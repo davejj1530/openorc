@@ -603,6 +603,7 @@ export class ThreadService {
       branch: parent.branch,
       worktreePath: parent.worktreePath,
       baseSha: parent.baseSha,
+      baseBranch: parent.baseBranch,
       seenAt: Date.now(),
     });
     audit.record(this.db, { actor: "user", action: "thread.fork", resourceType: "thread", resourceId: thread.id, metadata: { from: parent.id, at: at?.id ?? null } });

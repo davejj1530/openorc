@@ -3,7 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { chmod, lstat, mkdir, mkdtemp, readFile, readdir, readlink, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { commandExitCode, GitError } from "./exec.js";
+import { commandExitCode, GitError, WITHOUT_HOOKS } from "./exec.js";
 import type { BigIntStats } from "node:fs";
 
 export interface TeamTreeEntry {
@@ -377,7 +377,7 @@ async function createWorktree(cwd: string, target: string, headSha: string, tree
   const entries = await listTree(cwd, treeSha);
   if (await fileState(target)) throw new Error("Team worktree destination must not already exist.");
   await mkdir(path.dirname(target), { recursive: true });
-  await command(cwd, ["-c", "core.hooksPath=/dev/null", "worktree", "add", "--detach", "--no-checkout", target, headSha]);
+  await command(cwd, [...WITHOUT_HOOKS, "worktree", "add", "--detach", "--no-checkout", target, headSha]);
   // This is the new worktree's own index, never the source index.
   await command(target, ["read-tree", headSha]);
   await writeEntries(cwd, target, entries);

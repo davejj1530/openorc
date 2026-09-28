@@ -2,6 +2,7 @@ import {
   harnessName,
   isHarnessId,
   type ModelOption,
+  type PullRequestBranches,
   type PullRequestDraftComment,
   type PullRequestFilter,
   type PullRequestReviewAuthor,
@@ -112,4 +113,14 @@ export function writeReviewAuthor(author: PullRequestReviewAuthor): void {
   } catch {
     // The choice then lasts for this session only.
   }
+}
+
+/**
+ * The branch a new pull request targets until you choose another: the one its work started from, else the project's
+ * default branch, else GitHub's. Once GitHub's branches are known, only one of those; never the branch it opens from.
+ */
+export function pullRequestTarget(options: { started: string | null; projectDefault: string | null; head: string | null; branches: PullRequestBranches | undefined }): string | null {
+  const { started, projectDefault, head, branches } = options;
+  const candidates = [started, projectDefault, branches?.defaultBranch ?? null];
+  return candidates.find((branch): branch is string => branch !== null && branch !== head && (!branches || branches.branches.includes(branch))) ?? null;
 }

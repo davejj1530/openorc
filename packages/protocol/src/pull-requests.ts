@@ -100,6 +100,22 @@ export interface ReviewerAppStatus {
   error: string | null;
 }
 
+/** The branches of the repository gh opens pull requests in, as a new pull request's target picker lists them. */
+export interface PullRequestBranches {
+  /** GitHub's default branch first, then the rest by name. A long list stops after the first thousand. */
+  branches: string[];
+  defaultBranch: string | null;
+}
+
+/** Whether Git accepts `name` as a branch, following `git check-ref-format --branch`. */
+function isBranchName(name: string): boolean {
+  if (name === "@" || name.startsWith("-") || name.startsWith("/") || name.endsWith("/") || name.endsWith(".")) return false;
+  if (/[\s~^:?*[\\\p{Cc}]|\.\.|@\{|\/\//u.test(name)) return false;
+  return name.split("/").every((part) => !part.startsWith(".") && !part.endsWith(".lock"));
+}
+
+export const BranchName = z.string().min(1).max(255).refine(isBranchName, "Not a branch name.");
+
 const PullRequestRef = { projectId: z.string().min(1), number: z.number().int().positive() };
 const CommitId = z.string().regex(/^[0-9a-f]{40}$/);
 const Side = z.enum(["old", "new"]);
@@ -107,8 +123,10 @@ const REVIEW_TEXT_LIMIT = 65_536;
 
 export const pullRequestRpcParams = {
   "pulls.list": z.object({ projectId: z.string().min(1), filter: PullRequestFilter }).strict(),
+  /** The branches a new pull request can target, with `prefer` among them when GitHub has it. */
+  "pulls.branches": z.object({ projectId: z.string().min(1), prefer: BranchName.optional() }).strict(),
   "pulls.get": z.object(PullRequestRef).strict(),
-  /** The pull request's changes as one unified diff, as GitHub shows them. */
+  /** The pull request's changes as one unified diff, as GitHub shows them, and the head commit they are for. */
   "pulls.diff": z.object(PullRequestRef).strict(),
   /** The local draft review, or null when there is none. */
   "pulls.review.get": z.object(PullRequestRef).strict(),
@@ -147,8 +165,9 @@ export const pullRequestRpcParams = {
 
 export interface PullRequestRpcResults {
   "pulls.list": PullRequestSummary[];
+  "pulls.branches": PullRequestBranches;
   "pulls.get": PullRequestDetail;
-  "pulls.diff": { patch: string };
+  "pulls.diff": { patch: string; headSha: string };
   "pulls.review.get": PullRequestReview | null;
   "pulls.review.comment": PullRequestDraftComment;
   "pulls.review.editComment": PullRequestDraftComment;

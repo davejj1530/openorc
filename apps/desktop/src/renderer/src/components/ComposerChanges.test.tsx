@@ -34,6 +34,7 @@ const thread: ThreadSummary = {
   branch: "feature/composer",
   worktreePath: "/worktree",
   baseSha: "base",
+  baseBranch: null,
   pinnedAt: null,
   seenAt: null,
   doneAt: null,

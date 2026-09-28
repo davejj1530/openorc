@@ -758,4 +758,6 @@ export const migrations: Migration[] = [
   /** Removing a project from navigation preserves its files and historical records. */
   `ALTER TABLE projects ADD COLUMN removed_at INTEGER;`,
   pullRequestReviewMigration,
+  /** The branch a thread's worktree started from: its pull request targets it unless the user picks another. */
+  `ALTER TABLE threads ADD COLUMN base_branch TEXT;`,
 ];

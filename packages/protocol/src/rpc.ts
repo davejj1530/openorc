@@ -6,7 +6,7 @@ import { BranchLoss, type ChangePreview, type RemovalImpact } from "./workspace-
 import { z } from "zod";
 import type { AgentUpdates } from "./agent-updates.js";
 import { slackRpcParams, type SlackStatus } from "./slack.js";
-import { pullRequestRpcParams, type PullRequestRpcResults } from "./pull-requests.js";
+import { BranchName, pullRequestRpcParams, type PullRequestRpcResults } from "./pull-requests.js";
 import { HarnessId, type HarnessInfo } from "./harness.js";
 import { AgentEvent, AgentKind, ApprovalDecision, Frame } from "./events.js";
 import type { McpAppOpenResult } from "./mcp-apps.js";
@@ -350,11 +350,16 @@ export const rpcParams = {
   /** Uncommitted changes in the project root, where threads work. */
   "review.projectDiff": z.object({ projectId: z.string() }),
   "review.commitProject": z.object({ projectId: z.string(), message: z.string().min(1) }),
+  /** The checkout's recent commits and what Push would publish from its branch, whoever committed there. */
+  "git.projectLog": z.object({ projectId: z.string(), limit: z.number().int().positive().max(200).optional() }),
+  "git.projectPushState": z.object({ projectId: z.string() }),
+  "review.pushProject": z.object({ projectId: z.string() }),
   /** What a thread changed in its workspace: the checkout against HEAD, or its worktree against its base. */
   "review.threadDiff": z.object({ threadId: z.string(), comparison: z.enum(["base", "head"]).optional() }),
   "review.commitThread": z.object({ threadId: z.string(), message: z.string().min(1) }),
   "review.pushThread": z.object({ threadId: z.string() }),
-  "review.createThreadPr": z.object({ threadId: z.string(), title: z.string().min(1), body: z.string() }),
+  /** Opens a pull request from the thread's branch into `base`. */
+  "review.createThreadPr": z.object({ threadId: z.string(), title: z.string().min(1), body: z.string(), base: BranchName }),
   "git.threadLog": z.object({ threadId: z.string(), limit: z.number().int().positive().max(200).optional() }),
   /** Which branch Push would publish from the thread's workspace and which commits origin lacks. Local refs only; never fetches. */
   "git.threadPushState": z.object({ threadId: z.string() }),
@@ -427,7 +432,7 @@ export const rpcParams = {
   /** Lossless patch of the task's workspace against its base, written under the app data directory. */
   "review.exportPatch": z.object({ taskId: z.string() }),
   "review.push": z.object({ taskId: z.string() }),
-  "review.createPr": z.object({ taskId: z.string(), title: z.string().min(1), body: z.string() }),
+  "review.createPr": z.object({ taskId: z.string(), title: z.string().min(1), body: z.string(), base: BranchName }),
   "git.log": z.object({ taskId: z.string(), limit: z.number().int().positive().max(200).optional() }),
   "agents.models": z.object({ agent: AgentKind.optional() }),
   "agents.modelCatalog": z.object({ agent: HarnessId.optional() }),
@@ -697,6 +702,9 @@ export interface RpcResults extends PullRequestRpcResults {
   "review.diff": ReviewDiff;
   "review.projectDiff": ReviewDiff;
   "review.commitProject": { sha: string };
+  "git.projectLog": Commit[];
+  "git.projectPushState": PushState;
+  "review.pushProject": { remote: string; branch: string };
   "review.snapshots": Snapshot[];
   "review.markReviewed": Task;
   "review.comments.list": ReviewComment[];

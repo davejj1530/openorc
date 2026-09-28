@@ -275,7 +275,9 @@ export class WorkspaceService {
         this.assertOpen();
         await this.warnAboutHusky(worktreePath, project);
         this.assertOpen();
-        const updated = threads.update(this.db, thread.id, { worktreePath, branch, baseSha: thread.baseSha ?? startPoint, workspaceMode: "worktree" });
+        const baseBranch = thread.baseBranch ?? (await this.startBranch(project, base));
+        this.assertOpen();
+        const updated = threads.update(this.db, thread.id, { worktreePath, branch, baseSha: thread.baseSha ?? startPoint, baseBranch, workspaceMode: "worktree" });
         audit.record(this.db, { actor: "openorc", action: "workspace.create", resourceType: "thread", resourceId: thread.id, metadata: { worktreePath, branch, baseSha: startPoint } });
         if (project.settings.setupScript) await this.runSetup(project, { worktreePath, id: thread.id });
         this.assertOpen();
@@ -413,6 +415,12 @@ export class WorkspaceService {
   }
 
   /** Fetches the base from origin when it is a branch there, so tasks start from what the team sees. */
+  /** The branch a worktree starts from by name, `HEAD` being whatever the checkout is on. Null for a commit or a detached checkout. */
+  private async startBranch(project: Project, baseRef: string): Promise<string | null> {
+    if (baseRef !== "HEAD") return /^[0-9a-f]{40,64}$/.test(baseRef) ? null : baseRef;
+    return (await git(project.rootPath, ["symbolic-ref", "--short", "-q", "HEAD"], { okCodes: [0, 1] })).stdout.trim() || null;
+  }
+
   private async resolveStartPoint(project: Project, baseRef: string): Promise<string> {
     this.assertOpen();
     await assertCanBranch(project);

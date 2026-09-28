@@ -92,17 +92,55 @@ it("refuses a pull request until the checkout's branch is on origin with every c
   const createPr = vi.spyOn(gitTools, "createPr").mockResolvedValue("https://example.invalid/pull/1");
   const thread = threads.insert(core.db, { projectId: project.id, title: "Checkout", agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
   await git(root, ["switch", "-q", "-c", "fix/counter"]);
-  await expect(call("review.createThreadPr", { threadId: thread.id, title: "Fix", body: "" })).rejects.toThrow("This repository has no origin remote to open a pull request from.");
+  await expect(call("review.createThreadPr", { threadId: thread.id, title: "Fix", body: "", base: "main" })).rejects.toThrow("This repository has no origin remote to open a pull request from.");
 
   await addOrigin();
-  await expect(call("review.createThreadPr", { threadId: thread.id, title: "Fix", body: "" })).rejects.toThrow("Push fix/counter to origin before opening its pull request.");
+  await expect(call("review.createThreadPr", { threadId: thread.id, title: "Fix", body: "", base: "main" })).rejects.toThrow("Push fix/counter to origin before opening its pull request.");
   await call("review.pushThread", { threadId: thread.id });
   await writeFile(path.join(root, "README.md"), "Fixed\n");
   await commitAll(root, "fix: counter");
-  await expect(call("review.createThreadPr", { threadId: thread.id, title: "Fix", body: "" })).rejects.toThrow("Push the commit on fix/counter before opening its pull request.");
+  await expect(call("review.createThreadPr", { threadId: thread.id, title: "Fix", body: "", base: "main" })).rejects.toThrow("Push the commit on fix/counter before opening its pull request.");
   expect(createPr).not.toHaveBeenCalled();
 
   await call("review.pushThread", { threadId: thread.id });
-  expect(await call("review.createThreadPr", { threadId: thread.id, title: "Fix", body: "" })).toEqual({ url: "https://example.invalid/pull/1" });
+  expect(await call("review.createThreadPr", { threadId: thread.id, title: "Fix", body: "", base: "main" })).toEqual({ url: "https://example.invalid/pull/1" });
   expect(createPr).toHaveBeenCalledWith(await realpath(root), { title: "Fix", body: "", base: "main", head: "fix/counter" });
+});
+
+it("opens the pull request into the target the user chose, and says so when GitHub no longer has it", async () => {
+  vi.spyOn(gitTools, "hasGh").mockResolvedValue(true);
+  const createPr = vi.spyOn(gitTools, "createPr").mockResolvedValue("https://example.invalid/pull/2");
+  const hasBranch = vi.spyOn(gitTools.GitHubPulls.prototype, "hasBranch").mockResolvedValue(false);
+  const thread = threads.insert(core.db, { projectId: project.id, title: "Checkout", agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
+  await addOrigin();
+  await git(root, ["switch", "-q", "-c", "fix/counter"]);
+  await call("review.pushThread", { threadId: thread.id });
+
+  expect(await call("review.createThreadPr", { threadId: thread.id, title: "Fix", body: "", base: "dev" })).toEqual({ url: "https://example.invalid/pull/2" });
+  expect(createPr).toHaveBeenCalledWith(await realpath(root), { title: "Fix", body: "", base: "dev", head: "fix/counter" });
+  expect(hasBranch).not.toHaveBeenCalled();
+
+  createPr.mockRejectedValue(new Error("gh pr create failed: GraphQL: Base ref must be a branch (createPullRequest)"));
+  await expect(call("review.createThreadPr", { threadId: thread.id, title: "Fix", body: "", base: "release/9" })).rejects.toThrow("release/9 isn't a branch on GitHub. Choose another target branch.");
+  hasBranch.mockResolvedValue(true);
+  await expect(call("review.createThreadPr", { threadId: thread.id, title: "Fix", body: "", base: "dev" })).rejects.toThrow("gh pr create failed");
+  await expect(call("review.createThreadPr", { threadId: thread.id, title: "Fix", body: "", base: "no good" })).rejects.toThrow("Not a branch name.");
+});
+
+it("pushes the checkout's branch outside any conversation, after committing it from a new thread's Changes", async () => {
+  await addOrigin();
+  await git(root, ["switch", "-q", "-c", "feat/bots"]);
+  await call("review.pushProject", { projectId: project.id });
+  await writeFile(path.join(root, "README.md"), "Mentions skip the check\n");
+  const { sha } = await call("review.commitProject", { projectId: project.id, message: "fix: mentions skip the check" });
+
+  expect((await call("git.projectLog", { projectId: project.id }))[0]).toMatchObject({ sha, subject: "fix: mentions skip the check" });
+  expect(await call("git.projectPushState", { projectId: project.id })).toEqual({ branch: "feat/bots", blocked: null, published: true, unpushedCount: 1, unpushed: [sha] });
+  expect(await call("review.pushProject", { projectId: project.id })).toEqual({ remote: "origin", branch: "feat/bots" });
+  expect(await call("git.projectPushState", { projectId: project.id })).toEqual({ branch: "feat/bots", blocked: null, published: true, unpushedCount: 0, unpushed: [] });
+  expect((await git(root, ["ls-remote", "origin", "refs/heads/feat/bots"])).stdout.split(/\s/)[0]).toBe(sha);
+
+  await git(root, ["switch", "-q", "--detach"]);
+  expect(await call("git.projectPushState", { projectId: project.id })).toMatchObject({ branch: null, blocked: "The checkout isn't on a branch." });
+  await expect(call("review.pushProject", { projectId: project.id })).rejects.toThrow("The checkout isn't on a branch.");
 });

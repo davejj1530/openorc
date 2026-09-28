@@ -94,6 +94,7 @@ beforeEach(() => {
     if (method === "review.comments.list") return comments as RpcResults[M];
     if (method === "system.info") return { gh: { installed: true, path: "/fixture/gh" } } as RpcResults[M];
     if (method === "orchestration.review.send") return { admissionId: "accepted", task: team } as RpcResults[M];
+    if (method === "pulls.branches") return { branches: ["main", "release", "assignment"], defaultBranch: "main" } as RpcResults[M];
     throw new Error(`Unexpected RPC ${method}`);
   });
 });
@@ -133,8 +134,13 @@ it("keeps unsent selections and dialog drafts through commit, push and PR errors
   fireEvent.click(screen.getByRole("button", { name: "PR" }));
   const prDialog = await screen.findByRole("dialog", { name: "Open a pull request" });
   fireEvent.change(within(prDialog).getByLabelText("Title"), { target: { value: "Draft PR title" } });
+  // An assignment starts from a commit, so its pull request targets the default branch.
+  const target = within(prDialog).getByRole<HTMLButtonElement>("combobox", { name: "Target branch" });
+  await waitFor(() => expect(target.disabled).toBe(false));
+  expect(target.textContent).toBe("main");
   fireEvent.click(within(prDialog).getByRole("button", { name: "Create" }));
   expect(await within(prDialog).findByText("PR rejected")).toBeTruthy();
+  expect(core.call).toHaveBeenCalledWith("review.createPr", expect.objectContaining({ taskId: task.id, title: "Draft PR title", base: "main" }));
   expect(within(prDialog).getByLabelText("Title")).toHaveProperty("value", "Draft PR title");
   fireEvent.click(within(prDialog).getByRole("button", { name: "Cancel" }));
   expect(screen.getByRole("checkbox", { name: /Keep this selection/ })).toHaveProperty("checked", true);

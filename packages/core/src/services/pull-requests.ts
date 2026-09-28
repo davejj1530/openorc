@@ -12,6 +12,7 @@ import {
   type CommentAnchor,
   type ModelExecutionSettings,
   type Project,
+  type PullRequestBranches,
   type PullRequestDetail,
   type PullRequestDraftComment,
   type PullRequestFilter,
@@ -140,12 +141,17 @@ export class PullRequestService {
     return this.github.list(await this.repository(projectId), filter);
   }
 
+  /** The branches a new pull request can target, with `prefer` among them when GitHub has it. */
+  async branches(projectId: string, prefer?: string): Promise<PullRequestBranches> {
+    return this.github.branches(await this.repository(projectId), prefer);
+  }
+
   async get(key: PullReviewKey): Promise<PullRequestDetail> {
     return this.github.get(await this.repository(key.projectId), key.number);
   }
 
-  async diff(key: PullReviewKey): Promise<{ patch: string }> {
-    return { patch: await this.github.diff(await this.repository(key.projectId), key.number) };
+  async diff(key: PullReviewKey): Promise<{ patch: string; headSha: string }> {
+    return this.github.diff(await this.repository(key.projectId), key.number);
   }
 
   review(key: PullReviewKey): PullRequestReview | null {
@@ -177,13 +183,13 @@ export class PullRequestService {
     this.changed();
   }
 
+  /** Saves the draft's summary. A draft without comments moves to `commitId`, the head the summary was written about. */
   setSummary(key: PullReviewKey, commitId: string, summary: string): void {
     this.project(key.projectId);
     this.db.transaction(() => {
-      if (!pullReviews.get(this.db, key)) {
-        if (!summary.trim()) return;
-        pullReviews.open(this.db, key, commitId);
-      }
+      const review = pullReviews.get(this.db, key);
+      if (!review && !summary.trim()) return;
+      if (!this.staleReason(review, commitId)) this.draftAt(key, commitId);
       pullReviews.update(this.db, key, { summary });
     });
     this.changed();
@@ -275,7 +281,10 @@ export class PullRequestService {
     return { threadId: conversation.id };
   }
 
-  /** Posts the draft as one review, as the user through gh or as their reviewer app, then empties it. The conversation stays for the next round. */
+  /**
+   * Posts the draft as one review, as the user through gh or as their reviewer app, then removes what it carried.
+   * Edits made while it posted stay in the draft. The conversation stays for the next round.
+   */
   async submit(key: PullReviewKey, input: { event: PullRequestReviewEvent; summary: string; as: PullRequestReviewAuthor }): Promise<{ url: string | null }> {
     const { event, summary } = input;
     const project = this.project(key.projectId);
@@ -285,13 +294,15 @@ export class PullRequestService {
     const comments = review?.comments ?? [];
     if (event !== "approve" && !summary.trim() && comments.length === 0) throw new Error("Write a summary or add a comment before posting.");
     const detail = await this.github.get(project.rootPath, key.number);
-    const submission = { commitId: review?.commitId ?? detail.headSha, event, body: summary, comments };
+    // Comments post against the commit they were written on; a review without any is about the head as it is now.
+    const commitId = review && comments.length > 0 ? review.commitId : detail.headSha;
+    const submission = { commitId, event, body: summary, comments };
     const posted =
       input.as === "app"
         ? await this.options.reviewerApp.submitReview(detail.url, { ...submission, body: await this.signed(review, summary) })
         : await this.github.submitReview(project.rootPath, detail.url, submission);
     this.db.transaction(() => {
-      pullReviews.clearDraft(this.db, key);
+      if (review) pullReviews.clearPosted(this.db, key, review);
       audit.record(this.db, {
         actor: "user",
         action: "pull_request.review",
@@ -397,7 +408,8 @@ export class PullRequestService {
     const key = `${project.id}:${base}:${head}`;
     let diff = this.diffs.get(key);
     if (!diff) {
-      diff = git(project.rootPath, ["diff", "--no-color", "--no-ext-diff", "-M", base, head]).then((result) => result.stdout);
+      // The a/ and b/ prefixes are what patchFiles reads names by, whatever the user's diff.noprefix says.
+      diff = git(project.rootPath, ["diff", "--no-color", "--no-ext-diff", "-M", "--src-prefix=a/", "--dst-prefix=b/", base, head]).then((result) => result.stdout);
       diff.catch(() => this.diffs.delete(key));
       this.diffs.set(key, diff);
       if (this.diffs.size > CACHED_DIFFS) this.diffs.delete(this.diffs.keys().next().value!);
@@ -408,8 +420,8 @@ export class PullRequestService {
   /** Why the draft cannot move to `commitId`; null when it can. Comments stay on the commit they were written against. */
   private staleReason(review: PullRequestReview | null, commitId: string): string | null {
     if (!review || review.commitId === commitId) return null;
-    if (review.comments.length > 0) return `Your draft is for an earlier version of this pull request (${review.commitId.slice(0, 7)}). Post or discard it first.`;
-    if (review.threadId && this.options.runs.threadActivity(review.threadId) !== "idle") return "A model is still reviewing the earlier version of this pull request.";
+    if (review.comments.length > 0) return `Your draft is for a different version of this pull request (${review.commitId.slice(0, 7)}). Post or discard it first.`;
+    if (review.threadId && this.options.runs.threadActivity(review.threadId) !== "idle") return "A model is still reviewing a different version of this pull request.";
     return null;
   }
 

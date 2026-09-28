@@ -78,7 +78,15 @@ async function push(source: Awaited<ReturnType<typeof repository>>, content: str
 }
 
 function setup(
-  overrides: { activity?: "idle" | "running"; posted?: { args: string[]; input?: string }[]; startFails?: Error; repo?: Awaited<ReturnType<typeof repository>>; head?: () => string } = {},
+  overrides: {
+    activity?: "idle" | "running";
+    posted?: { args: string[]; input?: string }[];
+    /** Holds GitHub's answer to a posted review until it resolves. */
+    posting?: Promise<void>;
+    startFails?: Error;
+    repo?: Awaited<ReturnType<typeof repository>>;
+    head?: () => string;
+  } = {},
 ) {
   const source = overrides.repo ?? repo;
   const db = Db.memory();
@@ -89,6 +97,7 @@ function setup(
     if (args[0] === "api" && args[1] === "user") return "ada\n";
     if (args[0] === "api" && args[1] === "--method") {
       posted.push({ args, ...(input === undefined ? {} : { input }) });
+      await overrides.posting;
       return JSON.stringify({ html_url: `${url}#pullrequestreview-1` });
     }
     throw new GhError(`unexpected gh ${args.join(" ")}`);
@@ -146,7 +155,7 @@ describe("draft reviews", () => {
     const { service, key, invalidate } = setup();
     service.comment({ ...key, commitId: "a".repeat(40), ...yours });
     expect(invalidate).toHaveBeenCalledWith(["pull-reviews"]);
-    expect(() => service.comment({ ...key, commitId: "b".repeat(40), ...yours })).toThrow("Your draft is for an earlier version of this pull request (aaaaaaa). Post or discard it first.");
+    expect(() => service.comment({ ...key, commitId: "b".repeat(40), ...yours })).toThrow("Your draft is for a different version of this pull request (aaaaaaa). Post or discard it first.");
     const [comment] = service.review(key)!.comments;
     service.removeComment(key, comment!.id);
     // An empty draft follows the pull request to its new head.
@@ -190,6 +199,38 @@ describe("draft reviews", () => {
     service.comment({ ...key, commitId: repo.head, ...yours });
     await service.submit(key, { event: "comment", summary: "", as: "app" });
     expect(appPosts[0]!.review.body).toBe("");
+  });
+
+  it("keeps what changed in the draft while the review was posting", async () => {
+    const posted: { args: string[]; input?: string }[] = [];
+    let answer!: () => void;
+    const { service, key } = setup({ posted, posting: new Promise<void>((resolve) => (answer = resolve)) });
+    service.setSummary(key, repo.head, "Two small fixes.");
+    const edited = service.comment({ ...key, commitId: repo.head, ...yours });
+    service.comment({ ...key, commitId: repo.head, ...yours, body: "Posted as written." });
+    const submitting = service.submit(key, { event: "comment", summary: "Two small fixes.", as: "you" });
+    await vi.waitFor(() => expect(posted).toHaveLength(1));
+    service.editComment(key, edited.id, "Make this configurable, with a default of 3.");
+    service.comment({ ...key, commitId: repo.head, ...yours, body: "Added while posting." });
+    answer();
+    await submitting;
+    expect(JSON.parse(posted[0]!.input!).comments.map((comment: { body: string }) => comment.body)).toEqual(["Make this configurable.", "Posted as written."]);
+    expect(service.review(key)).toMatchObject({ summary: "", comments: [{ body: "Make this configurable, with a default of 3." }, { body: "Added while posting." }] });
+  });
+
+  it("posts a review without comments on the pull request's newest commit", async () => {
+    const posted: { args: string[]; input?: string }[] = [];
+    let head = repo.head;
+    const { service, key } = setup({ posted, head: () => head });
+    service.setSummary(key, head, "Looks close.");
+    await service.submit(key, { event: "comment", summary: "Looks close.", as: "you" });
+    head = "c".repeat(40);
+    await service.submit(key, { event: "approve", summary: "", as: "you" });
+    // The emptied draft follows a summary written about the newer commit.
+    service.setSummary(key, head, "Still good.");
+    expect(service.review(key)).toMatchObject({ commitId: head, summary: "Still good." });
+    await service.submit(key, { event: "comment", summary: "Still good.", as: "you" });
+    expect(posted.map((post) => JSON.parse(post.input!).commit_id)).toEqual([repo.head, head, head]);
   });
 
   it("refuses an empty review unless it approves", async () => {

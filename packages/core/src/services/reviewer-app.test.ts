@@ -25,10 +25,10 @@ afterEach(() => {
   for (const service of services.splice(0)) service.shutdown();
 });
 
-function setup(options: { exchange?: () => Response; secrets?: boolean } = {}) {
+function setup(options: { exchange?: () => Response | Promise<Response>; secrets?: boolean } = {}) {
   const saved: string[] = [];
   const secrets = { load: async () => saved.at(-1) ?? null, save: async (value: string) => void saved.push(value) };
-  const fetcher = vi.fn(async () => options.exchange?.() ?? new Response(JSON.stringify(created), { status: 201 })) as unknown as typeof fetch;
+  const fetcher = vi.fn(async () => (await options.exchange?.()) ?? new Response(JSON.stringify(created), { status: 201 })) as unknown as typeof fetch;
   const invalidate = vi.fn();
   const service = new ReviewerAppService(Db.memory(), {
     ...(options.secrets === false ? {} : { secrets }),
@@ -103,6 +103,27 @@ describe("reviewer app setup", () => {
     service.cancel();
     expect(service.status().setupUrl).toBeNull();
     await vi.waitFor(async () => expect(await get(url).catch(() => "closed")).toBe("closed"));
+  });
+
+  it("can still be cancelled while GitHub trades the code, and then keeps nothing", async () => {
+    let answer!: (response: Response) => void;
+    const exchange = new Promise<Response>((resolve) => (answer = resolve));
+    const { service, saved, fetcher } = setup({ exchange: () => exchange });
+    const { url } = await service.setup();
+    const back = `${new URL(url).origin}/reviewer-app/created?code=abc&state=${new URL(url).searchParams.get("state")}`;
+    const finishing = get(back);
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1));
+    expect(service.status().setupUrl).toBe(url);
+    // The code is traded once, however often the browser comes back.
+    expect((await get(back)).status).toBe(403);
+    service.cancel();
+    answer(new Response(JSON.stringify(created), { status: 201 }));
+    const page = await finishing;
+    expect(page.status).toBe(409);
+    expect(page.body).toContain('href="https://github.com/settings/apps/ada-reviewer"');
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(saved).toEqual([]);
+    expect(service.status()).toEqual({ app: null, setupUrl: null, error: null });
   });
 });
 

@@ -103,6 +103,44 @@ describe("GitHubPulls", () => {
     expect(await new GitHubPulls(gh).get("/repo", 7)).toMatchObject({ number: 7, body: "", headSha: "h".repeat(40), baseSha: "b".repeat(40), viewer: "ada" });
   });
 
+  it("reads the diff with the head it belongs to, again when a push lands in between", async () => {
+    const heads = ["a", "b", "b", "b"].map((letter) => JSON.stringify({ headRefOid: letter.repeat(40) }));
+    const patches = ["diff at a", "diff at b"];
+    const calls: string[] = [];
+    const gh: GhRunner = async (_cwd, args) => {
+      calls.push(args[1]!);
+      return args[1] === "view" ? heads.shift()! : patches.shift()!;
+    };
+    expect(await new GitHubPulls(gh).diff("/repo", 7)).toEqual({ patch: "diff at b", headSha: "b".repeat(40) });
+    expect(calls).toEqual(["view", "diff", "view", "view", "diff", "view"]);
+    const restless: GhRunner = async (_cwd, args) => (args[1] === "view" ? JSON.stringify({ headRefOid: String(calls.push("view")).padStart(40, "0") }) : "diff");
+    await expect(new GitHubPulls(restless).diff("/repo", 7)).rejects.toThrow("Pull request #7 kept changing while it loaded. Try again.");
+  });
+
+  it("lists the branches a pull request can target: the default, the preferred one, then the rest by name", async () => {
+    const page = (nodes: string[], endCursor: string | null, extra: Record<string, unknown> = {}) =>
+      JSON.stringify({
+        data: { repository: { defaultBranchRef: { name: "main" }, ...extra, refs: { nodes: nodes.map((name) => ({ name })), pageInfo: { hasNextPage: endCursor !== null, endCursor } } } },
+      });
+    const pages = [page(["alpha", "dev", "main"], "cursor-1", { preferred: { name: "dev" } }), page(["zeta"], null)];
+    const calls: string[][] = [];
+    const gh: GhRunner = async (_cwd, args) => {
+      calls.push(args);
+      return pages.shift()!;
+    };
+    expect(await new GitHubPulls(gh).branches("/repo", "dev")).toEqual({ branches: ["main", "dev", "alpha", "zeta"], defaultBranch: "main" });
+    expect(calls[0]).toEqual(expect.arrayContaining(["owner={owner}", "repo={repo}", "prefer=refs/heads/dev", "checkPrefer=true"]));
+    expect(calls[0]!.some((arg) => arg.startsWith("after="))).toBe(false);
+    expect(calls[1]).toEqual(expect.arrayContaining(["checkPrefer=false", "after=cursor-1"]));
+  });
+
+  it("tells a missing branch from a failure to check", async () => {
+    const pulls = (answer: string | GhError) => new GitHubPulls(fakeGh({ [`api repos/{owner}/{repo}/branches/${encodeURIComponent("release/2.x")}`]: answer }).gh);
+    expect(await pulls("").hasBranch("/repo", "release/2.x")).toBe(true);
+    expect(await pulls(new GhError("gh: Branch not found (HTTP 404)")).hasBranch("/repo", "release/2.x")).toBe(false);
+    await expect(pulls(new GhError("To get started with GitHub CLI, please run:  gh auth login")).hasBranch("/repo", "release/2.x")).rejects.toThrow("Sign in to GitHub first");
+  });
+
   it("posts a review to the pull request's own repository", async () => {
     const { gh, calls } = fakeGh({ "api --method": JSON.stringify({ html_url: "https://github.com/acme/app/pull/7#pullrequestreview-1" }) });
     const posted = await new GitHubPulls(gh).submitReview("/repo", raw.url, { commitId: "c".repeat(40), event: "comment", body: "Looks close.", comments: [] });

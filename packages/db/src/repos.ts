@@ -4,6 +4,7 @@ import { WORKSPACE_ID } from "@openorc/protocol";
 import type { ReviewComment, Run, RunState, Snapshot, Task, TaskStatus, Thread, Usage } from "@openorc/protocol";
 import type { Db } from "./database.js";
 import { redact, redactJson } from "./redact.js";
+import { jaccard, normalizeTitle, wordSet } from "./task-similarity.js";
 
 const now = () => Date.now();
 
@@ -190,64 +191,6 @@ export const tasks = {
   },
 };
 
-function normalizeTitle(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-}
-
-const stopWords = new Set([
-  "the",
-  "a",
-  "an",
-  "and",
-  "or",
-  "to",
-  "of",
-  "in",
-  "on",
-  "for",
-  "with",
-  "it",
-  "is",
-  "be",
-  "that",
-  "this",
-  "as",
-  "by",
-  "at",
-  "from",
-  "so",
-  "we",
-  "you",
-  "should",
-  "add",
-  "make",
-  "use",
-]);
-
-/** Enough stemming to make "escaping" and "escape" the same word without a dictionary. */
-function stem(word: string): string {
-  return word.replace(/(ing|ed|es|s)$/, "");
-}
-
-function wordSet(text: string): Set<string> {
-  return new Set(
-    normalizeTitle(text)
-      .split(" ")
-      .filter((w) => w.length > 2 && !stopWords.has(w))
-      .map(stem),
-  );
-}
-
-function jaccard(a: Set<string>, b: Set<string>): number {
-  if (a.size === 0 || b.size === 0) return 0;
-  let both = 0;
-  for (const w of a) if (b.has(w)) both += 1;
-  return both / (a.size + b.size - both);
-}
-
 /* Threads */
 
 interface ThreadRow {
@@ -265,6 +208,7 @@ interface ThreadRow {
   branch: string | null;
   worktree_path: string | null;
   base_sha: string | null;
+  base_branch: string | null;
   pinned_at: number | null;
   seen_at: number | null;
   done_at: number | null;
@@ -297,6 +241,7 @@ function threadFromRow(r: ThreadRow): Thread {
     branch: r.branch,
     worktreePath: r.worktree_path,
     baseSha: r.base_sha,
+    baseBranch: r.base_branch,
     pinnedAt: r.pinned_at,
     seenAt: r.seen_at,
     doneAt: r.done_at,
@@ -327,6 +272,7 @@ export interface ThreadPatch {
   branch?: string | null;
   worktreePath?: string | null;
   baseSha?: string | null;
+  baseBranch?: string | null;
   pinnedAt?: number | null;
   seenAt?: number | null;
   doneAt?: number | null;
@@ -350,6 +296,7 @@ const threadColumns: Record<keyof ThreadPatch, string> = {
   branch: "branch",
   worktreePath: "worktree_path",
   baseSha: "base_sha",
+  baseBranch: "base_branch",
   pinnedAt: "pinned_at",
   seenAt: "seen_at",
   doneAt: "done_at",

@@ -34,6 +34,7 @@ const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
   "inbox.list": ["inbox", "tasks"],
   // GitHub's side of a pull request, and the draft review kept here.
   "pulls.list": ["pulls"],
+  "pulls.branches": ["pulls"],
   "pulls.get": ["pulls"],
   "pulls.diff": ["pulls"],
   "pulls.review.get": ["pull-reviews"],
@@ -93,9 +94,13 @@ export function tagsFor(method: RpcMethod, params: unknown): string[] {
       return [`runs:thread:${String(p["threadId"])}`];
     case "review.threadDiff":
       return ["workspace-diff", `threaddiff:${String(p["threadId"])}`, `thread:${String(p["threadId"])}`];
+    // A checkout's branch moves with commits and pushes made anywhere, so these refresh with workspace-diff too.
     case "git.threadLog":
     case "git.threadPushState":
-      return [`threadlog:${String(p["threadId"])}`, `thread:${String(p["threadId"])}`];
+      return ["workspace-diff", `threadlog:${String(p["threadId"])}`, `thread:${String(p["threadId"])}`];
+    case "git.projectLog":
+    case "git.projectPushState":
+      return ["workspace-diff", `projectlog:${String(p["projectId"])}`];
     case "tasks.get":
       return ["tasks", `task:${String(p["id"])}`];
     case "runs.listForTask":
@@ -231,6 +236,7 @@ export function invalidatesFor(method: RpcMethod, params: unknown): string[] {
     case "review.commitThread":
       return ["workspace-diff", `threaddiff:${String(p["threadId"])}`, `threadlog:${String(p["threadId"])}`, `thread:${String(p["threadId"])}`, "threads", "orchestration"];
     case "review.pushThread":
+      return ["workspace-diff", "threads", `thread:${String(p["threadId"])}`, `threaddiff:${String(p["threadId"])}`, `threadlog:${String(p["threadId"])}`];
     case "review.createThreadPr":
       return ["threads", `thread:${String(p["threadId"])}`, `threaddiff:${String(p["threadId"])}`, `threadlog:${String(p["threadId"])}`];
     case "schedules.create":
@@ -254,6 +260,8 @@ export function invalidatesFor(method: RpcMethod, params: unknown): string[] {
       return [...reviewCommentTags(p), "threads", `thread:${String(p["threadId"])}`, ...(p["taskId"] ? ["tasks", task] : [])];
     case "review.commitProject":
       return ["workspace-diff", `projectdiff:${String(p["projectId"])}`];
+    case "review.pushProject":
+      return ["workspace-diff", `projectlog:${String(p["projectId"])}`, "threads"];
     case "review.commit":
       return ["workspace-diff", `diff:${String(p["taskId"])}`, `log:${String(p["taskId"])}`, `snapshots:${String(p["taskId"])}`, task, "tasks"];
     case "review.push":

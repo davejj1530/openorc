@@ -1,7 +1,23 @@
 import { git } from "@openorc/git";
 import type { Project } from "@openorc/protocol";
-import { open, realpath } from "node:fs/promises";
-import { isAbsolute, relative, resolve, sep } from "node:path";
+import { glob, open, realpath } from "node:fs/promises";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { projectGit } from "./project-git.js";
+
+/** Folders a .gitignore usually hides; a folder without git has none, so they are skipped by name. */
+const UNLISTED = new Set(["node_modules", "bower_components", "vendor", "dist", "build", "out", "target", "coverage", "__pycache__", "venv"]);
+/** A folder without git can be as large as a home directory; @ mentions only need a useful start. */
+const MAX_FOLDER_FILES = 20_000;
+
+/** A folder's files without git: hidden entries and the folders above are skipped, as a .gitignore would. */
+async function folderFiles(root: string): Promise<string[]> {
+  const files: string[] = [];
+  for await (const entry of glob("**", { cwd: root, withFileTypes: true, exclude: (dirent) => dirent.name.startsWith(".") || UNLISTED.has(dirent.name) })) {
+    if (entry.isFile()) files.push(relative(root, join(entry.parentPath, entry.name)));
+    if (files.length >= MAX_FOLDER_FILES) break;
+  }
+  return files;
+}
 
 interface Listing {
   at: number;
@@ -79,8 +95,10 @@ export class FileService {
   private async list(project: Project): Promise<string[]> {
     const hit = this.cache.get(project.id);
     if (hit && Date.now() - hit.at < 30_000) return hit.files;
-    const out = (await git(project.rootPath, ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], { maxBuffer: 256 * 1024 * 1024 })).stdout;
-    const files = out.split("\0").filter(Boolean);
+    const files =
+      (await projectGit(project)) === "none"
+        ? await folderFiles(project.rootPath)
+        : (await git(project.rootPath, ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], { maxBuffer: 256 * 1024 * 1024 })).stdout.split("\0").filter(Boolean);
     this.cache.set(project.id, { at: Date.now(), files });
     return files;
   }

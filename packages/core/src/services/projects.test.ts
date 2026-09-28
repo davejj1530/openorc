@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -85,6 +85,26 @@ it("makes retries idempotent and audits removal and restoration once each", asyn
   await service.import(root);
   const actions = db.stmt("SELECT action FROM audit_events WHERE resource_id = ? ORDER BY id").all(project.id);
   expect(actions.map((entry) => entry.action)).toEqual(["project.import", "project.remove", "project.restore"]);
+});
+
+it("imports a plain folder and a repository without commits as they are", async () => {
+  const plain = path.join(dir, "plain");
+  await mkdir(plain);
+  expect(await service.import(plain)).toMatchObject({ name: "plain", rootPath: await realpath(plain), gitRemote: null, defaultBranch: null });
+  const fresh = path.join(dir, "fresh");
+  await mkdir(fresh);
+  await git(fresh, ["init", "-q", "-b", "main"]);
+  expect(await service.import(fresh)).toMatchObject({ name: "fresh", rootPath: await realpath(fresh), defaultBranch: null });
+  // A folder inside a repository still brings the whole repository.
+  await mkdir(path.join(root, "src"));
+  expect(await service.import(path.join(root, "src"))).toMatchObject({ rootPath: await realpath(root) });
+  await expect(service.import(path.join(dir, "missing"))).rejects.toThrow("This folder does not exist or is unavailable.");
+  expect(
+    service
+      .list()
+      .map((project) => project.name)
+      .sort(),
+  ).toEqual(["fresh", "plain", "repo"]);
 });
 
 it("rejects Workspace and unknown IDs without changing the visible list", async () => {

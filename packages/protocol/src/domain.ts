@@ -42,6 +42,10 @@ export const Project = z.object({
 });
 export type Project = z.infer<typeof Project>;
 
+/** What git offers a project's folder right now: nothing, change tracking before the first commit, or everything. */
+export const ProjectGit = z.enum(["none", "no_commits", "ready"]);
+export type ProjectGit = z.infer<typeof ProjectGit>;
+
 export const WorkspaceMode = z.enum(["worktree", "current"]);
 export type WorkspaceMode = z.infer<typeof WorkspaceMode>;
 

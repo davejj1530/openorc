@@ -1,6 +1,6 @@
 import { normalizeModelSettings } from "@openorc/protocol";
-import { ModelExecutionSettings, type AgentKind, type ExecutionTarget, type Schedule, type TeamRevision } from "@openorc/protocol";
-import type { ModelChoice } from "../components/ModelPicker";
+import { ModelExecutionSettings, type AgentKind, type ExecutionTarget, type RpcResults, type Schedule, type TeamRevision } from "@openorc/protocol";
+import type { ModelChoice, TeamPickerChoices } from "../components/ModelPicker";
 
 export type ScheduleTarget =
   | { kind: "unselected" }
@@ -38,7 +38,14 @@ export function scheduleTargetSettings(target: ScheduleTarget, selected: ModelCh
 }
 
 /** Report compatibility without replacing a saved model or pinned team revision. */
-export function scheduleDraftIssue(project: string, availableProjects: readonly string[] | undefined, target: ScheduleTarget, archived: boolean, retainedTeam: boolean) {
+export function scheduleDraftIssue(
+  project: string,
+  availableProjects: readonly string[] | undefined,
+  target: ScheduleTarget,
+  archived: boolean,
+  retainedTeam: boolean,
+  teamBlocker: string | null = null,
+) {
   let projectIssue: string | null = null;
   if (!project) projectIssue = "Choose a project.";
   else if (availableProjects && !availableProjects.includes(project)) projectIssue = "This project is unavailable. Choose an available project.";
@@ -46,6 +53,7 @@ export function scheduleDraftIssue(project: string, availableProjects: readonly 
   let targetIssue: string | null = null;
   if (target.kind === "team" && target.projectId !== project) targetIssue = "The selected team belongs to another project. Choose a team for this project or select a model.";
   else if (archived && !retainedTeam) targetIssue = "The selected team was archived. Restore it or choose another target.";
+  else if (target.kind === "team" && teamBlocker) targetIssue = teamBlocker;
   else if (target.kind === "unselected") targetIssue = "Choose a model or saved team.";
   return { projectIssue, targetIssue };
 }
@@ -100,4 +108,37 @@ export function finishScheduleTrigger(id: string, requestKey: string): boolean {
   } catch {
     return false;
   }
+}
+
+/** The saved teams a schedule can pick. In a project that can't run teams yet, each one says why. */
+export function scheduleTeamChoices(input: {
+  teams: { data: RpcResults["orchestration.list"] | undefined; isError: boolean; isPending: boolean };
+  target: ScheduleTarget;
+  teamBlocker: string | null;
+  onSelect: (revision: TeamRevision) => void;
+  retry: () => void;
+}): TeamPickerChoices {
+  const { teams, target } = input;
+  const active = (teams.data ?? []).filter((item) => item.team.archivedAt === null);
+  let status: string | null = input.teamBlocker;
+  if (teams.isError) status = "Saved teams could not load. The current selection is kept.";
+  else if (teams.isPending) status = "Loading teams…";
+  else if (active.length === 0) status = "No active teams in this project.";
+  return {
+    options: active.map((item) => ({
+      teamId: item.team.id,
+      revisionId: item.revision.id,
+      name: item.revision.name,
+      revision: item.revision.number,
+      memberCount: item.revision.members.length,
+      disabledReason: input.teamBlocker,
+    })),
+    ...(target.kind === "team" ? { selectedRevisionId: target.target.teamRevisionId, selectedLabel: target.revision?.name ?? "Saved team" } : {}),
+    onSelect: (id) => {
+      const selected = teams.data?.find((item) => item.revision.id === id);
+      if (selected) input.onSelect(selected.revision);
+    },
+    status,
+    ...(teams.isError ? { action: { label: "Retry team list", onSelect: input.retry } } : {}),
+  };
 }

@@ -7,6 +7,7 @@ import { stopProcess, waitForProcessGroup } from "@openorc/agents";
 import { diskUsage, fetch, git, repoInfo, revParse, worktree } from "@openorc/git";
 import { WORKSPACE_ID, type BranchLoss, type Project, type RemovalImpact, type Task, type Thread } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
+import { assertCanBranch, projectGit } from "./project-git.js";
 import { assertSafeParentPath } from "./safe-parent-path.js";
 import { workspaceWriters, type WorkspaceLease, type WorkspaceWriters } from "./workspace-writers.js";
 
@@ -25,6 +26,11 @@ export function assertLossAccepted(loss: RemovalImpact, accepted: BranchLoss | u
     loss.commits ? `${plural(loss.commits, "commit")} that no other branch, remote or tag has` : null,
   ].filter(Boolean);
   throw new Error(`Deleting branch ${loss.branch} would delete ${parts.join(" and ")}. Confirm to delete them, or keep the branch.`);
+}
+
+/** Where work in the project folder starts: HEAD and its branch, or nothing to record for a folder without git. */
+async function checkoutStart(project: Project): Promise<{ headSha: string | null; branch: string | null }> {
+  return (await projectGit(project)) === "none" ? { headSha: null, branch: null } : repoInfo(project.rootPath);
 }
 
 export function slugify(title: string): string {
@@ -164,7 +170,7 @@ export class WorkspaceService {
       async () => {
         this.assertOpen();
         if (task.workspaceMode === "current") {
-          const info = await repoInfo(project.rootPath);
+          const info = await checkoutStart(project);
           this.assertOpen();
           return tasks.update(this.db, task.id, { baseSha: info.headSha, baseRef: info.branch ?? task.baseRef, branch: info.branch });
         }
@@ -177,7 +183,7 @@ export class WorkspaceService {
         this.assertOpen();
 
         const baseRef = task.baseRef ?? project.defaultBranch ?? "HEAD";
-        const startPoint = await this.resolveStartPoint(project.rootPath, baseRef);
+        const startPoint = await this.resolveStartPoint(project, baseRef);
         this.assertOpen();
         this.log.info(`worktree for "${task.title}" at ${worktreePath} on ${branch} from ${baseRef} (${startPoint.slice(0, 8)})`);
         await worktree.add(project.rootPath, { path: worktreePath, branch, startPoint });
@@ -234,7 +240,7 @@ export class WorkspaceService {
       async () => {
         this.assertOpen();
         if (thread.workspaceMode === "current") {
-          const info = await repoInfo(project.rootPath);
+          const info = await checkoutStart(project);
           this.assertOpen();
           return threads.update(this.db, thread.id, { baseSha: info.headSha, branch: info.branch });
         }
@@ -244,7 +250,7 @@ export class WorkspaceService {
         await mkdir(path.dirname(worktreePath), { recursive: true });
         this.assertOpen();
         const base = baseRef ?? project.defaultBranch ?? "HEAD";
-        const startPoint = await this.resolveStartPoint(project.rootPath, base);
+        const startPoint = await this.resolveStartPoint(project, base);
         this.assertOpen();
         this.log.info(`worktree for thread "${thread.title}" at ${worktreePath} on ${branch} from ${base} (${startPoint.slice(0, 8)})`);
         await worktree.add(project.rootPath, { path: worktreePath, branch, startPoint });
@@ -393,8 +399,11 @@ export class WorkspaceService {
   }
 
   /** Fetches the base from origin when it is a branch there, so tasks start from what the team sees. */
-  private async resolveStartPoint(root: string, baseRef: string): Promise<string> {
+  private async resolveStartPoint(project: Project, baseRef: string): Promise<string> {
     this.assertOpen();
+    await assertCanBranch(project);
+    this.assertOpen();
+    const root = project.rootPath;
     if (baseRef === "HEAD") return revParse(root, "HEAD");
     const fetched = await fetch(root, "origin", baseRef);
     this.assertOpen();

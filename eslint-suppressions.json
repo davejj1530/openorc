@@ -42,11 +42,6 @@
       "count": 2
     }
   },
-  "apps/desktop/src/renderer/src/dialogs/ImportProjectDialog.tsx": {
-    "@typescript-eslint/no-misused-promises": {
-      "count": 1
-    }
-  },
   "apps/desktop/src/renderer/src/lib/autorun.ts": {
     "@typescript-eslint/no-misused-promises": {
       "count": 2
@@ -78,9 +73,6 @@
     }
   },
   "apps/desktop/src/renderer/src/views/NewThread.tsx": {
-    "@typescript-eslint/no-misused-promises": {
-      "count": 1
-    },
     "react-hooks/exhaustive-deps": {
       "count": 1
     }

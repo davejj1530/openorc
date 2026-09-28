@@ -15,7 +15,7 @@ import {
   type Db,
   type ThreadListFilter,
 } from "@openorc/db";
-import { diffStat, git, pinObject, switchFiles, teamTransfer, treeHash, unpinAll } from "@openorc/git";
+import { diffStat, git, pinObject, switchFiles, teamTransfer, treeHash } from "@openorc/git";
 import {
   WORKSPACE_ID,
   normalizeModelEffort,
@@ -42,7 +42,7 @@ import type { RunService } from "./runs.js";
 import type { WorkspaceService } from "./workspace.js";
 import { directory, executionProject } from "./workspace-home.js";
 import { workspaceWriters, type WorkspaceWriters } from "./workspace-writers.js";
-import { checkpointRefs } from "./checkpoint-refs.js";
+import { checkpointRefs, unpinProjectRefs } from "./checkpoint-refs.js";
 import { ThreadMoves, fileChanges } from "./thread-moves.js";
 import { ThreadMessageQueue } from "./thread-message-queue.js";
 import { ThreadTaskExecution } from "./thread-task-execution.js";
@@ -623,8 +623,7 @@ export class ThreadService {
 
       threads.delete(this.db, id);
       // Its checkpoints go with it; nothing else keeps their trees.
-      if (thread.projectId !== WORKSPACE_ID)
-        await unpinAll(project.rootPath, checkpointRefs(id)).catch((e: unknown) => this.log.warn(`checkpoint refs of thread ${id} were kept: ${e instanceof Error ? e.message : String(e)}`));
+      await unpinProjectRefs(project, checkpointRefs(id)).catch((e: unknown) => this.log.warn(`checkpoint refs of thread ${id} were kept: ${e instanceof Error ? e.message : String(e)}`));
       this.invalidate(["threads", "tasks", "inbox"]);
     });
   }

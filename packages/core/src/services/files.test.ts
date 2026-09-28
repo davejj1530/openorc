@@ -43,3 +43,20 @@ it("reports missing, folder, binary, non-UTF-8 and oversized files without sendi
   await writeFile(join(root, "large"), Buffer.alloc(2 * 1024 * 1024 + 1));
   await expect(files.read(root, "large")).rejects.toThrow("too large");
 });
+
+it("offers a folder's files without git, skipping hidden entries and dependency or build output", async () => {
+  for (const folder of ["src", ".cache", "node_modules/lib", "dist"]) await mkdir(join(root, folder), { recursive: true });
+  for (const file of ["plan.md", "src/app.ts", ".env", ".cache/entry", "node_modules/lib/index.js", "dist/app.js"]) await writeFile(join(root, file), "x");
+  const project = {
+    id: "plain",
+    name: "workspace",
+    rootPath: root,
+    gitRemote: null,
+    defaultBranch: null,
+    settings: { setupScript: null, worktreeInclude: [], branchPrefix: "openorc/", detectedConfigs: [] },
+    createdAt: 0,
+    updatedAt: 0,
+  };
+  expect((await files.search(project, "")).sort()).toEqual(["plan.md", "src/app.ts"]);
+  expect(await files.search(project, "app")).toEqual(["src/app.ts"]);
+});

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { mkdtempSync, rmSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -132,7 +133,12 @@ function complete(threadId: string) {
 beforeEach(() => {
   folder = mkdtempSync(path.join(os.tmpdir(), "openorc-scheduling-"));
   db = Db.open(path.join(folder, "data.sqlite"));
-  project = projects.insert(db, { name: "Scheduling fixture", rootPath: path.join(folder, "repository"), defaultBranch: "main", gitRemote: null, settings: {} });
+  // Teams branch from a commit, so the project is a repository with one.
+  const repository = path.join(folder, "repository");
+  mkdirSync(repository);
+  execFileSync("git", ["init", "-q", "-b", "main"], { cwd: repository });
+  execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-q", "--allow-empty", "-m", "init"], { cwd: repository });
+  project = projects.insert(db, { name: "Scheduling fixture", rootPath: repository, defaultBranch: "main", gitRemote: null, settings: {} });
   saved = orchestration.save(db, {
     projectId: project.id,
     expectedRevisionId: null,

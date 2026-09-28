@@ -3,12 +3,14 @@ import os from "node:os";
 import path from "node:path";
 import type { DiffStat } from "@openorc/protocol";
 import { git } from "./exec.js";
+import { headOrEmptyTree } from "./repo.js";
 
 /** A throwaway index must not write split-index files into .git or share the real index's fsmonitor and untracked caches. */
 const THROWAWAY_INDEX = ["-c", "core.splitIndex=false", "-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false"];
 
 /**
- * Runs `use` against a throwaway index holding HEAD plus every working-tree change, untracked files included.
+ * Runs `use` against a throwaway index holding HEAD (or nothing, before the first commit) plus every working-tree
+ * change, untracked files included.
  * The index starts as a copy of the real one, so unchanged files keep their cached stats and are not re-read.
  */
 async function withWorkingTreeIndex<T>(cwd: string, use: (run: (args: string[], okCodes?: number[]) => Promise<string>) => Promise<T>): Promise<T> {
@@ -16,9 +18,10 @@ async function withWorkingTreeIndex<T>(cwd: string, use: (run: (args: string[], 
   const indexFile = path.join(dir, "index");
   const run = async (args: string[], okCodes?: number[]) => (await git(cwd, [...THROWAWAY_INDEX, ...args], { env: { GIT_INDEX_FILE: indexFile }, ...(okCodes ? { okCodes } : {}) })).stdout;
   try {
-    if (!(await seedFromRealIndex(cwd, indexFile, run))) {
+    const head = await headOrEmptyTree(cwd);
+    if (!(await seedFromRealIndex(cwd, indexFile, run, head))) {
       await rm(indexFile, { force: true });
-      await run(["read-tree", "HEAD"]);
+      await run(["read-tree", head]);
     }
     await run(["add", "-A"]);
     return await use(run);
@@ -28,7 +31,7 @@ async function withWorkingTreeIndex<T>(cwd: string, use: (run: (args: string[], 
 }
 
 /** Copies the real index and resets it to `tree`. False when that index cannot be trusted as a stat cache. */
-async function seedFromRealIndex(cwd: string, indexFile: string, run: (args: string[]) => Promise<string>, tree = "HEAD"): Promise<boolean> {
+async function seedFromRealIndex(cwd: string, indexFile: string, run: (args: string[]) => Promise<string>, tree: string): Promise<boolean> {
   try {
     const realIndex = (await git(cwd, ["rev-parse", "--path-format=absolute", "--git-path", "index"])).stdout.trim();
     // Git re-reads files changed in the same second as the index. Staying below the real index's time keeps that check.
@@ -85,7 +88,7 @@ export function patchSinceTree(cwd: string, treeSha: string): Promise<string> {
 }
 
 export async function diffStat(cwd: string, baseSha: string | null): Promise<DiffStat> {
-  const base = baseSha ?? "HEAD";
+  const base = baseSha ?? (await headOrEmptyTree(cwd));
   const out = (await git(cwd, ["diff", "--shortstat", base], { okCodes: [0, 1] })).stdout;
   const files = Number(/(\d+) files? changed/.exec(out)?.[1] ?? 0);
   const insertions = Number(/(\d+) insertions?/.exec(out)?.[1] ?? 0);

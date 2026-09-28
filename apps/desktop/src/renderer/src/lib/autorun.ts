@@ -86,7 +86,7 @@ function installBench(): void {
   core.onReady(() => {
     beginBenchmarkFrames();
     setTimeout(async () => {
-      const { mainThread, ...frames } = finishBenchmarkFrames();
+      const { mainThread, ...frames } = await finishBenchmarkFrames();
       window.openorc.report({ kind: "idle", frames, mainThread, ...(await snapshot()) });
       beginBenchmarkFrames();
       await core.call("bench.start", BENCH);
@@ -98,6 +98,7 @@ function installBench(): void {
     requestAnimationFrame(() => {
       const measurement = finishBenchmarkFrames();
       setTimeout(async () => {
+        const measured = await measurement;
         const current = phase === "bench" ? BENCH : SCALE;
         const samples = useStats.getState().samples.slice(-Math.ceil(current.durationMs / 1000) - 1);
         window.openorc.report({
@@ -106,10 +107,10 @@ function installBench(): void {
           bench: current,
           sent: result,
           samples,
-          longFramesTotal: measurement.longFramesTotal,
-          longestFrameMs: measurement.longestFrameMs,
-          measurementDurationMs: measurement.durationMs,
-          mainThread: measurement.mainThread,
+          longFramesTotal: measured.longFramesTotal,
+          longestFrameMs: measured.longestFrameMs,
+          measurementDurationMs: measured.durationMs,
+          mainThread: measured.mainThread,
           ...(await snapshot()),
         });
         if (phase === "bench") {
@@ -161,7 +162,7 @@ function installThreadBench(): void {
     else await settle(idleMs);
     const sent = await done;
     await new Promise((resolve) => requestAnimationFrame(resolve));
-    const frames = finishBenchmarkFrames();
+    const frames = await finishBenchmarkFrames();
     sampling = false;
     perSecond.push(long);
     return { ...frames, perSecond, eventsSent: sent?.eventsSent ?? 0, cpu: await cpu() };

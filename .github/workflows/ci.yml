@@ -123,8 +123,11 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Verify benchmark measurement and budget checks
+        run: node --test scripts/benchmark-measurement.test.cjs scripts/check-benchmark.test.cjs
       # The benchmarks drive the app through its test switches, which only a QA build carries.
-      - run: pnpm --filter @openorc/desktop build
+      - id: build
+        run: pnpm --filter @openorc/desktop build
         env:
           OPENORC_QA_BUILD: "1"
       - name: Run the bench autorun and enforce budgets
@@ -134,52 +137,23 @@ jobs:
           OPENORC_AUTOQUIT: "1"
         run: |
           pnpm exec electron . 2>&1 | tee bench.log
-          node - <<'EOF'
-          const fs = require("fs");
-          const lines = fs.readFileSync("bench.log", "utf8").split("\n").filter((l) => l.startsWith("[report] "));
-          const reports = lines.map((l) => JSON.parse(l.slice("[report] ".length)));
-          const bench = reports.find((r) => r.kind === "bench");
-          const scale = reports.find((r) => r.kind === "scale");
-          if (!bench || !scale) { console.error("missing bench or scale report"); process.exit(1); }
-          // Working set overstates private memory on macOS; the 50-agent budget is a regression fence, not a footprint claim.
-          // Hosted display pacing affects rAF even at idle. Gate on independent 20 ms main-thread gaps;
-          // raw animation-frame counts remain in the reports for display/rendering diagnosis (docs/benchmarks.md).
-          const checks = [
-            ["bench", "coldStartMs", bench.coldStartMs, 1500],
-            ["bench", "mainThread.stallsTotal", bench.mainThread?.stallsTotal, 5],
-            ["scale", "mainThread.stallsTotal", scale.mainThread?.stallsTotal, 30],
-            ["scale", "workingSetTotalMb", scale.workingSetTotalMb, 1500],
-          ];
-          let failed = false;
-          for (const [phase, k, v, max] of checks) {
-            console.log(`${phase}.${k}: ${v} (budget ${max})`);
-            if (typeof v !== "number" || v > max) failed = true;
-          }
-          console.log(`bench: ${bench.sent.eventsSent} events in ${bench.sent.framesSent} frames; scale: ${scale.sent.eventsSent} events across 50 runs`);
-          process.exit(failed ? 1 : 0);
-          EOF
+          node ../../scripts/check-benchmark.cjs bridge bench.log
       - name: Run the large-thread autorun and enforce budgets
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         working-directory: apps/desktop
         env:
           OPENORC_AUTOBENCH_THREAD: "1"
           OPENORC_AUTOQUIT: "1"
         run: |
           pnpm exec electron . 2>&1 | tee thread-bench.log
-          node - <<'EOF'
-          const fs = require("fs");
-          const line = fs.readFileSync("thread-bench.log", "utf8").split("\n").find((l) => l.startsWith("[report] ") && l.includes('"thread-bench"'));
-          if (!line) { console.error("missing thread-bench report"); process.exit(1); }
-          const report = JSON.parse(line.slice("[report] ".length));
-          // A 119-turn thread stays open while its own run streams and while five unrelated runs stream.
-          const checks = [
-            ["openMs", report.openMs, 1500],
-            ["stream.mainThread.stallsTotal", report.stream?.mainThread?.stallsTotal, 60],
-            ["unrelated.mainThread.stallsTotal", report.unrelated?.mainThread?.stallsTotal, 10],
-          ];
-          let failed = report.ok === false;
-          for (const [k, v, max] of checks) {
-            console.log(`thread-bench.${k}: ${v} (budget ${max})`);
-            if (typeof v !== "number" || v > max) failed = true;
-          }
-          process.exit(failed ? 1 : 0);
-          EOF
+          node ../../scripts/check-benchmark.cjs thread thread-bench.log
+      - name: Upload benchmark reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-reports
+          path: |
+            apps/desktop/bench.log
+            apps/desktop/thread-bench.log
+          if-no-files-found: ignore
+          retention-days: 7

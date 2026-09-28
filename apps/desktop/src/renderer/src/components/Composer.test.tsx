@@ -334,6 +334,21 @@ describe("Stop delivery", () => {
   });
 });
 
+describe("mode picker", () => {
+  const offered = async () => (await screen.findAllByRole("menuitem")).map((item) => item.firstElementChild?.textContent);
+  it("offers Claude every mode", async () => {
+    mount({ model: { agent: "claude", model: "claude-opus-5-5", effort: null }, modelControl: <span /> });
+    fireEvent.click(screen.getByRole("button", { name: "Mode: Accept edits" }));
+    expect(await offered()).toEqual(["Plan", "Review everything", "Accept edits", "Autonomous"]);
+  });
+  it("offers OpenCode only the modes it can run, and still shows a saved one it cannot", async () => {
+    mount({ model: { agent: "opencode", model: "openai/gpt-5", effort: null }, modelControl: <span /> });
+    expect(screen.getByText("Mode unavailable")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Mode: Accept edits" }));
+    expect(await offered()).toEqual(["Plan", "Autonomous"]);
+  });
+});
+
 describe("initial execution location", () => {
   it("offers the checkout choice before the first start", () => {
     mount({ hasStarted: false, children: <button>Checkout</button>, location: { label: "Local checkout", branch: "main" } });

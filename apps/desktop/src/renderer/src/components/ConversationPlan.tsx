@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { executionModePresentation, executionModeUnavailable, type PermissionPreset, type ThreadSummary } from "@openorc/protocol";
+import { executionModeAvailable, executionModePresentation, type PermissionPreset, type ThreadSummary } from "@openorc/protocol";
 import { useRpcMutation } from "../lib/query";
 import { useConversationPlans } from "../lib/conversation-plans";
 import { Button, Input, Select, TextButton } from "./ui";
@@ -16,14 +16,16 @@ export function ConversationPlan({ thread }: { thread: ThreadSummary }) {
   const team = Boolean(thread.teamInstanceId);
   const { query, runtime, plans } = useConversationPlans(thread.id, team);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [permission, setPermission] = useState<PermissionPreset>("review");
+  const [chosenPermission, setPermission] = useState<PermissionPreset>("review");
   const [exporting, setExporting] = useState(false);
   const [filename, setFilename] = useState("openorc-plan.md");
   const implement = useRpcMutation("threads.implementPlan");
   const implementTeam = useRpcMutation("orchestration.implementPlan");
   const exportPlan = useRpcMutation("threads.exportPlan");
   const plan = plans.find((p) => p.id === selectedId) ?? plans[0];
-  const unavailable = team ? null : executionModeUnavailable(thread.agent, permission);
+  // Offer only what this agent can run, starting from the strictest of those.
+  const implementationModes = (["review", "trusted", "autonomous"] as const).filter((mode) => executionModeAvailable(thread.agent, mode));
+  const permission = implementationModes.includes(chosenPermission) ? chosenPermission : (implementationModes[0] ?? chosenPermission);
   const ready = plan?.state === "ready" && Boolean(plan.text.trim());
   const current = plan?.id === plans[0]?.id;
   const busy = team
@@ -66,20 +68,20 @@ export function ConversationPlan({ thread }: { thread: ThreadSummary }) {
             <label className="grid gap-1 text-xs text-ink-2">
               Implementation mode
               <Select value={permission} onChange={(e) => setPermission(e.target.value as PermissionPreset)}>
-                {(["review", "trusted", "autonomous"] as const).map((value) => (
+                {implementationModes.map((value) => (
                   <option key={value} value={value}>
                     {executionModePresentation(thread.agent, value).label}
                   </option>
                 ))}
               </Select>
             </label>
-            <p className="text-xs text-ink-3">{unavailable ?? executionModePresentation(thread.agent, permission).hint}</p>
+            <p className="text-xs text-ink-3">{executionModePresentation(thread.agent, permission).hint}</p>
           </>
         )}
         <div className="flex flex-wrap items-center gap-2">
           <Button
             size="sm"
-            disabled={!ready || !current || busy || implementing || Boolean(unavailable)}
+            disabled={!ready || !current || busy || implementing}
             onClick={() => plan && (team ? implementTeam.mutate({ threadId: thread.id, planId: plan.id }) : implement.mutate({ id: thread.id, planId: plan.id, permissionMode: permission }))}
           >
             {implementing ? "Starting…" : "Implement this plan"}

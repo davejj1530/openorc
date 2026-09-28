@@ -243,6 +243,8 @@ export function PullRequestReviewBar({ projectId, pull, review }: { projectId: s
   const [dialog, setDialog] = useState<"submit" | "discard" | null>(null);
   const [posted, setPosted] = useState<{ url: string | null } | null>(null);
   const comments = review?.comments ?? [];
+  // A review outlives its drafts, so a posted one is still here with nothing in it.
+  const drafted = comments.length > 0 || Boolean(review?.summary.trim());
   const earlier = review !== null && comments.length > 0 && review.commitId !== pull.headSha;
   return (
     <div className="shrink-0 border-t border-line">
@@ -274,7 +276,7 @@ export function PullRequestReviewBar({ projectId, pull, review }: { projectId: s
           </span>
         ) : null}
         <span className="flex-1" />
-        {review ? (
+        {drafted ? (
           <Button size="sm" variant="ghost" onClick={() => setDialog("discard")}>
             Discard draft
           </Button>

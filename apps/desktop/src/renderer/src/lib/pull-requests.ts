@@ -39,6 +39,12 @@ export const reviewDecisionLabel: Record<PullRequestReviewDecision, { label: str
   review_required: { label: "Review required", tone: "muted" },
 };
 
+/** The number in a pull request's URL, or null for anything else. */
+export function pullRequestNumber(url: string | null): number | null {
+  const match = url ? /\/pull\/(\d+)(?:[/?#]|$)/.exec(url) : null;
+  return match ? Number(match[1]) : null;
+}
+
 /** Every word must match the title, number, author or either branch. */
 export function matchesPullRequest(pull: PullRequestSummary, query: string): boolean {
   const haystack = `${pull.title} #${pull.number} ${pull.author} ${pull.headRefName} ${pull.baseRefName}`.toLowerCase();

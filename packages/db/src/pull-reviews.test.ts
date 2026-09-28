@@ -44,12 +44,14 @@ describe("pull request reviews", () => {
     expect(pullReviews.get(db, key)?.threadId).toBeNull();
   });
 
-  it("removes a posted review together with its comments", () => {
-    const { db, key } = setup();
+  it("empties a posted draft but keeps its conversation for the next round", () => {
+    const { db, key, project } = setup();
+    const thread = threads.insert(db, { projectId: project.id, title: "Review #7", agent: "claude", model: null, mode: "plan", permissionMode: "review" });
     pullReviews.open(db, key, "a".repeat(40));
+    pullReviews.update(db, key, { threadId: thread.id, summary: "Nearly there." });
     pullReviews.addComment(db, key, { ...line, author: null });
-    pullReviews.remove(db, key);
-    expect(pullReviews.get(db, key)).toBeNull();
+    pullReviews.clearDraft(db, key);
+    expect(pullReviews.get(db, key)).toMatchObject({ commitId: "a".repeat(40), summary: "", threadId: thread.id, comments: [] });
     expect(db.stmt("SELECT COUNT(*) AS count FROM pull_request_review_comments").get()).toEqual({ count: 0 });
   });
 });

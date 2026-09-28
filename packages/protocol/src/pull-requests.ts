@@ -55,7 +55,10 @@ export interface PullRequestDraftComment {
   createdAt: number;
 }
 
-/** A review drafted in OpenOrc. Nothing in it reaches GitHub until it is submitted. */
+/**
+ * A pull request's review in OpenOrc: the draft, which reaches GitHub only when
+ * submitted, and the conversation that reviews it round after round.
+ */
 export interface PullRequestReview {
   projectId: string;
   number: number;

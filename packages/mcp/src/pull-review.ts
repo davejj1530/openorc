@@ -17,7 +17,8 @@ export interface PullReviewComment {
 export interface PullReviewTools {
   /** Whether the run belongs to a conversation reviewing a pull request. */
   available(runId: string): boolean;
-  diff(runId: string, path: string | undefined): Promise<string>;
+  /** The pull request's changes, or with `since` only those after a commit from an earlier review. */
+  diff(runId: string, input: { path?: string; since?: string }): Promise<string>;
   comment(runId: string, comment: PullReviewComment): Promise<string>;
   summary(runId: string, body: string): Promise<string>;
 }
@@ -30,10 +31,16 @@ export function registerPullReviewTools(mcp: McpServer, tools: PullReviewTools, 
     "pull_request_diff",
     {
       description:
-        "The pull request's changes as a unified diff, exactly what its draft comments attach to. Without a path, a large pull request returns its changed files instead; then ask for one path at a time.",
-      inputSchema: { path: z.string().min(1).optional() },
+        "The pull request's changes as a unified diff, exactly what its draft comments attach to. Without a path, a large pull request returns its changed files instead; then ask for one path at a time. With since, a commit from an earlier review, it shows only what changed after it.",
+      inputSchema: {
+        path: z.string().min(1).optional(),
+        since: z
+          .string()
+          .regex(/^[0-9a-f]{7,40}$/)
+          .optional(),
+      },
     },
-    async ({ path }) => text(await tools.diff(runId, path)),
+    async ({ path, since }) => text(await tools.diff(runId, { ...(path === undefined ? {} : { path }), ...(since === undefined ? {} : { since }) })),
   );
   mcp.registerTool(
     "pull_request_comment",

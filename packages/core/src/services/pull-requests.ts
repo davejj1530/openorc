@@ -1,8 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { mkdir } from "node:fs/promises";
-import path from "node:path";
 import { audit, projects, pullReviews, runs, threads, type Db, type PullReviewKey } from "@openorc/db";
-import { GitHubPulls, fetchPullRequest, git, pullRequestSource, worktree } from "@openorc/git";
+import { GitHubPulls, git, worktree } from "@openorc/git";
 import type { PullReviewComment, PullReviewTools } from "@openorc/mcp";
 import {
   WORKSPACE_ID,
@@ -25,11 +23,12 @@ import {
   type Run,
   type Thread,
 } from "@openorc/protocol";
+import { addReviewCheckout, fetchPullRequestHead, moveReviewCheckout } from "./pull-request-checkout.js";
 import type { ReviewerAppService } from "./reviewer-app.js";
 import type { RunService } from "./runs.js";
 import type { SystemService } from "./system.js";
 import type { ThreadService } from "./threads.js";
-import { slugify } from "./workspace.js";
+import type { WorkspaceWriters } from "./workspace-writers.js";
 
 export interface PullRequestServiceOptions {
   /** Where review checkouts live, beside the app's other worktrees. */
@@ -37,8 +36,10 @@ export interface PullRequestServiceOptions {
   github?: GitHubPulls;
   /** Whether gh is installed, from the probe the rest of the app reads. */
   system: Pick<SystemService, "info">;
-  threads: Pick<ThreadService, "start">;
+  threads: Pick<ThreadService, "start" | "update" | "queueFollowUp">;
   runs: Pick<RunService, "threadActivity" | "models">;
+  /** Serializes changes to a review conversation's copy with its own turns. */
+  writers: Pick<WorkspaceWriters, "withLease">;
   /** Posts reviews as the user's GitHub App instead of their gh account. */
   reviewerApp: Pick<ReviewerAppService, "submitReview">;
   invalidate(keys: string[]): void;
@@ -57,6 +58,20 @@ const PROMPT_BODY_LIMIT = 20_000;
 function reviewPrompt(detail: PullRequestDetail): string {
   const body = detail.body.trim() ? detail.body.trim().slice(0, PROMPT_BODY_LIMIT) : "No description.";
   return `Review pull request #${detail.number}: ${detail.title}\n${detail.url}\n\nBy @${detail.author}, merging ${detail.headRefName} into ${detail.baseRefName}.\n\n${body}`;
+}
+
+/** The message that starts another round in the same conversation, which remembers the last one. */
+function againPrompt(detail: PullRequestDetail, previous: string | null): string {
+  const lines = [`Review pull request #${detail.number} again: ${detail.title}`];
+  if (previous && previous !== detail.headSha) {
+    lines.push(
+      `New commits since your last review: ${previous.slice(0, 7)}..${detail.headSha.slice(0, 7)}. Your copy now has the latest code, and pull_request_diff with since "${previous}" shows only what changed.`,
+    );
+    lines.push("", "Check whether your earlier findings were addressed. Comment only on what still needs work or is new.");
+  } else {
+    lines.push("No commits were added since your last review. Look again, and add only findings you haven't made.");
+  }
+  return lines.join("\n");
 }
 
 /** The files a diff changes with their line counts, for a pull request too large to read in one piece. */
@@ -177,21 +192,36 @@ export class PullRequestService {
   discard(key: PullReviewKey): void {
     const review = pullReviews.get(this.db, key);
     if (review?.threadId && this.options.runs.threadActivity(review.threadId) !== "idle") throw new Error("A model is still reviewing. Stop it in its conversation first.");
-    pullReviews.remove(this.db, key);
+    this.db.transaction(() => pullReviews.clearDraft(this.db, key));
     this.changed();
   }
 
-  /** Starts a model reviewing the pull request's current head in a new Plan-mode conversation. */
+  /**
+   * Starts a model reviewing the pull request's current head. The first round
+   * opens a Plan-mode conversation of its own; later rounds continue it, so the
+   * model can check its earlier findings against the new commits.
+   */
   async start(key: PullReviewKey, reviewer: ModelExecutionSettings): Promise<{ threadId: string }> {
     const project = this.project(key.projectId);
     await this.assertGh();
     const detail = await this.github.get(project.rootPath, key.number);
     const current = pullReviews.get(this.db, key);
-    if (current?.threadId && current.commitId === detail.headSha && this.options.runs.threadActivity(current.threadId) !== "idle")
-      throw new Error("A model is already reviewing this pull request. Open its conversation to follow along.");
+    const conversation = current?.threadId ? threads.get(this.db, current.threadId) : null;
+    if (conversation && this.options.runs.threadActivity(conversation.id) !== "idle") throw new Error("A model is already reviewing this pull request. Open its conversation to follow along.");
     const stale = this.staleReason(current, detail.headSha);
     if (stale) throw new Error(stale);
-    const { path: checkoutPath, mergeBase } = await this.checkout(project, detail);
+    try {
+      // An archived conversation, or one whose copy was removed, was put away: the next round starts fresh.
+      if (conversation && conversation.archivedAt === null && conversation.worktreePath) return await this.reviewAgain(key, project, detail, conversation, reviewer);
+      return await this.reviewAnew(key, project, detail, reviewer);
+    } finally {
+      this.changed();
+    }
+  }
+
+  private async reviewAnew(key: PullReviewKey, project: Project, detail: PullRequestDetail, reviewer: ModelExecutionSettings): Promise<{ threadId: string }> {
+    const mergeBase = await fetchPullRequestHead(project, detail);
+    const checkoutPath = await addReviewCheckout(this.options.dataDir, project, detail);
     let admitted = false;
     try {
       const { thread } = await this.options.threads.start(
@@ -215,6 +245,8 @@ export class PullRequestService {
           onAdmitted: (thread) => {
             this.draftAt(key, detail.headSha);
             pullReviews.update(this.db, key, { threadId: thread.id, baseCommit: mergeBase });
+            // The conversation names the pull request it reviews, as one that opened a pull request does.
+            threads.update(this.db, thread.id, { prUrl: detail.url, prState: detail.state });
             admitted = true;
           },
         },
@@ -224,12 +256,26 @@ export class PullRequestService {
       // An admitted conversation owns its checkout and removes it with itself.
       if (!admitted) await worktree.remove(project.rootPath, checkoutPath, { force: true }).catch(() => undefined);
       throw error;
-    } finally {
-      this.changed();
     }
   }
 
-  /** Posts the draft as one review, as the user through gh or as their reviewer app, then clears it. */
+  /** Another round in the same conversation: its copy moves to the new head, and the reviewer the user chose now asks. */
+  private async reviewAgain(key: PullReviewKey, project: Project, detail: PullRequestDetail, conversation: Thread, reviewer: ModelExecutionSettings): Promise<{ threadId: string }> {
+    const previous = conversation.baseSha;
+    const mergeBase = await fetchPullRequestHead(project, detail);
+    await moveReviewCheckout({ db: this.db, writers: this.options.writers }, project, conversation, detail);
+    this.db.transaction(() => {
+      this.draftAt(key, detail.headSha);
+      pullReviews.update(this.db, key, { baseCommit: mergeBase });
+    });
+    const same = conversation.agent === reviewer.agent && conversation.model === reviewer.model && conversation.effort === reviewer.effort && conversation.fastMode === reviewer.fastMode;
+    if (!same) this.options.threads.update(conversation.id, { agent: reviewer.agent, model: reviewer.model, effort: reviewer.effort, fastMode: reviewer.fastMode });
+    this.options.threads.queueFollowUp({ threadId: conversation.id, text: againPrompt(detail, previous), requestKey: randomUUID() });
+    this.options.invalidate(["threads", `thread:${conversation.id}`, `checkpoints:${conversation.id}`, `threaddiff:${conversation.id}`, "workspace-diff"]);
+    return { threadId: conversation.id };
+  }
+
+  /** Posts the draft as one review, as the user through gh or as their reviewer app, then empties it. The conversation stays for the next round. */
   async submit(key: PullReviewKey, input: { event: PullRequestReviewEvent; summary: string; as: PullRequestReviewAuthor }): Promise<{ url: string | null }> {
     const { event, summary } = input;
     const project = this.project(key.projectId);
@@ -245,7 +291,7 @@ export class PullRequestService {
         ? await this.options.reviewerApp.submitReview(detail.url, { ...submission, body: await this.signed(review, summary) })
         : await this.github.submitReview(project.rootPath, detail.url, submission);
     this.db.transaction(() => {
-      pullReviews.remove(this.db, key);
+      pullReviews.clearDraft(this.db, key);
       audit.record(this.db, {
         actor: "user",
         action: "pull_request.review",
@@ -285,7 +331,7 @@ export class PullRequestService {
     const review = pullReviews.forThread(this.db, thread.id);
     if (!review) return null;
     return [
-      `This conversation reviews GitHub pull request #${review.number} for the user. Its code is checked out in your working folder at commit ${review.commitId.slice(0, 12)}, on no branch. Its changes start from commit ${(review.baseCommit ?? "").slice(0, 12)}.`,
+      `This conversation reviews GitHub pull request #${review.number} for the user. Its code is checked out in your working folder at commit ${(thread.baseSha ?? "").slice(0, 12)}, on no branch. Its changes start from commit ${(review.baseCommit ?? "").slice(0, 12)}.`,
       "Read the changes with pull_request_diff, and the surrounding code in the checkout as needed. Look for bugs, security problems, data loss, races, missing error handling and missing tests, and for code that will be hard to change. Skip style points a formatter or linter would catch.",
       "Record each finding with pull_request_comment on the changed line it is about: one finding per comment, saying what is wrong, why it matters and a concrete fix. Finish with pull_request_summary, a short overall assessment.",
       "Reviewing is the whole task: do not propose an implementation plan. Your comments and summary are drafts. The user edits them and decides what to post to GitHub; you cannot post, push or change files. Keep your reply short: the findings live in the draft.",
@@ -296,13 +342,13 @@ export class PullRequestService {
   agentTools(): PullReviewTools {
     return {
       available: (runId) => this.reviewForRun(runId) !== null,
-      diff: async (runId, filePath) => {
-        const { review } = this.requireReview(runId);
-        return agentDiff(await this.reviewDiff(review), filePath);
+      diff: async (runId, { path: filePath, since }) => {
+        const { review, head } = this.requireReview(runId);
+        return agentDiff(await this.reviewDiff(review.projectId, since ?? review.baseCommit, head, since !== undefined), filePath);
       },
       comment: async (runId, comment) => {
-        const { review, run } = this.requireReview(runId);
-        const file = patchFiles(await this.reviewDiff(review)).find((entry) => entry.path === comment.path);
+        const { review, run, head } = this.requireCurrent(runId);
+        const file = patchFiles(await this.reviewDiff(review.projectId, review.baseCommit, head)).find((entry) => entry.path === comment.path);
         if (!file) throw new Error(`${comment.path} is not changed in this pull request. Comment on a file pull_request_diff shows.`);
         const anchor = agentAnchor(file.chunk, comment);
         const added = pullReviews.addComment(this.db, review, { path: comment.path, ...anchor, body: comment.body, author: { agent: run.agent, model: run.model } });
@@ -310,7 +356,7 @@ export class PullRequestService {
         return `Draft comment saved on ${reviewCommentPlace(added)}.`;
       },
       summary: async (runId, body) => {
-        const { review } = this.requireReview(runId);
+        const { review } = this.requireCurrent(runId);
         pullReviews.update(this.db, review, { summary: body });
         this.changed();
         return "Summary saved. The user reviews the draft and decides what to post.";
@@ -318,43 +364,45 @@ export class PullRequestService {
     };
   }
 
-  private reviewForRun(runId: string): { review: PullRequestReview; run: Run } | null {
+  /** The review a run's conversation belongs to, with the commit its copy has checked out. */
+  private reviewForRun(runId: string): { review: PullRequestReview; run: Run; head: string } | null {
     const run = runs.get(this.db, runId);
     const review = run?.threadId ? pullReviews.forThread(this.db, run.threadId) : null;
-    return run && review ? { review, run } : null;
+    const head = run?.threadId ? threads.get(this.db, run.threadId)?.baseSha : null;
+    return run && review && head ? { review, run, head } : null;
   }
 
-  private requireReview(runId: string): { review: PullRequestReview; run: Run } {
+  private requireReview(runId: string): { review: PullRequestReview; run: Run; head: string } {
     const found = this.reviewForRun(runId);
     if (!found) throw new Error("This conversation no longer reviews a pull request.");
     return found;
   }
 
-  /** The changes at the reviewed commit, as the agent's checkout has them. GitHub diffs from the same merge base. */
-  private reviewDiff(review: PullRequestReview): Promise<string> {
-    const project = this.project(review.projectId);
-    const base = review.baseCommit;
-    if (!base) return Promise.reject(new Error("This review has no starting commit. Start a new review from the pull request."));
-    const key = `${project.id}:${base}:${review.commitId}`;
+  /** Drafting needs the draft and the conversation's copy on the same commit, or the comments would point at lines that moved. */
+  private requireCurrent(runId: string): { review: PullRequestReview; run: Run; head: string } {
+    const found = this.requireReview(runId);
+    if (found.review.commitId !== found.head) throw new Error("The pull request has newer commits than your copy. Ask the user to review it again from the Pull requests tab.");
+    return found;
+  }
+
+  /**
+   * Changes between two commits as the agent's copy has them: by default from
+   * the merge base to the reviewed head, as GitHub diffs a pull request.
+   */
+  private async reviewDiff(projectId: string, base: string | null, head: string, requested = false): Promise<string> {
+    const project = this.project(projectId);
+    if (!base) throw new Error("This review has no starting commit. Start a new review from the pull request.");
+    if (requested && (await git(project.rootPath, ["cat-file", "-e", `${base}^{commit}`], { okCodes: [0, 1, 128] })).code !== 0)
+      throw new Error(`Commit ${base} isn't in this repository. Use a commit from an earlier review.`);
+    const key = `${project.id}:${base}:${head}`;
     let diff = this.diffs.get(key);
     if (!diff) {
-      diff = git(project.rootPath, ["diff", "--no-color", "--no-ext-diff", "-M", base, review.commitId]).then((result) => result.stdout);
+      diff = git(project.rootPath, ["diff", "--no-color", "--no-ext-diff", "-M", base, head]).then((result) => result.stdout);
       diff.catch(() => this.diffs.delete(key));
       this.diffs.set(key, diff);
       if (this.diffs.size > CACHED_DIFFS) this.diffs.delete(this.diffs.keys().next().value!);
     }
     return diff;
-  }
-
-  /** The pull request's head in a worktree of its own, detached, with the commit its changes start from. */
-  private async checkout(project: Project, detail: PullRequestDetail): Promise<{ path: string; mergeBase: string }> {
-    const source = await pullRequestSource(project.rootPath, detail.url);
-    await fetchPullRequest(project.rootPath, { source, number: detail.number, baseRefName: detail.baseRefName, commits: [detail.headSha, detail.baseSha] });
-    const mergeBase = (await git(project.rootPath, ["merge-base", detail.baseSha, detail.headSha])).stdout.trim();
-    const target = path.join(this.options.dataDir, "worktrees", `${slugify(project.name)}-${project.id.slice(0, 6)}`, `pr-${detail.number}-${randomUUID().slice(0, 6)}`);
-    await mkdir(path.dirname(target), { recursive: true });
-    await worktree.addDetached(project.rootPath, { path: target, commit: detail.headSha });
-    return { path: target, mergeBase };
   }
 
   /** Why the draft cannot move to `commitId`; null when it can. Comments stay on the commit they were written against. */
@@ -367,15 +415,15 @@ export class PullRequestService {
 
   /**
    * The draft for `commitId`, opened if needed. An empty draft follows the pull
-   * request to a new commit and lets go of the conversation that reviewed the
-   * old one, whose agent would otherwise comment on lines that moved.
+   * request to a new commit. Its conversation stays linked; until its copy is
+   * moved too, the agent's drafting tools refuse lines that may have moved.
    */
   private draftAt(key: PullReviewKey, commitId: string): void {
     const review = pullReviews.get(this.db, key);
     const stale = this.staleReason(review, commitId);
     if (stale) throw new Error(stale);
     if (!review) pullReviews.open(this.db, key, commitId);
-    else if (review.commitId !== commitId) pullReviews.update(this.db, key, { commitId, threadId: null, baseCommit: null });
+    else if (review.commitId !== commitId) pullReviews.update(this.db, key, { commitId });
   }
 
   private project(projectId: string): Project {

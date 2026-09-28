@@ -449,7 +449,15 @@ export class OpenOrc {
     this.files = new FileService();
     this.imports = new ImportService(db, this.ledger, invalidate, this.log);
     this.reviewerApp = new ReviewerAppService(db, { secrets: options.githubSecrets, invalidate });
-    this.pullRequests = new PullRequestService(db, { dataDir: options.dataDir, system: this.system, threads: this.threads, runs: this.runs, reviewerApp: this.reviewerApp, invalidate });
+    this.pullRequests = new PullRequestService(db, {
+      dataDir: options.dataDir,
+      system: this.system,
+      threads: this.threads,
+      runs: this.runs,
+      reviewerApp: this.reviewerApp,
+      writers: this.workspaceWriters,
+      invalidate,
+    });
     this.slack = new SlackService(this, options.slackSecrets, new AttachmentService(options.dataDir));
     this.handlers = this.buildHandlers(invalidate);
   }

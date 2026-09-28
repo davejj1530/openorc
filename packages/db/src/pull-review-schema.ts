@@ -1,8 +1,9 @@
 /**
- * Reviews drafted in OpenOrc for a project's GitHub pull requests, one per
- * pull request until it is posted or discarded. A review names the commit its
- * comments were written against, and the conversation where a model reviews it
- * with the commit the reviewed changes start from.
+ * Reviews of a project's GitHub pull requests, one per pull request. A review
+ * holds a draft, named by the commit its comments were written against, and
+ * the conversation where a model reviews the pull request round after round,
+ * with the commit the reviewed changes start from. Posting or discarding
+ * empties the draft; the conversation stays.
  */
 export const pullRequestReviewMigration = `
 CREATE TABLE pull_request_reviews (

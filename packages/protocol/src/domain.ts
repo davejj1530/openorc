@@ -115,6 +115,7 @@ export const Thread = z.object({
   /** Legacy completion timestamp, retained for persisted data compatibility. */
   doneAt: z.number().nullable(),
   snoozedUntil: z.number().nullable(),
+  /** The conversation's pull request: the one it opened, or the one it reviews. Its state follows GitHub. */
   prUrl: z.string().nullable(),
   prState: PrState.nullable(),
   forkedFromId: z.string().nullable(),

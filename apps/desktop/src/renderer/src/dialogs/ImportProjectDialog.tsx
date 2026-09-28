@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
 import { Button, Dialog, Field, Input } from "../components/ui";
-import { useRpcMutation } from "../lib/query";
+import { useEffect, useState } from "react";
+
 import { useRouter } from "../lib/router";
+import { useRpcMutation } from "../lib/query";
 
 export function ImportProjectDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const importProject = useRpcMutation("projects.import");
@@ -15,6 +16,11 @@ export function ImportProjectDialog({ open, onOpenChange }: { open: boolean; onO
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- Opening starts a fresh attempt; mutation status changes must not erase the path being edited.
   }, [open]);
+
+  const chooseFolder = async () => {
+    const picked = await window.openorc.pickDirectory();
+    if (picked) setPath(picked);
+  };
 
   const submit = () => {
     if (!path.trim()) return;
@@ -30,24 +36,17 @@ export function ImportProjectDialog({ open, onOpenChange }: { open: boolean; onO
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} title="Import a repository">
+    <Dialog open={open} onOpenChange={onOpenChange} title="Import a project">
       <form
         onSubmit={(e) => {
           e.preventDefault();
           submit();
         }}
       >
-        <Field label="Repository folder" hint="Any folder inside a git repository. OpenOrc reads its config files and never modifies the checkout.">
+        <Field label="Folder">
           <div className="flex gap-2">
             <Input autoFocus value={path} onChange={(e) => setPath(e.target.value)} placeholder="/Users/you/dev/project" className="font-mono" />
-            <Button
-              onClick={async () => {
-                const picked = await window.openorc.pickDirectory();
-                if (picked) setPath(picked);
-              }}
-            >
-              Choose…
-            </Button>
+            <Button onClick={() => void chooseFolder()}>Choose…</Button>
           </div>
         </Field>
         {importProject.error ? <div className="text-sm text-bad mb-3">{importProject.error.message}</div> : null}

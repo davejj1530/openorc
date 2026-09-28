@@ -13,14 +13,17 @@ export function conversationLocation({
   mode,
   basePath,
   checkoutBranch,
+  plainFolder = false,
 }: {
   scope: ConversationScope;
   project: Project;
   mode: WorkspaceMode;
   basePath: string;
   checkoutBranch: string | null | undefined;
+  /** A project folder without git has no checkout to name, only the folder. */
+  plainFolder?: boolean;
 }) {
-  if (project.id === WORKSPACE_ID) return { label: null, branch: null, directory: basePath };
+  if (project.id === WORKSPACE_ID || plainFolder) return { label: null, branch: null, directory: basePath };
   if (scope.kind === "task") return { label: mode === "worktree" ? "Worktree" : "Local checkout", branch: mode === "current" ? (scope.task.branch ?? project.defaultBranch) : scope.task.branch };
   if (scope.thread.workspaceMode === "worktree") return { label: "Worktree", branch: scope.thread.branch };
   return { label: "Local checkout", branch: checkoutBranch ?? null };

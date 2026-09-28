@@ -35,6 +35,7 @@ import {
   type TeamRoomEvent,
   type Thread,
 } from "@openorc/protocol";
+import { assertCanBranch } from "./project-git.js";
 import type { AppSettingsService } from "./settings.js";
 import type { RunService } from "./runs.js";
 import { TeamCoordinator } from "./team-coordinator.js";
@@ -79,6 +80,11 @@ export class TeamConversationService {
   availability(): TeamExecutionAvailability {
     const enabled = this.settings.get().experimentalTeamExecution;
     return { enabled, reason: enabled ? null : "Team execution is disabled. Enable Team execution (Beta) in Settings.", maxHierarchyDepth: MAX_TEAM_DEPTH };
+  }
+  /** Every team workspace branches from a commit, local checkout included. */
+  private async requireBranching(projectId: string): Promise<void> {
+    const project = projects.get(this.db, projectId);
+    if (project) await assertCanBranch(project);
   }
   private requireEnabled(): void {
     const availability = this.availability();
@@ -126,6 +132,7 @@ export class TeamConversationService {
     if (existing) return existing;
     internal?.assertCanAdmit();
     this.requireEnabled();
+    await this.requireBranching(input.projectId);
     const plan = await this.coordinator.validateStart({
       projectId: input.projectId,
       teamRevisionId: input.executionTarget.teamRevisionId,

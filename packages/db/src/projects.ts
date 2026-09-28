@@ -70,6 +70,10 @@ export const projects = {
     );
     return projects.get(db, id) as Project;
   },
+  /** Git details found after import. Leaves updated_at alone, which orders the project list. */
+  updateGit(db: Db, id: string, git: { gitRemote: string | null; defaultBranch: string | null }): void {
+    db.stmt("UPDATE projects SET git_remote = ?, default_branch = ? WHERE id = ?").run(git.gitRemote, git.defaultBranch, id);
+  },
   updateSettings(db: Db, id: string, patch: Partial<ProjectSettings>): Project {
     const current = projects.get(db, id);
     if (!current) throw new Error(`project ${id} not found`);

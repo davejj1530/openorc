@@ -4,9 +4,10 @@ import { access, copyFile, glob, lstat, mkdir } from "node:fs/promises";
 import path from "node:path";
 import { audit, taskForwardings, tasks, threads, type Db } from "@openorc/db";
 import { stopProcess, waitForProcessGroup } from "@openorc/agents";
-import { diskUsage, fetch, git, repoInfo, revParse, worktree } from "@openorc/git";
+import { diskUsage, emptyTree, fetch, git, repoInfo, revParse, worktree } from "@openorc/git";
 import { WORKSPACE_ID, type BranchLoss, type Project, type RemovalImpact, type Task, type Thread } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
+import { assertCanBranch, projectGit } from "./project-git.js";
 import { assertSafeParentPath } from "./safe-parent-path.js";
 import { workspaceWriters, type WorkspaceLease, type WorkspaceWriters } from "./workspace-writers.js";
 
@@ -25,6 +26,25 @@ export function assertLossAccepted(loss: RemovalImpact, accepted: BranchLoss | u
     loss.commits ? `${plural(loss.commits, "commit")} that no other branch, remote or tag has` : null,
   ].filter(Boolean);
   throw new Error(`Deleting branch ${loss.branch} would delete ${parts.join(" and ")}. Confirm to delete them, or keep the branch.`);
+}
+
+/**
+ * Where work in the project folder starts: HEAD and its branch. `start` is HEAD, or the empty tree while nothing is
+ * committed, a folder without git included, so a thread's first turn keeps a comparison that a later `git init` or
+ * commit never replaces. Tasks keep HEAD alone: their commit list and base need a commit.
+ */
+async function checkoutStart(project: Project): Promise<{ headSha: string | null; start: string; branch: string | null }> {
+  if ((await projectGit(project)) === "none") return { headSha: null, start: await emptyTree(project.rootPath), branch: null };
+  const info = await repoInfo(project.rootPath);
+  return { headSha: info.headSha, start: info.headSha ?? (await emptyTree(project.rootPath)), branch: info.branch };
+}
+
+/**
+ * Whether the project folder is a repository of its own, so git housekeeping may run there. Workspace and a folder
+ * without git are not, and a plain folder can sit inside another repository that must stay untouched.
+ */
+async function ownsRepository(project: Project): Promise<boolean> {
+  return (await projectGit(project).catch(() => "none" as const)) !== "none";
 }
 
 export function slugify(title: string): string {
@@ -164,7 +184,7 @@ export class WorkspaceService {
       async () => {
         this.assertOpen();
         if (task.workspaceMode === "current") {
-          const info = await repoInfo(project.rootPath);
+          const info = await checkoutStart(project);
           this.assertOpen();
           return tasks.update(this.db, task.id, { baseSha: info.headSha, baseRef: info.branch ?? task.baseRef, branch: info.branch });
         }
@@ -177,7 +197,7 @@ export class WorkspaceService {
         this.assertOpen();
 
         const baseRef = task.baseRef ?? project.defaultBranch ?? "HEAD";
-        const startPoint = await this.resolveStartPoint(project.rootPath, baseRef);
+        const startPoint = await this.resolveStartPoint(project, baseRef);
         this.assertOpen();
         this.log.info(`worktree for "${task.title}" at ${worktreePath} on ${branch} from ${baseRef} (${startPoint.slice(0, 8)})`);
         await worktree.add(project.rootPath, { path: worktreePath, branch, startPoint });
@@ -234,9 +254,9 @@ export class WorkspaceService {
       async () => {
         this.assertOpen();
         if (thread.workspaceMode === "current") {
-          const info = await repoInfo(project.rootPath);
+          const info = await checkoutStart(project);
           this.assertOpen();
-          return threads.update(this.db, thread.id, { baseSha: info.headSha, branch: info.branch });
+          return threads.update(this.db, thread.id, { baseSha: info.start, branch: info.branch });
         }
 
         const branch = this.threadBranch(thread, project);
@@ -244,7 +264,7 @@ export class WorkspaceService {
         await mkdir(path.dirname(worktreePath), { recursive: true });
         this.assertOpen();
         const base = baseRef ?? project.defaultBranch ?? "HEAD";
-        const startPoint = await this.resolveStartPoint(project.rootPath, base);
+        const startPoint = await this.resolveStartPoint(project, base);
         this.assertOpen();
         this.log.info(`worktree for thread "${thread.title}" at ${worktreePath} on ${branch} from ${base} (${startPoint.slice(0, 8)})`);
         await worktree.add(project.rootPath, { path: worktreePath, branch, startPoint });
@@ -317,7 +337,7 @@ export class WorkspaceService {
 
   async cleanup(task: Task, project: Project, options: { deleteBranch?: boolean; force?: boolean; acceptLoss?: BranchLoss } = {}, inherited?: WorkspaceLease): Promise<Task> {
     this.assertOpen();
-    if (project.id === WORKSPACE_ID) return task;
+    if (!(await ownsRepository(project))) return task;
     // Deleting/archiving a task record must not remove a conversation's workspace.
     if (task.worktreePath && threads.list(this.db, { projectId: project.id, filter: "all" }).some((thread) => thread.worktreePath === task.worktreePath)) return task;
     if ((taskForwardings.target(this.db, task.id) ?? taskForwardings.source(this.db, task.id))?.state === "preparing")
@@ -393,8 +413,11 @@ export class WorkspaceService {
   }
 
   /** Fetches the base from origin when it is a branch there, so tasks start from what the team sees. */
-  private async resolveStartPoint(root: string, baseRef: string): Promise<string> {
+  private async resolveStartPoint(project: Project, baseRef: string): Promise<string> {
     this.assertOpen();
+    await assertCanBranch(project);
+    this.assertOpen();
+    const root = project.rootPath;
     if (baseRef === "HEAD") return revParse(root, "HEAD");
     const fetched = await fetch(root, "origin", baseRef);
     this.assertOpen();

@@ -104,6 +104,12 @@ export function targetModel(target: NewThreadTarget): ModelChoice | null {
   return lead ? normalizeModelSettings({ ...lead.settings, ...target.initialLeadOverrides }) : null;
 }
 
+/** Where a new thread works. Workspace, and a project that can't branch yet, always use the folder itself. */
+export function newThreadWorkspaceMode(input: { canBranch: boolean; chosen: WorkspaceMode | null; preferred: WorkspaceMode | undefined }): WorkspaceMode {
+  if (!input.canBranch) return "current";
+  return input.chosen ?? input.preferred ?? "current";
+}
+
 export function teamDepth(revision: TeamRevision): number {
   const members = new Map(revision.members.map((member) => [member.key, member]));
   return Math.max(

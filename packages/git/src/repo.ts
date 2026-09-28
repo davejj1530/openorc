@@ -1,14 +1,15 @@
 import { mkdtemp, rm, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import type { Commit, FileChange } from "@openorc/protocol";
+import type { Commit, FileChange, ProjectGit } from "@openorc/protocol";
 import { git, GitError } from "./exec.js";
 
 export interface RepoInfo {
   root: string;
   remoteUrl: string | null;
   defaultBranch: string | null;
-  headSha: string;
+  /** Null while the repository has no commits yet. */
+  headSha: string | null;
   branch: string | null;
 }
 
@@ -21,18 +22,50 @@ export async function isGitRepo(dir: string): Promise<boolean> {
   }
 }
 
+/**
+ * What git offers a folder. Only a repository's top folder counts: a plain folder inside another
+ * repository stays plain, so nothing OpenOrc does there reaches the outer repository.
+ */
+export async function gitState(dir: string): Promise<ProjectGit> {
+  const prefix = await git(dir, ["rev-parse", "--show-prefix"]).catch((error: unknown) => {
+    // Anything else, such as a missing folder, is a real failure for the caller to report.
+    if (error instanceof GitError && error.stderr.includes("not a git repository")) return null;
+    throw error;
+  });
+  if (prefix?.stdout.trim() !== "") return "none";
+  return (await headCommit(dir)) ? "ready" : "no_commits";
+}
+
+/** HEAD's commit, or null while the repository has no commits yet. */
+export async function headCommit(cwd: string): Promise<string | null> {
+  return (await git(cwd, ["rev-parse", "--verify", "--quiet", "HEAD^{commit}"], { okCodes: [0, 1] })).stdout.trim() || null;
+}
+
+/** The tree with nothing in it. Every repository knows it without storing it. */
+export async function emptyTree(cwd: string): Promise<string> {
+  return (await git(cwd, ["hash-object", "-t", "tree", "--stdin"], { input: "" })).stdout.trim();
+}
+
+/** What a diff without a base compares against: HEAD, or the empty tree before the first commit. */
+export async function headOrEmptyTree(cwd: string): Promise<string> {
+  return (await headCommit(cwd)) ?? (await emptyTree(cwd));
+}
+
+/** The origin remote's URL, or null when the repository has none. */
+export async function originUrl(root: string): Promise<string | null> {
+  try {
+    return (await git(root, ["remote", "get-url", "origin"])).stdout.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function repoInfo(dir: string): Promise<RepoInfo> {
   const root = (await git(dir, ["rev-parse", "--show-toplevel"])).stdout.trim();
-  const headSha = (await git(root, ["rev-parse", "HEAD"])).stdout.trim();
-  const branchOut = (await git(root, ["rev-parse", "--abbrev-ref", "HEAD"])).stdout.trim();
-  const branch = branchOut === "HEAD" ? null : branchOut;
-  let remoteUrl: string | null = null;
-  try {
-    remoteUrl = (await git(root, ["remote", "get-url", "origin"])).stdout.trim() || null;
-  } catch {
-    remoteUrl = null;
-  }
-  return { root, remoteUrl, defaultBranch: await defaultBranch(root), headSha, branch };
+  const headSha = await headCommit(root);
+  // Names the branch before its first commit too; a detached HEAD has none.
+  const branch = (await git(root, ["symbolic-ref", "--short", "--quiet", "HEAD"], { okCodes: [0, 1] })).stdout.trim() || null;
+  return { root, remoteUrl: await originUrl(root), defaultBranch: await defaultBranch(root), headSha, branch };
 }
 
 /** origin/HEAD if it is set, else the first of main or master that exists, else the current branch. */
@@ -76,8 +109,7 @@ export async function revParse(cwd: string, ref: string): Promise<string> {
 /** Changed files versus a base commit, plus untracked files. */
 export async function changedFiles(cwd: string, baseSha: string | null): Promise<FileChange[]> {
   const out: FileChange[] = [];
-  const args = baseSha ? ["diff", "--name-status", "-z", "-M", baseSha] : ["diff", "--name-status", "-z", "-M", "HEAD"];
-  const tracked = (await git(cwd, args)).stdout;
+  const tracked = (await git(cwd, ["diff", "--name-status", "-z", "-M", baseSha ?? (await headOrEmptyTree(cwd))])).stdout;
   const parts = tracked.split("\0");
   for (let i = 0; i < parts.length;) {
     const code = parts[i];
@@ -107,7 +139,7 @@ const MAX_UNTRACKED_DIFF_BYTES = 1024 * 1024;
  */
 export async function patchAgainst(cwd: string, baseSha: string | null): Promise<string> {
   const parts: string[] = [];
-  const base = baseSha ?? "HEAD";
+  const base = baseSha ?? (await headOrEmptyTree(cwd));
   parts.push((await git(cwd, ["diff", "--no-color", "--no-ext-diff", "-M", base], { okCodes: [0, 1] })).stdout);
   const untracked = (await git(cwd, ["ls-files", "--others", "--exclude-standard", "-z"])).stdout.split("\0").filter(Boolean);
   const renderable: string[] = [];
@@ -156,6 +188,7 @@ async function untrackedPatchPerFile(cwd: string, files: string[]): Promise<stri
 }
 
 export async function log(cwd: string, range: string | null, limit = 50): Promise<Commit[]> {
+  if (!range && !(await headCommit(cwd))) return [];
   const args = ["log", `--max-count=${limit}`, "--format=%H%x1f%an%x1f%at%x1f%s"];
   if (range) args.push(range);
   const out = (await git(cwd, args)).stdout;

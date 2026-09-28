@@ -90,7 +90,7 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-Import a repository with the plus button next to Projects, then start a thread with **⌘N**. Workspace conversations can also use folders that are not Git repositories.
+Import a project with the plus button next to Projects, then start a thread with **⌘N**.
 
 Tasks save to the backlog until you start them. Choose a local checkout or isolated worktree in the task's **Execution settings**. New tasks default to **Settings → General → Workspace**; tasks created from a conversation use that thread's location. Changing the location after work starts moves the task's conversation.
 

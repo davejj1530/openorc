@@ -12,38 +12,42 @@ export const queryClient = new QueryClient({
   },
 });
 
+/** Reads whose tags never depend on their parameters. */
+const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
+  "workspace.get": ["workspace"],
+  "slack.status": ["slack"],
+  "system.info": ["system"],
+  "agents.updates.get": ["agent-updates"],
+  "providers.usage": ["provider-usage", "system", "settings"],
+  "agents.models": ["models"],
+  "agents.modelCatalog": ["models"],
+  "memory.settings.get": ["settings"],
+  "app.settings.get": ["settings"],
+  "textGeneration.settings.get": ["text-generation", "system", "models"],
+  "schedules.list": ["schedules", "orchestration"],
+  "orchestration.availability": ["settings", "orchestration"],
+  "projects.list": ["projects"],
+  "projects.checkoutBranch": ["projects", "workspace-diff"],
+  "threads.list": ["threads"],
+  "threads.search": ["threads", "messages"],
+  "files.search": ["files"],
+  "inbox.list": ["inbox", "tasks"],
+};
+
 /**
  * Cache tags per query, matched against the core's invalidation keys and the
  * tags each mutation touches. Every read has at least one tag so no screen
  * can go stale after a write.
  */
 export function tagsFor(method: RpcMethod, params: unknown): string[] {
+  const fixed = fixedTags[method];
+  if (fixed) return [...fixed];
   const p = (params ?? {}) as Record<string, unknown>;
   switch (method) {
-    case "workspace.get":
-      return ["workspace"];
-    case "slack.status":
-      return ["slack"];
-    case "system.info":
-      return ["system"];
-    case "agents.updates.get":
-      return ["agent-updates"];
-    case "providers.usage":
-      return ["provider-usage", "system", "settings"];
-    case "agents.models":
-    case "agents.modelCatalog":
-      return ["models"];
     case "skills.list":
       // Project scoped: importing or removing a project changes what the
       // composer can offer, and a skill added on disk is found by a refetch.
       return ["skills", `project:${String(p["projectId"] ?? "")}`];
-    case "memory.settings.get":
-    case "app.settings.get":
-      return ["settings"];
-    case "textGeneration.settings.get":
-      return ["text-generation", "system", "models"];
-    case "schedules.list":
-      return ["schedules", "orchestration"];
     case "orchestration.list":
     case "orchestration.preflight":
       return ["orchestration", `orchestration:${String(p["projectId"])}`];
@@ -51,8 +55,6 @@ export function tagsFor(method: RpcMethod, params: unknown): string[] {
       return ["orchestration", `team:${String(p["id"])}`];
     case "orchestration.avatars.list":
       return ["orchestration.avatars", `team:${String(p["teamId"])}`];
-    case "orchestration.availability":
-      return ["settings", "orchestration"];
     case "orchestration.turnChanges":
       return [`checkpoints:${String(p["threadId"])}`];
     case "orchestration.runtime":
@@ -65,21 +67,18 @@ export function tagsFor(method: RpcMethod, params: unknown): string[] {
       return ["orchestration", "inbox", "threads", `task:${String(p["taskId"])}`, `comments:${String(p["taskId"])}`];
     case "orchestration.taskRuntime":
       return ["orchestration", "inbox", "tasks", `task:${String(p["taskId"])}`];
-    case "projects.list":
-      return ["projects"];
     case "projects.get":
       return ["projects", `project:${String(p["id"])}`];
+    // Git can appear in a turn, a commit, the terminal or outside the app; focus and settled commands refresh workspace-diff.
+    case "projects.git":
+      return ["projects", "workspace-diff", `projectgit:${String(p["id"])}`];
     case "tasks.list":
       return ["tasks", ...(p["threadId"] ? [`thread:${String(p["threadId"])}`] : [])];
-    case "threads.list":
-      return ["threads"];
     case "threads.plans":
       return [`plans:${String(p["id"])}`];
     case "threads.get":
     case "threads.messages":
       return ["threads", `thread:${String(p["id"])}`];
-    case "threads.search":
-      return ["threads", "messages"];
     case "threads.checkpoints":
       return [`checkpoints:${String(p["id"])}`];
     case "threads.importable":
@@ -91,8 +90,6 @@ export function tagsFor(method: RpcMethod, params: unknown): string[] {
     case "git.threadLog":
     case "git.threadPushState":
       return [`threadlog:${String(p["threadId"])}`, `thread:${String(p["threadId"])}`];
-    case "files.search":
-      return ["files"];
     case "tasks.get":
       return ["tasks", `task:${String(p["id"])}`];
     case "runs.listForTask":
@@ -107,8 +104,6 @@ export function tagsFor(method: RpcMethod, params: unknown): string[] {
       return [`snapshots:${String(p["taskId"])}`];
     case "git.log":
       return [`log:${String(p["taskId"])}`];
-    case "inbox.list":
-      return ["inbox", "tasks"];
     case "tasks.comments.list":
       return [`task-comments:${String(p["taskId"])}`];
     case "review.comments.list":

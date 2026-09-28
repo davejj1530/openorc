@@ -90,6 +90,7 @@ describe("query cache tags", () => {
       "agents.models",
       "projects.list",
       "projects.get",
+      "projects.checkoutBranch",
       "tasks.list",
       "tasks.get",
       "runs.listForTask",
@@ -117,6 +118,24 @@ describe("query cache tags", () => {
       "schedules.list",
     ];
     for (const read of reads) expect(tagsFor(read, params).length, `${read} has no tag`).toBeGreaterThan(0);
+  });
+
+  it("refreshes the checkout branch on the workspace refresh used by focus and terminal commands", async () => {
+    let branch = "prod";
+    const observer = new QueryObserver(queryClient, {
+      queryKey: ["projects.checkoutBranch", { id: "p1" }],
+      meta: { tags: tagsFor("projects.checkoutBranch", { id: "p1" }) },
+      queryFn: async () => branch,
+    });
+    const unsubscribe = observer.subscribe(() => {});
+    try {
+      await vi.waitFor(() => expect(observer.getCurrentResult().data).toBe("prod"));
+      branch = "hotfix";
+      invalidateTags(["workspace-diff"], { immediate: true });
+      await vi.waitFor(() => expect(observer.getCurrentResult().data).toBe("hotfix"));
+    } finally {
+      unsubscribe();
+    }
   });
 
   // Diffs are not polled, so a refresh pushed while a slow read is loading must still produce a read that starts after it.

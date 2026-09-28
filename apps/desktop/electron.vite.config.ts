@@ -8,7 +8,7 @@ import typegpu from "unplugin-typegpu/vite";
 // carry platform binaries or resolve their own, so they must be direct
 // dependencies of this app to resolve from its node_modules.
 // Packaging audits the compiled imports against scripts/packaged-runtime-dependencies.cjs.
-const nodeExternals = ["electron", "electron-updater", "node-pty", "sqlite-vec", "fastembed", "onnxruntime-node"];
+const nodeExternals = ["electron", /^electron-updater(?:\/|$)/, "node-pty", "sqlite-vec", "fastembed", "onnxruntime-node"];
 
 export default defineConfig(({ mode }) => {
   // Test switches (autorun, benchmarks, screenshots) exist only in development and QA builds. OPENORC_QA_BUILD=1 keeps

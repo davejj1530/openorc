@@ -1,18 +1,28 @@
 .download-page {
-  max-width: 1020px;
-  padding-block: clamp(64px, 9vw, 112px) var(--section-space);
+  --download-copy-size: clamp(0.8rem, 1vw, 1.2rem);
+  padding-block: clamp(42px, 4vw, 60px) var(--section-space);
 }
 .download-intro {
-  padding-bottom: clamp(48px, 7vw, 80px);
+  padding-bottom: 48px;
 }
 .download-intro h1 {
-  font-size: clamp(2.75rem, 6vw, 4.5rem);
-  letter-spacing: -0.035em;
+  max-width: 21ch;
+  font-size: clamp(2.75rem, 4.2vw, 3.75rem);
+  font-weight: 420;
+  line-height: 1.03;
+  letter-spacing: -0.036em;
+}
+.download-intro h1 span {
+  background: linear-gradient(100deg, #8d9098 0%, #c9ccd2 34%, #eef0f2 47%, #b4b8bf 61%, #8a8e96 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 .download-intro > p {
-  max-width: 48ch;
-  margin-top: 24px;
-  font-size: clamp(1rem, 1.7vw, 1.125rem);
+  max-width: 62ch;
+  margin-top: 20px;
+  font-size: var(--download-copy-size);
+  line-height: 1.55;
 }
 .download-intro .download-version {
   display: flex;
@@ -36,19 +46,19 @@
   text-underline-offset: 0.25em;
 }
 .download-installers h2,
-.download-empty h2,
-.download-help h2 {
+.download-empty h2 {
   max-width: none;
-  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-size: var(--type-title);
+  line-height: 1.35;
 }
 .download-device-hint {
   max-width: 66ch;
-  margin-top: 16px;
-  min-height: 3.3em;
+  margin-top: 12px;
+  font-size: var(--download-copy-size);
 }
 .download-list {
   padding: 0;
-  margin: 28px 0 0;
+  margin: 24px 0 0;
   list-style: none;
   border-top: 1px solid var(--rule);
 }
@@ -57,22 +67,22 @@
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  padding-block: 30px;
+  padding-block: 20px;
   border-bottom: 1px solid var(--rule);
 }
 .download-platform h3 {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
-  gap: 8px 16px;
-  font-size: 1.5rem;
+  gap: 4px 12px;
+  font-size: var(--type-title);
 }
 .download-platform h3 span {
   color: var(--muted);
-  font-size: var(--type-body);
+  font-size: var(--type-control);
 }
 .download-platform p {
-  margin-top: 9px;
+  margin-top: 8px;
   font-size: var(--type-control);
 }
 .download-recommendation {
@@ -84,9 +94,9 @@
 .download-file {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-end;
   flex-shrink: 0;
-  gap: 10px;
+  gap: 8px;
 }
 .download-file > span {
   color: var(--muted);
@@ -98,31 +108,43 @@
   font-size: var(--type-control);
 }
 .download-empty {
-  border-block: 1px solid var(--rule);
-  padding-block: 36px;
+  border-top: 1px solid var(--rule);
+  padding-top: 24px;
 }
 .download-empty p {
-  margin-top: 16px;
+  margin-top: 12px;
+  font-size: var(--download-copy-size);
 }
-.download-empty .text-link,
-.download-help .text-link {
-  margin-top: 16px;
+.download-empty .text-link {
+  margin-top: 12px;
   color: var(--accent);
 }
-.download-help {
-  max-width: 60ch;
-  padding-top: clamp(56px, 8vw, 88px);
-}
-.download-help p {
-  margin-top: 16px;
+@media (max-width: 700px) {
+  .download-page {
+    --download-copy-size: 0.8rem;
+    padding-top: 66px;
+  }
+  .download-intro {
+    padding-bottom: 32px;
+  }
+  .download-intro h1 {
+    font-size: clamp(2.2rem, 9.5vw, 3rem);
+    letter-spacing: -0.035em;
+  }
 }
 @media (max-width: 600px) {
   .download-row {
     align-items: flex-start;
     flex-direction: column;
-    gap: 20px;
+    gap: 16px;
   }
   .download-file {
     align-items: flex-start;
+  }
+}
+@media (forced-colors: active) {
+  .download-intro h1 span {
+    background: none;
+    color: CanvasText;
   }
 }

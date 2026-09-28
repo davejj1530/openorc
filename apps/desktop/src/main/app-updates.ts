@@ -13,15 +13,11 @@ type Updater = Pick<AppUpdater, "checkForUpdates" | "downloadUpdate" | "quitAndI
   Pick<EventEmitter, "on" | "removeListener">;
 const detail = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
-/**
- * GitHub answers 404 for the latest release until a stable one exists, and electron-updater reports that as a failed
- * check. Stable builds are the only ones offered, so for an installed build it means nothing newer is published yet.
- * The same error code also wraps network failures; only the 404 is treated as "nothing to install".
- */
-function noStableRelease(error: unknown): boolean {
+/** Missing metadata and network failures must remain visible; only an empty release feed means no update. */
+function noPublishedRelease(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   const code = (error as Error & { code?: unknown }).code;
-  return code === "ERR_UPDATER_NO_PUBLISHED_VERSIONS" || (code === "ERR_UPDATER_LATEST_VERSION_NOT_FOUND" && /HttpError: 404\b/.test(error.message));
+  return code === "ERR_UPDATER_NO_PUBLISHED_VERSIONS";
 }
 
 /** Owns update policy. Only an explicit install may drain the core and hand control to the installer. */
@@ -39,7 +35,7 @@ export class AppUpdates {
     this.current = disabledReason ? { phase: "disabled", reason: disabledReason } : { phase: "idle" };
     updater.autoDownload = false;
     updater.autoInstallOnAppQuit = false;
-    updater.allowPrerelease = false;
+    updater.allowPrerelease = true;
     updater.allowDowngrade = false;
     // electron-updater sends a random ID, which it keeps in the profile's .updaterId, with every request so a release
     // can reach a percentage of installs first. OpenOrc releases to everyone at once, so every install sends it empty.
@@ -91,7 +87,7 @@ export class AppUpdates {
         if (!result) throw new Error("Updates are unavailable in this build.");
         this.set(result.isUpdateAvailable ? { phase: "available", version: result.updateInfo.version } : { phase: "current" });
       } catch (error) {
-        this.set(noStableRelease(error) ? { phase: "current" } : { phase: "error", message: detail(error) });
+        this.set(noPublishedRelease(error) ? { phase: "current" } : { phase: "error", message: detail(error) });
       }
     });
   }

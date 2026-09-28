@@ -362,9 +362,9 @@ async function verify() {
   );
   let session = await launch();
   const updateMenu = await session.main(
-    `(() => { const item = smoke.electron.Menu.getApplicationMenu()?.getMenuItemById('app-update'); const updater = smoke.require('electron-updater').autoUpdater; return { label: item?.label, enabled: item?.enabled, autoDownload: updater.autoDownload, autoInstallOnAppQuit: updater.autoInstallOnAppQuit }; })()`,
+    `(() => { const item = smoke.electron.Menu.getApplicationMenu()?.getMenuItemById('app-update'); const updater = smoke.require('electron-updater').autoUpdater; return { label: item?.label, enabled: item?.enabled, autoDownload: updater.autoDownload, autoInstallOnAppQuit: updater.autoInstallOnAppQuit, allowPrerelease: updater.allowPrerelease, allowDowngrade: updater.allowDowngrade }; })()`,
   );
-  assert.deepEqual(updateMenu, { label: "Check for updates…", enabled: true, autoDownload: false, autoInstallOnAppQuit: false });
+  assert.deepEqual(updateMenu, { label: "Check for updates…", enabled: true, autoDownload: false, autoInstallOnAppQuit: false, allowPrerelease: true, allowDowngrade: false });
   console.log("PASS packaged updater dependency, native menu, and explicit download/install policy");
   await verifyUpdateDownload(session);
   if (updatesOnly) {

@@ -19,7 +19,7 @@ The development server defaults to `http://localhost:4321`. Production output is
 
 All Download buttons open `/download/`, which highlights a matching installer when the browser reports its platform and architecture. Detection uses [User-Agent Client Hints](https://developer.chrome.com/docs/privacy-security/user-agent-client-hints) where available. It does not infer Intel hardware from a MacIntel user agent, which Apple Silicon Macs can also report. When Mac architecture is unavailable, visitors choose Apple Silicon or Intel and receive instructions for finding their chip. Mobile visitors, unsupported platforms and uncertain Windows architectures receive manual choices. With JavaScript disabled, all links and choices remain usable. Device information is neither stored nor sent by the download code.
 
-Windows beta installers are labeled unsigned when their published filename carries that designation. Beta updates are installed manually. The client never requests GitHub's releases API; release metadata is embedded at build time using the same cached request as the changelog.
+Windows beta installers are labeled unsigned when their published filename carries that designation. The app offers newer published stable and beta releases through its updater; see `docs/desktop-updates.md` for the one-time migration from older builds. The client never requests GitHub's releases API; release metadata is embedded at build time using the same cached request as the changelog.
 
 ## Changelog
 

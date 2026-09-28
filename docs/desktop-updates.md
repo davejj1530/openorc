@@ -4,7 +4,9 @@
 
 Installed macOS and Windows releases update from public GitHub Releases. On macOS, use **OpenOrc → Check for updates…**; on Windows, use **Help → Check for updates…**. OpenOrc also checks 30 seconds after it starts and every six hours. To stop the automatic checks, turn off **Check for updates automatically** in Settings → General → Updates. A background check only changes the menu item: downloading and restarting to install both need you to choose them. Development builds and local packages without an update feed never check.
 
-Only stable releases are offered, so the updater never downgrades. Drafts and prereleases, including beta releases, are not offered; install a newer beta by hand.
+Published stable and beta releases are offered to everyone when their version is newer than the installed version. Drafts are not offered, and the updater never downgrades. Every release must use a higher version number.
+
+Versions through `0.1.0-beta.4` shipped with stable-only checks. Those installations need a one-time manual installation of the first beta containing this change, or an update to a newer stable release, before they can receive future beta updates.
 
 Restarting to install waits until nothing is in progress: agent turns, approvals, context maintenance, unfinished teams, pending requests, scheduled runs that are starting, memory processing, coding-agent updates, and running terminal panels. Idle agent sessions close normally. Once the app agrees, it holds new agent turns and terminals, finishes writing its data, and waits for the core process to exit cleanly before the installer starts. OpenOrc never stops a running agent to force an update. If shutdown cannot be confirmed or the installer fails, quit and reopen the app before trying again.
 
@@ -34,7 +36,7 @@ Keep certificates and keys in CI secrets. The workflow writes the notarization k
 1. Set `apps/desktop/package.json` to a non-zero version, such as `0.1.0` or `0.1.0-beta.1`. Once CI passes, commit the change and push its matching tag, such as `v0.1.0-beta.1`. Never move an existing release tag.
 2. Run **Desktop release** for that tag. The workflow pins its commit and builds on native macOS arm64, macOS x64, and Windows x64 runners. It requires macOS signing and notarization, and normally requires Windows signing. It builds macOS DMG and ZIP files and Windows NSIS installers, checks packaged startup and update behavior, and installs the Windows candidate on its disposable runner before uploading artifacts.
 3. Enable **create_draft** to attach successful builds, update metadata, and `SHA256SUMS.txt` to a new draft release. Existing releases are not overwritten. Download the assets and complete the checks under [Before publishing](#before-publishing). Review the tag and update destination. In the draft's notes, replace the comment under **Highlights** with 2 to 5 user-facing bullets and check the **Install notes**, then publish on GitHub. The website changelog shows those highlights once the release is public.
-4. Keep all installer, ZIP, blockmap, and update YAML assets. The channels are `latest-arm64` and `latest-x64`, so each macOS architecture has its own metadata file (`latest-arm64-mac.yml`, `latest-x64-mac.yml`); Windows uses `latest-x64.yml`. This keeps parallel builds from overwriting each other's update feed. electron-builder embeds the channel and release repository in `app-update.yml`. Do not change either after shipping without a migration plan.
+4. Keep all installer, ZIP, blockmap, and update YAML assets. The channels are `latest-arm64` and `latest-x64`, so each macOS architecture has its own metadata file (`latest-arm64-mac.yml`, `latest-x64-mac.yml`); Windows uses `latest-x64.yml`. This keeps parallel builds from overwriting each other's update feed. electron-builder embeds the channel and release repository in `app-update.yml`. The updater preserves this architecture-specific channel when discovering both stable and beta releases. Do not change it or the repository after shipping without a migration plan.
 
 The [electron-builder update guide](https://www.electron.build/v26/docs/features/auto-update/) explains the metadata and why macOS needs the ZIP.
 
@@ -46,7 +48,7 @@ A beta tag such as `v0.1.0-beta.1` can opt into **unsigned_windows_beta**. The w
 
 The Windows installer filename includes `-unsigned`, and the draft release notes say so. It has no verified Windows publisher. Windows may warn about an unrecognized app or block it under stricter policies. Keep that notice beside the website's Windows beta download. Do not describe checksums or build attestations as Windows signing.
 
-Beta tags create prereleases, which installed apps do not offer as updates. Draft assets are visible only to people with write access to the repository, and installed apps see a release only after it is published. No access token is embedded in the application.
+Beta tags create prereleases, which updated installations offer alongside stable releases. Draft assets are visible only to people with write access to the repository, and installed apps see a release only after it is published. No access token is embedded in the application.
 
 For a local Windows beta build, set `OPENORC_UNSIGNED_WINDOWS_BETA` to the beta package version along with `RELEASE_TAG` and `OPENORC_RELEASE_REPOSITORY`. Executable icon and version editing still run; only Authenticode signing is skipped.
 

@@ -157,6 +157,16 @@ function agent(permissionMode: PermissionPreset = "autonomous", overrides: Parti
 const eventTypes = (events: AgentEvent[]) => events.map((event) => event.type);
 
 describe("AcpAdapter", () => {
+  it("loads no opencode.json or .opencode plugins from an unvetted checkout", () => {
+    for (const untrustedCheckout of [true, false]) {
+      const s = agent("autonomous", { untrustedCheckout });
+      try {
+        expect(vi.mocked(spawn).mock.lastCall![2]!.env!["OPENCODE_DISABLE_PROJECT_CONFIG"]).toBe(untrustedCheckout ? "true" : process.env["OPENCODE_DISABLE_PROJECT_CONFIG"]);
+      } finally {
+        s.handle.close();
+      }
+    }
+  });
   it.each(["review", "trusted"] as const)("rejects unsupported strict %s before spawning", (preset) => {
     vi.mocked(spawn).mockClear();
     expect(() => agent(preset)).toThrow("cannot currently guarantee approval");

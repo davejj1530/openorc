@@ -99,6 +99,16 @@ function planInstructions(mode: RunSpec["mode"], mcpUrl: string | undefined, ser
   return `${delivery} Use read, glob and grep for investigation; shell, edits and native subagents are blocked in Plan.`;
 }
 
+/** OpenCode's environment for a run: the app's question tool and Plan agent, and nothing from an unvetted checkout. */
+function openCodeEnv(base: NodeJS.ProcessEnv, spec: RunSpec, askUser: boolean): NodeJS.ProcessEnv {
+  const env = { ...base };
+  if (askUser) env["OPENCODE_CONFIG_CONTENT"] = questionConfig(env["OPENCODE_CONFIG_CONTENT"]);
+  if (spec.mode === "plan") env["OPENCODE_CONFIG_CONTENT"] = planConfig(env["OPENCODE_CONFIG_CONTENT"], spec.internalMcp);
+  // A folder's opencode.json and .opencode plugins are code: an unvetted checkout's never load.
+  if (spec.untrustedCheckout) env["OPENCODE_DISABLE_PROJECT_CONFIG"] = "true";
+  return env;
+}
+
 export class AcpAdapter {
   constructor(private readonly options: AcpAdapterOptions) {}
 
@@ -144,10 +154,8 @@ export class AcpAdapter {
     const serverName = spec.internalMcp?.serverName ?? this.options.mcpServerName ?? "openorc";
     const mcpUrl = spec.internalMcp?.url ?? spec.mcpUrl;
     const mcpServers: McpServer[] = mcpUrl ? [{ type: "http", name: serverName, url: mcpUrl, headers: [] }] : [];
-    const env: NodeJS.ProcessEnv = { ...launch.env, ...this.options.env };
     const askUser = Boolean(mcpUrl && spec.internalMcp?.toolNames.includes("ask_user"));
-    if (askUser) env["OPENCODE_CONFIG_CONTENT"] = questionConfig(env["OPENCODE_CONFIG_CONTENT"]);
-    if (spec.mode === "plan") env["OPENCODE_CONFIG_CONTENT"] = planConfig(env["OPENCODE_CONFIG_CONTENT"], spec.internalMcp);
+    const env = openCodeEnv({ ...launch.env, ...this.options.env }, spec, askUser);
     const startedAt = Date.now();
     const proc = spawnAgentProcess(launch.binary, ["acp"], { cwd: spec.cwd, env, registry: launch.processRegistry });
     const mapper = new AcpUpdateMapper(spec.runId);

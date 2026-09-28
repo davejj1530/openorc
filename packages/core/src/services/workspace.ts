@@ -414,13 +414,13 @@ export class WorkspaceService {
     this.log.warn("this repo uses husky; commits in the worktree will fail until dependencies are installed. Add an install step to the project's setup script.");
   }
 
-  /** Fetches the base from origin when it is a branch there, so tasks start from what the team sees. */
   /** The branch a worktree starts from by name, `HEAD` being whatever the checkout is on. Null for a commit or a detached checkout. */
   private async startBranch(project: Project, baseRef: string): Promise<string | null> {
     if (baseRef !== "HEAD") return /^[0-9a-f]{40,64}$/.test(baseRef) ? null : baseRef;
     return (await git(project.rootPath, ["symbolic-ref", "--short", "-q", "HEAD"], { okCodes: [0, 1] })).stdout.trim() || null;
   }
 
+  /** Fetches the base from origin when it is a branch there, so tasks start from what the team sees. */
   private async resolveStartPoint(project: Project, baseRef: string): Promise<string> {
     this.assertOpen();
     await assertCanBranch(project);

@@ -68,6 +68,8 @@ async function snapshot(): Promise<Record<string, unknown>> {
     jsHeapMb: mem ? Math.round(mem.usedJSHeapSize / 1048576) : null,
     eventsReceived: received.eventsReceived,
     framesReceived: received.framesReceived,
+    visibility: document.visibilityState,
+    focused: document.hasFocus(),
   };
 }
 
@@ -82,8 +84,10 @@ function installBench(): void {
   let phase: "bench" | "scale" = "bench";
   useRouter.getState().navigate({ view: "diagnostics" });
   core.onReady(() => {
+    beginBenchmarkFrames();
     setTimeout(async () => {
-      window.openorc.report({ kind: "idle", ...(await snapshot()) });
+      const frames = finishBenchmarkFrames();
+      window.openorc.report({ kind: "idle", frames, ...(await snapshot()) });
       beginBenchmarkFrames();
       await core.call("bench.start", BENCH);
     }, 3000);
@@ -103,6 +107,7 @@ function installBench(): void {
           sent: result,
           samples,
           longFramesTotal: measurement.longFramesTotal,
+          longestFrameMs: measurement.longestFrameMs,
           measurementDurationMs: measurement.durationMs,
           ...(await snapshot()),
         });

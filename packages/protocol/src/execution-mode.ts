@@ -12,10 +12,10 @@ export const executionModeLabel: Record<ExecutionMode, string> = {
   autonomous: "Autonomous",
 };
 export const executionModeHint: Record<ExecutionMode, string> = {
-  plan: "Investigate and propose a plan. Project changes, external writes, browser input, and memory changes are blocked.",
-  review: "Read and search freely. Every command, edit, external write, browser input, and memory change asks first.",
-  trusted: "Allow workspace file edits and memory changes. Every command, external write, and browser input asks first.",
-  autonomous: "Tool permissions run automatically. Questions and password fields still ask.",
+  plan: "Read-only, proposes a plan",
+  review: "Asks before every command or edit",
+  trusted: "Edits files, asks before commands",
+  autonomous: "Runs tools without asking",
 };
 export function executionMode(mode: RunMode, permission: PermissionPreset): ExecutionMode {
   return mode === "plan" ? "plan" : permission;
@@ -31,18 +31,22 @@ export function stricterPermission(a: PermissionPreset, b: PermissionPreset): Pe
 export function executionModePresentation(agent: AgentKind | undefined, mode: ExecutionMode): { label: string; hint: string } {
   if (agent === "codex" && mode !== "plan") {
     return {
-      review: { label: "Review changes", hint: "Read-only sandbox. Reads and read-only commands run freely; changes and sandbox escalation ask you for approval." },
-      trusted: { label: "Ask for approval", hint: "Workspace edits and sandboxed commands run freely. Network access and actions outside the sandbox ask you for approval." },
-      autonomous: { label: "Full access", hint: "Codex runs without a sandbox or tool approval prompts. Questions that need your input still ask." },
+      review: { label: "Review changes", hint: "Read-only, asks before changes" },
+      trusted: { label: "Ask for approval", hint: "Asks only outside the sandbox" },
+      autonomous: { label: "Full access", hint: "No sandbox, no approval prompts" },
     }[mode];
   }
   return { label: executionModeLabel[mode], hint: executionModeHint[mode] };
 }
 
+/** OpenCode offers only Plan and Autonomous, since this integration cannot make it ask before each command. */
+export function executionModeAvailable(agent: AgentKind | undefined, mode: ExecutionMode): boolean {
+  return !((agent === "opencode" || agent === "acp") && (mode === "review" || mode === "trusted"));
+}
+
 export function executionModeUnavailable(agent: AgentKind, mode: ExecutionMode): string | null {
-  if ((agent === "opencode" || agent === "acp") && (mode === "review" || mode === "trusted"))
-    return `OpenCode cannot currently guarantee approval before every command through this integration. Choose Claude for ${executionModeLabel[mode]}, or explicitly choose another mode.`;
-  return null;
+  if (executionModeAvailable(agent, mode)) return null;
+  return `OpenCode cannot currently guarantee approval before every command through this integration. Choose Claude for ${executionModeLabel[mode]}, or explicitly choose another mode.`;
 }
 
 export interface ConversationPlan {

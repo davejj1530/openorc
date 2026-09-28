@@ -1,6 +1,16 @@
 import { relayClientStatus, relayHostStatus } from "./settings-presentation";
 import { useState } from "react";
-import { harnessCatalog, harnessIds, ExecutionMode, executionMode, executionModeSettings, executionModePresentation, executionModeUnavailable, type SlackClientConfig } from "@openorc/protocol";
+import {
+  harnessCatalog,
+  harnessIds,
+  ExecutionMode,
+  executionMode,
+  executionModeAvailable,
+  executionModeSettings,
+  executionModePresentation,
+  executionModeUnavailable,
+  type SlackClientConfig,
+} from "@openorc/protocol";
 import { Badge, Button, Input, Select } from "../components/ui";
 import { useRpc } from "../lib/query";
 import { Field, LoadError, Section } from "./settings-shared";
@@ -95,7 +105,7 @@ function RelaySlackSettings({ active }: { active: boolean }) {
             onChange={(e) => updateConfig(executionModeSettings(e.target.value as ExecutionMode))}
           >
             {ExecutionMode.options.map((value) => (
-              <option key={value} value={value}>
+              <option key={value} value={value} hidden={!executionModeAvailable(config.agent, value)}>
                 {executionModePresentation(config.agent, value).label}
               </option>
             ))}

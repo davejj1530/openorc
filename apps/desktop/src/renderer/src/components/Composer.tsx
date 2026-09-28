@@ -1,5 +1,14 @@
 import { useEffect, useState, type ComponentType, type ReactNode } from "react";
-import { ExecutionMode, executionMode, executionModeSettings, executionModePresentation, executionModeUnavailable, type PermissionPreset, type RunMode } from "@openorc/protocol";
+import {
+  ExecutionMode,
+  executionMode,
+  executionModeAvailable,
+  executionModeSettings,
+  executionModePresentation,
+  executionModeUnavailable,
+  type PermissionPreset,
+  type RunMode,
+} from "@openorc/protocol";
 import { ArrowUp, ChevronDown, Clock, FileText, GitBranch, Laptop, Plus, Square, X } from "./icons";
 import { Menu } from "@base-ui/react/menu";
 import { Popover } from "@base-ui/react/popover";
@@ -331,7 +340,11 @@ export function Composer(props: ComposerProps) {
             <ComposerChoice
               ariaLabel="Mode"
               value={executionMode(props.mode, props.permission)}
-              options={ExecutionMode.options.map((value) => ({ value, ...executionModePresentation(props.model?.agent, value) }))}
+              options={ExecutionMode.options.map((value) => ({
+                value,
+                ...executionModePresentation(props.model?.agent, value),
+                hidden: !executionModeAvailable(props.model?.agent, value),
+              }))}
               onChange={(value) => {
                 const next = executionModeSettings(value);
                 if (props.onExecutionMode) props.onExecutionMode(next);
@@ -500,7 +513,8 @@ export function ComposerChoice<T extends string>({
   className,
 }: {
   value: T;
-  options: readonly { value: T; label: string; hint?: string; icon?: ComponentType<{ size?: number }> }[];
+  /** A hidden option can still be the current value; the menu just doesn't offer it. */
+  options: readonly { value: T; label: string; hint?: string; icon?: ComponentType<{ size?: number }>; hidden?: boolean }[];
   onChange: (value: T) => void;
   disabled?: boolean;
   disabledReason?: string;
@@ -527,12 +541,14 @@ export function ComposerChoice<T extends string>({
         <CoversPreview />
         <Menu.Positioner side="top" align="end" sideOffset={6} collisionPadding={8}>
           <Menu.Popup className="menu-popup w-64 rounded-lg border border-line bg-surface p-1 shadow-panel outline-none">
-            {options.map((o) => (
-              <Menu.Item key={o.value} className="grid gap-0.5 px-2 py-1.5 rounded-md cursor-pointer data-[highlighted]:bg-surface-2 outline-none" onClick={() => onChange(o.value)}>
-                <span className={cn("text-base", value === o.value ? "text-ink font-medium" : "text-ink-2")}>{o.label}</span>
-                {o.hint ? <span className="text-xs text-ink-3">{o.hint}</span> : null}
-              </Menu.Item>
-            ))}
+            {options
+              .filter((o) => !o.hidden)
+              .map((o) => (
+                <Menu.Item key={o.value} className="grid gap-0.5 px-2 py-1.5 rounded-md cursor-pointer data-[highlighted]:bg-surface-2 outline-none" onClick={() => onChange(o.value)}>
+                  <span className={cn("text-base", value === o.value ? "text-ink font-medium" : "text-ink-2")}>{o.label}</span>
+                  {o.hint ? <span className="text-xs text-ink-3">{o.hint}</span> : null}
+                </Menu.Item>
+              ))}
           </Menu.Popup>
         </Menu.Positioner>
       </Menu.Portal>

@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_TEAM_LIMITS, harnessIds, type Project, type RpcResults, type TeamDetail } from "@openorc/protocol";
+import { DEFAULT_TEAM_LIMITS, WORKSPACE_ID, harnessIds, type Project, type RpcResults, type TeamDetail } from "@openorc/protocol";
 import { readNewThreadDraft, writeNewThreadDraft } from "../lib/new-thread-draft";
 import { useRouter } from "../lib/router";
 
@@ -10,11 +10,15 @@ let projects: Project[];
 let teams: TeamDetail[];
 let models: RpcResults["agents.models"];
 let system: RpcResults["system.info"];
+let branches: Record<string, string | null | undefined>;
+let branchError: boolean;
 
 vi.mock("../lib/query", () => ({
-  useRpc: (method: string) => {
+  useRpc: (method: string, params: { id?: string }) => {
     const data: Record<string, unknown> = {
       "projects.list": projects,
+      "projects.git": "ready",
+      "projects.checkoutBranch": branches[params.id ?? ""],
       "workspace.get": undefined,
       "system.info": system,
       "agents.models": models,
@@ -22,7 +26,7 @@ vi.mock("../lib/query", () => ({
       "orchestration.list": teams,
       "orchestration.availability": { enabled: true, reason: null, maxHierarchyDepth: 3 },
     };
-    return { data: data[method], isError: false, isPending: false, isLoading: false, error: null, refetch: vi.fn() };
+    return { data: data[method], isError: method === "projects.checkoutBranch" && branchError, isPending: false, isLoading: false, error: null, refetch: vi.fn() };
   },
   useRpcMutation: (method: string) =>
     method === "threads.start" ? { mutateAsync: start, reset: resetStart, isPending: false, error: null } : { mutateAsync: vi.fn(), mutate: vi.fn(), reset: vi.fn(), isPending: false, error: null },
@@ -57,6 +61,8 @@ afterEach(cleanup);
 beforeEach(() => {
   localStorage.clear();
   projects = [makeProject("p1"), makeProject("p2")];
+  branches = { p1: "prod", p2: "release" };
+  branchError = false;
   teams = [];
   models = [{ id: "codex-model", label: "Codex", agent: "codex", isDefault: true, efforts: ["medium"], defaultEffort: "medium" }];
   system = {
@@ -77,6 +83,47 @@ function saveModelDraft(projectId: string, prompt: string) {
 }
 
 describe("NewThread", () => {
+  it("shows the checked-out prod branch when the project default is dev", () => {
+    projects[0]!.defaultBranch = "dev";
+    const { container } = render(<NewThread projectId="p1" />);
+    expect(container.querySelector(".composer-branch")?.textContent).toBe("prod");
+  });
+
+  it("updates the branch after a checkout refresh", () => {
+    const view = render(<NewThread projectId="p1" />);
+    expect(view.container.querySelector(".composer-branch")?.textContent).toBe("prod");
+    branches.p1 = "hotfix";
+    view.rerender(<NewThread projectId="p1" />);
+    expect(view.container.querySelector(".composer-branch")?.textContent).toBe("hotfix");
+  });
+
+  it.each([null, undefined])("does not substitute the default branch when the checkout branch is %s", (branch) => {
+    branches.p1 = branch;
+    const { container } = render(<NewThread projectId="p1" />);
+    expect(container.querySelector(".composer-branch")).toBeNull();
+  });
+
+  it("hides a stale checkout branch if refreshing it fails", () => {
+    branchError = true;
+    const { container } = render(<NewThread projectId="p1" />);
+    expect(container.querySelector(".composer-branch")).toBeNull();
+  });
+
+  it("keeps the default branch as the starting point for a new worktree", () => {
+    projects[0]!.defaultBranch = "dev";
+    writeNewThreadDraft({ ...readNewThreadDraft("p1"), workspace: "worktree" });
+    const { container } = render(<NewThread projectId="p1" />);
+    expect(container.querySelector(".composer-branch")?.textContent).toBe("dev");
+  });
+
+  it("shows the selected folder without a branch in Workspace", () => {
+    projects = [makeProject(WORKSPACE_ID)];
+    writeNewThreadDraft({ ...readNewThreadDraft(WORKSPACE_ID), workingDirectory: "/chosen/folder" });
+    const { container } = render(<NewThread projectId={WORKSPACE_ID} />);
+    expect(container.querySelector(".composer-branch")).toBeNull();
+    expect(screen.getByText("/chosen/folder")).toBeTruthy();
+  });
+
   it("starts a recovered draft from the keyboard and opens the accepted thread", async () => {
     saveModelDraft("p1", "Recovered request");
     render(<NewThread projectId="p1" />);
@@ -93,8 +140,10 @@ describe("NewThread", () => {
     saveModelDraft("p2", "Second project");
     const view = render(<NewThread projectId="p1" />);
     expect(screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Message" }).value).toBe("First project");
+    expect(view.container.querySelector(".composer-branch")?.textContent).toBe("prod");
     view.rerender(<NewThread projectId="p2" />);
     expect(screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Message" }).value).toBe("Second project");
+    expect(view.container.querySelector(".composer-branch")?.textContent).toBe("release");
     expect(readNewThreadDraft("p1").prompt).toBe("First project");
   });
 

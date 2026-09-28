@@ -27,6 +27,7 @@ const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
   "schedules.list": ["schedules", "orchestration"],
   "orchestration.availability": ["settings", "orchestration"],
   "projects.list": ["projects"],
+  "projects.checkoutBranch": ["projects", "workspace-diff"],
   "threads.list": ["threads"],
   "threads.search": ["threads", "messages"],
   "files.search": ["files"],

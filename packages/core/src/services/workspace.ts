@@ -29,14 +29,22 @@ export function assertLossAccepted(loss: RemovalImpact, accepted: BranchLoss | u
 }
 
 /**
- * Where work in the project folder starts: HEAD and its branch, or nothing for a folder without git. `start` is HEAD,
- * or the empty tree before the first commit, so a thread's first turn keeps a comparison that a later commit never
- * replaces. Tasks keep HEAD alone: their commit list and base need a commit.
+ * Where work in the project folder starts: HEAD and its branch. `start` is HEAD, or the empty tree while nothing is
+ * committed, a folder without git included, so a thread's first turn keeps a comparison that a later `git init` or
+ * commit never replaces. Tasks keep HEAD alone: their commit list and base need a commit.
  */
-async function checkoutStart(project: Project): Promise<{ headSha: string | null; start: string | null; branch: string | null }> {
-  if ((await projectGit(project)) === "none") return { headSha: null, start: null, branch: null };
+async function checkoutStart(project: Project): Promise<{ headSha: string | null; start: string; branch: string | null }> {
+  if ((await projectGit(project)) === "none") return { headSha: null, start: await emptyTree(project.rootPath), branch: null };
   const info = await repoInfo(project.rootPath);
   return { headSha: info.headSha, start: info.headSha ?? (await emptyTree(project.rootPath)), branch: info.branch };
+}
+
+/**
+ * Whether the project folder is a repository of its own, so git housekeeping may run there. Workspace and a folder
+ * without git are not, and a plain folder can sit inside another repository that must stay untouched.
+ */
+async function ownsRepository(project: Project): Promise<boolean> {
+  return (await projectGit(project).catch(() => "none" as const)) !== "none";
 }
 
 export function slugify(title: string): string {
@@ -329,7 +337,7 @@ export class WorkspaceService {
 
   async cleanup(task: Task, project: Project, options: { deleteBranch?: boolean; force?: boolean; acceptLoss?: BranchLoss } = {}, inherited?: WorkspaceLease): Promise<Task> {
     this.assertOpen();
-    if (project.id === WORKSPACE_ID) return task;
+    if (!(await ownsRepository(project))) return task;
     // Deleting/archiving a task record must not remove a conversation's workspace.
     if (task.worktreePath && threads.list(this.db, { projectId: project.id, filter: "all" }).some((thread) => thread.worktreePath === task.worktreePath)) return task;
     if ((taskForwardings.target(this.db, task.id) ?? taskForwardings.source(this.db, task.id))?.state === "preparing")

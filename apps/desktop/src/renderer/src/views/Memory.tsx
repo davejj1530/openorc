@@ -90,7 +90,7 @@ export function Memory() {
         Loading projects…
       </p>
     );
-  else if (!projectId) status = <Empty title="No project yet">Import a repository to browse its saved knowledge.</Empty>;
+  else if (!projectId) status = <Empty title="No project yet">Import a project to browse its saved knowledge.</Empty>;
   return (
     <>
       <TopBar

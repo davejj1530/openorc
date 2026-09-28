@@ -11,6 +11,8 @@ interface QueryState<T> {
 export interface NewThreadAvailabilityInput {
   projectId: string;
   projects: Project[] | undefined;
+  /** Why the project can't have worktrees or teams yet, if it can't. */
+  teamBlocker: string | null;
   projectsFailed: boolean;
   permissionReady: boolean;
   target: NewThreadTarget;
@@ -41,6 +43,7 @@ export function evaluateNewThreadAvailability(input: NewThreadAvailabilityInput)
   if (availability.failed) gateReason = "Team availability could not load. Retry to continue.";
   else if (!availability.data) gateReason = "Checking team availability…";
   else if (!availability.data.enabled) gateReason = availability.data.reason ?? "Enable team execution in Settings to start a team.";
+  else gateReason = input.teamBlocker;
 
   const providerIssue = (settings: ModelChoice, memberName?: string): string | null => {
     const prefix = memberName ? `${memberName}: ` : "";

@@ -3,8 +3,9 @@ import { randomUUID } from "node:crypto";
 import { access, mkdir, realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { audit, comments, orchestration, projects, snapshots, tasks, teamDeletedThreads, teamRuntime, teamTasks, threads, type Db, type ReviewCommentScope } from "@openorc/db";
-import { changedFiles, commitAll, createPr, git, hasGh, log, patchAgainst, patchSinceTree, pullRequestTemplate, push, teamTransfer, unpushedCommits } from "@openorc/git";
+import { changedFiles, commitAll, createPr, git, hasGh, headCommit, log, patchAgainst, patchSinceTree, pullRequestTemplate, push, teamTransfer, unpushedCommits } from "@openorc/git";
 import type { Commit, Project, PushState, ReviewComment, ReviewDiff, Snapshot, Task, TeamActionAvailability, TeamReviewComment, Thread } from "@openorc/protocol";
+import { assertRepository, projectGit } from "./project-git.js";
 import { workspaceWriters, type WorkspaceWriters } from "./workspace-writers.js";
 import { teamPublicationBranch, teamWorkspaceLocation } from "./team-workspace-location.js";
 import type { TeamTaskExport } from "./team-task-export.js";
@@ -126,11 +127,13 @@ export class ReviewService {
 
   /** What the thread agent changed in the checkout itself, against HEAD. */
   async projectDiff(project: Project): Promise<ReviewDiff> {
+    await assertRepository(project);
     const [patch, files] = await Promise.all([patchAgainst(project.rootPath, null), changedFiles(project.rootPath, null)]);
     return { baseSha: null, patch, files, since: null };
   }
 
   async commitProject(project: Project, message: string): Promise<{ sha: string }> {
+    await assertRepository(project);
     return this.writers.withLease(project.rootPath, `committing project ${project.id}`, async () => {
       const sha = await commitAll(project.rootPath, message);
       audit.record(this.db, { actor: "user", action: "project.commit", resourceType: "project", resourceId: project.id, metadata: { sha } });
@@ -140,13 +143,14 @@ export class ReviewService {
 
   /* Threads: the checkout against HEAD, or the thread's worktree against where it branched. */
 
-  private threadCwd(thread: Thread, project: Project): string {
+  private async threadCwd(thread: Thread, project: Project): Promise<string> {
     if (project.id === WORKSPACE_ID) throw new Error("Git review is available in project conversations. Workspace uses ordinary folders.");
+    if (!thread.worktreePath) await assertRepository(project);
     return thread.worktreePath ?? project.rootPath;
   }
 
   async threadDiff(thread: Thread, project: Project, comparison: "base" | "head" = "base"): Promise<ReviewDiff> {
-    const cwd = this.threadCwd(thread, project);
+    const cwd = await this.threadCwd(thread, project);
     const base = comparison === "base" && thread.worktreePath ? thread.baseSha : null;
     const [patch, files] = await Promise.all([patchAgainst(cwd, base), changedFiles(cwd, base)]);
     return { baseSha: base, patch, files, since: null };
@@ -174,12 +178,13 @@ export class ReviewService {
     if (thread.branch && thread.worktreePath) return thread.branch;
     const head = await git(project.rootPath, ["symbolic-ref", "--short", "-q", "HEAD"], { okCodes: [0, 1] });
     if (head.code !== 0) throw new Error("The checkout isn't on a branch.");
+    if (!(await headCommit(project.rootPath))) throw new Error("Make a first commit before pushing.");
     return head.stdout.trim();
   }
 
   /** What Push would publish from the thread's workspace, judged by what origin was last seen to have. */
   async threadPushState(thread: Thread, project: Project): Promise<PushState> {
-    const cwd = this.threadCwd(thread, project);
+    const cwd = await this.threadCwd(thread, project);
     // A team worktree stays detached, and Push first advances its publication branch to HEAD.
     const team = thread.workspaceMode === "worktree" && Boolean(orchestration.getInstance(this.db, thread.id));
     let branch: string;
@@ -206,7 +211,7 @@ export class ReviewService {
 
   /** The pull request template gh would use, read from the thread's workspace. */
   async threadPrTemplate(thread: Thread, project: Project): Promise<{ body: string | null }> {
-    return { body: await pullRequestTemplate(this.threadCwd(thread, project)) };
+    return { body: await pullRequestTemplate(await this.threadCwd(thread, project)) };
   }
 
   async createThreadPr(thread: Thread, project: Project, title: string, body: string): Promise<{ url: string }> {
@@ -250,7 +255,7 @@ export class ReviewService {
     if (instance && !this.teamMutations) throw new Error("Team Git actions require the team's execution guard.");
     const reservation = instance ? this.teamMutations!.reserve(thread.id) : null;
     try {
-      const cwd = this.threadCwd(thread, ownedProject);
+      const cwd = await this.threadCwd(thread, ownedProject);
       const assertCurrent = () => {
         reservation?.assertCurrent();
         const current = threads.get(this.db, thread.id);
@@ -341,6 +346,7 @@ export class ReviewService {
     // A team-owned task never takes the ordinary path without an export authority; the integrated team branch stays the fallback.
     if (!team && ((task.threadId && orchestration.getInstance(this.db, task.threadId)) || teamRuntime.assignmentsForTask(this.db, task.id).length))
       throw new Error("Publish integrated team changes from the main team conversation. This assignment has no publication authority in this app instance.");
+    if (!task.worktreePath) await assertRepository(project);
     const cwd = task.worktreePath ?? project.rootPath;
     const assertCurrent = () => {
       const current = tasks.get(this.db, task.id);
@@ -362,9 +368,9 @@ export class ReviewService {
     return isSha(task.baseRef) ? project.defaultBranch : (task.baseRef ?? project.defaultBranch);
   }
 
-  threadLog(thread: Thread, project: Project, limit = 50): Promise<Commit[]> {
+  async threadLog(thread: Thread, project: Project, limit = 50): Promise<Commit[]> {
     const range = thread.worktreePath && thread.baseSha ? `${thread.baseSha}..HEAD` : null;
-    return log(this.threadCwd(thread, project), range, limit);
+    return log(await this.threadCwd(thread, project), range, limit);
   }
 
   async diff(task: Task, project: Project, options: { sinceReviewed?: boolean } = {}): Promise<ReviewDiff> {
@@ -538,10 +544,10 @@ export class ReviewService {
     return log(cwd, task.baseSha ? `${task.baseSha}..HEAD` : null, limit);
   }
 
-  /** Reading never prepares a workspace: a worktree task without one yet has nothing to show. */
+  /** Reading never prepares a workspace: a worktree task without one yet, or a folder without git, has nothing to show. */
   private async taskWorkspace(task: Task, project: Project): Promise<string | null> {
     const cwd = task.worktreePath ?? (task.workspaceMode === "worktree" ? null : project.rootPath);
-    if (!cwd) return null;
+    if (!cwd || (cwd === project.rootPath && (await projectGit(project)) === "none")) return null;
     try {
       await access(cwd);
       return cwd;

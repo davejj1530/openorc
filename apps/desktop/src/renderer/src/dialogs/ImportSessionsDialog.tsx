@@ -9,7 +9,7 @@ import { relativeTime } from "../lib/time";
 const agentLabel: Record<string, string> = { claude: "Claude Code", codex: "Codex" };
 
 function importEmptyState(projectId: string | undefined, loading: boolean, sessionCount: number) {
-  if (!projectId) return <div className="text-base text-ink-3">Import a repository first.</div>;
+  if (!projectId) return <div className="text-base text-ink-3">Import a project first.</div>;
   if (loading) return <div className="text-base text-ink-3">Reading the CLIs' history…</div>;
   if (sessionCount === 0) return <div className="text-base text-ink-3">Neither Claude Code nor Codex has sessions for this project.</div>;
   return null;

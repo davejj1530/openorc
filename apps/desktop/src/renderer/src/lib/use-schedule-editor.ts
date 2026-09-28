@@ -1,9 +1,25 @@
 import { useEffect, useState } from "react";
 import { harnessInfo, harnessLoggedIn, isHarnessId, type RunMode, type Schedule, type TeamRevision, type WorkspaceMode } from "@openorc/protocol";
-import { defaultChoice, type ModelChoice, type TeamPickerChoices } from "../components/ModelPicker";
+import { defaultChoice, type ModelChoice } from "../components/ModelPicker";
 import { usePermissionSelection } from "./permission-default";
+import { branchingReason, useProjectGit } from "./project-git";
 import { useRpc, useRpcMutation } from "./query";
-import { scheduleDraftIssue, scheduleModelTarget, scheduleTarget, scheduleTargetChoice, scheduleTargetPayload, scheduleTargetSettings, scheduleTeamTarget } from "./schedule-draft";
+import {
+  scheduleDraftIssue,
+  scheduleModelTarget,
+  scheduleTarget,
+  scheduleTargetChoice,
+  scheduleTargetPayload,
+  scheduleTargetSettings,
+  scheduleTeamChoices,
+  scheduleTeamTarget,
+} from "./schedule-draft";
+
+/** What the chosen project's git allows: until it can branch, a schedule works in the project folder. */
+function useScheduleGit(project: string, chosen: WorkspaceMode) {
+  const { state, cannotBranch } = useProjectGit(project);
+  return { cannotBranch, workspace: cannotBranch ? ("current" as const) : chosen, teamReason: branchingReason(state, "Teams") };
+}
 
 /** Owns the editable schedule, selected target and the version used for its save. */
 export function useScheduleEditor(schedule: Schedule | null, latest: Schedule | undefined, projectId: string, onClose: () => void) {
@@ -20,7 +36,9 @@ export function useScheduleEditor(schedule: Schedule | null, latest: Schedule | 
   const [minutes, setMinutes] = useState(schedule?.everyMinutes ?? 1440);
   const [mode, setMode] = useState<RunMode>(schedule?.mode ?? "plan");
   const { permission, select: setPermission, error: permissionError, ready: permissionReady } = usePermissionSelection(schedule?.permissionMode);
-  const [workspace, setWorkspace] = useState<WorkspaceMode>(schedule?.workspaceMode ?? "worktree");
+  const [chosenWorkspace, setWorkspace] = useState<WorkspaceMode>(schedule?.workspaceMode ?? "worktree");
+  const git = useScheduleGit(project, chosenWorkspace);
+  const workspace = git.workspace;
   const [target, setTarget] = useState(() => scheduleTarget(schedule));
   const [localError, setLocalError] = useState<string | null>(null);
   const choice = scheduleTargetChoice(target);
@@ -38,6 +56,7 @@ export function useScheduleEditor(schedule: Schedule | null, latest: Schedule | 
     target,
     archived,
     retainedTeam,
+    git.teamReason,
   );
   const error = localError ?? create.error?.message ?? update.error?.message ?? permissionError;
 
@@ -66,22 +85,7 @@ export function useScheduleEditor(schedule: Schedule | null, latest: Schedule | 
     void info.refetch();
     void projects.refetch();
   };
-  let pickerStatus: string | null = null;
-  if (teams.isError) pickerStatus = "Saved teams could not load. The current selection is kept.";
-  else if (teams.isPending) pickerStatus = "Loading teams…";
-  else if (!teams.data?.some((item) => item.team.archivedAt === null)) pickerStatus = "No active teams in this project.";
-  const pickerTeams: TeamPickerChoices = {
-    options: (teams.data ?? [])
-      .filter((item) => item.team.archivedAt === null)
-      .map((item) => ({ teamId: item.team.id, revisionId: item.revision.id, name: item.revision.name, revision: item.revision.number, memberCount: item.revision.members.length })),
-    ...(target.kind === "team" ? { selectedRevisionId: target.target.teamRevisionId, selectedLabel: revision?.name ?? "Saved team" } : {}),
-    onSelect: (id) => {
-      const selected = teams.data?.find((item) => item.revision.id === id);
-      if (selected) chooseTeam(selected.revision);
-    },
-    status: pickerStatus,
-    ...(teams.isError ? { action: { label: "Retry team list", onSelect: retryChecks } } : {}),
-  };
+  const pickerTeams = scheduleTeamChoices({ teams, target, teamBlocker: git.teamReason, onSelect: chooseTeam, retry: retryChecks });
   const effectiveMembers = revision?.members.map((member) => (member.managerKey === null && choice ? { ...member, settings: choice } : member)) ?? [];
   const offlineMember = effectiveMembers.find((member) => {
     const model = models.data?.find((item) => item.agent === member.settings.agent && item.id === member.settings.model);
@@ -105,7 +109,7 @@ export function useScheduleEditor(schedule: Schedule | null, latest: Schedule | 
   };
 
   return {
-    fields: { project, title, prompt, minutes, mode, permission, workspace },
+    fields: { project, title, prompt, minutes, mode, permission, workspace, worktreeBlocked: git.cannotBranch },
     target: { selection: target, choice, revision, lead, currentTeam, archived, teamTarget, retainedTeam, pickerTeams, offlineMember, previewReason },
     resources: { projects, models, info, teams, availability },
     status: { pending, conflict, projectIssue, targetIssue, error, permissionReady },

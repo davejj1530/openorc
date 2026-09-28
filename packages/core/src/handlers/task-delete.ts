@@ -1,7 +1,5 @@
 import { Db, tasks } from "@openorc/db";
-import { unpinAll } from "@openorc/git";
-import { WORKSPACE_ID } from "@openorc/protocol";
-import { snapshotRefs } from "../services/checkpoint-refs.js";
+import { snapshotRefs, unpinProjectRefs } from "../services/checkpoint-refs.js";
 import { LedgerUpkeep } from "../services/ledger-upkeep.js";
 import { RunService } from "../services/runs.js";
 import { TaskCommentService } from "../services/task-comments.js";
@@ -30,8 +28,7 @@ export function createTaskDeleteHandlers({ workspaces, comments, runService, db,
       if (live) await runService.closeAndWait(live.id);
       await workspaces.cleanup(task, project, { deleteBranch: deleteBranch ?? false, force: true, ...(acceptLoss ? { acceptLoss } : {}) });
       tasks.delete(db, id);
-      if (project.id !== WORKSPACE_ID)
-        await unpinAll(project.rootPath, snapshotRefs(id)).catch((e: unknown) => log.warn(`snapshot refs of task ${id} were kept: ${e instanceof Error ? e.message : String(e)}`));
+      await unpinProjectRefs(project, snapshotRefs(id)).catch((e: unknown) => log.warn(`snapshot refs of task ${id} were kept: ${e instanceof Error ? e.message : String(e)}`));
       await upkeep.forgetDeletedRuns();
       invalidate(["tasks", "inbox"]);
       return null;

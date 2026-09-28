@@ -1,9 +1,10 @@
 import { realpath } from "node:fs/promises";
 import { checkpoints, runCosts, runs, snapshots, tasks, threads, type Db, type LedgerWriter } from "@openorc/db";
 import { diffStat, pinObject, treeHash, worktree } from "@openorc/git";
-import { WORKSPACE_ID, type Project, type Run, type Task, type Thread } from "@openorc/protocol";
+import type { Project, Run, Task, Thread } from "@openorc/protocol";
 import type { OpenOrcMcpServer } from "@openorc/mcp";
 import { checkpointRefs, snapshotRefs } from "./checkpoint-refs.js";
+import { projectGit } from "./project-git.js";
 import type { McpAppService } from "./mcp-apps.js";
 import type { Logger } from "../transport.js";
 import { capturedTurnOutcome, providerTurnStatus, type CompletedTurn, type LiveRun, type Notification, type RunHooks, type RunScope, type TurnSettledOutcome } from "./run-types.js";
@@ -80,18 +81,19 @@ export class RunSettlement {
     const capture = await this.snapshot(entry, task, project);
     entry.busy = false;
     this.deps.turnSettled(entry.run, entry.scope, project, capturedTurnOutcome(turn, entry.failed, capture));
-    this.deps.invalidate([...this.deps.keysFor(entry.scope), `snapshots:${task.id}`, `diff:${task.id}`, `log:${task.id}`]);
+    this.deps.invalidate([...this.deps.keysFor(entry.scope), `snapshots:${task.id}`, `diff:${task.id}`, `log:${task.id}`, `projectgit:${project.id}`]);
     // A task run is one unit of work. Follow-ups resume the closed session.
     entry.handle.close();
   }
 
   private async completeThreadTurn(entry: LiveRun, project: Project, turn: CompletedTurn, thread: Thread): Promise<void> {
-    const capture = await this.checkpoint(entry, thread, entry.workspaceLease.paths[0]!);
+    const capture = await this.checkpoint(entry, project, thread, entry.workspaceLease.paths[0]!);
     entry.busy = false;
     this.deps.armIdle(entry);
     this.deps.turnSettled(entry.run, entry.scope, project, capturedTurnOutcome(turn, entry.failed, capture));
     threads.touch(this.deps.db, thread.id);
-    this.deps.invalidate([...this.deps.keysFor(entry.scope), `checkpoints:${thread.id}`, `threaddiff:${thread.id}`]);
+    // An agent may have set up git or made the first commit, which turns on more of the project.
+    this.deps.invalidate([...this.deps.keysFor(entry.scope), `checkpoints:${thread.id}`, `threaddiff:${thread.id}`, `projectgit:${project.id}`]);
     const reply = turn.resultText ?? entry.reply;
     this.deps.hooks.onThreadTurn(thread, { prompt: entry.prompt, reply });
     if (turn.status === "success") this.deps.notifyFor(entry.scope, "finished", thread.title, reply ? reply.replace(/\s+/g, " ").slice(0, 140) : "The agent finished its turn.");
@@ -107,11 +109,11 @@ export class RunSettlement {
   }
 
   private async snapshot(entry: LiveRun, task: Task, project: Project): Promise<{ snapshotId: string | null; error: string | null }> {
-    if (project.id === WORKSPACE_ID) return { snapshotId: null, error: null };
     if (task.workspaceMode !== "current" && !task.worktreePath) return { snapshotId: null, error: "This task has no workspace to snapshot." };
     const cwd = entry.workspaceLease.paths[0];
     if (!cwd) return { snapshotId: null, error: "This task has no workspace to snapshot." };
     try {
+      if ((await projectGit(project)) === "none") return { snapshotId: null, error: null };
       const [tree, stat] = await Promise.all([this.captureTree(entry, cwd, snapshotRefs(task.id)), diffStat(cwd, task.baseSha)]);
       return { snapshotId: snapshots.insert(this.deps.db, { taskId: task.id, runId: entry.run.id, turn: entry.turns, treeSha: tree, diffStat: stat }).id, error: null };
     } catch (e) {
@@ -121,9 +123,9 @@ export class RunSettlement {
     }
   }
 
-  private async checkpoint(entry: LiveRun, thread: Thread, cwd: string): Promise<{ snapshotId: string | null; error: string | null }> {
-    if (thread.projectId === WORKSPACE_ID) return { snapshotId: null, error: null };
+  private async checkpoint(entry: LiveRun, project: Project, thread: Thread, cwd: string): Promise<{ snapshotId: string | null; error: string | null }> {
     try {
+      if ((await projectGit(project)) === "none") return { snapshotId: null, error: null };
       const [tree, stat, root] = await Promise.all([this.captureTree(entry, cwd, checkpointRefs(thread.id)), diffStat(cwd, thread.baseSha), realpath(cwd)]);
       const last = checkpoints.listForThread(this.deps.db, thread.id).at(-1);
       if (last?.treeSha === tree && last.root === root) return { snapshotId: last.id, error: null };

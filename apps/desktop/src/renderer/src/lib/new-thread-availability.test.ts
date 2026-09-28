@@ -36,6 +36,7 @@ function input(): NewThreadAvailabilityInput {
   return {
     projectId: project.id,
     projects: [project],
+    teamBlocker: null,
     projectsFailed: false,
     permissionReady: true,
     target: { kind: "team", revision: team.revision, initialLeadOverrides: {} },
@@ -56,6 +57,14 @@ describe("new thread availability", () => {
     const result = evaluateNewThreadAvailability({ ...saved, teams: { data: [archived], failed: false } });
     expect(result.targetIssue).toContain("archived");
     expect(result.teamOptions).toEqual([]);
+  });
+
+  it("keeps every team off, with the reason, until the project can branch", () => {
+    const result = evaluateNewThreadAvailability({ ...input(), teamBlocker: "Teams need a first commit." });
+    expect(result.targetIssue).toBe("Teams need a first commit.");
+    expect(result.disabledReason).toBe("Teams need a first commit.");
+    expect(result.teamOptions.map((option) => option.disabledReason)).toEqual(["Teams need a first commit."]);
+    expect(evaluateNewThreadAvailability({ ...input(), target: { kind: "model", choice: input().choice! }, teamBlocker: "Teams need a first commit." }).disabledReason).toBeNull();
   });
 
   it("orders project and permission loading before provider and team failures", () => {

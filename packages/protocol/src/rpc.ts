@@ -88,6 +88,7 @@ export const rpcParams = {
   "projects.list": z.object({}),
   "projects.get": z.object({ id: z.string() }),
   "projects.git": z.object({ id: z.string() }),
+  "projects.checkoutBranch": z.object({ id: z.string() }),
   "projects.import": z.object({ rootPath: z.string() }),
   "projects.remove": z.object({ id: z.string().min(1) }).strict(),
   "projects.updateSettings": z.object({
@@ -587,6 +588,7 @@ export interface RpcResults {
   "projects.list": Project[];
   "projects.get": Project | null;
   "projects.git": ProjectGit;
+  "projects.checkoutBranch": string | null;
   "projects.import": Project;
   "projects.remove": { ok: true };
   "projects.updateSettings": Project;

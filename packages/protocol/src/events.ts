@@ -279,5 +279,10 @@ export const RunSpec = z.object({
   maxTurns: z.number().int().positive().optional(),
   /** Load only the app's MCP server, not the user's own configured servers. */
   strictMcp: z.boolean().optional(),
+  /**
+   * The working folder holds code the user hasn't vetted, such as a pull request under review. The agent takes no
+   * settings, hooks, plugins or MCP servers from it; only the user's own configuration applies.
+   */
+  untrustedCheckout: z.boolean().optional(),
 });
 export type RunSpec = z.infer<typeof RunSpec>;

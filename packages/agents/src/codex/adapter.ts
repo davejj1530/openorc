@@ -70,6 +70,33 @@ function sandboxFor(spec: RunSpec): "read-only" | "danger-full-access" | "worksp
   return "workspace-write";
 }
 
+/** One source of Codex settings for a folder. `disabledReason` says why Codex ignores it, such as an untrusted folder. */
+interface CodexConfigLayer {
+  name?: { type?: string };
+  disabledReason?: string | null;
+}
+
+/**
+ * Codex applies a folder's .codex settings, hooks and exec policies once its repository is trusted, and a worktree
+ * inherits that trust. Nothing turns this off for one run, so a run in an unvetted checkout refuses when it would happen.
+ */
+async function refuseProjectConfig(rpc: StdioJsonRpc, cwd: string): Promise<void> {
+  const read = await rpc.request<{ layers?: CodexConfigLayer[] }>("config/read", { cwd, includeLayers: true });
+  if (read.layers?.some((layer) => layer.name?.type === "project" && !layer.disabledReason))
+    throw new Error("Codex trusts this repository, so it would load the pull request's own .codex settings, which can run commands. Review it with a Claude or OpenCode model instead.");
+}
+
+/** Settings the thread starts with: in Plan, no MCP server but the app's. An unvetted checkout's own settings refuse the run. */
+async function threadConfig(rpc: StdioJsonRpc, spec: RunSpec, serverName: string): Promise<Record<string, unknown>> {
+  if (spec.untrustedCheckout) await refuseProjectConfig(rpc, spec.cwd);
+  const config: Record<string, unknown> = {};
+  if (spec.mode !== "plan") return config;
+  // Disable external MCP servers even if the user's native config pre-approves their tools.
+  const loaded = await rpc.request<{ config: { mcp_servers?: Record<string, unknown> } }>("config/read", { cwd: spec.cwd, includeLayers: false });
+  for (const name of Object.keys(loaded.config.mcp_servers ?? {})) if (name !== serverName) config[`mcp_servers.${name}.enabled`] = false;
+  return config;
+}
+
 function resumedThreadMethod(fork: boolean | undefined): "thread/fork" | "thread/resume" {
   return fork ? "thread/fork" : "thread/resume";
 }
@@ -394,14 +421,7 @@ export class CodexAdapter {
           capabilities: { experimentalApi: true, extensions: { "io.modelcontextprotocol/ui": { mimeTypes: ["text/html;profile=mcp-app"] } } },
         });
         rpc.notify("initialized", {});
-        const planConfig: Record<string, unknown> = {};
-        if (spec.mode === "plan") {
-          // Disable external MCP servers even if the user's native config pre-approves their tools.
-          const loaded = await rpc.request<{ config: { mcp_servers?: Record<string, unknown> } }>("config/read", { cwd: spec.cwd, includeLayers: false });
-          for (const name of Object.keys(loaded.config.mcp_servers ?? {})) {
-            if (name !== serverName) planConfig[`mcp_servers.${name}.enabled`] = false;
-          }
-        }
+        const planConfig = await threadConfig(rpc, spec, serverName);
         const threadParams = {
           config: { ...planConfig, ...mcpConfig, "sandbox_workspace_write.network_access": false },
           serviceTier,

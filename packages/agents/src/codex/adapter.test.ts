@@ -48,6 +48,9 @@ it("preserves the advertised efforts and default for Astra and other models", as
 
 vi.mock("node:child_process", () => ({ spawn: vi.fn() }));
 
+/** The layers the scripted app-server reports for a folder's settings. */
+let configLayers: { name: { type: string }; disabledReason?: string }[] | undefined;
+
 /** Scripted app-server transport; the adapter and JSON-RPC client run unchanged. */
 function server(permissionMode: PermissionPreset = "autonomous", overrides: Partial<RunSpec> = {}, onApproval: CodexAdapterOptions["onApproval"] = async () => "deny", requirePaginatedResume = false) {
   const stdin = new PassThrough();
@@ -92,7 +95,7 @@ function server(permissionMode: PermissionPreset = "autonomous", overrides: Part
         return;
       }
       let result: object = {};
-      if (req.method === "config/read") result = { config: { mcp_servers: { external: {} } } };
+      if (req.method === "config/read") result = { config: { mcp_servers: { external: {} } }, ...(configLayers ? { layers: configLayers } : {}) };
       else if (["thread/start", "thread/resume", "thread/fork"].includes(req.method)) result = { thread: { id: "thread-1" } };
       if (req.method === "turn/steer" && compacting) {
         stdout.write(JSON.stringify({ id: req.id, error: { code: -32600, message: "cannot steer a compact turn" } }) + "\n");
@@ -170,6 +173,38 @@ it("rejects a malformed elicitation form without approval and answers the next v
     s.handle.close();
     await s.handle.wait();
   }
+});
+
+describe("Codex in an unvetted checkout", () => {
+  const run = async (layers: typeof configLayers) => {
+    configLayers = layers;
+    const s = server("autonomous", { untrustedCheckout: true });
+    const errors: string[] = [];
+    s.handle.on("event", (event: AgentEvent) => {
+      if (event.type === "error") errors.push(event.message);
+    });
+    try {
+      await vi.waitFor(() => expect(errors.length || s.calls.some((call) => call.method === "turn/start")).toBeTruthy());
+      return { errors, methods: s.calls.map((call) => call.method), read: s.calls.find((call) => call.method === "config/read")?.params };
+    } finally {
+      configLayers = undefined;
+      s.handle.close();
+      await s.handle.wait();
+    }
+  };
+
+  it("refuses to start when Codex would apply the checkout's own .codex settings", async () => {
+    const { errors, methods, read } = await run([{ name: { type: "project" } }, { name: { type: "user" } }]);
+    expect(read).toMatchObject({ includeLayers: true });
+    expect(errors).toEqual(["Codex trusts this repository, so it would load the pull request's own .codex settings, which can run commands. Review it with a Claude or OpenCode model instead."]);
+    expect(methods).not.toContain("thread/start");
+  });
+
+  it("starts when Codex ignores them because the folder isn't trusted", async () => {
+    const { errors, methods } = await run([{ name: { type: "project" }, disabledReason: "Add it as a trusted project to load project-local config." }]);
+    expect(errors).toEqual([]);
+    expect(methods).toContain("turn/start");
+  });
 });
 
 describe("Codex Stop", () => {

@@ -196,6 +196,8 @@ export interface RunHooks {
   brief(project: Project): string;
   /** Instructions that belong to one conversation, such as the pull request it reviews; null for none. */
   threadContext?(thread: Thread): string | null;
+  /** Whether a conversation works in a checkout of code the user hasn't vetted, such as a pull request it reviews. */
+  untrustedCheckout?(thread: Thread): boolean;
   memoryEnabled?(): boolean;
   onRunFinished(run: Run, scope: RunScope, project: Project): void;
   /** Synchronous notification after capture; consumers queue follow-up work instead of awaiting it here. */

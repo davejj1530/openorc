@@ -131,6 +131,16 @@ export class ClaudeAdapter {
   }
 }
 
+/**
+ * Settings and MCP servers stay the ones OpenOrc chooses: only its own server while tools are restricted or the user
+ * asked for that, and only the user's own settings in an unvetted checkout. -p skips Claude Code's workspace trust
+ * check, so that checkout's settings, hooks and MCP servers would otherwise apply. Settings passed with --settings still do.
+ */
+function isolationArgs(spec: RunSpec, restricted: boolean, strictMcp: boolean): string[] {
+  const untrusted = spec.untrustedCheckout === true;
+  return [...(untrusted ? ["--setting-sources", "user"] : []), ...(restricted || strictMcp || untrusted ? ["--strict-mcp-config"] : [])];
+}
+
 /** Prepare the exact CLI launch and private MCP file before a process owns them. */
 function prepareClaudeLaunch(spec: RunSpec, launch: AgentLaunchEnvironment, options: ClaudeAdapterOptions) {
   if (process.platform === "win32" && (spec.mode === "plan" || spec.permissionMode === "trusted"))
@@ -165,12 +175,11 @@ function prepareClaudeLaunch(spec: RunSpec, launch: AgentLaunchEnvironment, opti
       "--permission-mode",
       spec.mode === "plan" ? "plan" : permissionModeFor[spec.permissionMode],
     ];
+    const restricted = spec.mode === "plan" || spec.permissionMode !== "autonomous";
     // Restrict mutation entry points to the tools covered by our explicit rules.
     // Native subagents have independent policies; use OpenOrc's inherited-policy delegation instead.
-    if (spec.mode === "plan" || spec.permissionMode !== "autonomous") {
-      args.push("--tools", "Read,Grep,Glob,Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch,AskUserQuestion,ExitPlanMode");
-      args.push("--strict-mcp-config");
-    }
+    if (restricted) args.push("--tools", "Read,Grep,Glob,Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch,AskUserQuestion,ExitPlanMode");
+    args.push(...isolationArgs(spec, restricted, Boolean(connection) && (spec.strictMcp ?? options.strictMcp) === true));
     if (spec.model) args.push("--model", spec.model);
     if (spec.effort) args.push("--effort", spec.effort);
     if (spec.maxTurns) args.push("--max-turns", String(spec.maxTurns));
@@ -198,7 +207,6 @@ function prepareClaudeLaunch(spec: RunSpec, launch: AgentLaunchEnvironment, opti
       // --mcp-config makes the first turn wait for all of the user's MCP servers, slow remote connectors included.
       // Claude Code still waits for the server behind --permission-prompt-tool, so ours is ready; the rest connect in the background.
       env["CLAUDE_CODE_MCP_STARTUP_WAIT_MS"] ??= "0";
-      if ((spec.strictMcp ?? options.strictMcp) && spec.mode !== "plan" && spec.permissionMode === "autonomous") args.push("--strict-mcp-config");
       args.push("--permission-prompt-tool", `mcp__${serverName}__approve`);
       // Exact tools on this app-owned connection, never a global tool-name rule.
       if (spec.internalMcp) args.push("--allowedTools", ...spec.internalMcp.toolNames.map((name) => `mcp__${serverName}__${name}`));

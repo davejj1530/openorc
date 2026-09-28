@@ -253,6 +253,7 @@ export class OpenOrc {
         inlineToolImages: (output) => this.toolImages.inline(output),
         brief: (project) => this.memory.brief(project),
         threadContext: (thread) => this.pullRequests.brief(thread),
+        untrustedCheckout: (thread) => this.pullRequests.reviewsPullRequest(thread),
         memoryEnabled: () => this.memory.enabled(),
         environment: () => this.environment.current(),
         claudeVersion: (snapshot, env) => (snapshot ? this.system.infoFor(snapshot, env) : this.system.info()).then((info) => harnessInfo(info, "claude").version),

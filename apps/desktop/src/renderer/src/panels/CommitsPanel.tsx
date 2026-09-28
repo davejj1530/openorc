@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import type { Project, PushState, Task, TeamActionAvailability, ThreadSummary } from "@openorc/protocol";
+import type { Commit, Project, PushState, Task, TeamActionAvailability, ThreadSummary } from "@openorc/protocol";
 import { Upload } from "../components/icons";
 import { Badge, Button, Empty } from "../components/ui";
 import { cn } from "../lib/cn";
@@ -23,11 +23,9 @@ function useCommits(source: CommitSource) {
     thread: useRpc("git.threadLog", { threadId: thread ?? "" }, { enabled: thread !== null, refetchInterval: 8000 }),
     checkout: useRpc("git.projectLog", { projectId: checkout ?? "" }, { enabled: checkout !== null, refetchInterval: 8000 }),
   };
-  const log = logs[source.kind];
-  const listed = Boolean(log.data?.length);
-  const threadPush = useRpc("git.threadPushState", { threadId: thread ?? "" }, { enabled: thread !== null && listed, refetchInterval: 8000 });
-  const checkoutPush = useRpc("git.projectPushState", { projectId: checkout ?? "" }, { enabled: checkout !== null && listed, refetchInterval: 8000 });
-  return { log, push: thread ? threadPush : checkoutPush };
+  const threadPush = useRpc("git.threadPushState", { threadId: thread ?? "" }, { enabled: thread !== null, refetchInterval: 8000 });
+  const checkoutPush = useRpc("git.projectPushState", { projectId: checkout ?? "" }, { enabled: checkout !== null, refetchInterval: 8000 });
+  return { log: logs[source.kind], push: thread ? threadPush : checkoutPush };
 }
 
 /** The commits on a task's branch since its base, a thread's workspace or the checkout, marking the ones origin doesn't have yet. */
@@ -35,26 +33,45 @@ export function CommitsPanel({ source }: { source: CommitSource }) {
   const { log, push } = useCommits(source);
   const commits = log.data ?? [];
   const unpushed = new Set(push.data?.unpushed);
-  if (!log.isLoading && commits.length === 0) return <Empty title={emptyTitle[source.kind]}>Commit from Changes once the diff looks right.</Empty>;
+  const empty = !log.isLoading && commits.length === 0;
+  // A branch can carry commits origin lacks from before the work began, such as a worktree started from local commits.
+  const pushable = !empty || Boolean(push.data?.unpushedCount);
   return (
     <div className="h-full flex flex-col min-h-0">
-      {source.kind === "thread" ? <ThreadPushBar thread={source.thread} project={source.project} state={push.data} error={push.error} /> : null}
-      {source.kind === "checkout" ? <CheckoutPushBar project={source.project} state={push.data} error={push.error} /> : null}
-      <div className="flex-1 min-h-0 overflow-y-auto">
-        {commits.map((c) => (
-          <div key={c.sha} className="grid gap-0.5 px-3 py-2 border-b border-line text-base">
-            <div className="flex items-center gap-2">
-              <span className="truncate">{c.subject}</span>
-              {unpushed.has(c.sha) ? <Badge className="ml-auto">Not pushed</Badge> : null}
-            </div>
-            <div className="flex items-center gap-2 text-sm text-ink-3">
-              <span className="font-mono text-xs">{shortSha(c.sha)}</span>
-              <span>{c.author}</span>
-              <span className="ml-auto tabular text-ink-4">{relativeTime(c.at)}</span>
-            </div>
+      {pushable ? <SourcePushBar source={source} state={push.data} error={push.error} /> : null}
+      {empty ? (
+        <div className="flex-1 min-h-0">
+          <Empty title={emptyTitle[source.kind]}>Commit from Changes once the diff looks right.</Empty>
+        </div>
+      ) : (
+        <CommitList commits={commits} unpushed={unpushed} />
+      )}
+    </div>
+  );
+}
+
+function SourcePushBar({ source, state, error }: { source: CommitSource; state: PushState | undefined; error: Error | null }) {
+  if (source.kind === "thread") return <ThreadPushBar thread={source.thread} project={source.project} state={state} error={error} />;
+  if (source.kind === "checkout") return <CheckoutPushBar project={source.project} state={state} error={error} />;
+  return null;
+}
+
+function CommitList({ commits, unpushed }: { commits: Commit[]; unpushed: ReadonlySet<string> }) {
+  return (
+    <div className="flex-1 min-h-0 overflow-y-auto">
+      {commits.map((c) => (
+        <div key={c.sha} className="grid gap-0.5 px-3 py-2 border-b border-line text-base">
+          <div className="flex items-center gap-2">
+            <span className="truncate">{c.subject}</span>
+            {unpushed.has(c.sha) ? <Badge className="ml-auto">Not pushed</Badge> : null}
           </div>
-        ))}
-      </div>
+          <div className="flex items-center gap-2 text-sm text-ink-3">
+            <span className="font-mono text-xs">{shortSha(c.sha)}</span>
+            <span>{c.author}</span>
+            <span className="ml-auto tabular text-ink-4">{relativeTime(c.at)}</span>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

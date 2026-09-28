@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { executionModeAvailable, executionModePresentation, type PermissionPreset, type ThreadSummary } from "@openorc/protocol";
+import { executionModeAvailable, executionModePresentation, type AgentKind, type PermissionPreset, type ThreadSummary } from "@openorc/protocol";
 import { useRpcMutation } from "../lib/query";
 import { useConversationPlans } from "../lib/conversation-plans";
 import { Button, Input, Select, TextButton } from "./ui";
@@ -9,6 +9,12 @@ function revisionStateSuffix(state: string): string {
   if (state === "draft") return " · writing";
   if (state === "interrupted") return " · interrupted";
   return "";
+}
+
+/** The modes this agent can implement a plan in, and the one in effect: your choice, or else the strictest. */
+function implementationChoice(agent: AgentKind, chosen: PermissionPreset) {
+  const modes = (["review", "trusted", "autonomous"] as const).filter((mode) => executionModeAvailable(agent, mode));
+  return { modes, permission: modes.includes(chosen) ? chosen : (modes[0] ?? chosen) };
 }
 
 /** Plan content has its own subscription so streaming it doesn't re-render the transcript. */
@@ -23,9 +29,7 @@ export function ConversationPlan({ thread }: { thread: ThreadSummary }) {
   const implementTeam = useRpcMutation("orchestration.implementPlan");
   const exportPlan = useRpcMutation("threads.exportPlan");
   const plan = plans.find((p) => p.id === selectedId) ?? plans[0];
-  // Offer only what this agent can run, starting from the strictest of those.
-  const implementationModes = (["review", "trusted", "autonomous"] as const).filter((mode) => executionModeAvailable(thread.agent, mode));
-  const permission = implementationModes.includes(chosenPermission) ? chosenPermission : (implementationModes[0] ?? chosenPermission);
+  const { modes: implementationModes, permission } = implementationChoice(thread.agent, chosenPermission);
   const ready = plan?.state === "ready" && Boolean(plan.text.trim());
   const current = plan?.id === plans[0]?.id;
   const busy = team

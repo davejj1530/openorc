@@ -44,9 +44,14 @@ export function executionModeAvailable(agent: AgentKind | undefined, mode: Execu
   return !((agent === "opencode" || agent === "acp") && (mode === "review" || mode === "trusted"));
 }
 
-export function executionModeUnavailable(agent: AgentKind, mode: ExecutionMode): string | null {
+export function executionModeUnavailable(agent: AgentKind | undefined, mode: ExecutionMode): string | null {
   if (executionModeAvailable(agent, mode)) return null;
   return `OpenCode cannot currently guarantee approval before every command through this integration. Choose Claude for ${executionModeLabel[mode]}, or explicitly choose another mode.`;
+}
+
+/** What the mode does with this agent, or why the agent cannot run it. */
+export function executionModeNote(agent: AgentKind | undefined, mode: ExecutionMode): string {
+  return executionModeUnavailable(agent, mode) ?? executionModePresentation(agent, mode).hint;
 }
 
 export interface ConversationPlan {

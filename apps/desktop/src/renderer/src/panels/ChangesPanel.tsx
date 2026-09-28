@@ -1,9 +1,10 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
-import type { Project, Task, Thread, ThreadSummary } from "@openorc/protocol";
-import { GitCommitHorizontal, GitPullRequest, RefreshCw, Upload } from "../components/icons";
-import { Button, Dialog, Empty, Field, IconButton, Input, Textarea, TextButton } from "../components/ui";
+import type { Project, Task, ThreadSummary } from "@openorc/protocol";
+import { GitCommitHorizontal, RefreshCw } from "../components/icons";
+import { Button, Dialog, Empty, Field, IconButton, Textarea, TextButton } from "../components/ui";
 import { ConversationReview } from "./ConversationReview";
 import { FileRows } from "./FileRows";
+import { PullRequestLink } from "./ThreadPullRequest";
 import { useRpc, useRpcMutation } from "../lib/query";
 import { teamGitActions } from "../lib/team-git-actions";
 import { useThreadMutationPending } from "../lib/thread-mutations";
@@ -11,44 +12,11 @@ import { useLayout, type WorkspaceChangesTarget } from "../lib/layout";
 
 const DiffView = lazy(() => import("../components/DiffView").then((m) => ({ default: m.DiffView })));
 
-function compareUrl(project: Project, thread: Thread): string | null {
-  const remote = project.gitRemote;
-  if (!remote || !thread.branch || thread.workspaceMode !== "worktree") return null;
-  const m = /github\.com[:/]([^/]+)\/([^/.]+)(?:\.git)?$/.exec(remote);
-  if (!m) return null;
-  return `https://github.com/${m[1]}/${m[2]}/compare/${encodeURIComponent(project.defaultBranch ?? "main")}...${encodeURIComponent(thread.branch)}?expand=1`;
-}
-
-function pullRequestAction(input: { thread: ThreadSummary; installed: boolean; ghUrl: string | null; allowed: boolean; busy: boolean; reason: string | null; openDialog: () => void }): ReactNode {
-  const { thread, installed, ghUrl, allowed, busy, reason, openDialog } = input;
-  if (thread.prUrl) {
-    return (
-      <Button size="sm" onClick={() => window.openorc.openExternal(thread.prUrl as string)} title={thread.prUrl}>
-        <GitPullRequest size={12} /> {thread.prState ?? "PR"}
-      </Button>
-    );
-  }
-  if (installed) {
-    return (
-      <Button size="sm" disabled={!allowed || busy} onClick={openDialog} title={reason ?? "Open a pull request"}>
-        <GitPullRequest size={12} /> PR
-      </Button>
-    );
-  }
-  if (ghUrl) {
-    return (
-      <Button size="sm" disabled={!allowed || busy} onClick={() => window.openorc.openExternal(ghUrl)} title={reason ?? "Compare on GitHub"}>
-        <GitPullRequest size={12} /> PR
-      </Button>
-    );
-  }
-  return null;
-}
-
 /**
  * What the thread's agent changed in its workspace: read it, comment on it,
- * commit it, push it, open the pull request. A task label marks comments made
- * from that task's screen. Team conversations take feedback through team review.
+ * commit it. Push and the pull request wait on the Commits tab, since only
+ * committed work can leave. A task label marks comments made from that task's
+ * screen. Team conversations take feedback through team review.
  */
 export function ChangesPanel({ thread, project, task }: { thread?: ThreadSummary; project: Project; task?: Task }) {
   const target: WorkspaceChangesTarget = { kind: thread ? "thread" : "project", id: thread?.id ?? project.id };
@@ -61,30 +29,23 @@ export function ChangesPanel({ thread, project, task }: { thread?: ThreadSummary
   const headDiff = useRpc("review.threadDiff", { threadId: thread?.id ?? "", comparison: "head" }, { enabled: Boolean(thread) });
   const diff = thread ? threadDiff : projectDiff;
   const uncommitted = thread ? headDiff : projectDiff;
-  const info = useRpc("system.info", {});
   const team = Boolean(thread?.teamInstanceId);
   const runtime = useRpc("orchestration.runtime", { threadId: thread?.id ?? "" }, { enabled: team, refetchInterval: 8000 });
   const threadCommit = useRpcMutation("review.commitThread");
   const projectCommit = useRpcMutation("review.commitProject");
   const commit = thread ? threadCommit : projectCommit;
-  const push = useRpcMutation("review.pushThread");
-  const pr = useRpcMutation("review.createThreadPr");
   const [commitOpen, setCommitOpen] = useState(false);
-  const [prOpen, setPrOpen] = useState(false);
   const [message, setMessage] = useState("");
-  const [prTitle, setPrTitle] = useState(thread?.title ?? project.name);
-  const [prBody, setPrBody] = useState("");
-  const [notice, setNotice] = useState<{ message: string; error?: boolean } | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const files = diff.data?.files ?? [];
   const patch = diff.data?.patch ?? "";
   const stat = countStat(patch);
-  const ghUrl = thread ? compareUrl(project, thread) : null;
   const where = thread?.workspaceMode === "worktree" ? "this thread's worktree" : project.name;
   const actions = teamGitActions(team, runtime);
   const threadMutationPending = useThreadMutationPending(thread?.id ?? "");
-  const busy = commit.isPending || push.isPending || pr.isPending || (team && threadMutationPending);
+  const busy = commit.isPending || (team && threadMutationPending);
   const canCommit = actions.commit.allowed && !uncommitted.isError && (uncommitted.data?.files.length ?? 0) > 0 && !busy;
-  const reasons = [...new Set(Object.values(actions).flatMap((action) => (!action.allowed && action.reason ? [action.reason] : [])))];
+  const commitReason = actions.commit.allowed ? null : actions.commit.reason;
   const refresh = () => {
     void diff.refetch();
     if (thread && comparison !== "head") void headDiff.refetch();
@@ -102,7 +63,7 @@ export function ChangesPanel({ thread, project, task }: { thread?: ThreadSummary
       const result = thread ? await threadCommit.mutateAsync({ threadId: thread.id, message: message.trim() }) : await projectCommit.mutateAsync({ projectId: project.id, message: message.trim() });
       setCommitOpen(false);
       setMessage("");
-      setNotice({ message: `Committed ${result.sha.slice(0, 7)}` });
+      setNotice(`Committed ${result.sha.slice(0, 7)}`);
     } catch {
       // The mutation keeps its error and the message in the open dialog for retry.
     } finally {
@@ -118,9 +79,6 @@ export function ChangesPanel({ thread, project, task }: { thread?: ThreadSummary
         </TextButton>
       </p>
     ) : null;
-  const prAction = thread
-    ? pullRequestAction({ thread, installed: Boolean(info.data?.gh.installed), ghUrl, allowed: actions.createPr.allowed, busy, reason: actions.createPr.reason, openDialog: () => setPrOpen(true) })
-    : null;
   let workspaceContent: ReactNode = null;
   if (diff.error) workspaceContent = <Empty title="Could not read the workspace">{diff.error.message}</Empty>;
   else if (!diff.isLoading && files.length === 0) {
@@ -160,24 +118,7 @@ export function ChangesPanel({ thread, project, task }: { thread?: ThreadSummary
         <Button size="sm" disabled={!canCommit} title={actions.commit.reason ?? undefined} onClick={() => setCommitOpen(true)}>
           <GitCommitHorizontal size={12} /> Commit
         </Button>
-        {thread ? (
-          <>
-            <Button
-              size="sm"
-              disabled={!actions.push.allowed || busy}
-              title={actions.push.reason ?? undefined}
-              onClick={() =>
-                push.mutate(
-                  { threadId: thread.id },
-                  { onSuccess: (r) => setNotice({ message: `Pushed ${r.branch} to ${r.remote}` }), onError: (e) => setNotice({ message: e.message, error: true }), onSettled: refresh },
-                )
-              }
-            >
-              <Upload size={12} /> {push.isPending ? "Pushing…" : "Push"}
-            </Button>
-            {prAction}
-          </>
-        ) : null}
+        {thread ? <PullRequestLink thread={thread} /> : null}
         <IconButton onClick={refresh} aria-label="Refresh" size="sm">
           <RefreshCw size={12} className={diff.isFetching ? "animate-spin" : ""} />
         </IconButton>
@@ -190,17 +131,17 @@ export function ChangesPanel({ thread, project, task }: { thread?: ThreadSummary
           </TextButton>
         </div>
       ) : null}
-      {reasons.length > 0 ? (
+      {commitReason ? (
         <p role="status" className="px-3 py-2 text-sm text-ink-3 border-b border-line">
-          {reasons.join(" ")}{" "}
+          {commitReason}{" "}
           <TextButton type="button" disabled={busy || runtime.isFetching} underline onClick={refresh}>
             Refresh team status
           </TextButton>
         </p>
       ) : null}
       {notice ? (
-        <div role={notice.error ? "alert" : "status"} className={`px-3 py-1.5 text-sm ${notice.error ? "text-bad" : "text-ink-3"} border-b border-line break-words`}>
-          {notice.message}
+        <div role="status" className="px-3 py-1.5 text-sm text-ink-3 border-b border-line break-words">
+          {notice}
         </div>
       ) : null}
       <div className="flex-1 min-h-0 flex flex-col">{workspaceContent}</div>
@@ -237,52 +178,6 @@ export function ChangesPanel({ thread, project, task }: { thread?: ThreadSummary
           </Button>
         </div>
       </Dialog>
-      {thread ? (
-        <Dialog
-          open={prOpen}
-          onOpenChange={(open) => {
-            if (!busy) setPrOpen(open);
-          }}
-          title="Open a pull request"
-          width={560}
-        >
-          <Field label="Title">
-            <Input value={prTitle} onChange={(e) => setPrTitle(e.target.value)} disabled={busy} autoFocus />
-          </Field>
-          <Field label="Body">
-            <Textarea rows={6} value={prBody} onChange={(e) => setPrBody(e.target.value)} disabled={busy} placeholder="What this changes and how to check it" />
-          </Field>
-          {actionNotice(actions.createPr.reason)}
-          {pr.error ? (
-            <div role="alert" className="text-sm text-bad mb-3 break-words">
-              {pr.error.message}
-            </div>
-          ) : null}
-          <div className="flex justify-end gap-2">
-            <Button disabled={busy} onClick={() => setPrOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              disabled={!actions.createPr.allowed || !prTitle.trim() || busy}
-              onClick={() =>
-                pr.mutate(
-                  { threadId: thread.id, title: prTitle.trim(), body: prBody },
-                  {
-                    onSuccess: (r) => {
-                      setPrOpen(false);
-                      setNotice({ message: `Opened ${r.url}` });
-                    },
-                    onSettled: refresh,
-                  },
-                )
-              }
-            >
-              {pr.isPending ? "Opening…" : "Open PR"}
-            </Button>
-          </div>
-        </Dialog>
-      ) : null}
     </div>
   );
 }

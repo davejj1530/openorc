@@ -6,6 +6,7 @@ import {
   executionModeSettings,
   executionModePresentation,
   executionModeUnavailable,
+  type AgentKind,
   type PermissionPreset,
   type RunMode,
 } from "@openorc/protocol";
@@ -340,11 +341,7 @@ export function Composer(props: ComposerProps) {
             <ComposerChoice
               ariaLabel="Mode"
               value={executionMode(props.mode, props.permission)}
-              options={ExecutionMode.options.map((value) => ({
-                value,
-                ...executionModePresentation(props.model?.agent, value),
-                hidden: !executionModeAvailable(props.model?.agent, value),
-              }))}
+              options={modeOptions(props.model?.agent)}
               onChange={(value) => {
                 const next = executionModeSettings(value);
                 if (props.onExecutionMode) props.onExecutionMode(next);
@@ -428,6 +425,11 @@ export function Composer(props: ComposerProps) {
       </div>
     </div>
   );
+}
+
+/** Every mode keeps its label for the trigger; the menu offers only the ones the agent can run. */
+function modeOptions(agent: AgentKind | undefined) {
+  return ExecutionMode.options.map((value) => ({ value, ...executionModePresentation(agent, value), hidden: !executionModeAvailable(agent, value) }));
 }
 
 /** Usage stays inspectable even while compaction is unavailable. Only the explicit action compacts. */

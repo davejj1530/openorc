@@ -5,6 +5,8 @@ export * from "./events.js";
 export * from "./mcp-apps.js";
 export * from "./domain.js";
 export * from "./review-comments.js";
+export * from "./diff-lines.js";
+export * from "./pull-requests.js";
 export * from "./rpc.js";
 export * from "./provider-usage.js";
 export * from "./model-catalog.js";

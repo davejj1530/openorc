@@ -35,6 +35,8 @@ import { createMcpAppsHandlers } from "./handlers/mcp-apps.js";
 import { createMemoryHandlers } from "./handlers/memory.js";
 import { createOrchestrationHandlers } from "./handlers/orchestration.js";
 import { createProjectsHandlers } from "./handlers/projects.js";
+import { createPullRequestHandlers } from "./handlers/pull-requests.js";
+import { createReviewerAppHandlers } from "./handlers/reviewer-app.js";
 import { createReviewCommentsHandlers } from "./handlers/review-comments.js";
 import { createReviewThreadHandlers } from "./handlers/review-thread.js";
 import { createReviewWorkspaceHandlers } from "./handlers/review-workspace.js";
@@ -70,9 +72,12 @@ import { LedgerUpkeep } from "./services/ledger-upkeep.js";
 import { LifecycleService } from "./services/lifecycle.js";
 import { MemoryService, type ProviderInfo } from "./services/memory.js";
 import { OrchestrationService } from "./services/orchestration.js";
+import { inUnvettedCopy } from "./services/review-copies.js";
 import { ProjectService } from "./services/projects.js";
 import { ProviderLog } from "./services/provider-log.js";
 import { ProviderUsageService } from "./services/provider-usage.js";
+import { PullRequestService } from "./services/pull-requests.js";
+import { ReviewerAppService } from "./services/reviewer-app.js";
 import { ReviewService } from "./services/review.js";
 import { RunService, type Notification } from "./services/runs.js";
 import { ScheduleService } from "./services/schedules.js";
@@ -106,6 +111,8 @@ export interface OpenOrcOptions {
   browser?: BrowserHost;
   slackSecrets?: SlackSecretStore;
   memorySecrets?: ProtectedSecretStore;
+  /** Keeps the reviewer app's private key. Without it, reviews post only as the user. */
+  githubSecrets?: ProtectedSecretStore;
   /** Where memory's embedding model runs. Defaults to the core's own thread, where loading it and each batch block everything else. */
   embedder?: TextEmbedder;
   dataDir: string;
@@ -153,6 +160,8 @@ export class OpenOrc {
   readonly threads: ThreadService;
   readonly settings: AppSettingsService;
   readonly lifecycle: LifecycleService;
+  readonly pullRequests: PullRequestService;
+  readonly reviewerApp: ReviewerAppService;
   readonly schedules: ScheduleService;
   readonly files: FileService;
   readonly imports: ImportService;
@@ -244,6 +253,8 @@ export class OpenOrc {
         taskImages: (spec) => new AttachmentService(options.dataDir).forTask(spec),
         inlineToolImages: (output) => this.toolImages.inline(output),
         brief: (project) => this.memory.brief(project),
+        threadContext: (thread) => this.pullRequests.brief(thread),
+        untrustedCheckout: (thread) => inUnvettedCopy(this.db, thread),
         memoryEnabled: () => this.memory.enabled(),
         environment: () => this.environment.current(),
         claudeVersion: (snapshot, env) => (snapshot ? this.system.infoFor(snapshot, env) : this.system.info()).then((info) => harnessInfo(info, "claude").version),
@@ -383,12 +394,9 @@ export class OpenOrc {
     this.teamForks = new TeamForkService(db, options.dataDir, this.teamOperations, this.workspaceWriters, (id) =>
       invalidate(["workspace-diff", "orchestration", "threads", `thread:${id}`, `threaddiff:${id}`]),
     );
-    this.teamRestores = new TeamRestoreService(db, options.dataDir, this.teamOperations, this.workspaceWriters, (id) =>
-      invalidate(["workspace-diff", "orchestration", "threads", `thread:${id}`, `threaddiff:${id}`, `threadlog:${id}`, `checkpoints:${id}`]),
-    );
-    this.teamMoves = new TeamMoveService(db, options.dataDir, this.teamOperations, this.workspaceWriters, (id) =>
-      invalidate(["workspace-diff", "orchestration", "threads", `thread:${id}`, `threaddiff:${id}`, `threadlog:${id}`, `checkpoints:${id}`]),
-    );
+    const workspaceReplaced = (id: string) => invalidate(["workspace-diff", "orchestration", "threads", `thread:${id}`, `threaddiff:${id}`, `threadlog:${id}`, `checkpoints:${id}`]);
+    this.teamRestores = new TeamRestoreService(db, options.dataDir, this.teamOperations, this.workspaceWriters, workspaceReplaced);
+    this.teamMoves = new TeamMoveService(db, options.dataDir, this.teamOperations, this.workspaceWriters, workspaceReplaced);
     this.teamDeletions = new TeamDeletionService(db, options.dataDir, this.teamOperations, this.workspaceWriters, (id) => {
       invalidate(["orchestration", "threads", "tasks", "inbox", `thread:${id}`]);
       // What deleted runs leave outside the database goes with them.
@@ -442,6 +450,16 @@ export class OpenOrc {
     });
     this.files = new FileService();
     this.imports = new ImportService(db, this.ledger, invalidate, this.log);
+    this.reviewerApp = new ReviewerAppService(db, { secrets: options.githubSecrets, invalidate });
+    this.pullRequests = new PullRequestService(db, {
+      dataDir: options.dataDir,
+      system: this.system,
+      threads: this.threads,
+      runs: this.runs,
+      reviewerApp: this.reviewerApp,
+      writers: this.workspaceWriters,
+      invalidate,
+    });
     this.slack = new SlackService(this, options.slackSecrets, new AttachmentService(options.dataDir));
     this.handlers = this.buildHandlers(invalidate);
   }
@@ -517,6 +535,7 @@ export class OpenOrc {
         ...createMemoryHost({ memoryService: this.memory, runService: this.runs, db: this.db, assertTeamActor, taskFor, projectFor }),
         ...createTeamHost({ teams: this.teams, slack: this.slack }),
         ...createThreadsHost({ threadService: this.threads, teamConversations: this.teamConversations, db: this.db, assertTeamActor }),
+        pullReview: this.pullRequests.agentTools(),
         tasks: {
           ...createTasksHost({ teams: this.teams, threadService: this.threads, teamTasks: this.teamTasks, dataDir: this.options.dataDir, assertTeamActor }),
           create: createTaskCreateHost({ teams: this.teams, teamTasks: this.teamTasks, threadService: this.threads, db: this.db, assertTeamActor }),
@@ -666,6 +685,7 @@ export class OpenOrc {
     await this.comments.close();
     await this.slack.close();
     this.lifecycle.stop();
+    this.reviewerApp.shutdown();
     await this.upkeep.stop();
     this.teamNotifications.shutdown();
     await this.schedules.shutdown();
@@ -693,6 +713,8 @@ export class OpenOrc {
       createSlackHandlers({ slack: this.slack, invalidate }),
       createSystemHandlers({ system: this.system, agentUpdates: this.agentUpdates, providerUsage: this.providerUsage, invalidate }),
       createProjectsHandlers({ db: this.db, projectService: this.projects, invalidate, transport: this.options.transport }),
+      createPullRequestHandlers({ pullRequests: this.pullRequests }),
+      createReviewerAppHandlers({ reviewerApp: this.reviewerApp }),
       createOrchestrationHandlers({ orchestrationService: this.orchestration, teamConversations: this.teamConversations, teamTasks: this.teamTasks, db: this.db }),
       createThreadQueriesHandlers({ threadService: this.threads, db: this.db, imports: this.imports }),
       createThreadLaunchHandlers({ threadService: this.threads, teamConversations: this.teamConversations, imports: this.imports }),

@@ -244,6 +244,44 @@ test("plan_write is offered only where the host accepts a plan document", async 
   assert.ok(!(await (await connect("act-run")).listTools()).tools.some((tool) => tool.name === "plan_write"));
 });
 
+void test("pull request review tools exist only for runs reviewing a pull request", async (t) => {
+  const { host, connect } = await fixture(t);
+  const received: unknown[] = [];
+  host.pullReview = {
+    available: (runId) => runId === "review-run",
+    diff: async (runId, { path, since }) => `diff for ${runId} ${path ?? "all"}${since ? ` since ${since}` : ""}`,
+    comment: async (runId, comment) => {
+      received.push({ runId, comment });
+      return "Draft comment saved.";
+    },
+    summary: async (runId, body) => {
+      received.push({ runId, body });
+      return "Summary saved.";
+    },
+  };
+  const names = ["pull_request_diff", "pull_request_comment", "pull_request_summary"];
+  for (const name of names) assert.ok(internalToolNames.includes(name));
+  const reviewer = await connect("review-run");
+  assert.deepEqual(
+    (await reviewer.listTools()).tools.map((tool) => tool.name).filter((name) => names.includes(name)),
+    names,
+  );
+  assert.ok(!(await (await connect("other-run")).listTools()).tools.some((tool) => names.includes(tool.name)));
+
+  assert.equal(resultText(await reviewer.callTool({ name: "pull_request_diff", arguments: { path: "src/app.ts" } })), "diff for review-run src/app.ts");
+  assert.equal(resultText(await reviewer.callTool({ name: "pull_request_diff", arguments: { since: "abc1234" } })), "diff for review-run all since abc1234");
+  assert.equal((await reviewer.callTool({ name: "pull_request_diff", arguments: { since: "HEAD~1" } })).isError, true);
+  await reviewer.callTool({ name: "pull_request_comment", arguments: { path: "src/app.ts", line: 12, body: "Close the server." } });
+  await reviewer.callTool({ name: "pull_request_comment", arguments: { path: "src/app.ts", line: 12, side: "old", start_line: 10, body: "Keep the guard." } });
+  assert.equal((await reviewer.callTool({ name: "pull_request_comment", arguments: { path: "src/app.ts", line: 0, body: "Nowhere." } })).isError, true);
+  await reviewer.callTool({ name: "pull_request_summary", arguments: { body: "Nearly there." } });
+  assert.deepEqual(received, [
+    { runId: "review-run", comment: { path: "src/app.ts", line: 12, side: "new", body: "Close the server." } },
+    { runId: "review-run", comment: { path: "src/app.ts", line: 12, side: "old", startLine: 10, startSide: "old", body: "Keep the guard." } },
+    { runId: "review-run", body: "Nearly there." },
+  ]);
+});
+
 void test("approval decisions preserve denial, answers and edited tool input across the MCP interface", async (t) => {
   const { host, connect } = await fixture(t);
   const requests: ApprovalRequest[] = [];

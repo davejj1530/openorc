@@ -43,19 +43,30 @@ export async function branchExists(root: string, branch: string): Promise<boolea
 
 /**
  * Creates a worktree on a new branch from `startPoint`. If the branch already
- * exists (a task being reopened), the worktree checks it out instead.
+ * exists (a task being reopened), the worktree checks it out instead. It holds
+ * the user's own work, so their post-checkout hook runs.
  */
 export async function add(root: string, options: { path: string; branch: string; startPoint: string }): Promise<void> {
   if (await branchExists(root, options.branch)) {
-    await git(root, ["worktree", "add", options.path, options.branch]);
+    await git(root, ["worktree", "add", options.path, options.branch], { hooks: true });
   } else {
-    await git(root, ["worktree", "add", "-b", options.branch, options.path, options.startPoint]);
+    await git(root, ["worktree", "add", "-b", options.branch, options.path, options.startPoint], { hooks: true });
   }
+}
+
+/** Creates a worktree at `commit` without a branch, for reading someone else's work. */
+export async function addDetached(root: string, options: { path: string; commit: string }): Promise<void> {
+  await git(root, ["worktree", "add", "--detach", options.path, options.commit]);
+}
+
+/** Moves a detached worktree to another commit. */
+export async function checkoutDetached(worktreePath: string, commit: string): Promise<void> {
+  await git(worktreePath, ["checkout", "--quiet", "--detach", commit]);
 }
 
 /**
  * Commits everything a worktree has not committed onto its branch, new files included and ignored ones not, so the
- * worktree can be removed without losing work. Commit hooks are skipped: this keeps work rather than changing it.
+ * worktree can be removed without losing work. No hook runs: this keeps work rather than changing it.
  * Returns the commit and how many paths it saved, or null when there was nothing to save.
  */
 export async function saveChanges(worktreePath: string, message: string): Promise<{ sha: string; paths: number } | null> {
@@ -65,7 +76,7 @@ export async function saveChanges(worktreePath: string, message: string): Promis
   if (!branch) throw new Error("This worktree is not on a branch, so its uncommitted changes have nowhere to be saved. Commit them to a branch first.");
   await git(worktreePath, ["add", "-A"]);
   try {
-    await git(worktreePath, ["commit", "--no-verify", "--quiet", "-m", message]);
+    await git(worktreePath, ["commit", "--quiet", "-m", message]);
   } catch (e) {
     if (e instanceof GitError && /tell me who you are|user\.(email|name)/i.test(e.stderr))
       throw new Error("Git has no user name or email set, so the uncommitted changes could not be saved. Set them with git config, then try again.");

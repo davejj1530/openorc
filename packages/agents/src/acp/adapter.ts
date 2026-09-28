@@ -2,9 +2,10 @@ import { spawnAgentProcess } from "../process-recovery.js";
 import { executionMode, executionModeUnavailable } from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
 import { spawn, type ChildProcess } from "node:child_process";
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import os from "node:os";
-import { extname } from "node:path";
+import path, { extname } from "node:path";
 import readline from "node:readline";
 import { Readable, Writable } from "node:stream";
 import {
@@ -99,6 +100,24 @@ function planInstructions(mode: RunSpec["mode"], mcpUrl: string | undefined, ser
   return `${delivery} Use read, glob and grep for investigation; shell, edits and native subagents are blocked in Plan.`;
 }
 
+/**
+ * Whether a folder holds OpenCode settings of its own. OpenCode 2 skips them in an unvetted checkout when told to, but
+ * earlier releases load .opencode plugins regardless, so a run there refuses rather than trust the installed version.
+ */
+function carriesOpenCodeConfig(cwd: string): boolean {
+  return ["opencode.json", "opencode.jsonc", ".opencode"].some((name) => existsSync(path.join(cwd, name)));
+}
+
+/** OpenCode's environment for a run: the app's question tool and Plan agent, and nothing from an unvetted checkout. */
+function openCodeEnv(base: NodeJS.ProcessEnv, spec: RunSpec, askUser: boolean): NodeJS.ProcessEnv {
+  const env = { ...base };
+  if (askUser) env["OPENCODE_CONFIG_CONTENT"] = questionConfig(env["OPENCODE_CONFIG_CONTENT"]);
+  if (spec.mode === "plan") env["OPENCODE_CONFIG_CONTENT"] = planConfig(env["OPENCODE_CONFIG_CONTENT"], spec.internalMcp);
+  // A folder's opencode.json and .opencode plugins are code: an unvetted checkout's never load.
+  if (spec.untrustedCheckout) env["OPENCODE_DISABLE_PROJECT_CONFIG"] = "true";
+  return env;
+}
+
 export class AcpAdapter {
   constructor(private readonly options: AcpAdapterOptions) {}
 
@@ -141,13 +160,13 @@ export class AcpAdapter {
   start(spec: RunSpec, launch: AgentLaunchEnvironment): RunHandle {
     const unavailable = executionModeUnavailable(spec.agent, executionMode(spec.mode ?? "act", spec.permissionMode));
     if (unavailable) throw new Error(unavailable);
+    if (spec.untrustedCheckout && carriesOpenCodeConfig(spec.cwd))
+      throw new Error("OpenCode could load this pull request's own OpenCode settings and plugins, which can run commands. Review it with a Claude model instead.");
     const serverName = spec.internalMcp?.serverName ?? this.options.mcpServerName ?? "openorc";
     const mcpUrl = spec.internalMcp?.url ?? spec.mcpUrl;
     const mcpServers: McpServer[] = mcpUrl ? [{ type: "http", name: serverName, url: mcpUrl, headers: [] }] : [];
-    const env: NodeJS.ProcessEnv = { ...launch.env, ...this.options.env };
     const askUser = Boolean(mcpUrl && spec.internalMcp?.toolNames.includes("ask_user"));
-    if (askUser) env["OPENCODE_CONFIG_CONTENT"] = questionConfig(env["OPENCODE_CONFIG_CONTENT"]);
-    if (spec.mode === "plan") env["OPENCODE_CONFIG_CONTENT"] = planConfig(env["OPENCODE_CONFIG_CONTENT"], spec.internalMcp);
+    const env = openCodeEnv({ ...launch.env, ...this.options.env }, spec, askUser);
     const startedAt = Date.now();
     const proc = spawnAgentProcess(launch.binary, ["acp"], { cwd: spec.cwd, env, registry: launch.processRegistry });
     const mapper = new AcpUpdateMapper(spec.runId);

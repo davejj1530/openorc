@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { commentAnchor, isOutdated } from "./diff-lines";
+import { commentAnchor, isOutdated, patchFiles } from "@openorc/protocol";
 
 const chunk = [
   "diff --git a/src/app.ts b/src/app.ts",
@@ -74,5 +74,48 @@ describe("outdated comments", () => {
     expect(isOutdated({ ...range, lineText: firstHunk }, chunk)).toBe(false);
     expect(isOutdated({ ...range, lineText: firstHunk.replace("3000", "8080") }, chunk)).toBe(true);
     expect(isOutdated({ ...range, startLine: 40, startSide: "old", lineText: firstHunk }, chunk)).toBe(true);
+  });
+});
+
+describe("file paths", () => {
+  it("reads each file's name as Git prints it, quoted or not", () => {
+    // Real `git diff` output: bytes outside ASCII in octal, C escapes, and a tab after a name with a space.
+    const patch = [
+      String.raw`diff --git "a/caf\303\251.ts" "b/caf\303\251.ts"`,
+      "new file mode 100644",
+      "--- /dev/null",
+      String.raw`+++ "b/caf\303\251.ts"`,
+      "@@ -0,0 +1 @@",
+      "+a",
+      String.raw`diff --git "a/gone \303\251.ts" "b/gone \303\251.ts"`,
+      "deleted file mode 100644",
+      String.raw`--- "a/gone \303\251.ts"` + "\t",
+      "+++ /dev/null",
+      "@@ -1 +0,0 @@",
+      "-x",
+      String.raw`diff --git "a/tab\there.ts" "b/tab\there.ts"`,
+      "--- /dev/null",
+      String.raw`+++ "b/tab\there.ts"`,
+      String.raw`diff --git "a/quote\"d.ts" "b/quote\"d.ts"`,
+      "--- /dev/null",
+      String.raw`+++ "b/quote\"d.ts"`,
+      String.raw`diff --git "a/back\\slash.ts" "b/back\\slash.ts"`,
+      "--- /dev/null",
+      String.raw`+++ "b/back\\slash.ts"`,
+      "diff --git a/with space.ts b/with space.ts",
+      "--- /dev/null",
+      "+++ b/with space.ts\t",
+      String.raw`diff --git a/old.ts "b/nouveau \303\251.ts"`,
+      "similarity index 100%",
+      "rename from old.ts",
+      String.raw`rename to "nouveau \303\251.ts"`,
+      String.raw`diff --git "a/bin \303\251.dat" "b/bin \303\251.dat"`,
+      "new file mode 100644",
+      String.raw`Binary files /dev/null and "b/bin \303\251.dat" differ`,
+      "diff --git a/mode.sh b/mode.sh",
+      "old mode 100644",
+      "new mode 100755",
+    ].join("\n");
+    expect(patchFiles(patch).map((file) => file.path)).toEqual(["café.ts", "gone é.ts", "tab\there.ts", 'quote"d.ts', "back\\slash.ts", "with space.ts", "nouveau é.ts", "bin é.dat", "mode.sh"]);
   });
 });

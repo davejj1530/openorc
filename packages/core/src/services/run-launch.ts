@@ -52,7 +52,7 @@ interface RunLaunchDependencies {
   mcp: () => Promise<OpenOrcMcpServer>;
   writers: WorkspaceWriters;
   adapters: RunAdapterRegistry;
-  hooks: Pick<RunHooks, "assertStart" | "taskImages" | "browserAvailable" | "claudeUserMcpServers" | "processRegistry">;
+  hooks: Pick<RunHooks, "assertStart" | "taskImages" | "browserAvailable" | "claudeUserMcpServers" | "processRegistry" | "untrustedCheckout">;
   log: Logger;
   isClosing: () => boolean;
   live: ReadonlyMap<string, LiveRun>;
@@ -269,6 +269,8 @@ export class RunLaunch {
       ...(resumeSessionId ? { resumeSessionId } : {}),
       ...(forkSession ? { forkSession: true } : {}),
       ...(input.agent === "claude" && this.deps.hooks.claudeUserMcpServers?.() === false ? { strictMcp: true } : {}),
+      // Decided by the conversation, not its mode, so switching a review to Act keeps it.
+      ...(input.scope.thread && this.deps.hooks.untrustedCheckout?.(input.scope.thread) ? { untrustedCheckout: true } : {}),
     };
   }
 

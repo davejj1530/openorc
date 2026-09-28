@@ -1568,7 +1568,7 @@ describe("team runtime through the core and real MCP server", () => {
       () => call("review.comments.send", { threadId: tasks.get(core.db, taskId)!.threadId!, taskId, commentIds: ["guarded-comment"] }),
       () => call("review.commit", { taskId, message: "Must not commit team output" }),
       () => call("review.push", { taskId }),
-      () => call("review.createPr", { taskId, title: "Must not publish", body: "Unintegrated output" }),
+      () => call("review.createPr", { taskId, title: "Must not publish", body: "Unintegrated output", base: "main" }),
       () => call("review.diff", { taskId }),
       () => call("git.log", { taskId }),
     ];

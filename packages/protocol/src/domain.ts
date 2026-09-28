@@ -109,12 +109,15 @@ export const Thread = z.object({
   worktreePath: z.string().nullable(),
   /** Where the thread started: its worktree's base commit, or the checkout's HEAD (the empty tree before a first commit). A worktree's Changes tab diffs against it. */
   baseSha: z.string().nullable(),
+  /** The branch the thread's worktree started from, which its pull request targets by default. Null when unknown, as in the checkout. */
+  baseBranch: z.string().nullable(),
   pinnedAt: z.number().nullable(),
   /** When the user last looked; activity after it is unread. */
   seenAt: z.number().nullable(),
   /** Legacy completion timestamp, retained for persisted data compatibility. */
   doneAt: z.number().nullable(),
   snoozedUntil: z.number().nullable(),
+  /** The conversation's pull request: the one it opened, or the one it reviews. Its state follows GitHub. */
   prUrl: z.string().nullable(),
   prState: PrState.nullable(),
   forkedFromId: z.string().nullable(),
@@ -156,6 +159,14 @@ export const QueuedMessage = z.object({
 export type QueuedMessage = z.infer<typeof QueuedMessage>;
 
 /** A thread with what is happening on it right now, for lists and the sidebar. */
+/**
+ * A conversation whose copy is on no branch, such as a pull request's copy under review. Outside a team, which
+ * publishes through a branch of its own, nothing in it is committed, pushed or opened as a pull request.
+ */
+export function isDetachedCopy(thread: Pick<Thread, "worktreePath" | "branch">): boolean {
+  return thread.worktreePath !== null && thread.branch === null;
+}
+
 export const ThreadSummary = Thread.extend({
   /** Whether any execution has started; absent in older cached summaries. */
   hasStarted: z.boolean().optional(),

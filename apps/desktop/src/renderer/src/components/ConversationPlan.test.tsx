@@ -27,6 +27,7 @@ const thread: ThreadSummary = {
   branch: null,
   worktreePath: null,
   baseSha: null,
+  baseBranch: null,
   pinnedAt: null,
   seenAt: null,
   doneAt: null,

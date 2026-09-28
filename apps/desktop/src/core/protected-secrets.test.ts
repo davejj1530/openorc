@@ -20,6 +20,15 @@ describe("protected storage client", () => {
     expect(client.receive({ type: "shutdown" })).toBe(false);
   });
 
+  it("answers the reviewer app's store on its own channel", async () => {
+    const send = vi.fn();
+    const client = new ProtectedSecretsClient(send);
+    const key = client.store("github.secrets").load();
+    expect(send.mock.calls[0]![0]).toMatchObject({ type: "github.secrets", operation: "load" });
+    client.receive({ type: "github.secrets.result", id: send.mock.calls[0]![0].id, value: "key-fixture" });
+    await expect(key).resolves.toBe("key-fixture");
+  });
+
   it("times out, ignores late replies, and accepts a subsequent request", async () => {
     vi.useFakeTimers();
     const send = vi.fn();

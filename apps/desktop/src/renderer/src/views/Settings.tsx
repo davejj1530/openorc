@@ -1,4 +1,4 @@
-import { settingsTabIndex, installationLabel, idleTimeoutLabel, memoryModelAgent, learningStatus } from "./settings-presentation";
+import { settingsTabIndex, idleTimeoutLabel, memoryModelAgent, learningStatus } from "./settings-presentation";
 import { AgentConnections } from "./settings-agent-updates";
 import { useRouter } from "../lib/router";
 import { useEffect, useRef, useState } from "react";
@@ -6,9 +6,10 @@ import { RefreshCw } from "../components/icons";
 import { distillationHarnessIds, harnessCatalog, type AppSettings, type ExtractionProviderChoice } from "@openorc/protocol";
 import { TopBar } from "../components/TopBar";
 import { MemoryControl } from "../components/MemoryControl";
-import { Badge, Button, Input, Select } from "../components/ui";
+import { Button, Input, Select } from "../components/ui";
 import { useRpc } from "../lib/query";
 import { AppearanceSettings } from "./settings-appearance";
+import { GitHubSettings } from "./settings-github";
 import { Field, LoadError, SaveStatus, Section, Toggle, usePreference } from "./settings-shared";
 import { SkillsSettings } from "./settings-skills";
 import { SlackSettings } from "./settings-slack";
@@ -97,18 +98,7 @@ export function Settings() {
                     </div>
                     {info.isError && <LoadError retry={() => void info.refetch()} />}
                     <AgentConnections info={info.data} />
-                    <Section title="GitHub" description="Pull requests use the GitHub CLI installed on this device.">
-                      <div className="settings-field">
-                        <span className="font-medium">GitHub CLI</span>
-                        <Badge tone={info.data?.gh.installed ? "ok" : "muted"}>{installationLabel(Boolean(info.data), info.data?.gh.installed ?? false)}</Badge>
-                      </div>
-                      {info.data && !info.data.gh.installed && (
-                        <p className="text-ink-2 mt-3">Install the GitHub CLI to create pull requests. Push still works; OpenOrc opens the compare page instead.</p>
-                      )}
-                      <Button className="mt-3" onClick={() => window.openorc.openExternal("https://cli.github.com")}>
-                        GitHub CLI setup
-                      </Button>
-                    </Section>
+                    <GitHubSettings info={info.data} />
                   </>
                 )}
                 {id === "skills" && <SkillsSettings active={active === id} />}

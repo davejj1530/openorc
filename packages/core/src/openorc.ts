@@ -72,6 +72,7 @@ import { LedgerUpkeep } from "./services/ledger-upkeep.js";
 import { LifecycleService } from "./services/lifecycle.js";
 import { MemoryService, type ProviderInfo } from "./services/memory.js";
 import { OrchestrationService } from "./services/orchestration.js";
+import { inUnvettedCopy } from "./services/review-copies.js";
 import { ProjectService } from "./services/projects.js";
 import { ProviderLog } from "./services/provider-log.js";
 import { ProviderUsageService } from "./services/provider-usage.js";
@@ -253,7 +254,7 @@ export class OpenOrc {
         inlineToolImages: (output) => this.toolImages.inline(output),
         brief: (project) => this.memory.brief(project),
         threadContext: (thread) => this.pullRequests.brief(thread),
-        untrustedCheckout: (thread) => this.pullRequests.reviewsPullRequest(thread),
+        untrustedCheckout: (thread) => inUnvettedCopy(this.db, thread),
         memoryEnabled: () => this.memory.enabled(),
         environment: () => this.environment.current(),
         claudeVersion: (snapshot, env) => (snapshot ? this.system.infoFor(snapshot, env) : this.system.info()).then((info) => harnessInfo(info, "claude").version),

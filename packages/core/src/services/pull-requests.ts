@@ -290,11 +290,6 @@ export class PullRequestService {
     return listed ?? author.model ?? (isHarnessId(author.agent) ? harnessName(author.agent) : author.agent);
   }
 
-  /** Whether the conversation reviews a pull request, so its checkout holds code the user hasn't vetted. */
-  reviewsPullRequest(thread: Thread): boolean {
-    return pullReviews.forThread(this.db, thread.id) !== null;
-  }
-
   /** What a conversation reviewing a pull request is told on every turn; null for any other conversation. */
   brief(thread: Thread): string | null {
     const review = pullReviews.forThread(this.db, thread.id);

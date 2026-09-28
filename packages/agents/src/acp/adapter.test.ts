@@ -1,4 +1,7 @@
 import { EventEmitter } from "node:events";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { PassThrough } from "node:stream";
 import { spawn, type ChildProcess } from "node:child_process";
 import { describe, expect, it, vi } from "vitest";
@@ -157,6 +160,18 @@ function agent(permissionMode: PermissionPreset = "autonomous", overrides: Parti
 const eventTypes = (events: AgentEvent[]) => events.map((event) => event.type);
 
 describe("AcpAdapter", () => {
+  it("refuses an unvetted checkout that carries OpenCode settings, which older releases load regardless", () => {
+    const cwd = mkdtempSync(path.join(os.tmpdir(), "openorc-opencode-copy-"));
+    try {
+      writeFileSync(path.join(cwd, "opencode.json"), "{}");
+      vi.mocked(spawn).mockClear();
+      expect(() => agent("autonomous", { untrustedCheckout: true, cwd })).toThrow("OpenCode could load this pull request's own OpenCode settings and plugins, which can run commands.");
+      expect(spawn).not.toHaveBeenCalled();
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
   it("loads no opencode.json or .opencode plugins from an unvetted checkout", () => {
     for (const untrustedCheckout of [true, false]) {
       const s = agent("autonomous", { untrustedCheckout });

@@ -196,7 +196,7 @@ describe("Codex in an unvetted checkout", () => {
   it("refuses to start when Codex would apply the checkout's own .codex settings", async () => {
     const { errors, methods, read } = await run([{ name: { type: "project" } }, { name: { type: "user" } }]);
     expect(read).toMatchObject({ includeLayers: true });
-    expect(errors).toEqual(["Codex trusts this repository, so it would load the pull request's own .codex settings, which can run commands. Review it with a Claude or OpenCode model instead."]);
+    expect(errors).toEqual(["Codex trusts this repository, so it would load the pull request's own .codex settings, which can run commands. Review it with a Claude model instead."]);
     expect(methods).not.toContain("thread/start");
   });
 

@@ -93,6 +93,6 @@ export class RunBriefs {
     if (thread.worktreePath) {
       return `You are in the thread "${thread.title}" for project ${project.name}, working in this thread's own worktree at ${thread.worktreePath} on branch ${thread.branch ?? "(pending)"}.`;
     }
-    return `You are in the thread "${thread.title}" for project ${project.name}, working directly in the repository at ${project.rootPath}${project.defaultBranch ? ` on ${project.defaultBranch}` : ""}.`;
+    return `You are in the thread "${thread.title}" for project ${project.name}, working directly in the project folder at ${project.rootPath}${project.defaultBranch ? ` on ${project.defaultBranch}` : ""}.`;
   }
 }

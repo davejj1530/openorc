@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { git } from "./exec.js";
-import { changedFiles, log, patchAgainst, repoInfo } from "./repo.js";
+import { changedFiles, gitState, log, patchAgainst, repoInfo } from "./repo.js";
 import { diffStat, treeHash } from "./snapshot.js";
 import { commitAll, pullRequestTemplate, push, unpushedCommits } from "./publish.js";
 import * as worktree from "./worktree.js";
@@ -193,6 +193,52 @@ describe("pull request template", () => {
     expect(await pullRequestTemplate(repo)).toBe("From the root\n");
     await writeFile(path.join(repo, ".github", "PULL_REQUEST_TEMPLATE.md"), "---\nname: Default\n---\n## Summary\n");
     expect(await pullRequestTemplate(repo)).toBe("## Summary\n");
+  });
+});
+
+describe("folders without git or commits", () => {
+  let dir: string;
+  beforeAll(async () => {
+    dir = await mkdtemp(path.join(os.tmpdir(), "openorc-git-new-"));
+  });
+  afterAll(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  async function fresh(name: string): Promise<string> {
+    const repo = path.join(dir, name);
+    await mkdir(repo);
+    await git(repo, ["init", "-q", "-b", "main"]);
+    return repo;
+  }
+
+  it("tells plain folders, repositories without commits and ready ones apart", async () => {
+    const plain = path.join(dir, "plain");
+    await mkdir(plain);
+    expect(await gitState(plain)).toBe("none");
+    const outer = await fresh("outer");
+    await mkdir(path.join(outer, "inner"));
+    // A folder inside another repository must not reach it.
+    expect(await gitState(path.join(outer, "inner"))).toBe("none");
+    expect(await gitState(outer)).toBe("no_commits");
+    expect(await gitState(root)).toBe("ready");
+    // A missing folder is a failure to report, not a folder without git.
+    await expect(gitState(path.join(dir, "missing"))).rejects.toThrow();
+  });
+
+  it("tracks changes before the first commit against an empty start", async () => {
+    const repo = await fresh("unborn");
+    await writeFile(path.join(repo, "plan.md"), "# Plan\n");
+    expect(await repoInfo(repo)).toMatchObject({ headSha: null, branch: "main", defaultBranch: null });
+    expect(await changedFiles(repo, null)).toEqual([{ path: "plan.md", status: "untracked", oldPath: null }]);
+    expect(await patchAgainst(repo, null)).toContain("+# Plan");
+    expect(await diffStat(repo, null)).toEqual({ files: 0, insertions: 0, deletions: 0, untracked: 1 });
+    expect(await log(repo, null)).toEqual([]);
+    const tree = await treeHash(repo);
+    expect((await git(repo, ["ls-tree", "--name-only", tree])).stdout.trim()).toBe("plan.md");
+    await git(repo, ["add", "plan.md"]);
+    expect(await changedFiles(repo, null)).toEqual([{ path: "plan.md", status: "added", oldPath: null }]);
+    expect(await treeHash(repo)).toBe(tree);
   });
 });
 

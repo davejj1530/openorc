@@ -1,11 +1,12 @@
 import { useRef, useState, type ReactNode } from "react";
 import { ArrowLeft, Check, CircleDashed, FolderGit2, GitBranch, Plus } from "../components/icons";
-import type { TaskPriority } from "@openorc/protocol";
+import type { TaskPriority, WorkspaceMode } from "@openorc/protocol";
 import { DocumentEditor, type DocumentEditorHandle } from "../components/DocumentEditor";
 import { PriorityIcon, priorityLabel, priorityOrder } from "../components/status";
 import { TopBar } from "../components/TopBar";
 import { Button, Empty, IconButton, Input, Kbd, Select, TextButton } from "../components/ui";
 import { readDraft, removeDraft, writeDraft } from "../lib/drafts";
+import { useProjectGit } from "../lib/project-git";
 import { useRpc, useRpcMutation } from "../lib/query";
 import { newThread, openTask, openThread, useRouter } from "../lib/router";
 import { useUi } from "../lib/ui";
@@ -22,7 +23,7 @@ function newTaskProjectGate(input: { error: Error | null; loading: boolean; empt
   if (input.empty) {
     return (
       <Empty title="Give your work a home">
-        <p>Import a repository to create your first task.</p>
+        <p>Import a project to create your first task.</p>
         <Button className="mt-4" onClick={input.importProject}>
           <FolderGit2 size={14} /> Import project
         </Button>
@@ -38,6 +39,57 @@ function workspaceHint(linkedThread: boolean, useWorktree: boolean): string {
   return "The thread will use your current checkout when you start work.";
 }
 
+/** A new task's worktree choice: a linked thread decides, then the draft, then the saved default, never before the project can branch. */
+function taskUsesWorktree(input: {
+  linked: boolean;
+  thread: { workspaceMode: WorkspaceMode } | null | undefined;
+  chosen: boolean | undefined;
+  preferred: WorkspaceMode | undefined;
+  canBranch: boolean;
+}): boolean {
+  if (input.linked) return input.thread?.workspaceMode === "worktree";
+  return input.canBranch && (input.chosen ?? input.preferred === "worktree");
+}
+
+/** Where a new task will work, and the branch its worktree starts from. */
+function NewTaskLocation(props: {
+  linked: boolean;
+  worktree: boolean;
+  worktreeBlocked: boolean;
+  settingsReady: boolean;
+  baseRef: string;
+  defaultBranch: string | null | undefined;
+  onWorktree: (worktree: boolean) => void;
+  onBaseRef: (baseRef: string) => void;
+}) {
+  return (
+    <details className="task-execution-settings">
+      <summary className="cursor-pointer text-sm text-ink-3 hover:text-ink select-none">Execution settings</summary>
+      <div className="grid gap-4 mt-4">
+        <ExecutionLocationSelect
+          value={props.worktree ? "worktree" : "current"}
+          disabled={!props.settingsReady || props.linked}
+          worktreeBlocked={props.worktreeBlocked}
+          onChange={(value) => props.onWorktree(value === "worktree")}
+        />
+        <label className="flex items-center gap-2 min-w-0 text-ink-3">
+          <GitBranch size={14} />
+          <span className="text-sm shrink-0">Base branch</span>
+          <Input
+            aria-label="Base branch"
+            disabled={!props.worktree || props.linked}
+            className="max-w-64"
+            placeholder={props.defaultBranch ?? "main"}
+            value={props.baseRef}
+            onChange={(e) => props.onBaseRef(e.target.value)}
+          />
+        </label>
+        <p className="text-sm text-ink-3">{workspaceHint(props.linked, props.worktree)}</p>
+      </div>
+    </details>
+  );
+}
+
 export function NewTask({ projectId, threadId }: { projectId?: string; threadId?: string }) {
   const projects = useRpc("projects.list", {});
   const thread = useRpc("threads.get", { id: threadId ?? "" }, { enabled: Boolean(threadId) });
@@ -47,7 +99,6 @@ export function NewTask({ projectId, threadId }: { projectId?: string; threadId?
   const [draft, setDraft] = useState(() =>
     readDraft(key, { title: "", spec: "", projectId: projectId ?? "", priority: "none" as TaskPriority, baseRef: "", useWorktree: undefined as boolean | undefined }),
   );
-  const useWorktree = threadId ? thread.data?.workspaceMode === "worktree" : (draft.useWorktree ?? settings.data?.defaultWorkspaceMode === "worktree");
   const submitting = useRef(false);
   const body = useRef<DocumentEditorHandle>(null);
   const current = useRef(draft);
@@ -62,6 +113,8 @@ export function NewTask({ projectId, threadId }: { projectId?: string; threadId?
   };
   const selectedId = draft.projectId || projectId || projects.data?.[0]?.id || "";
   const project = projects.data?.find((p) => p.id === selectedId);
+  const git = useProjectGit(selectedId);
+  const useWorktree = taskUsesWorktree({ linked: Boolean(threadId), thread: thread.data, chosen: draft.useWorktree, preferred: settings.data?.defaultWorkspaceMode, canBranch: !git.cannotBranch });
   const projectGate = newTaskProjectGate({
     error: projects.error,
     loading: projects.isLoading,
@@ -83,7 +136,7 @@ export function NewTask({ projectId, threadId }: { projectId?: string; threadId?
         spec: snapshot.spec.trim() || undefined,
         priority: snapshot.priority,
         baseRef: snapshot.baseRef.trim() || undefined,
-        useWorktree: threadId ? thread.data?.workspaceMode === "worktree" : (snapshot.useWorktree ?? settings.data.defaultWorkspaceMode === "worktree"),
+        useWorktree: taskUsesWorktree({ linked: Boolean(threadId), thread: thread.data, chosen: snapshot.useWorktree, preferred: settings.data.defaultWorkspaceMode, canBranch: !git.cannotBranch }),
       });
       removeDraft(key);
       openTask(task.id, "spec");
@@ -186,29 +239,16 @@ export function NewTask({ projectId, threadId }: { projectId?: string; threadId?
                 </TextButton>
               ) : null}
               <DocumentEditor ref={body} value={draft.spec} onChange={(spec) => patch({ spec })} onReadyChange={setImagesReady} disabled={create.isPending} />
-              <details className="task-execution-settings">
-                <summary className="cursor-pointer text-sm text-ink-3 hover:text-ink select-none">Execution settings</summary>
-                <div className="grid gap-4 mt-4">
-                  <ExecutionLocationSelect
-                    value={useWorktree ? "worktree" : "current"}
-                    disabled={!settings.data || Boolean(threadId)}
-                    onChange={(value) => patch({ useWorktree: value === "worktree" })}
-                  />
-                  <label className="flex items-center gap-2 min-w-0 text-ink-3">
-                    <GitBranch size={14} />
-                    <span className="text-sm shrink-0">Base branch</span>
-                    <Input
-                      aria-label="Base branch"
-                      disabled={!useWorktree || Boolean(threadId)}
-                      className="max-w-64"
-                      placeholder={project?.defaultBranch ?? "main"}
-                      value={draft.baseRef}
-                      onChange={(e) => patch({ baseRef: e.target.value })}
-                    />
-                  </label>
-                  <p className="text-sm text-ink-3">{workspaceHint(Boolean(threadId), useWorktree)}</p>
-                </div>
-              </details>
+              <NewTaskLocation
+                linked={Boolean(threadId)}
+                worktree={useWorktree}
+                worktreeBlocked={git.cannotBranch}
+                settingsReady={Boolean(settings.data)}
+                baseRef={draft.baseRef}
+                defaultBranch={project?.defaultBranch}
+                onWorktree={(worktree) => patch({ useWorktree: worktree })}
+                onBaseRef={(baseRef) => patch({ baseRef })}
+              />
             </div>
           </div>
           <footer className="document-footer">

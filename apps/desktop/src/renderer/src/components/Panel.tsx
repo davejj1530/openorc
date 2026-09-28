@@ -10,6 +10,7 @@ import { cn } from "../lib/cn";
 import { useConversationPlans } from "../lib/conversation-plans";
 import { useLayout, type PanelTab } from "../lib/layout";
 import { closedTools, isPanelTool, visibleTabs, type PanelSignals, type PanelTool } from "../lib/panel-tabs";
+import { useProjectGit } from "../lib/project-git";
 import { useRpc } from "../lib/query";
 import { useTrafficLights, useWindowsControls } from "../lib/window";
 import { CoversPreview, useBrowserPreview } from "../lib/browser-preview";
@@ -109,7 +110,8 @@ function panelScope(context: PanelContext): string | null {
 function usePanelSignals(context: PanelContext, savedChanges: boolean): PanelSignals {
   const thread = context.kind === "thread" ? context.thread : null;
   const id = thread?.id ?? "";
-  const git = thread !== null && context.project.id !== WORKSPACE_ID;
+  const { tracks } = useProjectGit(context.project.id);
+  const git = thread !== null && tracks;
   const diff = useRpc("review.threadDiff", { threadId: id, comparison: "head" }, { enabled: git });
   const { plans } = useConversationPlans(id, Boolean(thread?.teamInstanceId), thread !== null);
   const tasks = useRpc("tasks.list", { threadId: id }, { enabled: thread !== null });

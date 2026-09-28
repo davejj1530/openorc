@@ -262,6 +262,20 @@ function ScheduleRow({ schedule: s, projectName, onEdit }: { schedule: Schedule;
   );
 }
 
+/** Where a solo schedule's runs work. A worktree waits until the project can branch. */
+function ScheduleWorkspaceField(props: { value: WorkspaceMode; worktreeBlocked: boolean; disabled: boolean; onChange: (value: WorkspaceMode) => void }) {
+  return (
+    <Field label="Works in">
+      <Select value={props.value} disabled={props.disabled} onChange={(event) => props.onChange(event.target.value as WorkspaceMode)}>
+        <option value="worktree" disabled={props.worktreeBlocked}>
+          A fresh worktree
+        </option>
+        <option value="current">The checkout</option>
+      </Select>
+    </Field>
+  );
+}
+
 function ScheduleDialog({
   schedule,
   latest,
@@ -276,7 +290,7 @@ function ScheduleDialog({
   onClose: () => void;
 }) {
   const {
-    fields: { project, title, prompt, minutes, mode, permission, workspace },
+    fields: { project, title, prompt, minutes, mode, permission, workspace, worktreeBlocked },
     target: { selection: target, choice, revision, lead, currentTeam, archived, teamTarget, retainedTeam, pickerTeams, offlineMember, previewReason },
     resources: { projects, models, info, teams, availability },
     status: { pending, conflict, projectIssue, targetIssue, error, permissionReady },
@@ -371,14 +385,7 @@ function ScheduleDialog({
             </Select>
             <p className="mt-2 text-xs text-ink-3">{executionModeNote(choice?.agent, executionMode(mode, permission))}</p>
           </Field>
-          {!teamTarget ? (
-            <Field label="Works in">
-              <Select value={workspace} disabled={pending} onChange={(event) => setWorkspace(event.target.value as WorkspaceMode)}>
-                <option value="worktree">A fresh worktree</option>
-                <option value="current">The checkout</option>
-              </Select>
-            </Field>
-          ) : null}
+          {!teamTarget ? <ScheduleWorkspaceField value={workspace} worktreeBlocked={worktreeBlocked} disabled={pending} onChange={setWorkspace} /> : null}
         </div>
         {target.kind === "team" ? (
           <div className="text-xs text-ink-3 mb-3 space-y-2" data-schedule-team={target.target.teamRevisionId}>

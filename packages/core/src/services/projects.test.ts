@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -87,9 +87,84 @@ it("makes retries idempotent and audits removal and restoration once each", asyn
   expect(actions.map((entry) => entry.action)).toEqual(["project.import", "project.remove", "project.restore"]);
 });
 
+it("imports a plain folder and a repository without commits as they are", async () => {
+  const plain = path.join(dir, "plain");
+  await mkdir(plain);
+  expect(await service.import(plain)).toMatchObject({ name: "plain", rootPath: await realpath(plain), gitRemote: null, defaultBranch: null });
+  const fresh = path.join(dir, "fresh");
+  await mkdir(fresh);
+  await git(fresh, ["init", "-q", "-b", "main"]);
+  expect(await service.import(fresh)).toMatchObject({ name: "fresh", rootPath: await realpath(fresh), defaultBranch: null });
+  // A folder inside a repository still brings the whole repository.
+  await mkdir(path.join(root, "src"));
+  expect(await service.import(path.join(root, "src"))).toMatchObject({ rootPath: await realpath(root) });
+  await expect(service.import(path.join(dir, "missing"))).rejects.toThrow("This folder does not exist or is unavailable.");
+  expect(
+    service
+      .list()
+      .map((project) => project.name)
+      .sort(),
+  ).toEqual(["fresh", "plain", "repo"]);
+});
+
+it("fills in the remote and default branch once a folder added without git gains them", async () => {
+  const folder = path.join(dir, "later");
+  await mkdir(folder);
+  const project = await service.import(folder);
+  const invalidate = vi.fn();
+  const handlers = createProjectsHandlers({ db, projectService: service, invalidate, transport: { push() {} } });
+  expect(await handlers["projects.git"]({ id: project.id })).toBe("none");
+  await git(folder, ["init", "-q", "-b", "trunk"]);
+  await git(folder, ["config", "user.email", "test@example.com"]);
+  await git(folder, ["config", "user.name", "Test"]);
+  await writeFile(path.join(folder, "plan.md"), "# Plan\n");
+  await commitAll(folder, "init");
+  await git(folder, ["remote", "add", "origin", "https://github.com/example/later.git"]);
+  expect(invalidate).not.toHaveBeenCalled();
+  expect(await handlers["projects.git"]({ id: project.id })).toBe("ready");
+  expect(invalidate).toHaveBeenCalledWith(["projects", `project:${project.id}`]);
+  expect(service.get(project.id)).toMatchObject({ gitRemote: "https://github.com/example/later.git", defaultBranch: "trunk", updatedAt: project.updatedAt });
+  // Known values stay put, even when git would now guess another branch.
+  await git(folder, ["checkout", "-q", "-b", "other"]);
+  expect(await service.git(project.id)).toEqual({ state: "ready", changed: false });
+  expect(service.get(project.id)?.defaultBranch).toBe("trunk");
+});
+
 it("rejects Workspace and unknown IDs without changing the visible list", async () => {
   const project = await service.import(root);
   expect(() => service.remove(WORKSPACE_ID)).toThrow("Workspace cannot be removed");
   expect(() => service.remove("missing")).toThrow("not found");
   expect(service.list()).toEqual([project]);
+});
+
+it("reads the live checkout branch without replacing the saved default branch", async () => {
+  const project = await service.import(root);
+  projects.updateGit(db, project.id, { defaultBranch: "dev", gitRemote: null });
+  const handlers = createProjectsHandlers({ db, projectService: service, invalidate: vi.fn(), transport: { push() {} } });
+  const branch = () => handlers["projects.checkoutBranch"]({ id: project.id });
+  await git(root, ["checkout", "-q", "-b", "prod"]);
+  expect(await branch()).toBe("prod");
+  await git(root, ["checkout", "-q", "-b", "hotfix"]);
+  expect(await branch()).toBe("hotfix");
+  await git(root, ["checkout", "-q", "--detach"]);
+  expect(await branch()).toBeNull();
+  expect(service.get(project.id)?.defaultBranch).toBe("dev");
+  await rm(path.join(root, ".git"), { recursive: true, force: true });
+  expect(await branch()).toBeNull();
+  await rm(root, { recursive: true, force: true });
+  expect(await branch()).toBeNull();
+  expect(await handlers["projects.checkoutBranch"]({ id: WORKSPACE_ID })).toBeNull();
+  await expect(handlers["projects.checkoutBranch"]({ id: "missing" })).rejects.toThrow("not found");
+});
+
+it("reads unborn branches and never borrows a parent repository's branch", async () => {
+  const fresh = path.join(dir, "fresh");
+  await mkdir(fresh);
+  await git(fresh, ["init", "-q", "-b", "prod"]);
+  const project = await service.import(fresh);
+  expect(await service.checkoutBranch(project.id)).toBe("prod");
+  const nested = path.join(root, "plain");
+  await mkdir(nested);
+  const plain = projects.insert(db, { name: "Plain folder", rootPath: nested, gitRemote: null, defaultBranch: null, settings: {} });
+  expect(await service.checkoutBranch(plain.id)).toBeNull();
 });

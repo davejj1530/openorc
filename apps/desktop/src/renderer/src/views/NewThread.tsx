@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { WORKSPACE_ID, harnessIds, harnessInfo, harnessLoggedIn, type HarnessId, type Project, type TeamDetail } from "@openorc/protocol";
+import { WORKSPACE_ID, harnessIds, harnessInfo, harnessLoggedIn, type HarnessId, type Project, type TeamDetail, type WorkspaceMode } from "@openorc/protocol";
 import { FolderGit2, GitBranch, Laptop } from "../components/icons";
 import { Composer, ComposerChoice } from "../components/Composer";
 import { Panel } from "../components/Panel";
@@ -14,7 +14,9 @@ import { teamMentionEntries } from "../lib/composer-mentions";
 import { useLayout } from "../lib/layout";
 import { readOnboardingState } from "../lib/onboarding";
 import { evaluateNewThreadAvailability } from "../lib/new-thread-availability";
-import { readNewThreadDraft, readNewThreadProject, rememberNewThreadProject, targetModel, writeNewThreadDraft, type NewThreadDraft } from "../lib/new-thread-draft";
+import { useNewThreadLocation } from "../lib/new-thread-location";
+import { newThreadWorkspaceMode, readNewThreadDraft, readNewThreadProject, rememberNewThreadProject, targetModel, writeNewThreadDraft, type NewThreadDraft } from "../lib/new-thread-draft";
+import { branchingReason, useProjectGit } from "../lib/project-git";
 import { useRpc, useRpcMutation } from "../lib/query";
 import { openThread, useRouter } from "../lib/router";
 import { useSkillCommands } from "../lib/skill-commands";
@@ -22,7 +24,6 @@ import { useUi } from "../lib/ui";
 import { usePermissionSelection } from "../lib/permission-default";
 import { startNewThread } from "./new-thread-start";
 
-/** Project changes remount the composer so prompt, target and image drafts move together. */
 const workspaceOptions = [
   {
     value: "current" as const,
@@ -37,6 +38,30 @@ const workspaceOptions = [
     icon: GitBranch,
   },
 ];
+
+/** Where the thread works: a folder of your choice in Workspace, the checkout or a worktree in a project. */
+function ThreadPlace(props: { isWorkspace: boolean; mode: WorkspaceMode; blocked: string | null; disabled: boolean; onFolder: (folder: string) => void; onMode: (mode: WorkspaceMode) => void }) {
+  const chooseFolder = async () => {
+    const folder = await window.openorc.pickDirectory();
+    if (folder) props.onFolder(folder);
+  };
+  if (!props.isWorkspace)
+    return (
+      <ComposerChoice
+        ariaLabel="Where the thread works"
+        value={props.mode}
+        options={workspaceOptions}
+        onChange={props.onMode}
+        disabled={props.disabled || Boolean(props.blocked)}
+        disabledReason={props.blocked ?? undefined}
+      />
+    );
+  return (
+    <Button variant="ghost" size="sm" disabled={props.disabled} title="Choose the folder for this conversation" onClick={() => void chooseFolder()}>
+      Choose folder
+    </Button>
+  );
+}
 
 function heroHelp(input: { hasProject: boolean; activity: ReturnType<typeof useArrivalActivity>; revision: boolean; isWorkspace: boolean }): ReactNode {
   if (!input.hasProject) return null;
@@ -59,6 +84,7 @@ function heroHelp(input: { hasProject: boolean; activity: ReturnType<typeof useA
   );
 }
 
+/** Project changes remount the composer so prompt, target and image drafts move together. */
 export function NewThread({ projectId }: { projectId?: string }) {
   const projects = useRpc("projects.list", {});
   const home = useRpc("workspace.get", {});
@@ -104,6 +130,7 @@ function NewThreadProject({
   preferredHarness: HarnessId | null;
 }) {
   const isWorkspace = projectId === WORKSPACE_ID;
+  const git = useProjectGit(projectId);
   const info = useRpc("system.info", {});
   const models = useRpc("agents.models", {}, { staleTime: 5 * 60_000 });
   const settings = useRpc("app.settings.get", {});
@@ -134,7 +161,7 @@ function NewThreadProject({
   // The landing composer has no thread, so no thread action applies to it. The
   // skills do: they belong to the project, which is chosen on this screen.
   const skillCommands = useSkillCommands(isWorkspace ? undefined : projectId, choice?.agent);
-  const workspaceMode = isWorkspace ? "current" : (draft.workspace ?? settings.data?.defaultWorkspaceMode ?? "current");
+  const workspaceMode = newThreadWorkspaceMode({ canBranch: !isWorkspace && !git.cannotBranch, chosen: draft.workspace, preferred: settings.data?.defaultWorkspaceMode });
 
   useEffect(() => {
     if (target.kind !== "model" || target.choice || !models.data || !info.data) return;
@@ -153,6 +180,7 @@ function NewThreadProject({
   } = evaluateNewThreadAvailability({
     projectId,
     projects,
+    teamBlocker: branchingReason(git.state, "Teams"),
     projectsFailed: Boolean(projectsError),
     permissionReady,
     target,
@@ -162,6 +190,7 @@ function NewThreadProject({
     models: { data: models.data, failed: models.isError },
     system: { data: info.data, failed: info.isError },
   });
+  const location = useNewThreadLocation(projectId, selected, workspaceMode, draft.workingDirectory);
   const chooseTeam = (detail: TeamDetail) =>
     changeDraft({
       target: {
@@ -227,9 +256,9 @@ function NewThreadProject({
     if (mounted.current && useRouter.getState().route.view === "newthread") openThread(threadId);
   };
 
-  const composerChanges = useComposerChanges(!isWorkspace && selected && workspaceMode === "current" ? { kind: "project", id: selected.id, projectName: selected.name } : null);
+  const composerChanges = useComposerChanges(git.tracks && selected && workspaceMode === "current" ? { kind: "project", id: selected.id, projectName: selected.name } : null);
   const panelContext = selected
-    ? { kind: "newthread" as const, project: selected, workingDirectory: draft.workingDirectory ?? selected.rootPath, changes: !isWorkspace && workspaceMode === "current" }
+    ? { kind: "newthread" as const, project: selected, workingDirectory: draft.workingDirectory ?? selected.rootPath, changes: git.tracks && workspaceMode === "current" }
     : null;
 
   return (
@@ -246,7 +275,7 @@ function NewThreadProject({
               <p className="text-base text-ink-3 max-w-md">
                 {isWorkspace
                   ? "Start a conversation in any folder. Slack conversations live here too."
-                  : "The agent works in your repository. You may create a task first or go straight into building."}
+                  : "The agent works in your project folder. You may create a task first or go straight into building."}
               </p>
               {heroHelp({ hasProject: projects?.length !== 0, activity, revision: Boolean(revision), isWorkspace })}
             </div>
@@ -254,7 +283,7 @@ function NewThreadProject({
           <div className="new-thread-composer shrink-0 w-full max-w-chat mx-auto px-6 pb-2">
             {projects?.length === 0 ? (
               <div className="rounded-xl border border-line bg-surface p-4 text-base text-ink-2">
-                Import a repository to start.
+                Import a project to start.
                 <div className="mt-3">
                   <Button variant="primary" size="sm" onClick={() => useUi.getState().setImportProject(true)}>
                     <FolderGit2 size={13} /> Import project
@@ -302,11 +331,7 @@ function NewThreadProject({
                     permission={permission}
                     onPermission={setPermission}
                     settingsDisabled={start.isPending}
-                    location={{
-                      label: workspaceMode === "worktree" ? "New worktree" : null,
-                      ...(isWorkspace ? { directory: draft.workingDirectory ?? selected?.rootPath ?? "Workspace" } : {}),
-                      branch: selected?.defaultBranch ?? null,
-                    }}
+                    location={location}
                     changes={composerChanges}
                     projectId={isWorkspace ? undefined : projectId || undefined}
                     commands={skillCommands}
@@ -332,28 +357,14 @@ function NewThreadProject({
                       ) : null
                     }
                   >
-                    {isWorkspace ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={start.isPending}
-                        title="Choose the folder for this conversation"
-                        onClick={async () => {
-                          const workingDirectory = await window.openorc.pickDirectory();
-                          if (workingDirectory) changeDraft({ workingDirectory });
-                        }}
-                      >
-                        Choose folder
-                      </Button>
-                    ) : (
-                      <ComposerChoice
-                        ariaLabel="Where the thread works"
-                        value={workspaceMode}
-                        options={workspaceOptions}
-                        onChange={(workspace) => changeDraft({ workspace })}
-                        disabled={start.isPending}
-                      />
-                    )}
+                    <ThreadPlace
+                      isWorkspace={isWorkspace}
+                      mode={workspaceMode}
+                      blocked={branchingReason(git.state, "Worktrees")}
+                      disabled={start.isPending}
+                      onFolder={(workingDirectory) => changeDraft({ workingDirectory })}
+                      onMode={(workspace) => changeDraft({ workspace })}
+                    />
                   </Composer>
                 </div>
                 {targetIssue || projectIssue ? (

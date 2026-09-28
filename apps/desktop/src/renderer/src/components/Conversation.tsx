@@ -10,6 +10,7 @@ import { MessageQueue } from "./MessageQueue";
 import { ThreadChangeCard } from "./ThreadChangeCard";
 import { isImageGeneration } from "./ThreadImages";
 import { useComposerChanges } from "../lib/composer-changes";
+import { useProjectGit } from "../lib/project-git";
 import { Button, Empty } from "./ui";
 import { useRpc, useRpcMutation } from "../lib/query";
 import { useConversationDraft } from "../lib/conversation-draft";
@@ -107,6 +108,17 @@ function OwnedTaskConversation({ task, project }: { task: Task; project: Project
   ) : null;
 }
 
+/**
+ * The checkout a conversation works in, read only where the project folder has git: the branch a local checkout
+ * publishes, which the agent may switch mid-conversation, and its uncommitted changes.
+ */
+function useCheckout(thread: ThreadSummary | null, project: Project) {
+  const git = useProjectGit(project.id);
+  const checkout = useRpc("git.threadPushState", { threadId: thread?.id ?? "" }, { enabled: Boolean(thread) && git.tracks && thread?.workspaceMode === "current", refetchInterval: 8000 });
+  const changes = useComposerChanges(thread && git.tracks ? { kind: "thread", id: thread.id, projectName: project.name } : null);
+  return { checkout, changes, git };
+}
+
 function IndividualConversation({ scope, project }: { scope: ConversationScope; project: Project }) {
   const runsQuery = useRpc(scope.kind === "task" ? "runs.listForTask" : "runs.listForThread", scope.kind === "task" ? { taskId: scope.task.id } : { threadId: scope.thread.id });
   const runs = runsQuery.data ?? [];
@@ -116,13 +128,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   const [selectedWorkspace, setWorkspace] = useState<WorkspaceMode | null>(null);
   const workspaceMode = conversationWorkspaceMode({ scope, firstTaskRun, selected: selectedWorkspace });
   const thread = scope.kind === "thread" ? scope.thread : null;
-  // A local checkout publishes whatever branch the repository is on, which the agent may switch mid-conversation.
-  const checkout = useRpc(
-    "git.threadPushState",
-    { threadId: thread?.id ?? "" },
-    { enabled: Boolean(thread) && project.id !== WORKSPACE_ID && thread?.workspaceMode === "current", refetchInterval: 8000 },
-  );
-  const composerChanges = useComposerChanges(thread && project.id !== WORKSPACE_ID ? { kind: "thread", id: thread.id, projectName: project.name } : null);
+  const { checkout, changes: composerChanges, git } = useCheckout(thread, project);
 
   const activeRun: Run | undefined = runs[runs.length - 1];
   const basePath = (scope.kind === "task" ? scope.task.worktreePath : (scope.thread.workingDirectory ?? scope.thread.worktreePath)) ?? project.rootPath;
@@ -240,7 +246,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
     ...skills,
   ];
 
-  const location = conversationLocation({ scope, project, mode: workspaceMode, basePath, checkoutBranch: checkout.data?.branch });
+  const location = conversationLocation({ scope, project, mode: workspaceMode, basePath, checkoutBranch: checkout.data?.branch, plainFolder: git.state === "none" });
   const emptyHint = conversationEmptyHint({ task: scope.kind === "task", workspace: project.id === WORKSPACE_ID });
   const session = thread?.session;
   const placeholder = conversationPlaceholder({ firstTaskRun, working, canSteer, agent: choice?.agent });

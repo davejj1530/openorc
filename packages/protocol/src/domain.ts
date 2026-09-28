@@ -42,6 +42,10 @@ export const Project = z.object({
 });
 export type Project = z.infer<typeof Project>;
 
+/** What git offers a project's folder right now: nothing, change tracking before the first commit, or everything. */
+export const ProjectGit = z.enum(["none", "no_commits", "ready"]);
+export type ProjectGit = z.infer<typeof ProjectGit>;
+
 export const WorkspaceMode = z.enum(["worktree", "current"]);
 export type WorkspaceMode = z.infer<typeof WorkspaceMode>;
 
@@ -103,7 +107,7 @@ export const Thread = z.object({
   workspaceMode: WorkspaceMode,
   branch: z.string().nullable(),
   worktreePath: z.string().nullable(),
-  /** Where a worktree thread branched from; the Changes tab diffs against it. */
+  /** Where the thread started: its worktree's base commit, or the checkout's HEAD (the empty tree before a first commit). A worktree's Changes tab diffs against it. */
   baseSha: z.string().nullable(),
   pinnedAt: z.number().nullable(),
   /** When the user last looked; activity after it is unread. */

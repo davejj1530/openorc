@@ -1,17 +1,31 @@
 import { useRef, useState } from "react";
 import { WORKSPACE_ID, type Task, type WorkspaceMode } from "@openorc/protocol";
+import { useProjectGit } from "../lib/project-git";
 import { useRpc, useRpcMutation } from "../lib/query";
 import { useUi } from "../lib/ui";
 import { Select, TextButton } from "./ui";
 import { taskExecutionDisabledReason } from "../lib/task-execution-availability";
 
-export function ExecutionLocationSelect({ value, onChange, disabled }: { value: WorkspaceMode; onChange: (value: WorkspaceMode) => void; disabled?: boolean }) {
+export function ExecutionLocationSelect({
+  value,
+  onChange,
+  disabled,
+  worktreeBlocked,
+}: {
+  value: WorkspaceMode;
+  onChange: (value: WorkspaceMode) => void;
+  disabled?: boolean;
+  /** The project can't have a worktree yet; a task already set to one can still leave it. */
+  worktreeBlocked?: boolean;
+}) {
   return (
     <label className="flex flex-wrap items-center gap-3 text-sm text-ink-3">
       Execution location
       <Select aria-label="Execution location" value={value} disabled={disabled} onChange={(event) => onChange(event.target.value as WorkspaceMode)}>
         <option value="current">Local checkout</option>
-        <option value="worktree">Worktree</option>
+        <option value="worktree" disabled={worktreeBlocked}>
+          Worktree
+        </option>
       </Select>
     </label>
   );
@@ -95,17 +109,19 @@ export function useTaskExecutionLocation(task: Task, beforeChange: () => Promise
     refresh,
     loadError,
     movesThread: Boolean((executionThread && !pendingExecution) || ownWorkspace),
+    projectId: task.projectId,
     wait: () => pending.current ?? Promise.resolve(true),
     manageTeam: task.threadId && team.data && !team.data.ownerDeletedAt ? () => useUi.getState().setTeamMoveThread(task.threadId) : null,
   };
 }
 
 export function TaskExecutionSettings({ execution }: { execution: ReturnType<typeof useTaskExecutionLocation> }) {
+  const { cannotBranch } = useProjectGit(execution.projectId);
   return (
     <details className="task-execution-settings" open>
       <summary className="cursor-pointer text-sm text-ink-3 hover:text-ink select-none">Execution settings</summary>
       <div className="grid gap-3 mt-4">
-        <ExecutionLocationSelect value={execution.mode} onChange={execution.change} disabled={execution.isPending || Boolean(execution.reason)} />
+        <ExecutionLocationSelect value={execution.mode} onChange={execution.change} disabled={execution.isPending || Boolean(execution.reason)} worktreeBlocked={cannotBranch} />
         <p className="text-sm text-ink-3">
           {execution.reason ??
             (execution.movesThread

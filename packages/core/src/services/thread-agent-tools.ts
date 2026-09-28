@@ -4,6 +4,7 @@ import { WORKSPACE_ID, executionMode, executionModeLabel, type Run, type Task, t
 import { createHash } from "node:crypto";
 import type { RunService } from "./runs.js";
 import { checkoutBranch } from "./checkout-branch.js";
+import { projectGit } from "./project-git.js";
 import type { SpawnTaskInput, ThreadService } from "./threads.js";
 
 /** How many agent messages in a row may pass between conversations before a person has to write. */
@@ -42,7 +43,12 @@ export class ThreadAgentTools {
         if (thread.projectId === WORKSPACE_ID || thread.workspaceMode !== "current" || thread.worktreePath) return thread;
         const project = projects.get(this.db, thread.projectId);
         if (!project) return { ...thread, branch: null };
-        const pending = branches.get(project.rootPath) ?? checkoutBranch(project.rootPath);
+        const pending =
+          branches.get(project.rootPath) ??
+          projectGit(project).then(
+            (git) => (git === "none" ? null : checkoutBranch(project.rootPath)),
+            () => null,
+          );
         branches.set(project.rootPath, pending);
         return { ...thread, branch: await pending };
       }),

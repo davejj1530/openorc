@@ -65,7 +65,7 @@ function RemoveProjectDialog({ project, onClose }: { project: { id: string; name
       title="Remove project?"
     >
       <p className="text-base text-ink-2 break-words">
-        Remove <span className="font-medium text-ink">{project.name}</span> from the Projects list? Files, worktrees, and history are kept. Add the repository again to bring it back.
+        Remove <span className="font-medium text-ink">{project.name}</span> from the Projects list? Files, worktrees, and history are kept. Add the folder again to bring it back.
       </p>
       <p className="mt-2 text-base text-ink-3">Running work and schedules will continue.</p>
       {remove.error ? (

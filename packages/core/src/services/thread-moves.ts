@@ -3,6 +3,7 @@ import { threads, type Db } from "@openorc/db";
 import { git, pinObject, switchFiles, teamTransfer, treeHash, unpinAll, worktree, type TreeDeltaEntry } from "@openorc/git";
 import type { ChangePreview, FileChange, Project, Thread } from "@openorc/protocol";
 import { checkoutBranch } from "./checkout-branch.js";
+import { assertCanBranch } from "./project-git.js";
 import type { WorkspaceService } from "./workspace.js";
 import type { WorkspaceLease } from "./workspace-writers.js";
 
@@ -47,6 +48,7 @@ export class ThreadMoves {
     const source = thread.workspaceMode === "current" ? project.rootPath : thread.worktreePath;
     if (!source) return { files: [], blocked: null };
     try {
+      if (thread.workspaceMode === "current") await assertCanBranch(project);
       await assertNothingPartlyStaged(source);
       const head = await this.head(source);
       const base = thread.workspaceMode === "current" ? await this.tree(source, head) : await this.worktreeBase(thread, project, head);
@@ -62,6 +64,7 @@ export class ThreadMoves {
    * before that removes only what the move created.
    */
   async toWorktree(thread: Thread, project: Project, lease: WorkspaceLease): Promise<MoveResult> {
+    await assertCanBranch(project);
     const root = project.rootPath;
     const pins = `${REFS}/${thread.id}/${randomUUID()}/`;
     try {

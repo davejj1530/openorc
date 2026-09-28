@@ -42,6 +42,7 @@ function renderSettings(value = task, beforeChange = vi.fn(async () => true)) {
   client.setQueryData(["tasks.forwarding", { taskId: value.id }], { forwarding: null });
   client.setQueryData(["tasks.executionThread", { taskId: value.id }], value.executionThreadId ? owner : null);
   client.setQueryData(["orchestration.taskState", { taskId: value.id }], null);
+  client.setQueryData(["projects.git", { id: value.projectId }], "ready");
   function Fixture() {
     return <TaskExecutionSettings execution={useTaskExecutionLocation(value, beforeChange)} />;
   }
@@ -131,4 +132,16 @@ it("does not move a shared creator conversation from one task's settings", () =>
   renderSettings({ ...task, threadId: "owner", executionThreadId: "owner" });
   expect(screen.getByRole("combobox", { name: "Execution location" })).toHaveProperty("disabled", true);
   expect(screen.getByText(/shares its execution conversation/)).toBeTruthy();
+});
+
+it("keeps a worktree out of reach until the project has a first commit, without extra copy", async () => {
+  const { client } = renderSettings();
+  await act(async () => {
+    client.setQueryData(["projects.git", { id: task.projectId }], "no_commits");
+  });
+  const worktree = screen.getByRole("option", { name: "Worktree" });
+  await waitFor(() => expect(worktree).toHaveProperty("disabled", true));
+  expect(screen.getByText("This choice is saved for when work starts. Saving it does not start an agent or create a worktree.")).toBeTruthy();
+  expect(screen.getByRole("combobox", { name: "Execution location" })).toHaveProperty("disabled", false);
+  expect(mocks.call).not.toHaveBeenCalled();
 });

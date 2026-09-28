@@ -1,0 +1,19 @@
+name: Question
+description: Ask for help with setup or an existing feature.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check README.md, CONTRIBUTING.md, and docs/README.md first. Questions are public: omit credentials, private conversations, and full profiles. Suspected vulnerabilities belong in the private channel described in SECURITY.md.
+  - type: textarea
+    id: question
+    attributes:
+      label: What do you need help with?
+      description: Explain your goal and what you have already tried.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include the OpenOrc version or commit, OS, and relevant provider/CLI version.

@@ -1,0 +1,30 @@
+---
+/**
+ * Assistant prose with the app's **bold** and `code` markup. A streamed message
+ * wraps each word so the scene can reveal it the way replies arrive; inline
+ * code arrives as one word.
+ */
+interface Props {
+  text: string;
+  /** Window over which the words arrive, in the hero journey's moments. */
+  stream?: string;
+  class?: string;
+}
+const { text, stream, class: className } = Astro.props;
+type Kind = "text" | "strong" | "code";
+const parts = text
+  .split(/(\*\*[^*]+\*\*|`[^`]+`)/)
+  .filter(Boolean)
+  .map((part): { text: string; kind: Kind } =>
+    part.startsWith("**") ? { text: part.slice(2, -2), kind: "strong" } : part.startsWith("`") ? { text: part.slice(1, -1), kind: "code" } : { text: part, kind: "text" },
+  );
+const words = parts.flatMap((part) => (part.kind === "code" ? [part] : part.text.split(/(?<=\s)/).map((word) => ({ text: word, kind: part.kind }))));
+---
+
+{stream ? (
+  <div class:list={["hs-prose", className]} data-stream={stream}>
+    {words.map((word) => (word.kind === "code" ? <span class="hs-word"><code>{word.text}</code></span> : <span class:list={["hs-word", { "hs-strong": word.kind === "strong" }]}>{word.text}</span>))}
+  </div>
+) : (
+  <div class:list={["hs-prose", className]}>{parts.map((part) => (part.kind === "strong" ? <span class="hs-strong">{part.text}</span> : part.kind === "code" ? <code>{part.text}</code> : part.text))}</div>
+)}

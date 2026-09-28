@@ -1,0 +1,84 @@
+---
+import DiscussionScene from "./hero/DiscussionScene.astro";
+import HandoffScene from "./hero/HandoffScene.astro";
+import TeamScene from "./hero/TeamScene.astro";
+import openai from "../../public/openai.svg?raw";
+import claude from "../../public/claude.svg?raw";
+import opencode from "../../public/opencode.svg?raw";
+
+/** The provider marks the app ships. The OpenAI and OpenCode marks are dark and turn light on dark, as in the app. */
+const logoPaths = (svg: string, fill?: string) => {
+  const paths = svg.match(/<path\b[^>]*>(?:<\/path>)?/g)?.join("") ?? "";
+  return fill ? paths.replace(/fill="[^"]*"/g, `fill="${fill}"`) : paths;
+};
+
+const demos = [
+  {
+    id: "handoff",
+    label: "Across threads",
+    alt: "Sample OpenOrc project with two threads working side by side. Asked to build the billing page, Claude Code notices that the Plans migration thread is changing the plan data and messages it. Codex answers mid-migration with the new shape from its unmerged work and keeps going, and Claude Code builds the page against it.",
+    Scene: HandoffScene,
+  },
+  {
+    id: "discussion",
+    label: "Task discussion",
+    alt: "Sample task about rate-limiting the public API. The user mentions GPT-6-Astra and Opus 5.5. Astra suggests counting requests in memory; Opus points out that the app runs on three instances, so the limit would triple, and suggests Redis. The user asks Opus to build it, and a linked thread appears in the sidebar, already working.",
+    Scene: DiscussionScene,
+  },
+  {
+    id: "team",
+    label: "Agent team · Beta",
+    alt: "Agent teams are in Beta and enabled for new profiles. In this sample team conversation replacing dashboard polling with live updates, the lead sets one event contract, the server member adds a version field and tells the client member directly, and the reviewer, reading both sides, catches that the server sends seconds while the client expects milliseconds. The server fixes it and the lead hands it over for review.",
+    Scene: TeamScene,
+  },
+];
+---
+
+<script is:inline>
+  // Before first paint: the scenes will play, so they open on their first moment rather than their last.
+  if (!matchMedia("(prefers-reduced-motion: reduce)").matches) document.documentElement.setAttribute("data-hero-motion", "");
+</script>
+<section class="product-showcase" id="product" data-product-gallery aria-label="OpenOrc product demos">
+  <svg class="hs-sprite" aria-hidden="true">
+    <symbol id="hs-logo-codex" viewBox="0 0 41 41" set:html={logoPaths(openai, "#fff")} />
+    <symbol id="hs-logo-claude" viewBox="0 0 125 125" set:html={logoPaths(claude)} />
+    <symbol id="hs-logo-opencode" viewBox="96 64 320 384" set:html={logoPaths(opencode).replace(/#131010/gi, "#ececef").replace(/#7A7676/gi, "#8e8e98")} />
+  </svg>
+  <div class="demo-tabs container" role="tablist" aria-label="Explore OpenOrc demos" hidden data-demo-tabs>
+    {demos.map((demo, i) => (
+      <button type="button" role="tab" id={`demo-tab-${demo.id}`} aria-controls={`demo-${demo.id}`} aria-selected={i === 0 ? "true" : "false"} tabindex={i === 0 ? 0 : -1}>
+        <span class="demo-tab-index">0{i + 1}</span>
+        <span>{demo.label}</span>
+      </button>
+    ))}
+  </div>
+  {demos.map(({ id, alt, Scene }, i) => (
+    <article id={`demo-${id}`} class="demo-panel" data-panel hidden={i !== 0}>
+      <div class="demo-stage">
+        <div class="demo-platform">
+          <div class="demo-window">
+            <Scene label={alt} />
+          </div>
+        </div>
+      </div>
+    </article>
+  ))}
+</section>
+
+<script>
+  import { initTabs } from "../scripts/tabs";
+  import { initHeroScene } from "../scripts/hero-scene";
+
+  document.querySelectorAll<HTMLElement>("[data-product-gallery]").forEach((gallery) => {
+    const tabs = gallery.querySelector<HTMLElement>("[data-demo-tabs]");
+    const scenes = [...gallery.querySelectorAll<HTMLElement>("[data-panel]")].map((panel) => panel.querySelector<HTMLElement>("[data-hero-scene]"));
+    const players = new Map<number, ReturnType<typeof initHeroScene>>();
+    if (tabs && initTabs(gallery, (index) => {
+      const scene = scenes[index];
+      if (!scene) return;
+      const player = players.get(index);
+      if (player) player.restart();
+      else players.set(index, initHeroScene(scene));
+    })) tabs.hidden = false;
+  });
+</script>

@@ -1,0 +1,16 @@
+node_modules
+dist
+out
+build
+coverage
+pnpm-lock.yaml
+*.min.*
+output
+.local-development/
+.codegraph/
+apps/website/.astro
+# Preserve upstream notice bytes and their recorded hashes.
+licenses/vendor/
+apps/website/public/licenses/
+# Preserve the pinned upstream Devicon SVG bytes.
+apps/desktop/src/renderer/src/assets/project-stacks/*.svg

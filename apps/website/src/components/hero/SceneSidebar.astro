@@ -1,0 +1,105 @@
+---
+/** The app sidebar: navigation, then the sample workspace's projects and threads. */
+import { Image } from "astro:assets";
+import mark from "../../assets/openorc-mark.png";
+import ProductIcon from "./ProductIcon.astro";
+import { otherThreads, project, type SidebarRow } from "../../data/hero/workspace";
+import { timed, type Journey } from "../../data/hero/timeline";
+
+interface Props {
+  journey: Journey;
+  /** Navigation row shown as the current view, if the scene is not a thread. */
+  nav?: "Tasks";
+  /** Threads listed under the studio project ahead of the shared ones. */
+  rows: SidebarRow[];
+  /** Window during which an agent's question waits in the Inbox. */
+  inboxPending?: string;
+}
+const { journey, nav, rows, inboxPending } = Astro.props;
+const navigation = [
+  { icon: "inbox", label: "Inbox", count: 2 },
+  { icon: "tasks", label: "Tasks" },
+  { icon: "scheduled", label: "Scheduled" },
+  { icon: "orchestration", label: "Orchestration" },
+  { icon: "memory", label: "Memory" },
+] as const;
+const studio = [...rows, ...otherThreads.filter((thread) => !rows.some((row) => row.title === thread.title))];
+---
+
+<aside class="hs-sidebar">
+  <div class="hs-sidebar-inner">
+    <div class="hs-toolbar">
+      <span class="hs-icon-button"><ProductIcon name="panelLeft" /></span>
+      <span class="hs-icon-button"><ProductIcon name="search" /></span>
+      <span class="hs-icon-button"><ProductIcon name="arrowLeft" /></span>
+      <span class="hs-icon-button" data-disabled><ProductIcon name="arrowRight" /></span>
+    </div>
+    <div class="hs-brand">
+      <Image src={mark} alt="" width={48} height={48} format="webp" loading="eager" />
+      <span class="hs-wordmark">OpenOrc</span>
+      <span class="hs-icon-button hs-new-thread"><ProductIcon name="compose" /></span>
+    </div>
+    <div class="hs-nav">
+      {navigation.map((item) => (
+        <span class="hs-nav-row" data-nav={item.label} data-current={item.label === nav ? "" : undefined}>
+          <span class="hs-nav-icon">
+            <ProductIcon name={item.icon} />
+            {"count" in item ? (
+              <span class="hs-nav-badge">
+                {inboxPending ? <span {...timed(journey, `<${inboxPending.split("~")[0]} >${inboxPending.split("~")[1]}`)}>{item.count}</span> : item.count}
+                {inboxPending ? <span {...timed(journey, inboxPending)}>{item.count + 1}</span> : null}
+              </span>
+            ) : null}
+          </span>
+          {item.label}
+        </span>
+      ))}
+    </div>
+    <div class="hs-projects-head">
+      <span>Projects</span>
+      <span class="hs-projects-filter"><ProductIcon name="filter" /></span>
+      <span class="hs-icon-button hs-small"><ProductIcon name="plus" /></span>
+    </div>
+    <div class="hs-threads">
+      <div class="hs-group">
+        <span class="hs-group-head"><ProductIcon name="globe" />Workspace<ProductIcon name="chevronDown" class="hs-group-chevron" /></span>
+        <span class="hs-empty">No threads yet</span>
+      </div>
+      <div class="hs-group">
+        <span class="hs-group-head"><ProductIcon name="folder" />{project.name}<ProductIcon name="chevronDown" class="hs-group-chevron" /></span>
+        {studio.map((row) => (
+          <span class:list={["hs-row", { "hs-block": row.show }]} data-row={row.id} data-grow={row.show ? "" : undefined} data-flag={row.busy ? `busy:${row.busy}` : undefined} {...(row.show ? timed(journey, row.show) : {})}>
+            <span class="hs-row-title">
+              <span>{row.title}</span>
+              <span class="hs-status"><ProductIcon name="loader" /></span>
+            </span>
+            <span class="hs-row-meta">
+              <span class="hs-row-branch"><ProductIcon name="branch" /><span>{row.branch ?? project.branch}</span></span>
+              <span class="hs-row-providers">
+                {row.providers.map((provider) => (
+                  <span>
+                    <svg class="hs-logo" aria-hidden="true"><use href={`#hs-logo-${provider.harness}`} /></svg>
+                    {provider.label}
+                  </span>
+                ))}
+              </span>
+            </span>
+          </span>
+        ))}
+      </div>
+      <div class="hs-group">
+        <span class="hs-group-head"><ProductIcon name="folder" />website<ProductIcon name="chevronDown" class="hs-group-chevron" /></span>
+        <span class="hs-row">
+          <span class="hs-row-title"><span>Tell the product story</span></span>
+          <span class="hs-row-meta">
+            <span class="hs-row-branch"><ProductIcon name="branch" /><span>dev</span></span>
+            <span class="hs-row-providers"><span><svg class="hs-logo" aria-hidden="true"><use href="#hs-logo-codex" /></svg>Codex</span></span>
+          </span>
+        </span>
+      </div>
+    </div>
+    <div class="hs-sidebar-foot">
+      <span class="hs-nav-row"><span class="hs-nav-icon"><ProductIcon name="settings" /></span>Settings</span>
+    </div>
+  </div>
+</aside>

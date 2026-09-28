@@ -1,0 +1,1029 @@
+.home-page {
+  --bg: #141417;
+  --surface: #1c1c21;
+  --text: #ececef;
+  --muted: #b8b8c0;
+  --rule: #34343b;
+  --accent: #4ed7c5;
+  background: var(--bg);
+  color: var(--text);
+  overflow: clip;
+}
+
+/* One flat ground from the header through the stage, so nothing draws a
+   horizontal edge. Depth comes from the light under the product frame. */
+.home-page .hero {
+  position: relative;
+  isolation: isolate;
+  padding-top: clamp(42px, 4vw, 60px);
+  overflow: visible;
+  background: #141417;
+}
+.home-page .hero-art {
+  position: absolute;
+  z-index: 0;
+  top: clamp(-76px, calc(130px - 14vw), -24px);
+  right: max(0px, calc(45vw - 864px));
+  width: min(1240px, calc(100vw - 470px));
+  aspect-ratio: 1672 / 941;
+  pointer-events: none;
+  mix-blend-mode: lighten;
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 20%, #000 58%, transparent 96%);
+}
+.home-page .hero-art picture {
+  display: block;
+  width: 100%;
+  height: 100%;
+  mask-image: linear-gradient(to right, transparent 0%, #000 30%, #000 88%, transparent 100%);
+}
+.home-page .hero-art img {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+}
+.home-page .hero-content {
+  position: relative;
+  z-index: 1;
+  align-items: flex-start;
+  text-align: left;
+}
+.home-page .hero h1 {
+  max-width: 21ch;
+  font-size: clamp(2.75rem, 4.2vw, 3.75rem);
+  font-weight: 420;
+  line-height: 1.03;
+  letter-spacing: -0.036em;
+}
+.home-page .hero h1 span {
+  background: linear-gradient(100deg, #8d9098 0%, #c9ccd2 34%, #eef0f2 47%, #b4b8bf 61%, #8a8e96 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.home-page .hero-description {
+  max-width: 62ch;
+  margin-top: 20px;
+  color: #b8b8c0;
+  font-size: clamp(0.8rem, 1vw, 1.2rem);
+  line-height: 1.55;
+}
+.home-page .hero-actions {
+  justify-content: flex-start;
+  gap: 28px;
+  margin-top: 24px;
+}
+.home-page .button-primary {
+  border: 1px solid #e4e4e8;
+  background: #e4e4e8;
+  color: #19191d;
+  font-weight: 550;
+}
+.home-page .text-link {
+  color: #c8c8cf;
+}
+
+.home-page .product-showcase {
+  position: relative;
+  z-index: 1;
+  margin-top: clamp(30px, 3vw, 44px);
+  scroll-margin-top: 90px;
+}
+.home-page .demo-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+.home-page .demo-tabs[hidden] {
+  display: none;
+}
+.home-page .demo-tabs button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex: 0 1 auto;
+  min-width: 0;
+  min-height: 48px;
+  padding: 12px 18px 16px;
+  border: 0;
+  background: transparent;
+  color: #9999a3;
+  font-size: 0.9rem;
+  font-weight: 450;
+  white-space: nowrap;
+  transition: color 180ms ease;
+}
+.home-page .demo-tabs button:first-child {
+  padding-left: 0;
+}
+.home-page .demo-tabs button:hover,
+.home-page .demo-tabs button[aria-selected="true"] {
+  color: #ececef;
+}
+.home-page .demo-tab-index {
+  color: #74747e;
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.05em;
+}
+.home-page .demo-tabs button[aria-selected="true"] .demo-tab-index {
+  color: #74dccc;
+}
+.home-page .demo-panel {
+  min-width: 0;
+}
+.home-page .demo-stage {
+  position: relative;
+  isolation: isolate;
+  padding: clamp(22px, 2.5vw, 34px) 0 clamp(150px, 15vw, 230px);
+}
+.home-page .demo-platform {
+  position: relative;
+  isolation: isolate;
+  width: min(var(--content-width, 1376px), calc(100% - 64px));
+  margin-inline: auto;
+}
+/* The frame stands on a lit floor. The light pool begins behind its lower edge and
+   spreads below it; every layer fades out before the edge of its box, so the ground
+   stays seamless. */
+.home-page .demo-platform::before {
+  content: "";
+  position: absolute;
+  z-index: -2;
+  inset: 30% -22% -26%;
+  background: radial-gradient(ellipse 56% 62% at 50% 66%, #dde1e759 0%, #c0c5cc45 20%, #8f949b26 48%, #6f747a0d 72%, #6f747a00 100%);
+  pointer-events: none;
+}
+/* Where the frame meets the floor: a short, dark contact shadow. */
+.home-page .demo-platform::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: calc(100% - 10px);
+  left: 3%;
+  right: 3%;
+  height: 40px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, #000000e6, #00000099 42%, #00000000);
+  filter: blur(10px);
+  pointer-events: none;
+}
+.home-page .demo-window {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 8 / 5;
+  overflow: hidden;
+  container-type: inline-size;
+  border: 1px solid #1d1d22;
+  border-bottom-color: #2a2a31;
+  border-radius: 15px;
+  background: #141417;
+}
+
+.home-page .agents-section {
+  padding: clamp(16px, 2vw, 32px) 0 clamp(80px, 9vw, 140px);
+}
+@media (min-width: 1101px) {
+  .home-page .agents-section {
+    padding-top: clamp(56px, 4vw, 96px);
+  }
+}
+.home-page .agent-logos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 24px clamp(40px, 7vw, 120px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: #c8c8cf;
+}
+.home-page .agent-logos li {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 1.2rem;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+}
+.home-page .agent-logos svg {
+  width: 26px;
+  height: 26px;
+}
+.home-page .agents-caption {
+  margin-top: 30px;
+  color: #6e6e78;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.home-page .agents-statement {
+  max-width: 34ch;
+  margin-top: clamp(64px, 7vw, 104px);
+  color: #8e8e98;
+  font-size: clamp(1.75rem, 2.9vw, 2.75rem);
+  font-weight: 410;
+  line-height: 1.18;
+  letter-spacing: -0.028em;
+}
+.home-page .agents-statement strong {
+  color: #ececef;
+  font-weight: inherit;
+}
+
+.home-page .review-section {
+  padding: clamp(86px, 10vw, 152px) 0;
+  background: #141417;
+}
+.home-page .review-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+  gap: clamp(32px, 6vw, 96px);
+}
+.home-page .review-layout h2 {
+  max-width: 14ch;
+  font-size: clamp(2.35rem, 4vw, 3.75rem);
+  font-weight: 410;
+  line-height: 1.09;
+  letter-spacing: -0.036em;
+}
+.home-page .review-copy p {
+  max-width: 46ch;
+  color: #b8b8c0;
+  font-size: 1.05rem;
+  line-height: 1.65;
+}
+/* Two views composed like objects on the stage: the task list behind, the diff in front. */
+.home-page .review-stage {
+  position: relative;
+  height: clamp(420px, 42vw, 620px);
+  margin-top: clamp(48px, 6vw, 88px);
+  overflow: hidden;
+  mask-image: linear-gradient(#000 62%, transparent 100%);
+}
+.home-page .review-tasks {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 56%;
+  container-type: inline-size;
+}
+.home-page .review-changes {
+  position: absolute;
+  top: 9%;
+  right: 0;
+  z-index: 1;
+  width: 58%;
+  container-type: inline-size;
+  box-shadow:
+    0 0 0 1px #141417,
+    0 40px 90px -30px #000e;
+}
+.home-page .review-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  margin-top: 24px;
+  color: #4ed7c5;
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 0.3em;
+}
+
+.home-page .workflow-section {
+  padding-block: clamp(88px, 9vw, 136px) 0;
+  border-block: 0;
+  background: #141417;
+}
+.home-page .workflow-section .section-heading {
+  margin-bottom: clamp(40px, 4vw, 64px);
+}
+.home-page .section-heading {
+  margin-bottom: 54px;
+}
+.home-page .section-heading h2,
+.home-page .local-heading h2,
+.home-page .slack-heading h2,
+.home-page .faq-section h2 {
+  font-size: clamp(2.2rem, 3.5vw, 3.35rem);
+  font-weight: 410;
+  line-height: 1.13;
+  letter-spacing: -0.032em;
+}
+.home-page .section-heading > p {
+  color: #b8b8c0;
+  font-size: 1.05rem;
+}
+.home-page .worktree-section {
+  padding-top: clamp(108px, 12vw, 180px);
+}
+.home-page .workflow-tabs {
+  border-top-color: #3a3a42;
+}
+.home-page .workflow-tabs button {
+  border-left-color: #34343b;
+  color: #9e9ea8;
+  font-weight: 430;
+}
+.home-page .workflow-tabs button[aria-selected="true"]::before {
+  background: var(--accent);
+}
+.home-page .workflow-tabs button:hover,
+.home-page .workflow-tabs button[aria-selected="true"] {
+  color: #ececef;
+}
+/* Workflow mocks sit on a flat panel; the only depth is the floor light under each frame. */
+.home-page .showcase-panel {
+  position: relative;
+  isolation: isolate;
+  display: block;
+  padding: clamp(20px, 4%, 44px);
+  overflow: visible;
+  border: 1px solid #1d1d22;
+  border-radius: 16px;
+  background: #16161a;
+  aspect-ratio: auto;
+}
+.home-page .showcase-panel::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: auto 6% -10% 6%;
+  height: 40%;
+  background: radial-gradient(closest-side, #c4c9cf1f, #9aa0a70a 50%, #9aa0a700);
+  pointer-events: none;
+}
+.home-page .mock-window {
+  overflow: hidden;
+  container-type: inline-size;
+  border: 1px solid #2a2a31;
+  border-radius: 12px;
+  background: #1c1c21;
+  box-shadow: 0 18px 40px -24px #000c;
+}
+.home-page .capability-copy h3 {
+  font-size: clamp(1.5rem, 2.15vw, 2.1rem);
+  font-weight: 430;
+}
+.home-page .capability-copy p {
+  color: #b8b8c0;
+}
+
+.home-page .slack-section {
+  padding-block: clamp(82px, 8vw, 120px);
+  border-bottom-color: #34343b;
+}
+.home-page .slack-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(48px, 7vw, 112px);
+}
+.home-page .slack-heading {
+  align-items: center;
+}
+.home-page .slack-heading img {
+  filter: saturate(0.75);
+}
+.home-page .slack-heading h2 {
+  max-width: 22ch;
+}
+.home-page .slack-intro {
+  max-width: 65ch;
+  margin-top: 24px;
+  color: #b8b8c0;
+  font-size: 1.08rem;
+}
+.home-page .slack-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 620px;
+  overflow: hidden;
+  border: 1px solid #38363e;
+  border-radius: 14px;
+  background: #1b1d21;
+  box-shadow: 0 32px 70px -38px #000c;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  text-align: left;
+}
+/* Keep the first frame steady until the below-fold player is loaded. */
+[data-hero-motion] .home-page .slack-card:not([data-engine]) [data-start-hidden],
+:root:not([data-hero-motion]) .home-page .slack-card:not([data-engine]) [data-end-hidden] {
+  display: none;
+}
+.home-page .slack-card-head {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: 12px;
+  min-height: 54px;
+  padding: 0 22px;
+  border-bottom: 1px solid #38363e;
+  color: #f2f0f5;
+  font-size: 0.97rem;
+}
+.home-page .slack-card-head strong {
+  font-weight: 700;
+}
+.home-page .slack-card-channel {
+  color: #aaa7b0;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+.home-page .slack-card-more {
+  margin-left: auto;
+  color: #aaa7b0;
+  font-size: 1.3rem;
+  letter-spacing: 0.07em;
+}
+.home-page .slack-hash {
+  color: #bbb8c1;
+}
+.home-page .slack-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  padding: 20px 22px 16px;
+  overflow: hidden;
+}
+.home-page .slack-message {
+  display: grid;
+  flex: none;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+.home-page .slack-avatar {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  overflow: hidden;
+  border-radius: 7px;
+}
+.home-page .slack-avatar-user {
+  background: #685485;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.025em;
+}
+.home-page .slack-avatar-app {
+  background: #303238;
+}
+.home-page .slack-avatar-app img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+.home-page .slack-message-body {
+  min-width: 0;
+}
+.home-page .slack-meta {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  color: #f2f0f5;
+  font-size: 0.88rem;
+  line-height: 1.35;
+}
+.home-page .slack-meta strong {
+  font-weight: 700;
+}
+.home-page .slack-meta time {
+  color: #98949f;
+  font-size: 0.74rem;
+}
+.home-page .slack-app {
+  align-self: center;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: #393640;
+  color: #bbb6c2;
+  font-size: 0.6rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.home-page .slack-message p {
+  margin-top: 4px;
+  color: #e1dfe5;
+  font-size: 0.87rem;
+  line-height: 1.45;
+}
+.home-page .slack-mention {
+  padding: 1px 3px;
+  border-radius: 3px;
+  background: #4b3d60;
+  color: #e8d7ff;
+}
+.home-page .slack-permission .slack-message-body > p strong {
+  color: #f2f0f5;
+  font-weight: 700;
+}
+.home-page .slack-approval-detail {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 9px 11px;
+  border-left: 3px solid #777c88;
+  background: #24262c;
+  color: #d7d5dc;
+  font-size: 0.77rem;
+  line-height: 1.35;
+}
+.home-page .slack-approval-tool {
+  color: #f0edf4;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.7rem;
+  overflow-wrap: anywhere;
+}
+.home-page .slack-approval-note {
+  margin-top: 8px;
+  color: #a4a1aa;
+  font-size: 0.7rem;
+}
+.home-page .slack-approval-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.home-page .slack-approval-actions span {
+  padding: 4px 11px;
+  border: 1px solid #5a5c65;
+  border-radius: 5px;
+  color: #f2f0f5;
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+.home-page .slack-approval-actions span:first-child {
+  background: #31343b;
+}
+.home-page .slack-composer {
+  flex: none;
+  min-height: 110px;
+  margin: 0 16px 16px;
+  border: 1px solid #77747d;
+  border-radius: 9px;
+  background: #222429;
+  color: #aaa8b0;
+}
+.home-page .slack-composer-tools,
+.home-page .slack-composer-foot {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  min-height: 32px;
+  padding: 0 12px;
+}
+.home-page .slack-composer-tools {
+  border-bottom: 1px solid #36383d;
+  font-size: 0.78rem;
+}
+.home-page .slack-tool-bold {
+  font-weight: 800;
+}
+.home-page .slack-tool-italic {
+  font-style: italic;
+  font-weight: 700;
+}
+.home-page .slack-tool-strike {
+  text-decoration: line-through;
+  font-weight: 700;
+}
+.home-page .slack-tool-divider {
+  width: 1px;
+  height: 15px;
+  background: #505158;
+}
+.home-page .slack-composer-tools svg {
+  width: 17px;
+  height: 17px;
+}
+.home-page .slack-composer-input {
+  min-height: 42px;
+  padding: 10px 12px 4px;
+  color: #e1dfe5;
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+.home-page .slack-placeholder {
+  color: #85828d;
+}
+.home-page .slack-composer-foot {
+  gap: 10px;
+  min-height: 32px;
+  padding-bottom: 5px;
+}
+.home-page .slack-composer-add {
+  display: grid;
+  place-items: center;
+  width: 21px;
+  height: 21px;
+  border-radius: 5px;
+  background: #383a41;
+  color: #d6d4dc;
+  font-size: 1.05rem;
+  line-height: 1;
+}
+.home-page .slack-composer-hint {
+  color: #77747f;
+  font-size: 0.67rem;
+}
+.home-page .slack-composer-send {
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 24px;
+  margin-left: auto;
+  border-radius: 5px;
+  background: #3b8462;
+  color: #fff;
+}
+.home-page .slack-composer-send svg {
+  width: 17px;
+  height: 17px;
+}
+.home-page .slack-card[data-paused] * {
+  animation-play-state: paused !important;
+}
+.home-page .slack-card[data-fading] :is(.slack-body, .slack-composer) {
+  opacity: 0;
+}
+.home-page .slack-body,
+.home-page .slack-composer {
+  transition: opacity 450ms ease;
+}
+.home-page .slack-features {
+  margin-top: 68px;
+  gap: 40px;
+}
+.home-page .slack-features > div {
+  padding-top: 22px;
+  border-top: 1px solid #34343b;
+}
+.home-page .slack-features h3 {
+  margin-bottom: 13px;
+  font-size: 1.16rem;
+  font-weight: 460;
+}
+.home-page .slack-note {
+  margin-top: 50px;
+  color: #8e8e98;
+  font-size: 0.87rem;
+}
+
+.home-page .local-section {
+  gap: clamp(56px, 9vw, 150px);
+  padding-block: clamp(82px, 8vw, 126px);
+}
+.home-page .local-heading h2 {
+  max-width: 12ch;
+}
+.home-page .local-heading p {
+  max-width: 43ch;
+  margin-top: 25px;
+  color: #b8b8c0;
+  font-size: 1.04rem;
+}
+.home-page .local-facts > div {
+  padding-block: 26px;
+  border-bottom-color: #34343b;
+}
+.home-page .local-facts h3 {
+  font-size: 1.12rem;
+  font-weight: 460;
+}
+.home-page .local-facts p {
+  color: #b8b8c0;
+}
+.home-page .provider-names span {
+  color: #d4d4da;
+}
+.home-page .provider-names img[src="/claude.svg"] {
+  filter: saturate(0.75);
+}
+
+.home-page .faq-section {
+  border-top-color: #34343b;
+  gap: clamp(48px, 8vw, 120px);
+  padding-block: clamp(82px, 8vw, 126px);
+}
+.home-page .faq-section h2 {
+  max-width: 15ch;
+}
+.home-page .faq-list details {
+  border-bottom-color: #34343b;
+}
+.home-page .faq-list summary {
+  color: #ececef;
+  font-weight: 440;
+}
+.home-page .faq-list details p {
+  color: #b8b8c0;
+}
+
+.home-page .closing {
+  display: flex;
+  align-items: center;
+  min-height: clamp(480px, 39vw, 620px);
+  padding: clamp(96px, 11vw, 160px) 0;
+  border-top: 1px solid #2a2a31;
+  background: #141417;
+}
+.home-page .closing-art {
+  position: absolute;
+  top: 50%;
+  right: max(0px, calc(45vw - 864px));
+  width: min(1240px, calc(100vw - 470px));
+  aspect-ratio: 1672 / 941;
+  transform: translateY(-50%);
+  pointer-events: none;
+  mix-blend-mode: lighten;
+  mask-image: linear-gradient(to bottom, transparent, #000 13%, #000 78%, transparent);
+}
+.home-page .closing-art picture,
+.home-page .closing-art img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.home-page .closing-art picture {
+  mask-image: linear-gradient(to right, transparent, #000 30%, #000 100%);
+}
+.home-page .closing-art img {
+  object-fit: cover;
+}
+.home-page .closing::after {
+  display: none;
+}
+.home-page .closing-layout {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.home-page .closing h2 {
+  max-width: 16ch;
+  font-size: clamp(2.4rem, 4vw, 3.75rem);
+  font-weight: 410;
+  line-height: 1.07;
+  letter-spacing: -0.034em;
+}
+.home-page .closing-layout > p {
+  max-width: 46ch;
+  margin-top: 22px;
+  color: #b8b8c0;
+  font-size: 1.06rem;
+}
+.home-page .closing .hero-actions {
+  justify-content: flex-start;
+  margin-top: 32px;
+}
+
+@media (max-width: 1100px) {
+  .home-page .closing {
+    display: block;
+    min-height: 0;
+    padding: 96px 0 40px;
+  }
+  .home-page .closing-art {
+    position: relative;
+    top: auto;
+    right: auto;
+    width: min(100%, 620px);
+    aspect-ratio: 820 / 508;
+    margin: 12px 0 -8px auto;
+    transform: none;
+    mask-image: linear-gradient(to bottom, transparent, #000 13%, #000 78%, transparent 98%);
+  }
+  .home-page .closing-art picture {
+    mask-image: linear-gradient(to right, transparent, #000 12%, #000);
+  }
+  .home-page .hero-art {
+    position: relative;
+    top: auto;
+    right: auto;
+    width: min(100%, 620px);
+    aspect-ratio: 820 / 508;
+    margin: 12px 0 -8px auto;
+    mask-image: linear-gradient(to bottom, transparent 0%, #000 15%, #000 62%, transparent 98%);
+  }
+  .home-page .hero-art picture {
+    mask-image: linear-gradient(to right, transparent 0%, #000 12%, #000 100%);
+  }
+  .home-page .product-showcase {
+    margin-top: 16px;
+  }
+  .home-page .review-layout {
+    grid-template-columns: 1fr;
+  }
+  .home-page .review-copy p {
+    max-width: 65ch;
+  }
+  .home-page .slack-layout {
+    grid-template-columns: 1fr;
+    gap: 42px;
+  }
+  .home-page .slack-card {
+    width: 100%;
+    max-width: 720px;
+  }
+}
+
+@media (max-width: 700px) {
+  .home-page .hero {
+    padding-top: 66px;
+  }
+  .home-page .hero h1 {
+    font-size: clamp(2.2rem, 9.5vw, 3rem);
+    letter-spacing: -0.035em;
+  }
+  .home-page .hero-description {
+    margin-top: 22px;
+    font-size: 0.8rem;
+  }
+  .home-page .hero-actions {
+    gap: 11px 18px;
+  }
+  .home-page .product-showcase {
+    margin-top: 16px;
+  }
+  .home-page .demo-tabs {
+    width: 100%;
+    padding-inline: 20px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+  .home-page .demo-tabs button {
+    flex: 0 0 auto;
+    min-height: 50px;
+    padding: 11px 12px 14px;
+    font-size: 0.8rem;
+  }
+  .home-page .demo-tab-index {
+    display: none;
+  }
+  .home-page .demo-stage {
+    padding: 22px 0 110px;
+  }
+  .home-page .demo-platform {
+    width: calc(100% - 24px);
+  }
+  .home-page .demo-platform::before {
+    inset: 40% -30% -18%;
+  }
+  .home-page .demo-platform::after {
+    top: calc(100% - 8px);
+    height: 28px;
+    filter: blur(8px);
+  }
+  .home-page .demo-window {
+    aspect-ratio: 5 / 7;
+    border-radius: 11px;
+  }
+  .home-page .review-section {
+    padding-block: 72px;
+  }
+  .home-page .review-layout {
+    gap: 20px;
+  }
+  .home-page .review-layout h2 {
+    font-size: 2.55rem;
+  }
+  .home-page .review-stage {
+    height: auto;
+    margin-top: 40px;
+    mask-image: none;
+  }
+  .home-page .review-tasks,
+  .home-page .review-changes {
+    position: static;
+    width: 100%;
+  }
+  .home-page .review-changes {
+    margin-top: 16px;
+    box-shadow: none;
+  }
+  .home-page .workflow-section,
+  .home-page .slack-section,
+  .home-page .local-section,
+  .home-page .faq-section {
+    padding-block: 72px;
+  }
+  .home-page .worktree-section {
+    padding-top: 88px;
+  }
+  .home-page .section-heading {
+    margin-bottom: 38px;
+  }
+  .home-page .section-heading h2,
+  .home-page .local-heading h2,
+  .home-page .slack-heading h2,
+  .home-page .faq-section h2 {
+    font-size: 2.15rem;
+  }
+  .home-page .slack-heading {
+    align-items: flex-start;
+  }
+  .home-page .slack-heading img {
+    width: 26px;
+    height: 26px;
+    margin-top: 6px;
+  }
+  .home-page .slack-features {
+    margin-top: 44px;
+  }
+  .home-page .slack-layout {
+    gap: 32px;
+  }
+  .home-page .slack-card {
+    height: 690px;
+  }
+  .home-page .slack-card-head {
+    min-height: 48px;
+    padding-inline: 16px;
+  }
+  .home-page .slack-body {
+    gap: 13px;
+    padding: 18px 16px 14px;
+  }
+  .home-page .slack-composer {
+    margin-inline: 10px;
+    margin-bottom: 10px;
+  }
+  .home-page .slack-composer-hint {
+    display: none;
+  }
+  .home-page .local-section {
+    gap: 25px;
+  }
+  .home-page .local-heading {
+    display: block;
+  }
+  .home-page .closing {
+    padding: 72px 0 0;
+  }
+  .home-page .closing-art {
+    width: 100%;
+    margin-top: 28px;
+    margin-bottom: 0;
+    mask-image: linear-gradient(to bottom, transparent, #000 12%, #000 75%, transparent);
+  }
+  .home-page .closing-art picture {
+    mask-image: none;
+  }
+  .home-page .agents-section {
+    padding: 56px 0 72px;
+  }
+  .home-page .agent-logos {
+    gap: 18px 32px;
+  }
+  .home-page .agent-logos li {
+    font-size: 1.05rem;
+  }
+  .home-page .agents-statement {
+    margin-top: 48px;
+    font-size: 1.6rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .home-page .slack-card {
+    height: 760px;
+  }
+}
+
+@media (forced-colors: active) {
+  .home-page .hero-art {
+    display: none;
+  }
+  .home-page .demo-tabs button[aria-selected="true"] {
+    outline: 2px solid Highlight;
+    outline-offset: -3px;
+  }
+  .home-page .hero h1 span {
+    background: none;
+    color: CanvasText;
+  }
+  .home-page .demo-platform::before,
+  .home-page .demo-platform::after {
+    display: none;
+  }
+  .home-page .demo-stage,
+  .home-page .review-section,
+  .home-page .closing {
+    background: Canvas;
+  }
+}

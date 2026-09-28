@@ -1,0 +1,17 @@
+.onboarding-mascot {
+  position: relative;
+  width: 112px;
+  height: 112px;
+  flex-shrink: 0;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Keep the artboard's thinking dots and sparkles clear of the heading. */
+.onboarding-mascot > .rive-mascot {
+  position: absolute;
+  width: 150%;
+  height: 150%;
+  left: -25%;
+  top: -25%;
+}

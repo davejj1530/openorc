@@ -1,0 +1,192 @@
+wasm/src/skia_imports/include/config/SkUserConfig.h
+/*
+ * Copyright 2006 The Android Open Source Project
+ *
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+wasm/src/skia_imports/include/core/SkMath.h
+/*
+ * Copyright 2006 The Android Open Source Project
+ *
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+wasm/src/skia_imports/include/core/SkScalar.h
+/*
+ * Copyright 2006 The Android Open Source Project
+ *
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+wasm/src/skia_imports/include/core/SkSize.h
+/*
+ * Copyright 2011 Google Inc.
+ *
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+wasm/src/skia_imports/include/core/SkTypes.h
+/*
+ * Copyright 2006 The Android Open Source Project
+ *
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+wasm/src/skia_imports/include/private/SkFloatBits.h
+/*
+ * Copyright 2008 The Android Open Source Project
+ *
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+wasm/src/skia_imports/include/private/SkFloatingPoint.h
+/*
+ * Copyright 2006 The Android Open Source Project
+ *
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+wasm/src/skia_imports/include/private/SkMalloc.h
+/*
+ * Copyright 2017 Google Inc.
+ *
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+wasm/src/skia_imports/include/private/SkSafe_math.h
+/*
+ * Copyright 2016 Google Inc.
+ *
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+wasm/src/skia_imports/include/private/SkTDArray.h
+/*
+ * Copyright 2006 The Android Open Source Project
+ *
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+wasm/src/skia_imports/include/private/SkTFitsIn.h
+/*
+ * Copyright 2013 Google Inc.
+ *
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+wasm/src/skia_imports/include/private/SkTo.h
+/*
+ * Copyright 2018 Google Inc.
+ *
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+wasm/src/skia_imports/include/private/SkVx.h
+/*
+ * Copyright 2019 Google Inc.
+ *
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+wasm/src/skia_imports/src/core/SkIPoint16.h
+/*
+ * Copyright 2018 Google Inc.
+ *
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+wasm/src/skia_imports/src/core/SkMathPriv.h
+/*
+ * Copyright 2012 Google Inc.
+ *
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+wasm/src/skia_imports/src/gpu/GrDynamicRectanizer.cpp
+/*
+ * Copyright 2020 Google Inc.
+ *
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+wasm/src/skia_imports/src/gpu/GrDynamicRectanizer.h
+/*
+ * Copyright 2020 Google Inc.
+ *
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+wasm/src/skia_imports/src/gpu/GrRectanizer.h
+/*
+ * Copyright 2010 Google Inc.
+ *
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+wasm/src/skia_imports/src/gpu/GrRectanizerPow2.cpp
+/*
+ * Copyright 2010 Google Inc.
+ *
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+wasm/src/skia_imports/src/gpu/GrRectanizerPow2.h
+/*
+ * Copyright 2014 Google Inc.
+ *
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+wasm/src/skia_imports/src/gpu/GrRectanizerSkyline.cpp
+/*
+ * Copyright 2013 Google Inc.
+ *
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+wasm/src/skia_imports/src/gpu/GrRectanizerSkyline.h
+/*
+ * Copyright 2014 Google Inc.
+ *
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+wasm/src/skia_imports/src/ports/SkDebug_stdio.cpp
+/*
+ * Copyright 2006 The Android Open Source Project
+ *
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
+wasm/src/skia_imports/src/ports/SkMemory_malloc.cpp
+/*
+ * Copyright 2011 Google Inc.
+ *
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+

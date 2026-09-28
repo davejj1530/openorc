@@ -1,0 +1,346 @@
+{
+  "reviewed": "2026-09-27",
+  "scope": "Artwork included in the public source; provider marks retain separate rights. Hashes identify bytes, not ownership or permission.",
+  "assets": [
+    {
+      "group": "app-icon",
+      "path": "apps/desktop/resources/icon.png",
+      "sha256": "28189883b5d8b9aadf9f201dc106bc3a6c11ba78ce9a5a8d7104d04a3a490d24"
+    },
+    {
+      "group": "app-icon",
+      "path": "apps/desktop/build/icon.icns",
+      "sha256": "4461115d67f0e055054a00d0da65688e526076c9de12d2d5830c18781bf09703"
+    },
+    {
+      "group": "app-icon",
+      "path": "apps/website/public/favicon-64.png",
+      "sha256": "5b60ba9a0a71881083a852ccecbde0e9696f2a6b58d8bae0d71edd6e85bb85bb"
+    },
+    {
+      "group": "openorc-mark",
+      "path": "apps/desktop/src/renderer/src/assets/openorc-mark.png",
+      "sha256": "bc2f1d693f1cef0baeb5140770f33770f202007496ad33a0f2f44cfff5546617"
+    },
+    {
+      "group": "openorc-mark",
+      "path": "apps/website/src/assets/openorc-mark.png",
+      "sha256": "bc2f1d693f1cef0baeb5140770f33770f202007496ad33a0f2f44cfff5546617"
+    },
+    {
+      "group": "website-hero",
+      "path": "assets/website/hero-orchestra-linework-subtle-source.png",
+      "sha256": "9eeaf2b55bde6191be32feac36579feb4a8478c2305f576ccfaa332ff9a67f9f"
+    },
+    {
+      "group": "website-hero",
+      "path": "apps/website/public/hero-orchestra-linework-subtle.avif",
+      "sha256": "14b14c23cc358515cd08994064a2f185b9f97371f1ef4dabdf8c10164bb2d20a"
+    },
+    {
+      "group": "website-hero",
+      "path": "apps/website/public/hero-orchestra-linework-subtle.webp",
+      "sha256": "4a6d3f9c89e887dc0f265e515ad10f17d7732be7afca094c3e3a327ea56f5d59"
+    },
+    {
+      "group": "website-hero",
+      "path": "apps/website/public/hero-orchestra-linework-subtle-mobile.avif",
+      "sha256": "22ac53fe39f137dd180e91f76a9a419c17f766284ea470a7de9c353e4973cbb9"
+    },
+    {
+      "group": "website-hero",
+      "path": "apps/website/public/hero-orchestra-linework-subtle-mobile.webp",
+      "sha256": "c96eb5ec5b028fa48324fc3fdcea3b2f0a725e2d26255737a9b7df085075a4fe"
+    },
+    {
+      "group": "website-closing",
+      "path": "assets/website/closing-orchestra-linework-subtle-source.png",
+      "sha256": "0dfcf114a39a37508d999280d2ee0d5bc54d09ea5469f505e0e6cbe95b7656ba"
+    },
+    {
+      "group": "website-closing",
+      "path": "apps/website/public/closing-orchestra-linework-subtle.avif",
+      "sha256": "7d0a0539b260e008cedc409cc068ef20a112eb1aeaef95d8d6d9309a0510b139"
+    },
+    {
+      "group": "website-closing",
+      "path": "apps/website/public/closing-orchestra-linework-subtle.webp",
+      "sha256": "dc7bf643f276c1a607d9d92a5e4b77692d97484d4de3d967c7e4d9556eb1f9f5"
+    },
+    {
+      "group": "website-closing",
+      "path": "apps/website/public/closing-orchestra-linework-subtle-mobile.avif",
+      "sha256": "ca04d1cf6520fd9f712d0898d1c7e2fe648179cc411b1fbcb89565ede931e229"
+    },
+    {
+      "group": "website-closing",
+      "path": "apps/website/public/closing-orchestra-linework-subtle-mobile.webp",
+      "sha256": "a7649c51743783f6d241449f794c2b24d98fca115e2532e0f307f5c63ed4a940"
+    },
+    {
+      "group": "mascot",
+      "path": "assets/mascot/questling.riv",
+      "sha256": "c3bfc2ff54203286ece153ffde5789896bbe5a9b86f6fa6915e547c0171a11a4"
+    },
+    {
+      "group": "team-avatars",
+      "path": "apps/desktop/src/renderer/src/assets/team-avatars/avatar-01-facet.png",
+      "sha256": "ba3b954aff2459b46d7bb93091b7bef307492c8535e0964045f780bea5a72772"
+    },
+    {
+      "group": "team-avatars",
+      "path": "apps/desktop/src/renderer/src/assets/team-avatars/avatar-02-ripple.png",
+      "sha256": "ed5186e9fbe3ffe8c43da04afedace9a05226d6e337978430e23d0a7adc672ae"
+    },
+    {
+      "group": "team-avatars",
+      "path": "apps/desktop/src/renderer/src/assets/team-avatars/avatar-03-helix.png",
+      "sha256": "7d21f9c0eba0e9985d27ae309c65aacd49fc40d2ce24d2a8a771ce9542d7fe6a"
+    },
+    {
+      "group": "team-avatars",
+      "path": "apps/website/src/assets/team-avatars/avatar-01-facet.png",
+      "sha256": "ba3b954aff2459b46d7bb93091b7bef307492c8535e0964045f780bea5a72772"
+    },
+    {
+      "group": "team-avatars",
+      "path": "apps/website/src/assets/team-avatars/avatar-02-ripple.png",
+      "sha256": "ed5186e9fbe3ffe8c43da04afedace9a05226d6e337978430e23d0a7adc672ae"
+    },
+    {
+      "group": "team-avatars",
+      "path": "apps/website/src/assets/team-avatars/avatar-03-helix.png",
+      "sha256": "7d21f9c0eba0e9985d27ae309c65aacd49fc40d2ce24d2a8a771ce9542d7fe6a"
+    },
+    {
+      "group": "team-avatars",
+      "path": "apps/website/src/assets/team-avatars/avatar-04-portal.png",
+      "sha256": "135a3ddaf793cc97ae7a6da872241d3487cf5f6709b07dcd9850fc773bbb26db"
+    },
+    {
+      "group": "team-avatars",
+      "path": "apps/desktop/src/renderer/src/assets/team-avatars/avatar-04-portal.png",
+      "sha256": "135a3ddaf793cc97ae7a6da872241d3487cf5f6709b07dcd9850fc773bbb26db"
+    },
+    {
+      "group": "team-avatars",
+      "path": "apps/desktop/src/renderer/src/assets/team-avatars/avatar-05-strata.png",
+      "sha256": "a56d602c8d1594837a7a7550274937f3e38d15244c7546aeead35ccc5f26f750"
+    },
+    {
+      "group": "team-avatars",
+      "path": "apps/desktop/src/renderer/src/assets/team-avatars/avatar-06-knot.png",
+      "sha256": "fc7384d0b89acbe2dfd8a333911c868b29ad38cfe0057f3005782c75c2e03248"
+    },
+    {
+      "group": "team-avatars",
+      "path": "apps/desktop/src/renderer/src/assets/team-avatars/avatar-07-split.png",
+      "sha256": "cc3af7c702c06fdd0b0a54ee416b1a6a16f9db8e31cf09050b8d43c02c1673d6"
+    },
+    {
+      "group": "team-avatars",
+      "path": "apps/desktop/src/renderer/src/assets/team-avatars/avatar-08-bloom.png",
+      "sha256": "956f38958777fa95322401ec805d158c604085a879208e505bdcf49f185a2ddc"
+    },
+    {
+      "group": "team-avatars",
+      "path": "apps/desktop/src/renderer/src/assets/team-avatars/avatar-09-orbit.png",
+      "sha256": "41efc2d47ecc1fb70e82f058d8c21c1cce4f204c8c063fdc9d60e05707d6917e"
+    },
+    {
+      "group": "team-avatars",
+      "path": "apps/desktop/src/renderer/src/assets/team-avatars/avatar-10-fold.png",
+      "sha256": "2f226af5bfedd3d7e1eb0bf7941668198904a784241d7ca82b419929e38628f7"
+    },
+    {
+      "group": "team-avatars",
+      "path": "apps/desktop/src/renderer/src/assets/team-avatars/avatar-11-lens.png",
+      "sha256": "db1639863f3cfb1858fbcb3e8445ec20eef5c91c0e1374bfb6a1d1eaa9625d8d"
+    },
+    {
+      "group": "team-avatars",
+      "path": "apps/desktop/src/renderer/src/assets/team-avatars/avatar-12-axis.png",
+      "sha256": "25a2df7b3be58cb8e6e35f9a1f58a96dceedb0ad476fd1e5d2b80093909e7b55"
+    },
+    {
+      "group": "fast-mode",
+      "path": "assets/fast-mode/fast-mode-rocket.riv",
+      "sha256": "b24421b8dc48c4b13b62ed373045d041b7b1d9fc70a255afb989c8be455d73c4"
+    },
+    {
+      "group": "fast-mode",
+      "path": "assets/fast-mode/fast-mode-rocket.svg",
+      "sha256": "97df48843366547c3b0482cd5aaca235ede6340c8614b3ff7d12bc5c1403c2ea"
+    },
+    {
+      "group": "provider-marks",
+      "path": "apps/desktop/src/renderer/src/assets/providers/claude.svg",
+      "sha256": "f5d03d6785b5b01c79cb427145cec717d64257c6205a428608012f9dc3ffcdcf"
+    },
+    {
+      "group": "provider-marks",
+      "path": "apps/desktop/src/renderer/src/assets/providers/openai.svg",
+      "sha256": "de77af0a5dc3b2a0d97edcee21fd99309a91dd78a534b0c7f76cee8fc2c1bbc8"
+    },
+    {
+      "group": "provider-marks",
+      "path": "apps/desktop/src/renderer/src/assets/providers/opencode.svg",
+      "sha256": "a0738b2fc95b2f6c8955cfeeb9e825f423eb6a49d34feba63d1269225f789c39"
+    },
+    {
+      "group": "provider-marks",
+      "path": "apps/website/public/claude.svg",
+      "sha256": "f5d03d6785b5b01c79cb427145cec717d64257c6205a428608012f9dc3ffcdcf"
+    },
+    {
+      "group": "provider-marks",
+      "path": "apps/website/public/openai.svg",
+      "sha256": "de77af0a5dc3b2a0d97edcee21fd99309a91dd78a534b0c7f76cee8fc2c1bbc8"
+    },
+    {
+      "group": "provider-marks",
+      "path": "apps/website/public/opencode.svg",
+      "sha256": "a0738b2fc95b2f6c8955cfeeb9e825f423eb6a49d34feba63d1269225f789c39"
+    },
+    {
+      "group": "provider-marks",
+      "path": "apps/website/public/slack.svg",
+      "sha256": "1f40066b694020057218c46eb2a11982b278d89b2dc8f96a21e4ea04e2b9db3b"
+    },
+    {
+      "group": "readme-product",
+      "path": "docs/images/readme/workspace.png",
+      "sha256": "f92c10ad085eb9ace59319ae1dcb5d45dc67c6ca9155386a8e884b9f9d27d389"
+    },
+    {
+      "group": "readme-product",
+      "path": "docs/images/readme/teams.png",
+      "sha256": "40c2b4bd71a158fb56990add6df8b5f050141f04591e39a17af945f1c23baaa3"
+    },
+    {
+      "group": "readme-product",
+      "path": "docs/images/readme/discussion.png",
+      "sha256": "e89d1183084be965552879e5c16264284f0b020105cb3c4b133d7965fd196fd3"
+    },
+    {
+      "group": "project-stack-logos",
+      "path": "apps/desktop/src/renderer/src/assets/project-stacks/react.svg",
+      "sha256": "5825b649c8c04dec13ecf01d0182401bd0ec71789d2fa06224866d882cd1515f"
+    },
+    {
+      "group": "project-stack-logos",
+      "path": "apps/desktop/src/renderer/src/assets/project-stacks/nextjs.svg",
+      "sha256": "d9435c4ede7133b376c0173a80226bb3856729366707cd96e9a66e39448d0288"
+    },
+    {
+      "group": "project-stack-logos",
+      "path": "apps/desktop/src/renderer/src/assets/project-stacks/nestjs.svg",
+      "sha256": "97ae5e5666850f1f6119871a4197bef2da3472cd2d40a32e9420792a8bfcd360"
+    },
+    {
+      "group": "project-stack-logos",
+      "path": "apps/desktop/src/renderer/src/assets/project-stacks/vuejs.svg",
+      "sha256": "4cc1153600c0845c645ac6c718c11d516d6899079a0dc406e3d62f68b1d02c49"
+    },
+    {
+      "group": "project-stack-logos",
+      "path": "apps/desktop/src/renderer/src/assets/project-stacks/nuxt.svg",
+      "sha256": "c32689e693898de8639d44b0ae5bee53c28a37005dd7d65fe2c0bc85b0d0cc04"
+    },
+    {
+      "group": "project-stack-logos",
+      "path": "apps/desktop/src/renderer/src/assets/project-stacks/svelte.svg",
+      "sha256": "1941fe737cb55f6a88bf919d43131d3e346a1d2a0117bcf319f6638cf21f69f8"
+    },
+    {
+      "group": "project-stack-logos",
+      "path": "apps/desktop/src/renderer/src/assets/project-stacks/astro.svg",
+      "sha256": "f48e027603ad5d9823b86bd94fb77a499b0fae27e91649d5f9290fc9c92cecae"
+    },
+    {
+      "group": "project-stack-logos",
+      "path": "apps/desktop/src/renderer/src/assets/project-stacks/angular.svg",
+      "sha256": "9666f86466e1175ba5e0c685fb423123e93a544732fd7b241e92a192cbb613ab"
+    },
+    {
+      "group": "project-stack-logos",
+      "path": "apps/desktop/src/renderer/src/assets/project-stacks/express.svg",
+      "sha256": "27ec7e3d21d59102c046a96277877abf78aa9d7ad244277345d9c395486d42d4"
+    },
+    {
+      "group": "project-stack-logos",
+      "path": "apps/desktop/src/renderer/src/assets/project-stacks/laravel.svg",
+      "sha256": "b293960cd642537d2b19a1442168a396f25bdd31eb10f4f92447623cfc5730df"
+    },
+    {
+      "group": "project-stack-logos",
+      "path": "apps/desktop/src/renderer/src/assets/project-stacks/django.svg",
+      "sha256": "c3037ac285dd5f85ee148a151afb85e64b2a03b62c3affc178376d82ebff6a46"
+    },
+    {
+      "group": "project-stack-logos",
+      "path": "apps/desktop/src/renderer/src/assets/project-stacks/fastapi.svg",
+      "sha256": "7ef41f6a363b00ff595e6d0b933c025c92cbfae29dc1df24b2f6eb8b476ee486"
+    },
+    {
+      "group": "project-stack-logos",
+      "path": "apps/desktop/src/renderer/src/assets/project-stacks/javascript.svg",
+      "sha256": "0656ff65fc8eeacda5c78d7f9ffe91ec1eb919db64f56e0b7dcd460af4bbd36c"
+    },
+    {
+      "group": "project-stack-logos",
+      "path": "apps/desktop/src/renderer/src/assets/project-stacks/typescript.svg",
+      "sha256": "c9191199f4049920c2fc19035b8a6664f37f4689fcd9e8434e786097e78863f0"
+    },
+    {
+      "group": "project-stack-logos",
+      "path": "apps/desktop/src/renderer/src/assets/project-stacks/python.svg",
+      "sha256": "71493b4a732f0532b3a03a7a95da3ee11a65766367c8303b901ffbe7bf91a3a2"
+    },
+    {
+      "group": "project-stack-logos",
+      "path": "apps/desktop/src/renderer/src/assets/project-stacks/go.svg",
+      "sha256": "2d4558b96d3ec71d0d922a62668cb2ea5a5d83ed7d4caf6b0479b3266f795a2f"
+    },
+    {
+      "group": "project-stack-logos",
+      "path": "apps/desktop/src/renderer/src/assets/project-stacks/rust.svg",
+      "sha256": "16c6c6a98e990944fc5e1cc64cc8fc7b8be3a662ec4ee7951b7995d2e52f5e12"
+    },
+    {
+      "group": "project-stack-logos",
+      "path": "apps/desktop/src/renderer/src/assets/project-stacks/java.svg",
+      "sha256": "7582e518a9c02425f97155e5a3bd39d1a3a7d421b78caf9c8df7443dad3edc5d"
+    },
+    {
+      "group": "project-stack-logos",
+      "path": "apps/desktop/src/renderer/src/assets/project-stacks/csharp.svg",
+      "sha256": "7093478d0888e22a224b6fa832da6c9ffd14c433de8bd14aab0c1cb50925f3ee"
+    },
+    {
+      "group": "project-stack-logos",
+      "path": "apps/desktop/src/renderer/src/assets/project-stacks/ruby.svg",
+      "sha256": "74ead50b8f0f31e1b34618088bc0b0e16c04f1d4539039ef9358717d8505a63c"
+    },
+    {
+      "group": "project-stack-logos",
+      "path": "apps/desktop/src/renderer/src/assets/project-stacks/php.svg",
+      "sha256": "f22619a19c99a123e4678d71826f65f223721a739631dff46de39827c9ee0633"
+    },
+    {
+      "group": "project-stack-logos",
+      "path": "apps/desktop/src/renderer/src/assets/project-stacks/swift.svg",
+      "sha256": "46b6e4abd3ab12c589b8e276295f9439e2869bc4788d918efbc6e76147e8a06e"
+    },
+    {
+      "group": "project-stack-logos",
+      "path": "apps/desktop/src/renderer/src/assets/project-stacks/c.svg",
+      "sha256": "8cce48da91084256f15653e02bfd7046ccb34489d030cb1aa34dee766daad6b7"
+    },
+    {
+      "group": "project-stack-logos",
+      "path": "apps/desktop/src/renderer/src/assets/project-stacks/cplusplus.svg",
+      "sha256": "7ff8253551235e3a6b002a7c2bd6e3190d85113a64fcb40f2254473caeb025d4"
+    }
+  ]
+}

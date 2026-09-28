@@ -1,0 +1,6 @@
+# Preserve reviewed notice bytes on every platform.
+/LICENSE -text
+/NOTICE -text
+/THIRD_PARTY_NOTICES.md -text
+/licenses/** -text
+/apps/website/public/licenses/** -text

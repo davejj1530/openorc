@@ -1,0 +1,73 @@
+appId: app.openorc.desktop
+productName: OpenOrc
+# The hook audits notices/imports and filters runtime dependencies and native targets.
+beforePack: ./electron-builder.before-pack.cjs
+directories:
+  output: release
+  buildResources: build
+files:
+  - out/**
+  # Typecheck writes declaration output and build info into out/; none of it runs.
+  - "!out/types-*/**"
+  - "!**/*.tsbuildinfo"
+  - resources/icon.png
+  # Runtime dependencies are collected separately by electron-builder. Keep
+  # node-pty explicit because its native binding and helper must be unpacked.
+  - node_modules/node-pty/**
+  # Keep source maps in the checkout/build output for development, not installers.
+  - "!**/*.map"
+  # Third-party example pages, sample graphs, and GIFs are not used by Mermaid.
+  - "!**/node_modules/cytoscape-fcose/demo{,/**}"
+  # The orb uses vgpu's browser entrypoint and Electron's built-in WebGPU.
+  - "!**/node_modules/webgpu/dist/*.dawn.node"
+  # Development instructions are not runtime assets, including in dependencies.
+  - "!**/AGENTS.md"
+  - "!**/CLAUDE.md"
+extraResources:
+  - from: ../../LICENSE
+    to: LICENSE
+  - from: ../../NOTICE
+    to: NOTICE
+  - from: ../../THIRD_PARTY_NOTICES.md
+    to: THIRD_PARTY_NOTICES.md
+  - from: ../../licenses
+    to: licenses
+  # Electron's downloaded notices sit outside Electron.app and are otherwise
+  # absent from the application bundle. Keep them separate from our LICENSE.
+  - from: node_modules/electron/dist/LICENSE
+    to: licenses/electron/LICENSE
+  - from: node_modules/electron/dist/LICENSES.chromium.html
+    to: licenses/electron/LICENSES.chromium.html
+asar: true
+asarUnpack:
+  # Two files inside node-pty cannot be read from an archive: the .node binding
+  # is dlopened, and spawn-helper is exec'd by path. node-pty resolves the
+  # helper as a sibling of the binding, so both must land on disk together.
+  # Claude's own desktop app unpacks exactly node-pty for this reason.
+  - node_modules/node-pty/**
+  # SQLite loads extensions by physical filename, outside Electron's fs shim.
+  - node_modules/sqlite-vec-*/**
+mac:
+  icon: build/icon.icns
+  category: public.app-category.developer-tools
+  target:
+    - dir
+  # Local packages stay unsigned. The opt-in release configuration requires signing and notarization.
+  identity: null
+npmRebuild: false
+# Every package, local or released: no running the app as plain Node, no NODE_OPTIONS or --inspect, cookies encrypted
+# with the OS keychain, and code loaded only from the app's archive, checked against the hash packed with it. The
+# packaged smoke builds with electron-builder.smoke.cjs, which turns --inspect back on for its own copy.
+electronFuses:
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableCookieEncryption: true
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+  # Flipping a fuse changes the binary; an unsigned package needs a fresh ad-hoc signature to launch on Apple silicon.
+  resetAdHocDarwinSignature: true
+win:
+  icon: resources/icon.png
+linux:
+  icon: resources/icon.png

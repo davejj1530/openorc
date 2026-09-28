@@ -1,0 +1,157 @@
+{
+  "schemaVersion": 1,
+  "scope": "Verbatim copyright headers extracted from source at pinned revisions. License texts remain in licenses/vendor.",
+  "skia": [
+    {
+      "source": "https://raw.githubusercontent.com/rive-app/rive-wasm/e0bfcec3ccd0f1dee01686776da68f439a95cbfa/wasm/src/skia_imports/include/config/SkUserConfig.h",
+      "sourceSha256": "f3b0f96d36f0b75d2727e82d628c20fea8444d75b2a03041e850cb3ede90743d",
+      "rangeBytes": [1, 164],
+      "headerSha256": "911730c97ba9a277ee95f846e76c19f4573085213d78bd0f45be8e0a13db8c24"
+    },
+    {
+      "source": "https://raw.githubusercontent.com/rive-app/rive-wasm/e0bfcec3ccd0f1dee01686776da68f439a95cbfa/wasm/src/skia_imports/include/core/SkMath.h",
+      "sourceSha256": "4899a25aaf60b9886c96e8202025e0d566e3982d36df590f0f65cfe06f2c7bd7",
+      "rangeBytes": [0, 163],
+      "headerSha256": "911730c97ba9a277ee95f846e76c19f4573085213d78bd0f45be8e0a13db8c24"
+    },
+    {
+      "source": "https://raw.githubusercontent.com/rive-app/rive-wasm/e0bfcec3ccd0f1dee01686776da68f439a95cbfa/wasm/src/skia_imports/include/core/SkScalar.h",
+      "sourceSha256": "daee23e2958d3323cc48d42aa1415d05ad993acd4095647089936522f6f19444",
+      "rangeBytes": [0, 163],
+      "headerSha256": "911730c97ba9a277ee95f846e76c19f4573085213d78bd0f45be8e0a13db8c24"
+    },
+    {
+      "source": "https://raw.githubusercontent.com/rive-app/rive-wasm/e0bfcec3ccd0f1dee01686776da68f439a95cbfa/wasm/src/skia_imports/include/core/SkSize.h",
+      "sourceSha256": "fa1cb2cf88da64299c934a0937e4ca60443eeb0e89a37883f7d52b90332a54e5",
+      "rangeBytes": [0, 143],
+      "headerSha256": "bb45f1da011d3fa26cedfe7720ee96f94dbc391ac84f81b1de3d22ad1a694478"
+    },
+    {
+      "source": "https://raw.githubusercontent.com/rive-app/rive-wasm/e0bfcec3ccd0f1dee01686776da68f439a95cbfa/wasm/src/skia_imports/include/core/SkTypes.h",
+      "sourceSha256": "a3b1fb2072b89c18ab8c532421c354a0aae0ca43eec81c3c736a34c8dfe19de0",
+      "rangeBytes": [0, 163],
+      "headerSha256": "911730c97ba9a277ee95f846e76c19f4573085213d78bd0f45be8e0a13db8c24"
+    },
+    {
+      "source": "https://raw.githubusercontent.com/rive-app/rive-wasm/e0bfcec3ccd0f1dee01686776da68f439a95cbfa/wasm/src/skia_imports/include/private/SkFloatBits.h",
+      "sourceSha256": "dc919978e0d542c27951af1ab7d38536504684fd8e90db433ccef798dfcbf068",
+      "rangeBytes": [0, 163],
+      "headerSha256": "7bde1d3301ca078e4cb73ae533ceccde6f4c3bcd8b8a0f37ed7fd111b432803b"
+    },
+    {
+      "source": "https://raw.githubusercontent.com/rive-app/rive-wasm/e0bfcec3ccd0f1dee01686776da68f439a95cbfa/wasm/src/skia_imports/include/private/SkFloatingPoint.h",
+      "sourceSha256": "9504a6ef86a563d1f6716d1c1500e6631b7b7c1321ab6dcaa3f596f8b93f64b5",
+      "rangeBytes": [0, 163],
+      "headerSha256": "911730c97ba9a277ee95f846e76c19f4573085213d78bd0f45be8e0a13db8c24"
+    },
+    {
+      "source": "https://raw.githubusercontent.com/rive-app/rive-wasm/e0bfcec3ccd0f1dee01686776da68f439a95cbfa/wasm/src/skia_imports/include/private/SkMalloc.h",
+      "sourceSha256": "b26db30b262417c82e395b03d7c96dc3b57501334ee8a21f81c3bd1afd05f24b",
+      "rangeBytes": [0, 143],
+      "headerSha256": "c8f53b13da7731ad0728b14ce513e6b5bc1d4faa444d86d6aed962e83e696bd2"
+    },
+    {
+      "source": "https://raw.githubusercontent.com/rive-app/rive-wasm/e0bfcec3ccd0f1dee01686776da68f439a95cbfa/wasm/src/skia_imports/include/private/SkSafe_math.h",
+      "sourceSha256": "dbf84db8c39379a430e2d05a80e65dfc3133144faa9d27e608aa64c2aee7c53c",
+      "rangeBytes": [0, 143],
+      "headerSha256": "e4f9e4d94f03927123efa121293cfeb8abfafb3c678a24590f8a0a1cf052d1ef"
+    },
+    {
+      "source": "https://raw.githubusercontent.com/rive-app/rive-wasm/e0bfcec3ccd0f1dee01686776da68f439a95cbfa/wasm/src/skia_imports/include/private/SkTDArray.h",
+      "sourceSha256": "c1bb7673e0cc75c5fb338bede24504c9cb63db49f87e2dba17721714985a292d",
+      "rangeBytes": [0, 163],
+      "headerSha256": "911730c97ba9a277ee95f846e76c19f4573085213d78bd0f45be8e0a13db8c24"
+    },
+    {
+      "source": "https://raw.githubusercontent.com/rive-app/rive-wasm/e0bfcec3ccd0f1dee01686776da68f439a95cbfa/wasm/src/skia_imports/include/private/SkTFitsIn.h",
+      "sourceSha256": "29d32859a9e139d81d91fb6a5e19795610398cd2ac04f7f301bdef2a944a1a6b",
+      "rangeBytes": [0, 143],
+      "headerSha256": "15edc74d43709c6741f46c7c31ee1572771e015a5598f5a4312506e21ccf9a72"
+    },
+    {
+      "source": "https://raw.githubusercontent.com/rive-app/rive-wasm/e0bfcec3ccd0f1dee01686776da68f439a95cbfa/wasm/src/skia_imports/include/private/SkTo.h",
+      "sourceSha256": "60a12e6f56324565fa41d0d519b21ea2353aedbd9268f00a0f731cfb90579850",
+      "rangeBytes": [0, 143],
+      "headerSha256": "24361ec7f6be3bd4f4557da2d39afe66527adce005ce75a46efdaf005b8bd1c7"
+    },
+    {
+      "source": "https://raw.githubusercontent.com/rive-app/rive-wasm/e0bfcec3ccd0f1dee01686776da68f439a95cbfa/wasm/src/skia_imports/include/private/SkVx.h",
+      "sourceSha256": "a1e3d3a25ea5d468d4044390f46df8420ea06bb6c66f2ea885b460072239a938",
+      "rangeBytes": [0, 143],
+      "headerSha256": "d3c85a171f8d698e1cfc68b6974a05dab6208ae72bd1c57474aae96e81d2e776"
+    },
+    {
+      "source": "https://raw.githubusercontent.com/rive-app/rive-wasm/e0bfcec3ccd0f1dee01686776da68f439a95cbfa/wasm/src/skia_imports/src/core/SkIPoint16.h",
+      "sourceSha256": "879ea5d3b7137f9b9baebc45375e56a9e754cc0bd2af4eccd0b6a19637b89626",
+      "rangeBytes": [0, 143],
+      "headerSha256": "24361ec7f6be3bd4f4557da2d39afe66527adce005ce75a46efdaf005b8bd1c7"
+    },
+    {
+      "source": "https://raw.githubusercontent.com/rive-app/rive-wasm/e0bfcec3ccd0f1dee01686776da68f439a95cbfa/wasm/src/skia_imports/src/core/SkMathPriv.h",
+      "sourceSha256": "edc4d5125591d292296cb5cfb00cf9630e374f78a1271d4bd2b5ae3aa75b3118",
+      "rangeBytes": [0, 143],
+      "headerSha256": "0a5bef3d031190ceac3ffb8a7e54cab8bb7b8c6df65c1645c2ce6edc1525baa4"
+    },
+    {
+      "source": "https://raw.githubusercontent.com/rive-app/rive-wasm/e0bfcec3ccd0f1dee01686776da68f439a95cbfa/wasm/src/skia_imports/src/gpu/GrDynamicRectanizer.cpp",
+      "sourceSha256": "68260ba82b768552e9770dad5445ed1b465a01f27ffdd32e5cbe2aabe460bcf3",
+      "rangeBytes": [0, 143],
+      "headerSha256": "6063fed4aff20f30a8014448e60214faf20c5ffb974e3a7567dfa8ee63ddce77"
+    },
+    {
+      "source": "https://raw.githubusercontent.com/rive-app/rive-wasm/e0bfcec3ccd0f1dee01686776da68f439a95cbfa/wasm/src/skia_imports/src/gpu/GrDynamicRectanizer.h",
+      "sourceSha256": "85e65d1027b017317a07ca152fb5304cf6e60b1d47f52df6a55a3266bc1dcb6a",
+      "rangeBytes": [0, 143],
+      "headerSha256": "6063fed4aff20f30a8014448e60214faf20c5ffb974e3a7567dfa8ee63ddce77"
+    },
+    {
+      "source": "https://raw.githubusercontent.com/rive-app/rive-wasm/e0bfcec3ccd0f1dee01686776da68f439a95cbfa/wasm/src/skia_imports/src/gpu/GrRectanizer.h",
+      "sourceSha256": "16dee115802305918ddfa272855325afc74e433a90bf67240382621a50582b64",
+      "rangeBytes": [0, 143],
+      "headerSha256": "1028cdf38e5eb539eaf4bf49842f74fe96b41fa2825ff36ca572d3633eaf1246"
+    },
+    {
+      "source": "https://raw.githubusercontent.com/rive-app/rive-wasm/e0bfcec3ccd0f1dee01686776da68f439a95cbfa/wasm/src/skia_imports/src/gpu/GrRectanizerPow2.cpp",
+      "sourceSha256": "8d1bd9a24cdd3e02c32fc77696046b85cb575cdfb6ec7e978fd3ce4084540aed",
+      "rangeBytes": [0, 143],
+      "headerSha256": "1028cdf38e5eb539eaf4bf49842f74fe96b41fa2825ff36ca572d3633eaf1246"
+    },
+    {
+      "source": "https://raw.githubusercontent.com/rive-app/rive-wasm/e0bfcec3ccd0f1dee01686776da68f439a95cbfa/wasm/src/skia_imports/src/gpu/GrRectanizerPow2.h",
+      "sourceSha256": "0a142e3f262dda96af7ded2770aab1ff5b3456f2b0488b0ba870f3aef47f2f79",
+      "rangeBytes": [0, 143],
+      "headerSha256": "662386a78d704b0c618e12fee3f00e0ea26b204d8f6fbb371d255dadb67395d0"
+    },
+    {
+      "source": "https://raw.githubusercontent.com/rive-app/rive-wasm/e0bfcec3ccd0f1dee01686776da68f439a95cbfa/wasm/src/skia_imports/src/gpu/GrRectanizerSkyline.cpp",
+      "sourceSha256": "48f5dda143bd9f40e9c28c5b1921191121ce3e3ba4fb04761f786627544bb4fb",
+      "rangeBytes": [0, 143],
+      "headerSha256": "15edc74d43709c6741f46c7c31ee1572771e015a5598f5a4312506e21ccf9a72"
+    },
+    {
+      "source": "https://raw.githubusercontent.com/rive-app/rive-wasm/e0bfcec3ccd0f1dee01686776da68f439a95cbfa/wasm/src/skia_imports/src/gpu/GrRectanizerSkyline.h",
+      "sourceSha256": "2a14ca0fcf61abba7a8f4c1e89b5241b0ccbe571ef21adf8e38a48929b273e33",
+      "rangeBytes": [0, 143],
+      "headerSha256": "662386a78d704b0c618e12fee3f00e0ea26b204d8f6fbb371d255dadb67395d0"
+    },
+    {
+      "source": "https://raw.githubusercontent.com/rive-app/rive-wasm/e0bfcec3ccd0f1dee01686776da68f439a95cbfa/wasm/src/skia_imports/src/ports/SkDebug_stdio.cpp",
+      "sourceSha256": "94d390dcc02620b25f417366452b751472191970b9b38f15967153234944742a",
+      "rangeBytes": [0, 163],
+      "headerSha256": "911730c97ba9a277ee95f846e76c19f4573085213d78bd0f45be8e0a13db8c24"
+    },
+    {
+      "source": "https://raw.githubusercontent.com/rive-app/rive-wasm/e0bfcec3ccd0f1dee01686776da68f439a95cbfa/wasm/src/skia_imports/src/ports/SkMemory_malloc.cpp",
+      "sourceSha256": "52cb3934500b6fe60d07caf9c8c57bf3752b8644801fc6043448032451e2bbee",
+      "rangeBytes": [0, 143],
+      "headerSha256": "bb45f1da011d3fa26cedfe7720ee96f94dbc391ac84f81b1de3d22ad1a694478"
+    }
+  ],
+  "harfbuzzUnicode": {
+    "file": "rive-harfbuzz-unicode-header.txt",
+    "bytes": 581,
+    "sha256": "7828c73b7d5dfc0af928a2487d52e66113aa4f84f55f4c1ef15182a490e49bc4",
+    "source": "https://raw.githubusercontent.com/rive-app/harfbuzz/08d34675f64b1ac4880f4f10c9fd474a56dd4399/src/hb-unicode-emoji-table.hh",
+    "rangeBytes": [0, 581]
+  }
+}

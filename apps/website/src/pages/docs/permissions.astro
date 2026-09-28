@@ -1,0 +1,173 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import { docHref } from "../../data/docs";
+
+const sections = [
+  { id: "modes", title: "Modes" },
+  { id: "approvals", title: "Approvals" },
+  { id: "app-tools", title: "OpenOrc's own tools" },
+  { id: "actions", title: "Actions and each mode" },
+  { id: "browser", title: "The browser Preview" },
+  { id: "messages", title: "Messages to other conversations" },
+];
+
+const flags = `Claude Code   --allowedTools mcp__<server>__<tool> …
+              --permission-prompt-tool mcp__<server>__approve
+Codex         session config: mcp_servers.<server>.tools.<tool>.approval_mode = "approve"
+OpenCode      Plan agent rule: { action: "<server>_<tool>", resource: "*", effect: "allow" }`;
+---
+
+<DocsLayout slug="permissions" sections={sections}>
+  <section aria-labelledby="modes">
+    <h2 id="modes">Modes</h2>
+    <p>Every conversation has a mode, and each message runs under it:</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Mode</th>
+            <th scope="col">What it promises</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Plan</td>
+            <td>Investigate and propose a plan. Project changes, external writes, browser input, and memory changes are blocked.</td>
+          </tr>
+          <tr>
+            <td>Review everything</td>
+            <td>Read and search freely. Every command, edit, external write, browser input, and memory change asks first.</td>
+          </tr>
+          <tr>
+            <td>Accept edits</td>
+            <td>Workspace file edits and memory changes run. Every command, external write, and browser input asks first.</td>
+          </tr>
+          <tr>
+            <td>Autonomous</td>
+            <td>Tool permissions run automatically. Questions and password fields still ask.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Each provider enforces the mode for its own tools, such as shell commands and file edits, from settings OpenOrc passes to that process only; your own configuration files are not changed. The exact flags are on <a href={docHref("providers")}>Agent providers</a>. Claude Code follows the table above. OpenCode runs only in Plan and Autonomous, because this integration cannot yet guarantee that it asks before every command.</p>
+    <p>Codex enforces the modes with its own sandbox instead of asking before every command, and the app shows them under Codex's names:</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Mode</th>
+            <th scope="col">Shown for Codex as</th>
+            <th scope="col">What Codex does</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Plan</td>
+            <td>Plan</td>
+            <td>Read-only sandbox, and nothing asks: commands that only read run, and anything more fails. Your own MCP servers are turned off.</td>
+          </tr>
+          <tr>
+            <td>Review everything</td>
+            <td>Review changes</td>
+            <td>Read-only sandbox. Reads and commands that only read run without asking. File changes, and anything else the sandbox blocks, ask first.</td>
+          </tr>
+          <tr>
+            <td>Accept edits</td>
+            <td>Ask for approval</td>
+            <td>Workspace edits and commands inside Codex's sandbox run without asking, and the sandbox has no network. Network access and anything outside the sandbox ask first.</td>
+          </tr>
+          <tr>
+            <td>Autonomous</td>
+            <td>Full access</td>
+            <td>No sandbox and no approval prompts. Questions still ask.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>OpenOrc's own tools follow the same rules for every provider; see <a href="#actions">Actions and each mode</a>.</p>
+    <p>A mode change applies from your next message, with one exception: switching to Autonomous takes effect at once. OpenOrc approves the requests already waiting, and any the running agent makes after that, apart from typing into a password field.</p>
+  </section>
+
+  <section aria-labelledby="approvals">
+    <h2 id="approvals">Approvals</h2>
+    <p>When a provider or OpenOrc needs your permission, the conversation shows a card with the request and three choices: Allow, Allow for this run, and Deny. The agent waits until you answer. In Plan mode, OpenOrc denies a provider's external requests without asking; in Autonomous, it allows them. Questions an agent asks you, such as <code>ask_user</code>, always wait for your answer, in every mode.</p>
+    <p>Pending approvals live in the core's memory. Quitting OpenOrc denies them, and they are not restored at the next launch.</p>
+    <p>The audit log records the agent requests OpenOrc decides without asking you, such as those it refuses in Plan or allows in Autonomous, and why. It does not record uses of OpenOrc's own tools that the mode allows, such as <code>memory_record</code> in Accept edits, or repeats covered by "Allow for this run".</p>
+    <p class="docs-source">Source: <code>packages/core/src/services/run-approvals.ts</code> (<code>awaitApproval</code>, <code>authorizeAppAction</code>)</p>
+  </section>
+
+  <section aria-labelledby="app-tools">
+    <h2 id="app-tools">OpenOrc's own tools</h2>
+    <p>Agents reach OpenOrc's tools, such as <code>task_create</code>, <code>thread_send</code>, <code>browser</code>, and <code>memory_record</code>, through OpenOrc's MCP server. Each agent process gets its own server name and address, and the provider is told not to ask about those tools itself:</p>
+    <pre><code>{flags}</code></pre>
+    <p>A server of yours that is also named <code>openorc</code>, or that copies a tool name, gets none of this; only the name and address OpenOrc made for that process count.</p>
+    <p>Not asking at the provider does not mean allowed. OpenOrc applies the conversation's mode when one of its tools runs, the same way for every provider. The tools fall into three groups:</p>
+    <ul>
+      <li><strong>Reads</strong> run in every mode: <code>task_list</code>, <code>task_get</code>, <code>thread_list</code>, <code>thread_read</code>, <code>memory_search</code>, <code>task_context</code>, <code>execution_context</code>, and the browser's <code>open</code>, <code>snapshot</code>, <code>screenshot</code>, and <code>scroll</code>.</li>
+      <li><strong>Documents</strong> run in every mode, because they change only OpenOrc's own task records and plans: <code>task_create</code> in the backlog, <code>task_update</code>, and <code>plan_write</code>. <code>task_start</code> requires Act, and <code>ask_user</code> waits for you.</li>
+      <li><strong>Actions</strong> reach beyond the conversation, so they follow the rules below.</li>
+    </ul>
+    <p><code>execution_switch</code>, available to Slack requests, changes a request's model, effort or folder among the ones your Slack settings allow, never its permissions, so it runs in every mode. Team tools follow the <a href={docHref("teams")}>team's</a> own rules.</p>
+    <p class="docs-source">Source: <code>packages/core/src/services/app-actions.ts</code>, <code>packages/core/src/mcp-host/</code></p>
+  </section>
+
+  <section aria-labelledby="actions">
+    <h2 id="actions">Actions and each mode</h2>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Action</th>
+            <th scope="col">Plan</th>
+            <th scope="col">Review everything</th>
+            <th scope="col">Accept edits</th>
+            <th scope="col">Autonomous</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Browser click, fill, press</td>
+            <td>Blocked</td>
+            <td>Asks</td>
+            <td>Asks</td>
+            <td>Runs</td>
+          </tr>
+          <tr>
+            <td>Typing into a password field</td>
+            <td>Blocked</td>
+            <td>Asks</td>
+            <td>Asks</td>
+            <td>Asks</td>
+          </tr>
+          <tr>
+            <td><code>memory_record</code>, <code>memory_feedback</code></td>
+            <td>Blocked</td>
+            <td>Asks</td>
+            <td>Runs</td>
+            <td>Runs</td>
+          </tr>
+          <tr>
+            <td><code>thread_send</code> to a conversation in a more permissive mode</td>
+            <td>Blocked</td>
+            <td>Asks</td>
+            <td>Asks</td>
+            <td>Runs</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>A blocked action returns a message to the agent that says so, and nothing happens. "Allow for this run" on one of these approvals covers later actions of the same kind for the rest of that run, except password fields, which ask every time. Memory has further rules, such as protecting the memories you wrote; see <a href={docHref("memory") + "#tools"}>Memory tools</a>.</p>
+  </section>
+
+  <section aria-labelledby="browser">
+    <h2 id="browser">The browser Preview</h2>
+    <p>The Preview beside a conversation is a real Chromium view with one storage shared by every conversation and kept between launches, so it carries the sessions you signed in to there. An agent that clicks or types in it acts with those sessions, which is why input follows the rules above.</p>
+    <p>A fill aimed at a password field never reaches the page on its own. The page script refuses it, OpenOrc asks you with the site's name, and only then sends the text again, marked as allowed. Agents cannot mark it themselves. Snapshots never include the value of a password field.</p>
+    <p class="docs-source">Source: <code>apps/desktop/src/main/browser-page.ts</code>, <code>browser-pane.ts</code></p>
+  </section>
+
+  <section aria-labelledby="messages">
+    <h2 id="messages">Messages to other conversations</h2>
+    <p>A conversation that receives a message acts on it with its own mode. A message to a conversation in the same mode or a stricter one is always delivered, because it cannot do anything the sender could not. A message to a more permissive one asks you first, and from Plan it is refused. Messages to a team conversation follow the same check before being queued for its lead. How messages travel, the limit on chains of agent messages, and retries are covered in <a href={docHref("conversations") + "#messages"}>Messages between conversations</a>.</p>
+  </section>
+</DocsLayout>

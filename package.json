@@ -1,0 +1,43 @@
+{
+  "name": "openorc",
+  "private": true,
+  "version": "0.0.0",
+  "license": "Apache-2.0",
+  "description": "A desktop workspace for Codex, Claude Code, and OpenCode.",
+  "homepage": "https://openorc.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/davejj1530/openorc.git"
+  },
+  "bugs": {
+    "url": "https://github.com/davejj1530/openorc/issues"
+  },
+  "packageManager": "pnpm@11.21.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @openorc/desktop dev",
+    "dev:website": "pnpm --filter @openorc/website dev",
+    "qa:onboarding": "node scripts/onboarding-disposable-profile.cjs",
+    "qa:packaged": "node scripts/packaged-runtime-smoke.cjs",
+    "qa:release": "node scripts/packaged-release-check.cjs",
+    "licenses:check": "node scripts/distribution-notices.cjs check",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "lint": "eslint . --max-warnings 0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check:size": "node scripts/size-limit.cjs",
+    "size:update": "node scripts/size-limit.cjs --update"
+  },
+  "devDependencies": {
+    "eslint": "10.11.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "prettier": "^3.9.8",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "typescript-eslint": "8.70.1"
+  }
+}

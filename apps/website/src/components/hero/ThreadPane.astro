@@ -1,0 +1,59 @@
+---
+/** One conversation pane: the thread header, its transcript, and its composer. */
+import Composer from "./Composer.astro";
+import ProductIcon from "./ProductIcon.astro";
+import { project } from "../../data/hero/workspace";
+import type { Journey } from "../../data/hero/timeline";
+
+interface Props {
+  id: string;
+  journey: Journey;
+  title: string;
+  /** Windows during which the thread's agent is working. */
+  busy: string;
+  model: { label: string; effort: string; harness?: string; icon?: "orchestration" };
+  permission: string;
+  placeholder: string;
+  /** The thread runs in its own worktree on `branch`; the header names the branch, as the app does. */
+  worktree?: boolean;
+  branch?: string;
+  /** Window during which uncommitted changes show above the composer, with their counts. */
+  changes?: string;
+  changeStat?: { added: number; removed: number };
+  /** The prompt this pane's composer types, if any. */
+  prompt?: { text: string; typo: { at: number; key: string }; window: string; typed: string };
+}
+const { id, journey, title, busy, model, permission, placeholder, worktree, branch = project.branch, changes, changeStat, prompt } = Astro.props;
+---
+
+<section class="hs-pane" data-pane={id} data-flag={`busy:${busy}`}>
+  <header class="hs-header">
+    <span class="hs-header-lead">
+      <span class="hs-window-nav">
+        <span class="hs-icon-button"><ProductIcon name="panelLeft" /></span>
+        <span class="hs-icon-button"><ProductIcon name="search" /></span>
+        <span class="hs-icon-button"><ProductIcon name="arrowLeft" /></span>
+        <span class="hs-icon-button" data-disabled><ProductIcon name="arrowRight" /></span>
+      </span>
+      <span class="hs-title">{title}</span>
+      {worktree ? <span class="hs-thread-branch"><ProductIcon name="branch" /><span>{branch}</span></span> : null}
+      <span class="hs-chip"><span>{project.name}</span><ProductIcon name="chevronDown" /></span>
+    </span>
+    <span class="hs-header-actions">
+      <span class="hs-badge">working</span>
+      <span class="hs-icon-button hs-close-pane"><ProductIcon name="close" /></span>
+      <span class="hs-icon-button"><ProductIcon name="more" /></span>
+      <span class="hs-icon-button"><ProductIcon name="panelRight" /></span>
+    </span>
+  </header>
+  <slot name="bar" />
+  <div class="hs-transcript">
+    <div class="hs-column">
+      <slot />
+    </div>
+  </div>
+  <div class="hs-composer-area">
+    <slot name="hint" />
+    <Composer journey={journey} placeholder={placeholder} model={model} permission={permission} branch={branch} changes={changes} changeStat={changeStat} prompt={prompt} />
+  </div>
+</section>

@@ -1,0 +1,34 @@
+name: Bug report
+description: Report behavior that fails or differs from what you expected.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check existing issues first. This report will be public. For suspected vulnerabilities, read SECURITY.md and use private reporting instead.
+        Remove credentials, private conversations, personal paths, and account details from examples, screenshots, and logs. Do not attach your application database or full profile.
+  - type: textarea
+    id: behavior
+    attributes:
+      label: What happened?
+      description: Describe the observed behavior and what you expected.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Give the smallest repeatable example, using synthetic data where possible.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include the OpenOrc version or commit, OS and architecture, and relevant provider/CLI version. For source builds, include Node and pnpm versions.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Relevant screenshots or log excerpts
+      description: Optional. Include only the portion needed to explain the problem, after reviewing it for private information.

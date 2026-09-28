@@ -1,0 +1,21 @@
+name: Feature request
+description: Describe a workflow or capability you would like OpenOrc to support.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Search existing requests and ROADMAP.md first. This request will be public; use synthetic examples and omit private project information. For vulnerabilities, read SECURITY.md and use private reporting.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: Describe the workflow and where the current behavior gets in the way.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Explain the outcome you want and any alternatives you have considered.
+    validations:
+      required: true

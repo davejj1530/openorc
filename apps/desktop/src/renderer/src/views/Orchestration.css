@@ -1,0 +1,269 @@
+.orchestration {
+  container-type: inline-size;
+}
+.orchestration-layout {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.orchestration-toolbar {
+  padding: 16px 32px;
+  border-bottom: 1px solid var(--line);
+}
+.orchestration-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+.orchestration-switcher {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+.orchestration-switcher select {
+  width: 160px;
+  text-overflow: ellipsis;
+}
+.orchestration-team-switcher {
+  flex: 1;
+}
+.orchestration-team-switcher select {
+  width: 100%;
+  min-width: 100px;
+}
+.orchestration-archive-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+.orchestration-availability {
+  max-width: 800px;
+  margin: 12px auto 0;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+.orchestration-editor-region {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+.orchestration-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.orchestration-editor-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 32px 32px 40px;
+}
+.orchestration-editor-scroll > * {
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.orchestration-footer {
+  padding: 16px 32px;
+  border-top: 1px solid var(--line);
+}
+.orchestration-footer-content {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+.orchestration-load-error {
+  width: 100%;
+  max-width: 864px;
+  margin: 0 auto;
+  padding: 24px 32px;
+}
+/* The same content plane as the memory card and the settings group: --plane-fill plus
+   --material-seat, one construction across the app. NOT --material-lift, which aliases to
+   --material-raise in dark and which no content surface may read, and which at fifteen
+   members would be the pegboard. */
+.orchestration-card {
+  padding: 16px;
+  background: var(--plane-fill);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--material-seat);
+}
+/* 12px clears the contact's 1px reach. Do not restore the border-bottom: with the card it
+   would give every member two bottom edges, a border and a cast. */
+.orchestration-member {
+  margin-top: 12px;
+}
+.orchestration-avatar-editor {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  min-height: var(--control-lg);
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.orchestration-avatar-copy {
+  display: grid;
+  min-width: 112px;
+  line-height: var(--text-sm--line-height);
+}
+.orchestration-avatar-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.orchestration-avatar-message {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--ink-4);
+  font-size: var(--text-xs);
+  line-height: var(--text-xs--line-height);
+}
+.orchestration-avatar-message.text-bad {
+  color: var(--bad);
+}
+.orchestration-avatar-grid {
+  display: grid;
+  grid-template-columns: repeat(6, var(--control-lg));
+  justify-content: space-between;
+  gap: 12px;
+}
+.orchestration-avatar-option {
+  display: grid;
+  width: var(--control-lg);
+  height: var(--control-lg);
+  place-items: center;
+  padding: 0;
+  color: var(--ink-3);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  transition:
+    background-color 120ms var(--ease-out),
+    border-color 120ms var(--ease-out);
+}
+.orchestration-avatar-option:hover {
+  background: var(--surface-2);
+}
+.orchestration-avatar-option[data-selected] {
+  background: var(--surface-2);
+  border-color: var(--line-strong);
+  box-shadow: var(--material-recess);
+}
+.orchestration-avatar-option:disabled {
+  pointer-events: none;
+}
+.orchestration-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
+}
+.orchestration-tree {
+  padding: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--material-recess);
+}
+.orchestration-tree li {
+  display: flex;
+  min-height: var(--control-md);
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-base);
+  min-width: 0;
+}
+/* The soft grounds are required, not decorative: on --surface-2 in dark codex --warn
+   measures 4.48 and --bad 4.51, under the 4.5 floor; on the soft grounds they hold. */
+.orchestration-notice {
+  margin: 16px 0;
+  padding: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--material-recess);
+  font-size: var(--text-base);
+  line-height: var(--text-base--line-height);
+}
+.orchestration-notice[data-tone="warn"] {
+  background: var(--warn-soft);
+}
+.orchestration-notice[data-tone="bad"] {
+  background: var(--bad-soft);
+}
+/* A slot with nothing in it shares the geometry of .orchestration-tree, so "a thing you
+   read" and "a place a thing goes" are the same object at the same depth. */
+.orchestration-slot {
+  margin-top: 12px;
+  padding: 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--material-recess);
+}
+@container (max-width: 760px) {
+  .orchestration-toolbar,
+  .orchestration-editor-scroll,
+  .orchestration-footer,
+  .orchestration-load-error {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+  .orchestration-controls {
+    gap: 12px;
+  }
+  .orchestration-switcher {
+    flex: 1 1 40%;
+  }
+  .orchestration-switcher select {
+    width: 100%;
+  }
+  .orchestration-editor-scroll {
+    padding-top: 24px;
+  }
+}
+@container (max-width: 440px) {
+  .orchestration-toolbar,
+  .orchestration-editor-scroll,
+  .orchestration-footer,
+  .orchestration-load-error {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .orchestration-switcher {
+    flex-basis: 100%;
+  }
+  .orchestration-switcher > select {
+    flex: 1;
+  }
+  .orchestration-switcher {
+    justify-content: space-between;
+  }
+  .orchestration-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .orchestration-avatar-copy {
+    flex-basis: 100%;
+  }
+  .orchestration-footer-content > [role="status"] {
+    flex-basis: 100%;
+  }
+}

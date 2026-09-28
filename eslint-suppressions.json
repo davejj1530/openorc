@@ -1,0 +1,174 @@
+{
+  "apps/desktop/src/main/index.ts": {
+    "@typescript-eslint/no-floating-promises": {
+      "count": 1
+    },
+    "@typescript-eslint/no-misused-promises": {
+      "count": 1
+    }
+  },
+  "apps/desktop/src/main/link-navigation.ts": {
+    "@typescript-eslint/no-misused-promises": {
+      "count": 1
+    }
+  },
+  "apps/desktop/src/renderer/src/components/TaskCard.tsx": {
+    "react-hooks/exhaustive-deps": {
+      "count": 1
+    }
+  },
+  "apps/desktop/src/renderer/src/components/TaskComments.tsx": {
+    "react-hooks/exhaustive-deps": {
+      "count": 1
+    }
+  },
+  "apps/desktop/src/renderer/src/components/TaskStart.tsx": {
+    "@typescript-eslint/no-misused-promises": {
+      "count": 1
+    }
+  },
+  "apps/desktop/src/renderer/src/components/TeamTaskStart.tsx": {
+    "react-hooks/exhaustive-deps": {
+      "count": 1
+    }
+  },
+  "apps/desktop/src/renderer/src/components/Transcript.tsx": {
+    "@typescript-eslint/no-misused-promises": {
+      "count": 1
+    }
+  },
+  "apps/desktop/src/renderer/src/components/editor/document-schema.ts": {
+    "@typescript-eslint/no-floating-promises": {
+      "count": 2
+    }
+  },
+  "apps/desktop/src/renderer/src/dialogs/ImportProjectDialog.tsx": {
+    "@typescript-eslint/no-misused-promises": {
+      "count": 1
+    }
+  },
+  "apps/desktop/src/renderer/src/lib/autorun.ts": {
+    "@typescript-eslint/no-misused-promises": {
+      "count": 2
+    }
+  },
+  "apps/desktop/src/renderer/src/lib/use-team-delete-request.ts": {
+    "react-hooks/exhaustive-deps": {
+      "count": 1
+    }
+  },
+  "apps/desktop/src/renderer/src/lib/use-team-fork.ts": {
+    "react-hooks/exhaustive-deps": {
+      "count": 1
+    }
+  },
+  "apps/desktop/src/renderer/src/lib/use-team-move-request.ts": {
+    "react-hooks/exhaustive-deps": {
+      "count": 1
+    }
+  },
+  "apps/desktop/src/renderer/src/panels/CheckpointsPanel.tsx": {
+    "react-hooks/exhaustive-deps": {
+      "count": 1
+    }
+  },
+  "apps/desktop/src/renderer/src/views/Diagnostics.tsx": {
+    "@typescript-eslint/no-misused-promises": {
+      "count": 3
+    }
+  },
+  "apps/desktop/src/renderer/src/views/NewThread.tsx": {
+    "@typescript-eslint/no-misused-promises": {
+      "count": 1
+    },
+    "react-hooks/exhaustive-deps": {
+      "count": 1
+    }
+  },
+  "apps/desktop/src/renderer/src/views/TaskDocument.tsx": {
+    "@typescript-eslint/no-floating-promises": {
+      "count": 1
+    },
+    "@typescript-eslint/no-misused-promises": {
+      "count": 3
+    }
+  },
+  "apps/desktop/src/renderer/src/views/TaskView.tsx": {
+    "react-hooks/exhaustive-deps": {
+      "count": 1
+    }
+  },
+  "apps/desktop/src/renderer/src/views/settings-usage.tsx": {
+    "react-hooks/exhaustive-deps": {
+      "count": 1
+    }
+  },
+  "packages/agents/src/acp/adapter.test.ts": {
+    "@typescript-eslint/no-floating-promises": {
+      "count": 1
+    }
+  },
+  "packages/agents/src/acp/adapter.ts": {
+    "@typescript-eslint/no-misused-promises": {
+      "count": 1
+    }
+  },
+  "packages/agents/src/claude/adapter.test.ts": {
+    "@typescript-eslint/no-floating-promises": {
+      "count": 2
+    }
+  },
+  "packages/agents/src/claude/adapter.ts": {
+    "@typescript-eslint/no-misused-promises": {
+      "count": 1
+    }
+  },
+  "packages/agents/src/claude/file-boundary.test.ts": {
+    "@typescript-eslint/no-misused-promises": {
+      "count": 1
+    }
+  },
+  "packages/agents/src/codex/adapter.ts": {
+    "@typescript-eslint/no-misused-promises": {
+      "count": 1
+    }
+  },
+  "packages/core/src/services/attachments.ts": {
+    "@typescript-eslint/no-floating-promises": {
+      "count": 1
+    }
+  },
+  "packages/core/src/services/permissions.test.ts": {
+    "@typescript-eslint/no-floating-promises": {
+      "count": 1
+    },
+    "@typescript-eslint/no-misused-promises": {
+      "count": 1
+    }
+  },
+  "packages/core/src/services/task-comments.ts": {
+    "@typescript-eslint/no-floating-promises": {
+      "count": 1
+    }
+  },
+  "packages/core/src/services/team-workspaces.ts": {
+    "@typescript-eslint/no-misused-promises": {
+      "count": 1
+    }
+  },
+  "packages/mcp/src/file-boundary.test.ts": {
+    "@typescript-eslint/no-floating-promises": {
+      "count": 1
+    }
+  },
+  "packages/mcp/src/index.test.ts": {
+    "@typescript-eslint/no-floating-promises": {
+      "count": 18
+    }
+  },
+  "packages/mcp/src/index.ts": {
+    "@typescript-eslint/no-misused-promises": {
+      "count": 1
+    }
+  }
+}

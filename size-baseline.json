@@ -1,0 +1,742 @@
+{
+  "version": 1,
+  "thresholds": {
+    "fileLines": 800,
+    "functionLines": 100,
+    "complexity": 15
+  },
+  "files": {
+    "apps/desktop/src/renderer/src/components/TeamConversation.tsx": 1463,
+    "apps/desktop/src/renderer/src/components/Transcript.tsx": 1029,
+    "packages/core/src/services/team-conversation.ts": 826,
+    "packages/core/src/services/team-tasks.ts": 915,
+    "packages/core/src/services/threads.ts": 899,
+    "packages/db/src/repos.ts": 853,
+    "packages/db/src/team-runtime.ts": 1133
+  },
+  "functions": {
+    "apps/desktop/src/main/browser-page.ts::pageOperation": {
+      "complexity": 28
+    },
+    "apps/desktop/src/main/browser-page.ts::pageOperation.scan": {
+      "complexity": 16
+    },
+    "apps/desktop/src/main/browser-pane.ts::installBrowserPane": {
+      "lines": 132
+    },
+    "apps/desktop/src/main/browser-pane.ts::executeBrowserCommand": {
+      "complexity": 16
+    },
+    "apps/desktop/src/main/image-context-menu.ts::imageFilename": {
+      "complexity": 16
+    },
+    "apps/desktop/src/main/index.ts::<app.whenReady().then callback>": {
+      "lines": 133
+    },
+    "apps/desktop/src/renderer/src/App.tsx::App": {
+      "lines": 205,
+      "complexity": 36
+    },
+    "apps/desktop/src/renderer/src/App.tsx::App.<useEffect callback>#2.onKey": {
+      "complexity": 24
+    },
+    "apps/desktop/src/renderer/src/components/CommandPalette.tsx::CommandPalette": {
+      "lines": 151,
+      "complexity": 23
+    },
+    "apps/desktop/src/renderer/src/components/Composer.tsx::Composer": {
+      "lines": 284,
+      "complexity": 69
+    },
+    "apps/desktop/src/renderer/src/components/ComposerInput.tsx::ComposerInput": {
+      "lines": 214,
+      "complexity": 16
+    },
+    "apps/desktop/src/renderer/src/components/Conversation.tsx::Conversation": {
+      "complexity": 17
+    },
+    "apps/desktop/src/renderer/src/components/Conversation.tsx::OwnedTaskConversation": {
+      "complexity": 16
+    },
+    "apps/desktop/src/renderer/src/components/Conversation.tsx::IndividualConversation": {
+      "lines": 270,
+      "complexity": 93
+    },
+    "apps/desktop/src/renderer/src/components/ConversationPlan.tsx::ConversationPlan": {
+      "lines": 103,
+      "complexity": 28
+    },
+    "apps/desktop/src/renderer/src/components/DiffView.tsx::DiffView": {
+      "lines": 104
+    },
+    "apps/desktop/src/renderer/src/components/DiffView.tsx::FileBlock": {
+      "lines": 125
+    },
+    "apps/desktop/src/renderer/src/components/DocumentEditor.tsx::DocumentEditor": {
+      "lines": 283,
+      "complexity": 23
+    },
+    "apps/desktop/src/renderer/src/components/MemoryCard.tsx::MemoryCard": {
+      "lines": 111,
+      "complexity": 20
+    },
+    "apps/desktop/src/renderer/src/components/ModelPicker.tsx::ModelBrowser": {
+      "lines": 298,
+      "complexity": 51
+    },
+    "apps/desktop/src/renderer/src/components/ModelPicker.tsx::ComposerModelPicker": {
+      "lines": 153,
+      "complexity": 33
+    },
+    "apps/desktop/src/renderer/src/components/PaletteSelector.tsx::WorkspaceScene": {
+      "lines": 154
+    },
+    "apps/desktop/src/renderer/src/components/Panel.tsx::Panel": {
+      "lines": 148,
+      "complexity": 68
+    },
+    "apps/desktop/src/renderer/src/components/QuestionCard.tsx::QuestionCard": {
+      "lines": 105
+    },
+    "apps/desktop/src/renderer/src/components/Sidebar.tsx::ThreadRow": {
+      "complexity": 16
+    },
+    "apps/desktop/src/renderer/src/components/Sidebar.tsx::Sidebar": {
+      "lines": 194,
+      "complexity": 16
+    },
+    "apps/desktop/src/renderer/src/components/TaskCard.tsx::TaskCard": {
+      "lines": 157,
+      "complexity": 49
+    },
+    "apps/desktop/src/renderer/src/components/TaskCheckout.tsx::TaskCheckout": {
+      "complexity": 24
+    },
+    "apps/desktop/src/renderer/src/components/TaskCommentDiscussion.tsx::TaskCommentDiscussion": {
+      "lines": 118
+    },
+    "apps/desktop/src/renderer/src/components/TaskComments.tsx::TaskComments": {
+      "lines": 186,
+      "complexity": 25
+    },
+    "apps/desktop/src/renderer/src/components/TaskExecutionSettings.tsx::useTaskExecutionLocation": {
+      "complexity": 27
+    },
+    "apps/desktop/src/renderer/src/components/TaskForwarding.tsx::TaskForwarding": {
+      "complexity": 24
+    },
+    "apps/desktop/src/renderer/src/components/TeamConversation.tsx::TeamConversation": {
+      "lines": 277,
+      "complexity": 58
+    },
+    "apps/desktop/src/renderer/src/components/TeamConversation.tsx::TeamDirection": {
+      "complexity": 20
+    },
+    "apps/desktop/src/renderer/src/components/TeamConversation.tsx::TeamMemberCard": {
+      "lines": 118,
+      "complexity": 17
+    },
+    "apps/desktop/src/renderer/src/components/TeamConversation.tsx::ActorRecovery": {
+      "complexity": 28
+    },
+    "apps/desktop/src/renderer/src/components/TeamConversation.tsx::PublicationRecovery": {
+      "complexity": 16
+    },
+    "apps/desktop/src/renderer/src/components/TeamMoveDialog.tsx::MoveDialog": {
+      "lines": 134,
+      "complexity": 32
+    },
+    "apps/desktop/src/renderer/src/components/TeamMoveDialog.tsx::MoveDialog.submit": {
+      "complexity": 17
+    },
+    "apps/desktop/src/renderer/src/components/ThreadActions.tsx::ThreadMenuContent": {
+      "lines": 176,
+      "complexity": 57
+    },
+    "apps/desktop/src/renderer/src/components/ThreadImages.tsx::localFileLinks.<anonymous>.visit": {
+      "complexity": 16
+    },
+    "apps/desktop/src/renderer/src/components/ThreadMoveDialog.tsx::MoveDialog": {
+      "complexity": 21
+    },
+    "apps/desktop/src/renderer/src/components/ThreadPaneDivider.tsx::ThreadPaneDivider": {
+      "lines": 121
+    },
+    "apps/desktop/src/renderer/src/components/ThreadWorkspace.tsx::ThreadWorkspace": {
+      "lines": 107
+    },
+    "apps/desktop/src/renderer/src/components/TopBar.tsx::TopBar": {
+      "lines": 101,
+      "complexity": 22
+    },
+    "apps/desktop/src/renderer/src/components/Transcript.tsx::Transcript": {
+      "lines": 167
+    },
+    "apps/desktop/src/renderer/src/components/Transcript.tsx::WorkTurn": {
+      "complexity": 42
+    },
+    "apps/desktop/src/renderer/src/components/Transcript.tsx::BlockView": {
+      "complexity": 23
+    },
+    "apps/desktop/src/renderer/src/components/Transcript.tsx::ToolRow": {
+      "complexity": 26
+    },
+    "apps/desktop/src/renderer/src/components/Transcript.tsx::ActivityRow": {
+      "complexity": 20
+    },
+    "apps/desktop/src/renderer/src/components/Transcript.tsx::ThinkingRow": {
+      "complexity": 16
+    },
+    "apps/desktop/src/renderer/src/components/Transcript.tsx::toolCallPresentation": {
+      "complexity": 43
+    },
+    "apps/desktop/src/renderer/src/components/editor/TaskImage.tsx::TaskImageView": {
+      "lines": 104
+    },
+    "apps/desktop/src/renderer/src/components/editor/use-document-commands.ts::useDocumentCommands": {
+      "lines": 115
+    },
+    "apps/desktop/src/renderer/src/components/mascot-runtime.ts::createMascotAnimation": {
+      "lines": 102
+    },
+    "apps/desktop/src/renderer/src/components/orbs/renderer.ts::createOrbScene": {
+      "lines": 138
+    },
+    "apps/desktop/src/renderer/src/components/orbs/renderer.ts::createOrbRenderer": {
+      "lines": 107
+    },
+    "apps/desktop/src/renderer/src/components/useTeamConversationSettings.ts::useTeamConversationSettings": {
+      "lines": 143
+    },
+    "apps/desktop/src/renderer/src/lib/new-thread-availability.ts::evaluateNewThreadAvailability": {
+      "complexity": 27
+    },
+    "apps/desktop/src/renderer/src/lib/new-thread-availability.ts::evaluateNewThreadAvailability.providerIssue": {
+      "complexity": 23
+    },
+    "apps/desktop/src/renderer/src/lib/new-thread-draft.ts::decodeNewThreadDraft": {
+      "complexity": 29
+    },
+    "apps/desktop/src/renderer/src/lib/onboarding.ts::decodeOnboardingState": {
+      "complexity": 19
+    },
+    "apps/desktop/src/renderer/src/lib/onboarding.ts::resolveOnboarding": {
+      "complexity": 18
+    },
+    "apps/desktop/src/renderer/src/lib/query.ts::tagsFor": {
+      "lines": 107,
+      "complexity": 56
+    },
+    "apps/desktop/src/renderer/src/lib/query.ts::invalidatesFor": {
+      "lines": 111,
+      "complexity": 79
+    },
+    "apps/desktop/src/renderer/src/lib/router.ts::routeFromSpec": {
+      "complexity": 28
+    },
+    "apps/desktop/src/renderer/src/lib/rpc.ts::CoreClient.onPush": {
+      "complexity": 18
+    },
+    "apps/desktop/src/renderer/src/lib/task-document-draft.ts::useTaskDocumentDraft": {
+      "lines": 107
+    },
+    "apps/desktop/src/renderer/src/lib/team-feed.ts::teamFeed": {
+      "complexity": 20
+    },
+    "apps/desktop/src/renderer/src/lib/team-move-request.ts::readTeamMoveRequest": {
+      "complexity": 16
+    },
+    "apps/desktop/src/renderer/src/lib/team-task-actions.ts::readTeamTaskRequest": {
+      "complexity": 19
+    },
+    "apps/desktop/src/renderer/src/lib/theme-custom.ts::parseCustomColors": {
+      "complexity": 16
+    },
+    "apps/desktop/src/renderer/src/lib/tool-result.ts::toolResult": {
+      "complexity": 28
+    },
+    "apps/desktop/src/renderer/src/lib/transcript.ts::applyEvent": {
+      "lines": 156,
+      "complexity": 77
+    },
+    "apps/desktop/src/renderer/src/lib/use-schedule-editor.ts::useScheduleEditor": {
+      "lines": 106,
+      "complexity": 31
+    },
+    "apps/desktop/src/renderer/src/lib/use-team-editor.ts::useTeamEditor": {
+      "lines": 119
+    },
+    "apps/desktop/src/renderer/src/lib/use-team-fork.ts::useTeamFork": {
+      "complexity": 16
+    },
+    "apps/desktop/src/renderer/src/lib/use-team-fork.ts::useTeamFork.run": {
+      "complexity": 24
+    },
+    "apps/desktop/src/renderer/src/lib/work-transcript.ts::workTurns": {
+      "complexity": 18
+    },
+    "apps/desktop/src/renderer/src/lib/work-transcript.ts::workParts": {
+      "complexity": 33
+    },
+    "apps/desktop/src/renderer/src/panels/BrowserPanel.tsx::BrowserPanel": {
+      "lines": 242
+    },
+    "apps/desktop/src/renderer/src/panels/ChangesPanel.tsx::ChangesPanel": {
+      "lines": 236,
+      "complexity": 61
+    },
+    "apps/desktop/src/renderer/src/panels/CheckpointsPanel.tsx::CheckpointsPanel": {
+      "lines": 211,
+      "complexity": 52
+    },
+    "apps/desktop/src/renderer/src/panels/CheckpointsPanel.tsx::CheckpointsPanel.submit": {
+      "complexity": 18
+    },
+    "apps/desktop/src/renderer/src/panels/CommitsPanel.tsx::PushBar": {
+      "complexity": 18
+    },
+    "apps/desktop/src/renderer/src/panels/ReviewPanel.tsx::TaskReview": {
+      "lines": 166,
+      "complexity": 53
+    },
+    "apps/desktop/src/renderer/src/panels/ReviewPublication.tsx::ReviewPublication": {
+      "lines": 131,
+      "complexity": 26
+    },
+    "apps/desktop/src/renderer/src/panels/TaskDetailsPanel.tsx::TaskDetails": {
+      "lines": 262,
+      "complexity": 60
+    },
+    "apps/desktop/src/renderer/src/panels/TerminalPanel.tsx::TerminalPanel": {
+      "lines": 147
+    },
+    "apps/desktop/src/renderer/src/views/NewTask.tsx::NewTask": {
+      "lines": 198,
+      "complexity": 28
+    },
+    "apps/desktop/src/renderer/src/views/NewThread.tsx::NewThreadProject": {
+      "lines": 314,
+      "complexity": 53
+    },
+    "apps/desktop/src/renderer/src/views/Onboarding.tsx::OnboardingFlow": {
+      "lines": 191,
+      "complexity": 30
+    },
+    "apps/desktop/src/renderer/src/views/Orchestration.tsx::ProjectTeams": {
+      "complexity": 23
+    },
+    "apps/desktop/src/renderer/src/views/Orchestration.tsx::TeamEditor": {
+      "lines": 167,
+      "complexity": 35
+    },
+    "apps/desktop/src/renderer/src/views/Scheduled.tsx::Scheduled": {
+      "complexity": 16
+    },
+    "apps/desktop/src/renderer/src/views/Scheduled.tsx::ScheduleRow": {
+      "lines": 130,
+      "complexity": 28
+    },
+    "apps/desktop/src/renderer/src/views/Scheduled.tsx::ScheduleDialog": {
+      "lines": 178,
+      "complexity": 44
+    },
+    "apps/desktop/src/renderer/src/views/Settings.tsx::Settings": {
+      "lines": 111
+    },
+    "apps/desktop/src/renderer/src/views/Settings.tsx::Settings.<sections.map callback>#2": {
+      "complexity": 17
+    },
+    "apps/desktop/src/renderer/src/views/Settings.tsx::MemorySettings": {
+      "complexity": 27
+    },
+    "apps/desktop/src/renderer/src/views/TaskDocument.tsx::TaskDocument": {
+      "lines": 138
+    },
+    "apps/desktop/src/renderer/src/views/TaskList.tsx::TaskRows": {
+      "lines": 105
+    },
+    "apps/desktop/src/renderer/src/views/TaskView.tsx::TaskView": {
+      "complexity": 20
+    },
+    "apps/desktop/src/renderer/src/views/TeamMemberControls.tsx::MemberEditor": {
+      "lines": 119
+    },
+    "apps/desktop/src/renderer/src/views/TeamMemberControls.tsx::AvatarEditor": {
+      "lines": 119,
+      "complexity": 20
+    },
+    "apps/desktop/src/renderer/src/views/ThreadView.tsx::ThreadView": {
+      "lines": 142,
+      "complexity": 24
+    },
+    "apps/desktop/src/renderer/src/views/onboarding-flow.ts::useOnboardingFlow": {
+      "lines": 182,
+      "complexity": 16
+    },
+    "apps/desktop/src/renderer/src/views/settings-agent-updates.tsx::AgentConnections": {
+      "complexity": 16
+    },
+    "apps/desktop/src/renderer/src/views/settings-agent-updates.tsx::AgentConnection": {
+      "complexity": 22
+    },
+    "apps/desktop/src/renderer/src/views/settings-resets.tsx::ResetControls": {
+      "complexity": 23
+    },
+    "apps/desktop/src/renderer/src/views/settings-skills.tsx::SkillsSettings": {
+      "complexity": 17
+    },
+    "apps/desktop/src/renderer/src/views/settings-slack-direct.tsx::DirectSlackSettings": {
+      "lines": 223,
+      "complexity": 29
+    },
+    "apps/desktop/src/renderer/src/views/settings-slack-relay.ts::useSlackRelaySettings": {
+      "lines": 109
+    },
+    "apps/desktop/src/renderer/src/views/settings-slack.tsx::RelaySlackSettings": {
+      "lines": 168,
+      "complexity": 51
+    },
+    "apps/desktop/src/renderer/src/views/settings-usage.tsx::ProviderReport": {
+      "complexity": 20
+    },
+    "apps/desktop/src/shared/image-paths.ts::localPath": {
+      "complexity": 20
+    },
+    "apps/website/src/scripts/hero-scene.ts::initHeroScene": {
+      "lines": 149
+    },
+    "apps/website/src/scripts/hero-scene.ts::initHeroScene.render": {
+      "complexity": 16
+    },
+    "packages/agents/src/acp/adapter.ts::AcpAdapter.start": {
+      "lines": 191
+    },
+    "packages/agents/src/acp/adapter.ts::AcpAdapter.start.settle": {
+      "complexity": 17
+    },
+    "packages/agents/src/acp/updates.ts::AcpUpdateMapper.map": {
+      "complexity": 22
+    },
+    "packages/agents/src/acp/updates.ts::AcpUpdateMapper.toolCallUpdate": {
+      "complexity": 20
+    },
+    "packages/agents/src/claude/adapter.ts::prepareClaudeLaunch": {
+      "complexity": 29
+    },
+    "packages/agents/src/claude/adapter.ts::startClaudeSession": {
+      "lines": 295
+    },
+    "packages/agents/src/claude/adapter.ts::startClaudeSession.routeEvent": {
+      "complexity": 23
+    },
+    "packages/agents/src/claude/stream-json.ts::ClaudeStreamParser.streamEvent": {
+      "complexity": 28
+    },
+    "packages/agents/src/claude/stream-json.ts::ClaudeStreamParser.assistant": {
+      "complexity": 16
+    },
+    "packages/agents/src/claude/stream-json.ts::ClaudeStreamParser.system": {
+      "lines": 145,
+      "complexity": 54
+    },
+    "packages/agents/src/codex/adapter.ts::CodexAdapter.start": {
+      "lines": 301
+    },
+    "packages/agents/src/codex/adapter.ts::CodexAdapter.start.<rpc.on callback>#3": {
+      "complexity": 37
+    },
+    "packages/agents/src/codex/adapter.ts::CodexAdapter.handleServerRequest": {
+      "complexity": 18
+    },
+    "packages/agents/src/codex/notifications.ts::mapIncrementalEvent": {
+      "complexity": 25
+    },
+    "packages/agents/src/codex/notifications.ts::mapActivityNotice": {
+      "complexity": 20
+    },
+    "packages/agents/src/codex/notifications.ts::mapItemLifecycle": {
+      "lines": 183,
+      "complexity": 70
+    },
+    "packages/agents/src/codex/notifications.ts::readTokenUsage": {
+      "complexity": 18
+    },
+    "packages/agents/src/import.ts::claudeMeta": {
+      "complexity": 16
+    },
+    "packages/agents/src/import.ts::readClaudeSession": {
+      "complexity": 26
+    },
+    "packages/agents/src/import.ts::codexMeta": {
+      "complexity": 20
+    },
+    "packages/agents/src/import.ts::readCodexSession": {
+      "complexity": 24
+    },
+    "packages/agents/src/jsonrpc.ts::StdioJsonRpc.handleLine": {
+      "complexity": 20
+    },
+    "packages/agents/src/skills.ts::skillHeader": {
+      "complexity": 21
+    },
+    "packages/core/src/openorc.ts::OpenOrc.constructor": {
+      "lines": 290
+    },
+    "packages/core/src/openorc.ts::OpenOrc.guardTeamRequest": {
+      "complexity": 27
+    },
+    "packages/core/src/services/agent-update-installation.ts::detectAgentInstallation": {
+      "complexity": 24
+    },
+    "packages/core/src/services/mcp-apps.ts::McpAppService.open": {
+      "complexity": 20
+    },
+    "packages/core/src/services/memory.ts::MemoryService.runExtraction": {
+      "complexity": 16
+    },
+    "packages/core/src/services/orchestration.ts::OrchestrationService.preflight.<providers.map callback>": {
+      "complexity": 16
+    },
+    "packages/core/src/services/provider-resets.ts::CodexResetService.perform.<this.consume callback>": {
+      "complexity": 16
+    },
+    "packages/core/src/services/schedules.ts::ScheduleService.assertCanAdmit": {
+      "complexity": 16
+    },
+    "packages/core/src/services/schedules.ts::ScheduleService.execute": {
+      "complexity": 16
+    },
+    "packages/core/src/services/slack/images.ts::downloadSlackImage": {
+      "complexity": 28
+    },
+    "packages/core/src/services/slack/relay.ts::SlackRelay.receive": {
+      "complexity": 40
+    },
+    "packages/core/src/services/slack/relay.ts::SlackRelay.deliverResult": {
+      "complexity": 16
+    },
+    "packages/core/src/services/slack/runner.ts::SlackRunner.execute": {
+      "lines": 122,
+      "complexity": 42
+    },
+    "packages/core/src/services/slack/runner.ts::SlackRunner.switchExecution": {
+      "complexity": 29
+    },
+    "packages/core/src/services/slack/runner.ts::SlackRunner.observe": {
+      "complexity": 28
+    },
+    "packages/core/src/services/slack/runner.ts::SlackRunner.settled": {
+      "complexity": 16
+    },
+    "packages/core/src/services/slack/service.ts::SlackService.status": {
+      "complexity": 26
+    },
+    "packages/core/src/services/slack/service.ts::SlackService.startHost": {
+      "lines": 205,
+      "complexity": 31
+    },
+    "packages/core/src/services/slack/service.ts::SlackService.startHost.history": {
+      "complexity": 21
+    },
+    "packages/core/src/services/slack/service.ts::SlackService.poll": {
+      "complexity": 24
+    },
+    "packages/core/src/services/task-comments.ts::TaskCommentService.post": {
+      "complexity": 30
+    },
+    "packages/core/src/services/task-comments.ts::TaskCommentService.execute": {
+      "complexity": 24
+    },
+    "packages/core/src/services/task-forwarding.ts::TaskForwardingService.perform": {
+      "lines": 122,
+      "complexity": 26
+    },
+    "packages/core/src/services/team-assignments.ts::TeamAssignments.settleTurn": {
+      "complexity": 16
+    },
+    "packages/core/src/services/team-checkout-base.ts::teamCheckoutBase.resolve": {
+      "complexity": 29
+    },
+    "packages/core/src/services/team-context.ts::buildTeamContextSeed": {
+      "complexity": 20
+    },
+    "packages/core/src/services/team-conversation.ts::TeamConversationService.start": {
+      "complexity": 17
+    },
+    "packages/core/src/services/team-conversation.ts::TeamConversationService.project": {
+      "lines": 147
+    },
+    "packages/core/src/services/team-conversation.ts::TeamConversationService.chatEntries": {
+      "complexity": 18
+    },
+    "packages/core/src/services/team-deletions.ts::TeamDeletionService.perform": {
+      "lines": 137,
+      "complexity": 23
+    },
+    "packages/core/src/services/team-deletions.ts::TeamDeletionService.inventory": {
+      "complexity": 23
+    },
+    "packages/core/src/services/team-deletions.ts::TeamDeletionService.protectedPaths": {
+      "complexity": 17
+    },
+    "packages/core/src/services/team-delivery.ts::TeamDelivery.steerAvailability": {
+      "complexity": 25
+    },
+    "packages/core/src/services/team-delivery.ts::TeamDelivery.deliverNow": {
+      "lines": 113
+    },
+    "packages/core/src/services/team-delivery.ts::TeamDelivery.deliverNow.<Promise.resolve() .then callback>": {
+      "complexity": 17
+    },
+    "packages/core/src/services/team-delivery.ts::TeamDelivery.enqueueMessage": {
+      "complexity": 21
+    },
+    "packages/core/src/services/team-forks.ts::TeamForkService.perform": {
+      "lines": 130,
+      "complexity": 21
+    },
+    "packages/core/src/services/team-moves.ts::TeamMoveService.perform": {
+      "complexity": 29
+    },
+    "packages/core/src/services/team-moves.ts::TeamMoveService.retainReceipt": {
+      "complexity": 17
+    },
+    "packages/core/src/services/team-notifications.ts::TeamNotificationService.observe": {
+      "complexity": 17
+    },
+    "packages/core/src/services/team-notifications.ts::TeamNotificationService.approval": {
+      "complexity": 17
+    },
+    "packages/core/src/services/team-restores.ts::TeamRestoreService.perform": {
+      "lines": 113
+    },
+    "packages/core/src/services/team-room.ts::TeamRoomService.ensureMigrated": {
+      "complexity": 21
+    },
+    "packages/core/src/services/team-scheduler.ts::TeamScheduler.wake": {
+      "complexity": 16
+    },
+    "packages/core/src/services/team-task-export.ts::teamTaskExportAvailability": {
+      "complexity": 19
+    },
+    "packages/core/src/services/team-tasks.ts::inheritedPrerequisite": {
+      "complexity": 26
+    },
+    "packages/core/src/services/team-tasks.ts::teamTaskDependencies": {
+      "complexity": 26
+    },
+    "packages/core/src/services/team-tasks.ts::TeamTaskService.projectAdmission": {
+      "complexity": 27
+    },
+    "packages/core/src/services/team-tasks.ts::TeamTaskService.availability": {
+      "complexity": 16
+    },
+    "packages/core/src/services/team-tasks.ts::TeamTaskService.state": {
+      "complexity": 16
+    },
+    "packages/core/src/services/team-tasks.ts::TeamTaskService.accept": {
+      "lines": 110
+    },
+    "packages/core/src/services/team-tasks.ts::TeamTaskService.accept.<this.db.transaction callback>": {
+      "complexity": 31
+    },
+    "packages/core/src/services/team-tasks.ts::TeamTaskService.route.<this.db.transaction callback>": {
+      "complexity": 42
+    },
+    "packages/core/src/services/team-tasks.ts::TeamTaskService.captureRequest": {
+      "complexity": 16
+    },
+    "packages/core/src/services/team-turn-changes.ts::teamTurnChanges": {
+      "complexity": 20
+    },
+    "packages/core/src/services/team-workspace-cleanup.ts::verifyDirectory": {
+      "complexity": 20
+    },
+    "packages/core/src/services/team-workspace-cleanup.ts::removeTeamCleanup": {
+      "complexity": 27
+    },
+    "packages/core/src/services/team-workspace-location.ts::teamWorkspaceLocation": {
+      "complexity": 37
+    },
+    "packages/core/src/services/team-workspaces.ts::TeamWorkspaceService.prepare": {
+      "lines": 105
+    },
+    "packages/core/src/services/team-workspaces.ts::TeamWorkspaceService.prepare.<this.once callback>": {
+      "lines": 103,
+      "complexity": 41
+    },
+    "packages/core/src/services/team-workspaces.ts::TeamWorkspaceService.acceptIntegration.<this.recoveryOnce callback>": {
+      "complexity": 17
+    },
+    "packages/core/src/services/team-workspaces.ts::TeamWorkspaceService.integrate.<this.once callback>": {
+      "complexity": 19
+    },
+    "packages/core/src/services/threads.ts::ThreadService.summarize": {
+      "complexity": 18
+    },
+    "packages/core/src/services/threads.ts::ThreadService.continueThread.<this.writers.withLease callback>": {
+      "complexity": 20
+    },
+    "packages/core/src/services/threads.ts::ThreadService.update": {
+      "complexity": 32
+    },
+    "packages/core/src/services/workspace-writers.ts::WorkspaceWriters.acquire": {
+      "complexity": 20
+    },
+    "packages/db/src/orchestration.ts::orchestration.save.<db.transaction callback>": {
+      "complexity": 17
+    },
+    "packages/db/src/plans.ts::plans.capture": {
+      "complexity": 32
+    },
+    "packages/db/src/repos.ts::runs.update": {
+      "complexity": 16
+    },
+    "packages/db/src/task-execution-schema.ts::taskExecutionMigration": {
+      "complexity": 18
+    },
+    "packages/db/src/team-deletions.ts::<z .object({ projectRoot: absolute, retainedTaskIds: z.array(id).max(10_000), deletedTaskIds: z.array(id).max(10_000).default([]), entries: z.array(CleanupEntry).max(10_000), retainedPaths: z.array(z.object({ path: absolute, reason: id }).strict()).max(100_000), seed: TeamContextSeed.nullable(), throughExecutionRowid: timestamp, git: GitInventory.default({ branches: [], refPrefixes: [] }), exports: z.array(absolute).max(100_000).default([]), }) .strict() .superRefine callback>": {
+      "complexity": 18
+    },
+    "packages/db/src/team-runtime.ts::assertAssignmentReleased": {
+      "complexity": 22
+    },
+    "packages/db/src/team-runtime.ts::validateActorGraph": {
+      "complexity": 25
+    },
+    "packages/db/src/team-runtime.ts::validateMailbox": {
+      "complexity": 27
+    },
+    "packages/db/src/team-runtime.ts::validateReferences": {
+      "lines": 132,
+      "complexity": 23
+    },
+    "packages/db/src/team-runtime.ts::validateReferences.<record.attempts.forEach callback>": {
+      "complexity": 21
+    },
+    "packages/db/src/team-runtime.ts::immutableHistory": {
+      "lines": 130
+    },
+    "packages/db/src/team-runtime.ts::immutableHistory.<before.attempts.forEach callback>": {
+      "complexity": 29
+    },
+    "packages/db/src/team-tasks.ts::validateIntent": {
+      "complexity": 22
+    },
+    "packages/db/src/team-tasks.ts::validateRoute": {
+      "complexity": 16
+    },
+    "packages/db/src/team-workspaces.ts::teamWorkspaces.save": {
+      "complexity": 37
+    },
+    "packages/db/src/team-workspaces.ts::teamWorkspaces.savePublication": {
+      "complexity": 39
+    },
+    "packages/mcp/src/index.ts::buildServer": {
+      "lines": 435
+    },
+    "packages/memory/src/extractor.ts::parseExtraction": {
+      "complexity": 19
+    }
+  }
+}

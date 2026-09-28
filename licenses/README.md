@@ -1,0 +1,11 @@
+# Third-party notice evidence
+
+Original third-party text is preserved in this directory. It retains its own terms; the repository's Apache-2.0 license does not replace them.
+
+`manifest.json` records reviewed package versions, exact source URLs or installed-package paths, SHA-256 hashes, and desktop/website destinations. `vendor/` holds supplemental upstream notices. `shadercn-MIT.txt` covers the adapted orb runtime. Electron's downloaded MIT and Chromium notice files are copied into `licenses/electron/` during desktop packaging. Font and selected package notices remain inside the desktop archive.
+
+`tokenizer-notice-sources.json` records the archives and original notice hashes used in the historical native-tokenizer collection. The current dependency is JavaScript Tokenizers.js, whose original Apache license is also preserved here. `rive-header-sources.json` records the exact source bytes preserved in the Skia and Unicode copyright-header collections. See [native notice evidence](../docs/native-notice-evidence.md) and [the replacement](../docs/tokenizer-replacement.md) for the distinction between historical and current inputs.
+
+Run `pnpm licenses:check` after installation. Before distributing an artifact, run the separate artifact checks described in [the audit](../docs/distribution-notices.md). Build hooks cover only manifest-listed versions and files. Passing them does not establish complete native composition or brand-use clearance. The desktop artifact audit exits 2 for missing notices without a documented exception or recorded package limitations, even when all reviewed bytes match; it retains a rule for the removed native tokenizer so reintroduction cannot silently pass. The exact-version exception for `lazy-val` 1.0.5 preserves its published MIT/author metadata and reports the missing upstream notice. It does not supply that notice or waive other gaps.
+
+Preserve upstream text byte-for-byte, including copyright statements. Do not format these files. For an upgrade, review the upstream source and distribution obligations before refreshing versions, hashes, destinations, and website copies. A registry license label by itself is insufficient evidence for a missing copyright/license text.

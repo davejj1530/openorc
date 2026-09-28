@@ -1,0 +1,501 @@
+diff --git a/lib/cjs/fastembed.js b/lib/cjs/fastembed.js
+index 16ff4e40a96a2ed9b68e81011256f701bc2e7b82..503855b334dfd9f19383e8c57fe87f4c1c53bf0b 100644
+--- a/lib/cjs/fastembed.js
++++ b/lib/cjs/fastembed.js
+@@ -27,13 +27,16 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
+ };
+ Object.defineProperty(exports, "__esModule", { value: true });
+ exports.SparseTextEmbedding = exports.FlagEmbedding = exports.SparseEmbeddingModel = exports.EmbeddingModel = exports.ExecutionProvider = void 0;
+-const tokenizers_1 = require("@anush008/tokenizers");
++const { loadTokenizer } = require("../minilm-tokenizer.cjs");
+ const fs_1 = __importDefault(require("fs"));
+ const https_1 = __importDefault(require("https"));
+ const ort = __importStar(require("onnxruntime-node"));
+ const path_1 = __importDefault(require("path"));
+ const progress_1 = __importDefault(require("progress"));
+-const tar_1 = __importDefault(require("tar"));
++const tar_1 = require("tar");
++const { Transform } = require("node:stream");
++const { pipeline } = require("node:stream/promises");
++const { createGunzip } = require("node:zlib");
+ const hub_1 = require("@huggingface/hub");
+ var ExecutionProvider;
+ (function (ExecutionProvider) {
+@@ -111,48 +114,7 @@ class FlagEmbedding extends Embedding {
+         return new FlagEmbedding(tokenizer, session, model);
+     }
+     static loadTokenizer(modelDir, maxLength) {
+-        const tokenizerPath = path_1.default.join(modelDir.toString(), "tokenizer.json");
+-        if (!fs_1.default.existsSync(tokenizerPath)) {
+-            throw new Error(`Tokenizer file not found at ${tokenizerPath}`);
+-        }
+-        const configPath = path_1.default.join(modelDir.toString(), "config.json");
+-        if (!fs_1.default.existsSync(configPath)) {
+-            throw new Error(`Config file not found at ${configPath}`);
+-        }
+-        const config = JSON.parse(fs_1.default.readFileSync(configPath, "utf-8"));
+-        const tokenizerFilePath = path_1.default.join(modelDir.toString(), "tokenizer_config.json");
+-        if (!fs_1.default.existsSync(tokenizerFilePath)) {
+-            throw new Error(`Tokenizer file not found at ${tokenizerFilePath}`);
+-        }
+-        const tokenizerConfig = JSON.parse(fs_1.default.readFileSync(tokenizerFilePath, "utf-8"));
+-        maxLength = Math.min(maxLength, tokenizerConfig["model_max_length"]);
+-        const tokensMapPath = path_1.default.join(modelDir.toString(), "special_tokens_map.json");
+-        if (!fs_1.default.existsSync(tokensMapPath)) {
+-            throw new Error(`Tokens map file not found at ${tokensMapPath}`);
+-        }
+-        const tokensMap = JSON.parse(fs_1.default.readFileSync(tokensMapPath, "utf-8"));
+-        const tokenizer = tokenizers_1.Tokenizer.fromFile(tokenizerPath);
+-        tokenizer.setTruncation(maxLength);
+-        tokenizer.setPadding({
+-            maxLength,
+-            padId: config["pad_token_id"],
+-            padToken: tokenizerConfig["pad_token"],
+-        });
+-        for (let token of Object.values(tokensMap)) {
+-            if (typeof token === "string") {
+-                tokenizer.addSpecialTokens([token]);
+-            }
+-            else if (isAddedTokenMap(token)) {
+-                const addedToken = new tokenizers_1.AddedToken(token["content"], true, {
+-                    singleWord: token["single_word"],
+-                    leftStrip: token["lstrip"],
+-                    rightStrip: token["rstrip"],
+-                    normalized: token["normalized"],
+-                });
+-                tokenizer.addAddedTokens([addedToken]);
+-            }
+-        }
+-        return tokenizer;
++        return loadTokenizer(modelDir, maxLength);
+     }
+     static async downloadFileFromGCS(outputFilePath, model, showDownloadProgress = true) {
+         if (fs_1.default.existsSync(outputFilePath)) {
+@@ -205,11 +167,47 @@ class FlagEmbedding extends Embedding {
+     static async decompressToCache(targzPath, cacheDir) {
+         // Implementation for decompressing a .tar.gz file to a cache directory
+         if (path_1.default.extname(targzPath.toString()) === ".gz") {
+-            await tar_1.default.x({
+-                file: targzPath,
+-                // @ts-ignore
++            // OpenOrc uses the ~90 MB MiniLM model. Bound expanded bytes and
++            // entry count, and never materialize archive links in its cache.
++            const maxBytes = 512 * 1024 * 1024;
++            let bytes = 0;
++            let entries = 0;
++            let archiveEnded = false;
++            let headerChecked = false;
++            let prefix;
++            const limit = new Transform({
++                transform(chunk, _encoding, callback) {
++                    bytes += chunk.length;
++                    if (bytes > maxBytes) return callback(new Error("Model archive exceeds 512 MiB"));
++                    // tar auto-detects compression even after our gunzip. Reject
++                    // another layer so it cannot expand beyond this byte meter.
++                    if (!headerChecked) {
++                        chunk = prefix ? Buffer.concat([prefix, chunk]) : chunk;
++                        if (chunk.length < 4) { prefix = chunk; return callback(); }
++                        if ((chunk[0] === 0x1f && chunk[1] === 0x8b) || chunk.readUInt32LE(0) === 0xfd2fb528) {
++                            return callback(new Error("Nested model archive compression is not supported"));
++                        }
++                        headerChecked = true;
++                        prefix = undefined;
++                    }
++                    callback(null, archiveEnded ? undefined : chunk);
++                },
++            });
++            const unpack = tar_1.x({
+                 cwd: cacheDir,
++                strict: true,
++                filter(_name, entry) {
++                    if (++entries > 256 || entry.size > maxBytes) {
++                        unpack.abort(new Error("Model archive exceeds extraction limits"));
++                        return false;
++                    }
++                    return entry.type === "File" || entry.type === "Directory";
++                },
+             });
++            // tar retains bytes supplied after its end marker. Count but discard
++            // subsequent padding so it cannot accumulate in the parser's buffer.
++            unpack.on("eof", () => { archiveEnded = true; });
++            await pipeline(fs_1.default.createReadStream(targzPath), createGunzip(), limit, unpack);
+         }
+         else {
+             throw new Error(`Unsupported file extension: ${targzPath}`);
+@@ -246,7 +244,16 @@ class FlagEmbedding extends Embedding {
+                 maskArray.push(mask);
+                 typeIdsArray.push(typeIds);
+             });
+-            const maxLength = idsArray[0].length;
++            // OpenOrc's MiniLM tokenizer leaves padding to the batch: pad only to its longest text, not the model maximum.
++            const maxLength = Math.max(...idsArray.map((ids) => ids.length));
++            const padId = BigInt(this.tokenizer.padId);
++            for (let row = 0; row < idsArray.length; row++) {
++                while (idsArray[row].length < maxLength) {
++                    idsArray[row].push(padId);
++                    maskArray[row].push(0n);
++                    typeIdsArray[row].push(0n);
++                }
++            }
+             const batchInputIds = new ort.Tensor("int64", idsArray.flat(), [batchTexts.length, maxLength]);
+             const batchAttentionMask = new ort.Tensor("int64", maskArray.flat(), [batchTexts.length, maxLength]);
+             const batchTokenTypeId = new ort.Tensor("int64", typeIdsArray.flat(), [batchTexts.length, maxLength]);
+@@ -365,50 +372,8 @@ class SparseTextEmbedding extends SparseEmbedding {
+         });
+         return new SparseTextEmbedding(tokenizer, session, model, vocabSize);
+     }
+-    static loadTokenizer(modelDir, maxLength) {
+-        const tokenizerPath = path_1.default.join(modelDir.toString(), "tokenizer.json");
+-        if (!fs_1.default.existsSync(tokenizerPath)) {
+-            throw new Error(`Tokenizer file not found at ${tokenizerPath}`);
+-        }
+-        const configPath = path_1.default.join(modelDir.toString(), "config.json");
+-        if (!fs_1.default.existsSync(configPath)) {
+-            throw new Error(`Config file not found at ${configPath}`);
+-        }
+-        const config = JSON.parse(fs_1.default.readFileSync(configPath, "utf-8"));
+-        const tokenizerFilePath = path_1.default.join(modelDir.toString(), "tokenizer_config.json");
+-        if (!fs_1.default.existsSync(tokenizerFilePath)) {
+-            throw new Error(`Tokenizer file not found at ${tokenizerFilePath}`);
+-        }
+-        const tokenizerConfig = JSON.parse(fs_1.default.readFileSync(tokenizerFilePath, "utf-8"));
+-        maxLength = Math.min(maxLength, tokenizerConfig["model_max_length"]);
+-        const tokensMapPath = path_1.default.join(modelDir.toString(), "special_tokens_map.json");
+-        if (!fs_1.default.existsSync(tokensMapPath)) {
+-            throw new Error(`Tokens map file not found at ${tokensMapPath}`);
+-        }
+-        const tokensMap = JSON.parse(fs_1.default.readFileSync(tokensMapPath, "utf-8"));
+-        const tokenizer = tokenizers_1.Tokenizer.fromFile(tokenizerPath);
+-        tokenizer.setTruncation(maxLength);
+-        tokenizer.setPadding({
+-            maxLength,
+-            padId: config["pad_token_id"],
+-            padToken: tokenizerConfig["pad_token"],
+-        });
+-        for (let token of Object.values(tokensMap)) {
+-            if (typeof token === "string") {
+-                tokenizer.addSpecialTokens([token]);
+-            }
+-            else if (isAddedTokenMap(token)) {
+-                const addedToken = new tokenizers_1.AddedToken(token["content"], true, {
+-                    singleWord: token["single_word"],
+-                    leftStrip: token["lstrip"],
+-                    rightStrip: token["rstrip"],
+-                    normalized: token["normalized"],
+-                });
+-                tokenizer.addAddedTokens([addedToken]);
+-            }
+-        }
+-        const vocabSize = config["vocab_size"] || 30522;
+-        return { tokenizer, vocabSize };
++    static loadTokenizer() {
++        throw new Error("OpenOrc supports MiniLM dense embeddings only");
+     }
+     static async retrieveModel(model, cacheDir, showDownloadProgress = true) {
+         if (!fs_1.default.existsSync(cacheDir)) {
+@@ -531,13 +496,4 @@ class SparseTextEmbedding extends SparseEmbedding {
+     }
+ }
+ exports.SparseTextEmbedding = SparseTextEmbedding;
+-function isAddedTokenMap(token) {
+-    return (typeof token === "object" &&
+-        token !== null &&
+-        "token" in token &&
+-        "single_word" in token &&
+-        "rstrip" in token &&
+-        "lstrip" in token &&
+-        "normalized" in token);
+-}
+ //# sourceMappingURL=fastembed.js.map
+\ No newline at end of file
+diff --git a/lib/esm/fastembed.js b/lib/esm/fastembed.js
+index 620362efd465c6d3ce8c9eb54990c24168b16145..8a9d66710334623d9eeb29dd16613019720d8342 100644
+--- a/lib/esm/fastembed.js
++++ b/lib/esm/fastembed.js
+@@ -1,10 +1,13 @@
+-import { AddedToken, Tokenizer } from "@anush008/tokenizers";
++import { loadTokenizer } from "../minilm-tokenizer.cjs";
+ import fs from "fs";
+ import https from "https";
+ import * as ort from "onnxruntime-node";
+ import path from "path";
+ import Progress from "progress";
+-import tar from "tar";
++import { x as extract } from "tar";
++import { Transform } from "node:stream";
++import { pipeline } from "node:stream/promises";
++import { createGunzip } from "node:zlib";
+ import { downloadFileToCacheDir } from "@huggingface/hub";
+ export var ExecutionProvider;
+ (function (ExecutionProvider) {
+@@ -82,48 +85,7 @@ export class FlagEmbedding extends Embedding {
+         return new FlagEmbedding(tokenizer, session, model);
+     }
+     static loadTokenizer(modelDir, maxLength) {
+-        const tokenizerPath = path.join(modelDir.toString(), "tokenizer.json");
+-        if (!fs.existsSync(tokenizerPath)) {
+-            throw new Error(`Tokenizer file not found at ${tokenizerPath}`);
+-        }
+-        const configPath = path.join(modelDir.toString(), "config.json");
+-        if (!fs.existsSync(configPath)) {
+-            throw new Error(`Config file not found at ${configPath}`);
+-        }
+-        const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+-        const tokenizerFilePath = path.join(modelDir.toString(), "tokenizer_config.json");
+-        if (!fs.existsSync(tokenizerFilePath)) {
+-            throw new Error(`Tokenizer file not found at ${tokenizerFilePath}`);
+-        }
+-        const tokenizerConfig = JSON.parse(fs.readFileSync(tokenizerFilePath, "utf-8"));
+-        maxLength = Math.min(maxLength, tokenizerConfig["model_max_length"]);
+-        const tokensMapPath = path.join(modelDir.toString(), "special_tokens_map.json");
+-        if (!fs.existsSync(tokensMapPath)) {
+-            throw new Error(`Tokens map file not found at ${tokensMapPath}`);
+-        }
+-        const tokensMap = JSON.parse(fs.readFileSync(tokensMapPath, "utf-8"));
+-        const tokenizer = Tokenizer.fromFile(tokenizerPath);
+-        tokenizer.setTruncation(maxLength);
+-        tokenizer.setPadding({
+-            maxLength,
+-            padId: config["pad_token_id"],
+-            padToken: tokenizerConfig["pad_token"],
+-        });
+-        for (let token of Object.values(tokensMap)) {
+-            if (typeof token === "string") {
+-                tokenizer.addSpecialTokens([token]);
+-            }
+-            else if (isAddedTokenMap(token)) {
+-                const addedToken = new AddedToken(token["content"], true, {
+-                    singleWord: token["single_word"],
+-                    leftStrip: token["lstrip"],
+-                    rightStrip: token["rstrip"],
+-                    normalized: token["normalized"],
+-                });
+-                tokenizer.addAddedTokens([addedToken]);
+-            }
+-        }
+-        return tokenizer;
++        return loadTokenizer(modelDir, maxLength);
+     }
+     static async downloadFileFromGCS(outputFilePath, model, showDownloadProgress = true) {
+         if (fs.existsSync(outputFilePath)) {
+@@ -176,11 +138,47 @@ export class FlagEmbedding extends Embedding {
+     static async decompressToCache(targzPath, cacheDir) {
+         // Implementation for decompressing a .tar.gz file to a cache directory
+         if (path.extname(targzPath.toString()) === ".gz") {
+-            await tar.x({
+-                file: targzPath,
+-                // @ts-ignore
++            // OpenOrc uses the ~90 MB MiniLM model. Bound expanded bytes and
++            // entry count, and never materialize archive links in its cache.
++            const maxBytes = 512 * 1024 * 1024;
++            let bytes = 0;
++            let entries = 0;
++            let archiveEnded = false;
++            let headerChecked = false;
++            let prefix;
++            const limit = new Transform({
++                transform(chunk, _encoding, callback) {
++                    bytes += chunk.length;
++                    if (bytes > maxBytes) return callback(new Error("Model archive exceeds 512 MiB"));
++                    // tar auto-detects compression even after our gunzip. Reject
++                    // another layer so it cannot expand beyond this byte meter.
++                    if (!headerChecked) {
++                        chunk = prefix ? Buffer.concat([prefix, chunk]) : chunk;
++                        if (chunk.length < 4) { prefix = chunk; return callback(); }
++                        if ((chunk[0] === 0x1f && chunk[1] === 0x8b) || chunk.readUInt32LE(0) === 0xfd2fb528) {
++                            return callback(new Error("Nested model archive compression is not supported"));
++                        }
++                        headerChecked = true;
++                        prefix = undefined;
++                    }
++                    callback(null, archiveEnded ? undefined : chunk);
++                },
++            });
++            const unpack = extract({
+                 cwd: cacheDir,
++                strict: true,
++                filter(_name, entry) {
++                    if (++entries > 256 || entry.size > maxBytes) {
++                        unpack.abort(new Error("Model archive exceeds extraction limits"));
++                        return false;
++                    }
++                    return entry.type === "File" || entry.type === "Directory";
++                },
+             });
++            // tar retains bytes supplied after its end marker. Count but discard
++            // subsequent padding so it cannot accumulate in the parser's buffer.
++            unpack.on("eof", () => { archiveEnded = true; });
++            await pipeline(fs.createReadStream(targzPath), createGunzip(), limit, unpack);
+         }
+         else {
+             throw new Error(`Unsupported file extension: ${targzPath}`);
+@@ -217,7 +215,16 @@ export class FlagEmbedding extends Embedding {
+                 maskArray.push(mask);
+                 typeIdsArray.push(typeIds);
+             });
+-            const maxLength = idsArray[0].length;
++            // OpenOrc's MiniLM tokenizer leaves padding to the batch: pad only to its longest text, not the model maximum.
++            const maxLength = Math.max(...idsArray.map((ids) => ids.length));
++            const padId = BigInt(this.tokenizer.padId);
++            for (let row = 0; row < idsArray.length; row++) {
++                while (idsArray[row].length < maxLength) {
++                    idsArray[row].push(padId);
++                    maskArray[row].push(0n);
++                    typeIdsArray[row].push(0n);
++                }
++            }
+             const batchInputIds = new ort.Tensor("int64", idsArray.flat(), [batchTexts.length, maxLength]);
+             const batchAttentionMask = new ort.Tensor("int64", maskArray.flat(), [batchTexts.length, maxLength]);
+             const batchTokenTypeId = new ort.Tensor("int64", typeIdsArray.flat(), [batchTexts.length, maxLength]);
+@@ -335,50 +342,8 @@ export class SparseTextEmbedding extends SparseEmbedding {
+         });
+         return new SparseTextEmbedding(tokenizer, session, model, vocabSize);
+     }
+-    static loadTokenizer(modelDir, maxLength) {
+-        const tokenizerPath = path.join(modelDir.toString(), "tokenizer.json");
+-        if (!fs.existsSync(tokenizerPath)) {
+-            throw new Error(`Tokenizer file not found at ${tokenizerPath}`);
+-        }
+-        const configPath = path.join(modelDir.toString(), "config.json");
+-        if (!fs.existsSync(configPath)) {
+-            throw new Error(`Config file not found at ${configPath}`);
+-        }
+-        const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+-        const tokenizerFilePath = path.join(modelDir.toString(), "tokenizer_config.json");
+-        if (!fs.existsSync(tokenizerFilePath)) {
+-            throw new Error(`Tokenizer file not found at ${tokenizerFilePath}`);
+-        }
+-        const tokenizerConfig = JSON.parse(fs.readFileSync(tokenizerFilePath, "utf-8"));
+-        maxLength = Math.min(maxLength, tokenizerConfig["model_max_length"]);
+-        const tokensMapPath = path.join(modelDir.toString(), "special_tokens_map.json");
+-        if (!fs.existsSync(tokensMapPath)) {
+-            throw new Error(`Tokens map file not found at ${tokensMapPath}`);
+-        }
+-        const tokensMap = JSON.parse(fs.readFileSync(tokensMapPath, "utf-8"));
+-        const tokenizer = Tokenizer.fromFile(tokenizerPath);
+-        tokenizer.setTruncation(maxLength);
+-        tokenizer.setPadding({
+-            maxLength,
+-            padId: config["pad_token_id"],
+-            padToken: tokenizerConfig["pad_token"],
+-        });
+-        for (let token of Object.values(tokensMap)) {
+-            if (typeof token === "string") {
+-                tokenizer.addSpecialTokens([token]);
+-            }
+-            else if (isAddedTokenMap(token)) {
+-                const addedToken = new AddedToken(token["content"], true, {
+-                    singleWord: token["single_word"],
+-                    leftStrip: token["lstrip"],
+-                    rightStrip: token["rstrip"],
+-                    normalized: token["normalized"],
+-                });
+-                tokenizer.addAddedTokens([addedToken]);
+-            }
+-        }
+-        const vocabSize = config["vocab_size"] || 30522;
+-        return { tokenizer, vocabSize };
++    static loadTokenizer() {
++        throw new Error("OpenOrc supports MiniLM dense embeddings only");
+     }
+     static async retrieveModel(model, cacheDir, showDownloadProgress = true) {
+         if (!fs.existsSync(cacheDir)) {
+@@ -500,13 +465,4 @@ export class SparseTextEmbedding extends SparseEmbedding {
+         ];
+     }
+ }
+-function isAddedTokenMap(token) {
+-    return (typeof token === "object" &&
+-        token !== null &&
+-        "token" in token &&
+-        "single_word" in token &&
+-        "rstrip" in token &&
+-        "lstrip" in token &&
+-        "normalized" in token);
+-}
+ //# sourceMappingURL=fastembed.js.map
+\ No newline at end of file
+diff --git a/lib/minilm-tokenizer.cjs b/lib/minilm-tokenizer.cjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..c9a9a5fa5c6c0c8bc96e5d3220a73d111408d32c
+--- /dev/null
++++ b/lib/minilm-tokenizer.cjs
+@@ -0,0 +1,60 @@
++// OpenOrc's fixed MiniLM model: the same token IDs, masks and type IDs without a native tokenizer. The embedder pads each batch.
++const fs = require("node:fs");
++const path = require("node:path");
++const { Tokenizer } = require("@huggingface/tokenizers");
++
++function loadTokenizer(modelDir, requestedLength) {
++  const read = (name) => {
++    const file = path.join(modelDir.toString(), name);
++    if (!fs.existsSync(file)) throw new Error(`Tokenizer file not found at ${file}`);
++    return JSON.parse(fs.readFileSync(file, "utf8"));
++  };
++  const source = read("tokenizer.json");
++  const config = read("config.json");
++  const options = read("tokenizer_config.json");
++  const specialTokens = read("special_tokens_map.json");
++  if (config._name_or_path !== "sentence-transformers/all-MiniLM-L6-v2" ||
++      source.model?.type !== "WordPiece" || source.post_processor?.type !== "TemplateProcessing" ||
++      source.normalizer?.type !== "BertNormalizer" || source.pre_tokenizer?.type !== "BertPreTokenizer") {
++    throw new Error("OpenOrc's FastEmbed patch supports only the reviewed MiniLM WordPiece configuration");
++  }
++  const sequence = source.post_processor.single.filter((item) => item.Sequence);
++  if (sequence.length !== 1 || sequence[0].Sequence.id !== "A") {
++    throw new Error("Unsupported MiniLM single-sequence template");
++  }
++  for (const value of Object.values(specialTokens)) {
++    const content = typeof value === "string" ? value : value.content;
++    const added = source.added_tokens.find((token) => token.content === content && token.special);
++    if (!added || (typeof value === "object" && ["single_word", "lstrip", "rstrip", "normalized"].some((key) => value[key] !== added[key]))) {
++      throw new Error("MiniLM special-token map disagrees with the tokenizer");
++    }
++  }
++  const tokenizer = new Tokenizer(source, options);
++  const post = tokenizer.post_processor;
++  const maxLength = Math.min(requestedLength, options.model_max_length);
++  const overhead = post.post_process([], undefined, true).tokens.length;
++  if (!Number.isSafeInteger(maxLength) || maxLength < overhead ||
++      tokenizer.token_to_id(options.pad_token) !== config.pad_token_id ||
++      !Number.isSafeInteger(config.pad_token_id)) {
++    throw new Error("Invalid MiniLM token budget or padding configuration");
++  }
++  return {
++    encode(text) {
++      // Truncate content before upstream adds its template's special tokens.
++      const content = tokenizer.tokenize(text, { add_special_tokens: false }).slice(0, maxLength - overhead);
++      const processed = post.post_process(content, undefined, true);
++      const ids = processed.tokens.map((token) => {
++        const id = tokenizer.token_to_id(token);
++        if (!Number.isSafeInteger(id)) throw new Error("MiniLM emitted an unresolved token");
++        return id;
++      });
++      const mask = ids.map(() => 1);
++      const types = processed.token_type_ids;
++      if (!types || types.length !== ids.length) throw new Error("MiniLM type IDs do not match the token sequence");
++      return { getIds: () => ids, getAttentionMask: () => mask, getTypeIds: () => types };
++    },
++    // Unpadded encodings: the embedder pads each batch to its longest text.
++    padId: config.pad_token_id,
++  };
++}
++module.exports = { loadTokenizer };
+diff --git a/package.json b/package.json
+index 24a00281b1eb03f81c92d56ed3aa545ff767309a..1ca22296cc650387e96b66e7fb9ca0aaf9709224 100644
+--- a/package.json
++++ b/package.json
+@@ -38,11 +38,11 @@
+     "posttsc": "echo '{\"type\": \"module\"}' > ./lib/esm/package.json"
+   },
+   "dependencies": {
+-    "@anush008/tokenizers": "^0.0.0",
+     "@huggingface/hub": "^2.7.1",
+     "onnxruntime-node": "1.21.0",
+     "progress": "^2.0.3",
+-    "tar": "^6.2.0"
++    "tar": "^6.2.0",
++    "@huggingface/tokenizers": "0.2.0"
+   },
+   "devDependencies": {
+     "@types/progress": "^2.0.5",

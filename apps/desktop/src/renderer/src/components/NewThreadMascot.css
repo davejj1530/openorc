@@ -1,0 +1,69 @@
+.new-thread-mascot {
+  /* Body and eye colors come from the palette's dedicated mascot tokens. */
+  position: relative;
+  width: 80px;
+  height: 56px;
+  margin: 0 auto 20px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+/*
+ * In the hero, above the greeting and aligned with it. It lived at the composer's top right
+ * until 2026-09-20, which put it exactly where the effort popover opens: the popup covered
+ * the reaction the mascot exists to show. Up here it is in view while the popover is open.
+ */
+/* right:16, not 0. The frame is 62px but its canvas is 80 and overflow stays visible so
+   reactions can clear the frame, so at right:0 it sticks 9px past the reading column. The
+   scroller above it has overflow-y:auto, which forces overflow-x:auto, so those 9px became a
+   horizontal scrollbar that silently ate 10px of height and pushed the composer off the
+   floor at the 900x680 minimum. */
+.new-thread-mascot[data-placement="hero"] {
+  position: absolute;
+  top: -8px;
+  right: 16px;
+  margin: 0;
+}
+
+/*
+ * Retained for callers that still anchor to the composer. Tucked against its top right
+ * corner, out of the reading path.
+ */
+.new-thread-mascot[data-placement="composer"] {
+  position: absolute;
+  right: 16px;
+  bottom: 100%;
+  z-index: 1;
+  width: 62px;
+  height: 43px;
+  margin: 0 0 -4px;
+}
+.new-thread-mascot[data-placement="composer"] .rive-mascot-static,
+.new-thread-mascot[data-placement="composer"] .rive-mascot-canvas {
+  width: 80px;
+  height: 80px;
+}
+
+/* The artboard includes space around the body for thinking dots and sparkles. */
+.new-thread-mascot .rive-mascot-static,
+.new-thread-mascot .rive-mascot-canvas {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 104px;
+  height: 104px;
+  transform: translate(-50%, -50%);
+}
+
+@media (max-height: 700px), (max-width: 640px) {
+  .new-thread-mascot {
+    width: 62px;
+    height: 43px;
+    margin-bottom: 16px;
+  }
+  .new-thread-mascot .rive-mascot-static,
+  .new-thread-mascot .rive-mascot-canvas {
+    width: 80px;
+    height: 80px;
+  }
+}

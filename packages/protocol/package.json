@@ -1,0 +1,20 @@
+{
+  "name": "@openorc/protocol",
+  "version": "0.0.0",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared schemas for domain records, RPC, and agent events, plus the harness catalog and team state transition rules.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0"
+  }
+}

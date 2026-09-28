@@ -1,0 +1,64 @@
+---
+/**
+ * The Changes panel docked beside a conversation, still: the sample diff with
+ * its Git actions. Row numbering follows the app's unified view.
+ */
+import ProductIcon from "../hero/ProductIcon.astro";
+
+type Token = [text: string, tone?: "keyword" | "name" | "string" | "tag" | "component" | "attr" | "mark"];
+interface Row {
+  type: "context" | "add" | "del";
+  number: number;
+  tokens: Token[];
+}
+
+const rows: Row[] = [
+  { type: "context", number: 1, tokens: [["import", "keyword"], [" { "], ["ProjectPicker", "name"], [" } "], ["from", "keyword"], [" "], ["'./ProjectPicker'", "string"], [";"]] },
+  { type: "add", number: 2, tokens: [["import", "keyword"], [" { "], ["Button", "name"], [" } "], ["from", "keyword"], [" "], ["'./ui'", "string"], [";"]] },
+  { type: "context", number: 3, tokens: [[""]] },
+  { type: "context", number: 4, tokens: [["export", "keyword"], [" "], ["function", "keyword"], [" "], ["Welcome", "name"], ["() {"]] },
+  { type: "context", number: 5, tokens: [["  "], ["return", "keyword"], [" ("]] },
+  { type: "del", number: 5, tokens: [["    <"], ["main", "tag"], [" "], ["className", "attr"], ["="], ['"', "string"], ["empty", "mark"], ['"', "string"], [">"]] },
+  { type: "del", number: 6, tokens: [["      <"], ["p", "tag"], [">No projects yet.</"], ["p", "tag"], [">"]] },
+  { type: "add", number: 6, tokens: [["    <"], ["main", "tag"], [" "], ["className", "attr"], ["="], ['"', "string"], ["welcome", "mark"], ['"', "string"], [">"]] },
+  { type: "add", number: 7, tokens: [["      <"], ["h1", "tag"], [">Make yourself at home.</"], ["h1", "tag"], [">"]] },
+  { type: "add", number: 8, tokens: [["      <"], ["p", "tag"], [">Connect a project to start building.</"], ["p", "tag"], [">"]] },
+  { type: "context", number: 9, tokens: [["      <"], ["ProjectPicker", "component"], [" />"]] },
+  { type: "add", number: 10, tokens: [["      <"], ["Button", "component"], [" "], ["onClick", "attr"], ["={startConversation}>"]] },
+  { type: "add", number: 11, tokens: [["        Start a conversation"]] },
+  { type: "add", number: 12, tokens: [["      </"], ["Button", "component"], [">"]] },
+  { type: "add", number: 13, tokens: [["      <"], ["KeyboardHint", "component"], [" />"]] },
+  { type: "context", number: 14, tokens: [["    </"], ["main", "tag"], [">"]] },
+  { type: "context", number: 15, tokens: [["  );"]] },
+  { type: "context", number: 16, tokens: [["}"]] },
+];
+---
+
+<div class="hs-mock hs-mock-changes">
+  <div class="hs-cp-head">
+    <span class="hs-cp-title">Changes</span>
+    <span class="hs-cp-count">1</span>
+    <span class="hs-cp-stat"><span class="hs-added">+8</span> <span class="hs-removed">-2</span></span>
+    <span class="hs-cp-spacer"></span>
+    <span class="hs-button"><ProductIcon name="commit" />Commit</span>
+    <span class="hs-button"><ProductIcon name="upload" />Push</span>
+    <span class="hs-button"><ProductIcon name="pullRequest" />PR</span>
+    <span class="hs-icon-button hs-small hs-cp-refresh"><ProductIcon name="refresh" /></span>
+  </div>
+  <section class="hs-diff-file">
+    <div class="hs-diff-head">
+      <ProductIcon name="chevronRight" class="hs-diff-fold" />
+      <span class="hs-diff-letter">M</span>
+      <span class="hs-diff-path"><span>src/</span>Welcome.tsx</span>
+      <span class="hs-diff-stat"><span class="hs-added">+8</span> <span class="hs-removed">-2</span></span>
+    </div>
+    <div class="hs-diff">
+      {rows.map((row) => (
+        <div class="hs-diff-row" data-type={row.type}>
+          <span class="hs-diff-num">{row.number}</span>
+          <span class="hs-diff-code">{row.tokens.map(([text, tone]) => (tone ? <span data-tone={tone}>{text}</span> : text))}</span>
+        </div>
+      ))}
+    </div>
+  </section>
+</div>

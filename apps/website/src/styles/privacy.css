@@ -1,0 +1,41 @@
+.privacy-page {
+  max-width: 760px;
+  padding-block: 80px var(--section-space);
+}
+.privacy-intro {
+  padding-bottom: 40px;
+  border-bottom: 1px solid var(--rule);
+}
+.privacy-date {
+  margin-top: 20px;
+  font-size: var(--type-control);
+}
+.privacy-intro > p + p {
+  margin-top: 24px;
+}
+.privacy-article section {
+  margin-top: 48px;
+}
+.privacy-article h2 {
+  max-width: none;
+  font-size: var(--type-title);
+  margin-bottom: 16px;
+}
+.privacy-article p {
+  line-height: 1.8;
+}
+.privacy-article p + p {
+  margin-top: 16px;
+}
+.privacy-article a {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+@media (max-width: 700px) {
+  .privacy-page {
+    padding-top: 56px;
+  }
+  .privacy-article section {
+    margin-top: 36px;
+  }
+}

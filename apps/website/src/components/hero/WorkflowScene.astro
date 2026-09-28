@@ -1,0 +1,291 @@
+---
+/**
+ * The workflow demo. One question in a thread becomes three tasks; inside the
+ * first task the user weighs two models against each other, asks one to build
+ * it, and follows the change into the thread that starts. Content and timing:
+ * data/hero/workflow.ts.
+ */
+import { Image } from "astro:assets";
+import mark from "../../assets/openorc-mark.png";
+import ProductIcon from "./ProductIcon.astro";
+import Prose from "./Prose.astro";
+import SceneFrame from "./SceneFrame.astro";
+import TaskPane from "./TaskPane.astro";
+import ThreadPane from "./ThreadPane.astro";
+import Composer from "./Composer.astro";
+import { busy, workflow, workflowJourney } from "../../data/hero/workflow";
+import { branches, models, project } from "../../data/hero/workspace";
+import { timed } from "../../data/hero/timeline";
+
+interface Props {
+  label: string;
+}
+const { label } = Astro.props;
+const { thread, task, work } = workflow;
+const at = (windows: string) => timed(workflowJourney, windows);
+const rows = [
+  { id: "a", title: thread.title, providers: [{ harness: "codex", label: "Codex" }], busy: busy.a, show: ">aSend" },
+  { id: "b", title: work.title, branch: branches.cacheThread, providers: [{ harness: "codex", label: "Codex" }], busy: busy.b, show: ">bStart" },
+];
+const codex = { harness: "codex", label: models.codex.label, effort: models.codex.effort };
+const hints = [
+  ["@", "mention a file"],
+  ["⌘V", "paste an image"],
+  ["⌘K", "search"],
+];
+const options = [
+  { name: task.mentions.codex, harness: "Codex" },
+  { name: task.mentions.claude, harness: "Claude Code" },
+];
+const added = work.change.files.reduce((n, file) => n + file.added, 0);
+const removed = work.change.files.reduce((n, file) => n + file.removed, 0);
+/** Inline code in table cells and comments, as the app renders backticks. */
+const code = (text: string) => text.split(/(`[^`]+`)/).map((part) => (part.startsWith("`") ? { code: true, text: part.slice(1, -1) } : { code: false, text: part }));
+---
+
+<SceneFrame id="workflow" journey={workflowJourney} label={label} view="new" rows={rows} inboxPending="aQuestion~aPick">
+  <div class="hs-panes" data-views>
+    <section class="hs-pane" data-pane="new">
+      <header class="hs-header">
+        <span class="hs-header-lead">
+          <span class="hs-window-nav">
+            <span class="hs-icon-button"><ProductIcon name="panelLeft" /></span>
+            <span class="hs-icon-button"><ProductIcon name="search" /></span>
+            <span class="hs-icon-button"><ProductIcon name="arrowLeft" /></span>
+            <span class="hs-icon-button" data-disabled><ProductIcon name="arrowRight" /></span>
+          </span>
+          <span class="hs-title">New thread</span>
+          <span class="hs-chip"><span>{project.name}</span><ProductIcon name="chevronDown" /></span>
+        </span>
+        <span class="hs-header-actions">
+          <span class="hs-icon-button"><ProductIcon name="panelRight" /></span>
+        </span>
+      </header>
+      <div class="hs-new-body">
+        <div class="hs-new-greeting">
+          <svg class="hs-mascot" viewBox="0 0 500 500" fill="none" aria-hidden="true">
+            <g transform="translate(250 235)">
+              <path fill="#f080b8" d="M0-110C70-110 105-101 110-50C114-25 114 29 108 60C102 101 78 111 25 112C-5 113-40 113-64 106C-103 98-112 74-113 29C-114 2-113-31-106-57C-95-102-64-110 0-110Z" />
+              <g transform="translate(-18 -10)" fill="#141417"><rect x="-38" y="-28" width="22" height="56" rx="11" /><rect x="16" y="-28" width="22" height="56" rx="11" /></g>
+            </g>
+          </svg>
+          <div class="hs-new-title">What should we work on?</div>
+          <p class="hs-new-lead">The agent works in your repository. You may create a task first or go straight into building.</p>
+          <ul class="hs-new-hints">{hints.map(([key, hint]) => <li><kbd>{key}</kbd>{hint}</li>)}</ul>
+        </div>
+      </div>
+      <div class="hs-composer-area hs-composer-area-new">
+        <Composer journey={workflowJourney} placeholder="What would you like to do?" model={codex} permission={models.codex.permission} prompt={{ text: thread.prompt, typo: thread.typo, window: "typeStart~typeEnd", typed: "typeStart~aSend" }} large />
+      </div>
+    </section>
+
+    <ThreadPane id="a" journey={workflowJourney} title={thread.title} busy={busy.a} model={codex} permission={models.codex.permission} placeholder="Message Codex…">
+      <div class="hs-user hs-block" {...at(">aSend")}><div class="hs-bubble">{thread.prompt}</div></div>
+      <div class="hs-work hs-block" {...at(">aSend")}>
+        <span class="hs-work-toggle" data-open {...at("aSend~aDone")}><span data-clock="aSend">Working · 0s</span><ProductIcon name="chevronRight" /></span>
+        <span class="hs-work-toggle" {...at(">aDone")}><span data-duration="aSend~aDone">Worked for 7s</span><ProductIcon name="chevronRight" /></span>
+        <div class="hs-work-content" {...at("aSend~aDone")}>
+          <span class="hs-step" {...at("aSend~aThought")}><ProductIcon name="message" />Thinking<i class="hs-pulse"></i></span>
+          <span class="hs-step" {...at("aThought~aDone")}><ProductIcon name="message" />Thought for 1s</span>
+          <span class="hs-step hs-group-step hs-block" {...at("aThought~aRead")}><ProductIcon name="live" class="hs-live" />Reading files<ProductIcon name="chevronRight" /></span>
+          <span class="hs-step hs-group-step" {...at("aRead~aDone")}><ProductIcon name="read" />Read 6 files<ProductIcon name="chevronRight" /></span>
+          <span class="hs-step hs-group-step hs-block" {...at("aRead~aRan")}><ProductIcon name="live" class="hs-live" />Running command<ProductIcon name="chevronRight" /></span>
+          <span class="hs-step hs-group-step" {...at("aRan~aDone")}><ProductIcon name="command" />Ran a command<ProductIcon name="chevronRight" /></span>
+        </div>
+      </div>
+      <div class="hs-reply hs-block" {...at(">aIntroStart")}>
+        <Prose text={thread.intro} stream="aIntroStart~aIntroEnd" />
+        <div class="hs-table-wrap hs-block" {...at(">aTable")}>
+          <div class="hs-table-tools"><ProductIcon name="copy" /><ProductIcon name="download" /><ProductIcon name="maximize" /></div>
+          <div class="hs-table-scroll">
+          <table class="hs-table">
+            <thead><tr>{thread.table.head.map((cell) => <th>{cell}</th>)}</tr></thead>
+            <tbody>
+              {thread.table.rows.map((row) => (
+                <tr>{row.map((cell) => <td>{code(cell).map((part) => (part.code ? <code>{part.text}</code> : part.text))}</td>)}</tr>
+              ))}
+            </tbody>
+          </table>
+          </div>
+        </div>
+        <div class="hs-block" {...at(">aOutroStart")}><Prose text={thread.outro} stream="aOutroStart~aOutroEnd" /></div>
+      </div>
+      <div class="hs-question hs-block" {...at(">aQuestion")} data-flag="answered:>aPick">
+        <div class="hs-question-legend">{thread.question.text}</div>
+        <div class="hs-question-options" {...at("<aPick")}>
+          {thread.question.options.map((option, i) => (
+            <div class="hs-question-option" data-flag={i === 0 ? "chosen:>aSelect" : undefined}>
+              <i class="hs-question-radio"></i>
+              <span class="hs-question-option-text"><strong>{option.label}</strong><span>{option.description}</span></span>
+            </div>
+          ))}
+        </div>
+        <div class="hs-question-answer" {...at(">aPick")}>{thread.question.options[0].label}</div>
+        <div class="hs-question-foot" {...at("<aPick")}>
+          <span class="hs-button hs-button-md hs-button-primary" data-flag="ready:>aSelect">Answer</span>
+          <span class="hs-button hs-button-md hs-button-ghost">Decline</span>
+        </div>
+        <div class="hs-question-answered" {...at(">aPick")}>answered</div>
+      </div>
+      <div class="hs-work hs-block" {...at(">aPick")}>
+        <span class="hs-work-toggle" data-open {...at("aPick~aCreated")}><span data-clock="aPick">Working · 0s</span><ProductIcon name="chevronRight" /></span>
+        <span class="hs-work-toggle" {...at(">aCreated")}><span data-duration="aPick~aCreated">Worked for 3s</span><ProductIcon name="chevronRight" /></span>
+      </div>
+      <div class="hs-reply hs-block" {...at(">aCreatedStart")}><Prose text={thread.created} stream="aCreatedStart~aCreatedEnd" /></div>
+      <div class="hs-task-cards">
+        {workflow.tasks.map((item, i) => (
+          <div class="hs-task-card hs-block" {...at(`>aCard${i + 1}`)}>
+            <div class="hs-task-card-row">
+              <ProductIcon name="delegate" class="hs-task-card-glyph" />
+              <span class="hs-task-card-title">{item.title}</span>
+              <ProductIcon name="arrowUpRight" class="hs-task-card-open" />
+            </div>
+            <div class="hs-task-card-meta"><span>Backlog</span><span class="hs-task-card-time">just now</span></div>
+          </div>
+        ))}
+      </div>
+      <div class="hs-presence"><span class="hs-orb"><Image src={mark} alt="" width={48} height={48} format="webp" loading="lazy" /></span></div>
+    </ThreadPane>
+
+    <TaskPane id="task" journey={workflowJourney} title={task.title} start="bStart" branch={branches.cacheThread}>
+      <div class="hs-doc-title">{task.title}</div>
+      <div class="hs-props">
+        <span class="hs-prop" {...at("<bStart")}><ProductIcon name="circleDashed" class="hs-status-glyph hs-status-circleDashed" />Backlog<ProductIcon name="chevronDown" class="hs-prop-chevron" /></span>
+        <span class="hs-prop" {...at(">bStart")}><ProductIcon name="loader" class="hs-status-glyph hs-status-in_progress" />In progress<ProductIcon name="chevronDown" class="hs-prop-chevron" /></span>
+        <span class="hs-prop"><ProductIcon name="signalHigh" class="hs-priority" />High<ProductIcon name="chevronDown" class="hs-prop-chevron" /></span>
+        <span class="hs-prop">{project.name}</span>
+      </div>
+      <div class="hs-spec">
+        <div class="hs-spec-heading">Goal</div>
+        <p>{task.spec.goal}</p>
+        <div class="hs-spec-heading">Scope</div>
+        <ul class="hs-spec-list">{task.spec.scope.map((item) => <li>{code(item).map((part) => (part.code ? <code>{part.text}</code> : part.text))}</li>)}</ul>
+        <div class="hs-spec-heading">Acceptance criteria</div>
+        {task.spec.criteria.map((item) => (
+          <div class="hs-check"><i></i><span>{item.text}</span></div>
+        ))}
+      </div>
+      <div class="hs-labels"><span>Labels</span><span>{task.label}</span></div>
+
+      <section class="hs-comments">
+        <div class="hs-comments-head">Comments</div>
+        <p class="hs-comments-help">Mention a model to discuss this task. Clear work requests continue in a linked thread.</p>
+
+        <div class="hs-comment hs-block" {...at(">askPost")}>
+          <div class="hs-comment-meta"><strong>You</strong><time>just now</time></div>
+          <div class="hs-comment-body">{task.mentions.codex} {task.comments.ask.text}</div>
+          <div class="hs-comment-actions"><span>Reply</span></div>
+          <div class="hs-replies" {...at(">codexStart")}>
+            <article class="hs-response hs-block">
+              <div class="hs-comment-meta"><strong>{task.comments.codex.author}</strong><span>{task.comments.codex.meta}</span><time>just now</time></div>
+              <div class="hs-comment-body" {...at(">codexText")}><Prose text={task.comments.codex.body} stream="codexText~codexEnd" /></div>
+              <p class="hs-comment-status" {...at("<codexEnd")}>Replying…</p>
+              <div class="hs-comment-actions"><span>Reply</span><span {...at("<codexEnd")}>Cancel response</span></div>
+            </article>
+          </div>
+        </div>
+        <div class="hs-comment hs-block" {...at(">secondPost")}>
+          <div class="hs-comment-meta"><strong>You</strong><time>just now</time></div>
+          <div class="hs-comment-body">{task.mentions.claude} {task.comments.second.text}</div>
+          <div class="hs-comment-actions"><span>Reply</span></div>
+          <div class="hs-replies" {...at(">claudeStart")}>
+            <article class="hs-response hs-block">
+              <div class="hs-comment-meta"><strong>{task.comments.claude.author}</strong><span>{task.comments.claude.meta}</span><time>just now</time></div>
+              <div class="hs-comment-body" {...at(">claudeText")}><Prose text={task.comments.claude.body} stream="claudeText~claudeEnd" /></div>
+              <p class="hs-comment-status" {...at("<claudeEnd")}>Replying…</p>
+              <div class="hs-comment-actions"><span>Reply</span><span {...at("<claudeEnd")}>Cancel response</span></div>
+            </article>
+          </div>
+        </div>
+        <div class="hs-comment hs-block" {...at(">buildPost")}>
+          <div class="hs-comment-meta"><strong>You</strong><time>just now</time></div>
+          <div class="hs-comment-body">{task.mentions.codex} {task.comments.build.text}</div>
+          <div class="hs-comment-actions"><span>Reply</span></div>
+          <div class="hs-replies" {...at(">resultStart")}>
+            <article class="hs-response hs-block">
+              <div class="hs-comment-meta"><strong>{task.comments.result.author}</strong><span>{task.comments.result.meta}</span><time>just now</time></div>
+              <div class="hs-comment-body" {...at(">resultText")}><Prose text={task.comments.result.body} stream="resultText~resultEnd" /></div>
+              <p class="hs-comment-status" {...at("<bStart")}>Starting work…</p>
+              <p class="hs-comment-status" {...at(">bStart")}>Working in thread</p>
+              <div class="hs-comment-actions"><span>Reply</span><span {...at("<bStart")}>Cancel response</span><span {...at(">bStart")}>Open thread</span></div>
+            </article>
+          </div>
+        </div>
+
+        <div class="hs-tc" data-flag="focused:askFocus~buildPost;typed:askMention~askPost;typed:secondMention~secondPost;typed:buildMention~buildPost">
+          <div class="hs-tc-input">
+            <span class="hs-placeholder">Leave a note, or type @ to ask a model…</span>
+            <span {...at("askMention~askPick secondMention~secondPick buildMention~buildPick")}>@</span>
+            <span {...at("askPick~askPost buildPick~buildPost")}>{task.mentions.codex} </span>
+            <span {...at("secondPick~secondPost")}>{task.mentions.claude} </span>
+            <span class="hs-typed" data-type="askTypeStart~askTypeEnd" data-text={task.comments.ask.text} data-typo={`${task.comments.ask.typo.at}:${task.comments.ask.typo.key}`} {...at("askTypeStart~askPost")} />
+            <span class="hs-typed" data-type="secondTypeStart~secondTypeEnd" data-text={task.comments.second.text} data-typo={`${task.comments.second.typo.at}:${task.comments.second.typo.key}`} {...at("secondTypeStart~secondPost")} />
+            <span class="hs-typed" data-type="buildTypeStart~buildTypeEnd" data-text={task.comments.build.text} data-typo={`${task.comments.build.typo.at}:${task.comments.build.typo.key}`} {...at("buildTypeStart~buildPost")} />
+            <span class="hs-caret" {...at("askFocus~buildPost")} />
+          </div>
+          <div class="hs-mentions" {...at("askMention~askPick buildMention~buildPick")}>
+            {options.map((option, i) => (
+              <div class="hs-option" data-selected={i === 0 ? "" : undefined}><span>{option.name}</span><span>{option.harness}</span></div>
+            ))}
+          </div>
+          <div class="hs-mentions" {...at("secondMention~secondPick")}>
+            {options.map((option, i) => (
+              <div class="hs-option" data-selected={i === 1 ? "" : undefined}><span>{option.name}</span><span>{option.harness}</span></div>
+            ))}
+          </div>
+          <div class="hs-tc-foot">
+            <span>Type @ to choose a model and effort</span>
+            <span class="hs-tc-submit">Comment</span>
+          </div>
+        </div>
+      </section>
+    </TaskPane>
+
+    <ThreadPane
+      id="b"
+      journey={workflowJourney}
+      title={work.title}
+      busy={busy.b}
+      model={codex}
+      permission={models.codex.permission}
+      placeholder="Message Codex…"
+      worktree
+      branch={branches.cacheThread}
+      changes=">bDone"
+      changeStat={{ added, removed }}
+    >
+      <div class="hs-user"><div class="hs-bubble">{work.prompt}</div></div>
+      <div class="hs-work">
+        <span class="hs-work-toggle" data-open {...at("<bDone")}><span data-clock="bStart">Working · 0s</span><ProductIcon name="chevronRight" /></span>
+        <span class="hs-work-toggle" {...at(">bDone")}><span data-duration="bStart~bDone">Worked for 9s</span><ProductIcon name="chevronRight" /></span>
+        <div class="hs-work-content" {...at("<bDone")}>
+          <span class="hs-step hs-group-step" {...at("<bRead")}><ProductIcon name="live" class="hs-live" />Reading files<ProductIcon name="chevronRight" /></span>
+          <span class="hs-step hs-group-step" {...at(">bRead")}><ProductIcon name="read" />Read 4 files<ProductIcon name="chevronRight" /></span>
+          <span class="hs-step hs-group-step hs-block" {...at("bRead~bEdited")}><ProductIcon name="live" class="hs-live" />Editing files<ProductIcon name="chevronRight" /></span>
+          <span class="hs-step hs-group-step" {...at(">bEdited")}><ProductIcon name="edit" />Edited 3 files<ProductIcon name="chevronRight" /></span>
+        </div>
+      </div>
+      <div class="hs-reply hs-block" {...at(">bReplyStart")}><Prose text={work.reply} stream="bReplyStart~bReplyEnd" /></div>
+      <section class="hs-change hs-block" {...at(">bDone")}>
+        <div class="hs-change-heading">
+          <span class="hs-change-icon"><ProductIcon name="pencil" /></span>
+          <span class="hs-change-title">
+            <span class="hs-change-summary">Edited 3 files</span>
+            <span class="hs-counts"><span class="hs-added">+{added}</span><span class="hs-removed">−{removed}</span></span>
+          </span>
+          <span class="hs-change-actions">
+            <span class="hs-button hs-button-ghost"><ProductIcon name="undo" />Undo</span>
+            <span class="hs-button">Review</span>
+          </span>
+        </div>
+        {work.change.files.map((file) => (
+          <div class="hs-change-file">
+            <span>{file.path.slice(0, file.path.lastIndexOf("/") + 1)}<span class="hs-file-name">{file.path.slice(file.path.lastIndexOf("/") + 1)}</span></span>
+            <span class="hs-counts"><span class="hs-added">+{file.added}</span><span class="hs-removed">−{file.removed}</span></span>
+          </div>
+        ))}
+      </section>
+      <div class="hs-presence"><span class="hs-orb"><Image src={mark} alt="" width={48} height={48} format="webp" loading="lazy" /></span></div>
+    </ThreadPane>
+  </div>
+</SceneFrame>

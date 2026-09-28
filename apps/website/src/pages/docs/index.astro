@@ -1,0 +1,230 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import Diagram from "../../components/docs/Diagram.astro";
+import { systemDiagram } from "../../data/docs/diagrams";
+import { docHref, docLabel, docPages } from "../../data/docs";
+
+const sections = [
+  { id: "what", title: "What OpenOrc is" },
+  { id: "parts", title: "The parts" },
+  { id: "flow", title: "Following one message" },
+  { id: "terms", title: "Words used in these docs" },
+  { id: "data", title: "Where your data lives" },
+  { id: "source", title: "Source map" },
+  { id: "about", title: "About these pages" },
+];
+---
+
+<DocsLayout slug="" sections={sections}>
+  <section aria-labelledby="what">
+    <h2 id="what">What OpenOrc is</h2>
+    <p>
+      OpenOrc is an Electron desktop app for working with coding agents. It has no language model or agent of its own; the only model it runs is a small local embedding model for memory search. It starts the agent command-line tools you already installed and signed in to (Claude Code,
+      Codex, and OpenCode) and talks to them through their machine-readable interfaces.
+    </p>
+    <p>
+      Agents report what they do as a stream of events: text, tool calls, command output, file changes, and requests for permission. OpenOrc shows that stream as it arrives and saves the finished messages, tool calls, and results in a
+      SQLite database on your computer, together with your conversations, tasks, and project memory.
+    </p>
+    <p>
+      OpenOrc hands your message to the agent's CLI, and the CLI calls its model provider, such as Anthropic or OpenAI, directly with your login. OpenOrc does not proxy or inspect that traffic. There is no OpenOrc account and no OpenOrc
+      server.
+    </p>
+  </section>
+
+  <section aria-labelledby="parts">
+    <h2 id="parts">The parts</h2>
+    <p>OpenOrc is four kinds of process working together.</p>
+    <Diagram diagram={systemDiagram} />
+    <dl class="docs-terms">
+      <div>
+        <dt>Interface</dt>
+        <dd>A React app in an Electron window. Everything stored in OpenOrc comes to it from the core, except the update settings, which main keeps. It asks main for its connection to the core, terminals, the Preview browser, frames for MCP apps, native dialogs, opening links, showing files in the file manager, and window controls.</dd>
+      </div>
+      <div>
+        <dt>Core</dt>
+        <dd>A Node.js process that owns the database, starts the agents, runs Git, and offers OpenOrc's own tools to agents through a local <a href="https://modelcontextprotocol.io">Model Context Protocol</a> (MCP) server.</dd>
+      </div>
+      <div>
+        <dt>Agent CLIs</dt>
+        <dd>One child process of the core per active run. Agents read files, edit them, and run commands in the conversation's folder themselves.</dd>
+      </div>
+      <div>
+        <dt>Electron main</dt>
+        <dd>Creates the windows and starts the core. It also hosts terminals and the Preview browser, and stores encrypted secrets.</dd>
+      </div>
+    </dl>
+    <p>
+      <a href={docHref("processes")}>Processes and messaging</a> covers every process in detail.
+    </p>
+  </section>
+
+  <section aria-labelledby="flow">
+    <h2 id="flow">Following one message</h2>
+    <ol class="docs-steps">
+      <li>You press Send. The interface sends a request such as <code>runs.start</code> to the core over a MessagePort.</li>
+      <li>The core validates it, works out the conversation's folder, agent, model, and mode, and prepares a Git worktree if the conversation uses one.</li>
+      <li>The core starts the agent CLI with OpenOrc's instructions and your message, or sends your message to the process already running for this conversation.</li>
+      <li>The CLI calls its provider and starts working. It reports text, tool calls, and file changes as they happen.</li>
+      <li>An adapter translates that output into OpenOrc's event format. Events go to the window in batches, at most one per run every 16 ms, and to the database in batches every 50 ms.</li>
+      <li>When the turn ends, the core records token usage and, in a Git project, a snapshot of the files. Then it sends your next queued message, if there is one.</li>
+      <li>When the agent process exits while OpenOrc keeps running, and memory is on, the run is queued for memory extraction. Runs that end because you quit are not distilled.</li>
+    </ol>
+    <p>
+      <a href={docHref("conversations")}>Conversations, tasks, and runs</a> walks through the same path function by function.
+    </p>
+  </section>
+
+  <section aria-labelledby="terms">
+    <h2 id="terms">Words used in these docs</h2>
+    <dl class="docs-terms">
+      <div>
+        <dt>Project</dt>
+        <dd>A Git repository you imported. Its conversations can work in your checkout or in their own worktrees.</dd>
+      </div>
+      <div>
+        <dt>Workspace</dt>
+        <dd>The built-in home for conversations outside projects. Each Workspace conversation works in a folder you choose, the shared Workspace folder by default, which does not need to be a Git repository.</dd>
+      </div>
+      <div>
+        <dt>Thread</dt>
+        <dd>A conversation. It has a current agent, model, and mode, and no finished state: you can always continue it.</dd>
+      </div>
+      <div>
+        <dt>Task</dt>
+        <dd>A Markdown document that describes work, with a status. Saving a task never starts an agent.</dd>
+      </div>
+      <div>
+        <dt>Run</dt>
+        <dd>The lifetime of one agent process. A run can contain many turns.</dd>
+      </div>
+      <div>
+        <dt>Turn</dt>
+        <dd>One request and the agent's work until it stops.</dd>
+      </div>
+      <div>
+        <dt>Session</dt>
+        <dd>The provider's own conversation ID. OpenOrc stores it so a later run can resume where the last one stopped.</dd>
+      </div>
+      <div>
+        <dt>Provider</dt>
+        <dd>One of the supported agent tools: Claude Code, Codex, or OpenCode. The code calls them harnesses. The companies whose models they call, such as Anthropic and OpenAI, are called model providers in these pages.</dd>
+      </div>
+      <div>
+        <dt>Ledger</dt>
+        <dd>The database table that holds an agent's events in order. Streaming fragments are removed once the finished item is stored, and native provider output goes to a log file instead.</dd>
+      </div>
+      <div>
+        <dt>Memory</dt>
+        <dd>Short project facts, such as decisions and working commands, distilled from finished runs or recorded by agents and by you.</dd>
+      </div>
+      <div>
+        <dt>Team</dt>
+        <dd>An experimental, saved group of agents with roles. It is off by default.</dd>
+      </div>
+    </dl>
+  </section>
+
+  <section aria-labelledby="data">
+    <h2 id="data">Where your data lives</h2>
+    <p>OpenOrc keeps its data in one profile folder: <code>~/Library/Application Support/OpenOrc</code> on macOS and <code>%APPDATA%\OpenOrc</code> on Windows. The <code>OPENORC_USER_DATA</code> environment variable selects a different folder.</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">What</th>
+            <th scope="col">Where in the profile folder</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Conversations, tasks, events, memory, settings</td>
+            <td><code>openorc.sqlite</code></td>
+          </tr>
+          <tr>
+            <td>Files you attach and images that tools return</td>
+            <td><code>attachments/</code>, <code>tool-images/</code></td>
+          </tr>
+          <tr>
+            <td>Worktrees that OpenOrc creates</td>
+            <td><code>worktrees/</code>; team assignments use <code>team-workspaces/</code></td>
+          </tr>
+          <tr>
+            <td>Native agent output, for debugging</td>
+            <td><code>logs/provider/</code>, kept up to 14 days or 512 MB</td>
+          </tr>
+          <tr>
+            <td>Slack tokens and the optional memory API key</td>
+            <td><code>slack-secrets.enc</code>, <code>memory-extraction-key.enc</code>, encrypted with Electron <code>safeStorage</code> (the macOS Keychain, Windows DPAPI, or the Linux secret service)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      Treat this folder as private. It contains your prompts, source snippets, and command output. <a href={docHref("storage")}>Local storage</a> lists every file and table.
+    </p>
+  </section>
+
+  <section aria-labelledby="source">
+    <h2 id="source">Source map</h2>
+    <p>OpenOrc is a TypeScript monorepo. Every page in these docs names the files it describes.</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Folder</th>
+            <th scope="col">What it holds</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>apps/desktop</code></td>
+            <td>The Electron main process, the preload script, the core's process entry, and the React interface</td>
+          </tr>
+          <tr>
+            <td><code>packages/core</code></td>
+            <td>Application workflows: conversations, runs, tasks, teams, Git actions, memory, Slack, and the RPC handlers</td>
+          </tr>
+          <tr>
+            <td><code>packages/protocol</code></td>
+            <td>Shared types and zod schemas: records, events, and every RPC method</td>
+          </tr>
+          <tr>
+            <td><code>packages/agents</code></td>
+            <td>Adapters for Claude Code, Codex, and OpenCode</td>
+          </tr>
+          <tr>
+            <td><code>packages/db</code></td>
+            <td>SQLite schema, migrations, repositories, the event ledger, and search</td>
+          </tr>
+          <tr>
+            <td><code>packages/git</code></td>
+            <td>Git commands, worktrees, snapshots, and change transfer</td>
+          </tr>
+          <tr>
+            <td><code>packages/memory</code></td>
+            <td>Memory extraction, embeddings, retrieval, and the project brief</td>
+          </tr>
+          <tr>
+            <td><code>packages/mcp</code></td>
+            <td>The local MCP server that exposes OpenOrc's tools to agents</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="about">
+    <h2 id="about">About these pages</h2>
+    <p>These pages were written from the source code and checked against it. When the code and a page disagree, the code is right, and the page is a bug. Please <a href="https://github.com/davejj1530/openorc/issues">open an issue</a>.</p>
+    <ul>
+      {
+        docPages.slice(1).map((page) => (
+          <li>
+            <a href={docHref(page.slug)}>{docLabel(page)}</a>: {page.description}
+          </li>
+        ))
+      }
+    </ul>
+  </section>
+</DocsLayout>

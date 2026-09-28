@@ -1,0 +1,137 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Typecheck, test, build
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check:size
+      - run: node --test scripts/size-limit.test.cjs
+      - run: pnpm -r typecheck
+      - run: pnpm lint
+      - run: pnpm format:check
+      - run: node --test scripts/distribution-notices.test.cjs scripts/desktop-release.test.cjs scripts/packaged-native-target.test.cjs scripts/packaged-runtime-dependencies.test.cjs
+      - run: pnpm -r test
+        env:
+          GIT_AUTHOR_NAME: ci
+          GIT_AUTHOR_EMAIL: ci@openorc.local
+          GIT_COMMITTER_NAME: ci
+          GIT_COMMITTER_EMAIL: ci@openorc.local
+      - run: pnpm build
+
+  windows:
+    name: Windows typecheck and build
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check:size
+      - run: node --test scripts/size-limit.test.cjs
+      - run: pnpm -r typecheck
+      - run: node --test scripts/distribution-notices.test.cjs scripts/desktop-release.test.cjs scripts/packaged-native-target.test.cjs scripts/packaged-runtime-dependencies.test.cjs
+      # The full suite currently includes POSIX-only fixtures (e.g. /bin/sh).
+      # Keep running it in the macOS check job until those tests are portable.
+      - run: pnpm build
+
+  bench:
+    name: Bridge benchmark
+    runs-on: macos-15
+    timeout-minutes: 15
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # The benchmarks drive the app through its test switches, which only a QA build carries.
+      - run: pnpm --filter @openorc/desktop build
+        env:
+          OPENORC_QA_BUILD: "1"
+      - name: Run the bench autorun and enforce budgets
+        working-directory: apps/desktop
+        env:
+          OPENORC_AUTOBENCH: "1"
+          OPENORC_AUTOQUIT: "1"
+        run: |
+          pnpm exec electron . 2>&1 | tee bench.log
+          node - <<'EOF'
+          const fs = require("fs");
+          const lines = fs.readFileSync("bench.log", "utf8").split("\n").filter((l) => l.startsWith("[report] "));
+          const reports = lines.map((l) => JSON.parse(l.slice("[report] ".length)));
+          const bench = reports.find((r) => r.kind === "bench");
+          const scale = reports.find((r) => r.kind === "scale");
+          if (!bench || !scale) { console.error("missing bench or scale report"); process.exit(1); }
+          // Working set overstates private memory on macOS; the 50-agent budget is a regression fence, not a footprint claim.
+          const checks = [
+            ["bench", "coldStartMs", bench.coldStartMs, 1500],
+            ["bench", "longFramesTotal", bench.longFramesTotal, 5],
+            ["scale", "longFramesTotal", scale.longFramesTotal, 30],
+            ["scale", "workingSetTotalMb", scale.workingSetTotalMb, 1500],
+          ];
+          let failed = false;
+          for (const [phase, k, v, max] of checks) {
+            console.log(`${phase}.${k}: ${v} (budget ${max})`);
+            if (typeof v !== "number" || v > max) failed = true;
+          }
+          console.log(`bench: ${bench.sent.eventsSent} events in ${bench.sent.framesSent} frames; scale: ${scale.sent.eventsSent} events across 50 runs`);
+          process.exit(failed ? 1 : 0);
+          EOF
+      - name: Run the large-thread autorun and enforce budgets
+        working-directory: apps/desktop
+        env:
+          OPENORC_AUTOBENCH_THREAD: "1"
+          OPENORC_AUTOQUIT: "1"
+        run: |
+          pnpm exec electron . 2>&1 | tee thread-bench.log
+          node - <<'EOF'
+          const fs = require("fs");
+          const line = fs.readFileSync("thread-bench.log", "utf8").split("\n").find((l) => l.startsWith("[report] ") && l.includes('"thread-bench"'));
+          if (!line) { console.error("missing thread-bench report"); process.exit(1); }
+          const report = JSON.parse(line.slice("[report] ".length));
+          // A 119-turn thread stays open while its own run streams and while five unrelated runs stream.
+          const checks = [
+            ["openMs", report.openMs, 1500],
+            ["stream.longFramesTotal", report.stream?.longFramesTotal, 60],
+            ["unrelated.longFramesTotal", report.unrelated?.longFramesTotal, 10],
+          ];
+          let failed = report.ok === false;
+          for (const [k, v, max] of checks) {
+            console.log(`thread-bench.${k}: ${v} (budget ${max})`);
+            if (typeof v !== "number" || v > max) failed = true;
+          }
+          process.exit(failed ? 1 : 0);
+          EOF

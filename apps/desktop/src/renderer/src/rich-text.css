@@ -1,0 +1,226 @@
+/* Reading rhythm is shared by streamed replies and static document previews. */
+.prose-chat {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.75;
+}
+.prose-chat :where(p) {
+  margin: 0 0 14px;
+}
+.prose-chat :where(p:last-child) {
+  margin-bottom: 0;
+}
+.prose-chat :where(h1, h2, h3, h4, h5, h6) {
+  color: var(--ink);
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.018em;
+  text-wrap: pretty;
+  margin: 28px 0 10px;
+}
+.prose-chat h1 {
+  font-size: var(--text-title-sm);
+}
+.prose-chat h2 {
+  font-size: var(--text-xl);
+}
+.prose-chat h3 {
+  font-size: var(--text-lg);
+}
+.prose-chat :where(h4, h5, h6) {
+  font-size: var(--text-prose);
+}
+.prose-chat > div > :first-child {
+  margin-top: 0;
+}
+.prose-chat strong {
+  font-weight: 600;
+  color: var(--ink);
+}
+.prose-chat :where(ul, ol) {
+  margin: 10px 0 16px;
+  padding-left: 24px;
+}
+.prose-chat :where(ul) {
+  list-style-type: disc;
+}
+.prose-chat :where(ol) {
+  list-style-type: decimal;
+}
+.prose-chat li {
+  margin: 4px 0;
+  padding-left: 3px;
+}
+.prose-chat li::marker {
+  color: var(--ink-3);
+}
+.prose-chat li :where(ul, ol) {
+  margin: 5px 0;
+}
+.prose-chat li p {
+  margin: 4px 0;
+}
+.prose-chat ul:has(> li > input[type="checkbox"]) {
+  list-style: none;
+  padding-left: 0;
+}
+.prose-chat input[type="checkbox"] {
+  margin-right: 8px;
+  vertical-align: baseline;
+}
+.prose-chat a {
+  color: var(--accent-ink);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--accent-ink) 35%, transparent);
+  text-underline-offset: 3px;
+}
+.prose-chat a:hover {
+  text-decoration-color: currentColor;
+}
+.prose-chat :not(pre) > code {
+  font-size: 0.86em;
+  padding: 2px 5px;
+  border-radius: var(--radius-sm);
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+  box-decoration-break: clone;
+}
+.prose-chat blockquote {
+  margin: 16px 0;
+  padding: 3px 0 3px 16px;
+  border-left: 1px solid var(--line-strong);
+  color: var(--ink-2);
+  font-style: normal;
+}
+.prose-chat hr {
+  margin: 24px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+.prose-chat pre {
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  tab-size: 2;
+  margin: 0;
+}
+.prose-chat pre code {
+  font-size: inherit;
+}
+/* Output controls stay compact; each output has a single quiet boundary. */
+[data-streamdown="code-block"],
+[data-streamdown="table-wrapper"],
+[data-streamdown="mermaid-block"] {
+  min-width: 0;
+  max-width: 100%;
+  margin: 16px 0;
+  padding: 0;
+  gap: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+[data-streamdown="code-block"] > div:first-child {
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--line);
+}
+[data-streamdown="code-block-header"] {
+  height: var(--control-md);
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+}
+[data-streamdown="code-block-header"] span {
+  margin-left: 0;
+}
+[data-streamdown="code-block-body"] {
+  border: 0;
+  border-radius: 0;
+  padding: 16px;
+  background: var(--surface-2);
+}
+[data-streamdown="code-block-body"] pre {
+  background: transparent !important;
+}
+[data-streamdown="code-block-body"] code {
+  white-space: pre;
+}
+[data-streamdown="code-block-actions"] button,
+[data-streamdown="table-wrapper"] button,
+[data-streamdown="mermaid-block"] button {
+  min-width: var(--control-md);
+  min-height: var(--control-md);
+  border-radius: var(--radius-sm);
+  color: var(--ink-3);
+}
+[data-streamdown="code-block-actions"] button:hover,
+[data-streamdown="table-wrapper"] button:hover,
+[data-streamdown="mermaid-block"] button:hover {
+  color: var(--ink);
+  background: var(--surface-3);
+}
+[data-streamdown="table-wrapper"] > div:first-child:not(:only-child) {
+  padding: 5px 10px;
+}
+[data-streamdown="table-wrapper"] > div:last-child {
+  border: 0;
+  border-radius: 0;
+}
+[data-streamdown="table"] {
+  width: 100%;
+  margin: 0;
+  border: 0;
+  border-collapse: collapse;
+  font-size: var(--text-base);
+  line-height: 1.6;
+  background: var(--surface);
+}
+[data-streamdown="table"] :is(th, td) {
+  border: 0;
+  border-top: 1px solid var(--line);
+  padding: 10px 14px;
+  min-width: 100px;
+  vertical-align: top;
+}
+[data-streamdown="table"] th {
+  font-weight: 600;
+  color: var(--ink-2);
+  background: var(--surface-2);
+}
+[data-streamdown="table"] tbody tr:hover {
+  background: color-mix(in srgb, var(--surface-2) 55%, var(--surface));
+}
+[data-streamdown="table-fullscreen"],
+[data-streamdown="mermaid-fullscreen"] {
+  background: var(--surface);
+  color: var(--ink);
+}
+[data-streamdown="table-fullscreen"] [data-streamdown="table-wrapper"] {
+  border: 0;
+  margin: 0;
+  border-radius: 0;
+}
+[data-streamdown="mermaid-block"] {
+  padding: 12px;
+}
+.prose-chat .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 16px;
+  margin: 16px 0;
+  background: var(--surface-2);
+  border-radius: var(--radius-md);
+}
+.prose-chat .katex {
+  font-size: 1.1em;
+}
+@container (max-width: 400px) {
+  .prose-chat h1 {
+    font-size: var(--text-xl);
+  }
+  [data-streamdown="code-block-body"] {
+    padding: 12px;
+  }
+  [data-streamdown="table"] :is(th, td) {
+    padding: 8px 10px;
+  }
+}

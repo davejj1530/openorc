@@ -1,0 +1,106 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import { docHref } from "../../data/docs";
+
+const sections = [
+  { id: "windows", title: "More than one window" },
+  { id: "crashes", title: "Crashes and restarts" },
+  { id: "conversations", title: "Conversations" },
+  { id: "tasks", title: "Tasks and Git" },
+  { id: "storage", title: "Storage" },
+  { id: "memory", title: "Memory" },
+  { id: "slack", title: "Slack" },
+  { id: "teams", title: "Teams (Beta)" },
+  { id: "platforms", title: "Windows" },
+];
+---
+
+<DocsLayout slug="known-issues" sections={sections}>
+  <p>These are problems we know about in the version these pages describe. Each one names what you would notice and where it comes from, so you can plan around it until it is fixed.</p>
+
+  <section aria-labelledby="windows">
+    <h2 id="windows">More than one window</h2>
+    <ul>
+      <li><strong>Terminal output goes to the first window.</strong> Main sends terminal output to the first open window only, and any window loading or reloading detaches every terminal panel. Terminals in a second window can stay blank, and opening a window can stop live output in the others until you reopen the panel. (<code>apps/desktop/src/main/pty-host.ts</code>)</li>
+      <li><strong>Replies reach every window.</strong> The core posts every reply to every window, and each window numbers its requests starting from 1. When two windows have a request with the same number in flight, one can receive the other's reply. It is rare, and reloading the window fixes the display. (<code>apps/desktop/src/core/index.ts</code>)</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="crashes">
+    <h2 id="crashes">Crashes and restarts</h2>
+    <ul>
+      <li><strong>A crashed core is not reported.</strong> If the core process exits unexpectedly, windows are not told. Requests wait forever until you reload the window, which starts a new core.</li>
+      <li><strong>Crash cleanup has platform limits.</strong> On macOS and Linux, new agent processes are recorded before launch and surviving process groups are stopped before startup recovery. If ownership cannot be verified, startup blocks and reports the retained process group. Windows does not yet have this recovery mechanism; stop surviving agents before restarting work. Agents started by older versions also have no recovery receipt.</li>
+      <li><strong>Stop does not clear the queue.</strong> Pressing Stop ends the turn, and the next queued message is then sent. Queued messages are kept across restarts: those still waiting are sent when OpenOrc starts again, which starts the agent. A message that was being delivered when OpenOrc stopped is not sent again on its own; it waits in the queue with Retry.</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="conversations">
+    <h2 id="conversations">Conversations</h2>
+    <ul>
+      <li><strong>Switching back to a provider skips what happened in between.</strong> In a project conversation, returning to a provider that already worked in it resumes that provider's older session, with no summary of the other provider's work. Ask it to check the files, or start a fresh session. Workspace conversations start fresh with a short summary instead.</li>
+      <li><strong>Forks remember too much.</strong> Forking from an earlier point shows the conversation up to that point, but the agent's session continues from the parent's latest state, so it may know about later messages. A fork also shares the parent's folder and branch.</li>
+      <li><strong>Schedules need the app open.</strong> Schedules only fire while OpenOrc runs, and missed firings collapse into one.</li>
+      <li><strong>Long team and task histories load all at once.</strong> Ordinary conversations load a few turns at a time, but team conversations and task activity load every event, which can be slow for long histories.</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="tasks">
+    <h2 id="tasks">Tasks and Git</h2>
+    <ul>
+      <li><strong>A task's base branch can be ignored.</strong> When a task starts in the conversation it was created in, and that conversation already has a worktree, the task works on that worktree's branch, not the Base branch chosen for the task. (<code>packages/core/src/services/thread-task-execution.ts</code>)</li>
+      <li><strong>A failed setup script is not retried.</strong> If a project's setup script fails, the worktree is kept, and the next start uses it without running the script again.</li>
+      <li><strong>Terminal shells outlive their conversation.</strong> Deleting a conversation does not close its terminal, and there is no limit on open shells.</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="storage">
+    <h2 id="storage">Storage</h2>
+    <ul>
+      <li><strong>History does not expire.</strong> Conversations, their events, attachments, and the audit log grow until you delete them, and there is no size limit. Raw provider output is the exception: its log files in <code>logs/provider</code> are deleted after 14 days, oldest first once they pass 512 MB, and any raw output kept in the database is deleted after 14 days. Attachments are not deleted even when their conversation is.</li>
+      <li><strong>Staged task images are never cleared.</strong> Images pasted into a task document are staged in the window's IndexedDB and stay there after they are saved.</li>
+      <li><strong>Redaction does not revisit old records.</strong> Text is redacted when it is written, so a secret stored before a rule was added stays until you delete the conversation.</li>
+      <li><strong>Imports ignore custom CLI folders.</strong> Importing sessions reads <code>~/.claude</code> and <code>~/.codex</code> even if you moved them with <code>CLAUDE_CONFIG_DIR</code> or <code>CODEX_HOME</code>.</li>
+    </ul>
+    <p>See <a href={docHref("storage") + "#deleting"}>What deleting removes</a> for what stays after a delete.</p>
+  </section>
+
+  <section aria-labelledby="memory">
+    <h2 id="memory">Memory</h2>
+    <ul>
+      <li><strong>Some runs are never distilled.</strong> Runs that end because you quit are skipped, extraction jobs still waiting when you quit are discarded, failed extractions are not retried, and failures are not shown in the interface. OpenCode cannot run extraction yet, so under Automatic its runs are not summarized.</li>
+      <li><strong>The embedding worker does not restart.</strong> If it crashes, memory search uses full text only until OpenOrc restarts.</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="slack">
+    <h2 id="slack">Slack</h2>
+    <ul>
+      <li><strong>No automatic reconnect.</strong> After OpenOrc restarts, you have to press Connect again.</li>
+      <li><strong>"Also send to channel" replies are ignored.</strong> Slack marks them with a subtype OpenOrc does not accept.</li>
+      <li><strong>Large approvals are long.</strong> An approval for a large edit is posted in full, in as many Slack messages as it needs.</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="teams">
+    <h2 id="teams">Teams (Beta)</h2>
+    <ul>
+      <li><strong>Agents share your checkout.</strong> In local mode, the default, several team members edit your files at the same time, and file claims are advisory.</li>
+      <li><strong>Stopping leaves work unmerged.</strong> Stopping an execution, or reaching its time limit, does not capture or merge work in progress, and no notification is sent.</li>
+      <li><strong>A restart stops running turns.</strong> Turns that were running when OpenOrc stopped are marked as needing attention and wait for you to retry them. Retrying one does not count against the retry limit, and turns that had not started run on their own.</li>
+      <li><strong>Folders and refs accumulate.</strong> Assignment worktrees, merge scratch folders, and checkpoint refs are kept until the team conversation is deleted.</li>
+    </ul>
+    <p>More limitations are listed on <a href={docHref("teams") + "#unfinished"}>Agent teams</a>.</p>
+  </section>
+
+  <section aria-labelledby="platforms">
+    <h2 id="platforms">Windows</h2>
+    <ul>
+      <li>OpenOrc does not probe a login shell on Windows, so it finds agents only through the <code>OPENORC_CODEX_BIN</code>, <code>OPENORC_CLAUDE_BIN</code>, and <code>OPENORC_OPENCODE_BIN</code> environment variables.</li>
+      <li>Claude's Plan and Accept edits modes are unavailable on Windows.</li>
+      <li>Project setup scripts run with <code>/bin/bash</code>, which Windows does not have.</li>
+      <li>Stopping an agent signals only its main process, not the processes it started.</li>
+      <li>Windows beta installers are unsigned.</li>
+    </ul>
+  </section>
+</DocsLayout>

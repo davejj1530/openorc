@@ -1,0 +1,50 @@
+---
+import { Image } from "astro:assets";
+import Icon from "./Icon.astro";
+import mark from "../assets/openorc-mark.png";
+import { getPublishedReleases } from "../data/changelog";
+const docs = Astro.url.pathname.startsWith("/docs");
+const changelog = Astro.url.pathname.startsWith("/changelog");
+const hasPublishedReleases = (await getPublishedReleases()).length > 0;
+const home = Astro.url.pathname === "/" ? "" : "/";
+---
+
+<header class="site-header">
+  <nav class="container nav" aria-label="Main navigation">
+    <a class="wordmark" href="/" aria-label="OpenOrc home">
+      <Image src={mark} alt="" width={32} height={32} format="webp" loading="eager" />
+      OpenOrc
+    </a>
+    <div class="nav-links">
+      <a class="nav-secondary" href={`${home}#workflow`}>
+        Workflow
+      </a>
+      <a class="nav-secondary" href={`${home}#your-tools`}>
+        Your setup
+      </a>
+      <a href="/docs/" aria-current={docs ? "page" : undefined}>
+        Docs
+      </a>
+      {hasPublishedReleases && <a href="/changelog/" aria-current={changelog ? "page" : undefined}>Changelog</a>}
+    </div>
+    <div class="nav-actions">
+      <a class="nav-github" href="https://github.com/davejj1530/openorc" aria-label="OpenOrc on GitHub" target="_blank" rel="noopener noreferrer">
+        <Icon name="github" size={18} />
+        <span>GitHub</span>
+      </a>
+      <button class="button button-small" type="button" disabled aria-label="Download OpenOrc, coming soon">Coming soon</button>
+    </div>
+  </nav>
+</header>
+
+<script>
+  const header = document.querySelector<HTMLElement>(".site-header");
+  if (header) {
+    const updateHeader = () => {
+      header.toggleAttribute("data-at-top", window.scrollY <= 0);
+    };
+    updateHeader();
+    window.addEventListener("scroll", updateHeader, { passive: true });
+    window.addEventListener("pageshow", updateHeader);
+  }
+</script>

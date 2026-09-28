@@ -76,7 +76,8 @@ async function makeWork(dir: string) {
 }
 
 async function expectWork(dir: string, work: Awaited<ReturnType<typeof makeWork>>) {
-  expect(await readFile(path.join(dir, "big.bin"))).toEqual(work.big);
+  // Compare bytes natively: object equality walks millions of Buffer indices.
+  expect((await readFile(path.join(dir, "big.bin"))).equals(work.big), "big.bin must match byte for byte").toBe(true);
   expect(await readFile(path.join(dir, "image.bin"))).toEqual(work.binary);
   expect(await text(dir, "docs/café résumé.md")).toBe("Accents travel.\n");
   expect(await readlink(path.join(dir, "link"))).toBe("README.md");

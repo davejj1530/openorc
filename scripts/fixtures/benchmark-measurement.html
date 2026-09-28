@@ -1,0 +1,46 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Benchmark measurement regression test</title>
+<script type="module">
+  import { beginMainThreadMeasurement } from "./measurement.js";
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const block = (ms) => {
+    const until = performance.now() + ms;
+    while (performance.now() < until) {}
+  };
+  try {
+    await sleep(200);
+    // Model timer coalescing without blocking the thread. This also slows a
+    // polling implementation's own timers, so reverting to that proxy fails.
+    const original = window.setInterval.bind(window);
+    window.setInterval = (callback, delay, ...args) => original(callback, Math.max(80, delay), ...args);
+    let delayedCallbacks = 0;
+    const timer = setInterval(() => delayedCallbacks++, 4);
+    const finishDelayed = beginMainThreadMeasurement();
+    while (delayedCallbacks < 6) await sleep(20);
+    const delayed = await finishDelayed();
+    clearInterval(timer);
+    window.setInterval = original;
+
+    const finishFrozen = beginMainThreadMeasurement();
+    for (let i = 0; i < 6; i++) {
+      await sleep(20);
+      block(60);
+    }
+    const frozen = await finishFrozen();
+
+    // Finish synchronously in the same task as the freeze. The browser cannot
+    // enqueue its longtask entry until this task has returned.
+    await sleep(20);
+    const finishBoundary = beginMainThreadMeasurement();
+    block(60);
+    const boundary = await finishBoundary();
+    await sleep(20);
+    const finishNext = beginMainThreadMeasurement();
+    await sleep(100);
+    const next = await finishNext();
+    console.log("[measurement] " + JSON.stringify({ delayedCallbacks, delayed, frozen, boundary, next }));
+  } catch (error) {
+    console.log("[measurement] " + JSON.stringify({ error: String(error) }));
+  }
+</script>

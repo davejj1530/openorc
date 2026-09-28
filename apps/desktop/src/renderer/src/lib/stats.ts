@@ -40,15 +40,15 @@ let framesReceived = 0;
 const benchmarkFrames = new FrameMeasurement();
 let finishMainThread: ReturnType<typeof beginMainThreadMeasurement> | null = null;
 export function beginBenchmarkFrames() {
-  finishMainThread?.();
+  if (finishMainThread) throw new Error("A benchmark measurement is already active");
   benchmarkFrames.begin(performance.now());
   finishMainThread = beginMainThreadMeasurement();
 }
-export function finishBenchmarkFrames() {
+export async function finishBenchmarkFrames() {
   if (!finishMainThread) throw new Error("No benchmark measurement is active");
   const mainThread = finishMainThread();
   finishMainThread = null;
-  return { ...benchmarkFrames.finish(performance.now()), mainThread };
+  return { ...benchmarkFrames.finish(performance.now()), mainThread: await mainThread };
 }
 
 /** Totals up to the last frame; the store only catches up once a second. */

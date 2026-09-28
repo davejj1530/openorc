@@ -1,0 +1,43 @@
+--- a/dist/managers/ResizeManager.js
++++ b/dist/managers/ResizeManager.js
+@@ -2,14 +2,26 @@
+ var ResizeManager = class ResizeManager {
+ 	static resizeObserver;
+ 	static managersByElement = /* @__PURE__ */ new Map();
++	static pendingEntries = /* @__PURE__ */ new Map();
++	static resizeFrame;
+ 	static getResizeObserver() {
+ 		const resizeObserver = ResizeManager.resizeObserver ?? new ResizeObserver(ResizeManager.handleSharedResizeEntries);
+ 		ResizeManager.resizeObserver = resizeObserver;
+ 		return resizeObserver;
+ 	}
+ 	static handleSharedResizeEntries(entries) {
++		// Column width variables can reflow annotations and resize an ancestor.
++		// Apply them next frame, outside ResizeObserver's current delivery loop.
++		for (const entry of entries) if (ResizeManager.managersByElement.has(entry.target)) ResizeManager.pendingEntries.set(entry.target, entry);
++		if (ResizeManager.resizeFrame == null && ResizeManager.pendingEntries.size > 0) ResizeManager.resizeFrame = requestAnimationFrame(ResizeManager.flushSharedResizeEntries);
++	}
++	static flushSharedResizeEntries() {
++		ResizeManager.resizeFrame = void 0;
++		const entries = Array.from(ResizeManager.pendingEntries.values());
++		ResizeManager.pendingEntries.clear();
+ 		const entriesByManager = /* @__PURE__ */ new Map();
+ 		for (const entry of entries) {
++			if (!entry.target.isConnected) continue;
+ 			const manager = ResizeManager.managersByElement.get(entry.target);
+ 			if (manager == null) continue;
+ 			const managerEntries = entriesByManager.get(manager);
+@@ -167,7 +179,13 @@
+ 		if (owner == null) return;
+ 		else if (owner !== this) throw new Error("ResizeManager.unobserve: element is owned by another ResizeManager");
+ 		managersByElement.delete(element);
++		ResizeManager.pendingEntries.delete(element);
+ 		resizeObserver?.unobserve(element);
++		if (managersByElement.size === 0 && ResizeManager.resizeFrame != null) {
++			cancelAnimationFrame(ResizeManager.resizeFrame);
++			ResizeManager.resizeFrame = void 0;
++			ResizeManager.pendingEntries.clear();
++		}
+ 		if (resizeObserver != null && managersByElement.size === 0) {
+ 			resizeObserver.disconnect();
+ 			ResizeManager.resizeObserver = void 0;

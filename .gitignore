@@ -1,0 +1,23 @@
+node_modules/
+.pnpm-store/
+dist/
+out/
+release/
+release-smoke/
+*.log
+.DS_Store
+.env
+.env.*
+!.env.example
+coverage/
+
+# Local design reviews, generated previews, and temporary QA entrypoints.
+/output/
+/apps/desktop/.transcript-*.html
+
+# Local promo video sources, audio, and renders.
+/.promo-videos/
+
+# Local agent instructions and development notes.
+/AGENTS.md
+/.local-development/

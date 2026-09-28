@@ -1,0 +1,25 @@
+---
+/**
+ * The coding agents OpenOrc works with, as one monochrome row. The marks are
+ * the provider files the app ships (public/*.svg), recolored to the text color.
+ */
+import openai from "../../public/openai.svg?raw";
+import claude from "../../public/claude.svg?raw";
+import opencode from "../../public/opencode.svg?raw";
+
+const mono = (svg: string) => (svg.match(/<path[^>]*\/>|<path[^>]*>.*?<\/path>/gs)?.join("") ?? "").replace(/fill="[^"]*"/g, 'fill="currentColor"');
+const agents = [
+  { name: "Codex", viewBox: "0 0 41 41", paths: mono(openai) },
+  { name: "Claude Code", viewBox: "0 0 125 125", paths: mono(claude) },
+  { name: "OpenCode", viewBox: "96 64 320 384", paths: mono(opencode) },
+];
+---
+
+<ul class="agent-logos" aria-label="Supported coding agents">
+  {agents.map((agent) => (
+    <li>
+      <svg viewBox={agent.viewBox} aria-hidden="true" set:html={agent.paths} />
+      <span>{agent.name}</span>
+    </li>
+  ))}
+</ul>

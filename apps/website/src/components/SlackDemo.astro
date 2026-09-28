@@ -1,0 +1,80 @@
+---
+/** A synthetic Slack thread that ends at OpenOrc's real owner-only approval step. */
+import { Image } from "astro:assets";
+import mark from "../assets/openorc-mark.png";
+import { slack, slackJourney } from "../data/hero/slack";
+import { timed } from "../data/hero/timeline";
+
+const at = (windows: string) => timed(slackJourney, windows);
+---
+
+<div class="slack-card" role="img" aria-label="A sample Slack thread. David asks OpenOrc to simplify the studio welcome screen. OpenOrc posts a progress line naming the model and the tool it is using, which becomes its reply: should Connect a project be the one clear next step? David confirms. A new progress line waits for approval, and a permission request to edit Welcome.tsx offers Allow once and Deny, with buttons that expire after 10 minutes." data-hero-scene data-scene="slack" data-paused>
+  <div class="slack-card-head">
+    <strong>Thread</strong>
+    <span class="slack-card-channel"><span class="slack-hash">#</span>{slack.channel}</span>
+    <span class="slack-card-more" aria-hidden="true">···</span>
+  </div>
+  <div class="slack-body">
+    <div class="slack-message hs-block" {...at(">message")}>
+      <span class="slack-avatar slack-avatar-user">{slack.user.initials}</span>
+      <div class="slack-message-body">
+        <div class="slack-meta"><strong>{slack.user.name}</strong><time>{slack.times.first}</time></div>
+        <p><span class="slack-mention">@openorc</span> {slack.message}</p>
+      </div>
+    </div>
+    {/* One progress message per request, edited into the reply when the turn ends. */}
+    <div class="slack-message hs-block" {...at(">progress")}>
+      <span class="slack-avatar slack-avatar-app"><Image src={mark} alt="" width={72} height={72} format="webp" loading="lazy" /></span>
+      <div class="slack-message-body">
+        <div class="slack-meta"><strong>{slack.bot.name}</strong><span class="slack-app">APP</span><time>{slack.times.first}</time></div>
+        <p><span class="slack-mention">@{slack.user.name}</span> <span {...at("progress~reply")}>{slack.progress.reading}</span><span {...at(">reply")}>{slack.reply}</span></p>
+      </div>
+    </div>
+    <div class="slack-message hs-block" {...at(">followup")}>
+      <span class="slack-avatar slack-avatar-user">{slack.user.initials}</span>
+      <div class="slack-message-body">
+        <div class="slack-meta"><strong>{slack.user.name}</strong><time>{slack.times.second}</time></div>
+        <p>{slack.followup}</p>
+      </div>
+    </div>
+    <div class="slack-message hs-block" {...at(">working")}>
+      <span class="slack-avatar slack-avatar-app"><Image src={mark} alt="" width={72} height={72} format="webp" loading="lazy" /></span>
+      <div class="slack-message-body">
+        <div class="slack-meta"><strong>{slack.bot.name}</strong><span class="slack-app">APP</span><time>{slack.times.second}</time></div>
+        <p><span class="slack-mention">@{slack.user.name}</span> <span {...at("working~permission")}>{slack.progress.editing}</span><span {...at(">permission")}>{slack.progress.waiting}</span></p>
+      </div>
+    </div>
+    {/* A second message from the bot within minutes, so Slack groups it under the one above. */}
+    <div class="slack-message slack-permission hs-block" {...at(">permission")}>
+      <span></span>
+      <div class="slack-message-body">
+        <p><span class="slack-mention">@{slack.user.name}</span> <strong>Permission requested</strong></p>
+        <div class="slack-approval-detail">
+          <span class="slack-approval-tool">{slack.permission.tool}</span>
+          <span class="slack-approval-tool">{slack.permission.input}</span>
+        </div>
+        <div class="slack-approval-note">Only you can decide. Allow applies once. Buttons expire after 10 minutes.</div>
+        <div class="slack-approval-actions"><span>Allow once</span><span>Deny</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="slack-composer" aria-hidden="true">
+    <div class="slack-composer-tools">
+      <span class="slack-tool-bold">B</span><span class="slack-tool-italic">I</span><span class="slack-tool-strike">S</span>
+      <span class="slack-tool-divider"></span>
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m8.1 11.9 3.8-3.8M7 7.8l-1.6 1.6a3 3 0 0 0 4.2 4.2l1.6-1.6m-2.4-4 1.6-1.6a3 3 0 0 1 4.2 4.2L13 12.2" /></svg>
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M7 5h9M7 10h9M7 15h9" /><circle cx="3.5" cy="5" r=".7" fill="currentColor" stroke="none" /><circle cx="3.5" cy="10" r=".7" fill="currentColor" stroke="none" /><circle cx="3.5" cy="15" r=".7" fill="currentColor" stroke="none" /></svg>
+    </div>
+    <div class="slack-composer-input">
+      <span class="slack-placeholder" {...at("<draftStart >followup")}>Reply to thread…</span>
+      <span class="slack-draft" data-type="draftStart~draftEnd" data-text={slack.followup} {...at("draftStart~followup")}></span>
+    </div>
+    <div class="slack-composer-foot"><span class="slack-composer-add">+</span><span class="slack-composer-hint">Shift ↵ for new line</span><span class="slack-composer-send"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10h11m-4-4 4 4-4 4" /></svg></span></div>
+  </div>
+</div>
+
+<script>
+  import { observeHeroScenes } from "../scripts/observe-hero-scenes";
+
+  observeHeroScenes("[data-scene=\"slack\"]");
+</script>

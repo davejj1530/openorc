@@ -1,0 +1,55 @@
+---
+import Layout from "../layouts/Layout.astro";
+import SiteHeader from "../components/SiteHeader.astro";
+import SiteFooter from "../components/SiteFooter.astro";
+import { docHref } from "../data/docs";
+import "../styles/privacy.css";
+---
+
+<Layout title="Privacy policy · OpenOrc" description="How the OpenOrc website and desktop app handle information, including local storage, model providers, and optional integrations.">
+  <SiteHeader />
+  <main id="main" class="container privacy-page">
+    <header class="privacy-intro">
+      <h1>Privacy policy</h1>
+      <p class="privacy-date">Last updated September 27, 2026</p>
+      <p>This page describes what information the OpenOrc website and the OpenOrc desktop app handle.</p>
+    </header>
+    <article class="privacy-article" aria-label="Privacy policy">
+      <section aria-labelledby="website-title">
+        <h2 id="website-title">This website</h2>
+        <p>This website is a set of static pages with no accounts or forms. It uses Google Analytics to measure visits and which pages people use. Your browser loads Google's measurement script and sends information about your visit to Google Analytics, including the page viewed and browser and device details. Google Analytics uses first-party cookies to distinguish visitors and sessions. You can read more about this in <a href="https://support.google.com/analytics/answer/6004245">Google's description of Analytics data collection</a>.</p>
+        <p>Like any website, the server that delivers these pages receives the information included in every web request, such as your IP address, the page requested, and your browser’s user agent. The hosting service may keep this in access logs under its own terms.</p>
+      </section>
+      <section aria-labelledby="app-title">
+        <h2 id="app-title">The desktop app</h2>
+        <p>OpenOrc stores its settings, conversation history, tasks, execution events, and project memory on your computer. Project files and Git worktrees stay in their own folders. OpenOrc has no account of its own and sends no usage analytics.</p>
+        <p>When an agent runs, its provider receives your request and the context the agent works with, which can include conversation history, project files, and tool output. Providers handle this under their own terms and your account settings. The agent command-line tools you install also connect to their own services and keep their own local transcripts, under their own terms.</p>
+        <p>To name a conversation, OpenOrc sends the first 1,500 characters of your first request and of the reply to a small model from the conversation’s own agent. You can choose another provider for titles, or turn them off, in settings.</p>
+        <p>Memory is off until you turn it on. While it is on, OpenOrc summarizes finished runs to find what is worth remembering, and adds saved memories to later requests, whichever agent runs them. By default the agent that did the work also summarizes it. OpenCode cannot summarize yet, so its runs are skipped. You can instead choose one provider, or your Anthropic API key, to summarize every eligible run, including OpenCode’s. Replies to task comments are never summarized.</p>
+        <p>Memory search uses an 83 MB embedding model that runs on your computer. OpenOrc downloads it from Google Cloud Storage the first time memory needs it: when it saves a memory, searches, or indexes saved memories at startup. The download is checked against a fixed SHA-256 checksum. Nothing is downloaded while memory is off.</p>
+        <p>Installed releases ask GitHub Releases for updates shortly after launch and every six hours. These checks send no identifier for your installation, and you can turn them off in settings. Downloading and installing an update always requires your action.</p>
+        <p>On the same schedule, OpenOrc checks whether the agent command-line tools you installed have newer versions. It asks <code>registry.npmjs.org</code>, or <code>formulae.brew.sh</code> for tools installed with Homebrew, without cookies or credentials. These checks are on by default, and you can turn them off in settings. Installing an agent update always waits for you.</p>
+        <p>Before creating a worktree from a named branch, OpenOrc runs your own Git to fetch that branch from the repository’s <code>origin</code> remote. The built-in Preview browser loads the pages you or an agent open, and keeps their cookies and site data in OpenOrc’s application data. The <a href={docHref("network")}>network page</a> lists every connection the app makes.</p>
+      </section>
+      <section aria-labelledby="slack-title">
+        <h2 id="slack-title">If you connect Slack</h2>
+        <p>The optional Slack integration connects an activated Slack thread to a desktop conversation. Messages, participant and channel identifiers, progress updates, replies, and permission decisions pass between Slack and your computer. If you use a shared relay, the computer hosting it also routes these messages. Slack and your workspace administrator control the records kept in Slack. You can disconnect Slack in settings.</p>
+        <p>Each request you send from an activated Slack thread reaches your provider with the thread’s earlier messages, including other participants’ messages and the images attached to them. OpenOrc also saves those messages in the desktop conversation.</p>
+      </section>
+      <section aria-labelledby="retention-title">
+        <h2 id="retention-title">Storage and removal</h2>
+        <p>Local records stay in OpenOrc’s application data until you remove them. The exception is the provider log in <code>logs/provider</code>, a copy of the agents’ raw output kept for troubleshooting: OpenOrc deletes its files after 14 days, or sooner once the folder passes 512 MB. Removing a local conversation does not remove copies held by providers, Slack, backups, or your project files. Uninstalling the app may leave its data folder in place.</p>
+        <p>OpenOrc removes common secret formats, such as API keys, access tokens, passwords set in code or configuration, and credentials in URLs, from the records it keeps: execution events and their search index, run results and errors, the audit log, memories, summaries, and the provider log. It cannot recognize every sensitive value. Text that OpenOrc passes to an agent later, such as plans, task comments, and team messages, is stored as written, and so are your unsent drafts.</p>
+      </section>
+      <section aria-labelledby="contact-title">
+        <h2 id="contact-title">Questions</h2>
+        <p>Ask a privacy question or report a concern by opening an issue in the <a href="https://github.com/davejj1530/openorc/issues">OpenOrc GitHub repository</a>. Issues are public, so do not include personal or confidential information. Requests about information held by a model provider, Slack, or another connected service should go to that service.</p>
+      </section>
+      <section aria-labelledby="updates-title">
+        <h2 id="updates-title">Changes to this policy</h2>
+        <p>This page changes when the website or the app changes how it handles information. The date above shows the latest revision.</p>
+      </section>
+    </article>
+  </main>
+  <SiteFooter />
+</Layout>

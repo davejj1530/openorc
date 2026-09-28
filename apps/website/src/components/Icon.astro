@@ -1,0 +1,23 @@
+---
+interface Props {
+  name: "arrow" | "branch" | "check" | "thread" | "tasks" | "memory" | "chevron" | "plus" | "download" | "github";
+  size?: number;
+}
+const { name, size = 18 } = Astro.props;
+const paths = {
+  arrow: "M5 12h14m-6-6 6 6-6 6",
+  branch: "M6 7v10m0-5h6a6 6 0 0 0 6-6M8 5a2 2 0 1 1-4 0 2 2 0 0 1 4 0Zm0 14a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM20 4a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z",
+  check: "m5 12 4 4 10-10",
+  thread: "M7 4h10a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3h-6l-6 3v-3a3 3 0 0 1-2-3V7a3 3 0 0 1 3-3h1Z",
+  tasks: "m3 6 2 2 3-4m3 2h10M3 12h5m3 0h10M3 18h5m3 0h10",
+  memory: "M8 3h8v5h5v8h-5v5H8v-5H3V8h5V3Zm0 5h8v8H8V8Z",
+  chevron: "m9 5 7 7-7 7",
+  plus: "M12 5v14M5 12h14",
+  download: "M12 3v11m-4-4 4 4 4-4M4 17v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3",
+  github: "M12 .5C5.65 .5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.57.11.78-.24.78-.55 0-.27-.01-1.16-.02-2.11-3.2.7-3.88-1.36-3.88-1.36-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.75 1.18 1.75 1.18 1.02 1.74 2.68 1.24 3.34.95.1-.74.4-1.24.73-1.52-2.56-.29-5.25-1.28-5.25-5.7 0-1.26.45-2.3 1.18-3.11-.12-.29-.51-1.47.11-3.07 0 0 .96-.31 3.14 1.19a10.9 10.9 0 0 1 5.72 0c2.18-1.5 3.14-1.19 3.14-1.19.62 1.6.23 2.78.11 3.07.73.81 1.18 1.85 1.18 3.11 0 4.43-2.69 5.4-5.26 5.69.42.37.79 1.09.79 2.2 0 1.59-.02 2.87-.02 3.26 0 .31.21.67.79.55A11.51 11.51 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z",
+};
+---
+
+<svg width={size} height={size} viewBox="0 0 24 24" fill={name === "github" ? "currentColor" : "none"} stroke={name === "github" ? "none" : "currentColor"} stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d={paths[name]} />
+</svg>

@@ -1,0 +1,177 @@
+{
+  "upstream": "https://github.com/devicons/devicon",
+  "release": "v2.17.0",
+  "revision": "54cfe13ac10eaa1ef817a343ab0a9437eb3c2e08",
+  "license": "MIT",
+  "licenseFile": "licenses/vendor/devicon-MIT.txt",
+  "assets": [
+    {
+      "id": "react",
+      "file": "react.svg",
+      "source": "https://raw.githubusercontent.com/devicons/devicon/54cfe13ac10eaa1ef817a343ab0a9437eb3c2e08/icons/react/react-original.svg",
+      "sha256": "5825b649c8c04dec13ecf01d0182401bd0ec71789d2fa06224866d882cd1515f",
+      "bytes": 2387
+    },
+    {
+      "id": "nextjs",
+      "file": "nextjs.svg",
+      "source": "https://raw.githubusercontent.com/devicons/devicon/54cfe13ac10eaa1ef817a343ab0a9437eb3c2e08/icons/nextjs/nextjs-original.svg",
+      "sha256": "d9435c4ede7133b376c0173a80226bb3856729366707cd96e9a66e39448d0288",
+      "bytes": 749
+    },
+    {
+      "id": "nestjs",
+      "file": "nestjs.svg",
+      "source": "https://raw.githubusercontent.com/devicons/devicon/54cfe13ac10eaa1ef817a343ab0a9437eb3c2e08/icons/nestjs/nestjs-original.svg",
+      "sha256": "97ae5e5666850f1f6119871a4197bef2da3472cd2d40a32e9420792a8bfcd360",
+      "bytes": 5571
+    },
+    {
+      "id": "vue",
+      "file": "vuejs.svg",
+      "source": "https://raw.githubusercontent.com/devicons/devicon/54cfe13ac10eaa1ef817a343ab0a9437eb3c2e08/icons/vuejs/vuejs-original.svg",
+      "sha256": "4cc1153600c0845c645ac6c718c11d516d6899079a0dc406e3d62f68b1d02c49",
+      "bytes": 561
+    },
+    {
+      "id": "nuxt",
+      "file": "nuxt.svg",
+      "source": "https://raw.githubusercontent.com/devicons/devicon/54cfe13ac10eaa1ef817a343ab0a9437eb3c2e08/icons/nuxt/nuxt-original.svg",
+      "sha256": "c32689e693898de8639d44b0ae5bee53c28a37005dd7d65fe2c0bc85b0d0cc04",
+      "bytes": 855
+    },
+    {
+      "id": "svelte",
+      "file": "svelte.svg",
+      "source": "https://raw.githubusercontent.com/devicons/devicon/54cfe13ac10eaa1ef817a343ab0a9437eb3c2e08/icons/svelte/svelte-original.svg",
+      "sha256": "1941fe737cb55f6a88bf919d43131d3e346a1d2a0117bcf319f6638cf21f69f8",
+      "bytes": 3833
+    },
+    {
+      "id": "astro",
+      "file": "astro.svg",
+      "source": "https://raw.githubusercontent.com/devicons/devicon/54cfe13ac10eaa1ef817a343ab0a9437eb3c2e08/icons/astro/astro-original.svg",
+      "sha256": "f48e027603ad5d9823b86bd94fb77a499b0fae27e91649d5f9290fc9c92cecae",
+      "bytes": 1796
+    },
+    {
+      "id": "angular",
+      "file": "angular.svg",
+      "source": "https://raw.githubusercontent.com/devicons/devicon/54cfe13ac10eaa1ef817a343ab0a9437eb3c2e08/icons/angular/angular-original.svg",
+      "sha256": "9666f86466e1175ba5e0c685fb423123e93a544732fd7b241e92a192cbb613ab",
+      "bytes": 1115
+    },
+    {
+      "id": "express",
+      "file": "express.svg",
+      "source": "https://raw.githubusercontent.com/devicons/devicon/54cfe13ac10eaa1ef817a343ab0a9437eb3c2e08/icons/express/express-original.svg",
+      "sha256": "27ec7e3d21d59102c046a96277877abf78aa9d7ad244277345d9c395486d42d4",
+      "bytes": 914
+    },
+    {
+      "id": "laravel",
+      "file": "laravel.svg",
+      "source": "https://raw.githubusercontent.com/devicons/devicon/54cfe13ac10eaa1ef817a343ab0a9437eb3c2e08/icons/laravel/laravel-original.svg",
+      "sha256": "b293960cd642537d2b19a1442168a396f25bdd31eb10f4f92447623cfc5730df",
+      "bytes": 2339
+    },
+    {
+      "id": "django",
+      "file": "django.svg",
+      "source": "https://raw.githubusercontent.com/devicons/devicon/54cfe13ac10eaa1ef817a343ab0a9437eb3c2e08/icons/django/django-plain.svg",
+      "sha256": "c3037ac285dd5f85ee148a151afb85e64b2a03b62c3affc178376d82ebff6a46",
+      "bytes": 644
+    },
+    {
+      "id": "fastapi",
+      "file": "fastapi.svg",
+      "source": "https://raw.githubusercontent.com/devicons/devicon/54cfe13ac10eaa1ef817a343ab0a9437eb3c2e08/icons/fastapi/fastapi-original.svg",
+      "sha256": "7ef41f6a363b00ff595e6d0b933c025c92cbfae29dc1df24b2f6eb8b476ee486",
+      "bytes": 3065
+    },
+    {
+      "id": "javascript",
+      "file": "javascript.svg",
+      "source": "https://raw.githubusercontent.com/devicons/devicon/54cfe13ac10eaa1ef817a343ab0a9437eb3c2e08/icons/javascript/javascript-original.svg",
+      "sha256": "0656ff65fc8eeacda5c78d7f9ffe91ec1eb919db64f56e0b7dcd460af4bbd36c",
+      "bytes": 1144
+    },
+    {
+      "id": "typescript",
+      "file": "typescript.svg",
+      "source": "https://raw.githubusercontent.com/devicons/devicon/54cfe13ac10eaa1ef817a343ab0a9437eb3c2e08/icons/typescript/typescript-original.svg",
+      "sha256": "c9191199f4049920c2fc19035b8a6664f37f4689fcd9e8434e786097e78863f0",
+      "bytes": 943
+    },
+    {
+      "id": "python",
+      "file": "python.svg",
+      "source": "https://raw.githubusercontent.com/devicons/devicon/54cfe13ac10eaa1ef817a343ab0a9437eb3c2e08/icons/python/python-original.svg",
+      "sha256": "71493b4a732f0532b3a03a7a95da3ee11a65766367c8303b901ffbe7bf91a3a2",
+      "bytes": 2300
+    },
+    {
+      "id": "go",
+      "file": "go.svg",
+      "source": "https://raw.githubusercontent.com/devicons/devicon/54cfe13ac10eaa1ef817a343ab0a9437eb3c2e08/icons/go/go-original.svg",
+      "sha256": "2d4558b96d3ec71d0d922a62668cb2ea5a5d83ed7d4caf6b0479b3266f795a2f",
+      "bytes": 8965
+    },
+    {
+      "id": "rust",
+      "file": "rust.svg",
+      "source": "https://raw.githubusercontent.com/devicons/devicon/54cfe13ac10eaa1ef817a343ab0a9437eb3c2e08/icons/rust/rust-original.svg",
+      "sha256": "16c6c6a98e990944fc5e1cc64cc8fc7b8be3a662ec4ee7951b7995d2e52f5e12",
+      "bytes": 5897
+    },
+    {
+      "id": "java",
+      "file": "java.svg",
+      "source": "https://raw.githubusercontent.com/devicons/devicon/54cfe13ac10eaa1ef817a343ab0a9437eb3c2e08/icons/java/java-original.svg",
+      "sha256": "7582e518a9c02425f97155e5a3bd39d1a3a7d421b78caf9c8df7443dad3edc5d",
+      "bytes": 1540
+    },
+    {
+      "id": "csharp",
+      "file": "csharp.svg",
+      "source": "https://raw.githubusercontent.com/devicons/devicon/54cfe13ac10eaa1ef817a343ab0a9437eb3c2e08/icons/csharp/csharp-original.svg",
+      "sha256": "7093478d0888e22a224b6fa832da6c9ffd14c433de8bd14aab0c1cb50925f3ee",
+      "bytes": 851
+    },
+    {
+      "id": "ruby",
+      "file": "ruby.svg",
+      "source": "https://raw.githubusercontent.com/devicons/devicon/54cfe13ac10eaa1ef817a343ab0a9437eb3c2e08/icons/ruby/ruby-original.svg",
+      "sha256": "74ead50b8f0f31e1b34618088bc0b0e16c04f1d4539039ef9358717d8505a63c",
+      "bytes": 8328
+    },
+    {
+      "id": "php",
+      "file": "php.svg",
+      "source": "https://raw.githubusercontent.com/devicons/devicon/54cfe13ac10eaa1ef817a343ab0a9437eb3c2e08/icons/php/php-original.svg",
+      "sha256": "f22619a19c99a123e4678d71826f65f223721a739631dff46de39827c9ee0633",
+      "bytes": 4624
+    },
+    {
+      "id": "swift",
+      "file": "swift.svg",
+      "source": "https://raw.githubusercontent.com/devicons/devicon/54cfe13ac10eaa1ef817a343ab0a9437eb3c2e08/icons/swift/swift-original.svg",
+      "sha256": "46b6e4abd3ab12c589b8e276295f9439e2869bc4788d918efbc6e76147e8a06e",
+      "bytes": 1294
+    },
+    {
+      "id": "c",
+      "file": "c.svg",
+      "source": "https://raw.githubusercontent.com/devicons/devicon/54cfe13ac10eaa1ef817a343ab0a9437eb3c2e08/icons/c/c-original.svg",
+      "sha256": "8cce48da91084256f15653e02bfd7046ccb34489d030cb1aa34dee766daad6b7",
+      "bytes": 241
+    },
+    {
+      "id": "cpp",
+      "file": "cplusplus.svg",
+      "source": "https://raw.githubusercontent.com/devicons/devicon/54cfe13ac10eaa1ef817a343ab0a9437eb3c2e08/icons/cplusplus/cplusplus-original.svg",
+      "sha256": "7ff8253551235e3a6b002a7c2bd6e3190d85113a64fcb40f2254473caeb025d4",
+      "bytes": 1143
+    }
+  ]
+}

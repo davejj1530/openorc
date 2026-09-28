@@ -1,0 +1,37 @@
+.rive-mascot {
+  position: relative;
+  pointer-events: none;
+}
+
+.rive-mascot-static,
+.rive-mascot-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.rive-mascot-static {
+  display: block;
+}
+
+.rive-mascot-canvas {
+  visibility: hidden;
+}
+
+.rive-mascot[data-ready="true"] > .rive-mascot-canvas {
+  visibility: visible;
+}
+
+.rive-mascot[data-ready="true"] > .rive-mascot-static {
+  visibility: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rive-mascot[data-ready] > .rive-mascot-canvas {
+    visibility: hidden;
+  }
+  .rive-mascot[data-ready] > .rive-mascot-static {
+    visibility: visible;
+  }
+}

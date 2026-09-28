@@ -1,0 +1,31 @@
+---
+/**
+ * The OpenOrc window a hero scene plays in: traffic lights, the sidebar, and
+ * the scene's own main area in the slot. scripts/hero-scene.ts drives the
+ * journey named by `id`; data/hero/index.ts maps ids to journeys.
+ */
+import SceneSidebar from "./SceneSidebar.astro";
+import type { SidebarRow } from "../../data/hero/workspace";
+import type { Journey } from "../../data/hero/timeline";
+import "../../styles/hero-scene.css";
+
+interface Props {
+  id: string;
+  journey: Journey;
+  label: string;
+  /** Resting values of the scene-wide states its journey drives. */
+  view: string;
+  nav?: "Tasks";
+  rows: SidebarRow[];
+  inboxPending?: string;
+  /** Blocks open with springs and messages fly between threads (scripts/hero-motion.ts). */
+  motion?: boolean;
+}
+const { id, journey, label, view, nav, rows, inboxPending, motion } = Astro.props;
+---
+
+<div class="hero-scene" role="img" aria-label={label} data-hero-scene data-scene={id} data-view={view} data-sidebar="closed" data-motion={motion ? "" : undefined} data-paused>
+  <span class="hs-lights" aria-hidden="true"><i></i><i></i><i></i></span>
+  <SceneSidebar journey={journey} nav={nav} rows={rows} inboxPending={inboxPending} />
+  <slot />
+</div>

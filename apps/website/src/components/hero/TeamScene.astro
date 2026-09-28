@@ -1,0 +1,107 @@
+---
+/**
+ * Agent team. One instruction to a saved team: the lead sets a contract, the
+ * server and client members build against it and tell each other about
+ * changes, and the reviewer catches a bug between the two halves. Content and
+ * timing: data/hero/team.ts.
+ */
+import { Image } from "astro:assets";
+import mark from "../../assets/openorc-mark.png";
+import lead from "../../assets/team-avatars/avatar-01-facet.png";
+import server from "../../assets/team-avatars/avatar-02-ripple.png";
+import reviewer from "../../assets/team-avatars/avatar-03-helix.png";
+import client from "../../assets/team-avatars/avatar-04-portal.png";
+import ProductIcon from "./ProductIcon.astro";
+import Prose from "./Prose.astro";
+import SceneFrame from "./SceneFrame.astro";
+import ThreadPane from "./ThreadPane.astro";
+import { members, team, teamJourney, type MemberKey } from "../../data/hero/team";
+import { branches, models, teamThread } from "../../data/hero/workspace";
+import { timed } from "../../data/hero/timeline";
+
+interface Props {
+  label: string;
+}
+const { label } = Astro.props;
+const portraits: Record<MemberKey, ImageMetadata> = { lead, server, client, reviewer };
+const fixed = team.turns.find((turn) => turn.change)!;
+const at = (windows: string) => timed(teamJourney, windows);
+---
+
+<SceneFrame id="team" journey={teamJourney} label={label} view="team" rows={[{ ...teamThread, busy: team.busy }]} motion>
+  <div class="hs-panes">
+    <ThreadPane
+      id="team"
+      journey={teamJourney}
+      title={team.thread}
+      busy={team.busy}
+      model={{ icon: "orchestration", label: team.name, effort: "High" }}
+      permission={models.codex.permission}
+      placeholder="Message the team…"
+      worktree
+      branch={branches.team}
+      changes={`>${fixed.id}End`}
+      changeStat={fixed.change}
+      prompt={{ text: team.prompt, typo: team.typo, window: "typeStart~typeEnd", typed: "typeStart~send" }}
+    >
+      <div slot="bar" class="hs-team-bar">
+        <ProductIcon name="orchestration" />
+        <span class="hs-team-name">{team.name}</span>
+        <span class="hs-team-version">{team.version}</span>
+        <span class="hs-team-status">
+          <span {...at("<send")}>Ready</span>
+          <span {...at("send~done")}>Working</span>
+          <span {...at(">done")}>Completed</span>
+        </span>
+        <span class="hs-ghost">Show activity</span>
+        <span class="hs-ghost">Compact lead context</span>
+      </div>
+
+      <p class="hs-team-empty" {...at("<send")}>Send an instruction to start this team.</p>
+      <div class="hs-user hs-block" data-grow {...at(">send")}>
+        <div class="hs-bubble">{team.prompt}</div>
+        <span class="hs-seen" {...at("seenLead~seenAll")}>Seen by Lead</span>
+        <span class="hs-seen" {...at(">seenAll")}>Seen by everyone</span>
+      </div>
+      {team.turns.map((turn) => (
+        <section class="hs-turn hs-block" data-grow {...at(`>${turn.id}Start`)}>
+          <header class="hs-author">
+            <Image class="hs-avatar" src={portraits[turn.member]} alt="" width={80} height={80} format="webp" loading="lazy" />
+            <strong>{members[turn.member].name}</strong>
+            <span>{members[turn.member].model}</span>
+            <time>{team.time}</time>
+            <i class="hs-pulse" {...at(`${turn.id}Start~${turn.id}End`)}></i>
+          </header>
+          <div class="hs-writing" data-grow {...at(`${turn.id}Start~${turn.id}Text`)}>Writing response</div>
+          <div class="hs-reply" data-grow {...at(`>${turn.id}Text`)}><Prose text={turn.reply} stream={`${turn.id}Text~${turn.id}End`} /></div>
+          {turn.change ? (
+            <section class="hs-change hs-block" data-grow {...at(`>${turn.id}End`)}>
+              <div class="hs-change-heading">
+                <span class="hs-change-icon"><ProductIcon name="pencil" /></span>
+                <span class="hs-change-title">
+                  <span class="hs-change-summary">Edited 1 file</span>
+                  <span class="hs-counts"><span class="hs-added">+{turn.change.added}</span><span class="hs-removed">−{turn.change.removed}</span></span>
+                </span>
+                <span class="hs-change-actions"><span class="hs-button">Review</span></span>
+              </div>
+              <p class="hs-change-note">Shared workspace checkpoint · may include concurrent edits</p>
+              <div class="hs-change-file">
+                <span>{turn.change.path.slice(0, turn.change.path.lastIndexOf("/") + 1)}<span class="hs-file-name">{turn.change.path.slice(turn.change.path.lastIndexOf("/") + 1)}</span></span>
+                <span class="hs-counts"><span class="hs-added">+{turn.change.added}</span><span class="hs-removed">−{turn.change.removed}</span></span>
+              </div>
+            </section>
+          ) : null}
+        </section>
+      ))}
+      <div class="hs-presence">
+        <span class="hs-orb"><Image src={mark} alt="" width={48} height={48} format="webp" loading="eager" /></span>
+        <span {...at("send~done")} data-clock="send" data-clock-text="Working for {s}s">Working for 0s</span>
+      </div>
+
+      <p slot="hint" class="hs-hint">
+        <span {...at("<send >done")}>{team.hints.idle}</span>
+        <span {...at("send~done")}>{team.hints.active}</span>
+      </p>
+    </ThreadPane>
+  </div>
+</SceneFrame>

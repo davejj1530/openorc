@@ -1,0 +1,96 @@
+---
+import Layout from "./Layout.astro";
+import SiteHeader from "../components/SiteHeader.astro";
+import SiteFooter from "../components/SiteFooter.astro";
+import Icon from "../components/Icon.astro";
+import { docHref, docLabel, docPages, docsReviewed, type DocSection } from "../data/docs";
+import "../styles/docs.css";
+
+interface Props {
+  slug: string;
+  sections: DocSection[];
+}
+
+const { slug, sections } = Astro.props;
+const index = docPages.findIndex((page) => page.slug === slug);
+const page = docPages[index];
+if (!page) throw new Error(`Unknown docs page: ${slug}`);
+const previous = docPages[index - 1];
+const next = docPages[index + 1];
+---
+
+<Layout title={slug ? `${page.title} · OpenOrc docs` : "How OpenOrc works · OpenOrc docs"} description={page.description}>
+  <SiteHeader />
+  <main id="main" class="container docs">
+    <aside class="docs-nav">
+      <nav aria-label="Documentation">
+        <ol>
+          {docPages.map((item) => (
+            <li>
+              <a href={docHref(item.slug)} aria-current={item.slug === slug ? "page" : undefined}>
+                {docLabel(item)}
+              </a>
+            </li>
+          ))}
+        </ol>
+      </nav>
+    </aside>
+
+    <article class="docs-article">
+      <details class="docs-menu">
+        <summary>
+          All documentation <Icon name="chevron" size={15} />
+        </summary>
+        <nav aria-label="Documentation">
+          <ol>
+            {docPages.map((item) => (
+              <li>
+                <a href={docHref(item.slug)} aria-current={item.slug === slug ? "page" : undefined}>
+                  {docLabel(item)}
+                </a>
+              </li>
+            ))}
+          </ol>
+        </nav>
+      </details>
+      <header class="docs-header">
+        <h1>{page.title}</h1>
+        <p class="docs-lead">{page.description}</p>
+        <p class="docs-reviewed">
+          Checked against the source on {docsReviewed.date}.
+        </p>
+      </header>
+      <slot />
+      <nav class="docs-pager" aria-label="Previous and next pages">
+        {previous && (
+          <a class="docs-pager-previous" href={docHref(previous.slug)} rel="prev">
+            <Icon name="arrow" size={16} />
+            {docLabel(previous)}
+          </a>
+        )}
+        {next && (
+          <a class="docs-pager-next" href={docHref(next.slug)} rel="next">
+            {docLabel(next)}
+            <Icon name="arrow" size={16} />
+          </a>
+        )}
+      </nav>
+    </article>
+
+    {sections.length > 0 && (
+      <aside class="docs-toc">
+        <nav aria-labelledby="docs-toc-title">
+          <p id="docs-toc-title">On this page</p>
+          <ol>
+            {sections.map((section) => (
+              <li>
+                <a href={`#${section.id}`}>{section.title}</a>
+              </li>
+            ))}
+          </ol>
+        </nav>
+      </aside>
+    )}
+  </main>
+  <SiteFooter />
+</Layout>

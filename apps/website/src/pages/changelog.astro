@@ -1,0 +1,57 @@
+---
+import Layout from "../layouts/Layout.astro";
+import SiteHeader from "../components/SiteHeader.astro";
+import SiteFooter from "../components/SiteFooter.astro";
+import Icon from "../components/Icon.astro";
+import { getPublishedReleases } from "../data/changelog";
+import "../styles/changelog.css";
+
+const releases = await getPublishedReleases();
+const dateFormat = new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
+---
+
+<Layout title="Changelog · OpenOrc" description="Features, improvements, and fixes in published OpenOrc desktop releases." noindex={releases.length === 0}>
+  <SiteHeader />
+  <main id="main" class="container changelog-page">
+    <header class="changelog-intro">
+      <p class="changelog-eyebrow">OpenOrc / Changelog</p>
+      <h1>What’s new.</h1>
+      <p>Features, improvements, and fixes in published desktop releases.</p>
+    </header>
+
+    {releases.length === 0 ? (
+      <section class="changelog-empty" aria-labelledby="changelog-empty-title">
+        <span class="changelog-empty-index" aria-hidden="true">01 / Release log</span>
+        <h2 id="changelog-empty-title">The first public release is on its way.</h2>
+        <p>Its notes will appear here when it is published.</p>
+      </section>
+    ) : (
+      <ol class="changelog-list" aria-label="Published releases">
+        {releases.map((release) => (
+          <li class="changelog-entry" id={`release-${release.tag.replace(/[^a-zA-Z0-9-]/g, "-")}`}>
+            <div class="changelog-date">
+              <time datetime={release.publishedAt}>{dateFormat.format(new Date(release.publishedAt))}</time>
+            </div>
+            <article class="changelog-release">
+              <div class="changelog-release-heading">
+                <h2>{release.tag}</h2>
+                <span class="changelog-channel">{release.prerelease ? "Beta" : "Stable"}</span>
+              </div>
+              {release.highlights.length > 0 ? (
+                <ul class="changelog-highlights">
+                  {release.highlights.map((highlight) => <li>{highlight}</li>)}
+                </ul>
+              ) : (
+                <p class="changelog-no-highlights">Read the full release notes for changes and installation details.</p>
+              )}
+              <a class="changelog-release-link" href={release.url}>
+                Full release notes <Icon name="arrow" size={16} />
+              </a>
+            </article>
+          </li>
+        ))}
+      </ol>
+    )}
+  </main>
+  <SiteFooter />
+</Layout>

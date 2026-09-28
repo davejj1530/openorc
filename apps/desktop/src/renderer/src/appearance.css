@@ -1,0 +1,158 @@
+/* The same recess .orchestration-tree and .team-recovery already carry on an identical
+   --surface-2 fill. Without it this track is a groove in light (-2.79) and a raised bar in
+   dark (+5.38): the same object reading opposite ways by mode. */
+.appearance-modes {
+  display: flex;
+  gap: 4px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 4px;
+  margin-top: 16px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  box-shadow: var(--material-recess);
+}
+.appearance-modes button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: var(--control-lg);
+  padding: 0 16px;
+  border-radius: var(--radius-md);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+@container (max-width: 400px) {
+  .appearance-modes button {
+    padding-inline: 8px;
+  }
+}
+.appearance-modes button[aria-pressed="true"] {
+  background: var(--track-2-current);
+  color: var(--ink);
+  box-shadow: var(--material-contact);
+}
+.appearance-modes button:hover {
+  color: var(--ink);
+}
+.appearance-modes button:focus-visible {
+  background: var(--surface-3);
+}
+.appearance-status {
+  min-height: 20px;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+.transparency-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 4ch;
+  align-items: center;
+  gap: 12px;
+  max-width: var(--settings-control-width);
+}
+.settings-field .transparency-control input[type="range"] {
+  width: 100%;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--ink);
+  cursor: pointer;
+}
+.transparency-control input[type="range"]:focus-visible {
+  outline: 2px solid var(--ink-2);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}
+.transparency-control:has(input:disabled) {
+  opacity: 0.5;
+}
+.settings-field .transparency-control input:disabled {
+  cursor: not-allowed;
+}
+.color-editor-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-top: 16px;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+.color-group {
+  margin-top: 16px;
+}
+.color-group h3 {
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+}
+.color-rows {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(250px, 100%), 1fr));
+  gap: 0 24px;
+  max-width: 760px;
+  margin-top: 4px;
+}
+.color-row {
+  display: grid;
+  grid-template-columns: var(--control-sm) minmax(0, 1fr) 84px var(--control-sm);
+  align-items: center;
+  gap: 8px;
+  min-height: var(--control-lg);
+}
+/* The outline has to hold on a near-black swatch in dark and a near-white one in light. */
+.color-swatch {
+  width: var(--control-sm);
+  height: var(--control-sm);
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--ink) 28%, transparent);
+  border-radius: var(--radius-sm);
+  background: none;
+  cursor: pointer;
+}
+.color-swatch::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.color-swatch::-webkit-color-swatch {
+  border: none;
+  border-radius: calc(var(--radius-sm) - 1px);
+}
+.color-row-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.color-row-hex {
+  height: var(--control-sm);
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+.color-row-hex:focus {
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+.color-row-hex-invalid {
+  border-color: var(--bad);
+  color: var(--bad);
+}
+.color-row-reset {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-sm);
+  height: var(--control-sm);
+  border-radius: var(--radius-sm);
+  color: var(--ink-3);
+}
+.color-row-reset:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}

@@ -1,0 +1,66 @@
+---
+/** The message composer: writing well, controls row, and the changes tab that rises from its corner. */
+import ProductIcon from "./ProductIcon.astro";
+import { project } from "../../data/hero/workspace";
+import { timed, type Journey } from "../../data/hero/timeline";
+
+interface Props {
+  journey: Journey;
+  placeholder: string;
+  model: { label: string; effort: string; harness?: string; icon?: "orchestration" };
+  permission: string;
+  branch?: string;
+  /** Window during which uncommitted changes show above the composer, with their counts. The changes bar then names the branch instead of the controls. */
+  changes?: string;
+  changeStat?: { added: number; removed: number };
+  /** The prompt this composer types, if any. */
+  prompt?: { text: string; typo: { at: number; key: string }; window: string; typed: string };
+  large?: boolean;
+}
+const { journey, placeholder, model, permission, branch = project.branch, changes, changeStat = { added: 8, removed: 2 }, prompt, large } = Astro.props;
+---
+
+<div class="hs-composer" data-focused={prompt ? "" : undefined} data-large={large ? "" : undefined} data-flag={prompt ? `typed:${prompt.typed}` : undefined}>
+  {changes ? (
+    <div class="hs-changes" {...timed(journey, changes)}>
+      <svg class="hs-changes-shoulder" viewBox="0 0 32 22" aria-hidden="true">
+        <path d="M0 22V20C16 20 16 0 32 0V22Z" class="hs-shoulder-fill" />
+        <path d="M0 21.5C16 21.5 16 1.5 32 1.5" class="hs-shoulder-sheen" />
+        <path d="M0 20.5C16 20.5 16 0.5 32 0.5" class="hs-shoulder-edge" />
+      </svg>
+      <span class="hs-changes-body">
+        <span class="hs-changes-branch"><ProductIcon name="branch" /><span>{branch}</span></span>
+        <span class="hs-changes-chip"><span class="hs-added">+{changeStat.added}</span><span class="hs-removed">−{changeStat.removed}</span></span>
+        <span class="hs-changes-chip">Commit</span>
+      </span>
+    </div>
+  ) : null}
+  <div class="hs-shell">
+    <div class="hs-well">
+      <span class="hs-placeholder hs-placeholder-idle">{placeholder}</span>
+      <span class="hs-placeholder hs-placeholder-busy">Say it during this turn…</span>
+      {prompt ? <span class="hs-typed" data-type={prompt.window} data-text={prompt.text} data-typo={`${prompt.typo.at}:${prompt.typo.key}`} {...timed(journey, prompt.typed)} /> : null}
+      {prompt ? <span class="hs-caret" /> : null}
+    </div>
+    <div class="hs-foot">
+      <span class="hs-attach"><ProductIcon name="plus" /></span>
+      <span class="hs-meta">
+        {/* The app drops its Local checkout or Worktree chip once a conversation has started, so only the branch shows. */}
+        {!changes ? <span class="hs-location hs-branch-label"><ProductIcon name="branch" />{branch}</span> : null}
+        <span class="hs-picker">{permission}<ProductIcon name="chevronDown" /></span>
+      </span>
+      <span class="hs-actions">
+        <span class="hs-model">
+          {model.icon ? <ProductIcon name={model.icon} class="hs-model-icon" /> : <svg class="hs-logo" aria-hidden="true"><use href={`#hs-logo-${model.harness}`} /></svg>}
+          <span class="hs-model-name">{model.label}</span>
+          <span class="hs-model-effort">{model.effort}</span>
+          <ProductIcon name="chevronDown" />
+        </span>
+        <span class="hs-send">
+          <ProductIcon name="arrowUp" class="hs-send-arrow" />
+          <ProductIcon name="stop" class="hs-send-stop" />
+        </span>
+      </span>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,280 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import { docHref } from "../../data/docs";
+
+const sections = [
+  { id: "processes", title: "Every process" },
+  { id: "startup", title: "Startup" },
+  { id: "rpc", title: "Interface to core" },
+  { id: "pushes", title: "Live updates" },
+  { id: "internal", title: "Core to main" },
+  { id: "interface", title: "Inside the interface" },
+  { id: "environment", title: "Finding your tools" },
+  { id: "updates", title: "Agent updates" },
+  { id: "terminals", title: "Terminals" },
+  { id: "preview", title: "Preview browser" },
+  { id: "shutdown", title: "Shutdown" },
+];
+---
+
+<DocsLayout slug="processes" sections={sections}>
+  <section aria-labelledby="processes">
+    <h2 id="processes">Every process</h2>
+    <p>OpenOrc runs on Electron 44. Electron gives it three kinds of process of its own: a main process, a renderer for each window and each Preview view, and a utility process that OpenOrc calls the core. Everything else is a child of one of those.</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Process</th>
+            <th scope="col">Started by</th>
+            <th scope="col">What it does</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Electron main</td>
+            <td>Your OS</td>
+            <td>Creates windows and menus, starts the core, runs terminal shells, hosts the Preview browser, encrypts secrets, and checks for updates in packaged builds.</td>
+          </tr>
+          <tr>
+            <td>Renderer</td>
+            <td>Main, one per window</td>
+            <td>The React interface. It runs sandboxed with context isolation and has no Node.js access.</td>
+          </tr>
+          <tr>
+            <td>Preview pages</td>
+            <td>Main</td>
+            <td>A renderer for each Preview browser view, in a separate browser session. Up to six are kept alive.</td>
+          </tr>
+          <tr>
+            <td>Core</td>
+            <td>Main</td>
+            <td>A full Node.js process named <code>openorc-core</code>, started with Electron's <code>utilityProcess.fork</code>. It owns the SQLite database, starts agents, runs Git, serves OpenOrc's tools to agents, and runs schedules and Slack.</td>
+          </tr>
+          <tr>
+            <td>Embedding worker</td>
+            <td>Core, on first use</td>
+            <td>A worker thread that computes memory embeddings, so model loading never blocks the core.</td>
+          </tr>
+          <tr>
+            <td>Agent CLIs</td>
+            <td>Core</td>
+            <td><code>claude</code>, <code>codex app-server</code>, or <code>opencode acp</code>: one long-lived process per active run.</td>
+          </tr>
+          <tr>
+            <td>Short-lived CLIs</td>
+            <td>Core</td>
+            <td>Sign-in checks, model lists, usage readings, agent update checks and updates, and background text jobs such as memory extraction.</td>
+          </tr>
+          <tr>
+            <td><code>git</code> and <code>gh</code></td>
+            <td>Core</td>
+            <td>Worktrees, diffs, snapshots, commits, pushes, and pull requests.</td>
+          </tr>
+          <tr>
+            <td>Login shell</td>
+            <td>Core</td>
+            <td>Runs at startup, on Rescan, when Settings opens, when a team checks its members, and before agent update checks, to read your <code>PATH</code> and find the agent binaries. Not used on Windows.</td>
+          </tr>
+          <tr>
+            <td>Setup scripts</td>
+            <td>Core</td>
+            <td>A project's setup script, run with <code>/bin/bash -lc</code> when a new worktree is created.</td>
+          </tr>
+          <tr>
+            <td>Terminal shells</td>
+            <td>Main</td>
+            <td>Your shell, one per terminal panel, through <code>node-pty</code>.</td>
+          </tr>
+          <tr>
+            <td>Google Chrome</td>
+            <td>Main</td>
+            <td>Only when you choose Open in Chrome Incognito on a link: <code>--incognito --new-window &lt;url&gt;</code>.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>The core also listens on <code>127.0.0.1</code> for OpenOrc's MCP server, and main listens on another loopback port to serve interactive tool results (MCP Apps) in sandboxed frames. The OS chooses both ports at startup. When you host a Slack team relay, the core also listens on <code>127.0.0.1</code> at the port you set, 47831 by default.</p>
+    <p class="docs-source">Source: <code>apps/desktop/src/main/index.ts</code>, <code>apps/desktop/src/core/index.ts</code></p>
+  </section>
+
+  <section aria-labelledby="startup">
+    <h2 id="startup">Startup</h2>
+    <h3>Main process</h3>
+    <ol class="docs-steps">
+      <li>Chooses the profile folder: <code>OPENORC_USER_DATA</code>, or <code>OpenOrc</code> inside the OS app data folder. It sets the app name before Electron is ready, because on macOS and Linux that name selects the keychain entry used for encryption.</li>
+      <li>Takes the single-instance lock for that profile. A second copy of the app focuses the first window and exits.</li>
+      <li>Registers the <code>openorc-asset:</code> scheme, which serves attachments and images from disk to the interface.</li>
+      <li>Starts the core with <code>OPENORC_DATA_DIR</code> set to the profile folder, then creates the first window.</li>
+    </ol>
+    <h3>Core</h3>
+    <ol class="docs-steps">
+      <li>Opens <code>openorc.sqlite</code> and applies any pending migrations.</li>
+      <li>Compacts the database once, if it has a lot of free space and has never been compacted. The window shows "Tidying up saved history. This happens once and can take a minute." while this runs.</li>
+      <li>Creates the Workspace home folder and builds its services.</li>
+      <li>Recovers from the last session: runs that were still open are marked as errors, and interrupted comment replies and plans are marked as such. Team turns that were running are marked as needing attention, and team turns that had not started are queued to run; see <a href={docHref("teams") + "#recovery"}>Restarts and recovery</a>.</li>
+      <li>Probes your login shell for <code>PATH</code> and the agent binaries.</li>
+      <li>Starts the MCP server, then tells every window it is ready.</li>
+      <li>Sends messages still waiting in a conversation's queue, which can start agent runs right after launch. A message that was being sent when OpenOrc stopped is not sent again; it is marked as interrupted so you can check the conversation and retry it.</li>
+      <li>Starts its timers. Every 60 seconds it wakes snoozed conversations and checks schedules; every fifth minute it refreshes the state of open pull requests with <code>gh pr view</code>. Database upkeep runs after 60 seconds, then every 6 hours. <a href="#updates">Agent update checks</a> run after 30 seconds, then every 6 hours. It also embeds any memories that are missing vectors.</li>
+    </ol>
+    <p>The interface can connect before the core is ready. Requests wait until startup finishes, and a window that connects late receives the latest startup or ready message.</p>
+    <p class="docs-source">Source: <code>apps/desktop/src/main/app-identity.ts</code>, <code>packages/core/src/openorc.ts</code> (<code>OpenOrc.create</code>)</p>
+  </section>
+
+  <section aria-labelledby="rpc">
+    <h2 id="rpc">Interface to core</h2>
+    <p>Everything the interface shows from OpenOrc's records comes from the core. It asks main only for what needs Electron: terminals, the Preview browser, frames for interactive tool results (MCP Apps), the folder picker, opening links in your browser and showing files in their folder, new windows and window controls, and the setting for app update checks. When a window loads, it asks main for a connection to the core. Main creates a <code>MessageChannelMain</code>, gives one end to the core and the other to the window's preload script, and takes no further part. The preload script passes the port on to the page with <code>window.postMessage</code>, because message ports cannot cross Electron's context bridge.</p>
+    <h3>Requests</h3>
+    <p>Every request is a JSON-compatible object with a numeric ID chosen by the window:</p>
+    <pre><code>{"{"} "type": "rpc", "id": 42, "method": "runs.start", "params": {"{"} … {"}"} {"}"}</code></pre>
+    <p>Methods are grouped by name: <code>threads.*</code>, <code>runs.*</code>, <code>tasks.*</code>, <code>review.*</code>, <code>git.*</code>, <code>memory.*</code>, <code>orchestration.*</code> (teams), <code>slack.*</code>, <code>schedules.*</code>, <code>projects.*</code>, <code>agents.*</code>, <code>events.*</code>, <code>approvals.resolve</code>, and a few smaller groups. Each method's parameters are a <a href="https://zod.dev">zod</a> schema in <code>packages/protocol/src/rpc.ts</code>.</p>
+    <p>The core checks each message in three steps:</p>
+    <ol class="docs-steps">
+      <li>The envelope must match the request schema. A malformed message is logged and dropped without a reply.</li>
+      <li>The method must exist, and its parameters must pass that method's schema. Otherwise the reply is an error.</li>
+      <li>Team-owned conversations and tasks reject methods that teams do not support yet.</li>
+    </ol>
+    <p>The handler's result goes back as <code>rpc.result</code>, or <code>rpc.error</code> with a message. Replies are posted to every connected window, and each window keeps the ones whose ID matches one of its pending requests; see <a href={docHref("known-issues") + "#windows"}>Known issues</a>. The TypeScript compiler requires exactly one handler per method. Results are typed but not validated at runtime; the core is trusted. Requests have no timeout.</p>
+    <p>Setting <code>OPENORC_RPC_LOG=1</code> logs every call that succeeds, with its duration and the start of its parameters. Parameters of Slack methods and memory settings are left out because they can carry tokens.</p>
+    <p class="docs-source">Source: <code>packages/protocol/src/rpc.ts</code>, <code>packages/core/src/openorc.ts</code> (<code>handle</code>), <code>apps/desktop/src/renderer/src/lib/rpc.ts</code></p>
+  </section>
+
+  <section aria-labelledby="pushes">
+    <h2 id="pushes">Live updates</h2>
+    <p>Besides replies, the core pushes these messages to every connected window:</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Message</th>
+            <th scope="col">What it carries</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>frame</code></td>
+            <td>New agent events for one run. The core buffers events per run and sends at most one frame per run every 16 ms. The window applies frames in the order the port delivers them.</td>
+          </tr>
+          <tr>
+            <td><code>invalidate</code></td>
+            <td>Tags such as <code>threads</code> or <code>thread:&lt;id&gt;</code>. The window refetches only the queries marked with those tags.</td>
+          </tr>
+          <tr>
+            <td><code>notify</code></td>
+            <td>A desktop notification, such as a finished turn or a waiting approval. Sent only when notifications are on.</td>
+          </tr>
+          <tr>
+            <td><code>startup</code>, <code>ready</code></td>
+            <td>Startup progress, then the core's process ID and MCP port.</td>
+          </tr>
+          <tr>
+            <td><code>log</code></td>
+            <td>Core log lines. Only development and test builds have the Diagnostics screen that shows them.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Frames never touch the query cache. The window folds them into a separate transcript store. Before reading stored events, the core flushes pending frames and database writes, so a transcript loaded from the database never misses events that were still in flight.</p>
+    <p>There is no backpressure. Message ports have no flow control, so a very chatty run is limited only by the 16 ms batching.</p>
+    <p class="docs-source">Source: <code>packages/core/src/frames.ts</code>, <code>packages/protocol/src/rpc.ts</code> (<code>CorePush</code>)</p>
+  </section>
+
+  <section aria-labelledby="internal">
+    <h2 id="internal">Core to main</h2>
+    <p>The core cannot open windows or use Electron's encryption, so it asks main over the utility process's own port. These are the only messages on that channel:</p>
+    <ul>
+      <li><strong>Port handoff</strong>: main passes a new message port each time a window connects.</li>
+      <li><strong>Secrets</strong>: the core asks main to load or save the encrypted Slack configuration and the optional memory API key. Main encrypts with Electron <code>safeStorage</code>.</li>
+      <li><strong>Browser commands</strong>: when an agent uses the browser tool, the core forwards the command to main, which drives the Preview.</li>
+      <li><strong>Shell environment</strong>: the core sends the <code>PATH</code> it found, so terminals use the same one.</li>
+      <li><strong>Shutdown and updates</strong>: main asks the core to shut down, or to confirm it is idle before an update is installed.</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="interface">
+    <h2 id="interface">Inside the interface</h2>
+    <p>The interface is React 19, built with electron-vite and styled with Tailwind 4. It has no router library: a small zustand store holds the current view, up to three side-by-side conversation panes, and back and forward history.</p>
+    <p>Data the window asks for lives in <a href="https://tanstack.com/query">TanStack Query</a>. Each query key is the method name and its parameters, and each query carries tags. When an <code>invalidate</code> push arrives, the window waits 50 ms to collect more, then refetches the tagged queries that are on screen.</p>
+    <p>Live transcripts live in a separate store. Each frame is folded into the affected run only, and the screen updates at most once per animation frame. Conversation views subscribe to single runs, so a busy background run does not re-render the conversation you are reading.</p>
+    <h3>Opening a long conversation</h3>
+    <ol class="docs-steps">
+      <li>The window shows the newest run first and asks the core for its last 4 turns with <code>events.page</code>.</li>
+      <li>Tool results whose stored event, input included, is longer than 4,096 characters arrive without their output. The output loads when you hover over or focus that row.</li>
+      <li>Scrolling up loads older turns, 4 at a time, then older runs.</li>
+      <li>Runs that are not on screen are dropped from memory after 3 minutes, unless they are still running or waiting for you.</li>
+    </ol>
+    <h3>Showing agent output</h3>
+    <p>Agent replies are Markdown, rendered with Streamdown. Raw HTML in a reply is parsed and then sanitized to a GitHub-style allowlist, which removes scripts, styles, and event handlers. Code is highlighted with Shiki, math with KaTeX, and Mermaid diagrams render in Mermaid's strict mode. Remote images are not loaded; only attachments, images tools returned, inline image data, and local image files are shown.</p>
+    <p>The window's content security policy allows scripts only from the app itself, and images only from the app, <code>data:</code>, <code>blob:</code>, and <code>openorc-asset:</code> URLs.</p>
+    <p>Diffs render with <code>@pierre/diffs</code>, highlighted in two web workers. Terminals use xterm.js. The animated agent indicator is a WebGPU shader and falls back to a static icon when WebGPU is unavailable or reduced motion is on.</p>
+    <h3>Drafts</h3>
+    <p>Composer text is saved to the window's local storage on every change. A conversation's draft is also saved to the database 600 ms after you stop typing. Images pasted into a task document are staged in the window's IndexedDB until they are saved as attachments.</p>
+    <p class="docs-source">Source: <code>apps/desktop/src/renderer/src/lib/query.ts</code>, <code>lib/transcript.ts</code>, <code>components/Conversation.tsx</code>, <code>components/ThreadImages.tsx</code></p>
+  </section>
+
+  <section aria-labelledby="environment">
+    <h2 id="environment">Finding your tools</h2>
+    <p>Apps started from the Dock do not inherit your terminal's <code>PATH</code>, so on macOS the core asks your login shell. It runs your shell with <code>-ilc</code> and a small script that prints <code>$PATH</code> and the result of <code>command -v</code> for <code>codex</code>, <code>claude</code>, and <code>opencode</code>. The probe gets a minimal environment and 8 seconds to finish.</p>
+    <p>Only <code>PATH</code> and the binary locations are kept. Other variables your shell profile sets are not imported. The result is frozen as a numbered snapshot; each run uses the snapshot that was current when it started, and Rescan takes a new one.</p>
+    <p>On Windows there is no probe, and OpenOrc does not search <code>PATH</code>. It finds an agent only through <code>OPENORC_CODEX_BIN</code>, <code>OPENORC_CLAUDE_BIN</code>, or <code>OPENORC_OPENCODE_BIN</code>.</p>
+    <p>Each agent's readiness is checked with its own commands, with an 8-second timeout and a 60-second cache: <code>--version</code> and, at the same time, <code>claude auth status</code>, <code>codex login status</code>, or <code>opencode auth list</code>. The readiness check reads only whether you are signed in; the usage screen also shows your plan and, for Codex, your account email. OpenOrc never reads the credentials these tools store.</p>
+    <p class="docs-source">Source: <code>packages/core/src/services/shell-environment.ts</code>, <code>packages/core/src/services/system.ts</code></p>
+  </section>
+
+  <section aria-labelledby="updates">
+    <h2 id="updates">Agent updates</h2>
+    <p>The core checks the agent CLIs for newer versions 30 seconds after launch and then every 6 hours. This is on by default; the switch is Check for agent updates automatically in Settings, Connections, where Check for updates runs a check at any time.</p>
+    <p>A check probes your login shell again and runs the readiness check above. It then works out how each agent was installed from where its binary lives: a Homebrew cask, npm, Claude Code's own installer, or OpenCode's. For npm, it runs <code>npm root --global</code> to confirm that npm's global folder holds the binary. For Claude Code's installer, it reads the release channel from Claude's <code>settings.json</code>. Last, it asks the package registry for the latest version; see <a href={docHref("network") + "#downloads"}>Network</a>. A check never installs anything.</p>
+    <p>Updating runs only when you press Update Claude, Update Codex, Update OpenCode, or Update all. It refuses while an agent is working, an approval is waiting, a team execution is open, or background work such as memory extraction is running. Idle agent processes are closed first and start again with your next message. OpenOrc then runs one command per agent from your home folder, with a 3-minute limit:</p>
+    <ul>
+      <li>Homebrew cask: <code>brew upgrade --cask &lt;name&gt;</code></li>
+      <li>npm: <code>npm install --global &lt;package&gt;@latest</code></li>
+      <li>Claude Code's installer: <code>claude update</code></li>
+      <li>OpenCode's installer: <code>opencode upgrade --method curl</code></li>
+    </ul>
+    <p>Agents installed any other way, such as a Homebrew formula, pnpm, or bun, and every agent on Windows, are updated by hand.</p>
+    <p class="docs-source">Source: <code>packages/core/src/services/agent-updates.ts</code>, <code>agent-update-installation.ts</code></p>
+  </section>
+
+  <section aria-labelledby="terminals">
+    <h2 id="terminals">Terminals</h2>
+    <p>Terminal panels run in main, not in the core, so shell output never passes through the event ledger or the core's frame buffer. Main starts your account's login shell (or <code>$SHELL</code>, then <code>/bin/zsh</code>, when the account names none; on Windows, <code>%COMSPEC%</code>, usually <code>cmd.exe</code>, or PowerShell if that is unset) through <code>node-pty</code> in the conversation's folder. The shell gets main's environment, without the variables removed at startup (see <a href={docHref("security") + "#limits"}>What OpenOrc cannot protect against</a>), the <code>PATH</code> from the login-shell probe, and <code>TERM=xterm-256color</code>, <code>COLORTERM=truecolor</code>, and <code>TERM_PROGRAM=OpenOrc</code>.</p>
+    <p>Output is kept in a 256 KiB buffer per shell and sent to the window in 16 ms batches while a panel is attached. A shell survives closing its panel and reloading the window. It ends when you press Stop or Restart, or when you quit. OpenOrc refuses to install an update while a shell is running.</p>
+    <p>When a command in a terminal finishes, the Changes panel refreshes, so edits you make by hand show up.</p>
+    <p class="docs-source">Source: <code>apps/desktop/src/main/pty-host.ts</code></p>
+  </section>
+
+  <section aria-labelledby="preview">
+    <h2 id="preview">Preview browser</h2>
+    <p>The Preview panel is a Chromium view that main places over the window, sized to the panel. Each window has one view per conversation. OpenOrc keeps up to six views alive; beyond that, it closes the least recently shown view that is idle. Views run in their own browser session, separate from the app's pages, with no preload script and no Node.js access.</p>
+    <ul>
+      <li>Every permission request (camera, location, notifications, and so on) is denied.</li>
+      <li>Downloads are cancelled and pop-ups are blocked.</li>
+      <li>Only <code>http</code> and <code>https</code> URLs without an embedded username or password load. Every navigation, redirect, and frame is checked.</li>
+    </ul>
+    <p>Links in agent replies open here when the conversation has a Preview, and in your default browser otherwise.</p>
+    <h3>When an agent uses it</h3>
+    <p>Agents drive the Preview with OpenOrc's <code>browser</code> tool, which has seven actions: <code>open</code>, <code>snapshot</code>, <code>screenshot</code>, <code>click</code>, <code>fill</code>, <code>press</code>, and <code>scroll</code>.</p>
+    <ol class="docs-steps">
+      <li>The core checks that the calling run is active and works out which conversation it belongs to. The agent cannot choose another conversation's view.</li>
+      <li>The core sends the command to main, which runs one action at a time per conversation, with a 30-second limit. If the agent opens a page and no view exists, main creates one at 1000 × 720, hidden unless that conversation is on screen. Other actions need an existing view.</li>
+      <li>Snapshots and form filling run a fixed script in an isolated JavaScript world, so page scripts cannot see or change it. A snapshot returns up to 16,000 characters of text and 200 visible controls, with password values left out.</li>
+      <li>Clicks and key presses are sent as input events through the Chrome DevTools Protocol, attached to that view only. No remote debugging port is opened.</li>
+    </ol>
+    <p class="docs-source">Source: <code>apps/desktop/src/main/browser-pane.ts</code>, <code>browser-page.ts</code>, <code>packages/protocol/src/browser.ts</code></p>
+  </section>
+
+  <section aria-labelledby="shutdown">
+    <h2 id="shutdown">Shutdown</h2>
+    <ol class="docs-steps">
+      <li>Main closes every terminal shell and Preview view.</li>
+      <li>Main asks the core to shut down, and waits for it to exit. After 12 seconds it sends the core a termination signal.</li>
+      <li>The core stops its timers and integrations and denies pending approvals. Then it closes every agent process: an idle Claude process has its input closed so it can exit on its own, and any process still running gets <code>SIGTERM</code> to its process group, then <code>SIGKILL</code> after 2 seconds.</li>
+      <li>It flushes the event ledger and the provider log, closes the MCP server, and closes the database.</li>
+    </ol>
+    <p>Installing an update adds a check first. The core refuses while it is handling a request, an agent is working or waiting for approval, memory extraction is running, a team execution is open, or a schedule is starting. Main installs the update only after the core confirms and exits cleanly.</p>
+    <p>If you quit while an agent is working, its turn stops and the run is recorded as failed. Sending a message later resumes the provider session. After a crash, the next start marks every run that was still open as failed. See <a href={docHref("conversations") + "#recovery"}>recovery</a>.</p>
+    <p class="docs-source">Source: <code>apps/desktop/src/main/index.ts</code>, <code>packages/core/src/openorc.ts</code> (<code>close</code>), <code>packages/agents/src/process-lifetime.ts</code></p>
+  </section>
+</DocsLayout>

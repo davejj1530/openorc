@@ -1,0 +1,22 @@
+name: Rebuild website changelog
+
+on:
+  release:
+    types: [published, edited, unpublished]
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Trigger Vercel production build
+        env:
+          DEPLOY_HOOK_URL: ${{ secrets.VERCEL_WEBSITE_DEPLOY_HOOK }}
+        run: |
+          if [[ -z "$DEPLOY_HOOK_URL" ]]; then
+            echo "::error::Set the VERCEL_WEBSITE_DEPLOY_HOOK secret after connecting the website to Vercel."
+            exit 1
+          fi
+          curl --fail --silent --show-error --retry 3 --retry-all-errors --request POST --output /dev/null "$DEPLOY_HOOK_URL"

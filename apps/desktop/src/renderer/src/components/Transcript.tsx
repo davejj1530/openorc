@@ -1,0 +1,1026 @@
+import { lazy, memo, Suspense, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type ComponentProps } from "react";
+import { WorkRead, WorkEdit, WorkCommand, WorkSearch, WorkMessage, WorkDelegate, WorkAgent, WorkLive, Check, ChevronRight, Copy, FileText, GitFork, Globe, Hammer, Search, Terminal, X } from "./icons";
+import { workTurns, workParts, workTiming, workDuration } from "../lib/work-transcript";
+import { cn } from "../lib/cn";
+import { core } from "../lib/rpc";
+import type { FileSelection } from "../lib/layout";
+import type { Block, RunTranscript } from "../lib/transcript";
+import { QuestionCard } from "./QuestionCard";
+import { AgentOrb } from "./AgentOrb";
+import { TaskCard } from "./TaskCard";
+import { taskIdFromTool, uniqueTaskCards } from "../lib/task-progress";
+import { ToolResult } from "./ToolResult";
+import { UsageRecovery } from "./UsageRecovery";
+import { TranscriptErrorCard } from "./TranscriptErrorCard";
+const McpAppResult = lazy(() => import("./McpAppResult"));
+import { Button, IconButton, TextButton } from "./ui";
+import { ImageGenerationRow, ImageViewRow, isImageGeneration, isImageView, ThreadImage, ThreadMedia, ThreadRichText } from "./ThreadImages";
+import { isUnifiedDiff, toolDiff } from "../lib/chat-diff";
+import { isImagePath } from "../../../shared/image-paths";
+import { relativeTime } from "../lib/time";
+
+const InlineDiff = lazy(() => import("./InlineDiff").then((m) => ({ default: m.InlineDiff })));
+const diffLoading = (
+  <p role="status" className="my-2 text-xs text-ink-3">
+    Loading diff…
+  </p>
+);
+
+/**
+ * The conversation as a plain list. Only the loaded turns are here: older ones
+ * load as the reader nears the top, without moving what they are reading.
+ * Each block is memoized, so only the one being streamed re-renders, and
+ * off-screen blocks skip layout via CSS.
+ */
+export function Transcript({
+  run,
+  scrollKey = run.runId,
+  onFork,
+  trailing,
+  basePath,
+  fileScope,
+  mentionNames,
+  children,
+  working = false,
+  hasOlder = false,
+  onLoadOlder,
+}: {
+  basePath?: string;
+  fileScope?: FileSelection["scope"];
+  mentionNames?: ReadonlyMap<string, string>;
+  run: RunTranscript;
+  scrollKey?: string;
+  onFork?: (runId: string) => void;
+  trailing?: (blocks: Block[]) => ReactNode;
+  children?: ReactNode;
+  working?: boolean;
+  /** More turns exist above the loaded ones. */
+  hasOlder?: boolean;
+  onLoadOlder?: () => void;
+}) {
+  const parentRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const pinned = useRef(true);
+  const lastScrollTop = useRef(0);
+  /** The first turn in view, how far below the top it sat, and the scroll position then. */
+  const anchor = useRef<Anchor | null>(null);
+  const firstTurn = useRef<string | undefined>(undefined);
+  const olderRef = useRef<HTMLDivElement>(null);
+  const olderInView = useRef(false);
+  const loadOlder = useRef(onLoadOlder);
+  loadOlder.current = onLoadOlder;
+  // Opening a conversation waits, unseen, until its newest turns fill the view or nothing older is left, so they
+  // first appear at the bottom where they belong instead of sliding down as earlier turns arrive above them.
+  const [filledKey, setFilledKey] = useState<string | null>(null);
+  const waiting = hasOlder && filledKey !== scrollKey;
+  const reveal = useRef(() => {});
+  reveal.current = () => {
+    const el = parentRef.current;
+    if (el && waiting && el.scrollHeight > el.clientHeight) setFilledKey(scrollKey);
+  };
+
+  useEffect(() => {
+    const el = parentRef.current;
+    if (!el) return;
+    const atBottom = () => el.scrollHeight - el.scrollTop - el.clientHeight <= 1;
+    const onScroll = () => {
+      const top = el.scrollTop;
+      if (top < lastScrollTop.current) pinned.current = false;
+      else if (top > lastScrollTop.current && atBottom()) pinned.current = true;
+      lastScrollTop.current = top;
+      anchor.current = firstTurnInView(el);
+    };
+    // Input arrives before scroll events. Release the tail before a render or
+    // ResizeObserver can undo the first few pixels of an upward gesture.
+    const onWheel = (event: WheelEvent) => {
+      if (event.deltaY < 0) pinned.current = false;
+      else if (event.deltaY > 0 && atBottom()) pinned.current = true;
+    };
+    let touchY: number | undefined;
+    const onTouchStart = (event: TouchEvent) => {
+      touchY = event.touches[0]?.clientY;
+    };
+    const onTouchMove = (event: TouchEvent) => {
+      const nextY = event.touches[0]?.clientY;
+      if (nextY !== undefined && touchY !== undefined && nextY > touchY) pinned.current = false;
+      touchY = nextY;
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.target instanceof HTMLElement && event.target.closest('input, textarea, select, [contenteditable="true"]')) return;
+      if (["ArrowUp", "PageUp", "Home"].includes(event.key) || (event.key === " " && event.shiftKey)) pinned.current = false;
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    el.addEventListener("wheel", onWheel, { passive: true });
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: true });
+    el.addEventListener("keydown", onKeyDown);
+    // Child task cards keep streaming after the parent turn ends. Observe their
+    // layout too, including wrapping when the window or composer changes size.
+    const observer = new ResizeObserver(() => {
+      if (pinned.current) {
+        el.scrollTop = el.scrollHeight;
+        lastScrollTop.current = el.scrollTop;
+      }
+      reveal.current();
+    });
+    observer.observe(el, { box: "border-box" });
+    if (contentRef.current) observer.observe(contentRef.current, { box: "border-box" });
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+      el.removeEventListener("wheel", onWheel);
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("keydown", onKeyDown);
+      observer.disconnect();
+    };
+  }, []);
+
+  // Follow the tail only while pinned to it; scrolling up hands the transcript to the reader. When older turns load
+  // above, the browser keeps the reader's place, except at the very top where it does not; there the turn they were
+  // reading is put back where it was. Anything else, such as a turn folding its work, is left to the browser.
+  useLayoutEffect(() => {
+    const el = parentRef.current;
+    if (!el) return;
+    const first = el.querySelector<HTMLElement>("[data-turn]")?.dataset["turn"];
+    const olderArrived = firstTurn.current !== undefined && first !== firstTurn.current;
+    firstTurn.current = first;
+    if (pinned.current) el.scrollTop = el.scrollHeight;
+    else if (olderArrived && anchor.current && Math.abs(el.scrollTop - anchor.current.scrollTop) < 1) {
+      const turn = el.querySelector(`[data-turn="${CSS.escape(anchor.current.id)}"]`);
+      const drift = turn ? turn.getBoundingClientRect().top - el.getBoundingClientRect().top - anchor.current.offset : 0;
+      if (Math.abs(drift) >= 1) el.scrollTop += drift;
+    }
+    lastScrollTop.current = el.scrollTop;
+    anchor.current = firstTurnInView(el);
+    reveal.current();
+  }, [run.blocks]);
+
+  // Older turns load a screen before the reader reaches them, and keep loading while the top stays in reach.
+  useEffect(() => {
+    const el = parentRef.current;
+    const older = olderRef.current;
+    if (!el || !older) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        olderInView.current = Boolean(entry?.isIntersecting);
+        if (olderInView.current) loadOlder.current?.();
+      },
+      { root: el, rootMargin: "100% 0px 0px 0px" },
+    );
+    observer.observe(older);
+    return () => observer.disconnect();
+  }, [hasOlder]);
+  useEffect(() => {
+    if (hasOlder && olderInView.current) loadOlder.current?.();
+  }, [run.blocks, hasOlder]);
+  useLayoutEffect(() => {
+    const el = parentRef.current;
+    pinned.current = true;
+    if (el) {
+      el.scrollTop = el.scrollHeight;
+      lastScrollTop.current = el.scrollTop;
+    }
+  }, [scrollKey]);
+  // Loading that stalls must not keep the conversation hidden; after a moment it shows what it has.
+  useEffect(() => {
+    const timer = setTimeout(() => setFilledKey(scrollKey), 1500);
+    return () => clearTimeout(timer);
+  }, [scrollKey]);
+
+  return (
+    <ThreadMedia scopeKey={scrollKey} basePath={basePath} fileScope={fileScope} mentionNames={mentionNames}>
+      <div ref={parentRef} data-transcript className={cn("h-full overflow-y-auto", waiting && "invisible")}>
+        <div ref={contentRef} className="max-w-chat mx-auto px-6 py-5">
+          {hasOlder ? <div ref={olderRef} aria-hidden /> : null}
+          {children ?? <WorkTranscript runId={run.runId} blocks={run.blocks} live={working || run.live} onFork={onFork} trailing={trailing} />}
+          {run.blocks.length > 0 ? <AgentPresence working={working} since={lastPromptAt(run.blocks)} showElapsed={Boolean(children)} /> : null}
+        </div>
+      </div>
+    </ThreadMedia>
+  );
+}
+
+type Anchor = { id: string; offset: number; scrollTop: number };
+
+/** The first turn whose bottom is below the top of the scroller, found by halving since turns are in order. */
+function firstTurnInView(el: HTMLElement): Anchor | null {
+  const turns = el.querySelectorAll<HTMLElement>("[data-turn]");
+  const top = el.getBoundingClientRect().top;
+  let low = 0;
+  let high = turns.length - 1;
+  while (low < high) {
+    const middle = (low + high) >> 1;
+    if (turns[middle]!.getBoundingClientRect().bottom > top) high = middle;
+    else low = middle + 1;
+  }
+  const turn = turns[low];
+  return turn ? { id: turn.dataset["turn"]!, offset: turn.getBoundingClientRect().top - top, scrollTop: el.scrollTop } : null;
+}
+
+function lastPromptAt(blocks: Block[]): number {
+  for (let i = blocks.length - 1; i >= 0; i--) {
+    const block = blocks[i]!;
+    if (block.kind === "message" && block.role === "user" && block.at) return block.at;
+  }
+  return Date.now();
+}
+
+/**
+ * Whoever is on the other end, at the tail of the conversation. It does not
+ * come and go with a turn: it rests between them and stirs while one runs, so
+ * the conversation always ends in the agent rather than in whatever step
+ * happened last. The row above says which step is live; this says the turn is
+ * not over and how long it has been going.
+ *
+ * The clock only ticks while a turn runs; a resting orb needs no timer.
+ */
+export function AgentPresence({ working, since, showElapsed = true }: { working: boolean; since: number; showElapsed?: boolean }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (!working) return;
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [working]);
+  const seconds = Math.max(1, Math.round((now - since) / 1000));
+  return (
+    <div className="transcript-block mt-3 flex items-center gap-2 text-sm text-ink-3" data-state={working ? "running" : "idle"} role="status">
+      <AgentOrb state={working ? "thinking" : "idle"} />
+      {working && showElapsed ? <span>Working for {seconds}s</span> : null}
+    </div>
+  );
+}
+
+/** A run of finished steps reads as one line until opened, the way the agent apps fold their work. */
+type Item = { kind: "block"; block: Block } | { kind: "group"; id: string; blocks: Block[] };
+
+/** Tool attempts share one summary, including failures; their original status stays in the expanded details. */
+function foldable(block: Block, taskCards: boolean): boolean {
+  // Collaboration milestones are individually meaningful in the work timeline.
+  if (block.kind === "tool" && /(?:spawn_agent|thread_send|send_message|team_say|team_complete)$/.test(block.name)) return false;
+  if (block.kind === "activity" && /finished|completed/i.test(block.label)) return false;
+  if (block.kind === "thinking") return !block.status || block.status === "success" || block.status === "running";
+  if (block.kind === "tool") return (!block.status || ["running", "success", "error"].includes(block.status)) && !(taskCards && taskIdFromTool(block));
+  if (block.kind === "activity") return ["running", "success"].includes(block.status) && !isImageGeneration(block) && !isImageView(block);
+  return false;
+}
+
+export function groupBlocks(blocks: Block[], taskCards = true, pinned?: string, groupTools = true): Item[] {
+  const items: Item[] = [];
+  let run: Block[] = [];
+  const flush = () => {
+    const first = run[0];
+    // A lone activity or thought already supplies its own label and disclosure.
+    // Wrapping it repeats the same row without revealing any new information.
+    if (run.length === 1 && first && first.kind !== "tool") items.push({ kind: "block", block: first });
+    else if (first) items.push({ kind: "group", id: `group-${first.id}`, blocks: run });
+    run = [];
+  };
+  for (const block of uniqueTaskCards(blocks, taskCards)) {
+    if (groupTools && foldable(block, taskCards) && block.id !== pinned) run.push(block);
+    else {
+      flush();
+      items.push({ kind: "block", block });
+    }
+  }
+  flush();
+  return items;
+}
+
+/** "Edited 3 files, ran 2 commands, read a file": what a folded run of steps did, in the order it did it. */
+export function groupSummary(blocks: Block[]): string {
+  const counts = new Map<string, number>();
+  for (const block of blocks) {
+    if (block.kind === "thinking") continue;
+    const tool = block.kind === "tool" ? toolCallPresentation(block.name, block.input) : null;
+    let key: string;
+    if (tool) key = tool.summary ?? tool.verb;
+    else if (block.kind === "activity") key = block.label;
+    else key = block.kind;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  const nouns: Record<string, [string, string]> = { Ran: ["a command", "commands"], Read: ["a file", "files"], Edited: ["a file", "files"], Searched: ["once", "times"], Fetched: ["a page", "pages"] };
+  const parts = [...counts.entries()].map(([verb, count]) => {
+    const noun = nouns[verb];
+    if (!noun) return count === 1 ? verb : `${verb} ×${count}`;
+    return `${verb} ${count === 1 ? noun[0] : `${count} ${noun[1]}`}`;
+  });
+  const [first, ...rest] = parts;
+  return [first ?? "Thought", ...rest.map((part) => part.charAt(0).toLowerCase() + part.slice(1))].join(", ");
+}
+
+type GroupRowProps = { id: string; blocks: Block[]; runId: string; taskCards: boolean };
+
+/** Grouping builds new arrays each render; a folded group whose blocks are all the same objects has nothing new to show. */
+const sameGroup = (a: GroupRowProps, b: GroupRowProps) =>
+  a.id === b.id && a.runId === b.runId && a.taskCards === b.taskCards && a.blocks.length === b.blocks.length && a.blocks.every((block, i) => block === b.blocks[i]);
+
+const GroupRow = memo(function GroupRow({ id, blocks, runId, taskCards }: GroupRowProps) {
+  const [open, setOpen] = useState(false);
+  const [visited, setVisited] = useState(false);
+  const first = blocks.find((b) => b.kind === "tool") ?? blocks.find((b) => b.kind !== "thinking");
+  const { icon: Icon, tone } = first?.kind === "tool" ? toolCallPresentation(first.name, first.input) : { icon: WorkMessage, tone: "neutral" as Tone };
+  const live = blocks.some((b) => (b.kind === "tool" && !b.done) || (b.kind === "thinking" && b.endedAt === null) || (b.kind === "activity" && b.status === "running"));
+  let label: string;
+  if (live && !first) label = "Thinking";
+  else if (live && blocks.length === 1 && first?.kind === "tool") label = liveVerb(toolCallPresentation(first.name, first.input).verb);
+  else label = groupSummary(blocks);
+  const detailId = useId();
+  return (
+    <div data-transcript-group={id}>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={detailId}
+        onClick={() => {
+          setVisited(true);
+          setOpen((v) => !v);
+        }}
+        className="work-step-toggle"
+      >
+        {live ? <WorkLive size={16} className="work-live shrink-0" /> : <Icon size={16} className="tool-icon shrink-0" data-tone={tone} />}
+        <span className="truncate">{label}</span>
+        <ChevronRight size={12} className={cn("work-chevron shrink-0", open && "rotate-90")} />
+      </button>
+      <div id={detailId} hidden={!open} className="work-step-detail">
+        {visited ? blocks.map((block) => <BlockView key={block.id} block={block} runId={runId} taskCards={taskCards} />) : null}
+      </div>
+    </div>
+  );
+}, sameGroup);
+
+type WorkTranscriptProps = ComponentProps<typeof TranscriptContents> & { live?: boolean; ambient?: boolean; author?: string | undefined; showActivity?: boolean };
+type WorkTurnProps = WorkTranscriptProps & { id?: string };
+
+/** The same disclosure hierarchy serves solo turns, warm sessions, and team members. */
+export function WorkTranscript({ blocks, live = false, ...props }: WorkTranscriptProps) {
+  const turns = useSteadyTurns(blocks);
+  return (
+    <>
+      {turns.map((turn, index) => (
+        <WorkTurn key={turn.id} id={turn.id} {...props} blocks={turn.blocks} live={live && index === turns.length - 1} />
+      ))}
+    </>
+  );
+}
+
+/**
+ * A turn's blocks keep their array while none of them changed, so only the turn being streamed re-renders. A
+ * finished turn's blocks are the same objects from frame to frame.
+ */
+function useSteadyTurns(blocks: Block[]): { id: string; blocks: Block[] }[] {
+  const previous = useRef(new Map<string, Block[]>());
+  return useMemo(() => {
+    const turns = workTurns(blocks);
+    const next = new Map<string, Block[]>();
+    const steady = turns.map((turn) => {
+      const before = previous.current.get(turn.id);
+      const same = before && before.length === turn.blocks.length && before.every((block, i) => block === turn.blocks[i]);
+      const kept = same ? before : turn.blocks;
+      next.set(turn.id, kept);
+      return same ? { ...turn, blocks: kept } : turn;
+    });
+    previous.current = next;
+    return steady;
+  }, [blocks]);
+}
+
+const WorkTurn = memo(function WorkTurn({ id, blocks, live = false, ambient = false, author, trailing, showActivity = true, ...props }: WorkTurnProps) {
+  props = { ...props, runId: blocks.find((b) => b.runId)?.runId ?? props.runId };
+  const timing = workTiming(blocks, live);
+  const { before, work, after } = workParts(blocks, timing.live, props.taskCards, ambient);
+  const [choice, setChoice] = useState<{ mode: boolean; open: boolean | null }>({ mode: showActivity, open: null });
+  if (choice.mode !== showActivity) setChoice({ mode: showActivity, open: null });
+  const open = (choice.mode === showActivity ? choice.open : null) ?? (showActivity && timing.live);
+  const [visited, setVisited] = useState(false);
+  useEffect(() => {
+    if (open) setVisited(true);
+  }, [open]);
+  const contentId = useId();
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (!timing.live || !showActivity) return;
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [timing.live, showActivity]);
+  const elapsed = timing.live && timing.startedAt !== undefined ? Math.max(0, now - timing.startedAt) : timing.durationMs;
+  let outcome: string | null = null;
+  if (timing.outcome === "error") outcome = "Failed";
+  else if (timing.outcome === "cancelled") outcome = "Stopped";
+  const label = timing.live ? `Working${elapsed === undefined ? "" : ` · ${workDuration(elapsed)}`}` : `${outcome ?? "Worked"}${elapsed === undefined ? "" : ` for ${workDuration(elapsed)}`}`;
+  const current = timing.live
+    ? work.findLast(
+        (b) => (b.kind === "tool" && !b.done) || (b.kind === "thinking" && b.endedAt === null) || (b.kind === "activity" && b.status === "running") || (b.kind === "message" && b.streaming),
+      )
+    : undefined;
+  let activity: string | null = null;
+  if (current?.kind === "tool") activity = liveVerb(toolCallPresentation(current.name, current.input).verb);
+  else if (current?.kind === "activity") activity = current.label;
+  else if (current?.kind === "thinking") activity = "Thinking";
+  else if (current) activity = "Writing";
+  // Even a tool-free failed turn needs a terminal status; never leave it saying Working.
+  const hasWork = work.length > 0 || Boolean(outcome);
+  const footer = trailing?.(blocks);
+  const hiddenRecovery = !open || !showActivity ? work.findLast((b): b is Extract<Block, { kind: "activity" }> => b.kind === "activity" && Boolean(b.recovery))?.recovery : undefined;
+  if (!showActivity && !before.length && !after.length && !outcome && !footer) return null;
+  return (
+    <div className="work-turn" data-turn={id}>
+      <TranscriptContents {...props} blocks={before} />
+      {!showActivity && outcome ? (
+        <p className="my-4 text-sm text-ink-3" role="status">
+          {author ? `${author} · ` : ""}
+          {label}
+        </p>
+      ) : null}
+      {showActivity && hasWork ? (
+        <section className="work-section" aria-label={author ? `${author}’s work` : "Agent work"}>
+          <button type="button" className="work-toggle" aria-expanded={open} aria-controls={contentId} onClick={() => setChoice({ mode: showActivity, open: !open })}>
+            <span>
+              {author ? `${author} · ` : ""}
+              {label}
+            </span>
+            <ChevronRight size={14} className={cn("work-chevron", open && "rotate-90")} />
+          </button>
+          {!open && timing.live && showActivity ? (
+            <div className="work-current" role="status">
+              <WorkLive size={16} className="work-live" />
+              <span>{activity ?? "Working"}</span>
+            </div>
+          ) : null}
+          <div
+            id={contentId}
+            hidden={!open}
+            className="work-content"
+            onClickCapture={(event) => {
+              if ((event.target as HTMLElement).closest("button, summary")) setChoice({ mode: showActivity, open: true });
+            }}
+          >
+            {open || visited ? <TranscriptContents {...props} blocks={work} /> : null}
+          </div>
+        </section>
+      ) : null}
+      {hiddenRecovery ? <UsageRecovery provider={hiddenRecovery.provider} lead="Usage limit reached." /> : null}
+      <TranscriptContents {...props} blocks={after} />
+      {footer}
+    </div>
+  );
+});
+
+/** Shared event rendering keeps approvals and media attached to their actual run. */
+export function TranscriptContents({
+  runId,
+  blocks,
+  onFork,
+  replyAction,
+  trailing,
+  taskCards = true,
+  groupTools = true,
+  pendingApproval,
+}: {
+  runId: string;
+  blocks: Block[];
+  onFork?: ((runId: string) => void) | undefined;
+  replyAction?: { blockId: string; content: ReactNode } | undefined;
+  /** Content that follows a block or a folded group of blocks, such as a turn's change card. */ trailing?: ((blocks: Block[]) => ReactNode) | undefined;
+  taskCards?: boolean;
+  groupTools?: boolean;
+  pendingApproval?: ((block: Extract<Block, { kind: "approval" }>) => ReactNode) | undefined;
+}) {
+  const items: Item[] = useMemo(() => groupBlocks(blocks, taskCards, replyAction?.blockId, groupTools), [blocks, taskCards, replyAction?.blockId, groupTools]);
+  const compact = (item: Item | undefined) => Boolean(item && (item.kind === "group" || isCompact(item.block)));
+  return (
+    <>
+      {items.map((item, i) =>
+        item.kind === "group" ? (
+          <div key={item.id} className={cn("transcript-block", compact(items[i - 1]) ? "mt-0" : "mt-3")}>
+            <GroupRow id={item.id} blocks={item.blocks} runId={runId} taskCards={taskCards} />
+            {trailing?.(item.blocks)}
+          </div>
+        ) : (
+          <div key={item.block.id} className={cn("transcript-block", isCompact(item.block) && compact(items[i - 1]) ? "mt-0" : "mt-3")}>
+            {item.block.kind === "approval" && !item.block.decision && pendingApproval ? (
+              pendingApproval(item.block)
+            ) : (
+              <BlockView block={item.block} runId={runId} onFork={onFork} taskCards={taskCards} />
+            )}
+            {replyAction?.blockId === item.block.id ? replyAction.content : null}
+            {trailing?.([item.block])}
+          </div>
+        ),
+      )}
+    </>
+  );
+}
+
+function isCompact(block: Block | undefined): boolean {
+  return Boolean(block && (block.kind === "tool" || block.kind === "thinking" || block.kind === "activity" || block.kind === "status" || (block.kind === "approval" && Boolean(block.decision))));
+}
+
+/** One object for every message, so the rich-text memo holds while another row streams. */
+const wordFade = { animation: "fadeIn", sep: "word", duration: 240 } as const;
+
+const BlockView = memo(function BlockView({ block, runId, onFork, taskCards }: { block: Block; runId: string; onFork?: ((runId: string) => void) | undefined; taskCards: boolean }) {
+  switch (block.kind) {
+    case "message":
+      if (block.role === "user")
+        return <UserMessage text={block.text} at={block.at} attachments={block.attachments} onFork={onFork && block.runId ? () => onFork(block.runId as string) : undefined} />;
+      if (block.role === "system")
+        return (
+          <div>
+            <SystemNotice text={block.text} />
+            {block.attachments?.map((path) => (
+              <ThreadImage key={path} src={`openorc-asset://attachments/${path.split("/").pop() ?? ""}`} alt="Slack participant image" compact />
+            ))}
+          </div>
+        );
+      if (/^API Error:/.test(block.text)) return <TranscriptErrorCard text={block.text} />;
+      if (block.streaming && !block.text)
+        return (
+          <div data-state="running" className="text-sm text-ink-3 animate-pulse">
+            Writing response
+          </div>
+        );
+      return (
+        <div className="group">
+          <div className="text-prose text-ink prose-chat">
+            <ThreadRichText mode="streaming" isAnimating={block.streaming} animated={wordFade}>
+              {block.text}
+            </ThreadRichText>
+          </div>
+          <div className="mt-1 flex min-h-5 items-center gap-2">
+            {block.streaming ? null : <MessageTime at={block.at} />}
+            {block.text ? <CopyMessage text={block.text} /> : null}
+          </div>
+        </div>
+      );
+    case "activity":
+      if (isImageView(block)) return <ImageViewRow block={block} />;
+      return isImageGeneration(block) ? <ImageGenerationRow block={block} /> : <ActivityRow block={block} />;
+    case "thinking":
+      return <ThinkingRow block={block} />;
+    case "tool":
+      return taskCards && taskIdFromTool(block) ? <TaskCard taskId={taskIdFromTool(block) as string} /> : <ToolRow block={block} />;
+    case "approval":
+      return block.approvalKind === "user_input" ? (
+        <QuestionCard runId={runId} approvalId={block.approvalId} input={block.input} decided={block.decision} answers={block.answers} />
+      ) : (
+        <ApprovalRow block={block} runId={runId} />
+      );
+    case "status":
+      // "turn error" and "session error" restate the error card above them.
+      return block.tone === "bad" && !/^(turn|session) /.test(block.text) ? <TranscriptErrorCard text={block.text} /> : null;
+  }
+});
+
+/** When the message landed. Hidden until hover, the way the chat apps do it. */
+function MessageTime({ at, className }: { at: number | undefined; className?: string }) {
+  if (at === undefined) return null;
+  return (
+    <div
+      className={cn("h-5 flex items-center text-xs text-ink-4 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity", className)}
+      title={new Date(at).toLocaleString()}
+    >
+      {relativeTime(at)}
+    </div>
+  );
+}
+
+function copyMessageLabel(state: "idle" | "copied" | "error"): string {
+  if (state === "copied") return "Message copied";
+  if (state === "error") return "Could not copy message";
+  return "Copy message";
+}
+
+function CopyMessage({ text }: { text: string }) {
+  const [state, setState] = useState<"idle" | "copied" | "error">("idle");
+  useEffect(() => {
+    if (state === "idle") return;
+    const timer = window.setTimeout(() => setState("idle"), 2000);
+    return () => window.clearTimeout(timer);
+  }, [state]);
+  const label = copyMessageLabel(state);
+  return (
+    <IconButton
+      size="sm"
+      aria-label={label}
+      title={label}
+      className={cn(
+        "transition-opacity opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
+        state !== "idle" && "opacity-100",
+      )}
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(text);
+          setState("copied");
+        } catch {
+          setState("error");
+        }
+      }}
+    >
+      {state === "copied" ? <Check size={13} /> : <Copy size={13} />}
+    </IconButton>
+  );
+}
+
+function UserMessage({ text, at, attachments, onFork }: { text: string; at?: number | undefined; attachments?: string[]; onFork?: (() => void) | undefined }) {
+  return (
+    <div className="group flex justify-end">
+      <div className="max-w-4/5 grid gap-2 justify-items-end">
+        {attachments && attachments.length > 0 ? (
+          <div className="flex flex-wrap gap-2 justify-end">
+            {attachments.map((a) =>
+              isImagePath(a) ? <ThreadImage key={a} src={`openorc-asset://attachments/${a.split("/").pop() ?? ""}`} alt="Attached image" compact /> : <AttachedFile key={a} path={a} />,
+            )}
+          </div>
+        ) : null}
+        <div className="message-bubble rounded-xl px-4 py-2.5 text-md whitespace-pre-wrap">{text}</div>
+        <div className="flex w-full min-h-6 items-center justify-end gap-2">
+          {text ? <CopyMessage text={text} /> : null}
+          {onFork ? (
+            <IconButton
+              size="sm"
+              onClick={onFork}
+              title="Fork the thread from this point"
+              aria-label="Fork from here"
+              className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity"
+            >
+              <GitFork size={13} />
+            </IconButton>
+          ) : null}
+          <MessageTime at={at} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * An attachment with nothing to preview. The stored name keeps the one the
+ * user gave it after the id that makes it unique, so the chip prints that and
+ * opens the file where it lives.
+ */
+function AttachedFile({ path }: { path: string }) {
+  const stored = path.split(/[\\/]/).pop() ?? path;
+  const name = /^[a-f0-9-]{36}-/.test(stored) ? stored.slice(37) : stored;
+  return (
+    <button
+      type="button"
+      onClick={() => window.openorc.revealFile(path)}
+      title={`Show in folder: ${path}`}
+      className="flex max-w-56 items-center gap-2 rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm text-ink-2 hover:border-line-strong hover:text-ink"
+    >
+      <FileText size={14} className="shrink-0 text-ink-3" />
+      <span className="truncate">{name}</span>
+    </button>
+  );
+}
+
+/** One muted line per step, the way the agent apps read: verb, object, state. Click for the raw call. */
+function liveVerb(verb: string): string {
+  return (
+    (
+      {
+        Ran: "Running command",
+        Read: "Reading files",
+        Edited: "Editing files",
+        Searched: "Searching",
+        Fetched: "Fetching",
+        Delegated: "Delegating",
+        "Sent message": "Sending message",
+      } as Record<string, string>
+    )[verb] ?? verb
+  );
+}
+
+function ToolRow({ block }: { block: Extract<Block, { kind: "tool" }> }) {
+  const [open, setOpen] = useState(false);
+  // An output left out of the page starts loading when the pointer reaches the row, so it is there by the click.
+  const [near, setNear] = useState(false);
+  const output = useToolOutput(block, open || near);
+  const patch = useMemo(() => (open && /(?:^|__)apply_patch$/.test(block.name) ? toolDiff(block.input) : null), [open, block.name, block.input]);
+  const { icon: Icon, verb, object, tone } = toolCallPresentation(block.name, block.input);
+  const label = block.done ? verb : liveVerb(verb);
+  return (
+    <div>
+      <button
+        aria-expanded={open}
+        data-state={block.done ? (block.status ?? (block.isError ? "error" : "success")) : "running"}
+        onClick={() => setOpen((v) => !v)}
+        onPointerEnter={block.outputOmitted ? () => setNear(true) : undefined}
+        onFocus={block.outputOmitted ? () => setNear(true) : undefined}
+        className={cn("group flex items-center gap-2 min-h-6 w-full text-left text-sm", block.isError ? "text-bad" : "text-ink-3 hover:text-ink-2")}
+      >
+        <Icon size={16} className="tool-icon shrink-0" data-tone={block.isError ? "error" : tone} />
+        <span className="shrink-0">{label}</span>
+        {object ? <span className="font-mono truncate text-ink-2 group-hover:text-ink">{object}</span> : null}
+        {block.done && (block.isError || (block.status && block.status !== "success")) ? <span className="text-xs">{stateLabel(block.status ?? "error")}</span> : null}
+        {!block.done ? <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse shrink-0" /> : null}
+        <ChevronRight size={12} className={cn("ml-auto shrink-0 opacity-0 group-hover:opacity-100 transition-transform", open && "rotate-90 opacity-100")} />
+      </button>
+      {block.progress ? <div className="ml-5 text-xs text-ink-3 whitespace-pre-wrap">{block.progress}</div> : null}
+      {block.mcp && block.done && block.runId ? (
+        <Suspense fallback={null}>
+          <McpAppResult runId={block.runId} toolCallId={block.id} />
+        </Suspense>
+      ) : null}
+      {open ? (
+        <div className="ml-5 min-w-0">
+          {patch ? (
+            <Suspense fallback={diffLoading}>
+              <InlineDiff patch={patch} />
+            </Suspense>
+          ) : null}
+          <div className="tool-detail my-1 rounded-lg border border-line bg-surface-2/50 text-xs grid min-w-0">
+            {patch ? (
+              <details>
+                <summary className="cursor-pointer px-3 py-2 text-ink-3">Tool details</summary>
+                <pre className="px-3 py-2 whitespace-pre-wrap break-words text-ink-2 max-h-60 overflow-auto">{pretty(block.input, Infinity)}</pre>
+              </details>
+            ) : (
+              <pre className="px-3 py-2 whitespace-pre-wrap break-words text-ink-2 max-h-60 overflow-auto">{pretty(block.input, Infinity)}</pre>
+            )}
+            {output !== undefined ? <ToolResult output={output} /> : null}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** A loaded page leaves large outputs out; a row about to open reads its output from the ledger. */
+function useToolOutput(block: Extract<Block, { kind: "tool" }>, open: boolean): unknown {
+  const [loaded, setLoaded] = useState<{ id: string; output: unknown } | null>(null);
+  const { outputOmitted, runId, id } = block;
+  const have = loaded?.id === id;
+  useEffect(() => {
+    if (!open || !outputOmitted || !runId || have) return;
+    let current = true;
+    core.call("events.toolOutput", { runId, toolCallId: id }).then(
+      (result) => current && setLoaded({ id, output: result.output ?? undefined }),
+      () => undefined,
+    );
+    return () => {
+      current = false;
+    };
+  }, [open, outputOmitted, runId, id, have]);
+  if (!outputOmitted) return block.output;
+  return have ? loaded.output : undefined;
+}
+
+function stateLabel(status: string): string {
+  return ({ success: "Completed", error: "Failed", cancelled: "Interrupted", disconnected: "Disconnected", running: "Running" } as Record<string, string>)[status] ?? status;
+}
+
+function activityStatus(block: Extract<Block, { kind: "activity" }>, live: boolean): ReactNode {
+  if (live) return <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse shrink-0" />;
+  if (block.status !== "success") return <span className="text-xs">{stateLabel(block.status)}</span>;
+  return null;
+}
+
+/** The hue an activity's icon takes from what it is. */
+function activityTone(label: string): Tone {
+  if (/compact/i.test(label)) return "context";
+  if (/plan/i.test(label)) return "plan";
+  if (/starting|waiting/i.test(label)) return "neutral";
+  return "task";
+}
+
+function ActivityRow({ block }: { block: Extract<Block, { kind: "activity" }> }) {
+  const [open, setOpen] = useState(false);
+  const live = block.status === "running";
+  const showText = Boolean(block.text && (live || open || block.status === "error"));
+  const patch = showText && ((block.label === "Changes" && block.id.startsWith("activity-diff-")) || isUnifiedDiff(block.text));
+  const expandable = Boolean(block.text || block.detail);
+  return (
+    <div>
+      <button
+        data-state={block.status}
+        aria-expanded={expandable ? open : undefined}
+        disabled={!expandable}
+        onClick={() => setOpen((v) => !v)}
+        className={cn("group flex items-center gap-2 min-h-6 w-full text-left text-sm", block.status === "error" ? "text-bad" : "text-ink-3")}
+      >
+        {block.status === "success" && /agent|finished|completed/i.test(block.label) ? (
+          <WorkAgent size={16} className="tool-icon shrink-0" data-tone="agent" />
+        ) : (
+          <WorkMessage size={16} className="tool-icon shrink-0" data-tone={block.status === "error" ? "error" : activityTone(block.label)} />
+        )}
+        <span>{block.label}</span>
+        {activityStatus(block, live)}
+        {expandable ? <ChevronRight size={12} className={cn("ml-auto transition-transform", open && "rotate-90")} /> : null}
+      </button>
+      {showText &&
+        (patch ? (
+          <div className="ml-5 min-w-0">
+            <Suspense fallback={diffLoading}>
+              <InlineDiff patch={block.text} />
+            </Suspense>
+          </div>
+        ) : (
+          <div className="ml-5 my-1 text-sm text-ink-3 whitespace-pre-wrap">{block.text}</div>
+        ))}
+      {block.recovery?.kind === "usage" ? <UsageRecovery provider={block.recovery.provider} className="ml-5 my-1" /> : null}
+      {open && block.detail !== undefined ? (
+        <pre className="ml-5 my-1 px-3 py-2 rounded-lg border border-line text-xs text-ink-3 whitespace-pre-wrap break-words max-h-72 overflow-auto">{pretty(block.detail, Infinity)}</pre>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Reasoning reads live while the agent thinks, as in Codex and Claude
+ * Desktop, then folds to one line. Claude Code often sends the block with
+ * no text; that line then has nothing to unfold.
+ */
+function ThinkingRow({ block }: { block: Extract<Block, { kind: "thinking" }> }) {
+  const [open, setOpen] = useState(false);
+  const live = block.endedAt === null;
+  const seconds = Math.max(1, Math.round(((block.endedAt ?? Date.now()) - block.startedAt) / 1000));
+  const text = block.text.trim();
+  const expandable = text.length > 0;
+  return (
+    <div>
+      <button
+        data-state={live ? "running" : (block.status ?? "success")}
+        aria-expanded={expandable ? open : undefined}
+        onClick={() => setOpen((v) => !v)}
+        disabled={!expandable}
+        className={cn("group flex items-center gap-2 min-h-6 text-sm text-ink-3", expandable && "hover:text-ink-2")}
+      >
+        <WorkMessage size={16} className="tool-icon shrink-0" />
+        <span>{live ? "Thinking" : `Thought for ${seconds}s${block.status && block.status !== "success" ? ` · ${stateLabel(block.status)}` : ""}`}</span>
+        {live ? <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" /> : null}
+        {expandable ? <ChevronRight size={12} className={cn("opacity-0 group-hover:opacity-100 transition-transform", open && "rotate-90 opacity-100")} /> : null}
+      </button>
+      {text && open ? <div className={cn("ml-5 my-1 text-sm text-ink-3 whitespace-pre-wrap", live && !open && "thinking-tail")}>{text}</div> : null}
+    </div>
+  );
+}
+
+/**
+ * What the user actually needs to judge, per approval shape: the command for
+ * shell approvals, the tool arguments for MCP calls, the tool input for
+ * Claude's permission prompt. Raw params stay one click away.
+ */
+function approvalDetail(block: Extract<Block, { kind: "approval" }>): unknown {
+  const p = (block.input ?? {}) as Record<string, unknown>;
+  if (typeof p["command"] === "string") return p["command"];
+  const meta = p["_meta"] as Record<string, unknown> | undefined;
+  if (meta && meta["tool_params"] !== undefined) return meta["tool_params"];
+  if (p["permissions"] !== undefined) return p["permissions"];
+  if (p["input"] !== undefined) return p["input"];
+  return block.input;
+}
+
+function ApprovalRow({ block, runId }: { block: Extract<Block, { kind: "approval" }>; runId: string }) {
+  const decide = (decision: "allow" | "allow_for_run" | "deny") => void core.call("approvals.resolve", { runId, approvalId: block.approvalId, decision });
+  const [open, setOpen] = useState(false);
+  const label = block.toolName ?? block.approvalKind;
+  // An allowed call already shows as its tool row; only a refusal is worth a line of its own.
+  if (block.decision && block.decision !== "deny") return null;
+  if (block.decision) {
+    return (
+      <button onClick={() => setOpen((v) => !v)} className="group flex items-center gap-2 min-h-6 w-full text-left text-sm text-ink-3 hover:text-ink-2">
+        {block.decision === "deny" ? <X size={13} className="text-bad shrink-0" /> : <Check size={13} className="text-ok shrink-0" />}
+        <span>{block.decision === "deny" ? "Denied" : "Allowed"}</span>
+        <span className="font-mono truncate text-ink-2">{label}</span>
+        {open ? <pre className="basis-full text-xs whitespace-pre-wrap break-words ml-5">{summaryText(approvalDetail(block))}</pre> : null}
+      </button>
+    );
+  }
+  return (
+    <div data-blocking="true" className="rounded-xl border border-warn/60 bg-warn-soft/30 px-4 py-3">
+      <div className="flex items-center gap-2 text-base">
+        <span className="font-medium">Allow</span>
+        <span className="font-mono text-ink-2 truncate">{label}</span>
+        <span className="text-ink-3">?</span>
+      </div>
+      {block.reason ? <div className="text-sm text-ink-2 mt-1">{block.reason}</div> : null}
+      <pre className="text-xs font-mono text-ink-3 whitespace-pre-wrap break-words mt-2 max-h-40 overflow-auto">{open ? pretty(block.input, 800) : summaryText(approvalDetail(block))}</pre>
+      <div className="flex items-center gap-2 mt-3">
+        <Button size="sm" variant="primary" onClick={() => decide("allow")}>
+          Allow
+        </Button>
+        <Button size="sm" onClick={() => decide("allow_for_run")}>
+          Allow for this run
+        </Button>
+        <Button size="sm" variant="danger" onClick={() => decide("deny")}>
+          Deny
+        </Button>
+        <TextButton onClick={() => setOpen((v) => !v)} className="ml-auto text-xs text-ink-4 hover:text-ink-2">
+          {open ? "Summary" : "Raw request"}
+        </TextButton>
+      </div>
+    </div>
+  );
+}
+
+/** OpenOrc talking in the thread: a task result, a hand-off. Not the user, not the agent. */
+function SystemNotice({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const [head, ...rest] = text.split("\n");
+  const details = rest.join("\n").trim();
+  return (
+    <div className="system-notice rounded-xl border border-line bg-surface-2/60 px-4 py-3 text-sm">
+      <div className="flex items-start gap-2">
+        <WorkMessage size={16} className="text-ink-3 mt-0.5 shrink-0" />
+        <div className="min-w-0 flex-1">
+          <div className="text-ink-2">{head}</div>
+          {details ? (
+            <>
+              {open ? <pre className="mt-1 whitespace-pre-wrap break-words text-ink-3 font-sans">{details}</pre> : null}
+              <TextButton onClick={() => setOpen((v) => !v)} className="text-xs text-ink-4 hover:text-ink-2 mt-1">
+                {open ? "Hide details" : "Show details"}
+              </TextButton>
+            </>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type Icon = typeof Terminal;
+
+/** Verb and object for a tool call, from the names Claude Code and Codex use. */
+type Tone = "read" | "edit" | "run" | "search" | "web" | "task" | "memory" | "plan" | "think" | "context" | "neutral";
+
+function editedObject(paths: string[]): string {
+  if (paths.length === 1) return paths[0]!;
+  if (paths.length) return `${paths.length} files`;
+  return "";
+}
+
+function toolCallPresentation(name: string, input: unknown): { icon: Icon; verb: string; object: string; tone: Tone; summary?: string } {
+  const i = (input ?? {}) as Record<string, unknown>;
+  const str = (k: string) => (typeof i[k] === "string" ? (i[k] as string) : "");
+  const mcp = mcpCall(name);
+  const n = mcp?.tool ?? name;
+  const command = str("cmd") || str("command") || (Array.isArray(i["command"]) ? (i["command"] as string[]).join(" ") : "");
+  if (/^(shell|bash|exec|exec_command|run_command|execute)$/i.test(n) || command)
+    return { icon: WorkCommand, verb: "Ran", object: command.replace(/^\/bin\/zsh -lc /, "").replace(/^'(.*)'$/, "$1"), tone: "run" };
+  if (/^(read|read_file|view|cat|notebookread)$/i.test(n)) return { icon: WorkRead, verb: "Read", object: str("file_path") || str("path"), tone: "read" };
+  if (/^(edit|multiedit|write|apply_patch|write_file|str_replace|create_file|notebookedit)$/i.test(n)) {
+    if (Array.isArray(input)) {
+      const paths = input.flatMap((entry) => (entry && typeof entry.path === "string" ? [entry.path] : []));
+      return { icon: WorkEdit, verb: "Edited", object: editedObject(paths), tone: "edit" };
+    }
+    const patch = str("patch") || str("input");
+    const files = patch ? patch.split("\n").filter((l) => /^\*\*\* (Add|Update|Delete) File: /.test(l)).length : 0;
+    return { icon: WorkEdit, verb: "Edited", object: str("file_path") || str("path") || (files ? `${files} file${files === 1 ? "" : "s"}` : ""), tone: "edit" };
+  }
+  if (/^(grep|glob|search|rg|find|ls)$/i.test(n)) return { icon: WorkSearch, verb: "Searched", object: str("pattern") || str("query") || str("path"), tone: "search" };
+  if (/^(webfetch|fetch)$/i.test(n)) return { icon: Globe, verb: "Fetched", object: str("url"), tone: "web" };
+  if (/^websearch$/i.test(n)) return { icon: Globe, verb: "Searched the web for", object: str("query"), tone: "web" };
+  if (/thread_send$|send_message$|team_say$/.test(n)) return { icon: WorkMessage, verb: "Sent message", object: str("target") || str("recipient") || "", tone: "neutral" };
+  if (/task_start$/.test(n)) return { icon: WorkDelegate, verb: "Started task", object: str("title") || str("id"), tone: "task" };
+  if (/spawn_agent$/.test(n)) return { icon: WorkDelegate, verb: "Delegated", object: str("title") || str("task_name"), tone: "task" };
+  if (/task_create$/.test(n)) return { icon: WorkDelegate, verb: "Created task", object: str("title"), tone: "task" };
+  if (/task_list$/.test(n)) return { icon: WorkDelegate, verb: "Listed tasks", object: "", tone: "task" };
+  if (/task_get$/.test(n)) return { icon: WorkDelegate, verb: "Checked task", object: str("id").slice(0, 8), tone: "task" };
+  if (/task_update$/.test(n)) return { icon: WorkDelegate, verb: "Updated task", object: str("id").slice(0, 8), tone: "task" };
+  if (/memory_search$/.test(n)) return { icon: Search, verb: "Searched memory for", object: str("query"), tone: "memory" };
+  if (/memory_record$/.test(n)) return { icon: WorkRead, verb: "Remembered", object: str("title"), tone: "memory" };
+  if (/memory_feedback$/.test(n)) return { icon: WorkRead, verb: "Rated a memory", object: "", tone: "memory" };
+  if (/task_context$/.test(n)) return { icon: FileText, verb: "Read the task brief", object: "", tone: "task" };
+  if (/^(task|agent|subagent)$/i.test(n)) return { icon: WorkDelegate, verb: "Delegated", object: str("description"), tone: "task" };
+  if (/^todowrite$/i.test(n)) return { icon: Check, verb: "Updated the plan", object: "", tone: "plan" };
+  const object = str("description") || str("query") || str("path");
+  if (mcp) {
+    const { label, source } = mcpNames(mcp);
+    return { icon: Hammer, verb: label, object, tone: "neutral", summary: `Used ${source}` };
+  }
+  return { icon: Hammer, verb: n, object, tone: "neutral" };
+}
+
+type McpCall = { server: string; tool: string };
+
+/**
+ * An MCP tool call in each provider's naming: Claude Code's `mcp__server__tool`, Codex's `server.tool`, and OpenCode's
+ * `server_tool`, which only splits reliably for OpenOrc's own `openorc_<id>` server.
+ */
+function mcpCall(name: string): McpCall | null {
+  const match = /^mcp__(.+?)__(.+)$/.exec(name) ?? /^([^.]+)\.(.+)$/.exec(name) ?? /^(openorc_[0-9a-f]{32})_(.+)$/.exec(name);
+  return match ? { server: match[1]!, tool: match[2]! } : null;
+}
+
+/** "Codegraph: explore" for codegraph's `codegraph_explore`: the server as configured, minus Claude's claude.ai connector prefix, and the tool without a repeated server name. */
+function mcpNames({ server, tool }: McpCall): { label: string; source: string } {
+  const base = /^openorc(?:_[0-9a-f]{32})?$/.test(server) ? "OpenOrc" : server.replace(/^claude_ai_/, "");
+  const action = tool.toLowerCase().startsWith(`${base.toLowerCase()}_`) ? tool.slice(base.length + 1) : tool;
+  const spaced = (s: string) => s.replace(/[_-]+/g, " ").trim();
+  const source = spaced(base).replace(/^./, (c) => c.toUpperCase());
+  return { label: `${source}: ${spaced(action)}`, source };
+}
+
+function summaryText(v: unknown): string {
+  if (v === null || v === undefined) return "no arguments";
+  if (typeof v === "object" && Object.keys(v as object).length === 0) return "no arguments";
+  return pretty(v, 600);
+}
+
+function pretty(v: unknown, max = 2000): string {
+  const s = typeof v === "string" ? v : (JSON.stringify(v, null, 1) ?? "");
+  return s.length > max ? `${s.slice(0, max)}…` : s;
+}

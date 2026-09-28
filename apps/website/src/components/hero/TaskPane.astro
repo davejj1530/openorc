@@ -1,0 +1,55 @@
+---
+/**
+ * The task view: breadcrumb header, tab strip, the scrolling document in the slot, and the footer bar.
+ * The task waits in the backlog until its work starts, then runs in its own worktree on `branch`.
+ */
+import ProductIcon from "./ProductIcon.astro";
+import { project } from "../../data/hero/workspace";
+import { timed, type Journey } from "../../data/hero/timeline";
+
+interface Props {
+  id: string;
+  journey: Journey;
+  title: string;
+  /** Moment the task's work starts. Before it the status glyph is Backlog, after it In progress. */
+  start: string;
+  /** The worktree branch the footer names once work starts, as views/TaskDocument.tsx does. */
+  branch: string;
+}
+const { id, journey, title, start, branch } = Astro.props;
+const waiting = timed(journey, `<${start}`);
+const started = timed(journey, `>${start}`);
+const tabs = ["Overview", "Activity", "Changes", "Commits", "Memory"];
+---
+
+<section class="hs-pane" data-pane={id}>
+  <header class="hs-header">
+    <span class="hs-header-lead">
+      <span class="hs-window-nav">
+        <span class="hs-icon-button"><ProductIcon name="panelLeft" /></span>
+        <span class="hs-icon-button"><ProductIcon name="search" /></span>
+        <span class="hs-icon-button"><ProductIcon name="arrowLeft" /></span>
+        <span class="hs-icon-button" data-disabled><ProductIcon name="arrowRight" /></span>
+      </span>
+      <span class="hs-crumb">Tasks</span>
+      <span class="hs-crumb-sep">/</span>
+      <ProductIcon name="circleDashed" class="hs-status-glyph hs-status-circleDashed" {...waiting} />
+      <ProductIcon name="loader" class="hs-status-glyph hs-status-in_progress" {...started} />
+      <span class="hs-title">{title}</span>
+      <span class="hs-chip"><span>{project.name}</span><ProductIcon name="chevronDown" /></span>
+    </span>
+  </header>
+  <nav class="hs-tabs">
+    {tabs.map((tab, i) => <span class="hs-tab" data-current={i === 0 ? "" : undefined}>{tab}</span>)}
+  </nav>
+  <div class="hs-transcript">
+    <article class="hs-doc">
+      <slot />
+    </article>
+  </div>
+  <footer class="hs-doc-footer">
+    <span><ProductIcon name="check" />Saved</span>
+    <span class="hs-doc-branch"><ProductIcon name="branch" /><span {...waiting}>Isolated worktree on start</span><span {...started}>{branch}</span></span>
+    <span class="hs-open-thread">Open thread<ProductIcon name="arrowUpRight" /></span>
+  </footer>
+</section>

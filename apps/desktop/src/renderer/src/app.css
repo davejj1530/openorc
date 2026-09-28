@@ -1,0 +1,3729 @@
+@import "tailwindcss";
+@import "katex/dist/katex.min.css";
+@import "@fontsource-variable/jetbrains-mono";
+@import "./rich-text.css";
+@import "./appearance.css";
+@source "../../../node_modules/streamdown/dist/*.js";
+@source "../../../node_modules/@streamdown/mermaid/dist/*.js";
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Codex startup fallback. lib/theme-palettes.ts supplies the saved product palette.
+ * --surface is the main body; --bg is the supporting sidebar/window ground.
+ * Tailwind utilities read them through @theme inline.
+ */
+/*
+ * One flat ground with hairline separators, the way native tools read. Blue
+ * carries selection and primary actions only; everything else is neutral.
+ */
+:root {
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f7f7f7;
+  --surface-3: #efefef;
+  --line: #ebebeb;
+  --line-strong: #d6d6d6;
+  --ink: #0d0d0d;
+  --ink-2: #444444;
+  --ink-3: #686868;
+  --ink-4: #878787;
+  --accent: #0169cc;
+  --accent-ink: #0169cc;
+  --accent-soft: color-mix(in srgb, #0169cc 14%, #ffffff);
+  --accent-fg: #ffffff;
+  --ok: #157447;
+  --warn: #8b5c0a;
+  --review: #4f65b5;
+  --bad: #aa4538;
+  --ok-soft: color-mix(in srgb, var(--ok) 8%, var(--surface));
+  --warn-soft: color-mix(in srgb, var(--warn) 8%, var(--surface));
+  --bad-soft: color-mix(in srgb, var(--bad) 8%, var(--surface));
+  --selection: color-mix(in srgb, #0169cc 26%, #ffffff);
+  --bubble: #f4f4f4;
+  /* An image a palette may paint over --surface on the work plane; see .well::before. */
+  --surface-gradient: none;
+  --tone-read: var(--accent-ink);
+  --tone-edit: #8a4fd6;
+  --tone-run: #1f8a5b;
+  --tone-search: #b8720a;
+  --tone-web: #0f8a9a;
+  --tone-task: #d1476a;
+  --tone-memory: #9a5b2c;
+  --tone-plan: #d14a3c;
+  --tone-think: #7c5cd6;
+  --tone-context: #5f788b;
+  /* The floating layer: menus, popovers, tooltips, dialogs, the palette. One elevation for
+     all of them, derived from the material agents so it tracks the palette instead of being
+     literal black. No overlay takes --material-raise: a popup is already a floating plane,
+     and raising it again is what makes a submenu beside its parent read as two objects. */
+  /* RUNG 3, the near float: menus, popovers, the effort popup, the editor menus. The 28px
+     blur was already at the shipped dialog median; the -12 spread was throwing half of it
+     away. Clearance goes 0 to +6 against a shipped menu median of +7. */
+  --shadow: var(--material-contact), 0 12px 24px -6px var(--material-lo);
+  /* RUNG 4, the modal that owns the screen: the Dialog, the command palette, the image
+     viewer. Every system measured ships at least three floating tiers; this app shipped one,
+     at 0.37x the median dialog ink. This is the only place --material-lo-cast is spent in
+     light, which finally makes the name honest: lo-soft and lo rest, lo-cast floats. */
+  --shadow-far: var(--material-contact), 0 24px 48px -12px var(--material-lo-cast);
+  --ring: color-mix(in srgb, var(--accent) 55%, transparent);
+  /* Material. One light source. --ink is the palette's far end from the ground in both
+     modes, so the colour source is constant and only the geometry flips. Measured on
+     --surface across the five palettes: ink 4% = 2.79-3.15 L*, 9% = 6.32-7.36,
+     14% = 10.22-11.61. Specular on surface-2: light +3.88-4.30, dark +3.90-3.96.
+     Chrome only, never content. Never derive from --line: Cursor sets it at alpha
+     0.075 and Claude at 0.102, so a mix would compound alpha twice. */
+  /* In light this is an occluded lip, not a highlight. Derived from --ink, like dark's, but
+     spent in the opposite direction: a white specular here rendered 2.08 to 3.49 L* DARKER
+     than the --bg immediately above the edge it sat on, in all five palettes. 4% is Primer's
+     shipped light --shadow-inset (#1f23280a = 3.92%). Light's depth is shadow; dark's is
+     light; --material-hi is the top-edge agent in both. */
+  --material-hi: color-mix(in srgb, var(--ink) 4%, transparent);
+  --material-lo-soft: color-mix(in srgb, var(--ink) 4%, transparent);
+  --material-lo: color-mix(in srgb, var(--ink) 9%, transparent);
+  --material-lo-cast: color-mix(in srgb, var(--ink) 14%, transparent);
+  --material-sheen: inset 0 1px 0 var(--material-hi);
+  /* Spread 0, not -1: the one character that is the whole defect in miniature. At -1 the
+     rect's bottom edge sat flush with the element and 69% of the ink was never painted. */
+  --material-contact: 0 1px 2px 0 var(--material-lo);
+  /* RUNG 1, a resting inline control such as the selected panel tab: a small cast sized for
+     a control rather than a menu, in the soft agent. */
+  --material-raise: var(--material-sheen), var(--material-contact), 0 3px 6px -2px var(--material-lo-soft);
+  /* RUNG 2, a resting plane, and the rung the app was missing: a 700x120 composer and a
+     32x32 chip cannot share an elevation. No inset layer, deliberately: the composer is
+     light's one genuine bump, so it must not wear the lip. */
+  --material-lift: var(--material-contact), 0 6px 14px -4px var(--material-lo);
+  /* Content. Recess is the mirror of --material-contact and reads the SOFT agent, because a
+     well repeats and a repeated gouge is noise. Measured as PAINTED rather than declared,
+     inside a --surface-2 fill: -1.92 to -2.19 L* on row 0, against the 1px --line border
+     these boxes already carry at -5.60 to -10.16. Seat means the object is touching the page,
+     so in light it collapses to the contact alone; dark still composes a real specular in. No content surface reads
+     --material-raise, so the three-per-group chrome budget is untouched. */
+  --material-recess: inset 0 1px 2px 0 var(--material-lo-soft);
+  /* Seated means touching the page, and touching is a contact, not an edge. With the lip
+     inverted, keeping the sheen would put a dark line inside the blocking card's own
+     chromatic border: a third edge on a two-edge object. Dark still composes a real
+     specular into this, which is why the token survives. */
+  --material-seat: var(--material-contact);
+  /* The work plane's edge, one hairline in both modes. Light's plane is the same white as the
+     ground around it, so the line is the whole boundary; dark's plane sits a small step below
+     its ground and takes the same line. Inset, so the edge never grows the plane's box. This
+     is not --material-raise; the three-per-group raise budget is untouched. */
+  --material-well: inset 0 0 0 1px var(--line);
+  /* Content planes (settings groups, provider, memory and orchestration cards). Light's plane
+     is the page's white, told apart by its hairline and contact; dark's plane is the raised
+     step, lit along its top edge by --material-seat. */
+  --plane-fill: var(--bg);
+  /* Raised thread cards: the contact plus a soft cast, the lift the user's bubble has. */
+  --material-card: var(--material-contact), 0 4px 12px -6px var(--material-lo-cast);
+  /* A recessed track inside a plane: the switch, the usage meter, a path well. Light's grey
+     step sits under the white plane; dark's canvas sits under the raised one. */
+  --track-fill: var(--surface-2);
+  /* The selected segment of a --surface-2 track, such as the appearance modes. It sits one
+     step lighter than the track. */
+  --track-2-current: var(--surface);
+  /* The current row and the selected panel tab are RAISED in both modes. Light's selection is a
+     white plane on a white column, so its hairline draws the edge and the rung-1 contact
+     and cast lift it. No sheen: in light the sheen is an occluded lip, which reads as a
+     press. Dark keeps the lit top edge. */
+  --current-row-fill: var(--bg);
+  --current-row-material: 0 0 0 1px var(--line), var(--material-contact), 0 3px 6px -2px var(--material-lo-soft);
+  --current-chip-material: var(--current-row-material);
+  /* The user's own message is a raised plane in the palette's --bubble tone. Light lifts it
+     with a soft cast under the contact, plus a faint lit top edge that only shows on a dark
+     bubble such as OpenOrc's black one. */
+  --bubble-fill: var(--bubble);
+  --bubble-ink: var(--ink);
+  --bubble-material: inset 0 1px 0 color-mix(in srgb, var(--bg) 16%, transparent), var(--material-contact), 0 6px 14px -6px var(--material-lo-cast);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #181818;
+    --surface: #151515;
+    --surface-2: #1e1e1e;
+    --surface-3: #252525;
+    --line: #2a2a2a;
+    --line-strong: #3d3d3d;
+    --ink: #e6e6e6;
+    --ink-2: #b5b5b5;
+    --ink-3: #878787;
+    --ink-4: #686868;
+    --accent: #0875e1;
+    --accent-ink: #339cff;
+    --accent-soft: color-mix(in srgb, #339cff 14%, #151515);
+    --accent-fg: #ffffff;
+    --ok: #22975d;
+    --warn: #a47f29;
+    --review: #9aacf4;
+    --bad: #d06557;
+    --selection: color-mix(in srgb, #339cff 26%, #151515);
+    --bubble: #1d1d1d;
+    --tone-read: var(--accent-ink);
+    --tone-edit: #b58cff;
+    --tone-run: #5fd39a;
+    --tone-search: #f0b44c;
+    --tone-web: #4fd0e0;
+    --tone-task: #ff7f9e;
+    --tone-memory: #d9a066;
+    --tone-plan: #ff7b6b;
+    --tone-think: #a891ff;
+    --tone-context: #97b0c5;
+    --shadow: var(--material-sheen), var(--material-contact), 0 16px 32px -16px var(--material-lo-cast);
+    --ring: color-mix(in srgb, var(--accent) 60%, transparent);
+    /* Nothing in the palette is darker than --surface in dark, so the shadow agent scales
+       --surface's own lightness instead. Declared first: the three --material-lo-* below
+       read it. The seams flip from a cast to a lit lip, which is why this is not
+       light-dark(): that can swap a colour but not an offset.
+
+       Dark is not light's mirror. --surface is already near black, so a shadow has little
+       room: the weight moves to the specular, and the cast keeps a smaller negative spread
+       so it still clears the object. Two specular strengths, mirroring the --material-lo
+       pair: --material-hi lights a control's edge, --material-hi-soft a plane's, because a
+       full-strength lip down a whole column would read as a divider border, and columns are
+       separated by the gutter alone. --material-sheen and --material-contact are not
+       redeclared; they compose. --material-raise is, because its geometry has to change. */
+    --material-void: oklch(from var(--surface) calc(l * 0.4) c h);
+    --material-hi: color-mix(in srgb, var(--ink) 12%, transparent);
+    --material-hi-soft: color-mix(in srgb, var(--ink) 5%, transparent);
+    /* --surface is at the floor in dark and an occluder has nowhere to go: --material-lo-soft
+       inside a --surface card measures -0.26 L* in github/dark. So the far wall of the trough
+       catches the light instead, which is what a trough lit from above looks like when the
+       page is near black. Measured on --surface-2: +4.56 (github) to +4.93 (linear).
+       DO NOT "tidy" this to inset 0 1px 0 for symmetry with --material-sheen: the sign of the
+       offset is the entire cue, and flipping it turns every well in the product into a raise. */
+    --material-recess: inset 0 -1px 0 var(--material-hi-soft);
+    --material-lo-soft: color-mix(in srgb, var(--material-void) 35%, transparent);
+    --material-lo: color-mix(in srgb, var(--material-void) 55%, transparent);
+    --material-lo-cast: color-mix(in srgb, var(--material-void) 70%, transparent);
+    --material-raise: var(--material-sheen), var(--material-contact), 0 4px 12px -4px var(--material-lo-cast);
+    /* Pins and aliases, not design changes: today's dark strings written verbatim so dark is
+       byte-identical after light's geometry diverged. --material-contact and --material-seat
+       used to compose from :root and would otherwise inherit light's new clearance; --material-lift
+       and --shadow-far are new and would inherit light's values outright. Nothing errors if
+       these are dropped, dark just quietly gets heavier, so do not "tidy" them away. */
+    --material-contact: 0 1px 2px -1px var(--material-lo);
+    --material-seat: var(--material-sheen), var(--material-contact);
+    --material-lift: var(--material-raise);
+    --shadow-far: var(--shadow);
+    --track-2-current: var(--surface-3);
+    /* Dark's current row is genuinely lighter than its ground, so it keeps the lit edge.
+       Planes and the bubble take the lit edge alone, because a cast has nowhere to go
+       near black. */
+    --current-row-fill: var(--surface-2);
+    --current-row-material: var(--material-sheen);
+    --current-chip-material: var(--material-raise);
+    /* Most of a step above the canvas, so a hover row inside a plane still lifts at --surface-2. */
+    --plane-fill: color-mix(in srgb, var(--surface-2) 60%, var(--surface));
+    --material-card: var(--material-sheen), var(--material-contact), 0 4px 12px -6px var(--material-lo-cast);
+    --track-fill: var(--surface);
+    --bubble-material: var(--material-sheen);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #181818;
+  --surface: #151515;
+  --surface-2: #1e1e1e;
+  --surface-3: #252525;
+  --line: #2a2a2a;
+  --line-strong: #3d3d3d;
+  --ink: #e6e6e6;
+  --ink-2: #b5b5b5;
+  --ink-3: #878787;
+  --ink-4: #686868;
+  --accent: #0875e1;
+  --accent-ink: #339cff;
+  --accent-soft: color-mix(in srgb, #339cff 14%, #151515);
+  --accent-fg: #ffffff;
+  --ok: #22975d;
+  --warn: #a47f29;
+  --review: #9aacf4;
+  --bad: #d06557;
+  --selection: color-mix(in srgb, #339cff 26%, #151515);
+  --bubble: #1d1d1d;
+  --tone-read: var(--accent-ink);
+  --tone-edit: #b58cff;
+  --tone-run: #5fd39a;
+  --tone-search: #f0b44c;
+  --tone-web: #4fd0e0;
+  --tone-task: #ff7f9e;
+  --tone-memory: #d9a066;
+  --tone-plan: #ff7b6b;
+  --tone-think: #a891ff;
+  --tone-context: #97b0c5;
+  --shadow: var(--material-sheen), var(--material-contact), 0 16px 32px -16px var(--material-lo-cast);
+  --ring: color-mix(in srgb, var(--accent) 60%, transparent);
+  /* Nothing in the palette is darker than --surface in dark, so the shadow agent scales
+     --surface's own lightness instead. Declared first: the three --material-lo-* below
+     read it. The seams flip from a cast to a lit lip, which is why this is not
+     light-dark(): that can swap a colour but not an offset.
+
+     Dark is not light's mirror. --surface is already near black, so a shadow has little
+     room: the weight moves to the specular, and the cast keeps a smaller negative spread
+     so it still clears the object. Two specular strengths, mirroring the --material-lo
+     pair: --material-hi lights a control's edge, --material-hi-soft a plane's, because a
+     full-strength lip down a whole column would read as a divider border, and columns are
+     separated by the gutter alone. --material-sheen and --material-contact are not
+     redeclared; they compose. --material-raise is, because its geometry has to change. */
+  --material-void: oklch(from var(--surface) calc(l * 0.4) c h);
+  --material-hi: color-mix(in srgb, var(--ink) 12%, transparent);
+  --material-hi-soft: color-mix(in srgb, var(--ink) 5%, transparent);
+  /* --surface is at the floor in dark and an occluder has nowhere to go: --material-lo-soft
+       inside a --surface card measures -0.26 L* in github/dark. So the far wall of the trough
+       catches the light instead, which is what a trough lit from above looks like when the
+       page is near black. Measured on --surface-2: +4.56 (github) to +4.93 (linear).
+       DO NOT "tidy" this to inset 0 1px 0 for symmetry with --material-sheen: the sign of the
+       offset is the entire cue, and flipping it turns every well in the product into a raise. */
+  --material-recess: inset 0 -1px 0 var(--material-hi-soft);
+  --material-lo-soft: color-mix(in srgb, var(--material-void) 35%, transparent);
+  --material-lo: color-mix(in srgb, var(--material-void) 55%, transparent);
+  --material-lo-cast: color-mix(in srgb, var(--material-void) 70%, transparent);
+  --material-raise: var(--material-sheen), var(--material-contact), 0 4px 12px -4px var(--material-lo-cast);
+  /* Pins and aliases, not design changes: today's dark strings written verbatim so dark is
+     byte-identical after light's geometry diverged. --material-contact and --material-seat
+     used to compose from :root and would otherwise inherit light's new clearance;
+     --material-lift and --shadow-far are new and would inherit light's values outright.
+     Nothing errors if these are dropped, dark just quietly gets heavier. Do not tidy away. */
+  --material-contact: 0 1px 2px -1px var(--material-lo);
+  --material-seat: var(--material-sheen), var(--material-contact);
+  --material-lift: var(--material-raise);
+  --shadow-far: var(--shadow);
+  --track-2-current: var(--surface-3);
+  /* Dark's current row is genuinely lighter than its ground, so it keeps the lit edge.
+     Planes and the bubble take the lit edge alone, because a cast has nowhere to go
+     near black. */
+  --current-row-fill: var(--surface-2);
+  --current-row-material: var(--material-sheen);
+  --current-chip-material: var(--material-raise);
+  /* Most of a step above the canvas, so a hover row inside a plane still lifts at --surface-2. */
+  --plane-fill: color-mix(in srgb, var(--surface-2) 60%, var(--surface));
+  --material-card: var(--material-sheen), var(--material-contact), 0 4px 12px -6px var(--material-lo-cast);
+  --track-fill: var(--surface);
+  --bubble-material: var(--material-sheen);
+  color-scheme: dark;
+}
+
+/* github/dark's body is #010409, 1.02 L* above black: a cast tops out at -0.55 L* even
+   at 60%. Raise the specular there past the 12% dark base, never the cast. root.dataset.palette is written in
+   lib/theme.ts, so both the media and the explicit selector need the floor. */
+@media (prefers-color-scheme: dark) {
+  :root[data-palette="github"]:not([data-theme="light"]) {
+    --material-hi: color-mix(in srgb, var(--ink) 16%, transparent);
+  }
+}
+:root[data-palette="github"][data-theme="dark"] {
+  --material-hi: color-mix(in srgb, var(--ink) 16%, transparent);
+}
+
+/* Shadow rendering under forced colors is not dependable, so every primitive is nulled
+   rather than left to the UA. A blocking card's seat carries real information (the reader
+   must act on it), so it is restored with the one property forced colors preserves. The
+   shipped themes never draw focus outlines; this is the accessibility escape hatch, not a
+   focus style. */
+@media (forced-colors: active) {
+  :root {
+    --material-sheen: none;
+    --material-contact: none;
+    --material-raise: none;
+    --material-well: none;
+    --material-recess: none;
+    --material-seat: none;
+    --material-card: none;
+    --material-lift: none;
+    --shadow-far: none;
+    --current-row-material: none;
+    --current-chip-material: none;
+    --bubble-material: none;
+    --shadow: none;
+  }
+  [data-blocking="true"] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+}
+
+/*
+ * The scales. `static` is load-bearing: `@theme inline` only emits the steps
+ * Tailwind sees referenced, so hand-written CSS below could not read
+ * var(--text-md) or var(--radius-xl) and authors hardcoded px instead. `static`
+ * emits every step onto :root, so one declaration serves both the utilities and
+ * the rules in this file.
+ */
+@theme static {
+  /* Type. Eight roles plus the narrow-column title. Nothing else ships. */
+  --text-xs: 11px;
+  --text-xs--line-height: 16px;
+  --text-sm: 12px;
+  --text-sm--line-height: 18px;
+  --text-base: 13px;
+  --text-base--line-height: 20px;
+  --text-md: 14px;
+  --text-md--line-height: 22px;
+  --text-prose: 15px;
+  --text-prose--line-height: 25px;
+  --text-lg: 16px;
+  --text-lg--line-height: 24px;
+  --text-xl: 20px;
+  --text-xl--line-height: 28px;
+  --text-title-sm: 24px;
+  --text-title-sm--line-height: 32px;
+  --text-title: 28px;
+  --text-title--line-height: 36px;
+  /* streamdown's markdown headings reach for Tailwind's text-2xl and text-3xl, whose
+     defaults are 24px and 30px. Pinned to the title steps so a dependency cannot
+     introduce a size the scale does not have. */
+  --text-2xl: 24px;
+  --text-2xl--line-height: 32px;
+  --text-3xl: 28px;
+  --text-3xl--line-height: 36px;
+
+  /* 400 body · 500 labels, selected state, headers · 600 document and dialog titles. */
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+
+  /* Radius. sm chips · md buttons, fields, rows · lg menus, cards, popovers ·
+     xl composer shell and message bubbles · pill round send, dots, avatars. */
+  --radius-sm: 5px;
+  --radius-md: 7px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius-pill: 999px;
+
+  /* Control heights. Every button, select, field and toolbar control lands on one. */
+  --control-badge: 20px;
+  --control-sm: 24px;
+  --control-md: 28px;
+  --control-lg: 32px;
+  /* The round send button is the one deliberate exception to the ramp. */
+  --control-send: 36px;
+}
+
+@theme inline {
+  --color-background: var(--surface);
+  --color-foreground: var(--ink);
+  --color-muted: var(--surface-2);
+  --color-muted-foreground: var(--ink-3);
+  --color-border: var(--line);
+  --color-sidebar: var(--bg);
+  --color-primary: var(--accent);
+  --color-primary-foreground: var(--accent-fg);
+  --color-ring: var(--line-strong);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-ink-4: var(--ink-4);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-fg: var(--accent-fg);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-review: var(--review);
+  --color-warn-soft: var(--warn-soft);
+  --color-bad: var(--bad);
+  --color-bad-soft: var(--bad-soft);
+  --color-bubble: var(--bubble);
+  --shadow-panel: var(--shadow);
+  --shadow-modal: var(--shadow-far);
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", "SF Mono", Menlo, Consolas, monospace;
+  /* Height utilities over the control ramp, so components stay off raw pixels. */
+  --height-badge: var(--control-badge);
+  --height-control-sm: var(--control-sm);
+  --height-control-md: var(--control-md);
+  --height-control-lg: var(--control-lg);
+  --height-control-send: var(--control-send);
+  /* Layout measures, so no screen hardcodes a pixel width. The resizable ones are set on :root by the layout store. */
+  --width-sidebar: var(--layout-sidebar, 248px);
+  --width-panel: var(--layout-panel, 440px);
+  /* The floors the work row keeps: the conversation's, then the panel's. The panel floor is
+     limits.panel.min in lib/layout.ts. */
+  --width-main-min: 440px;
+  --width-panel-min: 340px;
+  --width-details: 72px;
+  --height-topbar: max(52px, calc(32px / var(--window-zoom, 1)));
+  --container-chat: 760px;
+  --container-document: 800px;
+  --document-gutter: 48px;
+  --composer-max-height: 240px;
+  --container-palette: 560px;
+  --grid-template-columns-rail: 72px minmax(0, 1fr);
+  --grid-template-columns-field: 6rem minmax(0, 1fr);
+  --spacing-hero: 14vh;
+  /* The gutter around the work plane. Deliberately NOT divided by --window-zoom: it is a
+     design measure and scales with the UI. The two clearances below are native-chrome
+     measurements and must not scale. */
+  --spacing-well: 8px;
+  --spacing-traffic: calc(84px / var(--window-zoom, 1));
+  --spacing-controls: calc(140px / var(--window-zoom, 1));
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  #root {
+    /* Keep workspace resize grips beneath dialogs and menus portaled to body. */
+    isolation: isolate;
+  }
+  /* The window never scrolls as a document: a popup that overflows or a focus below the fold must not shift the shell. */
+  html {
+    overflow: hidden;
+  }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: var(--text-base--line-height);
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+  ::selection {
+    background: var(--selection);
+  }
+  html {
+    caret-color: var(--accent);
+    accent-color: var(--accent);
+  }
+  /* Focus is shown through the control's surface or the editor's caret. */
+  :focus,
+  :focus-visible {
+    outline: none;
+  }
+  :is(input, textarea):focus-visible {
+    outline: none;
+    box-shadow: none;
+  }
+  .native-field:focus {
+    border-color: var(--line-strong);
+  }
+  button,
+  [role="tab"],
+  label {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  input,
+  textarea,
+  .prose-chat {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  input,
+  textarea,
+  select {
+    min-width: 0;
+    max-width: 100%;
+  }
+  textarea {
+    display: block;
+  }
+  svg {
+    flex-shrink: 0;
+  }
+  button,
+  a,
+  [role="tab"],
+  [role="button"] {
+    transition:
+      background-color 120ms var(--ease-out),
+      color 120ms var(--ease-out),
+      border-color 120ms var(--ease-out),
+      box-shadow 120ms var(--ease-out),
+      opacity 120ms var(--ease-out);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      transition-duration: 0ms !important;
+      animation-duration: 0ms !important;
+    }
+  }
+  input[type="checkbox"],
+  input[type="radio"] {
+    width: 13px;
+    height: 13px;
+    margin: 0;
+  }
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    color: inherit;
+  }
+  code,
+  pre,
+  kbd {
+    font-family: var(--font-mono);
+  }
+  /* Scrollbars keep the native overlay timing (appear while scrolling, auto-fade,
+     hover-expand). scrollbar-color recolors without invoking the ::-webkit-scrollbar
+     takeover — never reintroduce those pseudo-element rules: they hand painting to CSS
+     states and cost the platform behavior. Chromium paints the recolored bar itself, so
+     the pill shape may differ slightly from the system one. The track color is moot in
+     overlay mode. Tab strips that must never show a bar hide theirs with
+     scrollbar-width: none. */
+  html {
+    scrollbar-color: var(--ink-4) transparent;
+  }
+}
+
+/* Keyboard navigation uses a neutral fill, including selects with custom arrows.
+   Keep this outside the base layer so utility backgrounds cannot hide it. */
+:is(button, a, select, [role="button"], [role="tab"]):focus-visible {
+  background-color: var(--surface-3);
+  color: var(--ink);
+}
+label:has(input:is([type="checkbox"], [type="radio"]):focus-visible) {
+  background-color: var(--surface-2);
+}
+
+/* Numbers that sit in a column — timestamps, counts, usage, diff stats — hold their
+   slot instead of shuffling as digits change. The system face carries tnum. */
+.tabular,
+time,
+kbd {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Menus never grow past the space Base UI measures between their anchor and the window edge; they scroll instead. */
+.menu-popup {
+  max-height: var(--available-height);
+  overflow-y: auto;
+}
+
+/* Native regions ignore overflow clipping. Inherited no-drag on scrolling
+   content makes its offscreen descendants cut holes in the header above it.
+   Keep region declarations on window chrome and its controls, never content.
+   Use initial to clear a region: Chromium parses `none` as `no-drag`. */
+.drag-region {
+  -webkit-app-region: drag;
+  user-select: none;
+}
+.drag-region .no-drag,
+.resize-handle,
+.drag-region :is(button, a, input, select, textarea, [role="button"], [contenteditable="true"]) {
+  -webkit-app-region: no-drag;
+}
+.drag-region :is(input, textarea, [contenteditable="true"]) {
+  user-select: text;
+}
+
+/*
+ * The window well. One ground (--bg, painted by the App root) with the work column recessed
+ * into it. Every main view's canvas extends behind its title rail, below the top gutter.
+ * Native traffic lights stay centered on the shared header controls as the sidebar or zoom changes.
+ *
+ * The plane is a pseudo-element rather than the column's own background, so no view had to be
+ * restructured and the column keeps its container-type for the @container rules.
+ */
+.app-shell {
+  background: var(--bg);
+}
+html[data-transparent-shell="true"] body {
+  background: transparent;
+}
+html[data-transparent-shell="true"] .app-shell {
+  /* Tint the native blur once, behind all outer rails. Content planes stay opaque. */
+  background: color-mix(in srgb, var(--bg) var(--shell-opacity, 65%), transparent);
+}
+@media (prefers-reduced-transparency: reduce) {
+  html[data-transparent-shell="true"] .app-shell {
+    background: var(--bg);
+  }
+}
+/* Over the tinted blur an opaque row fill is a solid block, and while the thread list scrolls
+   under the pointer each hovered row's fading fill trails behind it. The sidebar's fills are
+   ink tints here instead, so they blend with whatever shows through. The nav badge's ring
+   knocks out the row fill, which is now see-through, so it drops away at rest. */
+html[data-transparent-shell="true"] .sidebar-shell {
+  --surface-2: color-mix(in srgb, var(--ink) 7%, transparent);
+  --surface-3: color-mix(in srgb, var(--ink) 11%, transparent);
+  --current-row-fill: color-mix(in srgb, var(--ink) 9%, transparent);
+}
+html[data-transparent-shell="true"] .sidebar-shell .nav-row:not(:hover, :focus-visible, [aria-current="page"]) {
+  --nav-row-fill: transparent;
+}
+.well {
+  position: relative;
+  /* Load-bearing and it fails silently: this scopes the plane's negative z to the column, so
+     no ancestor background can paint over it. Adding a transform, filter, opacity or
+     backdrop-filter to any wrapper above a well makes the column go blank with no error. */
+  isolation: isolate;
+  min-height: 0;
+  /* Margins, never gap or padding: gap doubles around the zero-width resize handle, and
+     padding on these columns would fire every @container rule two gutters early. */
+  margin: 0 var(--spacing-well) var(--spacing-well);
+}
+.well::before {
+  content: "";
+  position: absolute;
+  inset: var(--spacing-well) 0 0;
+  z-index: -1;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--material-well);
+}
+/* The plane's paint: the palette's --surface-gradient over --surface. The gradient is fixed to
+   the window rather than to each box, so anything that has to blend into the plane, such as a
+   sticky header or footer, paints this same fill and meets it without a seam. */
+.well::before,
+.well-fill,
+.onboarding-surface,
+.settings-feedback {
+  background:
+    var(--surface-gradient) fixed,
+    var(--surface);
+}
+/* Two adjacent wells share one gutter rather than stacking two. */
+.well + .well {
+  margin-left: 0;
+}
+/* While the sidebar is open, its shell spans the gutter beside it (see .sidebar-shell), so the
+   first plane seats flush against the sidebar and the list scrollbar rides the seam. With the
+   sidebar closed the gutter returns — a plane never touches the window edge. The margin
+   transition rides the same 220ms as the shell's width so the seam moves as one. */
+.work-row > .well:first-child {
+  transition: margin-left 220ms var(--ease-out);
+}
+body:has(.sidebar-shell[data-open="true"]) .work-row > .well:first-child {
+  margin-left: 0;
+}
+/* Only the top band contributes native drag rectangles. A pseudo-element keeps
+   the blank gutters draggable without passing drag/no-drag down to scrollers. */
+.work-row {
+  position: relative;
+}
+.work-row::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: var(--height-topbar);
+  pointer-events: none;
+  -webkit-app-region: drag;
+}
+
+/* The panel slides the way the sidebar does, and for the same reason: a third column that
+   blinks in and out reads as a glitch, while one that opens tells you where it came from.
+   The shell animates its own width and clips; the pane inside keeps the full width so the
+   content never reflows mid-slide and the container queries below never fire at a width
+   the panel is only passing through. */
+.panel-shell {
+  overflow: hidden;
+  width: calc(var(--panel-pane) + var(--spacing-well));
+  transition: width 220ms var(--ease-out); /* PANE_MS in Panel.tsx holds the panel open for exactly this long */
+}
+.panel-shell[data-open="false"] {
+  width: 0;
+}
+body[data-resizing] .panel-shell {
+  transition: none;
+}
+/* An open panel shares the work plane's edge, like the sidebar on the left.
+   Remove the well gutter so the resize grip sits on one visible seam. */
+.work-row:has(> .panel-shell[data-open="true"]) > .well,
+.work-row:has(> .panel-shell[data-open="true"]) .thread-pane:last-of-type > .well {
+  margin-right: 0;
+}
+/* An expanded preview covers the whole work row instead of sharing it. The conversation keeps
+   its layout and scroll underneath, and the native view follows its placeholder's new size.
+   Above the pane dividers' grips, which would otherwise poke through at z-index 5. */
+.panel-shell[data-expanded="true"] {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  width: auto;
+}
+.panel-shell[data-expanded="true"] .panel-pane {
+  width: 100%;
+  background: var(--bg);
+}
+
+/* The sidebar slides in and out; its content keeps its width so nothing reflows while it moves.
+   While open it also owns the well gutter beside it, so its edge — and the list's overlay
+   scrollbar — seats against the first plane instead of floating short of it. */
+.sidebar-shell {
+  position: relative;
+  /* 1 exists only to stay below the resize handle's 5, so the grip still takes the pointer. */
+  z-index: 1;
+  width: calc(var(--width-sidebar) + var(--spacing-well));
+  overflow: hidden;
+  transition: width 220ms var(--ease-out);
+}
+.sidebar-shell[data-open="false"] {
+  width: 0;
+}
+body[data-resizing] .sidebar-shell {
+  transition: none;
+}
+
+/* Reserve the expanded native scrollbar's space on the content, leaving its scroll
+   container flush with the shell. This also clears the resize grip in the same gutter. */
+.sidebar-thread-content {
+  margin-right: calc(2 * var(--spacing-well));
+}
+
+.sidebar-brand-mark {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+.sidebar-wordmark {
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+.sidebar-brand-new-thread {
+  color: var(--ink-2);
+  background-color: color-mix(in srgb, var(--ink) 7%, transparent);
+}
+.sidebar-brand-new-thread:is(:hover, :focus-visible) {
+  color: var(--ink);
+  background-color: color-mix(in srgb, var(--ink) 12%, transparent);
+}
+
+.sidebar-project-add {
+  opacity: 0;
+}
+.sidebar-project:hover .sidebar-project-add,
+.sidebar-project:focus-within .sidebar-project-add {
+  opacity: 1;
+}
+@media (hover: none) {
+  .sidebar-project-add {
+    opacity: 1;
+  }
+}
+
+/* The handle takes no width: it sits on the seam between two panes, its grip and hit area straddling both, and the grip shows only when the pointer is near. */
+.resize-handle {
+  position: relative;
+  width: 0;
+  flex: 0 0 0;
+  cursor: col-resize;
+  touch-action: none;
+  z-index: 5;
+}
+.resize-handle::after {
+  content: "";
+  position: absolute;
+  inset: 0 -6px;
+}
+/* Grab the full partition below the window's title bar. Keep its hit area on
+   the work side so the sidebar scrollbar remains independently draggable.
+   Cancel the handle's layout width so neither pane moves. */
+.resize-handle[data-edge="sidebar"] {
+  width: var(--spacing-well);
+  flex-basis: var(--spacing-well);
+  margin-right: calc(-1 * var(--spacing-well));
+  margin-top: var(--height-topbar);
+}
+.resize-handle[data-edge="sidebar"]::after {
+  inset: 0;
+}
+.resize-handle[data-edge="sidebar"] .resize-grip {
+  left: 0;
+}
+/* Mirror the sidebar grip at the panel's left edge. The handle itself straddles
+   the edge, so both sides can take the pointer; its margins cancel its width. */
+.resize-handle[data-edge="panel"] {
+  width: 12px;
+  flex-basis: 12px;
+  margin-left: -6px;
+  margin-right: -6px;
+  margin-top: var(--height-topbar);
+}
+.resize-handle[data-edge="panel"]::after {
+  inset: 0;
+}
+.resize-grip {
+  position: absolute;
+  width: 4px;
+  height: 44px;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: var(--radius-pill);
+  background: var(--line-strong);
+  pointer-events: none;
+  opacity: 0;
+  transition:
+    height 120ms var(--ease-out),
+    background-color 120ms var(--ease-out),
+    opacity 120ms var(--ease-out);
+}
+.resize-handle:is(:hover, :focus-visible, [data-dragging="true"]) .resize-grip {
+  height: 56px;
+  opacity: 1;
+  background: var(--ink-3);
+}
+
+/* Every title rail sits on its view's canvas, with one line separating it from the content. */
+.app-topbar {
+  padding-top: calc(var(--spacing-well) / 2);
+  border-bottom: 1px solid var(--line);
+}
+/* The band under a column header: a route's filter row, search row or toolbar. One 44px height
+   for all of them, clearing --control-lg with room. min-height rather than height so a
+   bar that wraps can grow. A bar with no current member stays flat: no material here. */
+.sub-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  min-height: 44px;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+/* The header keeps project switching beside the title on every screen. */
+.header-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: var(--control-badge);
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  max-width: 40%;
+  min-width: 0;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+.header-chip:hover,
+.header-chip[data-popup-open] {
+  background: var(--surface-3);
+  color: var(--ink-2);
+}
+
+/* One raised element per group, and it is the current one: the selected panel tab reads
+   --material-raise (rung 1, a resting inline control); the composer shell reads
+   --material-lift (rung 2, a resting plane). */
+.panel-tabs button[aria-selected="true"] {
+  box-shadow: var(--current-chip-material);
+}
+
+/* The current sidebar row is raised in both modes: a hairline and a small cast in light, the
+   lit edge in dark. Only the row's own background and shadow change, so rank in the sidebar
+   still rides on height, weight and ink, never on a new fill step, border or accent. */
+.sidebar-shell [aria-current="page"]:not(:focus-visible) {
+  background-color: var(--current-row-fill);
+}
+.sidebar-shell [aria-current="page"] {
+  box-shadow: var(--current-row-material);
+}
+
+/* GEOMETRY ONLY. These wrappers paint nothing in either mode; only their padding matters.
+   The selection cue is the item's own shadow, which reads on any ground, so nothing sits
+   behind the nav group and nav-versus-thread rank stays on height, weight and ink. */
+.nav-track,
+.panel-tabs {
+  background: none;
+  box-shadow: none;
+}
+/* 4px margin plus 4px padding puts a row's left edge 8px from the column. */
+.nav-track {
+  margin: 0 4px;
+  padding: 4px;
+}
+.panel-tabs {
+  padding: 2px;
+}
+
+/* :not(:focus-visible) is load-bearing and silent if dropped. These rules are unlayered and
+   outrank the global keyboard-focus fill, so without the guard focus becomes invisible with
+   no error and no failing test. Guarded, focus keeps --surface-3. The nav row is already
+   covered by the .sidebar-shell rule above; only the panel tab needs its own. */
+.panel-tabs > button:not(:focus-visible)[aria-selected="true"] {
+  background-color: var(--current-row-fill);
+}
+
+/* A nav count hangs off its icon's top-right corner. It is sized to the 15px nav icon and sits
+   high enough to keep the icon readable and clear of the label. Inside the row, it knocks
+   itself out of the row's own fill, which these follow in the order the row resolves them:
+   the column at rest, hover, the current page, then focus. */
+.nav-row {
+  --nav-row-fill: var(--bg);
+}
+.nav-row:hover {
+  --nav-row-fill: var(--surface-2);
+}
+.nav-row[aria-current="page"]:not(:focus-visible) {
+  --nav-row-fill: var(--current-row-fill);
+}
+.nav-row:focus-visible {
+  --nav-row-fill: var(--surface-3);
+}
+.nav-badge {
+  position: absolute;
+  top: -7px;
+  right: -4px;
+  display: grid;
+  place-items: center;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  border-radius: var(--radius-pill);
+  background: var(--ink);
+  color: var(--bg);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1;
+  box-shadow: 0 0 0 2px var(--nav-row-fill);
+}
+
+/* The task list's keyboard cursor. Without this it is indistinguishable from a hovered row,
+   because both resolve to surface-2. Sheen only: a list must not grow raised items. */
+.task-list [data-current] {
+  box-shadow: var(--material-sheen);
+}
+.task-group-header {
+  background-color: var(--surface-2);
+}
+.task-group-header:hover {
+  background-color: var(--surface-3);
+}
+.task-list-row:hover,
+.task-list-row[data-current] {
+  background-color: var(--surface-2);
+}
+.task-list [data-status-group] [data-row]:last-child .task-list-row {
+  border-bottom: 1px solid var(--line);
+}
+.schedule-delete:is(:hover, :focus-visible) {
+  color: var(--bad);
+}
+.schedule-row {
+  container-type: inline-size;
+}
+@container (max-width: 560px) {
+  .schedule-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+/* Two members of the floating layer that are not free-floating planes. The mention flyout
+   lives inside the already-raised composer shell, and a tooltip is a label, not a plane. */
+.composer-suggestions,
+.tooltip-popup {
+  box-shadow: var(--material-contact);
+}
+
+/* CONTENT. Three rungs and nothing between them.
+   A cue that states a class's fixed relationship to its ground is true of every instance, so
+   it may repeat: twenty code blocks are one page with twenty holes, and none of them claims
+   to be the important one. A cue that says this instance outranks its siblings is a lie the
+   moment there are two, so it is spent once. No content surface changes the token it uses as
+   a ground: one plane step (surface to surface-2) costs 51-82% of ink-3's headroom and
+   72-109% of ink-4's in nine of ten palette/mode pairs, and a box-shadow costs none. */
+
+/* Recessed: the box's own fill sits below its container. A predicate, not a preference. */
+[data-streamdown="code-block"],
+[data-streamdown="mermaid-block"],
+.prose-chat .katex-display,
+.tool-detail,
+.system-notice {
+  box-shadow: var(--material-recess);
+}
+
+/* RAISED CARDS. The surfaces a thread grows for a task, a turn's file changes, a question, an
+   MCP app or a failure to act on are raised planes, in the transcript and the panel alike. The
+   neutral ones take the plane fill; tinted ones keep their tint and take only the lift.
+   Unlayered on purpose, so the fill beats the components' own bg utilities. The loading
+   skeleton carries .surface-card too, so a card cannot change depth as it loads. */
+.surface-card,
+.change-card,
+.question-card,
+.mcp-app-card {
+  background: var(--plane-fill);
+}
+.surface-card,
+.change-card,
+.question-card,
+.mcp-app-card,
+.error-card,
+[data-blocking="true"] {
+  box-shadow: var(--material-card);
+}
+
+/* The user's own plane: the palette's --bubble tone, seated in light and lit along its top
+   edge in dark. */
+.message-bubble {
+  background: var(--bubble-fill);
+  color: var(--bubble-ink);
+  box-shadow: var(--bubble-material);
+}
+
+/* Deliberately excluded: [data-streamdown="table-wrapper"]. rich-text.css paints --surface
+   back inside the --surface-2 frame, so recessing it reads as three layers for one table. */
+
+/* Routine work is quiet; color identifies live work, delegation and attention. */
+.tool-icon {
+  color: currentColor;
+}
+.agent-orb .tool-icon[data-tone="think"] {
+  color: var(--tone-think);
+}
+.tool-icon[data-tone="task"] {
+  color: var(--accent-ink);
+}
+.tool-icon[data-tone="agent"] {
+  color: var(--ok);
+}
+.tool-icon[data-tone="error"] {
+  color: var(--bad);
+}
+.work-turn {
+  min-width: 0;
+}
+.work-section {
+  margin-top: 16px;
+  margin-bottom: 16px;
+}
+.work-toggle,
+.work-step-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  max-width: 100%;
+  text-align: left;
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+  cursor: pointer;
+}
+.work-toggle:hover,
+.work-step-toggle:hover {
+  color: var(--ink);
+}
+.work-toggle:focus-visible,
+.work-step-toggle:focus-visible {
+  background: var(--surface-2);
+  color: var(--ink);
+  border-radius: 5px;
+}
+.work-chevron {
+  flex-shrink: 0;
+  transition: transform 150ms ease-out;
+}
+.work-content {
+  padding-top: 8px;
+  margin-top: 4px;
+  border-top: 1px solid var(--line);
+}
+.work-content[hidden],
+.work-step-detail[hidden] {
+  display: none;
+}
+.work-step-toggle {
+  width: 100%;
+}
+.work-step-toggle > span {
+  min-width: 0;
+}
+.work-step-detail {
+  margin-left: 24px;
+  padding: 4px 0 8px;
+  min-width: 0;
+}
+.work-current {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  margin-top: 4px;
+}
+.work-live {
+  color: var(--accent-ink);
+  flex-shrink: 0;
+  animation: work-spin 1.6s linear infinite;
+}
+@keyframes work-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .work-live {
+    animation: none;
+  }
+  .work-chevron {
+    transition: none;
+  }
+}
+body[data-resizing] {
+  cursor: col-resize;
+  user-select: none;
+}
+body[data-resizing] iframe {
+  pointer-events: none;
+}
+
+/* Blocks below the fold skip layout until scrolled to; the transcript stays a plain list. */
+/* What a turn changed: one card under the reply, the way the agent apps show their edits. */
+.change-card {
+  margin-block: 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.change-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+}
+.change-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--ink-2);
+  flex: none;
+}
+.change-title {
+  display: grid;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.change-title strong {
+  font-weight: 500;
+}
+.change-counts {
+  display: inline-flex;
+  gap: 8px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-sm);
+}
+.change-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+.change-note {
+  padding: 0 16px 12px;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+.change-files {
+  border-top: 1px solid var(--line);
+  padding: 4px 16px;
+}
+.change-files li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding-block: 8px;
+  font-size: var(--text-sm);
+}
+.change-files li + li {
+  border-top: 1px solid var(--line);
+}
+.change-files li > :first-child {
+  overflow-wrap: anywhere;
+  min-width: 0;
+  color: var(--ink-2);
+}
+.change-files li > :first-child strong {
+  color: var(--ink);
+  font-weight: 500;
+}
+.change-more {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 16px;
+  border-top: 1px solid var(--line);
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+}
+.change-error {
+  padding: 8px 16px 12px;
+  font-size: var(--text-sm);
+}
+@container (max-width: 600px) {
+  .change-heading {
+    flex-wrap: wrap;
+  }
+}
+
+.transcript-block {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 48px;
+  animation: transcript-block-in 220ms ease-out both;
+}
+@keyframes transcript-block-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The agent at the tail of the conversation. A fixed slot so the shader and the still glyph
+   it falls back to occupy exactly the same space and the row never reflows when one replaces
+   the other. Deliberately larger than the 13px step icons: this is not one of them, it is
+   the one object on the page you are meant to look at, and at glyph size the shader reads
+   as a speck. */
+.agent-orb {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 36px; /* off-scale: an artwork box, sized to the artwork rather than a spacing step */
+  height: 36px;
+}
+
+/* Reasoning streams in view while it runs: the last few lines, fading in from the top. Click the row to read it all. */
+.thinking-tail {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  max-height: 88px;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, transparent, black 32px);
+}
+
+/* Every file in a patch folds to its own row. The header replaces the diff renderer's own,
+   so the path, the change letter and the two counts read in the app's ink ramp rather than
+   the highlighter's, and it stays on the top edge of the scroller while its file passes
+   under it. It paints --bg, the column's own ground, so a fold is a hairline and a row and
+   never a second plane. */
+.diff-file-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  height: var(--control-lg);
+  background-color: var(--bg);
+  transition: background-color 120ms var(--ease-out);
+}
+.diff-file-header:is(:hover, :focus-visible) {
+  background-color: var(--surface-2);
+}
+/* The highlighter paints its theme's own ground, and github-dark's #24292e is a grey slab on a
+   near-black column. A declaration on the host outranks the renderer's :host theme rule, so
+   code sits on the column's ground in both modes and every line tint mixes from it. */
+diffs-container {
+  --diffs-light-bg: var(--bg);
+  --diffs-dark-bg: var(--bg);
+  --diffs-font-family: var(--font-mono);
+  --diffs-bg-context-override: var(--bg);
+  --diffs-bg-context-gutter-override: var(--bg);
+  --diffs-fg-number-override: var(--ink-4);
+  --diffs-fg-number-addition-override: var(--ok);
+  --diffs-fg-number-deletion-override: var(--bad);
+  --diffs-addition-color-override: var(--ok);
+  --diffs-deletion-color-override: var(--bad);
+  --diffs-bg-addition-override: color-mix(in srgb, var(--bg) 87%, var(--ok));
+  --diffs-bg-addition-number-override: color-mix(in srgb, var(--bg) 83%, var(--ok));
+  --diffs-bg-addition-emphasis-override: color-mix(in srgb, var(--bg) 72%, var(--ok));
+  --diffs-bg-deletion-override: color-mix(in srgb, var(--bg) 87%, var(--bad));
+  --diffs-bg-deletion-number-override: color-mix(in srgb, var(--bg) 83%, var(--bad));
+  --diffs-bg-deletion-emphasis-override: color-mix(in srgb, var(--bg) 72%, var(--bad));
+}
+/* One hairline between neighbours, and one under a fold that is showing its code. A
+   border on the header alone would rule a folded row and leave an open one's code butting
+   straight onto the next fold, so the two rules are stated where each is actually true. */
+.diff-file + .diff-file {
+  border-top: 1px solid var(--line);
+}
+.diff-file-header[aria-expanded="true"] {
+  border-bottom: 1px solid var(--line);
+}
+
+/* Content gets the width; window furniture yields before the editor does. */
+.workspace-main {
+  container-type: inline-size;
+}
+.task-workspace {
+  container-type: inline-size;
+}
+.task-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.task-document {
+  width: 100%;
+  max-width: var(--container-document);
+  margin: 0 auto;
+  padding: 48px var(--document-gutter) 64px;
+}
+.document-title {
+  display: block;
+  width: 100%;
+  field-sizing: content;
+  resize: none;
+  overflow: hidden;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font-size: var(--text-title);
+  line-height: var(--text-title--line-height);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.025em;
+  overflow-wrap: anywhere;
+}
+.document-title::placeholder {
+  color: var(--ink-4);
+  font-weight: var(--font-weight-medium);
+}
+.task-properties {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin: 24px 0;
+}
+.property-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  min-height: var(--control-md);
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+.property-select {
+  width: auto;
+  max-width: 220px;
+  min-width: 0;
+  border: 0;
+  background-color: transparent;
+  padding-left: 0;
+  font-size: var(--text-sm);
+  cursor: default;
+  text-overflow: ellipsis;
+}
+.property-select:hover {
+  background-color: var(--surface-2);
+}
+.document-editor {
+  min-width: 0;
+}
+.document-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.document-description {
+  width: 100%;
+  min-height: 232px;
+  field-sizing: content;
+  resize: none;
+  border: 0;
+  background: transparent;
+  padding: 8px 0;
+  font-size: var(--text-prose);
+  line-height: 26px;
+  overflow-wrap: anywhere;
+}
+.document-description::placeholder {
+  color: var(--ink-4);
+}
+.document-preview {
+  min-height: 232px;
+  padding: 8px 0;
+  font-size: var(--text-prose);
+  line-height: 26px;
+}
+.task-execution-settings {
+  padding-top: 24px;
+  margin-top: 32px;
+  border-top: 1px solid var(--line);
+}
+.document-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px 24px;
+  border-top: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.document-footer > button {
+  flex-shrink: 0;
+}
+.document-footer kbd {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  opacity: 0.7;
+  margin-left: 8px;
+}
+.document-skeleton {
+  width: 65%;
+  height: 16px;
+  margin: 64px auto;
+  background: var(--surface-2);
+  border-radius: var(--radius-md);
+}
+.workspace-tabs {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 0 24px;
+  height: 40px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--line);
+}
+.workspace-tabs button {
+  height: 100%;
+  position: relative;
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.workspace-tabs button[aria-selected="true"] {
+  color: var(--ink);
+  font-weight: var(--font-weight-medium);
+}
+.workspace-tabs button[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  height: 2px;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  background: var(--ink-2); /* off-scale: a 2px rule rounds to its own height */
+  border-radius: 2px;
+}
+.task-activity {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+/* The workspace sits behind a single, generously padded writing surface. */
+.composer {
+  container: composer / inline-size;
+  --composer-surface: var(--surface-2);
+  --composer-edge: color-mix(in srgb, var(--line) 65%, transparent);
+  --composer-sheen: transparent;
+  --composer-track: var(--bg);
+  --composer-context-track: var(--surface-3);
+  --composer-context-hover: var(--surface);
+}
+[data-theme="dark"] .composer {
+  /* Give the input a visible well without dropping it to the conversation ground. */
+  --composer-track: color-mix(in srgb, var(--surface-2) 50%, var(--surface));
+  --composer-context-track: var(--composer-track);
+  --composer-context-hover: var(--surface-3);
+  /* The shell's --material-lift lights its top edge in dark; the changes tab draws the same line. */
+  --composer-sheen: var(--material-hi);
+}
+/* Ordinary folder chats retain their visible working directory. Git facts live below
+   the input when clean, or in a raised strip above the shell when dirty. */
+.composer-rail {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 4px 12px 0;
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.composer-rail svg {
+  flex-shrink: 0;
+  color: var(--ink-3);
+}
+/* Uncommitted work rises out of the shell's top-right as a tab of the same material, so it
+   never costs the writing surface a row. It hugs its content, runs straight up from the
+   shell's right side, and eases down into the top edge on the left, never closer to the left
+   edge than the shell's corner. The tab reaches down over the shell's 1px edge and the
+   input's 8px lead-in (9px), so its row shares that space and sits as close to the input as
+   it does to its own top edge. */
+.composer-changes {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  width: fit-content;
+  max-width: calc(100% - var(--radius-xl) - 8px);
+  margin: 0 0 -9px auto;
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.composer-changes-shoulder {
+  display: block;
+  flex-shrink: 0;
+}
+.composer-changes-shoulder-fill {
+  fill: var(--composer-surface);
+}
+.composer-changes-shoulder-sheen,
+.composer-changes-shoulder-edge {
+  fill: none;
+  transition: stroke 120ms ease-out;
+}
+.composer-changes-shoulder-sheen {
+  stroke: var(--composer-sheen);
+}
+.composer-changes-shoulder-edge {
+  stroke: var(--composer-edge);
+}
+.composer-changes-body {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 1 auto;
+  min-width: 0;
+  /* 8px on the right lines Commit up with the send button below. */
+  padding: 4px 8px 4px 4px;
+  border-top: 1px solid var(--composer-edge);
+  border-right: 1px solid var(--composer-edge);
+  border-top-right-radius: var(--radius-xl);
+  background: var(--composer-surface);
+  box-shadow: inset 0 1px 0 var(--composer-sheen);
+  transition: border-color 120ms ease-out;
+}
+.composer-changes-identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.composer-changes-project,
+.composer-changes-branch,
+.composer-changes-branch span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.composer-changes-project {
+  flex: 0 1 auto;
+}
+.composer-changes-branch {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 1 auto;
+}
+.composer-changes-branch svg {
+  flex-shrink: 0;
+  color: var(--ink-3);
+}
+.composer-changes-summary,
+.composer-changes-commit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--control-badge);
+  padding-inline: 8px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--ink-2);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.composer-changes-summary {
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.composer-changes-commit {
+  gap: 4px;
+}
+.composer-changes-summary:hover,
+.composer-changes-commit:hover:not(:disabled) {
+  background: var(--surface-3);
+  color: var(--ink);
+}
+.composer-changes-commit-wrap {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.composer-changes-commit:disabled {
+  color: var(--ink-4);
+}
+/* The foot shares the shell's fill. Its context control uses a separate lower track so the
+   white writing area in light mode does not turn that recessed control into a raised pill. */
+.composer-foot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+  padding: 4px 8px;
+  font-size: var(--text-base);
+  color: var(--ink-2);
+}
+.composer-lead {
+  display: flex;
+  align-items: center;
+}
+/* Keep the destination and mode reachable. Action groups reflow before controls clip. */
+.composer-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1 0 auto;
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: calc(100% - var(--control-lg) - 4px);
+  min-height: var(--control-lg);
+  padding-inline: 4px;
+  white-space: nowrap;
+}
+.composer-meta svg {
+  flex-shrink: 0;
+  color: var(--ink-3);
+}
+.composer-location,
+.composer-branch {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.composer-branch {
+  max-width: 180px;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+.composer-location span,
+.composer-branch span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* The only distribution mechanism now: the flex-1 spacer and .composer-send-controls are gone. */
+/* Shrinkable, with the model name as the thing that gives. flex-shrink 0 here let the foot
+   overflow its column at narrow widths, and because the scroller's overflow-y forces
+   overflow-x to auto, that overflow became a 10px horizontal scrollbar eating the height
+   the composer needed to sit on the floor. */
+.composer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  flex-wrap: wrap;
+  min-width: 0;
+  margin-left: auto;
+}
+.composer-actions > *:not(.composer-model-trigger) {
+  flex-shrink: 0;
+}
+/* The caller's destination toggle now reads the protected Plan/Act grammar rather than its
+   own filled tile: selection in ink and weight on a transparent ground. */
+.composer-destination [role="radiogroup"] {
+  display: inline-flex;
+  align-items: center;
+  background: transparent;
+  margin: 0;
+  gap: 2px;
+}
+.composer-destination [role="radio"] {
+  height: var(--control-sm);
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-normal);
+}
+.composer-destination [role="radio"]:hover {
+  color: var(--ink);
+}
+.composer-destination [role="radio"]:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.composer-destination [aria-checked="true"] {
+  background: transparent;
+  color: var(--ink);
+  font-weight: var(--font-weight-medium);
+}
+.composer-destination [role="radio"] svg {
+  width: 14px;
+  height: 14px;
+}
+.composer-shell {
+  border-radius: var(--radius-xl);
+  background: var(--composer-surface);
+  border-color: var(--composer-edge);
+  box-shadow: var(--material-lift);
+  transition:
+    border-color 120ms ease-out,
+    background-color 120ms ease-out,
+    box-shadow 120ms ease-out;
+}
+/* The changes tab takes over the shell's top-right corner, so the shell's side runs straight up into it. */
+.composer-changes + .composer-shell {
+  border-top-right-radius: 0;
+}
+/* The changes tab shares the shell's outline, so both answer focus and drag together. */
+.composer:has(.composer-shell:focus-within) {
+  --composer-edge: var(--line-strong);
+}
+.composer:has(.composer-shell[data-dragging]) {
+  --composer-edge: var(--ink-3);
+}
+/* The writing surface moved out to a wrapper so a highlight can be painted under the
+   text. The well is the wrapper's now (fill, recess, radius, the 8px inset it always
+   had) and the textarea keeps only its own box. Everything inside must agree on geometry
+   to the character, or the highlight drifts off the word it belongs to. */
+.composer-input-shell {
+  position: relative;
+  isolation: isolate;
+  width: calc(100% - 16px);
+  margin: 8px 8px 0;
+  border-radius: var(--radius-md);
+  background: var(--composer-track);
+  box-shadow: var(--material-recess);
+}
+.composer-input,
+.composer-input-mirror {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 12px;
+  font: inherit;
+  font-size: var(--text-prose);
+  line-height: 1.65;
+  letter-spacing: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  tab-size: 4;
+}
+.composer-input {
+  field-sizing: content;
+  display: block;
+  position: relative;
+  z-index: 1;
+  min-height: 56px;
+  max-height: var(--composer-max-height);
+  overflow-y: auto;
+  border-radius: var(--radius-md);
+  background: transparent;
+  caret-color: var(--ink);
+}
+/* Decorative only: it never takes the pointer, and it is hidden from the accessibility
+   tree because the textarea beside it already carries the same text. */
+.composer-input-mirror {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  color: transparent;
+  pointer-events: none;
+  user-select: none;
+}
+.composer-large .composer-input {
+  min-height: 68px;
+}
+/* Send now sits beside the send button while a turn runs. Quiet on purpose: the round
+   blue send is the one primary action in the composer under The One Blue Rule, and this
+   is the same send with different timing, not a louder one. */
+.composer-send-now {
+  flex-shrink: 0;
+  height: var(--control-sm);
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  transition:
+    background-color 120ms var(--ease-out),
+    color 120ms var(--ease-out);
+}
+.composer-send-now:hover:not(:disabled) {
+  background-color: var(--surface-2);
+  color: var(--ink);
+}
+/* Only reachable with an empty message, since the control is not rendered at all when
+   the turn cannot take direction. */
+.composer-send-now:disabled {
+  color: var(--ink-4);
+  pointer-events: none;
+}
+
+/* A "/name" the provider will resolve, marked in the popover and again in the message.
+   A wash rather than a fill: it sits under live text, so it has to read as emphasis on
+   the word and never as a control the caret could land outside of. */
+.skill-token {
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 24%, transparent);
+  color: inherit;
+}
+.composer-suggestions .skill-token {
+  color: var(--accent-ink);
+  background: none;
+  box-shadow: none;
+  font-weight: var(--font-weight-medium);
+}
+.composer-suggestions-more {
+  padding: 4px 8px 2px;
+  color: var(--ink-4);
+  font-size: var(--text-xs);
+}
+.composer-input::placeholder {
+  color: var(--ink-3);
+}
+/* Round, so attach, stop and send read as one family of circular controls, which is the
+   reference module's own toolbar. The hover is the composer's existing ink wash rather than
+   --surface-3: --surface-3 is -9.76 in light inside a --bg shell and a RAISE in dark, deeper
+   than the writing track it sits beside. The wash is -3.46 light, +3.19 dark, and flips sign
+   for free because --ink does. */
+.composer-icon-button {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: var(--control-lg);
+  height: var(--control-lg);
+  border-radius: var(--radius-pill);
+  color: var(--ink-2);
+}
+.composer-icon-button:hover {
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+  color: var(--ink);
+}
+.composer-icon-button:disabled {
+  color: var(--ink-4);
+  pointer-events: none;
+}
+/* The same value-in-a-track grammar as the usage meter, so the two surfaces state it
+   identically. This is the second and LAST recess inside the shell: both say "my fill sits
+   below my container" and neither claims rank, which is the licensed repeat. A third would
+   be the pegboard. */
+.composer-context {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  height: var(--control-sm);
+  padding: 0 8px 0 4px;
+  border-radius: var(--radius-pill);
+  background: var(--composer-context-track);
+  box-shadow: var(--material-recess);
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+.composer-context:hover,
+.composer-context:focus-visible,
+.composer-context[data-popup-open] {
+  background: var(--composer-context-hover);
+}
+.composer-context-popup {
+  width: min(320px, calc(100vw - 24px));
+  max-height: var(--available-height);
+  overflow-y: auto;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-panel);
+}
+.composer-context-stats {
+  display: grid;
+  gap: 4px;
+  margin-block: 12px;
+  font-size: var(--text-sm);
+}
+.composer-context-stats > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.composer-context-stats dt {
+  color: var(--ink-2);
+}
+.composer-context-stats dd {
+  color: var(--ink);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.composer-context-compact {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.composer-permission {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  height: var(--control-sm);
+  padding: 0 4px;
+  border-radius: var(--radius-sm);
+  color: var(--ink-2);
+  font-size: inherit;
+}
+.composer-permission:hover {
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+  color: var(--ink);
+}
+/* Every picker in the foot is the same object: transparent at rest, an ink wash on hover and
+   while open, the value in --ink and a small chevron. The protected rule is that a selected
+   mode is never a filled tile, and a transparent trigger honours it. */
+.composer-picker-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Harness marks. The OpenAI and OpenCode marks are dark on light and invert in dark themes. */
+.harness-logo {
+  display: inline-block;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .harness-provider-logo[data-provider="codex"],
+  :root:not([data-theme="light"]) .harness-provider-logo[data-provider="opencode"],
+  :root:not([data-theme="light"]) .harness-logo[data-provider="codex"],
+  :root:not([data-theme="light"]) .harness-logo[data-provider="opencode"] {
+    filter: invert(1);
+  }
+}
+:root[data-theme="dark"] .harness-provider-logo[data-provider="codex"],
+:root[data-theme="dark"] .harness-provider-logo[data-provider="opencode"],
+:root[data-theme="dark"] .harness-logo[data-provider="codex"],
+:root[data-theme="dark"] .harness-logo[data-provider="opencode"] {
+  filter: invert(1);
+}
+.composer-picker,
+.composer-model-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: var(--control-lg);
+  min-width: 0;
+  max-width: 300px;
+  padding: 0 8px;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--ink);
+  font-size: var(--text-base);
+}
+.composer-picker > svg {
+  flex-shrink: 0;
+  color: var(--ink-3);
+}
+.composer-picker:hover,
+.composer-picker:focus-visible,
+.composer-picker[data-popup-open] {
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+}
+.composer-model-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.composer-model-effort {
+  flex-shrink: 0;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+.composer-model-trigger > svg {
+  flex-shrink: 0;
+  margin-left: 2px;
+  color: var(--ink-3);
+}
+.composer-model-trigger:hover,
+.composer-model-trigger:focus-visible,
+.composer-model-trigger[data-popup-open] {
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+}
+.composer-send {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: var(--control-send);
+  height: var(--control-send);
+  margin-left: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--ink);
+  color: var(--surface);
+  transition:
+    opacity 120ms ease-out,
+    background-color 120ms ease-out;
+}
+.composer-send:hover {
+  opacity: 0.85;
+}
+.composer-send:disabled {
+  background: var(--surface-3);
+  color: var(--ink-3);
+  cursor: default;
+}
+/* Queue content stays inside the reading column, including unbroken logs and paths. */
+.message-queue {
+  min-width: 0;
+  container-type: inline-size;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+}
+.message-queue-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  color: var(--ink-3);
+}
+.message-queue-title {
+  color: var(--ink-2);
+  font-weight: 500;
+}
+.message-queue-count {
+  margin-left: 4px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.message-queue-hint {
+  margin-left: auto;
+}
+.message-queue-list {
+  margin: 0;
+  padding: 0 12px;
+  list-style: none;
+  max-height: min(240px, 28vh);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.message-queue-row {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.message-queue-position {
+  padding-top: 2px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.message-queue-message {
+  min-width: 0;
+  color: var(--ink-2);
+}
+.message-queue-message summary {
+  display: flex;
+  align-items: start;
+  gap: 8px;
+  min-width: 0;
+  padding: 2px 0;
+  cursor: pointer;
+  list-style: none;
+  border-radius: var(--radius-sm);
+}
+.message-queue-message summary::-webkit-details-marker {
+  display: none;
+}
+.message-queue-preview {
+  min-width: 0;
+  flex: 1;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.message-queue-chevron {
+  flex-shrink: 0;
+  margin-top: 3px;
+  color: var(--ink-3);
+}
+.message-queue-message[open] .message-queue-chevron {
+  transform: rotate(180deg);
+}
+.message-queue-message[open] .message-queue-preview {
+  display: block;
+  -webkit-line-clamp: unset;
+}
+.message-queue-attachments {
+  display: block;
+  margin-top: 4px;
+  color: var(--ink-3);
+}
+.message-queue-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+@container (max-width: 420px) {
+  .message-queue-row {
+    grid-template-columns: 14px minmax(0, 1fr);
+  }
+  .message-queue-actions {
+    grid-column: 2;
+    justify-content: flex-end;
+  }
+}
+
+.composer-send-queued {
+  background: var(--surface-3);
+  color: var(--ink);
+}
+.composer-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px 16px 0;
+}
+.composer-thumbnail {
+  width: 88px;
+  height: 88px;
+  border-radius: var(--radius-lg);
+  object-fit: cover;
+  border: 1px solid var(--line-strong);
+}
+/* A file that is not an image has no picture to stand for it, so it states itself: the
+   glyph, the name it arrived with, and its weight. It takes the thumbnail's height and
+   radius so a mixed row reads as one strip of attachments and not two. */
+.composer-file {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  width: 168px;
+  height: 88px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+.composer-file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+}
+.composer-file-size {
+  color: var(--ink-4);
+  font-size: var(--text-xs);
+}
+.composer-remove-image {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  width: var(--control-sm);
+  height: var(--control-sm);
+  border-radius: var(--radius-pill);
+  background: var(--ink);
+  color: var(--surface);
+}
+.composer-remove-image:hover {
+  opacity: 0.85;
+}
+.model-picker-popup {
+  --effort-galaxy-base: #906acb;
+  --effort-galaxy-light: #c6a3f2;
+  --effort-galaxy-deep: #684397;
+  --effort-rocket-accent: #a879dc;
+  width: min(420px, calc(100vw - 24px));
+  height: min(312px, calc(100vh - 24px));
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  color: var(--ink);
+  box-shadow: var(--shadow-panel);
+  outline: none;
+}
+.model-picker-popup[data-no-effort] {
+  height: min(288px, calc(100vh - 24px));
+}
+.model-picker-layout {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+.model-picker-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-height: 0;
+  padding: 10px 6px;
+  border-right: 1px solid var(--line);
+}
+.model-picker-rail-button {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: var(--control-send);
+  height: var(--control-send);
+  border-radius: var(--radius-md);
+  color: var(--ink-3);
+}
+.model-picker-rail-button:hover,
+.model-picker-rail-button[aria-pressed="true"] {
+  background: var(--surface-3);
+  color: var(--ink);
+}
+.model-picker-rail-button:focus-visible:not([aria-pressed="true"]) {
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+  color: var(--ink-2);
+}
+.model-picker-rail-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.model-picker-fast {
+  margin-top: auto;
+}
+.model-picker-fast[aria-pressed="true"] {
+  color: var(--accent-ink);
+}
+.model-picker-main {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-width: 0;
+  min-height: 0;
+}
+.model-picker-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: var(--control-send);
+  margin: 10px 12px 8px;
+  padding: 0 8px;
+  border-radius: var(--radius-md);
+  background: var(--surface-3);
+  color: var(--ink-3);
+}
+.model-picker-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: var(--text-base);
+}
+.model-picker-search input::placeholder {
+  color: var(--ink-4);
+}
+.model-picker-search button {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: var(--control-md);
+  height: var(--control-md);
+  border-radius: var(--radius-sm);
+}
+.model-picker-search button:hover,
+.model-picker-search button:focus-visible {
+  color: var(--ink-2);
+}
+.model-picker-search button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.model-picker-results {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 8px 8px;
+  scrollbar-color: var(--line-strong) transparent;
+  scrollbar-width: thin;
+}
+.model-picker-group + .model-picker-group {
+  margin-top: 8px;
+}
+.model-picker-group-label {
+  padding: 8px 10px 3px;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+}
+.model-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 38px;
+  padding: 0 10px;
+  border-radius: var(--radius-md);
+  color: var(--ink-2);
+  text-align: left;
+}
+.model-picker-row:hover,
+.model-picker-row[aria-pressed="true"] {
+  background: var(--surface-3);
+  color: var(--ink);
+}
+.model-picker-row:focus-visible:not([aria-pressed="true"]) {
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+  color: var(--ink-2);
+}
+.model-picker-row:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.model-picker-row-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-base);
+}
+.model-picker-row-meta {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+}
+.model-picker-check {
+  flex: 0 0 auto;
+  color: var(--ink);
+}
+.model-picker-team-row {
+  min-height: 44px;
+}
+.model-picker-message {
+  margin: 0;
+  padding: 8px 10px;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+}
+.model-picker-text-action {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--control-lg);
+  max-width: 100%;
+  padding: 0 10px;
+  border-radius: var(--radius-md);
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  text-align: left;
+}
+.model-picker-text-action:hover {
+  background: var(--surface-3);
+  color: var(--ink);
+}
+.model-picker-text-action:focus-visible,
+.model-picker-reset:focus-visible {
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+  color: var(--ink-2);
+}
+.model-picker-manage {
+  margin-top: 8px;
+}
+.model-picker-footer {
+  min-width: 0;
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--line);
+}
+.model-picker-effort-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+.model-picker-effort-value {
+  margin-left: auto;
+  color: var(--ink);
+}
+.model-picker-reset {
+  display: grid;
+  place-items: center;
+  width: var(--control-sm);
+  height: var(--control-sm);
+  border-radius: var(--radius-sm);
+}
+.model-picker-reset:hover {
+  background: var(--surface-3);
+}
+.model-picker-reset:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.model-picker-footer .composer-effort-slider {
+  margin-top: 8px;
+}
+.model-picker-popup .composer-effort-slider:has(input:focus-visible) .composer-effort-thumb {
+  border: 1px solid var(--line);
+}
+.model-picker-popup .composer-effort-slider[data-fast]:has(input:focus-visible) .fast-mode-rocket {
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+}
+.model-picker-effort-empty,
+.model-picker-effort-hint {
+  margin: 8px 0 0;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  line-height: var(--text-xs--line-height);
+}
+.composer-effort-popup {
+  --effort-galaxy-base: #906acb;
+  --effort-galaxy-light: #c6a3f2;
+  --effort-galaxy-deep: #684397;
+  --effort-rocket-accent: #a879dc;
+  width: min(288px, calc(100vw - 24px));
+  padding: 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  color: var(--ink);
+  box-shadow: var(--shadow-panel);
+}
+.composer-effort-heading {
+  display: grid;
+  grid-template-columns: var(--control-lg) 1fr var(--control-lg);
+  align-items: center;
+}
+.composer-effort-title {
+  text-align: center;
+  color: var(--accent-ink);
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-medium);
+}
+.composer-effort-model {
+  display: flex;
+  justify-content: center;
+  margin-top: 2px;
+}
+.composer-effort-model > button {
+  font-size: var(--text-base);
+}
+.composer-effort-slider {
+  position: relative;
+  margin-top: 16px;
+  height: var(--control-md);
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+}
+.composer-effort-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--effort-center);
+  border-radius: var(--radius-pill) 0 0 var(--radius-pill);
+  background: var(--accent);
+  transition: width 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+.composer-effort-slider[data-max] .composer-effort-fill {
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 54% 110%, var(--effort-galaxy-light), transparent 66%), linear-gradient(105deg, var(--effort-galaxy-base), var(--effort-galaxy-light) 48%, var(--effort-galaxy-deep));
+}
+/* Three independently moving layers give the small track depth without flashing. */
+.effort-galaxy {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+}
+.effort-galaxy-clouds {
+  position: absolute;
+  inset: -100% -35%;
+  background:
+    radial-gradient(ellipse at 20% 45%, var(--effort-galaxy-light) 0%, transparent 42%), radial-gradient(ellipse at 65% 75%, #b589df 0%, transparent 40%),
+    radial-gradient(ellipse at 80% 25%, #a678d4 0%, transparent 44%), linear-gradient(110deg, var(--effort-galaxy-deep), var(--effort-galaxy-base) 45%, #714893);
+  animation: galaxy-current 2400ms ease-in-out infinite alternate;
+  animation-play-state: paused;
+}
+.effort-galaxy-stars {
+  position: absolute;
+  inset: 0 -160px 0 0;
+  background-repeat: repeat;
+  background-size: 160px 28px;
+  animation: galaxy-stars 2200ms linear infinite;
+  animation-play-state: paused;
+}
+.effort-galaxy-stars-far {
+  opacity: 0.6;
+  background-image:
+    radial-gradient(circle at 9px 7px, white 0 0.6px, transparent 1px), radial-gradient(circle at 39px 21px, white 0 0.5px, transparent 0.9px),
+    radial-gradient(circle at 73px 11px, white 0 0.65px, transparent 1px), radial-gradient(circle at 101px 24px, white 0 0.5px, transparent 0.9px),
+    radial-gradient(circle at 141px 5px, white 0 0.6px, transparent 1px);
+}
+.effort-galaxy-stars-near {
+  animation-duration: 850ms;
+  background-image:
+    radial-gradient(ellipse 2px 1px at 23px 19px, #fff 30%, #ffffff80 60%, transparent), radial-gradient(ellipse 1.4px 0.8px at 58px 6px, #fff 30%, #ffffff80 60%, transparent),
+    radial-gradient(ellipse 2.6px 1px at 110px 15px, #fff 30%, #ffffff80 60%, transparent), radial-gradient(ellipse 1.8px 0.8px at 148px 24px, #fff 30%, #ffffff80 60%, transparent);
+}
+.effort-galaxy[data-running="true"] > span {
+  animation-play-state: running;
+}
+@keyframes galaxy-stars {
+  to {
+    transform: translateX(-160px);
+  }
+}
+@keyframes galaxy-current {
+  from {
+    transform: translate(-10%, -9%) rotate(-8deg) scale(1.08);
+  }
+  to {
+    transform: translate(10%, 9%) rotate(8deg) scale(1.18);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .effort-galaxy > span {
+    animation: none;
+  }
+}
+.composer-effort-slider[data-max] .composer-effort-ticks {
+  visibility: hidden;
+}
+.composer-effort-ticks {
+  position: absolute;
+  inset: 0 calc(var(--control-md) / 2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: none;
+}
+.composer-effort-ticks i {
+  position: relative;
+  width: 4px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--ink);
+  opacity: 0.3;
+}
+/* A short bar before the ultracode stop separates the mode from the levels. */
+.composer-effort-ticks i[data-detached]::before {
+  content: "";
+  position: absolute;
+  top: -6px;
+  left: -14px;
+  width: 1px;
+  height: 16px;
+  background: var(--ink);
+}
+.composer-effort-hint {
+  margin: 8px 0 0;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  line-height: var(--text-xs--line-height);
+  text-align: center;
+}
+.composer-effort-thumb {
+  position: absolute;
+  top: 0;
+  left: var(--effort-center);
+  width: var(--control-md);
+  height: var(--control-md);
+  transform: translateX(-50%);
+  border-radius: var(--radius-pill);
+  background: #ffffff;
+  border: 1px solid var(--line);
+  box-shadow: var(--material-contact);
+  transition: left 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+.composer-effort-slider[data-dragging] .composer-effort-thumb,
+.composer-effort-slider[data-dragging] .composer-effort-fill {
+  transition: none;
+}
+.composer-effort-slider input {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: var(--control-md);
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  cursor: grab;
+  touch-action: none;
+}
+.composer-effort-slider[data-dragging] input {
+  cursor: grabbing;
+}
+.composer-effort-slider:has(input:focus-visible) .composer-effort-thumb {
+  border: 3px solid var(--accent-ink);
+}
+/* One line at every width. The facts truncate from the branch inward rather than taking a
+   row of their own: a second row costs 28px of the composer's height permanently, and the
+   facts are the part of the foot you read least. */
+@container composer (max-width: 720px) {
+  .composer-branch {
+    max-width: 120px;
+  }
+}
+@container composer (max-width: 560px) {
+  .composer-branch {
+    display: none;
+  }
+  .composer-changes-project,
+  .composer-commit-suffix {
+    display: none;
+  }
+  .composer-foot {
+    display: grid;
+    grid-template-columns: var(--control-md) minmax(0, 1fr);
+  }
+  .composer-meta {
+    max-width: none;
+    overflow: visible;
+    height: auto;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+  }
+  .composer-actions {
+    grid-column: 1 / -1;
+    width: 100%;
+    flex-wrap: wrap;
+  }
+}
+@container composer (max-width: 480px) {
+  .composer-model-trigger {
+    max-width: 250px;
+  }
+}
+.panel-tabs {
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.panel-tabs button {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+/* The panel yields before the conversation does: it takes what the conversation's floor leaves
+   in the work row, down to its own floor. Below that the row cannot hold both, and the panel
+   floats over the work area instead (see the work-row container query). */
+.panel-shell {
+  --panel-pane: clamp(var(--width-panel-min), calc(100cqw - var(--width-main-min) - var(--spacing-well)), var(--width-panel));
+}
+.panel-pane {
+  container-name: review-panel;
+  container-type: inline-size;
+  width: calc(var(--panel-pane) + var(--spacing-well));
+  min-width: 0;
+}
+@container (max-width: 600px) {
+  .task-document {
+    padding: 28px 24px 40px;
+  }
+  .document-title {
+    font-size: var(--text-title-sm);
+    line-height: var(--text-title-sm--line-height);
+  }
+  .composer-padding {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .thread-branch {
+    display: none;
+  }
+  .workspace-tabs {
+    padding: 0 16px;
+    gap: 16px;
+    overflow-x: auto;
+  }
+}
+@container (max-width: 400px) {
+  .task-document {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .composer-branch {
+    max-width: 100px;
+  }
+  .model-effort {
+    display: none;
+  }
+}
+@container (max-width: 700px) {
+  .task-row-project,
+  .task-row-label {
+    display: none;
+  }
+}
+@container (max-width: 480px) {
+  .task-row-time {
+    display: none;
+  }
+}
+
+@container review-panel (max-width: 600px) {
+  .panel-tab-label:not([data-selected="true"]) {
+    display: none;
+  }
+}
+/* Menus communicate opening with a short native pop; workspace content never flies in. */
+.menu-popup {
+  transform-origin: var(--transform-origin);
+  transition:
+    opacity 100ms ease-out,
+    transform 100ms ease-out;
+}
+.menu-popup[data-starting-style],
+.menu-popup[data-ending-style] {
+  opacity: 0;
+  transform: translateY(2px);
+}
+/* Settings shares the workspace ground; the tab row leaves the pane to its content. */
+.settings-shell {
+  --settings-content-width: 760px;
+  --settings-control-width: 260px;
+  --settings-inset: 32px;
+  container-type: inline-size;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  /* The plane behind this column is rounded, so its own overflow clip has to be too, or the
+     sticky feedback bar squares the bottom corners. It inherits the plane's fill rather than
+     painting --surface again: an opaque background here buries the plane. */
+  overflow: hidden;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+.settings-layout {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100%;
+}
+.settings-nav {
+  min-width: 0;
+  padding-inline: var(--settings-inset);
+  border-bottom: 1px solid var(--line);
+}
+.settings-tablist {
+  display: flex;
+  gap: 24px;
+  max-width: var(--settings-content-width);
+  margin-inline: auto;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.settings-tablist::-webkit-scrollbar {
+  display: none;
+}
+.settings-tablist button {
+  position: relative;
+  flex: 0 0 auto;
+  min-height: 48px;
+  padding: 0 2px;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  transition: color 120ms var(--ease-out);
+}
+.settings-tablist button:hover {
+  color: var(--ink);
+}
+.settings-tablist button[aria-selected="true"] {
+  color: var(--ink);
+}
+.settings-tablist button[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 2px;
+  /* off-scale: a 2px rule rounds to its own height */
+  border-radius: 2px 2px 0 0;
+  background: var(--ink-2);
+}
+.settings-content {
+  min-width: 0;
+  overflow-y: auto;
+  padding: 32px var(--settings-inset) 40px;
+}
+.settings-content > div {
+  max-width: var(--settings-content-width);
+  margin-inline: auto;
+  overflow-wrap: anywhere;
+}
+.settings-heading {
+  margin-bottom: 24px;
+}
+.settings-section {
+  margin-bottom: 24px;
+}
+/* The content plane again, one construction across the app. The hairlines stop ruling the
+   page and start dividing a card, which is the whole second depth, bought once for all six
+   tabs. Its own hairline is what separates a white card from light's white page. */
+.settings-group {
+  margin-top: 12px;
+  padding: 8px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--plane-fill);
+  box-shadow: var(--material-seat);
+}
+.settings-group > :last-child {
+  border-bottom: 0;
+}
+/* Skills are a catalog, so the project choice is compact and the names hold a fixed
+   column. Descriptions can be long; opening a row reveals all of its text and path. */
+.skills-scope {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px 24px;
+  min-width: 0;
+  margin-bottom: 24px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--plane-fill);
+  box-shadow: var(--material-seat);
+}
+.skills-scope > div {
+  flex: 1;
+  min-width: 0;
+}
+.skills-scope select {
+  flex: 0 1 220px;
+}
+.skills-harnesses {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--line);
+}
+.skills-harness {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 0 12px;
+  border-bottom: 2px solid transparent;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.skills-harness:hover,
+.skills-harness[aria-pressed="true"] {
+  color: var(--ink);
+}
+.skills-harness[aria-pressed="true"] {
+  border-bottom-color: var(--ink);
+}
+.skills-harness:focus-visible {
+  outline: 2px solid var(--line-strong);
+  outline-offset: -2px;
+}
+.skills-harness-count {
+  min-width: 20px;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--surface-2);
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.skills-usage {
+  margin: 12px 0 20px;
+}
+.skills-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.skills-search {
+  position: relative;
+  flex: 1;
+  max-width: 360px;
+  min-width: 0;
+}
+.skills-search > svg {
+  position: absolute;
+  top: 50%;
+  left: 10px;
+  z-index: 1;
+  transform: translateY(-50%);
+  color: var(--ink-3);
+  pointer-events: none;
+}
+.skills-search input {
+  padding-left: 32px;
+}
+.skills-status {
+  min-height: 20px;
+  margin-bottom: 20px;
+  font-variant-numeric: tabular-nums;
+}
+.skills-section {
+  margin-bottom: 32px;
+}
+.skills-section-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.skills-list {
+  padding: 0;
+  overflow: hidden;
+  list-style: none;
+}
+.skills-list > li + li {
+  border-top: 1px solid var(--line);
+}
+.skills-item-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 190px) minmax(0, 1fr) 14px;
+  align-items: start;
+  gap: 16px;
+  min-width: 0;
+  padding: 12px 16px;
+  cursor: pointer;
+  list-style: none;
+}
+.skills-item-summary::-webkit-details-marker {
+  display: none;
+}
+.skills-item-summary:hover,
+.skills-item[open] {
+  background: var(--surface-2);
+}
+.skills-item-summary:focus-visible {
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 2px var(--line-strong);
+}
+.skills-command {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--text-base--line-height);
+}
+.skills-preview {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
+}
+.skills-item[open] .skills-preview {
+  display: block;
+  overflow: visible;
+}
+.skills-item-chevron {
+  margin-top: 3px;
+  color: var(--ink-3);
+  transition: transform 120ms var(--ease-out);
+}
+.skills-item[open] .skills-item-chevron {
+  transform: rotate(180deg);
+}
+.skills-item-detail {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  padding: 0 46px 14px 222px;
+  font-size: var(--text-sm);
+}
+.skills-item-detail code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--ink-2);
+}
+.skills-empty {
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--plane-fill);
+}
+.settings-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+  min-height: 64px;
+  padding-block: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.settings-field > span:not(.settings-switch) {
+  flex: 1;
+  min-width: 150px;
+}
+.settings-field select,
+.settings-field input:not([type="checkbox"]) {
+  width: var(--settings-control-width);
+  max-width: 100%;
+  min-width: 0;
+}
+.settings-field .settings-switch {
+  flex: 0 0 auto;
+}
+/* A recessed track holding a raised knob: the same construction as the appearance modes and
+   the task destination, and the reference module's own geometry. Checked fills with --ink
+   rather than --accent, which is what retires accent-color here and keeps one hot element
+   per view. Focus moves border-color only: no material, no halo. */
+.settings-switch {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  width: 32px;
+  height: var(--control-badge);
+}
+.settings-switch input {
+  appearance: none;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--track-fill);
+  box-shadow: var(--material-recess);
+  transition:
+    background-color 120ms var(--ease-out),
+    border-color 120ms var(--ease-out);
+}
+.settings-switch input:checked {
+  background: var(--ink);
+  border-color: var(--ink);
+  box-shadow: none;
+}
+.settings-switch input:focus-visible {
+  border-color: var(--line-strong);
+  background: var(--track-fill);
+}
+.settings-switch input:checked:focus-visible {
+  background: var(--ink);
+}
+.settings-switch input:disabled {
+  pointer-events: none;
+  opacity: 1;
+  border-color: var(--line);
+  background: var(--surface-2);
+}
+.settings-switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-pill);
+  background: var(--plane-fill);
+  box-shadow: var(--material-seat);
+  transition: left 120ms var(--ease-out);
+  pointer-events: none;
+}
+.settings-switch input:checked + .settings-switch-knob {
+  left: 14px;
+}
+/* appearance:none plus an aria-hidden knob renders invisible in Windows High Contrast
+   without this; it ships in the same commit as the control, never later. */
+@media (forced-colors: active) {
+  .settings-switch input {
+    border: 1px solid ButtonBorder;
+    background: ButtonFace;
+  }
+  .settings-switch input:checked {
+    background: Highlight;
+    border-color: Highlight;
+  }
+  .settings-switch-knob {
+    background: ButtonFace;
+    box-shadow: none;
+    outline: 1px solid ButtonBorder;
+  }
+}
+.settings-feedback {
+  position: sticky;
+  bottom: 0;
+  min-height: 36px;
+  border-top: 1px solid var(--line);
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  padding-block: 8px;
+}
+/* A path is field-shaped, so it takes the field's well at the field's radius. Turns the Data
+   tab from two floating text nodes into a card with wells in it. */
+.settings-path {
+  display: block;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  background: var(--track-fill);
+  box-shadow: var(--material-recess);
+  color: var(--ink-2);
+}
+.settings-agent {
+  padding-block: 16px;
+  border-bottom: 1px solid var(--line);
+}
+.settings-provider {
+  margin-top: 16px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--plane-fill);
+  box-shadow: var(--material-seat);
+}
+.settings-window {
+  margin-top: 16px;
+}
+/* The reference module's construction: an inset capsule with the value printed INSIDE the
+   track rather than beside it. A <progress> cannot hold children, so this is a div with
+   role=progressbar. The recess rides an ::after so the accent fill cannot paint over it, and
+   the value is drawn twice, the second clipped to the fill, so it stays legible wherever the
+   fill edge lands. --ink-2 on --track-fill clears 8:1 and --accent-fg on --accent
+   5.19-5.58 light / 4.52-6.34 dark, so both layers clear 4.5:1 in every palette.
+   --track-fill sits below the card in both modes, so the depth never reverses by mode. */
+.settings-meter {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: var(--control-sm);
+  margin-top: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--track-fill);
+  overflow: hidden;
+}
+.settings-meter::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: var(--material-recess);
+  pointer-events: none;
+}
+.settings-meter-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--used);
+  background: var(--accent);
+}
+.settings-meter-value {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--ink-2);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+.settings-meter-value-over {
+  color: var(--accent-fg);
+  clip-path: inset(0 calc(100% - var(--used)) 0 0);
+}
+.settings-unavailable {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 32px;
+  margin-top: 16px;
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+}
+.settings-unavailable strong {
+  display: block;
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-medium);
+  margin-top: 4px;
+}
+.settings-credit {
+  display: grid;
+  gap: 4px;
+  margin-top: 16px;
+}
+.settings-provider-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+}
+@container (max-width: 720px) {
+  .settings-layout {
+    --settings-inset: 24px;
+  }
+  .skills-scope {
+    flex-wrap: wrap;
+  }
+  .skills-scope select {
+    flex: 1 1 100%;
+  }
+  .settings-field select,
+  .settings-field input:not([type="checkbox"]) {
+    width: 100%;
+  }
+}
+@container (max-width: 500px) {
+  .settings-layout {
+    --settings-inset: 16px;
+  }
+  .settings-tablist {
+    gap: 16px;
+  }
+  .settings-content {
+    padding-top: 24px;
+  }
+  .skills-toolbar {
+    flex-wrap: wrap;
+  }
+  .skills-search {
+    flex-basis: 100%;
+    max-width: none;
+  }
+  .skills-item-summary {
+    grid-template-columns: minmax(0, 1fr) 14px;
+    gap: 4px 12px;
+  }
+  .skills-command {
+    grid-column: 1;
+  }
+  .skills-preview {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .skills-item-chevron {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .skills-item-detail {
+    padding-left: 16px;
+  }
+}
+
+/* Fast uses the readable accent; the effort thumb stays white. */
+.composer-fast-toggle[aria-pressed="true"] {
+  color: var(--accent-ink);
+}
+.composer-fast-description {
+  margin: 8px 0 0;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  line-height: var(--text-xs--line-height);
+  text-align: center;
+}
+
+/* Maximum effort follows the lavender Codex reference, independent of app accent. */
+.composer-effort-popup:has(.composer-effort-slider[data-max]) .composer-effort-title,
+.composer-effort-popup .composer-fast-toggle[aria-pressed="true"] {
+  color: light-dark(#7541a8, #c5a2ff);
+}
+
+/* A saved Fast request the model or account cannot serve stays on so it can be
+   turned off, but reads as a warning rather than as Fast running. */
+.composer-model-trigger > .composer-fast-indicator[data-blocked],
+.model-picker-fast[aria-pressed="true"][data-blocked],
+.composer-effort-popup .composer-fast-toggle[aria-pressed="true"][data-blocked] {
+  color: var(--warn);
+}
+
+/* Thread panes share the shell's quiet wells and resize affordance. Only this
+   viewport scrolls sideways when there isn't room for readable conversations. */
+.thread-workspace {
+  --thread-pane-min: 360px;
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+}
+.thread-pane-viewport {
+  height: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+}
+.thread-pane-group {
+  display: flex;
+  height: 100%;
+  min-width: calc(var(--thread-pane-count) * var(--thread-pane-min));
+}
+.thread-pane {
+  display: flex;
+  flex-basis: 0;
+  min-width: var(--thread-pane-min);
+  height: 100%;
+}
+.thread-pane > .well {
+  margin-left: 0;
+}
+/* Window chrome has its own hit-test plane, above static labels and conversation
+   layers. Keep it inside the same column so resizing and horizontal clipping
+   cannot put the native drag surface out of alignment with its header. */
+.thread-header {
+  position: relative;
+  isolation: isolate;
+  z-index: 1;
+}
+.thread-header,
+.thread-header * {
+  -webkit-app-region: drag;
+  user-select: none;
+}
+.thread-header-drag-surface {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+/* Only actual controls punch holes in the drag plane, including their icons.
+   Do not elevate/exclude entire title or action groups: their gaps must drag. */
+.thread-header :is(button, a, input, select, textarea, [role="button"], [contenteditable="true"], .no-drag) {
+  position: relative;
+  z-index: 2;
+}
+.thread-header :is(button, a, input, select, textarea, [role="button"], [contenteditable="true"], .no-drag),
+.thread-header :is(button, a, input, select, textarea, [role="button"], [contenteditable="true"], .no-drag) * {
+  -webkit-app-region: no-drag;
+}
+.thread-header :is(input, textarea, [contenteditable="true"]) {
+  user-select: text;
+}
+.thread-pane-content {
+  position: relative;
+  isolation: isolate;
+  z-index: 0;
+}
+body:has(.sidebar-shell[data-open="false"]) .thread-pane:first-child > .well {
+  margin-left: var(--spacing-well);
+}
+.thread-pane[data-focused="true"] > .well::before {
+  outline: 1px solid var(--line-strong);
+  outline-offset: -1px;
+}
+.thread-workspace[data-pane-count="1"] .thread-pane > .well::before {
+  outline: none;
+}
+.thread-pane-divider .resize-grip {
+  margin-left: calc(var(--spacing-well) / -2);
+}
+.thread-pane-divider::after {
+  inset: 0 -4px 0 calc(-1 * var(--spacing-well));
+}
+.thread-drop-preview {
+  position: absolute;
+  inset: var(--spacing-well);
+  top: calc(var(--height-topbar) + var(--spacing-well));
+  z-index: 10;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 24px;
+  border: 2px dashed var(--ink-3);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface) 75%, transparent);
+}
+.thread-drop-preview span,
+.thread-drop-error {
+  padding: 12px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--text-sm);
+}
+.thread-drop-error {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  right: 16px;
+}
+/* The work row measures the space beside the sidebar, so the panel can size itself against it. */
+.work-row {
+  container: work-row / inline-size;
+}
+/* 788px is --width-main-min plus --width-panel-min plus the panel's --spacing-well gutter; a
+   query cannot read any of them. Too narrow for both, the open panel floats over the right of
+   the work area rather than crushing the conversation, and its seam's grip goes with it. */
+@container work-row (max-width: 788px) {
+  .panel-shell {
+    --panel-pane: min(var(--width-panel), calc(100cqw - 48px));
+  }
+  .panel-shell[data-open="true"]:not([data-expanded="true"]) {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    border-left: 1px solid var(--line);
+    box-shadow: var(--shadow-far);
+  }
+  .resize-handle[data-edge="panel"] {
+    display: none;
+  }
+}
+@container (max-width: 480px) {
+  .thread-pane .header-chip {
+    flex: 0 1 auto;
+    max-width: 88px;
+  }
+}
+
+/* Task-owned discussion shares the document's reading column. */
+.task-comments {
+  margin-block: 32px;
+  border-top: 1px solid var(--color-line);
+  padding-top: 24px;
+  min-width: 0;
+}
+.task-comments-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.task-comments-heading h2 {
+  font-size: 16px;
+  font-weight: 600;
+}
+.task-comments-heading button {
+  font-size: 12px;
+}
+.task-comments-feed {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.task-comment {
+  padding-block: 20px;
+  border-bottom: 1px solid var(--color-line);
+  scroll-margin-top: 20px;
+}
+.task-comment-meta {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--color-ink-3);
+  margin-bottom: 8px;
+  overflow-wrap: anywhere;
+}
+.task-comment-meta strong {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+.task-comment-body {
+  font-size: 14px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+  min-width: 0;
+  max-height: 640px;
+  overflow-y: auto;
+}
+.task-comment-body pre {
+  max-width: 100%;
+  overflow-x: auto;
+}
+/* Replies hang off one line that curves into each response's name. Each response draws its own
+   elbow, and every response but the last carries the line on to the next, so the line ends at the
+   final reply without masking the gradient plane. Straight stretches are never painted twice, which
+   would darken translucent borders. --reply-turn is the top padding plus the middle of the name line. */
+.task-comment-replies {
+  margin-top: 4px;
+}
+.task-comment-response {
+  --reply-turn: 31px;
+  --reply-curve: 10px;
+  position: relative;
+  padding: 20px 0 0 28px;
+  scroll-margin-top: 20px;
+}
+.task-comment-response::before,
+.task-comment-response:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  border-left: 1px solid var(--color-line-strong);
+}
+.task-comment-response::before {
+  top: 0;
+  width: 20px;
+  height: var(--reply-turn);
+  border-bottom: 1px solid var(--color-line-strong);
+  border-bottom-left-radius: var(--reply-curve);
+}
+.task-comment-response:not(:last-child)::after {
+  top: calc(var(--reply-turn) - var(--reply-curve));
+  bottom: 0;
+}
+.task-comment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--color-ink-3);
+}
+.task-comment-context {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 240px;
+  overflow: auto;
+  margin-top: 8px;
+}
+.task-comment-executor {
+  margin-top: 20px;
+}
+.task-comment-composer {
+  --composer-surface: var(--bg);
+  position: relative;
+  margin-top: 24px;
+  background: var(--composer-surface);
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+}
+.task-comment-composer textarea {
+  display: block;
+  resize: none;
+  field-sizing: content;
+  width: 100%;
+  min-height: 84px;
+  max-height: 320px;
+  padding: 12px;
+  background: transparent;
+  font-size: 14px;
+  line-height: 1.6;
+  outline: none;
+}
+.task-comment-composer:focus-within {
+  border-color: var(--color-line-strong);
+}
+.task-comment-compose-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  flex-wrap: wrap;
+}
+.task-comment-recipients {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 8px 12px 0;
+  font-size: 12px;
+  color: var(--color-ink-3);
+  overflow-wrap: anywhere;
+}
+.task-comment-mentions {
+  max-height: 260px;
+  overflow: auto;
+  border-block: 1px solid var(--color-line);
+  padding: 4px;
+}
+.task-comment-mentions button[role="option"] {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 8px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.task-comment-mentions button[role="option"] span:last-child {
+  color: var(--color-ink-3);
+}
+.task-comment-mentions button[aria-selected="true"],
+.task-comment-mentions button[role="option"]:hover {
+  background: var(--color-surface-2);
+}
+.task-comment-mentions p {
+  padding: 8px;
+  font-size: 12px;
+}
+
+[data-theme="dark"] .task-comment-composer {
+  --composer-surface: color-mix(in srgb, var(--surface) 88%, #ffffff);
+}
+
+.task-comment-composer textarea::placeholder {
+  color: var(--ink-2);
+  opacity: 1;
+}
+.task-comment-compose-footer > span,
+.task-comment-recipients,
+.task-comment-mentions button[role="option"] span:last-child {
+  color: var(--ink-2);
+}
+.agent-update-toolbar,
+.agent-update-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.agent-update-toolbar {
+  margin-bottom: 12px;
+}
+.agent-update-notice {
+  position: fixed;
+  z-index: 40;
+  top: 56px;
+  right: 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: min(390px, calc(100vw - 40px));
+  padding: 16px;
+  border-radius: var(--radius-xl);
+  background: var(--surface-2);
+  color: var(--ink);
+  box-shadow: 0 8px 30px rgb(0 0 0 / 18%);
+}

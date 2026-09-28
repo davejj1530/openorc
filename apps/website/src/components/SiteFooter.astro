@@ -1,0 +1,21 @@
+---
+import { Image } from "astro:assets";
+import Icon from "./Icon.astro";
+import mark from "../assets/openorc-mark.png";
+import { getPublishedReleases } from "../data/changelog";
+const hasPublishedReleases = (await getPublishedReleases()).length > 0;
+---
+
+<footer class="container footer">
+  <a class="wordmark" href="/">
+    <Image src={mark} alt="" width={28} height={28} format="webp" />
+    OpenOrc
+  </a>
+  <span class="footer-credit">Made by <a href="https://www.eliasdavidceriola.com/">David C.</a></span>
+  <a href="/docs/">Docs</a>
+  {hasPublishedReleases && <a href="/changelog/">Changelog</a>}
+  <a href="/privacy/">Privacy</a>
+  <a href="#">
+    Back to top <Icon name="arrow" size={14} />
+  </a>
+</footer>

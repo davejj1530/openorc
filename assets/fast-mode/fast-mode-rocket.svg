@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="48" viewBox="0 0 96 48">
+  <g id="rocket">
+    <g id="exhaust" transform="translate(25 24)">
+      <path fill="#FFAD52" d="M2-8C-7-10-16-4-23 0C-15 4-7 10 2 8Z"/>
+      <path fill="#FFE5A2" d="M1-4C-5-5-10-2-14 0C-10 2-5 5 1 4Z"/>
+    </g>
+    <g id="fins" fill="#6E6ADE">
+      <path d="M43 15L30 3C26 0 22 3 23 8L25 21Z"/>
+      <path d="M43 33L30 45C26 48 22 45 23 40L25 27Z"/>
+    </g>
+    <path fill="#C5BCCE" d="M23 17H33V31H23Q20 24 23 17Z"/>
+    <path fill="#F8F6FC" d="M29 14C47 6 69 10 87 24C69 38 47 42 29 34Q24 24 29 14Z"/>
+    <path fill="#E7E0EC" d="M28 26C46 33 70 30 87 24C69 38 47 42 29 34Q27 30 28 26Z"/>
+    <path fill="#6E6ADE" d="M72 14Q80 18 87 24Q80 30 72 34Q75 24 72 14Z"/>
+    <circle fill="#6E6ADE" cx="54" cy="23" r="9"/>
+    <circle fill="#30203F" cx="54" cy="23" r="6.4"/>
+    <path fill="#DDBEF7" d="M50 20Q52 17 56 19L51 25Q48 23 50 20Z"/>
+  </g>
+</svg>

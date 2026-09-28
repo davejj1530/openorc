@@ -1,0 +1,259 @@
+name: Desktop release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag matching apps/desktop/package.json (vX.Y.Z or vX.Y.Z-beta.N)
+        required: true
+        type: string
+      create_draft:
+        description: Upload successful builds to a new draft GitHub release
+        default: false
+        type: boolean
+      unsigned_windows_beta:
+        description: Explicitly allow an unsigned Windows installer for this beta tag only
+        default: false
+        type: boolean
+      windows_only:
+        description: Validate only Windows packaging; cannot create a release draft
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    outputs:
+      commit: ${{ steps.source.outputs.commit }}
+      platforms: ${{ steps.source.outputs.platforms }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+          persist-credentials: false
+      - name: Validate the release repository, tag, and options
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OPENORC_RELEASE_REPOSITORY: ${{ vars.RELEASE_REPOSITORY }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          CREATE_DRAFT: ${{ inputs.create_draft }}
+          UNSIGNED_WINDOWS_BETA: ${{ inputs.unsigned_windows_beta }}
+          WINDOWS_ONLY: ${{ inputs.windows_only }}
+        run: |
+          node <<'NODE'
+          const { execFileSync } = require('node:child_process');
+          const { validateReleaseSource } = require('./scripts/desktop-release.cjs');
+          const repo = process.env.OPENORC_RELEASE_REPOSITORY;
+          if (!repo || !/^[A-Za-z0-9][A-Za-z0-9-]*\/[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(repo)) throw Error('RELEASE_REPOSITORY must be owner/repository.');
+          const metadata = JSON.parse(execFileSync('gh', ['api', `repos/${repo}`], { encoding: 'utf8' }));
+          validateReleaseSource({ repository: repo, currentRepository: process.env.GITHUB_REPOSITORY, tag: process.env.RELEASE_TAG, metadata, createDraft: process.env.CREATE_DRAFT === 'true' });
+          if (process.env.UNSIGNED_WINDOWS_BETA === 'true' && !/-beta\.\d+$/.test(process.env.RELEASE_TAG)) throw Error('Unsigned Windows builds require a beta tag.');
+          if (process.env.WINDOWS_ONLY === 'true' && process.env.CREATE_DRAFT === 'true') throw Error('Draft creation requires all platform builds.');
+          NODE
+      - name: Pin the reviewed source commit and verify version
+        id: source
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+          WINDOWS_ONLY: ${{ inputs.windows_only }}
+        run: |
+          node -e 'if (`v${require("./apps/desktop/package.json").version}` !== process.env.RELEASE_TAG) throw Error("Tag and desktop version differ")'
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          node <<'NODE'
+          const platforms = [
+            {runner:'macos-15',platform:'mac',arch:'arm64'},
+            {runner:'macos-15-intel',platform:'mac',arch:'x64'},
+            {runner:'windows-2025',platform:'win',arch:'x64'},
+          ].filter(item => process.env.WINDOWS_ONLY !== 'true' || item.platform === 'win');
+          require('node:fs').appendFileSync(process.env.GITHUB_OUTPUT, `platforms=${JSON.stringify(platforms)}\n`);
+          NODE
+
+  build:
+    needs: validate
+    name: Build ${{ matrix.platform }} ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.validate.outputs.platforms) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    environment: release
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.commit }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Verify native build architecture
+        env:
+          EXPECTED_ARCH: ${{ matrix.arch }}
+        run: node -e 'if (process.arch !== process.env.EXPECTED_ARCH) throw Error("Use a matching native runner for native dependencies")'
+      - run: pnpm install --frozen-lockfile
+      - name: Prepare Electron runtime and notice files
+        run: pnpm --filter @openorc/desktop exec node -e 'require("electron")'
+      - run: pnpm check:size
+      - run: node --test scripts/size-limit.test.cjs
+      - run: pnpm -r typecheck
+      - run: pnpm lint
+      - run: pnpm format:check
+      - run: node --test scripts/desktop-release.test.cjs scripts/distribution-notices.test.cjs scripts/packaged-native-target.test.cjs scripts/packaged-runtime-dependencies.test.cjs
+      - run: pnpm --filter @openorc/desktop exec vitest run src/main/app-updates.test.ts src/main/update-handoff.test.ts
+      - name: Prepare notarization key
+        if: matrix.platform == 'mac'
+        env:
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          if (!process.env.APPLE_API_KEY_BASE64) throw Error('Configure APPLE_API_KEY_BASE64 in the release environment.');
+          const key = path.join(process.env.RUNNER_TEMP, 'openorc-notarization.p8');
+          fs.writeFileSync(key, Buffer.from(process.env.APPLE_API_KEY_BASE64, 'base64'), { mode: 0o600 });
+          fs.appendFileSync(process.env.GITHUB_ENV, `APPLE_API_KEY=${key}\n`);
+          NODE
+      - name: Build installers and update metadata (no publication)
+        id: package
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+          UNSIGNED_WINDOWS_BETA: ${{ matrix.platform == 'win' && inputs.unsigned_windows_beta }}
+          OPENORC_RELEASE_REPOSITORY: ${{ vars.RELEASE_REPOSITORY }}
+          MAC_SIGNING_IDENTITY: ${{ vars.MAC_SIGNING_IDENTITY }}
+          WINDOWS_PUBLISHER_NAME: ${{ vars.WINDOWS_PUBLISHER_NAME }}
+          CSC_LINK: ${{ matrix.platform == 'mac' && secrets.MAC_CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ matrix.platform == 'mac' && secrets.MAC_CSC_KEY_PASSWORD || '' }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+        run: |
+          if [[ "$UNSIGNED_WINDOWS_BETA" == "true" ]]; then
+            export OPENORC_UNSIGNED_WINDOWS_BETA="${RELEASE_TAG#v}"
+          fi
+          node scripts/desktop-release.cjs
+          pnpm --filter @openorc/desktop release:build
+      - name: Audit packaged macOS notices
+        if: matrix.platform == 'mac'
+        run: |
+          node <<'NODE'
+          const { execFileSync } = require('node:child_process');
+          const path = require('node:path');
+          const app = path.resolve('apps/desktop/release', process.arch === 'arm64' ? 'mac-arm64' : 'mac', 'OpenOrc.app');
+          execFileSync(process.execPath, ['scripts/distribution-notices.cjs', 'desktop', app], { stdio: 'inherit' });
+          NODE
+      - name: Verify the signed macOS app's fuses, native code, and startup
+        if: matrix.platform == 'mac'
+        run: |
+          node <<'NODE'
+          const { execFileSync } = require('node:child_process');
+          const path = require('node:path');
+          const app = path.resolve('apps/desktop/release', process.arch === 'arm64' ? 'mac-arm64' : 'mac', 'OpenOrc.app');
+          execFileSync(process.execPath, ['scripts/packaged-release-check.cjs', app], { stdio: 'inherit' });
+          NODE
+      # The smoke reads the main process through Node's inspector, which release packages switch off. It runs on an
+      # unsigned package that differs from the release only in that fuse.
+      - name: Verify packaged macOS updater on the smoke package
+        if: matrix.platform == 'mac'
+        run: |
+          pnpm --filter @openorc/desktop exec electron-builder --dir --config electron-builder.smoke.cjs
+          node <<'NODE'
+          const { execFileSync } = require('node:child_process');
+          const path = require('node:path');
+          const app = path.resolve('apps/desktop/release-smoke', process.arch === 'arm64' ? 'mac-arm64' : 'mac', 'OpenOrc.app');
+          execFileSync(process.execPath, ['scripts/packaged-runtime-smoke.cjs', app, '--updates-only'], { stdio: 'inherit' });
+          NODE
+      - name: Verify Windows installer and installed runtime
+        if: matrix.platform == 'win'
+        shell: pwsh
+        env:
+          EXPECT_UNSIGNED: ${{ inputs.unsigned_windows_beta }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = @(Get-ChildItem apps/desktop/release/*.exe)
+          if ($installer.Count -ne 1) { throw 'Expected exactly one Windows installer' }
+          $signature = Get-AuthenticodeSignature $installer[0].FullName
+          if ($env:EXPECT_UNSIGNED -eq 'true') {
+            if ($signature.Status -ne 'NotSigned') { throw 'Unsigned beta installer unexpectedly signed' }
+          } elseif ($signature.Status -ne 'Valid') { throw 'Installer signature is not valid' }
+          $destination = Join-Path $env:RUNNER_TEMP 'openorc-installed-smoke'
+          $process = Start-Process -FilePath $installer[0].FullName -ArgumentList @('/S', "/D=$destination") -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Installer failed: $($process.ExitCode)" }
+          node scripts/distribution-notices.cjs desktop "$destination"
+          if ($LASTEXITCODE -ne 0) { throw 'Installed Windows notice audit failed' }
+          node scripts/packaged-release-check.cjs "$destination"
+          if ($LASTEXITCODE -ne 0) { throw 'Installed Windows release check failed' }
+          # The smoke reads the main process through Node's inspector, which release packages switch off.
+          pnpm --filter @openorc/desktop exec electron-builder --dir --config electron-builder.smoke.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'Windows smoke package build failed' }
+          node scripts/packaged-runtime-smoke.cjs (Resolve-Path apps/desktop/release-smoke/win-unpacked).Path
+          if ($LASTEXITCODE -ne 0) { throw 'Windows runtime smoke failed' }
+      - name: Remove notarization key
+        if: always() && matrix.platform == 'mac'
+        run: |
+          node -e 'require("node:fs").rmSync(require("node:path").join(process.env.RUNNER_TEMP, "openorc-notarization.p8"), { force: true })'
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.package.outcome == 'success'
+        with:
+          name: desktop-${{ matrix.platform }}-${{ matrix.arch }}
+          if-no-files-found: error
+          path: |
+            apps/desktop/release/*.dmg
+            apps/desktop/release/*.zip
+            apps/desktop/release/*.exe
+            apps/desktop/release/*.blockmap
+            apps/desktop/release/latest-*.yml
+
+  draft:
+    if: inputs.create_draft
+    needs: [validate, build]
+    runs-on: ubuntu-24.04
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-*
+          path: release
+          merge-multiple: true
+      - name: Create a draft for review (never publish automatically)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          UNSIGNED_WINDOWS_BETA: ${{ inputs.unsigned_windows_beta }}
+        run: |
+          (cd release && sha256sum * > SHA256SUMS.txt)
+          node <<'NODE'
+          const fs = require('node:fs');
+          const lines = [
+            '## Highlights',
+            '',
+            '<!-- Before publishing, add 2–5 user-facing bullets here. The website changelog shows this section. -->',
+            '',
+            '## Install notes',
+            '',
+            'macOS: Developer ID signed and notarized applications in DMG/ZIP downloads.',
+          ];
+          lines.push(process.env.UNSIGNED_WINDOWS_BETA === 'true'
+            ? 'Windows x64: unsigned beta. Windows may warn about the unrecognized app; some security policies may prevent installation. Download only from the official release.'
+            : 'Windows x64: signed NSIS installer.');
+          lines.push('', 'Beta releases are installed manually; the in-app updater offers stable releases only.', '', 'SHA256SUMS.txt covers the attached installers, ZIPs, blockmaps, and update metadata.');
+          fs.writeFileSync('release-notes.md', lines.join('\n') + '\n');
+          NODE
+          args=(--draft --verify-tag --title "OpenOrc $RELEASE_TAG" --notes-file release-notes.md)
+          if [[ "$RELEASE_TAG" == *-beta.* ]]; then args+=(--prerelease); fi
+          gh release create "$RELEASE_TAG" release/* "${args[@]}"

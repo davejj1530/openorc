@@ -1,0 +1,25 @@
+{
+  "name": "@openorc/db",
+  "version": "0.0.0",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "description": "The ledger. SQLite through node:sqlite, migrations, typed repositories, batched writer with redaction.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@openorc/protocol": "workspace:*",
+    "sqlite-vec": "0.1.9",
+    "zod": "^4.6.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0",
+    "vitest": "^4.1.11"
+  }
+}

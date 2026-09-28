@@ -1,0 +1,44 @@
+---
+import "@fontsource-variable/geist";
+import "../styles/global.css";
+interface Props {
+  title?: string;
+  description?: string;
+  noindex?: boolean;
+}
+const {
+  title = "OpenOrc — Your coding agents, working together",
+  description = "Bring Codex, Claude Code, and OpenCode into one desktop workspace. Share context between threads, discuss tasks, and review code where the work happens.",
+  noindex = false,
+} = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- Google tag (gtag.js) -->
+    <script is:inline async src="https://www.googletagmanager.com/gtag/js?id=G-6QFDF6RQ6B"></script>
+    <script is:inline>
+      window.dataLayer = window.dataLayer || [];
+      function gtag() { dataLayer.push(arguments); }
+      gtag('js', new Date());
+      gtag('config', 'G-6QFDF6RQ6B');
+    </script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    {noindex && <meta name="robots" content="noindex" />}
+    <meta name="theme-color" content="#141417" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png" />
+    <title>{title}</title>
+  </head>
+  <body class={Astro.url.pathname === "/" ? "site-home" : undefined}>
+    <a class="skip-link" href="#main">
+      Skip to content
+    </a>
+    <slot />
+  </body>
+</html>

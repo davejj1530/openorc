@@ -1,0 +1,624 @@
+{
+  "schemaVersion": 1,
+  "reviewed": "2026-09-23",
+  "scope": "Supplemental notice preservation, not complete licensing clearance. See docs/distribution-notices.md.",
+  "packages": [
+    {
+      "name": "electron",
+      "version": "44.3.0",
+      "distribution": "desktop"
+    },
+    {
+      "name": "node-pty",
+      "version": "1.1.0",
+      "distribution": "desktop"
+    },
+    {
+      "name": "sqlite-vec",
+      "version": "0.1.9",
+      "distribution": "desktop"
+    },
+    {
+      "name": "onnxruntime-node",
+      "version": "1.21.0",
+      "distribution": "desktop"
+    },
+    {
+      "name": "onnxruntime-common",
+      "version": "1.21.0",
+      "distribution": "desktop"
+    },
+    {
+      "name": "@rive-app/canvas",
+      "version": "2.42.1",
+      "distribution": "desktop"
+    },
+    {
+      "name": "@huggingface/tokenizers",
+      "version": "0.2.0",
+      "distribution": "desktop"
+    },
+    {
+      "name": "gearhash-jit",
+      "version": "1.0.2",
+      "distribution": "desktop"
+    },
+    {
+      "name": "fastembed",
+      "version": "2.1.0",
+      "distribution": "desktop"
+    },
+    {
+      "name": "react-remove-scroll-bar",
+      "version": "2.3.8",
+      "distribution": "desktop"
+    },
+    {
+      "name": "remark-math",
+      "version": "6.0.0",
+      "distribution": "desktop"
+    },
+    {
+      "name": "fastdom",
+      "version": "1.0.12",
+      "distribution": "desktop"
+    },
+    {
+      "name": "strictdom",
+      "version": "1.0.1",
+      "distribution": "desktop"
+    },
+    {
+      "name": "lru_map",
+      "version": "0.4.1",
+      "distribution": "desktop"
+    },
+    {
+      "name": "@fontsource-variable/inter",
+      "version": "5.3.0",
+      "distribution": "desktop"
+    },
+    {
+      "name": "@fontsource-variable/jetbrains-mono",
+      "version": "5.3.0",
+      "distribution": "desktop"
+    },
+    {
+      "name": "@fontsource-variable/geist",
+      "version": "5.3.0",
+      "distribution": "website"
+    },
+    {
+      "name": "rehype-katex",
+      "version": "7.0.1",
+      "distribution": "desktop"
+    },
+    {
+      "name": "electron-updater",
+      "version": "6.8.9",
+      "distribution": "desktop"
+    },
+    {
+      "name": "lazy-val",
+      "version": "1.0.5",
+      "distribution": "desktop"
+    }
+  ],
+  "files": [
+    {
+      "id": "sqlite-vec-MIT",
+      "input": "licenses/vendor/sqlite-vec-MIT.txt",
+      "source": "https://raw.githubusercontent.com/asg017/sqlite-vec/e9f598abfa0c06b328d8fe5da9c3760cce74be10/LICENSE-MIT",
+      "sha256": "6ce72bbe12d975bd5286e5ab0a064c069693300c47bccbc57bec18485f1621ea",
+      "desktop": {
+        "resource": "licenses/vendor/sqlite-vec-MIT.txt"
+      },
+      "covers": ["sqlite-vec", "sqlite-vec-darwin-arm64", "sqlite-vec-darwin-x64", "sqlite-vec-linux-arm64", "sqlite-vec-linux-x64", "sqlite-vec-windows-x64"]
+    },
+    {
+      "id": "sqlite-vec-Apache",
+      "input": "licenses/vendor/sqlite-vec-Apache.txt",
+      "source": "https://raw.githubusercontent.com/asg017/sqlite-vec/e9f598abfa0c06b328d8fe5da9c3760cce74be10/LICENSE-APACHE",
+      "sha256": "a38070a94d4afd9cd710e3ce67bd1de78097cfe1784c1f0109ac95d3c196bfdc",
+      "desktop": {
+        "resource": "licenses/vendor/sqlite-vec-Apache.txt"
+      }
+    },
+    {
+      "id": "onnxruntime-MIT",
+      "input": "licenses/vendor/onnxruntime-MIT.txt",
+      "source": "https://raw.githubusercontent.com/microsoft/onnxruntime/e0b66cad282043d4377cea5269083f17771b6dfc/LICENSE",
+      "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c",
+      "desktop": {
+        "resource": "licenses/vendor/onnxruntime-MIT.txt"
+      },
+      "covers": ["onnxruntime-node", "onnxruntime-common"]
+    },
+    {
+      "id": "onnxruntime-ThirdPartyNotices",
+      "input": "licenses/vendor/onnxruntime-ThirdPartyNotices.txt",
+      "source": "https://raw.githubusercontent.com/microsoft/onnxruntime/e0b66cad282043d4377cea5269083f17771b6dfc/ThirdPartyNotices.txt",
+      "sha256": "8c06e8cff286a4a117b3b246a4c7da68428a144af757823db50e3d6520941ec6",
+      "desktop": {
+        "resource": "licenses/vendor/onnxruntime-ThirdPartyNotices.txt"
+      }
+    },
+    {
+      "id": "rive-wasm-MIT",
+      "input": "licenses/vendor/rive-wasm-MIT.txt",
+      "source": "https://raw.githubusercontent.com/rive-app/rive-wasm/e0bfcec3ccd0f1dee01686776da68f439a95cbfa/LICENSE",
+      "sha256": "8a1efa755d19446b51a18e1c15f6308728da0b36283c4d38050698ad6954b69a",
+      "desktop": {
+        "resource": "licenses/vendor/rive-wasm-MIT.txt"
+      },
+      "covers": ["@rive-app/canvas"]
+    },
+    {
+      "id": "rive-runtime-MIT",
+      "input": "licenses/vendor/rive-runtime-MIT.txt",
+      "source": "https://raw.githubusercontent.com/rive-app/rive-runtime/45d4d01dfd1fe70d3f9e73764538c16f63a04d07/LICENSE",
+      "sha256": "fa43eb0d7fbf66f9504182d92dd097311278bb80111a5bf1403c366d6a403144",
+      "desktop": {
+        "resource": "licenses/vendor/rive-runtime-MIT.txt"
+      }
+    },
+    {
+      "id": "remark-math-MIT",
+      "input": "licenses/vendor/remark-math-MIT.txt",
+      "source": "https://raw.githubusercontent.com/remarkjs/remark-math/d5d0660b150810a535bbb07eac6cc96a4510aa24/license",
+      "sha256": "cb992262f361a5359e6771c28740d33c7041e15332ae8537fae40538992591a9",
+      "desktop": {
+        "resource": "licenses/vendor/remark-math-MIT.txt"
+      },
+      "covers": ["remark-math"]
+    },
+    {
+      "id": "react-remove-scroll-bar-MIT",
+      "input": "licenses/vendor/react-remove-scroll-bar-MIT.txt",
+      "source": "https://raw.githubusercontent.com/theKashey/react-remove-scroll-bar/8ca9ba5ea52de03308fe8ced94f7b159a44d28ff/LICENSE",
+      "sha256": "a79aae0c0f21990d9d963bb3c5a79cdcea9a46f8523ba55c58d7fe776b6ebc84",
+      "desktop": {
+        "resource": "licenses/vendor/react-remove-scroll-bar-MIT.txt"
+      },
+      "covers": ["react-remove-scroll-bar"]
+    },
+    {
+      "id": "opencode-MIT",
+      "input": "licenses/vendor/opencode-MIT.txt",
+      "source": "https://raw.githubusercontent.com/anomalyco/opencode/fe3f3a41f79ad292cc3c7c629567385a20ec5130/LICENSE",
+      "sha256": "625f0f619133f89bbbb2abe37369613dfa1885eba1e50d02170deb62bb42cb6b",
+      "desktop": {
+        "resource": "licenses/vendor/opencode-MIT.txt"
+      },
+      "website": "licenses/opencode-MIT.txt"
+    },
+    {
+      "id": "rive-harfbuzz-COPYING",
+      "input": "licenses/vendor/rive-harfbuzz-COPYING.txt",
+      "source": "https://raw.githubusercontent.com/rive-app/harfbuzz/08d34675f64b1ac4880f4f10c9fd474a56dd4399/COPYING",
+      "sha256": "ba8f810f2455c2f08e2d56bb49b72f37fcf68f1f4fade38977cfd7372050ad64",
+      "desktop": {
+        "resource": "licenses/vendor/rive-harfbuzz-COPYING.txt"
+      }
+    },
+    {
+      "id": "rive-luau-LICENSE",
+      "input": "licenses/vendor/rive-luau-LICENSE.txt",
+      "source": "https://raw.githubusercontent.com/luigi-rosso/luau/fb6ff089bd5687713a59aa60a5baa86e0a5c8bfd/LICENSE.txt",
+      "sha256": "1597b423ca8f9c76225b498071f03b2b3609c4960b8dc30e63b230490fc82efd",
+      "desktop": {
+        "resource": "licenses/vendor/rive-luau-LICENSE.txt"
+      }
+    },
+    {
+      "id": "rive-luau-lua_LICENSE",
+      "input": "licenses/vendor/rive-luau-lua_LICENSE.txt",
+      "source": "https://raw.githubusercontent.com/luigi-rosso/luau/fb6ff089bd5687713a59aa60a5baa86e0a5c8bfd/lua_LICENSE.txt",
+      "sha256": "8fc3b1ad94d6ca69763e5553eed4551dfacfd49785a76680fd4e5f1c1518c656",
+      "desktop": {
+        "resource": "licenses/vendor/rive-luau-lua_LICENSE.txt"
+      }
+    },
+    {
+      "id": "rive-miniaudio-LICENSE",
+      "input": "licenses/vendor/rive-miniaudio-LICENSE.txt",
+      "source": "https://raw.githubusercontent.com/rive-app/miniaudio/3a8b070f80e203a35ec763c5118da20805a90d5a/LICENSE",
+      "sha256": "457f1b500e0adf6bc059edddfa78a2f62012e7c3bb43476c20e0bd23b25ba0eb",
+      "desktop": {
+        "resource": "licenses/vendor/rive-miniaudio-LICENSE.txt"
+      }
+    },
+    {
+      "id": "rive-sheenbidi-LICENSE",
+      "input": "licenses/vendor/rive-sheenbidi-LICENSE.txt",
+      "source": "https://raw.githubusercontent.com/Tehreer/SheenBidi/adfccc46504b1be37b8894f064121c56c31312f7/LICENSE",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "desktop": {
+        "resource": "licenses/vendor/rive-sheenbidi-LICENSE.txt"
+      }
+    },
+    {
+      "id": "rive-yoga-LICENSE",
+      "input": "licenses/vendor/rive-yoga-LICENSE.txt",
+      "source": "https://raw.githubusercontent.com/rive-app/yoga/dc9e0e9f7c29c2a910e76f3738a800ca3c73e7fa/LICENSE",
+      "sha256": "52412d7bc7ce4157ea628bbaacb8829e0a9cb3c58f57f99176126bc8cf2bfc85",
+      "desktop": {
+        "resource": "licenses/vendor/rive-yoga-LICENSE.txt"
+      }
+    },
+    {
+      "id": "node-pty",
+      "input": "apps/desktop/node_modules/node-pty/LICENSE",
+      "source": {
+        "package": "node-pty",
+        "path": "LICENSE"
+      },
+      "sha256": "a3d60eaf32d2fb09c9d82ef39f14bd6e2c0f3ca7de30daa827486c0d6f8b6e9f",
+      "desktop": {
+        "asar": "node_modules/node-pty/LICENSE"
+      }
+    },
+    {
+      "id": "winpty",
+      "input": "apps/desktop/node_modules/node-pty/deps/winpty/LICENSE",
+      "source": {
+        "package": "node-pty",
+        "path": "deps/winpty/LICENSE"
+      },
+      "sha256": "c39e428064b4f3e4fe81a975bf0fd3b845922b431bc4d9a7ffc8bfb091981836",
+      "desktop": {
+        "asar": "node_modules/node-pty/deps/winpty/LICENSE"
+      }
+    },
+    {
+      "id": "inter",
+      "input": "apps/desktop/node_modules/@fontsource-variable/inter/LICENSE",
+      "source": {
+        "package": "@fontsource-variable/inter",
+        "path": "LICENSE"
+      },
+      "sha256": "3b0a5fca3d17942cde889069889dedbbbd075e9b599968c82a95f4d944e9b345",
+      "desktop": {
+        "asar": "node_modules/@fontsource-variable/inter/LICENSE"
+      }
+    },
+    {
+      "id": "jetbrains-mono",
+      "input": "apps/desktop/node_modules/@fontsource-variable/jetbrains-mono/LICENSE",
+      "source": {
+        "package": "@fontsource-variable/jetbrains-mono",
+        "path": "LICENSE"
+      },
+      "sha256": "403581b69dac5cff4079205e01c6b467e56af449ecbd7247693ddb1baafa005b",
+      "desktop": {
+        "asar": "node_modules/@fontsource-variable/jetbrains-mono/LICENSE"
+      }
+    },
+    {
+      "id": "fastembed",
+      "input": "apps/desktop/node_modules/fastembed/LICENSE",
+      "source": {
+        "package": "fastembed",
+        "path": "LICENSE"
+      },
+      "sha256": "62a96ea074f91b6744ad643692472195593d4565da5377009c418011eb7612ef",
+      "desktop": {
+        "asar": "node_modules/fastembed/LICENSE"
+      }
+    },
+    {
+      "id": "electron-MIT",
+      "input": "apps/desktop/node_modules/electron/dist/LICENSE",
+      "source": {
+        "package": "electron",
+        "path": "dist/LICENSE"
+      },
+      "sha256": "5154e165bd6c2cc0cfbcd8916498c7abab0497923bafcd5cb07673fe8480087d",
+      "desktop": {
+        "resource": "licenses/electron/LICENSE"
+      }
+    },
+    {
+      "id": "electron-Chromium",
+      "input": "apps/desktop/node_modules/electron/dist/LICENSES.chromium.html",
+      "source": {
+        "package": "electron",
+        "path": "dist/LICENSES.chromium.html",
+        "version": "44.3.0",
+        "windowsArtifact": "https://github.com/electron/electron/releases/download/v44.3.0/electron-v44.3.0-win32-x64.zip",
+        "windowsArtifactSha256": "26bf9a617d58d81772b3d68305d59ee48272969c15083c06db634a77358a8d9d",
+        "platformNote": "Windows upstream notice uses CRLF and additionally includes the MIT-licensed Windows WebAuthn API headers; both platform files are preserved byte-for-byte."
+      },
+      "sha256": "a62dabd1c6ef1327365b2a3fdffb806222684a746dcb8f4afd1c1f690eba5535",
+      "desktop": {
+        "resource": "licenses/electron/LICENSES.chromium.html"
+      },
+      "platformSha256": {
+        "darwin": "a62dabd1c6ef1327365b2a3fdffb806222684a746dcb8f4afd1c1f690eba5535",
+        "win32": "7b328b8c7463ac9bfc7dc648c751533517c8441a0b5b21047d6c0b2620e60d70"
+      }
+    },
+    {
+      "id": "shadercn",
+      "input": "licenses/shadercn-MIT.txt",
+      "source": "https://github.com/shadcn-labs/shadercn/blob/edf7412ac6f7b377b695ca2b2d14535a3be85d44/LICENSE",
+      "sha256": "6ce0c2dc1b054d7f63b7613da7816424be95555f71a09aa4639e8519e612d717",
+      "desktop": {
+        "resource": "licenses/shadercn-MIT.txt"
+      }
+    },
+    {
+      "id": "geist",
+      "input": "apps/website/node_modules/@fontsource-variable/geist/LICENSE",
+      "source": {
+        "package": "@fontsource-variable/geist",
+        "path": "LICENSE"
+      },
+      "sha256": "71609cbb5c78b5870d712eab73a31d76622635c6ed034ab5cee3b9ecbda8685f",
+      "website": "licenses/geist-OFL-1.1.txt"
+    },
+    {
+      "id": "fastdom",
+      "input": "licenses/vendor/fastdom-MIT.txt",
+      "source": {
+        "package": "fastdom",
+        "version": "1.0.12",
+        "path": "README.md",
+        "section": "## License"
+      },
+      "sha256": "df2ae14f12f31864acef768195afe4584b08a257f25925f49884619279f02f37",
+      "desktop": {
+        "resource": "licenses/vendor/fastdom-MIT.txt"
+      },
+      "covers": ["fastdom"]
+    },
+    {
+      "id": "strictdom",
+      "input": "licenses/vendor/strictdom-MIT.txt",
+      "source": {
+        "package": "strictdom",
+        "version": "1.0.1",
+        "path": "README.md",
+        "section": "## License"
+      },
+      "sha256": "eec385fa29ca410bf6bdbb5ddd5939af2067f474d3cd6d3fd46a4488656d8cbf",
+      "desktop": {
+        "resource": "licenses/vendor/strictdom-MIT.txt"
+      },
+      "covers": ["strictdom"]
+    },
+    {
+      "id": "lru_map",
+      "input": "licenses/vendor/lru_map-MIT.txt",
+      "source": {
+        "package": "lru_map",
+        "version": "0.4.1",
+        "path": "README.md",
+        "section": "# MIT license"
+      },
+      "sha256": "6d1ba2d02cd55eebb60dc5991c64617fd3a5c87ac863606ff89dddec03e1cfa7",
+      "desktop": {
+        "resource": "licenses/vendor/lru_map-MIT.txt"
+      },
+      "covers": ["lru_map"]
+    },
+    {
+      "id": "rehype-katex",
+      "input": "licenses/vendor/rehype-katex-MIT.txt",
+      "source": "https://raw.githubusercontent.com/remarkjs/remark-math/88a9497e1ede93b958237c85edbf5651faeca7af/license",
+      "sha256": "cb992262f361a5359e6771c28740d33c7041e15332ae8537fae40538992591a9",
+      "desktop": {
+        "resource": "licenses/vendor/rehype-katex-MIT.txt"
+      },
+      "covers": ["rehype-katex"]
+    },
+    {
+      "id": "gearhash-jit-MIT",
+      "input": "licenses/vendor/gearhash-jit-MIT.txt",
+      "source": "https://raw.githubusercontent.com/huggingface/huggingface.js/50b7fa1c13a5e02a67fafb1893271f96c4dbba2d/LICENSE",
+      "sha256": "d6e7b19451c1b3d1d66353bb4b1274138953b3bfd9ae60c56e77b1f548796982",
+      "desktop": {
+        "resource": "licenses/vendor/gearhash-jit-MIT.txt"
+      },
+      "covers": ["gearhash-jit"]
+    },
+    {
+      "id": "anush008-tokenizers-MIT",
+      "input": "licenses/vendor/anush008-tokenizers-MIT.txt",
+      "source": "https://raw.githubusercontent.com/Anush008/tokenizers/5ceff1b189bf7eee6d0fe2d90fc3de91bebe3af9/LICENSE",
+      "sha256": "62a96ea074f91b6744ad643692472195593d4565da5377009c418011eb7612ef",
+      "desktop": {
+        "resource": "licenses/vendor/anush008-tokenizers-MIT.txt"
+      },
+      "covers": ["@anush008/tokenizers", "@anush008/tokenizers-darwin-universal", "@anush008/tokenizers-linux-x64-gnu", "@anush008/tokenizers-win32-x64-msvc"]
+    },
+    {
+      "id": "tokenizer-native-notices",
+      "input": "licenses/vendor/tokenizer-native-NOTICES.txt",
+      "source": "licenses/tokenizer-notice-sources.json",
+      "sha256": "05d7f6bde4e5144e3622103fa16583321378c05ca3edf39327ad4d5ee711ec4c",
+      "desktop": {
+        "resource": "licenses/vendor/tokenizer-native-NOTICES.txt"
+      }
+    },
+    {
+      "id": "tokenizer-native-sources",
+      "input": "licenses/tokenizer-notice-sources.json",
+      "source": "https://registry.npmjs.org/@anush008/tokenizers-darwin-universal/0.0.0",
+      "sha256": "f884ea5cb0ef909688bf0f8637b3c56a07e2a4416075e704e74bd0b7253dcf7d",
+      "desktop": {
+        "resource": "licenses/tokenizer-notice-sources.json"
+      }
+    },
+    {
+      "id": "skia-BSD",
+      "input": "licenses/vendor/skia-BSD.txt",
+      "source": "https://raw.githubusercontent.com/google/skia/750673c775648c29002389a3f56fba459288eea9/LICENSE",
+      "sha256": "5f787c1dee3c56547f09ccc2906ab5f5293c4d8dd6c8654e573216c38e908dbd",
+      "desktop": {
+        "resource": "licenses/vendor/skia-BSD.txt"
+      }
+    },
+    {
+      "id": "libhydrogen-ISC",
+      "input": "licenses/vendor/libhydrogen-ISC.txt",
+      "source": "https://raw.githubusercontent.com/luigi-rosso/libhydrogen/4c298c5e3012d891b8b375c6dd215f580a36ed60/LICENSE",
+      "sha256": "d7c5b8bf483cd47cfad2253d8cd1c4f9d809a009d0f32ba63569fcecb1cea666",
+      "desktop": {
+        "resource": "licenses/vendor/libhydrogen-ISC.txt"
+      }
+    },
+    {
+      "id": "harfbuzz-Microsoft-MIT",
+      "input": "licenses/vendor/harfbuzz-Microsoft-MIT.txt",
+      "source": "https://raw.githubusercontent.com/rive-app/harfbuzz/08d34675f64b1ac4880f4f10c9fd474a56dd4399/src/ms-use/COPYING",
+      "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383",
+      "desktop": {
+        "resource": "licenses/vendor/harfbuzz-Microsoft-MIT.txt"
+      }
+    },
+    {
+      "id": "Unicode-V3",
+      "input": "licenses/vendor/Unicode-V3.txt",
+      "source": "https://www.unicode.org/license.txt",
+      "sha256": "e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96",
+      "desktop": {
+        "resource": "licenses/vendor/Unicode-V3.txt"
+      }
+    },
+    {
+      "id": "emscripten-LICENSE",
+      "input": "licenses/vendor/emscripten-LICENSE.txt",
+      "source": "https://raw.githubusercontent.com/emscripten-core/emscripten/7a5d93b50f6a3a35e85a0d2fc9e667b8498e6aed/LICENSE",
+      "sha256": "620a78084fc7ca97c0b5dea9abf891f3ffcadfdbf305276f099c9c4e12fc1d86",
+      "desktop": {
+        "resource": "licenses/vendor/emscripten-LICENSE.txt"
+      }
+    },
+    {
+      "id": "emscripten-musl-COPYRIGHT",
+      "input": "licenses/vendor/emscripten-musl-COPYRIGHT.txt",
+      "source": "https://raw.githubusercontent.com/emscripten-core/emscripten/7a5d93b50f6a3a35e85a0d2fc9e667b8498e6aed/system/lib/libc/musl/COPYRIGHT",
+      "sha256": "f9bc4423732350eb0b3f7ed7e91d530298476f8fec0c6c427a1c04ade22655af",
+      "desktop": {
+        "resource": "licenses/vendor/emscripten-musl-COPYRIGHT.txt"
+      }
+    },
+    {
+      "id": "emscripten-libcxx-LICENSE",
+      "input": "licenses/vendor/emscripten-libcxx-LICENSE.txt",
+      "source": "https://raw.githubusercontent.com/emscripten-core/emscripten/7a5d93b50f6a3a35e85a0d2fc9e667b8498e6aed/system/lib/libcxx/LICENSE.TXT",
+      "sha256": "539dd7aed86e8a4f12cbdd0e6c50c189c7d74847e4fecc64ce2c6ee3a01da38b",
+      "desktop": {
+        "resource": "licenses/vendor/emscripten-libcxx-LICENSE.txt"
+      }
+    },
+    {
+      "id": "emscripten-libcxxabi-LICENSE",
+      "input": "licenses/vendor/emscripten-libcxxabi-LICENSE.txt",
+      "source": "https://raw.githubusercontent.com/emscripten-core/emscripten/7a5d93b50f6a3a35e85a0d2fc9e667b8498e6aed/system/lib/libcxxabi/LICENSE.TXT",
+      "sha256": "e2b35be49f7284a45b7baca8fc7b3ab7440e7902392b2528a457816b5bb2a15c",
+      "desktop": {
+        "resource": "licenses/vendor/emscripten-libcxxabi-LICENSE.txt"
+      }
+    },
+    {
+      "id": "emscripten-compiler-rt-LICENSE",
+      "input": "licenses/vendor/emscripten-compiler-rt-LICENSE.txt",
+      "source": "https://raw.githubusercontent.com/emscripten-core/emscripten/7a5d93b50f6a3a35e85a0d2fc9e667b8498e6aed/system/lib/compiler-rt/LICENSE.TXT",
+      "sha256": "1a8f1058753f1ba890de984e48f0242a3a5c29a6a8f2ed9fd813f36985387e8d",
+      "desktop": {
+        "resource": "licenses/vendor/emscripten-compiler-rt-LICENSE.txt"
+      }
+    },
+    {
+      "id": "rive-skia-source-headers",
+      "input": "licenses/vendor/rive-skia-source-headers.txt",
+      "source": "licenses/rive-header-sources.json",
+      "sha256": "8378bd44250b168ec9ea4fbeadfe3eb0e65203e2bb71bc555a38c456bd1552c7",
+      "desktop": {
+        "resource": "licenses/vendor/rive-skia-source-headers.txt"
+      }
+    },
+    {
+      "id": "rive-harfbuzz-unicode-header",
+      "input": "licenses/vendor/rive-harfbuzz-unicode-header.txt",
+      "source": "https://raw.githubusercontent.com/rive-app/harfbuzz/08d34675f64b1ac4880f4f10c9fd474a56dd4399/src/hb-unicode-emoji-table.hh",
+      "sha256": "7828c73b7d5dfc0af928a2487d52e66113aa4f84f55f4c1ef15182a490e49bc4",
+      "desktop": {
+        "resource": "licenses/vendor/rive-harfbuzz-unicode-header.txt"
+      }
+    },
+    {
+      "id": "rive-header-sources",
+      "input": "licenses/rive-header-sources.json",
+      "source": "https://github.com/rive-app/rive-wasm/tree/e0bfcec3ccd0f1dee01686776da68f439a95cbfa/wasm/src/skia_imports",
+      "sha256": "7f0e7f9963b991bc134535483c47994a3b832cf6b1c6f3398c1920c2c29a35b1",
+      "desktop": {
+        "resource": "licenses/rive-header-sources.json"
+      }
+    },
+    {
+      "id": "huggingface-tokenizers-Apache",
+      "input": "licenses/vendor/huggingface-tokenizers-Apache.txt",
+      "source": "https://raw.githubusercontent.com/huggingface/tokenizers.js/4ddbf8ea098418e98f13c2ddcaa61dcee16d0580/LICENSE",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "desktop": {
+        "resource": "licenses/vendor/huggingface-tokenizers-Apache.txt"
+      },
+      "covers": ["@huggingface/tokenizers"]
+    },
+    {
+      "id": "electron-updater",
+      "input": "apps/desktop/node_modules/electron-updater/LICENSE",
+      "source": {
+        "package": "electron-updater",
+        "version": "6.8.9",
+        "path": "LICENSE"
+      },
+      "sha256": "bed8d0ab3e6031817f775a641ff37313b0f5591bc8ba0ed79b978dafbd4231ce",
+      "desktop": {
+        "asar": "node_modules/electron-updater/LICENSE"
+      }
+    },
+    {
+      "id": "lazy-val-declaration",
+      "input": "licenses/vendor/lazy-val-1.0.5.package.json",
+      "source": {
+        "package": "lazy-val",
+        "version": "1.0.5",
+        "path": "package.json",
+        "gitHead": "b69ad4119f1b19bdab13c61ee2fcc88d46b89071",
+        "url": "https://github.com/develar/lazy-val/tree/b69ad4119f1b19bdab13c61ee2fcc88d46b89071",
+        "note": "Original published metadata only, not a substitute for the missing upstream copyright/license notice."
+      },
+      "sha256": "a5096f95098452cf6fe5c8ac9be8f13f59ab7c9f605ba5ef92c91b2c505744f0",
+      "desktop": {
+        "resource": "licenses/vendor/lazy-val-1.0.5.package.json"
+      }
+    },
+    {
+      "id": "devicon-MIT",
+      "input": "licenses/vendor/devicon-MIT.txt",
+      "source": "https://raw.githubusercontent.com/devicons/devicon/54cfe13ac10eaa1ef817a343ab0a9437eb3c2e08/LICENSE",
+      "sha256": "121194741d4a915b9f5890fdd6dd95121f9b1f816517c792358d72d7c838d664",
+      "desktop": {
+        "resource": "licenses/vendor/devicon-MIT.txt"
+      }
+    }
+  ],
+  "unresolved": [
+    {
+      "packages": ["@anush008/tokenizers-darwin-universal", "@anush008/tokenizers-linux-x64-gnu", "@anush008/tokenizers-win32-x64-msvc"],
+      "reason": "The wrapper MIT notice and partial notices for 34 crates evidenced in the Darwin 0.0.0 binary are preserved. A complete compiled dependency inventory, including C libraries and Rust standard-library contributions, remains unverified. Linux and Windows binaries need separate inventories."
+    }
+  ],
+  "noticeExceptions": [
+    {
+      "name": "lazy-val",
+      "version": "1.0.5",
+      "evidence": "lazy-val-declaration",
+      "reason": "The published metadata declares MIT and names Vladimir Krivosheev as author. The package and its npm source commit omit copyright/license text. Retain this dependency with its original metadata and disclose the omission; this exception does not supply the missing upstream notice or establish licensing clearance. Review again when upgrading."
+    }
+  ]
+}

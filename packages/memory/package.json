@@ -1,0 +1,26 @@
+{
+  "name": "@openorc/memory",
+  "version": "0.0.0",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "description": "Memory: local embeddings, background extraction, hybrid retrieval, and the per-project brief.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./embedder-host": "./src/embedder-host.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@openorc/db": "workspace:*",
+    "@openorc/protocol": "workspace:*",
+    "fastembed": "2.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0",
+    "vitest": "^4.1.11"
+  }
+}

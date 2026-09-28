@@ -1,0 +1,67 @@
+---
+/** Glyphs copied from the desktop app's icon set (apps/desktop/src/renderer/src/components/icons.tsx). */
+const icons = {
+  panelLeft: '<rect x="3.5" y="3.5" width="17" height="17" rx="2.5"/><path d="M9 3.5v17"/>',
+  panelRight: '<rect x="3.5" y="3.5" width="17" height="17" rx="2.5"/><path d="M15 3.5v17"/>',
+  search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.3 15.3 5.2 5.2"/>',
+  arrowLeft: '<path d="M20 12H4m6-6-6 6 6 6"/>',
+  arrowRight: '<path d="M4 12h16m-6-6 6 6-6 6"/>',
+  arrowUp: '<path d="M12 20V4m-6 6 6-6 6 6"/>',
+  compose: '<path d="M11 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5 M10 11l8-8 3 3-8 8-4 1Z M16 5l3 3"/>',
+  inbox: '<path d="m3 12 4-8h10l4 8v7a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 19Z M3 12h5l2 3h4l2-3h5"/>',
+  tasks: '<path d="M14 3.5H6a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-9Z M7 9l1 1 2-2 M13 9h3 M7 14h2 M13 14h3 M7 17h2 M13 17h3"/>',
+  scheduled: '<path d="M9 20H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2v3 M7 2v4 M16 2v4 M3 9h17"/><circle cx="16" cy="16" r="5.5"/><path d="M16 13v3h2.5"/>',
+  orchestration: '<circle cx="12" cy="5.5" r="3"/><circle cx="4.5" cy="18" r="3"/><circle cx="19.5" cy="18" r="3"/><path d="M8.5 7.5a9 9 0 0 0-4 7 M15.5 7.5a9 9 0 0 1 4 7 M8 19.5h8"/>',
+  memory: '<path d="m12 3 9 5-9 5-9-5Z M3 12l9 5 9-5 M3 16l9 5 9-5"/>',
+  settings: '<path d="m9 3-.5 3-2 1-3-.5-1.5 3 2.5 2v2L2 15l1.5 3 3-.5 2 1 .5 3h6l.5-3 2-1 3 .5 1.5-3-2.5-2.5v-2l2.5-2-1.5-3-3 .5-2-1L15 3Z"/><circle cx="12" cy="12" r="3"/>',
+  filter: '<path d="M3.5 6h17 M7 12h10 M10 18h4"/>',
+  plus: '<path d="M12 5v14 M5 12h14"/>',
+  globe: '<circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/>',
+  folder: '<path d="M3 8V5.5a2 2 0 0 1 2-2h4.5L13 7h6a2 2 0 0 1 2 2v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8h7l2-2"/>',
+  chevronDown: '<path d="m6 9 6 6 6-6"/>',
+  chevronRight: '<path d="m9 6 6 6-6 6"/>',
+  branch: '<circle cx="6.5" cy="5.5" r="2.5"/><circle cx="6.5" cy="18.5" r="2.5"/><circle cx="18" cy="9" r="2.5"/><path d="M6.5 8v8 M6.5 15.5C13 15.5 18 15 18 11.5"/>',
+  loader: '<path d="M12 3.5A8.5 8.5 0 1 1 3.5 12"/>',
+  more: '<circle cx="5" cy="12" r=".8"/><circle cx="12" cy="12" r=".8"/><circle cx="19" cy="12" r=".8"/>',
+  close: '<path d="m6 6 12 12 M18 6 6 18"/>',
+  message: '<path d="M20.5 11.5a8.5 8.5 0 0 1-12.4 7.6L3 20.5l1.4-5.1a8.5 8.5 0 1 1 16.1-3.9Z"/>',
+  edit: '<path d="m14.7 4.8 1.5-1.5a2.1 2.1 0 0 1 3 0l1.5 1.5a2.1 2.1 0 0 1 0 3L9.2 19.3 3.5 21l1.7-5.7L14.7 4.8Zm0 0 4.5 4.5"/>',
+  read: '<path d="M12 6.5C9.4 4.7 6.7 4 3.5 4.5v14c3.2-.5 5.9.2 8.5 2 2.6-1.8 5.3-2.5 8.5-2v-14c-3.2-.5-5.9.2-8.5 2Zm0 0v14"/>',
+  live: '<path d="M12 3.5a8.5 8.5 0 0 1 8.5 8.5M12 20.5A8.5 8.5 0 0 1 3.5 12"/>',
+  pencil: '<path d="m5 15 11-11a1.4 1.4 0 0 1 2 0l2 2a1.4 1.4 0 0 1 0 2L9 19l-5 1Z M14 6l4 4"/>',
+  undo: '<path d="M3 10a9 9 0 1 1 1 7 M3 4v6h6"/>',
+  stop: '<rect x="3.5" y="3.5" width="17" height="17" rx="2.5"/>',
+  circleReview: '<circle cx="12" cy="12" r="8.5"/><path d="M8.5 10h7 M8.5 14h5"/>',
+  check: '<path d="m5 12 4.5 4.5L19 7"/>',
+  arrowUpRight: '<path d="M6 18 18 6 M7 6h11v11"/>',
+  signalHigh: '<path d="M5 20v-3 M10 20v-7 M15 20V9"/>',
+  image: '<rect x="3.5" y="3.5" width="17" height="17" rx="2.5"/><circle cx="8" cy="8" r="1.5"/><path d="m3.5 17 5-5 4 4 3-3 5 5"/>',
+  pause: '<path d="M8 5v14 M16 5v14"/>',
+  play: '<path d="M7 4.5 20 12 7 19.5Z"/>',
+  zap: '<path d="m14 2-11 12h8l-1 8 11-12h-8Z"/>',
+  trash: '<path d="M3.5 6.5h17 M9 6.5v-3h6v3 M5.5 6.5l1 13a1.5 1.5 0 0 0 1.5 1h8a1.5 1.5 0 0 0 1.5-1l1-13 M10 10v7 M14 10v7"/>',
+  download: '<path d="M4 15v4a1.5 1.5 0 0 0 1.5 1.5h13A1.5 1.5 0 0 0 20 19v-4 M12 3.5v12m-5-5 5 5 5-5"/>',
+  upload: '<path d="M4 15v4a1.5 1.5 0 0 0 1.5 1.5h13A1.5 1.5 0 0 0 20 19v-4 M12 15V3.5m-5 5 5-5 5 5"/>',
+  commit: '<circle cx="12" cy="12" r="4"/><path d="M3 12h5 M16 12h5"/>',
+  pullRequest: '<circle cx="6" cy="5.5" r="2.5"/><circle cx="6" cy="18.5" r="2.5"/><circle cx="18" cy="18.5" r="2.5"/><path d="M6 8v8 M18 16V9a3 3 0 0 0-3-3h-2 M16 3l-3 3 3 3"/>',
+  send: '<path d="m3 4 18 8-18 8 3-8Z M6 12h15"/>',
+  refresh: '<path d="M3.5 10A8.5 8.5 0 0 1 18 6l2.5 3 M20.5 3v6h-6 M20.5 14A8.5 8.5 0 0 1 6 18l-2.5-3 M3.5 21v-6h6"/>',
+  circleDashed: '<circle cx="12" cy="12" r="8.5" stroke-dasharray="3.3 3.38"/>',
+  circleHalf: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17Z" fill="currentColor" stroke="none"/>',
+  command: '<rect x="3" y="4.5" width="18" height="15" rx="3"/><path d="m7 9 3 3-3 3m6 0h4"/>',
+  signalLow: '<path d="M5 20v-3"/>',
+  signalMedium: '<path d="M5 20v-3 M10 20v-7"/>',
+  messageSquare: '<path d="M5.5 4h13A2.5 2.5 0 0 1 21 6.5v10a2.5 2.5 0 0 1-2.5 2.5H9l-6 3V6.5A2.5 2.5 0 0 1 5.5 4Z"/>',
+  delegate: '<g fill="currentColor" stroke="none"><path d="M5 2h9a3 3 0 0 1 3 3v.5H9A3.5 3.5 0 0 0 5.5 9v8H5a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3Z"/><path fill-rule="evenodd" d="M10 7.5h9a3 3 0 0 1 3 3v9a3 3 0 0 1-3 3h-9a3 3 0 0 1-3-3v-9a3 3 0 0 1 3-3Zm2 3v2h3.1L11 16.6l1.4 1.4 4.1-4.1V17h2v-6.5Z"/></g>',
+  copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M15 4H6a2 2 0 0 0-2 2v9"/>',
+  maximize: '<path d="M14 4h6v6 M20 4l-6 6 M10 20H4v-6 M4 20l6-6"/>',
+};
+
+interface Props extends Record<string, unknown> {
+  name: keyof typeof icons;
+  class?: string;
+}
+const { name, class: className, ...rest } = Astro.props;
+---
+
+<svg class:list={["hs-icon", className]} {...rest} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={icons[name]} />

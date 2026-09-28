@@ -1,0 +1,24 @@
+.project-stack-logo {
+  display: inline-block;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+/* Preserve upstream colors. These two dark-colored marks need a light ground. */
+.project-stack-logo[data-project-stack="astro"],
+.project-stack-logo[data-project-stack="django"] {
+  background: #fff;
+  border-radius: 2px;
+}
+
+/* Upstream Express and Rust marks are black; invert only these monochrome assets. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .project-stack-logo[data-project-stack="express"],
+  :root:not([data-theme="light"]) .project-stack-logo[data-project-stack="rust"] {
+    filter: invert(1);
+  }
+}
+:root[data-theme="dark"] .project-stack-logo[data-project-stack="express"],
+:root[data-theme="dark"] .project-stack-logo[data-project-stack="rust"] {
+  filter: invert(1);
+}

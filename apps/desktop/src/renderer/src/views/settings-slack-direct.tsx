@@ -6,9 +6,9 @@ import {
   ExecutionMode,
   executionMode,
   executionModeAvailable,
+  executionModeNote,
   executionModeSettings,
   executionModePresentation,
-  executionModeUnavailable,
   type SlackDirectConfig,
 } from "@openorc/protocol";
 import { Badge, Button, Input, Select } from "../components/ui";
@@ -188,10 +188,7 @@ export function DirectSlackSettings({ active }: { active: boolean }) {
               </option>
             ))}
           </Select>
-          <p className="mt-2 text-xs text-ink-3">
-            {executionModeUnavailable(config.agent, executionMode(config.mode ?? "act", config.permissionMode)) ??
-              executionModePresentation(config.agent, executionMode(config.mode ?? "act", config.permissionMode)).hint}
-          </p>
+          <p className="mt-2 text-xs text-ink-3">{executionModeNote(config.agent, executionMode(config.mode ?? "act", config.permissionMode))}</p>
         </Field>
         <div className="flex flex-wrap justify-end gap-2 mt-4">
           {(direct?.enabled || direct?.busy) && (

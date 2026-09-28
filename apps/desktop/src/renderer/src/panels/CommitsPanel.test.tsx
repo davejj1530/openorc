@@ -1,7 +1,7 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { Commit, PushState, RpcMethod, RpcParams, RpcResults, ThreadSummary } from "@openorc/protocol";
+import type { Commit, Project, PushState, RpcMethod, RpcParams, RpcResults, ThreadSummary } from "@openorc/protocol";
 import { CommitsPanel } from "./CommitsPanel";
 import { core } from "../lib/rpc";
 import { invalidateTags, queryClient } from "../lib/query";
@@ -43,6 +43,16 @@ const thread: ThreadSummary = {
   taskCount: 0,
   openTaskCount: 0,
 };
+const project: Project = {
+  id: "project",
+  name: "Site",
+  rootPath: "/tmp/site",
+  gitRemote: "git@github.com:openorc/site.git",
+  defaultBranch: "main",
+  settings: { setupScript: null, worktreeInclude: [], branchPrefix: "openorc", detectedConfigs: [] },
+  createdAt: 0,
+  updatedAt: 0,
+};
 const commits: Commit[] = [
   { sha: "b".repeat(40), author: "David C", at: 2, subject: "perf: site overall improvements" },
   { sha: "a".repeat(40), author: "David C", at: 1, subject: "fix: site ui bugs" },
@@ -65,6 +75,8 @@ beforeEach(() => {
       state = { ...state, published: true, unpushedCount: 0, unpushed: [] };
       return { remote: "origin", branch: "site-refresh" } as RpcResults[M];
     }
+    if (method === "system.info") return { gh: { installed: true, path: "/usr/bin/gh" } } as unknown as RpcResults[M];
+    if (method === "review.createThreadPr") return { url: "https://github.com/openorc/site/pull/7" } as RpcResults[M];
     if (method === "orchestration.runtime") {
       const action = { allowed: !teamReason, reason: teamReason };
       return { actions: { commit: action, push: action, createPr: action } } as RpcResults[M];
@@ -81,7 +93,7 @@ afterEach(() => {
 const mount = (source: ThreadSummary = thread) =>
   render(
     <QueryClientProvider client={queryClient}>
-      <CommitsPanel source={{ kind: "thread", thread: source }} />
+      <CommitsPanel source={{ kind: "thread", thread: source, project }} />
     </QueryClientProvider>,
   );
 const row = (subject: string) => screen.getByText(subject).closest(".grid") as HTMLElement;
@@ -95,7 +107,7 @@ it("marks the commits origin lacks and pushes them once everything is committed"
   fireEvent.click(button);
   expect(await screen.findByRole("status")).toHaveProperty("textContent", "Pushed site-refresh to origin");
   expect(vi.mocked(core.call)).toHaveBeenCalledWith("review.pushThread", { threadId: thread.id });
-  expect(((await screen.findByRole("button", { name: "Push" })) as HTMLButtonElement).disabled).toBe(true);
+  await waitFor(() => expect(screen.queryByRole("button", { name: /^Push/ })).toBeNull());
   expect(screen.queryByText("Not pushed")).toBeNull();
 
   // The next commit makes the success stale.
@@ -116,7 +128,7 @@ it("says why it can't push", async () => {
   state = { branch: "site-refresh", blocked: "This repository has no origin remote to push to.", published: false, unpushedCount: 0, unpushed: [] };
   mount();
   expect(await screen.findByText("This repository has no origin remote to push to.")).toBeTruthy();
-  expect((screen.getByRole("button", { name: "Push" }) as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.queryByRole("button", { name: /^Push|^Publish/ })).toBeNull();
 });
 
 it("waits for the team's go-ahead before pushing its workspace", async () => {
@@ -132,4 +144,24 @@ it("shows a rejected push and keeps the commits marked", async () => {
   fireEvent.click(await screen.findByRole("button", { name: "Push 1 commit" }));
   expect((await screen.findByRole("alert")).textContent).toBe("origin has newer commits on site-refresh. Pull them in first, then push again.");
   expect(screen.getByText("Not pushed")).toBeTruthy();
+});
+
+it("offers the pull request once the branch is on origin", async () => {
+  mount();
+  fireEvent.click(await screen.findByRole("button", { name: "Push 1 commit" }));
+  expect(screen.queryByRole("button", { name: "PR" })).toBeNull();
+
+  fireEvent.click(await screen.findByRole("button", { name: "PR" }));
+  const dialog = await screen.findByRole("dialog", { name: "Open a pull request" });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Open PR" }));
+  expect(await screen.findByText("Opened https://github.com/openorc/site/pull/7")).toBeTruthy();
+  expect(vi.mocked(core.call)).toHaveBeenCalledWith("review.createThreadPr", { threadId: thread.id, title: "Site", body: "" });
+});
+
+it("never offers a pull request from the default branch", async () => {
+  state = { branch: "main", blocked: null, published: true, unpushedCount: 0, unpushed: [] };
+  mount();
+  await waitFor(() => expect(queryClient.getQueryData(["git.threadPushState", { threadId: thread.id }])).toEqual(state));
+  expect(screen.queryByRole("button", { name: "PR" })).toBeNull();
+  expect(screen.queryByRole("button", { name: /^Push/ })).toBeNull();
 });

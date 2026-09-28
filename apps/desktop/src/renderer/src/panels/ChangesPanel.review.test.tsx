@@ -165,3 +165,13 @@ it("keeps a team conversation's changes read-only", async () => {
   expect(viewer.props!.onRequestComment).toBeUndefined();
   expect(core.call).not.toHaveBeenCalledWith("review.comments.list", expect.anything());
 });
+
+it("offers only Commit for uncommitted work, plus the pull request once one exists", async () => {
+  const { unmount } = mount({ thread });
+  expect(await screen.findByRole("button", { name: "Commit" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Push" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "PR" })).toBeNull();
+  unmount();
+  mount({ thread: { ...thread, prUrl: "https://github.com/openorc/site/pull/7", prState: "open" } });
+  expect(await screen.findByRole("button", { name: "open" })).toBeTruthy();
+});

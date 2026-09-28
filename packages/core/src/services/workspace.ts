@@ -8,6 +8,7 @@ import { diskUsage, emptyTree, fetch, git, repoInfo, revParse, worktree } from "
 import { WORKSPACE_ID, type BranchLoss, type Project, type RemovalImpact, type Task, type Thread } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
 import { assertCanBranch, projectGit } from "./project-git.js";
+import { inUnvettedCopy } from "./review-copies.js";
 import { assertSafeParentPath } from "./safe-parent-path.js";
 import { workspaceWriters, type WorkspaceLease, type WorkspaceWriters } from "./workspace-writers.js";
 
@@ -248,6 +249,9 @@ export class WorkspaceService {
       this.assertOpen();
       return thread;
     }
+    // Only reviewing again rebuilds a pull request's copy, on no branch. An ordinary worktree here would take a branch
+    // that keeps the pull request's code out of isolation once the next round checks it out.
+    if (inUnvettedCopy(this.db, thread)) throw new Error("This review's copy of the pull request is gone. Review it again from the Pull requests tab.");
     return this.writers.withLease(
       this.threadPath(thread, project),
       `preparing thread ${thread.id}`,

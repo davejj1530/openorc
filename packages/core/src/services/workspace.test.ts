@@ -341,4 +341,11 @@ describe("thread workspace preparation", () => {
     await git(root, ["checkout", "-q", "--detach"]);
     expect((await service.prepareThread(thread(), project, "HEAD")).baseBranch).toBeNull();
   });
+
+  it("won't rebuild a pull request's missing copy as an ordinary worktree on a branch", async () => {
+    const review = threads.insert(db, { projectId: project.id, title: "Review #7", agent: "codex", model: "fixture", mode: "plan", permissionMode: "review", workspaceMode: "worktree" });
+    const gone = threads.update(db, review.id, { worktreePath: path.join(directory, "pr-7-copy"), baseSha: "a".repeat(40) });
+    await expect(service.prepareThread(gone, project)).rejects.toThrow("This review's copy of the pull request is gone. Review it again from the Pull requests tab.");
+    expect(threads.get(db, review.id)).toMatchObject({ branch: null });
+  });
 });

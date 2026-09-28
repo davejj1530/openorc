@@ -66,16 +66,16 @@ export function publishedReleases(input: unknown): ChangelogRelease[] {
     .sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
 }
 
-export async function loadPublishedReleases(fetcher: typeof fetch = fetch): Promise<ChangelogRelease[]> {
+export async function loadPublishedReleases(fetcher: typeof fetch = fetch, token?: string): Promise<ChangelogRelease[]> {
   const releases: unknown[] = [];
   let nextUrl: string | null = releasesUrl;
   while (nextUrl) {
     const response: Response = await fetcher(nextUrl, {
-      headers: { Accept: "application/vnd.github+json", "User-Agent": "openorc-website" },
+      headers: { Accept: "application/vnd.github+json", "User-Agent": "openorc-website", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       signal: AbortSignal.timeout(10_000),
     });
     // The repository is private before launch. Anonymous visitors cannot see its releases.
-    if (response.status === 404 && releases.length === 0) return [];
+    if (response.status === 404 && !token && releases.length === 0) return [];
     if (!response.ok) throw new Error(`GitHub releases request failed: ${response.status} ${response.statusText}`);
     const page: unknown = await response.json();
     if (!Array.isArray(page)) throw new Error("GitHub returned an invalid releases list.");
@@ -93,5 +93,5 @@ let cachedReleases: Promise<ChangelogRelease[]> | undefined;
 export function getPublishedReleases(): Promise<ChangelogRelease[]> {
   // Development renders pages on demand; only the static build needs live releases.
   if (import.meta.env.DEV) return Promise.resolve([]);
-  return (cachedReleases ??= loadPublishedReleases());
+  return (cachedReleases ??= loadPublishedReleases(fetch, process.env.GITHUB_TOKEN));
 }

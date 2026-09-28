@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -50,12 +50,13 @@ void test("treats an anonymous 404 as no public releases", async () => {
 
 void test("reads all release pages before sorting the changelog", async () => {
   const calls: string[] = [];
-  const entries = await loadPublishedReleases(async (input) => {
+  const entries = await loadPublishedReleases(async (input, init) => {
+    assert.equal(new Headers(init?.headers).get("Authorization"), "Bearer test-pagination-token");
     calls.push(String(input));
     return calls.length === 1
       ? Response.json([release()], { headers: { link: '<https://api.github.com/repos/davejj1530/openorc/releases?per_page=100&page=2>; rel="next"' } })
       : Response.json([release({ tag_name: "v0.2.0", html_url: "https://github.com/davejj1530/openorc/releases/tag/v0.2.0", published_at: "2026-09-26T10:00:00Z" })]);
-  });
+  }, "test-pagination-token");
   assert.equal(calls.length, 2);
   assert.deepEqual(
     entries.map((entry) => entry.tag),
@@ -69,6 +70,51 @@ void test("fails the build when GitHub returns an unexpected response", async ()
     /GitHub releases request failed: 503/,
   );
   assert.throws(() => publishedReleases({ message: "not a list" }), /invalid releases list/);
+});
+
+void test("does not hide an authenticated access failure as an empty changelog", async () => {
+  await assert.rejects(
+    loadPublishedReleases(async () => new Response(null, { status: 404 }), "test-token"),
+    /GitHub releases request failed: 404/,
+  );
+});
+
+void test("the static build authenticates release requests without publishing its token or drafts", { timeout: 30_000 }, async (t) => {
+  const { build } = await import("astro");
+  const directory = await mkdtemp(join(tmpdir(), "openorc-website-build-test-"));
+  const outDir = join(directory, "dist");
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const token = "test-build-only-github-token";
+  const previousToken = process.env.GITHUB_TOKEN;
+  const previousNodeEnv = process.env.NODE_ENV;
+  process.env.GITHUB_TOKEN = token;
+  process.env.NODE_ENV = "production";
+  t.after(() => {
+    if (previousToken === undefined) delete process.env.GITHUB_TOKEN;
+    else process.env.GITHUB_TOKEN = previousToken;
+    if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previousNodeEnv;
+  });
+  const fetchPage = globalThis.fetch;
+  let releaseRequests = 0;
+  t.mock.method(globalThis, "fetch", (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+    const url = input instanceof Request ? input.url : String(input);
+    if (!url.startsWith("https://api.github.com/")) return fetchPage(input, init);
+    releaseRequests++;
+    if (new Headers(init?.headers).get("Authorization") !== `Bearer ${token}`) return Promise.resolve(new Response(null, { status: 403, statusText: "rate limit exceeded" }));
+    return Promise.resolve(Response.json([release(), release({ draft: true, body: "## Highlights\n- Unpublished draft detail" })]));
+  });
+
+  await build({ root: fileURLToPath(new URL("../../", import.meta.url)), outDir, cacheDir: join(directory, "cache"), logLevel: "silent" });
+  assert.ok(releaseRequests > 0);
+  const html = await readFile(join(outDir, "changelog/index.html"), "utf8");
+  assert.match(html, /First public release/);
+  assert.doesNotMatch(html, /Unpublished draft detail/);
+  for (const entry of await readdir(outDir, { recursive: true, withFileTypes: true })) {
+    if (!entry.isFile() || !/\.(?:html|css|js|mjs|json|map)$/.test(entry.name)) continue;
+    const contents = await readFile(join(entry.parentPath, entry.name), "utf8");
+    assert.equal(contents.includes(token), false, `${entry.name} must not contain the build token`);
+  }
 });
 
 void test("development pages render without requesting GitHub releases", { timeout: 30_000 }, async (t) => {

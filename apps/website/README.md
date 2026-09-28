@@ -15,7 +15,9 @@ The development server defaults to `http://localhost:4321`. Production output is
 
 ## Changelog
 
-`/changelog/` is generated at build time from published GitHub Releases. It shows the first five bullets under a release body's `## Highlights` or `## What's new` heading, then links to the full release notes. Drafts never appear. Public beta releases carry a Beta label; the header and footer link to the changelog once a public release exists. The build reads releases from the public GitHub API without a token. Until a release is published, the page shows a launch message.
+`/changelog/` is generated at build time from published GitHub Releases. It shows the first five bullets under a release body's `## Highlights` or `## What's new` heading, then links to the full release notes. Drafts never appear. Public beta releases carry a Beta label; the header and footer link to the changelog once a public release exists. Until a release is published, the page shows a launch message.
+
+Builds use `GITHUB_TOKEN` when supplied to avoid GitHub's shared-IP anonymous rate limit. GitHub Actions passes its built-in read-only token to the build steps; no repository secret is needed. Other build hosts can provide a token with read access to the public repository's releases. The token is used only by the build process and is not included in the static site. Without it, builds use the anonymous API and may hit its rate limit. Unexpected API errors still fail the build.
 
 The development server does not request GitHub releases. It uses the empty changelog state and hides the changelog navigation links, so ordinary page loads and hot reloads work without GitHub access. Run a production build and preview it to check the published release notes. Visitors to the built static site never make a GitHub releases API request.
 

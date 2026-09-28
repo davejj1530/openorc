@@ -107,6 +107,29 @@ it("imports a plain folder and a repository without commits as they are", async 
   ).toEqual(["fresh", "plain", "repo"]);
 });
 
+it("fills in the remote and default branch once a folder added without git gains them", async () => {
+  const folder = path.join(dir, "later");
+  await mkdir(folder);
+  const project = await service.import(folder);
+  const invalidate = vi.fn();
+  const handlers = createProjectsHandlers({ db, projectService: service, invalidate, transport: { push() {} } });
+  expect(await handlers["projects.git"]({ id: project.id })).toBe("none");
+  await git(folder, ["init", "-q", "-b", "trunk"]);
+  await git(folder, ["config", "user.email", "test@example.com"]);
+  await git(folder, ["config", "user.name", "Test"]);
+  await writeFile(path.join(folder, "plan.md"), "# Plan\n");
+  await commitAll(folder, "init");
+  await git(folder, ["remote", "add", "origin", "https://github.com/example/later.git"]);
+  expect(invalidate).not.toHaveBeenCalled();
+  expect(await handlers["projects.git"]({ id: project.id })).toBe("ready");
+  expect(invalidate).toHaveBeenCalledWith(["projects", `project:${project.id}`]);
+  expect(service.get(project.id)).toMatchObject({ gitRemote: "https://github.com/example/later.git", defaultBranch: "trunk", updatedAt: project.updatedAt });
+  // Known values stay put, even when git would now guess another branch.
+  await git(folder, ["checkout", "-q", "-b", "other"]);
+  expect(await service.git(project.id)).toEqual({ state: "ready", changed: false });
+  expect(service.get(project.id)?.defaultBranch).toBe("trunk");
+});
+
 it("rejects Workspace and unknown IDs without changing the visible list", async () => {
   const project = await service.import(root);
   expect(() => service.remove(WORKSPACE_ID)).toThrow("Workspace cannot be removed");

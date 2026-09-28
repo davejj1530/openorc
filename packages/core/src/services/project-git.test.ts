@@ -3,11 +3,12 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { projects } from "@openorc/db";
-import { git } from "@openorc/git";
+import { emptyTree, git } from "@openorc/git";
 import type { RunSpec } from "@openorc/protocol";
 import { CodexAdapter, RunHandle } from "@openorc/agents";
 import { OpenOrc } from "../openorc.js";
 import { projectGit } from "./project-git.js";
+import { threadTurnChanges } from "./thread-turn-changes.js";
 import { directory } from "./workspace-home.js";
 
 const dirs: string[] = [];
@@ -102,13 +103,17 @@ it("tracks a repository's changes before its first commit, and branches once it 
   await mkdir(folder);
   await repository(folder);
   await writeFile(join(folder, "plan.md"), "# Plan\n");
-  const { core, logs, turn } = await harness(root);
+  const { core, logs, input, turn } = await harness(root);
   try {
     const project = await core.projects.import(folder);
     expect(await projectGit(project)).toBe("no_commits");
     const thread = await turn(project.id);
-    expect(thread).toMatchObject({ baseSha: null, branch: "main" });
-    expect(core.threads.checkpoints(thread.id)).toHaveLength(1);
+    const empty = await emptyTree(folder);
+    expect(thread).toMatchObject({ baseSha: empty, branch: "main" });
+    const [first] = core.threads.checkpoints(thread.id);
+    const firstTurn = { threadId: thread.id, checkpointId: first!.id };
+    const planAdded = { files: [{ path: "plan.md", added: 1, removed: 0 }], patch: null };
+    expect(await threadTurnChanges(core.db, firstTurn)).toEqual(planAdded);
     expect((await core.review.threadDiff(thread, project)).files).toEqual([{ path: "plan.md", status: "untracked", oldPath: null }]);
     expect(await core.review.threadLog(thread, project)).toEqual([]);
     expect(await core.review.threadPushState(thread, project)).toMatchObject({ blocked: "Make a first commit before pushing." });
@@ -117,6 +122,12 @@ it("tracks a repository's changes before its first commit, and branches once it 
     const { sha } = await core.review.commitThread(thread, project, "Add the plan");
     expect(await projectGit(project)).toBe("ready");
     expect(await core.review.threadLog(thread, project)).toMatchObject([{ sha, subject: "Add the plan" }]);
+    // The next turn prepares the thread again. Its starting point, and so its first turn, stay where they were.
+    const next = await core.threads.continueThread(thread.id, { ...input, prompt: "Keep going" });
+    await vi.waitFor(() => expect(core.threads.get(thread.id)?.activity).toBe("idle"));
+    await core.runs.closeAndWait(next.id);
+    expect(core.threads.get(thread.id)?.baseSha).toBe(empty);
+    expect(await threadTurnChanges(core.db, firstTurn)).toEqual(planAdded);
     expect((await core.threads.moveWorkspace(thread.id, "worktree")).worktreePath).toBeTruthy();
     expect(logs).toEqual([]);
   } finally {

@@ -6,6 +6,7 @@ import { appOrigin, isExternalWebUrl, permitted } from "./app-origin";
 import electronUpdater from "electron-updater";
 import type { UpdateSettings } from "../shared/types";
 import { AppUpdates } from "./app-updates";
+import { configureReleaseFeed } from "./release-feed";
 import { UpdatePreferences } from "./update-preferences";
 import { installUpdateMenu } from "./update-menu";
 import { closeCoreForUpdate } from "./update-handoff";
@@ -197,7 +198,7 @@ app.whenReady().then(async () => {
   protocol.handle("openorc-asset", (request) => imageAssetResponse(request, app.getPath("userData")));
   core = startCore();
   installProjectIcons(isAppOrigin, app.getPath("userData"));
-  const disabledUpdates = updateUnavailableReason();
+  const disabledUpdates = updateUnavailableReason() ?? configureReleaseFeed(electronUpdater.autoUpdater, join(process.resourcesPath, "app-update.yml"));
   const updates = new AppUpdates(electronUpdater.autoUpdater, disabledUpdates, async () => {
     if (!preparePtysForUpdate()) return "Close your running terminal panels before restarting to update.";
     preparingUpdate = true;

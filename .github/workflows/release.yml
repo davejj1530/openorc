@@ -254,7 +254,7 @@ jobs:
           lines.push(process.env.UNSIGNED_WINDOWS_BETA === 'true'
             ? 'Windows x64: unsigned beta. Windows may warn about the unrecognized app; some security policies may prevent installation. Download only from the official release.'
             : 'Windows x64: signed NSIS installer.');
-          lines.push('', 'Beta releases are installed manually; the in-app updater offers stable releases only.', '', 'SHA256SUMS.txt covers the attached installers, ZIPs, blockmaps, and update metadata.');
+          lines.push('', 'Use Check for updates in OpenOrc for newer stable and beta releases. Downloading and restarting to install require your confirmation. Versions through 0.1.0-beta.4 need a one-time manual install to receive beta updates.', '', 'SHA256SUMS.txt covers the attached installers, ZIPs, blockmaps, and update metadata.');
           fs.writeFileSync('release-notes.md', lines.join('\n') + '\n');
           NODE
           args=(--draft --verify-tag --title "OpenOrc $RELEASE_TAG" --notes-file release-notes.md)

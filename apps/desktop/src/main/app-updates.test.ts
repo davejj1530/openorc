@@ -7,7 +7,7 @@ class FakeUpdater extends EventEmitter {
   requestHeaders: Record<string, string> | null = { "user-agent": "fixture" };
   autoDownload = true;
   autoInstallOnAppQuit = true;
-  allowPrerelease = true;
+  allowPrerelease = false;
   allowDowngrade = true;
   checkForUpdates = vi.fn<AppUpdater["checkForUpdates"]>();
   downloadUpdate = vi.fn<AppUpdater["downloadUpdate"]>().mockResolvedValue(["download.zip"]);
@@ -46,7 +46,7 @@ describe("desktop update policy", () => {
   it("checks quietly on a schedule without downloading or installing", async () => {
     vi.useFakeTimers();
     const { updater, updates } = fixture();
-    expect(updater).toMatchObject({ autoDownload: false, autoInstallOnAppQuit: false, allowPrerelease: false, allowDowngrade: false });
+    expect(updater).toMatchObject({ autoDownload: false, autoInstallOnAppQuit: false, allowPrerelease: true, allowDowngrade: false });
     updater.checkForUpdates.mockResolvedValue({ ...available, isUpdateAvailable: false });
     updates.setAutomaticChecks(true);
     updates.setAutomaticChecks(true);
@@ -115,26 +115,22 @@ describe("desktop update policy", () => {
     expect(updater.quitAndInstall).toHaveBeenCalledExactlyOnceWith(false, true);
   });
 
-  it("treats a feed with no stable release as up to date, but still reports a failed connection", async () => {
+  it("treats an empty release feed as current without hiding network or metadata failures", async () => {
     const failure = (message: string, code: string) => Object.assign(new Error(message), { code });
     const { updater, updates } = fixture();
-    updater.checkForUpdates.mockRejectedValueOnce(
-      failure(
-        "Unable to find latest version on GitHub (https://github.com/o/r/releases/latest), please ensure a production release exists: HttpError: 404 Not Found",
-        "ERR_UPDATER_LATEST_VERSION_NOT_FOUND",
-      ),
-    );
-    await updates.check();
-    expect(updates.state).toEqual({ phase: "current" });
-
     updater.checkForUpdates.mockRejectedValueOnce(failure("No published versions on GitHub", "ERR_UPDATER_NO_PUBLISHED_VERSIONS"));
     await updates.check();
     expect(updates.state).toEqual({ phase: "current" });
 
-    const offline = "Unable to find latest version on GitHub (https://github.com/o/r/releases/latest), please ensure a production release exists: Error: getaddrinfo ENOTFOUND github.com";
-    updater.checkForUpdates.mockRejectedValueOnce(failure(offline, "ERR_UPDATER_LATEST_VERSION_NOT_FOUND"));
-    await updates.check();
-    expect(updates.state).toEqual({ phase: "error", message: offline });
+    for (const [message, code] of [
+      ["HttpError: 404 Not Found", "ERR_UPDATER_LATEST_VERSION_NOT_FOUND"],
+      ["Missing architecture metadata", "ERR_UPDATER_CHANNEL_FILE_NOT_FOUND"],
+      ["getaddrinfo ENOTFOUND github.com", "ERR_UPDATER_INVALID_RELEASE_FEED"],
+    ] as const) {
+      updater.checkForUpdates.mockRejectedValueOnce(failure(message, code));
+      await updates.check();
+      expect(updates.state).toEqual({ phase: "error", message });
+    }
   });
 
   it("retries check and download errors without losing the available version", async () => {

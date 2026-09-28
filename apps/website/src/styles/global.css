@@ -102,7 +102,8 @@ h3 {
   width: min(var(--content-width, 1376px), calc(100% - 64px));
   margin-inline: auto;
 }
-.site-home {
+.site-home,
+.site-wide {
   --content-width: clamp(1376px, 68vw, 1760px);
 }
 .skip-link {

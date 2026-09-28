@@ -5,11 +5,13 @@ interface Props {
   title?: string;
   description?: string;
   noindex?: boolean;
+  wide?: boolean;
 }
 const {
   title = "OpenOrc — Your coding agents, working together",
   description = "Bring Codex, Claude Code, and OpenCode into one desktop workspace. Share context between threads, discuss tasks, and review code where the work happens.",
   noindex = false,
+  wide = false,
 } = Astro.props;
 ---
 
@@ -35,7 +37,7 @@ const {
     <link rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png" />
     <title>{title}</title>
   </head>
-  <body class={Astro.url.pathname === "/" ? "site-home" : undefined}>
+  <body class:list={{ "site-home": Astro.url.pathname === "/", "site-wide": wide }}>
     <a class="skip-link" href="#main">
       Skip to content
     </a>

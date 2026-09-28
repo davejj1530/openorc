@@ -6,9 +6,9 @@ import {
   ExecutionMode,
   executionMode,
   executionModeAvailable,
+  executionModeNote,
   executionModeSettings,
   executionModePresentation,
-  executionModeUnavailable,
   type SlackClientConfig,
 } from "@openorc/protocol";
 import { Badge, Button, Input, Select } from "../components/ui";
@@ -110,10 +110,7 @@ function RelaySlackSettings({ active }: { active: boolean }) {
               </option>
             ))}
           </Select>
-          <p className="mt-2 text-xs text-ink-3">
-            {executionModeUnavailable(config.agent, executionMode(config.mode ?? "act", config.permissionMode)) ??
-              executionModePresentation(config.agent, executionMode(config.mode ?? "act", config.permissionMode)).hint}
-          </p>
+          <p className="mt-2 text-xs text-ink-3">{executionModeNote(config.agent, executionMode(config.mode ?? "act", config.permissionMode))}</p>
         </Field>
         {client?.error && (
           <p className="text-bad mt-3" role="status">

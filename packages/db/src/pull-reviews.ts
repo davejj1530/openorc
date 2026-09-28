@@ -13,6 +13,7 @@ export type DraftCommentInsert = Omit<PullRequestDraftComment, "id" | "createdAt
 export interface PullReviewPatch {
   commitId?: string;
   summary?: string;
+  modelSummary?: string | null;
   threadId?: string | null;
   baseCommit?: string | null;
 }
@@ -22,6 +23,7 @@ interface ReviewRow {
   number: number;
   commit_id: string;
   summary: string;
+  model_summary: string | null;
   thread_id: string | null;
   base_commit: string | null;
   updated_at: number;
@@ -41,7 +43,13 @@ interface CommentRow {
   created_at: number;
 }
 
-const reviewColumns: Record<keyof PullReviewPatch, string> = { commitId: "commit_id", summary: "summary", threadId: "thread_id", baseCommit: "base_commit" };
+const reviewColumns: Record<keyof PullReviewPatch, string> = {
+  commitId: "commit_id",
+  summary: "summary",
+  modelSummary: "model_summary",
+  threadId: "thread_id",
+  baseCommit: "base_commit",
+};
 
 function commentFromRow(row: CommentRow): PullRequestDraftComment {
   return {
@@ -65,6 +73,7 @@ function reviewFromRow(db: Db, row: ReviewRow): PullRequestReview {
     number: row.number,
     commitId: row.commit_id,
     summary: row.summary,
+    modelSummary: row.model_summary,
     threadId: row.thread_id,
     baseCommit: row.base_commit,
     comments: comments.map(commentFromRow),
@@ -143,15 +152,16 @@ export const pullReviews = {
    * Removes what a posted review carried, as the draft stood when it was sent. A comment edited or added while it
    * was posting, and a summary changed since, stay in the draft.
    */
-  clearPosted(db: Db, key: PullReviewKey, sent: Pick<PullRequestReview, "summary" | "comments">): void {
+  clearPosted(db: Db, key: PullReviewKey, sent: Pick<PullRequestReview, "summary" | "modelSummary" | "comments">): void {
     const remove = db.stmt("DELETE FROM pull_request_review_comments WHERE id = ? AND project_id = ? AND number = ? AND body = ?");
     for (const comment of sent.comments) remove.run(comment.id, key.projectId, key.number, comment.body);
     db.stmt("UPDATE pull_request_reviews SET summary = '' WHERE project_id = ? AND number = ? AND summary = ?").run(key.projectId, key.number, sent.summary);
+    db.stmt("UPDATE pull_request_reviews SET model_summary = NULL WHERE project_id = ? AND number = ? AND model_summary IS ?").run(key.projectId, key.number, sent.modelSummary);
     touch(db, key, Date.now());
   },
   /** Empties the draft once it is discarded. The review keeps its conversation for the next round. */
   clearDraft(db: Db, key: PullReviewKey): void {
     db.stmt("DELETE FROM pull_request_review_comments WHERE project_id = ? AND number = ?").run(key.projectId, key.number);
-    db.stmt("UPDATE pull_request_reviews SET summary = '', updated_at = ? WHERE project_id = ? AND number = ?").run(Date.now(), key.projectId, key.number);
+    db.stmt("UPDATE pull_request_reviews SET summary = '', model_summary = NULL, updated_at = ? WHERE project_id = ? AND number = ?").run(Date.now(), key.projectId, key.number);
   },
 };

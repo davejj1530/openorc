@@ -124,3 +124,14 @@ export function pullRequestTarget(options: { started: string | null; projectDefa
   const candidates = [started, projectDefault, branches?.defaultBranch ?? null];
   return candidates.find((branch): branch is string => branch !== null && branch !== head && (!branches || branches.branches.includes(branch))) ?? null;
 }
+
+/** The reviewing model's summary, while the summary being written doesn't include it yet. */
+export function offeredSummary(summary: string, modelSummary: string | null | undefined): string | null {
+  const offered = modelSummary?.trim();
+  return offered && !summary.includes(offered) ? offered : null;
+}
+
+/** The summary with the model's added below it. */
+export function withModelSummary(summary: string, modelSummary: string): string {
+  return summary.trim() ? `${summary.trimEnd()}\n\n${modelSummary}` : modelSummary;
+}

@@ -35,9 +35,11 @@ const thread = {
 const commit: Commit = { sha: "b".repeat(40), author: "David C", at: 1_000, subject: "fix: mentions skip the probability check" };
 let state: PushState;
 let log: Commit[];
+let changed: string[];
 
 beforeEach(() => {
   log = [commit];
+  changed = [];
   state = { branch: "feat/bots", blocked: null, published: true, unpushedCount: 1, unpushed: [commit.sha] };
   queryClient.clear();
   queryClient.setDefaultOptions({ queries: { retry: false, staleTime: Infinity } });
@@ -50,7 +52,8 @@ beforeEach(() => {
       state = { ...state, unpushedCount: 0, unpushed: [] };
       return { remote: "origin", branch: "feat/bots" } as RpcResults[M];
     }
-    if (method === "review.threadDiff" || method === "review.projectDiff") return { baseSha: null, patch: "", files: [], since: null } as RpcResults[M];
+    if (method === "review.threadDiff" || method === "review.projectDiff")
+      return { baseSha: null, patch: "", files: changed.map((path) => ({ path, status: "modified", oldPath: null })), since: null } as RpcResults[M];
     if (method === "system.info") return { gh: { installed: true, path: "/usr/bin/gh" } } as unknown as RpcResults[M];
     return [] as unknown as RpcResults[M];
   });
@@ -90,4 +93,14 @@ it("offers Push in a worktree conversation whose unpushed commits come from befo
   mount({ kind: "thread", thread: { ...thread, workspaceMode: "worktree", worktreePath: "/tmp/site-wt" }, project });
   expect(await screen.findByRole("button", { name: "Push 1 commit" })).toBeTruthy();
   expect(screen.getByText("No commits from this thread yet")).toBeTruthy();
+});
+
+it("offers no Commit, Push or pull request in a pull request's copy under review", async () => {
+  changed = ["README.md"];
+  useLayout.setState({ panelTab: "changes" });
+  mount({ kind: "thread", thread: { ...thread, workspaceMode: "worktree", worktreePath: "/tmp/review-copy", branch: null }, project });
+  expect(await screen.findByText("README.md")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Commit" })).toBeNull();
+  expect(screen.queryByRole("tab", { name: "Commits" })).toBeNull();
+  expect(core.call).not.toHaveBeenCalledWith("git.threadPushState", expect.anything());
 });

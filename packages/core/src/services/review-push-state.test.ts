@@ -1,8 +1,8 @@
-import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { projects, threads } from "@openorc/db";
+import { projects, pullReviews, threads } from "@openorc/db";
 import * as gitTools from "@openorc/git";
 import { commitAll, git } from "@openorc/git";
 import type { CorePush, Project, RpcMethod, RpcParams, RpcResults } from "@openorc/protocol";
@@ -143,4 +143,32 @@ it("pushes the checkout's branch outside any conversation, after committing it f
   await git(root, ["switch", "-q", "--detach"]);
   expect(await call("git.projectPushState", { projectId: project.id })).toMatchObject({ branch: null, blocked: "The checkout isn't on a branch." });
   await expect(call("review.pushProject", { projectId: project.id })).rejects.toThrow("The checkout isn't on a branch.");
+});
+
+it("publishes nothing from a pull request's copy under review, and throws the copy away with its conversation", async () => {
+  await addOrigin();
+  await git(root, ["switch", "-q", "-c", "feat/mine"]);
+  await writeFile(path.join(root, "README.md"), "Mine, not pushed\n");
+  await commitAll(root, "mine");
+  const copy = path.join(folder, "review-copy");
+  await git(root, ["worktree", "add", "-q", "--detach", copy, "HEAD"]);
+  const thread = threads.insert(core.db, { projectId: project.id, title: "Review #7", agent: "codex", model: null, mode: "plan", permissionMode: "review", workspaceMode: "worktree" });
+  threads.update(core.db, thread.id, { worktreePath: copy, baseSha: (await git(copy, ["rev-parse", "HEAD"])).stdout.trim() });
+  pullReviews.open(core.db, { projectId: project.id, number: 7 }, "c".repeat(40));
+  pullReviews.update(core.db, { projectId: project.id, number: 7 }, { threadId: thread.id });
+  await writeFile(path.join(copy, "README.md"), "Edited in the review\n");
+
+  // The checkout's own branch, with a commit origin lacks, is none of this conversation's business.
+  const refusal = "This conversation's copy is on no branch, so nothing in it is committed or pushed.";
+  expect(await call("git.threadPushState", { threadId: thread.id })).toMatchObject({ branch: null, blocked: refusal, unpushedCount: 0 });
+  await expect(call("review.commitThread", { threadId: thread.id, message: "Should not commit" })).rejects.toThrow(refusal);
+  await expect(call("review.pushThread", { threadId: thread.id })).rejects.toThrow(refusal);
+
+  await core.threads.delete(thread.id);
+  expect(
+    await access(copy).then(
+      () => true,
+      () => false,
+    ),
+  ).toBe(false);
 });

@@ -1,4 +1,4 @@
-import { WORKSPACE_ID, reviewCommentPlace, teamReviewComment } from "@openorc/protocol";
+import { WORKSPACE_ID, isDetachedCopy, reviewCommentPlace, teamReviewComment } from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
 import { access, mkdir, realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -102,6 +102,8 @@ function acceptedMessage(selected: ReviewComment[]): string | null {
   return messageId ?? null;
 }
 
+const DETACHED_COPY = "This conversation's copy is on no branch, so nothing in it is committed or pushed.";
+
 /**
  * What Push would publish from `cwd`, judged by what origin was last seen to have: `head`, the branch itself unless
  * given, against the branch `branchOf` names. When no branch can be named, that is why nothing can be pushed.
@@ -195,6 +197,8 @@ export class ReviewService {
 
   async commitThread(thread: Thread, project: Project, message: string): Promise<{ sha: string }> {
     return this.withThreadMutation(thread, project, "committing", async (context) => {
+      // Committing runs the user's hooks, which in a pull request's copy would be its author's.
+      if (!context.team && isDetachedCopy(context.thread)) throw new Error(DETACHED_COPY);
       const publication = context.team && context.thread.workspaceMode === "worktree" ? await this.publicationRef(context) : null;
       context.assertCurrent();
       const sha = await commitAll(context.cwd, message);
@@ -212,8 +216,9 @@ export class ReviewService {
 
   /** The branch a thread publishes: its own for a worktree, whatever the checkout is on otherwise. */
   private async threadBranch(thread: Thread, project: Project): Promise<string> {
-    if (thread.branch && thread.worktreePath) return thread.branch;
-    return this.checkoutBranch(project);
+    if (!thread.worktreePath) return this.checkoutBranch(project);
+    if (isDetachedCopy(thread)) throw new Error(DETACHED_COPY);
+    return thread.branch!;
   }
 
   /** The branch the project's checkout is on, once it has a commit to push. */

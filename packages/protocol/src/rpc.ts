@@ -6,6 +6,7 @@ import { BranchLoss, type ChangePreview, type RemovalImpact } from "./workspace-
 import { z } from "zod";
 import type { AgentUpdates } from "./agent-updates.js";
 import { slackRpcParams, type SlackStatus } from "./slack.js";
+import { pullRequestRpcParams, type PullRequestRpcResults } from "./pull-requests.js";
 import { HarnessId, type HarnessInfo } from "./harness.js";
 import { AgentEvent, AgentKind, ApprovalDecision, Frame } from "./events.js";
 import type { McpAppOpenResult } from "./mcp-apps.js";
@@ -62,6 +63,7 @@ const REVIEW_SCOPE_REQUIRED = "Review comments need a conversation or a task.";
 
 export const rpcParams = {
   ...slackRpcParams,
+  ...pullRequestRpcParams,
   "tasks.comments.list": z.object({ taskId: z.string() }),
   "tasks.comments.post": z
     .object({
@@ -557,7 +559,7 @@ export interface ResolvedExtraction {
   viaApiKey: boolean;
 }
 
-export interface RpcResults {
+export interface RpcResults extends PullRequestRpcResults {
   "tasks.comments.list": TaskDiscussion;
   "tasks.comments.post": TaskComment;
   "tasks.comments.retry": CommentAttempt;

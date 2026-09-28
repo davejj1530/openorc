@@ -39,3 +39,4 @@ export { memories, vectors, summaries, extractionJobs, settings, ftsQuery, type 
 export { taskForwardings } from "./task-forwardings.js";
 
 export { plans } from "./plans.js";
+export { pullReviews, type PullReviewKey, type PullReviewPatch, type DraftCommentInsert } from "./pull-reviews.js";

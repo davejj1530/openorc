@@ -6,7 +6,7 @@ import type { RunHooks } from "./run-types.js";
 export class RunBriefs {
   constructor(
     private readonly db: Db,
-    private readonly hooks: Pick<RunHooks, "brief" | "memoryEnabled">,
+    private readonly hooks: Pick<RunHooks, "brief" | "memoryEnabled" | "threadContext">,
   ) {}
 
   taskBrief(task: Task, project: Project, mode: RunMode, teamManaged = false): string {
@@ -47,6 +47,8 @@ export class RunBriefs {
   threadBrief(thread: Thread, project: Project, mode: RunMode): string {
     const own = tasks.list(this.db, { threadId: thread.id }).filter((t) => t.status !== "archived");
     const lines = [this.threadLocation(thread, project)];
+    const context = this.hooks.threadContext?.(thread);
+    if (context) lines.push("", context);
     lines.push(
       "",
       "Tasks are records of work within this conversation. task_create saves a document without launching an agent. When asked to start a task, call task_start and implement it here in the current thread and workspace. Do not forward work to a separate task agent. Use task_update to record progress and completion. Only open a new thread when the user requests a separate conversation.",
@@ -91,7 +93,8 @@ export class RunBriefs {
       return `You are in Workspace conversation "${thread.title}", working in ${project.rootPath}. Workspace is your personal conversation home, not a repository. This folder need not be an imported project or a Git repository. Do not import projects automatically. Respect the current permissions for every operation.`;
     }
     if (thread.worktreePath) {
-      return `You are in the thread "${thread.title}" for project ${project.name}, working in this thread's own worktree at ${thread.worktreePath} on branch ${thread.branch ?? "(pending)"}.`;
+      const head = thread.branch ? `on branch ${thread.branch}` : "at a detached commit, on no branch";
+      return `You are in the thread "${thread.title}" for project ${project.name}, working in this thread's own worktree at ${thread.worktreePath} ${head}.`;
     }
     return `You are in the thread "${thread.title}" for project ${project.name}, working directly in the project folder at ${project.rootPath}${project.defaultBranch ? ` on ${project.defaultBranch}` : ""}.`;
   }

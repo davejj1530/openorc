@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Folder,
   GitBranch,
+  GitPullRequest,
   Inbox,
   ListFilter,
   ListTodo,
@@ -65,6 +66,20 @@ function NavItem({ route, icon, label, badge, active, onClick }: { route?: Route
       </span>
       <span className="flex-1 text-left truncate">{label}</span>
     </button>
+  );
+}
+
+/** The app's screens, above the projects. */
+function SidebarNav({ route, projectId, inbox }: { route: Route; projectId: string | null; inbox: number }) {
+  return (
+    <nav className="nav-track grid grid-cols-1 min-w-0 gap-px">
+      <NavItem route={{ view: "inbox" }} icon={<Inbox size={15} />} label="Inbox" badge={inbox} active={route.view === "inbox"} />
+      <NavItem route={{ view: "tasks" }} icon={<ListTodo size={15} />} label="Tasks" active={route.view === "tasks" || route.view === "task" || route.view === "newtask"} />
+      <NavItem route={{ view: "pulls" }} icon={<GitPullRequest size={15} />} label="Pull requests" active={route.view === "pulls" || route.view === "pull"} />
+      <NavItem route={{ view: "scheduled" }} icon={<CalendarClock size={15} />} label="Scheduled" active={route.view === "scheduled"} />
+      <NavItem route={{ view: "orchestration", ...(projectId ? { projectId } : {}) }} icon={<Workflow size={15} />} label="Orchestration" active={route.view === "orchestration"} />
+      <NavItem route={{ view: "memory" }} icon={<Brain size={15} />} label="Memory" active={route.view === "memory"} />
+    </nav>
   );
 }
 
@@ -248,21 +263,7 @@ export function Sidebar() {
                   </IconButton>
                 </Tooltip>
               </div>
-              <nav className="nav-track grid grid-cols-1 min-w-0 gap-px">
-                <NavItem route={{ view: "inbox" }} icon={<Inbox size={15} />} label="Inbox" badge={inbox} active={route.view === "inbox"} />
-                <NavItem route={{ view: "tasks" }} icon={<ListTodo size={15} />} label="Tasks" active={route.view === "tasks" || route.view === "task" || route.view === "newtask"} />
-                <NavItem route={{ view: "scheduled" }} icon={<CalendarClock size={15} />} label="Scheduled" active={route.view === "scheduled"} />
-                <NavItem
-                  route={{
-                    view: "orchestration",
-                    ...(projectId ? { projectId } : {}),
-                  }}
-                  icon={<Workflow size={15} />}
-                  label="Orchestration"
-                  active={route.view === "orchestration"}
-                />
-                <NavItem route={{ view: "memory" }} icon={<Brain size={15} />} label="Memory" active={route.view === "memory"} />
-              </nav>
+              <SidebarNav route={route} projectId={projectId} inbox={inbox} />
               <div className="flex items-center gap-0.5 pl-4 pr-2 mt-4 mb-1">
                 <span className="text-sm font-medium text-ink-3">Projects</span>
                 <span className="flex-1" />

@@ -66,6 +66,20 @@ const contract: Array<[RpcMethod, RpcMethod[]]> = [
   ["schedules.run", ["schedules.list", "threads.list"]],
   ["schedules.trigger", ["schedules.list", "threads.list"]],
   ["orchestration.archive", ["schedules.list"]],
+  ["memory.promote", ["memory.list"]],
+  ["textGeneration.settings.set", ["textGeneration.settings.get"]],
+  ["pulls.review.comment", ["pulls.review.get"]],
+  ["pulls.review.editComment", ["pulls.review.get"]],
+  ["pulls.review.removeComment", ["pulls.review.get"]],
+  ["pulls.review.summary", ["pulls.review.get"]],
+  ["pulls.review.discard", ["pulls.review.get"]],
+  ["pulls.review.start", ["pulls.review.get", "threads.list", "threads.get"]],
+  // A posted review changes the pull request's review decision on GitHub.
+  ["pulls.review.submit", ["pulls.review.get", "pulls.list", "pulls.get"]],
+  ["reviewerApp.setup", ["reviewerApp.get"]],
+  ["reviewerApp.cancelSetup", ["reviewerApp.get"]],
+  ["reviewerApp.configure", ["reviewerApp.get"]],
+  ["reviewerApp.remove", ["reviewerApp.get"]],
 ];
 
 const params = { id: "t1", taskId: "t1", threadId: "t1", projectId: "p1" };
@@ -115,6 +129,10 @@ describe("query cache tags", () => {
       "files.search",
       "app.settings.get",
       "schedules.list",
+      "pulls.list",
+      "pulls.get",
+      "pulls.diff",
+      "pulls.review.get",
     ];
     for (const read of reads) expect(tagsFor(read, params).length, `${read} has no tag`).toBeGreaterThan(0);
   });

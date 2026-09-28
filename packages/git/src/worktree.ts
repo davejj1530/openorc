@@ -53,6 +53,11 @@ export async function add(root: string, options: { path: string; branch: string;
   }
 }
 
+/** Creates a worktree at `commit` without a branch, for reading someone else's work. */
+export async function addDetached(root: string, options: { path: string; commit: string }): Promise<void> {
+  await git(root, ["worktree", "add", "--detach", options.path, options.commit]);
+}
+
 /**
  * Commits everything a worktree has not committed onto its branch, new files included and ignored ones not, so the
  * worktree can be removed without losing work. Commit hooks are skipped: this keeps work rather than changing it.

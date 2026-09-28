@@ -1,3 +1,5 @@
+import { releaseAssets, type ReleaseAsset } from "./release-assets";
+
 const releasesUrl = "https://api.github.com/repos/davejj1530/openorc/releases?per_page=100";
 const releasePath = "/davejj1530/openorc/releases/tag/";
 
@@ -8,6 +10,7 @@ interface GitHubRelease {
   draft?: unknown;
   prerelease?: unknown;
   published_at?: unknown;
+  assets?: unknown;
 }
 
 export interface ChangelogRelease {
@@ -16,6 +19,7 @@ export interface ChangelogRelease {
   publishedAt: string;
   prerelease: boolean;
   highlights: string[];
+  assets: ReleaseAsset[];
 }
 
 function releaseHighlights(body: string): string[] {
@@ -60,6 +64,7 @@ export function publishedReleases(input: unknown): ChangelogRelease[] {
           publishedAt: value.published_at,
           prerelease: value.prerelease === true,
           highlights: releaseHighlights(typeof value.body === "string" ? value.body : ""),
+          assets: releaseAssets(value.assets, value.tag_name),
         },
       ];
     })

@@ -1,0 +1,2 @@
+# Node's script runner avoids depending on a globally installed pnpm/Corepack shim.
+node --run precommit

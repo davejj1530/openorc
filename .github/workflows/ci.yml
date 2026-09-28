@@ -105,6 +105,7 @@ jobs:
       - run: node --test scripts/size-limit.test.cjs
       - run: pnpm -r typecheck
       - run: node --test scripts/distribution-notices.test.cjs scripts/desktop-release.test.cjs scripts/packaged-native-target.test.cjs scripts/packaged-runtime-dependencies.test.cjs
+      - run: pnpm format:check
       # The full suite currently includes POSIX-only fixtures (e.g. /bin/sh).
       # Keep running it in the macOS jobs until those tests are portable.
       - run: pnpm build

@@ -1,6 +1,10 @@
+# Match Prettier on every checkout, including Windows runners with autocrlf.
+* text=auto eol=lf
+
 # Preserve reviewed notice bytes on every platform.
 /LICENSE -text
 /NOTICE -text
 /THIRD_PARTY_NOTICES.md -text
 /licenses/** -text
 /apps/website/public/licenses/** -text
+/apps/desktop/src/renderer/src/assets/project-stacks/*.svg -text

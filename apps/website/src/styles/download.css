@@ -1,0 +1,128 @@
+.download-page {
+  max-width: 1020px;
+  padding-block: clamp(64px, 9vw, 112px) var(--section-space);
+}
+.download-intro {
+  padding-bottom: clamp(48px, 7vw, 80px);
+}
+.download-intro h1 {
+  font-size: clamp(2.75rem, 6vw, 4.5rem);
+  letter-spacing: -0.035em;
+}
+.download-intro > p {
+  max-width: 48ch;
+  margin-top: 24px;
+  font-size: clamp(1rem, 1.7vw, 1.125rem);
+}
+.download-intro .download-version {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  font-size: var(--type-control);
+}
+.download-version span {
+  color: var(--accent);
+}
+.download-version a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+.download-version a:hover {
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 0.25em;
+}
+.download-installers h2,
+.download-empty h2,
+.download-help h2 {
+  max-width: none;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+}
+.download-device-hint {
+  max-width: 66ch;
+  margin-top: 16px;
+  min-height: 3.3em;
+}
+.download-list {
+  padding: 0;
+  margin: 28px 0 0;
+  list-style: none;
+  border-top: 1px solid var(--rule);
+}
+.download-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding-block: 30px;
+  border-bottom: 1px solid var(--rule);
+}
+.download-platform h3 {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  font-size: 1.5rem;
+}
+.download-platform h3 span {
+  color: var(--muted);
+  font-size: var(--type-body);
+}
+.download-platform p {
+  margin-top: 9px;
+  font-size: var(--type-control);
+}
+.download-recommendation {
+  display: block;
+  margin-top: 8px;
+  color: var(--accent);
+  font-size: var(--type-control);
+}
+.download-file {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 10px;
+}
+.download-file > span {
+  color: var(--muted);
+  font-size: var(--type-control);
+}
+.download-notice {
+  max-width: 68ch;
+  margin-top: 20px;
+  font-size: var(--type-control);
+}
+.download-empty {
+  border-block: 1px solid var(--rule);
+  padding-block: 36px;
+}
+.download-empty p {
+  margin-top: 16px;
+}
+.download-empty .text-link,
+.download-help .text-link {
+  margin-top: 16px;
+  color: var(--accent);
+}
+.download-help {
+  max-width: 60ch;
+  padding-top: clamp(56px, 8vw, 88px);
+}
+.download-help p {
+  margin-top: 16px;
+}
+@media (max-width: 600px) {
+  .download-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .download-file {
+    align-items: flex-start;
+  }
+}

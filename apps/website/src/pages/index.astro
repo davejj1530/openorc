@@ -1,6 +1,7 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import Icon from "../components/Icon.astro";
+import DownloadButton from "../components/DownloadButton.astro";
 import SiteHeader from "../components/SiteHeader.astro";
 import SiteFooter from "../components/SiteFooter.astro";
 import ProductPreview from "../components/ProductPreview.astro";
@@ -30,7 +31,7 @@ const faqs = [
         <h1 id="hero-title">Your coding agents,<br /><span>working together.</span></h1>
         <p class="hero-description">Free and open-source desktop workspace for Codex, Claude Code, and OpenCode. Carry context between threads, decide in tasks, and read the diff before you commit.</p>
         <div class="hero-actions">
-          <button class="button button-primary" type="button" disabled aria-label="Download OpenOrc, coming soon">Coming soon</button>
+          <DownloadButton />
           <a class="text-link" href="#workflow">Explore the workflow <Icon name="chevron" size={15} /></a>
         </div>
       </div>
@@ -143,7 +144,7 @@ const faqs = [
         <h2 id="closing-title">Every agent. One workspace.</h2>
         <p>Start a conversation with the agents you already have, and keep every decision and review in one place.</p>
         <div class="hero-actions">
-          <button class="button button-primary" type="button" disabled aria-label="Download OpenOrc, coming soon">Coming soon</button>
+          <DownloadButton />
           <a class="text-link" href="/docs/">Read how it works <Icon name="chevron" size={15} /></a>
         </div>
       </div>

@@ -328,3 +328,17 @@ describe("removing a task worktree", () => {
     expect((await git(root, ["ls-tree", "--name-only", moved.branch!])).stdout).not.toContain("draft.ts");
   });
 });
+
+describe("thread workspace preparation", () => {
+  it("remembers the branch a thread's worktree started from, for its pull request's target", async () => {
+    const thread = () => threads.insert(db, { projectId: project.id, title: "Start", agent: "codex", model: "fixture", mode: "act", permissionMode: "trusted", workspaceMode: "worktree" });
+    await git(root, ["branch", "dev"]);
+    expect((await service.prepareThread(thread(), project, "dev")).baseBranch).toBe("dev");
+    // HEAD is whatever the checkout is on, as when a conversation moves out of it.
+    expect((await service.prepareThread(thread(), project, "HEAD")).baseBranch).toBe("main");
+    const sha = (await git(root, ["rev-parse", "HEAD"])).stdout.trim();
+    expect((await service.prepareThread(thread(), project, sha)).baseBranch).toBeNull();
+    await git(root, ["checkout", "-q", "--detach"]);
+    expect((await service.prepareThread(thread(), project, "HEAD")).baseBranch).toBeNull();
+  });
+});

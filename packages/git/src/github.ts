@@ -1,4 +1,13 @@
-import type { PullRequestDetail, PullRequestFilter, PullRequestReviewDecision, PullRequestReviewEvent, PullRequestSide, PullRequestState, PullRequestSummary } from "@openorc/protocol";
+import type {
+  PullRequestBranches,
+  PullRequestDetail,
+  PullRequestFilter,
+  PullRequestReviewDecision,
+  PullRequestReviewEvent,
+  PullRequestSide,
+  PullRequestState,
+  PullRequestSummary,
+} from "@openorc/protocol";
 import { git, run, GitError } from "./exec.js";
 
 /** Runs the user's own gh in a repository and returns what it printed. A failure rejects with a GhError. */
@@ -23,6 +32,35 @@ const runGh: GhRunner = async (cwd, args, input) => {
 
 const SUMMARY_FIELDS = "number,title,url,author,state,isDraft,headRefName,baseRefName,createdAt,updatedAt,additions,deletions,changedFiles,reviewDecision,labels";
 const LIST_LIMIT = "50";
+/** Reads of a diff before giving up on a pull request that keeps receiving pushes. */
+const DIFF_READS = 3;
+/** Pages of 100 branches a target picker reads before it stops. */
+const BRANCH_PAGES = 10;
+
+/**
+ * The repository's branches by name, a page at a time, with its default branch and, when asked, whether `prefer`
+ * exists. GitHub can't sort branches by activity. `{owner}` and `{repo}` are the repository gh opens pull requests in.
+ */
+const BRANCHES_QUERY = `query($owner: String!, $repo: String!, $after: String, $prefer: String!, $checkPrefer: Boolean!) {
+  repository(owner: $owner, name: $repo) {
+    defaultBranchRef { name }
+    preferred: ref(qualifiedName: $prefer) @include(if: $checkPrefer) { name }
+    refs(refPrefix: "refs/heads/", first: 100, after: $after, orderBy: { field: ALPHABETICAL, direction: ASC }) {
+      nodes { name }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
+}`;
+
+interface RawBranchPage {
+  data: {
+    repository: {
+      defaultBranchRef: { name: string } | null;
+      preferred?: { name: string } | null;
+      refs: { nodes: { name: string }[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } };
+    };
+  };
+}
 
 const filterArgs: Record<PullRequestFilter, string[]> = {
   open: ["--state", "open"],
@@ -174,11 +212,73 @@ export class GitHubPulls {
     return { ...pullRequestSummary(raw), body: raw.body ?? "", headSha: raw.headRefOid, baseSha: raw.baseRefOid, viewer };
   }
 
-  /** The changes as GitHub shows them: the head against where it left its base branch. */
-  diff(cwd: string, number: number): Promise<string> {
-    return this.gh(cwd, ["pr", "diff", String(number), "--color", "never"]).catch((error: unknown) => {
-      throw ghFailure(error, `Pull request #${number}`);
-    });
+  /**
+   * The changes as GitHub shows them, the head against where it left its base branch, and the head they are for.
+   * gh can't name that head with the diff, so it is read before and after; a push in between reads the diff again.
+   */
+  async diff(cwd: string, number: number): Promise<{ patch: string; headSha: string }> {
+    const ask = (args: string[]) =>
+      this.gh(cwd, ["pr", ...args]).catch((error: unknown) => {
+        throw ghFailure(error, `Pull request #${number}`);
+      });
+    const head = async () => (JSON.parse(await ask(["view", String(number), "--json", "headRefOid"])) as { headRefOid: string }).headRefOid;
+    for (let read = 0; read < DIFF_READS; read += 1) {
+      const before = await head();
+      const patch = await ask(["diff", String(number), "--color", "never"]);
+      if ((await head()) === before) return { patch, headSha: before };
+    }
+    throw new Error(`Pull request #${number} kept changing while it loaded. Try again.`);
+  }
+
+  /**
+   * The branches a new pull request can target in the repository gh opens pull requests in: the default branch first,
+   * `prefer` next when it exists, then the rest by name.
+   */
+  async branches(cwd: string, prefer?: string): Promise<PullRequestBranches> {
+    const names: string[] = [];
+    let defaultBranch: string | null = null;
+    let preferred: string | null = null;
+    let after: string | null = null;
+    for (let page = 0; page < BRANCH_PAGES; page += 1) {
+      const args = [
+        "api",
+        "graphql",
+        "-F",
+        "owner={owner}",
+        "-F",
+        "repo={repo}",
+        "-f",
+        `query=${BRANCHES_QUERY}`,
+        "-f",
+        `prefer=refs/heads/${prefer ?? ""}`,
+        "-F",
+        `checkPrefer=${page === 0 && prefer !== undefined}`,
+      ];
+      const out: string = await this.gh(cwd, after === null ? args : [...args, "-f", `after=${after}`]).catch((error: unknown) => {
+        throw ghFailure(error, "The repository's branches");
+      });
+      const { repository }: RawBranchPage["data"] = (JSON.parse(out) as RawBranchPage).data;
+      if (page === 0) {
+        defaultBranch = repository.defaultBranchRef?.name ?? null;
+        preferred = repository.preferred?.name ?? null;
+      }
+      names.push(...repository.refs.nodes.map((node) => node.name));
+      if (!repository.refs.pageInfo.hasNextPage) break;
+      after = repository.refs.pageInfo.endCursor;
+    }
+    const first = [defaultBranch, preferred].filter((name): name is string => name !== null);
+    return { branches: [...new Set([...first, ...names])], defaultBranch };
+  }
+
+  /** Whether `branch` is a branch of the repository gh opens pull requests in. */
+  async hasBranch(cwd: string, branch: string): Promise<boolean> {
+    try {
+      await this.gh(cwd, ["api", `repos/{owner}/{repo}/branches/${encodeURIComponent(branch)}`, "--silent"]);
+      return true;
+    } catch (error) {
+      if (error instanceof GhError && /HTTP 404/.test(error.stderr)) return false;
+      throw ghFailure(error, `The branch ${branch}`);
+    }
   }
 
   /** The signed-in account's login, or null when gh cannot say. */

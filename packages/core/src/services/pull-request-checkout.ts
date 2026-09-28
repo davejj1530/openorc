@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { access, mkdir, realpath } from "node:fs/promises";
 import path from "node:path";
 import { checkpoints, threads, type Db } from "@openorc/db";
-import { diffStat, fetchPullRequest, git, pinObject, pullRequestSource, treeHash, worktree } from "@openorc/git";
+import { diffStat, fetchPullRequest, git, isDirty, pinObject, pullRequestSource, treeHash, worktree } from "@openorc/git";
 import type { Project, PullRequestDetail, Thread } from "@openorc/protocol";
 import { checkpointRefs } from "./checkpoint-refs.js";
 import type { WorkspaceWriters } from "./workspace-writers.js";
@@ -44,9 +44,9 @@ export async function moveReviewCheckout(deps: { db: Db; writers: Pick<Workspace
       await worktree.prune(project.rootPath);
       await worktree.addDetached(project.rootPath, { path: cwd, commit: detail.headSha });
     } else {
-      if ((await git(cwd, ["status", "--porcelain"])).stdout.trim())
+      if (await isDirty(cwd))
         throw new Error("The review conversation's copy of the pull request has changes, so it can't move to the new commits. Archive that conversation to review in a fresh one.");
-      await git(cwd, ["checkout", "--quiet", "--detach", detail.headSha]);
+      await worktree.checkoutDetached(cwd, detail.headSha);
     }
     const tree = await treeHash(cwd);
     await pinObject(cwd, `${checkpointRefs(thread.id)}${tree}`, tree);

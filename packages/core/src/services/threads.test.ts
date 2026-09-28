@@ -967,10 +967,10 @@ describe("thread lifecycle", () => {
         () => review.commitProject(project, "Should not commit"),
         () => review.commitThread(thread, project, "Should not commit"),
         () => review.pushThread(thread, project),
-        () => review.createThreadPr(thread, project, "Should not publish", "Blocked"),
+        () => review.createThreadPr(thread, project, "Should not publish", "Blocked", "main"),
         () => review.commit(task, project, "Should not commit"),
         () => review.push(task, project),
-        () => review.createPr(task, project, "Should not publish", "Blocked"),
+        () => review.createPr(task, project, "Should not publish", "Blocked", "main"),
       ])
         await expect(operation()).rejects.toThrow(/another conversation's provider/);
       expect(threads.get(core.db, thread.id)).toEqual(thread);

@@ -30,9 +30,9 @@ export function createReviewThreadHandlers({
       invalidate([`thread:${threadId}`, "threads", "orchestration"]);
       return result;
     },
-    "review.createThreadPr": async ({ threadId, title, body }) => {
+    "review.createThreadPr": async ({ threadId, title, body, base }) => {
       const { thread, project } = threadAndProject(db, threadId);
-      const r = await review.createThreadPr(thread, project, title, body);
+      const r = await review.createThreadPr(thread, project, title, body, base);
       invalidate(["threads", `thread:${threadId}`]);
       return r;
     },

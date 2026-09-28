@@ -109,6 +109,8 @@ export const Thread = z.object({
   worktreePath: z.string().nullable(),
   /** Where the thread started: its worktree's base commit, or the checkout's HEAD (the empty tree before a first commit). A worktree's Changes tab diffs against it. */
   baseSha: z.string().nullable(),
+  /** The branch the thread's worktree started from, which its pull request targets by default. Null when unknown, as in the checkout. */
+  baseBranch: z.string().nullable(),
   pinnedAt: z.number().nullable(),
   /** When the user last looked; activity after it is unread. */
   seenAt: z.number().nullable(),

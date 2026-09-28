@@ -54,4 +54,20 @@ describe("pull request reviews", () => {
     expect(pullReviews.get(db, key)).toMatchObject({ commitId: "a".repeat(40), summary: "", threadId: thread.id, comments: [] });
     expect(db.stmt("SELECT COUNT(*) AS count FROM pull_request_review_comments").get()).toEqual({ count: 0 });
   });
+
+  it("removes only what a posted review carried", () => {
+    const { db, key } = setup();
+    pullReviews.open(db, key, "a".repeat(40));
+    pullReviews.update(db, key, { summary: "Nearly there." });
+    const kept = pullReviews.addComment(db, key, { ...line, author: null });
+    pullReviews.addComment(db, key, { ...line, body: "Posted as written.", author: null });
+    const sent = pullReviews.get(db, key)!;
+    pullReviews.editComment(db, key, kept.id, "Edited while posting.");
+    pullReviews.addComment(db, key, { ...line, body: "Added while posting.", author: null });
+    pullReviews.clearPosted(db, key, sent);
+    expect(pullReviews.get(db, key)).toMatchObject({ summary: "", comments: [{ id: kept.id, body: "Edited while posting." }, { body: "Added while posting." }] });
+    pullReviews.update(db, key, { summary: "Rewritten while posting." });
+    pullReviews.clearPosted(db, key, { summary: "Nearly there.", comments: [] });
+    expect(pullReviews.get(db, key)?.summary).toBe("Rewritten while posting.");
+  });
 });

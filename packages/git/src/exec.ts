@@ -20,6 +20,12 @@ export interface ExecOptions {
   maxBuffer?: number;
   /** Written to the command's stdin, for lists too long for arguments. */
   input?: string;
+  /**
+   * Lets the repository's hooks run, for the user's own commits, pushes and new worktrees. Every other command skips
+   * them: it may run in a checkout of someone else's pull request, where a relative core.hooksPath, as husky sets,
+   * finds hooks in that pull request's files.
+   */
+  hooks?: boolean;
 }
 
 export interface ExecResult {
@@ -28,17 +34,25 @@ export interface ExecResult {
   code: number;
 }
 
-/** Runs the user's own git. Nothing here reads credentials. */
+/** Keeps Git from running any hook. */
+export const WITHOUT_HOOKS = ["-c", "core.hooksPath=/dev/null"];
+
+/** Runs the user's own git. Nothing here reads credentials, and no hook runs unless `hooks` asks for them. */
 export function git(cwd: string, args: string[], options: ExecOptions = {}): Promise<ExecResult> {
-  return run("git", cwd, args, options);
+  return execute("git", cwd, args, options, options.hooks ? [] : WITHOUT_HOOKS);
 }
 
 export function run(bin: string, cwd: string, args: string[], options: ExecOptions = {}): Promise<ExecResult> {
+  return execute(bin, cwd, args, options, []);
+}
+
+/** Runs `bin` with `settings` ahead of `args`. A failure names the command by `args`, as its caller wrote it. */
+function execute(bin: string, cwd: string, args: string[], options: ExecOptions, settings: string[]): Promise<ExecResult> {
   const okCodes = options.okCodes ?? [0];
   return new Promise((resolve, reject) => {
     const child = execFile(
       bin,
-      args,
+      [...settings, ...args],
       {
         cwd,
         timeout: options.timeoutMs ?? 60_000,

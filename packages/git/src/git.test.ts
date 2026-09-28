@@ -1,11 +1,12 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { git } from "./exec.js";
-import { changedFiles, gitState, log, patchAgainst, repoInfo } from "./repo.js";
+import { changedFiles, gitState, isDirty, log, patchAgainst, repoInfo } from "./repo.js";
 import { diffStat, treeHash } from "./snapshot.js";
 import { commitAll, pullRequestTemplate, push, unpushedCommits } from "./publish.js";
+import { pinObject, unpinAll } from "./refs.js";
 import * as worktree from "./worktree.js";
 
 let root: string;
@@ -114,6 +115,58 @@ describe("worktree", () => {
     await writeFile(path.join(wt, "loose.ts"), "export const l = 1;\n");
     await expect(worktree.saveChanges(wt, "save")).rejects.toThrow(/not on a branch/);
     await worktree.remove(root, wt, { force: true });
+  });
+
+  it("runs no hook a pull request brings, whatever the app does in its checkout", async () => {
+    const ran = path.join(root, "..", path.basename(root) + "-hooks-ran");
+    const author = path.join(root, "..", path.basename(root) + "-author");
+    await worktree.add(root, { path: author, branch: "untrusted", startPoint: baseSha });
+    await mkdir(path.join(author, ".githooks"));
+    for (const hook of ["post-checkout", "reference-transaction", "post-index-change"]) {
+      await writeFile(path.join(author, ".githooks", hook), `#!/bin/sh\necho ${hook} >> "${ran}"\n`, { mode: 0o755 });
+    }
+    const untrusted = await commitAll(author, "bring hooks");
+    await worktree.remove(root, author, { force: true });
+    // A relative core.hooksPath, as husky sets, finds hooks in whatever is checked out.
+    await git(root, ["config", "core.hooksPath", ".githooks"]);
+    const review = path.join(root, "..", path.basename(root) + "-review");
+    try {
+      await worktree.addDetached(root, { path: review, commit: untrusted });
+      await worktree.checkoutDetached(review, baseSha);
+      await worktree.checkoutDetached(review, untrusted);
+      await writeFile(path.join(review, "README.md"), "# demo\nread\n");
+      await writeFile(path.join(review, "notes.md"), "untracked\n");
+      await isDirty(review);
+      const tree = await treeHash(review);
+      await patchAgainst(review, untrusted);
+      await pinObject(review, "refs/openorc/test/pin", tree);
+      await unpinAll(review, "refs/openorc/test/");
+    } finally {
+      await git(root, ["config", "--unset", "core.hooksPath"]);
+    }
+    expect(await readFile(ran, "utf8").catch(() => "")).toBe("");
+    await worktree.remove(root, review, { force: true });
+    await worktree.deleteBranch(root, "untrusted", { force: true });
+  });
+
+  it("runs the user's hooks for their own commits", async () => {
+    const wt = path.join(root, "..", path.basename(root) + "-own");
+    const hooks = path.join(root, "..", path.basename(root) + "-own-hooks");
+    const ran = path.join(hooks, "ran");
+    await worktree.add(root, { path: wt, branch: "openorc/own-abc1", startPoint: baseSha });
+    await mkdir(hooks);
+    await writeFile(path.join(hooks, "pre-commit"), `#!/bin/sh\necho pre-commit >> "${ran}"\n`, { mode: 0o755 });
+    await git(wt, ["config", "core.hooksPath", hooks]);
+    try {
+      await writeFile(path.join(wt, "own.ts"), "export const o = 1;\n");
+      await commitAll(wt, "own work");
+    } finally {
+      await git(wt, ["config", "--unset", "core.hooksPath"]);
+    }
+    expect(await readFile(ran, "utf8")).toBe("pre-commit\n");
+    await worktree.remove(root, wt, { force: true });
+    await worktree.deleteBranch(root, "openorc/own-abc1", { force: true });
+    await rm(hooks, { recursive: true, force: true });
   });
 });
 

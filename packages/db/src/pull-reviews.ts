@@ -139,7 +139,17 @@ export const pullReviews = {
     db.stmt("DELETE FROM pull_request_review_comments WHERE id = ? AND project_id = ? AND number = ?").run(id, key.projectId, key.number);
     touch(db, key, Date.now());
   },
-  /** Empties the draft once it is posted or discarded. The review keeps its conversation for the next round. */
+  /**
+   * Removes what a posted review carried, as the draft stood when it was sent. A comment edited or added while it
+   * was posting, and a summary changed since, stay in the draft.
+   */
+  clearPosted(db: Db, key: PullReviewKey, sent: Pick<PullRequestReview, "summary" | "comments">): void {
+    const remove = db.stmt("DELETE FROM pull_request_review_comments WHERE id = ? AND project_id = ? AND number = ? AND body = ?");
+    for (const comment of sent.comments) remove.run(comment.id, key.projectId, key.number, comment.body);
+    db.stmt("UPDATE pull_request_reviews SET summary = '' WHERE project_id = ? AND number = ? AND summary = ?").run(key.projectId, key.number, sent.summary);
+    touch(db, key, Date.now());
+  },
+  /** Empties the draft once it is discarded. The review keeps its conversation for the next round. */
   clearDraft(db: Db, key: PullReviewKey): void {
     db.stmt("DELETE FROM pull_request_review_comments WHERE project_id = ? AND number = ?").run(key.projectId, key.number);
     db.stmt("UPDATE pull_request_reviews SET summary = '', updated_at = ? WHERE project_id = ? AND number = ?").run(Date.now(), key.projectId, key.number);

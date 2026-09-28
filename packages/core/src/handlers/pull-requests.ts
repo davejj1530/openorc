@@ -7,6 +7,7 @@ type PullRequestMethod = Extract<keyof Handlers, `pulls.${string}`>;
 export function createPullRequestHandlers({ pullRequests }: Dependencies): Pick<Handlers, PullRequestMethod> {
   return {
     "pulls.list": ({ projectId, filter }) => pullRequests.list(projectId, filter),
+    "pulls.branches": ({ projectId, prefer }) => pullRequests.branches(projectId, prefer),
     "pulls.get": (key) => pullRequests.get(key),
     "pulls.diff": (key) => pullRequests.diff(key),
     "pulls.review.get": (key) => pullRequests.review(key),

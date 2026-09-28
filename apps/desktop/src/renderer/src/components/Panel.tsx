@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNod
 import { Menu } from "@base-ui/react/menu";
 import { PanelRight, PanelRightClose, FileText, FileDiff, ListTodo, SlidersHorizontal, GitCommitHorizontal, Globe, History, Brain, Maximize2, Minimize2, Plus, Terminal } from "./icons";
 import { WORKSPACE_ID } from "@openorc/protocol";
-import type { Project, Task, ThreadSummary } from "@openorc/protocol";
+import type { Project, PushState, Task, ThreadSummary } from "@openorc/protocol";
 import { ResizeHandle } from "./ResizeHandle";
 import { menuItem, menuPopup } from "./ThreadActions";
 import { Button, Empty, IconButton, Tooltip } from "./ui";
@@ -16,7 +16,7 @@ import { useTrafficLights, useWindowsControls } from "../lib/window";
 import { CoversPreview, useBrowserPreview } from "../lib/browser-preview";
 import { ChangesPanel } from "../panels/ChangesPanel";
 import { CheckpointsPanel } from "../panels/CheckpointsPanel";
-import { CommitsPanel } from "../panels/CommitsPanel";
+import { CommitsPanel, type CommitSource } from "../panels/CommitsPanel";
 import { MemoryPanel } from "../panels/MemoryPanel";
 import { TaskDetailsPanel } from "../panels/TaskDetailsPanel";
 import { ThreadTasksPanel } from "../panels/ThreadTasksPanel";
@@ -82,7 +82,7 @@ const labels: Record<PanelTab, string> = {
  */
 export function tabsFor(context: PanelContext): PanelTab[] {
   if (context.kind === "project") return ["changes"];
-  if (context.kind === "newthread") return [...(context.changes ? ["changes" as const] : []), "terminal", "browser", "memory"];
+  if (context.kind === "newthread") return [...(context.changes ? (["changes", "commits"] as const) : []), "terminal", "browser", "memory"];
   const plan: PanelTab[] = context.kind === "thread" ? ["plan"] : [];
   if (context.project.id === WORKSPACE_ID) return context.kind === "thread" ? ["tasks", ...plan, "terminal", "browser", "memory"] : ["task", "terminal", "browser", "memory"];
   return context.kind === "thread" ? ["changes", ...plan, "terminal", "browser", "tasks", "checkpoints", "commits", "memory"] : ["changes", "terminal", "browser", "task", "commits", "memory"];
@@ -102,6 +102,16 @@ function panelScope(context: PanelContext): string | null {
   return null;
 }
 
+/** Where a context's commits come from: a new thread's is the checkout it would work in. Null when it has none. */
+function commitSource(context: PanelContext): CommitSource | null {
+  if (context.kind === "thread") return { kind: "thread", thread: context.thread, project: context.project };
+  if (context.kind === "task") return { kind: "task", task: context.task };
+  return context.kind === "newthread" && context.changes ? { kind: "checkout", project: context.project } : null;
+}
+
+/** Whether the branch has commits origin lacks. Push is offered for them wherever they came from. */
+const hasCommitsToPush = (state: PushState | undefined) => Boolean(state?.unpushedCount);
+
 /**
  * What a thread has to show, read mostly from queries the open thread already runs: the
  * composer's diff and the transcript's plans and checkpoints. Tasks and projects keep their
@@ -117,8 +127,10 @@ function usePanelSignals(context: PanelContext, savedChanges: boolean): PanelSig
   const tasks = useRpc("tasks.list", { threadId: id }, { enabled: thread !== null });
   const checkpoints = useRpc("threads.checkpoints", { id }, { enabled: thread !== null });
   const log = useRpc("git.threadLog", { threadId: id }, { enabled: git });
+  const threadPush = useRpc("git.threadPushState", { threadId: id }, { enabled: git });
+  const checkoutPush = useRpc("git.projectPushState", { projectId: context.project.id }, { enabled: context.kind === "newthread" && context.changes });
   const memory = useRpc("memory.list", { projectId: context.project.id, limit: 40 }, { enabled: context.kind === "thread" || context.kind === "newthread" });
-  if (context.kind === "newthread") return { changes: true, memory: Boolean(memory.data?.length) };
+  if (context.kind === "newthread") return { changes: true, commits: hasCommitsToPush(checkoutPush.data), memory: Boolean(memory.data?.length) };
   if (!thread) return null;
   // A worktree's log starts at its base. A shared checkout's log is the repository's, so only
   // the commits made since the thread began are its own.
@@ -128,7 +140,7 @@ function usePanelSignals(context: PanelContext, savedChanges: boolean): PanelSig
     plan: plans.length > 0,
     tasks: Boolean(tasks.data?.length),
     checkpoints: Boolean(checkpoints.data?.length),
-    commits: commits.length > 0,
+    commits: commits.length > 0 || hasCommitsToPush(threadPush.data),
     memory: Boolean(memory.data?.length),
   };
 }
@@ -268,6 +280,7 @@ export function Panel({ context }: { context: PanelContext }) {
   }, [expandedPreview, expandable, setPanelExpanded]);
   const sidebarOpen = useLayout((s) => s.sidebarOpen);
   const trafficLights = useTrafficLights();
+  const source = commitSource(context);
 
   let body: ReactNode = null;
   if (!current)
@@ -318,8 +331,7 @@ export function Panel({ context }: { context: PanelContext }) {
   } else if (current === "tasks" && context.kind === "thread") body = <ThreadTasksPanel thread={context.thread} project={context.project} />;
   else if (current === "task" && context.kind === "task") body = <TaskDetailsPanel task={context.task} project={context.project} />;
   else if (current === "checkpoints" && context.kind === "thread") body = <CheckpointsPanel key={context.thread.id} thread={context.thread} />;
-  else if (current === "commits" && (context.kind === "thread" || context.kind === "task"))
-    body = <CommitsPanel source={context.kind === "task" ? { kind: "task", task: context.task } : { kind: "thread", thread: context.thread, project: context.project }} />;
+  else if (current === "commits" && source) body = <CommitsPanel source={source} />;
   else if (current === "memory" && context.kind !== "project") body = <MemoryPanel context={context} />;
 
   return (

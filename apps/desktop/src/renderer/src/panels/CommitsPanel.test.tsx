@@ -20,6 +20,7 @@ const thread: ThreadSummary = {
   branch: null,
   worktreePath: null,
   baseSha: null,
+  baseBranch: null,
   pinnedAt: null,
   seenAt: null,
   doneAt: null,
@@ -78,6 +79,7 @@ beforeEach(() => {
     if (method === "system.info") return { gh: { installed: true, path: "/usr/bin/gh" } } as unknown as RpcResults[M];
     if (method === "review.threadPrTemplate") return { body: "## Summary\n" } as RpcResults[M];
     if (method === "review.createThreadPr") return { url: "https://github.com/openorc/site/pull/7" } as RpcResults[M];
+    if (method === "pulls.branches") return { branches: ["main", "dev", "site-refresh"], defaultBranch: "main" } as RpcResults[M];
     if (method === "orchestration.runtime") {
       const action = { allowed: !teamReason, reason: teamReason };
       return { actions: { commit: action, push: action, createPr: action } } as RpcResults[M];
@@ -156,7 +158,25 @@ it("offers the pull request once the branch is on origin, drafted from the newes
   const dialog = await screen.findByRole("dialog", { name: "Open a pull request" });
   fireEvent.click(within(dialog).getByRole("button", { name: "Open PR" }));
   expect(await screen.findByText("Opened https://github.com/openorc/site/pull/7")).toBeTruthy();
-  expect(vi.mocked(core.call)).toHaveBeenCalledWith("review.createThreadPr", { threadId: thread.id, title: "perf: site overall improvements", body: "## Summary\n" });
+  expect(vi.mocked(core.call)).toHaveBeenCalledWith("review.createThreadPr", { threadId: thread.id, title: "perf: site overall improvements", body: "## Summary\n", base: "main" });
+});
+
+it("targets the branch the thread started from, and opens the pull request into another you choose", async () => {
+  state = { ...state, unpushedCount: 0, unpushed: [] };
+  mount({ ...thread, baseBranch: "dev" });
+  fireEvent.click(await screen.findByRole("button", { name: "PR" }));
+  const target = await screen.findByRole<HTMLButtonElement>("combobox", { name: "Target branch" });
+  await waitFor(() => expect(target.disabled).toBe(false));
+  expect(target.textContent).toBe("dev");
+
+  fireEvent.click(target);
+  expect(await screen.findByRole("option", { name: "main" })).toBeTruthy();
+  expect(screen.queryByRole("option", { name: "site-refresh" })).toBeNull();
+  fireEvent.click(screen.getByRole("option", { name: "main" }));
+  await waitFor(() => expect(target.textContent).toBe("main"));
+  fireEvent.click(screen.getByRole("button", { name: "Open PR" }));
+  await waitFor(() => expect(vi.mocked(core.call)).toHaveBeenCalledWith("review.createThreadPr", expect.objectContaining({ threadId: thread.id, base: "main" })));
+  expect(vi.mocked(core.call)).toHaveBeenCalledWith("pulls.branches", { projectId: project.id, prefer: "dev" });
 });
 
 it("never offers a pull request from the default branch", async () => {

@@ -49,22 +49,25 @@ function PullRequestHeading({ pull }: { pull: PullRequestDetail }) {
   );
 }
 
-/** The diff with the draft review's comments on it. You comment on the commit you are looking at. */
+/**
+ * The diff with the draft review's comments on it. A comment is on the commit whose diff it was started on, even when
+ * the diff refreshes to newer commits while it is being written.
+ */
 function PullRequestChanges({ projectId, pull, review }: { projectId: string; pull: PullRequestDetail; review: PullRequestReview | null }) {
   const key = { projectId, number: pull.number };
   const diff = useRpc("pulls.diff", key);
   const models = useModelCatalog();
   const addComment = useRpcMutation("pulls.review.comment");
   const removeComment = useRpcMutation("pulls.review.removeComment");
-  const [draft, setDraft] = useState<CommentDraft | null>(null);
+  const [draft, setDraft] = useState<{ location: CommentDraft; commitId: string } | null>(null);
   const drafts = review?.comments;
   const comments = useMemo(() => (drafts ?? []).map(diffComment), [drafts]);
   const authors = new Map((drafts ?? []).map((comment) => [comment.id, draftAuthor(comment.author, models.data)]));
   const error = addComment.error ?? removeComment.error;
   const submitDraft = (body: string) => {
     if (!draft) return;
-    const { path, startLine, startSide, line, side, lineText } = draft;
-    addComment.mutate({ ...key, commitId: pull.headSha, path, startLine, startSide, line, side, lineText, body }, { onSuccess: () => setDraft(null) });
+    const { path, startLine, startSide, line, side, lineText } = draft.location;
+    addComment.mutate({ ...key, commitId: draft.commitId, path, startLine, startSide, line, side, lineText, body }, { onSuccess: () => setDraft(null) });
   };
 
   if (diff.error) {
@@ -75,18 +78,19 @@ function PullRequestChanges({ projectId, pull, review }: { projectId: string; pu
     );
   }
   if (!diff.data) return <div className="document-skeleton" aria-label="Loading changes" />;
-  if (!diff.data.patch.trim()) return <Empty title="No changes">This pull request changes no files.</Empty>;
+  const { patch, headSha } = diff.data;
+  if (!patch.trim()) return <Empty title="No changes">This pull request changes no files.</Empty>;
   return (
     <>
       {/* The plane's edge is an inset hairline painted beneath its content, so the diff's opaque ground stops a pixel short of it. */}
       <div className="flex-1 min-h-0 mx-px">
         <Suspense fallback={null}>
           <DiffView
-            patch={diff.data.patch}
+            patch={patch}
             comments={comments}
             commentRanges
-            draft={draft}
-            onRequestComment={setDraft}
+            draft={draft?.location ?? null}
+            onRequestComment={(location) => setDraft({ location, commitId: headSha })}
             onSubmitDraft={submitDraft}
             onCancelDraft={() => setDraft(null)}
             onRemoveComment={(id) => removeComment.mutate({ ...key, id })}

@@ -3,7 +3,7 @@ import http from "node:http";
 import type { AddressInfo } from "node:net";
 import os from "node:os";
 import { settings, type Db } from "@openorc/db";
-import { GitHubAppClient, GitHubPulls, reviewerAppManifest, type GitHubAppIdentity, type ReviewSubmission } from "@openorc/git";
+import { GitHubAppClient, GitHubPulls, reviewerAppManifest, type GitHubAppCredentials, type GitHubAppIdentity, type ReviewSubmission } from "@openorc/git";
 import type { ReviewerAppStatus } from "@openorc/protocol";
 import type { ProtectedSecretStore } from "./extraction-credentials.js";
 
@@ -22,6 +22,8 @@ interface PendingSetup {
   url: string;
   server: http.Server;
   timer: NodeJS.Timeout;
+  /** GitHub sent its one-time code back, which is traded once: the setup's pages are done. */
+  exchanging: boolean;
 }
 
 export interface ReviewerAppOptions {
@@ -106,7 +108,7 @@ export class ReviewerAppService {
     const { port } = server.address() as AddressInfo;
     const timer = setTimeout(() => this.cancel(), SETUP_TIMEOUT_MS);
     timer.unref();
-    this.pending = { state, url: `http://127.0.0.1:${port}/reviewer-app/start?state=${state}`, server, timer };
+    this.pending = { state, url: `http://127.0.0.1:${port}/reviewer-app/start?state=${state}`, server, timer, exchanging: false };
     this.changed();
     return { url: this.pending.url };
   }
@@ -164,7 +166,7 @@ export class ReviewerAppService {
     }
     const url = new URL(request.url ?? "/", `http://127.0.0.1:${port}`);
     const pending = this.pending;
-    if (!pending || url.searchParams.get("state") !== pending.state) {
+    if (!pending || pending.exchanging || url.searchParams.get("state") !== pending.state) {
       sendPage(response, 403, "This link has expired", "<p>Start setting up the reviewer app again from OpenOrc.</p>");
       return;
     }
@@ -183,13 +185,21 @@ export class ReviewerAppService {
     });
   }
 
-  /** Trades GitHub's one-time code for the app, keeps its key, then sends the browser on to choose repositories. */
+  /**
+   * Trades GitHub's one-time code for the app, keeps its key, then sends the browser on to choose repositories. Setup
+   * can be cancelled until GitHub answers; the app it created then goes unused.
+   */
   private async finish(response: http.ServerResponse, pending: PendingSetup, code: string | null): Promise<void> {
-    // The code works once: this setup ends here whatever happens next.
-    this.pending = null;
+    pending.exchanging = true;
+    const app = await this.trade(code);
     try {
-      if (!code) throw new Error("GitHub didn't send the app back.");
-      const app = await this.github.exchangeManifestCode(code);
+      if (this.pending !== pending) {
+        const unused = app instanceof Error ? "" : ` You can delete it in <a href="https://github.com/settings/apps/${encodeURIComponent(app.slug)}">your GitHub settings</a>.`;
+        sendPage(response, 409, "Setup was cancelled", `<p>OpenOrc didn't keep the app.${unused}</p>`);
+        return;
+      }
+      this.pending = null;
+      if (app instanceof Error) throw app;
       await this.options.secrets!.save(app.pem);
       const stored: StoredApp = { id: app.id, slug: app.slug, name: app.name, owner: app.owner, allowApprove: false };
       settings.set(this.db, SETTING, JSON.stringify(stored));
@@ -203,6 +213,12 @@ export class ReviewerAppService {
       else response.once("close", () => this.close(pending));
       this.changed();
     }
+  }
+
+  /** The app GitHub's one-time code buys, or why it couldn't. */
+  private async trade(code: string | null): Promise<GitHubAppCredentials | Error> {
+    if (!code) return new Error("GitHub didn't send the app back.");
+    return this.github.exchangeManifestCode(code).catch((error: unknown) => (error instanceof Error ? error : new Error(String(error))));
   }
 
   private close(pending: PendingSetup): void {

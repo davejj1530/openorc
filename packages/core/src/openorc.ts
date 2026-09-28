@@ -584,7 +584,9 @@ export class OpenOrc {
         "threads.send",
       ].includes(method) &&
         hidden(params["id"])) ||
-      (["review.threadDiff", "review.commitThread", "review.pushThread", "review.createThreadPr", "git.threadLog", "git.threadPushState", "runs.listForThread"].includes(method) &&
+      (["review.threadDiff", "review.commitThread", "review.pushThread", "review.createThreadPr", "review.threadPrTemplate", "git.threadLog", "git.threadPushState", "runs.listForThread"].includes(
+        method,
+      ) &&
         hidden(params["threadId"]))
     ) {
       throw new Error("This conversation was deleted. Its saved tasks keep their team activity and controls.");

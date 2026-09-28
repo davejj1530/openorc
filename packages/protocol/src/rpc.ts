@@ -353,6 +353,7 @@ export const rpcParams = {
   "git.threadLog": z.object({ threadId: z.string(), limit: z.number().int().positive().max(200).optional() }),
   /** Which branch Push would publish from the thread's workspace and which commits origin lacks. Local refs only; never fetches. */
   "git.threadPushState": z.object({ threadId: z.string() }),
+  "review.threadPrTemplate": z.object({ threadId: z.string() }),
   /** Tracked files whose path matches, for @ mentions in the composer. */
   "files.search": z.object({ projectId: z.string(), query: z.string(), limit: z.number().int().positive().max(50).optional() }),
   /** Read a cited text file in the conversation's workspace. */
@@ -646,6 +647,8 @@ export interface RpcResults {
   "review.createThreadPr": { url: string };
   "git.threadLog": Commit[];
   "git.threadPushState": PushState;
+  /** The repository's pull request template, read from the thread's workspace; null when it has none. */
+  "review.threadPrTemplate": { body: string | null };
   "files.search": string[];
   "files.read": { path: string; content: string };
   "app.settings.get": AppSettings;

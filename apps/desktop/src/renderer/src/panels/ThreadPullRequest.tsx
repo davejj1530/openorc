@@ -48,8 +48,6 @@ export function ThreadPullRequest({
 }) {
   const info = useRpc("system.info", {});
   const [open, setOpen] = useState(false);
-  const [title, setTitle] = useState(thread.title);
-  const [body, setBody] = useState("");
   if (thread.prUrl) return <PullRequestLink thread={thread} />;
   if (!ready) return null;
   const disabled = !action.allowed || busy;
@@ -66,53 +64,85 @@ export function ThreadPullRequest({
       <Button size="sm" disabled={disabled} onClick={() => setOpen(true)} title={action.reason ?? "Open a pull request"}>
         <GitPullRequest size={12} /> PR
       </Button>
-      <Dialog
-        open={open}
-        onOpenChange={(next) => {
-          if (!busy) setOpen(next);
-        }}
-        title="Open a pull request"
-        width={560}
-      >
-        <Field label="Title">
-          <Input value={title} onChange={(e) => setTitle(e.target.value)} disabled={busy} autoFocus />
-        </Field>
-        <Field label="Body">
-          <Textarea rows={6} value={body} onChange={(e) => setBody(e.target.value)} disabled={busy} placeholder="What this changes and how to check it" />
-        </Field>
-        {action.reason ? (
-          <p role="status" className="text-sm text-ink-3 mb-3">
-            {action.reason}
-          </p>
-        ) : null}
-        {pr.error ? (
-          <div role="alert" className="text-sm text-bad mb-3 break-words">
-            {pr.error.message}
-          </div>
-        ) : null}
-        <div className="flex justify-end gap-2">
-          <Button disabled={busy} onClick={() => setOpen(false)}>
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            disabled={!action.allowed || !title.trim() || busy}
-            onClick={() =>
-              pr.mutate(
-                { threadId: thread.id, title: title.trim(), body },
-                {
-                  onSuccess: (r) => {
-                    setOpen(false);
-                    onOpened(r.url);
-                  },
-                },
-              )
-            }
-          >
-            {pr.isPending ? "Opening…" : "Open PR"}
-          </Button>
-        </div>
-      </Dialog>
+      <PullRequestDialog open={open} onOpenChange={setOpen} thread={thread} pr={pr} action={action} busy={busy} onOpened={onOpened} />
     </>
+  );
+}
+
+/**
+ * Title and description for a new pull request. Until you edit them they follow the newest
+ * commit and the repository's pull request template; your edits survive closing the dialog.
+ */
+function PullRequestDialog({
+  open,
+  onOpenChange,
+  thread,
+  pr,
+  action,
+  busy,
+  onOpened,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  thread: ThreadSummary;
+  pr: ReturnType<typeof useRpcMutation<"review.createThreadPr">>;
+  action: TeamActionAvailability;
+  busy: boolean;
+  onOpened: (url: string) => void;
+}) {
+  const log = useRpc("git.threadLog", { threadId: thread.id });
+  const template = useRpc("review.threadPrTemplate", { threadId: thread.id });
+  const [editedTitle, setTitle] = useState<string | null>(null);
+  const [editedBody, setBody] = useState<string | null>(null);
+  const title = editedTitle ?? log.data?.[0]?.subject ?? thread.title;
+  const body = editedBody ?? template.data?.body ?? "";
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!busy) onOpenChange(next);
+      }}
+      title="Open a pull request"
+      width={560}
+    >
+      <Field label="Title">
+        <Input value={title} onChange={(e) => setTitle(e.target.value)} disabled={busy} autoFocus />
+      </Field>
+      <Field label="Body">
+        <Textarea rows={6} value={body} onChange={(e) => setBody(e.target.value)} disabled={busy} placeholder="What this changes and how to check it" />
+      </Field>
+      {action.reason ? (
+        <p role="status" className="text-sm text-ink-3 mb-3">
+          {action.reason}
+        </p>
+      ) : null}
+      {pr.error ? (
+        <div role="alert" className="text-sm text-bad mb-3 break-words">
+          {pr.error.message}
+        </div>
+      ) : null}
+      <div className="flex justify-end gap-2">
+        <Button disabled={busy} onClick={() => onOpenChange(false)}>
+          Cancel
+        </Button>
+        <Button
+          variant="primary"
+          disabled={!action.allowed || !title.trim() || busy}
+          onClick={() =>
+            pr.mutate(
+              { threadId: thread.id, title: title.trim(), body },
+              {
+                onSuccess: (r) => {
+                  onOpenChange(false);
+                  onOpened(r.url);
+                },
+              },
+            )
+          }
+        >
+          {pr.isPending ? "Opening…" : "Open PR"}
+        </Button>
+      </div>
+    </Dialog>
   );
 }

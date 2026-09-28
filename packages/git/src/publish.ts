@@ -1,3 +1,5 @@
+import { readdir, readFile } from "node:fs/promises";
+import path from "node:path";
 import { git, run, GitError } from "./exec.js";
 
 export async function commitAll(cwd: string, message: string): Promise<string> {
@@ -50,6 +52,25 @@ export async function hasGh(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+const templateName = /^pull[_-]request[_-]template(\.|$)/i;
+/** A leading YAML block, which gh drops before using a template. */
+const frontMatter = /^---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/;
+
+/**
+ * The repository's default pull request template, found where `gh pr create` looks: a file named
+ * pull_request_template (any case, `_` or `-`, any extension) in `.github`, the root, then `docs`.
+ * Null when there is none.
+ */
+export async function pullRequestTemplate(cwd: string): Promise<string | null> {
+  for (const dir of [path.join(cwd, ".github"), cwd, path.join(cwd, "docs")]) {
+    const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
+    const names = entries.filter((entry) => !entry.isDirectory() && templateName.test(entry.name)).map((entry) => entry.name);
+    const name = names.sort()[0];
+    if (name) return (await readFile(path.join(dir, name), "utf8")).replace(frontMatter, "");
+  }
+  return null;
 }
 
 /** Opens a pull request with the user's own gh login. Returns the PR URL. */

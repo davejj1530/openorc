@@ -139,8 +139,9 @@ export const pullReviews = {
     db.stmt("DELETE FROM pull_request_review_comments WHERE id = ? AND project_id = ? AND number = ?").run(id, key.projectId, key.number);
     touch(db, key, Date.now());
   },
-  /** Deletes the review with its comments, once it is posted or discarded. */
-  remove(db: Db, key: PullReviewKey): void {
-    db.stmt("DELETE FROM pull_request_reviews WHERE project_id = ? AND number = ?").run(key.projectId, key.number);
+  /** Empties the draft once it is posted or discarded. The review keeps its conversation for the next round. */
+  clearDraft(db: Db, key: PullReviewKey): void {
+    db.stmt("DELETE FROM pull_request_review_comments WHERE project_id = ? AND number = ?").run(key.projectId, key.number);
+    db.stmt("UPDATE pull_request_reviews SET summary = '', updated_at = ? WHERE project_id = ? AND number = ?").run(Date.now(), key.projectId, key.number);
   },
 };

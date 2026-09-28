@@ -43,6 +43,11 @@ function reviewSettings(choice: ModelChoice | null): ModelExecutionSettings | nu
   return { agent: choice.agent, model: choice.model, effort: choice.effort, fastMode: Boolean(choice.fastMode) };
 }
 
+function startLabel(starting: boolean, again: boolean): string {
+  if (starting) return "Starting…";
+  return again ? "Review again" : "Start review";
+}
+
 /** The review's conversation, which says so while its model is still working. */
 function ReviewConversationLink({ conversation, models }: { conversation: ThreadSummary; models: ModelOption[] | undefined }) {
   const reviewing = conversation.activity !== "idle";
@@ -67,6 +72,8 @@ export function PullRequestReviewer({ projectId, pull, review }: { projectId: st
   const settings = reviewSettings(choice);
   const conversation = thread.data ?? null;
   const reviewing = conversation?.activity === "running" || conversation?.activity === "waiting";
+  // A later round continues the review's conversation, unless it was put away.
+  const again = conversation !== null && conversation.archivedAt === null;
   const begin = () => {
     if (settings) start.mutate({ projectId, number: pull.number, reviewer: settings });
   };
@@ -80,7 +87,7 @@ export function PullRequestReviewer({ projectId, pull, review }: { projectId: st
         <>
           <ModelPicker value={choice} onChange={(next) => choose({ kind: "model", choice: next })} ariaLabel="Reviewing model" disabled={start.isPending} />
           <Button size="sm" disabled={!settings || start.isPending || reviewing} onClick={begin}>
-            <Sparkles size={12} /> {start.isPending ? "Starting…" : "Start review"}
+            <Sparkles size={12} /> {startLabel(start.isPending, again)}
           </Button>
         </>
       ) : null}

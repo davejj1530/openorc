@@ -37,7 +37,7 @@ test("matching source, package version, public copy and built artifact pass", (t
   assert.equal(run("website", path.join(root, "dist")).status, 0);
 });
 
-test("Git checkout preserves reviewed notice bytes when core.autocrlf is enabled", (t) => {
+test("Git checkout uses LF for source and preserves reviewed notice bytes with core.autocrlf enabled", (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "openorc-notice-checkout-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const source = path.resolve(__dirname, "..");
@@ -52,12 +52,15 @@ test("Git checkout preserves reviewed notice bytes when core.autocrlf is enabled
     ]),
   ];
   const original = new Map(files.map((file) => [file, fs.readFileSync(path.join(source, file))]));
-  for (const file of [".gitattributes", ...files]) {
+  // CRLF notices must stay byte-identical even with the repository-wide LF rule.
+  for (const file of ["licenses/checkout-crlf.txt", "apps/website/public/licenses/checkout-crlf.txt"]) original.set(file, Buffer.from("Reviewed upstream notice.\r\n"));
+  for (const [file, bytes] of original) {
     const target = path.join(root, file);
     fs.mkdirSync(path.dirname(target), { recursive: true });
-    fs.copyFileSync(path.join(source, file), target);
+    fs.writeFileSync(target, bytes);
   }
-  fs.writeFileSync(path.join(root, "checkout-control.txt"), "Line endings must change here.\n");
+  const control = path.join(root, "checkout-control.txt");
+  fs.writeFileSync(control, "Source files must use LF.\n");
   const emptyConfig = path.join(root, "empty.gitconfig");
   fs.writeFileSync(emptyConfig, "");
   const git = (...args) => {
@@ -70,10 +73,17 @@ test("Git checkout preserves reviewed notice bytes when core.autocrlf is enabled
     assert.equal(result.status, 0, result.stderr || String(result.error));
   };
   git("init", "--quiet");
-  git("-c", "core.autocrlf=false", "add", "--", ".gitattributes", "checkout-control.txt", ...files);
-  for (const file of ["checkout-control.txt", ...files]) fs.unlinkSync(path.join(root, file));
+  // Prove the fixture converts to CRLF before applying the real checkout policy.
+  git("-c", "core.autocrlf=false", "add", "--", "checkout-control.txt");
+  fs.unlinkSync(control);
+  git("-c", "core.autocrlf=true", "checkout-index", "--force", "--", "checkout-control.txt");
+  assert.equal(fs.readFileSync(control, "utf8"), "Source files must use LF.\r\n");
+
+  fs.copyFileSync(path.join(source, ".gitattributes"), path.join(root, ".gitattributes"));
+  git("-c", "core.autocrlf=false", "add", "--", ".gitattributes", "checkout-control.txt", ...original.keys());
+  for (const file of ["checkout-control.txt", ...original.keys()]) fs.unlinkSync(path.join(root, file));
   git("-c", "core.autocrlf=true", "checkout-index", "--all", "--force");
-  assert.equal(fs.readFileSync(path.join(root, "checkout-control.txt"), "utf8"), "Line endings must change here.\r\n");
+  assert.equal(fs.readFileSync(control, "utf8"), "Source files must use LF.\n");
   for (const [file, bytes] of original) assert.ok(fs.readFileSync(path.join(root, file)).equals(bytes), `${file} changed during checkout`);
 });
 

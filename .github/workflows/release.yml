@@ -109,6 +109,9 @@ jobs:
       - run: node --test scripts/size-limit.test.cjs
       - run: pnpm -r typecheck
       - run: pnpm lint
+        env:
+          # Type-aware ESLint exceeds the runner's default ~2 GB heap.
+          NODE_OPTIONS: --max-old-space-size=4096
       - run: pnpm format:check
       - run: node --test scripts/desktop-release.test.cjs scripts/distribution-notices.test.cjs scripts/packaged-native-target.test.cjs scripts/packaged-runtime-dependencies.test.cjs
       - run: pnpm --filter @openorc/desktop exec vitest run src/main/app-updates.test.ts src/main/update-handoff.test.ts

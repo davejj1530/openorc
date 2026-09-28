@@ -137,10 +137,12 @@ jobs:
           const scale = reports.find((r) => r.kind === "scale");
           if (!bench || !scale) { console.error("missing bench or scale report"); process.exit(1); }
           // Working set overstates private memory on macOS; the 50-agent budget is a regression fence, not a footprint claim.
+          // Hosted display pacing affects rAF even at idle. Gate on independent 20 ms main-thread gaps;
+          // raw animation-frame counts remain in the reports for display/rendering diagnosis (docs/benchmarks.md).
           const checks = [
             ["bench", "coldStartMs", bench.coldStartMs, 1500],
-            ["bench", "longFramesTotal", bench.longFramesTotal, 5],
-            ["scale", "longFramesTotal", scale.longFramesTotal, 30],
+            ["bench", "mainThread.stallsTotal", bench.mainThread?.stallsTotal, 5],
+            ["scale", "mainThread.stallsTotal", scale.mainThread?.stallsTotal, 30],
             ["scale", "workingSetTotalMb", scale.workingSetTotalMb, 1500],
           ];
           let failed = false;
@@ -166,8 +168,8 @@ jobs:
           // A 119-turn thread stays open while its own run streams and while five unrelated runs stream.
           const checks = [
             ["openMs", report.openMs, 1500],
-            ["stream.longFramesTotal", report.stream?.longFramesTotal, 60],
-            ["unrelated.longFramesTotal", report.unrelated?.longFramesTotal, 10],
+            ["stream.mainThread.stallsTotal", report.stream?.mainThread?.stallsTotal, 60],
+            ["unrelated.mainThread.stallsTotal", report.unrelated?.mainThread?.stallsTotal, 10],
           ];
           let failed = report.ok === false;
           for (const [k, v, max] of checks) {

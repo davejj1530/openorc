@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { core } from "./rpc";
 import { FrameMeasurement } from "./frame-measurement";
+import { beginMainThreadMeasurement } from "./main-thread-measurement";
 
 export interface SecondSample {
   events: number;
@@ -37,8 +38,18 @@ let windowLong = 0;
 let eventsReceived = 0;
 let framesReceived = 0;
 const benchmarkFrames = new FrameMeasurement();
-export const beginBenchmarkFrames = () => benchmarkFrames.begin(performance.now());
-export const finishBenchmarkFrames = () => benchmarkFrames.finish(performance.now());
+let finishMainThread: ReturnType<typeof beginMainThreadMeasurement> | null = null;
+export function beginBenchmarkFrames() {
+  finishMainThread?.();
+  benchmarkFrames.begin(performance.now());
+  finishMainThread = beginMainThreadMeasurement();
+}
+export function finishBenchmarkFrames() {
+  if (!finishMainThread) throw new Error("No benchmark measurement is active");
+  const mainThread = finishMainThread();
+  finishMainThread = null;
+  return { ...benchmarkFrames.finish(performance.now()), mainThread };
+}
 
 /** Totals up to the last frame; the store only catches up once a second. */
 export const receivedTotals = () => ({ eventsReceived, framesReceived });

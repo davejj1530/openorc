@@ -86,8 +86,8 @@ function installBench(): void {
   core.onReady(() => {
     beginBenchmarkFrames();
     setTimeout(async () => {
-      const frames = finishBenchmarkFrames();
-      window.openorc.report({ kind: "idle", frames, ...(await snapshot()) });
+      const { mainThread, ...frames } = finishBenchmarkFrames();
+      window.openorc.report({ kind: "idle", frames, mainThread, ...(await snapshot()) });
       beginBenchmarkFrames();
       await core.call("bench.start", BENCH);
     }, 3000);
@@ -109,6 +109,7 @@ function installBench(): void {
           longFramesTotal: measurement.longFramesTotal,
           longestFrameMs: measurement.longestFrameMs,
           measurementDurationMs: measurement.durationMs,
+          mainThread: measurement.mainThread,
           ...(await snapshot()),
         });
         if (phase === "bench") {

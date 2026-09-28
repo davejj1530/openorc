@@ -44,6 +44,7 @@ let preparingUpdate = false;
 // Visual QA and CI switches. A release build compiles them out and ignores these variables.
 const screenshot = __OPENORC_QA__ ? process.env["OPENORC_SCREENSHOT"] : undefined;
 const autoquit = __OPENORC_QA__ && process.env["OPENORC_AUTOQUIT"] === "1";
+const benchmarking = __OPENORC_QA__ && ["OPENORC_AUTOBENCH", "OPENORC_AUTOBENCH_THREAD"].some((name) => process.env[name] === "1");
 
 // A packaged app accepts no remote debugging: any program could otherwise relaunch it with a debugging port and drive
 // its windows, the Preview's signed-in sessions included. Node's --inspect is switched off by a fuse instead.
@@ -123,6 +124,8 @@ function createWindow(route?: string): BrowserWindow {
       preload: join(here, "../preload/index.js"),
       sandbox: true,
       contextIsolation: true,
+      // A covered QA window must keep measuring the continuous workload.
+      backgroundThrottling: !benchmarking,
       ...(route ? { additionalArguments: [`--openorc-route=${route}`] } : {}),
     },
   });

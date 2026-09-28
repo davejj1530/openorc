@@ -691,3 +691,29 @@ describe("Claude MCP startup", () => {
     }
   });
 });
+
+describe("unvetted checkouts", () => {
+  const start = (spec: { untrustedCheckout?: boolean; mode?: "plan" | "act" }) => {
+    mockProcess();
+    return new ClaudeAdapter().start({ runId: "unvetted", agent: "claude", cwd: process.cwd(), prompt: "Fixture only", permissionMode: "autonomous", ...spec }, launch);
+  };
+
+  it("takes only the user's own settings and the app's MCP server, even in Act with full access", async () => {
+    for (const [spec, untrusted] of [
+      [{ untrustedCheckout: true }, true],
+      [{ untrustedCheckout: true, mode: "plan" as const }, true],
+      [{}, false],
+    ] as const) {
+      const handle = start(spec);
+      try {
+        const args = vi.mocked(spawn).mock.lastCall![1] as string[];
+        if (untrusted) expect(args[args.indexOf("--setting-sources") + 1]).toBe("user");
+        else expect(args).not.toContain("--setting-sources");
+        expect(args.includes("--strict-mcp-config")).toBe(untrusted);
+      } finally {
+        handle.close();
+        await handle.wait();
+      }
+    }
+  });
+});

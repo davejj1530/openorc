@@ -1,9 +1,9 @@
-import { WORKSPACE_ID, reviewCommentPlace, teamReviewComment } from "@openorc/protocol";
+import { WORKSPACE_ID, isDetachedCopy, reviewCommentPlace, teamReviewComment } from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
 import { access, mkdir, realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { audit, comments, orchestration, projects, snapshots, tasks, teamDeletedThreads, teamRuntime, teamTasks, threads, type Db, type ReviewCommentScope } from "@openorc/db";
-import { changedFiles, commitAll, createPr, git, hasGh, headCommit, log, patchAgainst, patchSinceTree, pullRequestTemplate, push, teamTransfer, unpushedCommits } from "@openorc/git";
+import { changedFiles, commitAll, createPr, git, GitHubPulls, hasGh, headCommit, log, patchAgainst, patchSinceTree, pullRequestTemplate, push, teamTransfer, unpushedCommits } from "@openorc/git";
 import type { Commit, Project, PushState, ReviewComment, ReviewDiff, Snapshot, Task, TeamActionAvailability, TeamReviewComment, Thread } from "@openorc/protocol";
 import { assertRepository, projectGit } from "./project-git.js";
 import { workspaceWriters, type WorkspaceWriters } from "./workspace-writers.js";
@@ -48,6 +48,7 @@ export interface ReviewOptions {
   /** Team-owned task publication availability; null for ordinary tasks. */
   taskExport?(taskId: string): TeamTaskExport | null;
   conversations?: ReviewConversations;
+  github?: GitHubPulls;
 }
 
 export interface NewReviewComment extends ReviewCommentScope {
@@ -100,7 +101,24 @@ function acceptedMessage(selected: ReviewComment[]): string | null {
   const [messageId] = messages;
   return messageId ?? null;
 }
-const isSha = (value: string | null | undefined) => Boolean(value && /^[0-9a-f]{40,64}$/.test(value));
+
+const DETACHED_COPY = "This conversation's copy is on no branch, so nothing in it is committed or pushed.";
+
+/**
+ * What Push would publish from `cwd`, judged by what origin was last seen to have: `head`, the branch itself unless
+ * given, against the branch `branchOf` names. When no branch can be named, that is why nothing can be pushed.
+ */
+async function pushState(cwd: string, branchOf: () => string | Promise<string>, head?: string): Promise<PushState> {
+  let branch: string;
+  try {
+    branch = await branchOf();
+  } catch (error) {
+    return { branch: null, blocked: error instanceof Error ? error.message : String(error), published: false, unpushedCount: 0, unpushed: [] };
+  }
+  const state = await unpushedCommits(cwd, { rev: head ?? `refs/heads/${branch}`, branch });
+  if (!state) return { branch, blocked: "This repository has no origin remote to push to.", published: false, unpushedCount: 0, unpushed: [] };
+  return { branch, blocked: null, published: state.published, unpushedCount: state.count, unpushed: state.shas };
+}
 
 /** Everything the Files and Commits tabs need, plus the three integrate actions. */
 export class ReviewService {
@@ -141,6 +159,27 @@ export class ReviewService {
     });
   }
 
+  async projectLog(project: Project, limit = 50): Promise<Commit[]> {
+    await assertRepository(project);
+    return log(project.rootPath, null, limit);
+  }
+
+  /** What Push would publish from the checkout's branch, whoever made its commits. */
+  async projectPushState(project: Project): Promise<PushState> {
+    await assertRepository(project);
+    return pushState(project.rootPath, () => this.checkoutBranch(project));
+  }
+
+  async pushProject(project: Project): Promise<{ remote: string; branch: string }> {
+    await assertRepository(project);
+    return this.writers.withLease(project.rootPath, `pushing project ${project.id}`, async () => {
+      const branch = await this.checkoutBranch(project);
+      await push(project.rootPath, branch);
+      audit.record(this.db, { actor: "user", action: "project.push", resourceType: "project", resourceId: project.id, metadata: { branch } });
+      return { remote: "origin", branch };
+    });
+  }
+
   /* Threads: the checkout against HEAD, or the thread's worktree against where it branched. */
 
   private async threadCwd(thread: Thread, project: Project): Promise<string> {
@@ -158,6 +197,8 @@ export class ReviewService {
 
   async commitThread(thread: Thread, project: Project, message: string): Promise<{ sha: string }> {
     return this.withThreadMutation(thread, project, "committing", async (context) => {
+      // Committing runs the user's hooks, which in a pull request's copy would be its author's.
+      if (!context.team && isDetachedCopy(context.thread)) throw new Error(DETACHED_COPY);
       const publication = context.team && context.thread.workspaceMode === "worktree" ? await this.publicationRef(context) : null;
       context.assertCurrent();
       const sha = await commitAll(context.cwd, message);
@@ -175,7 +216,13 @@ export class ReviewService {
 
   /** The branch a thread publishes: its own for a worktree, whatever the checkout is on otherwise. */
   private async threadBranch(thread: Thread, project: Project): Promise<string> {
-    if (thread.branch && thread.worktreePath) return thread.branch;
+    if (!thread.worktreePath) return this.checkoutBranch(project);
+    if (isDetachedCopy(thread)) throw new Error(DETACHED_COPY);
+    return thread.branch!;
+  }
+
+  /** The branch the project's checkout is on, once it has a commit to push. */
+  private async checkoutBranch(project: Project): Promise<string> {
     const head = await git(project.rootPath, ["symbolic-ref", "--short", "-q", "HEAD"], { okCodes: [0, 1] });
     if (head.code !== 0) throw new Error("The checkout isn't on a branch.");
     if (!(await headCommit(project.rootPath))) throw new Error("Make a first commit before pushing.");
@@ -187,15 +234,7 @@ export class ReviewService {
     const cwd = await this.threadCwd(thread, project);
     // A team worktree stays detached, and Push first advances its publication branch to HEAD.
     const team = thread.workspaceMode === "worktree" && Boolean(orchestration.getInstance(this.db, thread.id));
-    let branch: string;
-    try {
-      branch = team ? this.teamBranch(thread.id) : await this.threadBranch(thread, project);
-    } catch (error) {
-      return { branch: null, blocked: error instanceof Error ? error.message : String(error), published: false, unpushedCount: 0, unpushed: [] };
-    }
-    const state = await unpushedCommits(cwd, { rev: team ? "HEAD" : `refs/heads/${branch}`, branch });
-    if (!state) return { branch, blocked: "This repository has no origin remote to push to.", published: false, unpushedCount: 0, unpushed: [] };
-    return { branch, blocked: null, published: state.published, unpushedCount: state.count, unpushed: state.shas };
+    return team ? pushState(cwd, () => this.teamBranch(thread.id), "HEAD") : pushState(cwd, () => this.threadBranch(thread, project));
   }
 
   async pushThread(thread: Thread, project: Project): Promise<{ remote: string; branch: string }> {
@@ -214,13 +253,13 @@ export class ReviewService {
     return { body: await pullRequestTemplate(await this.threadCwd(thread, project)) };
   }
 
-  async createThreadPr(thread: Thread, project: Project, title: string, body: string): Promise<{ url: string }> {
+  /** Opens a pull request from the thread's branch into `base`, the target the user chose. */
+  async createThreadPr(thread: Thread, project: Project, title: string, body: string, base: string): Promise<{ url: string }> {
     return this.withThreadMutation(thread, project, "publishing", async (context) => {
       if (!(await hasGh())) throw new Error("the GitHub CLI (gh) is not installed");
       context.assertCurrent();
       const publication = context.team && context.thread.workspaceMode === "worktree" ? await this.publicationRef(context) : null;
       const branch = publication ? await this.updatePublicationRef(context, publication) : await this.threadBranch(context.thread, context.project);
-      const base = context.project.defaultBranch ?? "main";
       if (branch === base) throw new Error(`the thread is on ${base}; a pull request needs a branch of its own`);
       if (publication) {
         const remote = await git(context.cwd, ["ls-remote", "--exit-code", "origin", `refs/heads/${branch}`], { okCodes: [0, 2] });
@@ -229,11 +268,22 @@ export class ReviewService {
         await this.assertPushed(context.cwd, branch);
       }
       context.assertCurrent();
-      const url = await createPr(context.cwd, { title, body, base, head: branch });
+      const url = await this.openPullRequest(context.cwd, { title, body, base, head: branch });
       threads.update(this.db, thread.id, { prUrl: url, prState: "open" });
       audit.record(this.db, { actor: "user", action: "thread.pr", resourceType: "thread", resourceId: thread.id, metadata: { url } });
       return { url };
     });
+  }
+
+  /** Opens the pull request, saying plainly when gh refused because its target branch isn't on GitHub. */
+  private async openPullRequest(cwd: string, options: { title: string; body: string; base: string; head: string }): Promise<string> {
+    try {
+      return await createPr(cwd, options);
+    } catch (error) {
+      const github = this.options.github ?? new GitHubPulls();
+      if (!(await github.hasBranch(cwd, options.base).catch(() => true))) throw new Error(`${options.base} isn't a branch on GitHub. Choose another target branch.`);
+      throw error;
+    }
   }
 
   /**
@@ -362,10 +412,6 @@ export class ReviewService {
       assertCurrent();
       return operation({ task, project, cwd: lease.paths[0]!, team, assertCurrent });
     });
-  }
-
-  private taskBase(task: Task, project: Project): string | null {
-    return isSha(task.baseRef) ? project.defaultBranch : (task.baseRef ?? project.defaultBranch);
   }
 
   async threadLog(thread: Thread, project: Project, limit = 50): Promise<Commit[]> {
@@ -591,20 +637,20 @@ export class ReviewService {
     });
   }
 
-  async createPr(task: Task, project: Project, title: string, body: string): Promise<{ url: string }> {
+  /** Opens a pull request from the task's branch into `base`, the target the user chose. */
+  async createPr(task: Task, project: Project, title: string, body: string, base: string): Promise<{ url: string }> {
     return this.withTaskMutation(task, project, "publishing", async (context) => {
       if (!(await hasGh())) throw new Error("GitHub CLI (gh) is not installed. Install it and run gh auth login, or push and open the PR in the browser.");
       context.assertCurrent();
-      const base = this.taskBase(context.task, project);
       const publication = context.team ? await this.dedicatedRef(context.cwd, context.team.branch, context.assertCurrent) : null;
       const head = publication?.branch ?? context.task.branch;
-      if (!base || !head) throw new Error("task needs a base branch and its own branch to open a PR");
+      if (!head || head === base) throw new Error("task needs its own branch to open a PR");
       if (publication) {
         const remote = await git(context.cwd, ["ls-remote", "--exit-code", "origin", `refs/heads/${head}`], { okCodes: [0, 2] });
         if (remote.code !== 0 || remote.stdout.split(/\s/)[0] !== publication.head) throw new Error("Push the assignment's committed changes before creating its pull request.");
       }
       context.assertCurrent();
-      const url = await createPr(context.cwd, { title, body, base, head });
+      const url = await this.openPullRequest(context.cwd, { title, body, base, head });
       audit.record(this.db, { actor: "user", action: "review.pr", resourceType: "task", resourceId: task.id, metadata: { url } });
       return { url };
     });

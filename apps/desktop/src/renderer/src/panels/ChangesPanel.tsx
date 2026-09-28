@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
-import type { Project, Task, ThreadSummary } from "@openorc/protocol";
+import { isDetachedCopy, type Project, type Task, type ThreadSummary } from "@openorc/protocol";
 import { GitCommitHorizontal, RefreshCw } from "../components/icons";
 import { Button, Dialog, Empty, Field, IconButton, Textarea, TextButton } from "../components/ui";
 import { ConversationReview } from "./ConversationReview";
@@ -46,6 +46,8 @@ export function ChangesPanel({ thread, project, task }: { thread?: ThreadSummary
   const busy = commit.isPending || (team && threadMutationPending);
   const canCommit = actions.commit.allowed && !uncommitted.isError && (uncommitted.data?.files.length ?? 0) > 0 && !busy;
   const commitReason = actions.commit.allowed ? null : actions.commit.reason;
+  // A pull request's copy under review is someone else's code: it is read, never committed.
+  const commits = !thread || Boolean(thread.teamInstanceId) || !isDetachedCopy(thread);
   const refresh = () => {
     void diff.refetch();
     if (thread && comparison !== "head") void headDiff.refetch();
@@ -115,9 +117,11 @@ export function ChangesPanel({ thread, project, task }: { thread?: ThreadSummary
           </span>
         ) : null}
         <span className="flex-1" />
-        <Button size="sm" disabled={!canCommit} title={actions.commit.reason ?? undefined} onClick={() => setCommitOpen(true)}>
-          <GitCommitHorizontal size={12} /> Commit
-        </Button>
+        {commits ? (
+          <Button size="sm" disabled={!canCommit} title={actions.commit.reason ?? undefined} onClick={() => setCommitOpen(true)}>
+            <GitCommitHorizontal size={12} /> Commit
+          </Button>
+        ) : null}
         {thread ? <PullRequestLink thread={thread} /> : null}
         <IconButton onClick={refresh} aria-label="Refresh" size="sm">
           <RefreshCw size={12} className={diff.isFetching ? "animate-spin" : ""} />

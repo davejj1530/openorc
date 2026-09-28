@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Folder,
   GitBranch,
+  GitPullRequest,
   Inbox,
   ListFilter,
   ListTodo,
@@ -43,6 +44,7 @@ import { CoversPreview } from "../lib/browser-preview";
 import { sidebarThreadPage, visibleSidebarThreadIds } from "../lib/sidebar-thread-groups";
 import { SidebarProjectHeading } from "./SidebarProjectHeading";
 import { useProjectIconChanges } from "../lib/project-icons";
+import { pullRequestNumber } from "../lib/pull-requests";
 import openOrcMark from "../assets/openorc-mark.png";
 
 const PAGE = 8;
@@ -68,6 +70,28 @@ function NavItem({ route, icon, label, badge, active, onClick }: { route?: Route
   );
 }
 
+/** The app's screens, above the projects. */
+function SidebarNav({ route, projectId, inbox }: { route: Route; projectId: string | null; inbox: number }) {
+  return (
+    <nav className="nav-track grid grid-cols-1 min-w-0 gap-px">
+      <NavItem route={{ view: "inbox" }} icon={<Inbox size={15} />} label="Inbox" badge={inbox} active={route.view === "inbox"} />
+      <NavItem route={{ view: "tasks" }} icon={<ListTodo size={15} />} label="Tasks" active={route.view === "tasks" || route.view === "task" || route.view === "newtask"} />
+      <NavItem route={{ view: "pulls" }} icon={<GitPullRequest size={15} />} label="Pull requests" active={route.view === "pulls" || route.view === "pull"} />
+      <NavItem route={{ view: "scheduled" }} icon={<CalendarClock size={15} />} label="Scheduled" active={route.view === "scheduled"} />
+      <NavItem route={{ view: "orchestration", ...(projectId ? { projectId } : {}) }} icon={<Workflow size={15} />} label="Orchestration" active={route.view === "orchestration"} />
+      <NavItem route={{ view: "memory" }} icon={<Brain size={15} />} label="Memory" active={route.view === "memory"} />
+    </nav>
+  );
+}
+
+/** Where a thread works, as its row shows it: its branch, the pull request it reviews, or its folder. */
+function threadPlace(thread: ThreadSummary): { icon: ReactNode; label: string; title: string } {
+  if (thread.branch) return { icon: <GitBranch size={11} className="shrink-0" />, label: thread.branch, title: thread.branch };
+  const pull = pullRequestNumber(thread.prUrl);
+  if (thread.prUrl && pull !== null) return { icon: <GitPullRequest size={11} className="shrink-0" />, label: `PR #${pull}`, title: thread.prUrl };
+  return { icon: <Folder size={11} className="shrink-0" />, label: thread.projectId === WORKSPACE_ID ? "Local" : "No branch", title: thread.workingDirectory ?? "No recorded branch" };
+}
+
 /**
  * A thread row: title, then what matters at a glance. ⌘-click opens it in
  * the split; right-click gives every action.
@@ -80,7 +104,7 @@ function ThreadRow({ thread, active }: { thread: ThreadSummary; active: boolean 
   const providers = [...new Set(agents)].map((agent) => ({ agent, count: agents.filter((item) => item === agent).length }));
   const team = agents.length > 1;
   const agentLabel = providers.map(({ agent, count }) => `${team ? `${count} × ` : ""}${harnessShortName(agent)}`).join(", ");
-  const branch = thread.branch ?? (thread.projectId === WORKSPACE_ID ? "Local" : "No branch");
+  const place = threadPlace(thread);
   return (
     <ContextMenu.Root>
       <ContextMenu.Trigger
@@ -111,9 +135,9 @@ function ThreadRow({ thread, active }: { thread: ThreadSummary; active: boolean 
           <ThreadStatusIndicator thread={thread} />
         </span>
         <span className="flex min-w-0 items-center gap-2 text-xs leading-4 text-ink-3">
-          <span className="flex flex-1 min-w-0 items-center gap-1" title={thread.branch ?? thread.workingDirectory ?? "No recorded branch"}>
-            {thread.branch ? <GitBranch size={11} className="shrink-0" /> : <Folder size={11} className="shrink-0" />}
-            <span className="truncate">{branch}</span>
+          <span className="flex flex-1 min-w-0 items-center gap-1" title={place.title}>
+            {place.icon}
+            <span className="truncate">{place.label}</span>
           </span>
           <span
             className="inline-flex shrink-0 items-center gap-1.5"
@@ -248,21 +272,7 @@ export function Sidebar() {
                   </IconButton>
                 </Tooltip>
               </div>
-              <nav className="nav-track grid grid-cols-1 min-w-0 gap-px">
-                <NavItem route={{ view: "inbox" }} icon={<Inbox size={15} />} label="Inbox" badge={inbox} active={route.view === "inbox"} />
-                <NavItem route={{ view: "tasks" }} icon={<ListTodo size={15} />} label="Tasks" active={route.view === "tasks" || route.view === "task" || route.view === "newtask"} />
-                <NavItem route={{ view: "scheduled" }} icon={<CalendarClock size={15} />} label="Scheduled" active={route.view === "scheduled"} />
-                <NavItem
-                  route={{
-                    view: "orchestration",
-                    ...(projectId ? { projectId } : {}),
-                  }}
-                  icon={<Workflow size={15} />}
-                  label="Orchestration"
-                  active={route.view === "orchestration"}
-                />
-                <NavItem route={{ view: "memory" }} icon={<Brain size={15} />} label="Memory" active={route.view === "memory"} />
-              </nav>
+              <SidebarNav route={route} projectId={projectId} inbox={inbox} />
               <div className="flex items-center gap-0.5 pl-4 pr-2 mt-4 mb-1">
                 <span className="text-sm font-medium text-ink-3">Projects</span>
                 <span className="flex-1" />

@@ -99,3 +99,13 @@ it("round-trips provider-targeted usage routes while keeping old Settings routes
   expect(routeFromSpec("settings:usage:unknown")).toEqual({ view: "settings", section: "usage" });
   expect(routeFromSpec(specFromRoute({ view: "settings", section: "general" }))).toEqual({ view: "settings", section: "general" });
 });
+
+it("round-trips pull request routes and rejects a pull request without a number", async () => {
+  const { routeFromSpec, specFromRoute } = await import("./router");
+  expect(routeFromSpec("pulls")).toEqual({ view: "pulls" });
+  const route = { view: "pull" as const, projectId: "p1", number: 7 };
+  expect(specFromRoute(route)).toBe("pull:p1:7");
+  expect(routeFromSpec(specFromRoute(route))).toEqual(route);
+  expect(routeFromSpec("pull:p1")).toBeNull();
+  expect(routeFromSpec("pull:p1:none")).toBeNull();
+});

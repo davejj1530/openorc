@@ -1,4 +1,4 @@
-import type { ReviewComment } from "@openorc/protocol";
+import type { ReviewComment } from "./domain.js";
 
 const HUNK_HEADER = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/;
 
@@ -26,6 +26,67 @@ interface DiffRow {
   old: number | null;
   new: number | null;
   text: string;
+}
+
+/** One file's part of a unified diff and the path it changes, the new name for a rename. */
+export interface PatchFile {
+  path: string;
+  chunk: string;
+}
+
+/** A patch split per file, in the order the diff lists them. */
+export function patchFiles(patch: string): PatchFile[] {
+  const parts = patch.split(/^(?=diff --git )/m).filter((part) => part.trim().length > 0);
+  return parts.map((chunk) => ({ path: changedPath(chunk) ?? "file", chunk }));
+}
+
+const QUOTED = /^"(?:[^"\\]|\\.)*"/;
+const ESCAPES: Record<string, string> = { a: "\x07", b: "\b", t: "\t", n: "\n", v: "\v", f: "\f", r: "\r" };
+
+/**
+ * A name as Git prints it in a diff. One with unusual characters comes in double quotes with C escapes, and each byte
+ * of a non-ASCII character as three octal digits. An unquoted one containing a space ends with a tab.
+ */
+function gitName(text: string): string {
+  const quoted = QUOTED.exec(text)?.[0];
+  if (quoted === undefined) return text.replace(/\t$/, "");
+  // Rewritten as percent-encoded UTF-8, which decodeURIComponent turns back into text in any environment.
+  const encoded = quoted.slice(1, -1).replace(/\\([0-7]{3})|\\(.)|[^\\]+/gsu, (run, octal?: string, escaped?: string) => {
+    if (octal !== undefined) return `%${parseInt(octal, 8).toString(16).padStart(2, "0")}`;
+    return encodeURIComponent(escaped === undefined ? run : (ESCAPES[escaped] ?? escaped));
+  });
+  try {
+    return decodeURIComponent(encoded);
+  } catch {
+    // Not UTF-8: the name stays as Git printed it.
+    return text;
+  }
+}
+
+/** The name on one side of a diff without Git's a/ or b/ prefix; null for /dev/null, the side of an added or deleted file. */
+function sideName(text: string | undefined, prefix: "a/" | "b/" | "" = ""): string | null {
+  if (text === undefined || text === "/dev/null") return null;
+  const name = gitName(text);
+  return name.startsWith(prefix) ? name.slice(prefix.length) : name;
+}
+
+/** The two names a `diff --git` line gives, either of them quoted. Unquoted names that contain " b/" can't be told apart. */
+function headerNames(line: string): [string, string] | null {
+  const rest = line.slice("diff --git ".length);
+  const first = QUOTED.exec(rest)?.[0] ?? /^a\/.*?(?= "?b\/)/.exec(rest)?.[0];
+  if (first === undefined) return null;
+  return [first, rest.slice(first.length + 1)];
+}
+
+/**
+ * The path one file's part of a diff changes: its new name, or its old one when it was deleted. Only the lines before
+ * the first hunk are read, since a changed line can look like a header.
+ */
+function changedPath(chunk: string): string | null {
+  const header = chunk.split(/^@@ /m, 1)[0]!;
+  const line = (pattern: RegExp) => pattern.exec(header)?.[1];
+  const names = headerNames(header.split("\n", 1)[0]!);
+  return sideName(line(/^\+\+\+ (.+)$/m), "b/") ?? sideName(line(/^--- (.+)$/m), "a/") ?? sideName(line(/^(?:rename|copy) to (.+)$/m)) ?? sideName(names?.[1], "b/") ?? sideName(names?.[0], "a/");
 }
 
 function diffRows(chunk: string): DiffRow[] {

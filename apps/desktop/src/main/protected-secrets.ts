@@ -6,6 +6,7 @@ import { safeStorage, type UtilityProcess } from "electron";
 const files = new Map([
   ["slack.secrets", "slack-secrets.enc"],
   ["memory.secrets", "memory-extraction-key.enc"],
+  ["github.secrets", "github-reviewer-app.enc"],
 ]);
 const storageError = "Cannot access protected storage. Unlock your OS keychain or secret service and retry.";
 

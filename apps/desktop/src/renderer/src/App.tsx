@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { CommandPalette } from "./components/CommandPalette";
 import { Sidebar } from "./components/Sidebar";
 import { DeleteThreadDialog } from "./components/ThreadActions";
@@ -10,7 +10,7 @@ import { useLayout } from "./lib/layout";
 import { readOnboardingState, resolveOnboarding, writeOnboardingState, type PersistedOnboardingState } from "./lib/onboarding";
 import { useRpc } from "./lib/query";
 import { core } from "./lib/rpc";
-import { newThread, openThread, useRouter } from "./lib/router";
+import { newThread, openThread, useRouter, type Route } from "./lib/router";
 import { useUi } from "./lib/ui";
 import { useTrafficLights } from "./lib/window";
 import { Inbox } from "./views/Inbox";
@@ -19,6 +19,8 @@ import { NewThread } from "./views/NewThread";
 import { Onboarding } from "./views/Onboarding";
 import { Orchestration } from "./views/Orchestration";
 import { ProjectView } from "./views/ProjectView";
+import { PullRequestList } from "./views/PullRequestList";
+import { PullRequestView } from "./views/PullRequestView";
 import { Scheduled } from "./views/Scheduled";
 import { Settings } from "./views/Settings";
 import { AgentUpdateNotice } from "./views/settings-agent-updates";
@@ -216,48 +218,7 @@ export function App() {
             <TaskView key={route.taskId} taskId={route.taskId} tab={route.tab} />
           </Suspense>
         ) : null}
-        {route.view === "inbox" ? (
-          <Main>
-            <Inbox />
-          </Main>
-        ) : null}
-        {route.view === "tasks" ? (
-          <Main>
-            <TaskListView onNewTask={() => ui.openNewTask(currentProject)} />
-          </Main>
-        ) : null}
-        {route.view === "project" ? (
-          <Main>
-            <ProjectView projectId={route.projectId} onNewTask={() => ui.openNewTask(route.projectId)} />
-          </Main>
-        ) : null}
-        {route.view === "memory" ? (
-          <Main>
-            <Memory />
-          </Main>
-        ) : null}
-        {route.view === "scheduled" ? (
-          <Main>
-            <Scheduled />
-          </Main>
-        ) : null}
-        {route.view === "orchestration" ? (
-          <Main>
-            <Orchestration projectId={route.projectId} teamId={route.teamId} />
-          </Main>
-        ) : null}
-        {route.view === "settings" ? (
-          <Main>
-            <Settings />
-          </Main>
-        ) : null}
-        {Diagnostics && route.view === "diagnostics" ? (
-          <Main>
-            <Suspense fallback={null}>
-              <Diagnostics />
-            </Suspense>
-          </Main>
-        ) : null}
+        <MainScreen route={route} currentProject={currentProject} />
       </div>
       <CommandPalette open={ui.palette} onOpenChange={ui.setPalette} />
       <AgentUpdateNotice />
@@ -268,6 +229,51 @@ export function App() {
       <ThreadMoveDialog />
     </div>
   );
+}
+
+/** The screens that use the main column alone. */
+function MainScreen({ route, currentProject }: { route: Route; currentProject: string | undefined }) {
+  const openNewTask = useUi((s) => s.openNewTask);
+  let screen: ReactNode;
+  switch (route.view) {
+    case "inbox":
+      screen = <Inbox />;
+      break;
+    case "tasks":
+      screen = <TaskListView onNewTask={() => openNewTask(currentProject)} />;
+      break;
+    case "pulls":
+      screen = <PullRequestList />;
+      break;
+    case "pull":
+      screen = <PullRequestView key={`${route.projectId}:${route.number}`} projectId={route.projectId} number={route.number} />;
+      break;
+    case "project":
+      screen = <ProjectView projectId={route.projectId} onNewTask={() => openNewTask(route.projectId)} />;
+      break;
+    case "memory":
+      screen = <Memory />;
+      break;
+    case "scheduled":
+      screen = <Scheduled />;
+      break;
+    case "orchestration":
+      screen = <Orchestration projectId={route.projectId} teamId={route.teamId} />;
+      break;
+    case "settings":
+      screen = <Settings />;
+      break;
+    case "diagnostics":
+      screen = Diagnostics ? (
+        <Suspense fallback={null}>
+          <Diagnostics />
+        </Suspense>
+      ) : null;
+      break;
+    default:
+      screen = null;
+  }
+  return screen ? <Main>{screen}</Main> : null;
 }
 
 /** The main column for screens without a panel. */

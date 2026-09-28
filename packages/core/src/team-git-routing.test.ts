@@ -275,7 +275,7 @@ describe("team Git admission through the public runtime", () => {
       await held.promise;
       return true;
     });
-    const pending = call("review.createThreadPr", { threadId: thread.id, title: "Integrated PR", body: "Explicit user publication" });
+    const pending = call("review.createThreadPr", { threadId: thread.id, title: "Integrated PR", body: "Explicit user publication", base: "main" });
     await vi.waitFor(() => expect(gitTools.hasGh).toHaveBeenCalled());
     expect(core.review.teamActionAvailability(thread.id)).toMatchObject({ allowed: false, reason: expect.stringContaining("operation") });
     const direction = { threadId: thread.id, requestKey: "while-publishing", text: "Next execution" };

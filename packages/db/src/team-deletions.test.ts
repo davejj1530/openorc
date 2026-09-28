@@ -752,7 +752,7 @@ describe("durable team deletion receipts", () => {
     expect(db.version).toBe(migrations.length);
     expect(teamContexts.get(db, before.id)).toEqual(before);
     expect(teamRuntime.get(db, f.execution.id)).toEqual(f.execution);
-    expect(threads.get(db, f.thread.id)).toEqual({ ...f.thread, workingDirectory: null });
+    expect(threads.get(db, f.thread.id)).toEqual({ ...f.thread, workingDirectory: null, baseBranch: null });
     expect(ids(threads.list(db, { filter: "all" })).sort()).toEqual([f.thread.id, bare.thread.id].sort());
     const { record: hidden, checkpoint } = hide({ ...f, db });
     const taskless = teamDeletions.create(db, bare.input);

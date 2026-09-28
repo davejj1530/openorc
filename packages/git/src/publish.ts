@@ -2,15 +2,17 @@ import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { git, run, GitError } from "./exec.js";
 
+/** Commits everything for the user, running their hooks as their own commit would. */
 export async function commitAll(cwd: string, message: string): Promise<string> {
-  await git(cwd, ["add", "-A"]);
-  await git(cwd, ["commit", "-m", message]);
+  await git(cwd, ["add", "-A"], { hooks: true });
+  await git(cwd, ["commit", "-m", message], { hooks: true });
   return (await git(cwd, ["rev-parse", "HEAD"])).stdout.trim();
 }
 
 export async function push(cwd: string, branch: string, remote = "origin"): Promise<void> {
   try {
-    await git(cwd, ["push", "-u", remote, branch], { timeoutMs: 120_000 });
+    // Hooks run as for the user's own push; Git LFS uploads its files from pre-push.
+    await git(cwd, ["push", "-u", remote, branch], { timeoutMs: 120_000, hooks: true });
   } catch (e) {
     // Git's own report is a page of hints; the remedy is one sentence.
     if (e instanceof GitError && /\[rejected\].*\((fetch first|non-fast-forward)\)/.test(e.stderr)) throw new Error(`${remote} has newer commits on ${branch}. Pull them in first, then push again.`);

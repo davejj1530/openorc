@@ -206,7 +206,7 @@ describe("publishing an integrated team workspace", () => {
     expect(await review.pushThread(thread, project)).toEqual({ remote: "origin", branch: "main" });
     expect((await gitTools.git(project.rootPath, ["ls-remote", "origin", "refs/heads/main"])).stdout.trim().split(/\s/)[0]).toBe(committed.sha);
     expect(await remoteHead()).toBe("");
-    await expect(review.createThreadPr(thread, project, "Main PR", "")).rejects.toThrow(/needs a branch of its own/);
+    await expect(review.createThreadPr(thread, project, "Main PR", "", "main")).rejects.toThrow(/needs a branch of its own/);
   });
 
   it("uses a local checkout feature branch for PRs while preserving team guards and physical writer exclusion", async () => {
@@ -221,7 +221,7 @@ describe("publishing an integrated team workspace", () => {
     blocked = null;
     await review.commitThread(thread, project, "Feature");
     await review.pushThread(thread, project);
-    expect(await review.createThreadPr(thread, project, "Local feature PR", "Requested")).toEqual({ url: "https://example.invalid/pull/1" });
+    expect(await review.createThreadPr(thread, project, "Local feature PR", "Requested", "main")).toEqual({ url: "https://example.invalid/pull/1" });
     const physical = (await gitTools.git(project.rootPath, ["rev-parse", "--show-toplevel"])).stdout.trim();
     expect(gitTools.createPr).toHaveBeenCalledWith(physical, { title: "Local feature PR", body: "Requested", base: "main", head: "local-feature" });
     expect(reserved).toBe(false);
@@ -276,11 +276,11 @@ describe("publishing an integrated team workspace", () => {
   it("requires an explicit push before mocked PR creation and records the exact lead branch", async () => {
     await change();
     await review.commitThread(thread, project, "Ready for review");
-    await expect(review.createThreadPr(thread, project, "Team PR", "Reviewed integrated changes")).rejects.toThrow(/push/i);
+    await expect(review.createThreadPr(thread, project, "Team PR", "Reviewed integrated changes", "main")).rejects.toThrow(/push/i);
     expect(gitTools.createPr).not.toHaveBeenCalled();
     expect(await remoteHead()).toBe("");
     await review.pushThread(thread, project);
-    expect(await review.createThreadPr(thread, project, "Team PR", "Reviewed integrated changes")).toEqual({ url: "https://example.invalid/pull/1" });
+    expect(await review.createThreadPr(thread, project, "Team PR", "Reviewed integrated changes", "main")).toEqual({ url: "https://example.invalid/pull/1" });
     expect(gitTools.createPr).toHaveBeenCalledWith(await realCwd(), { title: "Team PR", body: "Reviewed integrated changes", base: "main", head: branch() });
     expect(threads.get(db, thread.id)).toMatchObject({ prUrl: "https://example.invalid/pull/1", prState: "open" });
   });
@@ -288,7 +288,7 @@ describe("publishing an integrated team workspace", () => {
   it.each(["Pending approval"])("blocks every Git side effect for %s", async (reason) => {
     await change();
     blocked = reason;
-    for (const action of [() => review.commitThread(thread, project, "Blocked"), () => review.pushThread(thread, project), () => review.createThreadPr(thread, project, "Blocked", "")]) {
+    for (const action of [() => review.commitThread(thread, project, "Blocked"), () => review.pushThread(thread, project), () => review.createThreadPr(thread, project, "Blocked", "", "main")]) {
       await expect(action()).rejects.toThrow(reason);
     }
     expect(await head()).toBe(base);
@@ -307,7 +307,7 @@ describe("publishing an integrated team workspace", () => {
       await held.promise;
       return true;
     });
-    const pending = review.createThreadPr(thread, project, "Held", "");
+    const pending = review.createThreadPr(thread, project, "Held", "", "main");
     await vi.waitFor(() => expect(gitTools.hasGh).toHaveBeenCalled());
     expect(reserved).toBe(true);
     await expect(writers.acquire(cwd, "new provider turn")).rejects.toThrow(/in use/);
@@ -394,12 +394,12 @@ describe("publishing an integrated team workspace", () => {
     expect(tasks.get(db, task.id)?.branch).toBe(branch);
     expect(threads.get(db, thread.id)?.branch).toBeNull();
     await expect(gitTools.git(project.rootPath, ["rev-parse", "--verify", "--quiet", `refs/heads/${branch}`]).then((r) => r.stdout.trim())).resolves.toBe(committed.sha);
-    await expect(review.createPr(tasks.get(db, task.id)!, project, "Worker PR", "body")).rejects.toThrow(/Push the assignment/);
+    await expect(review.createPr(tasks.get(db, task.id)!, project, "Worker PR", "body", "main")).rejects.toThrow(/Push the assignment/);
     const pushed = await review.push(tasks.get(db, task.id)!, project);
     expect(pushed).toEqual({ remote: "origin", branch });
     expect((await gitTools.git(project.rootPath, ["ls-remote", "origin", `refs/heads/${branch}`])).stdout.trim().split(/\s/)[0]).toBe(committed.sha);
     const created = vi.mocked(gitTools.createPr);
-    await review.createPr(tasks.get(db, task.id)!, project, "Worker PR", "body");
+    await review.createPr(tasks.get(db, task.id)!, project, "Worker PR", "body", "main");
     expect(created.mock.lastCall?.[1]).toEqual({ title: "Worker PR", body: "body", base: "main", head: branch });
     expect(await realpath(created.mock.lastCall![0])).toBe(await realpath(worker));
     // A divergent dedicated ref is never overwritten.
@@ -429,7 +429,7 @@ describe("publishing an integrated team workspace", () => {
       baseRef: "main",
       parentTaskId: null,
     });
-    for (const action of [() => review.commit(task, project, "Worker commit"), () => review.push(task, project), () => review.createPr(task, project, "Worker PR", "")])
+    for (const action of [() => review.commit(task, project, "Worker commit"), () => review.push(task, project), () => review.createPr(task, project, "Worker PR", "", "main")])
       await expect(action()).rejects.toThrow(/main team conversation/);
     expect(gitTools.createPr).not.toHaveBeenCalled();
   });

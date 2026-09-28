@@ -328,3 +328,24 @@ describe("removing a task worktree", () => {
     expect((await git(root, ["ls-tree", "--name-only", moved.branch!])).stdout).not.toContain("draft.ts");
   });
 });
+
+describe("thread workspace preparation", () => {
+  it("remembers the branch a thread's worktree started from, for its pull request's target", async () => {
+    const thread = () => threads.insert(db, { projectId: project.id, title: "Start", agent: "codex", model: "fixture", mode: "act", permissionMode: "trusted", workspaceMode: "worktree" });
+    await git(root, ["branch", "dev"]);
+    expect((await service.prepareThread(thread(), project, "dev")).baseBranch).toBe("dev");
+    // HEAD is whatever the checkout is on, as when a conversation moves out of it.
+    expect((await service.prepareThread(thread(), project, "HEAD")).baseBranch).toBe("main");
+    const sha = (await git(root, ["rev-parse", "HEAD"])).stdout.trim();
+    expect((await service.prepareThread(thread(), project, sha)).baseBranch).toBeNull();
+    await git(root, ["checkout", "-q", "--detach"]);
+    expect((await service.prepareThread(thread(), project, "HEAD")).baseBranch).toBeNull();
+  });
+
+  it("won't rebuild a pull request's missing copy as an ordinary worktree on a branch", async () => {
+    const review = threads.insert(db, { projectId: project.id, title: "Review #7", agent: "codex", model: "fixture", mode: "plan", permissionMode: "review", workspaceMode: "worktree" });
+    const gone = threads.update(db, review.id, { worktreePath: path.join(directory, "pr-7-copy"), baseSha: "a".repeat(40) });
+    await expect(service.prepareThread(gone, project)).rejects.toThrow("This review's copy of the pull request is gone. Review it again from the Pull requests tab.");
+    expect(threads.get(db, review.id)).toMatchObject({ branch: null });
+  });
+});

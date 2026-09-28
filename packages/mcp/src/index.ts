@@ -7,6 +7,8 @@ import { UserInput, type UserInputResult } from "./questions.js";
 export { UserInput, validateUserAnswers, type UserInputResult } from "./questions.js";
 import { TaskStatus, HarnessId, CommentIntent, parseFileBoundary, type ApprovalDecision, type BrowserCommand, type BrowserResult } from "@openorc/protocol";
 import { registerBrowserTool } from "./browser.js";
+import { registerPullReviewTools, type PullReviewTools } from "./pull-review.js";
+export type { PullReviewComment, PullReviewTools } from "./pull-review.js";
 import { fileBoundaryAnswer } from "./file-boundary.js";
 
 export interface ExecutionSwitchInput {
@@ -71,6 +73,7 @@ export interface McpHost {
   };
   /** Available when the host supports authenticated team execution. */
   team?: TeamTools;
+  pullReview?: PullReviewTools;
 }
 
 /** The host derives the team actor and execution from the authenticated run. */
@@ -285,6 +288,9 @@ export const internalToolNames = [
   "team_say",
   "team_claim",
   "team_history",
+  "pull_request_diff",
+  "pull_request_comment",
+  "pull_request_summary",
 ];
 
 function requireTeam(host: McpHost): TeamTools {
@@ -301,6 +307,12 @@ function approvalPayload(toolName: string, input: Record<string, unknown>, resul
   const answers: Record<string, string> = {};
   for (const [question, values] of Object.entries(result.answers)) answers[question] = values.join(", ");
   return { behavior: "allow", updatedInput: { ...input, answers } };
+}
+
+/** Tools only some hosts or runs have: the shared browser, and review tools for a conversation reviewing a pull request. */
+function registerOptionalTools(mcp: McpServer, host: McpHost, runId: string): void {
+  if (host.browser) registerBrowserTool(mcp, (command) => host.browser!(runId, command));
+  if (host.pullReview?.available(runId)) registerPullReviewTools(mcp, host.pullReview, runId);
 }
 
 function buildServer(host: McpHost, runId: string): McpServer {
@@ -359,7 +371,7 @@ function buildServer(host: McpHost, runId: string): McpServer {
     return mcp;
   }
 
-  if (host.browser) registerBrowserTool(mcp, (command) => host.browser!(runId, command));
+  registerOptionalTools(mcp, host, runId);
 
   if (host.plan?.available(runId))
     mcp.registerTool(

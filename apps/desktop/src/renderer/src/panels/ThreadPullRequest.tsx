@@ -3,13 +3,15 @@ import type { Project, TeamActionAvailability, Thread, ThreadSummary } from "@op
 import { GitPullRequest } from "../components/icons";
 import { Button, Dialog, Field, Input, Textarea } from "../components/ui";
 import { useRpc, type useRpcMutation } from "../lib/query";
+import { TargetBranchField, useTargetBranch } from "./PullRequestTarget";
 
 function compareUrl(project: Project, thread: Thread): string | null {
   const remote = project.gitRemote;
   if (!remote || !thread.branch || thread.workspaceMode !== "worktree") return null;
   const m = /github\.com[:/]([^/]+)\/([^/.]+)(?:\.git)?$/.exec(remote);
   if (!m) return null;
-  return `https://github.com/${m[1]}/${m[2]}/compare/${encodeURIComponent(project.defaultBranch ?? "main")}...${encodeURIComponent(thread.branch)}?expand=1`;
+  const base = thread.baseBranch ?? project.defaultBranch ?? "main";
+  return `https://github.com/${m[1]}/${m[2]}/compare/${encodeURIComponent(base)}...${encodeURIComponent(thread.branch)}?expand=1`;
 }
 
 /** The thread's pull request once it exists, with its state, opening it on GitHub. */
@@ -33,7 +35,7 @@ export function ThreadPullRequest({
   pr,
   action,
   busy,
-  ready,
+  head,
   onOpened,
 }: {
   thread: ThreadSummary;
@@ -42,14 +44,14 @@ export function ThreadPullRequest({
   pr: ReturnType<typeof useRpcMutation<"review.createThreadPr">>;
   action: TeamActionAvailability;
   busy: boolean;
-  /** Whether the branch can open a pull request now: its own, and on origin with every commit. */
-  ready: boolean;
+  /** The branch the pull request opens from, once it can: its own, and on origin with every commit. */
+  head: string | null;
   onOpened: (url: string) => void;
 }) {
   const info = useRpc("system.info", {});
   const [open, setOpen] = useState(false);
   if (thread.prUrl) return <PullRequestLink thread={thread} />;
-  if (!ready) return null;
+  if (!head) return null;
   const disabled = !action.allowed || busy;
   if (!info.data?.gh.installed) {
     const ghUrl = compareUrl(project, thread);
@@ -64,19 +66,22 @@ export function ThreadPullRequest({
       <Button size="sm" disabled={disabled} onClick={() => setOpen(true)} title={action.reason ?? "Open a pull request"}>
         <GitPullRequest size={12} /> PR
       </Button>
-      <PullRequestDialog open={open} onOpenChange={setOpen} thread={thread} pr={pr} action={action} busy={busy} onOpened={onOpened} />
+      <PullRequestDialog open={open} onOpenChange={setOpen} thread={thread} project={project} head={head} pr={pr} action={action} busy={busy} onOpened={onOpened} />
     </>
   );
 }
 
 /**
- * Title and description for a new pull request. Until you edit them they follow the newest
- * commit and the repository's pull request template; your edits survive closing the dialog.
+ * Target, title and description for a new pull request. Until you edit them they follow where the
+ * thread started, its newest commit and the repository's pull request template; your edits survive
+ * closing the dialog.
  */
 function PullRequestDialog({
   open,
   onOpenChange,
   thread,
+  project,
+  head,
   pr,
   action,
   busy,
@@ -85,6 +90,8 @@ function PullRequestDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   thread: ThreadSummary;
+  project: Project;
+  head: string | null;
   pr: ReturnType<typeof useRpcMutation<"review.createThreadPr">>;
   action: TeamActionAvailability;
   busy: boolean;
@@ -96,6 +103,20 @@ function PullRequestDialog({
   const [editedBody, setBody] = useState<string | null>(null);
   const title = editedTitle ?? log.data?.[0]?.subject ?? thread.title;
   const body = editedBody ?? template.data?.body ?? "";
+  const target = useTargetBranch({ project, started: thread.baseBranch, head, open });
+  const base = target.value;
+  const openPr = () => {
+    if (!base) return;
+    pr.mutate(
+      { threadId: thread.id, title: title.trim(), body, base },
+      {
+        onSuccess: (r) => {
+          onOpenChange(false);
+          onOpened(r.url);
+        },
+      },
+    );
+  };
   return (
     <Dialog
       open={open}
@@ -105,6 +126,7 @@ function PullRequestDialog({
       title="Open a pull request"
       width={560}
     >
+      <TargetBranchField target={target} disabled={busy} />
       <Field label="Title">
         <Input value={title} onChange={(e) => setTitle(e.target.value)} disabled={busy} autoFocus />
       </Field>
@@ -125,21 +147,7 @@ function PullRequestDialog({
         <Button disabled={busy} onClick={() => onOpenChange(false)}>
           Cancel
         </Button>
-        <Button
-          variant="primary"
-          disabled={!action.allowed || !title.trim() || busy}
-          onClick={() =>
-            pr.mutate(
-              { threadId: thread.id, title: title.trim(), body },
-              {
-                onSuccess: (r) => {
-                  onOpenChange(false);
-                  onOpened(r.url);
-                },
-              },
-            )
-          }
-        >
+        <Button variant="primary" disabled={!action.allowed || !title.trim() || !base || busy} onClick={openPr}>
           {pr.isPending ? "Opening…" : "Open PR"}
         </Button>
       </div>

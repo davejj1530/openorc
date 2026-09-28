@@ -10,6 +10,8 @@ export type Route =
   | { view: "thread"; threadId: string }
   | { view: "inbox" }
   | { view: "tasks" }
+  | { view: "pulls" }
+  | { view: "pull"; projectId: string; number: number }
   | { view: "project"; projectId: string }
   | { view: "task"; taskId: string; tab: TaskTab }
   | { view: "memory" }
@@ -108,11 +110,23 @@ export function openTask(taskId: string, tab: TaskTab = "spec"): void {
   useRouter.getState().navigate({ view: "task", taskId, tab });
 }
 
+export function openPullRequest(projectId: string, number: number): void {
+  useRouter.getState().navigate({ view: "pull", projectId, number });
+}
+
 export function openThread(threadId: string): void {
   useRouter.getState().navigate({ view: "thread", threadId });
 }
 
-/** "thread:<id>", "task:<id>:<tab>", or a plain screen name, as windows and autorun pass them. */
+/** Screens a spec names without an id. */
+type PlainView = "inbox" | "tasks" | "pulls" | "memory" | "scheduled" | "diagnostics" | "newthread";
+const plainViews: ReadonlySet<string> = new Set<PlainView>(["inbox", "tasks", "pulls", "memory", "scheduled", "diagnostics", "newthread"]);
+
+function isPlainView(view: string | undefined): view is PlainView {
+  return view !== undefined && plainViews.has(view);
+}
+
+/** "thread:<id>", "task:<id>:<tab>", "pull:<project>:<number>", or a plain screen name, as windows and autorun pass them. */
 export function routeFromSpec(spec: string): Route | null {
   const [view, id, tab] = spec.split(":");
   if (view === "onboarding")
@@ -130,6 +144,7 @@ export function routeFromSpec(spec: string): Route | null {
       tab: (tab as TaskTab | undefined) ?? "spec",
     };
   if (view === "project" && id) return { view: "project", projectId: id };
+  if (view === "pull" && id && Number(tab) > 0) return { view: "pull", projectId: id, number: Number(tab) };
   if (view === "orchestration")
     return {
       view,
@@ -142,22 +157,32 @@ export function routeFromSpec(spec: string): Route | null {
       ...(id === "usage" ? { section: "usage" as const, ...(tab === "codex" || tab === "claude" ? { provider: tab } : {}) } : {}),
       ...(id === "general" ? { section: "general" as const } : {}),
     };
-  if (view === "inbox" || view === "tasks" || view === "memory" || view === "scheduled" || view === "diagnostics" || view === "newthread") return { view };
+  if (isPlainView(view)) return { view };
   return null;
+}
+
+function settingsSpec(route: Extract<Route, { view: "settings" }>): string {
+  return route.section ? `settings:${route.section}${route.provider ? `:${route.provider}` : ""}` : "settings";
+}
+
+function onboardingSpec(route: Extract<Route, { view: "onboarding" }>): string {
+  return ["onboarding", route.mode === "recovery" ? "recovery" : null, route.preview ? "preview" : null].filter(Boolean).join(":");
 }
 
 export function specFromRoute(route: Route): string {
   switch (route.view) {
     case "settings":
-      return route.section ? `settings:${route.section}${route.provider ? `:${route.provider}` : ""}` : "settings";
+      return settingsSpec(route);
     case "onboarding":
-      return ["onboarding", route.mode === "recovery" ? "recovery" : null, route.preview ? "preview" : null].filter(Boolean).join(":");
+      return onboardingSpec(route);
     case "thread":
       return `thread:${route.threadId}`;
     case "task":
       return `task:${route.taskId}:${route.tab}`;
     case "project":
       return `project:${route.projectId}`;
+    case "pull":
+      return `pull:${route.projectId}:${route.number}`;
     case "newtask":
       return `newtask${route.projectId ? `:${route.projectId}` : ""}`;
     case "orchestration":

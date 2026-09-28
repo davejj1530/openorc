@@ -18,6 +18,7 @@ import { teamJournalMigration } from "./team-journal-schema.js";
 import { taskExecutionMigration } from "./task-execution-schema.js";
 import { conversationReviewCommentsMigration } from "./review-comments-schema.js";
 import { teamCancellationMigration } from "./team-cancellation-schema.js";
+import { pullRequestReviewMigration } from "./pull-review-schema.js";
 /**
  * Migrations run in order; `PRAGMA user_version` records how many applied.
  * Never edit a shipped migration. Append a new one.
@@ -756,4 +757,9 @@ export const migrations: Migration[] = [
   teamCancellationMigration,
   /** Removing a project from navigation preserves its files and historical records. */
   `ALTER TABLE projects ADD COLUMN removed_at INTEGER;`,
+  pullRequestReviewMigration,
+  /** The branch a thread's worktree started from: its pull request targets it unless the user picks another. */
+  `ALTER TABLE threads ADD COLUMN base_branch TEXT;`,
+  /** A reviewing model's latest summary. It fills the draft's summary until the user writes their own, then waits beside it. */
+  `ALTER TABLE pull_request_reviews ADD COLUMN model_summary TEXT;`,
 ];

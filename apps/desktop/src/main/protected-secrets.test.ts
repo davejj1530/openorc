@@ -54,7 +54,7 @@ function connect() {
     client.receive(message);
   });
   installProtectedSecrets(child as unknown as UtilityProcess, dataDir);
-  return { child, memory: client.store("memory.secrets"), slack: client.store("slack.secrets") };
+  return { child, memory: client.store("memory.secrets"), slack: client.store("slack.secrets"), github: client.store("github.secrets") };
 }
 
 describe("desktop protected stores", () => {
@@ -80,6 +80,15 @@ describe("desktop protected stores", () => {
     await slack.save('{"devices":[]}');
     await expect(memory.load()).resolves.toBe("memory-fixture");
     await expect(connect().slack.load()).resolves.toBe('{"devices":[]}');
+  });
+
+  it("keeps the reviewer app's key in a file of its own", async () => {
+    const { memory, github } = connect();
+    await memory.save("memory-fixture");
+    await github.save("reviewer-key-fixture");
+    expect((await readFile(join(dataDir, "github-reviewer-app.enc"))).includes("reviewer-key-fixture")).toBe(false);
+    await expect(connect().github.load()).resolves.toBe("reviewer-key-fixture");
+    await expect(memory.load()).resolves.toBe("memory-fixture");
   });
 
   it("orders simultaneous saves and loads per store", async () => {

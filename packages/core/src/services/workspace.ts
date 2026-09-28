@@ -8,6 +8,7 @@ import { diskUsage, emptyTree, fetch, git, repoInfo, revParse, worktree } from "
 import { WORKSPACE_ID, type BranchLoss, type Project, type RemovalImpact, type Task, type Thread } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
 import { assertCanBranch, projectGit } from "./project-git.js";
+import { inUnvettedCopy } from "./review-copies.js";
 import { assertSafeParentPath } from "./safe-parent-path.js";
 import { workspaceWriters, type WorkspaceLease, type WorkspaceWriters } from "./workspace-writers.js";
 
@@ -248,6 +249,9 @@ export class WorkspaceService {
       this.assertOpen();
       return thread;
     }
+    // Only reviewing again rebuilds a pull request's copy, on no branch. An ordinary worktree here would take a branch
+    // that keeps the pull request's code out of isolation once the next round checks it out.
+    if (inUnvettedCopy(this.db, thread)) throw new Error("This review's copy of the pull request is gone. Review it again from the Pull requests tab.");
     return this.writers.withLease(
       this.threadPath(thread, project),
       `preparing thread ${thread.id}`,
@@ -275,7 +279,9 @@ export class WorkspaceService {
         this.assertOpen();
         await this.warnAboutHusky(worktreePath, project);
         this.assertOpen();
-        const updated = threads.update(this.db, thread.id, { worktreePath, branch, baseSha: thread.baseSha ?? startPoint, workspaceMode: "worktree" });
+        const baseBranch = thread.baseBranch ?? (await this.startBranch(project, base));
+        this.assertOpen();
+        const updated = threads.update(this.db, thread.id, { worktreePath, branch, baseSha: thread.baseSha ?? startPoint, baseBranch, workspaceMode: "worktree" });
         audit.record(this.db, { actor: "openorc", action: "workspace.create", resourceType: "thread", resourceId: thread.id, metadata: { worktreePath, branch, baseSha: startPoint } });
         if (project.settings.setupScript) await this.runSetup(project, { worktreePath, id: thread.id });
         this.assertOpen();
@@ -410,6 +416,12 @@ export class WorkspaceService {
     this.assertOpen();
     if (project.settings.setupScript) return;
     this.log.warn("this repo uses husky; commits in the worktree will fail until dependencies are installed. Add an install step to the project's setup script.");
+  }
+
+  /** The branch a worktree starts from by name, `HEAD` being whatever the checkout is on. Null for a commit or a detached checkout. */
+  private async startBranch(project: Project, baseRef: string): Promise<string | null> {
+    if (baseRef !== "HEAD") return /^[0-9a-f]{40,64}$/.test(baseRef) ? null : baseRef;
+    return (await git(project.rootPath, ["symbolic-ref", "--short", "-q", "HEAD"], { okCodes: [0, 1] })).stdout.trim() || null;
   }
 
   /** Fetches the base from origin when it is a branch there, so tasks start from what the team sees. */

@@ -26,7 +26,6 @@ import {
   type PermissionPreset,
   type Run,
   type RunMode,
-  type TaskPriority,
   type Thread,
   type ThreadCheckpoint,
   type ThreadSearchHit,
@@ -38,6 +37,8 @@ import { randomUUID } from "node:crypto";
 import { realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Logger } from "../transport.js";
+import { titleFromPrompt, type StartThreadInput, type ThreadPatch, type ThreadTitler } from "./thread-inputs.js";
+import { inUnvettedCopy } from "./review-copies.js";
 import type { RunService } from "./runs.js";
 import type { WorkspaceService } from "./workspace.js";
 import { directory, executionProject } from "./workspace-home.js";
@@ -51,62 +52,7 @@ import { ThreadAgentTools } from "./thread-agent-tools.js";
 /** How many agent messages in a row may pass between conversations before a person has to write. */
 export { MAX_AGENT_HOPS } from "./thread-agent-tools.js";
 
-export interface StartThreadInput {
-  projectId: string;
-  workingDirectory?: string;
-  agent: AgentKind;
-  model: string | undefined;
-  effort: string | undefined;
-  fastMode?: boolean | undefined;
-  mode: RunMode;
-  permissionMode: PermissionPreset;
-  workspaceMode?: WorkspaceMode;
-  baseRef?: string;
-  prompt: string;
-  attachments: string[] | undefined;
-  title: string | undefined;
-  /** How the first message shows: what the user typed, or a system notice such as a scheduled prompt. */
-  promptRole?: "user" | "system";
-}
-
-/** Names a thread from its first exchange; null when no model is available. */
-export type ThreadTitler = (exchange: { request: string; reply: string | null }, agent: AgentKind) => Promise<string | null>;
-
-export interface SpawnTaskInput {
-  title: string;
-  spec: string;
-  priority?: TaskPriority;
-  labels?: string[];
-  execution?: "backlog" | "delegate";
-  workspaceMode?: WorkspaceMode;
-}
-
-export interface ThreadPatch {
-  title?: string;
-  mode?: RunMode;
-  permissionMode?: PermissionPreset;
-  model?: string | null;
-  effort?: string | null;
-  fastMode?: boolean;
-  agent?: AgentKind;
-  archived?: boolean;
-  pinned?: boolean;
-  done?: boolean;
-  snoozedUntil?: number | null;
-  seen?: boolean;
-  draft?: string | null;
-  prUrl?: string | null;
-}
-
-/** The first line of the prompt makes a fine title until the user renames the thread. */
-export function titleFromPrompt(prompt: string): string {
-  const line =
-    prompt
-      .split("\n")
-      .find((l) => l.trim().length > 0)
-      ?.trim() ?? "New thread";
-  return line.length > 72 ? `${line.slice(0, 71).trimEnd()}…` : line;
-}
+export { titleFromPrompt, type SpawnTaskInput, type StartThreadInput, type ThreadPatch, type ThreadTitler } from "./thread-inputs.js";
 
 /**
  * Threads are the conversation the user has with an agent in the project
@@ -253,11 +199,11 @@ export class ThreadService {
     if (input.workingDirectory && input.projectId !== WORKSPACE_ID) throw new Error("Only Workspace conversations can choose a working folder.");
     const home = executionProject(this.db, { projectId: input.projectId });
     const project = input.projectId === WORKSPACE_ID ? { ...home, rootPath: await directory(input.workingDirectory ?? home.rootPath) } : home;
-    if (project.id === WORKSPACE_ID && input.workspaceMode === "worktree") throw new Error("Workspace conversations run in a folder. Open a project to create a worktree.");
+    const workspaceMode = input.checkout ? "worktree" : (input.workspaceMode ?? "current");
+    if (project.id === WORKSPACE_ID && workspaceMode === "worktree") throw new Error("Workspace conversations run in a folder. Open a project to create a worktree.");
     const id = randomUUID();
     const title = input.title?.trim() || titleFromPrompt(input.prompt);
-    const workspaceMode = input.workspaceMode ?? "current";
-    const destination = this.workspaces.threadPath({ id, title, workspaceMode, worktreePath: null }, project);
+    const destination = this.workspaces.threadPath({ id, title, workspaceMode, worktreePath: input.checkout?.path ?? null }, project);
     return this.writers.withLease(
       destination,
       `starting thread ${id}`,
@@ -284,8 +230,9 @@ export class ThreadService {
             metadata: { projectId: project.id, agent: input.agent, workspaceMode: admitted.workspaceMode },
           });
           if (project.id === WORKSPACE_ID) admitted.workingDirectory = threads.update(this.db, admitted.id, { workingDirectory: project.rootPath }).workingDirectory;
-          internal?.onAdmitted(admitted);
-          return admitted;
+          const adopted = input.checkout ? threads.update(this.db, admitted.id, { worktreePath: input.checkout.path, baseSha: input.checkout.baseSha }) : admitted;
+          internal?.onAdmitted(adopted);
+          return adopted;
         });
         this.invalidate(["threads", `thread:${thread.id}`]);
         try {
@@ -618,7 +565,8 @@ export class ThreadService {
     const project = executionProject(this.db, thread);
     await this.writers.withLease(this.workspaces.threadPath(thread, project), `deleting thread ${id}`, async (lease) => {
       if (thread.worktreePath && !this.worktreeShared(thread)) {
-        await this.workspaces.cleanupThread(thread, project, {}, lease);
+        // A pull request's copy under review is someone else's code, so any changes in it go with it.
+        await this.workspaces.cleanupThread(thread, project, { save: !inUnvettedCopy(this.db, thread) }, lease);
       }
 
       threads.delete(this.db, id);
@@ -657,6 +605,7 @@ export class ThreadService {
       branch: parent.branch,
       worktreePath: parent.worktreePath,
       baseSha: parent.baseSha,
+      baseBranch: parent.baseBranch,
       seenAt: Date.now(),
     });
     audit.record(this.db, { actor: "user", action: "thread.fork", resourceType: "thread", resourceId: thread.id, metadata: { from: parent.id, at: at?.id ?? null } });

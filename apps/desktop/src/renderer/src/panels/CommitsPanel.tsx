@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { PushState, Task, ThreadSummary } from "@openorc/protocol";
+import type { Project, PushState, Task, ThreadSummary } from "@openorc/protocol";
 import { Upload } from "../components/icons";
 import { Badge, Button, Empty } from "../components/ui";
 import { cn } from "../lib/cn";
@@ -7,8 +7,9 @@ import { useRpc, useRpcMutation } from "../lib/query";
 import { teamGitActions } from "../lib/team-git-actions";
 import { useThreadMutationPending } from "../lib/thread-mutations";
 import { relativeTime, shortSha } from "../lib/time";
+import { ThreadPullRequest } from "./ThreadPullRequest";
 
-export type CommitSource = { kind: "task"; task: Task } | { kind: "thread"; thread: ThreadSummary };
+export type CommitSource = { kind: "task"; task: Task } | { kind: "thread"; thread: ThreadSummary; project: Project };
 
 /** The commits on a task's branch since its base, or on a thread's workspace, marking the ones origin doesn't have yet. */
 export function CommitsPanel({ source }: { source: CommitSource }) {
@@ -25,7 +26,7 @@ export function CommitsPanel({ source }: { source: CommitSource }) {
   }
   return (
     <div className="h-full flex flex-col min-h-0">
-      {thread ? <PushBar thread={thread} state={pushState.data} error={pushState.error} /> : null}
+      {source.kind === "thread" ? <PushBar thread={source.thread} project={source.project} state={pushState.data} error={pushState.error} /> : null}
       <div className="flex-1 min-h-0 overflow-y-auto">
         {commits.map((c) => (
           <div key={c.sha} className="grid gap-0.5 px-3 py-2 border-b border-line text-base">
@@ -45,18 +46,21 @@ export function CommitsPanel({ source }: { source: CommitSource }) {
   );
 }
 
-/** Push from the commit list: the Changes tab, and its Push, leave once everything is committed. */
-function PushBar({ thread, state, error }: { thread: ThreadSummary; state: PushState | undefined; error: Error | null }) {
+/** Push and the pull request, each shown only once it can run: after a commit origin lacks, and after the branch is on origin. */
+function PushBar({ thread, project, state, error }: { thread: ThreadSummary; project: Project; state: PushState | undefined; error: Error | null }) {
   const team = Boolean(thread.teamInstanceId);
   const runtime = useRpc("orchestration.runtime", { threadId: thread.id }, { enabled: team, refetchInterval: 8000 });
   const push = useRpcMutation("review.pushThread");
+  const pr = useRpcMutation("review.createThreadPr");
   const threadMutationPending = useThreadMutationPending(thread.id);
   const [notice, setNotice] = useState<{ message: string; error?: boolean } | null>(null);
-  const action = teamGitActions(team, runtime).push;
+  const actions = teamGitActions(team, runtime);
+  const action = actions.push;
   const reason = error?.message ?? state?.blocked ?? action.reason;
-  const busy = push.isPending || (team && threadMutationPending);
-  const pending = Boolean(state && (state.unpushedCount > 0 || !state.published));
-  const canPush = pending && action.allowed && !reason && !busy;
+  const busy = push.isPending || pr.isPending || (team && threadMutationPending);
+  const pending = hasUnpushed(state);
+  const pushable = pending && !state?.blocked;
+  const canPush = action.allowed && !reason && !busy;
   // A success holds until new commits arrive; a failure until nothing is left to push.
   const shown = notice && (notice.error ? pending : !pending) ? notice : null;
   const pushNow = () => {
@@ -68,9 +72,20 @@ function PushBar({ thread, state, error }: { thread: ThreadSummary; state: PushS
       <div className="h-10 shrink-0 flex items-center gap-2 px-3 border-b border-line text-base">
         <span className="font-medium">Commits</span>
         <span className="flex-1" />
-        <Button size="sm" disabled={!canPush} title={state?.branch ? `Push ${state.branch} to origin` : undefined} onClick={pushNow}>
-          <Upload size={12} /> {pushLabel(state, push.isPending)}
-        </Button>
+        {pushable ? (
+          <Button size="sm" disabled={!canPush} title={state?.branch ? `Push ${state.branch} to origin` : undefined} onClick={pushNow}>
+            <Upload size={12} /> {pushLabel(state, push.isPending)}
+          </Button>
+        ) : null}
+        <ThreadPullRequest
+          thread={thread}
+          project={project}
+          pr={pr}
+          action={actions.createPr}
+          busy={busy}
+          ready={pullRequestReady(state, project)}
+          onOpened={(url) => setNotice({ message: `Opened ${url}` })}
+        />
       </div>
       {reason ? (
         <p role="status" className="px-3 py-2 text-sm text-ink-3 border-b border-line">
@@ -84,6 +99,16 @@ function PushBar({ thread, state, error }: { thread: ThreadSummary; state: PushS
       ) : null}
     </>
   );
+}
+
+/** GitHub opens a pull request only from a branch of its own that origin has with every commit. */
+function pullRequestReady(state: PushState | undefined, project: Project): boolean {
+  return Boolean(state?.branch && !state.blocked && !hasUnpushed(state) && state.branch !== (project.defaultBranch ?? "main"));
+}
+
+/** Whether origin lacks the branch or some of its commits. */
+function hasUnpushed(state: PushState | undefined): boolean {
+  return Boolean(state && (state.unpushedCount > 0 || !state.published));
 }
 
 /** "Push 2 commits" while origin lacks some, "Publish branch" until origin has the branch at all. */

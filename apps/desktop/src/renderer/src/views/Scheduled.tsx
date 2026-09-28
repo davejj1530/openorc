@@ -1,4 +1,4 @@
-import { ExecutionMode, executionMode, executionModeAvailable, executionModeSettings, executionModePresentation, executionModeUnavailable } from "@openorc/protocol";
+import { ExecutionMode, executionMode, executionModeAvailable, executionModeNote, executionModeSettings, executionModePresentation } from "@openorc/protocol";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { harnessName, type Schedule, type WorkspaceMode } from "@openorc/protocol";
 import { ArrowUpRight, CalendarClock, Pause, Play, Plus, RefreshCw, Trash2, Zap } from "../components/icons";
@@ -369,9 +369,7 @@ function ScheduleDialog({
                 </option>
               ))}
             </Select>
-            <p className="mt-2 text-xs text-ink-3">
-              {(choice && executionModeUnavailable(choice.agent, executionMode(mode, permission))) ?? executionModePresentation(choice?.agent, executionMode(mode, permission)).hint}
-            </p>
+            <p className="mt-2 text-xs text-ink-3">{executionModeNote(choice?.agent, executionMode(mode, permission))}</p>
           </Field>
           {!teamTarget ? (
             <Field label="Works in">

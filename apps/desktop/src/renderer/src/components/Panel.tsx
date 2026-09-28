@@ -317,7 +317,7 @@ export function Panel({ context }: { context: PanelContext }) {
   else if (current === "task" && context.kind === "task") body = <TaskDetailsPanel task={context.task} project={context.project} />;
   else if (current === "checkpoints" && context.kind === "thread") body = <CheckpointsPanel key={context.thread.id} thread={context.thread} />;
   else if (current === "commits" && (context.kind === "thread" || context.kind === "task"))
-    body = <CommitsPanel source={context.kind === "task" ? { kind: "task", task: context.task } : { kind: "thread", thread: context.thread }} />;
+    body = <CommitsPanel source={context.kind === "task" ? { kind: "task", task: context.task } : { kind: "thread", thread: context.thread, project: context.project }} />;
   else if (current === "memory" && context.kind !== "project") body = <MemoryPanel context={context} />;
 
   return (

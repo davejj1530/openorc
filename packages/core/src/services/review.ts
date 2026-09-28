@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { access, mkdir, realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { audit, comments, orchestration, projects, snapshots, tasks, teamDeletedThreads, teamRuntime, teamTasks, threads, type Db, type ReviewCommentScope } from "@openorc/db";
-import { changedFiles, commitAll, createPr, git, hasGh, log, patchAgainst, patchSinceTree, push, teamTransfer, unpushedCommits } from "@openorc/git";
+import { changedFiles, commitAll, createPr, git, hasGh, log, patchAgainst, patchSinceTree, pullRequestTemplate, push, teamTransfer, unpushedCommits } from "@openorc/git";
 import type { Commit, Project, PushState, ReviewComment, ReviewDiff, Snapshot, Task, TeamActionAvailability, TeamReviewComment, Thread } from "@openorc/protocol";
 import { workspaceWriters, type WorkspaceWriters } from "./workspace-writers.js";
 import { teamPublicationBranch, teamWorkspaceLocation } from "./team-workspace-location.js";
@@ -202,6 +202,11 @@ export class ReviewService {
       audit.record(this.db, { actor: "user", action: "thread.push", resourceType: "thread", resourceId: thread.id, metadata: { branch } });
       return { remote: "origin", branch };
     });
+  }
+
+  /** The pull request template gh would use, read from the thread's workspace. */
+  async threadPrTemplate(thread: Thread, project: Project): Promise<{ body: string | null }> {
+    return { body: await pullRequestTemplate(this.threadCwd(thread, project)) };
   }
 
   async createThreadPr(thread: Thread, project: Project, title: string, body: string): Promise<{ url: string }> {

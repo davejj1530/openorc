@@ -76,6 +76,7 @@ beforeEach(() => {
       return { remote: "origin", branch: "site-refresh" } as RpcResults[M];
     }
     if (method === "system.info") return { gh: { installed: true, path: "/usr/bin/gh" } } as unknown as RpcResults[M];
+    if (method === "review.threadPrTemplate") return { body: "## Summary\n" } as RpcResults[M];
     if (method === "review.createThreadPr") return { url: "https://github.com/openorc/site/pull/7" } as RpcResults[M];
     if (method === "orchestration.runtime") {
       const action = { allowed: !teamReason, reason: teamReason };
@@ -146,7 +147,7 @@ it("shows a rejected push and keeps the commits marked", async () => {
   expect(screen.getByText("Not pushed")).toBeTruthy();
 });
 
-it("offers the pull request once the branch is on origin", async () => {
+it("offers the pull request once the branch is on origin, drafted from the newest commit and the template", async () => {
   mount();
   fireEvent.click(await screen.findByRole("button", { name: "Push 1 commit" }));
   expect(screen.queryByRole("button", { name: "PR" })).toBeNull();
@@ -155,7 +156,7 @@ it("offers the pull request once the branch is on origin", async () => {
   const dialog = await screen.findByRole("dialog", { name: "Open a pull request" });
   fireEvent.click(within(dialog).getByRole("button", { name: "Open PR" }));
   expect(await screen.findByText("Opened https://github.com/openorc/site/pull/7")).toBeTruthy();
-  expect(vi.mocked(core.call)).toHaveBeenCalledWith("review.createThreadPr", { threadId: thread.id, title: "Site", body: "" });
+  expect(vi.mocked(core.call)).toHaveBeenCalledWith("review.createThreadPr", { threadId: thread.id, title: "perf: site overall improvements", body: "## Summary\n" });
 });
 
 it("never offers a pull request from the default branch", async () => {
@@ -164,4 +165,17 @@ it("never offers a pull request from the default branch", async () => {
   await waitFor(() => expect(queryClient.getQueryData(["git.threadPushState", { threadId: thread.id }])).toEqual(state));
   expect(screen.queryByRole("button", { name: "PR" })).toBeNull();
   expect(screen.queryByRole("button", { name: /^Push/ })).toBeNull();
+});
+
+it("keeps your pull request edits when the dialog closes", async () => {
+  state = { ...state, unpushedCount: 0, unpushed: [] };
+  mount();
+  fireEvent.click(await screen.findByRole("button", { name: "PR" }));
+  const title = await screen.findByRole<HTMLInputElement>("textbox", { name: "Title" });
+  await waitFor(() => expect(title.value).toBe("perf: site overall improvements"));
+  fireEvent.change(title, { target: { value: "Faster site" } });
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  fireEvent.click(screen.getByRole("button", { name: "PR" }));
+  expect((await screen.findByRole<HTMLInputElement>("textbox", { name: "Title" })).value).toBe("Faster site");
 });

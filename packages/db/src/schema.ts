@@ -760,4 +760,6 @@ export const migrations: Migration[] = [
   pullRequestReviewMigration,
   /** The branch a thread's worktree started from: its pull request targets it unless the user picks another. */
   `ALTER TABLE threads ADD COLUMN base_branch TEXT;`,
+  /** A reviewing model's latest summary. It fills the draft's summary until the user writes their own, then waits beside it. */
+  `ALTER TABLE pull_request_reviews ADD COLUMN model_summary TEXT;`,
 ];

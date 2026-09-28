@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pullRequestNumber, pullRequestTarget, pullRequestTone } from "./pull-requests";
+import { offeredSummary, pullRequestNumber, pullRequestTarget, pullRequestTone, withModelSummary } from "./pull-requests";
 
 describe("pull request presentation", () => {
   it("reads the number from a pull request's address only", () => {
@@ -31,5 +31,18 @@ describe("a new pull request's target", () => {
     expect(pullRequestTarget({ started: null, projectDefault: "trunk", head: "feat/login", branches: known })).toBe("main");
     expect(pullRequestTarget({ started: "dev", projectDefault: "main", head: "dev", branches: known })).toBe("main");
     expect(pullRequestTarget({ started: null, projectDefault: null, head: "main", branches: known })).toBeNull();
+  });
+});
+
+describe("the model's summary beside the user's", () => {
+  it("is offered until the summary being written includes it", () => {
+    expect(offeredSummary("Needs a test for retries.", "Looks close; add backoff.")).toBe("Looks close; add backoff.");
+    expect(offeredSummary(withModelSummary("Needs a test for retries.", "Looks close; add backoff."), "Looks close; add backoff.")).toBeNull();
+    expect(offeredSummary("Anything", null)).toBeNull();
+  });
+
+  it("goes below the user's summary, or stands alone when there is none", () => {
+    expect(withModelSummary("Mine.\n", "The model's.")).toBe("Mine.\n\nThe model's.");
+    expect(withModelSummary("  ", "The model's.")).toBe("The model's.");
   });
 });

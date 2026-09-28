@@ -67,7 +67,7 @@ describe("pull request reviews", () => {
     pullReviews.clearPosted(db, key, sent);
     expect(pullReviews.get(db, key)).toMatchObject({ summary: "", comments: [{ id: kept.id, body: "Edited while posting." }, { body: "Added while posting." }] });
     pullReviews.update(db, key, { summary: "Rewritten while posting." });
-    pullReviews.clearPosted(db, key, { summary: "Nearly there.", comments: [] });
+    pullReviews.clearPosted(db, key, { summary: "Nearly there.", modelSummary: null, comments: [] });
     expect(pullReviews.get(db, key)?.summary).toBe("Rewritten while posting.");
   });
 });

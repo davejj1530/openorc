@@ -287,6 +287,21 @@ describe("model reviews", () => {
     expect(tools.available(runId)).toBe(true);
   });
 
+  it("keeps a summary the user wrote when the model sums up again, offering the model's beside it", async () => {
+    const { service, key, db, started } = setup();
+    await service.start(key, { agent: "codex", model: "gpt-6", effort: null, fastMode: false });
+    const tools = service.agentTools();
+    const runId = `run-${started()!.id}`;
+    await tools.summary(runId, "First round: one fix needed.");
+    await tools.summary(runId, "Second round: looks good.");
+    expect(pullReviews.get(db, key)).toMatchObject({ summary: "Second round: looks good.", modelSummary: "Second round: looks good." });
+    service.setSummary(key, repo.head, "Ship it once the tests pass.");
+    expect(await tools.summary(runId, "Third round: all fixed.")).toContain("the user wrote, which stays");
+    expect(pullReviews.get(db, key)).toMatchObject({ summary: "Ship it once the tests pass.", modelSummary: "Third round: all fixed." });
+    service.discard(key);
+    expect(pullReviews.get(db, key)).toMatchObject({ summary: "", modelSummary: null });
+  });
+
   it("refuses drafting once the draft has moved past the conversation's copy", async () => {
     const { service, key, started } = setup();
     await service.start(key, { agent: "codex", model: "gpt-6", effort: null, fastMode: false });
@@ -321,8 +336,9 @@ describe("model reviews", () => {
 
     const runId = `run-${started()!.id}`;
     const since = await service.agentTools().diff(runId, { since: first });
+    // The hunks that changed after the first round, numbered as the whole pull request's diff numbers them.
     expect(since).toContain("+  const backoff = 100;");
-    expect(since).not.toContain("+  const retries = 3;");
+    expect(since).toContain("@@ -1,4 +1,6 @@");
     expect(await service.agentTools().comment(runId, { path: "app.ts", line: 4, side: "new", body: "Make the backoff grow." })).toBe("Draft comment saved on app.ts:4.");
   });
 

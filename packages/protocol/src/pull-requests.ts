@@ -65,6 +65,8 @@ export interface PullRequestReview {
   /** The pull request commit the comments were written against. The review posts against it. */
   commitId: string;
   summary: string;
+  /** The reviewing model's latest summary. It fills `summary` until the user writes their own, then waits beside it. */
+  modelSummary: string | null;
   /** The conversation where a model reviews this pull request, once one was started. */
   threadId: string | null;
   /** Where that model's checkout says the changes start: the commit the pull request left its base branch at. */

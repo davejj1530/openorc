@@ -2,7 +2,7 @@ import { useState } from "react";
 import { reviewCommentPlace, type PullRequestDetail, type PullRequestDraftComment, type PullRequestReview, type PullRequestReviewAuthor, type PullRequestReviewEvent } from "@openorc/protocol";
 import { ChevronDown, ChevronRight, ExternalLink, Pencil, X } from "./icons";
 import { Button, Dialog, Field, IconButton, Segmented, Textarea, TextButton, Tooltip } from "./ui";
-import { draftAuthor, readReviewAuthor, writeReviewAuthor } from "../lib/pull-requests";
+import { draftAuthor, offeredSummary, readReviewAuthor, withModelSummary, writeReviewAuthor } from "../lib/pull-requests";
 import { useRpc, useRpcMutation } from "../lib/query";
 import { useModelCatalog } from "../lib/use-model-catalog";
 
@@ -145,6 +145,7 @@ function SubmitReviewDialog({
   const [chosenEvent, setEvent] = useState<PullRequestReviewEvent>("comment");
   const saved = review?.summary ?? "";
   const summary = edited ?? saved;
+  const offered = offeredSummary(summary, review?.modelSummary);
   const count = review?.comments.length ?? 0;
   const options = verdicts(author, pull.viewer !== null && pull.viewer === pull.author, app?.allowApprove ?? false);
   // A verdict the chosen author can't give falls back to a comment.
@@ -181,6 +182,7 @@ function SubmitReviewDialog({
       <Field label="Summary">
         <Textarea rows={6} value={summary} onChange={(e) => setEdited(e.target.value)} placeholder="Overall feedback" autoFocus disabled={submit.isPending} />
       </Field>
+      {offered ? <ModelSummary text={offered} disabled={submit.isPending} onAdd={() => setEdited(withModelSummary(summary, offered))} /> : null}
       <div className="mb-2 flex items-center gap-3">
         <span className="w-20 shrink-0 text-sm text-ink-3">Post as</span>
         <Segmented label="Post as" value={author} onChange={choose} options={authorOptions(app !== null)} />
@@ -204,6 +206,21 @@ function SubmitReviewDialog({
         </Button>
       </div>
     </Dialog>
+  );
+}
+
+/** The model's summary, kept beside one the user wrote rather than replacing it. */
+function ModelSummary({ text, disabled, onAdd }: { text: string; disabled: boolean; onAdd: () => void }) {
+  return (
+    <div className="mb-3 rounded-md border border-line px-3 py-2">
+      <div className="mb-1 flex items-center justify-between gap-3">
+        <span className="text-sm text-ink-3">Model's summary</span>
+        <TextButton disabled={disabled} onClick={onAdd}>
+          Add to summary
+        </TextButton>
+      </div>
+      <p className="max-h-32 overflow-y-auto whitespace-pre-wrap break-words text-sm text-ink-2">{text}</p>
+    </div>
   );
 }
 

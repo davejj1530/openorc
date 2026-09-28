@@ -159,6 +159,14 @@ export const QueuedMessage = z.object({
 export type QueuedMessage = z.infer<typeof QueuedMessage>;
 
 /** A thread with what is happening on it right now, for lists and the sidebar. */
+/**
+ * A conversation whose copy is on no branch, such as a pull request's copy under review. Outside a team, which
+ * publishes through a branch of its own, nothing in it is committed, pushed or opened as a pull request.
+ */
+export function isDetachedCopy(thread: Pick<Thread, "worktreePath" | "branch">): boolean {
+  return thread.worktreePath !== null && thread.branch === null;
+}
+
 export const ThreadSummary = Thread.extend({
   /** Whether any execution has started; absent in older cached summaries. */
   hasStarted: z.boolean().optional(),

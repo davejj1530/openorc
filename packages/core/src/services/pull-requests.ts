@@ -1,15 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { audit, projects, pullReviews, runs, threads, type Db, type PullReviewKey } from "@openorc/db";
 import { GitHubPulls, git, worktree } from "@openorc/git";
-import type { PullReviewComment, PullReviewTools } from "@openorc/mcp";
+import type { PullReviewTools } from "@openorc/mcp";
 import {
   WORKSPACE_ID,
-  commentAnchor,
   harnessName,
   isHarnessId,
   patchFiles,
   reviewCommentPlace,
-  type CommentAnchor,
   type ModelExecutionSettings,
   type Project,
   type PullRequestBranches,
@@ -25,6 +23,7 @@ import {
   type Thread,
 } from "@openorc/protocol";
 import { addReviewCheckout, fetchPullRequestHead, moveReviewCheckout } from "./pull-request-checkout.js";
+import { REVIEW_DIFF, agentAnchor, agentDiff, changedSince } from "./pull-request-diff.js";
 import type { ReviewerAppService } from "./reviewer-app.js";
 import type { RunService } from "./runs.js";
 import type { SystemService } from "./system.js";
@@ -49,8 +48,6 @@ export interface PullRequestServiceOptions {
 /** Who wrote a draft, by agent and model. */
 type DraftAuthor = NonNullable<PullRequestDraftComment["author"]>;
 
-/** How much of a diff one tool result carries before the agent is asked to read it a file at a time. */
-const AGENT_DIFF_LIMIT = 150_000;
 /** Review diffs kept for agents between tool calls. */
 const CACHED_DIFFS = 16;
 const PROMPT_BODY_LIMIT = 20_000;
@@ -73,50 +70,6 @@ function againPrompt(detail: PullRequestDetail, previous: string | null): string
     lines.push("No commits were added since your last review. Look again, and add only findings you haven't made.");
   }
   return lines.join("\n");
-}
-
-/** The files a diff changes with their line counts, for a pull request too large to read in one piece. */
-function changedFileList(patch: string): string {
-  return patchFiles(patch)
-    .map((file) => {
-      const lines = file.chunk.split("\n");
-      const added = lines.filter((line) => line.startsWith("+") && !line.startsWith("+++")).length;
-      const removed = lines.filter((line) => line.startsWith("-") && !line.startsWith("---")).length;
-      return `${file.path} (+${added} -${removed})`;
-    })
-    .join("\n");
-}
-
-function limited(text: string): string {
-  return text.length <= AGENT_DIFF_LIMIT ? text : `${text.slice(0, AGENT_DIFF_LIMIT)}\n[Truncated. Read the rest of this file in your checkout.]`;
-}
-
-/** The diff an agent asked for: all of it, one file, or the file list when all of it is too long. */
-function agentDiff(patch: string, filePath: string | undefined): string {
-  if (!patch.trim()) return "This pull request changes nothing.";
-  if (filePath === undefined) {
-    if (patch.length <= AGENT_DIFF_LIMIT) return patch;
-    return `This pull request is too large to read at once. Ask for one path at a time. Changed files:\n${changedFileList(patch)}`;
-  }
-  const file = patchFiles(patch).find((entry) => entry.path === filePath);
-  return file ? limited(file.chunk) : `${filePath} is not changed in this pull request. Changed files:\n${changedFileList(patch)}`;
-}
-
-/**
- * Where an agent's comment attaches, checked the way GitHub will check it:
- * every line must be in the diff, and a range must stay inside one hunk.
- */
-function agentAnchor(chunk: string, comment: PullReviewComment): CommentAnchor {
-  const end = { line: comment.line, side: comment.side };
-  const start = comment.startLine === undefined ? end : { line: comment.startLine, side: comment.startSide ?? comment.side };
-  const where = `${comment.path} line ${comment.line} (${comment.side} side)`;
-  if (!commentAnchor(chunk, end, end)) throw new Error(`${where} is not in this pull request's diff. Comment on a line pull_request_diff shows.`);
-  if (!commentAnchor(chunk, start, start)) throw new Error(`${comment.path} line ${start.line} (${start.side} side) is not in this pull request's diff.`);
-  const anchor = commentAnchor(chunk, start, end)!;
-  const single = start.line === end.line && start.side === end.side;
-  const exact = anchor.line === end.line && anchor.side === end.side && (single ? anchor.startLine === null : anchor.startLine === start.line && anchor.startSide === start.side);
-  if (!exact) throw new Error(`The range ending at ${where} must start above it, in the same hunk.`);
-  return anchor;
 }
 
 /**
@@ -360,7 +313,9 @@ export class PullRequestService {
       available: (runId) => this.reviewForRun(runId) !== null,
       diff: async (runId, { path: filePath, since }) => {
         const { review, head } = this.requireReview(runId);
-        return agentDiff(await this.reviewDiff(review.projectId, since ?? review.baseCommit, head, since !== undefined), filePath);
+        const full = await this.reviewDiff(review.projectId, review.baseCommit, head);
+        if (since === undefined) return agentDiff(full, filePath);
+        return agentDiff(changedSince(full, await this.reviewDiff(review.projectId, since, head, true)), filePath, `this pull request since ${since}`);
       },
       comment: async (runId, comment) => {
         const { review, run, head } = this.requireCurrent(runId);
@@ -373,9 +328,11 @@ export class PullRequestService {
       },
       summary: async (runId, body) => {
         const { review } = this.requireCurrent(runId);
-        pullReviews.update(this.db, review, { summary: body });
+        // A summary the user wrote stays; the model's waits beside it for the user to add.
+        const theirs = review.summary.trim() !== "" && review.summary !== review.modelSummary;
+        pullReviews.update(this.db, review, { modelSummary: body, ...(theirs ? {} : { summary: body }) });
         this.changed();
-        return "Summary saved. The user reviews the draft and decides what to post.";
+        return theirs ? "Summary saved beside the one the user wrote, which stays. The user decides what to post." : "Summary saved. The user reviews the draft and decides what to post.";
       },
     };
   }
@@ -413,8 +370,7 @@ export class PullRequestService {
     const key = `${project.id}:${base}:${head}`;
     let diff = this.diffs.get(key);
     if (!diff) {
-      // The a/ and b/ prefixes are what patchFiles reads names by, whatever the user's diff.noprefix says.
-      diff = git(project.rootPath, ["diff", "--no-color", "--no-ext-diff", "-M", "--src-prefix=a/", "--dst-prefix=b/", base, head]).then((result) => result.stdout);
+      diff = git(project.rootPath, [...REVIEW_DIFF, base, head]).then((result) => result.stdout);
       diff.catch(() => this.diffs.delete(key));
       this.diffs.set(key, diff);
       if (this.diffs.size > CACHED_DIFFS) this.diffs.delete(this.diffs.keys().next().value!);

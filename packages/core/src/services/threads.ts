@@ -1,6 +1,7 @@
 import {
   audit,
   plans,
+  pullReviews,
   settings,
   checkpoints,
   messages,
@@ -564,7 +565,8 @@ export class ThreadService {
     const project = executionProject(this.db, thread);
     await this.writers.withLease(this.workspaces.threadPath(thread, project), `deleting thread ${id}`, async (lease) => {
       if (thread.worktreePath && !this.worktreeShared(thread)) {
-        await this.workspaces.cleanupThread(thread, project, {}, lease);
+        // A pull request's copy under review is someone else's code, so any changes in it go with it.
+        await this.workspaces.cleanupThread(thread, project, { save: pullReviews.forThread(this.db, id) === null }, lease);
       }
 
       threads.delete(this.db, id);

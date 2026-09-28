@@ -136,3 +136,35 @@ it("rejects Workspace and unknown IDs without changing the visible list", async 
   expect(() => service.remove("missing")).toThrow("not found");
   expect(service.list()).toEqual([project]);
 });
+
+it("reads the live checkout branch without replacing the saved default branch", async () => {
+  const project = await service.import(root);
+  projects.updateGit(db, project.id, { defaultBranch: "dev", gitRemote: null });
+  const handlers = createProjectsHandlers({ db, projectService: service, invalidate: vi.fn(), transport: { push() {} } });
+  const branch = () => handlers["projects.checkoutBranch"]({ id: project.id });
+  await git(root, ["checkout", "-q", "-b", "prod"]);
+  expect(await branch()).toBe("prod");
+  await git(root, ["checkout", "-q", "-b", "hotfix"]);
+  expect(await branch()).toBe("hotfix");
+  await git(root, ["checkout", "-q", "--detach"]);
+  expect(await branch()).toBeNull();
+  expect(service.get(project.id)?.defaultBranch).toBe("dev");
+  await rm(path.join(root, ".git"), { recursive: true, force: true });
+  expect(await branch()).toBeNull();
+  await rm(root, { recursive: true, force: true });
+  expect(await branch()).toBeNull();
+  expect(await handlers["projects.checkoutBranch"]({ id: WORKSPACE_ID })).toBeNull();
+  await expect(handlers["projects.checkoutBranch"]({ id: "missing" })).rejects.toThrow("not found");
+});
+
+it("reads unborn branches and never borrows a parent repository's branch", async () => {
+  const fresh = path.join(dir, "fresh");
+  await mkdir(fresh);
+  await git(fresh, ["init", "-q", "-b", "prod"]);
+  const project = await service.import(fresh);
+  expect(await service.checkoutBranch(project.id)).toBe("prod");
+  const nested = path.join(root, "plain");
+  await mkdir(nested);
+  const plain = projects.insert(db, { name: "Plain folder", rootPath: nested, gitRemote: null, defaultBranch: null, settings: {} });
+  expect(await service.checkoutBranch(plain.id)).toBeNull();
+});

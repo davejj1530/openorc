@@ -14,6 +14,7 @@ import { teamMentionEntries } from "../lib/composer-mentions";
 import { useLayout } from "../lib/layout";
 import { readOnboardingState } from "../lib/onboarding";
 import { evaluateNewThreadAvailability } from "../lib/new-thread-availability";
+import { useNewThreadLocation } from "../lib/new-thread-location";
 import { newThreadWorkspaceMode, readNewThreadDraft, readNewThreadProject, rememberNewThreadProject, targetModel, writeNewThreadDraft, type NewThreadDraft } from "../lib/new-thread-draft";
 import { branchingReason, useProjectGit } from "../lib/project-git";
 import { useRpc, useRpcMutation } from "../lib/query";
@@ -189,6 +190,7 @@ function NewThreadProject({
     models: { data: models.data, failed: models.isError },
     system: { data: info.data, failed: info.isError },
   });
+  const location = useNewThreadLocation(projectId, selected, workspaceMode, draft.workingDirectory);
   const chooseTeam = (detail: TeamDetail) =>
     changeDraft({
       target: {
@@ -329,11 +331,7 @@ function NewThreadProject({
                     permission={permission}
                     onPermission={setPermission}
                     settingsDisabled={start.isPending}
-                    location={{
-                      label: workspaceMode === "worktree" ? "New worktree" : null,
-                      ...(isWorkspace ? { directory: draft.workingDirectory ?? selected?.rootPath ?? "Workspace" } : {}),
-                      branch: selected?.defaultBranch ?? null,
-                    }}
+                    location={location}
                     changes={composerChanges}
                     projectId={isWorkspace ? undefined : projectId || undefined}
                     commands={skillCommands}

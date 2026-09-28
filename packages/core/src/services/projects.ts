@@ -4,6 +4,7 @@ import { audit, projects, type Db } from "@openorc/db";
 import { defaultBranch, isGitRepo, originUrl, repoInfo } from "@openorc/git";
 import type { Project, ProjectGit, ProjectSettings } from "@openorc/protocol";
 import { projectGit } from "./project-git.js";
+import { checkoutBranch } from "./checkout-branch.js";
 import { directory } from "./workspace-home.js";
 
 /** Config files from other tools that tell us how this repo likes its worktrees. */
@@ -27,6 +28,14 @@ export class ProjectService {
 
   get(id: string): Project | null {
     return projects.get(this.db, id);
+  }
+
+  /** The local checkout can move independently of the default branch used for new worktrees. */
+  async checkoutBranch(id: string): Promise<string | null> {
+    const project = projects.get(this.db, id);
+    if (!project) throw new Error(`project ${id} not found`);
+    const state = await projectGit(project).catch(() => "none");
+    return state === "none" ? null : checkoutBranch(project.rootPath);
   }
 
   /** Any folder can be a project. A folder inside a repository brings the whole repository, as it always has. */

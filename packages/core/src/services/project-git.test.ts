@@ -2,9 +2,9 @@ import { afterEach, expect, it, vi } from "vitest";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { projects } from "@openorc/db";
+import { projects, tasks } from "@openorc/db";
 import { emptyTree, git } from "@openorc/git";
-import type { RunSpec } from "@openorc/protocol";
+import type { CorePush, RpcMethod, RpcParams, RpcResults, RunSpec } from "@openorc/protocol";
 import { CodexAdapter, RunHandle } from "@openorc/agents";
 import { OpenOrc } from "../openorc.js";
 import { projectGit } from "./project-git.js";
@@ -33,8 +33,8 @@ async function repository(dir: string, options: { commit?: boolean } = {}): Prom
   await git(dir, ["commit", "-q", "-m", "init"]);
 }
 
-/** A core whose Codex turns end as soon as they start. Warnings and errors it logs are kept. */
-async function harness(root: string) {
+/** A core whose Codex turns end once `duringTurn` has run, standing in for the agent's work. Warnings and errors it logs are kept. */
+async function harness(root: string, duringTurn: () => Promise<void> = async () => {}) {
   vi.spyOn(CodexAdapter.prototype, "start").mockImplementation((spec: RunSpec) => {
     let finish!: (code: number) => void;
     const done = new Promise<number>((resolve) => {
@@ -43,20 +43,30 @@ async function harness(root: string) {
     const handle = new RunHandle(spec.runId, { send: async () => {}, interrupt() {}, close: () => finish(0), done });
     setTimeout(() => {
       handle.emit("event", { type: "session.started", runId: spec.runId, ts: Date.now(), agent: "codex", externalSessionId: spec.runId, model: "fixture" });
-      handle.emit("event", { type: "turn.completed", runId: spec.runId, ts: Date.now(), turnId: "turn", status: "success", durationMs: 1 });
+      void duringTurn().then(() => handle.emit("event", { type: "turn.completed", runId: spec.runId, ts: Date.now(), turnId: "turn", status: "success", durationMs: 1 }));
     }, 0);
     return handle;
   });
   const logs: string[] = [];
+  const pushed: CorePush[] = [];
   const core = await OpenOrc.create({
     dataDir: join(root, "data"),
     ephemeral: true,
     transport: {
       push(message) {
+        pushed.push(message);
         if (message.type === "log" && message.level !== "info") logs.push(message.message);
       },
     },
   });
+  let requestId = 0;
+  const call = async <M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> => {
+    const id = ++requestId;
+    await core.handle({ type: "rpc", id, method, params });
+    const reply = pushed.find((message) => (message.type === "rpc.result" || message.type === "rpc.error") && message.id === id);
+    if (reply?.type !== "rpc.result") throw new Error(reply?.type === "rpc.error" ? reply.message : "Missing RPC reply");
+    return reply.result as RpcResults[M];
+  };
   vi.spyOn(core.memory, "onRunFinished").mockImplementation(() => {});
   vi.spyOn(core.textGeneration, "title").mockResolvedValue(null);
   const input = { agent: "codex" as const, model: "fixture", effort: undefined, mode: "act" as const, permissionMode: "review" as const, attachments: undefined, title: undefined };
@@ -67,7 +77,7 @@ async function harness(root: string) {
     await core.runs.closeAndWait(run.id);
     return core.threads.get(thread.id)!;
   };
-  return { core, logs, input, turn };
+  return { core, logs, input, turn, call };
 }
 
 it("runs a folder without git as a project, keeps git features off with a reason, and never reaches a repository around it", async () => {
@@ -75,13 +85,13 @@ it("runs a folder without git as a project, keeps git features off with a reason
   const outer = join(root, "outer");
   await mkdir(join(outer, "app"), { recursive: true });
   await repository(outer, { commit: true });
-  const { core, logs, input, turn } = await harness(root);
+  const { core, logs, input, turn, call } = await harness(root);
   try {
     // As if the folder was added before a repository grew around it.
     const project = projects.insert(core.db, { name: "app", rootPath: join(outer, "app"), gitRemote: null, defaultBranch: null, settings: {} });
     expect(await projectGit(project)).toBe("none");
     const thread = await turn(project.id);
-    expect(thread).toMatchObject({ workspaceMode: "current", baseSha: null, branch: null });
+    expect(thread).toMatchObject({ workspaceMode: "current", baseSha: await emptyTree(join(outer, "app")), branch: null });
     expect(core.threads.checkpoints(thread.id)).toEqual([]);
     expect(logs).toEqual([]);
     expect((await git(outer, ["for-each-ref", "refs/openorc/"])).stdout).toBe("");
@@ -91,6 +101,12 @@ it("runs a folder without git as a project, keeps git features off with a reason
     await expect(core.threads.moveWorkspace(thread.id, "worktree")).rejects.toThrow(needsGit);
     await expect(core.threads.start({ ...input, projectId: project.id, prompt: "Isolate it", workspaceMode: "worktree" })).rejects.toThrow(needsGit);
     await core.threads.delete(thread.id);
+    // Deleting the folder's task leaves the outer repository's stale worktree record for its own git to prune.
+    await git(outer, ["worktree", "add", "-q", "-b", "stale", join(root, "stale")]);
+    await rm(join(root, "stale"), { recursive: true, force: true });
+    const task = tasks.insert(core.db, { projectId: project.id, title: "Tidy the notes", spec: null, priority: "none", labels: [], workspaceMode: "current", baseRef: null, parentTaskId: null });
+    await call("tasks.delete", { id: task.id });
+    expect((await git(outer, ["worktree", "list", "--porcelain"])).stdout).toContain(join(root, "stale"));
     expect(logs).toEqual([]);
   } finally {
     await core.close();
@@ -129,6 +145,42 @@ it("tracks a repository's changes before its first commit, and branches once it 
     expect(core.threads.get(thread.id)?.baseSha).toBe(empty);
     expect(await threadTurnChanges(core.db, firstTurn)).toEqual(planAdded);
     expect((await core.threads.moveWorkspace(thread.id, "worktree")).worktreePath).toBeTruthy();
+    expect(logs).toEqual([]);
+  } finally {
+    await core.close();
+  }
+});
+
+it("gives a thread a starting point when its agent sets up git during the first turn", async () => {
+  const root = await temp();
+  const folder = join(root, "sketch");
+  await mkdir(folder);
+  await writeFile(join(folder, "plan.md"), "# Plan\n");
+  let firstTurnWork = true;
+  const { core, logs, input, turn } = await harness(root, async () => {
+    if (!firstTurnWork) return;
+    firstTurnWork = false;
+    // The agent sets up git, and even commits, before its first turn ends.
+    await repository(folder);
+    await git(folder, ["add", "-A"]);
+    await git(folder, ["commit", "-q", "-m", "Start"]);
+  });
+  try {
+    const project = await core.projects.import(folder);
+    expect(await projectGit(project)).toBe("none");
+    const thread = await turn(project.id);
+    const empty = await emptyTree(folder);
+    expect(thread.baseSha).toBe(empty);
+    const [first] = core.threads.checkpoints(thread.id);
+    const firstTurn = { threadId: thread.id, checkpointId: first!.id };
+    const planAdded = { files: [{ path: "plan.md", added: 1, removed: 0 }], patch: null };
+    expect(await threadTurnChanges(core.db, firstTurn)).toEqual(planAdded);
+    // The next turn prepares the thread in a repository with a commit now. The starting point stays.
+    const next = await core.threads.continueThread(thread.id, { ...input, prompt: "Keep going" });
+    await vi.waitFor(() => expect(core.threads.get(thread.id)?.activity).toBe("idle"));
+    await core.runs.closeAndWait(next.id);
+    expect(core.threads.get(thread.id)?.baseSha).toBe(empty);
+    expect(await threadTurnChanges(core.db, firstTurn)).toEqual(planAdded);
     expect(logs).toEqual([]);
   } finally {
     await core.close();

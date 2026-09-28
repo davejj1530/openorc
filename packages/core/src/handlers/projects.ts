@@ -6,7 +6,7 @@ import { type Transport } from "../transport.js";
 import type { Handlers } from "./types.js";
 type Dependencies = {
   db: Db;
-  projectService: Pick<ProjectService, "list" | "get" | "git" | "import" | "remove" | "updateSettings">;
+  projectService: Pick<ProjectService, "list" | "get" | "git" | "checkoutBranch" | "import" | "remove" | "updateSettings">;
   invalidate: (keys: string[]) => void;
   transport: Transport;
 };
@@ -16,7 +16,10 @@ export function createProjectsHandlers({
   projectService,
   invalidate,
   transport,
-}: Dependencies): Pick<Handlers, "workspace.get" | "workspace.configure" | "projects.list" | "projects.get" | "projects.git" | "projects.import" | "projects.remove" | "projects.updateSettings"> {
+}: Dependencies): Pick<
+  Handlers,
+  "workspace.get" | "workspace.configure" | "projects.list" | "projects.get" | "projects.git" | "projects.checkoutBranch" | "projects.import" | "projects.remove" | "projects.updateSettings"
+> {
   return {
     "workspace.get": () => workspaceHome(db),
     "workspace.configure": async ({ entrypoint }) => {
@@ -26,6 +29,7 @@ export function createProjectsHandlers({
     },
     "projects.list": () => projectService.list(),
     "projects.get": ({ id }) => (id === WORKSPACE_ID ? workspaceHome(db) : projectService.get(id)),
+    "projects.checkoutBranch": ({ id }) => (id === WORKSPACE_ID ? null : projectService.checkoutBranch(id)),
     "projects.git": async ({ id }) => {
       if (id === WORKSPACE_ID) return "none";
       const { state, changed } = await projectService.git(id);

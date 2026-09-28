@@ -440,7 +440,8 @@ describe("Claude stream-json process", () => {
 
   it("times out an unanswered settings request without settling a later request from its late response", async () => {
     const proc = mockProcess();
-    const handle = new ClaudeAdapter({ controlReplyTimeoutMs: 20 }).start({ runId: "fixture", agent: "claude", cwd: process.cwd(), prompt: "First", permissionMode: "trusted" }, launch);
+    const options = { controlReplyTimeoutMs: 20 };
+    const handle = new ClaudeAdapter(options).start({ runId: "fixture", agent: "claude", cwd: process.cwd(), prompt: "First", permissionMode: "trusted" }, launch);
     try {
       await tick();
       written(proc);
@@ -451,6 +452,8 @@ describe("Claude stream-json process", () => {
       const [first] = written(proc);
       await expect(timedOut).rejects.toThrow("Claude Code did not answer the settings change.");
 
+      // The next request waits as long as it needs, so a busy machine can't time it out before the test answers it.
+      options.controlReplyTimeoutMs = 60_000;
       const next = handle.applySettings({ effort: "high" });
       await tick();
       const [second] = written(proc);

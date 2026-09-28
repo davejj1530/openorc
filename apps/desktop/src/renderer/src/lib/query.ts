@@ -31,6 +31,12 @@ const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
   "threads.search": ["threads", "messages"],
   "files.search": ["files"],
   "inbox.list": ["inbox", "tasks"],
+  // GitHub's side of a pull request, and the draft review kept here.
+  "pulls.list": ["pulls"],
+  "pulls.get": ["pulls"],
+  "pulls.diff": ["pulls"],
+  "pulls.review.get": ["pull-reviews"],
+  "reviewerApp.get": ["reviewer-app"],
 };
 
 /**
@@ -130,15 +136,41 @@ function reviewCommentTags(p: Record<string, unknown>): string[] {
  */
 const workspaceMutations = new Set<RpcMethod>(["threads.moveWorkspace", "threads.cancelMove", "threads.cancelTeamOperation", "threads.restore"]);
 
+/** Mutations whose effects never depend on their parameters. */
+const fixedInvalidations: Partial<Record<RpcMethod, readonly string[]>> = {
+  "providers.codex.reset": ["provider-usage"],
+  "agents.models.refresh": ["models"],
+  "workspace.configure": ["workspace", "projects"],
+  "app.settings.set": ["settings"],
+  "memory.settings.set": ["settings"],
+  "textGeneration.settings.set": ["text-generation"],
+  "memory.record": ["memory"],
+  "memory.update": ["memory"],
+  "memory.feedback": ["memory"],
+  "memory.remove": ["memory"],
+  "memory.promote": ["memory"],
+  "pulls.review.comment": ["pull-reviews"],
+  "pulls.review.editComment": ["pull-reviews"],
+  "pulls.review.removeComment": ["pull-reviews"],
+  "pulls.review.summary": ["pull-reviews"],
+  "pulls.review.discard": ["pull-reviews"],
+  "pulls.review.start": ["pull-reviews", "threads"],
+  // A posted review can change the pull request's review decision.
+  "pulls.review.submit": ["pull-reviews", "pulls"],
+  "reviewerApp.setup": ["reviewer-app"],
+  "reviewerApp.cancelSetup": ["reviewer-app"],
+  "reviewerApp.configure": ["reviewer-app"],
+  "reviewerApp.remove": ["reviewer-app"],
+};
+
 function workspaceMutationTags(id: string): string[] {
   return ["workspace-diff", "threads", "tasks", "inbox", "orchestration", `thread:${id}`, `threaddiff:${id}`, `threadlog:${id}`, `checkpoints:${id}`];
 }
 
 export function invalidatesFor(method: RpcMethod, params: unknown): string[] {
+  const fixed = fixedInvalidations[method];
+  if (fixed) return [...fixed];
   if (method.startsWith("agents.updates.")) return ["agent-updates", ...(method === "agents.updates.install" ? ["system", "models"] : [])];
-  if (method === "providers.codex.reset") return ["provider-usage"];
-  if (method === "agents.models.refresh") return ["models"];
-  if (method === "workspace.configure") return ["workspace", "projects"];
   if (method.startsWith("projects.")) return ["projects", "tasks"];
   const p = (params ?? {}) as Record<string, unknown>;
   if (method.startsWith("tasks.comments.")) return [`task-comments:${String(p["taskId"])}`];
@@ -200,8 +232,6 @@ export function invalidatesFor(method: RpcMethod, params: unknown): string[] {
     case "review.pushThread":
     case "review.createThreadPr":
       return ["threads", `thread:${String(p["threadId"])}`, `threaddiff:${String(p["threadId"])}`, `threadlog:${String(p["threadId"])}`];
-    case "app.settings.set":
-      return ["settings"];
     case "schedules.create":
     case "schedules.update":
     case "schedules.delete":
@@ -228,16 +258,6 @@ export function invalidatesFor(method: RpcMethod, params: unknown): string[] {
     case "review.push":
     case "review.createPr":
       return [`diff:${String(p["taskId"])}`, `log:${String(p["taskId"])}`, `snapshots:${String(p["taskId"])}`, task, "tasks"];
-    case "memory.record":
-    case "memory.update":
-    case "memory.feedback":
-    case "memory.remove":
-    case "memory.promote":
-      return ["memory"];
-    case "memory.settings.set":
-      return ["settings"];
-    case "textGeneration.settings.set":
-      return ["text-generation"];
     default:
       return [];
   }

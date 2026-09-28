@@ -1,4 +1,4 @@
-import type { ReviewComment } from "@openorc/protocol";
+import type { ReviewComment } from "./domain.js";
 
 const HUNK_HEADER = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/;
 
@@ -26,6 +26,23 @@ interface DiffRow {
   old: number | null;
   new: number | null;
   text: string;
+}
+
+/** One file's part of a unified diff and the path it changes, the new name for a rename. */
+export interface PatchFile {
+  path: string;
+  chunk: string;
+}
+
+/** A patch split per file, in the order the diff lists them. */
+export function patchFiles(patch: string): PatchFile[] {
+  const parts = patch.split(/^(?=diff --git )/m).filter((part) => part.trim().length > 0);
+  return parts.map((chunk) => {
+    // Git ends a name containing spaces with a tab on this line.
+    const plus = /^\+\+\+ b\/(.+?)\t?$/m.exec(chunk)?.[1];
+    const header = /^diff --git a\/(.+?) b\/(.+)$/m.exec(chunk);
+    return { path: plus ?? header?.[2] ?? "file", chunk };
+  });
 }
 
 function diffRows(chunk: string): DiffRow[] {

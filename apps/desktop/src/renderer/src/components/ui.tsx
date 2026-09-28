@@ -125,7 +125,8 @@ export function Segmented<T extends string>({
   className,
 }: {
   value: T;
-  options: readonly { value: T; label: ReactNode }[];
+  /** A disabled option can say why on hover. */
+  options: readonly { value: T; label: ReactNode; disabled?: boolean; reason?: string }[];
   onChange: (value: T) => void;
   label: string;
   size?: "sm" | "md";
@@ -139,8 +140,14 @@ export function Segmented<T extends string>({
           type="button"
           role="radio"
           aria-checked={value === option.value}
+          disabled={option.disabled}
+          title={option.disabled ? option.reason : undefined}
           onClick={() => onChange(option.value)}
-          className={cn("rounded-md whitespace-nowrap transition-colors text-ink-3 hover:bg-surface-2 hover:text-ink", segmentSizes[size], value === option.value && "text-ink font-medium")}
+          className={cn(
+            "rounded-md whitespace-nowrap transition-colors text-ink-3 hover:bg-surface-2 hover:text-ink disabled:text-ink-4 disabled:hover:bg-transparent",
+            segmentSizes[size],
+            value === option.value && "text-ink font-medium",
+          )}
         >
           {option.label}
         </button>

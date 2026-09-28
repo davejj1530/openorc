@@ -1,6 +1,8 @@
 import type { ProtectedSecretStore } from "@openorc/core";
 
-type Channel = "slack.secrets" | "memory.secrets";
+const channels = ["slack.secrets", "memory.secrets", "github.secrets"] as const;
+type Channel = (typeof channels)[number];
+const results = new Set<unknown>(channels.map((channel) => `${channel}.result`));
 interface Pending {
   channel: Channel;
   resolve(value: string | null): void;
@@ -57,7 +59,7 @@ export class ProtectedSecretsClient {
   receive(message: unknown): boolean {
     if (!message || typeof message !== "object") return false;
     const result = message as { type?: unknown; id?: unknown; value?: unknown; error?: unknown };
-    if (result.type !== "slack.secrets.result" && result.type !== "memory.secrets.result") return false;
+    if (!results.has(result.type)) return false;
     if (typeof result.id !== "number") return true;
     const request = this.pending.get(result.id);
     if (!request || result.type !== `${request.channel}.result`) return true;

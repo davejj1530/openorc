@@ -194,6 +194,8 @@ export interface RunHooks {
   /** Includes host-generated Codex/Claude requests, after their pending handle exists. */
   onApprovalRequested?(event: Extract<AgentEvent, { type: "approval.requested" }>): void;
   brief(project: Project): string;
+  /** Instructions that belong to one conversation, such as the pull request it reviews; null for none. */
+  threadContext?(thread: Thread): string | null;
   memoryEnabled?(): boolean;
   onRunFinished(run: Run, scope: RunScope, project: Project): void;
   /** Synchronous notification after capture; consumers queue follow-up work instead of awaiting it here. */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { commentAnchor, isOutdated } from "./diff-lines";
+import { commentAnchor, isOutdated } from "@openorc/protocol";
 
 const chunk = [
   "diff --git a/src/app.ts b/src/app.ts",

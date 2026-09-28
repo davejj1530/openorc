@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { PatchDiff, Virtualizer, WorkerPoolContextProvider, type FileDiffOptions, type SelectedLineRange, type SelectionSide } from "@pierre/diffs/react";
 import DiffWorker from "@pierre/diffs/worker/worker.js?worker";
-import { reviewCommentLines, reviewCommentSent, type ReviewComment } from "@openorc/protocol";
+import { commentAnchor, isOutdated, patchFiles, reviewCommentLines, reviewCommentSent, type CommentAnchor, type DiffLine, type DiffSide, type PatchFile, type ReviewComment } from "@openorc/protocol";
 import { ChevronRight, X } from "./icons";
 import { applyDiffIcons } from "./icons-diff";
-import { commentAnchor, isOutdated, type CommentAnchor, type DiffLine, type DiffSide } from "./diff-lines";
 import { patchStat } from "./diff-stat";
 import { cn } from "../lib/cn";
 import { useTheme } from "../lib/theme";
@@ -19,6 +18,8 @@ export interface CommentLocation extends CommentAnchor {
 export type CommentDraft = CommentLocation;
 export interface ReviewCommentState {
   label: string;
+  /** Who wrote the comment, when it may not be you. */
+  author?: string;
   removeDisabled: boolean;
   reason?: string;
 }
@@ -57,9 +58,7 @@ const statusTone: Record<FileStatus, string> = { added: "text-ok", deleted: "tex
 const statusLetter: Record<FileStatus, string> = { added: "A", deleted: "D", renamed: "R", modified: "M" };
 const statusLabel: Record<FileStatus, string> = { added: "Added", deleted: "Deleted", renamed: "Renamed", modified: "Modified" };
 
-interface PatchFile {
-  path: string;
-  chunk: string;
+interface DiffFile extends PatchFile {
   status: FileStatus;
   insertions: number;
   deletions: number;
@@ -73,14 +72,10 @@ function statusOf(chunk: string): FileStatus {
 }
 
 /** One patch string, split per file so each file gets its own header, click handler and annotations. */
-function splitPatch(patch: string): PatchFile[] {
-  const parts = patch.split(/^(?=diff --git )/m).filter((p) => p.trim().length > 0);
-  return parts.map((chunk) => {
-    // Git ends a name containing spaces with a tab on this line.
-    const plus = /^\+\+\+ b\/(.+?)\t?$/m.exec(chunk)?.[1];
-    const header = /^diff --git a\/(.+?) b\/(.+)$/m.exec(chunk);
-    const stat = patchStat(chunk);
-    return { path: plus ?? header?.[2] ?? "file", chunk, status: statusOf(chunk), insertions: stat.insertions, deletions: stat.deletions };
+function splitPatch(patch: string): DiffFile[] {
+  return patchFiles(patch).map((file) => {
+    const stat = patchStat(file.chunk);
+    return { ...file, status: statusOf(file.chunk), insertions: stat.insertions, deletions: stat.deletions };
   });
 }
 
@@ -97,7 +92,7 @@ const MAX_OPEN_ON_ARRIVAL = 5;
  * mounting one worker-highlighted view and mounting one per changed file: a
  * 189-file branch opened every one of them against a two-worker pool.
  */
-function initiallyExpanded(files: PatchFile[], comments: ReviewComment[]): ReadonlySet<string> {
+function initiallyExpanded(files: DiffFile[], comments: ReviewComment[]): ReadonlySet<string> {
   // A lone file has no list to skim and nothing to save: folding it hides the only thing
   // the panel is for, to spare a view that would have been the floor anyway.
   if (files.length === 1) return new Set(files.map((file) => file.path));
@@ -225,7 +220,7 @@ export function DiffView({ patch, comments = [], commentRanges = false, draft = 
  * change letter and the two counts read in the app's own ink ramp, and it
  * stays put while its file scrolls past.
  */
-function FileHeader({ file, open, onToggle, commentCount }: { file: PatchFile; open: boolean; onToggle: (header: HTMLButtonElement) => void; commentCount: number }) {
+function FileHeader({ file, open, onToggle, commentCount }: { file: DiffFile; open: boolean; onToggle: (header: HTMLButtonElement) => void; commentCount: number }) {
   const cut = file.path.lastIndexOf("/");
   const directory = cut === -1 ? "" : file.path.slice(0, cut + 1);
   const name = cut === -1 ? file.path : file.path.slice(cut + 1);
@@ -410,7 +405,7 @@ function CommentAnnotation({ comment, state, onRemove, outdated = false }: { com
   return (
     <div className={cn("my-1 mx-3 rounded-md border bg-surface px-3 py-2 text-sm font-sans", outdated && "border-dashed border-line-strong", !outdated && "border-line")}>
       <div className="flex items-center gap-2 text-xs text-ink-3 mb-1">
-        <span className="font-medium text-ink-2">You</span>
+        <span className="font-medium text-ink-2">{state?.author ?? "You"}</span>
         {range ? <span className="text-ink-2">{range}</span> : null}
         <span>{state?.label ?? (reviewCommentSent(comment) ? "sent to the agent" : "not sent yet")}</span>
         {outdated ? <span>· {changedLabel(comment)}</span> : null}

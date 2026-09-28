@@ -2,10 +2,11 @@
 
 OpenOrc encrypts the credentials it saves with Electron `safeStorage`, which uses the macOS Keychain, Windows data protection, or the Linux secret service. Only the main process reads or writes them. Settings screens and usage views learn only whether a key is saved and see safe error messages, never the key itself.
 
-The data folder holds two separate encrypted files:
+The data folder holds three separate encrypted files:
 
 - `memory-extraction-key.enc`: the optional Anthropic API key for memory extraction.
 - `slack-secrets.enc`: Slack tokens and device settings (see [Slack](slack.md)).
+- `github-reviewer-app.enc`: the private key of your pull request reviewer app (see below).
 
 The memory-extraction key is never written to the SQLite database. Each save writes a new owner-only file, syncs it to disk, replaces the old file, and on macOS and Linux syncs the folder before reporting success. Saves to the same file happen one at a time. Linux's `basic_text` backend, which does not encrypt, is refused. Reading a missing file needs no keychain access; saving or reading a key needs working OS protection.
 
@@ -22,6 +23,12 @@ Encrypted files only open with the same OS account and encryption key. Copying t
 Open **Settings → Memory & models → Learn from completed runs** and choose **Anthropic API key** as the provider. The key field appears after that choice; the provider list is available while memory is on. The saved key is never shown in the field. Removing the key saves an encrypted empty value. Diagnostic logs leave out memory settings.
 
 If protected storage is locked or unavailable, key-based extraction is unavailable and Settings shows what to do. Unlock the OS keychain or secret service, then use **Retry storage** or **Retry save**. A failure before the file is replaced keeps the previous value. If only the final sync fails, the new file may already be in place; save again to be sure. **Off** and subscription-based extraction stay available, and OpenOrc never falls back to saving the key unencrypted.
+
+## The reviewer app's key
+
+**Settings → Connections → GitHub → Reviewer app** creates a GitHub App on your account so that reviews can post as the app rather than as you. Each person creates their own: posting as an app needs its private key, and OpenOrc has no server that could keep a shared app's key private.
+
+Setup opens a page that OpenOrc serves on `127.0.0.1` for up to 15 minutes. It sends GitHub the app's description, and GitHub returns a one-time code that OpenOrc exchanges for the key. The key goes straight to `github-reviewer-app.enc` and is used only to sign short-lived tokens; the ones that post a review can reach pull requests in that one repository and nothing else. The app's name and ID sit in the database; the key never does. **Remove** saves an encrypted empty value; the app itself stays on GitHub until you delete it there.
 
 ## For contributors
 

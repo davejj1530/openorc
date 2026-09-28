@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { git } from "./exec.js";
 import { changedFiles, log, patchAgainst, repoInfo } from "./repo.js";
 import { diffStat, treeHash } from "./snapshot.js";
-import { commitAll, push, unpushedCommits } from "./publish.js";
+import { commitAll, pullRequestTemplate, push, unpushedCommits } from "./publish.js";
 import * as worktree from "./worktree.js";
 
 let root: string;
@@ -170,6 +170,29 @@ describe("push", () => {
     await writeFile(path.join(local, "mine.md"), "Mine\n");
     await commitAll(local, "mine");
     await expect(push(local, "main")).rejects.toThrow("origin has newer commits on main. Pull them in first, then push again.");
+  });
+});
+
+describe("pull request template", () => {
+  let repo: string;
+  beforeAll(async () => {
+    repo = await mkdtemp(path.join(os.tmpdir(), "openorc-template-"));
+  });
+  afterAll(async () => {
+    await rm(repo, { recursive: true, force: true });
+  });
+
+  it("finds the template where gh looks, preferring .github, and drops front matter", async () => {
+    expect(await pullRequestTemplate(repo)).toBeNull();
+    await mkdir(path.join(repo, "docs"));
+    await writeFile(path.join(repo, "docs", "pull-request-template.txt"), "From docs\n");
+    expect(await pullRequestTemplate(repo)).toBe("From docs\n");
+    await writeFile(path.join(repo, "pull_request_template.md"), "From the root\n");
+    expect(await pullRequestTemplate(repo)).toBe("From the root\n");
+    await mkdir(path.join(repo, ".github", "PULL_REQUEST_TEMPLATE"), { recursive: true });
+    expect(await pullRequestTemplate(repo)).toBe("From the root\n");
+    await writeFile(path.join(repo, ".github", "PULL_REQUEST_TEMPLATE.md"), "---\nname: Default\n---\n## Summary\n");
+    expect(await pullRequestTemplate(repo)).toBe("## Summary\n");
   });
 });
 

@@ -17,6 +17,8 @@
     "node": ">=24"
   },
   "scripts": {
+    "prepare": "husky",
+    "precommit": "lint-staged",
     "dev": "pnpm --filter @openorc/desktop dev",
     "dev:website": "pnpm --filter @openorc/website dev",
     "qa:onboarding": "node scripts/onboarding-disposable-profile.cjs",
@@ -35,6 +37,8 @@
   "devDependencies": {
     "eslint": "10.11.0",
     "eslint-plugin-react-hooks": "7.1.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.6.0",
     "prettier": "^3.9.8",
     "tsx": "^4.20.0",
     "typescript": "^5.9.0",

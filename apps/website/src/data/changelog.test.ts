@@ -102,7 +102,9 @@ void test("the static build authenticates release requests without publishing it
     if (!url.startsWith("https://api.github.com/")) return fetchPage(input, init);
     releaseRequests++;
     if (new Headers(init?.headers).get("Authorization") !== `Bearer ${token}`) return Promise.resolve(new Response(null, { status: 403, statusText: "rate limit exceeded" }));
-    return Promise.resolve(Response.json([release(), release({ draft: true, body: "## Highlights\n- Unpublished draft detail" })]));
+    const name = "OpenOrc-0.1.0-mac-arm64.dmg";
+    const asset = { name, size: 250_000_000, state: "uploaded", browser_download_url: `https://github.com/davejj1530/openorc/releases/download/v0.1.0/${name}` };
+    return Promise.resolve(Response.json([release({ assets: [asset] }), release({ draft: true, body: "## Highlights\n- Unpublished draft detail" })]));
   });
 
   await build({ root: fileURLToPath(new URL("../../", import.meta.url)), outDir, cacheDir: join(directory, "cache"), logLevel: "silent" });
@@ -110,6 +112,12 @@ void test("the static build authenticates release requests without publishing it
   const html = await readFile(join(outDir, "changelog/index.html"), "utf8");
   assert.match(html, /First public release/);
   assert.doesNotMatch(html, /Unpublished draft detail/);
+  const downloads = await readFile(join(outDir, "download/index.html"), "utf8");
+  assert.match(downloads, /href="https:\/\/github.com\/davejj1530\/openorc\/releases\/download\/v0.1.0\/OpenOrc-0.1.0-mac-arm64.dmg"/);
+  assert.doesNotMatch(downloads, /href="[^"]*(?:mac-x64.dmg|win-x64.exe)"/);
+  const home = await readFile(join(outDir, "index.html"), "utf8");
+  assert.doesNotMatch(home, /Coming soon/);
+  assert.match(home, /href="\/download\/"/);
   for (const entry of await readdir(outDir, { recursive: true, withFileTypes: true })) {
     if (!entry.isFile() || !/\.(?:html|css|js|mjs|json|map)$/.test(entry.name)) continue;
     const contents = await readFile(join(entry.parentPath, entry.name), "utf8");
@@ -140,12 +148,16 @@ void test("development pages render without requesting GitHub releases", { timeo
   });
   t.after(() => server.stop());
 
-  for (const path of ["/", "/docs/", "/changelog/", "/"]) {
+  for (const path of ["/", "/docs/", "/changelog/", "/download/", "/"]) {
     const response = await fetchPage(`http://127.0.0.1:${server.address.port}${path}`);
     const html = await response.text();
     assert.equal(releaseRequests, 0, `${path} must not contact GitHub in development`);
     assert.equal(response.status, 200);
     assert.match(html, /id="main"/);
     assert.doesNotMatch(html, /GitHub releases request failed/);
+    if (path === "/download/") {
+      assert.match(html, /first release is on its way/);
+      assert.doesNotMatch(html, /href="[^\"]+\.(dmg|exe)"/);
+    }
   }
 });

@@ -1,0 +1,71 @@
+---
+import Layout from "../layouts/Layout.astro";
+import SiteHeader from "../components/SiteHeader.astro";
+import SiteFooter from "../components/SiteFooter.astro";
+import Icon from "../components/Icon.astro";
+import { getPublishedReleases } from "../data/changelog";
+import { installerTargets, selectDownloadRelease } from "../data/downloads";
+import "../styles/download.css";
+const release = selectDownloadRelease(await getPublishedReleases());
+---
+
+<Layout title="Download OpenOrc for macOS and Windows" description="Download OpenOrc for Apple Silicon and Intel Macs, or Windows PCs. Bring your coding agents into one desktop workspace.">
+  <SiteHeader />
+  <main id="main" class="container download-page">
+    <header class="download-intro">
+      <h1>Your agents.<br />On your desktop.</h1>
+      <p>Download OpenOrc for macOS or Windows. Free and open source, with no OpenOrc account required.</p>
+      {release && <p class="download-version">{release.tag} <span>{release.prerelease ? "Public beta" : "Stable release"}</span><a href={release.url}>Release notes <Icon name="arrow" size={14} /></a></p>}
+    </header>
+
+    {release ? (
+      <section class="download-installers" aria-labelledby="installers-title">
+        <h2 id="installers-title">Choose your installer.</h2>
+        <p class="download-device-hint" data-device-hint>For a Mac, open the Apple menu → About This Mac to find your chip or processor.</p>
+        <ul class="download-list">
+          {installerTargets.map((target) => {
+            const installer = release.installers.find((item) => item.target === target.id);
+            return (
+              <li class="download-row" data-installer={target.id}>
+                <div class="download-platform">
+                  <h3>{target.title} <span>{target.chip}</span></h3>
+                  <p>{target.detail}</p>
+                  <span class="download-recommendation" data-recommendation hidden>Suggested for your computer</span>
+                </div>
+                <div class="download-file">
+                  {installer ? (
+                    <>
+                      <a class="button button-primary" href={installer.url} data-installer-link aria-label={`Download OpenOrc for ${target.title}, ${target.chip}${installer.unsigned ? ", unsigned beta" : ""}`}>
+                        Download {target.extension.toUpperCase()}<Icon name="download" size={17} />
+                      </a>
+                      <span>{Math.round(installer.size / 1_000_000)} MB{installer.unsigned && " · Unsigned beta"}</span>
+                    </>
+                  ) : <p>Not available in this release</p>}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+        {release.installers.some((installer) => installer.unsigned) && <p class="download-notice">The Windows beta is unsigned. Windows may show an unrecognized-app warning during installation.</p>}
+        {release.prerelease && <p class="download-notice">Beta updates are installed manually. The in-app updater offers stable releases only.</p>}
+      </section>
+    ) : (
+      <section class="download-empty" aria-labelledby="download-empty-title">
+        <h2 id="download-empty-title">The first release is on its way.</h2>
+        <p>Installers will appear here once the public release is published.</p>
+        <a class="text-link" href="https://github.com/davejj1530/openorc/releases">Check releases on GitHub <Icon name="arrow" size={16} /></a>
+      </section>
+    )}
+
+    <aside class="download-help" aria-labelledby="download-help-title">
+      <h2 id="download-help-title">Bring the tools you already use.</h2>
+      <p>OpenOrc works with your installed Codex, Claude Code, and OpenCode tools. Keep their existing sign-in and configuration.</p>
+      <a class="text-link" href="/docs/">Read the docs <Icon name="arrow" size={16} /></a>
+    </aside>
+  </main>
+  <SiteFooter />
+</Layout>
+
+<script>
+  import "../scripts/download-links";
+</script>

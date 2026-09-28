@@ -1,0 +1,13 @@
+---
+import Icon from "./Icon.astro";
+interface Props { compact?: boolean }
+const { compact = false } = Astro.props;
+---
+
+{compact ? (
+  <a class="button button-small" href="/download/">Download</a>
+) : (
+  <a class="button button-primary" href="/download/">
+    Download OpenOrc<Icon name="download" size={18} />
+  </a>
+)}

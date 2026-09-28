@@ -74,10 +74,13 @@
   margin-top: 24px;
 }
 .home-page .button-primary {
-  border: 1px solid #e4e4e8;
+  border: 0;
   background: #e4e4e8;
   color: #19191d;
   font-weight: 550;
+}
+.home-page .button-primary:not(:disabled):hover {
+  color: #fff;
 }
 .home-page .text-link {
   color: #c8c8cf;

@@ -81,6 +81,8 @@ pnpm exec prettier --check path/to/changed-file.ts
 
 `pnpm format` rewrites the repository. Avoid whole-repository formatting in a focused change, especially when the checkout contains other work. Run `pnpm format:check` to confirm the repository is formatted.
 
+`pnpm install` installs the Husky pre-commit hook. On each commit, lint-staged runs Prettier on staged files and stages its formatting changes. Unstaged edits are preserved, and unsupported formats and files in `.prettierignore` are skipped. The hook runs through `node --run precommit`, so it does not require a global pnpm shim. Full typecheck and tests stay in CI; run the relevant checks above before pushing. Git checks text files out with LF endings on every platform to match Prettier, while pinned third-party files retain their original bytes.
+
 ## Desktop and live-provider checks
 
 Build the desktop before checks that load its production output:

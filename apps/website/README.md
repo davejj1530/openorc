@@ -11,7 +11,15 @@ pnpm --filter @openorc/website build
 pnpm --filter @openorc/website preview
 ```
 
-The development server defaults to `http://localhost:4321`. Production output is `apps/website/dist`, ready for a static host. The site URL is configured as `https://openorc.app`. The Download buttons are intentionally disabled until a public release is available.
+The development server defaults to `http://localhost:4321`. Production output is `apps/website/dist`, ready for a static host. The site URL is configured as `https://openorc.app`.
+
+## Downloads
+
+`/download/` lists the uploaded installers from published GitHub Releases. It prefers the newest stable release with installers, falling back to the newest public beta before a stable release exists. Drafts, unfinished uploads, missing platform assets and foreign URLs never become download links. Before publication, Download leads to a page explaining that installers are not available yet, with a link to GitHub Releases. The site must rebuild after a release is published; the release hook below handles this when configured.
+
+All Download buttons open `/download/`, which highlights a matching installer when the browser reports its platform and architecture. Detection uses [User-Agent Client Hints](https://developer.chrome.com/docs/privacy-security/user-agent-client-hints) where available. It does not infer Intel hardware from a MacIntel user agent, which Apple Silicon Macs can also report. When Mac architecture is unavailable, visitors choose Apple Silicon or Intel and receive instructions for finding their chip. Mobile visitors, unsupported platforms and uncertain Windows architectures receive manual choices. With JavaScript disabled, all links and choices remain usable. Device information is neither stored nor sent by the download code.
+
+Windows beta installers are labeled unsigned when their published filename carries that designation. Beta updates are installed manually. The client never requests GitHub's releases API; release metadata is embedded at build time using the same cached request as the changelog.
 
 ## Changelog
 
@@ -35,7 +43,7 @@ The workflow section plays a fourth, longer scene (`data/hero/workflow.ts`): a q
 
 ## Content boundaries
 
-Slack copy follows [the integration documentation](../../docs/slack.md): agent work runs on the user's computer, so OpenOrc must stay open and the computer awake for scheduled work and Slack replies. Provider subscriptions and API usage remain separate. Local data claims distinguish stored workspace data from requests sent to the chosen provider. The homepage download controls read "Coming soon" and stay disabled until a verified public release exists.
+Slack copy follows [the integration documentation](../../docs/slack.md): agent work runs on the user's computer, so OpenOrc must stay open and the computer awake for scheduled work and Slack replies. Provider subscriptions and API usage remain separate. Local data claims distinguish stored workspace data from requests sent to the chosen provider. Download links come from published release assets, rather than guessed filenames or unreleased tags.
 
 ## Asset provenance
 

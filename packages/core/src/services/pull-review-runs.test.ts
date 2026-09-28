@@ -1,8 +1,8 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { afterEach, expect, it, vi } from "vitest";
-import { projects, pullReviews } from "@openorc/db";
+import { projects, threads } from "@openorc/db";
 import { CodexAdapter, RunHandle } from "@openorc/agents";
 import { commitAll, git } from "@openorc/git";
 import type { RunSpec } from "@openorc/protocol";
@@ -14,7 +14,7 @@ afterEach(async () => {
   if (root) await rm(root, { recursive: true, force: true });
 });
 
-it("runs a pull request's review conversation as an unvetted checkout, in any mode", async () => {
+it("runs every conversation in a pull request's copy as an unvetted checkout, in any mode", async () => {
   root = await mkdtemp(join(tmpdir(), "openorc-review-runs-"));
   await git(root, ["init", "-q", "-b", "main"]);
   await git(root, ["config", "user.email", "fixture@example.com"]);
@@ -39,15 +39,22 @@ it("runs a pull request's review conversation as an unvetted checkout, in any mo
   try {
     const project = projects.insert(core.db, { name: "Site", rootPath: root, gitRemote: null, defaultBranch: "main", settings: {} });
     const input = { agent: "codex" as const, model: "fixture", effort: undefined, mode: "act" as const, permissionMode: "autonomous" as const, attachments: undefined };
-    const { thread } = await core.threads.start({ ...input, prompt: "Hello", projectId: project.id, title: undefined, workspaceMode: "current" });
-    await vi.waitFor(() => expect(core.threads.get(thread.id)?.activity).toBe("idle"));
+    const { thread: own } = await core.threads.start({ ...input, prompt: "Hello", projectId: project.id, title: undefined, workspaceMode: "current" });
+    await vi.waitFor(() => expect(core.threads.get(own.id)?.activity).toBe("idle"));
     expect(specs[0]!.untrustedCheckout).toBeUndefined();
 
-    pullReviews.open(core.db, { projectId: project.id, number: 7 }, head);
-    pullReviews.update(core.db, { projectId: project.id, number: 7 }, { threadId: thread.id });
-    await core.threads.continueThread(thread.id, { ...input, prompt: "Fix it yourself" });
-    await vi.waitFor(() => expect(specs).toHaveLength(2));
-    expect(specs[1]).toMatchObject({ mode: "act", permissionMode: "autonomous", untrustedCheckout: true });
+    // A pull request's copy: a worktree on no branch. Its fork shares it, and neither is linked to the review.
+    const copy = join(root, "..", `${basename(root)}-pr-7`);
+    await git(root, ["worktree", "add", "-q", "--detach", copy, head]);
+    const review = threads.insert(core.db, { projectId: project.id, title: "Review #7", agent: "codex", model: "fixture", mode: "plan", permissionMode: "review", workspaceMode: "worktree" });
+    threads.update(core.db, review.id, { worktreePath: copy, baseSha: head });
+    const fork = core.threads.fork(review.id);
+    for (const thread of [review, fork]) {
+      await core.threads.continueThread(thread.id, { ...input, prompt: "Fix it yourself" });
+      await vi.waitFor(() => expect(core.threads.get(thread.id)?.activity).toBe("idle"));
+      expect(specs.at(-1)).toMatchObject({ cwd: await realpath(copy), mode: "act", permissionMode: "autonomous", untrustedCheckout: true });
+    }
+    await rm(copy, { recursive: true, force: true });
   } finally {
     await core.close();
   }

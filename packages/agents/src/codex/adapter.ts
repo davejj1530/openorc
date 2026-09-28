@@ -83,7 +83,7 @@ interface CodexConfigLayer {
 async function refuseProjectConfig(rpc: StdioJsonRpc, cwd: string): Promise<void> {
   const read = await rpc.request<{ layers?: CodexConfigLayer[] }>("config/read", { cwd, includeLayers: true });
   if (read.layers?.some((layer) => layer.name?.type === "project" && !layer.disabledReason))
-    throw new Error("Codex trusts this repository, so it would load the pull request's own .codex settings, which can run commands. Review it with a Claude or OpenCode model instead.");
+    throw new Error("Codex trusts this repository, so it would load the pull request's own .codex settings, which can run commands. Review it with a Claude model instead.");
 }
 
 /** Settings the thread starts with: in Plan, no MCP server but the app's. An unvetted checkout's own settings refuse the run. */

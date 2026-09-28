@@ -1,7 +1,6 @@
 import {
   audit,
   plans,
-  pullReviews,
   settings,
   checkpoints,
   messages,
@@ -39,6 +38,7 @@ import { realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Logger } from "../transport.js";
 import { titleFromPrompt, type StartThreadInput, type ThreadPatch, type ThreadTitler } from "./thread-inputs.js";
+import { inUnvettedCopy } from "./review-copies.js";
 import type { RunService } from "./runs.js";
 import type { WorkspaceService } from "./workspace.js";
 import { directory, executionProject } from "./workspace-home.js";
@@ -566,7 +566,7 @@ export class ThreadService {
     await this.writers.withLease(this.workspaces.threadPath(thread, project), `deleting thread ${id}`, async (lease) => {
       if (thread.worktreePath && !this.worktreeShared(thread)) {
         // A pull request's copy under review is someone else's code, so any changes in it go with it.
-        await this.workspaces.cleanupThread(thread, project, { save: pullReviews.forThread(this.db, id) === null }, lease);
+        await this.workspaces.cleanupThread(thread, project, { save: !inUnvettedCopy(this.db, thread) }, lease);
       }
 
       threads.delete(this.db, id);

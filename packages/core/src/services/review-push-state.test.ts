@@ -2,7 +2,7 @@ import { access, mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promise
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { projects, pullReviews, threads } from "@openorc/db";
+import { projects, threads } from "@openorc/db";
 import * as gitTools from "@openorc/git";
 import { commitAll, git } from "@openorc/git";
 import type { CorePush, Project, RpcMethod, RpcParams, RpcResults } from "@openorc/protocol";
@@ -154,8 +154,6 @@ it("publishes nothing from a pull request's copy under review, and throws the co
   await git(root, ["worktree", "add", "-q", "--detach", copy, "HEAD"]);
   const thread = threads.insert(core.db, { projectId: project.id, title: "Review #7", agent: "codex", model: null, mode: "plan", permissionMode: "review", workspaceMode: "worktree" });
   threads.update(core.db, thread.id, { worktreePath: copy, baseSha: (await git(copy, ["rev-parse", "HEAD"])).stdout.trim() });
-  pullReviews.open(core.db, { projectId: project.id, number: 7 }, "c".repeat(40));
-  pullReviews.update(core.db, { projectId: project.id, number: 7 }, { threadId: thread.id });
   await writeFile(path.join(copy, "README.md"), "Edited in the review\n");
 
   // The checkout's own branch, with a commit origin lacks, is none of this conversation's business.
@@ -164,11 +162,15 @@ it("publishes nothing from a pull request's copy under review, and throws the co
   await expect(call("review.commitThread", { threadId: thread.id, message: "Should not commit" })).rejects.toThrow(refusal);
   await expect(call("review.pushThread", { threadId: thread.id })).rejects.toThrow(refusal);
 
-  await core.threads.delete(thread.id);
-  expect(
-    await access(copy).then(
+  // A fork shares the copy; deleting the last conversation to use it discards the changes too.
+  const exists = () =>
+    access(copy).then(
       () => true,
       () => false,
-    ),
-  ).toBe(false);
+    );
+  const fork = core.threads.fork(thread.id);
+  await core.threads.delete(thread.id);
+  expect(await exists()).toBe(true);
+  await core.threads.delete(fork.id);
+  expect(await exists()).toBe(false);
 });

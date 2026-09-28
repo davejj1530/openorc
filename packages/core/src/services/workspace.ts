@@ -4,7 +4,7 @@ import { access, copyFile, glob, lstat, mkdir } from "node:fs/promises";
 import path from "node:path";
 import { audit, taskForwardings, tasks, threads, type Db } from "@openorc/db";
 import { stopProcess, waitForProcessGroup } from "@openorc/agents";
-import { diskUsage, fetch, git, repoInfo, revParse, worktree } from "@openorc/git";
+import { diskUsage, emptyTree, fetch, git, repoInfo, revParse, worktree } from "@openorc/git";
 import { WORKSPACE_ID, type BranchLoss, type Project, type RemovalImpact, type Task, type Thread } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
 import { assertCanBranch, projectGit } from "./project-git.js";
@@ -28,9 +28,15 @@ export function assertLossAccepted(loss: RemovalImpact, accepted: BranchLoss | u
   throw new Error(`Deleting branch ${loss.branch} would delete ${parts.join(" and ")}. Confirm to delete them, or keep the branch.`);
 }
 
-/** Where work in the project folder starts: HEAD and its branch, or nothing to record for a folder without git. */
-async function checkoutStart(project: Project): Promise<{ headSha: string | null; branch: string | null }> {
-  return (await projectGit(project)) === "none" ? { headSha: null, branch: null } : repoInfo(project.rootPath);
+/**
+ * Where work in the project folder starts: HEAD and its branch, or nothing for a folder without git. `start` is HEAD,
+ * or the empty tree before the first commit, so a thread's first turn keeps a comparison that a later commit never
+ * replaces. Tasks keep HEAD alone: their commit list and base need a commit.
+ */
+async function checkoutStart(project: Project): Promise<{ headSha: string | null; start: string | null; branch: string | null }> {
+  if ((await projectGit(project)) === "none") return { headSha: null, start: null, branch: null };
+  const info = await repoInfo(project.rootPath);
+  return { headSha: info.headSha, start: info.headSha ?? (await emptyTree(project.rootPath)), branch: info.branch };
 }
 
 export function slugify(title: string): string {
@@ -242,7 +248,7 @@ export class WorkspaceService {
         if (thread.workspaceMode === "current") {
           const info = await checkoutStart(project);
           this.assertOpen();
-          return threads.update(this.db, thread.id, { baseSha: info.headSha, branch: info.branch });
+          return threads.update(this.db, thread.id, { baseSha: info.start, branch: info.branch });
         }
 
         const branch = this.threadBranch(thread, project);

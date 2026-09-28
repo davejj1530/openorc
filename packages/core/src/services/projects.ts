@@ -1,8 +1,9 @@
 import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 import { audit, projects, type Db } from "@openorc/db";
-import { isGitRepo, repoInfo } from "@openorc/git";
-import type { Project, ProjectSettings } from "@openorc/protocol";
+import { defaultBranch, isGitRepo, originUrl, repoInfo } from "@openorc/git";
+import type { Project, ProjectGit, ProjectSettings } from "@openorc/protocol";
+import { projectGit } from "./project-git.js";
 import { directory } from "./workspace-home.js";
 
 /** Config files from other tools that tell us how this repo likes its worktrees. */
@@ -61,6 +62,22 @@ export class ProjectService {
     });
     audit.record(this.db, { actor: "user", action: "project.import", resourceType: "project", resourceId: project.id, metadata: { rootPath: root, detected } });
     return project;
+  }
+
+  /**
+   * What git offers the project now. A folder can gain git, a first commit or an origin after it was added, so a
+   * missing remote or default branch is filled in once git reports it. Known values stay as they are.
+   */
+  async git(id: string): Promise<{ state: ProjectGit; changed: boolean }> {
+    const project = projects.get(this.db, id);
+    if (!project) throw new Error(`project ${id} not found`);
+    const state = await projectGit(project);
+    if (state === "none") return { state, changed: false };
+    const gitRemote = project.gitRemote ?? (await originUrl(project.rootPath));
+    const branch = project.defaultBranch ?? (await defaultBranch(project.rootPath));
+    if (gitRemote === project.gitRemote && branch === project.defaultBranch) return { state, changed: false };
+    projects.updateGit(this.db, id, { gitRemote, defaultBranch: branch });
+    return { state, changed: true };
   }
 
   remove(id: string): void {

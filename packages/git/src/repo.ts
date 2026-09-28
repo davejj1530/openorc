@@ -41,9 +41,23 @@ export async function headCommit(cwd: string): Promise<string | null> {
   return (await git(cwd, ["rev-parse", "--verify", "--quiet", "HEAD^{commit}"], { okCodes: [0, 1] })).stdout.trim() || null;
 }
 
+/** The tree with nothing in it. Every repository knows it without storing it. */
+export async function emptyTree(cwd: string): Promise<string> {
+  return (await git(cwd, ["hash-object", "-t", "tree", "--stdin"], { input: "" })).stdout.trim();
+}
+
 /** What a diff without a base compares against: HEAD, or the empty tree before the first commit. */
 export async function headOrEmptyTree(cwd: string): Promise<string> {
-  return (await headCommit(cwd)) ?? (await git(cwd, ["hash-object", "-t", "tree", "--stdin"], { input: "" })).stdout.trim();
+  return (await headCommit(cwd)) ?? (await emptyTree(cwd));
+}
+
+/** The origin remote's URL, or null when the repository has none. */
+export async function originUrl(root: string): Promise<string | null> {
+  try {
+    return (await git(root, ["remote", "get-url", "origin"])).stdout.trim() || null;
+  } catch {
+    return null;
+  }
 }
 
 export async function repoInfo(dir: string): Promise<RepoInfo> {
@@ -51,13 +65,7 @@ export async function repoInfo(dir: string): Promise<RepoInfo> {
   const headSha = await headCommit(root);
   // Names the branch before its first commit too; a detached HEAD has none.
   const branch = (await git(root, ["symbolic-ref", "--short", "--quiet", "HEAD"], { okCodes: [0, 1] })).stdout.trim() || null;
-  let remoteUrl: string | null = null;
-  try {
-    remoteUrl = (await git(root, ["remote", "get-url", "origin"])).stdout.trim() || null;
-  } catch {
-    remoteUrl = null;
-  }
-  return { root, remoteUrl, defaultBranch: await defaultBranch(root), headSha, branch };
+  return { root, remoteUrl: await originUrl(root), defaultBranch: await defaultBranch(root), headSha, branch };
 }
 
 /** origin/HEAD if it is set, else the first of main or master that exists, else the current branch. */

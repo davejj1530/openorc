@@ -1,13 +1,12 @@
 import { Db } from "@openorc/db";
 import { WORKSPACE_ID } from "@openorc/protocol";
-import { projectGit } from "../services/project-git.js";
 import { ProjectService } from "../services/projects.js";
 import { configureWorkspace, workspaceHome } from "../services/workspace-home.js";
 import { type Transport } from "../transport.js";
 import type { Handlers } from "./types.js";
 type Dependencies = {
   db: Db;
-  projectService: Pick<ProjectService, "list" | "get" | "import" | "remove" | "updateSettings">;
+  projectService: Pick<ProjectService, "list" | "get" | "git" | "import" | "remove" | "updateSettings">;
   invalidate: (keys: string[]) => void;
   transport: Transport;
 };
@@ -27,10 +26,11 @@ export function createProjectsHandlers({
     },
     "projects.list": () => projectService.list(),
     "projects.get": ({ id }) => (id === WORKSPACE_ID ? workspaceHome(db) : projectService.get(id)),
-    "projects.git": ({ id }) => {
-      const project = id === WORKSPACE_ID ? workspaceHome(db) : projectService.get(id);
-      if (!project) throw new Error(`project ${id} not found`);
-      return projectGit(project);
+    "projects.git": async ({ id }) => {
+      if (id === WORKSPACE_ID) return "none";
+      const { state, changed } = await projectService.git(id);
+      if (changed) invalidate(["projects", `project:${id}`]);
+      return state;
     },
     "projects.import": async ({ rootPath }) => {
       const p = await projectService.import(rootPath);

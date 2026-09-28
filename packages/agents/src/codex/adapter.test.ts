@@ -200,6 +200,14 @@ describe("Codex in an unvetted checkout", () => {
     expect(methods).not.toContain("thread/start");
   });
 
+  it("refuses when Codex doesn't say which settings it would apply", async () => {
+    const { errors, methods } = await run(undefined);
+    expect(errors).toEqual([
+      "This version of Codex can't show whether it would load the pull request's own .codex settings, which can run commands. Update Codex, or review it with a Claude model instead.",
+    ]);
+    expect(methods).not.toContain("thread/start");
+  });
+
   it("starts when Codex ignores them because the folder isn't trusted", async () => {
     const { errors, methods } = await run([{ name: { type: "project" }, disabledReason: "Add it as a trusted project to load project-local config." }]);
     expect(errors).toEqual([]);

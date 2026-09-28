@@ -82,7 +82,10 @@ interface CodexConfigLayer {
  */
 async function refuseProjectConfig(rpc: StdioJsonRpc, cwd: string): Promise<void> {
   const read = await rpc.request<{ layers?: CodexConfigLayer[] }>("config/read", { cwd, includeLayers: true });
-  if (read.layers?.some((layer) => layer.name?.type === "project" && !layer.disabledReason))
+  // A Codex that doesn't list its settings' sources can't show it would skip the checkout's.
+  if (!read.layers)
+    throw new Error("This version of Codex can't show whether it would load the pull request's own .codex settings, which can run commands. Update Codex, or review it with a Claude model instead.");
+  if (read.layers.some((layer) => layer.name?.type === "project" && !layer.disabledReason))
     throw new Error("Codex trusts this repository, so it would load the pull request's own .codex settings, which can run commands. Review it with a Claude model instead.");
 }
 

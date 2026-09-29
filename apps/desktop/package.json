@@ -1,6 +1,6 @@
 {
   "name": "@openorc/desktop",
-  "version": "0.1.0-beta.7",
+  "version": "0.1.0-beta.8",
   "license": "Apache-2.0",
   "private": true,
   "description": "Desktop workspace for coding-agent conversations, tasks, and changes.",

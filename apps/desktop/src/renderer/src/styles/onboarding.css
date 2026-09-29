@@ -33,6 +33,11 @@
   padding-left: var(--spacing-traffic);
 }
 
+/* Windows and Linux draw their window controls over the header's right end, where recovery's Close sits. */
+.onboarding-chrome[data-window-controls="true"] {
+  padding-right: var(--spacing-controls);
+}
+
 .onboarding-brand {
   color: var(--ink-2);
   font-weight: var(--font-weight-medium);

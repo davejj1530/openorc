@@ -5,6 +5,7 @@
   "private": true,
   "description": "Desktop workspace for coding-agent conversations, tasks, and changes.",
   "homepage": "https://openorc.app",
+  "desktopName": "openorc.desktop",
   "main": "./out/main/index.mjs",
   "scripts": {
     "icons:build": "node scripts/build-app-icon.mjs",
@@ -13,6 +14,7 @@
     "preview": "electron-vite preview",
     "package": "electron-vite build && electron-builder --dir",
     "package:smoke": "electron-vite build && electron-builder --dir --config electron-builder.smoke.cjs",
+    "package:linux": "electron-vite build && electron-builder --linux --config electron-builder.linux.cjs --publish never",
     "release:build": "electron-vite build && electron-builder --config electron-builder.release.cjs --publish never",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test": "vitest run",

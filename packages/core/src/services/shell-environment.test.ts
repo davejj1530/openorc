@@ -47,7 +47,10 @@ describe("loginShell", () => {
   it("uses the platform fallback when neither account nor inherited shell is available", () => {
     const account = os.userInfo();
     vi.spyOn(os, "userInfo").mockReturnValue({ ...account, shell: "" });
+    const platform = vi.spyOn(process, "platform", "get").mockReturnValue("darwin");
     expect(loginShell({})).toBe("/bin/zsh");
+    platform.mockReturnValue("linux");
+    expect(loginShell({})).toBe("/bin/sh");
   });
 });
 

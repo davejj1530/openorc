@@ -19,6 +19,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.spyOn(process, "platform", "get").mockReturnValue("darwin");
   fake.theme.prefersReducedTransparency = false;
+  fake.theme.shouldUseDarkColors = true;
 });
 afterEach(() => vi.restoreAllMocks());
 
@@ -47,6 +48,20 @@ it("uses acrylic on supported Windows and an opaque fallback on older Windows an
   expect(win.setBackgroundColor).toHaveBeenLastCalledWith(appearance.background);
   vi.spyOn(process, "platform", "get").mockReturnValue("linux");
   expect(apply().supported).toBe(false);
+});
+
+it("draws the Windows and Linux control symbols in the theme's ink, leaving macOS's traffic lights alone", () => {
+  apply();
+  expect(win.setTitleBarOverlay).not.toHaveBeenCalled();
+  for (const platform of ["win32", "linux"] as const) {
+    vi.spyOn(process, "platform", "get").mockReturnValue(platform);
+    fake.theme.shouldUseDarkColors = true;
+    apply();
+    expect(win.setTitleBarOverlay).toHaveBeenLastCalledWith({ symbolColor: "#e6e6e6" });
+    fake.theme.shouldUseDarkColors = false;
+    apply();
+    expect(win.setTitleBarOverlay).toHaveBeenLastCalledWith({ symbolColor: "#282828" });
+  }
 });
 
 it("accepts only the app's top frame and validates appearance messages", () => {

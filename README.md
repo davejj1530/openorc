@@ -62,18 +62,20 @@ Get a second perspective before you build. Request implementation when you're re
 
 OpenOrc was initially built in private and is now open source. It is in active beta development.
 
-| Platform             | Status                                                                                                                                                                                |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| macOS, Apple Silicon | Supported. CI runs the full test suite here.                                                                                                                                          |
-| macOS, Intel         | Released, but not fully validated. Release builds pass the packaged startup and update checks; the test suite runs only on Apple Silicon.                                             |
-| Windows x64          | Released, but not fully validated. Release builds are installed and smoke-tested; the test suite does not run on Windows. A beta installer can be unsigned; its release notes say so. |
-| Linux                | Not a release target.                                                                                                                                                                 |
+| Platform             | Status                                                                                                                                                                                                                     |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| macOS, Apple Silicon | Supported. CI runs the full test suite here.                                                                                                                                                                               |
+| macOS, Intel         | Released, but not fully validated. Release builds pass the packaged startup and update checks; the test suite runs only on Apple Silicon.                                                                                  |
+| Windows x64          | Released, but not fully validated. Release builds are installed and smoke-tested; the test suite does not run on Windows. A beta installer can be unsigned; its release notes say so.                                      |
+| Linux x64            | Released, but not fully validated. Release builds ship as an rpm, a deb and an AppImage; the deb and AppImage are installed and smoke-tested, and CI runs the test suite on Ubuntu. Installs do not update themselves yet. |
 
 See the [release guide](docs/desktop-updates.md) and [roadmap](ROADMAP.md).
 
+On Linux, install the rpm on Fedora or openSUSE (`sudo dnf install ./OpenOrc-….rpm`) and the deb on Debian or Ubuntu (`sudo apt install ./OpenOrc-….deb`). Both add OpenOrc to your applications and an `openorc` command. The AppImage runs anywhere else; like other AppImages, it needs FUSE 2 (`fuse-libs` on Fedora, `libfuse2t64` on Ubuntu). Linux packages are not code-signed, so check your download against the release's `SHA256SUMS.txt`.
+
 ## Run from source
 
-You'll need **Node.js 24**, **pnpm 11.21.0**, and Git on your shell's PATH. These Node and pnpm versions are recorded in `.node-version` and `package.json`. Install and sign in to at least one supported agent CLI. The GitHub CLI (`gh`) is optional and enables pull request workflows.
+You'll need **Node.js 24**, **pnpm 11.21.0**, and Git on your shell's PATH. These Node and pnpm versions are recorded in `.node-version` and `package.json`. On Linux, the terminal's native module compiles during installation, so you also need a C++ compiler, make and Python 3 (`sudo dnf install gcc-c++ make python3` on Fedora, `sudo apt install build-essential python3` on Debian and Ubuntu). Install and sign in to at least one supported agent CLI. The GitHub CLI (`gh`) is optional and enables pull request workflows.
 
 | Agent       | Setup                                                                                      |
 | ----------- | ------------------------------------------------------------------------------------------ |
@@ -90,7 +92,7 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-Import a project with the plus button next to Projects, then start a thread with **⌘N**.
+Import a project with the plus button next to Projects, then start a thread with **⌘N** (**Ctrl+N** on Windows and Linux).
 
 Tasks save to the backlog until you start them. Choose a local checkout or isolated worktree in the task's **Execution settings**. New tasks default to **Settings → General → Workspace**; tasks created from a conversation use that thread's location. Changing the location after work starts moves the task's conversation.
 
@@ -106,9 +108,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for native dependency troubleshooting, ve
 
 ## Data and credentials
 
-Conversations, task records, and project memory are stored on your machine. Each agent's requests go to its own provider, and a small model from the conversation's own agent names the conversation. Memory is off until you turn it on. While it is on, the agent that ran each finished run summarizes it, unless you choose one provider for every run, and the first search by meaning downloads an 83 MB embedding model from Google Cloud Storage, checked against a pinned SHA-256. Installed releases check GitHub Releases for new stable versions, without an installation identifier; Settings → General turns automatic checks off. Betas are published as prereleases, which the updater never offers, so install betas manually. [Network connections](https://openorc.app/docs/network/) lists every connection the app makes.
+Conversations, task records, and project memory are stored on your machine. Each agent's requests go to its own provider, and a small model from the conversation's own agent names the conversation. Memory is off until you turn it on. While it is on, the agent that ran each finished run summarizes it, unless you choose one provider for every run, and the first search by meaning downloads an 83 MB embedding model from Google Cloud Storage, checked against a pinned SHA-256. Installed macOS and Windows releases check GitHub Releases for new stable versions, without an installation identifier; Settings → General turns automatic checks off. Betas are published as prereleases, which the updater never offers, so install betas manually. [Network connections](https://openorc.app/docs/network/) lists every connection the app makes.
 
-The desktop stores its SQLite ledger, attachments, images tools return, and managed workspaces in the application data directory: `~/Library/Application Support/OpenOrc` on macOS and `%APPDATA%\OpenOrc` on Windows. `OPENORC_USER_DATA` selects a different profile. Treat this directory as private: it can contain prompts, source snippets, terminal output, and project history. Native provider output goes to a debug log in `logs/provider` there, kept for 14 days or 512 MB; deleting a thread does not remove its lines from that log before they expire. Redaction of the ledger, its search index, run results, memories, and logs is a best-effort filter, not a guarantee that all sensitive content is removed. Plans, task comments, and team messages are stored as written because agents receive them later.
+The desktop stores its SQLite ledger, attachments, images tools return, and managed workspaces in the application data directory: `~/Library/Application Support/OpenOrc` on macOS, `%APPDATA%\OpenOrc` on Windows, and `~/.config/OpenOrc` on Linux. `OPENORC_USER_DATA` selects a different profile. Treat this directory as private: it can contain prompts, source snippets, terminal output, and project history. Native provider output goes to a debug log in `logs/provider` there, kept for 14 days or 512 MB; deleting a thread does not remove its lines from that log before they expire. Redaction of the ledger, its search index, run results, memories, and logs is a best-effort filter, not a guarantee that all sensitive content is removed. Plans, task comments, and team messages are stored as written because agents receive them later.
 
 Agent execution uses the installed CLIs and their existing login flows. The Claude usage display asks the installed Claude Code CLI for its plan usage; OpenOrc never reads the credential Claude Code stores. Direct Slack credentials and the optional memory-extraction API key use Electron's OS-backed protected storage. See [credential storage](docs/credential-storage.md) for recovery and backup considerations.
 

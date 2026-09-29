@@ -12,7 +12,7 @@ export interface DownloadNavigator {
   userAgentData?: ClientHints;
 }
 export interface DownloadDevice {
-  platform: "mac" | "windows" | "mobile" | "other";
+  platform: "mac" | "windows" | "linux" | "mobile" | "other";
   target: InstallerTarget | null;
 }
 
@@ -22,7 +22,18 @@ function downloadPlatform(nav: DownloadNavigator): DownloadDevice["platform"] {
   const platform = nav.userAgentData?.platform || nav.platform || ua;
   if (/Mac/i.test(platform)) return "mac";
   if (/Win/i.test(platform)) return "windows";
+  // ChromeOS reports Linux too, but installs neither package.
+  if (/Linux/i.test(platform) && !/CrOS/i.test(ua)) return "linux";
   return "other";
+}
+
+/** The Linux packages are x64 only. Some Linux browsers name their distribution; the rest leave the choice to the visitor. */
+function linuxPackage(ua: string, hints?: { architecture?: string; bitness?: string }): InstallerTarget | null {
+  const x64 = (hints?.architecture === "x86" && hints.bitness === "64") || /x86_64|amd64/i.test(ua);
+  if (hints?.architecture === "arm" || hints?.bitness === "32" || !x64) return null;
+  if (/Fedora|openSUSE|SUSE|Red Hat/i.test(ua)) return "linux-rpm";
+  if (/Ubuntu|Debian|Mint/i.test(ua)) return "linux-deb";
+  return null;
 }
 
 export function downloadDevice(nav: DownloadNavigator, hints?: { architecture?: string; bitness?: string }): DownloadDevice {
@@ -39,13 +50,14 @@ export function downloadDevice(nav: DownloadNavigator, hints?: { architecture?: 
     const x64 = hints?.architecture === "x86" && hints.bitness === "64";
     return { platform, target: x64 || /Win64|WOW64|Windows.*x64/i.test(nav.userAgent) ? "win-x64" : null };
   }
+  if (platform === "linux") return { platform, target: linuxPackage(nav.userAgent, hints) };
   return { platform, target: null };
 }
 
 /** Enhancement only: denied or unavailable hints leave the manual choices usable. */
 export async function detectDownloadDevice(nav: DownloadNavigator): Promise<DownloadDevice> {
   const fallback = downloadDevice(nav);
-  if (!["mac", "windows"].includes(fallback.platform) || !nav.userAgentData?.getHighEntropyValues) return fallback;
+  if (!["mac", "windows", "linux"].includes(fallback.platform) || !nav.userAgentData?.getHighEntropyValues) return fallback;
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     const hints = await Promise.race([

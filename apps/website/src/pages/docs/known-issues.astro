@@ -12,6 +12,7 @@ const sections = [
   { id: "slack", title: "Slack" },
   { id: "teams", title: "Teams (Beta)" },
   { id: "platforms", title: "Windows" },
+  { id: "linux", title: "Linux" },
 ];
 ---
 
@@ -101,6 +102,17 @@ const sections = [
       <li>Project setup scripts run with <code>/bin/bash</code>, which Windows does not have.</li>
       <li>Stopping an agent signals only its main process, not the processes it started.</li>
       <li>Windows beta installers are unsigned.</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="linux">
+    <h2 id="linux">Linux</h2>
+    <ul>
+      <li>OpenOrc does not update itself on Linux. Install each new release's rpm, deb or AppImage over the old one; your data folder stays in place.</li>
+      <li>Linux packages are x64 only and are not code-signed. Check a download against the release's <code>SHA256SUMS.txt</code>.</li>
+      <li>The AppImage needs FUSE 2, which some distributions leave out: install <code>fuse-libs</code> on Fedora or <code>libfuse2t64</code> on Ubuntu, or use the rpm or deb.</li>
+      <li>Credentials need the Secret Service or KWallet. Desktops Electron does not recognize, such as a bare window manager, fall back to storage OpenOrc refuses; start OpenOrc with <code>--password-store=gnome-libsecret</code> there.</li>
+      <li>OpenOrc runs through XWayland in Wayland sessions, as Electron does by default. Start it with <code>--ozone-platform=wayland</code> to run natively.</li>
     </ul>
   </section>
 </DocsLayout>

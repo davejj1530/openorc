@@ -7,7 +7,7 @@ import { Button, Select, TextButton } from "../components/ui";
 import { type OnboardingStep, type PersistedOnboardingState } from "../lib/onboarding";
 import { useTheme, type ThemeChoice } from "../lib/theme";
 import { PaletteSelector } from "../components/PaletteSelector";
-import { useTrafficLights } from "../lib/window";
+import { useTrafficLights, useWindowsControls } from "../lib/window";
 import { useOnboardingFlow } from "./onboarding-flow";
 import "../styles/onboarding.css";
 
@@ -307,6 +307,7 @@ export function Onboarding(props: OnboardingProps) {
 
 function OnboardingFlow({ mode = "first_run", initialStep, persisted, onPersist, onComplete, preview, onTogglePreview }: OnboardingProps & { preview: boolean; onTogglePreview: () => void }) {
   const trafficLights = useTrafficLights();
+  const windowsControls = useWindowsControls();
   const flow = useOnboardingFlow({ mode, initialStep, persisted, onPersist, onComplete, preview });
   const { page, progress, agents, project, previewControls, storageError, setStorageError } = flow;
   const { step, setStep, advance, retreat, complete, completeRecovery, closeRecovery } = progress;
@@ -327,7 +328,7 @@ function OnboardingFlow({ mode = "first_run", initialStep, persisted, onPersist,
     const canReturn = rows.some((row) => row.state === "ready");
     return (
       <div className="onboarding-root">
-        <header className="onboarding-chrome" data-traffic-lights={trafficLights || undefined}>
+        <header className="onboarding-chrome" data-traffic-lights={trafficLights || undefined} data-window-controls={windowsControls || undefined}>
           <span className="onboarding-brand">OpenOrc</span>
           <span className="onboarding-chrome-label" />
           <TextButton className="onboarding-preview-trigger" tone="muted" onClick={closeRecovery}>
@@ -374,7 +375,7 @@ function OnboardingFlow({ mode = "first_run", initialStep, persisted, onPersist,
 
   return (
     <div className="onboarding-root">
-      <header className="onboarding-chrome" data-traffic-lights={trafficLights || undefined}>
+      <header className="onboarding-chrome" data-traffic-lights={trafficLights || undefined} data-window-controls={windowsControls || undefined}>
         <span className="onboarding-brand">OpenOrc</span>
         <span className="onboarding-chrome-label">Set up your workspace</span>
         {import.meta.env.DEV ? (

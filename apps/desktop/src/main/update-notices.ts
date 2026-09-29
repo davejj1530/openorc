@@ -1,4 +1,4 @@
-import type { UpdateSnapshot, UpdateState } from "../shared/app-updates";
+import type { UpdateDismissal, UpdateSnapshot, UpdateState } from "../shared/app-updates";
 import type { AppUpdates } from "./app-updates";
 import type { UpdatePreferences } from "./update-preferences";
 
@@ -31,16 +31,17 @@ export class UpdateNotices {
     return { state, dismissed: this.hiddenPhase === state.phase || ("version" in state && this.dismissed === state.version) };
   }
 
-  dismiss(): UpdateSnapshot {
+  dismiss(request: UpdateDismissal): UpdateSnapshot {
     const state = this.updates.state;
-    if (state.phase === "available" || state.phase === "ready") {
-      this.preferences.dismiss(state.version);
-      this.dismissed = state.version;
-      this.changed(this.snapshot);
-    } else if (state.phase === "downloading" || state.phase === "install-error") {
-      this.hiddenPhase = state.phase;
-      this.changed(this.snapshot);
+    if (request.phase !== state.phase) return this.snapshot;
+    if ("version" in request && (!("version" in state) || request.version !== state.version)) return this.snapshot;
+    if (request.kind === "later") {
+      this.preferences.dismiss(request.version);
+      this.dismissed = request.version;
+    } else {
+      this.hiddenPhase = request.phase;
     }
+    this.changed(this.snapshot);
     return this.snapshot;
   }
 

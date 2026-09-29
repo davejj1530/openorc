@@ -111,7 +111,7 @@ it("uses the in-app notice without a desktop notification when any app window is
 it("remembers Later across restarts and settings changes, and prompts for a newer version", async () => {
   const first = fixture();
   await first.updates.check();
-  first.call("dismiss");
+  first.call("dismiss", { kind: "later", phase: "available", version: "0.2.0" });
   expect(first.win.webContents.send).toHaveBeenLastCalledWith("updates:state", expect.objectContaining({ dismissed: true }));
   first.call("setAutomaticChecks", false);
   first.dispose();
@@ -138,7 +138,7 @@ it("remembers notification delivery across restarts even without a dismissal", a
 it("reveals the update notice and restores a window on notification click without downloading", async () => {
   const f = fixture();
   await f.updates.check();
-  f.call("dismiss");
+  f.call("dismiss", { kind: "later", phase: "available", version: "0.2.0" });
   f.win.isMinimized.mockReturnValue(true);
   native.notices[0]!.click!();
   expect(f.win.restore).toHaveBeenCalledOnce();
@@ -154,7 +154,7 @@ it("reveals the update notice and restores a window on notification click withou
 it("shares download progress and refusal to restart during work, then permits an explicit safe restart", async () => {
   const f = fixture();
   await f.updates.check();
-  f.call("dismiss");
+  f.call("dismiss", { kind: "later", phase: "available", version: "0.2.0" });
   let finish!: () => void;
   f.updater.downloadUpdate.mockImplementationOnce(
     () =>
@@ -206,7 +206,7 @@ it("lets a download be hidden until ready, and lets an unrecoverable install err
   );
   const download = f.call("download");
   await Promise.resolve();
-  f.call("dismiss");
+  f.call("dismiss", { kind: "hide", phase: "downloading", version: "0.2.0" });
   f.updater.emit("download-progress", { percent: 50 });
   expect(f.call("getState")).toMatchObject({ state: { phase: "downloading", percent: 50 }, dismissed: true });
   finish();
@@ -215,7 +215,7 @@ it("lets a download be hidden until ready, and lets an unrecoverable install err
   f.prepare.mockRejectedValueOnce(new Error("Core shutdown failed"));
   await f.call("install");
   expect(f.call("getState")).toMatchObject({ state: { phase: "install-error" }, dismissed: false });
-  f.call("dismiss");
+  f.call("dismiss", { kind: "hide", phase: "install-error" });
   expect(f.call("getState")).toMatchObject({ dismissed: true });
   expect(f.updater.quitAndInstall).not.toHaveBeenCalled();
 });
@@ -228,6 +228,9 @@ it("rejects every update channel from embedded frames and external pages", () =>
     expect(() => handler({ senderFrame: frame, sender: { mainFrame: frame } })).toThrow("Only the app window");
   }
   expect(() => f.call("setAutomaticChecks", "true")).toThrow("on or off");
+  for (const request of [undefined, null, { kind: "hide", phase: "ready", version: "0.2.0" }, { kind: "later", phase: "downloading", version: "0.2.0" }, { kind: "later", phase: "available" }]) {
+    expect(() => f.call("dismiss", request)).toThrow("Invalid update dismissal");
+  }
   f.dispose();
   expect(native.handlers.size).toBe(0);
 });
@@ -242,4 +245,45 @@ it("preserves notification and dismissal history when changing automatic checks"
   expect(reloaded.automaticChecks()).toBe(false);
   expect(reloaded.dismissedVersion()).toBe("0.2.0");
   expect(reloaded.notifiedVersion()).toBe("0.2.0");
+});
+
+it("ignores a delayed Hide request after the download becomes ready", async () => {
+  const f = fixture();
+  await f.updates.check();
+  let finish!: () => void;
+  f.updater.downloadUpdate.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = () => resolve([]);
+      }),
+  );
+  const download = f.call("download");
+  await Promise.resolve();
+  // Captured by the renderer while it still shows progress, delivered after main finishes downloading.
+  const request = { kind: "hide", phase: "downloading", version: "0.2.0" };
+  finish();
+  await download;
+  f.call("dismiss", request);
+  expect(f.call("getState")).toMatchObject({ state: { phase: "ready", version: "0.2.0" }, dismissed: false });
+  expect(new UpdatePreferences(join(dir, "updates.json")).dismissedVersion()).toBeNull();
+});
+
+it("discovers a newer release on the next scheduled check after Later without restarting", async () => {
+  const f = fixture();
+  await vi.advanceTimersByTimeAsync(30_000);
+  f.call("dismiss", { kind: "later", phase: "available", version: "0.2.0" });
+  expect(f.call("getState")).toMatchObject({ state: { phase: "available", version: "0.2.0" }, dismissed: true });
+  await vi.advanceTimersByTimeAsync(6 * 60 * 60 * 1000);
+  expect(f.call("getState")).toMatchObject({ state: { phase: "available", version: "0.2.0" }, dismissed: true });
+  expect(native.show).toHaveBeenCalledTimes(1);
+  const info = { version: "0.3.0", files: [], releaseDate: "2026-09-29", path: "app.zip", sha512: "fixture" };
+  f.updater.checkForUpdates.mockResolvedValue({ isUpdateAvailable: true, updateInfo: info, versionInfo: info });
+  await vi.advanceTimersByTimeAsync(6 * 60 * 60 * 1000);
+  expect(f.updater.checkForUpdates).toHaveBeenCalledTimes(3);
+  expect(f.call("getState")).toMatchObject({ state: { phase: "available", version: "0.3.0" }, dismissed: false });
+  expect(native.show).toHaveBeenCalledTimes(2);
+  expect(f.updater.downloadUpdate).not.toHaveBeenCalled();
+  // A slow Later click from another window must not dismiss the newly discovered release.
+  f.call("dismiss", { kind: "later", phase: "available", version: "0.2.0" });
+  expect(f.call("getState")).toMatchObject({ dismissed: false });
 });

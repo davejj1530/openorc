@@ -17,7 +17,7 @@ function fixture(initial: UpdateState = { phase: "available", version: "0.2.0" }
     }),
     download: vi.fn(async () => {}),
     install: vi.fn(async () => {}),
-    dismiss: vi.fn(async () => {
+    dismiss: vi.fn<OpenOrcApi["updates"]["dismiss"]>(async () => {
       const next = { state: initial, dismissed: true };
       listener(next);
       return next;
@@ -50,7 +50,7 @@ it("dismisses through main and follows shared dismissal and notification-click e
   const view = render(<AppUpdateNotice />);
   fireEvent.click(await screen.findByRole("button", { name: "Later" }));
   await waitFor(() => expect(screen.queryByRole("complementary")).toBeNull());
-  expect(f.api.dismiss).toHaveBeenCalledOnce();
+  expect(f.api.dismiss).toHaveBeenCalledExactlyOnceWith({ kind: "later", phase: "available", version: "0.2.0" });
   f.push({ phase: "available", version: "0.2.0" });
   expect(screen.getByRole("button", { name: "Download update" })).toBeTruthy();
   view.unmount();
@@ -76,6 +76,9 @@ it("offers a retry after download failure and recovery guidance after an install
   render(<AppUpdateNotice />);
   expect(await screen.findByRole("button", { name: "Retry download" })).toBeTruthy();
   expect(screen.getByRole("alert").textContent).toBe("Network disconnected");
+  f.push({ phase: "available", version: "0.2.0", checkError: "Couldn’t check for a newer release: offline" });
+  expect(screen.getByRole("alert").textContent).toContain("Couldn’t check for a newer release");
+  expect(screen.getByRole("button", { name: "Download update" })).toBeTruthy();
   f.push({ phase: "install-error", message: "Core shutdown could not be confirmed." });
   expect(screen.getByRole("status").textContent).toContain("quit and reopen OpenOrc");
   expect(screen.queryByRole("button", { name: "Restart to update" })).toBeNull();
@@ -98,5 +101,5 @@ it.each(["downloading", "install-error"] as const)("can hide %s to keep working 
   expect(isPreviewCovered()).toBe(true);
   fireEvent.click(hide);
   await waitFor(() => expect(isPreviewCovered()).toBe(false));
-  expect(f.api.dismiss).toHaveBeenCalledOnce();
+  expect(f.api.dismiss).toHaveBeenCalledExactlyOnceWith(phase === "downloading" ? { kind: "hide", phase, version: "0.2.0" } : { kind: "hide", phase });
 });

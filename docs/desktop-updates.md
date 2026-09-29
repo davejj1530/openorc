@@ -10,6 +10,8 @@ When a newer release is found, an in-app notice offers **Download update** or **
 
 **Hide** on a download notice hides its progress until the update is ready, without cancelling the download. A failed-install notice can also be hidden so you can finish your work before quitting and reopening the app.
 
+Checks continue after choosing **Later** for an undownloaded release, so a newer release can appear without restarting OpenOrc. If a later check fails, the previously found version remains available to download from the notice or the native menu.
+
 Published stable and beta releases are offered to everyone when their version is newer than the installed version. Drafts are not offered, and the updater never downgrades. Every release must use a higher version number.
 
 Versions through `0.1.0-beta.4` shipped with stable-only checks. Those installations need a one-time manual installation of the first beta containing this change, or an update to a newer stable release, before they can receive future beta updates.

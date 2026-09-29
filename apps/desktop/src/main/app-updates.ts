@@ -73,15 +73,18 @@ export class AppUpdates {
   }
 
   check(): Promise<void> {
-    if (!["idle", "current", "error", "checking"].includes(this.current.phase)) return this.operation ?? Promise.resolve();
+    if (!["idle", "current", "error", "checking", "available"].includes(this.current.phase)) return this.operation ?? Promise.resolve();
     return this.run(async () => {
+      const previous = this.current;
       this.set({ phase: "checking" });
       try {
         const result = await this.updater.checkForUpdates();
         if (!result) throw new Error("Updates are unavailable in this build.");
         this.set(result.isUpdateAvailable ? { phase: "available", version: result.updateInfo.version } : { phase: "current" });
       } catch (error) {
-        this.set(noPublishedRelease(error) ? { phase: "current" } : { phase: "error", message: detail(error) });
+        if (noPublishedRelease(error)) this.set({ phase: "current" });
+        else if (previous.phase === "available") this.set({ ...previous, checkError: `Couldn’t check for a newer release: ${detail(error)}` });
+        else this.set({ phase: "error", message: detail(error) });
       }
     });
   }

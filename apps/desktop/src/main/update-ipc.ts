@@ -1,5 +1,6 @@
 import { BrowserWindow, ipcMain, Notification, type IpcMainInvokeEvent } from "electron";
 import type { UpdateSettings } from "../shared/types";
+import { isUpdateDismissal } from "../shared/app-updates";
 import type { AppUpdates } from "./app-updates";
 import { UpdateNotices } from "./update-notices";
 import { UpdatePreferences } from "./update-preferences";
@@ -46,7 +47,10 @@ export function installUpdateControls(updates: AppUpdates, file: string, isAppOr
       return settings();
     },
     "updates:getState": () => notices.snapshot,
-    "updates:dismiss": () => notices.dismiss(),
+    "updates:dismiss": (request: unknown) => {
+      if (!isUpdateDismissal(request)) throw new Error("Invalid update dismissal.");
+      return notices.dismiss(request);
+    },
     "updates:download": () => updates.download(),
     "updates:install": () => updates.install(),
   };

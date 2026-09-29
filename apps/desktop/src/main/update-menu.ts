@@ -40,13 +40,15 @@ export function installUpdateMenu(updates: AppUpdates): () => void {
     if (dialogOpen) return;
     dialogOpen = true;
     try {
-      await updates.check();
+      // This item's available-state action is Download, so keep the known release usable even offline.
+      if (updates.state.phase !== "available") await updates.check();
       let state = updates.state;
       if (state.phase === "disabled") await show("Updates are unavailable in this build", state.reason);
       else if (state.phase === "current") await show("OpenOrc is up to date", `You’re running OpenOrc ${app.getVersion()}.`);
       else if (state.phase === "error") await show("Couldn’t check for updates", `${state.message}\n\nTry Check for updates again when you’re connected.`);
       else if (state.phase === "available") {
-        const choice = await show(`OpenOrc ${state.version} is available`, `You’re running ${app.getVersion()}. Downloading will not interrupt your work.`, ["Download update", "Later"]);
+        const detail = [`You’re running ${app.getVersion()}. Downloading will not interrupt your work.`, state.checkError].filter(Boolean).join("\n\n");
+        const choice = await show(`OpenOrc ${state.version} is available`, detail, ["Download update", "Later"]);
         if (choice !== 0) return;
         await updates.download();
         state = updates.state;

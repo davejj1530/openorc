@@ -169,4 +169,50 @@ describe("desktop update policy", () => {
     await updates.install();
     expect(updater.quitAndInstall).toHaveBeenCalledOnce();
   });
+
+  it("keeps a known release downloadable if a later check fails", async () => {
+    const { updater, updates } = fixture();
+    await updates.check();
+    updater.checkForUpdates.mockRejectedValueOnce(new Error("offline"));
+    await updates.check();
+    expect(updater.checkForUpdates).toHaveBeenCalledTimes(2);
+    expect(updates.state).toEqual({ phase: "available", version: "0.2.0", checkError: "Couldn’t check for a newer release: offline" });
+    await updates.download();
+    expect(updater.downloadUpdate).toHaveBeenCalledOnce();
+    expect(updates.state).toEqual({ phase: "ready", version: "0.2.0" });
+  });
+
+  it("serializes available-release rechecks and never rechecks during a download or after it is ready", async () => {
+    const { updater, updates } = fixture();
+    await updates.check();
+    let checked!: (result: UpdateCheckResult) => void;
+    updater.checkForUpdates.mockReturnValueOnce(
+      new Promise((resolve) => {
+        checked = resolve;
+      }),
+    );
+    const checking = updates.check();
+    await Promise.resolve();
+    expect(updates.state.phase).toBe("checking");
+    const duplicate = updates.check();
+    const downloadDuringCheck = updates.download();
+    expect(updater.downloadUpdate).not.toHaveBeenCalled();
+    checked(available);
+    await Promise.all([checking, duplicate, downloadDuringCheck]);
+    expect(updater.checkForUpdates).toHaveBeenCalledTimes(2);
+    let downloaded!: (files: string[]) => void;
+    updater.downloadUpdate.mockReturnValueOnce(
+      new Promise((resolve) => {
+        downloaded = resolve;
+      }),
+    );
+    const downloading = updates.download();
+    await Promise.resolve();
+    const checkDuringDownload = updates.check();
+    downloaded(["app.zip"]);
+    await Promise.all([downloading, checkDuringDownload]);
+    await updates.check();
+    expect(updater.checkForUpdates).toHaveBeenCalledTimes(2);
+    expect(updates.state.phase).toBe("ready");
+  });
 });

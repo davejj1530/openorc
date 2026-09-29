@@ -4,6 +4,8 @@
 
 Installed macOS and Windows releases update from public GitHub Releases. On macOS, use **OpenOrc → Check for updates…**; on Windows, use **Help → Check for updates…**. OpenOrc also checks 30 seconds after it starts and every six hours. To stop the automatic checks, turn off **Check for updates automatically** in Settings → General → Updates. A background check only changes the menu item: downloading and restarting to install both need you to choose them. Development builds and local packages without an update feed never check.
 
+Linux installs do not update themselves yet, and Settings → General → Updates says so. Install each new version from its release: `sudo dnf install ./OpenOrc-….rpm` or `sudo apt install ./OpenOrc-….deb` upgrades the installed package in place, and a newer AppImage replaces the old file. Your data folder stays where it is.
+
 Published stable and beta releases are offered to everyone when their version is newer than the installed version. Drafts are not offered, and the updater never downgrades. Every release must use a higher version number.
 
 Versions through `0.1.0-beta.4` shipped with stable-only checks. Those installations need a one-time manual installation of the first beta containing this change, or an update to a newer stable release, before they can receive future beta updates.
@@ -34,13 +36,13 @@ Keep certificates and keys in CI secrets. The workflow writes the notarization k
 ### Build and publish
 
 1. Set `apps/desktop/package.json` to a non-zero version, such as `0.1.0` or `0.1.0-beta.1`. Once CI passes, commit the change and push its matching tag, such as `v0.1.0-beta.1`. Never move an existing release tag.
-2. Run **Desktop release** for that tag. The workflow pins its commit and builds on native macOS arm64, macOS x64, and Windows x64 runners. It requires macOS signing and notarization, and normally requires Windows signing. It builds macOS DMG and ZIP files and Windows NSIS installers, checks packaged startup and update behavior, and installs the Windows candidate on its disposable runner before uploading artifacts.
+2. Run **Desktop release** for that tag. The workflow pins its commit and builds on native macOS arm64, macOS x64, Windows x64, and Linux x64 runners. It requires macOS signing and notarization, and normally requires Windows signing; Linux packages are not code-signed. It builds macOS DMG and ZIP files, Windows NSIS installers, and a Linux AppImage, deb and rpm, checks packaged startup and update behavior, and installs the Windows candidate and the Linux deb on their disposable runners before uploading artifacts.
 3. Enable **create_draft** to attach successful builds, update metadata, and `SHA256SUMS.txt` to a new draft release. Existing releases are not overwritten. Download the assets and complete the checks under [Before publishing](#before-publishing). Review the tag and update destination. In the draft's notes, replace the comment under **Highlights** with 2 to 5 user-facing bullets and check the **Install notes**, then publish on GitHub. The website changelog shows those highlights once the release is public.
-4. Keep all installer, ZIP, blockmap, and update YAML assets. The channels are `latest-arm64` and `latest-x64`, so each macOS architecture has its own metadata file (`latest-arm64-mac.yml`, `latest-x64-mac.yml`); Windows uses `latest-x64.yml`. This keeps parallel builds from overwriting each other's update feed. electron-builder embeds the channel and release repository in `app-update.yml`. The updater preserves this architecture-specific channel when discovering both stable and beta releases. Do not change it or the repository after shipping without a migration plan.
+4. Keep all installer, ZIP, blockmap, and update YAML assets. The channels are `latest-arm64` and `latest-x64`, so each macOS architecture has its own metadata file (`latest-arm64-mac.yml`, `latest-x64-mac.yml`); Windows uses `latest-x64.yml` and Linux `latest-x64-linux.yml`, which installed Linux builds do not read yet. This keeps parallel builds from overwriting each other's update feed. electron-builder embeds the channel and release repository in `app-update.yml`. The updater preserves this architecture-specific channel when discovering both stable and beta releases. Do not change it or the repository after shipping without a migration plan.
 
 The [electron-builder update guide](https://www.electron.build/v26/docs/features/auto-update/) explains the metadata and why macOS needs the ZIP.
 
-For packaging problems, **windows_only** runs just the Windows job. It cannot create a draft: a draft needs successful builds and checks for all three platform and architecture combinations.
+For packaging problems, **windows_only** runs just the Windows job. It cannot create a draft: a draft needs successful builds and checks for all four platform and architecture combinations.
 
 ### Unsigned Windows beta
 
@@ -52,7 +54,7 @@ Beta tags create prereleases, which updated installations offer alongside stable
 
 For a local Windows beta build, set `OPENORC_UNSIGNED_WINDOWS_BETA` to the beta package version along with `RELEASE_TAG` and `OPENORC_RELEASE_REPOSITORY`. Executable icon and version editing still run; only Authenticode signing is skipped.
 
-For local unsigned packages, use `pnpm --filter @openorc/desktop package`. For a signed native release outside CI, provide the same variables (use `CSC_LINK` and `CSC_KEY_PASSWORD` for the macOS certificate and `APPLE_API_KEY` for the path of a temporary `.p8` file), set `RELEASE_TAG` and `OPENORC_RELEASE_REPOSITORY`, then run `pnpm --filter @openorc/desktop release:build`. It also uses `--publish never`.
+For local unsigned packages, use `pnpm --filter @openorc/desktop package`. On Linux, `pnpm --filter @openorc/desktop package:linux` builds the AppImage, deb and rpm without an update feed; the rpm needs `rpmbuild` (the `rpm-build` package on Fedora, `rpm` on Debian and Ubuntu). For a signed native release outside CI, provide the same variables (use `CSC_LINK` and `CSC_KEY_PASSWORD` for the macOS certificate and `APPLE_API_KEY` for the path of a temporary `.p8` file), set `RELEASE_TAG` and `OPENORC_RELEASE_REPOSITORY`, then run `pnpm --filter @openorc/desktop release:build`. It also uses `--publish never`.
 
 ### Before publishing
 
@@ -82,4 +84,4 @@ This final test needs a controlled test feed and two real installer versions. An
 
 The dependency audit reports a [documented notice exception](distribution-notices.md) for `lazy-val` 1.0.5, which `electron-updater` uses. Its original MIT and author metadata are kept, and the missing upstream copyright and license text is disclosed. This exact-version exception does not block the release workflow. Other unresolved notices, changed evidence, and recorded native limitations still fail the packaged artifact audits and prevent draft creation.
 
-Electron 44.3.0 ships different Chromium notices on Windows and macOS. The manifest pins each platform's original file separately; the Windows file also includes the MIT-licensed Windows WebAuthn API headers and keeps upstream CRLF line endings. Source and packaged copies must match the reviewed hash for their platform.
+Electron 44.3.0 ships different Chromium notices on Windows and macOS. The manifest pins each platform's original file separately; the Windows file also includes the MIT-licensed Windows WebAuthn API headers and keeps upstream CRLF line endings. Linux's file is byte-identical to macOS's. Source and packaged copies must match the reviewed hash for their platform.

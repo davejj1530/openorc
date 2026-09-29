@@ -13,10 +13,12 @@ async function enhanceDownloads() {
     hint.textContent = "Choose your Mac’s chip below. In the Apple menu, open About This Mac and look for Chip or Processor.";
   } else if (device.platform === "windows") {
     hint.textContent = "The Windows installer is for 64-bit Intel and AMD PCs. Check Settings → System → About if you’re unsure.";
+  } else if (device.platform === "linux") {
+    hint.textContent = "Choose the rpm for Fedora or openSUSE, the deb for Debian or Ubuntu, or the AppImage for other distributions. All three are for 64-bit Intel and AMD processors.";
   } else if (device.platform === "mobile") {
-    hint.textContent = "OpenOrc runs on a computer. Visit this page on your Mac or Windows PC to install it.";
+    hint.textContent = "OpenOrc runs on a computer. Visit this page on your Mac, Windows PC or Linux computer to install it.";
   } else {
-    hint.textContent = "OpenOrc is available for macOS and Windows. Choose the installer for the computer you’ll use.";
+    hint.textContent = "OpenOrc is available for macOS, Windows and Linux. Choose the installer for the computer you’ll use.";
   }
 }
 

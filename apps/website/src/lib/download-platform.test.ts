@@ -18,10 +18,19 @@ void test("suggests Windows x64 without claiming support for ARM or 32-bit syste
   assert.equal(downloadDevice({ ...windows, userAgent: "Windows NT 10.0; ARM64" }).target, null);
 });
 
-void test("recognizes iPad desktop mode and does not offer desktop builds on phones or Linux", () => {
+void test("recognizes iPad desktop mode and does not offer desktop builds on phones or ChromeOS", () => {
   assert.deepEqual(downloadDevice({ ...mac, maxTouchPoints: 5 }), { platform: "mobile", target: null });
   for (const userAgent of ["iPhone", "iPad", "Linux; Android 14"]) assert.equal(downloadDevice({ ...mac, userAgent }).platform, "mobile");
-  assert.deepEqual(downloadDevice({ userAgent: "X11; Linux x86_64", platform: "Linux x86_64", maxTouchPoints: 0 }), { platform: "other", target: null });
+  assert.deepEqual(downloadDevice({ userAgent: "X11; CrOS x86_64 14541.0.0", platform: "Linux x86_64", maxTouchPoints: 0 }), { platform: "other", target: null });
+});
+
+void test("suggests a Linux package only when the browser names its distribution and runs on x64", () => {
+  const linux = (userAgent: string): DownloadNavigator => ({ userAgent, platform: "Linux x86_64", maxTouchPoints: 0 });
+  assert.deepEqual(downloadDevice(linux("Mozilla/5.0 (X11; Linux x86_64)")), { platform: "linux", target: null });
+  assert.equal(downloadDevice(linux("Mozilla/5.0 (X11; Fedora; Linux x86_64; rv:130.0)")).target, "linux-rpm");
+  assert.equal(downloadDevice(linux("Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:130.0)")).target, "linux-deb");
+  assert.equal(downloadDevice({ ...linux("Mozilla/5.0 (X11; Fedora; Linux aarch64; rv:130.0)"), platform: "Linux aarch64" }).target, null);
+  assert.equal(downloadDevice(linux("Mozilla/5.0 (X11; Fedora; Linux x86_64; rv:130.0)"), { architecture: "arm", bitness: "64" }).target, null);
 });
 
 void test("uses browser hints and gracefully handles denied or withheld architecture", async () => {

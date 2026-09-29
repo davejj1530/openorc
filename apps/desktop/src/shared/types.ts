@@ -181,7 +181,7 @@ export interface OpenOrcApi {
     setAutomaticChecks(on: boolean): Promise<UpdateSettings>;
     getState(): Promise<import("./app-updates").UpdateSnapshot>;
     onState(callback: (snapshot: import("./app-updates").UpdateSnapshot) => void): () => void;
-    dismiss(): Promise<import("./app-updates").UpdateSnapshot>;
+    dismiss(request: import("./app-updates").UpdateDismissal): Promise<import("./app-updates").UpdateSnapshot>;
     download(): Promise<void>;
     install(): Promise<void>;
   };

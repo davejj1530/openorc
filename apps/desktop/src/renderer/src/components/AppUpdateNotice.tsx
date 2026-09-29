@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { UpdateSnapshot, UpdateState } from "../../../shared/app-updates";
+import type { UpdateDismissal, UpdateSnapshot, UpdateState } from "../../../shared/app-updates";
 import { CoversPreview } from "../lib/browser-preview";
 import { Download } from "./icons";
 import { TextButton } from "./ui";
@@ -60,6 +60,13 @@ function actionLabel(state: UpdateState): string {
   return "Download update";
 }
 
+function noticeDismissal(state: UpdateState): UpdateDismissal | null {
+  if (state.phase === "available" || state.phase === "ready") return { kind: "later", phase: state.phase, version: state.version };
+  if (state.phase === "downloading") return { kind: "hide", phase: state.phase, version: state.version };
+  if (state.phase === "install-error") return { kind: "hide", phase: state.phase };
+  return null;
+}
+
 /** Shared by the running app and the visual fixture; all actions go to the existing main-process updater. */
 export function AppUpdateNoticeContent({ snapshot }: { snapshot: UpdateSnapshot }) {
   const { state, dismissed } = snapshot;
@@ -67,20 +74,20 @@ export function AppUpdateNoticeContent({ snapshot }: { snapshot: UpdateSnapshot 
   const [error, setError] = useState<string | null>(null);
   const text = noticeText(state);
   if (!text || dismissed) return null;
-  const run = async (action: "download" | "install" | "dismiss") => {
+  const run = async (action: "download" | "install" | UpdateDismissal) => {
     setPending(true);
     setError(null);
     try {
-      await window.openorc.updates[action]();
+      if (typeof action === "string") await window.openorc.updates[action]();
+      else await window.openorc.updates.dismiss(action);
     } catch {
       setError("Could not complete that action. Try again or use the update menu.");
     } finally {
       setPending(false);
     }
   };
-  const problem = ("error" in state && state.error) || error;
-  const actionable = state.phase === "available" || state.phase === "ready";
-  const hideable = state.phase === "downloading" || state.phase === "install-error";
+  const problem = ("error" in state && state.error) || ("checkError" in state && state.checkError) || error;
+  const dismissal = noticeDismissal(state);
   const percent = state.phase === "downloading" ? Math.round(state.percent ?? 0) : null;
   return (
     <aside className="agent-update-notice" aria-label="OpenOrc update">
@@ -102,18 +109,18 @@ export function AppUpdateNoticeContent({ snapshot }: { snapshot: UpdateSnapshot 
             {problem}
           </p>
         ) : null}
-        {actionable ? (
+        {dismissal?.kind === "later" ? (
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-3">
             <TextButton disabled={pending} className="text-sm" onClick={() => void run(state.phase === "ready" ? "install" : "download")}>
               {actionLabel(state)}
             </TextButton>
-            <TextButton disabled={pending} className="text-sm text-ink-2" onClick={() => void run("dismiss")}>
+            <TextButton disabled={pending} className="text-sm text-ink-2" onClick={() => void run(dismissal)}>
               Later
             </TextButton>
           </div>
         ) : null}
-        {hideable ? (
-          <TextButton className="text-sm text-ink-2 mt-3" onClick={() => void run("dismiss")}>
+        {dismissal?.kind === "hide" ? (
+          <TextButton className="text-sm text-ink-2 mt-3" onClick={() => void run(dismissal)}>
             Hide
           </TextButton>
         ) : null}

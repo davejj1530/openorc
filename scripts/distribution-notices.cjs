@@ -79,11 +79,11 @@ function asarReader() {
 }
 
 /**
- * A Windows executable names only the app's version, and the app no longer runs as Node to report its runtime. Its V8
- * snapshot, which packaging copies unchanged and every Electron build regenerates, identifies the runtime instead: when
- * it matches the installed electron package's copy, the app runs that package's version.
+ * A Windows executable names only the app's version, a Linux one names none, and the app no longer runs as Node to
+ * report its runtime. Its V8 snapshot, which packaging copies unchanged and every Electron build regenerates,
+ * identifies the runtime instead: when it matches the installed electron package's copy, the app runs that version.
  */
-function windowsRuntimeVersion(appPath) {
+function snapshotRuntimeVersion(appPath) {
   const electronDir = path.dirname(createRequire(path.join(root, "apps/desktop/package.json")).resolve("electron/package.json"));
   const snapshot = (dir) => hash(fs.readFileSync(path.join(dir, "v8_context_snapshot.bin")));
   return snapshot(appPath) === snapshot(path.join(electronDir, "dist")) ? JSON.parse(fs.readFileSync(path.join(electronDir, "package.json"), "utf8")).version : undefined;
@@ -91,7 +91,7 @@ function windowsRuntimeVersion(appPath) {
 
 function verifyDesktop(appPath, manifest) {
   const mac = appPath.endsWith(".app");
-  assert.ok(mac || process.platform === "win32", "Windows application inspection requires a Windows runner");
+  assert.ok(mac || ["win32", "linux"].includes(process.platform), "Windows and Linux application inspection requires a runner of that platform");
   const resources = path.join(appPath, mac ? "Contents/Resources" : "resources");
   const archive = path.join(resources, "app.asar");
   const asar = asarReader();
@@ -109,7 +109,7 @@ function verifyDesktop(appPath, manifest) {
   const electron = manifest.packages.find((item) => item.name === "electron");
   const runtimeVersion = mac
     ? fs.readFileSync(path.join(appPath, "Contents/Frameworks/Electron Framework.framework/Resources/Info.plist"), "utf8").match(/<key>CFBundleVersion<\/key>\s*<string>([^<]+)<\/string>/)?.[1]
-    : windowsRuntimeVersion(appPath);
+    : snapshotRuntimeVersion(appPath);
   assert.equal(runtimeVersion, electron.version, "Electron binary version differs from copied runtime notices");
   for (const file of ["LICENSE", "NOTICE", "THIRD_PARTY_NOTICES.md"]) {
     assert.deepEqual(fs.readFileSync(path.join(resources, file)), fs.readFileSync(path.join(root, file)), `${file}: distribution copy differs`);

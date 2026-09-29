@@ -112,11 +112,12 @@ function createWindow(route?: string): BrowserWindow {
     minWidth: 900,
     minHeight: 600,
     show: false,
-    titleBarStyle: "hiddenInset",
+    // Linux ignores hiddenInset and would keep its own title bar and menu bar above our headers.
+    titleBarStyle: process.platform === "linux" ? "hidden" : "hiddenInset",
     // Center the native buttons in the shared column headers (12px buttons).
     trafficLightPosition: { x: 14, y: (TOPBAR_HEIGHT - 12) / 2 },
-    // Windows keeps its own controls, drawn over the rightmost header; the renderer leaves them room.
-    ...(process.platform === "win32" ? { titleBarOverlay: { height: TOPBAR_HEIGHT, color: "#00000000", symbolColor: "#b1b1b8" } } : {}),
+    // Windows and Linux keep their own controls, drawn over the header; the renderer leaves them room.
+    ...(process.platform !== "darwin" ? { titleBarOverlay: { height: TOPBAR_HEIGHT, color: "#00000000", symbolColor: "#b1b1b8" } } : {}),
     // Must equal the default palette's dark --bg (codex). The compositor paints this into
     // newly exposed area during a live resize, and the main process cannot read CSS vars.
     backgroundColor: "#1a1a1a",
@@ -142,7 +143,12 @@ function createWindow(route?: string): BrowserWindow {
   });
   const appOwner = win.webContents.id;
   win.webContents.once("destroyed", () => mcpAppSandbox.releaseOwner(appOwner));
-  win.once("ready-to-show", () => win.show());
+  const reveal = () => {
+    if (!win.isDestroyed() && !win.isVisible()) win.show();
+  };
+  win.once("ready-to-show", reveal);
+  // On Wayland Chromium stops painting a window that has never been shown, so ready-to-show can wait forever.
+  if (process.platform === "linux") win.webContents.once("did-finish-load", reveal);
   // The columns give the traffic lights room only while there are traffic lights to give room to.
   const tellFullscreen = () => win.webContents.send("window:fullscreen", win.isFullScreen());
   win.on("enter-full-screen", tellFullscreen);
@@ -269,7 +275,7 @@ app.whenReady().then(async () => {
     const height = Math.max(32, TOPBAR_HEIGHT * zoom);
     if (win && process.platform === "darwin" && !win.isFullScreen()) {
       win.setWindowButtonPosition({ x: 14, y: Math.round((height - 12) / 2) });
-    } else if (win && process.platform === "win32") {
+    } else if (win && process.platform !== "darwin") {
       win.setTitleBarOverlay({ height: Math.round(height) });
     }
     return zoom;
@@ -325,6 +331,7 @@ app.on("before-quit", (event) => {
 
 function updateUnavailableReason(): string | null {
   if (!app.isPackaged) return "Run an installed release of OpenOrc to receive updates. Development builds do not contact the update service.";
+  if (process.platform === "linux") return "OpenOrc does not update itself on Linux yet. Install new versions from its GitHub releases.";
   if (!["darwin", "win32"].includes(process.platform)) return "Automatic updates are currently supported on macOS and Windows.";
   if (!existsSync(join(process.resourcesPath, "app-update.yml"))) return "This build has no release repository configured. Install an official release to receive updates.";
   return null;

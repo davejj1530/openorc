@@ -55,6 +55,21 @@ void test("prefers stable releases, and does not invent missing platform downloa
   );
 });
 
+void test("offers each Linux package under its format's own architecture name", () => {
+  const tag = "v0.2.0";
+  const linux = release(tag);
+  const names = ["OpenOrc-0.2.0-linux-x86_64.rpm", "OpenOrc-0.2.0-linux-amd64.deb", "OpenOrc-0.2.0-linux-x86_64.AppImage", "OpenOrc-0.2.0-linux-x64.rpm"];
+  linux.assets = names.map((name) => ({ name, size: 110_000_000, state: "uploaded", browser_download_url: `https://github.com/davejj1530/openorc/releases/download/${tag}/${name}` }));
+  assert.deepEqual(
+    selectDownloadRelease(publishedReleases([linux]))?.installers.map(({ target, name, unsigned }) => ({ target, name, unsigned })),
+    [
+      { target: "linux-rpm", name: "OpenOrc-0.2.0-linux-x86_64.rpm", unsigned: false },
+      { target: "linux-deb", name: "OpenOrc-0.2.0-linux-amd64.deb", unsigned: false },
+      { target: "linux-appimage", name: "OpenOrc-0.2.0-linux-x86_64.AppImage", unsigned: false },
+    ],
+  );
+});
+
 void test("does not offer an unsigned installer as a stable Windows release", () => {
   const stable = release("v0.1.0");
   stable.assets = [

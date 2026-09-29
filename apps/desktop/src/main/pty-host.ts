@@ -409,10 +409,11 @@ export class PtyHost {
 /**
  * The shell the core probes, so the panel and the PATH it inherits come from one shell. The account's login shell
  * comes first: SHELL is inherited from whatever launched OpenOrc and only fills in when the account names none.
+ * Past both, the same default as the core's probe: zsh on macOS, /bin/sh elsewhere.
  */
 export function terminalShell(env: NodeJS.ProcessEnv = process.env, accountShell: () => string | null = currentAccountShell): string {
   if (process.platform === "win32") return env["COMSPEC"] ?? "powershell.exe";
-  return accountShell() || env["SHELL"] || "/bin/zsh";
+  return accountShell() || env["SHELL"] || (process.platform === "darwin" ? "/bin/zsh" : "/bin/sh");
 }
 
 function currentAccountShell(): string | null {

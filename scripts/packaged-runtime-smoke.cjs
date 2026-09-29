@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Run against the smoke package (pnpm --filter @openorc/desktop package:smoke), a macOS .app or Windows application
-// directory. It reads the main process through Node's inspector, which every other package switches off with a fuse;
-// scripts/packaged-release-check.cjs checks the package that ships. Uses only disposable data.
+// Run against the smoke package (pnpm --filter @openorc/desktop package:smoke), a macOS .app, or a Windows or Linux
+// application directory. It reads the main process through Node's inspector, which every other package switches off
+// with a fuse; scripts/packaged-release-check.cjs checks the package that ships. Uses only disposable data.
 // Node 24: node scripts/packaged-runtime-smoke.cjs <absolute-app-path> [--keychain-only | --updates-only]
 const assert = require("node:assert/strict");
 const { spawn, execFileSync } = require("node:child_process");
@@ -10,13 +10,13 @@ const path = require("node:path");
 const http = require("node:http");
 const { createHash } = require("node:crypto");
 const { setTimeout: delay } = require("node:timers/promises");
-const { windows, packagedEnvironment, packagedExecutable } = require("./fixtures/packaged-environment.cjs");
+const { windows, linux, packagedEnvironment, packagedExecutable } = require("./fixtures/packaged-environment.cjs");
 
 const appPath = process.argv[2];
 const keychainOnly = process.argv[3] === "--keychain-only";
 const updatesOnly = process.argv[3] === "--updates-only";
 assert.ok(process.argv.length <= 4 && (!process.argv[3] || keychainOnly || updatesOnly), "Only --keychain-only or --updates-only is supported after the app path");
-assert.ok(!keychainOnly || !windows, "--keychain-only is macOS-only");
+assert.ok(!keychainOnly || !windows, "--keychain-only checks the macOS keychain or the Linux Secret Service");
 const executable = packagedExecutable(appPath);
 const { root, profile, repository, fixtureBin, git, env } = packagedEnvironment();
 const syntheticKey = "synthetic-packaged-smoke-not-a-real-api-key";
@@ -322,6 +322,13 @@ async function verifyUpdateDownload(session) {
   }
 }
 
+/** Installed Linux builds do not update themselves, so there is no download to exercise; Settings says why instead. */
+async function verifyLinuxUpdatePolicy(session) {
+  const settings = await session.renderer("window.openorc.updates.settings()");
+  assert.match(settings.unavailable ?? "", /does not update itself on Linux/);
+  console.log("PASS Linux update policy: the packaged app reports that it does not update itself");
+}
+
 async function assertNoPlaintext() {
   for (const name of ["openorc.sqlite", "openorc.sqlite-wal", "memory-extraction-key.enc"]) {
     const file = path.join(profile, name);
@@ -366,7 +373,8 @@ async function verify() {
   );
   assert.deepEqual(updateMenu, { label: "Check for updates…", enabled: true, autoDownload: false, autoInstallOnAppQuit: false, allowPrerelease: true, allowDowngrade: false });
   console.log("PASS packaged updater dependency, native menu, and explicit download/install policy");
-  await verifyUpdateDownload(session);
+  if (linux) await verifyLinuxUpdatePolicy(session);
+  else await verifyUpdateDownload(session);
   if (updatesOnly) {
     const version = await session.main("smoke.electron.app.getVersion()");
     await quit(session);
@@ -409,13 +417,19 @@ async function verify() {
 }
 
 async function verifyProtectedStorage() {
-  const context = windows ? "this Windows login" : "the disposable HOME's keychain";
+  let context = "the disposable HOME's keychain";
+  if (windows) context = "this Windows login";
+  else if (linux) context = "the disposable HOME's Secret Service";
   let session = await launch(false);
   let encryption;
   try {
     // An isolated macOS HOME may have no usable keychain. Do this last, with a
     // separate deadline: native keychain access can block Electron's main loop.
-    encryption = await session.main("smoke.electron.safeStorage.isEncryptionAvailable()", 15_000);
+    // Linux reports encryption as available even when it falls back to a fixed key; OpenOrc refuses that backend.
+    encryption = await session.main(
+      "smoke.electron.safeStorage.isEncryptionAvailable() && (process.platform !== 'linux' || smoke.electron.safeStorage.getSelectedStorageBackend() !== 'basic_text')",
+      15_000,
+    );
   } catch (error) {
     if (error.code !== "SMOKE_EVALUATION_TIMEOUT") throw error;
     await quit(session, true);

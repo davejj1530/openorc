@@ -112,6 +112,30 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
+  linux:
+    name: Linux typecheck, test and build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r typecheck
+      - run: node --test scripts/distribution-notices.test.cjs scripts/desktop-release.test.cjs scripts/packaged-native-target.test.cjs scripts/packaged-runtime-dependencies.test.cjs
+      - run: pnpm -r test
+        env:
+          GIT_AUTHOR_NAME: ci
+          GIT_AUTHOR_EMAIL: ci@openorc.local
+          GIT_COMMITTER_NAME: ci
+          GIT_COMMITTER_EMAIL: ci@openorc.local
+      - run: pnpm build
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
   bench:
     name: Bridge benchmark
     runs-on: macos-15

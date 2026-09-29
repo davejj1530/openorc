@@ -28,7 +28,8 @@ vi.mock("../lib/router", () => ({
   useRouter: (select: (state: { navigate: typeof navigate; back: typeof back }) => unknown) => select({ navigate, back }),
 }));
 
-vi.mock("../lib/window", () => ({ useTrafficLights: () => true }));
+let windowsControls = false;
+vi.mock("../lib/window", () => ({ useTrafficLights: () => true, useWindowsControls: () => windowsControls }));
 
 vi.mock("../components/RiveMascot", () => ({
   RiveMascot: ({ reaction, reactionKey }: { reaction?: string; reactionKey?: string }) => <div className="rive-mascot" data-reaction={reaction} data-reaction-key={reactionKey} />,
@@ -78,6 +79,7 @@ beforeEach(() => {
     custom: {},
   });
   harnesses = [];
+  windowsControls = false;
   systemLoading = false;
   projectList = [];
   projectLoading = false;
@@ -243,6 +245,19 @@ describe("Onboarding", () => {
     expect(screen.getByRole("alert").textContent).toContain("could not be saved");
     expect(screen.getByRole("heading", { name: "Use the agents you already have" })).toBeTruthy();
     expect(screen.getByRole("checkbox", { name: "Codex selected" }).getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("keeps recovery's Close clear of window controls drawn over the header's right end", () => {
+    harnesses = [{ ...ready("codex"), state: "check_failed" }];
+    const persisted = { version: 1, step: "done", completedAt: 123, selectedHarnesses: ["codex"], defaultHarness: "codex" } as const;
+    windowsControls = true;
+    const view = render(<Onboarding mode="recovery" persisted={persisted} onPersist={vi.fn(() => true)} onComplete={vi.fn()} />);
+    // With no agent ready, Close is the only way out of recovery.
+    expect((screen.getByRole("button", { name: "Return to OpenOrc" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByRole("button", { name: "Close" }).closest("header")?.getAttribute("data-window-controls")).toBe("true");
+    windowsControls = false;
+    view.rerender(<Onboarding mode="recovery" persisted={persisted} onPersist={vi.fn(() => true)} onComplete={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "Close" }).closest("header")?.hasAttribute("data-window-controls")).toBe(false);
   });
 
   it("rescans during recovery and completes without replacing saved preferences", () => {

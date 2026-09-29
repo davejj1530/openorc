@@ -9,12 +9,12 @@ import "../styles/download.css";
 const release = selectDownloadRelease(await getPublishedReleases());
 ---
 
-<Layout wide title="Download OpenOrc for macOS and Windows" description="Download OpenOrc for Apple Silicon and Intel Macs, or Windows PCs. Bring your coding agents into one desktop workspace.">
+<Layout wide title="Download OpenOrc for macOS, Windows and Linux" description="Download OpenOrc for Apple Silicon and Intel Macs, Windows PCs, or Linux. Bring your coding agents into one desktop workspace.">
   <SiteHeader />
   <main id="main" class="container download-page">
     <header class="download-intro">
       <h1>Your agents.<br /><span>One workspace.</span></h1>
-      <p>Download OpenOrc for macOS or Windows. Free and open source, no OpenOrc account required.</p>
+      <p>Download OpenOrc for macOS, Windows or Linux. Free and open source, no OpenOrc account required.</p>
       {release && <p class="download-version">{release.tag} <span>{release.prerelease ? "Public beta" : "Stable release"}</span><a href={release.url}>Release notes <Icon name="arrow" size={14} /></a></p>}
     </header>
 
@@ -36,7 +36,7 @@ const release = selectDownloadRelease(await getPublishedReleases());
                   {installer ? (
                     <>
                       <a class="button button-primary" href={installer.url} data-installer-link aria-label={`Download OpenOrc for ${target.title}, ${target.chip}${installer.unsigned ? ", unsigned beta" : ""}`}>
-                        Download {target.extension.toUpperCase()}<Icon name="download" size={17} />
+                        Download {target.format}<Icon name="download" size={17} />
                       </a>
                       <span>{Math.round(installer.size / 1_000_000)} MB{installer.unsigned && " · Unsigned beta"}</span>
                     </>

@@ -7,10 +7,11 @@ const os = require("node:os");
 const path = require("node:path");
 
 const windows = process.platform === "win32";
+const linux = process.platform === "linux";
 
 function packagedEnvironment() {
-  assert.ok(windows || process.platform === "darwin", "This launcher validates macOS and Windows packages");
-  if (!windows) assert.ok(["/bin/zsh", "/bin/bash", "/bin/sh"].includes(os.userInfo().shell), "Disposable shell fixtures currently support macOS zsh/bash/sh logins only");
+  assert.ok(windows || linux || process.platform === "darwin", "This launcher validates macOS, Windows and Linux packages");
+  if (!windows) assert.ok(["/bin/zsh", "/bin/bash", "/bin/sh"].includes(os.userInfo().shell), "Disposable shell fixtures currently support zsh/bash/sh logins only");
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "openorc-packaged-smoke-"));
   const profile = path.join(root, "profile");
   const repository = path.join(root, "repository");
@@ -49,6 +50,7 @@ function packagedEnvironment() {
           PATHEXT: ".COM;.EXE;.BAT;.CMD",
         }
       : { SHELL: "/bin/sh" }),
+    ...(linux ? displayEnvironment() : {}),
     LANG: "en_US.UTF-8",
     OPENORC_USER_DATA: profile,
     OPENORC_CODEX_BIN: windows ? path.join(fixtureBin, "codex.exe") : "/usr/bin/false",
@@ -62,7 +64,7 @@ function packagedEnvironment() {
   // Packages encrypt cookies with a key kept in the keychain and read it at startup. A HOME without a keychain would
   // block startup on a "Keychain Not Found" dialog, so the disposable HOME gets its own empty, unlocked default
   // keychain. macOS resolves the keychain list from HOME, so the user's own keychains are never touched.
-  if (!windows) {
+  if (process.platform === "darwin") {
     const keychain = path.join(root, "Library/Keychains/login.keychain-db");
     fs.mkdirSync(path.dirname(keychain), { recursive: true });
     const security = (...args) => execFileSync("security", args, { env: { ...process.env, HOME: root }, stdio: "ignore" });
@@ -70,15 +72,58 @@ function packagedEnvironment() {
     security("default-keychain", "-d", "user", "-s", keychain);
     security("set-keychain-settings", keychain);
   }
+  if (linux) Object.assign(env, disposableSecretService(root));
   return { root, profile, repository, fixtureBin, fixturePath, git, env };
 }
 
-/** The app's own executable inside a packaged macOS .app or Windows application directory. */
+/** The X display a Linux package opens its window on: the one this check runs under, such as xvfb-run's in CI. */
+function displayEnvironment() {
+  const authority = process.env.XAUTHORITY || path.join(os.homedir(), ".Xauthority");
+  return { ...(process.env.DISPLAY ? { DISPLAY: process.env.DISPLAY } : {}), ...(fs.existsSync(authority) ? { XAUTHORITY: authority } : {}) };
+}
+
+/**
+ * Linux keeps protected storage in the Secret Service. Where dbus-daemon and gnome-keyring-daemon are installed, the
+ * disposable HOME gets its own session bus and an empty, unlocked keyring, so the user's own keyring is never touched.
+ * Chromium uses the Secret Service only on desktops it recognizes, hence GNOME. Without both tools the package falls
+ * back to plain-text storage, which OpenOrc refuses; the runtime smoke then reports that limit.
+ */
+function disposableSecretService(root) {
+  const runtime = path.join(root, "run");
+  fs.mkdirSync(runtime, { mode: 0o700 });
+  const base = { HOME: root, XDG_RUNTIME_DIR: runtime, XDG_DATA_HOME: path.join(root, ".local/share"), PATH: "/usr/bin:/bin" };
+  let bus;
+  try {
+    bus = execFileSync("dbus-daemon", ["--session", "--fork", "--print-address=1", "--print-pid=1"], { env: base, encoding: "utf8", timeout: 10_000 }).trim().split("\n");
+  } catch {
+    return {};
+  }
+  const [address, pid] = bus;
+  // The keyring daemon leaves with the bus it serves.
+  process.once("exit", () => {
+    try {
+      process.kill(Number(pid));
+    } catch {
+      /* Already gone. */
+    }
+  });
+  const env = { DBUS_SESSION_BUS_ADDRESS: address, XDG_RUNTIME_DIR: runtime, XDG_CURRENT_DESKTOP: "GNOME" };
+  try {
+    // Creates and unlocks the login keyring with this password. An empty one creates no keyring at all.
+    const password = "disposable-openorc-smoke-keyring";
+    execFileSync("gnome-keyring-daemon", ["--unlock", "--components=secrets", "--daemonize"], { env: { ...base, ...env }, input: password, stdio: ["pipe", "ignore", "ignore"], timeout: 10_000 });
+  } catch {
+    return {};
+  }
+  return env;
+}
+
+/** The app's own executable inside a packaged macOS .app, or a Windows or Linux application directory. */
 function packagedExecutable(appPath) {
-  assert.ok(appPath && path.isAbsolute(appPath) && (windows || appPath.endsWith(".app")), "Supply an absolute packaged application path");
-  const executable = path.join(appPath, windows ? "OpenOrc.exe" : "Contents/MacOS/OpenOrc");
+  assert.ok(appPath && path.isAbsolute(appPath) && (windows || linux || appPath.endsWith(".app")), "Supply an absolute packaged application path");
+  const executable = path.join(appPath, { win32: "OpenOrc.exe", linux: "openorc", darwin: "Contents/MacOS/OpenOrc" }[process.platform]);
   fs.accessSync(executable, fs.constants.X_OK);
   return executable;
 }
 
-module.exports = { windows, packagedEnvironment, packagedExecutable };
+module.exports = { windows, linux, packagedEnvironment, packagedExecutable };

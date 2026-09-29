@@ -20,6 +20,7 @@ const [off, on] = ["0".charCodeAt(0), "1".charCodeAt(0)];
 
 const appPath = process.argv[2];
 assert.equal(process.argv.length, 3, "Usage: node scripts/packaged-release-check.cjs <absolute-app-path>");
+const mac = process.platform === "darwin";
 const executable = packagedExecutable(appPath);
 const { root: home, profile, env } = packagedEnvironment();
 const launched = [];
@@ -34,7 +35,7 @@ async function until(check, label, timeout = 60_000) {
 }
 
 async function verifyFuses() {
-  const wire = await getCurrentFuseWire(windows ? executable : appPath);
+  const wire = await getCurrentFuseWire(mac ? appPath : executable);
   const expected = {
     RunAsNode: off,
     EnableNodeOptionsEnvironmentVariable: off,
@@ -79,7 +80,7 @@ function machOFiles(dir) {
 function verifyNativeCode() {
   const builderRequire = createRequire(desktopRequire.resolve("electron-builder"));
   const asar = createRequire(builderRequire.resolve("app-builder-lib"))("@electron/asar");
-  const archive = path.join(appPath, windows ? "resources" : "Contents/Resources", "app.asar");
+  const archive = path.join(appPath, mac ? "Contents/Resources" : "resources", "app.asar");
   const entries = asar.listPackage(archive);
   assert.deepEqual(
     entries.filter((entry) => entry.endsWith(".map")),
@@ -104,7 +105,8 @@ function verifyNativeCode() {
     [],
     "Native code inside app.asar",
   );
-  if (windows) return console.log("PASS native code: none inside the archive");
+  // Only macOS refuses native code signed by another team; Windows and Linux have no such check to prepare for.
+  if (!mac) return console.log("PASS native code: none inside the archive");
   const team = teamOf(appPath);
   if (!team) return console.log("PASS native code: none inside the archive (unsigned package, so team signatures were not checked)");
   assert.deepEqual(

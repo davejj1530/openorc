@@ -8,7 +8,7 @@ OpenOrc uses the [Apache License, Version 2.0](LICENSE). Unless explicitly state
 
 ## Development setup
 
-Use Node.js 24 and the pnpm version in `package.json`. CI runs every check on an Apple Silicon macOS runner, along with the performance benchmarks. On Windows Server 2025 it runs the size check, typecheck, script tests, and build, but not the test suite, because some tests rely on POSIX tools such as `/bin/sh`. Installers are built and checked only by the [release workflow](docs/desktop-updates.md). Linux is not a release target. The [README](README.md#project-status) lists the status of each platform.
+Use Node.js 24 and the pnpm version in `package.json`. CI runs every check on an Apple Silicon macOS runner, along with the performance benchmarks. On Ubuntu 24.04 it runs the typecheck, script tests, test suite, and build. On Windows Server 2025 it runs the size check, typecheck, script tests, and build, but not the test suite, because some tests rely on POSIX tools such as `/bin/sh`. Installers are built and checked only by the [release workflow](docs/desktop-updates.md). The [README](README.md#project-status) lists the status of each platform.
 
 ```sh
 pnpm install --frozen-lockfile
@@ -17,7 +17,7 @@ pnpm qa:onboarding --dev
 
 The onboarding launcher creates a disposable application profile and removes it when the app exits. Add `--keep` to retain the profile for inspection. To work against your normal profile, use `pnpm dev`; quit any existing OpenOrc instance using that profile first. On macOS, `pnpm dev` uses the same data folder as an installed build but a different Keychain entry, so it cannot decrypt Slack credentials or the memory-extraction key saved by the installed app. See [credential storage](docs/credential-storage.md).
 
-Electron, node-pty, ONNX Runtime, and sqlite-vec include platform-specific dependencies. Use a fresh install for the target platform. If native builds are required, install that platform's compiler tools; on macOS this is the Xcode Command Line Tools. The workspace's `allowBuilds` list controls dependency install scripts. Do not disable that list to work around a failed install; capture the failing dependency and command.
+Electron, node-pty, ONNX Runtime, and sqlite-vec include platform-specific dependencies. Use a fresh install for the target platform. If native builds are required, install that platform's compiler tools; on macOS this is the Xcode Command Line Tools. On Linux, node-pty publishes no prebuilt binding and always compiles during installation, which needs a C++ compiler, make and Python 3 (`sudo dnf install gcc-c++ make python3` on Fedora, `sudo apt install build-essential python3` on Debian and Ubuntu). The workspace's `allowBuilds` list controls dependency install scripts. Do not disable that list to work around a failed install; capture the failing dependency and command.
 
 ## Finding the right module
 
@@ -93,6 +93,8 @@ pnpm qa:onboarding
 ```
 
 The scripts under `scripts/` have different fixtures and prerequisites; inspect the chosen script before running it. Prefer disposable profiles and fixture repositories. Never point destructive or restore tests at your everyday application data or a working repository.
+
+On Linux, `pnpm --filter @openorc/desktop package:linux` builds an AppImage, deb and rpm from your checkout; the rpm needs `rpmbuild` (`rpm-build` on Fedora, `rpm` on Debian and Ubuntu).
 
 Packages switch off Node's inspector, so there are two packaged checks. `pnpm qa:release /absolute/path/to/OpenOrc.app` checks a package as it ships: its fuses, its native code, and that it starts and ignores take-over switches. `pnpm qa:packaged` runs the deeper smoke on the package from `pnpm --filter @openorc/desktop package:smoke`, which keeps the inspector on; its first model check downloads MiniLM. Both use disposable data and disabled provider binaries. Exit code 2 from the smoke means native/model checks passed but OS credential verification is incomplete. See [packaged runtime validation](docs/packaged-runtime-validation.md) for build commands, coverage, and keychain limits.
 

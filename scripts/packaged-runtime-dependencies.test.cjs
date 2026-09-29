@@ -47,14 +47,20 @@ test("runtime closure follows production, optional, peer, nested-version and cyc
   assert.throws(() => dependencyGraph(root), /Missing production dependency shared/);
 });
 
-for (const target of ["darwin-arm64", "darwin-x64", "win32-x64"]) {
+for (const target of ["darwin-arm64", "darwin-x64", "win32-x64", "linux-x64"]) {
   test(`copying retains runtime files and notices but omits bundled library copies for ${target}`, async (t) => {
     const { root, write } = fixture(t);
     const [platform, arch] = target.split("-");
     const config = doMergeConfigs([structuredClone(baseConfig)]);
     const packager = { config, appInfo: { type: "commonjs" }, debugLogger: { isEnabled: false }, getWorkspaceRoot: async () => root };
     configureNativeFiles({ packager, electronPlatformName: platform }, runtimeFilePatterns(new Set(["runtime", "@scope/runtime", "node-pty"])));
-    const matcher = getNodeModuleFileMatcher(root, path.join(root, "app"), (pattern) => pattern.replaceAll("${arch}", arch), config[platform === "darwin" ? "mac" : "win"], packager);
+    const matcher = getNodeModuleFileMatcher(
+      root,
+      path.join(root, "app"),
+      (pattern) => pattern.replaceAll("${arch}", arch),
+      config[{ darwin: "mac", win32: "win", linux: "linux" }[platform]],
+      packager,
+    );
     const files = [
       "package.json",
       "LICENSE",

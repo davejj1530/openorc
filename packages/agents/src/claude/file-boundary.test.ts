@@ -22,6 +22,10 @@ function runHook(command: string, home: string): Promise<{ code: number | null; 
     child.stdout.on("data", (chunk) => (stdout += chunk));
     child.stderr.on("data", (chunk) => (stderr += chunk));
     child.on("close", (code) => resolve({ code, stdout, stderr }));
+    // A hook that blocks may exit before reading the request, which fails the write with EPIPE. Only that is expected.
+    child.stdin.on("error", (error: NodeJS.ErrnoException) => {
+      if (error.code !== "EPIPE") throw error;
+    });
     child.stdin.end(JSON.stringify(request));
   });
 }

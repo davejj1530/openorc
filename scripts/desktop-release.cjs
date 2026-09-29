@@ -27,8 +27,8 @@ function releaseConfig({ env = process.env, platform = process.platform, arch = 
   if (unsignedBetaVersion && (unsignedBetaVersion !== version || !version.includes("-beta."))) throw new Error("OPENORC_UNSIGNED_WINDOWS_BETA must match this exact beta version");
   const repository = required("OPENORC_RELEASE_REPOSITORY");
   if (!/^[A-Za-z0-9][A-Za-z0-9-]*\/[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(repository)) throw new Error("OPENORC_RELEASE_REPOSITORY must be owner/repository");
-  if (!["darwin", "win32"].includes(platform) || !["arm64", "x64"].includes(arch) || (platform === "win32" && arch !== "x64"))
-    throw new Error("Release builds support native macOS arm64/x64 and Windows x64 runners");
+  if (!["darwin", "win32", "linux"].includes(platform) || !["arm64", "x64"].includes(arch) || (platform !== "darwin" && arch !== "x64"))
+    throw new Error("Release builds support native macOS arm64/x64, Windows x64 and Linux x64 runners");
   const [owner, repo] = repository.split("/");
   const config = {
     extends: path.resolve(__dirname, "../apps/desktop/electron-builder.yml"),
@@ -57,6 +57,11 @@ function releaseConfig({ env = process.env, platform = process.platform, arch = 
       entitlements: "build/entitlements.mac.plist",
       entitlementsInherit: "build/entitlements.mac.plist",
     };
+  } else if (platform === "linux") {
+    // Linux packages carry no code signature; the draft's SHA256SUMS.txt covers them. Installed builds do not update
+    // themselves, but the release still records their metadata beside the other platforms'.
+    config.forceCodeSigning = false;
+    config.linux = { target: ["AppImage", "deb", "rpm"] };
   } else {
     if (unsignedBetaVersion) {
       config.forceCodeSigning = false;

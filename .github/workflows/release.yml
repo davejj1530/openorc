@@ -74,6 +74,7 @@ jobs:
             {runner:'macos-15',platform:'mac',arch:'arm64'},
             {runner:'macos-15-intel',platform:'mac',arch:'x64'},
             {runner:'windows-2025',platform:'win',arch:'x64'},
+            {runner:'ubuntu-24.04',platform:'linux',arch:'x64'},
           ].filter(item => process.env.WINDOWS_ONLY !== 'true' || item.platform === 'win');
           require('node:fs').appendFileSync(process.env.GITHUB_OUTPUT, `platforms=${JSON.stringify(platforms)}\n`);
           NODE
@@ -102,6 +103,15 @@ jobs:
         env:
           EXPECTED_ARCH: ${{ matrix.arch }}
         run: node -e 'if (process.arch !== process.env.EXPECTED_ARCH) throw Error("Use a matching native runner for native dependencies")'
+      - name: Install Linux packaging and check tools
+        if: matrix.platform == 'linux'
+        # rpm builds the rpm; Xvfb, D-Bus and gnome-keyring give the packaged checks a display and a disposable Secret
+        # Service. Ubuntu confines the unprivileged user namespaces Chromium's sandbox uses; Fedora and most distributions
+        # allow them, as the installed packages expect.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends rpm xvfb xauth dbus-daemon gnome-keyring
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - run: pnpm install --frozen-lockfile
       - name: Prepare Electron runtime and notice files
         run: pnpm --filter @openorc/desktop exec node -e 'require("electron")'
@@ -203,6 +213,25 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Windows smoke package build failed' }
           node scripts/packaged-runtime-smoke.cjs (Resolve-Path apps/desktop/release-smoke/win-unpacked).Path
           if ($LASTEXITCODE -ne 0) { throw 'Windows runtime smoke failed' }
+      - name: Verify Linux installers and installed runtime
+        if: matrix.platform == 'linux'
+        run: |
+          release="$PWD/apps/desktop/release"
+          for pattern in '*.AppImage' '*.deb' '*.rpm'; do
+            count=$(find "$release" -maxdepth 1 -name "$pattern" | wc -l)
+            if [[ "$count" != 1 ]]; then echo "Expected exactly one $pattern installer" >&2; exit 1; fi
+          done
+          rpm -qp --info "$release"/*.rpm
+          dpkg-deb --info "$release"/*.deb
+          node scripts/distribution-notices.cjs desktop "$release/linux-unpacked"
+          # The deb as installed, and the AppImage's contents, both ship the package the checks expect.
+          sudo apt-get install -y "$release"/*.deb
+          xvfb-run -a node scripts/packaged-release-check.cjs /opt/OpenOrc
+          (cd "$RUNNER_TEMP" && "$release"/*.AppImage --appimage-extract >/dev/null)
+          xvfb-run -a node scripts/packaged-release-check.cjs "$RUNNER_TEMP/squashfs-root"
+          # The smoke reads the main process through Node's inspector, which release packages switch off.
+          pnpm --filter @openorc/desktop exec electron-builder --dir --config electron-builder.smoke.cjs
+          xvfb-run -a node scripts/packaged-runtime-smoke.cjs "$PWD/apps/desktop/release-smoke/linux-unpacked"
       - name: Remove notarization key
         if: always() && matrix.platform == 'mac'
         run: |
@@ -216,6 +245,9 @@ jobs:
             apps/desktop/release/*.dmg
             apps/desktop/release/*.zip
             apps/desktop/release/*.exe
+            apps/desktop/release/*.AppImage
+            apps/desktop/release/*.deb
+            apps/desktop/release/*.rpm
             apps/desktop/release/*.blockmap
             apps/desktop/release/latest-*.yml
 
@@ -254,7 +286,8 @@ jobs:
           lines.push(process.env.UNSIGNED_WINDOWS_BETA === 'true'
             ? 'Windows x64: unsigned beta. Windows may warn about the unrecognized app; some security policies may prevent installation. Download only from the official release.'
             : 'Windows x64: signed NSIS installer.');
-          lines.push('', 'Use Check for updates in OpenOrc for newer stable and beta releases. Downloading and restarting to install require your confirmation. Versions through 0.1.0-beta.4 need a one-time manual install to receive beta updates.', '', 'SHA256SUMS.txt covers the attached installers, ZIPs, blockmaps, and update metadata.');
+          lines.push('Linux x64: rpm for Fedora and openSUSE, deb for Debian and Ubuntu, and an AppImage for other distributions. Linux packages are not code-signed; check them against SHA256SUMS.txt. Linux installs do not update themselves yet: install each new version from its release.');
+          lines.push('', 'On macOS and Windows, use Check for updates in OpenOrc for newer stable and beta releases. Downloading and restarting to install require your confirmation. Versions through 0.1.0-beta.4 need a one-time manual install to receive beta updates.', '', 'SHA256SUMS.txt covers the attached installers, ZIPs, blockmaps, and update metadata.');
           fs.writeFileSync('release-notes.md', lines.join('\n') + '\n');
           NODE
           args=(--draft --verify-tag --title "OpenOrc $RELEASE_TAG" --notes-file release-notes.md)

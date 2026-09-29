@@ -66,20 +66,20 @@ OnlyLoadAppFromAsar                    on`;
     <pre><code>{fuses}</code></pre>
     <ul>
       <li>The app itself cannot be started as plain Node.js, and ignores <code>NODE_OPTIONS</code> and <code>--inspect</code>.</li>
-      <li>It loads its code only from its <code>app.asar</code> archive. The build records the archive's SHA-256 in the app, on macOS in the signed <code>Info.plist</code>, and Electron checks it before loading.</li>
-      <li>Cookies, including the Preview's signed-in sessions, are encrypted on disk with a key kept in the macOS Keychain or protected by Windows DPAPI.</li>
+      <li>It loads its code only from its <code>app.asar</code> archive. The build records the archive's SHA-256 in the app, on macOS in the signed <code>Info.plist</code>, and Electron checks it before loading. Electron has no such check on Linux: the rpm and deb install the archive where only root can change it, and an AppImage is as protected as the file you keep it in.</li>
+      <li>Cookies, including the Preview's signed-in sessions, are encrypted on disk with a key kept in the macOS Keychain or protected by Windows DPAPI. On Linux the key lives in the Secret Service or KWallet; without either, Chromium's built-in fallback key only obscures them.</li>
       <li>An installed app refuses to start with <code>--remote-debugging-port</code> or <code>--remote-debugging-pipe</code>, before it opens a window or a debugging port.</li>
       <li>Release builds read no test switches: nothing that starts agents, approves requests, runs benchmarks, takes screenshots, answers the folder picker, or forces a theme or screen, and no diagnostics screen. These exist only in development and test builds, so no environment variable can make an installed app act on its own.</li>
     </ul>
     <p>On macOS the app runs with the hardened runtime and one entitlement, <code>com.apple.security.cs.allow-jit</code>, which V8 needs to compile JavaScript. Library validation stays on: the app loads only native code signed by Apple or by the same developer, and all of its own native code sits outside the archive, where signing covers it.</p>
-    <p>Before a release is published, a check runs on the signed macOS app and the installed Windows app. It reads the fuses, looks for native code inside the archive and, on macOS, for any executable file not signed by the same team, starts the app, and confirms that <code>ELECTRON_RUN_AS_NODE</code>, <code>--inspect</code>, and remote debugging do nothing.</p>
+    <p>Before a release is published, a check runs on the signed macOS app, the installed Windows app, and the installed Linux app. It reads the fuses, looks for native code inside the archive and, on macOS, for any executable file not signed by the same team, starts the app, and confirms that <code>ELECTRON_RUN_AS_NODE</code>, <code>--inspect</code>, and remote debugging do nothing.</p>
     <p class="docs-source">Source: <code>apps/desktop/electron-builder.yml</code>, <code>apps/desktop/build/entitlements.mac.plist</code>, <code>scripts/packaged-release-check.cjs</code></p>
   </section>
 
   <section aria-labelledby="secrets">
     <h2 id="secrets">Secrets and your data</h2>
     <ul>
-      <li>Slack tokens and the optional memory API key are encrypted with Electron's <code>safeStorage</code>, which uses the macOS Keychain or Windows DPAPI, and written to files only you can read. They are never in the database. See <a href={docHref("storage") + "#settings"}>Settings and secrets</a>.</li>
+      <li>Slack tokens and the optional memory API key are encrypted with Electron's <code>safeStorage</code>, which uses the macOS Keychain, Windows DPAPI, or the Linux Secret Service or KWallet, and written to files only you can read. They are never in the database. See <a href={docHref("storage") + "#settings"}>Settings and secrets</a>.</li>
       <li>OpenOrc never reads or stores the agents' logins. Each CLI signs in and keeps its credentials itself.</li>
       <li>Text that looks like a secret is replaced before it is stored. See <a href={docHref("storage") + "#redaction"}>Redaction</a>.</li>
       <li>The database is a plain SQLite file in your profile folder, and it is not encrypted. Your conversations, plans, and memories are as private as the rest of your files.</li>

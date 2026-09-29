@@ -34,7 +34,7 @@ vi.mock("./lib/ui", () => ({
   useUi: () => ({ importSessions: { open: false } }),
 }));
 let trafficLights = true;
-vi.mock("./lib/window", () => ({ useTrafficLights: () => trafficLights }));
+vi.mock("./lib/window", () => ({ useTrafficLights: () => trafficLights, useWindowsControls: () => false }));
 
 let harnesses: HarnessInfo[] | undefined;
 let projectCount = 1;

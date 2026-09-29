@@ -70,4 +70,26 @@ electronFuses:
 win:
   icon: resources/icon.png
 linux:
-  icon: resources/icon.png
+  # No icon here: electron-builder derives the installed icon sizes from mac.icon's ICNS. From the 1024px PNG alone it
+  # installs only a 1024x1024 icon, a size icon themes do not list, so desktops would show a generic one.
+  category: Development
+  synopsis: Your coding agents, working together.
+  # Otherwise the executable, the installed package, and the deb and rpm files are named after the scoped package name.
+  executableName: openorc
+  artifactName: OpenOrc-${version}-${os}-${arch}.${ext}
+  # Names the .desktop entry after package.json's desktopName, which Electron also uses as the window's WM_CLASS and
+  # Wayland app ID, so the desktop matches running windows to the launcher entry and its icon.
+  syncDesktopName: true
+  # deb and rpm need a maintainer, and package.json names no author.
+  maintainer: OpenOrc contributors
+  # Local packages stay unpacked, like macOS. electron-builder.linux.cjs and the release configuration build installers.
+  target:
+    - dir
+appImage:
+  # The AppImage's launcher drops Chromium's sandbox only where unprivileged user namespaces are unavailable. The
+  # default desktop entry would pass --no-sandbox everywhere, even where the sandbox works.
+  executableArgs: []
+deb:
+  packageName: openorc
+rpm:
+  packageName: openorc

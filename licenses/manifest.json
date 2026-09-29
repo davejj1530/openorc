@@ -327,7 +327,9 @@
         "version": "44.3.0",
         "windowsArtifact": "https://github.com/electron/electron/releases/download/v44.3.0/electron-v44.3.0-win32-x64.zip",
         "windowsArtifactSha256": "26bf9a617d58d81772b3d68305d59ee48272969c15083c06db634a77358a8d9d",
-        "platformNote": "Windows upstream notice uses CRLF and additionally includes the MIT-licensed Windows WebAuthn API headers; both platform files are preserved byte-for-byte."
+        "linuxArtifact": "https://github.com/electron/electron/releases/download/v44.3.0/electron-v44.3.0-linux-x64.zip",
+        "linuxArtifactSha256": "8b49b9efdd73c0f467edc3c1cd5678392c384ccf224f34ff54179f736e2f384b",
+        "platformNote": "Windows upstream notice uses CRLF and additionally includes the MIT-licensed Windows WebAuthn API headers; both platform files are preserved byte-for-byte. The Linux upstream notice is byte-identical to the macOS file."
       },
       "sha256": "a62dabd1c6ef1327365b2a3fdffb806222684a746dcb8f4afd1c1f690eba5535",
       "desktop": {
@@ -335,7 +337,8 @@
       },
       "platformSha256": {
         "darwin": "a62dabd1c6ef1327365b2a3fdffb806222684a746dcb8f4afd1c1f690eba5535",
-        "win32": "7b328b8c7463ac9bfc7dc648c751533517c8441a0b5b21047d6c0b2620e60d70"
+        "win32": "7b328b8c7463ac9bfc7dc648c751533517c8441a0b5b21047d6c0b2620e60d70",
+        "linux": "a62dabd1c6ef1327365b2a3fdffb806222684a746dcb8f4afd1c1f690eba5535"
       }
     },
     {

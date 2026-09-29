@@ -12,9 +12,11 @@ The memory-extraction key is never written to the SQLite database. Each save wri
 
 ## Where the data lives
 
-The data folder is in the OS application data directory (`~/Library/Application Support/OpenOrc` on macOS). Set `OPENORC_USER_DATA` to use a different one.
+The data folder is in the OS application data directory (`~/Library/Application Support/OpenOrc` on macOS, `%APPDATA%\OpenOrc` on Windows, and `~/.config/OpenOrc` on Linux). Set `OPENORC_USER_DATA` to use a different one.
 
 Packaged builds store their encryption key under the name `OpenOrc`, and development builds under `@openorc/desktop`, so the two cannot read each other's credentials. A change of macOS signing identity may ask for Keychain approval again. See [Electron's encryption initialization](https://github.com/electron/electron/blob/v44.3.0/shell/browser/electron_browser_main_parts.cc#L591).
+
+On Linux, Electron keeps the key in the Secret Service (GNOME Keyring) or KWallet, choosing by desktop: GNOME, KDE Plasma, Cinnamon, Xfce and the other desktops Chromium recognizes work without setup. Elsewhere, such as a bare window manager, Electron falls back to `basic_text`, which OpenOrc refuses. If a secret service is running there, start OpenOrc with `--password-store=gnome-libsecret` (or `--password-store=kwallet6`) to use it.
 
 Encrypted files only open with the same OS account and encryption key. Copying them to another machine is not a way to back up credentials.
 
@@ -34,4 +36,4 @@ Setup opens a page that OpenOrc serves on `127.0.0.1` for up to 15 minutes. It s
 
 Tests use disposable databases, real file writes and permissions, interrupted saves, concurrent requests, safe RPC responses and logging, the usage view, and settings recovery. They replace Electron's encryption with a test implementation.
 
-The [packaged runtime check](packaged-runtime-validation.md) runs a real package. When OS encryption is unavailable, it checks that saving is refused. When it is available, it checks real encryption, restart, replacement, and clearing. On macOS, `--keychain-only` repeats that lifecycle across four app instances in a temporary keychain inside a disposable home folder; your login keychain is never read or changed. All credentials and app data in these checks are synthetic. They do not cover keychain prompts for signed builds or Linux secret services.
+The [packaged runtime check](packaged-runtime-validation.md) runs a real package. When OS encryption is unavailable, it checks that saving is refused. When it is available, it checks real encryption, restart, replacement, and clearing. On macOS, `--keychain-only` repeats that lifecycle across four app instances in a temporary keychain inside a disposable home folder; your login keychain is never read or changed. On Linux it does the same with a disposable GNOME Keyring on a private session bus. All credentials and app data in these checks are synthetic. They do not cover keychain prompts for signed builds, KWallet, or a desktop's own keyring prompts.

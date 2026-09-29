@@ -22,7 +22,8 @@ export function applyWindowAppearance(win: BrowserWindow, appearance: WindowAppe
   if (process.platform === "darwin") win.setVibrancy(enabled ? "under-window" : null);
   if (process.platform === "win32" && supported) win.setBackgroundMaterial(enabled ? "acrylic" : "none");
   win.setBackgroundColor(enabled ? "#00000000" : appearance.background);
-  if (process.platform === "win32") {
+  // Windows and Linux draw their controls over the header, so their symbols follow its theme.
+  if (process.platform !== "darwin") {
     win.setTitleBarOverlay({ symbolColor: nativeTheme.shouldUseDarkColors ? "#e6e6e6" : "#282828" });
   }
   return { supported, enabled, reducedTransparency };

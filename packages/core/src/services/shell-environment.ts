@@ -74,7 +74,8 @@ export function parseShellProbe(stdout: string): ShellProbeResult | null {
 /**
  * The user's login shell as the account records it, so a `chsh` between two
  * Rescans is honoured. SHELL is only a fallback: it is inherited at launch and
- * never changes for the life of the process.
+ * never changes for the life of the process. Past both, macOS's default shell,
+ * or /bin/sh elsewhere, which an empty account shell means and every Linux has.
  */
 export function loginShell(env: NodeJS.ProcessEnv = process.env): string {
   let fromAccount: string | undefined;
@@ -83,7 +84,7 @@ export function loginShell(env: NodeJS.ProcessEnv = process.env): string {
   } catch {
     fromAccount = undefined;
   }
-  return fromAccount || env["SHELL"] || "/bin/zsh";
+  return fromAccount || env["SHELL"] || (process.platform === "darwin" ? "/bin/zsh" : "/bin/sh");
 }
 
 /**

@@ -8,7 +8,9 @@ allowBuilds:
   node-pty: true
   sqlite-vec: true
   electron-winstaller: false
-  onnxruntime-node: true
+  # Its install script only downloads ~350 MB of CUDA providers on Linux x64. Embeddings run on the CPU binaries the
+  # package already ships.
+  onnxruntime-node: false
   "@vgpu/adapter-node": false
   webgpu: false
 

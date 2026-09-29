@@ -33,7 +33,7 @@
 ## Releases and compliance
 
 - [Desktop releases and updates](desktop-updates.md)
-- [Packaged runtime checks](packaged-runtime-validation.md) (macOS and Windows)
+- [Packaged runtime checks](packaged-runtime-validation.md) (macOS, Windows and Linux)
 - [Dependency remediation](dependency-remediation.md)
 - [Third-party notices](../THIRD_PARTY_NOTICES.md)
 - [Distribution notice checks](distribution-notices.md)

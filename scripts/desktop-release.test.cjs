@@ -38,7 +38,7 @@ test("release configurations satisfy the installed electron-builder schema", asy
   const desktop = createRequire(path.resolve(__dirname, "../apps/desktop/package.json"));
   const builder = createRequire(desktop.resolve("electron-builder"));
   const { validateConfiguration } = builder("app-builder-lib/out/util/config/config");
-  for (const platform of ["darwin", "win32"]) await validateConfiguration(releaseConfig({ ...input, platform, arch: "x64" }), { isEnabled: false });
+  for (const platform of ["darwin", "win32", "linux"]) await validateConfiguration(releaseConfig({ ...input, platform, arch: "x64" }), { isEnabled: false });
   await validateConfiguration(
     releaseConfig({
       platform: "win32",
@@ -68,6 +68,14 @@ test("native release artifacts include update metadata, signatures, and separate
   assert.equal(win.win.signtoolOptions.publisherName, "Fixture");
   assert.ok(!JSON.stringify(mac).includes("key.p8"), "signing secrets must not become packaged configuration");
 });
+test("Linux x64 releases build unsigned AppImage, deb and rpm installers without signing credentials", () => {
+  const linux = releaseConfig({ version: "0.1.0", platform: "linux", arch: "x64", env: { RELEASE_TAG: env.RELEASE_TAG, OPENORC_RELEASE_REPOSITORY: env.OPENORC_RELEASE_REPOSITORY } });
+  assert.deepEqual(linux.linux.target, ["AppImage", "deb", "rpm"]);
+  assert.equal(linux.forceCodeSigning, false);
+  assert.equal(linux.publish[0].channel, "latest-x64");
+  assert.equal(linux.mac, undefined);
+  assert.equal(linux.win, undefined);
+});
 test("rejects missing credentials, placeholder versions, unsafe repositories and mismatched tags", () => {
   for (const key of ["RELEASE_TAG", "OPENORC_RELEASE_REPOSITORY", "CSC_LINK", "CSC_KEY_PASSWORD", "MAC_SIGNING_IDENTITY", "APPLE_API_KEY", "APPLE_API_KEY_ID", "APPLE_API_ISSUER"]) {
     assert.throws(() => releaseConfig({ ...input, env: { ...env, [key]: "" } }), new RegExp(key));
@@ -80,6 +88,7 @@ test("rejects missing credentials, placeholder versions, unsafe repositories and
   assert.throws(() => releaseConfig({ ...input, env: { ...env, OPENORC_RELEASE_REPOSITORY: "https://token@github.com/owner/repo" } }), /owner\/repository/);
   assert.throws(() => releaseConfig({ ...input, env: { ...env, MAC_SIGNING_IDENTITY: "-" } }), /Developer ID/);
   assert.throws(() => releaseConfig({ ...input, platform: "linux" }), /native macOS/);
+  assert.throws(() => releaseConfig({ ...input, platform: "freebsd", arch: "x64" }), /native macOS/);
 });
 
 test("unsigned Windows beta requires an exact-version opt-in and cannot weaken macOS or stable signing", () => {

@@ -126,9 +126,16 @@ describe("terminal shell", () => {
     expect(terminalShell({ SHELL: "/tmp/payload" }, () => "/bin/bash")).toBe("/bin/bash");
   });
 
-  it.skipIf(process.platform === "win32")("falls back to SHELL, then zsh, only when the account names no shell", () => {
-    expect(terminalShell({ SHELL: "/opt/homebrew/bin/fish" }, () => null)).toBe("/opt/homebrew/bin/fish");
-    expect(terminalShell({}, () => null)).toBe("/bin/zsh");
+  it("falls back to SHELL, then the platform's default shell, only when the account names no shell", () => {
+    const platform = vi.spyOn(process, "platform", "get").mockReturnValue("darwin");
+    try {
+      expect(terminalShell({ SHELL: "/opt/homebrew/bin/fish" }, () => null)).toBe("/opt/homebrew/bin/fish");
+      expect(terminalShell({}, () => null)).toBe("/bin/zsh");
+      platform.mockReturnValue("linux");
+      expect(terminalShell({}, () => null)).toBe("/bin/sh");
+    } finally {
+      platform.mockRestore();
+    }
   });
 });
 

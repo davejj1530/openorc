@@ -4,10 +4,9 @@ import { isAbsolute, join } from "node:path";
 import { protocol, app, BrowserWindow, dialog, ipcMain, MessageChannelMain, session, shell, utilityProcess, type UtilityProcess } from "electron";
 import { appOrigin, isExternalWebUrl, permitted } from "./app-origin";
 import electronUpdater from "electron-updater";
-import type { UpdateSettings } from "../shared/types";
 import { AppUpdates } from "./app-updates";
 import { configureReleaseFeed } from "./release-feed";
-import { UpdatePreferences } from "./update-preferences";
+import { installUpdateControls } from "./update-ipc";
 import { installUpdateMenu } from "./update-menu";
 import { closeCoreForUpdate } from "./update-handoff";
 import { McpAppSandbox } from "./mcp-app-sandbox";
@@ -217,21 +216,9 @@ app.whenReady().then(async () => {
     return blocked;
   });
   const removeUpdateMenuListener = installUpdateMenu(updates);
-  const updatePreferences = new UpdatePreferences(join(app.getPath("userData"), "updates.json"));
-  updates.setAutomaticChecks(updatePreferences.automaticChecks());
-  const updateSettings = (): UpdateSettings => ({ automaticChecks: updatePreferences.automaticChecks(), unavailable: disabledUpdates });
-  ipcMain.handle("updates:settings", (event) => {
-    if (event.senderFrame !== event.sender.mainFrame || !isAppOrigin(event.senderFrame.url)) throw new Error("Only the app window can read update settings.");
-    return updateSettings();
-  });
-  ipcMain.handle("updates:setAutomaticChecks", (event, on: unknown) => {
-    if (event.senderFrame !== event.sender.mainFrame || !isAppOrigin(event.senderFrame.url)) throw new Error("Only the app window can change update settings.");
-    if (typeof on !== "boolean") throw new Error("Automatic update checks are on or off.");
-    updatePreferences.setAutomaticChecks(on);
-    updates.setAutomaticChecks(on);
-    return updateSettings();
-  });
+  const removeUpdateControls = installUpdateControls(updates, join(app.getPath("userData"), "updates.json"), isAppOrigin, createWindow);
   app.once("will-quit", () => {
+    removeUpdateControls();
     removeUpdateMenuListener();
     updates.dispose();
   });

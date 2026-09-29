@@ -59,6 +59,15 @@ const api: OpenOrcApi = {
   },
   platform: process.platform,
   updates: {
+    getState: () => ipcRenderer.invoke("updates:getState"),
+    download: () => ipcRenderer.invoke("updates:download"),
+    install: () => ipcRenderer.invoke("updates:install"),
+    dismiss: (request) => ipcRenderer.invoke("updates:dismiss", request),
+    onState(callback) {
+      const listener = (_event: unknown, snapshot: import("../shared/app-updates").UpdateSnapshot) => callback(snapshot);
+      ipcRenderer.on("updates:state", listener);
+      return () => ipcRenderer.off("updates:state", listener);
+    },
     settings() {
       return ipcRenderer.invoke("updates:settings") as Promise<UpdateSettings>;
     },

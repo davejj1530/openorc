@@ -2,7 +2,15 @@
 
 ## Updating OpenOrc
 
-Installed macOS and Windows releases update from public GitHub Releases. On macOS, use **OpenOrc → Check for updates…**; on Windows, use **Help → Check for updates…**. OpenOrc also checks 30 seconds after it starts and every six hours. To stop the automatic checks, turn off **Check for updates automatically** in Settings → General → Updates. A background check only changes the menu item: downloading and restarting to install both need you to choose them. Development builds and local packages without an update feed never check.
+Installed macOS and Windows releases update from public GitHub Releases. On macOS, use **OpenOrc → Check for updates…**; on Windows, use **Help → Check for updates…**. OpenOrc also checks 30 seconds after it starts and every six hours. To stop the automatic checks, turn off **Check for updates automatically** in Settings → General → Updates. Development builds and local packages without an update feed never check.
+
+When a newer release is found, an in-app notice offers **Download update** or **Later**. Downloading shows progress, then **Restart to update**. Both downloading and restarting require your action. If OpenOrc is in the background, it also attempts one silent desktop notification per version; clicking it brings the app and update notice forward. Desktop delivery depends on operating-system notification permissions. The in-app notice works independently of those permissions.
+
+**Later** dismisses that version across windows and restarts, but the native update menu remains available. Starting a download from the menu brings progress back into view. Notification history and dismissal are saved independently of the automatic-check setting. A newer version can prompt again. Download failures offer a retry; a restart blocked by active work explains what needs to finish.
+
+**Hide** on a download notice hides its progress until the update is ready, without cancelling the download. A failed-install notice can also be hidden so you can finish your work before quitting and reopening the app.
+
+Checks continue after choosing **Later** for an undownloaded release, so a newer release can appear without restarting OpenOrc. If a later check fails, the previously found version remains available to download from the notice or the native menu.
 
 Published stable and beta releases are offered to everyone when their version is newer than the installed version. Drafts are not offered, and the updater never downgrades. Every release must use a higher version number.
 

@@ -192,27 +192,73 @@ describe("desktop update policy", () => {
       }),
     );
     const checking = updates.check();
+    // Also cover a confirmation before the queued check has changed the visible phase.
+    expect(updates.state.phase).toBe("available");
+    const downloadDuringCheck = updates.download();
     await Promise.resolve();
     expect(updates.state.phase).toBe("checking");
     const duplicate = updates.check();
-    const downloadDuringCheck = updates.download();
+    const duplicateDownload = updates.download();
     expect(updater.downloadUpdate).not.toHaveBeenCalled();
-    checked(available);
-    await Promise.all([checking, duplicate, downloadDuringCheck]);
-    expect(updater.checkForUpdates).toHaveBeenCalledTimes(2);
     let downloaded!: (files: string[]) => void;
     updater.downloadUpdate.mockReturnValueOnce(
       new Promise((resolve) => {
         downloaded = resolve;
       }),
     );
-    const downloading = updates.download();
-    await Promise.resolve();
+    checked(available);
+    await Promise.all([checking, duplicate]);
+    await vi.waitFor(() => expect(updates.state.phase).toBe("downloading"));
+    expect(updater.checkForUpdates).toHaveBeenCalledTimes(2);
     const checkDuringDownload = updates.check();
     downloaded(["app.zip"]);
-    await Promise.all([downloading, checkDuringDownload]);
+    await Promise.all([downloadDuringCheck, duplicateDownload, checkDuringDownload]);
     await updates.check();
     expect(updater.checkForUpdates).toHaveBeenCalledTimes(2);
+    expect(updater.downloadUpdate).toHaveBeenCalledOnce();
+    expect(updates.state.phase).toBe("ready");
+  });
+
+  it.each([true, false])("uses final availability after a queued download's recheck (available: %s)", async (isUpdateAvailable) => {
+    const { updater, updates } = fixture();
+    await updates.check();
+    let checked!: (result: UpdateCheckResult) => void;
+    updater.checkForUpdates.mockReturnValueOnce(
+      new Promise((resolve) => {
+        checked = resolve;
+      }),
+    );
+    const checking = updates.check();
+    const download = updates.download();
+    await Promise.resolve();
+    const latest = { ...info, version: "0.3.0" };
+    checked({ isUpdateAvailable, updateInfo: latest, versionInfo: latest });
+    await Promise.all([checking, download]);
+    expect(updater.downloadUpdate).toHaveBeenCalledTimes(isUpdateAvailable ? 1 : 0);
+    expect(updates.state).toEqual(isUpdateAvailable ? { phase: "ready", version: "0.3.0" } : { phase: "current" });
+    expect(updater.quitAndInstall).not.toHaveBeenCalled();
+  });
+
+  it("keeps a queued confirmation on check failure and does not retry a failed download for duplicate clicks", async () => {
+    const { updater, updates } = fixture();
+    await updates.check();
+    let failCheck!: (error: Error) => void;
+    updater.checkForUpdates.mockReturnValueOnce(
+      new Promise((_resolve, reject) => {
+        failCheck = reject;
+      }),
+    );
+    const checking = updates.check();
+    const first = updates.download();
+    const duplicate = updates.download();
+    updater.downloadUpdate.mockRejectedValueOnce(new Error("interrupted"));
+    await Promise.resolve();
+    failCheck(new Error("offline"));
+    await Promise.all([checking, first, duplicate]);
+    expect(updater.downloadUpdate).toHaveBeenCalledOnce();
+    expect(updates.state).toEqual({ phase: "available", version: "0.2.0", error: "interrupted" });
+    await updates.download();
+    expect(updater.downloadUpdate).toHaveBeenCalledTimes(2);
     expect(updates.state.phase).toBe("ready");
   });
 });

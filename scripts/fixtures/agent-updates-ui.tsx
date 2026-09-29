@@ -66,7 +66,9 @@ function Preview() {
           <h1 className="text-2xl font-semibold">What would you like to work on?</h1>
         </div>
       )}
-      <AgentUpdateNotice />
+      <div className="workspace-update-notices">
+        <AgentUpdateNotice />
+      </div>
     </div>
   );
 }

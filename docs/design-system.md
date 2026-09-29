@@ -26,6 +26,8 @@ Recurring actions in task lists, schedules, and team toolbars use neutral icon b
 
 Agent updates live in Settings → Connections: each agent shows its installed version and any available latest version, with explicit Update and Update all actions, a manual check, and an automatic-check toggle. Reuse shared buttons, badges, toggles, and Precision Outline icons; let agent rows and toolbars wrap at narrow widths. A dismissible notice in the upper-right workspace uses the same surface and text tokens, with Review updates leading to Connections so versions and update results stay together.
 
+OpenOrc release updates share that upper-right notice stack, above agent updates. Use the existing Download icon, neutral surface and text tokens, and explicit Download update, Later, and Restart to update text actions. Progress uses a labeled native progress element with a percentage; failures and restart refusals remain readable in the notice. Notices wrap within the window and scroll as a stack on short windows, without overlapping each other. Later is remembered per version across windows and restarts. The notice covers the native Preview while visible so its actions remain reachable; downloads and failed installs have a Hide action to restore Preview access. A hidden download notice returns when ready.
+
 Responsive behavior follows available column width. Allow properties and toolbars to wrap; secondary labels may yield while accessible names remain. Check narrow windows, split conversations, enlarged text, keyboard focus, and reduced motion.
 
 ## Icons and motion

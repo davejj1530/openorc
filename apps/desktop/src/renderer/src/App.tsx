@@ -24,6 +24,7 @@ import { PullRequestView } from "./views/PullRequestView";
 import { Scheduled } from "./views/Scheduled";
 import { Settings } from "./views/Settings";
 import { AgentUpdateNotice } from "./views/settings-agent-updates";
+import { AppUpdateNotice } from "./components/AppUpdateNotice";
 import { TaskListView } from "./views/TaskList";
 import { ThreadWorkspace } from "./components/ThreadWorkspace";
 
@@ -221,7 +222,10 @@ export function App() {
         <MainScreen route={route} currentProject={currentProject} />
       </div>
       <CommandPalette open={ui.palette} onOpenChange={ui.setPalette} />
-      <AgentUpdateNotice />
+      <div className="workspace-update-notices">
+        <AppUpdateNotice />
+        <AgentUpdateNotice />
+      </div>
       <ImportProjectDialog open={ui.importProject} onOpenChange={ui.setImportProject} />
       <ImportSessionsDialog open={ui.importSessions.open} projectId={ui.importSessions.projectId ?? currentProject} onOpenChange={(open) => ui.setImportSessions(open)} />
       <DeleteThreadDialog />

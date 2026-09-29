@@ -1,13 +1,7 @@
 import type { AppUpdater } from "electron-updater";
 import type { EventEmitter } from "node:events";
-
-export type UpdateState =
-  | { phase: "disabled"; reason: string }
-  | { phase: "idle" | "checking" | "current" }
-  | { phase: "available" | "downloading" | "ready"; version: string; percent?: number; error?: string }
-  | { phase: "installing"; version: string }
-  | { phase: "error"; message: string }
-  | { phase: "install-error"; message: string };
+import type { UpdateState } from "../shared/app-updates";
+export type { UpdateState } from "../shared/app-updates";
 
 type Updater = Pick<AppUpdater, "checkForUpdates" | "downloadUpdate" | "quitAndInstall" | "autoDownload" | "autoInstallOnAppQuit" | "allowPrerelease" | "allowDowngrade" | "requestHeaders"> &
   Pick<EventEmitter, "on" | "removeListener">;

@@ -290,6 +290,17 @@ function ThemeStep({ preview, onStorageError }: { preview: boolean; onStorageErr
   );
 }
 
+/** The draggable header, padded clear of native window controls at either end. */
+function OnboardingChrome({ children }: { children: ReactNode }) {
+  const trafficLights = useTrafficLights();
+  const windowsControls = useWindowsControls();
+  return (
+    <header className="onboarding-chrome" data-traffic-lights={trafficLights || undefined} data-window-controls={windowsControls || undefined}>
+      {children}
+    </header>
+  );
+}
+
 interface OnboardingProps {
   mode?: OnboardingMode;
   previewInitially?: boolean;
@@ -306,8 +317,6 @@ export function Onboarding(props: OnboardingProps) {
 }
 
 function OnboardingFlow({ mode = "first_run", initialStep, persisted, onPersist, onComplete, preview, onTogglePreview }: OnboardingProps & { preview: boolean; onTogglePreview: () => void }) {
-  const trafficLights = useTrafficLights();
-  const windowsControls = useWindowsControls();
   const flow = useOnboardingFlow({ mode, initialStep, persisted, onPersist, onComplete, preview });
   const { page, progress, agents, project, previewControls, storageError, setStorageError } = flow;
   const { step, setStep, advance, retreat, complete, completeRecovery, closeRecovery } = progress;
@@ -328,13 +337,13 @@ function OnboardingFlow({ mode = "first_run", initialStep, persisted, onPersist,
     const canReturn = rows.some((row) => row.state === "ready");
     return (
       <div className="onboarding-root">
-        <header className="onboarding-chrome" data-traffic-lights={trafficLights || undefined} data-window-controls={windowsControls || undefined}>
+        <OnboardingChrome>
           <span className="onboarding-brand">OpenOrc</span>
           <span className="onboarding-chrome-label" />
           <TextButton className="onboarding-preview-trigger" tone="muted" onClick={closeRecovery}>
             Close
           </TextButton>
-        </header>
+        </OnboardingChrome>
         <main className="onboarding-surface">
           <div className="onboarding-scroll">
             <div className="onboarding-page" ref={page}>
@@ -375,7 +384,7 @@ function OnboardingFlow({ mode = "first_run", initialStep, persisted, onPersist,
 
   return (
     <div className="onboarding-root">
-      <header className="onboarding-chrome" data-traffic-lights={trafficLights || undefined} data-window-controls={windowsControls || undefined}>
+      <OnboardingChrome>
         <span className="onboarding-brand">OpenOrc</span>
         <span className="onboarding-chrome-label">Set up your workspace</span>
         {import.meta.env.DEV ? (
@@ -385,7 +394,7 @@ function OnboardingFlow({ mode = "first_run", initialStep, persisted, onPersist,
         ) : (
           <span />
         )}
-      </header>
+      </OnboardingChrome>
       {preview ? <PreviewTools step={step} rows={rows} onStep={setStep} onState={previewControls.setRowState} onReplay={() => setStep("scan")} onReset={previewControls.reset} /> : null}
       <main className="onboarding-surface">
         <Progress step={step} />

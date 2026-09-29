@@ -1,17 +1,12 @@
 import type { AppUpdater } from "electron-updater";
 import type { EventEmitter } from "node:events";
-
-export type UpdateState =
-  | { phase: "disabled"; reason: string }
-  | { phase: "idle" | "checking" | "current" }
-  | { phase: "available" | "downloading" | "ready"; version: string; percent?: number; error?: string }
-  | { phase: "installing"; version: string }
-  | { phase: "error"; message: string }
-  | { phase: "install-error"; message: string };
+import type { UpdateState } from "../shared/app-updates";
+export type { UpdateState } from "../shared/app-updates";
 
 type Updater = Pick<AppUpdater, "checkForUpdates" | "downloadUpdate" | "quitAndInstall" | "autoDownload" | "autoInstallOnAppQuit" | "allowPrerelease" | "allowDowngrade" | "requestHeaders"> &
   Pick<EventEmitter, "on" | "removeListener">;
 const detail = (error: unknown) => (error instanceof Error ? error.message : String(error));
+type OperationKind = "check" | "download" | "install";
 
 /** Missing metadata and network failures must remain visible; only an empty release feed means no update. */
 function noPublishedRelease(error: unknown): boolean {
@@ -23,7 +18,7 @@ function noPublishedRelease(error: unknown): boolean {
 /** Owns update policy. Only an explicit install may drain the core and hand control to the installer. */
 export class AppUpdates {
   private current: UpdateState;
-  private operation: Promise<void> | null = null;
+  private operation: { kind: OperationKind; promise: Promise<void> } | null = null;
   private listeners = new Set<(state: UpdateState) => void>();
   private timers: ReturnType<typeof setTimeout>[] = [];
 
@@ -68,34 +63,41 @@ export class AppUpdates {
     if (this.current.phase === "downloading") this.set({ ...this.current, percent: Math.max(0, Math.min(100, progress.percent)) });
   };
 
-  private run(work: () => Promise<void>): Promise<void> {
-    if (this.operation) return this.operation;
+  private run(kind: OperationKind, work: () => Promise<void>): Promise<void> {
+    if (this.operation) return this.operation.promise;
     // Reserve the operation before invoking anything that can notify subscribers.
     const pending = Promise.resolve().then(work);
-    this.operation = pending.finally(() => {
+    const promise = pending.finally(() => {
       this.operation = null;
     });
-    return this.operation;
+    this.operation = { kind, promise };
+    return promise;
   }
 
   check(): Promise<void> {
-    if (!["idle", "current", "error", "checking"].includes(this.current.phase)) return this.operation ?? Promise.resolve();
-    return this.run(async () => {
+    if (!["idle", "current", "error", "checking", "available"].includes(this.current.phase)) return this.operation?.promise ?? Promise.resolve();
+    return this.run("check", async () => {
+      const previous = this.current;
       this.set({ phase: "checking" });
       try {
         const result = await this.updater.checkForUpdates();
         if (!result) throw new Error("Updates are unavailable in this build.");
         this.set(result.isUpdateAvailable ? { phase: "available", version: result.updateInfo.version } : { phase: "current" });
       } catch (error) {
-        this.set(noPublishedRelease(error) ? { phase: "current" } : { phase: "error", message: detail(error) });
+        if (noPublishedRelease(error)) this.set({ phase: "current" });
+        else if (previous.phase === "available") this.set({ ...previous, checkError: `Couldn’t check for a newer release: ${detail(error)}` });
+        else this.set({ phase: "error", message: detail(error) });
       }
     });
   }
 
   download(): Promise<void> {
+    // A confirmation can arrive while a scheduled check owns the operation, even before its phase is published.
+    // Preserve that explicit intent, then use the check's latest availability; duplicate downloads still coalesce.
+    if (this.operation?.kind === "check") return this.operation.promise.then(() => this.download());
     const state = this.current;
-    if (state.phase !== "available") return this.operation ?? Promise.resolve();
-    return this.run(async () => {
+    if (state.phase !== "available") return this.operation?.promise ?? Promise.resolve();
+    return this.run("download", async () => {
       this.set({ phase: "downloading", version: state.version, percent: 0 });
       try {
         await this.updater.downloadUpdate();
@@ -108,8 +110,8 @@ export class AppUpdates {
 
   install(): Promise<void> {
     const state = this.current;
-    if (state.phase !== "ready") return this.operation ?? Promise.resolve();
-    return this.run(async () => {
+    if (state.phase !== "ready") return this.operation?.promise ?? Promise.resolve();
+    return this.run("install", async () => {
       this.set({ phase: "installing", version: state.version });
       try {
         const blocked = await this.prepareInstall();

@@ -18,7 +18,7 @@ export function UpdateSettingsSection() {
       {settings.isError && <LoadError retry={() => void settings.refetch()} />}
       <Toggle
         label="Check for updates automatically"
-        hint={`Shortly after OpenOrc starts and every six hours, it asks GitHub whether a newer release exists. Nothing downloads or installs until you choose to. With this off, use Check for updates in ${menu}.`}
+        hint={`Shortly after OpenOrc starts and every six hours, it checks for a newer release and shows a notice when one is available. If OpenOrc is in the background, it also sends a desktop notification. Nothing downloads or installs until you choose to. With this off, use Check for updates in ${menu}.`}
         checked={(save.isPending ? save.variables : undefined) ?? settings.data?.automaticChecks ?? true}
         disabled={!settings.data || save.isPending}
         onChange={(on) => save.mutate(on)}

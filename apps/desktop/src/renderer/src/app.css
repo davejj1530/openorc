@@ -463,10 +463,11 @@
   --spacing-hero: 14vh;
   /* The gutter around the work plane. Deliberately NOT divided by --window-zoom: it is a
      design measure and scales with the UI. The two clearances below are native-chrome
-     measurements and must not scale. */
+     measurements and must not scale. Linux measures its own window controls instead, since
+     the desktop picks their end and size (lib/window.ts); these values stay macOS's and Windows'. */
   --spacing-well: 8px;
-  --spacing-traffic: calc(84px / var(--window-zoom, 1));
-  --spacing-controls: calc(140px / var(--window-zoom, 1));
+  --spacing-traffic: var(--window-controls-left, calc(84px / var(--window-zoom, 1)));
+  --spacing-controls: var(--window-controls-right, calc(140px / var(--window-zoom, 1)));
 }
 
 @layer base {

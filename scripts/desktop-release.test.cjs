@@ -2,7 +2,7 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const path = require("node:path");
 const { createRequire } = require("node:module");
-const { releaseConfig, validateReleaseSource } = require("./desktop-release.cjs");
+const { compareVersions, nextVersion, releaseChanges, releaseConfig, releaseNotes, validateReleaseSource, withVersion } = require("./desktop-release.cjs");
 const env = {
   RELEASE_TAG: "v0.1.0",
   OPENORC_RELEASE_REPOSITORY: "fixture/openorc",
@@ -110,4 +110,40 @@ test("unsigned Windows beta requires an exact-version opt-in and cannot weaken m
   const mac = releaseConfig({ ...beta, platform: "darwin", env: { ...env, ...betaEnv } });
   assert.equal(mac.forceCodeSigning, true);
   assert.equal(mac.mac.notarize, true);
+});
+test("releases count up from the newest release unless the desktop package names a newer line", () => {
+  const released = ["0.1.0-beta.10", "0.1.0-beta.8", "0.1.0-beta.9"];
+  assert.equal(nextVersion("0.1.0-beta.8", released), "0.1.0-beta.11", "betas count up past a stale package version");
+  assert.equal(nextVersion("0.2.0-beta.0", released), "0.2.0-beta.0", "a newer line ships as written");
+  assert.equal(nextVersion("0.1.0", released), "0.1.0", "a stable release follows its betas");
+  assert.equal(nextVersion("0.1.0", [...released, "0.1.0"]), "0.1.1", "patches follow a stable release");
+  assert.equal(nextVersion("0.1.0-beta.1", []), "0.1.0-beta.1", "the first release ships as written");
+  assert.deepEqual(["0.1.0", "0.1.0-beta.10", "0.1.1-beta.0", "0.1.0-beta.9"].toSorted(compareVersions), ["0.1.0-beta.9", "0.1.0-beta.10", "0.1.0", "0.1.1-beta.0"]);
+});
+
+test("release notes come from changes users get, without internal commits or duplicates", () => {
+  const changes = releaseChanges([
+    "feat: allow projects without git to be imported",
+    "fix(core): address review of projects without git",
+    "feat: allow projects without git to be imported (#3)",
+    "chore(release): bump version to 0.1.0-beta.8",
+    "docs: explain releases",
+    "refactor!: address findings",
+    "perf(transcript): faster long threads",
+    "Update the onboarding copy",
+  ]);
+  assert.deepEqual(changes, {
+    features: ["Allow projects without git to be imported", "Update the onboarding copy"],
+    fixes: ["Address review of projects without git", "Faster long threads"],
+  });
+  assert.deepEqual(releaseChanges(["chore: tidy", "test: cover it", "ci: cache"]), { features: [], fixes: [] });
+  const notes = releaseNotes({ ...changes, unsignedWindows: true });
+  assert.match(notes, /^## Highlights\n\n- Allow projects without git to be imported\n- Update the onboarding copy\n\n## Fixes\n\n- Address review/);
+  assert.match(notes, /Windows x64: unsigned beta/);
+  assert.match(releaseNotes({ features: [], fixes: ["Keep drafts"], unsignedWindows: false }), /^## Highlights\n\n- Keep drafts\n\n## Install notes[\s\S]*Windows x64: signed NSIS installer/);
+});
+
+test("a release build takes its version from the tag without reformatting the package", () => {
+  const packageJson = '{\n  "name": "@openorc/desktop",\n  "version": "0.1.0-beta.8",\n  "private": true\n}\n';
+  assert.equal(withVersion(packageJson, "0.1.0-beta.9"), packageJson.replace("0.1.0-beta.8", "0.1.0-beta.9"));
 });

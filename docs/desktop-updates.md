@@ -28,7 +28,7 @@ Updates keep the app ID (`app.openorc.desktop`), the OpenOrc name, and your data
 
 Releases are built and published from the public repository named by the `RELEASE_REPOSITORY` Actions variable (`owner/name`). The release workflow must run in that repository: it rejects a run from any other repository, and electron-builder embeds that repository in every installer as the update feed. Never ship a GitHub token in the app.
 
-Run `.github/workflows/release.yml` (**Desktop release**) from the Actions tab. It validates the tag and repository, builds and checks the installers, and can attach them to a draft release. It never publishes a release. The release environment needs:
+Releases run automatically (see [Automatic releases](#automatic-releases)). Both they and hand-run releases go through `.github/workflows/release.yml` (**Desktop release**), which validates the tag and repository, builds and checks the installers, and attaches them to a release. The release environment needs:
 
 | Kind     | Name                                                           | Value                                                                                           |
 | -------- | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
@@ -41,22 +41,36 @@ Run `.github/workflows/release.yml` (**Desktop release**) from the Actions tab. 
 
 Keep certificates and keys in CI secrets. The workflow writes the notarization key to the runner's temporary folder and removes it afterwards. The Windows configuration signs with a certificate file; organizations using hardware or cloud signing should replace that part before releasing. Signing and notarization follow [electron-builder v26's signing configuration](https://www.electron.build/v26/docs/features/code-signing/).
 
-### Build and publish
+### Automatic releases
 
-1. Set `apps/desktop/package.json` to a non-zero version, such as `0.1.0` or `0.1.0-beta.1`. Once CI passes, commit the change and push its matching tag, such as `v0.1.0-beta.1`. Never move an existing release tag.
+Every push to `main` that passes CI and changes something for users is released automatically. `feat`, `fix`, `perf` and `revert` commits count, as does any commit without a conventional type. Pushes with only `build`, `chore`, `ci`, `docs`, `refactor`, `style` or `test` commits are not released.
+
+**Automatic release** (`.github/workflows/auto-release.yml`) runs after CI succeeds. It releases only the newest commit on `main`: if `main` has moved on, the newer commit is released once its own CI passes, and a burst of pushes ships together. It picks the version, tags the tested commit, and calls **Desktop release** to build, check, and publish, then rebuilds the website changelog. A failed or cancelled release removes its tag and draft, so the next push uses the same version.
+
+Publishing is immediate, and installed apps offer a release as soon as it is public, so keep `main` releasable.
+
+**Versions** come from tags, and version bumps are never committed. `apps/desktop/package.json` names the release line. A version there that is newer than every release ships as written the next time something is released: use it to start `0.2.0-beta.0` or to ship `0.1.0` as stable. After that, betas count up from the newest release (`0.1.0-beta.9`, then `0.1.0-beta.10`), and patches follow a stable release (`0.1.1`). The release build writes the tag's version into the package it builds. Never move an existing release tag.
+
+**Release notes** are written from the commit subjects since the previous release, so write subjects as short, user-facing sentences. `feat` subjects become the **Highlights**; the website changelog shows the first five. Fixes follow under **Fixes**, and a release with only fixes lists them as its highlights. Pull request numbers and conventional prefixes are removed. To improve the wording, edit the published release on GitHub; the website rebuilds when a release is edited.
+
+### Build a release by hand
+
+Run **Desktop release** from the Actions tab to retry a failed release or to review one before it goes out.
+
+1. Push a tag for the commit, such as `v0.1.0-beta.12`. It must be newer than every existing release, and it sets the version.
 2. Run **Desktop release** for that tag. The workflow pins its commit and builds on native macOS arm64, macOS x64, Windows x64, and Linux x64 runners. It requires macOS signing and notarization, and normally requires Windows signing; Linux packages are not code-signed. It builds macOS DMG and ZIP files, Windows NSIS installers, and a Linux AppImage, deb and rpm, checks packaged startup and update behavior, and installs the Windows candidate and the Linux deb on their disposable runners before uploading artifacts.
-3. Enable **create_draft** to attach successful builds, update metadata, and `SHA256SUMS.txt` to a new draft release. Existing releases are not overwritten. Download the assets and complete the checks under [Before publishing](#before-publishing). Review the tag and update destination. In the draft's notes, replace the comment under **Highlights** with 2 to 5 user-facing bullets and check the **Install notes**, then publish on GitHub. The website changelog shows those highlights once the release is public.
+3. Enable **create_draft** to attach successful builds, update metadata, and `SHA256SUMS.txt` to a new draft release with generated notes. Existing releases are not overwritten. Complete the checks under [Before publishing](#before-publishing), review the tag, update destination and notes, then publish on GitHub. Enable **publish** instead to publish as soon as the builds are attached, as automatic releases do.
 4. Keep all installer, ZIP, blockmap, and update YAML assets. The channels are `latest-arm64` and `latest-x64`, so each macOS architecture has its own metadata file (`latest-arm64-mac.yml`, `latest-x64-mac.yml`); Windows uses `latest-x64.yml` and Linux `latest-x64-linux.yml`, which installed Linux builds do not read yet. This keeps parallel builds from overwriting each other's update feed. electron-builder embeds the channel and release repository in `app-update.yml`. The updater preserves this architecture-specific channel when discovering both stable and beta releases. Do not change it or the repository after shipping without a migration plan.
 
 The [electron-builder update guide](https://www.electron.build/v26/docs/features/auto-update/) explains the metadata and why macOS needs the ZIP.
 
-For packaging problems, **windows_only** runs just the Windows job. It cannot create a draft: a draft needs successful builds and checks for all four platform and architecture combinations.
+For packaging problems, **windows_only** runs just the Windows job. It cannot create a release: a release needs successful builds and checks for all four platform and architecture combinations.
 
 ### Unsigned Windows beta
 
-A beta tag such as `v0.1.0-beta.1` can opt into **unsigned_windows_beta**. The workflow sets `OPENORC_UNSIGNED_WINDOWS_BETA` to that exact package version. Stable versions and mismatched exceptions are rejected. Without this option, Windows signing credentials are required. macOS always requires signing and notarization.
+A beta tag such as `v0.1.0-beta.1` can opt into **unsigned_windows_beta**, and automatic beta releases always do. It applies only while the release environment has no `WIN_CSC_LINK` secret: once a Windows certificate is configured, betas are signed. The workflow sets `OPENORC_UNSIGNED_WINDOWS_BETA` to that exact package version. Stable versions and mismatched exceptions are rejected, so a stable release fails until Windows signing is configured. macOS always requires signing and notarization.
 
-The Windows installer filename includes `-unsigned`, and the draft release notes say so. It has no verified Windows publisher. Windows may warn about an unrecognized app or block it under stricter policies. Keep that notice beside the website's Windows beta download. Do not describe checksums or build attestations as Windows signing.
+The Windows installer filename includes `-unsigned`, and the release notes say so. It has no verified Windows publisher. Windows may warn about an unrecognized app or block it under stricter policies. Keep that notice beside the website's Windows beta download. Do not describe checksums or build attestations as Windows signing.
 
 Beta tags create prereleases, which updated installations offer alongside stable releases. Draft assets are visible only to people with write access to the repository, and installed apps see a release only after it is published. No access token is embedded in the application.
 
@@ -66,7 +80,9 @@ For local unsigned packages, use `pnpm --filter @openorc/desktop package`. On Li
 
 ### Before publishing
 
-Automated tests cover the update policy, concurrent actions, retryable network errors, progress, refusing to install while work is running, holding new turns and terminals, and requiring a clean exit of the core process. Release configuration tests reject missing signing inputs, malformed repositories, placeholder versions, and mismatched tags. Run them with `node --test scripts/desktop-release.test.cjs`.
+Automatic releases publish once the workflow's own checks pass. These steps are for a release you review by hand.
+
+Automated tests cover the update policy, concurrent actions, retryable network errors, progress, refusing to install while work is running, holding new turns and terminals, and requiring a clean exit of the core process. Release configuration tests reject missing signing inputs, malformed repositories, placeholder versions, and mismatched tags, and release planning tests cover versions and generated notes. Run them with `node --test scripts/desktop-release.test.cjs`.
 
 On macOS or Windows, the smoke package can also run the real updater against a disposable local feed. The smoke reads the app through Node's inspector, which only the smoke package allows, so it does not work on a release or ordinary local package:
 

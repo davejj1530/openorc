@@ -1,0 +1,86 @@
+name: Automatic release
+
+# When CI passes on a push to main with changes for users, that commit ships as the next release.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+# One release at a time; a burst of pushes waits and ships together.
+concurrency:
+  group: automatic-release
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: Choose the version
+    # Pushes to this repository only: a pull request from a fork can use a branch named main.
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.plan.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          # Release tags and every commit since the last one.
+          fetch-depth: 0
+      - name: Plan the release
+        id: plan
+        env:
+          TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          # Only main's newest commit ships; a newer push is released once its own CI passes.
+          if [[ "$(git ls-remote origin refs/heads/main | cut -f1)" != "$TESTED_SHA" ]]; then
+            echo "::notice::main has moved past $TESTED_SHA; the newer commit is released after its CI passes."
+            exit 0
+          fi
+          node scripts/desktop-release.cjs next >> "$GITHUB_OUTPUT"
+      - name: Tag the tested commit
+        if: steps.plan.outputs.tag
+        env:
+          TAG: ${{ steps.plan.outputs.tag }}
+          TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          git tag "$TAG" "$TESTED_SHA"
+          git push origin "refs/tags/$TAG"
+
+  release:
+    name: Release
+    needs: plan
+    if: needs.plan.outputs.tag
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.plan.outputs.tag }}
+      publish: true
+      # Betas ship an unsigned Windows installer until a Windows certificate is configured; stable releases never do.
+      unsigned_windows_beta: ${{ contains(needs.plan.outputs.tag, '-beta.') }}
+    secrets: inherit
+    permissions:
+      contents: write
+      actions: write
+
+  cleanup:
+    name: Remove the unfinished release
+    needs: [plan, release]
+    # A failed or cancelled release leaves no tag or draft behind, so the next push can take the same version.
+    if: (failure() || cancelled()) && needs.plan.outputs.tag
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.plan.outputs.tag }}
+        run: |
+          # A published release stays: installed apps may already offer it.
+          if [[ "$(gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null)" == "false" ]]; then exit 0; fi
+          gh release delete "$TAG" --yes 2>/dev/null || true
+          if gh api "repos/$GH_REPO/git/ref/tags/$TAG" > /dev/null 2>&1; then gh api --method DELETE "repos/$GH_REPO/git/refs/tags/$TAG"; fi

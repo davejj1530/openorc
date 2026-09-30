@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { PanelTab } from "./layout";
 import { closedTools, visibleTabs } from "./panel-tabs";
 
-const thread: PanelTab[] = ["changes", "plan", "terminal", "browser", "tasks", "checkpoints", "commits", "memory"];
+const thread: PanelTab[] = ["changes", "plan", "terminal", "browser", "tasks", "checkpoints", "commits", "memory", "instructions"];
 
 describe("visibleTabs", () => {
   it("shows only content tabs whose signal is true", () => {
@@ -21,7 +21,7 @@ describe("visibleTabs", () => {
 
 describe("closedTools", () => {
   it("offers the context's tools that are not showing", () => {
-    expect(closedTools(thread, ["changes", "terminal"])).toEqual(["browser"]);
+    expect(closedTools(thread, ["changes", "terminal"])).toEqual(["browser", "instructions"]);
     expect(closedTools(["changes"], [])).toEqual([]);
   });
 });

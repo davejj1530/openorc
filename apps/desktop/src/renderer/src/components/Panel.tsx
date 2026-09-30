@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Menu } from "@base-ui/react/menu";
-import { PanelRight, PanelRightClose, FileText, FileDiff, ListTodo, SlidersHorizontal, GitCommitHorizontal, Globe, History, Brain, Maximize2, Minimize2, Plus, Terminal } from "./icons";
+import { PanelRight, PanelRightClose, BookText, FileText, FileDiff, ListTodo, SlidersHorizontal, GitCommitHorizontal, Globe, History, Brain, Maximize2, Minimize2, Plus, Terminal } from "./icons";
 import { WORKSPACE_ID, isDetachedCopy } from "@openorc/protocol";
 import type { Project, PushState, Task, ThreadSummary } from "@openorc/protocol";
 import { ResizeHandle } from "./ResizeHandle";
@@ -28,6 +28,7 @@ const FilePanel = lazy(() => import("../panels/FilePanel").then((m) => ({ defaul
 // xterm and its stylesheet are a chunk only a reader who opens a terminal pays for.
 const TerminalPanel = lazy(() => import("../panels/TerminalPanel").then((m) => ({ default: m.TerminalPanel })));
 const BrowserPanel = lazy(() => import("../panels/BrowserPanel").then((m) => ({ default: m.BrowserPanel })));
+const InstructionsPanel = lazy(() => import("../panels/InstructionsPanel").then((m) => ({ default: m.InstructionsPanel })));
 
 /** What the third column can show for the thing selected in the main column. */
 export type PanelContext =
@@ -60,6 +61,7 @@ const icons = {
   commits: GitCommitHorizontal,
   checkpoints: History,
   memory: Brain,
+  instructions: BookText,
 };
 const labels: Record<PanelTab, string> = {
   plan: "Plan",
@@ -72,26 +74,40 @@ const labels: Record<PanelTab, string> = {
   commits: "Commits",
   checkpoints: "Checkpoints",
   memory: "Memory",
+  instructions: "Instructions",
 };
 
 /**
  * Every tab a context can offer, in strip order. Which of them show is decided by
  * visibleTabs: Terminal and Preview sit next to Changes because all three answer
  * "what is happening in this workspace", and both need the same cwd the diff is
- * read from.
+ * read from. Instructions follows Memory, since both are what the agent knows.
  */
 export function tabsFor(context: PanelContext): PanelTab[] {
   if (context.kind === "project") return ["changes"];
   if (context.kind === "newthread") return [...(context.changes ? (["changes", "commits"] as const) : []), "terminal", "browser", "memory"];
   const plan: PanelTab[] = context.kind === "thread" ? ["plan"] : [];
-  if (context.project.id === WORKSPACE_ID) return context.kind === "thread" ? ["tasks", ...plan, "terminal", "browser", "memory"] : ["task", "terminal", "browser", "memory"];
-  return context.kind === "thread" ? ["changes", ...plan, "terminal", "browser", "tasks", "checkpoints", "commits", "memory"] : ["changes", "terminal", "browser", "task", "commits", "memory"];
+  if (context.project.id === WORKSPACE_ID) return context.kind === "thread" ? ["tasks", ...plan, "terminal", "browser", "memory", "instructions"] : ["task", "terminal", "browser", "memory"];
+  return context.kind === "thread"
+    ? ["changes", ...plan, "terminal", "browser", "tasks", "checkpoints", "commits", "memory", "instructions"]
+    : ["changes", "terminal", "browser", "task", "commits", "memory"];
 }
 
 function useSelectedFile(context: PanelContext) {
   const file = useLayout((s) => s.selectedFile);
   const id = panelEntityId(context);
   return file && file.scope.kind === context.kind && file.scope.id === id ? file : null;
+}
+
+/** A saved diff shows only beside the conversation it came from. */
+function useSelectedChanges(context: PanelContext) {
+  const changes = useLayout((s) => s.selectedChanges);
+  if (!changes) return null;
+  const here =
+    changes.kind === "thread"
+      ? context.kind === "thread" && changes.id === context.thread.id
+      : (!changes.taskId && context.kind === "thread" && changes.threadId === context.thread.id) || (context.kind === "task" && changes.taskId === context.task.id);
+  return here ? changes : null;
 }
 
 /** The key a panel's opened tools are remembered under, matching the keys its panes use. */
@@ -250,15 +266,7 @@ export function Panel({ context }: { context: PanelContext }) {
   const windowsControls = useWindowsControls();
   const file = useSelectedFile(context);
   const mounted = useMountedThroughClose(open);
-  const selectedChanges = useLayout((state) => state.selectedChanges);
-  // A selection shows only beside the conversation it came from.
-  const scopedChanges =
-    selectedChanges &&
-    (selectedChanges.kind === "thread"
-      ? context.kind === "thread" && selectedChanges.id === context.thread.id
-      : (!selectedChanges.taskId && context.kind === "thread" && selectedChanges.threadId === context.thread.id) || (context.kind === "task" && selectedChanges.taskId === context.task.id))
-      ? selectedChanges
-      : null;
+  const scopedChanges = useSelectedChanges(context);
   const previewUrls = useLayout((s) => s.previewUrls);
   const rememberPreviewUrl = useLayout((s) => s.rememberPreviewUrl);
   const browserSurface = context.kind === "thread" || context.kind === "task" ? panelScope(context) : null;
@@ -345,6 +353,7 @@ export function Panel({ context }: { context: PanelContext }) {
   else if (current === "checkpoints" && context.kind === "thread") body = <CheckpointsPanel key={context.thread.id} thread={context.thread} />;
   else if (current === "commits" && source) body = <CommitsPanel source={source} />;
   else if (current === "memory" && context.kind !== "project") body = <MemoryPanel context={context} />;
+  else if (current === "instructions" && context.kind === "thread") body = <InstructionsPanel key={context.thread.id} threadId={context.thread.id} />;
 
   return (
     <>

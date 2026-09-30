@@ -169,6 +169,7 @@ Slack image attachments (associate each file ID with its message above): <JSON>`
       </table>
     </div>
     <p>The instructions are built when the process starts and stay the same until it closes. The CLIs add their own system prompts, tools, and project files such as <code>CLAUDE.md</code> or <code>AGENTS.md</code>; those are not listed here.</p>
+    <p>A conversation's Instructions tab, in the side panel, shows and edits the files its agent reads: <code>AGENTS.md</code> in the conversation's folder first, that folder's <code>CLAUDE.md</code> for Claude Code, and the agent's personal file. That is <code>CLAUDE.md</code> in <code>~/.claude</code> or <code>CLAUDE_CONFIG_DIR</code>, <code>AGENTS.md</code> in <code>~/.codex</code> or <code>CODEX_HOME</code>, or OpenCode's <code>~/.config/opencode/AGENTS.md</code>. Saving creates a missing file and refuses one that changed after you started editing it, for example because the agent edited it. An agent picks up a saved change when its process next starts.</p>
     <p class="docs-source">Source: <code>packages/core/src/services/run-launch.ts</code> (<code>systemPrompt</code>), <code>run-briefs.ts</code> (<code>threadBrief</code>, <code>taskBrief</code>)</p>
   </section>
 

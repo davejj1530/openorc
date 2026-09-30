@@ -30,6 +30,7 @@ import { createBenchHandlers } from "./handlers/bench.js";
 import { createCatalogHandlers } from "./handlers/catalog.js";
 import { createEventsHandlers } from "./handlers/events.js";
 import { createFilesHandlers } from "./handlers/files.js";
+import { createInstructionsHandlers } from "./handlers/instructions.js";
 import { createInboxHandlers } from "./handlers/inbox.js";
 import { createMcpAppsHandlers } from "./handlers/mcp-apps.js";
 import { createMemoryHandlers } from "./handlers/memory.js";
@@ -741,6 +742,7 @@ export class OpenOrc {
       createReviewCommentsHandlers({ review: this.review, invalidate }),
       createReviewWorkspaceHandlers({ review: this.review, db: this.db, taskCheckout: this.taskCheckout, invalidate }),
       createFilesHandlers({ db: this.db, files: this.files }),
+      createInstructionsHandlers({ db: this.db }),
       createSettingsHandlers({ settings: this.settings, textGeneration: this.textGeneration, invalidate }),
       createSchedulesHandlers({ schedules: this.schedules }),
       createCatalogHandlers({ runService: this.runs, invalidate }),

@@ -126,6 +126,9 @@ export function tagsFor(method: RpcMethod, params: unknown): string[] {
       return ["memory", `memory:${String(p["projectId"])}`];
     case "memory.forTask":
       return ["memory", `memory:task:${String(p["taskId"])}`];
+    // Agents edit these files in turns, which settle as workspace-diff; changing the thread's agent changes which files they are.
+    case "instructions.list":
+      return ["instructions", "workspace-diff", `thread:${String(p["threadId"])}`];
     default:
       return [];
   }
@@ -155,6 +158,8 @@ const fixedInvalidations: Partial<Record<RpcMethod, readonly string[]>> = {
   "memory.feedback": ["memory"],
   "memory.remove": ["memory"],
   "memory.promote": ["memory"],
+  // A project's file shows in its conversation's changes too.
+  "instructions.save": ["instructions", "workspace-diff"],
   "pulls.review.comment": ["pull-reviews"],
   "pulls.review.editComment": ["pull-reviews"],
   "pulls.review.removeComment": ["pull-reviews"],

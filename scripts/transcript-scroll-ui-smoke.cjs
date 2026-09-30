@@ -58,7 +58,10 @@ async function checkUI() {
     await read("scrollSmoke.update()");
     await pause(100);
     assert.ok(await read(`el.scrollTop <= ${dragTop} + 1`), "Upward scrolling without a wheel must release following");
-    console.log("PASS: upward scroll, input/render race, child resize, resume at bottom, new run, thread switch and scrollbar scrolling.");
+    await read("scrollSmoke.send(); scrollSmoke.update()");
+    await pause(100);
+    assert.ok(await read("el.scrollHeight - el.scrollTop - el.clientHeight <= 1"), "Sending a message must return to the newest turn and follow it");
+    console.log("PASS: upward scroll, input/render race, child resize, resume at bottom, new run, thread switch, scrollbar scrolling and sending.");
   } finally {
     win.destroy();
     app.quit();

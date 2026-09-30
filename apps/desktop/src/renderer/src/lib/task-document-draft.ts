@@ -2,9 +2,18 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { Task } from "@openorc/protocol";
 import type { DocumentEditorHandle } from "../components/DocumentEditor";
 import { writeDraft } from "./drafts";
-import { acknowledgeTaskDraft, readTaskDraft, sameTaskDraft, taskDraftPatch, type TaskDocumentDraft } from "./task-draft";
+import { acknowledgeTaskDraft, readTaskDraft, sameSavedTaskDraft, sameTaskDraft, taskDraftPatch, type TaskDocumentDraft } from "./task-draft";
 import { useTaskDraftActions } from "./task-draft-context";
 import { useRpcMutation } from "./query";
+
+/** The locally kept draft when there is one. An unreadable draft is reported, never replaced. */
+function initialDraft(taskId: string, incoming: TaskDocumentDraft): { draft: TaskDocumentDraft; error: string | null } {
+  try {
+    return { draft: readTaskDraft(taskId) ?? incoming, error: null };
+  } catch (error) {
+    return { draft: incoming, error: error instanceof Error ? error.message : String(error) };
+  }
+}
 
 /** One mounted Overview owns its editor; the task barrier retains its draft after navigation. */
 export function useTaskDocumentDraft(task: Pick<Task, "id" | "title" | "spec" | "labels">) {
@@ -19,13 +28,7 @@ export function useTaskDocumentDraft(task: Pick<Task, "id" | "title" | "spec" | 
   const previousIncoming = useRef(incoming);
   const latestIncoming = useRef(incoming);
   latestIncoming.current = incoming;
-  const [initial] = useState(() => {
-    try {
-      return { draft: readTaskDraft(task.id) ?? incoming, error: null };
-    } catch (error) {
-      return { draft: incoming, error: error instanceof Error ? error.message : String(error) };
-    }
-  });
+  const [initial] = useState(() => initialDraft(task.id, incoming));
   const [draft, setDraft] = useState(initial.draft);
   const [error, reportError] = useState<string | null>(initial.error);
   const unreadableDraft = useRef(initial.error);
@@ -100,6 +103,8 @@ export function useTaskDocumentDraft(task: Pick<Task, "id" | "title" | "spec" | 
     if (previousIncoming.current === incoming) return;
     if (dirty || save.isPending) return;
     previousIncoming.current = incoming;
+    // Replacing the draft with the server's copy of it would move the caret mid-sentence.
+    if (sameSavedTaskDraft(incoming, current.current)) return;
     acknowledgeTaskDraft(task.id, current.current);
     current.current = incoming;
     savedRef.current = incoming;

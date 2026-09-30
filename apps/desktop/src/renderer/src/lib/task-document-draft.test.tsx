@@ -133,3 +133,15 @@ it("cancels autosave on navigation but keeps an in-memory draft when local stora
   await actions.flushTaskDraft(task.id);
   expect(mutation.mutateAsync).toHaveBeenCalledWith({ id: task.id, patch: { title: "Task", spec: "only in memory", labels: [] } });
 });
+
+it("keeps the draft being typed when the server returns its own save trimmed", async () => {
+  const { result, rerender } = renderHook((input) => useTaskDocumentDraft(input), { initialProps: { ...task, labels: [] as string[] } });
+  act(() => result.current.patch({ spec: "Keep typing ", labels: "bug,review" }));
+  await act(async () => {
+    expect(await result.current.flush()).toBe(true);
+  });
+  expect(mutation.mutateAsync).toHaveBeenCalledWith({ id: task.id, patch: { title: "Task", spec: "Keep typing", labels: ["bug", "review"] } });
+  rerender({ ...task, spec: "Keep typing", labels: ["bug", "review"] });
+  expect(result.current.draft).toEqual({ title: "Task", spec: "Keep typing ", labels: "bug,review" });
+  expect(result.current.dirty).toBe(false);
+});

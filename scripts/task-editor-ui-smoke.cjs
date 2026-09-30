@@ -118,7 +118,7 @@ async function run() {
     await win.reload();
     await until(`document.querySelector('[data-image-state="saved"] img')?.naturalWidth === 640`, "restart restores image");
     assert.equal(await read("editorSmoke.value()"), withImage);
-    await click('[aria-label="View image: image.png"]');
+    await click('[aria-label="View image"]');
     await until(`Boolean(document.querySelector('[role=dialog]'))`, "image viewer");
     await key("Escape");
 
@@ -149,7 +149,7 @@ async function run() {
     delay = 900;
     await pasteImage();
     await until(`Boolean(document.querySelector('[data-image-state="saving"]'))`, "saving image");
-    await read(`[...document.querySelectorAll('.task-image-tools button')].find(el=>el.textContent.includes('Remove')).click()`);
+    await click('[aria-label="Remove image"]');
     await pause(1100);
     assert.equal(await read(`document.querySelectorAll('.task-image').length`), 0, "late save does not resurrect deleted image");
     delay = 0;
@@ -201,8 +201,10 @@ async function run() {
 
     const legacy = "<details><summary>Keep me</summary>Hidden content</details>\n\n$$x^2$$";
     await load(legacy);
-    assert.equal(await read(`document.querySelector('[aria-label="Task description Markdown"]').value`), legacy);
-    assert.equal(await read("editorSmoke.value()"), legacy);
+    await until(`document.querySelector('.task-rich-editor')?.textContent.includes('<details>')`, "raw HTML opens in rich text");
+    assert.equal(await read(`Boolean(document.querySelector('[aria-label="Task description Markdown"]'))`), false);
+    await pause(200);
+    assert.equal(await read("editorSmoke.value()"), legacy, "mount keeps Markdown it has no rich form for as written");
     await load(withImage + "\n\n- [ ] Match the reference\n- [x] Keep the draft safe");
     for (const theme of ["light", "dark"]) {
       await read(`editorSmoke.theme('${theme}')`);

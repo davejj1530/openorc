@@ -4,7 +4,7 @@ New tasks and a task's Overview use a rich document editor. It supports headings
 
 ## Images
 
-Paste images from the clipboard, drop image files where you want them, or use `/image`. PNG, JPEG, GIF, and WebP images are accepted up to 20 MB, 40 megapixels, and 16,384 pixels per side. Images offer a large preview, alternative text, replacement, and removal.
+Paste images from the clipboard, drop image files where you want them, or use `/image`. PNG, JPEG, GIF, and WebP images are accepted up to 20 MB, 40 megapixels, and 16,384 pixels per side. An added image gets a line of its own, and writing continues below it. Select an image to view it large, describe it, replace it, or remove it. Images referenced by a path on this computer, absolute or relative to the project, show as well.
 
 Images are saved in the background. Creating a task, saving, or leaving the page waits for them to finish, and autosave pauses while any are pending. A failed image stays in the document with **Retry** and **Remove**. A text draft that fails to save is shown as unsaved rather than reported as saved. Retrying, navigating, reloading, and undo or redo can recover an image that was still saving.
 
@@ -12,7 +12,7 @@ Removing an image from a document does not delete its file, because another draf
 
 ## Markdown
 
-Task descriptions are stored as Markdown, and opening a document never rewrites it. The rich editor opens a document only when it can show it without changing its content. Anything it cannot represent, including raw HTML and math, stays in source mode with a read-only preview. You can also switch to Markdown yourself. Block dragging, image resizing and captions, advanced table editing, and shared editing are not supported.
+Task descriptions are stored as Markdown. Every description opens in rich text, and opening one never rewrites it: only edits are saved. Markdown with no rich form, such as raw HTML, `$$` math, footnotes, and images inside links, is kept exactly as written and shows as plain source you can edit in place. **Markdown** shows the whole source, and **Rich text** returns. Block dragging, image resizing and captions, advanced table editing, and shared editing are not supported.
 
 ## Images when a task runs
 
@@ -21,7 +21,7 @@ Before a task run starts, OpenOrc checks every image in its description, includi
 - **Ordinary task runs:** the task's images are listed as file paths, in document order, in the prompt. This works the same way for every provider. Images you attach in the composer are sent separately as attachments.
 - **Team runs:** the task's images are attached to the member's turn.
 
-Linked images on the web stay links with an **Open linked image** action. They are not downloaded or sent to the agent.
+Images on the web are not loaded, so opening a description never contacts their server. They show where they point, with an action to open them in the browser. They are not downloaded or sent to the agent.
 
 ## For contributors
 

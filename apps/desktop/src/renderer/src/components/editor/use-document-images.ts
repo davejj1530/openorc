@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { Editor } from "@tiptap/react";
+import type { Editor, JSONContent } from "@tiptap/react";
 import type { Transaction } from "@tiptap/pm/state";
 import { finishImageImport, stageImage } from "../../lib/image-imports";
 import { hasPendingImages } from "./document-schema";
@@ -16,6 +16,26 @@ function pendingImages(editor: Editor): string[] {
     if (node.type.name === "image" && String(node.attrs.src).startsWith("openorc-pending://")) pending.push(String(node.attrs.src));
   });
   return [...new Set(pending)];
+}
+
+/**
+ * Each image gets a paragraph of its own. Text around the caret splits, and the
+ * caret stays at the start of what follows, so writing continues below.
+ */
+function insertImages(editor: Editor, range: { from: number; to: number }, images: JSONContent[]): void {
+  const paragraphs = images.map((image) => editor.schema.nodeFromJSON({ type: "paragraph", content: [image] }));
+  editor
+    .chain()
+    .focus()
+    .setTextSelection({ from: range.from, to: range.to })
+    .deleteSelection()
+    .command(({ tr, commands }) => (tr.selection.$from.parent.isTextblock && tr.selection.$from.parentOffset > 0 ? commands.splitBlock() : true))
+    .command(({ tr }) => {
+      const { $from } = tr.selection;
+      tr.insert($from.parent.isTextblock ? $from.before() : $from.pos, paragraphs);
+      return true;
+    })
+    .run();
 }
 
 /** Owns staged bytes, selection tracking, readiness, and cleanup for one editor mount. */
@@ -63,7 +83,7 @@ export function useDocumentImages(onReadyChange: ((ready: boolean) => void) | un
     listeners.current.add(detach);
 
     const work = (async () => {
-      const images = [];
+      const images: JSONContent[] = [];
       for (const file of files) {
         try {
           images.push({ type: "image", attrs: { src: `openorc-pending://${await stageImage(file)}`, alt: file.name || "Pasted image" } });
@@ -72,12 +92,7 @@ export function useDocumentImages(onReadyChange: ((ready: boolean) => void) | un
         }
       }
       if (!mounted.current || editor.isDestroyed || !images.length) return;
-      const selection = bookmark.resolve(editor.state.doc);
-      editor
-        .chain()
-        .insertContentAt({ from: selection.from, to: selection.to }, [...images, { type: "paragraph" }], { updateSelection: true })
-        .focus()
-        .run();
+      insertImages(editor, bookmark.resolve(editor.state.doc), images);
     })().finally(() => {
       detach();
       staging.current.delete(work);

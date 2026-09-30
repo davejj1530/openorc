@@ -6,11 +6,6 @@
   margin-bottom: 12px;
   color: var(--ink-3);
 }
-.task-editor-hint {
-  font-size: var(--text-sm);
-  margin-left: 4px;
-  flex: 1;
-}
 .task-editor-mode {
   margin-left: auto;
   padding: 4px 8px;
@@ -51,7 +46,10 @@
 }
 .task-rich-editor h1,
 .task-rich-editor h2,
-.task-rich-editor h3 {
+.task-rich-editor h3,
+.task-rich-editor h4,
+.task-rich-editor h5,
+.task-rich-editor h6 {
   font-weight: 600;
   letter-spacing: -0.02em;
   margin: 28px 0 10px;
@@ -67,6 +65,18 @@
 .task-rich-editor h3 {
   font-size: var(--text-lg);
   line-height: var(--text-lg--line-height);
+}
+.task-rich-editor h4,
+.task-rich-editor h5,
+.task-rich-editor h6 {
+  font-size: var(--text-prose);
+  line-height: var(--text-prose--line-height);
+  margin: 20px 0 8px;
+  letter-spacing: 0;
+}
+.task-rich-editor h5,
+.task-rich-editor h6 {
+  color: var(--ink-2);
 }
 .task-rich-editor strong {
   font-weight: 600;
@@ -183,6 +193,10 @@
   background: var(--surface-2);
   font-weight: 600;
 }
+.task-rich-editor th p,
+.task-rich-editor td p {
+  margin: 0;
+}
 .task-rich-editor .selectedCell {
   background: var(--selection);
 }
@@ -190,11 +204,30 @@
   outline: none;
   background: var(--surface-2);
 }
+/* Source kept as written reads as quiet raw text, apart from code blocks. */
+.task-rich-editor pre.task-verbatim {
+  background: none;
+  border: 0;
+  border-left: 2px solid var(--line-strong);
+  border-radius: 0;
+  box-shadow: none;
+  padding: 2px 0 2px 14px;
+  max-height: none;
+  color: var(--ink-3);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.task-rich-editor .task-verbatim-inline {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  color: var(--ink-3);
+}
 .task-source-editor {
   font-family: var(--font-mono);
   font-size: var(--text-base);
 }
 .task-format-menu,
+.task-link-editor,
 .task-insert-menu {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -267,11 +300,6 @@
   font-size: var(--text-base);
   color: var(--ink-3);
 }
-.task-editor-notice {
-  font-size: var(--text-sm);
-  color: var(--ink-3);
-  margin: 8px 0;
-}
 .task-editor-error,
 .task-image-error {
   font-size: var(--text-sm);
@@ -286,49 +314,82 @@
   gap: 4px;
   margin-left: 6px;
 }
+/* Images are inline, as in Markdown; a screenshot is wide enough to take its own line. */
 .task-image {
   position: relative;
-  margin: 18px 0;
+  display: inline-block;
+  vertical-align: bottom;
+  max-width: 100%;
+  margin: 6px 0;
+}
+.task-image img {
+  display: block;
+  max-width: 100%;
+  max-height: 560px;
+  height: auto;
   border-radius: var(--radius-md);
+  /* A hairline keeps light screenshots from dissolving into a light page. */
+  box-shadow: 0 0 0 1px var(--line);
 }
-.task-image > button {
-  border: 0;
-  background: transparent;
-  width: fit-content;
-  margin: 0;
+.task-image.is-selected img,
+.task-image.is-selected .task-image-card,
+.task-image.is-selected .task-image-frame {
+  box-shadow: 0 0 0 2px var(--accent);
 }
-.task-image > button > img {
-  max-height: 520px;
-  border-radius: var(--radius-md);
-}
-.task-remote-image {
+.task-image-card {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
+  min-height: 44px;
+  max-width: 480px;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
   background: var(--surface-2);
-  font-size: var(--text-base);
+  box-shadow: 0 0 0 1px var(--line);
   color: var(--ink-2);
-  box-shadow: var(--material-recess);
+  font-size: var(--text-base);
 }
-.task-remote-image button {
-  margin-left: auto;
-  text-decoration: underline;
+.task-image-card svg {
+  flex-shrink: 0;
+  color: var(--ink-3);
 }
-.task-image > button > span {
-  display: none;
-}
-.task-image.is-selected {
+.task-image-frame {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 200px;
+  min-height: 96px;
+  overflow: hidden;
+  border-radius: var(--radius-md);
   background: var(--surface-2);
+  color: var(--ink-3);
+}
+.task-image-frame img {
+  opacity: 0.6;
+  box-shadow: none;
+}
+.task-image-status {
+  position: absolute;
+  bottom: 8px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: var(--text-sm);
 }
 .task-image-tools {
+  position: absolute;
+  top: 6px;
+  right: 6px;
   display: flex;
-  justify-content: flex-end;
-  gap: 4px;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-panel);
   opacity: 0;
+  pointer-events: none;
   transition: opacity 120ms ease-out;
 }
 .task-image:hover .task-image-tools,
@@ -336,56 +397,19 @@
 .task-image.is-selected .task-image-tools,
 .task-image[data-image-state="error"] .task-image-tools {
   opacity: 1;
+  pointer-events: auto;
 }
-.task-image-tools button {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 7px;
-  border-radius: var(--radius-sm);
-  color: var(--ink-3);
-  font-size: var(--text-xs);
-}
-.task-image-tools button:hover,
-.task-image-tools button:focus-visible {
-  color: var(--ink);
-  background: var(--surface-2);
-}
-.task-image-pending {
-  position: relative;
-  background: var(--surface-2);
-  border-radius: var(--radius-md);
-  min-height: 100px;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-}
-.task-image-pending img {
-  max-width: 100%;
-  max-height: 520px;
-  opacity: 0.6;
-}
-.task-image-pending > span {
-  position: absolute;
-  bottom: 12px;
-  background: var(--surface);
-  padding: 4px 8px;
-  border-radius: var(--radius-sm);
-  color: var(--ink-2);
-  font-size: var(--text-sm);
+.task-image-error {
+  display: block;
 }
 .task-image-alt {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  padding: 8px 0;
-  color: var(--ink-3);
-  font-size: var(--text-sm);
+  padding-top: 6px;
 }
 .task-image-alt input {
   flex: 1;
-  min-width: 160px;
+  min-width: 220px;
+  font-size: var(--text-sm);
   background: var(--surface-2);
   color: var(--ink);
   padding: 4px 8px;
@@ -394,32 +418,35 @@
 .task-link-editor {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  padding: 12px;
-  margin: 8px 0;
-  background: var(--surface-2);
-  border-radius: var(--radius-md);
+  align-items: center;
+  gap: 2px;
+  width: 360px;
+  max-width: calc(100vw - 24px);
+  padding: 4px;
   font-size: var(--text-sm);
 }
 .task-link-editor input {
   flex: 1;
-  min-width: 140px;
+  min-width: 0;
   padding: 4px 8px;
-  background: var(--surface);
   border-radius: var(--radius-sm);
+  background: var(--surface-2);
   color: var(--ink);
 }
 .task-link-editor button {
   padding: 4px 8px;
   border-radius: var(--radius-sm);
+  color: var(--ink-2);
 }
-.task-link-editor button:hover {
-  background: var(--surface-3);
+.task-link-editor button:hover,
+.task-link-editor button:focus-visible {
+  background: var(--surface-2);
+  color: var(--ink);
 }
-@container (max-width: 400px) {
-  .task-editor-hint {
-    display: none;
-  }
+.task-link-editor [role="alert"] {
+  flex-basis: 100%;
+  padding: 2px 8px;
+  color: var(--bad);
 }
 @media (prefers-reduced-motion: reduce) {
   .task-image-tools {

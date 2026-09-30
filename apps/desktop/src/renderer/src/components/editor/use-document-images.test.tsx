@@ -29,7 +29,10 @@ it("keeps the insertion point while staging and replaces the pending image when 
     });
     await act(async () => finishStage("staged"));
     await waitFor(() => expect(editor.getMarkdown()).toContain("openorc-pending://staged"));
-    expect(editor.getMarkdown()).toContain("New Start");
+    // The image takes a paragraph of its own between the split text, and writing continues after it.
+    expect(editor.state.doc.children.map((block) => block.children.map((node) => node.text ?? node.type.name))).toEqual([["New Start"], ["image"], [" end"]]);
+    expect(editor.state.selection.$from.parent.textContent).toBe(" end");
+    expect(editor.state.selection.$from.parentOffset).toBe(0);
 
     await act(async () => expect(await hook.result.current.flush(editor, false, editor.getMarkdown())).toBe(true));
     expect(editor.getMarkdown()).toContain("openorc-asset://attachments/saved.png");

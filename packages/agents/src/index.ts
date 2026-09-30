@@ -12,6 +12,7 @@ export { recoverAgentProcesses } from "./process-recovery.js";
 export { agentBinary } from "./bin.js";
 export { isImageAttachment, partitionAttachments, withAttachedFiles } from "./attachments.js";
 export { listSkills } from "./skills.js";
+export { instructionFiles } from "./instructions.js";
 export { readCodexUsage, consumeCodexReset, type CodexUsageOptions, type CodexAccountReport } from "./codex/usage.js";
 export { readClaudeUsage, type ClaudeUsageResult, type ClaudeUsageOptions } from "./claude/usage.js";
 export { claudeConfigDir } from "./claude/config-dir.js";

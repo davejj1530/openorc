@@ -525,3 +525,15 @@ export const AgentSkill = z.object({
   path: z.string(),
 });
 export type AgentSkill = z.infer<typeof AgentSkill>;
+
+/**
+ * An instruction file a thread's agent reads, as it is on disk: one in the thread's folder, or the agent's personal
+ * file that every project shares. A missing file has no version and empty content; saving it creates it.
+ */
+export const InstructionFile = z.object({
+  scope: z.enum(["project", "personal"]),
+  path: z.string(),
+  content: z.string(),
+  version: z.string().nullable(),
+});
+export type InstructionFile = z.infer<typeof InstructionFile>;

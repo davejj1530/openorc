@@ -3,11 +3,11 @@ import type { PanelTab } from "./layout";
 /** Tabs that hold something only when the thread does. */
 type ContentTab = "changes" | "plan" | "tasks" | "checkpoints" | "commits" | "memory";
 /** Tabs that are tools rather than content: they join the strip once opened for a scope. */
-export type PanelTool = "terminal" | "browser";
+export type PanelTool = "terminal" | "browser" | "instructions";
 /** Whether each content tab has something to show. Null leaves content tabs unfiltered. */
 export type PanelSignals = Partial<Record<ContentTab, boolean>> | null;
 
-export const panelTools: readonly PanelTool[] = ["terminal", "browser"];
+export const panelTools: readonly PanelTool[] = ["terminal", "browser", "instructions"];
 const contentTabs: readonly PanelTab[] = ["changes", "plan", "tasks", "checkpoints", "commits", "memory"];
 
 export function isPanelTool(tab: PanelTab): tab is PanelTool {

@@ -19,6 +19,7 @@ import {
   Commit,
   FileChange,
   ImportableSession,
+  type InstructionFile,
   Memory,
   MemorySource,
   MemoryStatus,
@@ -368,6 +369,10 @@ export const rpcParams = {
   "files.search": z.object({ projectId: z.string(), query: z.string(), limit: z.number().int().positive().max(50).optional() }),
   /** Read a cited text file in the conversation's workspace. */
   "files.read": z.object({ scope: z.object({ kind: z.enum(["thread", "task"]), id: z.string() }), path: z.string().min(1) }),
+  /** The instruction files the thread's agent reads, AGENTS.md first and its personal file last. */
+  "instructions.list": z.object({ threadId: z.string() }),
+  /** Saves one of them. `version` is the one the edit started from, null for a new file; a file changed since then is refused. */
+  "instructions.save": z.object({ threadId: z.string(), path: z.string().min(1), content: z.string().max(2 * 1024 * 1024), version: z.string().nullable() }),
   "app.settings.get": z.object({}),
   "app.settings.set": AppSettings.partial(),
   "schedules.list": z.object({ projectId: z.string().optional() }),
@@ -663,6 +668,8 @@ export interface RpcResults extends PullRequestRpcResults {
   "review.threadPrTemplate": { body: string | null };
   "files.search": string[];
   "files.read": { path: string; content: string };
+  "instructions.list": InstructionFile[];
+  "instructions.save": InstructionFile;
   "app.settings.get": AppSettings;
   "app.settings.set": AppSettings;
   "schedules.list": Schedule[];

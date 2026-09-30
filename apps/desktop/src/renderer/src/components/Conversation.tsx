@@ -140,6 +140,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   const { prompt, setPrompt, clearDraft, error: draftError } = useConversationDraft({ draftKey, threadId: thread?.id ?? null, initialText: thread?.draft ?? "" });
   const start = useRpcMutation("runs.start");
   const send = useRpcMutation("runs.send");
+  const [sends, setSends] = useState(0);
   const queue = useRpcMutation("threads.queue");
   const unqueue = useRpcMutation("threads.unqueue");
   const sendQueued = useRpcMutation("threads.sendQueued");
@@ -205,6 +206,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
 
   const submit = async (text: string, attachments: string[], now: boolean) => {
     if (!choice) throw new Error("Choose a model first.");
+    setSends((count) => count + 1);
     await settings.waitForSave();
     const body = text || (attachments.length ? "See the attached image." : "Start working on this task.");
     if (thread && working) {
@@ -260,6 +262,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
           basePath={basePath}
           run={merged}
           scrollKey={scope.kind === "thread" ? scope.thread.id : scope.task.id}
+          followKey={sends}
           onFork={thread ? forkFrom : undefined}
           hasOlder={hasOlder}
           onLoadOlder={loadOlder}
@@ -280,7 +283,10 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
               canSend={canSteer}
               pending={sendQueued.isPending || unqueue.isPending}
               sendReason={steerReason}
-              onSend={(messageId) => sendQueued.mutate({ id: thread.id, messageId })}
+              onSend={(messageId) => {
+                setSends((count) => count + 1);
+                sendQueued.mutate({ id: thread.id, messageId });
+              }}
               onRemove={(messageId) => unqueue.mutate({ id: thread.id, messageId })}
             />
           ) : null}

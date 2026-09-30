@@ -1,4 +1,4 @@
-import { lazy, memo, Suspense, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type ComponentProps } from "react";
+import { lazy, memo, Suspense, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type ComponentProps, type RefObject } from "react";
 import { WorkRead, WorkEdit, WorkCommand, WorkSearch, WorkMessage, WorkDelegate, WorkAgent, WorkLive, Check, ChevronRight, Copy, FileText, GitFork, Globe, Hammer, Search, Terminal, X } from "./icons";
 import { workTurns, workParts, workTiming, workDuration } from "../lib/work-transcript";
 import { cn } from "../lib/cn";
@@ -44,6 +44,7 @@ export function Transcript({
   working = false,
   hasOlder = false,
   onLoadOlder,
+  followKey,
 }: {
   basePath?: string;
   fileScope?: FileSelection["scope"];
@@ -57,6 +58,8 @@ export function Transcript({
   /** More turns exist above the loaded ones. */
   hasOlder?: boolean;
   onLoadOlder?: () => void;
+  /** Changes when the user sends a message, which returns the view to the newest turn to follow it. */
+  followKey?: number;
 }) {
   const parentRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -117,10 +120,7 @@ export function Transcript({
     // Child task cards keep streaming after the parent turn ends. Observe their
     // layout too, including wrapping when the window or composer changes size.
     const observer = new ResizeObserver(() => {
-      if (pinned.current) {
-        el.scrollTop = el.scrollHeight;
-        lastScrollTop.current = el.scrollTop;
-      }
+      if (pinned.current) scrollToTail(el, lastScrollTop);
       reveal.current();
     });
     observer.observe(el, { box: "border-box" });
@@ -174,13 +174,9 @@ export function Transcript({
     if (hasOlder && olderInView.current) loadOlder.current?.();
   }, [run.blocks, hasOlder]);
   useLayoutEffect(() => {
-    const el = parentRef.current;
     pinned.current = true;
-    if (el) {
-      el.scrollTop = el.scrollHeight;
-      lastScrollTop.current = el.scrollTop;
-    }
-  }, [scrollKey]);
+    if (parentRef.current) scrollToTail(parentRef.current, lastScrollTop);
+  }, [scrollKey, followKey]);
   // Loading that stalls must not keep the conversation hidden; after a moment it shows what it has.
   useEffect(() => {
     const timer = setTimeout(() => setFilledKey(scrollKey), 1500);
@@ -201,6 +197,12 @@ export function Transcript({
 }
 
 type Anchor = { id: string; offset: number; scrollTop: number };
+
+/** Shows the newest turn, and remembers where so the scroll event this causes is not taken for the reader leaving. */
+function scrollToTail(el: HTMLElement, lastScrollTop: RefObject<number>) {
+  el.scrollTop = el.scrollHeight;
+  lastScrollTop.current = el.scrollTop;
+}
 
 /** The first turn whose bottom is below the top of the scroller, found by halving since turns are in order. */
 function firstTurnInView(el: HTMLElement): Anchor | null {

@@ -9,16 +9,19 @@ function App() {
   const [revision, update] = useState(0);
   const [runId, setRunId] = useState("scroll");
   const [scrollKey, setScrollKey] = useState("thread");
+  const [sends, setSends] = useState(0);
   Object.assign(window, {
     scrollSmoke: {
       update: () => flushSync(() => update((n) => n + 1)),
       nextRun: () => flushSync(() => setRunId("next-run")),
       nextThread: () => flushSync(() => setScrollKey("next-thread")),
+      send: () => flushSync(() => setSends((n) => n + 1)),
     },
   });
   const run = getRun("scroll")!;
   return (
     <Transcript
+      followKey={sends}
       scrollKey={scrollKey}
       run={{
         ...run,

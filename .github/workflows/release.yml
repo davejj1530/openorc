@@ -1,22 +1,44 @@
 name: Desktop release
 
+# Automatic release calls this after CI passes on main; run it by hand to retry or repair a release.
 on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing release tag matching apps/desktop/package.json (vX.Y.Z or vX.Y.Z-beta.N)
+        description: Existing release tag, newer than every release (vX.Y.Z or vX.Y.Z-beta.N); it sets the version
         required: true
         type: string
       create_draft:
         description: Upload successful builds to a new draft GitHub release
         default: false
         type: boolean
+      publish:
+        description: Upload successful builds to a new GitHub release and publish it
+        default: false
+        type: boolean
       unsigned_windows_beta:
-        description: Explicitly allow an unsigned Windows installer for this beta tag only
+        description: Allow an unsigned Windows installer for this beta tag while no Windows certificate is configured
         default: false
         type: boolean
       windows_only:
-        description: Validate only Windows packaging; cannot create a release draft
+        description: Validate only Windows packaging; cannot create a release
+        default: false
+        type: boolean
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+      create_draft:
+        default: false
+        type: boolean
+      publish:
+        default: false
+        type: boolean
+      unsigned_windows_beta:
+        default: false
+        type: boolean
+      windows_only:
         default: false
         type: boolean
 
@@ -41,13 +63,15 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.tag }}
+          # Every release tag, to check this one is newer.
+          fetch-depth: 0
           persist-credentials: false
       - name: Validate the release repository, tag, and options
         env:
           GH_TOKEN: ${{ github.token }}
           OPENORC_RELEASE_REPOSITORY: ${{ vars.RELEASE_REPOSITORY }}
           RELEASE_TAG: ${{ inputs.tag }}
-          CREATE_DRAFT: ${{ inputs.create_draft }}
+          CREATE_RELEASE: ${{ inputs.create_draft || inputs.publish }}
           UNSIGNED_WINDOWS_BETA: ${{ inputs.unsigned_windows_beta }}
           WINDOWS_ONLY: ${{ inputs.windows_only }}
         run: |
@@ -57,17 +81,17 @@ jobs:
           const repo = process.env.OPENORC_RELEASE_REPOSITORY;
           if (!repo || !/^[A-Za-z0-9][A-Za-z0-9-]*\/[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(repo)) throw Error('RELEASE_REPOSITORY must be owner/repository.');
           const metadata = JSON.parse(execFileSync('gh', ['api', `repos/${repo}`], { encoding: 'utf8' }));
-          validateReleaseSource({ repository: repo, currentRepository: process.env.GITHUB_REPOSITORY, tag: process.env.RELEASE_TAG, metadata, createDraft: process.env.CREATE_DRAFT === 'true' });
+          validateReleaseSource({ repository: repo, currentRepository: process.env.GITHUB_REPOSITORY, tag: process.env.RELEASE_TAG, metadata, createDraft: process.env.CREATE_RELEASE === 'true' });
           if (process.env.UNSIGNED_WINDOWS_BETA === 'true' && !/-beta\.\d+$/.test(process.env.RELEASE_TAG)) throw Error('Unsigned Windows builds require a beta tag.');
-          if (process.env.WINDOWS_ONLY === 'true' && process.env.CREATE_DRAFT === 'true') throw Error('Draft creation requires all platform builds.');
+          if (process.env.WINDOWS_ONLY === 'true' && process.env.CREATE_RELEASE === 'true') throw Error('A release requires all platform builds.');
           NODE
-      - name: Pin the reviewed source commit and verify version
+          # Installed apps never downgrade, so a release must be newer than every other one.
+          node scripts/desktop-release.cjs check "$RELEASE_TAG"
+      - name: Pin the reviewed source commit
         id: source
         env:
-          RELEASE_TAG: ${{ inputs.tag }}
           WINDOWS_ONLY: ${{ inputs.windows_only }}
         run: |
-          node -e 'if (`v${require("./apps/desktop/package.json").version}` !== process.env.RELEASE_TAG) throw Error("Tag and desktop version differ")'
           echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           node <<'NODE'
           const platforms = [
@@ -125,6 +149,16 @@ jobs:
       - run: pnpm format:check
       - run: node --test scripts/desktop-release.test.cjs scripts/distribution-notices.test.cjs scripts/packaged-native-target.test.cjs scripts/packaged-runtime-dependencies.test.cjs
       - run: pnpm --filter @openorc/desktop exec vitest run src/main/app-updates.test.ts src/main/update-handoff.test.ts
+      - name: Choose Windows signing
+        id: signing
+        if: matrix.platform == 'win'
+        env:
+          ALLOW_UNSIGNED: ${{ inputs.unsigned_windows_beta }}
+          HAS_CERTIFICATE: ${{ secrets.WIN_CSC_LINK != '' }}
+        # An allowed unsigned beta is still signed once a Windows certificate is configured.
+        run: |
+          if [[ "$ALLOW_UNSIGNED" == "true" && "$HAS_CERTIFICATE" != "true" ]]; then unsigned=true; else unsigned=false; fi
+          echo "unsigned=$unsigned" >> "$GITHUB_OUTPUT"
       - name: Prepare notarization key
         if: matrix.platform == 'mac'
         env:
@@ -142,7 +176,7 @@ jobs:
         id: package
         env:
           RELEASE_TAG: ${{ inputs.tag }}
-          UNSIGNED_WINDOWS_BETA: ${{ matrix.platform == 'win' && inputs.unsigned_windows_beta }}
+          UNSIGNED_WINDOWS_BETA: ${{ steps.signing.outputs.unsigned }}
           OPENORC_RELEASE_REPOSITORY: ${{ vars.RELEASE_REPOSITORY }}
           MAC_SIGNING_IDENTITY: ${{ vars.MAC_SIGNING_IDENTITY }}
           WINDOWS_PUBLISHER_NAME: ${{ vars.WINDOWS_PUBLISHER_NAME }}
@@ -156,7 +190,8 @@ jobs:
           if [[ "$UNSIGNED_WINDOWS_BETA" == "true" ]]; then
             export OPENORC_UNSIGNED_WINDOWS_BETA="${RELEASE_TAG#v}"
           fi
-          node scripts/desktop-release.cjs
+          # Sets the desktop version from the tag, then checks the signing inputs.
+          node scripts/desktop-release.cjs prepare
           pnpm --filter @openorc/desktop release:build
       - name: Audit packaged macOS notices
         if: matrix.platform == 'mac'
@@ -192,7 +227,7 @@ jobs:
         if: matrix.platform == 'win'
         shell: pwsh
         env:
-          EXPECT_UNSIGNED: ${{ inputs.unsigned_windows_beta }}
+          EXPECT_UNSIGNED: ${{ steps.signing.outputs.unsigned }}
         run: |
           $ErrorActionPreference = 'Stop'
           $installer = @(Get-ChildItem apps/desktop/release/*.exe)
@@ -251,45 +286,47 @@ jobs:
             apps/desktop/release/*.blockmap
             apps/desktop/release/latest-*.yml
 
-  draft:
-    if: inputs.create_draft
+  release:
+    if: inputs.create_draft || inputs.publish
     needs: [validate, build]
     runs-on: ubuntu-24.04
     environment: release
     permissions:
       contents: write
+      actions: write
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.commit }}
+          # The notes cover every commit since the previous release.
+          fetch-depth: 0
+          persist-credentials: false
       - uses: actions/download-artifact@v4
         with:
           pattern: desktop-*
           path: release
           merge-multiple: true
-      - name: Create a draft for review (never publish automatically)
+      - name: Create the release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ inputs.tag }}
-          UNSIGNED_WINDOWS_BETA: ${{ inputs.unsigned_windows_beta }}
+          PUBLISH: ${{ inputs.publish }}
         run: |
           (cd release && sha256sum * > SHA256SUMS.txt)
-          node <<'NODE'
-          const fs = require('node:fs');
-          const lines = [
-            '## Highlights',
-            '',
-            '<!-- Before publishing, add 2–5 user-facing bullets here. The website changelog shows this section. -->',
-            '',
-            '## Install notes',
-            '',
-            'macOS: Developer ID signed and notarized applications in DMG/ZIP downloads.',
-          ];
-          lines.push(process.env.UNSIGNED_WINDOWS_BETA === 'true'
-            ? 'Windows x64: unsigned beta. Windows may warn about the unrecognized app; some security policies may prevent installation. Download only from the official release.'
-            : 'Windows x64: signed NSIS installer.');
-          lines.push('Linux x64: rpm for Fedora and openSUSE, deb for Debian and Ubuntu, and an AppImage for other distributions. Linux packages are not code-signed; check them against SHA256SUMS.txt. Linux installs do not update themselves yet: install each new version from its release.');
-          lines.push('', 'On macOS and Windows, use Check for updates in OpenOrc for newer stable and beta releases. Downloading and restarting to install require your confirmation. Versions through 0.1.0-beta.4 need a one-time manual install to receive beta updates.', '', 'SHA256SUMS.txt covers the attached installers, ZIPs, blockmaps, and update metadata.');
-          fs.writeFileSync('release-notes.md', lines.join('\n') + '\n');
-          NODE
+          notes=(notes "$RELEASE_TAG")
+          if compgen -G 'release/*-unsigned.exe' > /dev/null; then notes+=(--unsigned-windows); fi
+          node scripts/desktop-release.cjs "${notes[@]}" > release-notes.md
           args=(--draft --verify-tag --title "OpenOrc $RELEASE_TAG" --notes-file release-notes.md)
           if [[ "$RELEASE_TAG" == *-beta.* ]]; then args+=(--prerelease); fi
           gh release create "$RELEASE_TAG" release/* "${args[@]}"
+          # Installed apps offer a release as soon as it is public, so it goes public with every asset in place.
+          if [[ "$PUBLISH" == "true" ]]; then gh release edit "$RELEASE_TAG" --draft=false; fi
+      - name: Rebuild the website changelog
+        if: inputs.publish
+        # A release published with the workflow token starts no other workflow, so the rebuild is requested directly.
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh workflow run website-changelog.yml --ref main

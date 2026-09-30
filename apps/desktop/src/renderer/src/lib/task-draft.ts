@@ -39,21 +39,26 @@ export function readTaskDraft(taskId: string): TaskDocumentDraft | null {
   throw new Error("The local task draft could not be read. Open Overview and save the task before continuing.");
 }
 
+function labelList(labels: string): string[] {
+  return [
+    ...new Set(
+      labels
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean),
+    ),
+  ];
+}
+
 export function taskDraftPatch(draft: TaskDocumentDraft) {
   if (!draft.title.trim()) throw new Error("Add a task title in Overview before continuing.");
   if (draft.spec.includes("openorc-pending://")) throw new Error("A task image has not saved. Open Overview to retry or remove it before continuing.");
-  return {
-    title: draft.title.trim(),
-    spec: draft.spec.trim() || null,
-    labels: [
-      ...new Set(
-        draft.labels
-          .split(",")
-          .map((value) => value.trim())
-          .filter(Boolean),
-      ),
-    ],
-  };
+  return { title: draft.title.trim(), spec: draft.spec.trim() || null, labels: labelList(draft.labels) };
+}
+
+/** Drafts that save the same task fields. The server returns a saved draft trimmed, so its copy is not a new revision. */
+export function sameSavedTaskDraft(a: TaskDocumentDraft, b: TaskDocumentDraft): boolean {
+  return a.title.trim() === b.title.trim() && a.spec.trim() === b.spec.trim() && labelList(a.labels).join(",") === labelList(b.labels).join(",");
 }
 
 /** Another window or a later keystroke may have replaced this exact snapshot. */

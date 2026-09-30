@@ -188,7 +188,7 @@ export function TaskDocument({ task, project, ref }: { task: Task; project: Proj
               {properties.error.message}
             </p>
           ) : null}
-          <DocumentEditor ref={body} value={draft.spec} onChange={(spec) => patch({ spec })} onReadyChange={reportImagesReady} />
+          <DocumentEditor ref={body} value={draft.spec} onChange={(spec) => patch({ spec })} onReadyChange={reportImagesReady} basePath={task.worktreePath ?? project.rootPath} />
           <div className="flex flex-wrap items-center gap-3 mt-6 text-sm text-ink-3">
             <label className="flex min-w-0 items-center gap-2">
               <span>Labels</span>

@@ -1,26 +1,37 @@
+import { getSchema } from "@tiptap/react";
 import { describe, expect, it } from "vitest";
-import { canEditRichly, markdownManager, safeImageSource, slashQuery } from "./document-schema";
+import { documentExtensions, markdownManager, slashQuery } from "./document-schema";
 
-describe("task document compatibility", () => {
+const schema = getSchema(documentExtensions());
+const roundTrip = (source: string) => markdownManager().serialize(markdownManager().parse(source));
+
+describe("task documents in rich text", () => {
   it.each([
-    "",
     "## Goal\n\nKeep **bold**, *italic*, ~~removed~~, and `code`.\n\n[Link](https://example.com)",
     "```ts\nconst x = '<tag>';\n```",
+    "<!-- Keep this comment -->\n\nText",
+    "<details><summary>More</summary>\n\nHidden body\n\n</details>",
+    "Press <kbd>Cmd</kbd> and wait for <model>.",
+    "#### Deep heading",
+    "$$\nx_1 + y^2\n$$",
+    "Inline $$x_1^2$$ math",
+    "A footnote[^1].\n\n[^1]: Its text.",
+    "[![CI](https://example.com/badge.svg)](https://example.com/actions)",
     "Before\n\n![Screenshot](openorc-asset://attachments/abc-123.png)\n\nAfter",
-  ])("allows lossless rich editing: %s", (source) => {
-    expect(canEditRichly(source)).toBe(true);
-    const manager = markdownManager();
-    const once = manager.serialize(manager.parse(source));
-    expect(manager.serialize(manager.parse(once))).toBe(once);
+    "1. First\n2. Look\n![Screenshot](openorc-asset://attachments/abc-123.png)\n3. Third",
+  ])("keeps what it has no rich form for as written: %s", (source) => {
+    expect(roundTrip(source)).toBe(source);
+    expect(() => schema.nodeFromJSON(markdownManager().parse(source)).check()).not.toThrow();
   });
-  it.each(["<!-- Keep this comment -->\nText", "Math $x^2$", "![Unsafe](javascript:alert)", "#### Unsupported heading"])("keeps unsupported content in source: %s", (source) =>
-    expect(canEditRichly(source)).toBe(false),
-  );
-  it("only allows safe image sources", () => {
-    expect(safeImageSource("openorc-asset://attachments/abc-123.png")).toBe(true);
-    expect(safeImageSource("openorc-asset://attachments/../secret.png")).toBe(false);
-    expect(safeImageSource("file:///etc/passwd")).toBe(false);
-    expect(safeImageSource("javascript:alert(1)")).toBe(false);
+
+  it("keeps a lone image inside its paragraph, as Markdown reads it", () => {
+    expect(markdownManager().parse("![Screenshot](openorc-asset://attachments/abc-123.png)").content?.[0]?.type).toBe("paragraph");
+  });
+
+  it("drops a list item's indent from its continuation lines", () => {
+    const source = "2. Look\n   ![Screenshot](openorc-asset://attachments/abc-123.png)";
+    expect(roundTrip(source)).toBe("2. Look\n![Screenshot](openorc-asset://attachments/abc-123.png)");
+    expect(roundTrip(roundTrip(source))).toBe(roundTrip(source));
   });
 });
 

@@ -238,7 +238,7 @@ export function NewTask({ projectId, threadId }: { projectId?: string; threadId?
                   From {thread.data?.title ?? "thread"}
                 </TextButton>
               ) : null}
-              <DocumentEditor ref={body} value={draft.spec} onChange={(spec) => patch({ spec })} onReadyChange={setImagesReady} disabled={create.isPending} />
+              <DocumentEditor ref={body} value={draft.spec} onChange={(spec) => patch({ spec })} onReadyChange={setImagesReady} disabled={create.isPending} basePath={project?.rootPath} />
               <NewTaskLocation
                 linked={Boolean(threadId)}
                 worktree={useWorktree}

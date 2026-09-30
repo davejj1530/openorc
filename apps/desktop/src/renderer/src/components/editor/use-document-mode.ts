@@ -1,86 +1,55 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { TextSelection } from "@tiptap/pm/state";
 import type { Editor } from "@tiptap/react";
-import { canEditRichly } from "./document-schema";
 
-const MODE_NOTICES = {
-  preserved: "This document uses formatting that is preserved in Markdown mode.",
-  cannotSwitch: "This document uses formatting that is preserved in Markdown mode. Edit it here to keep all its content.",
-} as const;
-
-/** Keeps external Markdown, local rich edits, and source mode in one synchronization path. */
-export function useDocumentMode(editor: Editor | null, value: string, onChange: (value: string) => void, initiallyRich: boolean, reportReady: (editor: Editor) => void) {
-  const [source, setSource] = useState(!initiallyRich);
-  const [sourcePreview, setSourcePreview] = useState(false);
-  const [notice, setNotice] = useState(initiallyRich ? "" : MODE_NOTICES.preserved);
+/** Keeps the rich document, the Markdown view, and the saved Markdown in step without replacing what the user is editing. */
+export function useDocumentMode(editor: Editor | null, value: string, onChange: (value: string) => void) {
+  const [source, setSource] = useState(false);
   const sourceInput = useRef<HTMLTextAreaElement>(null);
-  const sourceSelection = useRef<{ start: number; end: number } | null>(null);
-  const emitted = useRef(value);
-  const richSelection = useRef<{ from: number; to: number; value: string } | null>(null);
-  const callbacks = useRef({ onChange, reportReady });
-  callbacks.current = { onChange, reportReady };
+  // The Markdown the rich document holds. Any other value came from outside the editor.
+  const shown = useRef(value);
+  const change = useRef(onChange);
+  change.current = onChange;
 
   useEffect(() => {
-    if (!editor || value === emitted.current) return;
-    emitted.current = value;
-    if (!canEditRichly(value)) {
-      setSource(true);
-      setNotice(MODE_NOTICES.preserved);
-      return;
-    }
-    editor.commands.setContent(value, { contentType: "markdown", emitUpdate: false });
-    callbacks.current.reportReady(editor);
-  }, [editor, value]);
+    if (!editor || editor.isDestroyed || source || value === shown.current) return;
+    shown.current = value;
+    showMarkdown(editor, value);
+  }, [editor, value, source]);
 
-  useLayoutEffect(() => {
-    if (!source || sourcePreview || !sourceSelection.current || !sourceInput.current) return;
-    sourceInput.current.setSelectionRange(sourceSelection.current.start, sourceSelection.current.end);
-  }, [source, sourcePreview]);
-
-  const emitRich = (currentEditor: Editor): void => {
-    if (source) return;
-    const markdown = currentEditor.getMarkdown();
-    emitted.current = markdown;
-    callbacks.current.onChange(markdown);
+  const emitRich = (current: Editor): void => {
+    const markdown = current.getMarkdown();
+    shown.current = markdown;
+    change.current(markdown);
   };
 
-  const emitSource = (markdown: string): void => {
-    emitted.current = markdown;
-    callbacks.current.onChange(markdown);
-  };
+  const emitSource = (markdown: string): void => change.current(markdown);
 
-  const rememberSourceSelection = (): void => {
-    const input = sourceInput.current;
-    if (input) sourceSelection.current = { start: input.selectionStart, end: input.selectionEnd };
-  };
-
-  const toggleSourcePreview = (): void => {
-    if (!sourcePreview) rememberSourceSelection();
-    setSourcePreview((preview) => !preview);
-  };
-
-  const switchMode = (): void => {
-    if (!source) {
-      if (editor) richSelection.current = { from: editor.state.selection.from, to: editor.state.selection.to, value: emitted.current };
-      setSource(true);
-      setSourcePreview(false);
-      return;
-    }
-    if (!canEditRichly(value)) {
-      setNotice(MODE_NOTICES.cannotSwitch);
-      return;
-    }
-    editor?.commands.setContent(value, { contentType: "markdown", emitUpdate: false });
-    if (editor && richSelection.current?.value === value) {
-      editor.commands.setTextSelection({ from: richSelection.current.from, to: richSelection.current.to });
-    }
-    setNotice("");
-    setSource(false);
-  };
+  const toggleSource = (): void => setSource((open) => !open);
 
   const focus = (): void => {
     if (source) sourceInput.current?.focus();
     else editor?.commands.focus();
   };
 
-  return { source, sourcePreview, notice, sourceInput, emitRich, emitSource, rememberSourceSelection, toggleSourcePreview, switchMode, focus };
+  return { source, sourceInput, emitRich, emitSource, toggleSource, focus };
+}
+
+/** Replaces the document only when the Markdown says something else, keeping the caret near where it was. */
+function showMarkdown(editor: Editor, markdown: string): void {
+  if (!editor.markdown) return;
+  const next = editor.markdown.parse(markdown);
+  // The same document restated, or with the empty paragraph TrailingNode keeps at its end, is not a change.
+  if (editor.markdown.serialize(next).trimEnd() === editor.getMarkdown().trimEnd()) return;
+  const { from, to } = editor.state.selection;
+  editor
+    .chain()
+    .setMeta("addToHistory", false)
+    .setContent(next, { emitUpdate: false })
+    .command(({ tr }) => {
+      const end = tr.doc.content.size;
+      tr.setSelection(TextSelection.between(tr.doc.resolve(Math.min(from, end)), tr.doc.resolve(Math.min(to, end))));
+      return true;
+    })
+    .run();
 }

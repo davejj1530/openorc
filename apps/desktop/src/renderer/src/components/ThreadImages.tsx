@@ -17,6 +17,8 @@ const MediaContext = createContext<{ basePath?: string; fileScope?: FileSelectio
 });
 
 export const useThreadMentionNames = () => useContext(MediaContext).mentionNames;
+/** The workspace path and image viewer, for images drawn outside Markdown like the task editor's. */
+export const useThreadMedia = () => useContext(MediaContext);
 
 export function ThreadMedia({
   children,

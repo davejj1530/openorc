@@ -1461,12 +1461,6 @@ diffs-container {
 .document-description::placeholder {
   color: var(--ink-4);
 }
-.document-preview {
-  min-height: 232px;
-  padding: 8px 0;
-  font-size: var(--text-prose);
-  line-height: 26px;
-}
 .task-execution-settings {
   padding-top: 24px;
   margin-top: 32px;

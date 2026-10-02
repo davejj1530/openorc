@@ -206,6 +206,12 @@ describe("usage refresh", () => {
     expect(r.windows).toEqual([]);
     expect(r.status).toBe("unavailable");
   });
+  it("sends a CLI that fails to start to the reinstall instead of asking its account", async () => {
+    const { service, system, read } = setup();
+    system.info.mockResolvedValueOnce(withHarness(connected, "codex", { state: "check_failed", version: null }));
+    expect(await service.read("codex")).toMatchObject({ status: "error", message: "Codex fails to start. Reinstall it in Settings → Connections, then refresh." });
+    expect(read).not.toHaveBeenCalled();
+  });
   it("falls back to windows reported during runs when the account cannot be asked, keeping their report time", async () => {
     const { service, claude } = setup();
     service.observe({ type: "raw", agent: "claude", runId: "r1", ts: at - 600_000, payload: rateLimitEvent(0.5, 0.6) });

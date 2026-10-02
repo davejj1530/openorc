@@ -1,4 +1,15 @@
-import { harnessIds, type AgentUpdate, type AgentUpdates, type HarnessId, type RpcParams, type SystemInfo } from "@openorc/protocol";
+import {
+  harnessCatalog,
+  harnessFailsToStart,
+  harnessIds,
+  harnessInfo,
+  type AgentUpdate,
+  type AgentUpdates,
+  type HarnessId,
+  type HarnessInfo,
+  type RpcParams,
+  type SystemInfo,
+} from "@openorc/protocol";
 import { type AgentInstallation, detectAgentInstallation, fetchAgentRelease, newerRelease, releaseVersion, runUpdateCommand, type UpdateRunner } from "./agent-update-installation.js";
 import type { EnvSnapshot } from "./shell-environment.js";
 
@@ -18,6 +29,30 @@ interface Dependencies {
 const INTERVAL = 6 * 60 * 60 * 1000;
 const key = (name: string) => `agentUpdates.${name}`;
 const blank = (id: HarnessId): AgentUpdate => ({ id, installedVersion: null, latestVersion: null, status: "unchecked", method: "", canUpdate: false, message: null, checkedAt: null });
+const actionable = new Set<AgentUpdate["status"]>(["available", "broken"]);
+
+/** An installation that fails to start; OpenOrc offers the reinstall only when it knows the installer. */
+function broken(plan: AgentInstallation, message: string | null): Pick<AgentUpdate, "status" | "installedVersion" | "method" | "canUpdate" | "message"> {
+  const row = { status: "broken", installedVersion: null, method: plan.method } as const;
+  if (!plan.repair) return { ...row, canUpdate: false, message: "Reinstall using the tool that installed this agent, then check again." };
+  return { ...row, canUpdate: true, message };
+}
+
+/** A successful exit proves nothing; only the agent's own version probe afterwards does. */
+function outcome(row: AgentUpdate, plan: AgentInstallation, after: HarnessInfo): Partial<AgentUpdate> {
+  if (row.status === "broken") {
+    if (harnessFailsToStart(after)) return { status: "error", message: "Reinstalling did not fix it. Check the installation in a terminal, then check again." };
+    return { status: "unchecked", installedVersion: releaseVersion(after.version), canUpdate: false, message: "Reinstalled." };
+  }
+  if (harnessFailsToStart(after)) return broken(plan, `${harnessCatalog[row.id].name} no longer starts after the update.`);
+  const installed = releaseVersion(after.version);
+  if (!installed || newerRelease(row.latestVersion!, installed))
+    return {
+      status: "error",
+      message: "The newer version is not active yet. Your package manager or release channel may be holding it back. Check the installation in a terminal, then check again.",
+    };
+  return { status: "current", installedVersion: installed, message: "Updated. Your next message uses the new version." };
+}
 
 /** Owns update state independently of windows. Only install() executes an updater. */
 export class AgentUpdateService {
@@ -93,12 +128,16 @@ export class AgentUpdateService {
           if (!harness.path) row.status = "not_installed";
           else {
             row.installedVersion = releaseVersion(harness.version);
-            if (!row.installedVersion) throw new Error("The installed version could not be read. Check the agent in a terminal, then try again.");
+            const failing = harnessFailsToStart(harness);
+            if (!row.installedVersion && !failing) throw new Error("The installed version could not be read. Check the agent in a terminal, then try again.");
             const plan = await (this.deps.detect ?? detectAgentInstallation)(harness.id, harness.path, environment);
             this.plans.set(harness.id, plan);
-            row = { ...row, method: plan.method, canUpdate: Boolean(plan.command), message: plan.message };
-            row.latestVersion = await (this.deps.latest ?? fetchAgentRelease)(plan.releaseUrl);
-            row.status = newerRelease(row.latestVersion, row.installedVersion!) ? "available" : "current";
+            if (failing) row = { ...row, ...broken(plan, null) };
+            else {
+              row = { ...row, method: plan.method, canUpdate: Boolean(plan.command), message: plan.message };
+              row.latestVersion = await (this.deps.latest ?? fetchAgentRelease)(plan.releaseUrl);
+              row.status = newerRelease(row.latestVersion, row.installedVersion!) ? "available" : "current";
+            }
             row.checkedAt = Date.now();
           }
         } catch {
@@ -117,7 +156,7 @@ export class AgentUpdateService {
     if (this.stopped) return Promise.reject(new Error("OpenOrc is closing."));
     if (this.installing || this.checking) return Promise.reject(new Error("An agent update or check is already running. Wait for it to finish."));
     const selected = [...new Set(ids)].map((id) => this.rows.find((row) => row.id === id)!);
-    if (selected.some((row) => row.status !== "available" || !row.canUpdate)) return Promise.reject(new Error("Check for updates and select agents that can be updated here."));
+    if (selected.some((row) => !actionable.has(row.status) || !row.canUpdate)) return Promise.reject(new Error("Check for updates and select agents that can be updated here."));
     this.installing = Promise.resolve()
       .then(() => this.apply(selected))
       .finally(() => {
@@ -133,22 +172,9 @@ export class AgentUpdateService {
     try {
       // Serial execution avoids racing shared package managers; a failure does not hide the other results.
       for (const row of selected) {
-        this.patch(row.id, { status: "updating", message: null });
+        this.patch(row.id, { status: row.status === "broken" ? "reinstalling" : "updating", message: null });
         try {
-          const info = await this.deps.info(true);
-          const harness = info.harnesses.find((h) => h.id === row.id)!;
-          if (!harness.path) throw new Error("This agent is no longer installed. Check for updates again.");
-          const environment = this.deps.environment();
-          const plan = await (this.deps.detect ?? detectAgentInstallation)(row.id, harness.path, environment);
-          const previous = this.plans.get(row.id);
-          if (!plan.command || plan.identity !== previous?.identity || JSON.stringify(plan.command) !== JSON.stringify(previous.command))
-            throw new Error("The installation changed. Check for updates again before updating.");
-          await (this.deps.run ?? runUpdateCommand)(plan.command, { ...environment.env });
-          const after = await this.deps.info(true);
-          const installed = releaseVersion(after.harnesses.find((h) => h.id === row.id)?.version ?? null);
-          if (!installed || newerRelease(row.latestVersion!, installed))
-            throw new Error("The newer version is not active yet. Your package manager or release channel may be holding it back. Check the installation in a terminal, then check again.");
-          this.patch(row.id, { status: "current", installedVersion: installed, message: "Updated. Your next message uses the new version." });
+          this.patch(row.id, await this.execute(row));
         } catch (error) {
           this.patch(row.id, { status: "error", message: error instanceof Error ? error.message : "The update failed. Check again to retry." });
         }
@@ -157,6 +183,20 @@ export class AgentUpdateService {
       release();
       this.deps.refreshed?.();
     }
+  }
+  /** Runs the update, or the reinstall for a broken row, that the last check planned for this installation. */
+  private async execute(row: AgentUpdate): Promise<Partial<AgentUpdate>> {
+    const repair = row.status === "broken";
+    const harness = harnessInfo(await this.deps.info(true), row.id);
+    if (!harness.path) throw new Error("This agent is no longer installed. Check for updates again.");
+    const environment = this.deps.environment();
+    const plan = await (this.deps.detect ?? detectAgentInstallation)(row.id, harness.path, environment);
+    const previous = this.plans.get(row.id);
+    const command = repair ? plan.repair : plan.command;
+    if (!command || plan.identity !== previous?.identity || JSON.stringify(command) !== JSON.stringify(repair ? previous.repair : previous.command))
+      throw new Error("The installation changed. Check for updates again before updating.");
+    await (this.deps.run ?? runUpdateCommand)(command, { ...environment.env });
+    return outcome(row, plan, harnessInfo(await this.deps.info(true), row.id));
   }
   private patch(id: HarnessId, patch: Partial<AgentUpdate>): void {
     this.rows = this.rows.map((row) => (row.id === id ? { ...row, ...patch } : row));

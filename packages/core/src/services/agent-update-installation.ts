@@ -14,6 +14,8 @@ export interface AgentInstallation {
   method: string;
   releaseUrl: string;
   command: UpdateCommand | null;
+  /** Restores an installation that no longer starts; null when the broken binary would have to repair itself. */
+  repair: UpdateCommand | null;
   message: string | null;
   /** The resolved launcher must still identify the same installation at update time. */
   identity: string;
@@ -86,7 +88,14 @@ const registry = (id: HarnessId, channel = "latest") => `https://registry.npmjs.
 /** Recognize only installations whose owner can be proved; wrappers/custom package managers stay manual. */
 export async function detectAgentInstallation(id: HarnessId, binary: string, snapshot: EnvSnapshot, run: UpdateRunner = runUpdateCommand): Promise<AgentInstallation> {
   const target = await realpath(binary);
-  const manual: AgentInstallation = { identity: target, method: "Manual", releaseUrl: registry(id), command: null, message: "Update using the tool that installed this agent, then check again." };
+  const manual: AgentInstallation = {
+    identity: target,
+    method: "Manual",
+    releaseUrl: registry(id),
+    command: null,
+    repair: null,
+    message: "Update using the tool that installed this agent, then check again.",
+  };
   if (process.platform === "win32") return manual;
 
   const brewMatch = /^(.*)\/(Caskroom|Cellar)\/(codex|claude-code(?:@latest)?|opencode)\//.exec(target);
@@ -96,11 +105,13 @@ export async function detectAgentInstallation(id: HarnessId, binary: string, sna
     if (kind !== "Caskroom" || id === "opencode" || (id === "codex" ? name !== "codex" : !name?.startsWith("claude-code")))
       return { ...manual, method: "Homebrew", message: `Update this installation with Homebrew, then check again.` };
     const brew = await resolveBinary("brew", `${prefix}/bin`);
+    const cask = (verb: string): UpdateCommand | null => (brew ? { binary: brew, args: [verb, "--cask", name!] } : null);
     return {
       ...manual,
       method: "Homebrew",
       releaseUrl: `https://formulae.brew.sh/api/cask/${name}.json`,
-      command: brew ? { binary: brew, args: ["upgrade", "--cask", name!] } : null,
+      command: cask("upgrade"),
+      repair: cask("reinstall"),
       message: brew ? null : "Homebrew could not be found. Update in a terminal, then check again.",
     };
   }
@@ -112,7 +123,9 @@ export async function detectAgentInstallation(id: HarnessId, binary: string, sna
     if (npm) {
       const root = await run({ binary: npm, args: ["root", "--global"] }, { ...snapshot.env });
       if ((await realpath(root).catch(() => root)) === `${npmRoot}/node_modules`) {
-        return { ...manual, method: "npm", command: { binary: npm, args: ["install", "--global", `${packages[id]}@latest`] }, message: null };
+        // npm skips a platform package it failed to fetch and still exits 0; installing again restores it.
+        const command = { binary: npm, args: ["install", "--global", `${packages[id]}@latest`] };
+        return { ...manual, method: "npm", command, repair: command, message: null };
       }
     }
   }

@@ -7,21 +7,30 @@ import type { EnvSnapshot } from "./shell-environment.js";
 const environment: EnvSnapshot = { revision: 1, shell: "/bin/zsh", path: "/fixture", binaries: { codex: "/fixture/codex", claude: "/fixture/claude", opencode: null }, env: { PATH: "/fixture" } };
 function setup() {
   const versions: Record<HarnessId, string | null> = { codex: "codex-cli 1.0.0", claude: "2.1.0 (Claude Code)", opencode: null };
+  /** Installed agents whose version command fails. */
+  const failing = new Set<HarnessId>();
   const info = vi.fn(async (): Promise<SystemInfo> => ({
     dataDir: "/fixture",
     gh: { installed: false, path: null },
-    harnesses: harnessIds.map((id) => ({ id, state: versions[id] ? "ready" : "not_found", path: versions[id] ? `/fixture/${id}` : null, version: versions[id], revision: 1 })),
+    harnesses: harnessIds.map((id) =>
+      failing.has(id)
+        ? { id, state: "check_failed", path: `/fixture/${id}`, version: null, revision: 1 }
+        : { id, state: versions[id] ? "ready" : "not_found", path: versions[id] ? `/fixture/${id}` : null, version: versions[id], revision: 1 },
+    ),
   }));
   const detect = vi.fn(async (id: HarnessId): Promise<AgentInstallation> => ({
     method: "npm",
     identity: `/fixture/${id}`,
     releaseUrl: id,
     command: { binary: "/fixture/npm", args: [id] },
+    repair: { binary: "/fixture/npm", args: [id, "repair"] },
     message: null,
   }));
   const latest = vi.fn(async (id: string) => (id === "codex" ? "1.1.0" : "2.2.0"));
   const run = vi.fn(async (command: { binary: string; args: string[] }) => {
-    versions[command.args[0] as HarnessId] = await latest(command.args[0]!);
+    const id = command.args[0] as HarnessId;
+    versions[id] = await latest(id);
+    failing.delete(id);
     return "";
   });
   const release = vi.fn();
@@ -41,7 +50,7 @@ function setup() {
       saved.set(key, value);
     },
   });
-  return { service, info, detect, latest, run, reserve, release, versions, saved };
+  return { service, info, detect, latest, run, reserve, release, versions, failing, saved };
 }
 afterEach(() => {
   vi.useRealTimers();
@@ -132,7 +141,7 @@ describe("agent updates", () => {
   it("refuses an installation replaced after the check", async () => {
     const f = setup();
     await f.service.check();
-    f.detect.mockResolvedValueOnce({ identity: "/other/codex", method: "Manual", releaseUrl: "codex", command: null, message: null });
+    f.detect.mockResolvedValueOnce({ identity: "/other/codex", method: "Manual", releaseUrl: "codex", command: null, repair: null, message: null });
     expect((await f.service.install(["codex"])).agents[0]?.message).toContain("installation changed");
     expect(f.run).not.toHaveBeenCalled();
     expect(f.release).toHaveBeenCalled();
@@ -144,5 +153,44 @@ describe("agent updates", () => {
     const first = f.service.install(["codex"]);
     await expect(f.service.install(["claude"])).rejects.toThrow("already running");
     await first;
+  });
+});
+
+describe("installations that fail to start", () => {
+  it("offers a reinstall instead of a release check, then trusts only the next version probe", async () => {
+    const f = setup();
+    f.failing.add("codex");
+    const state = await f.service.check();
+    expect(state.agents[0]).toMatchObject({ status: "broken", installedVersion: null, method: "npm", canUpdate: true, message: null });
+    expect(f.latest).toHaveBeenCalledTimes(1);
+    const after = await f.service.install(["codex"]);
+    expect(f.run).toHaveBeenCalledWith({ binary: "/fixture/npm", args: ["codex", "repair"] }, expect.anything());
+    expect(after.agents[0]).toMatchObject({ status: "unchecked", installedVersion: "1.1.0", canUpdate: false, message: "Reinstalled." });
+  });
+  it("says when an update leaves the agent unable to start and offers the reinstall", async () => {
+    const f = setup();
+    await f.service.check();
+    f.run.mockImplementationOnce(async () => {
+      f.failing.add("codex");
+      return "";
+    });
+    const state = await f.service.install(["codex"]);
+    expect(state.agents[0]).toMatchObject({ status: "broken", installedVersion: null, canUpdate: true, message: "Codex no longer starts after the update." });
+  });
+  it("reports a reinstall that did not help", async () => {
+    const f = setup();
+    f.failing.add("codex");
+    await f.service.check();
+    f.run.mockResolvedValueOnce("");
+    expect((await f.service.install(["codex"])).agents[0]).toMatchObject({ status: "error", message: expect.stringContaining("Reinstalling did not fix it") });
+  });
+  it("leaves the reinstall to the user when the broken binary is its own updater", async () => {
+    const f = setup();
+    f.failing.add("claude");
+    f.detect.mockImplementation(async (id) => ({ method: "Native", identity: `/fixture/${id}`, releaseUrl: id, command: { binary: `/fixture/${id}`, args: ["update"] }, repair: null, message: null }));
+    const state = await f.service.check();
+    expect(state.agents[1]).toMatchObject({ status: "broken", canUpdate: false, message: expect.stringContaining("Reinstall using the tool") });
+    await expect(f.service.install(["claude"])).rejects.toThrow("Check for updates");
+    expect(f.run).not.toHaveBeenCalled();
   });
 });

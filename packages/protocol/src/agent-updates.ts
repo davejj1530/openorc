@@ -4,8 +4,10 @@ export interface AgentUpdate {
   id: HarnessId;
   installedVersion: string | null;
   latestVersion: string | null;
-  status: "not_installed" | "unchecked" | "current" | "available" | "checking" | "updating" | "error";
+  /** `broken`: installed but fails to start, so a reinstall is the remedy. */
+  status: "not_installed" | "unchecked" | "current" | "available" | "broken" | "checking" | "updating" | "reinstalling" | "error";
   method: string;
+  /** OpenOrc can run the update, or the reinstall for a broken installation, itself. */
   canUpdate: boolean;
   message: string | null;
   checkedAt: number | null;

@@ -53,6 +53,10 @@ const base = {
 export const ActivityStatus = z.enum(["running", "success", "error", "cancelled", "disconnected"]);
 export type ActivityStatus = z.infer<typeof ActivityStatus>;
 
+/** What gets a failed activity going again: more usage, or signing the provider's CLI back in. */
+export const ActivityRecovery = z.object({ kind: z.enum(["usage", "sign_in"]), provider: z.enum(["codex", "claude"]) });
+export type ActivityRecovery = z.infer<typeof ActivityRecovery>;
+
 /** A command the agent left running in the background, such as a dev server. It runs until it ends or is stopped. */
 export const BackgroundCommand = z.object({ id: z.string(), description: z.string() });
 export type BackgroundCommand = z.infer<typeof BackgroundCommand>;
@@ -106,7 +110,7 @@ export const AgentEvent = z.discriminatedUnion("type", [
     text: z.string().optional(),
     detail: z.unknown().optional(),
     activityKind: z.literal("image_generation").optional(),
-    recovery: z.object({ kind: z.literal("usage"), provider: z.enum(["codex", "claude"]) }).optional(),
+    recovery: ActivityRecovery.optional(),
     imagePath: z.string().optional(),
   }),
   z.object({

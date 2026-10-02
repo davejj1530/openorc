@@ -10,6 +10,7 @@ vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onFrame: vi.fn(), onInvali
 vi.mock("./ThreadImages", () => ({
   ThreadRichText: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   ThreadMedia: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  useThreadMedia: () => ({ fileScope: { kind: "thread", id: "thread-1" }, openImage: () => {} }),
   ThreadImage: () => null,
   isImageView: () => false,
   ImageViewRow: () => <div>Viewed image</div>,
@@ -219,6 +220,26 @@ it("keeps quota recovery visible when work is collapsed and preserves it through
   fireEvent.click(screen.getByRole("button", { name: "Manage usage" }));
   expect(navigate).toHaveBeenCalledWith({ view: "settings", section: "usage", provider: "claude" });
   navigate.mockRestore();
+});
+
+it("signs a signed-out Claude back in from the thread's Terminal, under the folded work and on its row", async () => {
+  const { useLayout } = await import("../lib/layout");
+  const { typeAtPrompt } = await import("../lib/terminal-requests");
+  const signedOut: Block = { id: "sign-in", kind: "activity", label: "Claude is signed out", status: "error", text: "", recovery: { kind: "sign_in", provider: "claude" } };
+  render(<WorkTranscript runId="run" blocks={[signedOut, { ...end, outcome: "error" }]} />);
+  const signIn = screen.getByRole("button", { name: "Sign in" });
+  expect(signIn.parentElement!.textContent).toBe("Claude is signed out. Sign in");
+  fireEvent.click(signIn);
+  expect(useLayout.getState()).toMatchObject({ panelOpen: true, panelTab: "terminal", panelThreadId: "thread-1" });
+  expect(useLayout.getState().panelTools["thread:thread-1"]).toEqual(["terminal"]);
+  const typed: string[] = [];
+  const shell = typeAtPrompt("thread:thread-1", (command) => typed.push(command));
+  shell.output("\x1b[?2004h");
+  shell.dispose();
+  expect(typed).toEqual(["claude auth login"]);
+
+  fireEvent.click(screen.getByRole("button", { name: "Failed for 3m 42s" }));
+  expect(screen.getByRole("button", { name: "Sign in" }).parentElement!.textContent).toBe("Sign in");
 });
 
 const codexUsage: ProviderUsage = {

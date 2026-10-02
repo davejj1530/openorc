@@ -332,3 +332,19 @@ it("attaches usage recovery only to rejected structured rate-limit events", () =
   const warning = parser.parseLine(JSON.stringify({ type: "rate_limit_event", rate_limit_info: { status: "allowed_warning" } }));
   expect(JSON.stringify(warning)).not.toContain('"recovery":');
 });
+
+it("offers sign-in when the account login fails, and leaves a failing key's message as Claude Code wrote it", () => {
+  const failure = (id: string, text: string) =>
+    JSON.stringify({ type: "assistant", error: "authentication_failed", is_api_error_message: true, message: { id, model: "<synthetic>", role: "assistant", content: [{ type: "text", text }] } });
+  const account = new ClaudeStreamParser("account");
+  account.parseLine(JSON.stringify({ type: "system", subtype: "init", session_id: "s", model: "claude-opus-5-5", apiKeySource: "none" }));
+  const signedOut = account.parseLine(failure("m1", "Failed to authenticate: OAuth session expired and could not be refreshed"));
+  expect(signedOut).toContainEqual(expect.objectContaining({ type: "activity.updated", label: "Claude is signed out", status: "error", recovery: { kind: "sign_in", provider: "claude" } }));
+  expect(signedOut.map((ev) => ev.type)).not.toContain("message.completed");
+
+  const keyed = new ClaudeStreamParser("keyed");
+  keyed.parseLine(JSON.stringify({ type: "system", subtype: "init", session_id: "s", model: "claude-opus-5-5", apiKeySource: "ANTHROPIC_API_KEY" }));
+  const invalidKey = keyed.parseLine(failure("m2", "Invalid API key · Fix external API key"));
+  expect(invalidKey).toContainEqual(expect.objectContaining({ type: "message.completed", text: "Invalid API key · Fix external API key" }));
+  expect(JSON.stringify(invalidKey)).not.toContain('"recovery":');
+});

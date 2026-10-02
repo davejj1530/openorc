@@ -7,6 +7,9 @@ import { claudeFastModeReason } from "./fast-mode.js";
  */
 const BACKGROUND_WORK = new Set(["local_agent", "remote_agent", "local_workflow", "in_process_teammate"]);
 
+/** Logins that come from a key the user set rather than their account. Signing in again does not replace them. */
+const USER_KEY_SOURCES = new Set(["ANTHROPIC_API_KEY", "apiKeyHelper"]);
+
 function sameCommands(a: readonly BackgroundCommand[], b: readonly BackgroundCommand[]): boolean {
   return a.length === b.length && a.every((command, i) => command.id === b[i]!.id && command.description === b[i]!.description);
 }
@@ -44,6 +47,8 @@ export class ClaudeStreamParser {
   private lastToolId: string | null = null;
   /** The model the session runs on, from the init line; picks its entry out of a result's per-model usage. */
   private model: string | null = null;
+  /** Where the session's login comes from, from the init line. */
+  private keySource: string | null = null;
   /** Model turns summed over every result line; read when the process exits. */
   turns = 0;
   /** The init line repeats at every turn of a stream-json process; the session is announced once. */
@@ -109,7 +114,8 @@ export class ClaudeStreamParser {
         this.streamEvent(msg, now, out);
         break;
       case "assistant":
-        this.assistant(msg, now, out);
+        if (this.accountSignedOut(msg)) this.signInNeeded(msg, now, out);
+        else this.assistant(msg, now, out);
         break;
       case "user":
         this.user(msg, now, out);
@@ -172,6 +178,28 @@ export class ClaudeStreamParser {
         out.push({ type: "thinking.delta", runId: this.runId, ts: now, messageId, text: delta["thinking"] });
       }
     }
+  }
+
+  /**
+   * Claude Code answers a request its login could not authorize with a stand-in assistant line. An account login is
+   * fixed by signing in again; a key the user set keeps the CLI's own words.
+   */
+  private accountSignedOut(msg: Record<string, unknown>): boolean {
+    return msg["error"] === "authentication_failed" && !USER_KEY_SOURCES.has(this.keySource ?? "");
+  }
+
+  private signInNeeded(msg: Record<string, unknown>, now: number, out: AgentEvent[]): void {
+    this.settleRequest(now, out);
+    this.finishThinking(now, out);
+    out.push({
+      type: "activity.updated",
+      runId: this.runId,
+      ts: now,
+      activityId: `sign-in-${str(msg["uuid"]) ?? now}`,
+      label: "Claude is signed out",
+      status: "error",
+      recovery: { kind: "sign_in", provider: "claude" },
+    });
   }
 
   /** Complete assistant lines carry final text, full tool input and per-request context usage. */
@@ -310,6 +338,7 @@ export class ClaudeStreamParser {
     const subtype = msg["subtype"];
     if (subtype === "init") {
       this.model = str(msg["model"]);
+      this.keySource = str(msg["apiKeySource"]);
       if (!this.announced) {
         this.announced = true;
         out.push({

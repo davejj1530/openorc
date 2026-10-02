@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
-import type { ActivityStatus, AgentEvent, Frame, McpToolSource } from "@openorc/protocol";
+import type { ActivityRecovery, ActivityStatus, AgentEvent, Frame, McpToolSource } from "@openorc/protocol";
 import { core } from "./rpc";
 
 /**
@@ -36,7 +36,7 @@ export type Block = { at?: number; turnKey?: string; runId?: string } & (
       detail?: unknown;
       activityKind?: "image_generation";
       imagePath?: string;
-      recovery?: { kind: "usage"; provider: "codex" | "claude" };
+      recovery?: ActivityRecovery;
     }
   | { id: string; kind: "approval"; approvalId: string; approvalKind: string; toolName?: string; input: unknown; reason?: string; decision?: string; answers?: Record<string, string[]> }
   | { id: string; kind: "status"; text: string; tone: "muted" | "ok" | "bad"; boundary?: "turn" | "session"; durationMs?: number; outcome?: "success" | "error" | "cancelled" }

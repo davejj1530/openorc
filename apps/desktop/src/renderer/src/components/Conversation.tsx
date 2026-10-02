@@ -22,6 +22,8 @@ import { useConversationTranscript } from "../lib/conversation-transcript";
 import { conversationCanSteer, conversationSteerReason, conversationSendDisabledReason } from "../lib/conversation-presentation";
 import { useConversationSettings } from "../lib/conversation-settings";
 import { TeamConversation, TeamTaskConversation } from "./TeamConversation";
+import { useOrclingConversation } from "./useOrclingConversation";
+import { ConversationVoice } from "../lib/turn-authors";
 
 export type ConversationScope = { kind: "task"; task: Task } | { kind: "thread"; thread: ThreadSummary };
 
@@ -137,6 +139,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
 
   const settings = useConversationSettings({ thread, activeRun });
   const { choice, mode, permission, permissionReady, permissionError } = settings;
+  const orclings = useOrclingConversation({ thread, runs, choice, onModel: settings.selectModel });
   const draftKey = `conversation.${scope.kind === "thread" ? scope.thread.id : scope.task.id}`;
   const { prompt, setPrompt, clearDraft, error: draftError } = useConversationDraft({ draftKey, threadId: thread?.id ?? null, initialText: thread?.draft ?? "" });
   const start = useRpcMutation("runs.start");
@@ -211,6 +214,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
     setSends((count) => count + 1);
     await settings.waitForSave();
     const body = text || (attachments.length ? "See the attached image." : "Start working on this task.");
+    if (await orclings.ask(body, attachments)) return clearDraft();
     if (thread && working) {
       if (now && canSteer && activeRun) await send.mutateAsync({ runId: activeRun.id, text: body, attachments });
       else await queue.mutateAsync({ id: thread.id, text: body, attachments, requestKey: crypto.randomUUID() });
@@ -258,21 +262,23 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   function renderTranscript() {
     if (merged && merged.blocks.length > 0)
       return (
-        <Transcript
-          working={working}
-          fileScope={{ kind: scope.kind, id: scope.kind === "thread" ? scope.thread.id : scope.task.id }}
-          basePath={basePath}
-          run={merged}
-          scrollKey={scope.kind === "thread" ? scope.thread.id : scope.task.id}
-          followKey={sends}
-          onFork={thread ? forkFrom : undefined}
-          hasOlder={hasOlder}
-          onLoadOlder={loadOlder}
-          trailing={changeCard}
-        />
+        <ConversationVoice.Provider value={orclings.voice}>
+          <Transcript
+            working={working}
+            fileScope={{ kind: scope.kind, id: scope.kind === "thread" ? scope.thread.id : scope.task.id }}
+            basePath={basePath}
+            run={merged}
+            scrollKey={scope.kind === "thread" ? scope.thread.id : scope.task.id}
+            followKey={sends}
+            onFork={thread ? forkFrom : undefined}
+            hasOlder={hasOlder}
+            onLoadOlder={loadOlder}
+            trailing={changeCard}
+          />
+        </ConversationVoice.Provider>
       );
     if (runsQuery.isLoading) return null;
-    return <Empty title={conversationEmptyTitle({ count: runs.length, firstTaskRun })}>{runs.length === 0 ? emptyHint : ""}</Empty>;
+    return orclings.empty ?? <Empty title={conversationEmptyTitle({ count: runs.length, firstTaskRun })}>{runs.length === 0 ? emptyHint : ""}</Empty>;
   }
   return (
     <div className="h-full min-w-0 flex flex-col min-h-0">
@@ -314,7 +320,9 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
             value={prompt}
             onChange={setPrompt}
             onSubmit={submit}
-            placeholder={placeholder}
+            placeholder={orclings.placeholder ?? placeholder}
+            mentions={orclings.mentions}
+            modelControl={orclings.modelControl}
             model={choice}
             onModel={settings.selectModel}
             onExecutionMode={settings.selectExecutionMode}

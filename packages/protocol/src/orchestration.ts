@@ -23,10 +23,11 @@ export const LeadOverrides = z
   .strict();
 export type LeadOverrides = z.infer<typeof LeadOverrides>;
 
-/** Team is an execution target, never a provider or a model ID. */
+/** Team and Orcling are execution targets, never a provider or a model ID. */
 export const ExecutionTarget = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("model"), settings: ModelExecutionSettings }).strict(),
   z.object({ kind: z.literal("team"), teamRevisionId: z.string().min(1), initialLeadOverrides: LeadOverrides.optional() }).strict(),
+  z.object({ kind: z.literal("orcling"), orclingId: z.string().min(1) }).strict(),
 ]);
 export type ExecutionTarget = z.infer<typeof ExecutionTarget>;
 
@@ -129,6 +130,8 @@ export const TeamMember = z
     responsibility: z.string().trim().min(1, "Describe each agent's responsibility.").max(8000),
     managerKey: MemberKey.nullable(),
     settings: ModelExecutionSettings,
+    /** An Orcling who takes this seat, bringing its instructions and memory. */
+    orclingId: z.string().min(1).nullable().optional(),
   })
   .strict();
 export type TeamMember = z.infer<typeof TeamMember>;

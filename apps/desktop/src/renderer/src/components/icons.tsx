@@ -191,6 +191,8 @@ export const MessageSquare = icon("MessageSquare", <path d="M5.5 4h13A2.5 2.5 0 
 export const MailOpen = icon("MailOpen", <path d="m3 10 9-7 9 7v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 19Z M3 10l9 6 9-6 M3.5 20l5.5-6 M20.5 20 15 14" />);
 export const Brain = icon("Brain", layers);
 export const SquareStack = icon("SquareStack", layers);
+/** An Orcling: the mascot's soft body and two upright eyes. */
+export const Orcling = icon("Orcling", <path d="M12 4.5c5.6 0 7.5 1.9 7.5 7.5s-1.9 7.5-7.5 7.5-7.5-1.9-7.5-7.5 1.9-7.5 7.5-7.5Z M9.75 10.25v2.5 M14.25 10.25v2.5" />);
 export const Workflow = icon(
   "Workflow",
   <>

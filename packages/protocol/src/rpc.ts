@@ -7,6 +7,7 @@ import { z } from "zod";
 import type { AgentUpdates } from "./agent-updates.js";
 import { slackRpcParams, type SlackStatus } from "./slack.js";
 import { BranchName, pullRequestRpcParams, type PullRequestRpcResults } from "./pull-requests.js";
+import { orclingRpcParams, type OrclingRpcResults } from "./orclings.js";
 import { HarnessId, type HarnessInfo } from "./harness.js";
 import { AgentEvent, AgentKind, ApprovalDecision, Frame } from "./events.js";
 import type { McpAppOpenResult } from "./mcp-apps.js";
@@ -65,6 +66,7 @@ const REVIEW_SCOPE_REQUIRED = "Review comments need a conversation or a task.";
 export const rpcParams = {
   ...slackRpcParams,
   ...pullRequestRpcParams,
+  ...orclingRpcParams,
   "tasks.comments.list": z.object({ taskId: z.string() }),
   "tasks.comments.post": z
     .object({
@@ -183,6 +185,8 @@ export const rpcParams = {
   }),
   "threads.get": z.object({ id: z.string() }),
   "threads.messages": z.object({ id: z.string() }),
+  /** The newest thing the person or an agent said in the conversation, its text clipped for a preview. */
+  "threads.lastMessage": z.object({ id: z.string() }),
   "threads.plans": z.object({ id: z.string() }),
   "threads.implementPlan": z.object({ id: z.string(), planId: z.string(), permissionMode: PermissionPreset }),
   "threads.exportPlan": z.object({
@@ -572,7 +576,7 @@ export interface ResolvedExtraction {
   viaApiKey: boolean;
 }
 
-export interface RpcResults extends PullRequestRpcResults {
+export interface RpcResults extends PullRequestRpcResults, OrclingRpcResults {
   "tasks.comments.list": TaskDiscussion;
   "tasks.comments.post": TaskComment;
   "tasks.comments.retry": CommentAttempt;
@@ -637,6 +641,7 @@ export interface RpcResults extends PullRequestRpcResults {
   "threads.list": ThreadSummary[];
   "threads.get": ThreadSummary | null;
   "threads.messages": ThreadMessage[];
+  "threads.lastMessage": ThreadMessage | null;
   "threads.plans": ConversationPlan[];
   "threads.implementPlan": Run;
   "threads.exportPlan": { path: string };

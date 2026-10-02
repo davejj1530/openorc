@@ -34,6 +34,7 @@ import { createInstructionsHandlers } from "./handlers/instructions.js";
 import { createInboxHandlers } from "./handlers/inbox.js";
 import { createMcpAppsHandlers } from "./handlers/mcp-apps.js";
 import { createMemoryHandlers } from "./handlers/memory.js";
+import { createOrclingHandlers } from "./handlers/orclings.js";
 import { createOrchestrationHandlers } from "./handlers/orchestration.js";
 import { createProjectsHandlers } from "./handlers/projects.js";
 import { createPullRequestHandlers } from "./handlers/pull-requests.js";
@@ -64,6 +65,7 @@ import { createTaskCreateHost } from "./mcp-host/task-create.js";
 import { createTasksHost } from "./mcp-host/tasks.js";
 import { createTeamHost } from "./mcp-host/team.js";
 import { createThreadsHost } from "./mcp-host/threads.js";
+import { createOrclingHost } from "./mcp-host/orcling.js";
 import { AgentUpdateService } from "./services/agent-updates.js";
 import { AttachmentService } from "./services/attachments.js";
 import type { ProtectedSecretStore } from "./services/extraction-credentials.js";
@@ -72,6 +74,7 @@ import { ImportService } from "./services/imports.js";
 import { LedgerUpkeep } from "./services/ledger-upkeep.js";
 import { LifecycleService } from "./services/lifecycle.js";
 import { MemoryService, type ProviderInfo } from "./services/memory.js";
+import { OrclingService } from "./services/orclings.js";
 import { OrchestrationService } from "./services/orchestration.js";
 import { inUnvettedCopy } from "./services/review-copies.js";
 import { ProjectService } from "./services/projects.js";
@@ -157,6 +160,7 @@ export class OpenOrc {
   readonly environment: ShellEnvironment;
   readonly providerUsage: ProviderUsageService;
   readonly memory: MemoryService;
+  readonly orclings: OrclingService;
   readonly textGeneration: TextGenerationService;
   readonly threads: ThreadService;
   readonly settings: AppSettingsService;
@@ -233,6 +237,8 @@ export class OpenOrc {
     };
     this.memory = new MemoryService(db, { dataDir: options.dataDir, secrets: options.memorySecrets, embedder: options.embedder }, backgroundProviders, invalidate, this.log);
     this.textGeneration = new TextGenerationService(db, backgroundProviders, invalidate);
+    this.orclings = new OrclingService({ db, dataDir: options.dataDir, memory: this.memory, runs: () => this.runs, threads: () => this.threads, invalidate });
+    this.memory.extractionOwner = (run, thread) => this.orclings.memoryOwner(run, thread);
     this.runs = new RunService(
       db,
       this.ledger,
@@ -251,6 +257,7 @@ export class OpenOrc {
           return minutes ? minutes * 60_000 : null;
         },
         claudeUserMcpServers: () => this.settings.get().claudeUserMcpServers,
+        orclings: this.orclings.runHooks,
         taskImages: (spec) => new AttachmentService(options.dataDir).forTask(spec),
         inlineToolImages: (output) => this.toolImages.inline(output),
         brief: (project) => this.memory.brief(project),
@@ -530,12 +537,23 @@ export class OpenOrc {
   async mcpServer(): Promise<OpenOrcMcpServer> {
     if (!this.mcp) {
       const { assertTeamActor, taskFor, projectFor } = createContextHost({ teams: this.teams, db: this.db });
+      const threadsHost = createThreadsHost({ threadService: this.threads, teamConversations: this.teamConversations, db: this.db, assertTeamActor });
       this.mcp = startMcpServer({
         ...createRunHost({ runService: this.runs, db: this.db, comments: this.comments, assertTeamActor }),
         ...createBrowserHost({ db: this.db, runService: this.runs, browser: this.options.browser, assertTeamActor }),
         ...createMemoryHost({ memoryService: this.memory, runService: this.runs, db: this.db, assertTeamActor, taskFor, projectFor }),
         ...createTeamHost({ teams: this.teams, slack: this.slack }),
-        ...createThreadsHost({ threadService: this.threads, teamConversations: this.teamConversations, db: this.db, assertTeamActor }),
+        ...threadsHost,
+        ...createOrclingHost({
+          db: this.db,
+          orclings: this.orclings,
+          memory: this.memory,
+          runs: this.runs,
+          threads: this.threads,
+          settings: this.settings,
+          send: threadsHost.threads.send,
+          invalidate: (keys) => this.options.transport.push({ type: "invalidate", keys }),
+        }),
         pullReview: this.pullRequests.agentTools(),
         tasks: {
           ...createTasksHost({ teams: this.teams, threadService: this.threads, teamTasks: this.teamTasks, dataDir: this.options.dataDir, assertTeamActor }),
@@ -719,8 +737,8 @@ export class OpenOrc {
       createPullRequestHandlers({ pullRequests: this.pullRequests }),
       createReviewerAppHandlers({ reviewerApp: this.reviewerApp }),
       createOrchestrationHandlers({ orchestrationService: this.orchestration, teamConversations: this.teamConversations, teamTasks: this.teamTasks, db: this.db }),
-      createThreadQueriesHandlers({ threadService: this.threads, db: this.db, imports: this.imports }),
-      createThreadLaunchHandlers({ threadService: this.threads, teamConversations: this.teamConversations, imports: this.imports }),
+      createThreadQueriesHandlers({ threadService: this.threads, db: this.db, ledger: this.ledger, imports: this.imports }),
+      createThreadLaunchHandlers({ threadService: this.threads, teamConversations: this.teamConversations, orclings: this.orclings, imports: this.imports }),
       createThreadWorkspaceHandlers({
         db: this.db,
         teamDeletionsService: this.teamDeletions,
@@ -749,6 +767,7 @@ export class OpenOrc {
       createSchedulesHandlers({ schedules: this.schedules }),
       createCatalogHandlers({ runService: this.runs, invalidate }),
       createMemoryHandlers({ memory: this.memory, db: this.db }),
+      createOrclingHandlers({ orclings: this.orclings }),
       createInboxHandlers({ runService: this.runs, db: this.db, teams: this.teams }),
       createBenchHandlers({ frames: this.frames, bench: this.bench, db: this.db, ledger: this.ledger, transport: this.options.transport, benchmarks: Boolean(this.options.benchmarks) }),
     );

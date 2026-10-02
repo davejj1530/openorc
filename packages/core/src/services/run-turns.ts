@@ -1,9 +1,10 @@
-import { projects, runs, threads, type Db } from "@openorc/db";
+import { runs, threads, type Db } from "@openorc/db";
 import { randomUUID } from "node:crypto";
 import { type LiveSettings } from "@openorc/agents";
 import { type AgentEvent, type AgentKind, type Run, type Thread } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
 import type { ContinueSettings, LiveRun, RunHooks, RunScope, SendOptions, StartRunInput } from "./run-types.js";
+import { executionProject } from "./workspace-home.js";
 
 /** Settings fixed at process launch must match before another turn can reuse it. */
 export function matchesContinueSettings(entry: LiveRun, desired: ContinueSettings): boolean {
@@ -22,7 +23,7 @@ interface RunTurnsDependencies {
   live: ReadonlyMap<string, LiveRun>;
   compactions: ReadonlyMap<string, Promise<void>>;
   isClosing: () => boolean;
-  hooks: Pick<RunHooks, "assertSend">;
+  hooks: Pick<RunHooks, "assertSend" | "orclings">;
   resetAgentChain: (threadId: string) => void;
   disarmIdle: (runId: string) => void;
   armIdle: (entry: LiveRun) => void;
@@ -66,8 +67,8 @@ export class RunTurns {
   }
 
   private async restartTurn(entry: LiveRun, thread: Thread, text: string, options: SendOptions): Promise<void> {
-    const project = projects.get(this.deps.db, thread.projectId);
-    if (!project) throw new Error("The thread's project was not found.");
+    // A Workspace conversation works in its own folder, not the Workspace root.
+    const project = executionProject(this.deps.db, thread);
     await this.deps.start({
       scope: { thread, task: null },
       project,
@@ -131,7 +132,9 @@ export class RunTurns {
 
   private mustRestart(entry: LiveRun, thread: Thread): boolean {
     const launchPreference = entry.run.mode === "plan" ? entry.run.permissionMode : entry.providerPermissionMode;
-    return entry.failed !== null || thread.permissionMode !== launchPreference || thread.mode !== entry.run.mode || thread.agent !== entry.run.agent;
+    if (entry.failed !== null || thread.permissionMode !== launchPreference || thread.mode !== entry.run.mode || thread.agent !== entry.run.agent) return true;
+    // A guest Orcling's process hands the thread back to its own speaker, and an Orcling's own conversation may be due a new session.
+    return (entry.run.orclingId ?? null) !== (thread.orclingId ?? null) || this.deps.hooks.orclings?.rolloverDue(thread) === true;
   }
 
   private async applyThreadSettings(entry: LiveRun, thread: Thread): Promise<boolean> {

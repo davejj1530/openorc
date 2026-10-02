@@ -12,6 +12,11 @@ export const MAX_AGENT_HOPS = 4;
 
 const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0, max).trimEnd()}…` : text);
 
+/** Agents reach the threads of their own project; an Orcling works across all of the person's projects. */
+export function reachesThread(db: Db, runId: string, source: Thread, target: Thread): boolean {
+  return target.projectId === source.projectId || Boolean(runRepo.get(db, runId)?.orclingId);
+}
+
 type MessageResult = { delivered: boolean; message: string };
 type MessageScope = { thread: Thread; target: Thread };
 type MessageRelay = (source: Thread, target: Thread) => string;
@@ -227,7 +232,7 @@ export class ThreadAgentTools {
   async toolThreadRead(runId: string, id: string, limit = 10): Promise<{ thread: ThreadCard; messages: { role: "user" | "assistant" | "system"; text: string }[] } | null> {
     const { thread } = this.scopeOf(runId);
     const target = threads.get(this.db, id);
-    if (!thread || !target || target.projectId !== thread.projectId || teamDeletedThreads.has(this.db, id)) return null;
+    if (!thread || !target || !reachesThread(this.db, runId, thread, target) || teamDeletedThreads.has(this.db, id)) return null;
     const out = this.context.messages(id);
     for (const run of runRepo.listForThread(this.db, id).slice(-4)) {
       for (const ev of listEvents(this.db, run.id, { kinds: ["message.completed"], newest: true, limit: 2000 })) {
@@ -324,7 +329,7 @@ export class ThreadAgentTools {
     const { thread } = this.scopeOf(runId);
     const target = threads.get(this.db, id);
     if (!thread) return { message: "Only a thread can message other threads." };
-    if (!target || target.projectId !== thread.projectId || teamDeletedThreads.has(this.db, id)) return { message: "No such thread in this project." };
+    if (!target || !reachesThread(this.db, runId, thread, target) || teamDeletedThreads.has(this.db, id)) return { message: "No such thread in this project." };
     if (target.id === thread.id) return { message: "That is this thread." };
     return { thread, target };
   }

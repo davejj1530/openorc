@@ -5,6 +5,7 @@ import { Button, Dialog, Field, IconButton, Segmented, Textarea, TextButton, Too
 import { draftAuthor, offeredSummary, readReviewAuthor, withModelSummary, writeReviewAuthor } from "../lib/pull-requests";
 import { useRpc, useRpcMutation } from "../lib/query";
 import { useModelCatalog } from "../lib/use-model-catalog";
+import { useOrclings } from "../lib/orclings";
 
 type Key = { projectId: string; number: number };
 
@@ -255,6 +256,7 @@ function DiscardDialog({ open, onClose, reviewKey, count }: { open: boolean; onC
 /** The draft review under the diff: its comments, and the way to post it or throw it away. */
 export function PullRequestReviewBar({ projectId, pull, review }: { projectId: string; pull: PullRequestDetail; review: PullRequestReview | null }) {
   const models = useModelCatalog();
+  const orclings = useOrclings();
   const reviewKey = { projectId, number: pull.number };
   const [listOpen, setListOpen] = useState(false);
   const [dialog, setDialog] = useState<"submit" | "discard" | null>(null);
@@ -268,7 +270,7 @@ export function PullRequestReviewBar({ projectId, pull, review }: { projectId: s
       {listOpen && comments.length > 0 ? (
         <ul className="max-h-60 overflow-y-auto border-b border-line py-1" aria-label="Draft comments">
           {comments.map((comment) => (
-            <DraftCommentRow key={comment.id} comment={comment} reviewKey={reviewKey} author={draftAuthor(comment.author, models.data)} />
+            <DraftCommentRow key={comment.id} comment={comment} reviewKey={reviewKey} author={draftAuthor(comment.author, models.data, orclings)} />
           ))}
         </ul>
       ) : null}

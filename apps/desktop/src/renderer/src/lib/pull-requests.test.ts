@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { offeredSummary, pullRequestNumber, pullRequestTarget, pullRequestTone, withModelSummary } from "./pull-requests";
+import { defaultOrclingLook, type ModelOption, type Orcling } from "@openorc/protocol";
+import { draftAuthor, offeredSummary, pullRequestNumber, pullRequestTarget, pullRequestTone, withModelSummary } from "./pull-requests";
 
 describe("pull request presentation", () => {
   it("reads the number from a pull request's address only", () => {
@@ -9,6 +10,25 @@ describe("pull request presentation", () => {
     expect(pullRequestNumber("https://github.com/acme/app/issues/3")).toBeNull();
     expect(pullRequestNumber("https://github.com/acme/app/pull/3x")).toBeNull();
     expect(pullRequestNumber(null)).toBeNull();
+  });
+
+  it("names a draft comment by the Orcling that wrote it and the model it ran on", () => {
+    const models: ModelOption[] = [{ id: "gpt-6-sol", label: "GPT-6 Sol", agent: "codex", isDefault: true, efforts: ["low", "high"], defaultEffort: "low" }];
+    const gloop: Orcling = {
+      id: "gloop",
+      name: "Gloop",
+      look: defaultOrclingLook,
+      settings: { agent: "codex", model: "gpt-6-sol", effort: "low", fastMode: false },
+      permission: "approve",
+      threadId: "home",
+      createdAt: 1,
+      updatedAt: 1,
+    };
+    expect(draftAuthor(null, models, [gloop])).toBe("You");
+    expect(draftAuthor({ agent: "codex", model: "gpt-6-sol" }, models, [gloop])).toBe("GPT-6 Sol");
+    expect(draftAuthor({ agent: "codex", model: "gpt-6-sol", orclingId: "gloop" }, models, [gloop])).toBe("Gloop - GPT-6 Sol");
+    // A deleted Orcling leaves the model that ran.
+    expect(draftAuthor({ agent: "codex", model: "gpt-6-sol", orclingId: "gone" }, models, [gloop])).toBe("GPT-6 Sol");
   });
 
   it("shows a draft as its own state until it is merged or closed", () => {

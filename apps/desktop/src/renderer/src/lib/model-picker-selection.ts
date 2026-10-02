@@ -61,8 +61,9 @@ export function pickerSettings(input: { model: ModelOption | undefined; value: M
   return { efforts, defaultEffort, effort, effortIndex, fast, fastAvailable, fastBlocked, fastHint };
 }
 
-export function browserModels(input: { list: ModelOption[]; section: HarnessId | "teams"; query: string }) {
-  const options = input.section === "teams" ? [] : input.list.filter((model) => model.agent === input.section);
+/** A harness's models for the browser; teams and Orclings list no models (a null harness). */
+export function browserModels(input: { list: ModelOption[]; section: HarnessId | null; query: string }) {
+  const options = input.section === null ? [] : input.list.filter((model) => model.agent === input.section);
   const legacy = options.filter((model) => model.legacy);
   const searching = input.query.trim().length > 0;
   const visible = options.filter((model) => (searching || !model.legacy) && (!searching || matchesQuery(model, input.query)));

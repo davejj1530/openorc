@@ -3,6 +3,7 @@ import { MAX_TEAM_DEPTH, MAX_TEAM_MEMBERS, harnessInfo, harnessLoggedIn, isHarne
 import { Plus, Trash2, Workflow } from "../components/icons";
 import { MemberAvatar, TEAM_AVATARS } from "../components/MemberAvatar";
 import { defaultChoice, ModelPicker } from "../components/ModelPicker";
+import { orclingById, useOrclings } from "../lib/orclings";
 import { Badge, Button, Dialog, IconButton, Input, Select, Switch, Textarea, TextButton, Tooltip } from "../components/ui";
 import { addTeamMember, promoteTeamLead, removeTeamMember, updateTeamMember } from "../lib/team-editor-draft";
 import { useRpc, useRpcMutation } from "../lib/query";
@@ -90,10 +91,12 @@ function MemberEditor({
 }) {
   const id = useId();
   const lead = member.managerKey === null;
+  // An Orcling in the seat brings its own name and face; they change only where the Orcling is edited.
+  const seated = orclingById(useOrclings(), member.orclingId);
   return (
     <div className="orchestration-card orchestration-member">
       <div className="flex items-center gap-3 mb-3 min-w-0">
-        <MemberAvatar avatar={avatar} fallbackIndex={index} size="lg" />
+        <MemberAvatar avatar={avatar} orcling={seated} fallbackIndex={index} size="lg" />
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-sm font-medium truncate">{member.name || `Member ${index + 1}`}</span>
           {lead ? (
@@ -116,20 +119,22 @@ function MemberEditor({
           <Trash2 size={13} />
         </Button>
       </div>
-      <AvatarEditor
-        memberKey={member.key}
-        memberName={member.name || `Member ${index + 1}`}
-        teamId={teamId}
-        avatar={avatar}
-        fallbackIndex={index}
-        ready={avatarReady}
-        loading={avatarLoading}
-        loadError={avatarError}
-      />
+      {seated ? null : (
+        <AvatarEditor
+          memberKey={member.key}
+          memberName={member.name || `Member ${index + 1}`}
+          teamId={teamId}
+          avatar={avatar}
+          fallbackIndex={index}
+          ready={avatarReady}
+          loading={avatarLoading}
+          loadError={avatarError}
+        />
+      )}
       <div className="orchestration-fields">
-        <label className="grid gap-1.5 text-sm text-ink-3">
+        <label className="grid gap-1.5 text-sm text-ink-3" title={seated ? `${seated.name} keeps its own name. Edit ${seated.name} to rename it.` : undefined}>
           Member name
-          <Input maxLength={80} value={member.name} onChange={(event) => onChange({ name: event.target.value })} />
+          <Input maxLength={80} value={seated?.name ?? member.name} disabled={Boolean(seated)} onChange={(event) => onChange({ name: event.target.value })} />
         </label>
         <label className="grid gap-1.5 text-sm text-ink-3">
           Reports to
@@ -145,29 +150,7 @@ function MemberEditor({
           </Select>
         </label>
       </div>
-      <div className="mt-3 flex items-center gap-3 flex-wrap">
-        <div>
-          <span id={`${id}-model`} className="block text-sm text-ink-3 mb-1">
-            Model and effort
-          </span>
-          <div aria-labelledby={`${id}-model`}>
-            <ModelPicker
-              value={member.settings.model ? member.settings : null}
-              onChange={(choice) => {
-                if (isHarnessId(choice.agent)) onChange({ settings: { agent: choice.agent, model: choice.model, effort: choice.effort, fastMode: Boolean(choice.fastMode) } });
-              }}
-            />
-          </div>
-        </div>
-        <label className="flex items-center gap-2 text-sm text-ink-2 mt-5" title={fastHint ?? (!fastSupported ? "Fast mode is unavailable for this model" : undefined)}>
-          <Switch
-            checked={member.settings.fastMode}
-            disabled={!fastSupported && !member.settings.fastMode}
-            onChange={(event) => onChange({ settings: { ...member.settings, fastMode: event.target.checked } })}
-          />
-          Fast mode
-        </label>
-      </div>
+      <MemberModelRow id={`${id}-model`} member={member} fastSupported={fastSupported} fastHint={fastHint} onChange={onChange} />
       {unavailable ? <p className="text-sm text-warn mt-1">{unavailable}</p> : null}
       <label className="mt-3 grid gap-1.5 text-sm text-ink-3">
         Responsibility
@@ -400,5 +383,61 @@ export function TeamMembers({ draft, teamId, onChange }: { draft: TeamDraft; tea
       </section>
       {draft.members.length > 0 ? <DiscussionEditor draft={draft} onChange={(discussion) => onChange({ discussion })} /> : null}
     </>
+  );
+}
+
+/** The member's model and Fast mode. An Orcling sits with its own model, effort and Fast mode; they change only where the Orcling is edited. */
+function MemberModelRow({
+  id,
+  member,
+  fastSupported,
+  fastHint,
+  onChange,
+}: {
+  id: string;
+  member: TeamMember;
+  fastSupported: boolean;
+  fastHint: string | null;
+  onChange: (patch: Partial<TeamMember>) => void;
+}) {
+  return (
+    <div className="mt-3 flex items-center gap-3 flex-wrap">
+      <MemberModel id={id} member={member} onChange={onChange} />
+      {member.orclingId ? null : (
+        <label className="flex items-center gap-2 text-sm text-ink-2 mt-5" title={fastHint ?? (!fastSupported ? "Fast mode is unavailable for this model" : undefined)}>
+          <Switch
+            checked={member.settings.fastMode}
+            disabled={!fastSupported && !member.settings.fastMode}
+            onChange={(event) => onChange({ settings: { ...member.settings, fastMode: event.target.checked } })}
+          />
+          Fast mode
+        </label>
+      )}
+    </div>
+  );
+}
+
+/** The member's model, or an Orcling who takes the seat with its own model, instructions and memory. */
+function MemberModel({ id, member, onChange }: { id: string; member: TeamMember; onChange: (patch: Partial<TeamMember>) => void }) {
+  const orclings = useOrclings();
+  return (
+    <div>
+      <span id={id} className="block text-sm text-ink-3 mb-1">
+        Model and effort
+      </span>
+      <div aria-labelledby={id}>
+        <ModelPicker
+          value={member.settings.model ? member.settings : null}
+          onChange={(choice) => {
+            if (isHarnessId(choice.agent)) onChange({ settings: { agent: choice.agent, model: choice.model, effort: choice.effort, fastMode: Boolean(choice.fastMode) }, orclingId: null });
+          }}
+          orclings={{
+            options: orclings,
+            selectedId: member.orclingId ?? null,
+            onSelect: (orcling) => onChange({ settings: { ...orcling.settings }, orclingId: orcling.id, name: orcling.name }),
+          }}
+        />
+      </div>
+    </div>
   );
 }

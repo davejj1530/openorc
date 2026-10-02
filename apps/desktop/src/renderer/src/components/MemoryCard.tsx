@@ -34,7 +34,7 @@ export function MemoryCard({ memory }: { memory: Memory }) {
         {memory.status !== "active" ? <Badge tone="bad">{memory.status}</Badge> : null}
         <span className="flex-1" />
         <Actions
-          title={memory.title}
+          memory={memory}
           disabled={busy}
           onEdit={() => {
             setTitle(memory.title);
@@ -126,7 +126,7 @@ export function MemoryCard({ memory }: { memory: Memory }) {
 }
 
 function Actions({
-  title,
+  memory,
   disabled,
   onEdit,
   onHelpful,
@@ -134,7 +134,7 @@ function Actions({
   onDelete,
   onPromote,
 }: {
-  title: string;
+  memory: Memory;
   disabled: boolean;
   onEdit: () => void;
   onHelpful: () => void;
@@ -143,9 +143,11 @@ function Actions({
   onPromote: (file: "CLAUDE.md" | "AGENTS.md") => void;
 }) {
   const item = "flex items-center gap-2 h-7 px-2 rounded-md text-base text-ink-2 cursor-pointer data-[highlighted]:bg-surface-2 outline-none";
+  // An Orcling's memory is about the person, not a project's instruction files.
+  const promotable = !memory.orclingId;
   return (
     <Menu.Root>
-      <Menu.Trigger aria-label={`Actions for ${title}`} disabled={disabled} className="text-ink-3 hover:text-ink rounded-md p-1">
+      <Menu.Trigger aria-label={`Actions for ${memory.title}`} disabled={disabled} className="text-ink-3 hover:text-ink rounded-md p-1">
         <MoreHorizontal size={14} />
       </Menu.Trigger>
       <Menu.Portal>
@@ -158,12 +160,16 @@ function Actions({
             <Menu.Item className={item} onClick={onHelpful}>
               <ThumbsUp size={13} /> Mark helpful
             </Menu.Item>
-            <Menu.Item className={item} onClick={() => onPromote("CLAUDE.md")}>
-              <Upload size={13} /> Add to CLAUDE.md
-            </Menu.Item>
-            <Menu.Item className={item} onClick={() => onPromote("AGENTS.md")}>
-              <Upload size={13} /> Add to AGENTS.md
-            </Menu.Item>
+            {promotable ? (
+              <>
+                <Menu.Item className={item} onClick={() => onPromote("CLAUDE.md")}>
+                  <Upload size={13} /> Add to CLAUDE.md
+                </Menu.Item>
+                <Menu.Item className={item} onClick={() => onPromote("AGENTS.md")}>
+                  <Upload size={13} /> Add to AGENTS.md
+                </Menu.Item>
+              </>
+            ) : null}
             <Menu.Separator className="my-1 h-px bg-line" />
             <Menu.Item className={item} onClick={onRetract}>
               <X size={13} /> Retract

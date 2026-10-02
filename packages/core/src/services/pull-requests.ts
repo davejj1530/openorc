@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { audit, projects, pullReviews, runs, threads, type Db, type PullReviewKey } from "@openorc/db";
+import { audit, orclings, projects, pullReviews, runs, threads, type Db, type PullReviewKey } from "@openorc/db";
 import { GitHubPulls, git, worktree } from "@openorc/git";
 import type { PullReviewTools } from "@openorc/mcp";
 import {
@@ -47,6 +47,8 @@ export interface PullRequestServiceOptions {
 
 /** Who wrote a draft, by agent and model. */
 type DraftAuthor = NonNullable<PullRequestDraftComment["author"]>;
+/** Who reviews: a model, or an Orcling with the model it uses. */
+type Reviewer = ModelExecutionSettings & { orclingId: string | null };
 
 /** Review diffs kept for agents between tool calls. */
 const CACHED_DIFFS = 16;
@@ -160,8 +162,12 @@ export class PullRequestService {
    * opens a Plan-mode conversation of its own; later rounds continue it, so the
    * model can check its earlier findings against the new commits.
    */
-  async start(key: PullReviewKey, reviewer: ModelExecutionSettings): Promise<{ threadId: string }> {
+  async start(key: PullReviewKey, chosen: ModelExecutionSettings, orclingId?: string): Promise<{ threadId: string }> {
     const project = this.project(key.projectId);
+    const orcling = orclingId ? orclings.get(this.db, orclingId) : null;
+    if (orclingId && !orcling) throw new Error("That Orcling no longer exists. Choose another reviewer.");
+    // An Orcling reviews with its own model; its identity follows the conversation.
+    const reviewer = { ...(orcling?.settings ?? chosen), orclingId: orcling?.id ?? null };
     await this.assertGh();
     const detail = await this.github.get(project.rootPath, key.number);
     const current = pullReviews.get(this.db, key);
@@ -178,7 +184,7 @@ export class PullRequestService {
     }
   }
 
-  private async reviewAnew(key: PullReviewKey, project: Project, detail: PullRequestDetail, reviewer: ModelExecutionSettings): Promise<{ threadId: string }> {
+  private async reviewAnew(key: PullReviewKey, project: Project, detail: PullRequestDetail, reviewer: Reviewer): Promise<{ threadId: string }> {
     const mergeBase = await fetchPullRequestHead(project, detail);
     const checkoutPath = await addReviewCheckout(this.options.dataDir, project, detail);
     let admitted = false;
@@ -205,7 +211,7 @@ export class PullRequestService {
             this.draftAt(key, detail.headSha);
             pullReviews.update(this.db, key, { threadId: thread.id, baseCommit: mergeBase });
             // The conversation names the pull request it reviews, as one that opened a pull request does.
-            threads.update(this.db, thread.id, { prUrl: detail.url, prState: detail.state });
+            threads.update(this.db, thread.id, { prUrl: detail.url, prState: detail.state, orclingId: reviewer.orclingId });
             admitted = true;
           },
         },
@@ -219,7 +225,7 @@ export class PullRequestService {
   }
 
   /** Another round in the same conversation: its copy moves to the new head, and the reviewer the user chose now asks. */
-  private async reviewAgain(key: PullReviewKey, project: Project, detail: PullRequestDetail, conversation: Thread, reviewer: ModelExecutionSettings): Promise<{ threadId: string }> {
+  private async reviewAgain(key: PullReviewKey, project: Project, detail: PullRequestDetail, conversation: Thread, reviewer: Reviewer): Promise<{ threadId: string }> {
     const previous = conversation.baseSha;
     const mergeBase = await fetchPullRequestHead(project, detail);
     await moveReviewCheckout({ db: this.db, writers: this.options.writers }, project, conversation, detail);
@@ -229,6 +235,7 @@ export class PullRequestService {
     });
     const same = conversation.agent === reviewer.agent && conversation.model === reviewer.model && conversation.effort === reviewer.effort && conversation.fastMode === reviewer.fastMode;
     if (!same) this.options.threads.update(conversation.id, { agent: reviewer.agent, model: reviewer.model, effort: reviewer.effort, fastMode: reviewer.fastMode });
+    if ((conversation.orclingId ?? null) !== reviewer.orclingId) threads.update(this.db, conversation.id, { orclingId: reviewer.orclingId });
     this.options.threads.queueFollowUp({ threadId: conversation.id, text: againPrompt(detail, previous), requestKey: randomUUID() });
     this.options.invalidate(["threads", `thread:${conversation.id}`, `checkpoints:${conversation.id}`, `threaddiff:${conversation.id}`, "workspace-diff"]);
     return { threadId: conversation.id };
@@ -269,25 +276,28 @@ export class PullRequestService {
   }
 
   /**
-   * The body a review posted by the app carries: which models drafted it, then
-   * the summary. The app is one name on GitHub, so the models are named here.
+   * The body a review posted by the app carries: which models and Orclings drafted it, then
+   * the summary. The app is one name on GitHub, so the reviewers are named here.
    */
   private async signed(review: PullRequestReview | null, summary: string): Promise<string> {
     const authors = new Map<string, DraftAuthor>();
     const conversation = review?.threadId ? threads.get(this.db, review.threadId) : null;
-    if (conversation) authors.set(`${conversation.agent}:${conversation.model}`, { agent: conversation.agent, model: conversation.model });
-    for (const comment of review?.comments ?? []) if (comment.author) authors.set(`${comment.author.agent}:${comment.author.model}`, comment.author);
+    const add = (author: DraftAuthor) => authors.set(`${author.agent}:${author.model}:${author.orclingId ?? ""}`, author);
+    if (conversation) add({ agent: conversation.agent, model: conversation.model, orclingId: conversation.orclingId ?? null });
+    for (const comment of review?.comments ?? []) if (comment.author) add(comment.author);
     if (authors.size === 0) return summary;
-    const names = new Set(await Promise.all([...authors.values()].map((author) => this.modelName(author))));
+    const names = new Set(await Promise.all([...authors.values()].map((author) => this.reviewerName(author))));
     const line = `Review by ${new Intl.ListFormat("en", { type: "conjunction" }).format([...names])}.`;
     return summary.trim() ? `${line}\n\n${summary}` : line;
   }
 
-  /** A model by the name the model picker shows, falling back to its ID or harness. */
-  private async modelName(author: DraftAuthor): Promise<string> {
+  /** A model by the name the model picker shows, falling back to its ID or harness, after the Orcling that ran it. */
+  private async reviewerName(author: DraftAuthor): Promise<string> {
     const models = await this.options.runs.models(author.agent).catch(() => []);
     const listed = models.find((model) => model.id === author.model)?.label;
-    return listed ?? author.model ?? (isHarnessId(author.agent) ? harnessName(author.agent) : author.agent);
+    const model = listed ?? author.model ?? (isHarnessId(author.agent) ? harnessName(author.agent) : author.agent);
+    const orcling = author.orclingId ? orclings.get(this.db, author.orclingId) : null;
+    return orcling ? `${orcling.name} (${model})` : model;
   }
 
   /** What a conversation reviewing a pull request is told on every turn; null for any other conversation. */
@@ -317,7 +327,12 @@ export class PullRequestService {
         const file = patchFiles(await this.reviewDiff(review.projectId, review.baseCommit, head)).find((entry) => entry.path === comment.path);
         if (!file) throw new Error(`${comment.path} is not changed in this pull request. Comment on a file pull_request_diff shows.`);
         const anchor = agentAnchor(file.chunk, comment);
-        const added = pullReviews.addComment(this.db, review, { path: comment.path, ...anchor, body: comment.body, author: { agent: run.agent, model: run.model } });
+        const added = pullReviews.addComment(this.db, review, {
+          path: comment.path,
+          ...anchor,
+          body: comment.body,
+          author: { agent: run.agent, model: run.model, ...(run.orclingId ? { orclingId: run.orclingId } : {}) },
+        });
         this.changed();
         return `Draft comment saved on ${reviewCommentPlace(added)}.`;
       },

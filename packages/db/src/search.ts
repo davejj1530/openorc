@@ -31,7 +31,8 @@ export const messages = {
     if (m.text.trim().length === 0) return;
     db.stmt("INSERT INTO messages_fts (text, run_id, role, ts, message_id) VALUES (?, ?, ?, ?, ?)").run(m.text, m.runId, m.role, m.ts, m.messageId);
   },
-  search(db: Db, query: string, options: { projectId?: string; limit?: number } = {}): ThreadSearchHit[] {
+  /** With `orclingId`, only what was said where that Orcling spoke: its own conversation, threads it works in, and its guest replies. */
+  search(db: Db, query: string, options: { projectId?: string; orclingId?: string; limit?: number } = {}): ThreadSearchHit[] {
     const q = messageQuery(query);
     if (!q) return [];
     const args: (string | number)[] = [q];
@@ -39,6 +40,10 @@ export const messages = {
     if (options.projectId) {
       where = "AND t.project_id = ?";
       args.push(options.projectId);
+    }
+    if (options.orclingId) {
+      where += " AND (r.orcling_id = ? OR t.orcling_id = ?)";
+      args.push(options.orclingId, options.orclingId);
     }
     args.push(options.limit ?? 30);
     const rows = db

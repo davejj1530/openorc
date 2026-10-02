@@ -18,6 +18,7 @@ import { Memory } from "./views/Memory";
 import { NewThread } from "./views/NewThread";
 import { Onboarding } from "./views/Onboarding";
 import { Orchestration } from "./views/Orchestration";
+import { OrclingDesigner } from "./views/OrclingDesigner";
 import { ProjectView } from "./views/ProjectView";
 import { PullRequestList } from "./views/PullRequestList";
 import { PullRequestView } from "./views/PullRequestView";
@@ -263,6 +264,9 @@ function MainScreen({ route, currentProject }: { route: Route; currentProject: s
       break;
     case "orchestration":
       screen = <Orchestration projectId={route.projectId} teamId={route.teamId} />;
+      break;
+    case "orcling":
+      screen = <OrclingDesigner orclingId={route.orclingId} />;
       break;
     case "settings":
       screen = <Settings />;

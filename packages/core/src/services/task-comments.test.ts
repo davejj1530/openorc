@@ -458,3 +458,26 @@ it("retries implementation after a failed first start instead of treating its th
   await vi.waitFor(() => expect(taskComments.attempt(core.db, a.id)?.executionRunId).toBeTruthy());
   expect(start).toHaveBeenCalledTimes(2);
 });
+
+it("lets a mentioned Orcling reply as itself, read-only, with its current model", async () => {
+  const gloop = await call("orclings.create", {
+    draft: {
+      name: "Gloop",
+      look: { shape: 0, eyes: 0, texture: 0, glasses: 0, accessory: 0, bodyColor: "#52b8a0", eyeColor: "#1b1c20" },
+      settings: { agent: "codex", model: "test-model", effort: "low", fastMode: false },
+      permission: "allow",
+    },
+  });
+  const c = await post("@Gloop what would you change?", []);
+  const a = await response(c.id);
+  expect(a.recipient).toEqual({ agent: "codex", model: "test-model", effort: "low", orclingId: gloop.id });
+  const run = runs.get(core.db, a.runId!)!;
+  expect(run).toMatchObject({ orclingId: gloop.id, mode: "plan", permissionMode: "review" });
+  const spec = sessions.get(run.id)!.spec;
+  expect(spec.systemPromptAppendix).toContain("# You are Gloop");
+  expect(spec.systemPromptAppendix).not.toContain("orcling_remember");
+  expect(spec.internalMcp?.toolNames).toEqual(["ask_user", "approve", "task_comment_intent"]);
+  await core.comments.intent(run.id, { intent: "discussion", quote: "" });
+  await finish(run.id);
+  expect(taskComments.attempt(core.db, a.id)?.state).toBe("success");
+});

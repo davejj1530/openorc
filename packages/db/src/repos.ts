@@ -1,15 +1,16 @@
 import { threadListOrder } from "./thread-list-order.js";
 import { randomUUID } from "node:crypto";
 import { WORKSPACE_ID } from "@openorc/protocol";
-import type { ReviewComment, Run, RunState, Snapshot, Task, TaskStatus, Thread, Usage } from "@openorc/protocol";
+import type { Run, RunState, Snapshot, Task, TaskStatus, Thread, Usage } from "@openorc/protocol";
 import type { Db } from "./database.js";
 import { redact, redactJson } from "./redact.js";
 import { jaccard, normalizeTitle, wordSet } from "./task-similarity.js";
 
 const now = () => Date.now();
 
-// Keep the repository exports stable while project persistence lives in its own module.
+// Keep the repository exports stable while project persistence and review comments live in their own modules.
 export { projects } from "./projects.js";
+export { comments, type ReviewCommentScope, type ReviewCommentInsert } from "./review-comments.js";
 
 /* Tasks */
 
@@ -219,6 +220,7 @@ interface ThreadRow {
   forked_at_run_id: string | null;
   draft: string | null;
   imported_from: string | null;
+  orcling_id?: string | null;
   created_at: number;
   updated_at: number;
   last_activity_at: number;
@@ -252,6 +254,7 @@ function threadFromRow(r: ThreadRow): Thread {
     forkedAtRunId: r.forked_at_run_id,
     draft: r.draft,
     importedFrom: r.imported_from,
+    orclingId: r.orcling_id ?? null,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     lastActivityAt: r.last_activity_at,
@@ -281,6 +284,7 @@ export interface ThreadPatch {
   prState?: Thread["prState"];
   draft?: string | null;
   archivedAt?: number | null;
+  orclingId?: string | null;
 }
 
 const threadColumns: Record<keyof ThreadPatch, string> = {
@@ -305,6 +309,7 @@ const threadColumns: Record<keyof ThreadPatch, string> = {
   prState: "pr_state",
   draft: "draft",
   archivedAt: "archived_at",
+  orclingId: "orcling_id",
 };
 
 export type ThreadListFilter = "active" | "done" | "archived" | "all";
@@ -431,151 +436,6 @@ export const threads = {
   },
 };
 
-/* Review comments */
-
-interface CommentRow {
-  id: string;
-  thread_id: string | null;
-  task_id: string | null;
-  snapshot_id: string | null;
-  path: string;
-  start_line: number | null;
-  start_side: "old" | "new" | null;
-  line: number | null;
-  side: "old" | "new" | null;
-  line_text: string | null;
-  body: string;
-  sent_in_run_id: string | null;
-  sent_message_id: string | null;
-  created_at: number;
-  /** The state of the queued message that accepted the comment. */
-  message_state: string | null;
-}
-
-/** A comment stays sent while its message stands; removing that message from the queue returns the comment to its review. */
-const COMMENT_ROWS = "SELECT c.*, q.state AS message_state FROM review_comments c LEFT JOIN thread_queue q ON q.id = c.sent_message_id";
-
-function commentFromRow(r: CommentRow): ReviewComment {
-  return {
-    id: r.id,
-    threadId: r.thread_id,
-    taskId: r.task_id,
-    snapshotId: r.snapshot_id,
-    path: r.path,
-    startLine: r.start_line,
-    startSide: r.start_side,
-    line: r.line,
-    side: r.side,
-    lineText: r.line_text,
-    body: r.body,
-    sentInRunId: r.sent_in_run_id,
-    sentMessageId: r.message_state === "cancelled" ? null : r.sent_message_id,
-    createdAt: r.created_at,
-  };
-}
-
-/**
- * Which comments a review reads: a conversation's, a task's without a
- * conversation (team review), or a conversation's together with its task's
- * comments from before that task had a conversation.
- */
-export interface ReviewCommentScope {
-  threadId?: string;
-  taskId?: string;
-}
-
-export interface ReviewCommentInsert {
-  threadId: string | null;
-  taskId: string | null;
-  snapshotId: string | null;
-  path: string;
-  startLine: number | null;
-  startSide: "old" | "new" | null;
-  line: number | null;
-  side: "old" | "new" | null;
-  lineText: string | null;
-  body: string;
-}
-
-export const comments = {
-  get(db: Db, id: string): ReviewComment | null {
-    const row = db.stmt(`${COMMENT_ROWS} WHERE c.id = ?`).get(id) as unknown as CommentRow | undefined;
-    return row ? commentFromRow(row) : null;
-  },
-  list(db: Db, scope: ReviewCommentScope): ReviewComment[] {
-    const order = "ORDER BY c.created_at, c.rowid";
-    let rows: CommentRow[];
-    if (scope.threadId && scope.taskId) {
-      rows = db.stmt(`${COMMENT_ROWS} WHERE c.thread_id = ? OR (c.thread_id IS NULL AND c.task_id = ?) ${order}`).all(scope.threadId, scope.taskId) as unknown as CommentRow[];
-    } else if (scope.threadId) {
-      rows = db.stmt(`${COMMENT_ROWS} WHERE c.thread_id = ? ${order}`).all(scope.threadId) as unknown as CommentRow[];
-    } else if (scope.taskId) {
-      rows = db.stmt(`${COMMENT_ROWS} WHERE c.task_id = ? AND c.thread_id IS NULL ${order}`).all(scope.taskId) as unknown as CommentRow[];
-    } else {
-      throw new Error("Review comments need a conversation or a task.");
-    }
-    return rows.map(commentFromRow);
-  },
-  /** A task's comments without a conversation, as team review claims and marks them. */
-  listForTask(db: Db, taskId: string): ReviewComment[] {
-    return comments.list(db, { taskId });
-  },
-  insert(db: Db, c: ReviewCommentInsert): ReviewComment {
-    if (c.threadId === null && c.taskId === null) throw new Error("Review comments need a conversation or a task.");
-    const id = randomUUID();
-    const t = now();
-    db.stmt("INSERT INTO review_comments (id, thread_id, task_id, snapshot_id, path, start_line, start_side, line, side, line_text, body, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
-      id,
-      c.threadId,
-      c.taskId,
-      c.snapshotId,
-      c.path,
-      c.startLine,
-      c.startSide,
-      c.line,
-      c.side,
-      c.lineText,
-      c.body,
-      t,
-    );
-    return {
-      id,
-      threadId: c.threadId,
-      taskId: c.taskId,
-      snapshotId: c.snapshotId,
-      path: c.path,
-      startLine: c.startLine,
-      startSide: c.startSide,
-      line: c.line,
-      side: c.side,
-      lineText: c.lineText,
-      body: c.body,
-      sentInRunId: null,
-      sentMessageId: null,
-      createdAt: t,
-    };
-  },
-  remove(db: Db, id: string): void {
-    db.stmt("DELETE FROM review_comments WHERE id = ?").run(id);
-  },
-  /** Team review: the run that received a retained batch. */
-  markSent(db: Db, ids: string[], runId: string): void {
-    for (const id of ids) db.stmt("UPDATE review_comments SET sent_in_run_id = ? WHERE id = ?").run(runId, id);
-  },
-  /**
-   * The conversation message that accepted these comments. Only unsent rows
-   * change, including rows whose message was removed from the queue, so a
-   * retried send cannot move a comment to a second message; a task's earlier
-   * comments join the conversation they were sent to.
-   */
-  markQueued(db: Db, ids: string[], input: { threadId: string; messageId: string }): void {
-    for (const id of ids)
-      db.stmt(
-        "UPDATE review_comments SET sent_message_id = ?, thread_id = COALESCE(thread_id, ?) WHERE id = ? AND sent_in_run_id IS NULL AND (sent_message_id IS NULL OR sent_message_id IN (SELECT id FROM thread_queue WHERE state = 'cancelled'))",
-      ).run(input.messageId, input.threadId, id);
-  },
-};
-
 /* Runs */
 
 interface RunRow {
@@ -597,6 +457,7 @@ interface RunRow {
   usage: string | null;
   result_text: string | null;
   error: string | null;
+  orcling_id?: string | null;
 }
 
 function runFromRow(r: RunRow): Run {
@@ -619,6 +480,7 @@ function runFromRow(r: RunRow): Run {
     usage: r.usage ? (JSON.parse(r.usage) as Usage) : null,
     resultText: r.result_text,
     error: r.error,
+    orclingId: r.orcling_id ?? null,
   };
 }
 
@@ -647,12 +509,15 @@ export const runs = {
       fastMode?: boolean;
       mode: Run["mode"];
       permissionMode: Run["permissionMode"];
+      orclingId?: string | null;
     },
   ): Run {
     if ([r.taskId, r.threadId, r.commentTurnId].filter(Boolean).length !== 1) throw new Error("a run belongs to exactly one task, thread or comment turn");
     db.stmt(
       "INSERT INTO runs (id, task_id, thread_id, agent, model, effort, fast_mode, mode, permission_mode, state, started_at, working_directory, comment_turn_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'starting', ?, ?, ?)",
     ).run(r.id, r.taskId, r.threadId, r.agent, r.model, r.effort ?? null, Number(r.fastMode ?? false), r.mode, r.permissionMode, now(), r.workingDirectory ?? null, r.commentTurnId ?? null);
+    // Set apart so ledgers from before Orclings accept every other run unchanged.
+    if (r.orclingId) db.stmt("UPDATE runs SET orcling_id = ? WHERE id = ?").run(r.orclingId, r.id);
     return runs.get(db, r.id) as Run;
   },
   update(
@@ -727,11 +592,13 @@ export const runs = {
     return r?.thread_id ?? null;
   },
   /** The most recent session id for a task or thread, so a new run can resume it. */
-  lastSession(db: Db, scope: { taskId: string } | { threadId: string }, agent: Run["agent"]): string | null {
+  /** The newest session of this provider in a task or thread, spoken by the same Orcling or, without one, by no Orcling. */
+  lastSession(db: Db, scope: { taskId: string } | { threadId: string }, agent: Run["agent"], orclingId: string | null = null): string | null {
     const column = "taskId" in scope ? "task_id" : "thread_id";
     const id = "taskId" in scope ? scope.taskId : scope.threadId;
-    const r = db.stmt(`SELECT external_session_id FROM runs WHERE ${column} = ? AND agent = ? AND external_session_id IS NOT NULL ORDER BY started_at DESC LIMIT 1`).get(id, agent) as
-      { external_session_id: string } | undefined;
+    const r = db
+      .stmt(`SELECT external_session_id FROM runs WHERE ${column} = ? AND agent = ? AND orcling_id IS ? AND external_session_id IS NOT NULL ORDER BY started_at DESC LIMIT 1`)
+      .get(id, agent, orclingId) as { external_session_id: string } | undefined;
     return r?.external_session_id ?? null;
   },
 };

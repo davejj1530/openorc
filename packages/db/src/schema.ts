@@ -19,6 +19,7 @@ import { taskExecutionMigration } from "./task-execution-schema.js";
 import { conversationReviewCommentsMigration } from "./review-comments-schema.js";
 import { teamCancellationMigration } from "./team-cancellation-schema.js";
 import { pullRequestReviewMigration } from "./pull-review-schema.js";
+import { orclingMigration } from "./orcling-schema.js";
 /**
  * Migrations run in order; `PRAGMA user_version` records how many applied.
  * Never edit a shipped migration. Append a new one.
@@ -762,4 +763,7 @@ export const migrations: Migration[] = [
   `ALTER TABLE threads ADD COLUMN base_branch TEXT;`,
   /** A reviewing model's latest summary. It fills the draft's summary until the user writes their own, then waits beside it. */
   `ALTER TABLE pull_request_reviews ADD COLUMN model_summary TEXT;`,
+  orclingMigration,
+  /** The Orcling that drafted a pull request review comment, so the draft names it beside its model. */
+  `ALTER TABLE pull_request_review_comments ADD COLUMN author_orcling_id TEXT REFERENCES orclings(id) ON DELETE SET NULL;`,
 ];

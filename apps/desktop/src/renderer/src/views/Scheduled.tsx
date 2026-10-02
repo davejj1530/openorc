@@ -7,11 +7,13 @@ import { TopBar } from "../components/TopBar";
 import { Badge, Button, Dialog, Empty, Field, IconButton, Input, Select, Textarea, Tooltip } from "../components/ui";
 import { cn } from "../lib/cn";
 import { useLayout } from "../lib/layout";
+import { useOrclings } from "../lib/orclings";
 import { useRpc, useRpcMutation } from "../lib/query";
 import { openThread, useRouter } from "../lib/router";
 import { relativeTime, untilTime } from "../lib/time";
 import { useScheduleEditor } from "../lib/use-schedule-editor";
 import { beginScheduleTrigger, finishScheduleTrigger, readScheduleTrigger } from "../lib/schedule-draft";
+import { pickerTeam } from "../lib/team-settings";
 
 const intervals: { label: string; minutes: number }[] = [
   { label: "Every 30 minutes", minutes: 30 },
@@ -296,6 +298,7 @@ function ScheduleDialog({
     status: { pending, conflict, projectIssue, targetIssue, error, permissionReady },
     actions: { setProject, setTitle, setPrompt, setMinutes, setMode, setPermission, setWorkspace, chooseTeam, chooseModel, changeSettings, retryChecks, submit },
   } = useScheduleEditor(schedule, latest, projectId, onClose);
+  const orclings = useOrclings();
   const picker = <ModelPicker value={choice} onChange={chooseModel} showEffort={false} teams={pickerTeams} disabled={pending} />;
 
   return (
@@ -360,7 +363,7 @@ function ScheduleDialog({
                 teams={pickerTeams}
                 disabled={pending}
                 settingsDisabled={pending}
-                {...(revision && lead ? { team: { name: revision.name, revision: revision.number, leadName: lead.name } } : {})}
+                {...(revision ? { team: pickerTeam(revision, orclings) } : {})}
               />
             ) : (
               picker

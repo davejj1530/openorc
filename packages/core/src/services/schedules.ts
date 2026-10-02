@@ -80,6 +80,8 @@ export class ScheduleService {
     } else if (target?.kind === "model") {
       target = { ...target, settings: normalizeModelSettings(target.settings) };
       ({ agent, model, effort } = target.settings);
+    } else if (target?.kind === "orcling") {
+      throw new Error("Schedules run a model or a saved team. Choose one of those for this schedule.");
     }
     if (!agent) throw new Error("Choose a model or saved team for this schedule.");
     return ScheduleLaunchSnapshot.parse({ ...input, executionTarget: target, ...normalizeModelSettings({ agent, model, effort }), workspaceMode });

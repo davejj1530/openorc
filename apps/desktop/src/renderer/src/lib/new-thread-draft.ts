@@ -4,7 +4,11 @@ import type { ModelChoice } from "../components/ModelPicker";
 import { readDraft, writeDraft } from "./drafts";
 
 export type NewThreadTarget =
-  { kind: "model"; choice: ModelChoice | null } | { kind: "team"; revision: TeamRevision; initialLeadOverrides: LeadOverrides } | { kind: "unavailable"; label: string; reason: string };
+  | { kind: "model"; choice: ModelChoice | null }
+  | { kind: "team"; revision: TeamRevision; initialLeadOverrides: LeadOverrides }
+  /** An Orcling, with the model it had when chosen for display; the core starts it with its current one. */
+  | { kind: "orcling"; orclingId: string; name: string; settings: ModelExecutionSettings }
+  | { kind: "unavailable"; label: string; reason: string };
 
 export interface NewThreadDraft {
   projectId: string;
@@ -36,14 +40,7 @@ export function decodeNewThreadDraft(projectId: string, value: unknown, legacyPr
     launchRequest,
   };
   if (!object(raw.target)) return fallback;
-  if (raw.target.kind === "team") {
-    const revision = TeamRevision.safeParse(raw.target.revision);
-    const overrides = LeadOverrides.safeParse(raw.target.initialLeadOverrides ?? {});
-    if (revision.success && overrides.success && revision.data.projectId === projectId && raw.projectId === projectId) {
-      return { ...fallback, target: { kind: "team", revision: revision.data, initialLeadOverrides: overrides.data } };
-    }
-    return { ...fallback, target: { kind: "unavailable", label: "Saved team", reason: "This saved team selection cannot be restored. Choose the team again; your message and images are kept." } };
-  }
+  if (raw.target.kind === "team") return { ...fallback, target: decodeTeamTarget(projectId, raw.projectId, raw.target) };
   if (raw.target.kind === "unavailable")
     return {
       ...fallback,
@@ -58,8 +55,24 @@ export function decodeNewThreadDraft(projectId: string, value: unknown, legacyPr
     if (choice?.success) return { ...fallback, target: { kind: "model", choice: normalizeModelSettings(choice.data) } };
     return { ...fallback, target: { kind: "unavailable", label: "Saved model", reason: "This saved model selection cannot be restored. Choose a model again; your message and images are kept." } };
   }
+  if (raw.target.kind === "orcling") return { ...fallback, target: decodeOrclingTarget(raw.target) };
   if (raw.target.kind === "model" && raw.target.choice === null) return fallback;
   return { ...fallback, target: { kind: "unavailable", label: "Saved target", reason: "This saved selection cannot be restored. Choose a model or team again; your message and images are kept." } };
+}
+
+function decodeTeamTarget(projectId: string, savedProjectId: unknown, raw: Record<string, unknown>): NewThreadTarget {
+  const revision = TeamRevision.safeParse(raw.revision);
+  const overrides = LeadOverrides.safeParse(raw.initialLeadOverrides ?? {});
+  if (revision.success && overrides.success && revision.data.projectId === projectId && savedProjectId === projectId) {
+    return { kind: "team", revision: revision.data, initialLeadOverrides: overrides.data };
+  }
+  return { kind: "unavailable", label: "Saved team", reason: "This saved team selection cannot be restored. Choose the team again; your message and images are kept." };
+}
+
+function decodeOrclingTarget(raw: Record<string, unknown>): NewThreadTarget {
+  const settings = ModelExecutionSettings.safeParse(raw.settings);
+  if (settings.success && typeof raw.orclingId === "string" && typeof raw.name === "string") return { kind: "orcling", orclingId: raw.orclingId, name: raw.name, settings: settings.data };
+  return { kind: "unavailable", label: "Saved Orcling", reason: "This saved Orcling selection cannot be restored. Choose it again; your message and images are kept." };
 }
 
 export function readNewThreadDraft(projectId: string): NewThreadDraft {
@@ -99,6 +112,7 @@ export function readNewThreadProject(): string | null {
 
 export function targetModel(target: NewThreadTarget): ModelChoice | null {
   if (target.kind === "model") return target.choice ? normalizeModelSettings(target.choice) : null;
+  if (target.kind === "orcling") return normalizeModelSettings(target.settings);
   if (target.kind !== "team") return null;
   const lead = target.revision.members.find((member) => member.managerKey === null);
   return lead ? normalizeModelSettings({ ...lead.settings, ...target.initialLeadOverrides }) : null;
@@ -130,19 +144,18 @@ export function teamDepth(revision: TeamRevision): number {
   );
 }
 
-/** Both execution targets use the workspace selected in the composer. */
+/** Every execution target uses the workspace selected in the composer. */
 export function newThreadStartInput(
   draft: NewThreadDraft,
   input: Pick<RpcParams<"threads.start">, "permissionMode" | "prompt" | "attachments"> & { workspaceMode: WorkspaceMode },
 ): RpcParams<"threads.start"> {
   const choice = targetModel(draft.target);
   if (!choice || draft.target.kind === "unavailable") throw new Error("Choose an execution target first.");
-  return {
-    projectId: draft.projectId,
-    mode: draft.mode,
-    ...input,
-    ...(draft.target.kind === "team"
-      ? { executionTarget: { kind: "team", teamRevisionId: draft.target.revision.id, initialLeadOverrides: draft.target.initialLeadOverrides } }
-      : { agent: choice.agent, model: choice.model, effort: choice.effort ?? undefined, fastMode: Boolean(choice.fastMode) }),
-  };
+  return { projectId: draft.projectId, mode: draft.mode, ...input, ...startTarget(draft.target, choice) };
+}
+
+function startTarget(target: Exclude<NewThreadTarget, { kind: "unavailable" }>, choice: ModelChoice): Partial<RpcParams<"threads.start">> {
+  if (target.kind === "team") return { executionTarget: { kind: "team", teamRevisionId: target.revision.id, initialLeadOverrides: target.initialLeadOverrides } };
+  if (target.kind === "orcling") return { executionTarget: { kind: "orcling", orclingId: target.orclingId } };
+  return { agent: choice.agent, model: choice.model, effort: choice.effort ?? undefined, fastMode: Boolean(choice.fastMode) };
 }

@@ -9,6 +9,8 @@ export interface RetrievedMemory {
 
 export interface RetrieveOptions {
   projectId: string | null;
+  /** Searches this Orcling's own memory instead of a project's. */
+  orclingId?: string;
   query: string;
   types?: MemoryType[];
   limit?: number;
@@ -45,11 +47,11 @@ export class Retriever {
   ) {}
 
   async retrieve(options: RetrieveOptions): Promise<RetrievedMemory[]> {
-    const { projectId, query } = options;
+    const { projectId, orclingId, query } = options;
     const limit = options.limit ?? 8;
     const fused = new Map<string, { memory: Memory; rrf: number }>();
 
-    const fts = memories.search(this.db, query, projectId, 40);
+    const fts = orclingId ? memories.searchOrcling(this.db, query, orclingId, 40) : memories.search(this.db, query, projectId, 40);
     fts.forEach(({ memory }, i) => add(fused, memory, 1 / (RRF_K + i + 1)));
 
     // A first-run model download must not hold up search or an agent's MCP call.
@@ -65,7 +67,7 @@ export class Retriever {
           ]);
     if (timer) clearTimeout(timer);
     if (qv) {
-      const vec = vectors.knn(this.db, qv, projectId, 40);
+      const vec = orclingId ? vectors.knnOrcling(this.db, qv, orclingId, 40) : vectors.knn(this.db, qv, projectId, 40);
       vec.forEach(({ memory }, i) => add(fused, memory, 1 / (RRF_K + i + 1)));
     }
 

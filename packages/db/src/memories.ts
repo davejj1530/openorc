@@ -12,6 +12,7 @@ interface MemoryRow {
   id: string;
   scope: MemoryScope;
   project_id: string | null;
+  orcling_id: string | null;
   type: MemoryType;
   topic_key: string | null;
   title: string;
@@ -33,6 +34,7 @@ function fromRow(db: Db, r: MemoryRow): Memory {
     id: r.id,
     scope: r.scope,
     projectId: r.project_id,
+    orclingId: r.orcling_id,
     type: r.type,
     topicKey: r.topic_key,
     title: r.title,
@@ -53,6 +55,8 @@ function fromRow(db: Db, r: MemoryRow): Memory {
 export interface MemoryInput {
   scope?: MemoryScope;
   projectId: string | null;
+  /** An Orcling's own memory: no project, never in project searches. */
+  orclingId?: string | null;
   type: MemoryType;
   topicKey?: string | null;
   title: string;
@@ -66,6 +70,8 @@ export interface MemoryInput {
 
 export interface MemoryFilter {
   projectId?: string;
+  /** Lists one Orcling's memories; without it, lists leave every Orcling's out. */
+  orclingId?: string;
   types?: MemoryType[];
   sources?: MemorySource[];
   statuses?: MemoryStatus[];
@@ -87,6 +93,12 @@ export function ftsQuery(text: string): string | null {
   return unique.map((w, i) => (i === unique.length - 1 ? `"${w}"*` : `"${w}"`)).join(" OR ");
 }
 
+/** Whose a memory is: an Orcling's own, never tied to a project, or a project's. */
+function ownerOf(input: MemoryInput): { scope: MemoryScope; projectId: string | null; orclingId: string | null } {
+  if (input.orclingId) return { scope: "orcling", projectId: null, orclingId: input.orclingId };
+  return { scope: input.scope ?? "project", projectId: input.projectId, orclingId: null };
+}
+
 export const memories = {
   get(db: Db, id: string): Memory | null {
     const r = db.stmt("SELECT * FROM memories WHERE id = ?").get(id) as unknown as MemoryRow | undefined;
@@ -100,6 +112,8 @@ export const memories = {
       where.push("(project_id = ? OR scope IN ('user', 'global'))");
       args.push(filter.projectId);
     }
+    where.push(filter.orclingId ? "orcling_id = ?" : "orcling_id IS NULL");
+    if (filter.orclingId) args.push(filter.orclingId);
     if (filter.types && filter.types.length > 0) {
       where.push(`type IN (${filter.types.map(() => "?").join(",")})`);
       args.push(...filter.types);
@@ -136,14 +150,32 @@ export const memories = {
     return rows.map((r) => ({ memory: fromRow(db, r), rank: r.rank }));
   },
 
+  /** BM25 candidates among one Orcling's active memories. */
+  searchOrcling(db: Db, query: string, orclingId: string, limit = 40): { memory: Memory; rank: number }[] {
+    const q = ftsQuery(query);
+    if (!q) return [];
+    const rows = db
+      .stmt(
+        `SELECT m.*, bm25(memories_fts, 2.0, 1.0) AS rank
+         FROM memories_fts f JOIN memories m ON m.rowid = f.rowid
+         WHERE memories_fts MATCH ? AND m.status = 'active' AND m.orcling_id = ?
+         ORDER BY rank LIMIT ?`,
+      )
+      .all(q, orclingId, limit) as unknown as (MemoryRow & { rank: number })[];
+    return rows.map((r) => ({ memory: fromRow(db, r), rank: r.rank }));
+  },
+
   /**
    * Insert, or fold into the active memory with the same topic key: the body
    * is refreshed, evidence grows, and the confirmation clock resets.
    */
   upsert(db: Db, input: MemoryInput): { memory: Memory; merged: boolean } {
     const t = now();
+    const owner = ownerOf(input);
     if (input.topicKey) {
-      const existing = db.stmt("SELECT * FROM memories WHERE project_id IS ? AND topic_key = ? AND status = 'active'").get(input.projectId, input.topicKey) as unknown as MemoryRow | undefined;
+      const existing = db
+        .stmt("SELECT * FROM memories WHERE project_id IS ? AND orcling_id IS ? AND topic_key = ? AND status = 'active'")
+        .get(owner.projectId, owner.orclingId, input.topicKey) as unknown as MemoryRow | undefined;
       // What the user wrote stays as they wrote it.
       if (existing?.source === "user" && input.source !== "user")
         throw new Error("A memory the user wrote uses this topic key, and only the user can change it. Record the new fact under another topic key, or without one.");
@@ -157,11 +189,12 @@ export const memories = {
     }
     const id = randomUUID();
     db.stmt(
-      "INSERT INTO memories (id, scope, project_id, type, topic_key, title, body, confidence, status, source, source_run_id, source_task_id, evidence_count, created_at, updated_at, last_confirmed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, 1, ?, ?, ?)",
+      "INSERT INTO memories (id, scope, project_id, orcling_id, type, topic_key, title, body, confidence, status, source, source_run_id, source_task_id, evidence_count, created_at, updated_at, last_confirmed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, 1, ?, ?, ?)",
     ).run(
       id,
-      input.scope ?? "project",
-      input.projectId,
+      owner.scope,
+      owner.projectId,
+      owner.orclingId,
       input.type,
       input.topicKey ?? null,
       clean(input.title),
@@ -179,8 +212,11 @@ export const memories = {
   },
 
   /** Whether an active memory the user wrote holds this topic key. Only the user can change such a memory. */
-  userOwnsTopic(db: Db, projectId: string | null, topicKey: string): boolean {
-    return db.stmt("SELECT 1 FROM memories WHERE project_id IS ? AND topic_key = ? AND status = 'active' AND source = 'user'").get(projectId, topicKey) !== undefined;
+  userOwnsTopic(db: Db, projectId: string | null, topicKey: string, orclingId: string | null = null): boolean {
+    return (
+      db.stmt("SELECT 1 FROM memories WHERE project_id IS ? AND orcling_id IS ? AND topic_key = ? AND status = 'active' AND source = 'user'").get(orclingId ? null : projectId, orclingId, topicKey) !==
+      undefined
+    );
   },
 
   setFiles(db: Db, id: string, files: string[]): void {
@@ -266,6 +302,22 @@ export const vectors = {
     return rows.map((r) => ({ memory: fromRow(db, r), distance: r.distance }));
   },
 
+  /** Nearest active memories of one Orcling. */
+  knnOrcling(db: Db, embedding: Float32Array, orclingId: string, limit = 40): { memory: Memory; distance: number }[] {
+    if (!db.hasVectors) return [];
+    const buf = Buffer.from(embedding.buffer, embedding.byteOffset, embedding.byteLength);
+    const rows = db
+      .stmt(
+        `SELECT m.*, v.distance AS distance
+         FROM memory_vec v JOIN memories m ON m.rowid = v.memory_rowid
+         WHERE v.embedding MATCH ? AND v.k = ? AND m.status = 'active' AND m.orcling_id = ?
+         ORDER BY v.distance LIMIT ?`,
+      )
+      // The index finds nearest rows before the owner filter, so it looks wider than it keeps.
+      .all(buf, limit * 8, orclingId, limit) as unknown as (MemoryRow & { distance: number })[];
+    return rows.map((r) => ({ memory: fromRow(db, r), distance: r.distance }));
+  },
+
   /** Memories that have no vector yet, so a backfill can embed them. */
   missing(db: Db, limit = 200): Memory[] {
     if (!db.hasVectors) return [];
@@ -315,8 +367,17 @@ export const summaries = {
   forTask(db: Db, taskId: string): SessionSummary[] {
     return (db.stmt("SELECT * FROM session_summaries WHERE task_id = ? ORDER BY created_at").all(taskId) as unknown as SummaryRow[]).map(summaryFromRow);
   },
+  /** A project's newest run summaries, newest first. An Orcling's own conversation is private, so its summaries stay out. */
   recent(db: Db, projectId: string, limit = 5): SessionSummary[] {
-    return (db.stmt("SELECT * FROM session_summaries WHERE project_id = ? ORDER BY created_at DESC LIMIT ?").all(projectId, limit) as unknown as SummaryRow[]).map(summaryFromRow);
+    return (
+      db
+        .stmt("SELECT * FROM session_summaries WHERE project_id = ? AND (thread_id IS NULL OR thread_id NOT IN (SELECT thread_id FROM orclings)) ORDER BY created_at DESC LIMIT ?")
+        .all(projectId, limit) as unknown as SummaryRow[]
+    ).map(summaryFromRow);
+  },
+  /** A conversation's newest run summaries, newest first. */
+  forThread(db: Db, threadId: string, limit = 5): SessionSummary[] {
+    return (db.stmt("SELECT * FROM session_summaries WHERE thread_id = ? ORDER BY created_at DESC LIMIT ?").all(threadId, limit) as unknown as SummaryRow[]).map(summaryFromRow);
   },
 };
 

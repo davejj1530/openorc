@@ -9,15 +9,37 @@ export function taskCardStatusLabel({ approvalKind, runState, taskLabel }: { app
   return taskLabel;
 }
 
-export function taskIdFromTool(block: Extract<Block, { kind: "tool" }>): string | null {
-  if (!/task_(create|start)$/.test(block.name) || !block.done || block.isError) return null;
+type ToolBlock = Extract<Block, { kind: "tool" }>;
+
+function toolText(block: ToolBlock): string {
   const out = block.output;
   const content = Array.isArray(out) ? out : (out as { content?: unknown[] })?.content;
-  let text: string;
-  if (typeof out === "string") text = out;
-  else if (content) text = content.map((c) => (c as { text?: string }).text ?? "").join("");
-  else text = JSON.stringify(out ?? "");
-  return /"id":\s*"([0-9a-f-]{36})"/.exec(text)?.[1] ?? null;
+  if (typeof out === "string") return out;
+  if (content) return content.map((c) => (c as { text?: string }).text ?? "").join("");
+  return JSON.stringify(out ?? "");
+}
+
+export function taskIdFromTool(block: ToolBlock): string | null {
+  if (/thread_start$/.test(block.name)) return startedWorkFromTool(block)?.taskId ?? null;
+  if (!/task_(create|start)$/.test(block.name) || !block.done || block.isError) return null;
+  return /"id":\s*"([0-9a-f-]{36})"/.exec(toolText(block))?.[1] ?? null;
+}
+
+/** Whether a tool call shows as a live card rather than a step: a task it saved or started, or a thread it started. */
+export function toolShowsCard(block: ToolBlock): boolean {
+  return Boolean(taskIdFromTool(block) ?? startedWorkFromTool(block));
+}
+
+/** The thread an agent started elsewhere with a thread_start tool, and the saved task it took up, if any. */
+export function startedWorkFromTool(block: ToolBlock): { threadId: string; taskId: string | null } | null {
+  if (!/thread_start$/.test(block.name) || !block.done || block.isError) return null;
+  try {
+    const started = JSON.parse(toolText(block)) as { thread?: { id?: unknown }; task?: { id?: unknown } };
+    if (typeof started.thread?.id !== "string") return null;
+    return { threadId: started.thread.id, taskId: typeof started.task?.id === "string" ? started.task.id : null };
+  } catch {
+    return null;
+  }
 }
 
 /** Create and start results share one live card; keep its first position as more results arrive. */

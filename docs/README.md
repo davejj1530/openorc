@@ -15,6 +15,7 @@
 - [Fast mode](fast-mode.md)
 - [Appearance and rich thread output](appearance-rich-output.md)
 - [Slack](slack.md)
+- [Orclings](orclings.md)
 - [Credential storage](credential-storage.md)
 - [Coding-agent updates](agent-updates.md)
 - [Team corrections during active work](team-live-steering.md) (Beta)

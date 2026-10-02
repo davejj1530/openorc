@@ -5,7 +5,7 @@ import { Orchestration } from "./Orchestration";
 import { core } from "../lib/rpc";
 import { queryClient } from "../lib/query";
 import { useRouter } from "../lib/router";
-import { DEFAULT_TEAM_LIMITS, TeamDetail } from "@openorc/protocol";
+import { DEFAULT_TEAM_LIMITS, defaultOrclingLook, TeamDetail, type Orcling } from "@openorc/protocol";
 
 vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onInvalidate: vi.fn(), onReady: vi.fn() } }));
 vi.mock("../components/TopBar", () => ({ TopBar: () => null }));
@@ -15,6 +15,7 @@ let availabilityError = false;
 let detail: TeamDetail | null = null;
 let saveFailure = false;
 let avatarIndex = 0;
+let orclingList: Orcling[] = [];
 
 function savedTeam() {
   return TeamDetail.parse({
@@ -38,6 +39,7 @@ beforeEach(() => {
   detail = null;
   saveFailure = false;
   avatarIndex = 0;
+  orclingList = [];
   localStorage.clear();
   useRouter.setState({ route: { view: "orchestration", projectId: "project" }, threadIds: [], history: [], future: [] });
   vi.mocked(core.call).mockImplementation(async (method, input) => {
@@ -65,9 +67,37 @@ beforeEach(() => {
       return { enabled, reason: enabled ? null : "Team execution is disabled.", maxHierarchyDepth: 3 };
     }
     if (method === "agents.models") return [];
+    if (method === "orclings.list") return orclingList as never;
     if (method === "system.info") return { harnesses: [{ id: "codex", state: "ready", path: "/bin/codex", version: "1", revision: 1 }] } as never;
     throw new Error(`Unexpected RPC: ${method}`);
   });
+});
+
+it("seats an Orcling under its own name and face, which only the Orcling's own settings change", async () => {
+  const saved = savedTeam();
+  saved.revision.members[0] = { ...saved.revision.members[0]!, name: "Gloop", orclingId: "gloop" };
+  detail = saved;
+  orclingList = [
+    {
+      id: "gloop",
+      name: "Gloop",
+      look: defaultOrclingLook,
+      settings: { agent: "codex", model: "model", effort: null, fastMode: false },
+      permission: "allow",
+      threadId: "home",
+      createdAt: 1,
+      updatedAt: 1,
+    },
+  ];
+  render(
+    <QueryClientProvider client={queryClient}>
+      <Orchestration projectId="project" teamId="team" />
+    </QueryClientProvider>,
+  );
+  const memberName = (await screen.findByRole("textbox", { name: "Member name" })) as HTMLInputElement;
+  await waitFor(() => expect(memberName.disabled).toBe(true));
+  expect(memberName.value).toBe("Gloop");
+  expect(screen.queryByRole("button", { name: "Choose default" })).toBeNull();
 });
 
 it("keeps edits after a failed save and blocks archiving until the draft is discarded", async () => {

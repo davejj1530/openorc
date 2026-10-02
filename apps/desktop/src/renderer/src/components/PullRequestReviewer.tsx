@@ -14,6 +14,7 @@ import { LoaderCircle, Sparkles } from "./icons";
 import { defaultChoice, ModelPicker, type ModelChoice } from "./ModelPicker";
 import { Button, Segmented, TextButton } from "./ui";
 import { draftAuthor, readPullReviewer, writePullReviewer, type PullReviewer } from "../lib/pull-requests";
+import { orclingById, useOrclings } from "../lib/orclings";
 import { useRpc, useRpcMutation } from "../lib/query";
 import { openThread } from "../lib/router";
 import { useModelCatalog } from "../lib/use-model-catalog";
@@ -51,7 +52,8 @@ function startLabel(starting: boolean, again: boolean): string {
 /** The review's conversation, which says so while its model is still working. */
 function ReviewConversationLink({ conversation, models }: { conversation: ThreadSummary; models: ModelOption[] | undefined }) {
   const reviewing = conversation.activity !== "idle";
-  const author = draftAuthor({ agent: conversation.agent, model: conversation.model }, models);
+  const orcling = orclingById(useOrclings(), conversation.orclingId);
+  const author = orcling?.name ?? draftAuthor({ agent: conversation.agent, model: conversation.model }, models);
   return (
     <TextButton underline className="inline-flex items-center gap-1.5 text-sm" onClick={() => openThread(conversation.id)} title={conversation.title}>
       {reviewing ? <LoaderCircle size={13} className="animate-spin" aria-hidden="true" /> : null}
@@ -74,8 +76,10 @@ export function PullRequestReviewer({ projectId, pull, review }: { projectId: st
   const reviewing = conversation?.activity === "running" || conversation?.activity === "waiting";
   // A later round continues the review's conversation, unless it was put away.
   const again = conversation !== null && conversation.archivedAt === null;
+  const orclings = useOrclings();
+  const orcling = orclingById(orclings, reviewer.orclingId);
   const begin = () => {
-    if (settings) start.mutate({ projectId, number: pull.number, reviewer: settings });
+    if (settings) start.mutate({ projectId, number: pull.number, reviewer: settings, ...(orcling ? { orclingId: orcling.id } : {}) });
   };
 
   return (
@@ -85,7 +89,13 @@ export function PullRequestReviewer({ projectId, pull, review }: { projectId: st
       <Segmented label="Reviewer" size="sm" value={reviewer.kind} onChange={(kind) => choose({ ...reviewer, kind })} options={reviewers} />
       {reviewer.kind === "model" ? (
         <>
-          <ModelPicker value={choice} onChange={(next) => choose({ kind: "model", choice: next })} ariaLabel="Reviewing model" disabled={start.isPending} />
+          <ModelPicker
+            value={orcling ? { ...orcling.settings } : choice}
+            onChange={(next) => choose({ kind: "model", choice: next, orclingId: null })}
+            orclings={{ options: orclings, selectedId: orcling?.id ?? null, onSelect: (next) => choose({ kind: "model", choice: { ...next.settings }, orclingId: next.id }) }}
+            ariaLabel="Reviewer"
+            disabled={start.isPending}
+          />
           <Button size="sm" disabled={!settings || start.isPending || reviewing} onClick={begin}>
             <Sparkles size={12} /> {startLabel(start.isPending, again)}
           </Button>

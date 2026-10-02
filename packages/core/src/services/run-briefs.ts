@@ -1,4 +1,4 @@
-import { tasks, threads, type Db } from "@openorc/db";
+import { orclings, tasks, threads, type Db } from "@openorc/db";
 import { WORKSPACE_ID, type Project, type RunMode, type Task, type Thread } from "@openorc/protocol";
 import type { RunHooks } from "./run-types.js";
 
@@ -45,6 +45,7 @@ export class RunBriefs {
   }
 
   threadBrief(thread: Thread, project: Project, mode: RunMode): string {
+    if (orclings.forThread(this.db, thread.id)) return this.orclingHomeBrief(project, mode);
     const own = tasks.list(this.db, { threadId: thread.id }).filter((t) => t.status !== "archived");
     const lines = [this.threadLocation(thread, project)];
     const context = this.hooks.threadContext?.(thread);
@@ -85,6 +86,17 @@ export class RunBriefs {
     );
     const memoryBrief = this.hooks.brief(project);
     if (memoryBrief) lines.push("", memoryBrief);
+    return lines.join("\n");
+  }
+
+  /**
+   * An Orcling's own conversation is a chat, not a work thread. Its Orcling brief says who it is and
+   * how it reaches projects; no project's memory or task rules come with it, since what they hold
+   * would read as its own history.
+   */
+  private orclingHomeBrief(project: Project, mode: RunMode): string {
+    const lines = [`You work in ${project.rootPath}, your own folder for notes and files. It is not a project or a repository. Respect the current permissions for every operation.`];
+    if (mode === "plan") lines.push("Plan mode: do not modify files or run commands that change state.");
     return lines.join("\n");
   }
 

@@ -7,9 +7,11 @@ import {
   harnessName,
   isHarnessId,
   normalizeModelEffort,
+  stricterPermission,
   type AgentEvent,
   type AgentKind,
   type ModelOption,
+  type PermissionPreset,
   type Project,
   type Run,
   type RunMode,
@@ -52,7 +54,7 @@ interface RunLaunchDependencies {
   mcp: () => Promise<OpenOrcMcpServer>;
   writers: WorkspaceWriters;
   adapters: RunAdapterRegistry;
-  hooks: Pick<RunHooks, "assertStart" | "taskImages" | "browserAvailable" | "claudeUserMcpServers" | "processRegistry" | "untrustedCheckout">;
+  hooks: Pick<RunHooks, "assertStart" | "taskImages" | "browserAvailable" | "claudeUserMcpServers" | "processRegistry" | "untrustedCheckout" | "orclings">;
   log: Logger;
   isClosing: () => boolean;
   live: ReadonlyMap<string, LiveRun>;
@@ -162,6 +164,7 @@ export class RunLaunch {
         fastMode: input.fastMode ?? false,
         mode: input.mode,
         permissionMode: input.permissionMode,
+        orclingId: input.orclingId ?? null,
       });
     } catch (error) {
       lease.release();
@@ -182,8 +185,9 @@ export class RunLaunch {
     const spec = this.runSpec(prepared, lease, internalMcp);
     await this.lockTaskWorkspace(attempt);
     assertAdmission();
+    const orclingCeiling = input.orclingId ? this.deps.hooks.orclings?.ceiling(input.orclingId) : undefined;
     // No await occurs between this permission read and the provider launch.
-    const latestTeamThread = this.adoptTeamPermission(run, input, spec);
+    const teamPermission = this.adoptTeamPermission(run, input, spec, orclingCeiling);
     phase("prepare");
     if (!isHarnessId(input.agent)) throw new Error(`Provider ${input.agent} has no executable adapter.`);
     const handle = this.deps.adapters[input.agent].start(spec, { ...launch, processRegistry: this.deps.hooks.processRegistry });
@@ -198,7 +202,8 @@ export class RunLaunch {
       workspaceLease: lease,
       internalMcp,
       providerPermissionMode: spec.permissionMode,
-      ...(latestTeamThread ? { permissionGate: latestTeamThread.mode === "plan" ? ("review" as const) : latestTeamThread.permissionMode } : {}),
+      ...(teamPermission ? { permissionGate: teamPermission } : {}),
+      ...(orclingCeiling ? { orclingCeiling } : {}),
     });
     // The picker can change while catalog discovery or MCP startup is awaiting.
     const thread = input.scope.thread;
@@ -276,6 +281,7 @@ export class RunLaunch {
 
   private systemPrompt(input: StartRunInput, taskImages: string[]): string {
     return [
+      this.deps.hooks.orclings?.brief(input) ?? "",
       !input.scope.comment && this.deps.hooks.browserAvailable ? browserInstructions : "",
       this.scopeBrief(input),
       taskImages.length ? `Task images in document order (open them from these paths):\n${taskImages.map((file, index) => `${index + 1}. ${file}`).join("\n")}` : "",
@@ -306,7 +312,8 @@ export class RunLaunch {
       .catch((error: unknown) => this.deps.log.warn(String(error)));
   }
 
-  private adoptTeamPermission(run: Run, input: StartRunInput, spec: RunSpec): Thread | null {
+  /** A team member works with the team conversation's current permission, never looser than its Orcling's. Returns the app gate. */
+  private adoptTeamPermission(run: Run, input: StartRunInput, spec: RunSpec, orclingCeiling: PermissionPreset | undefined): PermissionPreset | null {
     if (!input.teamAttemptId) return null;
     const { task, thread } = input.scope;
     const teamThreadId = thread?.id ?? task?.threadId;
@@ -320,10 +327,12 @@ export class RunLaunch {
     ) {
       throw new Error("Team permission ownership changed during startup.");
     }
-    spec.permissionMode = input.mode === "plan" ? "review" : latest.permissionMode;
-    if (run.permissionMode === latest.permissionMode) return latest;
+    const allowed = orclingCeiling ? stricterPermission(latest.permissionMode, orclingCeiling) : latest.permissionMode;
+    const gate = latest.mode === "plan" ? "review" : allowed;
+    spec.permissionMode = input.mode === "plan" ? "review" : allowed;
+    if (run.permissionMode === allowed) return gate;
     const previous = run.permissionMode;
-    run.permissionMode = latest.permissionMode;
+    run.permissionMode = allowed;
     runs.update(this.deps.db, run.id, { permissionMode: run.permissionMode });
     audit.record(this.deps.db, {
       actor: "openorc",
@@ -332,7 +341,7 @@ export class RunLaunch {
       resourceId: run.id,
       metadata: { previous, permissionMode: run.permissionMode, providerPermissionMode: spec.permissionMode, reason: "team_startup" },
     });
-    return latest;
+    return gate;
   }
 
   private async failStartup(attempt: LaunchAttempt, error: unknown): Promise<void> {
@@ -372,6 +381,7 @@ export class RunLaunch {
     const runId = randomUUID();
     const model = input.model ?? (await this.deps.models(agent, environment, launch).catch(() => [] as ModelOption[])).find((item) => item.isDefault)?.id;
     input = { ...input, effort: normalizeModelEffort(agent, model, input.effort) };
+    input = this.deps.hooks.orclings?.prepare(input) ?? input;
     phase("model");
     const { resumeSessionId, forkSession } = this.resumeTarget(input, model);
     return { input, taskImages, cwd, runId, model, resumeSessionId, forkSession };
@@ -396,7 +406,8 @@ export class RunLaunch {
 
   private resumeTarget(input: StartRunInput, model: string | undefined): { resumeSessionId: string | null | undefined; forkSession: boolean } {
     const { scope, agent } = input;
-    const own = !scope.comment && input.resume ? (runs.lastSession(this.deps.db, scope.task ? { taskId: scope.task.id } : { threadId: scope.thread.id }, agent) ?? undefined) : undefined;
+    const own =
+      !scope.comment && input.resume ? (runs.lastSession(this.deps.db, scope.task ? { taskId: scope.task.id } : { threadId: scope.thread.id }, agent, input.orclingId) ?? undefined) : undefined;
     const commentRun = scope.comment?.resumeRunId ? runs.get(this.deps.db, scope.comment.resumeRunId) : null;
     if (scope.comment && input.resume) this.assertCommentResume(scope.comment.task, commentRun, agent, model, input);
     const resumeSessionId = own ?? (scope.comment && input.resume ? commentRun?.externalSessionId : input.resumeFrom?.sessionId);

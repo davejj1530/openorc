@@ -4,6 +4,7 @@ import { Menu } from "@base-ui/react/menu";
 import { Conversation } from "../components/Conversation";
 import { menuItem, menuPopup, ThreadMenuItems } from "../components/ThreadActions";
 import { TopBar } from "../components/TopBar";
+import { ThreadOrcling } from "../components/OrclingAvatar";
 import { Badge, IconButton, Input, TextButton, Tooltip } from "../components/ui";
 import { useLayout } from "../lib/layout";
 import { useRpc, useRpcMutation } from "../lib/query";
@@ -75,7 +76,6 @@ export function ThreadView({ threadId, first, last, focused, onClose }: { thread
       </main>
     );
   }
-  const parent = t.forkedFromId;
 
   return (
     <>
@@ -134,13 +134,8 @@ export function ThreadView({ threadId, first, last, focused, onClose }: { thread
             </>
           }
         >
-          {parent ? (
-            <Tooltip label="Forked from another thread">
-              <TextButton onClick={() => openThread(parent)} tone="muted" aria-label="Open the parent thread">
-                <GitFork size={13} />
-              </TextButton>
-            </Tooltip>
-          ) : null}
+          <ForkParent parent={t.forkedFromId} />
+          <ThreadOrcling threadId={t.id} orclingId={t.orclingId} />
           <span className="inline-flex min-w-0 items-center h-7 pr-1 text-ink">
             <TitleEditor title={t.title} editing={renaming} onEditingChange={setRenaming} onSave={(title) => update.mutate({ id: t.id, patch: { title } })} />
           </span>
@@ -215,3 +210,15 @@ function TitleEditor({ title, editing, onEditingChange, onSave }: { title: strin
 }
 
 export { menuItem };
+
+/** A fork links back to the thread it continues. */
+function ForkParent({ parent }: { parent: string | null }) {
+  if (!parent) return null;
+  return (
+    <Tooltip label="Forked from another thread">
+      <TextButton onClick={() => openThread(parent)} tone="muted" aria-label="Open the parent thread">
+        <GitFork size={13} />
+      </TextButton>
+    </Tooltip>
+  );
+}

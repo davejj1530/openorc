@@ -102,7 +102,8 @@ export class TeamAttemptAdmission {
     if (!revision || revision.projectId !== input.projectId || !projects.get(this.services.db, input.projectId)) throw new Error("Team revision not found in this project.");
     if (!input.allowArchived && orchestration.get(this.services.db, revision.teamId)?.team.archivedAt !== null) throw new Error("An archived team cannot be selected for a new instance.");
     const lead = revision.members.find((member) => member.managerKey === null)!;
-    const leadOverrides = LeadOverrides.parse(input.leadOverrides ?? {});
+    // An Orcling leads on its own model and effort; only a model lead takes a conversation's overrides.
+    const leadOverrides: LeadOverrides = lead.orclingId ? {} : LeadOverrides.parse(input.leadOverrides ?? {});
     const settings = normalizeModelSettings({ ...lead.settings, ...leadOverrides });
     if (leadOverrides.effort !== undefined) leadOverrides.effort = settings.effort;
     await Promise.all(revision.members.map((member) => this.services.hooks.validate(member.key === lead.key ? settings : normalizeModelSettings(member.settings), input.projectId)));
@@ -116,7 +117,9 @@ export class TeamAttemptAdmission {
     const thread = threads.get(this.services.db, threadId);
     const revision = instance ? orchestration.getRevision(this.services.db, instance.teamRevisionId) : null;
     if (!thread || !revision || revision.projectId !== thread.projectId) throw new Error("This conversation has no pinned team revision.");
-    const settings = normalizeModelSettings({ ...revision.members.find((member) => member.managerKey === null)!.settings, ...LeadOverrides.parse(overrides) });
+    const lead = revision.members.find((member) => member.managerKey === null)!;
+    if (lead.orclingId) throw new Error("An Orcling leads this team on its own model and effort. Edit the Orcling to change them.");
+    const settings = normalizeModelSettings({ ...lead.settings, ...LeadOverrides.parse(overrides) });
     await this.services.hooks.validate(settings, thread.projectId);
     this.services.assertAccepting();
     return settings;

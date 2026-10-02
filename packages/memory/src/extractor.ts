@@ -28,15 +28,27 @@ export interface Extraction {
 
 const MEMORY_TYPES: MemoryType[] = ["decision", "spec", "lesson", "preference", "convention", "command", "env_quirk", "ownership"];
 
-const SYSTEM = `You distill a finished coding-agent run into durable memory for future runs on the same project.
-Return ONLY minified JSON, no prose, no code fences, matching exactly:
+const FORMAT = `Return ONLY minified JSON, no prose, no code fences, matching exactly:
 {"summary":{"request":string,"workDone":string,"outcome":string,"openItems":string[]},
- "memories":[{"type":"decision|spec|lesson|preference|convention|command|env_quirk|ownership","title":string,"body":string,"topicKey":string|null,"files":string[],"confidence":number}]}
+ "memories":[{"type":"decision|spec|lesson|preference|convention|command|env_quirk|ownership","title":string,"body":string,"topicKey":string|null,"files":string[],"confidence":number}]}`;
+
+const SYSTEM = `You distill a finished coding-agent run into durable memory for future runs on the same project.
+${FORMAT}
 Rules:
 - Record only what helps a future run: failed approaches with the cause, decisions with rationale, commands that worked, environment quirks, conventions, durable preferences. Skip anything obvious from reading the code.
 - title <= 80 chars, imperative. body <= 400 chars, concrete.
 - topicKey groups memories that supersede each other, like "test/pool" or "architecture/auth"; null if none.
 - confidence 0.3-0.9: higher when the run proved it, lower when inferred.
+- 0 to 6 memories. Prefer none over noise.`;
+
+const ORCLING_SYSTEM = `You distill a finished conversation between a person and their long-term AI companion into durable memory the companion keeps about that person.
+${FORMAT}
+Rules:
+- Record what helps the companion in later conversations: how the person likes to work and be spoken to, their goals and plans, people and projects they mention, decisions they made, and what went wrong. Skip small talk and one-off details.
+- type: preference for likes and ways of working, decision for choices made, lesson for what failed, convention for routines, ownership for people and responsibilities, spec for goals and plans.
+- title <= 80 chars. body <= 400 chars, concrete, about the person.
+- topicKey groups memories that supersede each other, like "work/schedule" or "tone/replies"; null if none. files is usually empty.
+- confidence 0.3-0.9: higher when the person said it plainly, lower when inferred.
 - 0 to 6 memories. Prefer none over noise.`;
 
 /** Codex enforces this schema on its final message, so the reply is JSON by construction. */
@@ -78,8 +90,18 @@ const OUTPUT_SCHEMA = {
  * so a failed extraction never breaks a run.
  */
 export class Extractor extends TextGenerator {
-  async extract(digest: RunDigest, context: { taskTitle: string; taskSpec: string | null }): Promise<Extraction | null> {
-    const prompt = [SYSTEM, "", `Project task: ${context.taskTitle}`, context.taskSpec ? `Spec: ${context.taskSpec}` : "", "", "Run to distill:", renderDigest(digest)].join("\n");
+  /** `orcling` distills memories about the person for their companion, instead of a project's lessons. */
+  async extract(digest: RunDigest, context: { taskTitle: string; taskSpec: string | null; orcling?: boolean }): Promise<Extraction | null> {
+    const system = context.orcling ? ORCLING_SYSTEM : SYSTEM;
+    const prompt = [
+      system,
+      "",
+      `${context.orcling ? "Conversation" : "Project task"}: ${context.taskTitle}`,
+      context.taskSpec ? `Spec: ${context.taskSpec}` : "",
+      "",
+      "Run to distill:",
+      renderDigest(digest),
+    ].join("\n");
 
     const raw = await this.ask(prompt, OUTPUT_SCHEMA);
     if (!raw) return null;

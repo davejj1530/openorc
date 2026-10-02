@@ -2,6 +2,7 @@ import {
   harnessName,
   isHarnessId,
   type ModelOption,
+  type Orcling,
   type PullRequestBranches,
   type PullRequestDraftComment,
   type PullRequestFilter,
@@ -10,6 +11,7 @@ import {
   type PullRequestSummary,
   type ReviewComment,
 } from "@openorc/protocol";
+import { orclingById } from "./orclings";
 import type { ModelChoice } from "./model-picker-selection";
 
 export const pullRequestFilters: readonly { value: PullRequestFilter; label: string }[] = [
@@ -61,18 +63,21 @@ export function diffComment(comment: PullRequestDraftComment): ReviewComment {
   return { ...comment, threadId: null, taskId: null, snapshotId: null, sentInRunId: null, sentMessageId: null };
 }
 
-/** Who wrote a draft comment: you, or the model that reviewed, by the name the model picker shows. */
-export function draftAuthor(author: PullRequestDraftComment["author"], models: ModelOption[] | undefined): string {
+/** Who wrote a draft comment: you, or the model that reviewed by the name the model picker shows, after the Orcling that ran it. */
+export function draftAuthor(author: PullRequestDraftComment["author"], models: ModelOption[] | undefined, orclings: readonly Orcling[] = []): string {
   if (!author) return "You";
-  const model = models?.find((option) => option.agent === author.agent && option.id === author.model);
-  if (model) return model.label;
-  return author.model ?? (isHarnessId(author.agent) ? harnessName(author.agent) : author.agent);
+  const listed = models?.find((option) => option.agent === author.agent && option.id === author.model)?.label;
+  const model = listed ?? author.model ?? (isHarnessId(author.agent) ? harnessName(author.agent) : author.agent);
+  const orcling = orclingById(orclings, author.orclingId);
+  return orcling ? `${orcling.name} - ${model}` : model;
 }
 
-/** Who drafts the review: you alone, or a model you pick. */
+/** Who drafts the review: you alone, or a model or Orcling you pick. */
 export interface PullReviewer {
   kind: "you" | "model";
   choice: ModelChoice | null;
+  /** An Orcling that reviews with its own model; the choice then shows that model. */
+  orclingId?: string | null;
 }
 
 const REVIEWER_KEY = "openorc.pull-reviewer";
@@ -80,7 +85,7 @@ const REVIEWER_KEY = "openorc.pull-reviewer";
 export function readPullReviewer(): PullReviewer {
   try {
     const saved = JSON.parse(localStorage.getItem(REVIEWER_KEY) ?? "null") as PullReviewer | null;
-    if (saved && (saved.kind === "you" || saved.kind === "model")) return { kind: saved.kind, choice: saved.choice ?? null };
+    if (saved && (saved.kind === "you" || saved.kind === "model")) return { kind: saved.kind, choice: saved.choice ?? null, orclingId: typeof saved.orclingId === "string" ? saved.orclingId : null };
   } catch {
     // An unreadable choice starts over.
   }

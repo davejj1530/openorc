@@ -1,4 +1,4 @@
-import { taskComments, tasks, projects, threads, runs, orchestration, teamRuntime, type Db } from "@openorc/db";
+import { taskComments, tasks, projects, threads, runs, orchestration, orclings, teamRuntime, type Db } from "@openorc/db";
 import {
   commentRecipientKey,
   resolveCommentMentions,
@@ -8,9 +8,11 @@ import {
   type CommentIntent,
   type CommentRecipient,
   type ModelOption,
+  type Orcling,
   type RpcParams,
   type Run,
   type TaskDiscussion,
+  type Thread,
 } from "@openorc/protocol";
 import { isSessionLost, type RunService, type TurnSettledOutcome } from "./runs.js";
 import type { ThreadService } from "./threads.js";
@@ -87,8 +89,9 @@ export class TaskCommentService {
     const task = this.task(input.taskId);
     const body = input.source === "description" ? "Please discuss the saved task description with me." : input.body.trim();
     if (!body) throw new Error("Write a comment first.");
-    const mentioned = resolveCommentMentions(input.source === "description" ? (task.spec ?? "") : body, catalog);
-    const recipients = [...new Map([...input.recipients, ...mentioned].map((r) => [commentRecipientKey(r), r])).values()];
+    const everyOrcling = orclings.list(this.db);
+    const mentioned = resolveCommentMentions(input.source === "description" ? (task.spec ?? "") : body, catalog, everyOrcling);
+    const recipients = [...new Map([...input.recipients.map((r) => asOrcling(r, everyOrcling)), ...mentioned].map((r) => [commentRecipientKey(r), r])).values()];
     if (recipients.length > 8) throw new Error("Mention up to eight agents at a time.");
     if (input.source === "description" && !recipients.length) throw new Error("Tag an available model in the description first.");
     for (const r of recipients) {
@@ -107,7 +110,7 @@ export class TaskCommentService {
         (c) =>
           `User (${c.id}): ${c.body}\n${history.attempts
             .filter((a) => a.commentId === c.id)
-            .map((a) => `${a.recipient.model}: ${a.body}`)
+            .map((a) => `${everyOrcling.find((o) => o.id === a.recipient.orclingId)?.name ?? a.recipient.model}: ${a.body}`)
             .join("\n")}`,
       )
       .join("\n\n");
@@ -300,7 +303,7 @@ export class TaskCommentService {
         this.changed(taskId);
         return;
       }
-      const thread = this.threadService.taskThreadForStart(taskId, { ...item.recipient, effort: item.recipient.effort });
+      const thread = this.carryOrcling(item.recipient, task, this.threadService.taskThreadForStart(taskId, { ...item.recipient, effort: item.recipient.effort }));
       if (thread.mode !== "act") throw new Error("Switch the linked thread to an implementation mode before starting work.");
       taskComments.update(this.db, item.id, { state: "starting_work", error: null, threadId: thread.id });
       this.changed(taskId);
@@ -332,6 +335,11 @@ export class TaskCommentService {
       this.executing.delete(taskId);
       this.changed(taskId);
     }
+  }
+  /** Work an Orcling agreed to do happens as that Orcling, in a thread made for the task; the task's own conversation keeps its agent. */
+  private carryOrcling(recipient: CommentRecipient, task: { threadId: string | null }, thread: Thread): Thread {
+    if (!recipient.orclingId || thread.id === task.threadId || thread.orclingId) return thread;
+    return threads.update(this.db, thread.id, { orclingId: recipient.orclingId });
   }
   private settleExecutorChoices(taskId: string, commentId: string, selectedId: string) {
     for (const sibling of taskComments.list(this.db, taskId).attempts)
@@ -374,6 +382,14 @@ export class TaskCommentService {
     for (const item of taskComments.unfinished(this.db)) if (item.state === "queued" || item.state === "running") await this.cancel(item.taskId, item.id);
     await Promise.allSettled([...this.jobs]);
   }
+}
+
+/** An Orcling replies with its current model, whatever an older reply recorded. */
+function asOrcling(recipient: CommentRecipient, everyOrcling: Orcling[]): CommentRecipient {
+  if (!recipient.orclingId) return recipient;
+  const orcling = everyOrcling.find((o) => o.id === recipient.orclingId);
+  if (!orcling) throw new Error("That Orcling no longer exists. Mention another agent.");
+  return { agent: orcling.settings.agent, model: orcling.settings.model, effort: orcling.settings.effort, orclingId: orcling.id };
 }
 
 function workOutcomeLabel(status: TurnSettledOutcome["status"]): string {

@@ -1,4 +1,4 @@
-import { Db, orchestration, teamDeletions, teamForks, teamMoves, teamRestores } from "@openorc/db";
+import { Db, orchestration, orclings, teamDeletions, teamForks, teamMoves, teamRestores } from "@openorc/db";
 import { LedgerUpkeep } from "../services/ledger-upkeep.js";
 import { TeamDeletionService } from "../services/team-deletions.js";
 import { TeamForkService } from "../services/team-forks.js";
@@ -30,6 +30,8 @@ export function createThreadWorkspaceHandlers({
 > {
   return {
     "threads.delete": async ({ id, requestKey }) => {
+      const owner = orclings.forThread(db, id);
+      if (owner) throw new Error(`This is ${owner.name}'s own conversation. Delete ${owner.name} to remove it.`);
       // A finished taskless deletion has no instance left; its receipt still answers the replayed key.
       if (orchestration.getInstance(db, id) || (requestKey && (teamDeletions.find(db, id, requestKey) || teamDeletions.rejection(db, id, requestKey)))) {
         if (!requestKey) throw new Error("Deleting a team conversation needs a request key so an interrupted delete can be retried safely.");

@@ -21,10 +21,11 @@ import type {
 } from "@openorc/protocol";
 import { Composer, permissionLabel } from "./Composer";
 import { useComposerChanges } from "../lib/composer-changes";
-import { ComposerModelPicker } from "./ModelPicker";
+import { TeamLeadPicker } from "./TeamLeadPicker";
 import { AgentPresence, Transcript, TranscriptContents } from "./Transcript";
 import { ThreadMedia, useThreadMentionNames } from "./ThreadImages";
 import { MemberAvatar } from "./MemberAvatar";
+import { orclingById, useOrclings } from "../lib/orclings";
 import { AlertCircle, ChevronDown, Folder, GitFork, Workflow } from "./icons";
 import { Button, TextButton, Tooltip } from "./ui";
 import { emptyRun, getRun, hydrate, useRun, useRunMap, useRuns, type Block, type RunTranscript } from "../lib/transcript";
@@ -85,12 +86,17 @@ const TeamAttentionTarget = createContext<{ id: string; select: (id: string) => 
 const TeamControlScope = createContext<string | undefined>(undefined);
 const useTeamControl = (threadId: string) => teamControlParams(threadId, useContext(TeamControlScope));
 // Pictures are read once per conversation; every author line and card looks its member up here.
-const TeamAvatars = createContext<{ choices: ReadonlyMap<string, TeamMemberAvatarChoice>; roster: readonly string[] }>({ choices: new Map(), roster: [] });
+const TeamAvatars = createContext<{ choices: ReadonlyMap<string, TeamMemberAvatarChoice>; roster: readonly string[]; seats: ReadonlyMap<string, string> }>({
+  choices: new Map(),
+  roster: [],
+  seats: new Map(),
+});
 
-/** The member's picture beside its name; its roster position stands in until the saved choice loads. */
+/** The member's picture beside its name, or the face of the Orcling in its seat; its roster position stands in until the saved choice loads. */
 function TeamMemberPicture({ memberKey, size }: { memberKey: string; size: "sm" | "md" | "lg" }) {
-  const { choices, roster } = useContext(TeamAvatars);
-  return <MemberAvatar avatar={choices.get(memberKey) ?? null} fallbackIndex={Math.max(0, roster.indexOf(memberKey))} size={size} />;
+  const { choices, roster, seats } = useContext(TeamAvatars);
+  const orcling = orclingById(useOrclings(), seats.get(memberKey));
+  return <MemberAvatar avatar={choices.get(memberKey) ?? null} orcling={orcling} fallbackIndex={Math.max(0, roster.indexOf(memberKey))} size={size} />;
 }
 
 export function TeamConversation({
@@ -133,6 +139,7 @@ export function TeamConversation({
     () => ({
       choices: new Map(avatars.data?.map((item) => [item.memberKey, item.avatar] as const) ?? []),
       roster: data.revision.members.map((member) => member.key),
+      seats: new Map(data.revision.members.flatMap((member) => (member.orclingId ? [[member.key, member.orclingId] as const] : []))),
     }),
     [avatars.data, data.revision.members],
   );
@@ -317,19 +324,7 @@ export function TeamConversation({
                     mentions={mentions}
                     model={editingChoice ?? effective}
                     onModel={changeLead}
-                    modelControl={
-                      <ComposerModelPicker
-                        value={editingChoice ?? effective}
-                        onChange={changeLead}
-                        team={{ name: data.revision.name, revision: data.revision.number, leadName: lead.name }}
-                        settingsDisabled={leadSaving}
-                        modelSelector={
-                          <span className="text-sm text-ink-2">
-                            {lead.name} · {effective.model}
-                          </span>
-                        }
-                      />
-                    }
+                    modelControl={<TeamLeadPicker revision={data.revision} value={editingChoice ?? effective} onChange={changeLead} saving={leadSaving} />}
                     onExecutionMode={changePolicy}
                     mode={policy.mode}
                     onMode={(mode) => changePolicy({ mode })}

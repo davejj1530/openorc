@@ -72,3 +72,29 @@ export function buildBrief(db: Db, projectId: string, openTaskTitles: string[]):
 export function hasBrief(db: Db, projectId: string): boolean {
   return memories.list(db, { projectId, statuses: ["active"], limit: 1 }).length > 0;
 }
+
+const ORCLING_SECTIONS: { types: MemoryType[]; heading: string; max: number }[] = [
+  { types: ["preference"], heading: "How they like things", max: 8 },
+  { types: ["decision"], heading: "Decisions", max: 6 },
+  { types: ["lesson", "env_quirk"], heading: "Lessons", max: 6 },
+  { types: ["convention", "ownership", "spec", "command"], heading: "Things to know", max: 8 },
+];
+
+/** An Orcling's own memory for its prompt: what it has learned about the person it helps, wherever it is working. */
+export function buildOrclingBrief(db: Db, orclingId: string): string {
+  const all = memories.list(db, { orclingId, statuses: ["active"], limit: 400 });
+  if (all.length === 0) return "";
+  const score = (m: Memory) => m.confidence * Math.pow(0.5, (Date.now() - m.lastConfirmedAt) / HALF_LIFE_MS);
+  const lines = ["# Your memory", "What you have learned about the person you help, from every conversation. It is yours alone. Each line shows its age."];
+  for (const section of ORCLING_SECTIONS) {
+    const items = all
+      .filter((m) => section.types.includes(m.type))
+      .sort((a, b) => score(b) - score(a))
+      .slice(0, section.max);
+    if (items.length === 0) continue;
+    lines.push("", `## ${section.heading}`);
+    for (const m of items) lines.push(`- ${m.title} (${AGE_LABEL(m.lastConfirmedAt)}): ${m.body}`);
+  }
+  const brief = lines.join("\n");
+  return brief.length > MAX_CHARS ? brief.slice(0, MAX_CHARS) + "\n…" : brief;
+}

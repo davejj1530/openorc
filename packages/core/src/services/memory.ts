@@ -1,6 +1,6 @@
 import { extractionJobs, listEvents, memories, settings, summaries, tasks, vectors, type Db, type MemoryFilter, type MemoryInput } from "@openorc/db";
 import type { AgentLaunchEnvironment } from "@openorc/agents";
-import { buildBrief, DIGEST_EVENT_KINDS, digestRun, Embedder, Extractor, hasBrief, Retriever, type RetrievedMemory, type TextEmbedder } from "@openorc/memory";
+import { buildBrief, buildOrclingBrief, DIGEST_EVENT_KINDS, digestRun, Embedder, Extractor, hasBrief, Retriever, type RetrievedMemory, type TextEmbedder } from "@openorc/memory";
 import {
   distillationHarnessIds,
   harnessCatalog,
@@ -75,6 +75,8 @@ export class MemoryService {
   private closing = false;
   private readonly background = new Set<Promise<unknown>>();
   private configuring = 0;
+  /** Which Orcling a finished run's memories belong to: set for an Orcling's own conversation, null for a project's. */
+  extractionOwner: (run: Run, thread: Thread | null) => string | null = () => null;
 
   constructor(
     private readonly db: Db,
@@ -335,7 +337,8 @@ export class MemoryService {
         extractionJobs.finish(this.db, run.id, { state: "skipped", error: "no distillation provider available" });
         return;
       }
-      const result = await extractor.extract(digest, { taskTitle: title, taskSpec: spec });
+      const orclingId = this.extractionOwner(run, scope.thread);
+      const result = await extractor.extract(digest, { taskTitle: title, taskSpec: spec, orcling: orclingId !== null });
       if (!permitted()) {
         extractionJobs.finish(this.db, run.id, { state: "skipped", error: "memory learning was disabled" });
         return;
@@ -344,7 +347,7 @@ export class MemoryService {
         extractionJobs.finish(this.db, run.id, { state: "skipped", error: "extractor unavailable or unparseable" });
         return;
       }
-      const learned = this.leaveUserTopics(project.id, result.memories);
+      const learned = this.leaveUserTopics(project.id, result.memories, orclingId);
       const written = this.db.transaction(() => {
         summaries.upsert(this.db, {
           runId: run.id,
@@ -360,6 +363,7 @@ export class MemoryService {
         return learned.map((mem) => {
           const input: MemoryInput = {
             projectId: project.id,
+            orclingId,
             type: mem.type,
             topicKey: mem.topicKey,
             title: mem.title,
@@ -376,7 +380,7 @@ export class MemoryService {
       });
       extractionJobs.finish(this.db, run.id, { state: "done", memoriesWritten: written.length });
       this.log.info(`extracted ${written.length} mem` + `ory item(s) from run ${run.id}; left ${result.memories.length - learned.length} topic(s) the user wrote unchanged`);
-      this.invalidate(["memory", `memory:${project.id}`, ...(scope.task ? [`memory:task:${scope.task.id}`] : [])]);
+      this.invalidate([...memoryKeys({ projectId: project.id, orclingId }), ...(scope.task ? [`memory:task:${scope.task.id}`] : [])]);
       void this.track(this.embedAll(written, permitted));
     } catch (e) {
       extractionJobs.finish(this.db, run.id, { state: "failed", error: e instanceof Error ? e.message : String(e) });
@@ -385,8 +389,8 @@ export class MemoryService {
   }
 
   /** A topic the user wrote stays theirs. Extraction leaves it alone rather than failing and losing the run's summary. */
-  private leaveUserTopics<T extends { topicKey?: string | null }>(projectId: string, learned: T[]): T[] {
-    return learned.filter((mem) => !mem.topicKey || !memories.userOwnsTopic(this.db, projectId, mem.topicKey));
+  private leaveUserTopics<T extends { topicKey?: string | null }>(projectId: string, learned: T[], orclingId: string | null): T[] {
+    return learned.filter((mem) => !mem.topicKey || !memories.userOwnsTopic(this.db, projectId, mem.topicKey, orclingId));
   }
 
   /** Embeds distilled memories outside the distillation slot, so a model still downloading holds up no other run. */
@@ -446,31 +450,48 @@ export class MemoryService {
     return memories.list(this.db, { projectId, ...options });
   }
 
+  /** An Orcling's own memories, which no project search sees. */
+  listOrcling(orclingId: string, options: Omit<MemoryFilter, "projectId" | "orclingId"> = {}): Memory[] {
+    return memories.list(this.db, { orclingId, ...options });
+  }
+
+  async retrieveOrcling(orclingId: string, query: string, limit: number): Promise<RetrievedMemory[]> {
+    if (!this.enabled() || this.closing) return [];
+    const revision = this.policyRevision;
+    const results = await this.track(this.retriever.retrieve({ projectId: null, orclingId, query, limit, semantic: true }));
+    return this.enabled() && revision === this.policyRevision ? results : [];
+  }
+
+  /** What an Orcling remembers, for its prompt; empty while memory is off. */
+  orclingBrief(orclingId: string): string {
+    return this.enabled() ? buildOrclingBrief(this.db, orclingId) : "";
+  }
+
   record(input: MemoryInput): Memory {
     this.assertEnabled();
     const { memory } = memories.upsert(this.db, input);
     void this.track(this.embed(memory));
-    this.invalidate(["memory", input.projectId ? `memory:${input.projectId}` : "memory"]);
+    this.invalidate(memoryKeys(memory));
     return memory;
   }
 
   update(id: string, patch: Parameters<typeof memories.update>[2]): Memory {
     const m = memories.update(this.db, id, patch);
     if (patch.title || patch.body) void this.track(this.embed(m));
-    this.invalidate(["memory", `memory:${m.projectId ?? ""}`]);
+    this.invalidate(memoryKeys(m));
     return m;
   }
 
   feedback(id: string, verdict: "helpful" | "wrong" | "stale"): Memory {
     const m = memories.feedback(this.db, id, verdict);
-    this.invalidate(["memory", `memory:${m.projectId ?? ""}`]);
+    this.invalidate(memoryKeys(m));
     return m;
   }
 
   remove(id: string): void {
     const m = memories.get(this.db, id);
     memories.remove(this.db, id);
-    this.invalidate(["memory", `memory:${m?.projectId ?? ""}`]);
+    this.invalidate(memoryKeys(m ?? { projectId: null }));
   }
 
   recentSummaries(projectId: string, limit = 5): SessionSummary[] {
@@ -500,6 +521,11 @@ export class MemoryService {
     }
     return this.enabled() && revision === this.policyRevision ? lines.join("\n") : taskOnly;
   }
+}
+
+/** Cache keys for a memory's list: its project's, or its Orcling's. */
+function memoryKeys(owner: { projectId: string | null; orclingId?: string | null }): string[] {
+  return ["memory", owner.orclingId ? `memory:orcling:${owner.orclingId}` : `memory:${owner.projectId ?? ""}`];
 }
 
 function extractionHarness(choice: string) {

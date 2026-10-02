@@ -381,7 +381,7 @@ export class ThreadService {
     const folderChanged = nextDirectory !== currentProject.rootPath;
     const project = { ...currentProject, rootPath: nextDirectory };
     if (folderChanged) input = { ...input, fresh: true };
-    const own = runRepo.listForThread(this.db, thread.id);
+    const own = runRepo.listForThread(this.db, thread.id).filter((run) => (run.orclingId ?? null) === (thread.orclingId ?? null));
     if (thread.projectId === WORKSPACE_ID && own.length && own.at(-1)?.agent !== input.agent) input = { ...input, fresh: true };
     // A fresh start, or a provider that cannot read the old session, gets a brief instead of the session.
     const switching = own.length > 0 && !own.some((r) => r.agent === input.agent);

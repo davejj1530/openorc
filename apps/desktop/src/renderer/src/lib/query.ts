@@ -39,6 +39,10 @@ const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
   "pulls.diff": ["pulls"],
   "pulls.review.get": ["pull-reviews"],
   "reviewerApp.get": ["reviewer-app"],
+  // Orclings, their instructions and what they remember.
+  "orclings.list": ["orclings"],
+  "orclings.instructions": ["orclings"],
+  "orclings.memories": ["orclings", "memory"],
 };
 
 /**
@@ -86,6 +90,9 @@ export function tagsFor(method: RpcMethod, params: unknown): string[] {
     case "threads.get":
     case "threads.messages":
       return ["threads", `thread:${String(p["id"])}`];
+    // Only the conversation's own sends and turns change what was said last, so other threads' activity leaves it be.
+    case "threads.lastMessage":
+      return [`thread:${String(p["id"])}`];
     case "threads.checkpoints":
       return [`checkpoints:${String(p["id"])}`];
     case "threads.importable":
@@ -172,6 +179,14 @@ const fixedInvalidations: Partial<Record<RpcMethod, readonly string[]>> = {
   "reviewerApp.cancelSetup": ["reviewer-app"],
   "reviewerApp.configure": ["reviewer-app"],
   "reviewerApp.remove": ["reviewer-app"],
+  "orclings.create": ["orclings", "threads"],
+  // Team seats read their Orcling's current model, so teams refresh with it.
+  "orclings.update": ["orclings", "threads", "orchestration"],
+  "orclings.delete": ["orclings", "threads", "memory", "orchestration"],
+  "orclings.instructions.save": ["orclings"],
+  "orclings.instructions.restore": ["orclings"],
+  "orclings.ask": ["threads"],
+  "orclings.assign": ["orclings", "threads"],
 };
 
 function workspaceMutationTags(id: string): string[] {

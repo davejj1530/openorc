@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import type { RemoteApproval, RemoteDecision } from "./approvals.js";
-import { runs, settings, redact } from "@openorc/db";
+import { orclings, runs, settings, redact, threads } from "@openorc/db";
 import type { AgentEvent, SlackClientConfig, HarnessId } from "@openorc/protocol";
 import type { ExecutionSwitchInput } from "@openorc/mcp";
 import type { OpenOrc } from "../../openorc.js";
@@ -27,7 +27,9 @@ interface Pending {
   failure: string | null;
   failedModels: Map<string, string>;
   progress: { status: string; messageId: string | null; text: string };
-  next?: { agent: HarnessId; model?: string; effort: string | undefined; workingDirectory: string; prompt: string };
+  next?: { agent: HarnessId; model?: string; effort: string | undefined; workingDirectory: string; prompt: string; orclingId: string | null };
+  /** The Orcling the next launch speaks as; null hands the conversation back to a plain model. */
+  orclingId?: string | null;
   generation: number;
   waiting(): void;
   finish(text: string): void;
@@ -173,6 +175,7 @@ export class SlackRunner {
     if (!this.pending.has(p) || p.generation !== this.generation || !p.threadId) return;
     const input = p.input;
     try {
+      if (p.orclingId !== undefined) threads.update(this.core.db, p.threadId, { orclingId: p.orclingId });
       await this.core.threads.continueThread(p.threadId, input);
     } catch (error) {
       // A startup failure may already have scheduled recovery through settled().
@@ -251,6 +254,7 @@ export class SlackRunner {
           p.failedModels.get(`${m.agent}:${m.id}`) ?? m.unavailable ?? (info.harnesses.some((h) => h.id === m.agent && harnessLoggedIn(h)) ? null : "Connect this harness in OpenOrc Settings."),
       })),
       folders,
+      orclings: orclings.list(this.core.db).map((o) => ({ id: o.id, name: o.name, agent: o.settings.agent, model: o.settings.model, current: current.orclingId === o.id })),
     };
   }
 
@@ -279,7 +283,7 @@ export class SlackRunner {
     if (this.active(runId) !== p || p.next) throw new Error("The active request changed.");
     if (sameModel && (effort ?? null) === context.current.effort && workingDirectory === context.current.workingDirectory)
       return { switched: false, message: "This run already uses that model, effort and folder. Continue here." };
-    p.next = { agent, model, effort, workingDirectory, prompt: input.instructions };
+    p.next = { agent, model, effort, workingDirectory, prompt: input.instructions, orclingId: null };
     return {
       queued: true,
       agent,
@@ -288,6 +292,22 @@ export class SlackRunner {
       workingDirectory,
       message: "End this turn now. OpenOrc will continue this same request with these settings after your turn settles. Do not execute its work yourself.",
     };
+  }
+
+  /** Hands the conversation to one of the owner's Orclings, which continues it with its own model, instructions and memory. */
+  async switchToOrcling(runId: string, orclingId: string, instructions: string) {
+    const p = this.active(runId);
+    if (p.next) throw new Error("A switch is already queued. End this turn now.");
+    if (p.switches >= 4) throw new Error("Too many switches in one request. Ask the owner to continue in a new reply.");
+    const orcling = orclings.get(this.core.db, orclingId);
+    if (!orcling) throw new Error("Choose an Orcling ID from execution_context; the request has not switched.");
+    const context = await this.executionContext(runId);
+    const selected = context.models.find((m) => m.agent === orcling.settings.agent && m.id === orcling.settings.model);
+    if (!selected || selected.unavailable) throw new Error(selected?.unavailable ?? `${orcling.name}'s model is unavailable right now. The request has not switched.`);
+    if (this.active(runId) !== p || p.next) throw new Error("The active request changed.");
+    const { agent, model, effort } = orcling.settings;
+    p.next = { agent, model, effort: effort ?? undefined, workingDirectory: context.current.workingDirectory!, prompt: instructions, orclingId: orcling.id };
+    return { queued: true, orcling: orcling.name, message: `End this turn now. ${orcling.name} continues this same request after your turn settles. Do not execute its work yourself.` };
   }
 
   observe(event: AgentEvent): void {
@@ -350,7 +370,8 @@ export class SlackRunner {
       if (p.runId !== runId) continue;
       if (outcome.status === "error" && this.recover(p, runId, p.failure ?? redact(outcome.error ?? "The provider failed.").text)) continue;
       if (p.next && outcome.status === "success") {
-        const next = p.next;
+        const { orclingId, ...next } = p.next;
+        p.orclingId = orclingId;
         delete p.next;
         p.excludedRuns.add(runId);
         p.runId = null;

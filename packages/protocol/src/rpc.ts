@@ -448,8 +448,12 @@ export const rpcParams = {
   "agents.models": z.object({ agent: AgentKind.optional() }),
   "agents.modelCatalog": z.object({ agent: HarnessId.optional() }),
   "agents.models.refresh": z.object({ agent: HarnessId.optional() }),
-  /** The selected harness's skills in this project, including personal, plugin, and built-in sources. */
-  "skills.list": z.object({ projectId: z.string(), agent: HarnessId }),
+  /**
+   * The selected harness's skills where a conversation works, including personal, plugin, and built-in sources.
+   * A project's are found from its root. A Workspace conversation, an Orcling's own included, works in its own
+   * folder, given as `workingDirectory`; without one, the Workspace's folder.
+   */
+  "skills.list": z.object({ projectId: z.string(), workingDirectory: z.string().min(1).max(4096).optional(), agent: HarnessId }),
   /** Stores an image the user pasted or dropped, returning where it lives. */
   "attachments.save": z.object({ name: z.string(), mime: z.string(), dataBase64: z.string() }),
   /** Stores any other file the user attached. Kept apart from images because only an image is ever served back over the asset protocol. */

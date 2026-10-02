@@ -229,7 +229,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
     await startRun(body, attachments);
   };
 
-  const skills = useSkillCommands(project.id === WORKSPACE_ID ? undefined : project.id, choice?.agent);
+  const skills = useSkillCommands(project.id, choice?.agent, thread?.workingDirectory);
   const commands: SlashCommand[] = [
     ...(thread
       ? [

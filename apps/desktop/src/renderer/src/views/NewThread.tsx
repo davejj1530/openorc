@@ -170,8 +170,8 @@ function NewThreadProject({
   const target = draft.target;
   const revision = target.kind === "team" ? target.revision : null;
   // The landing composer has no thread, so no thread action applies to it. The
-  // skills do: they belong to the project, which is chosen on this screen.
-  const skillCommands = useSkillCommands(isWorkspace ? undefined : projectId, choice?.agent);
+  // skills do: they belong to the project, or the Workspace folder, chosen on this screen.
+  const skillCommands = useSkillCommands(projectId, choice?.agent, draft.workingDirectory);
   const workspaceMode = newThreadWorkspaceMode({ canBranch: !isWorkspace && !git.cannotBranch, chosen: draft.workspace, preferred: settings.data?.defaultWorkspaceMode });
 
   useEffect(() => {

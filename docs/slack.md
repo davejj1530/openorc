@@ -56,7 +56,7 @@ If a run fails, OpenOrc starts one recovery turn with the configured default mod
 
 Conversation ownership is `(Slack workspace, user, channel, root thread)` on the receiving desktop. Each run records its working folder, harness, model, and permissions. Workspace has no Git worktree, checkpoint, commit, or PR controls; use an imported project’s conversation for managed Git review. Slack arrivals update the thread list without changing the desktop view.
 
-Workspace composers accept text and attachments. Project-indexed file mentions and skill suggestions are not offered there; the agent still reads the selected folder and its own applicable instructions.
+Workspace composers accept text and attachments, and suggest the skills the selected harness finds from the conversation's folder. Project-indexed file mentions are not offered there; the agent still reads the selected folder and its own applicable instructions.
 
 ## Thread replies and readable messages
 

@@ -1,6 +1,23 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Menu } from "@base-ui/react/menu";
-import { PanelRight, PanelRightClose, BookText, FileText, FileDiff, ListTodo, SlidersHorizontal, GitCommitHorizontal, Globe, History, Brain, Maximize2, Minimize2, Plus, Terminal } from "./icons";
+import {
+  PanelRight,
+  PanelRightClose,
+  BookText,
+  FileText,
+  FileDiff,
+  ListTodo,
+  SlidersHorizontal,
+  GitCommitHorizontal,
+  Globe,
+  History,
+  Brain,
+  Maximize2,
+  Minimize2,
+  Orcling,
+  Plus,
+  Terminal,
+} from "./icons";
 import { WORKSPACE_ID, isDetachedCopy } from "@openorc/protocol";
 import type { Project, PushState, Task, ThreadSummary } from "@openorc/protocol";
 import { ResizeHandle } from "./ResizeHandle";
@@ -18,6 +35,7 @@ import { ChangesPanel } from "../panels/ChangesPanel";
 import { CheckpointsPanel } from "../panels/CheckpointsPanel";
 import { CommitsPanel, type CommitSource } from "../panels/CommitsPanel";
 import { MemoryPanel } from "../panels/MemoryPanel";
+import { OrclingPanel } from "../panels/OrclingPanel";
 import { TaskDetailsPanel } from "../panels/TaskDetailsPanel";
 import { ThreadTasksPanel } from "../panels/ThreadTasksPanel";
 
@@ -51,6 +69,7 @@ function panelOwner(context: PanelContext): ThreadSummary | Task | null {
 }
 
 const icons = {
+  orcling: Orcling,
   plan: FileText,
   file: FileText,
   changes: FileDiff,
@@ -64,6 +83,7 @@ const icons = {
   instructions: BookText,
 };
 const labels: Record<PanelTab, string> = {
+  orcling: "Orcling",
   plan: "Plan",
   file: "Code",
   changes: "Changes",
@@ -86,11 +106,27 @@ const labels: Record<PanelTab, string> = {
 export function tabsFor(context: PanelContext): PanelTab[] {
   if (context.kind === "project") return ["changes"];
   if (context.kind === "newthread") return [...(context.changes ? (["changes", "commits"] as const) : []), "terminal", "browser", "memory"];
-  const plan: PanelTab[] = context.kind === "thread" ? ["plan"] : [];
-  if (context.project.id === WORKSPACE_ID) return context.kind === "thread" ? ["tasks", ...plan, "terminal", "browser", "memory", "instructions"] : ["task", "terminal", "browser", "memory"];
-  return context.kind === "thread"
-    ? ["changes", ...plan, "terminal", "browser", "tasks", "checkpoints", "commits", "memory", "instructions"]
-    : ["changes", "terminal", "browser", "task", "commits", "memory"];
+  if (context.kind === "task") return context.project.id === WORKSPACE_ID ? ["task", "terminal", "browser", "memory"] : ["changes", "terminal", "browser", "task", "commits", "memory"];
+  // The Orcling working in a conversation comes first: its profile is who you are talking to.
+  const orcling: PanelTab[] = context.thread.orclingId ? ["orcling"] : [];
+  if (context.project.id === WORKSPACE_ID) return [...orcling, "tasks", "plan", "terminal", "browser", "memory", "instructions"];
+  return [...orcling, "changes", "plan", "terminal", "browser", "tasks", "checkpoints", "commits", "memory", "instructions"];
+}
+
+/** Tabs that belong to a conversation alone. */
+function threadTabBody(current: PanelTab, context: Extract<PanelContext, { kind: "thread" }>): ReactNode {
+  switch (current) {
+    case "tasks":
+      return <ThreadTasksPanel thread={context.thread} project={context.project} />;
+    case "checkpoints":
+      return <CheckpointsPanel key={context.thread.id} thread={context.thread} />;
+    case "instructions":
+      return <InstructionsPanel key={context.thread.id} threadId={context.thread.id} />;
+    case "orcling":
+      return context.thread.orclingId ? <OrclingPanel key={context.thread.orclingId} orclingId={context.thread.orclingId} /> : null;
+    default:
+      return null;
+  }
 }
 
 function useSelectedFile(context: PanelContext) {
@@ -348,12 +384,10 @@ export function Panel({ context }: { context: PanelContext }) {
   } else if (current === "browser" && context.kind !== "project") {
     const owner = scope ?? `newthread:${context.project.id}`;
     body = <BrowserPanel key={owner} id={owner} defaultUrl={previewUrls[owner] ?? "http://localhost:3000"} onUrl={(url) => rememberPreviewUrl(owner, url)} />;
-  } else if (current === "tasks" && context.kind === "thread") body = <ThreadTasksPanel thread={context.thread} project={context.project} />;
-  else if (current === "task" && context.kind === "task") body = <TaskDetailsPanel task={context.task} project={context.project} />;
-  else if (current === "checkpoints" && context.kind === "thread") body = <CheckpointsPanel key={context.thread.id} thread={context.thread} />;
+  } else if (current === "task" && context.kind === "task") body = <TaskDetailsPanel task={context.task} project={context.project} />;
   else if (current === "commits" && source) body = <CommitsPanel source={source} />;
   else if (current === "memory" && context.kind !== "project") body = <MemoryPanel context={context} />;
-  else if (current === "instructions" && context.kind === "thread") body = <InstructionsPanel key={context.thread.id} threadId={context.thread.id} />;
+  else if (context.kind === "thread") body = threadTabBody(current, context);
 
   return (
     <>

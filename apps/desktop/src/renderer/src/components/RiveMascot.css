@@ -35,3 +35,9 @@
     visibility: visible;
   }
 }
+
+.orcling-preview-still {
+  display: grid;
+  place-items: center;
+  padding-bottom: 4%;
+}

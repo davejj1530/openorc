@@ -21,17 +21,22 @@ If a provider still asks, OpenOrc checks that the request really comes from that
 | Browser click, fill, press                      | blocked | asks              | asks         | allowed    |
 | Typing into a password field                    | blocked | asks              | asks         | asks       |
 | `memory_record`, `memory_feedback`              | blocked | asks              | allowed      | allowed    |
+| `orcling_remember`                              | blocked | asks              | allowed      | allowed    |
+| `orcling_instructions_update`                   | asks    | asks              | allowed      | allowed    |
 | `thread_send` to a more permissive conversation | blocked | asks              | asks         | allowed    |
+| `orcling_thread_start`                          | blocked | asks              | asks         | allowed    |
 
 When OpenOrc asks, you see the usual approval card. **Allow for this run** covers later actions of the same kind in that run, except password fields, which ask every time.
 
 Everything else is allowed in every mode, because it changes nothing outside OpenOrc's own records:
 
-- Reading: `task_list`, `task_get`, `thread_list`, `thread_read`, `memory_search`, `task_context`, `execution_context`, and browser `open`, `snapshot`, `screenshot` and `scroll`.
+- Reading: `task_list`, `task_get`, `thread_list`, `thread_read`, `memory_search`, `task_context`, `execution_context`, the Orcling reads `orcling_recall`, `orcling_history`, `orcling_projects`, `orcling_project` and `orcling_thread_read`, and browser `open`, `snapshot`, `screenshot` and `scroll`.
 - Asking you: `ask_user`.
-- Documents: `task_create` in the backlog, `task_update`, and `plan_write`.
+- Documents: `task_create` in the backlog, `orcling_task_create`, `task_update`, and `plan_write`.
 - Task comments: `task_comment_intent`, which records whether a comment asks for work. The work itself starts only after the agent's reply.
 - `approve`: Claude Code's permission prompt. Claude Code calls it, not the model, to hand each tool request to OpenOrc's approval cards and mode rules.
+
+An Orcling's tools exist only in runs where an Orcling speaks. Its permission caps the mode it works in anywhere: Approve runs as Review everything (Plan on OpenCode, which cannot ask first), Allow as Autonomous, and the stricter of the Orcling's and the conversation's rule wins. `orcling_thread_send` follows the `thread_send` rules below and can reach threads in any project. `orcling_thread_start` sets the Orcling working in a new project thread, or on a saved task that has no conversation of someone else's; that thread works as freely as the conversation that started it, within the Orcling's permission. See [Orclings](orclings.md).
 
 `task_start` is refused in Plan. It marks the task in progress so the calling conversation can work on it; it does not start another agent. `execution_switch` changes a Slack request's model or folder, never its permissions. Team tools follow the team's own rules.
 

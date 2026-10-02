@@ -27,3 +27,16 @@ Settings → Appearance → Colors → Mascot edits `--mascot-body` and `--masco
 ```sh
 pnpm --filter @openorc/desktop exec vitest run src/renderer/src/components/mascot-runtime.test.ts src/renderer/src/lib/theme-custom.test.ts
 ```
+
+## Orcling
+
+`orcling.riv` is Questling extended for Orclings, the companions you design. With every variant at 0 it renders exactly like `questling.riv`.
+
+- Artboard `Orcling` (500 × 500), state machine `App states`, view model `ViewModel1`, bound with `autoBind`.
+- `bodyColor`, `eyeColor` and `expression` work as they do for Questling.
+- Number properties pick the variants, in the order of `orcling-art.ts`: `shape` 0–11, `eyes` 0–4, `texture` 0–3, `glasses` 0–3, `accessory` 0–5. Send whole numbers within these ranges; the file does not clamp them.
+- Solos bound to these numbers switch the body, eye style, glasses and the accessory's front and back layers. Formula converters show each shape's texture layers, and per-shape lookups place accessories on every silhouette.
+- Glasses follow the eyes' glances; the eyes shrink behind the frames. With an accessory on, the Thinking dots move to the upper left and the apple's stem hides.
+- Only vector paths, gradients, strokes, Solos and data binding: no shaders, scripts, feathering, meshes or images, so it renders with `@rive-app/canvas`.
+
+The body fills about the central 300 × 300 of the artboard; accessories reach above it. `OrclingPreview` draws the live character and `OrclingStill` the flat drawing used for small avatars and as the fallback under reduced motion.

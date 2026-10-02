@@ -5,20 +5,16 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { z } from "zod";
 import { UserInput, type UserInputResult } from "./questions.js";
 export { UserInput, validateUserAnswers, type UserInputResult } from "./questions.js";
-import { TaskStatus, HarnessId, CommentIntent, parseFileBoundary, type ApprovalDecision, type BrowserCommand, type BrowserResult } from "@openorc/protocol";
+import { TaskStatus, CommentIntent, parseFileBoundary, type ApprovalDecision, type BrowserCommand, type BrowserResult } from "@openorc/protocol";
 import { registerBrowserTool } from "./browser.js";
 import { registerPullReviewTools, type PullReviewTools } from "./pull-review.js";
 export type { PullReviewComment, PullReviewTools } from "./pull-review.js";
+import { orclingToolNames, registerOrclingTools, type OrclingTools } from "./orcling-tools.js";
+export type { OrclingMemoryEntry, OrclingTools } from "./orcling-tools.js";
 import { fileBoundaryAnswer } from "./file-boundary.js";
 
-export interface ExecutionSwitchInput {
-  agent?: HarnessId;
-  model?: string;
-  /** Exact catalog effort, or null to use the model's default. */
-  effort?: string | null;
-  folderId?: string;
-  instructions: string;
-}
+import { registerExecutionTools, type ExecutionTools } from "./execution-tools.js";
+export type { ExecutionSwitchInput, ExecutionTools } from "./execution-tools.js";
 
 export interface ApprovalRequest {
   runId: string;
@@ -66,14 +62,11 @@ export interface McpHost {
   tasks: TaskTools;
   threads: ThreadTools;
   /** Execution choices scoped to the authenticated, active Slack run. */
-  execution?: {
-    available(runId: string): boolean;
-    context(runId: string): Promise<unknown>;
-    switch(runId: string, input: ExecutionSwitchInput): Promise<unknown>;
-  };
+  execution?: ExecutionTools;
   /** Available when the host supports authenticated team execution. */
   team?: TeamTools;
   pullReview?: PullReviewTools;
+  orcling?: OrclingTools;
 }
 
 /** The host derives the team actor and execution from the authenticated run. */
@@ -291,6 +284,7 @@ export const internalToolNames = [
   "pull_request_diff",
   "pull_request_comment",
   "pull_request_summary",
+  ...orclingToolNames,
 ];
 
 function requireTeam(host: McpHost): TeamTools {
@@ -309,10 +303,11 @@ function approvalPayload(toolName: string, input: Record<string, unknown>, resul
   return { behavior: "allow", updatedInput: { ...input, answers } };
 }
 
-/** Tools only some hosts or runs have: the shared browser, and review tools for a conversation reviewing a pull request. */
+/** Tools only some hosts or runs have: the shared browser, review tools for a conversation reviewing a pull request, and an Orcling's own tools. */
 function registerOptionalTools(mcp: McpServer, host: McpHost, runId: string): void {
   if (host.browser) registerBrowserTool(mcp, (command) => host.browser!(runId, command));
   if (host.pullReview?.available(runId)) registerPullReviewTools(mcp, host.pullReview, runId);
+  if (host.orcling?.available(runId)) registerOrclingTools(mcp, host.orcling, runId);
 }
 
 function buildServer(host: McpHost, runId: string): McpServer {
@@ -386,6 +381,9 @@ function buildServer(host: McpHost, runId: string): McpServer {
         return { content: [{ type: "text", text: "Plan saved. The user reviews and implements it from OpenOrc; end your turn with a one-line summary." }] };
       },
     );
+
+  // An Orcling's own conversation is a chat. Its own tools reach every project's tasks, threads and memory; the general ones would point at the Workspace.
+  if (host.orcling?.ownConversation(runId)) return mcp;
 
   if (memoryEnabled)
     mcp.registerTool(
@@ -570,39 +568,7 @@ function buildServer(host: McpHost, runId: string): McpServer {
     async ({ id, status, spec }) => ({ content: [{ type: "text", text: JSON.stringify(await host.tasks.update(runId, id, { ...(status ? { status } : {}), ...(spec ? { spec } : {}) })) }] }),
   );
 
-  if (host.execution?.available(runId)) {
-    mcp.registerTool(
-      "execution_context",
-      {
-        description:
-          "Inspect this active Slack conversation's model, configured reasoning effort, harness and working folder, plus available models with supported efforts/defaults and the folder catalog. A null current effort means the model's default. Use this to answer settings questions or choose a requested switch.",
-        inputSchema: {},
-      },
-      async () => {
-        if (!host.execution) throw new Error("Execution tools are unavailable in this host.");
-        return { content: [{ type: "text", text: JSON.stringify(await host.execution.context(runId)) }] };
-      },
-    );
-    mcp.registerTool(
-      "execution_switch",
-      {
-        description:
-          "Queue a model/harness, reasoning effort, or folder change requested by the Slack owner, using exact IDs and supported efforts from execution_context. Effort can change alone; null resets it to the model's default. Omitted effort is preserved for the same model; a different model uses its default. Supply the owner's remaining task as instructions. After acceptance, end your turn immediately: OpenOrc continues this same conversation automatically with those settings. Permissions remain unchanged.",
-        inputSchema: {
-          agent: HarnessId.optional(),
-          model: z.string().min(1).optional(),
-          effort: z.string().min(1).nullable().optional(),
-          folderId: z.string().min(1).optional(),
-          instructions: z.string().min(1).max(20000),
-        },
-      },
-      async (input) => {
-        if (!host.execution) throw new Error("Execution tools are unavailable in this host.");
-        if (!input.agent && !input.model && input.effort === undefined && !input.folderId) throw new Error("Choose a model, harness, effort or folder to switch.");
-        return { content: [{ type: "text", text: JSON.stringify(await host.execution.switch(runId, input)) }] };
-      },
-    );
-  }
+  if (host.execution?.available(runId)) registerExecutionTools(mcp, host.execution, runId);
   mcp.registerTool(
     "thread_list",
     { description: "The other conversations (threads) open on this project: what each is doing and its last reply. Your own thread is marked current.", inputSchema: {} },

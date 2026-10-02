@@ -1,5 +1,7 @@
 import { effortLabel, harnessName, type CommentAttempt, type CommentRecipient, type ModelOption, type TaskComment, type TaskDiscussion } from "@openorc/protocol";
 import { modelLabel } from "../lib/model-effort-label";
+import { orclingById, useOrclings } from "../lib/orclings";
+import { OrclingAvatar } from "./OrclingAvatar";
 import { openThread } from "../lib/router";
 import { relativeTime } from "../lib/time";
 import { Button, TextButton } from "./ui";
@@ -84,10 +86,7 @@ export function TaskCommentDiscussion({
                 {attempts.map((item) => (
                   <article key={item.id} id={`comment-${item.id}`} className="task-comment-response" aria-label={`${recipientName(item.recipient)} response`}>
                     <div className="task-comment-meta">
-                      <strong>{modelLabel(item.recipient, models)}</strong>
-                      <span>
-                        {item.recipient.effort ? effortLabel(item.recipient.effort) : "Default"} · {harnessName(item.recipient.agent)}
-                      </span>
+                      <ReplyAuthor recipient={item.recipient} models={models} />
                       <time title={new Date(item.createdAt).toLocaleString()}>{relativeTime(item.createdAt)}</time>
                     </div>
                     {item.body ? (
@@ -150,5 +149,29 @@ export function TaskCommentDiscussion({
         );
       })}
     </ol>
+  );
+}
+
+/** Who replied: an Orcling by name, with the model it used, or the model with its effort and harness. */
+function ReplyAuthor({ recipient, models }: { recipient: CommentRecipient; models: readonly ModelOption[] | undefined }) {
+  const orcling = orclingById(useOrclings(), recipient.orclingId);
+  if (orcling) {
+    return (
+      <>
+        <strong className="inline-flex items-center gap-1.5">
+          <OrclingAvatar orcling={orcling} size={16} />
+          {orcling.name}
+        </strong>
+        <span>{modelLabel(recipient, models)}</span>
+      </>
+    );
+  }
+  return (
+    <>
+      <strong>{modelLabel(recipient, models)}</strong>
+      <span>
+        {recipient.effort ? effortLabel(recipient.effort) : "Default"} · {harnessName(recipient.agent)}
+      </span>
+    </>
   );
 }

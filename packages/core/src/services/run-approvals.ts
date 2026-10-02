@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { AcpApprovalRequest, CodexApprovalRequest } from "@openorc/agents";
 import { audit, orchestration, runs, tasks, threads, type Db } from "@openorc/db";
 import { UserInput, validateUserAnswers, type UserInputResult } from "@openorc/mcp";
-import { executionMode, harnessCatalog, isHarnessId, type AgentEvent, type ApprovalDecision, type ApprovalResolution } from "@openorc/protocol";
+import { executionMode, harnessCatalog, isHarnessId, stricterPermission, type AgentEvent, type ApprovalDecision, type ApprovalResolution } from "@openorc/protocol";
 import { appActionPolicy, blockedInPlan, type AppAction } from "./app-actions.js";
 import type { Logger } from "../transport.js";
 import type { LiveRun, PendingApproval, RunScope, ThreadPermissionState } from "./run-types.js";
@@ -320,8 +320,9 @@ export class RunApprovals {
     return this.threadPermissions(thread.id);
   }
 
-  private applyEntryPermission(entry: LiveRun, target: Thread["permissionMode"], team: boolean): void {
+  private applyEntryPermission(entry: LiveRun, requested: Thread["permissionMode"], team: boolean): void {
     const run = entry.run;
+    const target = entry.orclingCeiling ? stricterPermission(requested, entry.orclingCeiling) : requested;
     if (entry.closingRequested || entry.exiting) return;
     if (team) entry.permissionGate = target;
     if (run.mode !== "act") return;

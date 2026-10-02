@@ -25,7 +25,7 @@ export function createPullRequestHandlers({ pullRequests }: Dependencies): Pick<
       pullRequests.discard(key);
       return null;
     },
-    "pulls.review.start": ({ reviewer, ...key }) => pullRequests.start(key, reviewer),
+    "pulls.review.start": ({ reviewer, orclingId, ...key }) => pullRequests.start(key, reviewer, orclingId),
     "pulls.review.submit": ({ event, summary, as, ...key }) => pullRequests.submit(key, { event, summary, as }),
   };
 }

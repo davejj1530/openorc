@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { TeamMemberAvatarChoice } from "@openorc/protocol";
+import type { Orcling, TeamMemberAvatarChoice } from "@openorc/protocol";
 import avatar01 from "../assets/team-avatars/avatar-01-facet.png";
 import avatar02 from "../assets/team-avatars/avatar-02-ripple.png";
 import avatar03 from "../assets/team-avatars/avatar-03-helix.png";
@@ -13,6 +13,7 @@ import avatar10 from "../assets/team-avatars/avatar-10-fold.png";
 import avatar11 from "../assets/team-avatars/avatar-11-lens.png";
 import avatar12 from "../assets/team-avatars/avatar-12-axis.png";
 import { cn } from "../lib/cn";
+import { OrclingAvatar } from "./OrclingAvatar";
 
 export const TEAM_AVATARS = [
   { name: "Hollow", src: avatar01 },
@@ -30,6 +31,7 @@ export const TEAM_AVATARS = [
 ] as const;
 
 const sizes = { sm: "size-6", md: "size-8", lg: "size-10" } as const;
+const pixels = { sm: 24, md: 32, lg: 40 } as const;
 
 function defaultAvatar(index: number) {
   const normalized = Number.isSafeInteger(index) ? ((index % TEAM_AVATARS.length) + TEAM_AVATARS.length) % TEAM_AVATARS.length : 0;
@@ -42,16 +44,19 @@ function customAvatarSource(path: string): string {
 
 /**
  * A member's durable identity. Broken custom files fall back to the bundled
- * pool instead of leaving a broken-image glyph in the conversation.
+ * pool instead of leaving a broken-image glyph in the conversation. An Orcling
+ * in the seat shows its own face.
  */
 export function MemberAvatar({
   avatar,
+  orcling,
   fallbackIndex = 0,
   size = "md",
   alt = "",
   className,
 }: {
   avatar?: TeamMemberAvatarChoice | null;
+  orcling?: Pick<Orcling, "look"> | null;
   fallbackIndex?: number;
   size?: keyof typeof sizes;
   alt?: string;
@@ -60,6 +65,7 @@ export function MemberAvatar({
   const customPath = avatar?.kind === "custom" ? avatar.path : null;
   const [customFailed, setCustomFailed] = useState(false);
   useEffect(() => setCustomFailed(false), [customPath]);
+  if (orcling) return <OrclingAvatar orcling={orcling} size={pixels[size]} className={cn("shrink-0", className)} />;
 
   const bundled = defaultAvatar(avatar?.kind === "default" ? avatar.index : fallbackIndex);
   const src = customPath && !customFailed ? customAvatarSource(customPath) : bundled.src;

@@ -3,7 +3,8 @@ import { WORKSPACE_ID } from "@openorc/protocol";
 import { useRef, useState } from "react";
 import { Menu } from "@base-ui/react/menu";
 import type { ThreadSummary } from "@openorc/protocol";
-import { AlarmClock, AppWindow, Archive, ArchiveRestore, Columns2, GitBranch, GitFork, Laptop, MailOpen, Pin, PinOff, Trash2 } from "./icons";
+import { AlarmClock, AppWindow, Archive, ArchiveRestore, Columns2, GitBranch, GitFork, Laptop, MailOpen, Pencil, Pin, PinOff, Trash2 } from "./icons";
+import { orclingHome, useOrclings } from "../lib/orclings";
 import { Button, Dialog } from "./ui";
 import { cn } from "../lib/cn";
 import { useRpc, useRpcMutation } from "../lib/query";
@@ -53,6 +54,15 @@ export function snoozePresets(now = new Date()): { label: string; until: number 
 
 /** Every action a thread has, as menu items. The same list serves the header menu and the sidebar's context menu. */
 export function ThreadMenuItems({ thread, parts: M }: { thread: ThreadSummary; parts: MenuParts }) {
+  const home = orclingHome(useOrclings(), thread.id);
+  // An Orcling's own conversation lives and goes with the Orcling, which you change in its designer.
+  if (home) {
+    return (
+      <M.Item className={menuItem} onClick={() => useRouter.getState().navigate({ view: "orcling", orclingId: home.id })}>
+        <Pencil size={13} /> Edit {home.name}
+      </M.Item>
+    );
+  }
   return <ThreadMenuContent key={thread.id} thread={thread} parts={M} />;
 }
 

@@ -23,7 +23,10 @@ import { useTrafficLights } from "../lib/window";
 import { CoversPreview } from "../lib/browser-preview";
 import { sidebarThreadPage, visibleSidebarThreadIds } from "../lib/sidebar-thread-groups";
 import { SidebarProjectHeading } from "./SidebarProjectHeading";
+import { SidebarOrclings } from "./SidebarOrclings";
 import { NavItem, SidebarNav } from "./SidebarNav";
+import { orclingById, useOrclings } from "../lib/orclings";
+import { OrclingAvatar } from "./OrclingAvatar";
 import { useProjectIconChanges } from "../lib/project-icons";
 import { pullRequestNumber } from "../lib/pull-requests";
 import openOrcMark from "../assets/openorc-mark.png";
@@ -46,10 +49,6 @@ function ThreadRow({ thread, active }: { thread: ThreadSummary; active: boolean 
   const navigate = useRouter((s) => s.navigate);
   const addPane = useRouter((s) => s.addThreadPane);
   const split = useRouter((s) => s.threadIds.includes(thread.id));
-  const agents = thread.agents?.length ? thread.agents : [thread.agent];
-  const providers = [...new Set(agents)].map((agent) => ({ agent, count: agents.filter((item) => item === agent).length }));
-  const team = agents.length > 1;
-  const agentLabel = providers.map(({ agent, count }) => `${team ? `${count} × ` : ""}${harnessShortName(agent)}`).join(", ");
   const place = threadPlace(thread);
   return (
     <ContextMenu.Root>
@@ -85,19 +84,7 @@ function ThreadRow({ thread, active }: { thread: ThreadSummary; active: boolean 
             {place.icon}
             <span className="truncate">{place.label}</span>
           </span>
-          <span
-            className="inline-flex shrink-0 items-center gap-1.5"
-            role="img"
-            aria-label={team ? `Team agents: ${agentLabel}` : `Agent: ${agentLabel}`}
-            title={team ? `Team agents: ${agentLabel}` : agentLabel}
-          >
-            {providers.map(({ agent, count }) => (
-              <span key={agent} className="inline-flex items-center gap-1">
-                {isHarnessId(agent) ? <HarnessLogo id={agent} size={12} className="shrink-0" /> : null}
-                <span className="tabular">{team ? count : harnessShortName(agent)}</span>
-              </span>
-            ))}
-          </span>
+          <ThreadAgents thread={thread} />
         </span>
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
@@ -109,6 +96,38 @@ function ThreadRow({ thread, active }: { thread: ThreadSummary; active: boolean 
         </ContextMenu.Positioner>
       </ContextMenu.Portal>
     </ContextMenu.Root>
+  );
+}
+
+/** Who works in a thread: its Orcling, or its agents by provider, counted for a team. */
+function ThreadAgents({ thread }: { thread: ThreadSummary }) {
+  const orcling = orclingById(useOrclings(), thread.orclingId);
+  if (orcling) {
+    return (
+      <span className="inline-flex shrink-0 items-center gap-1" title={orcling.name}>
+        <OrclingAvatar orcling={orcling} size={12} />
+        <span>{orcling.name}</span>
+      </span>
+    );
+  }
+  const agents = thread.agents?.length ? thread.agents : [thread.agent];
+  const providers = [...new Set(agents)].map((agent) => ({ agent, count: agents.filter((item) => item === agent).length }));
+  const team = agents.length > 1;
+  const agentLabel = providers.map(({ agent, count }) => `${team ? `${count} × ` : ""}${harnessShortName(agent)}`).join(", ");
+  return (
+    <span
+      className="inline-flex shrink-0 items-center gap-1.5"
+      role="img"
+      aria-label={team ? `Team agents: ${agentLabel}` : `Agent: ${agentLabel}`}
+      title={team ? `Team agents: ${agentLabel}` : agentLabel}
+    >
+      {providers.map(({ agent, count }) => (
+        <span key={agent} className="inline-flex items-center gap-1">
+          {isHarnessId(agent) ? <HarnessLogo id={agent} size={12} className="shrink-0" /> : null}
+          <span className="tabular">{team ? count : harnessShortName(agent)}</span>
+        </span>
+      ))}
+    </span>
   );
 }
 
@@ -152,6 +171,7 @@ export function Sidebar() {
   const trafficLights = useTrafficLights();
   const projects = useRpc("projects.list", {});
   const groups = [{ id: WORKSPACE_ID, name: "Workspace" }, ...(projects.data ?? [])];
+  const homes = new Set(useOrclings().map((orcling) => orcling.threadId));
   // Each group owns a page so a busy repository cannot crowd out another project.
   const threadQueries = useQueries({
     queries: groups.map((group) => {
@@ -167,7 +187,8 @@ export function Sidebar() {
   const project = (projects.data ?? []).find((p) => p.id === projectId) ?? null;
   const activeId = route.view === "thread" ? route.threadId : null;
   const activeThread = useRpc("threads.get", { id: activeId ?? "" }, { enabled: !!activeId });
-  const activeProjectId = activeThread.data?.projectId;
+  // Unfold the project that lists the open thread. An Orcling's own conversation is listed under Orclings instead.
+  const activeProjectId = activeId && !homes.has(activeId) ? activeThread.data?.projectId : undefined;
   useEffect(() => {
     if (!activeId || !activeProjectId) return;
     const layout = useLayout.getState();
@@ -186,7 +207,7 @@ export function Sidebar() {
   const sections = groups.map((group, index) => {
     const query = threadQueries[index]!;
     const limit = limits[`${filter}:${group.id}`] ?? PAGE;
-    const page = sidebarThreadPage({ projectId: group.id, fetched: query.data, selected: activeThread.data, filter, limit, now });
+    const page = sidebarThreadPage({ projectId: group.id, fetched: query.data, selected: activeThread.data, filter, limit, now, hidden: homes });
     return { ...group, query, ...page };
   });
   const order = visibleSidebarThreadIds(sections, collapsed);
@@ -216,6 +237,7 @@ export function Sidebar() {
                 </Tooltip>
               </div>
               <SidebarNav route={route} projectId={projectId} />
+              <SidebarOrclings route={route} />
               <div className="flex items-center gap-0.5 pl-4 pr-2 mt-4 mb-1">
                 <span className="text-sm font-medium text-ink-3">Projects</span>
                 <span className="flex-1" />

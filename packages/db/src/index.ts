@@ -3,6 +3,7 @@ export { Db } from "./database.js";
 export { LedgerWriter, listEvents, countEvents, completedToolCall, type LedgerOptions, type ListEventsOptions } from "./ledger.js";
 export { ledgerMaintenance, type LedgerSpace } from "./maintenance.js";
 export { transcriptPage, type TranscriptPage } from "./transcript-page.js";
+export { lastThreadMessage } from "./last-message.js";
 export { redact, redactValue, redactJson, type RedactResult, type RedactValueResult } from "./redact.js";
 export { projects, tasks, threads, runs, snapshots, comments, audit, type ReviewCommentScope, type TaskPatch, type ThreadPatch, type ThreadInsert, type ThreadListFilter } from "./repos.js";
 export { threadQueue, type ThreadQueueEntry } from "./thread-queue.js";
@@ -39,4 +40,5 @@ export { memories, vectors, summaries, extractionJobs, settings, ftsQuery, type 
 export { taskForwardings } from "./task-forwardings.js";
 
 export { plans } from "./plans.js";
+export { orclings, type OrclingInsert } from "./orclings.js";
 export { pullReviews, type PullReviewKey, type PullReviewPatch, type DraftCommentInsert } from "./pull-reviews.js";

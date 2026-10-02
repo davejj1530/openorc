@@ -1,5 +1,5 @@
 import type { Block } from "./transcript";
-import { taskIdFromTool } from "./task-progress";
+import { toolShowsCard } from "./task-progress";
 
 /** Persisted turn identity wins; user messages and terminal events also cover older transcripts. */
 export function workTurns(blocks: Block[]): { id: string; blocks: Block[] }[] {
@@ -27,6 +27,11 @@ export function workTurns(blocks: Block[]): { id: string; blocks: Block[] }[] {
   return turns;
 }
 
+/** A person's message reads before the turn's work, and so does a notice that opens the turn, such as who started it. */
+function readsFirst(block: Block, index: number): boolean {
+  return block.kind === "message" && (block.role === "user" || (block.role === "system" && index === 0));
+}
+
 export function workParts(blocks: Block[], live: boolean, taskCards = true, ambient = false) {
   let finalStart = blocks.findLastIndex((b) => b.kind === "message" && b.role === "assistant");
   while (finalStart > 0) {
@@ -41,13 +46,13 @@ export function workParts(blocks: Block[], live: boolean, taskCards = true, ambi
     work: Block[] = [],
     after: Block[] = [];
   for (const [index, b] of blocks.entries()) {
-    if (b.kind === "message" && b.role === "user") before.push(b);
+    if (readsFirst(b, index)) before.push(b);
     else if (
       (b.kind === "message" && (b.role === "system" || /^API Error:/.test(b.text) || (showReply && b.role === "assistant" && index >= finalStart))) ||
       (b.kind === "approval" && (!b.decision || b.decision === "deny" || b.approvalKind === "user_input")) ||
       // Failed attempts stay with their work history; turn outcomes and provider
       // errors carry the overall failure state without promoting earlier retries.
-      (b.kind === "tool" && taskCards && taskIdFromTool(b)) ||
+      (b.kind === "tool" && taskCards && toolShowsCard(b)) ||
       (b.kind === "activity" && b.activityKind === "image_generation") ||
       (b.kind === "status" && b.tone === "bad" && !/^(turn|session) /.test(b.text))
     )

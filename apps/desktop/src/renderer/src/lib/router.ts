@@ -17,6 +17,8 @@ export type Route =
   | { view: "memory" }
   | { view: "scheduled" }
   | { view: "orchestration"; projectId?: string; teamId?: string }
+  /** The Orcling designer: a new Orcling, or one being changed. */
+  | { view: "orcling"; orclingId?: string }
   | { view: "settings"; section?: "usage" | "connections" | "general"; provider?: "codex" | "claude" }
   | { view: "diagnostics" };
 

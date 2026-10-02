@@ -4,8 +4,10 @@ import type { ModelOption } from "./rpc.js";
 import { harnessName, isHarnessId } from "./harness.js";
 import { effortLabel, modelEfforts } from "./model-effort.js";
 import { formatModelEffortLabel } from "./orchestration.js";
+import type { Orcling } from "./orclings.js";
 
-export const CommentRecipient = z.object({ agent: HarnessId, model: z.string().min(1), effort: z.string().nullable() }).strict();
+/** A model and effort, or an Orcling, which brings its own identity and memory to the reply. */
+export const CommentRecipient = z.object({ agent: HarnessId, model: z.string().min(1), effort: z.string().nullable(), orclingId: z.string().min(1).optional() }).strict();
 export type CommentRecipient = z.infer<typeof CommentRecipient>;
 export const CommentIntent = z.object({ intent: z.enum(["discussion", "clarification", "execution"]), quote: z.string().max(4000).default("") }).strict();
 export type CommentIntent = z.infer<typeof CommentIntent>;
@@ -42,7 +44,7 @@ export type TaskDiscussion = {
   questions?: { runId: string; approvalId: string; input: unknown }[];
   executionActivity?: Record<string, "idle" | "running" | "waiting">;
 };
-export const commentRecipientKey = (r: CommentRecipient): string => JSON.stringify([r.agent, r.model, r.effort]);
+export const commentRecipientKey = (r: CommentRecipient): string => JSON.stringify(r.orclingId ? ["orcling", r.orclingId] : [r.agent, r.model, r.effort]);
 /** The exact form: harness, model ID and effort. Always accepted, but people see the name. */
 export const commentMention = (r: CommentRecipient): string => `${r.agent}:${r.model}${r.effort ? `-${r.effort}` : ""}`;
 
@@ -94,6 +96,15 @@ export function commentMentionOptions(models: ModelOption[]): CommentMentionOpti
   return options.map((o) => ({ name: shared.has(o) ? o.token : o.name, token: o.token, recipient: o.recipient }));
 }
 
+/** Every Orcling a comment can mention, by name. Its reply uses the Orcling's own model. */
+export function orclingMentionOptions(orclings: Pick<Orcling, "id" | "name" | "settings">[]): CommentMentionOption[] {
+  return orclings.map((o) => ({
+    name: o.name,
+    token: o.name,
+    recipient: { agent: o.settings.agent, model: o.settings.model, effort: o.settings.effort, orclingId: o.id },
+  }));
+}
+
 /** A mention ends at whitespace, closing punctuation or a sentence's final period. */
 const mentionEnd = /^(?:$|[\s,;:!?)]|\.(?:\s|$))/;
 
@@ -102,8 +113,11 @@ const mentionEnd = /^(?:$|[\s,;:!?)]|\.(?:\s|$))/;
  * harness. Names have several words and model IDs have hyphens, so the longest
  * whole match wins; nothing is split.
  */
-export function resolveCommentMentions(text: string, models: ModelOption[]): CommentRecipient[] {
-  const keys = commentMentionOptions(models).flatMap((o) => [o.name, o.token, o.token.slice(o.recipient.agent.length + 1)].map((key) => ({ key, recipient: o.recipient })));
+export function resolveCommentMentions(text: string, models: ModelOption[], orclings: Pick<Orcling, "id" | "name" | "settings">[] = []): CommentRecipient[] {
+  const keys = [
+    ...commentMentionOptions(models).flatMap((o) => [o.name, o.token, o.token.slice(o.recipient.agent.length + 1)].map((key) => ({ key, recipient: o.recipient }))),
+    ...orclingMentionOptions(orclings).map((o) => ({ key: o.name, recipient: o.recipient })),
+  ];
   const result = new Map<string, CommentRecipient>();
   // Code blocks, inline code and quoted lines are inert examples.
   const prose = text

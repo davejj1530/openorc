@@ -4,9 +4,20 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RunHandle } from "@openorc/agents";
-import { Db, LedgerWriter, audit, checkpoints, orchestration, plans, projects, runs, snapshots, tasks, teamContextParts, teamContexts, teamRoom, teamRuntime, threads } from "@openorc/db";
+import { Db, LedgerWriter, audit, checkpoints, orchestration, orclings, plans, projects, runs, snapshots, tasks, teamContextParts, teamContexts, teamRoom, teamRuntime, threads } from "@openorc/db";
 import { commitAll, git } from "@openorc/git";
-import { MAX_TEAM_CONTEXT_BYTES, type Project, type RunSpec, type Task, type TeamActorRecord, type TeamDispatchInput, type TeamDraft, type TeamExecutionRecord, type Thread } from "@openorc/protocol";
+import {
+  defaultOrclingLook,
+  MAX_TEAM_CONTEXT_BYTES,
+  type Project,
+  type RunSpec,
+  type Task,
+  type TeamActorRecord,
+  type TeamDispatchInput,
+  type TeamDraft,
+  type TeamExecutionRecord,
+  type Thread,
+} from "@openorc/protocol";
 import { FrameCoalescer } from "../frames.js";
 import { RunService, type RunAdapterRegistry, type RunHooks } from "./runs.js";
 import { ShellEnvironment } from "./shell-environment.js";
@@ -864,6 +875,19 @@ describe("durable team coordination with real run capture", () => {
     coordinator.wait(lead.spec.runId);
     await finish(lead);
     expect(activeTurn(execution.id, worker.id).spec.effort).toBe("max");
+  });
+
+  it("runs an Orcling lead on its own model and effort, and never lets the conversation change them", async () => {
+    const gloop = orclings.insert(db, {
+      id: "gloop",
+      threadId: newThread().id,
+      draft: { name: "Gloop", look: defaultOrclingLook, settings: { agent: "claude", model: "fixture-fable", effort: "low", fastMode: false }, permission: "allow" },
+    });
+    const draft = roster(1);
+    draft.members[0]!.orclingId = gloop.id;
+    const execution = await startTeam(draft);
+    expect(activeTurn(execution.id).spec).toMatchObject({ agent: "claude", model: "fixture-fable", effort: "low", fastMode: false });
+    await expect(coordinator.validateLeadSettings(thread.id, { effort: "max" })).rejects.toThrow(/An Orcling leads this team/);
   });
 
   it.each([4, 5])("uses configured team capacity %i without an implicit provider ceiling across conversations", async (capacity) => {

@@ -4,7 +4,7 @@ import type { RpcParams } from "@openorc/protocol";
 import type { FileReference } from "../../../shared/file-reference";
 import type { PanelTool } from "./panel-tabs";
 
-export type PanelTab = "plan" | "file" | "changes" | "tasks" | "task" | "terminal" | "browser" | "commits" | "checkpoints" | "memory" | "instructions";
+export type PanelTab = "orcling" | "plan" | "file" | "changes" | "tasks" | "task" | "terminal" | "browser" | "commits" | "checkpoints" | "memory" | "instructions";
 /** One turn's saved diff, opened from its change card: a team attempt's checkpoint or a thread turn's. */
 export type ChangeSelection = ({ kind: "team" } & Omit<RpcParams<"orchestration.turnChanges">, "includePatch">) | ({ kind: "thread" } & Omit<RpcParams<"threads.turnChanges">, "includePatch">);
 export type FileSelection = FileReference & { scope: RpcParams<"files.read">["scope"] };

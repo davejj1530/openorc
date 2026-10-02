@@ -49,6 +49,12 @@ it("keeps final prose, questions, provider errors, media and task cards outside 
   expect(workParts([tool, reply], true)).toEqual({ before: [], work: [tool], after: [reply] });
 });
 
+it("shows a notice that opens a turn before its work, and a thread an agent started outside it", () => {
+  const opener: Block = { id: "opener", kind: "message", role: "system", text: "Skiller started this thread.\n\nBuild the landing page", streaming: false };
+  const started: Block = { ...tool, id: "started", name: "openorc.orcling_thread_start", output: '{"thread":{"id":"12345678-1234-1234-1234-123456789abc","title":"Landing page"}}' };
+  expect(workParts([opener, tool, started, reply], false)).toEqual({ before: [opener], work: [tool], after: [started, reply] });
+});
+
 it.each([true])("keeps failed attempts in chronological work history with live=%s", (live) => {
   const attempts: Block[] = [
     { ...tool, id: "failed", isError: true, output: "7 tests failed" },

@@ -50,8 +50,8 @@ export interface PullRequestDraftComment {
   /** What the commented lines said when the comment was written, so a later push shows it as outdated. */
   lineText: string | null;
   body: string;
-  /** The agent and model that wrote it; null for your own comments. */
-  author: { agent: AgentKind; model: string | null } | null;
+  /** The agent and model that wrote it, and the Orcling when one reviewed; null for your own comments. */
+  author: { agent: AgentKind; model: string | null; orclingId?: string | null } | null;
   createdAt: number;
 }
 
@@ -153,7 +153,8 @@ export const pullRequestRpcParams = {
   "pulls.review.summary": z.object({ ...PullRequestRef, commitId: CommitId, summary: z.string().max(REVIEW_TEXT_LIMIT) }).strict(),
   "pulls.review.discard": z.object(PullRequestRef).strict(),
   /** Starts a model reviewing the pull request in a read-only conversation of its own. */
-  "pulls.review.start": z.object({ ...PullRequestRef, reviewer: ModelExecutionSettings }).strict(),
+  /** With `orclingId`, that Orcling reviews with its own model, instructions and memory. */
+  "pulls.review.start": z.object({ ...PullRequestRef, reviewer: ModelExecutionSettings, orclingId: z.string().min(1).optional() }).strict(),
   /** Posts the draft as one GitHub review, as you or as your reviewer app, then clears it. */
   "pulls.review.submit": z.object({ ...PullRequestRef, event: PullRequestReviewEvent, summary: z.string().max(REVIEW_TEXT_LIMIT), as: PullRequestReviewAuthor.default("you") }).strict(),
   "reviewerApp.get": z.object({}).strict(),

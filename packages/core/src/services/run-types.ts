@@ -96,6 +96,24 @@ export interface StartRunInput {
   workspaceLease?: WorkspaceLease;
   /** A team member talking in the conversation: runs beside the thread's other live members in a shared workspace lease. */
   shared?: { key: string };
+  /** The Orcling who speaks in this run; without it, the thread's own Orcling if it has one. */
+  orclingId?: string;
+}
+
+/** How an Orcling's identity joins the runs it speaks in. */
+export interface OrclingRunHooks {
+  /**
+   * The launch as whoever speaks: the Orcling asked for, else the thread's own. An Orcling stays within its
+   * permission and its own conversation starts fresh when a new session is due. Anyone joining a conversation
+   * where others spoke since hears what they said.
+   */
+  prepare(input: StartRunInput): StartRunInput;
+  /** Who the Orcling speaking is and what it remembers; empty for a run without one. */
+  brief(input: StartRunInput): string;
+  /** Whether the next message in this thread should start a new session of its Orcling's own conversation. */
+  rolloverDue(thread: Thread): boolean;
+  /** The loosest permission an Orcling may work with anywhere. */
+  ceiling(orclingId: string): PermissionPreset;
 }
 
 export interface LiveRun {
@@ -106,6 +124,8 @@ export interface LiveRun {
   providerPermissionMode: PermissionPreset;
   /** A stricter team request immediately closes the app gate, even if native bypass needs restart. */
   permissionGate?: PermissionPreset;
+  /** The loosest permission the Orcling speaking in this run may have, whatever its conversation allows. */
+  orclingCeiling?: PermissionPreset;
   /** App actions the user allowed for the rest of this run. */
   appActionsAllowed?: Set<AppAction>;
   scope: RunScope;
@@ -159,6 +179,7 @@ export interface LiveProcessBinding {
   internalMcp: NonNullable<RunSpec["internalMcp"]>;
   providerPermissionMode: PermissionPreset;
   permissionGate?: PermissionPreset;
+  orclingCeiling?: PermissionPreset;
 }
 
 /** A turn in flight, or background work that will report back: the agent is at work. */
@@ -221,4 +242,5 @@ export interface RunHooks {
   idleTimeoutMs?(): number | null;
   /** Whether Claude Code should also connect the user's own MCP servers; each one adds to its start-up time. */
   claudeUserMcpServers?(): boolean;
+  orclings?: OrclingRunHooks;
 }

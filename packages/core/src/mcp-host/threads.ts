@@ -3,6 +3,7 @@ import { type McpHost } from "@openorc/mcp";
 import { createHash } from "node:crypto";
 import { TeamConversationService } from "../services/team-conversation.js";
 import { ThreadService } from "../services/threads.js";
+import { reachesThread } from "../services/thread-agent-tools.js";
 import type { RunContext } from "./context.js";
 type Dependencies = {
   threadService: Pick<ThreadService, "toolThreadList" | "toolThreadRead" | "sourceThreadFor" | "toolThreadSend">;
@@ -27,7 +28,7 @@ export function createThreadsHost({ threadService, teamConversations, db, assert
         const source = threadService.sourceThreadFor(runId);
         const target = threads.get(db, id);
         if (!source) return { delivered: false, message: "Only a thread can message other threads." };
-        if (!target || target.projectId !== source.projectId || teamDeletedThreads.has(db, id)) return { delivered: false, message: "No such thread in this project." };
+        if (!target || !reachesThread(db, runId, source, target) || teamDeletedThreads.has(db, id)) return { delivered: false, message: "No such thread in this project." };
         if (target.id === source.id) return { delivered: false, message: "That is this thread." };
         if (!orchestration.getInstance(db, id)) return threadService.toolThreadSend(runId, id, text, attribution ?? undefined, requestKey);
         // A retried tool call without a key must not deliver twice; identical intentional repeats need distinct keys.

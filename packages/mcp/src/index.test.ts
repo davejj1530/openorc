@@ -282,6 +282,50 @@ void test("pull request review tools exist only for runs reviewing a pull reques
   ]);
 });
 
+void test("an Orcling's own conversation has its own tools instead of the general task, thread and memory tools", async (t) => {
+  const { host, connect } = await fixture(t);
+  const answer = async () => "";
+  host.orcling = {
+    available: () => true,
+    ownConversation: (runId) => runId === "home-run",
+    updateInstructions: answer,
+    remember: answer,
+    recall: answer,
+    history: answer,
+    projects: answer,
+    project: answer,
+    readThread: answer,
+    createTask: answer,
+    startWork: answer,
+    sendThread: answer,
+  };
+  const general = [
+    "memory_search",
+    "memory_record",
+    "memory_feedback",
+    "task_context",
+    "task_create",
+    "task_start",
+    "task_list",
+    "task_get",
+    "task_update",
+    "thread_list",
+    "thread_read",
+    "thread_send",
+  ];
+  const home = (await (await connect("home-run")).listTools()).tools.map((tool) => tool.name);
+  const elsewhere = (await (await connect("guest-run")).listTools()).tools.map((tool) => tool.name);
+  assert.deepEqual(
+    home.filter((name) => general.includes(name)),
+    [],
+  );
+  for (const name of ["ask_user", "orcling_project", "orcling_remember", "orcling_thread_start"]) assert.ok(home.includes(name));
+  assert.deepEqual(
+    general.filter((name) => elsewhere.includes(name)),
+    general,
+  );
+});
+
 void test("approval decisions preserve denial, answers and edited tool input across the MCP interface", async (t) => {
   const { host, connect } = await fixture(t);
   const requests: ApprovalRequest[] = [];

@@ -127,6 +127,8 @@ export const Thread = z.object({
   draft: z.string().nullable(),
   /** The CLI transcript this thread was imported from, if any. */
   importedFrom: z.string().nullable(),
+  /** The Orcling who works in this conversation: its own, or one chosen to work here. */
+  orclingId: z.string().nullable().optional(),
   createdAt: z.number(),
   updatedAt: z.number(),
   lastActivityAt: z.number(),
@@ -357,6 +359,8 @@ export const Run = z.object({
   resultText: z.string().nullable(),
   /** Why the run failed, when it did. */
   error: z.string().nullable(),
+  /** The Orcling who spoke in this run, if one did. */
+  orclingId: z.string().nullable().optional(),
 });
 export type Run = z.infer<typeof Run>;
 
@@ -416,7 +420,7 @@ export type ReviewComment = z.infer<typeof ReviewComment>;
 export const MemoryType = z.enum(["decision", "spec", "lesson", "preference", "convention", "command", "env_quirk", "ownership"]);
 export type MemoryType = z.infer<typeof MemoryType>;
 
-export const MemoryScope = z.enum(["project", "user", "global"]);
+export const MemoryScope = z.enum(["project", "user", "global", "orcling"]);
 export type MemoryScope = z.infer<typeof MemoryScope>;
 
 export const MemoryStatus = z.enum(["active", "superseded", "retracted", "stale"]);
@@ -429,6 +433,8 @@ export const Memory = z.object({
   id: z.string(),
   scope: MemoryScope,
   projectId: z.string().nullable(),
+  /** Set when the memory belongs to an Orcling rather than a project. */
+  orclingId: z.string().nullable().optional(),
   type: MemoryType,
   topicKey: z.string().nullable(),
   title: z.string(),

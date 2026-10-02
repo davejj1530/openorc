@@ -255,6 +255,7 @@ export class TeamAttemptLaunch {
     const context = attempt.contextCheckpointId ? teamContexts.get(this.services.db, attempt.contextCheckpointId) : null;
     if (attempt.contextCheckpointId && !context) throw new Error("The reserved context checkpoint was not found.");
     const session = attempt.contextSessionId ?? attempt.resumeSessionId;
+    const seat = seatOrcling(this.services.db, original.threadId, actor.memberKey);
     const current = this.services.status(executionId);
     const contextInstructions = context
       ? `\n\nCurrent coordinator state (authoritative for this turn):\n${buildTeamCoordinationContext(
@@ -272,6 +273,7 @@ export class TeamAttemptLaunch {
         scope: task ? { task, thread: null } : { task: null, thread },
         project,
         ...shared,
+        ...(seat ? { orclingId: seat } : {}),
         ...attempt.settings,
         effort: attempt.settings.effort ?? undefined,
         mode: reservedMode,
@@ -397,4 +399,11 @@ export class TeamAttemptLaunch {
     if (prompt === null) throw new Error("This turn's reserved input was not found.");
     return prompt;
   }
+}
+
+/** The Orcling who took this member's seat when the team was saved, if any. */
+function seatOrcling(db: TeamCore["db"], threadId: string, memberKey: string): string | undefined {
+  const instance = orchestration.getInstance(db, threadId);
+  const revision = instance ? orchestration.getRevision(db, instance.teamRevisionId) : null;
+  return revision?.members.find((member) => member.key === memberKey)?.orclingId ?? undefined;
 }

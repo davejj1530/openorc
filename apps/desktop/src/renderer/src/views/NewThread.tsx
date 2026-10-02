@@ -6,7 +6,9 @@ import { Panel } from "../components/Panel";
 import { useComposerChanges } from "../lib/composer-changes";
 import { NewThreadMascot } from "../components/NewThreadMascot";
 import { ArrivalPanel, useArrivalActivity } from "../components/NewThreadActivity";
-import { ComposerModelPicker, defaultChoice, ModelPicker, type ModelChoice, type TeamPickerChoices } from "../components/ModelPicker";
+import { ComposerModelPicker, defaultChoice, ModelPicker, type ModelChoice, type OrclingPickerChoices, type TeamPickerChoices } from "../components/ModelPicker";
+import { useOrclings } from "../lib/orclings";
+import { pickerTeam } from "../lib/team-settings";
 import { TopBar } from "../components/TopBar";
 import { Button, Kbd, Select, TextButton } from "../components/ui";
 import { cn } from "../lib/cn";
@@ -15,7 +17,16 @@ import { useLayout } from "../lib/layout";
 import { readOnboardingState } from "../lib/onboarding";
 import { evaluateNewThreadAvailability } from "../lib/new-thread-availability";
 import { useNewThreadLocation } from "../lib/new-thread-location";
-import { newThreadWorkspaceMode, readNewThreadDraft, readNewThreadProject, rememberNewThreadProject, targetModel, writeNewThreadDraft, type NewThreadDraft } from "../lib/new-thread-draft";
+import {
+  newThreadWorkspaceMode,
+  readNewThreadDraft,
+  readNewThreadProject,
+  rememberNewThreadProject,
+  targetModel,
+  writeNewThreadDraft,
+  type NewThreadDraft,
+  type NewThreadTarget,
+} from "../lib/new-thread-draft";
 import { branchingReason, useProjectGit } from "../lib/project-git";
 import { useRpc, useRpcMutation } from "../lib/query";
 import { openThread, useRouter } from "../lib/router";
@@ -141,6 +152,7 @@ function NewThreadProject({
   const [storageError, setStorageError] = useState<string | null>(null);
   const { permission, select: setPermission, error: permissionError, ready: permissionReady } = usePermissionSelection();
   const start = useRpcMutation("threads.start");
+  const orclings = useOrclings();
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -157,7 +169,6 @@ function NewThreadProject({
   const choice = targetModel(draft.target);
   const target = draft.target;
   const revision = target.kind === "team" ? target.revision : null;
-  const lead = revision?.members.find((member) => member.managerKey === null);
   // The landing composer has no thread, so no thread action applies to it. The
   // skills do: they belong to the project, which is chosen on this screen.
   const skillCommands = useSkillCommands(isWorkspace ? undefined : projectId, choice?.agent);
@@ -220,23 +231,11 @@ function NewThreadProject({
     void info.refetch();
     onRetryProjects();
   };
-  let selectedTeamFields: { selectedRevisionId?: string; selectedLabel?: string } = {};
-  if (revision) selectedTeamFields = { selectedRevisionId: revision.id, selectedLabel: revision.name };
-  else if (target.kind === "unavailable") selectedTeamFields = { selectedLabel: target.label };
-  let teamAction: TeamPickerChoices["action"];
-  if (teams.isError || availability.isError) teamAction = { label: "Retry team checks", onSelect: retry };
-  else if (availability.data && !availability.data.enabled) teamAction = { label: "Open Settings", onSelect: () => useRouter.getState().navigate({ view: "settings" }) };
-  else if (teams.data && !teams.data.some((team) => team.team.archivedAt === null))
-    teamAction = { label: "Create a team in Orchestration", onSelect: () => useRouter.getState().navigate({ view: "orchestration", projectId }) };
-  const pickerTeams: TeamPickerChoices = {
-    options: teamOptions,
-    ...selectedTeamFields,
-    onSelect: (id) => {
-      const team = teams.data?.find((detail) => detail.revision.id === id);
-      if (team) chooseTeam(team);
-    },
-    status: teamStatus,
-    ...(teamAction ? { action: teamAction } : {}),
+  const pickerTeams = teamPickerChoices({ projectId, target, teams, availability, options: teamOptions, status: teamStatus, retry, choose: chooseTeam });
+  const pickerOrclings: OrclingPickerChoices = {
+    options: orclings,
+    selectedId: target.kind === "orcling" ? target.orclingId : null,
+    onSelect: (orcling) => changeDraft({ target: { kind: "orcling", orclingId: orcling.id, name: orcling.name, settings: orcling.settings } }),
   };
 
   const submit = async (text: string, attachments: string[]) => {
@@ -306,23 +305,16 @@ function NewThreadProject({
                     onModel={changeSettings}
                     modelControl={
                       target.kind === "unavailable" ? (
-                        <ModelPicker value={null} onChange={chooseModel} teams={isWorkspace ? undefined : pickerTeams} disabled={start.isPending} />
+                        <ModelPicker value={null} onChange={chooseModel} teams={isWorkspace ? undefined : pickerTeams} orclings={isWorkspace ? undefined : pickerOrclings} disabled={start.isPending} />
                       ) : (
                         <ComposerModelPicker
                           value={choice}
                           onChange={changeSettings}
                           onSelectModel={chooseModel}
                           teams={isWorkspace ? undefined : pickerTeams}
+                          orclings={isWorkspace ? undefined : pickerOrclings}
                           disabled={start.isPending}
-                          {...(revision && lead
-                            ? {
-                                team: {
-                                  name: revision.name,
-                                  revision: revision.number,
-                                  leadName: lead.name,
-                                },
-                              }
-                            : {})}
+                          {...(revision ? { team: pickerTeam(revision, orclings) } : {})}
                         />
                       )
                     }
@@ -412,4 +404,36 @@ function NewThreadProject({
       {panelContext ? <Panel context={panelContext} /> : null}
     </>
   );
+}
+
+/** Saved teams the picker offers here, with the step that unblocks them when none can start. */
+function teamPickerChoices(input: {
+  projectId: string;
+  target: NewThreadTarget;
+  teams: { data?: TeamDetail[] | undefined; isError: boolean };
+  availability: { data?: { enabled: boolean } | undefined; isError: boolean };
+  options: TeamPickerChoices["options"];
+  status: TeamPickerChoices["status"];
+  retry: () => void;
+  choose: (team: TeamDetail) => void;
+}): TeamPickerChoices {
+  const { target, teams, availability } = input;
+  let selected: { selectedRevisionId?: string; selectedLabel?: string } = {};
+  if (target.kind === "team") selected = { selectedRevisionId: target.revision.id, selectedLabel: target.revision.name };
+  else if (target.kind === "unavailable") selected = { selectedLabel: target.label };
+  let action: TeamPickerChoices["action"];
+  if (teams.isError || availability.isError) action = { label: "Retry team checks", onSelect: input.retry };
+  else if (availability.data && !availability.data.enabled) action = { label: "Open Settings", onSelect: () => useRouter.getState().navigate({ view: "settings" }) };
+  else if (teams.data && !teams.data.some((team) => team.team.archivedAt === null))
+    action = { label: "Create a team in Orchestration", onSelect: () => useRouter.getState().navigate({ view: "orchestration", projectId: input.projectId }) };
+  return {
+    options: input.options,
+    ...selected,
+    onSelect: (id) => {
+      const team = teams.data?.find((detail) => detail.revision.id === id);
+      if (team) input.choose(team);
+    },
+    status: input.status,
+    ...(action ? { action } : {}),
+  };
 }

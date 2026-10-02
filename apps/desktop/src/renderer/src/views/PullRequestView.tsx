@@ -13,6 +13,7 @@ import { invalidateTags, useRpc, useRpcMutation } from "../lib/query";
 import { useRouter } from "../lib/router";
 import { relativeTime } from "../lib/time";
 import { useModelCatalog } from "../lib/use-model-catalog";
+import { useOrclings } from "../lib/orclings";
 
 const DiffView = lazy(() => import("../components/DiffView").then((m) => ({ default: m.DiffView })));
 
@@ -57,12 +58,13 @@ function PullRequestChanges({ projectId, pull, review }: { projectId: string; pu
   const key = { projectId, number: pull.number };
   const diff = useRpc("pulls.diff", key);
   const models = useModelCatalog();
+  const orclings = useOrclings();
   const addComment = useRpcMutation("pulls.review.comment");
   const removeComment = useRpcMutation("pulls.review.removeComment");
   const [draft, setDraft] = useState<{ location: CommentDraft; commitId: string } | null>(null);
   const drafts = review?.comments;
   const comments = useMemo(() => (drafts ?? []).map(diffComment), [drafts]);
-  const authors = new Map((drafts ?? []).map((comment) => [comment.id, draftAuthor(comment.author, models.data)]));
+  const authors = new Map((drafts ?? []).map((comment) => [comment.id, draftAuthor(comment.author, models.data, orclings)]));
   const error = addComment.error ?? removeComment.error;
   const submitDraft = (body: string) => {
     if (!draft) return;

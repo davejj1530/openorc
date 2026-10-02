@@ -1,4 +1,6 @@
-import type { ModelExecutionSettings, TeamInstance, Thread } from "@openorc/protocol";
+import type { ModelExecutionSettings, Orcling, TeamInstance, TeamRevision, Thread } from "@openorc/protocol";
+import type { EffortTeam } from "../components/ModelPickerEffort";
+import { orclingById } from "./orclings";
 
 export type TeamPolicy = Pick<Thread, "mode" | "permissionMode">;
 export type TeamPolicyAcknowledgement = TeamPolicy & Pick<Thread, "updatedAt">;
@@ -26,4 +28,12 @@ export function effectiveTeamLead(
   acknowledged: TeamLeadAcknowledgement | null,
 ): ModelExecutionSettings {
   return acknowledged && instance.configurationVersion < acknowledged.configurationVersion ? acknowledged.settings : { ...saved, ...instance.leadOverrides };
+}
+
+/** A team as its lead's effort picker names it. An Orcling lead is named even before Orclings load, so its effort stays its own. */
+export function pickerTeam(revision: TeamRevision, orclings: readonly Orcling[]): EffortTeam | undefined {
+  const lead = revision.members.find((member) => member.managerKey === null);
+  if (!lead) return undefined;
+  const team = { name: revision.name, revision: revision.number, leadName: lead.name };
+  return lead.orclingId ? { ...team, leadOrcling: orclingById(orclings, lead.orclingId)?.name ?? lead.name } : team;
 }

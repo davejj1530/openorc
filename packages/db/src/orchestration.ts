@@ -8,6 +8,7 @@ import {
   TeamInstance,
   TeamLimits,
   TeamMemberAvatarChoice,
+  type Orcling,
   type TeamDefinition,
   type TeamDetail,
   type TeamMember,
@@ -15,6 +16,7 @@ import {
   type TeamRevision,
 } from "@openorc/protocol";
 import type { Db } from "./database.js";
+import { orclings } from "./orclings.js";
 
 interface TeamRow {
   id: string;
@@ -33,6 +35,7 @@ interface RevisionRow {
   name: string;
   limits: string;
   discussion?: string | null;
+  orcling_seats?: string | null;
   created_at: number;
 }
 
@@ -182,6 +185,7 @@ export const orchestration = {
     const row = db.stmt("SELECT * FROM orchestration_team_revisions WHERE id = ? AND sealed = 1").get(id) as unknown as RevisionRow | undefined;
     if (!row) return null;
     const members = db.stmt("SELECT * FROM orchestration_team_members WHERE revision_id = ? ORDER BY position").all(id) as unknown as MemberRow[];
+    const seats = orclingSeats(db, row.orcling_seats);
     return {
       id: row.id,
       teamId: row.team_id,
@@ -192,10 +196,9 @@ export const orchestration = {
       ...(row.discussion ? { discussion: TeamDiscussion.parse(JSON.parse(row.discussion)) } : {}),
       members: members.map((member) => ({
         key: member.member_key,
-        name: member.name,
         responsibility: member.responsibility,
         managerKey: member.manager_key,
-        settings: { agent: member.agent, model: member.model, effort: member.effort, fastMode: Boolean(member.fast_mode) },
+        ...seatSettings(member, seats.get(member.member_key)),
       })),
       createdAt: row.created_at,
     };
@@ -288,6 +291,7 @@ export const orchestration = {
           Number(member.settings.fastMode),
         );
       }
+      saveSeats(db, revisionId, draft.members);
       db.stmt("UPDATE orchestration_team_revisions SET sealed = 1 WHERE id = ?").run(revisionId);
       if (existing) {
         const result = db
@@ -397,3 +401,26 @@ export const orchestration = {
     };
   },
 };
+
+/** The Orclings in a revision's seats, by member key. A deleted Orcling leaves its seat to the model saved with it. */
+function orclingSeats(db: Db, saved: string | null | undefined): Map<string, Orcling> {
+  const seats = Object.entries(saved ? (JSON.parse(saved) as Record<string, string>) : {});
+  return new Map(
+    seats.flatMap(([key, id]) => {
+      const orcling = orclings.get(db, id);
+      return orcling ? [[key, orcling] as const] : [];
+    }),
+  );
+}
+
+/** An Orcling brings its own name and model to its seat, whatever the team saved when it sat down. */
+function seatSettings(member: MemberRow, orcling: Orcling | undefined): Pick<TeamMember, "name" | "settings" | "orclingId"> {
+  if (orcling) return { name: orcling.name, settings: { ...orcling.settings }, orclingId: orcling.id };
+  return { name: member.name, settings: { agent: member.agent, model: member.model, effort: member.effort, fastMode: Boolean(member.fast_mode) } };
+}
+
+/** Records which seats Orclings took, before the revision is sealed. A team without Orclings records nothing. */
+function saveSeats(db: Db, revisionId: string, members: readonly TeamMember[]): void {
+  const seats = Object.fromEntries(members.flatMap((member) => (member.orclingId ? [[member.key, member.orclingId]] : [])));
+  if (Object.keys(seats).length) db.stmt("UPDATE orchestration_team_revisions SET orcling_seats = ? WHERE id = ?").run(JSON.stringify(seats), revisionId);
+}

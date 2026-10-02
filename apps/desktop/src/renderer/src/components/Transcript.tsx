@@ -6,9 +6,12 @@ import { core } from "../lib/rpc";
 import type { FileSelection } from "../lib/layout";
 import type { Block, RunTranscript } from "../lib/transcript";
 import { QuestionCard } from "./QuestionCard";
-import { AgentOrb } from "./AgentOrb";
+import { AgentPresence } from "./AgentPresence";
+import { useTurnAuthor } from "../lib/turn-authors";
+export { AgentPresence } from "./AgentPresence";
+import { StartedThreadCard } from "./StartedThreadCard";
 import { TaskCard } from "./TaskCard";
-import { taskIdFromTool, uniqueTaskCards } from "../lib/task-progress";
+import { startedWorkFromTool, taskIdFromTool, toolShowsCard, uniqueTaskCards } from "../lib/task-progress";
 import { ToolResult } from "./ToolResult";
 import { UsageRecovery } from "./UsageRecovery";
 import { TranscriptErrorCard } from "./TranscriptErrorCard";
@@ -227,32 +230,6 @@ function lastPromptAt(blocks: Block[]): number {
   return Date.now();
 }
 
-/**
- * Whoever is on the other end, at the tail of the conversation. It does not
- * come and go with a turn: it rests between them and stirs while one runs, so
- * the conversation always ends in the agent rather than in whatever step
- * happened last. The row above says which step is live; this says the turn is
- * not over and how long it has been going.
- *
- * The clock only ticks while a turn runs; a resting orb needs no timer.
- */
-export function AgentPresence({ working, since, showElapsed = true }: { working: boolean; since: number; showElapsed?: boolean }) {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    if (!working) return;
-    setNow(Date.now());
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, [working]);
-  const seconds = Math.max(1, Math.round((now - since) / 1000));
-  return (
-    <div className="transcript-block mt-3 flex items-center gap-2 text-sm text-ink-3" data-state={working ? "running" : "idle"} role="status">
-      <AgentOrb state={working ? "thinking" : "idle"} />
-      {working && showElapsed ? <span>Working for {seconds}s</span> : null}
-    </div>
-  );
-}
-
 /** A run of finished steps reads as one line until opened, the way the agent apps fold their work. */
 type Item = { kind: "block"; block: Block } | { kind: "group"; id: string; blocks: Block[] };
 
@@ -262,7 +239,7 @@ function foldable(block: Block, taskCards: boolean): boolean {
   if (block.kind === "tool" && /(?:spawn_agent|thread_send|send_message|team_say|team_complete)$/.test(block.name)) return false;
   if (block.kind === "activity" && /finished|completed/i.test(block.label)) return false;
   if (block.kind === "thinking") return !block.status || block.status === "success" || block.status === "running";
-  if (block.kind === "tool") return (!block.status || ["running", "success", "error"].includes(block.status)) && !(taskCards && taskIdFromTool(block));
+  if (block.kind === "tool") return (!block.status || ["running", "success", "error"].includes(block.status)) && !(taskCards && toolShowsCard(block));
   if (block.kind === "activity") return ["running", "success"].includes(block.status) && !isImageGeneration(block) && !isImageView(block);
   return false;
 }
@@ -387,8 +364,9 @@ function useSteadyTurns(blocks: Block[]): { id: string; blocks: Block[] }[] {
   }, [blocks]);
 }
 
-const WorkTurn = memo(function WorkTurn({ id, blocks, live = false, ambient = false, author, trailing, showActivity = true, ...props }: WorkTurnProps) {
+const WorkTurn = memo(function WorkTurn({ id, blocks, live = false, ambient = false, author: named, trailing, showActivity = true, ...props }: WorkTurnProps) {
   props = { ...props, runId: blocks.find((b) => b.runId)?.runId ?? props.runId };
+  const author = useTurnAuthor(named, props.runId);
   const timing = workTiming(blocks, live);
   const { before, work, after } = workParts(blocks, timing.live, props.taskCards, ambient);
   const [choice, setChoice] = useState<{ mode: boolean; open: boolean | null }>({ mode: showActivity, open: null });
@@ -562,7 +540,7 @@ const BlockView = memo(function BlockView({ block, runId, onFork, taskCards }: {
     case "thinking":
       return <ThinkingRow block={block} />;
     case "tool":
-      return taskCards && taskIdFromTool(block) ? <TaskCard taskId={taskIdFromTool(block) as string} /> : <ToolRow block={block} />;
+      return <ToolBlock block={block} cards={taskCards} />;
     case "approval":
       return block.approvalKind === "user_input" ? (
         <QuestionCard runId={runId} approvalId={block.approvalId} input={block.input} decided={block.decision} answers={block.answers} />
@@ -693,6 +671,14 @@ function liveVerb(verb: string): string {
       } as Record<string, string>
     )[verb] ?? verb
   );
+}
+
+/** A tool call that saved or started work shows that work as a live card; any other call is a row. */
+function ToolBlock({ block, cards }: { block: Extract<Block, { kind: "tool" }>; cards: boolean }) {
+  const taskId = cards ? taskIdFromTool(block) : null;
+  if (taskId) return <TaskCard taskId={taskId} />;
+  const started = cards ? startedWorkFromTool(block) : null;
+  return started ? <StartedThreadCard threadId={started.threadId} /> : <ToolRow block={block} />;
 }
 
 function ToolRow({ block }: { block: Extract<Block, { kind: "tool" }> }) {

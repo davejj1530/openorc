@@ -11,6 +11,7 @@ export * from "./rpc.js";
 export * from "./provider-usage.js";
 export * from "./model-catalog.js";
 export * from "./orchestration.js";
+export * from "./orclings.js";
 export * from "./team-runtime.js";
 export * from "./team-room.js";
 export * from "./team-workspaces.js";

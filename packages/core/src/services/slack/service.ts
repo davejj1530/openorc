@@ -71,6 +71,9 @@ export class SlackService {
   switchExecution(runId: string, input: ExecutionSwitchInput) {
     return this.runner.switchExecution(runId, input);
   }
+  switchToOrcling(runId: string, orclingId: string, instructions: string) {
+    return this.runner.switchToOrcling(runId, orclingId, instructions);
+  }
 
   /** Serialize settings/connect mutations, including the encrypted read-modify-write. */
   change<T>(fn: () => Promise<T>): Promise<T> {

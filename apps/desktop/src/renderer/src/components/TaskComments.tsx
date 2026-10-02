@@ -1,11 +1,18 @@
 import { useMemo, useRef, useState } from "react";
-import { commentMentionOptions, commentRecipientKey, harnessName, type CommentAttempt, type CommentRecipient, type TaskComment } from "@openorc/protocol";
+import { commentMentionOptions, commentRecipientKey, harnessName, orclingMentionOptions, type CommentAttempt, type CommentRecipient, type ModelOption, type TaskComment } from "@openorc/protocol";
+import { useOrclings } from "../lib/orclings";
 import { useRpc, useRpcMutation } from "../lib/query";
 import { modelEffortLabel } from "../lib/model-effort-label";
 import { mentionQueryAt, insertMention } from "../lib/composer-mentions";
 import { Button, TextButton } from "./ui";
 import { TaskCommentDiscussion } from "./TaskCommentDiscussion";
 import { useTaskCommentDraft } from "./useTaskCommentDraft";
+
+/** Everyone a comment can mention: Orclings first, then every available model and effort. */
+function useMentionOptions(models: ModelOption[] | undefined) {
+  const orclings = useOrclings();
+  return useMemo(() => [...orclingMentionOptions(orclings), ...commentMentionOptions((models ?? []).filter((m) => !m.unavailable))], [models, orclings]);
+}
 
 function modelSearchMessage(pending: boolean, failed: boolean): string {
   if (pending) return "Loading models…";
@@ -26,7 +33,7 @@ export function TaskComments({ taskId, description, beforeSend }: { taskId: stri
   const [selected, setSelected] = useState(0);
   const [dismissed, setDismissed] = useState(false);
   const editor = useRef<HTMLTextAreaElement>(null);
-  const options = useMemo(() => commentMentionOptions((models.data ?? []).filter((m) => !m.unavailable)), [models.data]);
+  const options = useMentionOptions(models.data);
   const names = useMemo(() => new Map(options.map((o) => [commentRecipientKey(o.recipient), o.name])), [options]);
   const recipientName = (r: CommentRecipient) => names.get(commentRecipientKey(r)) ?? modelEffortLabel(r, models.data);
   const query = dismissed ? null : mentionQueryAt(draft.body, caret);

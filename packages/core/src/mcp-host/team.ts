@@ -3,7 +3,7 @@ import { SlackService } from "../services/slack/service.js";
 import { TeamCoordinator } from "../services/team-coordinator.js";
 type Dependencies = {
   teams: Pick<TeamCoordinator, "binding" | "statusForRun" | "message" | "say" | "claim" | "wait" | "complete" | "contextPart" | "history">;
-  slack: Pick<SlackService, "executionAvailable" | "executionContext" | "switchExecution">;
+  slack: Pick<SlackService, "executionAvailable" | "executionContext" | "switchExecution" | "switchToOrcling">;
 };
 export function createTeamHost({ teams, slack }: Dependencies): Pick<McpHost, "team" | "execution"> {
   return {
@@ -27,7 +27,7 @@ export function createTeamHost({ teams, slack }: Dependencies): Pick<McpHost, "t
     execution: {
       available: (runId) => slack.executionAvailable(runId),
       context: (runId) => slack.executionContext(runId),
-      switch: (runId, input) => slack.switchExecution(runId, input),
+      switch: (runId, input) => (input.orclingId ? slack.switchToOrcling(runId, input.orclingId, input.instructions) : slack.switchExecution(runId, input)),
     },
   };
 }

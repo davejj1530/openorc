@@ -83,6 +83,11 @@
       "sha256": "c3bfc2ff54203286ece153ffde5789896bbe5a9b86f6fa6915e547c0171a11a4"
     },
     {
+      "group": "mascot",
+      "path": "assets/mascot/orcling.riv",
+      "sha256": "1a30952352377c1095549250a2e009ec59b6cc2ab4e35d34036e373a2b02203b"
+    },
+    {
       "group": "team-avatars",
       "path": "apps/desktop/src/renderer/src/assets/team-avatars/avatar-01-facet.png",
       "sha256": "ba3b954aff2459b46d7bb93091b7bef307492c8535e0964045f780bea5a72772"

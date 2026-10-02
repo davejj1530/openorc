@@ -40,6 +40,7 @@ interface CommentRow {
   body: string;
   author_agent: AgentKind | null;
   author_model: string | null;
+  author_orcling_id?: string | null;
   created_at: number;
 }
 
@@ -61,7 +62,7 @@ function commentFromRow(row: CommentRow): PullRequestDraftComment {
     side: row.side,
     lineText: row.line_text,
     body: row.body,
-    author: row.author_agent ? { agent: row.author_agent, model: row.author_model } : null,
+    author: row.author_agent ? { agent: row.author_agent, model: row.author_model, ...(row.author_orcling_id ? { orclingId: row.author_orcling_id } : {}) } : null,
     createdAt: row.created_at,
   };
 }
@@ -117,7 +118,7 @@ export const pullReviews = {
     const id = randomUUID();
     const at = Date.now();
     db.stmt(
-      "INSERT INTO pull_request_review_comments (id, project_id, number, path, start_line, start_side, line, side, line_text, body, author_agent, author_model, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO pull_request_review_comments (id, project_id, number, path, start_line, start_side, line, side, line_text, body, author_agent, author_model, author_orcling_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     ).run(
       id,
       key.projectId,
@@ -131,6 +132,7 @@ export const pullReviews = {
       comment.body,
       comment.author?.agent ?? null,
       comment.author?.model ?? null,
+      comment.author?.orclingId ?? null,
       at,
     );
     touch(db, key, at);

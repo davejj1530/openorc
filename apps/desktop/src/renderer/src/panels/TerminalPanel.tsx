@@ -3,6 +3,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { Terminal as Xterm } from "@xterm/xterm";
 import { RotateCcw, Square, Terminal } from "../components/icons";
 import { Button, Empty, IconButton, TextButton } from "../components/ui";
+import { typeAtPrompt } from "../lib/terminal-requests";
 import { useTheme } from "../lib/theme";
 import { terminalTheme } from "./terminal-theme";
 import "@xterm/xterm/css/xterm.css";
@@ -31,6 +32,26 @@ const RESIZE_SETTLE_MS = 150;
 
 type Status = { kind: "starting" } | { kind: "running" } | { kind: "exited"; code: number | null } | { kind: "error"; message: string };
 
+/** An xterm drawn into `element` and fitted to it. */
+function openXterm(element: HTMLElement): { term: Xterm; fit: FitAddon } {
+  const term = new Xterm({
+    cursorBlink: true,
+    fontFamily: getComputedStyle(document.documentElement).getPropertyValue("--font-mono").trim() || "monospace",
+    fontSize: 12,
+    lineHeight: 1.35,
+    macOptionIsMeta: true,
+    // The ring in main is the replay after a re-attach; this is only what the
+    // reader can scroll back through in the view they are looking at.
+    scrollback: 5000,
+    theme: terminalTheme(getComputedStyle(document.documentElement), isDark()),
+  });
+  const fit = new FitAddon();
+  term.loadAddon(fit);
+  term.open(element);
+  fit.fit();
+  return { term, fit };
+}
+
 /** The panel is 440px wide by default; the tail of a worktree path is the part that says which workspace this is. */
 function shortPath(cwd: string): string {
   const parts = cwd.split(/[\\/]/).filter(Boolean);
@@ -50,21 +71,7 @@ export function TerminalPanel({ id, cwd }: { id: string; cwd: string }) {
     const element = hostRef.current;
     if (!element) return;
     const api = window.openorc.terminal;
-    const term = new Xterm({
-      cursorBlink: true,
-      fontFamily: getComputedStyle(document.documentElement).getPropertyValue("--font-mono").trim() || "monospace",
-      fontSize: 12,
-      lineHeight: 1.35,
-      macOptionIsMeta: true,
-      // The ring in main is the replay after a re-attach; this is only what the
-      // reader can scroll back through in the view they are looking at.
-      scrollback: 5000,
-      theme: terminalTheme(getComputedStyle(document.documentElement), isDark()),
-    });
-    const fit = new FitAddon();
-    term.loadAddon(fit);
-    term.open(element);
-    fit.fit();
+    const { term, fit } = openXterm(element);
     termRef.current = term;
 
     const keys = term.onData((data: string) => api.write(id, data));
@@ -81,6 +88,8 @@ export function TerminalPanel({ id, cwd }: { id: string; cwd: string }) {
     let live = true;
     let offData = (): void => {};
     let offExit = (): void => {};
+    // Commands asked for elsewhere, such as signing in.
+    const requests = typeAtPrompt(id, (command) => api.write(id, `${command}\r`));
     // Before the open, not after: main sends nothing for a shell nobody is
     // watching, so anything written during the round trip would be held back
     // rather than queued. Attached first, those bytes are in the snapshot the
@@ -95,11 +104,18 @@ export function TerminalPanel({ id, cwd }: { id: string; cwd: string }) {
         // and the live stream from overlapping: main stops batching at the
         // moment it takes the snapshot, so the first push it sends afterwards
         // cannot arrive before this line has run.
-        offData = api.onData(id, (chunk) => term.write(chunk));
-        offExit = api.onExit(id, (code) => setStatus({ kind: "exited", code }));
+        offData = api.onData(id, (chunk) => {
+          term.write(chunk);
+          requests.output(chunk);
+        });
+        offExit = api.onExit(id, (code) => {
+          requests.ended();
+          setStatus({ kind: "exited", code });
+        });
         // A shell that ended while this panel was away said so to nobody, so
         // its code comes back with the backlog instead of over the wire.
         setStatus(running ? { kind: "running" } : { kind: "exited", code: exitCode });
+        if (running && backlog) requests.output(backlog);
       } catch (error) {
         if (live) setStatus({ kind: "error", message: error instanceof Error ? error.message : String(error) });
       }
@@ -109,6 +125,7 @@ export function TerminalPanel({ id, cwd }: { id: string; cwd: string }) {
       live = false;
       window.clearTimeout(settle);
       observer.disconnect();
+      requests.dispose();
       offData();
       offExit();
       keys.dispose();

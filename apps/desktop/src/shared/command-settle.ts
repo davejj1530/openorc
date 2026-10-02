@@ -4,7 +4,7 @@ export const COMMAND_SETTLE_MS = 800;
 export const RUNNING_SETTLE_MS = 8000;
 
 /** zsh and bash turn bracketed paste back on as they draw the next prompt: the typed command has ended. */
-const PROMPT_READY = "\x1b[?2004h";
+export const PROMPT_READY = "\x1b[?2004h";
 
 export interface CommandSettleWatcher {
   /** Keystrokes the user sent to the shell. */

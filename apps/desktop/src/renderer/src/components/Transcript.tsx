@@ -1,4 +1,5 @@
 import { lazy, memo, Suspense, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type ComponentProps, type RefObject } from "react";
+import { harnessCatalog, type ActivityRecovery } from "@openorc/protocol";
 import { WorkRead, WorkEdit, WorkCommand, WorkSearch, WorkMessage, WorkDelegate, WorkAgent, WorkLive, Check, ChevronRight, Copy, FileText, GitFork, Globe, Hammer, Search, Terminal, X } from "./icons";
 import { workTurns, workParts, workTiming, workDuration } from "../lib/work-transcript";
 import { cn } from "../lib/cn";
@@ -14,6 +15,7 @@ import { TaskCard } from "./TaskCard";
 import { startedWorkFromTool, taskIdFromTool, toolShowsCard, uniqueTaskCards } from "../lib/task-progress";
 import { ToolResult } from "./ToolResult";
 import { UsageRecovery } from "./UsageRecovery";
+import { SignInRecovery } from "./SignInRecovery";
 import { TranscriptErrorCard } from "./TranscriptErrorCard";
 const McpAppResult = lazy(() => import("./McpAppResult"));
 import { Button, IconButton, TextButton } from "./ui";
@@ -440,7 +442,7 @@ const WorkTurn = memo(function WorkTurn({ id, blocks, live = false, ambient = fa
           </div>
         </section>
       ) : null}
-      {hiddenRecovery ? <UsageRecovery provider={hiddenRecovery.provider} lead="Usage limit reached." /> : null}
+      {hiddenRecovery ? <Recovery recovery={hiddenRecovery} folded /> : null}
       <TranscriptContents {...props} blocks={after} />
       {footer}
     </div>
@@ -808,12 +810,19 @@ function ActivityRow({ block }: { block: Extract<Block, { kind: "activity" }> })
         ) : (
           <div className="ml-5 my-1 text-sm text-ink-3 whitespace-pre-wrap">{block.text}</div>
         ))}
-      {block.recovery?.kind === "usage" ? <UsageRecovery provider={block.recovery.provider} className="ml-5 my-1" /> : null}
+      {block.recovery ? <Recovery recovery={block.recovery} className="ml-5 my-1" /> : null}
       {open && block.detail !== undefined ? (
         <pre className="ml-5 my-1 px-3 py-2 rounded-lg border border-line text-xs text-ink-3 whitespace-pre-wrap break-words max-h-72 overflow-auto">{pretty(block.detail, Infinity)}</pre>
       ) : null}
     </div>
   );
+}
+
+/** The way back from a failed activity, on its row, or under the folded work with what happened. */
+function Recovery({ recovery, folded = false, className }: { recovery: ActivityRecovery; folded?: boolean; className?: string }) {
+  if (recovery.kind === "sign_in")
+    return <SignInRecovery provider={recovery.provider} lead={folded ? `${harnessCatalog[recovery.provider].shortName} is signed out.` : undefined} className={className} />;
+  return <UsageRecovery provider={recovery.provider} lead={folded ? "Usage limit reached." : undefined} className={className} />;
 }
 
 /**

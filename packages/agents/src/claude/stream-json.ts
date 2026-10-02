@@ -1,5 +1,15 @@
-import type { AgentEvent, Usage } from "@openorc/protocol";
+import type { AgentEvent, BackgroundCommand, Usage } from "@openorc/protocol";
 import { claudeFastModeReason } from "./fast-mode.js";
+
+/**
+ * Background tasks that are the agent's own work, which report back when they finish. Anything else Claude Code runs
+ * in the background, such as a shell command or a monitor, is a command that runs until it ends or is stopped.
+ */
+const BACKGROUND_WORK = new Set(["local_agent", "remote_agent", "local_workflow", "in_process_teammate"]);
+
+function sameCommands(a: readonly BackgroundCommand[], b: readonly BackgroundCommand[]): boolean {
+  return a.length === b.length && a.every((command, i) => command.id === b[i]!.id && command.description === b[i]!.description);
+}
 
 /** An explicit provider error wins over the result subtype. */
 function resultStatus(isError: boolean, subtype: string): "error" | "max_turns" | "success" {
@@ -55,8 +65,8 @@ export class ClaudeStreamParser {
   /** The last Fast state reported for a run that asked for Fast, with its reason when off. */
   private fastModeState: string | null = null;
   private fastModeNotices = 0;
-  /** Ids of the background tasks the session has running. */
-  private background: string[] = [];
+  /** What the session has running in the background: its work by id, and its commands. */
+  private background: { work: string[]; commands: BackgroundCommand[] } = { work: [], commands: [] };
 
   constructor(
     private readonly runId: string,
@@ -76,9 +86,14 @@ export class ClaudeStreamParser {
     this.manualCompactionRequested = true;
   }
 
-  /** The background tasks the session has running, by id, so they can be stopped. */
-  get backgroundTasks(): readonly string[] {
-    return this.background;
+  /** Background work the session has running, such as a subagent, by id, so a stop can end it. */
+  get backgroundWork(): readonly string[] {
+    return this.background.work;
+  }
+
+  /** Commands the session has running in the background, such as a dev server, so each can be stopped on its own. */
+  get backgroundCommands(): readonly BackgroundCommand[] {
+    return this.background.commands;
   }
 
   parseLine(line: string, now = Date.now()): AgentEvent[] {
@@ -394,23 +409,8 @@ export class ClaudeStreamParser {
       if (detail && this.lastToolId) out.push({ type: "tool.updated", runId: this.runId, ts: now, toolCallId: this.lastToolId, progress: detail });
       return;
     }
-    // Every task running in the background, replacing the last list. Ambient tasks, such as watchers, are
-    // housekeeping rather than work; Claude Code asks hosts to leave them out of activity.
     if (subtype === "background_tasks_changed") {
-      const rawTasks = msg["tasks"];
-      if (rawTasks !== undefined && !Array.isArray(rawTasks)) {
-        out.push(protocolError(this.runId, now, "Expected background tasks to be an array"));
-        return;
-      }
-      if (Array.isArray(rawTasks) && !rawTasks.every(isRecord)) {
-        out.push(protocolError(this.runId, now, "Expected background task entries to be objects"));
-        return;
-      }
-      const tasks = Array.isArray(rawTasks) ? (rawTasks as Record<string, unknown>[]) : [];
-      const running = tasks.filter((t) => t?.["ambient"] !== true).flatMap((t) => str(t?.["task_id"]) ?? []);
-      const changed = running.length !== this.background.length;
-      this.background = running;
-      if (changed) out.push({ type: "background.updated", runId: this.runId, ts: now, running: running.length });
+      this.backgroundTasksChanged(msg["tasks"], now, out);
       return;
     }
     if (subtype === "task_started" || subtype === "task_notification") {
@@ -435,6 +435,32 @@ export class ClaudeStreamParser {
       });
       return;
     }
+  }
+
+  /**
+   * Every task running in the background, replacing the last list. Ambient tasks, such as watchers, are housekeeping
+   * rather than work; Claude Code asks hosts to leave them out of activity.
+   */
+  private backgroundTasksChanged(rawTasks: unknown, now: number, out: AgentEvent[]): void {
+    if (rawTasks !== undefined && !Array.isArray(rawTasks)) {
+      out.push(protocolError(this.runId, now, "Expected background tasks to be an array"));
+      return;
+    }
+    if (Array.isArray(rawTasks) && !rawTasks.every(isRecord)) {
+      out.push(protocolError(this.runId, now, "Expected background task entries to be objects"));
+      return;
+    }
+    const work: string[] = [];
+    const commands: BackgroundCommand[] = [];
+    for (const task of (rawTasks ?? []) as Record<string, unknown>[]) {
+      const id = str(task["task_id"]);
+      if (!id || task["ambient"] === true) continue;
+      if (BACKGROUND_WORK.has(str(task["task_type"]) ?? "")) work.push(id);
+      else commands.push({ id, description: str(task["description"]) ?? "Background command" });
+    }
+    const changed = work.length !== this.background.work.length || !sameCommands(commands, this.background.commands);
+    this.background = { work, commands };
+    if (changed) out.push({ type: "background.updated", runId: this.runId, ts: now, running: work.length, commands });
   }
 
   /**

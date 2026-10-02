@@ -10,6 +10,7 @@ import {
   type AgentKind,
   type ApprovalDecision,
   type ApprovalResolution,
+  type BackgroundCommand,
   type ExecutionMode,
   type HarnessId,
   type ModelCatalog,
@@ -34,6 +35,7 @@ import { RunProgress } from "./run-progress.js";
 import { isSessionLost, RunSettlement } from "./run-settlement.js";
 import { matchesContinueSettings, RunTurns } from "./run-turns.js";
 import {
+  occupied,
   working,
   type ContinueSettings,
   type LiveRun,
@@ -80,6 +82,7 @@ export class RunService {
     ) {
       throw new Error("Finish agent work and pending approvals before updating. Your conversations will be kept.");
     }
+    if (this.backgroundCommandsRunning) throw new Error("Stop the background commands running in your conversations before updating.");
     this.agentUpdateReserved = true;
     try {
       await Promise.all([...this.live.keys()].map((id) => this.closeAndWait(id)));
@@ -173,7 +176,7 @@ export class RunService {
       (message) => this.log.info(message),
       (leaseId) =>
         [...this.live.values()].some(
-          (entry) => entry.workspaceLease.id === leaseId && entry.scope.thread && !entry.team && !working(entry) && !entry.exiting && !entry.closingRequested && !this.compactions.has(entry.run.id),
+          (entry) => entry.workspaceLease.id === leaseId && entry.scope.thread && !entry.team && !occupied(entry) && !entry.exiting && !entry.closingRequested && !this.compactions.has(entry.run.id),
         ),
     );
     this.codex = new CodexAdapter({ onApproval: (request) => this.approvals.handleCodexApproval(request) });
@@ -349,12 +352,32 @@ export class RunService {
     return null;
   }
 
-  /** What a thread is doing right now, for its card in the sidebar. Background work counts after the turn that started it ends. */
+  /**
+   * What a thread is doing right now, for its card in the sidebar. Background work counts after the turn that started
+   * it ends; a command left running, such as a dev server, does not.
+   */
   threadActivity(threadId: string): "idle" | "running" | "waiting" {
     const entry = [...this.live.values()].find((e) => e.run.threadId === threadId);
     if (!entry) return "idle";
     for (const p of this.approvals.pendingEntries) if (p.info.runId === entry.run.id) return "waiting";
     return working(entry) ? "running" : "idle";
+  }
+
+  /** Commands the thread's agent left running in the background, such as a dev server. */
+  threadBackgroundCommands(threadId: string): BackgroundCommand[] {
+    return [...this.live.values()].find((e) => e.run.threadId === threadId)?.commands ?? [];
+  }
+
+  /** Stop a command the thread's agent left running. One that already ended is left alone. */
+  async stopBackgroundCommand(threadId: string, commandId: string): Promise<void> {
+    const entry = [...this.live.values()].find((e) => e.run.threadId === threadId);
+    if (!entry?.commands.some((command) => command.id === commandId)) return;
+    await entry.handle.stopCommand(commandId);
+  }
+
+  /** An agent left a command running in the background. Closing its process for an update would end it. */
+  get backgroundCommandsRunning(): boolean {
+    return [...this.live.values()].some((entry) => entry.commands.length > 0);
   }
 
   /** The state of the provider session behind a thread, from the live process or the last run's fate. */
@@ -631,7 +654,7 @@ export class RunService {
   prepareForUpdate(): boolean {
     if (this.agentUpdateReserved) return false;
     if (this.closing || this.starting.size || this.startOperations.size || this.finalizations.size || this.compactions.size || this.approvals.pendingCount) return false;
-    if ([...this.live.values()].some((entry) => working(entry) || entry.exiting || entry.closingRequested)) return false;
+    if ([...this.live.values()].some((entry) => occupied(entry) || entry.exiting || entry.closingRequested)) return false;
     this.closing = true;
     return true;
   }

@@ -42,6 +42,7 @@ export class RunProcess {
       turns: 0,
       busy: true,
       background: 0,
+      commands: [],
       steerable: false,
       lastAgentEventAt: null,
       prompt: input.promptRole === "system" ? null : input.prompt,

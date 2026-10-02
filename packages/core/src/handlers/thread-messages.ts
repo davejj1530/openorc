@@ -6,14 +6,14 @@ import type { Handlers } from "./types.js";
 type Dependencies = {
   db: Db;
   teamConversations: Pick<TeamConversationService, "compact" | "relay" | "send">;
-  threadService: Pick<ThreadService, "compact" | "queue" | "unqueue" | "sendQueued" | "send">;
+  threadService: Pick<ThreadService, "compact" | "queue" | "unqueue" | "sendQueued" | "stopCommand" | "send">;
 };
 
 export function createThreadMessagesHandlers({
   db,
   teamConversations,
   threadService,
-}: Dependencies): Pick<Handlers, "threads.compact" | "threads.queue" | "threads.unqueue" | "threads.sendQueued" | "threads.send"> {
+}: Dependencies): Pick<Handlers, "threads.compact" | "threads.queue" | "threads.unqueue" | "threads.sendQueued" | "threads.stopCommand" | "threads.send"> {
   return {
     "threads.compact": async ({ id, requestKey }) => {
       if (orchestration.getInstance(db, id)) {
@@ -25,6 +25,10 @@ export function createThreadMessagesHandlers({
     "threads.queue": ({ id, text, attachments, requestKey }) => threadService.queue(id, text, attachments, requestKey),
     "threads.unqueue": ({ id, messageId }) => threadService.unqueue(id, messageId),
     "threads.sendQueued": ({ id, messageId }) => threadService.sendQueued(id, messageId),
+    "threads.stopCommand": async ({ id, commandId }) => {
+      await threadService.stopCommand(id, commandId);
+      return null;
+    },
     "threads.send": async ({ id, text, fromThreadId }) => {
       if (orchestration.getInstance(db, id)) {
         if (fromThreadId) {

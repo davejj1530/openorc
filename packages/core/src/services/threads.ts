@@ -148,6 +148,7 @@ export class ThreadService {
       teamInstanceId: instance?.id ?? null,
       agents: (instance ? orchestration.getRevision(this.db, instance.teamRevisionId)?.members.map((member) => member.settings.agent) : null) ?? [t.agent],
       activity,
+      backgroundCommands: this.runs.threadBackgroundCommands(t.id),
       // Activity the user has not looked at yet, once the agent is done with it.
       unread: activity === "idle" && (t.seenAt === null || t.lastActivityAt > t.seenAt),
       session: this.runs.threadSession(t.id),
@@ -728,6 +729,13 @@ export class ThreadService {
   }
   send(...args: Parameters<ThreadMessageQueue["send"]>) {
     return this.messageQueue.send(...args);
+  }
+
+  /** Stop a command the agent left running in the background, such as a dev server. */
+  async stopCommand(id: string, commandId: string): Promise<void> {
+    this.thread(id);
+    this.rejectPinnedTeam(id);
+    await this.runs.stopBackgroundCommand(id, commandId);
   }
   /* Checkpoints */
   checkpoints(id: string): ThreadCheckpoint[] {

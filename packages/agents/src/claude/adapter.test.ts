@@ -319,7 +319,7 @@ describe("Claude stream-json process", () => {
 
   it("stops background work between turns and reports its end once no turn follows", async () => {
     const proc = mockProcess();
-    const handle = new ClaudeAdapter({ followUpGraceMs: 20 }).start({ runId: "fixture", agent: "claude", cwd: process.cwd(), prompt: "Serve the preview", permissionMode: "trusted" }, launch);
+    const handle = new ClaudeAdapter({ followUpGraceMs: 20 }).start({ runId: "fixture", agent: "claude", cwd: process.cwd(), prompt: "Trace it in the background", permissionMode: "trusted" }, launch);
     const events: AgentEvent[] = [];
     handle.on("event", (event) => events.push(event));
     const counts = () => events.flatMap((e) => (e.type === "background.updated" ? [e.running] : []));
@@ -327,18 +327,51 @@ describe("Claude stream-json process", () => {
       await tick();
       written(proc);
       proc.stdout.write(
-        `${JSON.stringify({ type: "system", subtype: "background_tasks_changed", tasks: [{ task_id: "b1", task_type: "local_bash", description: "Serve" }] })}\n${JSON.stringify({ type: "result", subtype: "success", result: "Serving", num_turns: 1, duration_ms: 1 })}\n`,
+        `${JSON.stringify({ type: "system", subtype: "background_tasks_changed", tasks: [{ task_id: "w1", task_type: "local_workflow", description: "Trace" }] })}\n${JSON.stringify({ type: "result", subtype: "success", result: "Tracing", num_turns: 1, duration_ms: 1 })}\n`,
       );
       await tick();
       handle.interrupt();
       await tick();
-      expect(written(proc)).toEqual([expect.objectContaining({ type: "control_request", request: { subtype: "stop_task", task_id: "b1" } })]);
+      expect(written(proc)).toEqual([expect.objectContaining({ type: "control_request", request: { subtype: "stop_task", task_id: "w1" } })]);
       proc.stdout.write(`${JSON.stringify({ type: "system", subtype: "background_tasks_changed", tasks: [] })}\n`);
       await tick();
       expect(counts()).toEqual([1]);
       await new Promise((resolve) => setTimeout(resolve, 40));
       expect(counts()).toEqual([1, 0]);
       expect(events.filter((e) => e.type === "turn.completed")).toHaveLength(1);
+    } finally {
+      handle.close();
+      await handle.wait();
+    }
+  });
+
+  it("leaves a command to its own stop and reports it without waiting for a turn", async () => {
+    const proc = mockProcess();
+    const handle = new ClaudeAdapter({ followUpGraceMs: 20 }).start({ runId: "fixture", agent: "claude", cwd: process.cwd(), prompt: "Serve the preview", permissionMode: "trusted" }, launch);
+    const events: AgentEvent[] = [];
+    handle.on("event", (event) => events.push(event));
+    const lists = () => events.flatMap((e) => (e.type === "background.updated" ? [{ running: e.running, commands: e.commands?.map((command) => command.id) }] : []));
+    try {
+      await tick();
+      written(proc);
+      proc.stdout.write(
+        `${JSON.stringify({ type: "system", subtype: "background_tasks_changed", tasks: [{ task_id: "b1", task_type: "local_bash", description: "Serve" }] })}\n${JSON.stringify({ type: "result", subtype: "success", result: "Serving", num_turns: 1, duration_ms: 1 })}\n`,
+      );
+      await tick();
+      expect(lists()).toEqual([{ running: 0, commands: ["b1"] }]);
+      // Stop ends the agent's work; the server it left running is not that.
+      await handle.interrupt();
+      await handle.stopCommand("ended");
+      await tick();
+      expect(written(proc)).toEqual([]);
+      await handle.stopCommand("b1");
+      expect(written(proc)).toEqual([expect.objectContaining({ type: "control_request", request: { subtype: "stop_task", task_id: "b1" } })]);
+      proc.stdout.write(`${JSON.stringify({ type: "system", subtype: "background_tasks_changed", tasks: [] })}\n`);
+      await tick();
+      expect(lists()).toEqual([
+        { running: 0, commands: ["b1"] },
+        { running: 0, commands: [] },
+      ]);
     } finally {
       handle.close();
       await handle.wait();

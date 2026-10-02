@@ -220,6 +220,48 @@ function prepareClaudeLaunch(spec: RunSpec, launch: AgentLaunchEnvironment, opti
   }
 }
 
+type BackgroundUpdated = Extract<AgentEvent, { type: "background.updated" }>;
+
+/**
+ * Background work that ends between turns is held until the CLI shows whether the agent comes back to report on it,
+ * so the session never reads as idle in between. Commands coming and going are never held.
+ */
+class BackgroundSettling {
+  private held: { event: BackgroundUpdated; timer: ReturnType<typeof setTimeout> } | null = null;
+  /** How much background work the host last heard of. */
+  private reportedWork = 0;
+
+  constructor(
+    private readonly emit: (event: BackgroundUpdated) => void,
+    private readonly graceMs: number,
+  ) {}
+
+  /** A newer list replaces one still held. */
+  update(event: BackgroundUpdated, activeTurn: boolean): void {
+    this.drop();
+    if (event.running === 0 && this.reportedWork > 0 && !activeTurn) {
+      this.held = { event, timer: setTimeout(() => this.release(), this.graceMs) };
+      return;
+    }
+    this.reportedWork = event.running;
+    this.emit(event);
+  }
+
+  /** A turn took over, or no turn came: the end of the work can be reported. */
+  release(): void {
+    const held = this.held;
+    if (!held) return;
+    this.drop();
+    this.reportedWork = held.event.running;
+    this.emit(held.event);
+  }
+
+  drop(): void {
+    if (this.held) clearTimeout(this.held.timer);
+    this.held = null;
+  }
+}
+
 /** One session owns the child, pending writers and controls until the close barrier settles. */
 function startClaudeSession(spec: RunSpec, prepared: ReturnType<typeof prepareClaudeLaunch>, options: ClaudeAdapterOptions): RunHandle {
   const { binary, env, args, connection, registry } = prepared;
@@ -247,8 +289,7 @@ function startClaudeSession(spec: RunSpec, prepared: ReturnType<typeof prepareCl
   let held: { event: Extract<AgentEvent, { type: "turn.completed" }>; timer: ReturnType<typeof setTimeout> } | null = null;
   /** Time of results folded into a turn that carried on. Cost needs no carrying: every result reports the session's running total. */
   let carriedMs = 0;
-  /** Background work that ended between turns, held until the CLI shows whether the agent comes back to report on it. */
-  let settling: { event: Extract<AgentEvent, { type: "background.updated" }>; timer: ReturnType<typeof setTimeout> } | null = null;
+  const background = new BackgroundSettling((event) => handle.emit("event", event), options.followUpGraceMs ?? FOLLOW_UP_GRACE_MS);
   /** Control requests whose answer decides something, by request id. Stops and interrupts are not awaited. */
   const controlReplies = new Map<string, { resolve: () => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>();
   const exited = () => proc.exitCode !== null || proc.signalCode !== null;
@@ -311,22 +352,13 @@ function startClaudeSession(spec: RunSpec, prepared: ReturnType<typeof prepareCl
     const failure = controlFailure(response);
     settleControl(requestId, failure);
   };
-  const releaseSettling = (): void => {
-    if (!settling) return;
-    const { event, timer } = settling;
-    settling = null;
-    clearTimeout(timer);
-    handle.emit("event", event);
-  };
-
   /** Close all child resources before reporting the final session event. */
   const finalizeProcess = async (code: number | null): Promise<void> => {
     await waitForProcessGroup(proc);
     if (connection) rmSync(connection.dir, { recursive: true, force: true });
     releaseHeld();
     // The process is gone, and its background work with it.
-    if (settling) clearTimeout(settling.timer);
-    settling = null;
+    background.drop();
     compaction?.reject(new Error("Claude exited before context compaction finished."));
     for (const requestId of [...controlReplies.keys()]) settleControl(requestId, new Error("Claude exited before answering the settings change."));
     compaction = null;
@@ -366,8 +398,9 @@ function startClaudeSession(spec: RunSpec, prepared: ReturnType<typeof prepareCl
       }
       if (exited()) return;
       if (!activeTurn) {
-        // Between turns, what still runs is background work the agent started. Stopping it starts no turn.
-        for (const taskId of parser.backgroundTasks) void write(controlRequest({ subtype: "stop_task", task_id: taskId })).catch(() => undefined);
+        // Between turns, what still works is background work the agent started. Stopping it starts no turn. Commands,
+        // such as a dev server, are not the agent at work; each has its own stop.
+        for (const taskId of parser.backgroundWork) void write(controlRequest({ subtype: "stop_task", task_id: taskId })).catch(() => undefined);
         return;
       }
       interrupting = true;
@@ -395,6 +428,11 @@ function startClaudeSession(spec: RunSpec, prepared: ReturnType<typeof prepareCl
     send: async (text, attachments) => {
       await writeUser(text, attachments);
       activeTurn = true;
+    },
+    stopCommand: async (commandId) => {
+      // One that already ended has nothing to stop. A stop the user asked for starts no turn.
+      if (exited() || !parser.backgroundCommands.some((command) => command.id === commandId)) return;
+      await write(controlRequest({ subtype: "stop_task", task_id: commandId }));
     },
     // set_model and the effortLevel and fastMode flags take effect on the next turn of the same session; the flags land in
     // the layer --settings filled at launch. The CLI answers each request.
@@ -467,7 +505,7 @@ function startClaudeSession(spec: RunSpec, prepared: ReturnType<typeof prepareCl
         midTurnWrites = 0;
       } else handle.emit("event", ev);
       // Background work that just ended hands over to this turn, so the session never reads as idle.
-      releaseSettling();
+      background.release();
       return;
     }
     if (ev.type === "turn.completed") {
@@ -484,13 +522,8 @@ function startClaudeSession(spec: RunSpec, prepared: ReturnType<typeof prepareCl
       return;
     }
     if (ev.type === "background.updated") {
-      // A newer count replaces one still held.
-      if (settling) clearTimeout(settling.timer);
-      settling = null;
-      if (ev.running === 0 && !activeTurn) {
-        settling = { event: ev, timer: setTimeout(releaseSettling, options.followUpGraceMs ?? FOLLOW_UP_GRACE_MS) };
-        return;
-      }
+      background.update(ev, activeTurn);
+      return;
     }
     handle.emit("event", ev);
   };

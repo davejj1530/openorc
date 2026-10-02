@@ -40,6 +40,7 @@ let liveSettings: boolean;
 const steerTransport = vi.fn<(text: string, attachments?: string[]) => Promise<"accepted" | "unavailable">>();
 const settingsTransport = vi.fn<(settings: LiveSettings) => Promise<void>>();
 const followupTransport = vi.fn<(text: string, attachments?: string[]) => Promise<void>>();
+const stopTransport = vi.fn<(commandId: string) => Promise<void>>();
 const invalidations = vi.fn<(keys: string[]) => void>();
 let scripted: Map<string, { handle: RunHandle; finish: () => void }>;
 let adapters: RunAdapterRegistry;
@@ -58,6 +59,7 @@ beforeEach(() => {
   steerTransport.mockReset().mockResolvedValue("accepted");
   settingsTransport.mockReset().mockResolvedValue(undefined);
   followupTransport.mockReset().mockResolvedValue(undefined);
+  stopTransport.mockReset().mockResolvedValue(undefined);
   invalidations.mockReset();
   scripted = new Map();
   const start = (spec: RunSpec, _launch: AgentLaunchEnvironment) => {
@@ -74,6 +76,7 @@ beforeEach(() => {
     };
     const handle = new RunHandle(spec.runId, {
       send: followupTransport,
+      stopCommand: stopTransport,
       ...(spec.agent === "codex" ? { steer: steerTransport, canSteer: () => steerable } : {}),
       ...(liveSettings ? { applySettings: settingsTransport } : {}),
       interrupt() {},
@@ -1064,5 +1067,33 @@ describe("background work", () => {
     await vi.waitFor(() => expect(service.threadActivity(thread.id)).toBe("idle"));
     expect(hooks.onThreadIdle).toHaveBeenCalledWith(expect.objectContaining({ id: thread.id }));
     await vi.waitFor(() => expect(service.isLive(run.id)).toBe(false), { timeout: 3000 });
+  });
+
+  it("finishes a turn that leaves a command running, and keeps its process open until the command is stopped", async () => {
+    hooks.idleTimeoutMs = () => 100;
+    hooks.onThreadIdle = vi.fn();
+    const { thread, input } = conversation();
+    const run = await service.start(input);
+    const server = { id: "b1", description: "Serve the preview" };
+    emit(run.id, { type: "background.updated", runId: run.id, ts: Date.now(), running: 0, commands: [server] });
+    turnCompleted(run.id, "launch");
+    await vi.waitFor(() => expect(hooks.onTurnSettled).toHaveBeenCalledOnce());
+    expect(service.threadActivity(thread.id)).toBe("idle");
+    expect(service.threadBackgroundCommands(thread.id)).toEqual([server]);
+    // Neither the idle clock, another writer nor an update may end the server.
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    await expect(writers.acquire(root, "review commit")).rejects.toThrow(/in use/);
+    expect(service.prepareForUpdate()).toBe(false);
+    await expect(service.reserveAgentUpdate()).rejects.toThrow(/background commands/);
+    expect(service.isLive(run.id)).toBe(true);
+
+    await service.stopBackgroundCommand(thread.id, "ended");
+    expect(stopTransport).not.toHaveBeenCalled();
+    await service.stopBackgroundCommand(thread.id, "b1");
+    expect(stopTransport).toHaveBeenCalledWith("b1");
+    emit(run.id, { type: "background.updated", runId: run.id, ts: Date.now(), running: 0, commands: [] });
+    await vi.waitFor(() => expect(service.threadBackgroundCommands(thread.id)).toEqual([]));
+    await vi.waitFor(() => expect(service.isLive(run.id)).toBe(false), { timeout: 3000 });
+    expect(hooks.onThreadIdle).not.toHaveBeenCalled();
   });
 });

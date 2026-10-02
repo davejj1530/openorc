@@ -598,6 +598,7 @@ export class OpenOrc {
         "threads.queue",
         "threads.unqueue",
         "threads.sendQueued",
+        "threads.stopCommand",
         "threads.checkpoints",
         "threads.turnChanges",
         "threads.restore",
@@ -675,6 +676,7 @@ export class OpenOrc {
     if (this.memory.hasPendingWork) return "Wait for memory processing to finish before restarting to update.";
     if (teamRuntime.openIds(this.db).length) return "Finish or stop your active teams before restarting to update.";
     if (this.schedules.hasPendingWork) return "A scheduled task is starting. Try again when it has finished.";
+    if (this.runs.backgroundCommandsRunning) return "Stop the background commands running in your conversations before restarting to update.";
     if (!this.runs.prepareForUpdate()) return "Wait for agent work, approvals, and context maintenance to finish before restarting to update.";
     this.schedules.stopAccepting();
     return null;

@@ -1,5 +1,5 @@
 import type { AgentLaunchEnvironment, RunHandle } from "@openorc/agents";
-import type { AgentEvent, AgentKind, CorePush, HarnessId, PermissionPreset, Project, Run, RunMode, RunSpec, Task, TeamPermissionState, Thread, Usage } from "@openorc/protocol";
+import type { AgentEvent, AgentKind, BackgroundCommand, CorePush, HarnessId, PermissionPreset, Project, Run, RunMode, RunSpec, Task, TeamPermissionState, Thread, Usage } from "@openorc/protocol";
 import type { AppAction } from "./app-actions.js";
 import type { EnvSnapshot } from "./shell-environment.js";
 import type { WorkspaceLease } from "./workspace-writers.js";
@@ -115,8 +115,10 @@ export interface LiveRun {
   turns: number;
   /** A turn is in progress. Sessions stay open between turns, so live alone does not mean working. */
   busy: boolean;
-  /** Background tasks the agent started, such as a shell, subagent or workflow. They outlive turns and can start one when they finish. */
+  /** Background work the agent started, such as a subagent or workflow. It outlives turns and reports back in a turn of its own. */
   background: number;
+  /** Commands the agent left running in the background, such as a dev server. They run until they end or are stopped. */
+  commands: BackgroundCommand[];
   /** Last advertised native control state, independent of transcript output. */
   steerable: boolean;
   /** Stamped when OpenOrc observes the latest provider event. */
@@ -159,9 +161,14 @@ export interface LiveProcessBinding {
   permissionGate?: PermissionPreset;
 }
 
-/** A turn in flight, or background work the agent started. Closing the process would lose either. */
+/** A turn in flight, or background work that will report back: the agent is at work. */
 export function working(entry: LiveRun): boolean {
   return entry.busy || entry.background > 0;
+}
+
+/** The agent is at work, or a command it left running in the background still runs. Closing the process would end them. */
+export function occupied(entry: LiveRun): boolean {
+  return working(entry) || entry.commands.length > 0;
 }
 
 export interface PendingApproval {

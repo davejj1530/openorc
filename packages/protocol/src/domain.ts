@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AgentKind, Usage } from "./events.js";
+import { AgentKind, BackgroundCommand, Usage } from "./events.js";
 import { ExecutionTarget, TeamRevision } from "./orchestration.js";
 
 /** Domain records as the renderer sees them. Columns are nullable, not optional. */
@@ -175,6 +175,8 @@ export const ThreadSummary = Thread.extend({
   /** One provider per saved team member, or the solo thread provider; absent in older summaries. */
   agents: z.array(AgentKind).optional(),
   activity: ThreadActivity,
+  /** Commands the agent left running after its turn, such as a dev server; absent in older cached summaries. */
+  backgroundCommands: z.array(BackgroundCommand).optional(),
   unread: z.boolean(),
   session: ThreadSession,
   /** Context use on the latest turn, when the agent reported it. */

@@ -2,11 +2,12 @@ import { conversationWorkspaceMode, conversationLocation, conversationEmptyHint,
 import { WORKSPACE_ID } from "@openorc/protocol";
 import { TaskForwarding } from "./TaskForwarding";
 import { useCallback, useState } from "react";
-import { defaultHarnessId, harnessShortName, type Project, type Run, type Task, type ThreadSummary, type WorkspaceMode } from "@openorc/protocol";
+import { defaultHarnessId, harnessShortName, type AgentKind, type Project, type Run, type Task, type ThreadSummary, type WorkspaceMode } from "@openorc/protocol";
 import { AlertCircle, GitBranch, Laptop } from "./icons";
 import { Composer, type SlashCommand, ComposerChoice } from "./Composer";
 import { Transcript } from "./Transcript";
 import { MessageQueue } from "./MessageQueue";
+import { BackgroundCommands } from "./BackgroundCommands";
 import { ThreadChangeCard } from "./ThreadChangeCard";
 import { isImageGeneration } from "./ThreadImages";
 import { useComposerChanges } from "../lib/composer-changes";
@@ -144,6 +145,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   const queue = useRpcMutation("threads.queue");
   const unqueue = useRpcMutation("threads.unqueue");
   const sendQueued = useRpcMutation("threads.sendQueued");
+  const stopCommand = useRpcMutation("threads.stopCommand");
   const compact = useRpcMutation("threads.compact");
   const fork = useRpcMutation("threads.fork");
   const forkThread = fork.mutate;
@@ -290,27 +292,14 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
               onRemove={(messageId) => unqueue.mutate({ id: thread.id, messageId })}
             />
           ) : null}
-          {session && (session.status === "lost" || session.status === "error") && !working ? (
-            <div data-blocking="true" className="rounded-xl border border-bad/50 bg-bad-soft/40 px-4 py-3 text-sm">
-              <div className="flex items-start gap-2">
-                <AlertCircle size={14} className="text-bad mt-0.5 shrink-0" />
-                <div className="min-w-0 flex-1 grid gap-2">
-                  <div className="text-ink">{session.status === "lost" ? `${harnessShortName(thread?.agent ?? defaultHarnessId)} no longer has this session.` : "The last turn failed."}</div>
-                  {session.message ? <div className="text-ink-3 whitespace-pre-wrap break-words max-h-24 overflow-auto">{session.message}</div> : null}
-                  <div className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      disabled={!choice || busy}
-                      onClick={() => void startRun("Continue where you left off. Check the working tree first.", [], true).catch(() => {})}
-                    >
-                      {session.status === "lost" ? "Start a fresh session with a handoff" : "Retry with a fresh session"}
-                    </Button>
-                    {session.status === "error" ? <span className="text-xs text-ink-4">Or send a message to resume.</span> : null}
-                  </div>
-                </div>
-              </div>
-            </div>
+          {thread ? <BackgroundCommands commands={thread.backgroundCommands ?? []} pending={stopCommand.isPending} onStop={(commandId) => stopCommand.mutate({ id: thread.id, commandId })} /> : null}
+          {session && !working ? (
+            <SessionRecovery
+              session={session}
+              agent={thread?.agent ?? defaultHarnessId}
+              disabled={!choice || busy}
+              onRestart={() => void startRun("Continue where you left off. Check the working tree first.", [], true).catch(() => {})}
+            />
           ) : null}
           {switching && choice ? (
             <div className="text-xs text-ink-3 px-1">Switching to {harnessShortName(choice.agent)} starts a fresh session. It gets a brief of this conversation, not the other agent's session.</div>
@@ -351,7 +340,10 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
             compactDisabledReason={working ? "Available after this turn finishes." : undefined}
             projectId={project.id === WORKSPACE_ID ? undefined : project.id}
             commands={commands}
-            error={(start.error ?? send.error ?? queue.error ?? sendQueued.error ?? compact.error ?? unqueue.error ?? fork.error ?? settings.error ?? draftError)?.message ?? permissionError}
+            error={
+              (start.error ?? send.error ?? queue.error ?? sendQueued.error ?? stopCommand.error ?? compact.error ?? unqueue.error ?? fork.error ?? settings.error ?? draftError)?.message ??
+              permissionError
+            }
           >
             {firstTaskRun && scope.kind === "task" ? (
               <ComposerChoice
@@ -384,6 +376,28 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
               Retry loading agent history
             </Button>
           ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** A lost session or a failed last turn, with a fresh start that hands the conversation over. */
+function SessionRecovery({ session, agent, disabled, onRestart }: { session: NonNullable<ThreadSummary["session"]>; agent: AgentKind; disabled: boolean; onRestart: () => void }) {
+  if (session.status !== "lost" && session.status !== "error") return null;
+  return (
+    <div data-blocking="true" className="rounded-xl border border-bad/50 bg-bad-soft/40 px-4 py-3 text-sm">
+      <div className="flex items-start gap-2">
+        <AlertCircle size={14} className="text-bad mt-0.5 shrink-0" />
+        <div className="min-w-0 flex-1 grid gap-2">
+          <div className="text-ink">{session.status === "lost" ? `${harnessShortName(agent)} no longer has this session.` : "The last turn failed."}</div>
+          {session.message ? <div className="text-ink-3 whitespace-pre-wrap break-words max-h-24 overflow-auto">{session.message}</div> : null}
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="primary" disabled={disabled} onClick={onRestart}>
+              {session.status === "lost" ? "Start a fresh session with a handoff" : "Retry with a fresh session"}
+            </Button>
+            {session.status === "error" ? <span className="text-xs text-ink-4">Or send a message to resume.</span> : null}
+          </div>
         </div>
       </div>
     </div>

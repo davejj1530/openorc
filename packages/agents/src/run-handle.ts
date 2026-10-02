@@ -21,6 +21,8 @@ export interface RunControls {
   close: () => void;
   /** Send a follow-up prompt on the same session, where the agent supports it. */
   send: (text: string, attachments?: string[]) => Promise<void>;
+  /** Stop one command the agent left running in the background, such as a dev server. One that already ended is left alone. */
+  stopCommand?: (commandId: string) => Promise<void>;
   /** Live input only: unavailable proves no input was sent; errors may be ambiguous. */
   steer?: (text: string, attachments?: string[]) => Promise<"accepted" | "unavailable">;
   /** Dynamic provider readiness. A live process can be between turns or compacting. */
@@ -59,6 +61,11 @@ export class RunHandle extends EventEmitter<RunHandleEvents> {
   }
   send(text: string, attachments?: string[]): Promise<void> {
     return this.controls.send(text, attachments);
+  }
+  /** Only agents that report background commands can stop one. */
+  stopCommand(commandId: string): Promise<void> {
+    if (!this.controls.stopCommand) return Promise.reject(new Error("this agent cannot stop a background command"));
+    return this.controls.stopCommand(commandId);
   }
   get compacting(): boolean {
     return this.controls.compacting?.() ?? false;

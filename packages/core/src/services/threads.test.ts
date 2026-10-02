@@ -67,6 +67,46 @@ function serviceNaming(title: string | null): ThreadService {
   );
 }
 
+describe("commands left running in the background", () => {
+  it("ends the turn, sends what was queued, and stops the command when asked", async () => {
+    const thread = threads.insert(core.db, { projectId: project.id, title: "Preview the site", agent: "claude", model: null, mode: "act", permissionMode: "trusted" });
+    const send = vi.fn(async () => {});
+    const stopCommand = vi.fn(async () => {});
+    let handle!: RunHandle;
+    const adapter = vi.spyOn(ClaudeAdapter.prototype, "start").mockImplementation((spec) => {
+      let finish!: (code: number) => void;
+      const done = new Promise<number>((resolve) => {
+        finish = resolve;
+      });
+      handle = new RunHandle(spec.runId, {
+        send,
+        stopCommand,
+        interrupt() {},
+        close() {
+          handle.emit("exit", 0);
+          finish(0);
+        },
+        done,
+      });
+      return handle;
+    });
+    const run = await core.runs.start({ scope: { task: null, thread }, project, agent: "claude", model: "fixture", mode: "act", permissionMode: "trusted", prompt: "Open the website", resume: false });
+    adapter.mockRestore();
+    const server = { id: "b1", description: "Serve the preview" };
+    handle.emit("event", { type: "session.started", runId: run.id, ts: Date.now(), agent: "claude", externalSessionId: "preview", model: "fixture" });
+    handle.emit("event", { type: "background.updated", runId: run.id, ts: Date.now(), running: 0, commands: [server] });
+    core.threads.queue(thread.id, "More changes");
+    expect(core.threads.get(thread.id)?.queued).toHaveLength(1);
+    handle.emit("event", { type: "turn.completed", runId: run.id, ts: Date.now(), turnId: "first", status: "success", durationMs: 0 });
+    // The server runs on, but the turn is over: the queued message goes out on the same session.
+    await vi.waitFor(() => expect(send).toHaveBeenCalledWith("More changes", []));
+    expect(core.threads.get(thread.id)).toMatchObject({ queued: [], backgroundCommands: [server] });
+
+    await core.handle({ type: "rpc", id: 1, method: "threads.stopCommand", params: { id: thread.id, commandId: "b1" } });
+    expect(stopCommand).toHaveBeenCalledWith("b1");
+  });
+});
+
 describe("compaction and delivery recovery", () => {
   async function idleSession(controls: { send: (text: string, attachments?: string[]) => Promise<void>; compact: () => Promise<void> }) {
     const thread = planThread();

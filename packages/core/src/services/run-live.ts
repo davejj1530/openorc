@@ -5,7 +5,7 @@ import { projects, tasks, threads, type Db } from "@openorc/db";
 import { WORKSPACE_ID, type AgentEvent, type Project } from "@openorc/protocol";
 import { overlaps } from "./workspace-writers.js";
 import type { Logger } from "../transport.js";
-import { working, type LiveRun, type RunHooks } from "./run-types.js";
+import { occupied, working, type LiveRun, type RunHooks } from "./run-types.js";
 
 /** Workspace leases hold resolved paths; records may not. Compare checkouts by the directory they resolve to. */
 function canonicalDirectory(dir: string): string {
@@ -101,11 +101,11 @@ export class RunLive {
     const runId = entry.run.id;
     this.disarmIdle(runId);
     const timeout = this.deps.hooks.idleTimeoutMs?.() ?? null;
-    if (!timeout || entry.scope.task || this.deps.isClosing() || working(entry)) return;
+    if (!timeout || entry.scope.task || this.deps.isClosing() || occupied(entry)) return;
     const timer = setTimeout(() => {
       this.idleTimers.delete(runId);
       const live = this.live.get(runId);
-      if (!live || working(live) || live.exiting || live.closingRequested || this.pendingCompactions.has(runId) || this.deps.isClosing()) return;
+      if (!live || occupied(live) || live.exiting || live.closingRequested || this.pendingCompactions.has(runId) || this.deps.isClosing()) return;
       this.deps.log.info(`run ${runId} idle for ${Math.round(timeout / 1000)}s; closing its process, the session resumes on the next message`);
       void this.deps.closeAndWait(runId).catch((error) => this.deps.log.warn(`run ${runId} idle close: ${error instanceof Error ? error.message : String(error)}`));
     }, timeout);
@@ -116,7 +116,7 @@ export class RunLive {
   async yieldIdle(paths: readonly string[]): Promise<boolean> {
     const idle = [...this.live.values()].filter(
       (entry) =>
-        entry.scope.thread && !entry.team && !working(entry) && !entry.exiting && !entry.closingRequested && !this.pendingCompactions.has(entry.run.id) && overlaps(entry.workspaceLease.paths, paths),
+        entry.scope.thread && !entry.team && !occupied(entry) && !entry.exiting && !entry.closingRequested && !this.pendingCompactions.has(entry.run.id) && overlaps(entry.workspaceLease.paths, paths),
     );
     if (idle.length === 0) return false;
     for (const entry of idle) {

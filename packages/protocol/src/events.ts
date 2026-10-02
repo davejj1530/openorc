@@ -53,6 +53,10 @@ const base = {
 export const ActivityStatus = z.enum(["running", "success", "error", "cancelled", "disconnected"]);
 export type ActivityStatus = z.infer<typeof ActivityStatus>;
 
+/** A command the agent left running in the background, such as a dev server. It runs until it ends or is stopped. */
+export const BackgroundCommand = z.object({ id: z.string(), description: z.string() });
+export type BackgroundCommand = z.infer<typeof BackgroundCommand>;
+
 export const AgentEvent = z.discriminatedUnion("type", [
   z.object({ type: z.literal("plan.updated"), ...base, documentId: z.string(), text: z.string(), delta: z.boolean().optional(), complete: z.boolean().optional() }),
   z.object({
@@ -200,13 +204,16 @@ export const AgentEvent = z.discriminatedUnion("type", [
     durationMs: z.number().nonnegative(),
   }),
   /**
-   * How many background tasks the agent has running, such as a shell, subagent or workflow. They outlive the turn
-   * that started them, and one that finishes can start a turn on its own. Each event replaces the last count.
+   * What the agent has running in the background, outliving the turn that started it. `running` counts work that
+   * reports back, such as a subagent or workflow: the agent is at work until it does. `commands` lists commands, such
+   * as a dev server, that run until they end or are stopped. Either can start a turn when it ends on its own. Each
+   * event replaces the last; events recorded before `commands` existed counted commands in `running`.
    */
   z.object({
     type: z.literal("background.updated"),
     ...base,
     running: z.number().int().nonnegative(),
+    commands: z.array(BackgroundCommand).optional(),
   }),
   /** The agent process is gone. Emitted exactly once per run. */
   z.object({

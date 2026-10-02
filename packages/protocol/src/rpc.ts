@@ -262,6 +262,8 @@ export const rpcParams = {
   "threads.queue": z.object({ id: z.string(), text: z.string().min(1), attachments: z.array(z.string()).optional(), requestKey: z.string().min(1).optional() }),
   "threads.unqueue": z.object({ id: z.string(), messageId: z.string().min(1) }),
   "threads.sendQueued": z.object({ id: z.string(), messageId: z.string().min(1) }),
+  /** Stop a command the agent left running in the background, such as a dev server. */
+  "threads.stopCommand": z.object({ id: z.string(), commandId: z.string().min(1) }),
   "threads.checkpoints": z.object({ id: z.string() }),
   /** What the turn that saved a checkpoint changed, against the checkpoint before it. */
   "threads.turnChanges": z.object({ id: z.string(), checkpointId: z.string(), includePatch: z.boolean().optional(), paths: z.array(z.string().min(1)).min(1).max(500).optional() }).strict(),
@@ -651,6 +653,7 @@ export interface RpcResults extends PullRequestRpcResults {
   "threads.queue": QueuedMessage[];
   "threads.unqueue": QueuedMessage[];
   "threads.sendQueued": QueuedMessage[];
+  "threads.stopCommand": null;
   "threads.checkpoints": ThreadCheckpoint[];
   "threads.turnChanges": TurnFileChanges;
   "threads.restore": null | { rejected: string };

@@ -1,7 +1,7 @@
 import { runs, type Db } from "@openorc/db";
 import { harnessName, type AgentEvent, type Project } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
-import { working, type CompletedTurn, type LiveRun, type RunHooks, type RunScope } from "./run-types.js";
+import { occupied, working, type CompletedTurn, type LiveRun, type RunHooks, type RunScope } from "./run-types.js";
 
 /** Tools that only read. Any other tool, including one this list does not know, may have changed files. */
 const READ_ONLY_TOOLS = new Set([
@@ -87,7 +87,7 @@ export class RunEvents {
         this.onTurnStarted(entry);
         return;
       case "background.updated":
-        this.onBackgroundUpdated(entry, project, ev.running);
+        this.onBackgroundUpdated(entry, project, ev);
         return;
       case "activity.updated":
         // Codex reports its turn's changes as they grow; a Claude background task that ends may have written files.
@@ -139,20 +139,18 @@ export class RunEvents {
     this.deps.invalidate(this.deps.keysFor(entry.scope));
   }
 
-  private onBackgroundUpdated(entry: LiveRun, project: Project, running: number): void {
-    const was = working(entry);
-    entry.background = running;
-    if (working(entry) === was) return;
+  private onBackgroundUpdated(entry: LiveRun, project: Project, ev: Extract<AgentEvent, { type: "background.updated" }>): void {
+    const was = { working: working(entry), occupied: occupied(entry) };
+    entry.background = ev.running;
+    entry.commands = ev.commands ?? [];
+    // The thread shows whether its agent is at work and which commands still run.
     this.deps.invalidate(this.deps.keysFor(entry.scope));
-    if (was) this.deps.refreshDiffs(entry, project);
-    if (!was) {
-      this.deps.disarmIdle(entry.run.id);
-      return;
-    }
+    if (was.working && !working(entry)) this.deps.refreshDiffs(entry, project);
+    if (!was.occupied && occupied(entry)) this.deps.disarmIdle(entry.run.id);
     if (entry.exiting || entry.closingRequested) return;
-    // The work ended with no turn to report on it, as when the user stops it.
-    this.deps.armIdle(entry);
-    if (entry.scope.thread) this.deps.hooks.onThreadIdle?.(entry.scope.thread);
+    // What ran ended with no turn to report on it, as when the user stops it.
+    if (was.occupied && !occupied(entry)) this.deps.armIdle(entry);
+    if (was.working && !working(entry) && entry.scope.thread) this.deps.hooks.onThreadIdle?.(entry.scope.thread);
   }
 
   private onActivityUpdated(entry: LiveRun, project: Project, ev: Extract<AgentEvent, { type: "activity.updated" }>): void {

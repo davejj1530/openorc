@@ -278,16 +278,21 @@ describe("ClaudeStreamParser", () => {
     ]);
   });
 
-  it("counts the background work Claude Code lists, leaving out ambient tasks and unchanged counts", () => {
+  it("counts background work apart from the commands left running, leaving out ambient tasks and unchanged lists", () => {
     const p = new ClaudeStreamParser("run-bg");
     const listed = (tasks: unknown[]) => p.parseLine(line({ type: "system", subtype: "background_tasks_changed", tasks }), 1000).filter((e) => e.type !== "raw");
     const workflow = { task_id: "w1", task_type: "local_workflow", description: "Trace" };
-    expect(listed([workflow])).toEqual([{ type: "background.updated", runId: "run-bg", ts: 1000, running: 1 }]);
-    expect(listed([workflow, { task_id: "m1", task_type: "monitor", description: "Watch the build", ambient: true }])).toEqual([]);
-    expect(listed([workflow, { task_id: "b1", task_type: "local_bash", description: "Run the tests" }])).toMatchObject([{ running: 2 }]);
-    expect(p.backgroundTasks).toEqual(["w1", "b1"]);
-    expect(listed([])).toMatchObject([{ running: 0 }]);
-    expect(p.backgroundTasks).toEqual([]);
+    const server = { task_id: "b1", task_type: "local_bash", description: "Serve the preview" };
+    expect(listed([workflow])).toEqual([{ type: "background.updated", runId: "run-bg", ts: 1000, running: 1, commands: [] }]);
+    expect(listed([workflow, { task_id: "m1", task_type: "monitor_ws", description: "Watch the build", ambient: true }])).toEqual([]);
+    expect(listed([workflow, server])).toEqual([{ type: "background.updated", runId: "run-bg", ts: 1000, running: 1, commands: [{ id: "b1", description: "Serve the preview" }] }]);
+    // Another piece of work in place of the first changes nothing the host counts.
+    expect(listed([server, { task_id: "a1", task_type: "local_agent", description: "Review" }])).toEqual([]);
+    expect(p.backgroundWork).toEqual(["a1"]);
+    expect(p.backgroundCommands).toEqual([{ id: "b1", description: "Serve the preview" }]);
+    expect(listed([])).toMatchObject([{ running: 0, commands: [] }]);
+    expect(p.backgroundWork).toEqual([]);
+    expect(p.backgroundCommands).toEqual([]);
   });
 
   it("stays quiet about Fast on a run that did not ask for it", () => {

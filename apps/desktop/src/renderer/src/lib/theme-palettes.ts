@@ -1,6 +1,6 @@
 // Built-in palettes. A preset named after a product adapts that product's UI colors to the
 // shell's roles and follows the rules below, so its values are not exact copies.
-export type ThemePreset = "openorc" | "codex" | "conductor" | "linear" | "cursor" | "claude" | "github" | "halcyon" | "kamakura" | "clickup" | "cyberpunk" | "notion";
+export type ThemePreset = "openorc" | "codex" | "conductor" | "linear" | "cursor" | "claude" | "github" | "halcyon" | "kamakura" | "clickup" | "cyberpunk" | "notion" | "eliron";
 export type Mode = "light" | "dark";
 export interface ThemeTemplate {
   id: ThemePreset;
@@ -64,7 +64,16 @@ const fadeIntoSidebar = "linear-gradient(var(--surface), var(--bg))";
 // Where it sits below, the plane starts at the sidebar's tone and ends a notch under its own,
 // because those two grounds are only a step or two apart.
 const fadeFromSidebar = "linear-gradient(var(--bg), oklch(from var(--surface) calc(l - 0.02) c h))";
-export const themePresets: ThemeTemplate[] = [
+// Success and attention: +N counts, checks and diff additions; waiting, approvals and warnings.
+// Every palette starts from the shell's own, the values app.css declares before a palette loads,
+// and changes only the ones it names. The soft fills tint their ink unless a palette paints them.
+// Switching palettes only sets properties, never clears them, so every palette carries every key.
+const statusSoft = { "--ok-soft": "color-mix(in srgb, var(--ok) 8%, var(--surface))", "--warn-soft": "color-mix(in srgb, var(--warn) 8%, var(--surface))" };
+const statusTokens: Record<Mode, Record<string, string>> = {
+  light: { "--ok": "#157447", "--warn": "#8b5c0a", ...statusSoft },
+  dark: { "--ok": "#22975d", "--warn": "#a47f29", ...statusSoft },
+};
+const presets: ThemeTemplate[] = [
   // OpenOrc's own palette. Dark is a Linear-style charcoal, a few steps lighter than Linear's,
   // whose work plane fades from its lit top into the sidebar's ground, as Linear's agent view
   // does. Light keeps the white ground and black bubble. Teal carries actions and links in both
@@ -625,4 +634,76 @@ export const themePresets: ThemeTemplate[] = [
       ),
     },
   },
+  // Eliron's studio colors, from its site: a white canvas, graphite ink that also fills the
+  // controls, and baby blue and pink laid flat. Light keeps the site's values, with its focus
+  // blue for links and its pink for selection. The site has no dark mode, so dark grounds the
+  // plane in the graphite and carries the pastels into the links, the bubble and the selection.
+  // The mascot wears the pink Eliron dot in both modes. Mint marks success and lime attention:
+  // in light they are fills, with darker inks of the same hues for text, and in dark the pastels
+  // are the text.
+  {
+    id: "eliron",
+    name: "Eliron",
+    description: "White and graphite · baby blue and pink",
+    colors: {
+      light: palette(
+        {
+          sidebar: "#ffffff",
+          body: "#ffffff",
+          raised: "#f5f7f8",
+          hover: "#eceff1",
+          border: "#e0e3e5",
+          borderStrong: "#c6cbcf",
+          text: "#191c20",
+          secondaryText: "#40464c",
+          mutedText: "#60666b",
+          faintText: "#82888d",
+          bubble: "#cbefff",
+        },
+        "#191c20",
+        "#415ba0",
+        "#ffffff",
+        {
+          "--mascot-body": "#ffc9ff",
+          "--mascot-eyes": "#191c20",
+          "--accent-soft": "color-mix(in srgb, #cbefff 55%, #ffffff)",
+          "--selection": "#ffc9ff",
+          "--ok": "#187029",
+          "--ok-soft": "#9ef2a4",
+          "--warn": "#5e6304",
+          "--warn-soft": "#e8f552",
+        },
+      ),
+      dark: palette(
+        {
+          sidebar: "#121417",
+          body: "#191c20",
+          raised: "#22262b",
+          hover: "#2b3036",
+          border: "#272b31",
+          borderStrong: "#363b42",
+          text: "#e0e3e5",
+          secondaryText: "#b9bfc4",
+          mutedText: "#979da2",
+          faintText: "#787e83",
+          bubble: "#1f2d36",
+        },
+        "#f5f7f8",
+        "#cbefff",
+        "#191c20",
+        {
+          "--mascot-body": "#ffc9ff",
+          "--mascot-eyes": "#191c20",
+          "--selection": "color-mix(in srgb, #ffc9ff 26%, #191c20)",
+          "--surface-gradient": fadeIntoSidebar,
+          "--ok": "#9ef2a4",
+          "--warn": "#e8f552",
+        },
+      ),
+    },
+  },
 ];
+export const themePresets: ThemeTemplate[] = presets.map((preset) => ({
+  ...preset,
+  colors: { light: { ...statusTokens.light, ...preset.colors.light }, dark: { ...statusTokens.dark, ...preset.colors.dark } },
+}));

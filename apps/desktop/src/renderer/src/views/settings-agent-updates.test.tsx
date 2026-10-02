@@ -82,3 +82,27 @@ it("disables actions and suppresses the notice while an update is running", asyn
   expect((screen.getByRole("button", { name: "Check for updates" }) as HTMLButtonElement).disabled).toBe(true);
   expect((screen.getByRole("button", { name: "Update Claude" }) as HTMLButtonElement).disabled).toBe(true);
 });
+it("offers a reinstall for an agent that fails to start instead of a login hint", async () => {
+  const broken = { status: "broken" as const, installedVersion: null, latestVersion: null };
+  state = {
+    ...state,
+    agents: state.agents.map((row) => {
+      if (row.id === "codex") return { ...row, ...broken, message: null };
+      if (row.id === "opencode") return { ...row, ...broken, message: "Reinstall using the tool that installed this agent, then check again." };
+      return row;
+    }),
+  };
+  const failing: SystemInfo = { ...info, harnesses: info.harnesses.map((row) => (row.id === "claude" ? row : { ...row, state: "check_failed", version: null })) };
+  render(
+    <QueryClientProvider client={queryClient}>
+      <AgentConnections info={failing} />
+    </QueryClientProvider>,
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "Reinstall Codex" }));
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("agents.updates.install", { ids: ["codex"] }));
+  expect(screen.getAllByText("Fails to start")).toHaveLength(2);
+  expect(screen.queryByText(/Connect in a terminal/)).toBeNull();
+  expect(screen.queryByRole("button", { name: "Reinstall OpenCode" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Reinstall instructions" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Update all" })).toBeTruthy();
+});

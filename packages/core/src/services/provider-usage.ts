@@ -3,6 +3,7 @@ import { captureLaunchEnvironment, readClaudeUsage, readCodexUsage, consumeCodex
 import { settings, type Db } from "@openorc/db";
 import {
   harnessCatalog,
+  harnessFailsToStart,
   harnessInfo,
   harnessInstalled,
   harnessLoggedIn,
@@ -385,6 +386,11 @@ export class ProviderUsageService {
         reader.forget?.();
         result.status = "disconnected";
         result.message = `Install ${harnessCatalog[provider].name}, then refresh connections.`;
+        return result;
+      }
+      if (harnessFailsToStart(row)) {
+        result.status = "error";
+        result.message = `${harnessCatalog[provider].name} fails to start. Reinstall it in Settings → Connections, then refresh.`;
         return result;
       }
       return await reader.read(result, at, row, snapshot);

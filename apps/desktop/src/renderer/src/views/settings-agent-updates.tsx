@@ -1,5 +1,6 @@
 import { agentUpdateStatus, agentConnectionStatus } from "./settings-presentation";
-import { agentUpdateNoticeKey, harnessCatalog, harnessIds, harnessInstalled, harnessLoggedIn, type AgentUpdate, type HarnessInfo, type SystemInfo } from "@openorc/protocol";
+import { agentUpdateNoticeKey, harnessCatalog, harnessFailsToStart, harnessIds, harnessInstalled, harnessLoggedIn, type AgentUpdate, type HarnessInfo, type SystemInfo } from "@openorc/protocol";
+import { cn } from "../lib/cn";
 import { useRpc, useRpcMutation } from "../lib/query";
 import { useRouter } from "../lib/router";
 import { Download, X } from "../components/icons";
@@ -72,7 +73,6 @@ function AgentConnection({ id, info, update, busy, onUpdate }: { id: HarnessInfo
   const harness = harnessCatalog[id];
   const installed = info ? harnessInstalled(info) : false;
   const loggedIn = info ? harnessLoggedIn(info) : false;
-  const status = update?.status;
   return (
     <div className="settings-agent">
       <div className="agent-update-row">
@@ -89,30 +89,10 @@ function AgentConnection({ id, info, update, busy, onUpdate }: { id: HarnessInfo
           ) : null}
           {info?.path ? <code className="settings-path text-sm mt-1">{info.path.replace(/^\/Users\/[^/]+/, "~")}</code> : null}
         </div>
-        {status === "available" && update?.canUpdate ? (
-          <Button size="sm" disabled={busy} onClick={onUpdate}>
-            Update {harness.shortName}
-          </Button>
-        ) : null}
-        {status === "updating" ? (
-          <span role="status" className="text-sm text-ink-2">
-            Updating…
-          </span>
-        ) : null}
+        {update ? <AgentUpdateAction update={update} name={harness.shortName} busy={busy} onUpdate={onUpdate} /> : null}
       </div>
-      {status === "available" && <p className="text-sm mt-2">Version {update?.latestVersion} available</p>}
-      {status === "current" && <p className="text-sm text-ink-2 mt-2">Up to date</p>}
-      {update?.message ? (
-        <p className={`text-sm mt-2 ${status === "error" ? "text-bad" : "text-ink-2"}`} role={status === "error" ? "alert" : undefined}>
-          {update.message}
-        </p>
-      ) : null}
-      {status === "available" && !update?.canUpdate ? (
-        <TextButton className="text-sm mt-2" onClick={() => void window.openorc.openExternal(harness.setupUrl)}>
-          Update instructions
-        </TextButton>
-      ) : null}
-      {info && !loggedIn ? (
+      {update ? <AgentUpdateDetails update={update} setupUrl={harness.setupUrl} /> : null}
+      {info && !loggedIn && !harnessFailsToStart(info) ? (
         <p className="text-ink-2 mt-2">
           {installed ? (
             <>
@@ -124,6 +104,49 @@ function AgentConnection({ id, info, update, busy, onUpdate }: { id: HarnessInfo
         </p>
       ) : null}
     </div>
+  );
+}
+
+const actionLabels: Partial<Record<AgentUpdate["status"], string>> = { available: "Update", broken: "Reinstall" };
+const progressLabels: Partial<Record<AgentUpdate["status"], string>> = { updating: "Updating…", reinstalling: "Reinstalling…" };
+
+/** The row's one action: run the planned update or reinstall, or show that it is running. */
+function AgentUpdateAction({ update, name, busy, onUpdate }: { update: AgentUpdate; name: string; busy: boolean; onUpdate: () => void }) {
+  const progress = progressLabels[update.status];
+  if (progress)
+    return (
+      <span role="status" className="text-sm text-ink-2">
+        {progress}
+      </span>
+    );
+  const action = actionLabels[update.status];
+  if (!action || !update.canUpdate) return null;
+  return (
+    <Button size="sm" disabled={busy} onClick={onUpdate}>
+      {action} {name}
+    </Button>
+  );
+}
+
+function AgentUpdateDetails({ update, setupUrl }: { update: AgentUpdate; setupUrl: string }) {
+  const { status } = update;
+  const alert = status === "error" || status === "broken";
+  const action = actionLabels[status];
+  return (
+    <>
+      {status === "available" && <p className="text-sm mt-2">Version {update.latestVersion} available</p>}
+      {status === "current" && <p className="text-sm text-ink-2 mt-2">Up to date</p>}
+      {update.message ? (
+        <p className={cn("text-sm mt-2", alert && "text-bad", !alert && "text-ink-2")} role={alert ? "alert" : undefined}>
+          {update.message}
+        </p>
+      ) : null}
+      {action && !update.canUpdate ? (
+        <TextButton className="text-sm mt-2" onClick={() => void window.openorc.openExternal(setupUrl)}>
+          {action} instructions
+        </TextButton>
+      ) : null}
+    </>
   );
 }
 

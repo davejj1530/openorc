@@ -1,4 +1,4 @@
-import { harnessCatalog, isHarnessId, type ExtractionProviderChoice, type HarnessInfo, type RpcResults, type SlackStatus } from "@openorc/protocol";
+import { harnessCatalog, harnessFailsToStart, isHarnessId, type ExtractionProviderChoice, type HarnessInfo, type RpcResults, type SlackStatus } from "@openorc/protocol";
 import { extractionSummary } from "../lib/memory-extraction";
 import { formatUsageTime } from "../lib/provider-usage";
 
@@ -64,6 +64,7 @@ export function agentUpdateStatus({ updating, checking, checked }: { updating: b
 }
 export function agentConnectionStatus({ info, installed, loggedIn }: { info: HarnessInfo | undefined; installed: boolean; loggedIn: boolean }): string {
   if (!info) return "Checking…";
+  if (harnessFailsToStart(info)) return "Fails to start";
   if (info.state === "check_failed") return "Connection check failed";
   if (!installed) return "Not installed";
   return loggedIn ? "Connected" : "Not logged in";

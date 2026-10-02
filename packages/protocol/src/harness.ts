@@ -115,6 +115,8 @@ export interface HarnessInfo {
 
 export const harnessInstalled = (row: HarnessInfo): boolean => row.path !== null && row.state !== "not_found";
 export const harnessLoggedIn = (row: HarnessInfo): boolean => row.state === "ready";
+/** Found, but its version command failed, so nothing can run through it until it is reinstalled. */
+export const harnessFailsToStart = (row: HarnessInfo): boolean => row.state === "check_failed" && row.path !== null && row.version === null;
 
 /** The probe row for one harness. Every registry harness has a row, so a missing one is a programming error. */
 export function harnessInfo(info: { harnesses: readonly HarnessInfo[] }, id: HarnessId): HarnessInfo {

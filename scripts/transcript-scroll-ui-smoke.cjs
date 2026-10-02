@@ -61,7 +61,16 @@ async function checkUI() {
     await read("scrollSmoke.send(); scrollSmoke.update()");
     await pause(100);
     assert.ok(await read("el.scrollHeight - el.scrollTop - el.clientHeight <= 1"), "Sending a message must return to the newest turn and follow it");
-    console.log("PASS: upward scroll, input/render race, child resize, resume at bottom, new run, thread switch, scrollbar scrolling and sending.");
+    // The composer empties after a send, so the view grows and the browser moves the position up to stay in range.
+    // A shown window can deliver that scroll event before the resize is observed.
+    await read('el.style.height = "540px"');
+    await pause(100);
+    await read('el.style.height = ""; el.scrollHeight; el.dispatchEvent(new Event("scroll"))');
+    await pause(100);
+    await read('el.firstElementChild.style.paddingBottom = "360px"');
+    await pause(100);
+    assert.ok(await read("el.scrollHeight - el.scrollTop - el.clientHeight <= 1"), "A taller view must keep following the newest turn");
+    console.log("PASS: upward scroll, input/render race, child resize, resume at bottom, new run, thread switch, scrollbar scrolling, sending and a growing view.");
   } finally {
     win.destroy();
     app.quit();

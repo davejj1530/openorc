@@ -93,7 +93,9 @@ export function Transcript({
     const atBottom = () => el.scrollHeight - el.scrollTop - el.clientHeight <= 1;
     const onScroll = () => {
       const top = el.scrollTop;
-      if (top < lastScrollTop.current) pinned.current = false;
+      // The browser also moves up to stay in range when the view grows or the content shrinks, such as the
+      // composer emptying after a send. That leaves the view at the bottom, so only rising above it lets go.
+      if (top < lastScrollTop.current && !atBottom()) pinned.current = false;
       else if (top > lastScrollTop.current && atBottom()) pinned.current = true;
       lastScrollTop.current = top;
       anchor.current = firstTurnInView(el);

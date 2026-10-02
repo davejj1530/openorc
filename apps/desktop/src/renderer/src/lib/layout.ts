@@ -14,6 +14,12 @@ export type WorkspaceChangesRequest = WorkspaceChangesTarget & { comparison: "ba
 /** Which threads the sidebar lists: the working set or the archive. */
 export type SidebarFilter = "active" | "archived";
 
+/** A screen the sidebar can list. The ones the user hides wait under More; Inbox sits in the window's header instead. */
+export type SidebarScreen = "tasks" | "pulls" | "scheduled" | "orchestration" | "memory";
+
+/** Screens most people open rarely start under More, until the user lists them. */
+const DEFAULT_HIDDEN_SCREENS: SidebarScreen[] = ["scheduled", "memory"];
+
 interface LayoutState {
   sidebarOpen: boolean;
   sidebarWidth: number;
@@ -35,6 +41,8 @@ interface LayoutState {
   toggleThreadPanel: (id: string) => void;
   openThreadPanel: (id: string, tab: PanelTab) => void;
   sidebarFilter: SidebarFilter;
+  /** Screens the sidebar leaves under More. */
+  hiddenScreens: SidebarScreen[];
   /** Sidebar sections the user folded: namespaced project/pinned keys, plus opt-in snoozed-open keys. */
   collapsed: string[];
   /**
@@ -53,6 +61,7 @@ interface LayoutState {
   setPanelWidth: (px: number) => void;
   setProject: (id: string | null) => void;
   setSidebarFilter: (filter: SidebarFilter) => void;
+  setScreenShown: (screen: SidebarScreen, shown: boolean) => void;
   toggleCollapsed: (key: string) => void;
   rememberPreviewUrl: (key: string, url: string) => void;
   rememberPanelTool: (key: string, tool: PanelTool) => void;
@@ -66,7 +75,9 @@ export const limits = {
 
 const KEY = "openorc.layout";
 
-function read(): Partial<Pick<LayoutState, "sidebarOpen" | "sidebarWidth" | "panelOpen" | "panelWidth" | "panelTab" | "projectId" | "sidebarFilter" | "collapsed" | "previewUrls" | "panelTools">> {
+function read(): Partial<
+  Pick<LayoutState, "sidebarOpen" | "sidebarWidth" | "panelOpen" | "panelWidth" | "panelTab" | "projectId" | "sidebarFilter" | "hiddenScreens" | "collapsed" | "previewUrls" | "panelTools">
+> {
   try {
     return JSON.parse(localStorage.getItem(KEY) ?? "{}") as Partial<LayoutState>;
   } catch {
@@ -86,6 +97,7 @@ function persist(s: LayoutState): void {
         panelTab: s.panelTab,
         projectId: s.projectId,
         sidebarFilter: s.sidebarFilter,
+        hiddenScreens: s.hiddenScreens,
         collapsed: s.collapsed,
         previewUrls: s.previewUrls,
         panelTools: s.panelTools,
@@ -120,6 +132,7 @@ export const useLayout = create<LayoutState>((set, get) => {
     projectId: saved.projectId === undefined ? WORKSPACE_ID : saved.projectId,
     panelThreadId: null,
     sidebarFilter: saved.sidebarFilter === "archived" ? ("archived" as const) : ("active" as const),
+    hiddenScreens: saved.hiddenScreens ?? DEFAULT_HIDDEN_SCREENS,
     collapsed: saved.collapsed ?? ["snoozed"],
     previewUrls: saved.previewUrls ?? {},
     panelTools: saved.panelTools ?? {},
@@ -170,6 +183,10 @@ export const useLayout = create<LayoutState>((set, get) => {
       commit({ panelThreadId: id, panelOpen: open, ...(open ? {} : { panelExpanded: false }) });
     },
     setSidebarFilter: (sidebarFilter) => commit({ sidebarFilter }),
+    setScreenShown: (screen, shown) => {
+      const others = get().hiddenScreens.filter((hidden) => hidden !== screen);
+      commit({ hiddenScreens: shown ? others : [...others, screen] });
+    },
     toggleCollapsed: (key) => commit({ collapsed: get().collapsed.includes(key) ? get().collapsed.filter((k) => k !== key) : [...get().collapsed, key] }),
     // Bounded because the key is a surface id and threads are unbounded; the
     // oldest entries are the ones whose thread the reader has stopped opening.

@@ -3,13 +3,12 @@ import {
   ArrowLeft,
   ArrowRight,
   ArrowUp,
-  Brain,
-  CalendarClock,
   Check,
   ChevronDown,
   Copy,
   Folder,
   GitBranch,
+  GitPullRequest,
   Inbox,
   Laptop,
   ListFilter,
@@ -81,20 +80,7 @@ function WorkspaceScene({ colors, mode }: { colors: Record<string, string>; mode
     <div className="palette-stage" ref={ref}>
       <div className="palette-workspace" style={{ ...colors, zoom: scale } as CSSProperties} data-preview-mode={mode} aria-hidden="true">
         <aside className="palette-sidebar">
-          <div className="palette-window-nav">
-            <IconSlot>
-              <PanelLeft size={15} />
-            </IconSlot>
-            <IconSlot>
-              <Search size={15} />
-            </IconSlot>
-            <IconSlot>
-              <ArrowLeft size={15} />
-            </IconSlot>
-            <IconSlot muted>
-              <ArrowRight size={15} />
-            </IconSlot>
-          </div>
+          <WindowNavScene />
           <div className="palette-brand">
             <img src={openOrcMark} alt="" className="sidebar-brand-mark" />
             <span className="sidebar-wordmark">OpenOrc</span>
@@ -103,11 +89,10 @@ function WorkspaceScene({ colors, mode }: { colors: Record<string, string>; mode
             </IconSlot>
           </div>
           <nav className="palette-nav">
-            <NavRow icon={<Inbox size={15} />} label="Inbox" badge="2" />
             <NavRow icon={<ListTodo size={15} />} label="Tasks" />
-            <NavRow icon={<CalendarClock size={15} />} label="Scheduled" />
+            <NavRow icon={<GitPullRequest size={15} />} label="Pull requests" />
             <NavRow icon={<Workflow size={15} />} label="Orchestration" />
-            <NavRow icon={<Brain size={15} />} label="Memory" />
+            <NavRow icon={<MoreHorizontal size={15} />} label="More" />
           </nav>
           <div className="palette-projects">
             <span>Projects</span>
@@ -230,17 +215,40 @@ function WorkspaceScene({ colors, mode }: { colors: Record<string, string>; mode
   );
 }
 
+/** The sidebar's header as the app draws it: sidebar toggle, inbox with its count, search and history. */
+function WindowNavScene() {
+  return (
+    <div className="palette-window-nav">
+      <IconSlot>
+        <PanelLeft size={15} />
+      </IconSlot>
+      <IconSlot>
+        <span className="palette-inbox">
+          <Inbox size={15} />
+          <span className="nav-badge">2</span>
+        </span>
+      </IconSlot>
+      <IconSlot>
+        <Search size={15} />
+      </IconSlot>
+      <IconSlot>
+        <ArrowLeft size={15} />
+      </IconSlot>
+      <IconSlot muted>
+        <ArrowRight size={15} />
+      </IconSlot>
+    </div>
+  );
+}
+
 function IconSlot({ children, className, size = "md", muted }: { children: ReactNode; className?: string; size?: "sm" | "md"; muted?: boolean }) {
   return <span className={cn("palette-icon-slot", size === "sm" && "palette-icon-slot-sm", muted && "palette-icon-slot-muted", className)}>{children}</span>;
 }
 
-function NavRow({ icon, label, badge }: { icon: ReactNode; label: string; badge?: string }) {
+function NavRow({ icon, label }: { icon: ReactNode; label: string }) {
   return (
     <span className="palette-nav-row">
-      <span>
-        {icon}
-        {badge ? <span className="nav-badge">{badge}</span> : null}
-      </span>
+      <span>{icon}</span>
       <span>{label}</span>
     </span>
   );

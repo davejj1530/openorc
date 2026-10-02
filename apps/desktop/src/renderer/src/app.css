@@ -931,11 +931,15 @@ body[data-resizing] .sidebar-shell {
 
 /* The current sidebar row is raised in both modes: a hairline and a small cast in light, the
    lit edge in dark. Only the row's own background and shadow change, so rank in the sidebar
-   still rides on height, weight and ink, never on a new fill step, border or accent. */
-.sidebar-shell [aria-current="page"]:not(:focus-visible) {
+   still rides on height, weight and ink, never on a new fill step, border or accent. The
+   header's Inbox control is raised the same way on its screen, in the main column's header
+   too while the sidebar is hidden. */
+.sidebar-shell [aria-current="page"]:not(:focus-visible),
+.app-topbar .nav-row[aria-current="page"]:not(:focus-visible) {
   background-color: var(--current-row-fill);
 }
-.sidebar-shell [aria-current="page"] {
+.sidebar-shell [aria-current="page"],
+.app-topbar .nav-row[aria-current="page"] {
   box-shadow: var(--current-row-material);
 }
 
@@ -964,12 +968,16 @@ body[data-resizing] .sidebar-shell {
   background-color: var(--current-row-fill);
 }
 
-/* A nav count hangs off its icon's top-right corner. It is sized to the 15px nav icon and sits
-   high enough to keep the icon readable and clear of the label. Inside the row, it knocks
-   itself out of the row's own fill, which these follow in the order the row resolves them:
-   the column at rest, hover, the current page, then focus. */
+/* A nav count hangs off its icon's top-right corner, as on the header's Inbox control. It is
+   sized to the 15px nav icon and sits high enough to keep the icon readable and clear of the
+   label. It knocks itself out of its control's own fill, which these follow in the order the
+   control resolves them: the ground at rest, hover, the current page, then focus. In the main
+   column's header the ground is the plane rather than the column. */
 .nav-row {
   --nav-row-fill: var(--bg);
+}
+.app-topbar .nav-row {
+  --nav-row-fill: var(--surface);
 }
 .nav-row:hover {
   --nav-row-fill: var(--surface-2);
@@ -996,6 +1004,11 @@ body[data-resizing] .sidebar-shell {
   font-weight: var(--font-weight-semibold);
   line-height: 1;
   box-shadow: 0 0 0 2px var(--nav-row-fill);
+}
+/* With no label beside it, the header's Inbox control centres its count on the icon's corner,
+   so the glyph stays recognisable. */
+.inbox-control .nav-badge {
+  right: -8px;
 }
 
 /* The task list's keyboard cursor. Without this it is indistinguishable from a hovered row,

@@ -154,6 +154,12 @@
   height: 52px;
   padding: 4px 8px 0;
 }
+/* The Inbox count rides the header icon as it does in the app, knocked out of the sidebar's ground. */
+.palette-inbox {
+  --nav-row-fill: var(--bg);
+  position: relative;
+  display: inline-flex;
+}
 
 .palette-brand {
   display: flex;
@@ -175,7 +181,6 @@
 }
 
 .palette-nav-row {
-  --nav-row-fill: var(--bg);
   display: flex;
   align-items: center;
   gap: 8px;

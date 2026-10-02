@@ -1,27 +1,7 @@
 import { harnessShortName, isHarnessId, WORKSPACE_ID } from "@openorc/protocol";
 import { ContextMenu } from "@base-ui/react/context-menu";
 import { Menu } from "@base-ui/react/menu";
-import {
-  ArrowLeft,
-  ArrowRight,
-  Brain,
-  CalendarClock,
-  Check,
-  ChevronDown,
-  ChevronRight,
-  Folder,
-  GitBranch,
-  GitPullRequest,
-  Inbox,
-  ListFilter,
-  ListTodo,
-  PanelLeft,
-  PenSquare,
-  Plus,
-  Search,
-  Settings,
-  Workflow,
-} from "./icons";
+import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronRight, Folder, GitBranch, GitPullRequest, Inbox, ListFilter, PanelLeft, PenSquare, Plus, Search, Settings } from "./icons";
 import { useEffect, useState, type ReactNode } from "react";
 import type { ThreadSummary } from "@openorc/protocol";
 import { useQueries } from "@tanstack/react-query";
@@ -35,7 +15,7 @@ import { IconButton, Tooltip } from "./ui";
 import { cn } from "../lib/cn";
 import { useLayout, type SidebarFilter } from "../lib/layout";
 import { useRpc } from "../lib/query";
-import { newThread, useRouter, type Route } from "../lib/router";
+import { newThread, useRouter } from "../lib/router";
 import { usePendingApprovals } from "../lib/transcript";
 import { useUi } from "../lib/ui";
 import { startThreadDrag, endThreadDrag } from "../lib/thread-drag";
@@ -43,46 +23,12 @@ import { useTrafficLights } from "../lib/window";
 import { CoversPreview } from "../lib/browser-preview";
 import { sidebarThreadPage, visibleSidebarThreadIds } from "../lib/sidebar-thread-groups";
 import { SidebarProjectHeading } from "./SidebarProjectHeading";
+import { NavItem, SidebarNav } from "./SidebarNav";
 import { useProjectIconChanges } from "../lib/project-icons";
 import { pullRequestNumber } from "../lib/pull-requests";
 import openOrcMark from "../assets/openorc-mark.png";
 
 const PAGE = 8;
-
-function NavItem({ route, icon, label, badge, active, onClick }: { route?: Route; icon: ReactNode; label: string; badge?: number; active: boolean; onClick?: () => void }) {
-  const navigate = useRouter((s) => s.navigate);
-  return (
-    <button
-      onClick={() => {
-        if (onClick) onClick();
-        else if (route) navigate(route);
-      }}
-      aria-current={active ? "page" : undefined}
-      aria-label={badge ? `${label}, ${badge}` : undefined}
-      className={cn("nav-row no-drag w-full flex items-center gap-3 h-9 px-2 rounded-md text-md font-normal text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink", active && "text-ink")}
-    >
-      <span className={cn("relative text-ink-3", active && "text-ink")}>
-        {icon}
-        {badge ? <span className="nav-badge tabular transition-shadow">{badge > 99 ? "99+" : badge}</span> : null}
-      </span>
-      <span className="flex-1 text-left truncate">{label}</span>
-    </button>
-  );
-}
-
-/** The app's screens, above the projects. */
-function SidebarNav({ route, projectId, inbox }: { route: Route; projectId: string | null; inbox: number }) {
-  return (
-    <nav className="nav-track grid grid-cols-1 min-w-0 gap-px">
-      <NavItem route={{ view: "inbox" }} icon={<Inbox size={15} />} label="Inbox" badge={inbox} active={route.view === "inbox"} />
-      <NavItem route={{ view: "tasks" }} icon={<ListTodo size={15} />} label="Tasks" active={route.view === "tasks" || route.view === "task" || route.view === "newtask"} />
-      <NavItem route={{ view: "pulls" }} icon={<GitPullRequest size={15} />} label="Pull requests" active={route.view === "pulls" || route.view === "pull"} />
-      <NavItem route={{ view: "scheduled" }} icon={<CalendarClock size={15} />} label="Scheduled" active={route.view === "scheduled"} />
-      <NavItem route={{ view: "orchestration", ...(projectId ? { projectId } : {}) }} icon={<Workflow size={15} />} label="Orchestration" active={route.view === "orchestration"} />
-      <NavItem route={{ view: "memory" }} icon={<Brain size={15} />} label="Memory" active={route.view === "memory"} />
-    </nav>
-  );
-}
 
 /** Where a thread works, as its row shows it: its branch, the pull request it reviews, or its folder. */
 function threadPlace(thread: ThreadSummary): { icon: ReactNode; label: string; title: string } {
@@ -205,7 +151,6 @@ export function Sidebar() {
   const collapsed = useLayout((s) => s.collapsed);
   const trafficLights = useTrafficLights();
   const projects = useRpc("projects.list", {});
-  const tasks = useRpc("tasks.list", {});
   const groups = [{ id: WORKSPACE_ID, name: "Workspace" }, ...(projects.data ?? [])];
   // Each group owns a page so a busy repository cannot crowd out another project.
   const threadQueries = useQueries({
@@ -219,8 +164,6 @@ export function Sidebar() {
       };
     }),
   });
-  const pendingApprovals = usePendingApprovals();
-  const inbox = pendingApprovals + (tasks.data ?? []).filter((t) => t.status === "review" || t.status === "proposed").length;
   const project = (projects.data ?? []).find((p) => p.id === projectId) ?? null;
   const activeId = route.view === "thread" ? route.threadId : null;
   const activeThread = useRpc("threads.get", { id: activeId ?? "" }, { enabled: !!activeId });
@@ -272,7 +215,7 @@ export function Sidebar() {
                   </IconButton>
                 </Tooltip>
               </div>
-              <SidebarNav route={route} projectId={projectId} inbox={inbox} />
+              <SidebarNav route={route} projectId={projectId} />
               <div className="flex items-center gap-0.5 pl-4 pr-2 mt-4 mb-1">
                 <span className="text-sm font-medium text-ink-3">Projects</span>
                 <span className="flex-1" />
@@ -374,7 +317,7 @@ export function Sidebar() {
   );
 }
 
-/** The window's navigation: sidebar toggle, search and history. In the sidebar's header while it is open, in the main header while it is hidden. */
+/** The window's navigation: sidebar toggle, inbox, search and history. In the sidebar's header while it is open, in the main header while it is hidden. */
 export function WindowNav({ open }: { open: boolean }) {
   const back = useRouter((s) => s.back);
   const forward = useRouter((s) => s.forward);
@@ -383,6 +326,7 @@ export function WindowNav({ open }: { open: boolean }) {
   return (
     <>
       <SidebarToggle open={open} />
+      <InboxButton />
       <IconButton onClick={() => useUi.getState().setPalette(true)} aria-label="Search" className="no-drag">
         <Search size={15} />
       </IconButton>
@@ -393,6 +337,34 @@ export function WindowNav({ open }: { open: boolean }) {
         <ArrowRight size={15} />
       </IconButton>
     </>
+  );
+}
+
+/** What waits for the user: approvals in the runs loaded here, and tasks to review or accept. */
+function useInboxCount(): number {
+  const approvals = usePendingApprovals();
+  const tasks = useRpc("tasks.list", {});
+  return approvals + (tasks.data ?? []).filter((task) => task.status === "review" || task.status === "proposed").length;
+}
+
+/** Opens the inbox, with what waits in it counted on the icon's corner. */
+function InboxButton() {
+  const current = useRouter((s) => s.route.view === "inbox");
+  const count = useInboxCount();
+  return (
+    <Tooltip label="Inbox">
+      <IconButton
+        onClick={() => useRouter.getState().navigate({ view: "inbox" })}
+        aria-label={count ? `Inbox, ${count}` : "Inbox"}
+        aria-current={current ? "page" : undefined}
+        className={cn("inbox-control nav-row no-drag", current && "text-ink")}
+      >
+        <span className="relative">
+          <Inbox size={15} />
+          {count ? <span className="nav-badge tabular transition-shadow">{count > 99 ? "99+" : count}</span> : null}
+        </span>
+      </IconButton>
+    </Tooltip>
   );
 }
 

@@ -127,7 +127,7 @@ describe.each([{ ids: ["a", "b"] }, { ids: ["a", "b", "c"] }])("header focus bou
     for (const id of ids.slice(1)) {
       const header = container.querySelector(`[data-thread-pane="${id}"] header`)!;
       const title = within(header as HTMLElement).getByText(`Thread ${id}`);
-      expect(title.tagName).toBe("SPAN");
+      expect(title.tagName).toBe("BUTTON");
       for (const target of [header, title, within(header as HTMLElement).getByRole("button", { name: "Open the pull request" })]) {
         fireEvent.pointerDown(target);
         fireEvent.mouseDown(target);
@@ -137,6 +137,10 @@ describe.each([{ ids: ["a", "b"] }, { ids: ["a", "b", "c"] }])("header focus bou
         fireEvent.focus(target);
         expectActive("a");
       }
+      const titleInput = within(header as HTMLElement).getByRole("textbox", { name: "Thread title" });
+      fireEvent.focus(titleInput);
+      expectActive("a");
+      fireEvent.keyDown(titleInput, { key: "Escape" });
       expect(window.openorc.openExternal).toHaveBeenCalledWith(`https://example.com/${id}`);
     }
   });
@@ -167,7 +171,7 @@ describe.each([{ ids: ["a", "b"] }, { ids: ["a", "b", "c"] }])("header focus bou
     const { container } = setup();
     for (const id of ids.slice(1)) {
       const pane = container.querySelector<HTMLElement>(`[data-thread-pane="${id}"]`)!;
-      const toggle = within(pane).getByRole("button", { name: "Show panel" });
+      const toggle = within(pane).getByRole("button", { name: "Changes" });
       fireEvent.pointerDown(toggle);
       fireEvent.focus(toggle);
       fireEvent.click(toggle);

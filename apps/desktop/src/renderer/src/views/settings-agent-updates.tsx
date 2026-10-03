@@ -6,6 +6,7 @@ import { useRouter } from "../lib/router";
 import { Download, X } from "../components/icons";
 import { Badge, Button, IconButton, TextButton } from "../components/ui";
 import { Section, Toggle } from "./settings-shared";
+import { HarnessLogo } from "../components/HarnessLogo";
 
 /** The shared core state survives navigation and keeps every window in agreement. */
 export function AgentConnections({ info }: { info?: SystemInfo }) {
@@ -78,6 +79,7 @@ function AgentConnection({ id, info, update, busy, onUpdate }: { id: HarnessInfo
       <div className="agent-update-row">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
+            <HarnessLogo id={id} size={18} />
             <h3 className="font-semibold">{harness.name}</h3>
             <Badge tone={loggedIn ? "ok" : "muted"}>{agentConnectionStatus({ info, installed, loggedIn })}</Badge>
           </div>
@@ -87,7 +89,12 @@ function AgentConnection({ id, info, update, busy, onUpdate }: { id: HarnessInfo
               {update?.method ? ` · ${update.method}` : ""}
             </p>
           ) : null}
-          {info?.path ? <code className="settings-path text-sm mt-1">{info.path.replace(/^\/Users\/[^/]+/, "~")}</code> : null}
+          {info?.path ? (
+            <details className="settings-agent-location">
+              <summary>Installation location</summary>
+              <code>{info.path.replace(/^\/Users\/[^/]+/, "~")}</code>
+            </details>
+          ) : null}
         </div>
         {update ? <AgentUpdateAction update={update} name={harness.shortName} busy={busy} onUpdate={onUpdate} /> : null}
       </div>

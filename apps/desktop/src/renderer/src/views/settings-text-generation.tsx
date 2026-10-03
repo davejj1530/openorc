@@ -18,7 +18,7 @@ export function TextGenerationSettings() {
       <Section title="Text generation" description="Names new threads with a small model. Works independently of memory distillation and your conversation model.">
         <Field label="Harness" hint="Automatic names each conversation with a small model from the agent it uses, so its text stays with that provider. A chosen harness names every conversation.">
           <Select value={provider} disabled={s.disabled} onChange={(event) => void s.commit({ provider: event.target.value as Preferences["provider"] })}>
-            <option value="auto">Automatic · the conversation's agent</option>
+            <option value="auto">Automatic · per conversation</option>
             {harnessIds.map((id) => (
               <option key={id} value={id}>
                 {harnessCatalog[id].name}

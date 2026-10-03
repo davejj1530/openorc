@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import { defaultOrclingLook, WORKSPACE_ID } from "@openorc/protocol";
@@ -29,7 +29,7 @@ afterEach(cleanup);
 
 const folded = `project:${WORKSPACE_ID}`;
 const open = (threadId: string) => {
-  useLayout.setState({ collapsed: [folded] });
+  useLayout.setState({ collapsed: [folded], sidebarOpen: true });
   useRouter.setState({ route: { view: "thread", threadId } });
   render(
     <QueryClientProvider client={new QueryClient()}>
@@ -46,4 +46,27 @@ it("unfolds the project that lists the opened thread", () => {
 it("leaves Workspace folded when an Orcling's own conversation opens, since Orclings list it", () => {
   open("rini-home");
   expect(useLayout.getState().collapsed).toContain(folded);
+});
+
+it("switches between project threads and Orclings in one sidebar, remembering the project thread", () => {
+  open("notes");
+  expect(screen.getByRole("region", { name: "Thread browser" })).toBeTruthy();
+  expect(screen.queryByRole("region", { name: "Orclings" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Orclings" }));
+  expect(useRouter.getState().route).toEqual({ view: "thread", threadId: "rini-home" });
+  expect(screen.queryByRole("region", { name: "Thread browser" })).toBeNull();
+  expect(screen.getByRole("region", { name: "Orclings" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Threads" }).getAttribute("aria-current")).toBeNull();
+  expect(screen.getByRole("button", { name: "Orclings" }).getAttribute("aria-current")).toBe("page");
+  fireEvent.click(screen.getByRole("button", { name: "Threads" }));
+  expect(useRouter.getState().route).toEqual({ view: "thread", threadId: "notes" });
+  expect(screen.getByRole("region", { name: "Thread browser" })).toBeTruthy();
+  expect(screen.queryByRole("region", { name: "Orclings" })).toBeNull();
+});
+
+it("opens project conversations when Threads is chosen from an initial Orcling chat", () => {
+  open("rini-home");
+  fireEvent.click(screen.getByRole("button", { name: "Threads" }));
+  expect(useRouter.getState().route).toMatchObject({ view: "newthread" });
+  expect(screen.queryByRole("region", { name: "Orclings" })).toBeNull();
 });

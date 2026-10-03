@@ -1,7 +1,8 @@
 import { create } from "zustand";
 import { syncWindowAppearance } from "./window-appearance";
 import { themePresets, type Mode, type ThemePreset } from "./theme-palettes";
-import { overridesFor, parseCustomColors, withColor, withoutColor, withoutOverrides, type CustomColors } from "./theme-custom";
+import { overridesFor, parseCustomColors, withColor, withoutColor, withoutOverrides, withAccents, withoutAccents, type CustomColors } from "./theme-custom";
+import { combinationColors, resolveAccentColors, type AccentCombination, type AccentToken } from "./theme-accents";
 export { themePresets, type ThemePreset } from "./theme-palettes";
 
 export type ThemeChoice = "system" | "light" | "dark";
@@ -40,7 +41,7 @@ function apply(choice: ThemeChoice, preset: ThemePreset, custom: CustomColors): 
   root.dataset.theme = resolved;
   root.dataset.palette = preset;
   root.classList.toggle("dark", resolved === "dark");
-  const colors = { ...themePresets.find((p) => p.id === preset)!.colors[resolved], ...overridesFor(custom, preset, resolved) };
+  const colors = resolveAccentColors(themePresets.find((p) => p.id === preset)!.colors[resolved], overridesFor(custom, preset, resolved));
   for (const [key, value] of Object.entries(colors)) root.style.setProperty(key, value);
   syncWindowAppearance(choice);
   return resolved;
@@ -56,6 +57,9 @@ interface ThemeState {
   setColor: (token: string, value: string) => boolean;
   resetColor: (token: string) => boolean;
   resetColors: () => boolean;
+  setAccent: (token: AccentToken, value: string) => boolean;
+  setAccentCombination: (id: AccentCombination) => boolean;
+  resetAccents: (token?: AccentToken) => boolean;
 }
 const choice = parseChoice(read("openorc.theme"));
 const preset = parsePreset(read("openorc.palette"));
@@ -94,6 +98,18 @@ export const useTheme = create<ThemeState>((set, get) => {
     resetColors: () => {
       const { preset, resolved, custom } = get();
       return commit(withoutOverrides(custom, preset, resolved));
+    },
+    setAccent: (token, value) => {
+      const { preset, resolved, custom } = get();
+      return commit(withAccents(custom, preset, resolved, { [token]: value }));
+    },
+    setAccentCombination: (id) => {
+      const { preset, resolved, custom } = get();
+      return commit(withAccents(custom, preset, resolved, combinationColors(id, resolved)));
+    },
+    resetAccents: (token) => {
+      const { preset, resolved, custom } = get();
+      return commit(withoutAccents(custom, preset, resolved, token));
     },
   };
 });

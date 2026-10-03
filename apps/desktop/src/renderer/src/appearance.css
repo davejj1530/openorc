@@ -156,3 +156,121 @@
   background: var(--surface-2);
   color: var(--ink);
 }
+.color-swatch:focus-visible,
+.color-row-reset:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.accent-combinations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+.accent-combinations button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+.accent-combinations button:hover {
+  background: var(--surface-2);
+}
+.accent-combinations button[aria-pressed="true"] {
+  border-color: var(--navigation-ink);
+  background: var(--navigation-soft);
+  color: var(--navigation-ink);
+}
+.accent-swatches {
+  display: flex;
+  padding-left: 3px;
+}
+.accent-swatches i {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-left: -3px;
+  border: 1px solid var(--surface);
+}
+.accent-editor {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.2fr) minmax(200px, 1fr);
+  align-items: center;
+  gap: 24px;
+  margin-top: 20px;
+}
+.accent-role + .accent-role {
+  margin-top: 12px;
+}
+.accent-role p,
+.accent-note {
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+.accent-role p {
+  padding-left: calc(var(--control-sm) + 8px);
+}
+.accent-note {
+  margin-top: 16px;
+}
+.accent-example {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  font-size: var(--text-sm);
+}
+.accent-example-navigation {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  background: var(--navigation-soft);
+  color: var(--navigation-ink);
+}
+.accent-example-navigation svg:last-child {
+  margin-left: auto;
+}
+.accent-example p {
+  margin: 16px 0;
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+.accent-example-link {
+  color: var(--content-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.accent-example-action {
+  display: inline-block;
+  padding: 7px 10px;
+  border-radius: var(--radius-md);
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-weight: 500;
+}
+.appearance-advanced > summary {
+  width: fit-content;
+  cursor: pointer;
+  color: var(--ink-2);
+  padding: 8px 0;
+}
+.accent-combinations button:focus-visible,
+.appearance-advanced > summary:focus-visible {
+  outline: 2px solid var(--accent-ink);
+  outline-offset: 2px;
+}
+@container (max-width: 600px) {
+  .accent-editor {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+}

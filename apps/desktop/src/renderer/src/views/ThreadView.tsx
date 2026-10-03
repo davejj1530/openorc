@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState } from "react";
-import { AlarmClock, ArrowLeft, GitBranch, GitFork, GitPullRequest, MoreHorizontal, X } from "../components/icons";
+import { AlarmClock, ArrowLeft, GitFork, GitPullRequest, MoreHorizontal, X } from "../components/icons";
 import { Menu } from "@base-ui/react/menu";
+import { ThreadTitle } from "../components/ThreadTitle";
+import { ThreadTools } from "../components/ThreadTools";
 import { Conversation } from "../components/Conversation";
 import { menuItem, menuPopup, ThreadMenuItems } from "../components/ThreadActions";
 import { TopBar } from "../components/TopBar";
 import { ThreadOrcling } from "../components/OrclingAvatar";
-import { Badge, IconButton, Input, TextButton, Tooltip } from "../components/ui";
+import { Badge, IconButton, TextButton, Tooltip } from "../components/ui";
 import { useLayout } from "../lib/layout";
 import { useRpc, useRpcMutation } from "../lib/query";
 import { useConversationPlans } from "../lib/conversation-plans";
-import { newThread, openThread, useRouter } from "../lib/router";
+import { openThread, useRouter } from "../lib/router";
 import { CoversPreview } from "../lib/browser-preview";
 
 const prTone = { open: "muted", merged: "ok", closed: "bad" } as const;
@@ -24,8 +26,8 @@ export function ThreadView({ threadId, first, last, focused, onClose }: { thread
   const update = useRpcMutation("threads.update");
   const setProject = useLayout((s) => s.setProject);
   const panelOpen = useLayout((s) => s.panelOpen);
-  const panelOwner = useLayout((s) => s.panelThreadId);
   const [renaming, setRenaming] = useState(false);
+  const [teamToolbar, setTeamToolbar] = useState<HTMLSpanElement | null>(null);
   const activate = () => {
     if (!focused) useRouter.getState().focusThreadPane(threadId);
   };
@@ -58,6 +60,7 @@ export function ThreadView({ threadId, first, last, focused, onClose }: { thread
       <main className="workspace-main well flex-1 min-w-0 flex flex-col">
         <TopBar
           windowDragSurface
+          showProject={false}
           inSplit={!first}
           rightmost={last && !panelOpen}
           actions={
@@ -83,17 +86,13 @@ export function ThreadView({ threadId, first, last, focused, onClose }: { thread
       <main className="workspace-main well flex-1 min-w-0 flex flex-col">
         <TopBar
           windowDragSurface
-          projectId={t.projectId}
-          projectName={p.name}
-          onProjectChange={(id) => newThread(id ?? undefined)}
-          panel
+          showProject={false}
           inSplit={!first}
           rightmost={last && !panelOpen}
-          panelActive={panelOpen && panelOwner === threadId}
-          onPanelToggle={() => useLayout.getState().toggleThreadPanel(threadId)}
           actions={
             <>
-              {t.activity !== "idle" ? <Badge tone={t.activity === "waiting" ? "warn" : "accent"}>{t.activity === "waiting" ? "needs you" : "working"}</Badge> : null}
+              {t.teamInstanceId ? <span ref={setTeamToolbar} className="thread-team-toolbar" /> : null}
+              {!t.teamInstanceId && t.activity !== "idle" ? <Badge tone={t.activity === "waiting" ? "warn" : "accent"}>{t.activity === "waiting" ? "needs you" : "working"}</Badge> : null}
               {t.prUrl ? (
                 <Tooltip label={t.prUrl}>
                   <TextButton onClick={() => window.openorc.openExternal(t.prUrl as string)} className="inline-flex" aria-label="Open the pull request">
@@ -131,23 +130,17 @@ export function ThreadView({ threadId, first, last, focused, onClose }: { thread
                   </Menu.Positioner>
                 </Menu.Portal>
               </Menu.Root>
+              <ThreadTools threadId={threadId} />
             </>
           }
         >
           <ForkParent parent={t.forkedFromId} />
           <ThreadOrcling threadId={t.id} orclingId={t.orclingId} />
-          <span className="inline-flex min-w-0 items-center h-7 pr-1 text-ink">
-            <TitleEditor title={t.title} editing={renaming} onEditingChange={setRenaming} onSave={(title) => update.mutate({ id: t.id, patch: { title } })} />
-          </span>
-          {t.workspaceMode === "worktree" && t.branch ? (
-            <span className="thread-branch inline-flex items-center gap-1 text-xs font-mono font-normal text-ink-3 truncate max-w-56" title={t.worktreePath ?? t.branch}>
-              <GitBranch size={11} /> {t.branch}
-            </span>
-          ) : null}
+          <ThreadTitle title={t.title} editing={renaming} onEditingChange={setRenaming} onSave={(title) => update.mutate({ id: t.id, patch: { title } })} />
         </TopBar>
         {/* Header controls own their thread explicitly; only conversation interaction activates a pane. */}
         <div className="thread-pane-content flex-1 min-h-0" onPointerDownCapture={activate} onFocusCapture={activate}>
-          <Conversation key={t.id} scope={{ kind: "thread", thread: t }} project={p} />
+          <Conversation key={t.id} scope={{ kind: "thread", thread: t }} project={p} toolbarTarget={teamToolbar} />
         </div>
       </main>
     </>
@@ -172,41 +165,6 @@ function RevealEmittedPlan({ threadId, focused, team }: { threadId: string; focu
     useLayout.getState().openThreadPanel(threadId, "plan");
   }, [isSuccess, planId, focused, threadId]);
   return null;
-}
-
-function TitleEditor({ title, editing, onEditingChange, onSave }: { title: string; editing: boolean; onEditingChange: (editing: boolean) => void; onSave: (title: string) => void }) {
-  const [value, setValue] = useState(title);
-  useEffect(() => setValue(title), [title]);
-  if (!editing) {
-    return (
-      <span className="min-w-0 truncate text-left text-base font-medium select-none" title={title}>
-        {title}
-      </span>
-    );
-  }
-  const commit = () => {
-    onEditingChange(false);
-    const v = value.trim();
-    if (v && v !== title) onSave(v);
-    else setValue(title);
-  };
-  return (
-    <Input
-      autoFocus
-      aria-label="Thread title"
-      value={value}
-      onChange={(e) => setValue(e.target.value)}
-      onBlur={commit}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") commit();
-        if (e.key === "Escape") {
-          setValue(title);
-          onEditingChange(false);
-        }
-      }}
-      className="h-6 min-w-0 w-full text-base font-medium bg-surface"
-    />
-  );
 }
 
 export { menuItem };

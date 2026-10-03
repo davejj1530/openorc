@@ -52,14 +52,15 @@ export function SaveStatus({ status, retry }: { status: string; retry: () => voi
   );
 }
 
-/** A settings group. `flush` opts out of the plane for a group that already IS a container
- *  of its own, so nothing ends up as a card inside a card. */
+/** Preferences align their introduction with the controls. Visual editors can span the page. */
 export function Section({ id, title, children, description, flush }: { id?: string; title: string; children: ReactNode; description?: string; flush?: boolean }) {
   return (
-    <section id={id} className="settings-section">
-      <h2 className="text-lg font-semibold">{title}</h2>
-      {description && <p className="text-ink-2 mt-1 mb-3">{description}</p>}
-      <div className={flush ? "mt-2" : "settings-group"}>{children}</div>
+    <section id={id} className="settings-section" data-wide={flush || undefined}>
+      <header className="settings-section-intro">
+        <h2>{title}</h2>
+        {description && <p>{description}</p>}
+      </header>
+      <div className={flush ? "settings-section-body" : "settings-section-body settings-group"}>{children}</div>
     </section>
   );
 }
@@ -112,5 +113,5 @@ function saveStatusContent(status: string, retry: () => void) {
       </span>
     );
   }
-  return "Changes save automatically.";
+  return null;
 }

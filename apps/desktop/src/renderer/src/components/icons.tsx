@@ -182,6 +182,7 @@ export const Trash2 = icon(
 export const Pencil = icon("Pencil", <path d="m5 15 11-11a1.4 1.4 0 0 1 2 0l2 2a1.4 1.4 0 0 1 0 2L9 19l-5 1Z M14 6l4 4" />);
 export const PenSquare = icon("PenSquare", <path d="M11 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5 M10 11l8-8 3 3-8 8-4 1Z M16 5l3 3" />);
 export const Home = icon("Home", <path d="m3 10 9-7 9 7 M5 8.5v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-10 M9.5 20.5v-7h5v7" />);
+export const Orclings = icon("Orclings", <path d="M12 3.5c7 0 8.5 1.5 8.5 8.5s-1.5 8.5-8.5 8.5-8.5-1.5-8.5-8.5S5 3.5 12 3.5Z M9 10v4 M15 10v4" />);
 export const FolderGit2 = icon("FolderGit2", folder);
 export const Folder = icon("Folder", folder);
 export const Zap = icon("Zap", <path d="m14 2-11 12h8l-1 8 11-12h-8Z" />);

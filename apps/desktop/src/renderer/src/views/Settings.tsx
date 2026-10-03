@@ -2,7 +2,7 @@ import { settingsTabIndex, idleTimeoutLabel, memoryModelAgent, learningStatus } 
 import { AgentConnections } from "./settings-agent-updates";
 import { useRouter } from "../lib/router";
 import { useEffect, useRef, useState } from "react";
-import { RefreshCw } from "../components/icons";
+import { RefreshCw, Signal, Link2, MessageSquare, BookText, SunMoon, SlidersHorizontal, Brain, Folder } from "../components/icons";
 import { distillationHarnessIds, harnessCatalog, type AppSettings, type ExtractionProviderChoice } from "@openorc/protocol";
 import { TopBar } from "../components/TopBar";
 import { MemoryControl } from "../components/MemoryControl";
@@ -18,19 +18,22 @@ import { TextGenerationSettings } from "./settings-text-generation";
 import { UpdateSettingsSection } from "./settings-updates";
 
 const sections = [
-  { id: "usage", label: "Usage", title: "Usage & allowances", description: "Your providers, their limits, and what’s left." },
-  { id: "connections", label: "Connections", title: "Connections", description: "Manage the tools OpenOrc uses on your behalf." },
-  { id: "slack", label: "Slack", title: "Slack", description: "Run Slack requests on your own computer." },
-  { id: "skills", label: "Skills", title: "Skills", description: "Skills available to Codex, Claude Code, and OpenCode in this project." },
-  { id: "appearance", label: "Appearance", title: "Appearance", description: "Make your workspace feel like yours." },
-  { id: "general", label: "General", title: "General", description: "Make OpenOrc fit the way you work." },
-  { id: "memory", label: "Memory & models", title: "Memory & models", description: "Control shared project memory and the models used for background work." },
-  { id: "data", label: "Data", title: "Data on this device", description: "Know where your work lives and how it is used." },
+  { id: "usage", label: "Usage", icon: Signal, description: "Account allowances, across your providers." },
+  { id: "connections", label: "Connections", icon: Link2, description: "The agents and tools connected to OpenOrc." },
+  { id: "slack", label: "Slack", icon: MessageSquare, description: "Bring requests from Slack to this computer." },
+  { id: "skills", label: "Skills", icon: BookText, description: "Browse the skills your agents can use." },
+  { id: "appearance", label: "Appearance", icon: SunMoon, description: "Your workspace, in your own colors." },
+  { id: "general", label: "General", icon: SlidersHorizontal, description: "Everyday preferences for the way you work." },
+  { id: "memory", label: "Memory & models", icon: Brain, description: "What OpenOrc remembers, and which models help." },
+  { id: "data", label: "Data", icon: Folder, description: "Your work lives on this device." },
 ] as const;
 
 export function Settings() {
   const route = useRouter((state) => state.route);
   const [active, setActive] = useState<string>("usage");
+  useEffect(() => {
+    document.getElementById(`settings-tab-${active}`)?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+  }, [active]);
   useEffect(() => {
     if (route.view !== "settings" || !route.section) return;
     setActive(route.section);
@@ -54,7 +57,9 @@ export function Settings() {
   const info = useRpc("system.info", { refresh: true });
   return (
     <>
-      <TopBar>Settings</TopBar>
+      <TopBar showProject={false}>
+        <h1 className="settings-window-title">Settings</h1>
+      </TopBar>
       <div className="settings-shell">
         <div className="settings-layout">
           <nav className="settings-nav" aria-label="Settings sections">
@@ -73,29 +78,29 @@ export function Settings() {
                 tabs[next]?.click();
               }}
             >
-              {sections.map(({ id, label }) => (
+              {sections.map(({ id, label, icon: Icon }) => (
                 <button key={id} id={`settings-tab-${id}`} role="tab" aria-selected={active === id} tabIndex={active === id ? 0 : -1} aria-controls={`settings-${id}`} onClick={() => select(id)}>
-                  {label}
+                  <Icon size={20} aria-hidden="true" />
+                  <span>{label}</span>
                 </button>
               ))}
             </div>
           </nav>
           <div ref={content} className="settings-content">
-            {sections.map(({ id, title, description }) => (
+            {sections.map(({ id, description }) => (
               <div key={id} id={`settings-${id}`} role="tabpanel" aria-labelledby={`settings-tab-${id}`} tabIndex={0} hidden={active !== id}>
                 <header className="settings-heading">
-                  <h1 className="text-xl font-semibold">{title}</h1>
-                  <p className="text-md text-ink-2 mt-1">{description}</p>
+                  <p>{description}</p>
+                  {id === "connections" && (
+                    <Button disabled={info.isFetching} onClick={() => void info.refetch()}>
+                      <RefreshCw size={13} />
+                      {info.isFetching ? "Checking…" : "Refresh connections"}
+                    </Button>
+                  )}
                 </header>
                 {id === "usage" && <ProviderUsageOverview active={active === id} />}
                 {id === "connections" && (
                   <>
-                    <div className="flex justify-end">
-                      <Button disabled={info.isFetching} onClick={() => void info.refetch()}>
-                        <RefreshCw size={13} />
-                        {info.isFetching ? "Checking…" : "Refresh connections"}
-                      </Button>
-                    </div>
                     {info.isError && <LoadError retry={() => void info.refetch()} />}
                     <AgentConnections info={info.data} />
                     <GitHubSettings info={info.data} />
@@ -111,15 +116,7 @@ export function Settings() {
                     <TextGenerationSettings />
                   </>
                 )}
-                {id === "data" && (
-                  <Section title="Local storage" description="Your ledger, memories, and worktrees live in the OpenOrc data folder.">
-                    {info.isError ? <LoadError retry={() => void info.refetch()} /> : <code className="settings-path">{info.data?.dataDir ?? "Loading data location…"}</code>}
-                    <p className="text-ink-2 mt-4">
-                      Memory search runs on this device. Each agent’s requests go to its own provider. Run summaries, while memory is on, and conversation titles use that same agent unless you choose
-                      another provider in Memory &amp; models.
-                    </p>
-                  </Section>
-                )}
+                {id === "data" && <DataSettings dataDir={info.data?.dataDir} error={info.isError} retry={() => void info.refetch()} />}
               </div>
             ))}
           </div>
@@ -163,10 +160,7 @@ function GeneralSettings() {
           </Select>
         </Field>
       </Section>
-      <Section
-        title="Agents"
-        description="A thread keeps its provider process open between turns so replies start at once. Closing quiet processes frees memory; the next message resumes the same session."
-      >
+      <Section title="Agents" description="Keep agents ready for quick replies, or free memory by closing idle agents. Sessions resume with your next message.">
         <Field label="Close idle processes after">
           <Select value={days(v.idleProcessMinutes)} disabled={s.disabled} onChange={(e) => void s.commit({ idleProcessMinutes: e.target.value ? Number(e.target.value) : null })}>
             {idleOptions.map((m) => (
@@ -187,7 +181,7 @@ function GeneralSettings() {
       <Section id="team-execution-setting" title="Orchestration">
         <Toggle
           label="Team execution (Beta)"
-          hint="Run saved teams through three levels: lead, managers and workers. Teams support schedules, forks and workspace moves. Failed workspace operations keep recovery options and saved files. Turning this off keeps existing activity and Stop available."
+          hint="Let a lead coordinate managers and workers. Turning this off keeps existing activity and Stop available."
           checked={v.experimentalTeamExecution ?? true}
           disabled={s.disabled}
           onChange={(experimentalTeamExecution) => void s.commit({ experimentalTeamExecution })}
@@ -201,7 +195,7 @@ function GeneralSettings() {
 /** The choices offered for distillation: automatic, each harness that can distil, the API key, or off. */
 const providerChoices: readonly ExtractionProviderChoice[] = ["auto", ...distillationHarnessIds, "apikey", "off"];
 const providerLabel = (choice: ExtractionProviderChoice): string => {
-  if (choice === "auto") return "Automatic · the agent that ran it";
+  if (choice === "auto") return "Automatic · per agent";
   if (choice === "apikey") return "Anthropic API key";
   if (choice === "off") return "Off · no background learning";
   return `${harnessCatalog[choice].name} subscription`;
@@ -303,6 +297,31 @@ export function MemorySettings() {
         <p className="text-ink-2 mt-3">{learningStatus({ loading: s.query.isLoading, error: s.query.isError, saved, provider, storageError, reason: v.reason })}</p>
       </Section>
       <SaveStatus status={s.status} retry={() => void s.retry()} />
+    </>
+  );
+}
+
+function DataSettings({ dataDir, error, retry }: { dataDir?: string; error: boolean; retry: () => void }) {
+  return (
+    <>
+      <Section title="Local storage" description="Your ledger, memories, and worktrees live in the OpenOrc data folder.">
+        <span className="settings-storage-label">Data folder</span>
+        {error ? <LoadError retry={retry} /> : <code className="settings-path">{dataDir ?? "Loading data location…"}</code>}
+      </Section>
+      <Section title="How your data is used">
+        <div className="settings-data-note">
+          <h3>Memory search</h3>
+          <p>Search runs on this device.</p>
+        </div>
+        <div className="settings-data-note">
+          <h3>Agent requests</h3>
+          <p>Each agent’s requests go to its own provider.</p>
+        </div>
+        <div className="settings-data-note">
+          <h3>Background models</h3>
+          <p>Run summaries, while memory is on, and conversation titles use that same agent unless you choose another provider in Memory &amp; models.</p>
+        </div>
+      </Section>
     </>
   );
 }

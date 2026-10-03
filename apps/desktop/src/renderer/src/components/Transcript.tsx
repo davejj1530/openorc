@@ -1,6 +1,6 @@
 import { lazy, memo, Suspense, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type ComponentProps, type RefObject } from "react";
 import { harnessCatalog, type ActivityRecovery } from "@openorc/protocol";
-import { WorkRead, WorkEdit, WorkCommand, WorkSearch, WorkMessage, WorkDelegate, WorkAgent, WorkLive, Check, ChevronRight, Copy, FileText, GitFork, Globe, Hammer, Search, Terminal, X } from "./icons";
+import { WorkRead, WorkEdit, WorkCommand, WorkSearch, WorkMessage, WorkDelegate, WorkAgent, WorkLive, Check, ChevronRight, FileText, GitFork, Globe, Hammer, Search, Terminal, X } from "./icons";
 import { workTurns, workParts, workTiming, workDuration } from "../lib/work-transcript";
 import { cn } from "../lib/cn";
 import { core } from "../lib/rpc";
@@ -22,7 +22,7 @@ import { Button, IconButton, TextButton } from "./ui";
 import { ImageGenerationRow, ImageViewRow, isImageGeneration, isImageView, ThreadImage, ThreadMedia, ThreadRichText } from "./ThreadImages";
 import { isUnifiedDiff, toolDiff } from "../lib/chat-diff";
 import { isImagePath } from "../../../shared/image-paths";
-import { relativeTime } from "../lib/time";
+import { CopyMessage, MessageTime } from "./MessageActions";
 
 const InlineDiff = lazy(() => import("./InlineDiff").then((m) => ({ default: m.InlineDiff })));
 const diffLoading = (
@@ -505,6 +505,7 @@ function isCompact(block: Block | undefined): boolean {
 const wordFade = { animation: "fadeIn", sep: "word", duration: 240 } as const;
 
 const BlockView = memo(function BlockView({ block, runId, onFork, taskCards }: { block: Block; runId: string; onFork?: ((runId: string) => void) | undefined; taskCards: boolean }) {
+  const author = useTurnAuthor(undefined, block.runId ?? runId);
   switch (block.kind) {
     case "message":
       if (block.role === "user")
@@ -526,13 +527,17 @@ const BlockView = memo(function BlockView({ block, runId, onFork, taskCards }: {
           </div>
         );
       return (
-        <div className="group">
+        <div className="group journal-message journal-response">
+          <div className="journal-author">
+            <span className="journal-author-mark" />
+            {author ?? "Assistant"}
+          </div>
           <div className="text-prose text-ink prose-chat">
             <ThreadRichText mode="streaming" isAnimating={block.streaming} animated={wordFade}>
               {block.text}
             </ThreadRichText>
           </div>
-          <div className="mt-1 flex min-h-5 items-center gap-2">
+          <div className="journal-reply-actions mt-1 flex min-h-5 items-center gap-2">
             {block.streaming ? null : <MessageTime at={block.at} />}
             {block.text ? <CopyMessage text={block.text} /> : null}
           </div>
@@ -557,60 +562,14 @@ const BlockView = memo(function BlockView({ block, runId, onFork, taskCards }: {
   }
 });
 
-/** When the message landed. Hidden until hover, the way the chat apps do it. */
-function MessageTime({ at, className }: { at: number | undefined; className?: string }) {
-  if (at === undefined) return null;
-  return (
-    <div
-      className={cn("h-5 flex items-center text-xs text-ink-4 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity", className)}
-      title={new Date(at).toLocaleString()}
-    >
-      {relativeTime(at)}
-    </div>
-  );
-}
-
-function copyMessageLabel(state: "idle" | "copied" | "error"): string {
-  if (state === "copied") return "Message copied";
-  if (state === "error") return "Could not copy message";
-  return "Copy message";
-}
-
-function CopyMessage({ text }: { text: string }) {
-  const [state, setState] = useState<"idle" | "copied" | "error">("idle");
-  useEffect(() => {
-    if (state === "idle") return;
-    const timer = window.setTimeout(() => setState("idle"), 2000);
-    return () => window.clearTimeout(timer);
-  }, [state]);
-  const label = copyMessageLabel(state);
-  return (
-    <IconButton
-      size="sm"
-      aria-label={label}
-      title={label}
-      className={cn(
-        "transition-opacity opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
-        state !== "idle" && "opacity-100",
-      )}
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(text);
-          setState("copied");
-        } catch {
-          setState("error");
-        }
-      }}
-    >
-      {state === "copied" ? <Check size={13} /> : <Copy size={13} />}
-    </IconButton>
-  );
-}
-
 function UserMessage({ text, at, attachments, onFork }: { text: string; at?: number | undefined; attachments?: string[]; onFork?: (() => void) | undefined }) {
   return (
-    <div className="group flex justify-end">
-      <div className="max-w-4/5 grid gap-2 justify-items-end">
+    <div className="group journal-message journal-prompt">
+      <div className="journal-author">
+        <span className="journal-author-mark" />
+        You
+      </div>
+      <div className="journal-message-body grid gap-2">
         {attachments && attachments.length > 0 ? (
           <div className="flex flex-wrap gap-2 justify-end">
             {attachments.map((a) =>
@@ -618,8 +577,8 @@ function UserMessage({ text, at, attachments, onFork }: { text: string; at?: num
             )}
           </div>
         ) : null}
-        <div className="message-bubble rounded-xl px-4 py-2.5 text-md whitespace-pre-wrap">{text}</div>
-        <div className="flex w-full min-h-6 items-center justify-end gap-2">
+        <div className="message-bubble text-prose whitespace-pre-wrap">{text}</div>
+        <div className="journal-message-actions flex w-full min-h-6 items-center gap-2">
           {text ? <CopyMessage text={text} /> : null}
           {onFork ? (
             <IconButton

@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-02T15:29:05.515625+00:00",
+  "title": "Design System: OpenOrc rail and document study",
+  "extensions": {
+    "colorMeta": {
+      "accent": {
+        "role": "primary",
+        "displayName": "Actions (blue by default)"
+      },
+      "surface-light": {
+        "role": "neutral",
+        "displayName": "Pearl"
+      },
+      "surface-dark": {
+        "role": "neutral",
+        "displayName": "Cool charcoal"
+      }
+    },
+    "typographyMeta": {
+      "base": {
+        "displayName": "Interface",
+        "purpose": "Compact desktop navigation and controls."
+      },
+      "prose": {
+        "displayName": "Conversation",
+        "purpose": "Readable agent messages and documents."
+      },
+      "display": {
+        "displayName": "Document title",
+        "purpose": "Task and welcome-page headings use Charter with platform serif fallbacks. Thread titles use 13px semibold system type in the top toolbar."
+      }
+    },
+    "shadows": [
+      {
+        "name": "composer",
+        "value": "none",
+        "purpose": "A flat writing surface with a fine border and tonal settings toolbar."
+      },
+      {
+        "name": "current-row",
+        "value": "none",
+        "purpose": "Selected navigation uses tonal fill instead of cast depth."
+      }
+    ],
+    "motion": [
+      {
+        "name": "search-hover",
+        "value": "background-color 160ms ease-out",
+        "purpose": "Short feedback on the sidebar search control."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "reading-column",
+        "value": "620px container"
+      },
+      {
+        "name": "navigation-overlay",
+        "value": "900px viewport"
+      }
+    ]
+  },
+  "components": [],
+  "narrative": {
+    "northStar": "A calm place to think with coding agents",
+    "overview": "A compact app rail and a single thread sidebar, with project selection in a popover, document conversations, a task workspace, and contextual inspector. Settings uses a horizontal category toolbar, aligned preference rows, and an account usage ledger.",
+    "keyCharacteristics": [
+      "Threads and Orclings have separate rail destinations sharing one navigation sidebar",
+      "Flat persistent surfaces and a sidebar resize grip on the seam",
+      "A single-color face mark and an interactive Orcling study with sample data",
+      "Compact thread titles in one toolbar and one author line per conversation turn",
+      "A writing surface with a settings toolbar and separate Git strip",
+      "Flat responsive settings with one category toolbar",
+      "Usage limits show one primary reported amount and secondary report details"
+    ],
+    "rules": [
+      {
+        "name": "Semantic Color",
+        "body": "Read live palette roles instead of hardcoding study colors into components.",
+        "section": "colors"
+      },
+      {
+        "name": "Context once",
+        "body": "Keep agent and project identity with the composer instead of repeating it in the conversation header.",
+        "section": "components"
+      },
+      {
+        "name": "Text input focus",
+        "body": "Use a surface and caret change without an outline or halo for text inputs. Preserve visible keyboard focus on buttons, tabs, and disclosures.",
+        "section": "components"
+      },
+      {
+        "name": "Reported allowances",
+        "body": "Show remaining allowance when reported, otherwise used allowance. Keep unknown and stale values explicit and preserve reset outcomes.",
+        "section": "components"
+      }
+    ],
+    "dos": ["Do preserve saved palettes and custom colors.", "Do keep native window-control clearance and existing product workflows."],
+    "donts": ["Do not treat this study as global product identity approval.", "Do not treat synthetic preview content as product facts."]
+  }
+}

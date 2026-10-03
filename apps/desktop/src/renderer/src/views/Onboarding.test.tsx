@@ -156,8 +156,8 @@ describe("Onboarding", () => {
     fireEvent.click(screen.getByRole("button", { name: "Claude palette" }));
     expect(localStorage.getItem("openorc.theme")).toBeNull();
     expect(localStorage.getItem("openorc.palette")).toBeNull();
-    expect(screen.getByRole("figure", { name: "Claude workspace preview" })).toBeTruthy();
-    expect(document.querySelector(".palette-workspace")?.getAttribute("data-preview-mode")).toBe("dark");
+    expect(screen.getByRole("button", { name: "Claude palette" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("button", { name: "Dark" }).getAttribute("aria-pressed")).toBe("true");
     fireEvent.change(screen.getByLabelText(/Step/), {
       target: { value: "done" },
     });

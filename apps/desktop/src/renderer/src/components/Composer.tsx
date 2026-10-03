@@ -14,7 +14,6 @@ import { ArrowUp, ChevronDown, Clock, FileText, GitBranch, Laptop, Plus, Square,
 import { Menu } from "@base-ui/react/menu";
 import { Popover } from "@base-ui/react/popover";
 import { ComposerInput } from "./ComposerInput";
-import { ChangesShoulder } from "./ChangesShoulder";
 import { ComposerModelPicker, type ModelChoice } from "./ModelPicker";
 import { Button, Tooltip } from "./ui";
 import { cn } from "../lib/cn";
@@ -213,48 +212,6 @@ export function Composer(props: ComposerProps) {
           </button>
         </p>
       ) : null}
-      {changed && props.changes ? (
-        <section className="composer-changes" aria-label="Uncommitted changes">
-          <ChangesShoulder />
-          <div className="composer-changes-body">
-            <div className="composer-changes-identity">
-              <span className="composer-changes-project" title={props.changes.projectName}>
-                {props.changes.projectName}
-              </span>
-              {props.location.branch ? (
-                <span className="composer-changes-branch" title={props.location.branch}>
-                  <GitBranch size={14} />
-                  <span>{props.location.branch}</span>
-                </span>
-              ) : null}
-            </div>
-            <button
-              type="button"
-              className="composer-changes-summary"
-              onClick={props.changes.onReview}
-              aria-label={`Review ${props.changes.files} changed ${props.changes.files === 1 ? "file" : "files"}, ${props.changes.insertions} added and ${props.changes.deletions} removed lines`}
-            >
-              {props.changes.insertions + props.changes.deletions > 0 ? (
-                <>
-                  {props.changes.insertions > 0 ? <span className="text-ok">+{props.changes.insertions.toLocaleString()}</span> : null}
-                  {props.changes.deletions > 0 ? <span className="text-bad">−{props.changes.deletions.toLocaleString()}</span> : null}
-                </>
-              ) : (
-                <span>
-                  {props.changes.files} {props.changes.files === 1 ? "file" : "files"}
-                </span>
-              )}
-            </button>
-            <Tooltip label={props.changes.commitDisabledReason ?? "Commit changes"}>
-              <span className="composer-changes-commit-wrap">
-                <button type="button" className="composer-changes-commit" aria-label="Commit changes" disabled={Boolean(props.changes.commitDisabledReason)} onClick={props.changes.onCommit}>
-                  Commit<span className="composer-commit-suffix"> changes</span>
-                </button>
-              </span>
-            </Tooltip>
-          </div>
-        </section>
-      ) : null}
       <div
         className="composer-shell relative border"
         data-dragging={dragging || undefined}
@@ -423,6 +380,47 @@ export function Composer(props: ComposerProps) {
           </div>
         </div>
       </div>
+      {changed && props.changes ? (
+        <section className="composer-changes" aria-label="Uncommitted changes">
+          <div className="composer-changes-body">
+            <div className="composer-changes-identity">
+              <span className="composer-changes-project" title={props.changes.projectName}>
+                {props.changes.projectName}
+              </span>
+              {props.location.branch ? (
+                <span className="composer-changes-branch" title={props.location.branch}>
+                  <GitBranch size={14} />
+                  <span>{props.location.branch}</span>
+                </span>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              className="composer-changes-summary"
+              onClick={props.changes.onReview}
+              aria-label={`Review ${props.changes.files} changed ${props.changes.files === 1 ? "file" : "files"}, ${props.changes.insertions} added and ${props.changes.deletions} removed lines`}
+            >
+              {props.changes.insertions + props.changes.deletions > 0 ? (
+                <>
+                  {props.changes.insertions > 0 ? <span className="text-ok">+{props.changes.insertions.toLocaleString()}</span> : null}
+                  {props.changes.deletions > 0 ? <span className="text-bad">−{props.changes.deletions.toLocaleString()}</span> : null}
+                </>
+              ) : (
+                <span>
+                  {props.changes.files} {props.changes.files === 1 ? "file" : "files"}
+                </span>
+              )}
+            </button>
+            <Tooltip label={props.changes.commitDisabledReason ?? "Commit changes"}>
+              <span className="composer-changes-commit-wrap">
+                <button type="button" className="composer-changes-commit" aria-label="Commit changes" disabled={Boolean(props.changes.commitDisabledReason)} onClick={props.changes.onCommit}>
+                  Commit<span className="composer-commit-suffix"> changes</span>
+                </button>
+              </span>
+            </Tooltip>
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

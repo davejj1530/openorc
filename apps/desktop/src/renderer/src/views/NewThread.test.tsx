@@ -180,3 +180,15 @@ describe("NewThread", () => {
     expect(readNewThreadDraft("p1").prompt).toBe("Retained direction");
   });
 });
+
+it("prepares a starter as an editable plan without starting a run", () => {
+  saveModelDraft("p1", "");
+  render(<NewThread projectId="p1" />);
+  fireEvent.click(screen.getByRole("button", { name: "Explore this project" }));
+  const message = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Message" });
+  expect(message.value).toContain("Walk me through this project");
+  expect(readNewThreadDraft("p1").mode).toBe("plan");
+  expect(start).not.toHaveBeenCalled();
+  fireEvent.change(message, { target: { value: "Explore just the renderer" } });
+  expect(readNewThreadDraft("p1").prompt).toBe("Explore just the renderer");
+});

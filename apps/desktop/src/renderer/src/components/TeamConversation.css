@@ -1,20 +1,40 @@
-.team-conversation-heading {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 12px 24px;
-  font-size: var(--text-sm);
-  border-bottom: 1px solid var(--line);
-  color: var(--ink-2);
+.thread-team-toolbar {
+  display: inline-flex;
 }
-.team-conversation-name {
-  color: var(--ink);
-  font-weight: 600;
+.team-tools-inline {
+  display: flex;
+  justify-content: flex-end;
+  padding: 4px 24px;
+}
+.team-toolbar-trigger {
+  max-width: 200px;
+  gap: 5px;
+}
+.team-toolbar-status {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.team-tools-menu {
+  width: 280px;
+  max-width: calc(100vw - 24px);
+}
+.team-tools-summary {
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
   overflow-wrap: anywhere;
 }
-.team-conversation-status {
-  margin-left: auto;
+.team-tools-summary strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+.team-tools-description {
+  padding: 6px 8px 8px;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--ink-3);
 }
 .team-refresh-error {
   display: flex;
@@ -29,7 +49,7 @@
   min-width: 0;
 }
 .team-turn {
-  margin-top: 20px;
+  margin-top: 16px;
   min-width: 0;
 }
 .team-turn-continued {
@@ -37,7 +57,7 @@
 }
 .team-turn-author {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 4px 8px;
   font-size: var(--text-sm);
@@ -46,11 +66,20 @@
 }
 .team-turn-author strong {
   font-size: var(--text-base);
-  font-weight: 500;
+  font-weight: 600;
   color: var(--ink);
 }
+.team-author-model {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .team-turn-author time {
+  margin-left: auto;
   color: var(--ink-4);
+  white-space: nowrap;
+  font-size: var(--text-xs);
 }
 .team-direction-footer {
   display: flex;
@@ -306,8 +335,15 @@
   justify-content: flex-end;
 }
 @container (max-width: 600px) {
-  .team-conversation-heading {
-    padding-inline: 16px;
+  .team-toolbar-status {
+    display: none;
+  }
+  .team-toolbar-trigger {
+    width: 28px;
+    padding: 0;
+  }
+  .team-toolbar-trigger > svg:last-child {
+    display: none;
   }
   .team-member-content {
     padding-left: 12px;
@@ -420,8 +456,4 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   padding-bottom: 4px;
-}
-.team-activity-toggle[aria-pressed="true"] {
-  background: var(--surface-2);
-  color: var(--ink);
 }

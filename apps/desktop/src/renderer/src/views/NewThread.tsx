@@ -1,17 +1,16 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { WORKSPACE_ID, harnessIds, harnessInfo, harnessLoggedIn, type HarnessId, type Project, type TeamDetail, type WorkspaceMode } from "@openorc/protocol";
 import { FolderGit2, GitBranch, Laptop } from "../components/icons";
 import { Composer, ComposerChoice } from "../components/Composer";
 import { Panel } from "../components/Panel";
 import { useComposerChanges } from "../lib/composer-changes";
-import { NewThreadMascot } from "../components/NewThreadMascot";
+import { NewThreadWelcome } from "../components/NewThreadWelcome";
 import { ArrivalPanel, useArrivalActivity } from "../components/NewThreadActivity";
 import { ComposerModelPicker, defaultChoice, ModelPicker, type ModelChoice, type OrclingPickerChoices, type TeamPickerChoices } from "../components/ModelPicker";
 import { useOrclings } from "../lib/orclings";
 import { pickerTeam } from "../lib/team-settings";
 import { TopBar } from "../components/TopBar";
-import { Button, Kbd, Select, TextButton } from "../components/ui";
-import { cn } from "../lib/cn";
+import { Button, Select, TextButton } from "../components/ui";
 import { teamMentionEntries } from "../lib/composer-mentions";
 import { useLayout } from "../lib/layout";
 import { readOnboardingState } from "../lib/onboarding";
@@ -71,27 +70,6 @@ function ThreadPlace(props: { isWorkspace: boolean; mode: WorkspaceMode; blocked
     <Button variant="ghost" size="sm" disabled={props.disabled} title="Choose the folder for this conversation" onClick={() => void chooseFolder()}>
       Choose folder
     </Button>
-  );
-}
-
-function heroHelp(input: { hasProject: boolean; activity: ReturnType<typeof useArrivalActivity>; revision: boolean; isWorkspace: boolean }): ReactNode {
-  if (!input.hasProject) return null;
-  if (input.activity.any) return <ArrivalPanel activity={input.activity} />;
-  return (
-    <ul className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-ink-4">
-      {!input.isWorkspace ? (
-        <li className="flex items-center gap-1.5">
-          <Kbd>@</Kbd>
-          {input.revision ? "address a member" : "mention a file"}
-        </li>
-      ) : null}
-      <li className="flex items-center gap-1.5">
-        <Kbd>⌘V</Kbd>paste an image
-      </li>
-      <li className="flex items-center gap-1.5">
-        <Kbd>⌘K</Kbd>search
-      </li>
-    </ul>
   );
 }
 
@@ -267,18 +245,7 @@ function NewThreadProject({
           New thread
         </TopBar>
         <div className="new-thread-body flex-1 min-h-0 flex flex-col overflow-y-auto">
-          <div className={cn("flex-1 flex justify-center pt-8", activity.any ? "items-start pb-8" : "items-end pb-hero")}>
-            <div className="relative max-w-chat w-full px-6">
-              <NewThreadMascot choice={choice} placement="hero" />
-              <h1 className="text-xl font-medium text-ink mb-2">What should we work on?</h1>
-              <p className="text-base text-ink-3 max-w-md">
-                {isWorkspace
-                  ? "Start a conversation in any folder. Slack conversations live here too."
-                  : "The agent works in your project folder. You may create a task first or go straight into building."}
-              </p>
-              {heroHelp({ hasProject: projects?.length !== 0, activity, revision: Boolean(revision), isWorkspace })}
-            </div>
-          </div>
+          <NewThreadWelcome isWorkspace={isWorkspace} hasProject={projects?.length !== 0} onStart={(prompt) => changeDraft({ prompt, mode: "plan" })} />
           <div className="new-thread-composer shrink-0 w-full max-w-chat mx-auto px-6 pb-2">
             {projects?.length === 0 ? (
               <div className="rounded-xl border border-line bg-surface p-4 text-base text-ink-2">
@@ -399,6 +366,12 @@ function NewThreadProject({
             <div className="h-4" />
             {/* <p className="text-xs text-ink-3 mt-3 text-center">{revision ? "Each agent uses an isolated workspace. You direct the lead, which delegates to the team." : draft.mode === "plan" ? "Plan investigates first. Tasks save to backlog." : "Tasks save to backlog. Ask to start them when you’re ready."}</p> */}
           </div>
+          {activity.any ? (
+            <div className="new-thread-recent">
+              <h2>Pick up where you left off</h2>
+              <ArrivalPanel activity={activity} />
+            </div>
+          ) : null}
         </div>
       </main>
       {panelContext ? <Panel context={panelContext} /> : null}

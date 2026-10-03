@@ -1,73 +1,51 @@
 .palette-selector {
-  container-type: inline-size;
-  display: grid;
-  gap: 16px;
+  min-width: 0;
 }
-
 .palette-choices {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
-  gap: 4px 8px;
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+  gap: 8px;
 }
-
 .palette-choice {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 64px 14px;
-  align-items: center;
+  grid-template-columns: 1fr auto;
   gap: 8px;
-  min-height: 44px;
-  padding: 8px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
   color: var(--ink-2);
   text-align: left;
-  font-size: var(--text-base);
-  transition:
-    background-color 120ms var(--ease-out),
-    border-color 120ms var(--ease-out);
+  font-size: var(--text-sm);
+  transition: background-color 120ms var(--ease-out);
 }
-
-.palette-choice:hover,
-.palette-choice:focus-visible {
-  color: var(--ink);
+.palette-choice:hover {
   background: var(--surface-2);
 }
-
 .palette-choice[aria-pressed="true"] {
-  border-color: var(--line-strong);
-  background: var(--surface-2);
+  border-color: var(--navigation-ink);
+  background: var(--navigation-soft);
   color: var(--ink);
 }
-
 .palette-choice:focus-visible {
-  background: var(--surface-3);
-  color: var(--ink);
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }
-
-.palette-choice-name {
-  white-space: nowrap;
-}
-
-.palette-choice[aria-pressed="true"] .palette-choice-name {
-  font-weight: var(--font-weight-medium);
-}
-
 .palette-choice-check {
   visibility: hidden;
+  align-self: center;
+  color: var(--navigation-ink);
 }
-
 .palette-choice[aria-pressed="true"] .palette-choice-check {
   visibility: visible;
 }
-
 .palette-swatches {
   display: flex;
-  height: 20px;
+  grid-column: 1 / -1;
+  height: 24px;
   overflow: hidden;
   border: 1px solid var(--line-strong);
-  border-radius: var(--radius-sm);
+  border-radius: 4px;
 }
-
 .palette-swatches i {
   flex: 1;
   background: var(--bg);
@@ -84,330 +62,11 @@
 .palette-swatches i:nth-child(5) {
   background: var(--accent);
 }
-
-/* The preview is the thread workspace as the app draws it, in the palette under the pointer.
-   The scene is laid out at one window width so its proportions never depend on the settings
-   column, then zoomed to fit the column; a narrow column shows the same window smaller, the
-   way a screenshot would. The stage clips the odd fraction of a pixel the zoom leaves over. */
-.palette-sample {
-  min-width: 0;
-  margin: 0;
-}
-
-.palette-stage {
-  overflow: hidden;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-xl);
-}
-
-.palette-workspace {
-  display: grid;
-  grid-template-columns: 200px minmax(0, 1fr);
-  min-width: 800px;
-  height: 520px;
-  background: var(--bg);
-  color: var(--ink);
-  font-size: var(--text-base);
-  line-height: var(--text-base--line-height);
-  pointer-events: none;
-  user-select: none;
-  /* Tokens derived on :root resolve against the live palette, not this one. The solid fills
-     that would give the live palette away are derived again here; the translucent materials
-     are tints of ink and read the same in every palette of a mode. */
-  --bubble-fill: var(--bubble);
-}
-.palette-workspace[data-preview-mode="light"] {
-  --current-row-fill: var(--bg);
-}
-.palette-workspace[data-preview-mode="dark"] {
-  --current-row-fill: var(--surface-2);
-}
-
-.palette-icon-slot {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: var(--control-md);
-  height: var(--control-md);
-  border-radius: var(--radius-md);
-  color: var(--ink-2);
-}
-.palette-icon-slot-sm {
-  width: var(--control-sm);
-  height: var(--control-sm);
-  color: var(--ink-3);
-}
-.palette-icon-slot-muted {
-  color: var(--ink-4);
-}
-
-.palette-sidebar {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.palette-window-nav {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  height: 52px;
-  padding: 4px 8px 0;
-}
-/* The Inbox count rides the header icon as it does in the app, knocked out of the sidebar's ground. */
-.palette-inbox {
-  --nav-row-fill: var(--bg);
-  position: relative;
-  display: inline-flex;
-}
-
-.palette-brand {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 48px;
-  padding: 0 16px;
-}
-.palette-brand .sidebar-wordmark {
-  flex: 1;
-  min-width: 0;
-}
-
-.palette-nav {
-  display: grid;
-  gap: 1px;
-  margin: 0 4px;
-  padding: 4px;
-}
-
-.palette-nav-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 32px;
-  padding: 0 8px;
-  border-radius: var(--radius-md);
-  color: var(--ink-2);
-  font-weight: var(--font-weight-medium);
-}
-.palette-nav-row > span:first-child {
-  position: relative;
-  display: inline-flex;
-  color: var(--ink-3);
-}
-
-.palette-projects {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  margin: 16px 8px 4px 16px;
+.palette-description {
+  margin-top: 10px;
   color: var(--ink-3);
   font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
 }
-.palette-projects > span:first-child {
-  flex: 1;
-}
-
-.palette-project {
-  margin: 0 16px 12px 8px;
-}
-
-.palette-project-name {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 8px;
-  color: var(--ink-2);
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
-}
-.palette-project-name svg {
-  flex-shrink: 0;
-  color: var(--ink-3);
-}
-
-.palette-thread-rows {
-  display: grid;
-  gap: 1px;
-}
-
-.palette-thread-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 2px;
-  padding: 6px 8px;
-  border-radius: var(--radius-md);
-  color: var(--ink-2);
-}
-.palette-thread-row[data-current] {
-  color: var(--ink);
-  background: var(--current-row-fill);
-  box-shadow: var(--current-row-material);
-}
-
-.palette-thread-title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.palette-thread-title > span {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.palette-thread-row[data-current] .palette-thread-title {
-  font-weight: var(--font-weight-medium);
-}
-.palette-thread-title svg {
-  flex-shrink: 0;
-  color: var(--accent-ink);
-}
-
-.palette-thread-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--ink-3);
-  font-size: var(--text-xs);
-  line-height: 16px;
-}
-.palette-thread-meta > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-.palette-thread-meta > span:first-child {
-  flex: 1;
-}
-
-.palette-sidebar-foot {
-  margin-top: auto;
-  padding: 4px 8px 8px;
-}
-
-/* The work plane: the palette's gradient over its surface, recessed into the sidebar's ground. */
-.palette-plane {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  margin: var(--spacing-well) var(--spacing-well) var(--spacing-well) 0;
-  overflow: hidden;
-  border-radius: var(--radius-lg);
-  background: var(--surface-gradient), var(--surface);
-  box-shadow: var(--material-well);
-}
-
-.palette-topbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-  height: 52px;
-  padding: 4px 12px 0;
-  border-bottom: 1px solid var(--line);
-  font-weight: var(--font-weight-medium);
-}
-.palette-topbar-title {
-  min-width: 0;
-  padding: 0 4px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--ink);
-}
-.palette-topbar-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-left: auto;
-}
-
-.palette-transcript {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  flex: 1;
-  min-height: 0;
-  padding: 16px 20px 0;
-  overflow: hidden;
-}
-
-.palette-user {
-  display: flex;
-  justify-content: flex-end;
-}
-.palette-user .message-bubble {
-  max-width: 80%;
-  padding: 10px 16px;
-  border-radius: var(--radius-xl);
-  font-size: var(--text-md);
-  line-height: var(--text-md--line-height);
-}
-
-.palette-reply {
-  color: var(--ink);
-  font-size: var(--text-prose);
-}
-
-.palette-reply-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 20px;
-  margin-top: 4px;
-  color: var(--ink-4);
-  font-size: var(--text-xs);
-  line-height: 16px;
-}
-.palette-reply-meta svg {
-  color: var(--ink-3);
-}
-
-/* The scene is a scaled-down window, so the composer keeps its wide-window layout rather than
-   answering its own container queries at the preview's width. */
-.palette-workspace .palette-composer {
-  container-type: normal;
-  flex-shrink: 0;
-  margin: auto 20px 20px;
-}
-.palette-composer-placeholder {
-  color: var(--ink-3);
-}
-
-.palette-sample-caption {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 12px;
-  color: var(--ink-3);
-  font-size: var(--text-sm);
-  line-height: var(--text-sm--line-height);
-}
-
-.palette-sample-caption > span:first-child {
-  display: grid;
-  gap: 2px;
-}
-
-.palette-sample-caption strong {
-  color: var(--ink-2);
-  font-weight: var(--font-weight-medium);
-}
-
-.palette-sample-caption > span:last-child {
-  white-space: nowrap;
-}
-
-@container (max-width: 340px) {
-  .palette-sample-caption {
-    flex-wrap: wrap;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .palette-choice {
     transition: none;

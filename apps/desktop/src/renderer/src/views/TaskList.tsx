@@ -182,7 +182,17 @@ const shelfOptions = [
 
 type TaskShelf = "active" | "done" | "archived";
 
-function taskListBody(input: { error: Error | null; loading: boolean; list: Task[]; query: string; shelf: TaskShelf; showProject: boolean; retry: () => void; onNewTask: () => void }): ReactNode {
+function taskListBody(input: {
+  error: Error | null;
+  loading: boolean;
+  list: Task[];
+  query: string;
+  shelf: TaskShelf;
+  stage: TaskStatus | null;
+  showProject: boolean;
+  retry: () => void;
+  onNewTask: () => void;
+}): ReactNode {
   if (input.error)
     return (
       <Empty title="Tasks couldn’t load">
@@ -196,6 +206,9 @@ function taskListBody(input: { error: Error | null; loading: boolean; list: Task
   if (input.query) {
     title = "No matching tasks";
     description = "Try a different title or label.";
+  } else if (input.stage) {
+    title = `No ${statusLabel[input.stage].toLowerCase()} tasks`;
+    description = "Choose another status to see the rest of your tasks.";
   } else if (input.shelf === "active") {
     title = "Make room for your next idea";
     description = "Capture the work, shape the details, then bring in an agent.";
@@ -203,7 +216,7 @@ function taskListBody(input: { error: Error | null; loading: boolean; list: Task
   return (
     <Empty title={title}>
       {description}
-      {!input.query && input.shelf === "active" ? (
+      {!input.query && !input.stage && input.shelf === "active" ? (
         <div className="mt-4">
           <Button onClick={input.onNewTask}>
             <Plus size={13} /> New task <Kbd>⌘⇧N</Kbd>
@@ -220,9 +233,12 @@ export function TaskListView({ onNewTask }: { onNewTask: () => void }) {
   const [query, setQuery] = useState("");
   const [shelf, setShelf] = useState<TaskShelf>("active");
   const all = tasks.data ?? [];
+  const [stage, setStage] = useState<TaskStatus | null>(null);
   const list = all.filter(
     (task) =>
-      (shelf === "active" ? task.status !== "done" && task.status !== "archived" : task.status === shelf) && `${task.title} ${task.labels.join(" ")}`.toLowerCase().includes(query.toLowerCase()),
+      (shelf === "active" ? task.status !== "done" && task.status !== "archived" : task.status === shelf) &&
+      (!stage || task.status === stage) &&
+      `${task.title} ${task.labels.join(" ")}`.toLowerCase().includes(query.toLowerCase()),
   );
   return (
     <>
@@ -237,20 +253,57 @@ export function TaskListView({ onNewTask }: { onNewTask: () => void }) {
       >
         Tasks
       </TopBar>
-      <div className="sub-header py-2">
-        <Segmented label="Task filter" value={shelf} onChange={setShelf} options={shelfOptions} />
-        <label className="flex min-w-0 items-center gap-2 ml-auto text-ink-3">
-          <Search size={13} />
-          <input
-            aria-label="Filter tasks"
-            className="bg-transparent min-w-0 w-36 text-sm py-1 placeholder:text-ink-4"
-            value={query}
-            placeholder="Filter tasks…"
-            onChange={(e) => setQuery(e.target.value)}
+      <div className="task-page">
+        <div className="task-page-heading">
+          <div>
+            <div className="document-eyebrow">Your workspace</div>
+            <h1>Make space for what’s next.</h1>
+            <p>Shape an idea, hand it off, and follow it through.</p>
+          </div>
+          <Button onClick={onNewTask}>
+            <Plus size={15} />
+            New task
+          </Button>
+        </div>
+        <div className="task-stage-picker" aria-label="Task status">
+          {(["backlog", "in_progress", "review"] as const).map((status) => (
+            <button
+              key={status}
+              aria-pressed={stage === status}
+              onClick={() => {
+                setShelf("active");
+                setStage(stage === status ? null : status);
+              }}
+            >
+              <StatusIcon status={status} />
+              <span>{statusLabel[status]}</span>
+              <span className="task-stage-count">{all.filter((task) => task.status === status).length}</span>
+            </button>
+          ))}
+        </div>
+        <div className="sub-header task-page-filters py-2">
+          <Segmented
+            label="Task filter"
+            value={shelf}
+            onChange={(value) => {
+              setShelf(value);
+              setStage(null);
+            }}
+            options={shelfOptions}
           />
-        </label>
+          <label className="flex min-w-0 items-center gap-2 ml-auto text-ink-3">
+            <Search size={13} />
+            <input
+              aria-label="Filter tasks"
+              className="bg-transparent min-w-0 w-36 text-sm py-1 placeholder:text-ink-4"
+              value={query}
+              placeholder="Filter tasks…"
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </label>
+        </div>
+        {taskListBody({ error: tasks.error, loading: tasks.isLoading, list, query, shelf, stage, showProject: !projectId, retry: () => void tasks.refetch(), onNewTask })}
       </div>
-      {taskListBody({ error: tasks.error, loading: tasks.isLoading, list, query, shelf, showProject: !projectId, retry: () => void tasks.refetch(), onNewTask })}
     </>
   );
 }

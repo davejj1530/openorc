@@ -33,7 +33,7 @@ export type ConversationScope = { kind: "task"; task: Task } | { kind: "thread";
  * queues while the agent is busy, and otherwise starts a run that resumes
  * the agent's last session. Thread drafts survive leaving the screen.
  */
-export function Conversation({ scope, project }: { scope: ConversationScope; project: Project }) {
+export function Conversation({ scope, project, toolbarTarget }: { scope: ConversationScope; project: Project; toolbarTarget?: HTMLElement | null }) {
   const pinned = scope.kind === "thread" && Boolean(scope.thread.teamInstanceId);
   const runtime = useRpc("orchestration.runtime", { threadId: scope.kind === "thread" ? scope.thread.id : "" }, { enabled: pinned });
   if (scope.kind === "task" && scope.task.threadId) return <OwnedTaskConversation task={scope.task} project={project} />;
@@ -49,7 +49,16 @@ export function Conversation({ scope, project }: { scope: ConversationScope; pro
       </div>
     );
   if (runtime.data && pinned && scope.kind === "thread")
-    return <TeamConversation thread={scope.thread} project={project} data={runtime.data} refresh={() => void runtime.refetch()} refreshError={runtime.error?.message ?? null} />;
+    return (
+      <TeamConversation
+        thread={scope.thread}
+        project={project}
+        data={runtime.data}
+        refresh={() => void runtime.refetch()}
+        refreshError={runtime.error?.message ?? null}
+        toolbarTarget={toolbarTarget}
+      />
+    );
   return scope.kind === "task" ? (
     <TaskForwarding task={scope.task}>
       <IndividualConversation scope={scope} project={project} />

@@ -69,9 +69,9 @@
   vertical-align: baseline;
 }
 .prose-chat a {
-  color: var(--accent-ink);
+  color: var(--content-ink);
   text-decoration: underline;
-  text-decoration-color: color-mix(in srgb, var(--accent-ink) 35%, transparent);
+  text-decoration-color: color-mix(in srgb, var(--content-ink) 35%, transparent);
   text-underline-offset: 3px;
 }
 .prose-chat a:hover {
@@ -81,8 +81,8 @@
   font-size: 0.86em;
   padding: 2px 5px;
   border-radius: var(--radius-sm);
-  color: var(--accent-ink);
-  background: var(--accent-soft);
+  color: var(--content-ink);
+  background: var(--content-soft);
   box-decoration-break: clone;
 }
 .prose-chat blockquote {

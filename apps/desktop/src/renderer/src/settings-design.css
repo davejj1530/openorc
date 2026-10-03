@@ -1,0 +1,400 @@
+/* Preference sheets share the workspace's quiet typography and independent accents. */
+.settings-shell .settings-field:first-child {
+  padding-top: 0;
+}
+.settings-shell .settings-field:last-child {
+  padding-bottom: 0;
+}
+.settings-shell .settings-field > span:not(.settings-switch) {
+  min-width: 160px;
+}
+.settings-shell .settings-feedback {
+  margin-top: 12px;
+  position: static;
+  min-height: 0;
+}
+.settings-shell .appearance-modes {
+  margin: 0;
+}
+.settings-shell .accent-combinations {
+  margin-top: 0;
+}
+.settings-shell .accent-editor {
+  margin-top: 16px;
+}
+.settings-shell .appearance-advanced {
+  margin-top: 12px;
+}
+.settings-shell .memory-control {
+  padding: 20px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.settings-shell .skills-scope {
+  padding: 0 0 20px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.settings-shell .skills-list {
+  margin-top: 12px;
+  border-block: 1px solid var(--line);
+}
+.settings-shell .skills-item-summary {
+  padding-inline: 8px;
+}
+.settings-shell .skills-empty {
+  border: 0;
+  border-block: 1px solid var(--line);
+  border-radius: 0;
+  padding: 24px 0;
+  background: transparent;
+}
+.settings-shell .settings-agent:first-of-type {
+  padding-top: 12px;
+}
+.settings-agent-location {
+  color: var(--ink-3);
+  font-size: 11px;
+  margin-top: 8px;
+}
+.settings-agent-location summary {
+  width: fit-content;
+  cursor: pointer;
+}
+.settings-agent-location code {
+  display: block;
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}
+.settings-storage-label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+.settings-data-note + .settings-data-note {
+  border-top: 1px solid var(--line);
+  margin-top: 16px;
+  padding-top: 16px;
+}
+.settings-data-note h3 {
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+.settings-data-note p {
+  color: var(--ink-2);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.usage-account {
+  padding: 22px 0;
+  border-top: 1px solid var(--line);
+  scroll-margin-top: 16px;
+}
+.usage-account:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 6px;
+}
+.usage-account-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.usage-account-identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.usage-account-identity > div {
+  min-width: 0;
+}
+.usage-account-identity img {
+  flex-shrink: 0;
+}
+.usage-account-identity h2 {
+  font-size: 15px;
+  font-weight: 600;
+}
+.usage-account-identity p {
+  color: var(--ink-3);
+  font-size: 12px;
+  margin-top: 2px;
+}
+.usage-account-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.usage-account-status [data-warning] {
+  color: var(--warn);
+}
+.usage-windows {
+  display: grid;
+}
+.usage-window {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(90px, 1.25fr) 90px;
+  align-items: center;
+  gap: 6px 24px;
+  padding-block: 12px;
+}
+.usage-window + .usage-window {
+  border-top: 1px solid var(--line);
+}
+.usage-window-label h3,
+.usage-credit h3 {
+  font-size: 13px;
+  font-weight: 500;
+}
+.usage-window-label p,
+.usage-credit p {
+  margin-top: 3px;
+  color: var(--ink-3);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.usage-window-meter {
+  display: grid;
+  gap: 6px;
+}
+.usage-meter {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--surface-3);
+}
+.usage-meter > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--navigation-ink);
+}
+.usage-window[data-warning] .usage-meter > span {
+  background: var(--warn);
+}
+.usage-window-value {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  white-space: nowrap;
+}
+.usage-window-value strong {
+  font-size: 24px;
+  line-height: 1;
+  font-weight: 500;
+  letter-spacing: -0.8px;
+  font-variant-numeric: tabular-nums;
+}
+.usage-window-value small {
+  font-size: 14px;
+  margin-left: 2px;
+  letter-spacing: 0;
+  color: var(--ink-2);
+}
+.usage-window-value > span {
+  color: var(--ink-3);
+  font-size: 11px;
+}
+.usage-window-warning {
+  color: var(--warn);
+  font-size: 11px;
+}
+.usage-window-observed {
+  grid-column: 1 / -1;
+  color: var(--ink-3);
+  font-size: 11px;
+}
+.usage-empty {
+  padding-block: 10px;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+.usage-credit {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding-block: 12px;
+  border-top: 1px solid var(--line);
+}
+.usage-credit strong {
+  font-size: 14px;
+  font-weight: 500;
+}
+.usage-message {
+  color: var(--ink-2);
+  font-size: 12px;
+  margin-top: 10px;
+}
+.usage-account-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-top: 10px;
+  color: var(--ink-3);
+  font-size: 11px;
+}
+.usage-account-footer > button {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.usage-report-details {
+  min-width: 0;
+  flex: 1;
+}
+.usage-report-details > summary {
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: fit-content;
+  cursor: pointer;
+  list-style: none;
+}
+.usage-report-details > summary::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-right: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+  transform: rotate(-45deg);
+  margin-right: 3px;
+}
+.usage-report-details[open] > summary::before {
+  transform: rotate(45deg);
+}
+.usage-report-details > summary::-webkit-details-marker {
+  display: none;
+}
+.usage-report-details > summary:hover {
+  color: var(--ink);
+}
+.usage-report-details > summary:focus-visible,
+.settings-agent-location > summary:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+.usage-report-details dl {
+  display: grid;
+  gap: 6px;
+  margin-block: 8px;
+}
+.usage-report-details dl > div {
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr);
+  gap: 16px;
+}
+.usage-report-details dd {
+  color: var(--ink-2);
+}
+.usage-footnote {
+  max-width: 650px;
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+  color: var(--ink-3);
+  font-size: 11px;
+  line-height: 1.6;
+}
+@container (max-width: 800px) {
+  .settings-shell .settings-section:has(> .settings-section-intro) {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .settings-shell .settings-section-intro p {
+    max-width: 600px;
+  }
+}
+@container (max-width: 540px) {
+  .settings-shell .settings-nav {
+    padding: 8px 12px;
+  }
+  .settings-tablist button {
+    flex-grow: 0;
+    min-width: 72px;
+    padding-inline: 8px;
+  }
+  .usage-window {
+    grid-template-columns: minmax(0, 1fr) 80px;
+    gap: 8px 18px;
+  }
+  .usage-window-value {
+    grid-column: 2;
+    grid-row: 1 / 3;
+  }
+  .usage-window-meter {
+    grid-row: 2;
+    grid-column: 1;
+  }
+  .usage-account-heading {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .usage-account-status {
+    margin-left: auto;
+  }
+  .usage-account-footer {
+    gap: 8px;
+  }
+  .usage-report-details dl > div {
+    grid-template-columns: 1fr;
+    gap: 1px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .settings-tablist button {
+    transition: none;
+  }
+}
+@media (forced-colors: active) {
+  .settings-tablist button[aria-selected="true"] {
+    outline: 1px solid Highlight;
+    outline-offset: -1px;
+  }
+  .usage-meter {
+    border: 1px solid CanvasText;
+  }
+  .usage-meter > span {
+    background: Highlight;
+    forced-color-adjust: none;
+  }
+}
+.usage-reset-details {
+  margin-top: 8px;
+  color: var(--ink-3);
+  font-size: 11px;
+}
+.usage-reset-details > summary {
+  width: fit-content;
+  cursor: pointer;
+  padding-block: 4px;
+}
+.usage-reset-details > summary:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.settings-shell .settings-feedback:empty {
+  display: none;
+}
+.settings-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}

@@ -26,7 +26,7 @@ import { AgentPresence, Transcript, TranscriptContents } from "./Transcript";
 import { ThreadMedia, useThreadMentionNames } from "./ThreadImages";
 import { MemberAvatar } from "./MemberAvatar";
 import { orclingById, useOrclings } from "../lib/orclings";
-import { AlertCircle, ChevronDown, Folder, GitFork, Workflow } from "./icons";
+import { AlertCircle, ChevronDown, Folder, GitFork } from "./icons";
 import { Button, TextButton, Tooltip } from "./ui";
 import { emptyRun, getRun, hydrate, useRun, useRunMap, useRuns, type Block, type RunTranscript } from "../lib/transcript";
 import { useRpc, useRpcMutation } from "../lib/query";
@@ -53,6 +53,7 @@ import { teamAttention, teamRequestSummary } from "../lib/team-attention";
 import { teamChatText } from "../lib/team-transcript";
 import { teamMentionNames } from "../lib/mention-names";
 import { TeamChangeCard } from "./TeamChangeCard";
+import { TeamConversationTools } from "./TeamConversationTools";
 import "./TeamConversation.css";
 
 // Extend the native conversation: one reading column, one time-ordered feed in
@@ -106,6 +107,7 @@ export function TeamConversation({
   refresh,
   refreshError,
   retainedTaskId,
+  toolbarTarget,
 }: {
   thread: Thread | ThreadSummary;
   project: Project;
@@ -113,6 +115,7 @@ export function TeamConversation({
   refresh: () => void;
   refreshError: string | null;
   retainedTaskId?: string;
+  toolbarTarget?: HTMLElement | null | undefined;
 }) {
   const [showActivity, setShowActivity] = useState(() => readDraft("team.showActivity", { enabled: false }).enabled === true);
   const attentionId = useId();
@@ -128,7 +131,6 @@ export function TeamConversation({
   const stop = useRpcMutation("orchestration.stop");
   const compact = useRpcMutation("orchestration.compact");
   const compactRequest = useTeamContextAction(`conversation.${thread.id}.context.compact`, (requestKey) => compact.mutateAsync({ ...control, requestKey }));
-  const compactDescriptionId = useId();
   const permissionDescriptionId = useId();
   const modeDescriptionId = useId();
   const last = data.executions.at(-1);
@@ -202,50 +204,33 @@ export function TeamConversation({
         <TeamActivityVisibility.Provider value={showActivity}>
           <TeamAttentionTarget.Provider value={attentionTarget}>
             <div ref={conversationRef} className="team-conversation h-full flex flex-col min-h-0" data-team-thread={thread.id} data-team-retained-task={retainedTaskId}>
-              <div className="team-conversation-heading">
-                <Workflow size={15} />
-                <span className="team-conversation-name">{data.revision.name}</span>
-                <span className="text-ink-3">Version {data.revision.number}</span>
-                <span className="team-conversation-status" role="status">
-                  {last ? executionLabel(last) : "Ready"}
-                </span>
-                {working ? (
-                  <span className="text-ink-3" data-team-working>
-                    {working}
-                  </span>
-                ) : null}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="team-activity-toggle"
-                  aria-pressed={showActivity}
-                  onClick={() => {
-                    const enabled = !showActivity;
-                    setShowActivity(enabled);
-                    writeDraft("team.showActivity", { enabled });
-                  }}
-                >
-                  Show activity
-                </Button>
-                {retained && !data.context?.compact ? null : (
-                  <>
-                    <Tooltip label={compactDescription}>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        aria-describedby={compactDescriptionId}
-                        disabled={compactRequest.working || (!compactRequest.pending && (!data.context?.compact.allowed || Boolean(refreshError)))}
-                        onClick={compactRequest.run}
-                      >
-                        {durableActionLabel({ working: compactRequest.working, pending: Boolean(compactRequest.pending), labels: ["Compact lead context", "Retry compact request", "Compacting…"] })}
-                      </Button>
-                    </Tooltip>
-                    <span id={compactDescriptionId} className="sr-only">
-                      {compactDescription}
-                    </span>
-                  </>
-                )}
-              </div>
+              <TeamConversationTools
+                target={toolbarTarget}
+                name={data.revision.name}
+                version={data.revision.number}
+                status={last ? executionLabel(last) : "Ready"}
+                working={working}
+                showActivity={showActivity}
+                onShowActivity={(enabled) => {
+                  setShowActivity(enabled);
+                  writeDraft("team.showActivity", { enabled });
+                }}
+                compact={
+                  retained && !data.context?.compact
+                    ? null
+                    : {
+                        label: durableActionLabel({
+                          working: compactRequest.working,
+                          pending: Boolean(compactRequest.pending),
+                          labels: ["Compact lead context", "Retry compact request", "Compacting…"],
+                        }),
+                        description: compactDescription,
+                        disabled: compactRequest.working || (!compactRequest.pending && (!data.context?.compact.allowed || Boolean(refreshError))),
+                        pending: compactRequest.working || Boolean(compactRequest.pending),
+                        run: compactRequest.run,
+                      }
+                }
+              />
               {showActivity && active && last ? <TeamActivityStrip execution={last} revision={data.revision} /> : null}
               {refreshError ? (
                 <div className="team-refresh-error" role="alert">
@@ -642,9 +627,13 @@ function TeamAuthor({
   const model = useModelEffortLabel(settings);
   return (
     <header className="team-turn-author">
-      {memberKey ? <TeamMemberPicture memberKey={memberKey} size="lg" /> : null}
+      {memberKey ? <TeamMemberPicture memberKey={memberKey} size="sm" /> : null}
       <strong>{name}</strong>
-      {model ? <span>{model}</span> : null}
+      {model ? (
+        <span className="team-author-model" title={model}>
+          {model}
+        </span>
+      ) : null}
       {at !== undefined ? <time dateTime={new Date(at).toISOString()}>{clockTime(at)}</time> : null}
       {note ? <span>{note}</span> : null}
       {live ? <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" role="status" aria-label="Working" /> : null}

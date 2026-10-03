@@ -2,6 +2,7 @@
 // a user makes on top of it. Light and dark hold separate values, so switching
 // appearance never shows a color picked for the other mode.
 import { themePresets, type Mode, type ThemePreset } from "./theme-palettes";
+import { accentRoles, accentTokens, type AccentToken } from "./theme-accents";
 
 export type TokenOverrides = Record<string, string>;
 export type CustomColors = Partial<Record<ThemePreset, Partial<Record<Mode, TokenOverrides>>>>;
@@ -44,6 +45,8 @@ export const colorGroups = [
       { token: "--accent-fg", label: "On accent" },
       { token: "--accent-soft", label: "Accent tint" },
       { token: "--selection", label: "Selection" },
+      { token: "--navigation-accent", label: "Navigation accent" },
+      { token: "--content-accent", label: "Content accent" },
     ],
   },
 ] satisfies { name: string; tokens: { token: string; label: string }[] }[];
@@ -86,6 +89,29 @@ export function withoutColor(custom: CustomColors, preset: ThemePreset, mode: Mo
 
 export function withoutOverrides(custom: CustomColors, preset: ThemePreset, mode: Mode): CustomColors {
   return Object.keys(overridesFor(custom, preset, mode)).length === 0 ? custom : replace(custom, preset, mode, {});
+}
+
+/** One save per accent edit, so windows never see a half-applied color combination. */
+export function withAccents(custom: CustomColors, preset: ThemePreset, mode: Mode, colors: Record<string, string>): CustomColors {
+  const accepted: Record<string, string> = {};
+  for (const { token } of accentRoles) {
+    const hex = normalizeHex(colors[token] ?? "");
+    if (hex) accepted[token] = hex;
+  }
+  if (Object.keys(accepted).length === 0) return custom;
+  const overrides = { ...overridesFor(custom, preset, mode), ...accepted };
+  if (accepted["--accent"]) for (const token of ["--accent-ink", "--accent-fg", "--accent-soft", "--selection"]) delete overrides[token];
+  if (accepted["--content-accent"]) delete overrides["--selection"];
+  return replace(custom, preset, mode, overrides);
+}
+
+export function withoutAccents(custom: CustomColors, preset: ThemePreset, mode: Mode, role?: AccentToken): CustomColors {
+  const overrides = { ...overridesFor(custom, preset, mode) };
+  let tokens = role ? [role] : accentTokens;
+  if (role === "--accent") tokens = ["--accent", "--accent-ink", "--accent-fg", "--accent-soft"];
+  for (const token of tokens) delete overrides[token];
+  if (role !== "--navigation-accent") delete overrides["--selection"];
+  return replace(custom, preset, mode, overrides);
 }
 
 /** Drops anything a past version, a hand edit, or another tab may have left behind. */

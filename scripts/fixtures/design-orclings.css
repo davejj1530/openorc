@@ -1,0 +1,279 @@
+/* Orcling study: the same shell and flat surfaces, with identity in the artwork. */
+.orcling-study .orcling-avatar {
+  flex-shrink: 0;
+}
+.orcling-study .browser-heading h2 {
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.6px;
+}
+.orcling-chat-scroll,
+.orcling-profile-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.orcling-chat-document {
+  max-width: var(--container-chat);
+  margin: 0 auto;
+  padding: 28px var(--reading-gutter);
+}
+.orcling-conversation-date {
+  color: var(--ink-3);
+  text-align: center;
+  font-size: 11px;
+  margin-bottom: 32px;
+}
+.orcling-chat-reply {
+  margin-top: 28px;
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--ink-2);
+}
+.orcling-chat-reply > header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  color: var(--ink);
+  font-size: 12px;
+}
+.orcling-chat-reply > header strong {
+  font-weight: 550;
+}
+.orcling-chat-reply time {
+  margin-left: auto;
+  color: var(--ink-3);
+  font-size: 10px;
+}
+.orcling-chat-reply > p {
+  margin-bottom: 12px;
+}
+.orcling-project-link {
+  display: grid;
+  width: 100%;
+  gap: 4px;
+  padding: 16px 0;
+  margin-top: 20px;
+  border-block: 1px solid var(--line);
+  text-align: left;
+}
+.orcling-project-link:hover {
+  color: var(--content-ink);
+}
+.orcling-project-link > span {
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.orcling-project-link > strong {
+  font-size: 13px;
+  font-weight: 550;
+}
+.orcling-profile-document {
+  max-width: 790px;
+  margin: 0 auto;
+  padding: 32px 40px 48px;
+}
+.orcling-profile-identity {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  margin-bottom: 24px;
+}
+.orcling-profile-identity > div {
+  min-width: 0;
+  flex: 1;
+}
+.orcling-profile-identity label {
+  display: block;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.orcling-profile-identity input {
+  display: block;
+  width: 100%;
+  padding: 3px 0;
+  font-size: 25px;
+  letter-spacing: -0.6px;
+  font-weight: 600;
+  background: transparent;
+}
+.orcling-profile-identity p {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ink-3);
+  margin-top: 4px;
+}
+.orcling-profile-tabs {
+  display: flex;
+  gap: 24px;
+  border-bottom: 1px solid var(--line);
+}
+.orcling-profile-tabs > button {
+  padding: 12px 0;
+  color: var(--ink-3);
+  font-size: 12px;
+  border-bottom: 2px solid transparent;
+}
+.orcling-profile-tabs > button[aria-selected="true"] {
+  border-bottom-color: var(--navigation-ink);
+  color: var(--ink);
+  font-weight: 550;
+}
+.orcling-profile-section {
+  padding-top: 24px;
+}
+.orcling-profile-section h2 {
+  font-size: 13px;
+  font-weight: 550;
+  margin-bottom: 12px;
+}
+.orcling-profile-section > p {
+  color: var(--ink-3);
+  font-size: 12px;
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+.orcling-shape-options {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+}
+.orcling-shape-options > button {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 8px 2px;
+  border-radius: 6px;
+  color: var(--ink-3);
+  font-size: 10px;
+}
+.orcling-shape-options > button:hover {
+  background: var(--surface-2);
+}
+.orcling-shape-options > button[aria-checked="true"] {
+  background: var(--navigation-soft);
+  color: var(--navigation-ink);
+}
+.orcling-color-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.orcling-color-options > button {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  color: #1b1c20;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--ink) 20%, transparent);
+}
+.orcling-look-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 32px;
+  margin-top: 24px;
+}
+.orcling-look-fields label {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.orcling-look-fields select {
+  color: var(--ink);
+  background: transparent;
+  min-width: 0;
+  max-width: 60%;
+  padding: 4px;
+}
+.orcling-preview-feedback {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ink-3);
+  margin-top: 20px;
+}
+.orcling-profile-section textarea {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  padding: 14px;
+  font-size: 13px;
+  line-height: 1.65;
+}
+.orcling-save-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 12px;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.orcling-instruction-history {
+  border-top: 1px solid var(--line);
+  margin-top: 24px;
+  padding-top: 16px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ink-3);
+}
+.orcling-instruction-history summary {
+  cursor: pointer;
+  color: var(--ink-2);
+  margin-bottom: 12px;
+}
+.orcling-instruction-history p {
+  margin-bottom: 8px;
+}
+.orcling-memory-row {
+  border-top: 1px solid var(--line);
+  padding: 18px 0;
+}
+.orcling-memory-row strong {
+  font-size: 13px;
+  font-weight: 550;
+}
+.orcling-memory-row p {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink-2);
+  margin: 6px 0;
+}
+.orcling-memory-row > span {
+  font-size: 10px;
+  color: var(--ink-3);
+}
+.orcling-study :is(.orcling-contact, .orcling-project-link, .orcling-profile-tabs > button, .orcling-shape-options > button, .orcling-color-options > button):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+@container (max-width: 620px) {
+  .orcling-profile-document {
+    padding: 24px;
+  }
+  .orcling-profile-identity {
+    gap: 14px;
+  }
+  .orcling-profile-identity > svg {
+    width: 72px;
+    height: 72px;
+    flex-shrink: 0;
+  }
+  .orcling-shape-options {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .orcling-look-fields {
+    column-gap: 18px;
+  }
+  .orcling-chat-document {
+    padding-inline: 28px;
+  }
+}

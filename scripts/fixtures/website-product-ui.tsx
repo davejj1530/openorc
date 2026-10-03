@@ -2,7 +2,10 @@
  * No live RPC, account, project files, or provider calls are available here. */
 import { createRoot } from "react-dom/client";
 import { QueryClientProvider } from "@tanstack/react-query";
+import { createDesignSettingsRpc } from "./design-settings";
+import { useRouter } from "../../apps/desktop/src/renderer/src/lib/router";
 
+let automaticChecks = false;
 Object.assign(window, {
   openorc: {
     platform: "darwin",
@@ -10,26 +13,27 @@ Object.assign(window, {
     openWindow() {},
     onTheme: () => () => {},
     setTheme() {},
+    updates: { settings: async () => ({ automaticChecks }), setAutomaticChecks: async (value: boolean) => ({ automaticChecks: (automaticChecks = value) }) },
     assetUrl: (p: string) => p,
   },
 });
 
 async function main() {
   const query = new URLSearchParams(location.search);
+  const designPreview = query.has("design");
   // Capture at 2x pixel density without enlarging the component's layout.
   // This is fixture-only; the production renderer's styles are unchanged.
   const captureScale = query.get("scale") === "2" ? 2 : 1;
   const sizeCapture = () => {
     const root = document.getElementById("root")!;
     root.style.width = `${window.innerWidth / captureScale}px`;
-    root.style.height = `${window.innerHeight / captureScale}px`;
+    root.style.height = `${(window.innerHeight - (designPreview ? 40 : 0)) / captureScale}px`;
     root.style.zoom = String(captureScale);
   };
   sizeCapture();
   window.addEventListener("resize", sizeCapture);
   const { core } = await import("../../apps/desktop/src/renderer/src/lib/rpc");
   const { queryClient } = await import("../../apps/desktop/src/renderer/src/lib/query");
-  const { useRouter } = await import("../../apps/desktop/src/renderer/src/lib/router");
   const { useLayout } = await import("../../apps/desktop/src/renderer/src/lib/layout");
   const { useTheme } = await import("../../apps/desktop/src/renderer/src/lib/theme");
   const { emptyRun, seedRun } = await import("../../apps/desktop/src/renderer/src/lib/transcript");
@@ -61,6 +65,7 @@ async function main() {
     createdAt: now - 180000,
     updatedAt: now,
     lastActivityAt: now,
+    lastAgentEventAt: now - 20000,
     archivedAt: null,
     activity: "idle",
     unread: false,
@@ -98,7 +103,7 @@ async function main() {
     createdAt: now - 3600000,
     updatedAt: now,
   }));
-  const patch = `diff --git a/src/Welcome.tsx b/src/Welcome.tsx\n--- a/src/Welcome.tsx\n+++ b/src/Welcome.tsx\n@@ -1,9 +1,15 @@\n import { ProjectPicker } from './ProjectPicker';\n+import { Button } from './ui';\n \n export function Welcome() {\n   return (\n-    <main className="empty">\n-      <p>No projects yet.</p>\n+    <main className="welcome">\n+      <h1>Make yourself at home.</h1>\n+      <p>Connect a project to start building.</p>\n       <ProjectPicker />\n+      <Button onClick={startConversation}>\n+        Start a conversation\n+      </Button>\n+      <KeyboardHint />\n     </main>\n   );\n }\n`;
+  const patch = `diff --git a/src/Welcome.tsx b/src/Welcome.tsx\n--- a/src/Welcome.tsx\n+++ b/src/Welcome.tsx\n@@ -1,10 +1,16 @@\n import { ProjectPicker } from './ProjectPicker';\n+import { Button } from './ui';\n \n export function Welcome() {\n   return (\n-    <main className="empty">\n-      <p>No projects yet.</p>\n+    <main className="welcome">\n+      <h1>Make yourself at home.</h1>\n+      <p>Connect a project to start building.</p>\n       <ProjectPicker />\n+      <Button onClick={startConversation}>\n+        Start a conversation\n+      </Button>\n+      <KeyboardHint />\n     </main>\n   );\n }\n`;
   const diff = { baseSha: null, since: null, patch, files: [{ path: "src/Welcome.tsx", status: "modified", oldPath: null }], branch: "main", base: "main", dirty: true };
   const messages = [
     { id: "request", role: "user", text: "Let’s make onboarding feel more thoughtful. Help people connect their first project, then give them a clear next step.", createdAt: now - 90000 },
@@ -187,7 +192,10 @@ async function main() {
     { agent: "codex", id: "gpt-6-astra", label: "GPT-6-Astra", efforts: ["high"], defaultEffort: "high", isDefault: true },
     { agent: "claude", id: "claude-opus-5-5[1m]", label: "Opus 5.5 (1M context)", efforts: ["high"], defaultEffort: "high" },
   ];
+  const settingsRpc = createDesignSettingsRpc();
   core.call = (async (method: string, params: Record<string, unknown> = {}) => {
+    const setting = settingsRpc(method, params);
+    if (setting !== undefined) return setting;
     if (method === "tasks.comments.list")
       return {
         comments: [
@@ -241,15 +249,22 @@ async function main() {
         { id: "docs-review", title: "Check docs against the code", everyMinutes: 10080, agent: "codex", model: "gpt-6-astra", enabled: false },
       ].map((schedule) => ({ ...schedule, projectId: "studio", version: 1, lastRunAt: now - 3600000, nextRunAt: now + 3600000, lastThreadId: "onboarding" }));
     if (method === "projects.list") return projects;
+    if (method === "projects.git") return "ready";
     if (method === "projects.get") return projects.find((p) => p.id === params.id) ?? project;
     if (method === "workspace.get") return { ...project, id: "openorc-workspace", name: "Workspace" };
-    if (method === "threads.list") return threads.filter((t) => !params.projectId || t.projectId === params.projectId);
+    if (method === "threads.list") return threads.filter((t) => (!params.projectId || t.projectId === params.projectId) && (params.filter === "archived" ? Boolean(t.archivedAt) : !t.archivedAt));
     if (method === "threads.get") return threads.find((t) => t.id === params.id) ?? threads[0];
     if (method === "threads.messages") return params.id === "team" ? [] : messages;
-    if (method === "threads.update") return threads.find((t) => t.id === params.id) ?? threads[0];
+    if (method === "threads.update") {
+      const index = threads.findIndex((thread) => thread.id === params.id);
+      if (index >= 0) threads[index] = { ...threads[index], ...params.patch };
+      return threads[index] ?? threads[0];
+    }
     if (method === "threads.permissions") return team.policy;
-    if (method === "tasks.list" || method === "tasks.listForThread") return tasks;
+    if (method === "tasks.list" || method === "tasks.listForThread") return tasks.filter((task) => !params.projectId || task.projectId === params.projectId);
     if (method === "tasks.get") return tasks.find((t) => t.id === params.id) ?? tasks[0];
+    if (method === "tasks.update") return Object.assign(tasks.find((t) => t.id === params.id) ?? tasks[0], params.patch, { updatedAt: Date.now() });
+    if (method === "tasks.executionThread") return null;
     if (method === "orchestration.taskState") return null;
     if (method === "review.threadDiff" || method === "review.projectDiff" || method === "review.diff") return diff;
     if (method === "git.threadPushState") return { branch: "main", blocked: null, published: true, unpushedCount: 0, unpushed: [] };
@@ -257,12 +272,14 @@ async function main() {
     if (method === "orchestration.availability") return { enabled: true, maxHierarchyDepth: 3 };
     if (method === "agents.models") return models;
     if (method === "agents.modelCatalog") return { models, providers: [] };
-    if (method === "app.settings.get") return { defaultWorkspaceMode: "current", defaultPermissionMode: "review" };
+    if (method === "agents.updates.get") return { agents: [], automatic: false, checking: false, updating: false };
     if (method === "system.info")
       return {
+        dataDir: "/Users/you/Library/Application Support/OpenOrc",
         harnesses: [
           { id: "codex", state: "ready" },
           { id: "claude", state: "ready" },
+          { id: "opencode", state: "not_found" },
         ],
         codex: { installed: true, loggedIn: true },
         gh: { installed: true, loggedIn: true },
@@ -271,8 +288,12 @@ async function main() {
   }) as typeof core.call;
   queryClient.setDefaultOptions({ queries: { retry: false } });
   useTheme.getState().setPreset("openorc");
-  useTheme.getState().set("dark");
-  useLayout.setState({ sidebarOpen: true, panelOpen: false, projectId: null, collapsed: [] });
+  useTheme.getState().set(query.get("theme") === "light" ? "light" : "dark");
+  const { accentCombinations } = await import("../../apps/desktop/src/renderer/src/lib/theme-accents");
+  const accent = accentCombinations.find((entry) => entry.id === query.get("accent"));
+  if (accent) useTheme.getState().setAccentCombination(accent.id);
+  else if (query.get("accent") === "default") useTheme.getState().resetAccents();
+  useLayout.setState({ sidebarOpen: !designPreview || window.innerWidth > 900, panelOpen: false, projectId: null, collapsed: [] });
   useLayout.getState().setSidebarWidth(270);
   useLayout.getState().setPanelWidth(450);
   // Detail captures render the same production components at readable widths.
@@ -301,12 +322,21 @@ async function main() {
     useLayout.setState({ sidebarOpen: false });
     useRouter.getState().navigate({ view: "scheduled" });
   } else if (mode === "tasks") useRouter.getState().navigate({ view: "tasks" });
+  else if (["usage", "connections", "slack", "skills", "appearance", "general", "memory", "data"].includes(mode)) {
+    useRouter.getState().navigate({ view: "settings", section: mode as "usage" });
+  } else if (mode === "new") useRouter.getState().navigate({ view: "newthread", projectId: "studio" });
+  else if (mode === "orclings") useRouter.getState().navigate({ view: "thread", threadId: "orcling-rini" });
+  else if (mode === "document") useRouter.getState().navigate({ view: "task", taskId: "welcome", tab: "spec" });
   else useRouter.getState().navigate({ view: "thread", threadId: mode === "teams" ? "team" : "onboarding" });
   if (mode === "review") useLayout.getState().openWorkspaceChanges({ kind: "thread", id: "onboarding" });
   const { App } = await import("../../apps/desktop/src/renderer/src/App");
+  const { DesignOrclings } = await import("./design-orclings");
   createRoot(document.getElementById("root")!).render(
     <QueryClientProvider client={queryClient}>
-      <App />
+      <DesignOrclings>
+        <App />
+      </DesignOrclings>
+      {designPreview ? <DesignPreviewBar /> : null}
       {/* Browser captures omit Electron's native chrome. Reproduce only the
           buttons in the space already reserved by the production header:
           main/index.ts trafficLightPosition (14, 20), 12px buttons, 8px gaps. */}
@@ -316,6 +346,71 @@ async function main() {
         ))}
       </div>
     </QueryClientProvider>,
+  );
+}
+
+/** Preview controls live outside the production app; all views use its real components. */
+function DesignPreviewBar() {
+  const query = new URLSearchParams(location.search);
+  const threadId = useRouter((state) => (state.route.view === "thread" ? state.route.threadId : null));
+  let previewView = ["connections", "slack", "skills", "general", "memory", "data"].includes(query.get("view") ?? "") ? "usage" : (query.get("view") ?? "workspace");
+  if (threadId?.startsWith("orcling-")) previewView = "orclings";
+  else if (threadId && previewView === "orclings") previewView = threadId === "team" ? "teams" : "workspace";
+  return (
+    <nav
+      aria-label="Design preview"
+      style={{
+        position: "fixed",
+        inset: "auto 0 0",
+        height: 40,
+        display: "flex",
+        alignItems: "center",
+        gap: 16,
+        padding: "0 18px",
+        background: "var(--bg)",
+        borderTop: "1px solid var(--line)",
+        fontSize: 12,
+      }}
+    >
+      <span style={{ color: "var(--ink-3)", marginRight: "auto", minWidth: 0, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>Design study · Sample data</span>
+      <label style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+        View
+        <select
+          aria-label="Preview view"
+          style={{ maxWidth: 140 }}
+          value={previewView}
+          onChange={(e) => {
+            query.set("view", e.target.value);
+            location.search = query.toString();
+          }}
+        >
+          <option value="workspace">Conversation</option>
+          <option value="teams">Team conversation</option>
+          <option value="orclings">Orclings</option>
+          <option value="new">New thread</option>
+          <option value="tasks">Tasks</option>
+          <option value="document">Document</option>
+          <option value="review">Changes</option>
+          <option value="usage">Settings</option>
+          <option value="appearance">Appearance</option>
+        </select>
+      </label>
+      <label style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+        Theme
+        <select
+          aria-label="Preview theme"
+          value={query.get("theme") ?? "dark"}
+          onChange={(e) => {
+            query.set("theme", e.target.value);
+            query.set("view", previewView);
+            location.search = query.toString();
+          }}
+        >
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </label>
+    </nav>
   );
 }
 void main();

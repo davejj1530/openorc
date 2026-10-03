@@ -79,13 +79,13 @@ it("reuses the same attempt after a lost response and resumes an attempt supplie
 
 it("keeps a terminal outcome visible if post-redemption usage refresh fails", async () => {
   mocks.call.mockResolvedValue({ outcome: "reset", message: "Reset used; refresh usage", usage: { ...report, status: "error", resets: undefined } });
-  const view = mount(<ResetControls report={report} stale={false} />);
+  const view = mount(<ResetControls report={report} stale={false} disclosure />);
   fireEvent.click(screen.getByRole("button", { name: "Use reset" }));
   fireEvent.click(screen.getByRole("button", { name: "Confirm reset" }));
   await screen.findByRole("status");
   view.rerender(
     <QueryClientProvider client={view.client}>
-      <ResetControls report={{ ...report, status: "error", resets: undefined }} stale />
+      <ResetControls report={{ ...report, status: "error", resets: undefined }} stale disclosure />
     </QueryClientProvider>,
   );
   expect(screen.getByRole("status").textContent).toContain("Reset used");
@@ -116,4 +116,36 @@ it("refreshes only the opened provider once on return and does not infer a Claud
   fireEvent(window, new Event("focus"));
   expect(reads("claude")).toBe(before.claude + 1);
   expect(reads("codex")).toBe(before.codex);
+});
+
+it("keeps unknown amounts unknown and marks retained quota values out of date after a refresh fails", async () => {
+  const now = Date.now();
+  let fail = false;
+  mocks.call.mockImplementation(async (method, input) => {
+    if (method === "memory.settings.get") return {};
+    if (fail && input.provider === "codex") throw new Error("Offline");
+    return {
+      ...report,
+      provider: input.provider,
+      resets: undefined,
+      windows:
+        input.provider === "codex"
+          ? [
+              { id: "session", label: "Session", usedPercent: 18, remainingPercent: 82, resetsAt: now + 3600000, observedAt: now, exhausted: false },
+              { id: "weekly", label: "Weekly", usedPercent: null, remainingPercent: null, resetsAt: null, observedAt: now, exhausted: false },
+            ]
+          : [],
+    };
+  });
+  mount(<ProviderUsageOverview active />);
+  const codex = screen.getByRole("region", { name: "Codex usage" });
+  const meter = await within(codex).findByRole("progressbar", { name: "Session: reported allowance remaining" });
+  expect(meter.getAttribute("aria-valuenow")).toBe("82");
+  expect(within(codex).getAllByRole("progressbar")).toHaveLength(1);
+  expect(within(codex).getByText("Not reported")).toBeTruthy();
+  fail = true;
+  fireEvent.click(within(codex).getByRole("button", { name: "Refresh Codex usage" }));
+  await within(codex).findByRole("alert");
+  expect(meter.getAttribute("aria-valuenow")).toBe("82");
+  expect(meter.getAttribute("aria-valuetext")).toBe("82% remaining, out of date");
 });

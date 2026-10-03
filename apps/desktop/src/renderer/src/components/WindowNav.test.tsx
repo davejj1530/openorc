@@ -20,7 +20,7 @@ import { WindowNav } from "./Sidebar";
 afterEach(cleanup);
 
 it("puts Inbox between the sidebar toggle and search, counting what waits in it", () => {
-  render(<WindowNav open />);
+  const { rerender } = render(<WindowNav open={false} />);
   expect(screen.getAllByRole("button").map((button) => button.getAttribute("aria-label"))).toEqual(["Toggle sidebar", "Inbox, 4", "Search", "Back", "Forward"]);
 
   const inbox = screen.getByRole("button", { name: "Inbox, 4" });
@@ -29,4 +29,7 @@ it("puts Inbox between the sidebar toggle and search, counting what waits in it"
   fireEvent.click(inbox);
   expect(useRouter.getState().route).toEqual({ view: "inbox" });
   expect(inbox.getAttribute("aria-current")).toBe("page");
+  rerender(<WindowNav open />);
+  expect(screen.queryByRole("button", { name: "Search" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Inbox, 4" })).toBeTruthy();
 });

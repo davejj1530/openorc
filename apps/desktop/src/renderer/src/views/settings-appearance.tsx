@@ -1,14 +1,17 @@
 import { useMemo, useState } from "react";
-import { Monitor, Moon, RotateCcw, Sun } from "../components/icons";
+import { Monitor, Moon, Sun } from "../components/icons";
 import { Button } from "../components/ui";
 import { cn } from "../lib/cn";
 import { toHex } from "../lib/color";
 import { themePresets, useTheme, type ThemeChoice } from "../lib/theme";
-import { colorGroups, editableTokens, normalizeHex, overridesFor } from "../lib/theme-custom";
+import { colorGroups, editableTokens, overridesFor } from "../lib/theme-custom";
 import { Field, Section, Toggle } from "./settings-shared";
 import { useWindowAppearance } from "../lib/window-appearance";
 import { PaletteSelector } from "../components/PaletteSelector";
 import { MascotStill } from "../components/MascotStill";
+import { ColorRow } from "../components/ColorRow";
+import { AccentSettings } from "./settings-accents";
+import { resolveAccentColors } from "../lib/theme-accents";
 
 const modes = [
   { id: "system", name: "System", icon: Monitor },
@@ -24,7 +27,7 @@ export function AppearanceSettings() {
   const report: Report = (saved) => setStatus(saved ? "Appearance saved" : "Applied for this session. Storage is unavailable; select again to retry saving.");
   return (
     <>
-      <Section flush title="Color appearance" description="Use a light or dark workspace, or follow your device.">
+      <Section title="Color appearance" description="Use a light or dark workspace, or follow your device.">
         <div className="appearance-modes" role="group" aria-label="Color appearance">
           {modes.map(({ id, name, icon: Icon }) => (
             <button key={id} type="button" aria-pressed={choice === id} onClick={() => report(set(id))}>
@@ -34,11 +37,15 @@ export function AppearanceSettings() {
           ))}
         </div>
       </Section>
-      <WindowAppearanceSettings report={report} />
+      <AccentSettings report={report} />
       <Section flush title="Palette" description="Product palettes for your workspace. Every palette works in light and dark.">
         <PaletteSelector preset={preset} mode={resolved} custom={custom} onChange={(next) => report(setPreset(next))} />
       </Section>
-      <ColorEditor report={report} />
+      <WindowAppearanceSettings report={report} />
+      <details className="appearance-advanced">
+        <summary>Fine-tune individual colors</summary>
+        <ColorEditor report={report} />
+      </details>
       <p className="appearance-status" role="status">
         {status}
       </p>
@@ -92,6 +99,7 @@ function ColorEditor({ report }: { report: Report }) {
   const { preset, resolved, custom, setColor, resetColor, resetColors } = useTheme();
   const theme = themePresets.find((entry) => entry.id === preset)!;
   const overrides = overridesFor(custom, preset, resolved);
+  const colors = resolveAccentColors(theme.colors[resolved], overrides);
   const changed = Object.keys(overrides).length;
   // The palette authors colors in syntaxes the picker cannot read, so resolve
   // each one to hex once per palette and appearance mode.
@@ -120,7 +128,7 @@ function ColorEditor({ report }: { report: Report }) {
               <ColorRow
                 key={token}
                 label={label}
-                value={overrides[token] ?? base}
+                value={toHex(colors[token]) ?? base}
                 changed={token in overrides}
                 onChange={(hex) => report(setColor(token, hex))}
                 onReset={() => report(resetColor(token))}
@@ -130,40 +138,5 @@ function ColorEditor({ report }: { report: Report }) {
         </div>
       ))}
     </Section>
-  );
-}
-
-function ColorRow({ label, value, changed, onChange, onReset }: { label: string; value: string; changed: boolean; onChange: (hex: string) => void; onReset: () => void }) {
-  const [draft, setDraft] = useState<string | null>(null);
-  const text = draft ?? value;
-  const valid = normalizeHex(text) !== null;
-  const commit = () => {
-    const hex = normalizeHex(text);
-    setDraft(null);
-    if (hex !== null && hex !== value) onChange(hex);
-  };
-  return (
-    <div className="color-row">
-      <input className="color-swatch" type="color" value={value} aria-label={label} onChange={(event) => onChange(event.target.value)} />
-      <span className={cn("color-row-label", changed && "font-medium")}>{label}</span>
-      <input
-        className={cn("color-row-hex", !valid && "color-row-hex-invalid")}
-        value={text}
-        spellCheck={false}
-        aria-label={`${label} hex value`}
-        aria-invalid={!valid}
-        onChange={(event) => setDraft(event.target.value)}
-        onBlur={commit}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") commit();
-          if (event.key === "Escape") setDraft(null);
-        }}
-      />
-      {changed && (
-        <button type="button" className="color-row-reset" title={`Reset ${label} to the palette`} aria-label={`Reset ${label} to the palette`} onClick={onReset}>
-          <RotateCcw size={13} />
-        </button>
-      )}
-    </div>
   );
 }

@@ -128,3 +128,19 @@ it("disables only the saving row, retains its status on failure and lets the use
   expect(screen.queryByRole("alert")).toBeNull();
   expect(useRouter.getState().route).toEqual({ view: "tasks" });
 });
+
+it("filters by stage and clears that filter when changing shelves", async () => {
+  await show();
+  const stages = screen.getByLabelText("Task status");
+  fireEvent.click(within(stages).getByRole("button", { name: /Review/ }));
+  expect(screen.queryByRole("button", { name: "Export rows, Backlog" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Review copy, Review" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("radio", { name: "Done" }));
+  fireEvent.click(screen.getByRole("radio", { name: "Active" }));
+  expect(screen.getByRole("button", { name: "Export rows, Backlog" })).toBeTruthy();
+  expect(
+    within(stages)
+      .getByRole("button", { name: /Review/ })
+      .getAttribute("aria-pressed"),
+  ).toBe("false");
+});

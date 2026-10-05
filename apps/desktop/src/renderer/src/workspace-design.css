@@ -579,8 +579,19 @@
 .team-turn-author + [data-team-run] > .work-turn:first-child > .transcript-block:first-child {
   margin-top: 6px;
 }
+.journal-prompt > .journal-message-body {
+  width: fit-content;
+  max-width: min(88%, 72ch);
+  min-width: 0;
+  margin-inline-start: auto;
+  grid-template-columns: minmax(0, 1fr);
+}
 .app-shell .journal-prompt .message-bubble {
-  width: 100%;
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+  justify-self: end;
+  overflow-wrap: anywhere;
   background: var(--bubble);
   box-shadow: none;
   border: 1px solid var(--line);

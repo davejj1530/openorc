@@ -360,10 +360,10 @@ async function main() {
       {designPreview ? <DesignPreviewBar /> : null}
       {/* Browser captures omit Electron's native chrome. Reproduce only the
           buttons in the space already reserved by the production header:
-          main/index.ts trafficLightPosition (14, 14), 12px buttons, 8px gaps. */}
-      <div aria-hidden="true" style={{ position: "fixed", left: 14, top: 14, display: "flex", gap: 8, pointerEvents: "none", zIndex: 100 }}>
+          main/index.ts trafficLightPosition (14, 13), 14px buttons, 9px gaps. */}
+      <div aria-hidden="true" style={{ position: "fixed", left: 14, top: 13, display: "flex", gap: 9, pointerEvents: "none", zIndex: 100 }}>
         {["#ff5f57", "#febc2e", "#28c840"].map((background) => (
-          <span key={background} style={{ width: 12, height: 12, borderRadius: "50%", background }} />
+          <span key={background} style={{ width: 14, height: 14, borderRadius: "50%", background }} />
         ))}
       </div>
     </QueryClientProvider>,

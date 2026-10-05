@@ -1,4 +1,4 @@
-import { useEffect, useState, type ComponentType, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 import {
   ExecutionMode,
   executionMode,
@@ -145,6 +145,7 @@ export interface ComposerProps {
  */
 export function Composer(props: ComposerProps) {
   const isNewThread = props.presentation === "new-thread";
+  const shell = useRef<HTMLDivElement>(null);
   const files = useComposerAttachments({ draftKey: props.draftKey, disabledReason: props.attachmentsDisabledReason });
   const { attachments, uploading, addFiles, remove: removeAttachments } = files;
   const { value, onChange } = props;
@@ -216,6 +217,7 @@ export function Composer(props: ComposerProps) {
         </p>
       ) : null}
       <div
+        ref={shell}
         className="composer-shell relative border"
         data-dragging={dragging || undefined}
         onDragOver={(e) => {
@@ -268,6 +270,8 @@ export function Composer(props: ComposerProps) {
           projectId={props.projectId}
           mentions={props.mentions}
           commands={props.commands}
+          suggestionAnchor={shell}
+          suggestionSide={isNewThread ? "bottom" : "top"}
         />
         {/* Workspace context and settings share the shell's bottom row. */}
         <div className="composer-foot">

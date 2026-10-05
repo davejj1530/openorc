@@ -109,11 +109,42 @@ describe("slash suggestions", () => {
   });
 
   it("inserts a Codex skill with its dollar prefix without offering slash actions", () => {
-    const { container } = mount({ commands: [{ name: "code-review", hint: "Review code", insert: true, prefix: "$" }], value: "Please $co" });
+    const { container } = mount({
+      commands: [
+        { name: "compact", hint: "Summarize", run: vi.fn() },
+        { name: "code-review", hint: "Review code", insert: true, prefix: "$" },
+      ],
+      value: "Please $co",
+    });
     selectAt("Please $co".length);
+    expect(screen.queryByRole("option", { name: "/compact Summarize" })).toBeNull();
     fireEvent.keyDown(message(), { key: "Tab" });
     expect(message().value).toBe("Please $code-review ");
     expect(container.querySelector(".composer-input-mirror mark")?.textContent).toBe("$code-review");
+  });
+
+  it.each([
+    ["conversation", "Tab"],
+    ["conversation", "Enter"],
+    ["new-thread", "Tab"],
+    ["new-thread", "mouse"],
+  ] as const)("offers Codex skills from / in the %s composer and selects with %s", async (presentation, method) => {
+    const onSubmit = vi.fn(async () => {});
+    const { container } = mount({
+      commands: [{ name: "code-review", hint: "Review code", insert: true, prefix: "$" }],
+      presentation,
+      value: "",
+      onSubmit,
+    });
+    fireEvent.change(message(), { target: { value: "/", selectionStart: 1 } });
+    expect(screen.getByRole("option", { name: "$code-review Review code" })).toBeTruthy();
+    fireEvent.change(message(), { target: { value: "Please /co afterward", selectionStart: "Please /co".length } });
+    if (method === "mouse") fireEvent.mouseDown(screen.getByRole("option", { name: "$code-review Review code" }));
+    else fireEvent.keyDown(message(), { key: method });
+    expect(message().value).toBe("Please $code-review  afterward");
+    expect(container.querySelector(".composer-input-mirror mark")?.textContent).toBe("$code-review");
+    await waitFor(() => expect(message().selectionStart).toBe("Please $code-review ".length));
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 
   it.each(["/tmp/co", "https://example.com/co"])("does not offer suggestions inside %j", (value) => {

@@ -207,6 +207,11 @@ function mapReasoningSummary({ runId, method, p, state, ts }: NotificationContex
   return out;
 }
 
+/** The command as Codex ran it, with Codex's own reading of what it does (read a file, search, list files) when it gave one. */
+function commandInput(item: Record<string, unknown>) {
+  return { command: item["command"], cwd: item["cwd"], ...(Array.isArray(item["commandActions"]) ? { commandActions: item["commandActions"] } : {}) };
+}
+
 /** An item family validates its nested record before emitting or mutating tool/reasoning state. */
 function mapItemLifecycle({ runId, method, p, state, ts }: NotificationContext): AgentEvent[] {
   const { summaryIndex } = state;
@@ -243,7 +248,7 @@ function mapItemLifecycle({ runId, method, p, state, ts }: NotificationContext):
         break;
       case "commandExecution":
         if (started) {
-          out.push({ type: "tool.started", runId, ts, toolCallId: id, name: "shell", input: { command: item["command"], cwd: item["cwd"] }, parentToolCallId: null });
+          out.push({ type: "tool.started", runId, ts, toolCallId: id, name: "shell", input: commandInput(item), parentToolCallId: null });
         } else {
           out.push({
             type: "tool.completed",
@@ -254,7 +259,7 @@ function mapItemLifecycle({ runId, method, p, state, ts }: NotificationContext):
             output: item["aggregatedOutput"],
             isError: terminalStatus(item["status"]) === "error" || (typeof item["exitCode"] === "number" && item["exitCode"] !== 0),
             status: typeof item["exitCode"] === "number" && item["exitCode"] !== 0 ? "error" : terminalStatus(item["status"]),
-            input: { command: item["command"], cwd: item["cwd"] },
+            input: commandInput(item),
           });
         }
         break;

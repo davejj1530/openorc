@@ -37,7 +37,7 @@ vi.mock("../lib/rpc", () => ({
     ),
   },
 }));
-vi.mock("../lib/transcript", () => ({ usePendingApprovals: () => 0 }));
+vi.mock("../lib/transcript", () => ({ usePendingApprovals: () => 0, useRun: () => undefined }));
 vi.mock("../lib/window", () => ({ useTrafficLights: () => false, useWindowsControls: () => false }));
 vi.mock("../lib/browser-preview", () => ({ CoversPreview: () => null }));
 vi.mock("./ui", async (importOriginal) => ({

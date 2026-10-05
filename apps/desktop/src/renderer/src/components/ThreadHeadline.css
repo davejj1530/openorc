@@ -1,0 +1,17 @@
+/* Lines up under the title, past the row's place icon and the gap after it. */
+.thread-preview-headline {
+  display: block;
+  margin-left: calc(13px + 8px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-xs);
+  line-height: 16px;
+  color: var(--ink-3);
+}
+.thread-preview-headline[data-tone="live"] {
+  color: var(--ink-2);
+}
+.thread-preview-headline[data-tone="attention"] {
+  color: var(--warn);
+}

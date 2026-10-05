@@ -1,64 +1,28 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-03T14:33:09.223Z",
+  "generatedAt": "2026-10-03T16:01:44.337688+00:00",
   "title": "Design System: OpenOrc desktop",
   "extensions": {
     "colorMeta": {
       "action-light": {
         "role": "primary",
         "displayName": "Action Light",
-        "tonalRamp": [
-          "oklch(15% 0.1587 258.96)",
-          "oklch(27% 0.1587 258.96)",
-          "oklch(39% 0.1587 258.96)",
-          "oklch(51% 0.1587 258.96)",
-          "oklch(63% 0.1587 258.96)",
-          "oklch(75% 0.1587 258.96)",
-          "oklch(87% 0.1587 258.96)",
-          "oklch(95% 0.1587 258.96)"
-        ]
+        "tonalRamp": ["oklch(15% 0 0)", "oklch(27% 0 0)", "oklch(39% 0 0)", "oklch(51% 0 0)", "oklch(63% 0 0)", "oklch(75% 0 0)", "oklch(87% 0 0)", "oklch(95% 0 0)"]
       },
       "action-dark": {
         "role": "primary",
         "displayName": "Action Dark",
-        "tonalRamp": [
-          "oklch(15% 0.1565 258.69)",
-          "oklch(27% 0.1565 258.69)",
-          "oklch(39% 0.1565 258.69)",
-          "oklch(51% 0.1565 258.69)",
-          "oklch(63% 0.1565 258.69)",
-          "oklch(75% 0.1565 258.69)",
-          "oklch(87% 0.1565 258.69)",
-          "oklch(95% 0.1565 258.69)"
-        ]
+        "tonalRamp": ["oklch(15% 0 0)", "oklch(27% 0 0)", "oklch(39% 0 0)", "oklch(51% 0 0)", "oklch(63% 0 0)", "oklch(75% 0 0)", "oklch(87% 0 0)", "oklch(95% 0 0)"]
       },
       "accent-text-light": {
         "role": "primary",
         "displayName": "Accent Text Light",
-        "tonalRamp": [
-          "oklch(15% 0.1289 256.12)",
-          "oklch(27% 0.1289 256.12)",
-          "oklch(39% 0.1289 256.12)",
-          "oklch(51% 0.1289 256.12)",
-          "oklch(63% 0.1289 256.12)",
-          "oklch(75% 0.1289 256.12)",
-          "oklch(87% 0.1289 256.12)",
-          "oklch(95% 0.1289 256.12)"
-        ]
+        "tonalRamp": ["oklch(15% 0 0)", "oklch(27% 0 0)", "oklch(39% 0 0)", "oklch(51% 0 0)", "oklch(63% 0 0)", "oklch(75% 0 0)", "oklch(87% 0 0)", "oklch(95% 0 0)"]
       },
       "accent-text-dark": {
         "role": "primary",
         "displayName": "Accent Text Dark",
-        "tonalRamp": [
-          "oklch(15% 0.0817 257.10)",
-          "oklch(27% 0.0817 257.10)",
-          "oklch(39% 0.0817 257.10)",
-          "oklch(51% 0.0817 257.10)",
-          "oklch(63% 0.0817 257.10)",
-          "oklch(75% 0.0817 257.10)",
-          "oklch(87% 0.0817 257.10)",
-          "oklch(95% 0.0817 257.10)"
-        ]
+        "tonalRamp": ["oklch(15% 0 0)", "oklch(27% 0 0)", "oklch(39% 0 0)", "oklch(51% 0 0)", "oklch(63% 0 0)", "oklch(75% 0 0)", "oklch(87% 0 0)", "oklch(95% 0 0)"]
       },
       "on-action": {
         "role": "primary",
@@ -77,30 +41,12 @@
       "navigation-soft-light": {
         "role": "primary",
         "displayName": "Navigation Soft Light",
-        "tonalRamp": [
-          "oklch(15% 0.0160 253.90)",
-          "oklch(27% 0.0160 253.90)",
-          "oklch(39% 0.0160 253.90)",
-          "oklch(51% 0.0160 253.90)",
-          "oklch(63% 0.0160 253.90)",
-          "oklch(75% 0.0160 253.90)",
-          "oklch(87% 0.0160 253.90)",
-          "oklch(95% 0.0160 253.90)"
-        ]
+        "tonalRamp": ["oklch(15% 0 0)", "oklch(27% 0 0)", "oklch(39% 0 0)", "oklch(51% 0 0)", "oklch(63% 0 0)", "oklch(75% 0 0)", "oklch(87% 0 0)", "oklch(95% 0 0)"]
       },
       "navigation-soft-dark": {
         "role": "primary",
         "displayName": "Navigation Soft Dark",
-        "tonalRamp": [
-          "oklch(15% 0.0414 254.39)",
-          "oklch(27% 0.0414 254.39)",
-          "oklch(39% 0.0414 254.39)",
-          "oklch(51% 0.0414 254.39)",
-          "oklch(63% 0.0414 254.39)",
-          "oklch(75% 0.0414 254.39)",
-          "oklch(87% 0.0414 254.39)",
-          "oklch(95% 0.0414 254.39)"
-        ]
+        "tonalRamp": ["oklch(15% 0 0)", "oklch(27% 0 0)", "oklch(39% 0 0)", "oklch(51% 0 0)", "oklch(63% 0 0)", "oklch(75% 0 0)", "oklch(87% 0 0)", "oklch(95% 0 0)"]
       },
       "sidebar-light": {
         "role": "neutral",
@@ -269,6 +215,11 @@
           "oklch(87% 0.0000 0.00)",
           "oklch(95% 0.0000 0.00)"
         ]
+      },
+      "on-action-dark": {
+        "role": "primary",
+        "displayName": "On Action Dark",
+        "tonalRamp": ["oklch(15% 0 0)", "oklch(27% 0 0)", "oklch(39% 0 0)", "oklch(51% 0 0)", "oklch(63% 0 0)", "oklch(75% 0 0)", "oklch(87% 0 0)", "oklch(95% 0 0)"]
       }
     },
     "typographyMeta": {
@@ -368,7 +319,7 @@
       "refersTo": "button-primary",
       "description": "The shared Button primary variant at its default size.",
       "html": "<button type=\"button\" class=\"ds-button-primary\">Save changes</button>",
-      "css": ".ds-button-primary{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:28px;padding:0 10px;border:1px solid transparent;border-radius:8px;background:var(--accent,#2865c2);color:var(--accent-fg,#fff);font:500 13px/20px var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif);white-space:nowrap;transition:background-color 150ms,color 150ms,filter 150ms}.ds-button-primary:hover{filter:brightness(1.1)}.ds-button-primary:focus-visible{background:var(--surface-3,#eaeaea);color:var(--ink,#303030)}.ds-button-primary:active{filter:brightness(.95)}.ds-button-primary:disabled{background:var(--surface-3,#eaeaea);color:var(--ink-3,#626262);border-color:transparent;pointer-events:none}"
+      "css": ".ds-button-primary{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:28px;padding:0 10px;border:1px solid transparent;border-radius:8px;background:var(--accent,#171717);color:var(--accent-fg,#fff);font:500 13px/20px var(--font-sans, 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);white-space:nowrap;transition:background-color 150ms,color 150ms,filter 150ms}.ds-button-primary:hover{filter:brightness(1.1)}.ds-button-primary:focus-visible{background:var(--surface-3,#eaeaea);color:var(--ink,#333333)}.ds-button-primary:active{filter:brightness(.95)}.ds-button-primary:disabled{background:var(--surface-3,#eaeaea);color:var(--ink-3,#626262);border-color:transparent;pointer-events:none}"
     },
     {
       "name": "Secondary button",
@@ -376,7 +327,7 @@
       "refersTo": "button-secondary",
       "description": "The shared Button secondary variant at its default size.",
       "html": "<button type=\"button\" class=\"ds-button-secondary\">New task</button>",
-      "css": ".ds-button-secondary{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:28px;padding:0 10px;border:1px solid transparent;border-radius:8px;background:var(--surface-2,#efefef);color:var(--ink,#303030);font:500 13px/20px var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif);white-space:nowrap;transition:background-color 150ms,color 150ms,filter 150ms}.ds-button-secondary:hover{background:var(--surface-3,#eaeaea)}.ds-button-secondary:focus-visible{background:var(--surface-3,#eaeaea);color:var(--ink,#303030)}.ds-button-secondary:active{filter:brightness(.95)}.ds-button-secondary:disabled{background:var(--surface-3,#eaeaea);color:var(--ink-3,#626262);border-color:transparent;pointer-events:none}"
+      "css": ".ds-button-secondary{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:28px;padding:0 10px;border:1px solid transparent;border-radius:8px;background:var(--surface-2,#efefef);color:var(--ink,#333333);font:500 13px/20px var(--font-sans, 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);white-space:nowrap;transition:background-color 150ms,color 150ms,filter 150ms}.ds-button-secondary:hover{background:var(--surface-3,#eaeaea)}.ds-button-secondary:focus-visible{background:var(--surface-3,#eaeaea);color:var(--ink,#333333)}.ds-button-secondary:active{filter:brightness(.95)}.ds-button-secondary:disabled{background:var(--surface-3,#eaeaea);color:var(--ink-3,#626262);border-color:transparent;pointer-events:none}"
     },
     {
       "name": "Ghost button",
@@ -384,7 +335,7 @@
       "refersTo": "button-ghost",
       "description": "The shared Button ghost variant at its default size.",
       "html": "<button type=\"button\" class=\"ds-button-ghost\">Cancel</button>",
-      "css": ".ds-button-ghost{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:28px;padding:0 10px;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--ink-2,#444);font:500 13px/20px var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif);white-space:nowrap;transition:background-color 150ms,color 150ms,filter 150ms}.ds-button-ghost:hover{background:var(--surface-2,#efefef);color:var(--ink,#303030)}.ds-button-ghost:focus-visible{background:var(--surface-3,#eaeaea);color:var(--ink,#303030)}.ds-button-ghost:active{filter:brightness(.95)}.ds-button-ghost:disabled{color:var(--ink-4,#626262);pointer-events:none}"
+      "css": ".ds-button-ghost{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:28px;padding:0 10px;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--ink-2,#444);font:500 13px/20px var(--font-sans, 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);white-space:nowrap;transition:background-color 150ms,color 150ms,filter 150ms}.ds-button-ghost:hover{background:var(--surface-2,#efefef);color:var(--ink,#333333)}.ds-button-ghost:focus-visible{background:var(--surface-3,#eaeaea);color:var(--ink,#333333)}.ds-button-ghost:active{filter:brightness(.95)}.ds-button-ghost:disabled{color:var(--ink-4,#626262);pointer-events:none}"
     },
     {
       "name": "Danger button",
@@ -392,15 +343,15 @@
       "refersTo": "button-danger",
       "description": "The shared Button danger variant at its default size.",
       "html": "<button type=\"button\" class=\"ds-button-danger\">Delete</button>",
-      "css": ".ds-button-danger{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:28px;padding:0 10px;border:1px solid var(--line,#e1e1e1);border-radius:8px;background:var(--surface,#f7f7f7);color:var(--bad,#aa4538);font:500 13px/20px var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif);white-space:nowrap;transition:background-color 150ms,color 150ms,filter 150ms}.ds-button-danger:hover{background:var(--bad-soft,color-mix(in srgb,#aa4538 8%,#f7f7f7))}.ds-button-danger:focus-visible{background:var(--surface-3,#eaeaea);color:var(--ink,#303030)}.ds-button-danger:active{filter:brightness(.95)}.ds-button-danger:disabled{background:var(--surface-3,#eaeaea);color:var(--ink-3,#626262);border-color:transparent;pointer-events:none}"
+      "css": ".ds-button-danger{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:28px;padding:0 10px;border:1px solid var(--line,#e5e5e5);border-radius:8px;background:var(--surface,#f7f7f7);color:var(--bad,#aa4538);font:500 13px/20px var(--font-sans, 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);white-space:nowrap;transition:background-color 150ms,color 150ms,filter 150ms}.ds-button-danger:hover{background:var(--bad-soft,color-mix(in srgb,#aa4538 8%,#f7f7f7))}.ds-button-danger:focus-visible{background:var(--surface-3,#eaeaea);color:var(--ink,#333333)}.ds-button-danger:active{filter:brightness(.95)}.ds-button-danger:disabled{background:var(--surface-3,#eaeaea);color:var(--ink-3,#626262);border-color:transparent;pointer-events:none}"
     },
     {
       "name": "Thread filter",
       "kind": "input",
       "refersTo": "thread-filter",
       "description": "Loaded-title search with a neutral focus surface and no focus halo.",
-      "html": "<label class=\"ds-thread-search\"><svg aria-hidden=\"true\" width=\"13\" height=\"13\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"10.5\" cy=\"10.5\" r=\"6.5\"/><path d=\"m15.3 15.3 5.2 5.2\"/></svg><input aria-label=\"Filter loaded threads\" placeholder=\"Filter threads…\"></label>",
-      "css": ".ds-thread-search{display:flex;align-items:center;gap:6px;height:28px;padding:0 8px;border-radius:6px;color:var(--ink-3,#626262);max-width:240px}.ds-thread-search:focus-within{background:var(--surface-2,#efefef)}.ds-thread-search input{width:100%;min-width:0;padding:5px 0;border:0;background:transparent;color:var(--ink,#303030);font:400 12px/18px var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif)}.ds-thread-search input:focus{outline:none;box-shadow:none;caret-color:var(--accent-ink,#2159a0)}.ds-thread-search input::placeholder{color:var(--ink-3,#626262);opacity:1}"
+      "html": "<label class=\"ds-thread-search\"><svg aria-hidden=\"true\" width=\"13\" height=\"13\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"10.5\" cy=\"10.5\" r=\"6.5\"/><path d=\"m15.3 15.3 5.2 5.2\"/></svg><input aria-label=\"Filter loaded threads\" placeholder=\"Filter threads\u2026\"></label>",
+      "css": ".ds-thread-search{display:flex;align-items:center;gap:6px;height:28px;padding:0 8px;border-radius:6px;color:var(--ink-3,#626262);max-width:240px}.ds-thread-search:focus-within{background:var(--surface-2,#efefef)}.ds-thread-search input{width:100%;min-width:0;padding:5px 0;border:0;background:transparent;color:var(--ink,#333333);font:400 12px/18px var(--font-sans, 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif)}.ds-thread-search input:focus{outline:none;box-shadow:none;caret-color:var(--accent-ink,#333333)}.ds-thread-search input::placeholder{color:var(--ink-3,#626262);opacity:1}"
     },
     {
       "name": "Conversation tabs",
@@ -408,7 +359,7 @@
       "refersTo": "navigation-selected",
       "description": "Threads and Orclings share the same navigation column.",
       "html": "<nav class=\"ds-conversation-tabs\" aria-label=\"Conversations\"><button type=\"button\" aria-current=\"page\">Threads</button><button type=\"button\">Orclings</button></nav>",
-      "css": ".ds-conversation-tabs{display:flex;align-items:center;gap:4px}.ds-conversation-tabs button{height:28px;padding:0 12px;border:0;border-radius:7px;background:transparent;color:var(--ink-3,#626262);font:400 12px/18px var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif)}.ds-conversation-tabs button:hover{background:var(--surface-3,#eaeaea)}.ds-conversation-tabs button[aria-current=\"page\"]{background:var(--navigation-soft,#e8f0fa);color:var(--navigation-ink,#2159a0)}.ds-conversation-tabs button:focus-visible{outline:2px solid var(--ring,#2159a0);outline-offset:2px;background:var(--surface-3,#eaeaea);color:var(--ink,#303030)}"
+      "css": ".ds-conversation-tabs{display:flex;align-items:center;gap:4px}.ds-conversation-tabs button{height:28px;padding:0 12px;border:0;border-radius:7px;background:transparent;color:var(--ink-3,#626262);font:400 12px/18px var(--font-sans, 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif)}.ds-conversation-tabs button:hover{background:var(--surface-3,#eaeaea)}.ds-conversation-tabs button[aria-current=\"page\"]{background:var(--navigation-soft,#e8e8e8);color:var(--navigation-ink,#333333)}.ds-conversation-tabs button:focus-visible{outline:2px solid var(--ring,#333333);outline-offset:2px;background:var(--surface-3,#eaeaea);color:var(--ink,#333333)}"
     },
     {
       "name": "Task filters",
@@ -416,7 +367,7 @@
       "refersTo": "task-filter-selected",
       "description": "Distinct padded targets with a soft selected state.",
       "html": "<div class=\"ds-task-filters\" role=\"radiogroup\" aria-label=\"Task filter\"><button type=\"button\" role=\"radio\" aria-checked=\"true\">Active</button><button type=\"button\" role=\"radio\" aria-checked=\"false\">Done</button><button type=\"button\" role=\"radio\" aria-checked=\"false\">Archived</button></div>",
-      "css": ".ds-task-filters{display:flex;gap:4px}.ds-task-filters button{min-height:28px;padding:0 10px;border:0;border-radius:6px;background:transparent;color:var(--ink-3,#626262);font:400 12px/18px var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif)}.ds-task-filters button:hover,.ds-task-filters button:focus-visible{background:var(--surface-2,#efefef);color:var(--ink,#303030)}.ds-task-filters button[aria-checked=\"true\"]{background:var(--navigation-soft,#e8f0fa);color:var(--navigation-ink,#2159a0)}"
+      "css": ".ds-task-filters{display:flex;gap:4px}.ds-task-filters button{min-height:28px;padding:0 10px;border:0;border-radius:6px;background:transparent;color:var(--ink-3,#626262);font:400 12px/18px var(--font-sans, 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif)}.ds-task-filters button:hover,.ds-task-filters button:focus-visible{background:var(--surface-2,#efefef);color:var(--ink,#333333)}.ds-task-filters button[aria-checked=\"true\"]{background:var(--navigation-soft,#e8e8e8);color:var(--navigation-ink,#333333)}"
     },
     {
       "name": "User prompt",
@@ -424,15 +375,15 @@
       "refersTo": "user-prompt",
       "description": "A quiet boundary around the user's message; assistant responses remain unboxed.",
       "html": "<div class=\"ds-user-prompt\">Help people connect their first project, then give them a clear next step.</div>",
-      "css": ".ds-user-prompt{max-width:520px;padding:10px 12px;border:1px solid var(--line,#e1e1e1);border-radius:12px;background:var(--bubble,#fff);color:var(--bubble-ink,#303030);box-shadow:none;font:400 14px/1.55 var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif)}"
+      "css": ".ds-user-prompt{max-width:520px;padding:10px 12px;border:1px solid var(--line,#e5e5e5);border-radius:12px;background:var(--bubble,#fff);color:var(--bubble-ink,#333333);box-shadow:none;font:400 14px/1.55 var(--font-sans, 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif)}"
     },
     {
       "name": "Composer",
       "kind": "custom",
       "refersTo": "composer-shell",
       "description": "Raised shell, distinct writing area, and compact transparent controls. This example shows appearance only.",
-      "html": "<div class=\"ds-composer\"><div class=\"ds-composer-shell\"><textarea class=\"ds-composer-input\" rows=\"2\" aria-label=\"Message\" placeholder=\"Message Codex…\"></textarea><div class=\"ds-composer-foot\"><button type=\"button\" class=\"ds-composer-mode\">Review changes</button><div class=\"ds-composer-actions\"><button type=\"button\" class=\"ds-composer-model\">Model · High</button><button type=\"button\" class=\"ds-composer-send\" aria-label=\"Send message\"><svg aria-hidden=\"true\" width=\"15\" height=\"15\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 20V4m-6 6 6-6 6 6\"/></svg></button></div></div><div class=\"ds-composer-git\">main</div></div></div>",
-      "css": ".ds-composer{container:ds-composer / inline-size;max-width:520px;width:100%}.ds-composer-shell{display:flex;flex-direction:column;padding:4px;border:1px solid var(--line,#e1e1e1);border-radius:11px;background:var(--surface-2,#efefef);box-shadow:none}.ds-composer-input{display:block;min-height:48px;padding:9px 8px;resize:vertical;border:0;border-radius:8px;background:var(--composer-input,#fff);color:var(--ink,#303030);font:400 13px/1.6 var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif)}.ds-composer-input:focus{outline:none;box-shadow:none;caret-color:var(--accent-ink,#2159a0)}.ds-composer-input::placeholder{color:var(--ink-3,#626262)}.ds-composer-foot{display:flex;flex-wrap:wrap;gap:2px;padding:3px 2px 0}.ds-composer-foot button{min-height:28px;border:0;border-radius:5px;background:transparent;color:var(--ink,#303030);font:400 12px/18px var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif)}.ds-composer-foot button:hover,.ds-composer-foot button:focus-visible{background:var(--surface-3,#eaeaea)}.ds-composer-actions{display:flex;align-items:center;flex:1;gap:3px;min-width:130px}.ds-composer-model{margin-right:auto}.ds-composer-foot .ds-composer-send{display:grid;place-items:center;width:26px;height:26px;min-height:26px;border-radius:999px;background:var(--accent,#2865c2);color:var(--accent-fg,#fff)}.ds-composer-git{padding:1px 5px;color:var(--ink-3,#626262);font:400 11px/16px var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif)}@container ds-composer (max-width:440px){.ds-composer-actions{flex-basis:100%;flex-wrap:wrap;min-width:0}}"
+      "html": "<div class=\"ds-composer\"><div class=\"ds-composer-shell\"><textarea class=\"ds-composer-input\" rows=\"2\" aria-label=\"Message\" placeholder=\"Message Codex\u2026\"></textarea><div class=\"ds-composer-foot\"><button type=\"button\" class=\"ds-composer-mode\">Review changes</button><div class=\"ds-composer-actions\"><button type=\"button\" class=\"ds-composer-model\">Model \u00b7 High</button><button type=\"button\" class=\"ds-composer-send\" aria-label=\"Send message\"><svg aria-hidden=\"true\" width=\"15\" height=\"15\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 20V4m-6 6 6-6 6 6\"/></svg></button></div></div><div class=\"ds-composer-git\">main</div></div></div>",
+      "css": ".ds-composer{container:ds-composer / inline-size;max-width:520px;width:100%}.ds-composer-shell{display:flex;flex-direction:column;padding:4px;border:1px solid var(--line,#e5e5e5);border-radius:11px;background:var(--surface-2,#efefef);box-shadow:none}.ds-composer-input{display:block;min-height:48px;padding:9px 8px;resize:vertical;border:0;border-radius:8px;background:var(--composer-input,#fff);color:var(--ink,#333333);font:400 13px/1.6 var(--font-sans, 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif)}.ds-composer-input:focus{outline:none;box-shadow:none;caret-color:var(--accent-ink,#333333)}.ds-composer-input::placeholder{color:var(--ink-3,#626262)}.ds-composer-foot{display:flex;flex-wrap:wrap;gap:2px;padding:3px 2px 0}.ds-composer-foot button{min-height:28px;border:0;border-radius:5px;background:transparent;color:var(--ink,#333333);font:400 12px/18px var(--font-sans, 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif)}.ds-composer-foot button:hover,.ds-composer-foot button:focus-visible{background:var(--surface-3,#eaeaea)}.ds-composer-actions{display:flex;align-items:center;flex:1;gap:3px;min-width:130px}.ds-composer-model{margin-right:auto}.ds-composer-foot .ds-composer-send{display:grid;place-items:center;width:26px;height:26px;min-height:26px;border-radius:999px;background:var(--accent,#171717);color:var(--accent-fg,#fff)}.ds-composer-git{padding:1px 5px;color:var(--ink-3,#626262);font:400 11px/16px var(--font-sans, 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif)}@container ds-composer (max-width:440px){.ds-composer-actions{flex-basis:100%;flex-wrap:wrap;min-width:0}}"
     },
     {
       "name": "Inset work panel",
@@ -440,12 +391,12 @@
       "refersTo": "work-panel",
       "description": "Opaque paper inside a neutral canvas, separated with a fine border and no cast shadow.",
       "html": "<section class=\"ds-work-panel\"><header class=\"ds-work-panel-header\">Changes</header><div class=\"ds-work-panel-body\">Review the current changes alongside the conversation.</div></section>",
-      "css": ".ds-work-panel{margin:0 12px 12px;max-width:520px;min-height:160px;border:1px solid var(--line,#e1e1e1);border-radius:14px;overflow:hidden;background:var(--paper,#fff);color:var(--ink,#303030);box-shadow:none;font:400 13px/20px var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif)}.ds-work-panel-header{padding:8px 12px;border-bottom:1px solid var(--line,#e1e1e1)}.ds-work-panel-body{padding:12px;color:var(--ink-2,#444)}"
+      "css": ".ds-work-panel{margin:0 12px 12px;max-width:520px;min-height:160px;border:1px solid var(--line,#e5e5e5);border-radius:14px;overflow:hidden;background:var(--paper,#fff);color:var(--ink,#333333);box-shadow:none;font:400 13px/20px var(--font-sans, 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif)}.ds-work-panel-header{padding:8px 12px;border-bottom:1px solid var(--line,#e5e5e5)}.ds-work-panel-body{padding:12px;color:var(--ink-2,#444)}"
     }
   ],
   "narrative": {
     "northStar": "A calm place to think with coding agents",
-    "overview": "OpenOrc is a compact desktop workspace for several projects at once. A shared sidebar keeps projects and conversations visible; the conversation occupies the center, and an optional work panel holds review and tools. The approved Cursor-inspired composition uses neutral gray, white, or charcoal grounds with blue accents in the OpenOrc palette. The Cursor palette uses the same structure with monochrome accents.\n\nThis record describes the built desktop interface. It preserves the workflows in [PRODUCT.md](../../PRODUCT.md), including drafts, task authorization, Orcling privacy, and project context. Packaged application artwork is unchanged.",
+    "overview": "OpenOrc is a compact desktop workspace for several projects at once. A shared sidebar keeps projects and conversations visible; the conversation occupies the center, and an optional work panel holds review and tools. OpenOrc and Cursor share one palette: neutral gray, white, or charcoal grounds, monochrome accents, and Inter typography.\n\nThis record describes the built desktop interface. It preserves the workflows in [PRODUCT.md](../../PRODUCT.md), including drafts, task authorization, Orcling privacy, and project context. Packaged application artwork is unchanged.",
     "keyCharacteristics": [
       "One resizable sidebar with expandable project groups and Threads/Orclings tabs.",
       "Compact toolbar titles, bounded user prompts, and unboxed assistant responses.",

@@ -36,7 +36,7 @@ async function main() {
   const { core } = await import("../../apps/desktop/src/renderer/src/lib/rpc");
   const { queryClient } = await import("../../apps/desktop/src/renderer/src/lib/query");
   const { useLayout } = await import("../../apps/desktop/src/renderer/src/lib/layout");
-  const { useTheme } = await import("../../apps/desktop/src/renderer/src/lib/theme");
+  const { useTheme, parsePreset } = await import("../../apps/desktop/src/renderer/src/lib/theme");
   const { emptyRun, seedRun } = await import("../../apps/desktop/src/renderer/src/lib/transcript");
   const mode = query.get("view") ?? "workspace";
   const now = Date.now();
@@ -305,7 +305,7 @@ async function main() {
     return [];
   }) as typeof core.call;
   queryClient.setDefaultOptions({ queries: { retry: false } });
-  useTheme.getState().setPreset(query.get("palette") === "cursor" ? "cursor" : "openorc");
+  useTheme.getState().setPreset(parsePreset(query.get("palette")));
   useTheme.getState().set(query.get("theme") === "light" ? "light" : "dark");
   const { accentCombinations } = await import("../../apps/desktop/src/renderer/src/lib/theme-accents");
   const accent = accentCombinations.find((entry) => entry.id === query.get("accent"));

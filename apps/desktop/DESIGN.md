@@ -2,54 +2,55 @@
 name: OpenOrc desktop
 description: A neutral multi-project workspace with compact conversations and inset work panels.
 colors:
-  action-light: "#2865c2"
-  action-dark: "#2f6cc8"
-  accent-text-light: "#2159a0"
-  accent-text-dark: "#a8ccff"
+  action-light: "#171717"
+  action-dark: "#e3e3e3"
+  accent-text-light: "#333333"
+  accent-text-dark: "#e5e5e5"
   on-action: "#ffffff"
-  navigation-soft-light: "#e8f0fa"
-  navigation-soft-dark: "#27374b"
+  on-action-dark: "#191919"
+  navigation-soft-light: "#e8e8e8"
+  navigation-soft-dark: "#303030"
   sidebar-light: "#f3f3f3"
-  sidebar-dark: "#1b1b1b"
+  sidebar-dark: "#161616"
   canvas-light: "#f7f7f7"
-  canvas-dark: "#202020"
-  paper-light: "#ffffff"
-  paper-dark: "#252525"
+  canvas-dark: "#181818"
+  paper-light: "#fdfdfd"
+  paper-dark: "#1e1e1e"
   raised-light: "#efefef"
-  raised-dark: "#2b2b2b"
-  border-light: "#e1e1e1"
-  border-dark: "#3a3a3a"
-  ink-light: "#303030"
-  ink-dark: "#f0f0f0"
+  raised-dark: "#242424"
+  border-light: "#e5e5e5"
+  border-dark: "#333333"
+  ink-light: "#333333"
+  ink-dark: "#e5e5e5"
 typography:
   interface:
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif'
+    fontFamily: '"Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
     fontSize: "13px"
     fontWeight: 400
     lineHeight: "20px"
   title:
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif'
+    fontFamily: '"Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
     fontSize: "13px"
     fontWeight: 600
     lineHeight: "20px"
     letterSpacing: "-0.15px"
   body:
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif'
+    fontFamily: '"Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
     fontSize: "14px"
     fontWeight: 400
     lineHeight: 1.6
   composer:
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif'
+    fontFamily: '"Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
     fontSize: "13px"
     fontWeight: 400
     lineHeight: 1.6
   label:
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif'
+    fontFamily: '"Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
     fontSize: "12px"
     fontWeight: 400
     lineHeight: "18px"
   document:
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif'
+    fontFamily: '"Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
     fontSize: "30px"
     fontWeight: 500
     lineHeight: 1.16
@@ -142,7 +143,7 @@ components:
 
 **Creative North Star: "A calm place to think with coding agents"**
 
-OpenOrc is a compact desktop workspace for several projects at once. A shared sidebar keeps projects and conversations visible; the conversation occupies the center, and an optional work panel holds review and tools. The approved Cursor-inspired composition uses neutral gray, white, or charcoal grounds with blue accents in the OpenOrc palette. The Cursor palette uses the same structure with monochrome accents.
+OpenOrc is a compact desktop workspace for several projects at once. A shared sidebar keeps projects and conversations visible; the conversation occupies the center, and an optional work panel holds review and tools. OpenOrc and Cursor share one palette: neutral gray, white, or charcoal grounds, monochrome accents, and Inter typography.
 
 This record describes the built desktop interface. It preserves the workflows in [PRODUCT.md](../../PRODUCT.md), including drafts, task authorization, Orcling privacy, and project context. Packaged application artwork is unchanged.
 
@@ -160,19 +161,19 @@ The frontmatter records the OpenOrc palette in both appearances; component entri
 
 ### Primary
 
-Blue is used for actions, selected navigation, and reading accents. Use `--accent` and its foreground, text, and tint companions for actions; `--navigation-ink` and `--navigation-soft` for active views, threads, and filters; and `--content-ink` and `--content-soft` for links, inline code, and conversation markers. Solid blue action fills keep white labels. Success, attention, review, destructive feedback, and diff meaning retain separate status roles.
+OpenOrc and Cursor use ink accents for actions, selected navigation, and reading accents. Use `--accent` and its foreground, text, and tint companions for actions; `--navigation-ink` and `--navigation-soft` for active views, threads, and filters; and `--content-ink` and `--content-soft` for links, inline code, and conversation markers. Light actions use dark ink with white labels; dark actions use light ink with dark labels. Success, attention, review, destructive feedback, and diff meaning retain separate status roles.
 
 ### Neutral
 
-`--bg` supplies the sidebar, `--surface` the conversation canvas, `--paper` the work panel, and `--surface-2` raised controls and the composer shell. `--composer-input` independently supplies the writing area. OpenOrc light uses white paper and writing areas; dark uses a lighter charcoal work surface inside a slightly brighter composer shell. Fine borders and the ink hierarchy distinguish adjacent surfaces. Cursor keeps this geometry with its own neutral values and Inter typography.
+`--bg` supplies the sidebar, `--surface` the conversation canvas, `--paper` the work panel, and `--surface-2` raised controls and the composer shell. `--composer-input` independently supplies the writing area. OpenOrc and Cursor share nearly white paper and white writing areas in light mode. Dark mode uses a charcoal work surface inside a brighter composer shell. Fine borders and the ink hierarchy distinguish adjacent surfaces.
 
 **The Semantic Color Rule.** Read live palette roles instead of hardcoding OpenOrc colors into components.
 
-Appearance mode and palette selection remain independent. Accent choices and fine-grained custom colors persist per palette and light/dark mode. Editing or resetting Actions preserves Content and its selection color; resetting all accents preserves unrelated surface and text overrides. Paper and writing-area roles are editable and have fallbacks for every palette. Other presets may retain dark work-plane gradients; OpenOrc and Cursor grounds stay flat.
+Appearance mode and palette selection remain independent. Accent choices and fine-grained custom colors persist per palette and light/dark mode. Editing or resetting Actions preserves Content and its selection color; resetting all accents preserves unrelated surface and text overrides. Paper and writing-area roles are editable and have fallbacks for every palette. Product presets stay flat; original Kamakura, Cyberpunk, and Eliron themes retain their authored dark work-plane treatment. [Theme references](../../docs/theme-references.md) distinguish source values from adaptations.
 
 ## Typography
 
-System sans-serif is the default throughout the app, including task document headings. Cursor switches the interface to Inter Variable. Code uses JetBrains Mono Variable with platform monospace fallbacks.
+OpenOrc and Cursor use Inter Variable throughout the interface, including task document headings. Conductor uses Geist Variable from its published app styles. Other presets use system sans-serif. Code uses JetBrains Mono Variable with platform monospace fallbacks.
 
 The frontmatter defines the observed hierarchy. Toolbar titles use the compact semibold title role. Ordinary controls use the interface or label role; conversation prose uses the body role, while the composer has its own smaller text. Task document headings use the document role. New-thread and list pages use the compact toolbar title. Dates, counts, usage, and diff statistics use tabular numerals.
 

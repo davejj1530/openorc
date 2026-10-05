@@ -380,7 +380,8 @@ export function Panel({ context }: { context: PanelContext }) {
     const cwd = context.kind === "newthread" ? context.workingDirectory : ((context.kind === "thread" ? context.thread.workingDirectory : null) ?? owner?.worktreePath ?? context.project.rootPath);
     const id = context.kind === "newthread" ? `newthread:${context.project.id}:${cwd}` : `${context.kind}:${context.kind === "thread" ? context.thread.id : context.task.id}`;
     body = <TerminalPanel key={id} id={id} cwd={cwd} />;
-  } else if (current === "browser" && context.kind !== "project") {
+  } else if (current === "browser" && context.kind !== "project" && open) {
+    // Native views ignore the shell's clip and inert state; hide them at close, not after its animation.
     const owner = scope ?? `newthread:${context.project.id}`;
     body = <BrowserPanel key={owner} id={owner} defaultUrl={previewUrls[owner] ?? "http://localhost:3000"} onUrl={(url) => rememberPreviewUrl(owner, url)} />;
   } else if (current === "task" && context.kind === "task") body = <TaskDetailsPanel task={context.task} project={context.project} />;

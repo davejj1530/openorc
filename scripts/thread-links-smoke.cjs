@@ -120,6 +120,13 @@ async function check() {
     assert.equal(await read("!!document.querySelector('[role=dialog]')"), false);
     assert.deepEqual(external, []);
     await read("document.querySelector('[aria-label=\"Hide panel\"]').click()");
+    await until(() => read("document.querySelector('.panel-shell')?.getAttribute('data-open') === 'false'"));
+    await pause(32);
+    assert.equal(
+      win.contentView.children.some((view) => view.webContents && view.getVisible()),
+      false,
+      "Closing the panel hides the native preview before the shell finishes animating",
+    );
     await click("second page");
     await expectPreview(site + "/page-b");
     await read("document.querySelector('[data-show-tasks]').click()");

@@ -35,7 +35,7 @@ it("resolves Conductor in both modes and keeps custom colors while changing tran
   useWindowAppearance.getState().setTransparent(true);
   expect(sync).toHaveBeenLastCalledWith({ theme: "dark", transparent: true, background: "#302010" });
   useTheme.getState().set("light");
-  expect(sync).toHaveBeenLastCalledWith({ theme: "light", transparent: true, background: "#faf8f7" });
+  expect(sync).toHaveBeenLastCalledWith({ theme: "light", transparent: true, background: "#fafaf9" });
   useTheme.getState().set("dark");
   expect(document.documentElement.style.getPropertyValue("--bg")).toBe("#302010");
   expect(localStorage.getItem("openorc.palette")).toBe("conductor");

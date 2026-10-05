@@ -27,7 +27,7 @@ it("applies a combination, saves a custom role, and restores it when returning f
   await act(() => useTheme.getState().set("light"));
   expect(screen.getByLabelText<HTMLInputElement>("Navigation hex value").value).toBe("#abcdef");
   fireEvent.click(screen.getByRole("button", { name: "Reset Navigation to the palette" }));
-  expect(screen.getByLabelText<HTMLInputElement>("Navigation hex value").value).toBe("#2159a0");
+  expect(screen.getByLabelText<HTMLInputElement>("Navigation hex value").value).toBe("#333333");
 });
 
 it("syncs another window's saved choices and reports a failed save without discarding the preview", async () => {
@@ -46,10 +46,14 @@ it("syncs another window's saved choices and reports a failed save without disca
 });
 
 it.each([
-  ["claude", "light", ["#0b0b0b", "#d97757", "#184f95"]],
-  ["claude", "dark", ["#ffffff", "#d97757", "#6da7ec"]],
-  ["github", "light", ["#1f883d", "#0969da", "#0969da"]],
-  ["github", "dark", ["#238636", "#4493f8", "#4493f8"]],
+  ["openorc", "light", ["#171717", "#333333", "#333333"]],
+  ["openorc", "dark", ["#e3e3e3", "#e5e5e5", "#e5e5e5"]],
+  ["conductor", "light", ["#413030", "#413030", "#413030"]],
+  ["conductor", "dark", ["#f3f2f1", "#eae8e6", "#eae8e6"]],
+  ["claude", "light", ["#0b0b0b", "#383835", "#184f95"]],
+  ["claude", "dark", ["#ffffff", "#f9f9f7", "#9ec5f4"]],
+  ["github", "light", ["#1f883d", "#1f2328", "#0969da"]],
+  ["github", "dark", ["#238636", "#f0f6fc", "#4493f8"]],
   ["eliron", "light", ["#191c20", "#ffc9ff", "#415ba0"]],
   ["eliron", "dark", ["#f5f7f8", "#ffc9ff", "#cbefff"]],
 ] as const)("restores %s's native accents in %s without removing surface edits", async (preset, mode, defaults) => {

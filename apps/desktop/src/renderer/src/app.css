@@ -2,6 +2,7 @@
 @import "katex/dist/katex.min.css";
 @import "@fontsource-variable/jetbrains-mono";
 @import "@fontsource-variable/inter";
+@import "@fontsource-variable/geist";
 @import "./rich-text.css";
 @import "./appearance.css";
 @import "./workspace-design.css";
@@ -10,8 +11,13 @@
 @source "../../../node_modules/@streamdown/mermaid/dist/*.js";
 @custom-variant dark (&:where(.dark, .dark *));
 
+html[data-palette="openorc"],
 html[data-palette="cursor"] {
   --font-sans: "Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+html[data-palette="conductor"] {
+  --font-sans: "Geist Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 /*

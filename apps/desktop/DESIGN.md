@@ -172,9 +172,9 @@ Appearance mode and palette selection remain independent. Accent choices and fin
 
 ## Typography
 
-System sans-serif is the default throughout the app, including task and welcome headings. Cursor switches the interface to Inter Variable. Code uses JetBrains Mono Variable with platform monospace fallbacks.
+System sans-serif is the default throughout the app, including task document headings. Cursor switches the interface to Inter Variable. Code uses JetBrains Mono Variable with platform monospace fallbacks.
 
-The frontmatter defines the observed hierarchy. Toolbar titles use the compact semibold title role. Ordinary controls use the interface or label role; conversation prose uses the body role, while the composer has its own smaller text. Task page headings use the document role. New-thread welcome headings scale from (28px) to (36px). Dates, counts, usage, and diff statistics use tabular numerals.
+The frontmatter defines the observed hierarchy. Toolbar titles use the compact semibold title role. Ordinary controls use the interface or label role; conversation prose uses the body role, while the composer has its own smaller text. Task document headings use the document role. New-thread and list pages use the compact toolbar title. Dates, counts, usage, and diff statistics use tabular numerals.
 
 Thread rows have single-line titles with ellipsis. Provider and branch details remain in accessible labels and hover text. Long prose wraps; code and tables may scroll within their own containers.
 
@@ -191,7 +191,7 @@ Responsive rules follow the available space:
 - At viewport widths of (900px) or less, navigation becomes an overlay. Selecting a conversation or destination dismisses it; switching Threads/Orclings keeps the list open.
 - At work-row widths of (788px) or less, an open work panel overlays the work area. It can still expand independently.
 - At composer widths of (440px) or less, action controls move to a second row and wrap.
-- At viewport widths of (520px) or less, reading gutters shrink to (12px) and new-thread recent items use one column.
+- At viewport widths of (520px) or less, reading gutters shrink to (12px). Expanded new-thread activity uses one column when its available width is (480px) or less.
 - Settings retains its horizontal category toolbar and maximum (960px) content width. Preference rows stack below an (800px) container; usage rows reflow below (540px).
 
 ## Elevation & Depth
@@ -228,11 +228,13 @@ User prompts have a quiet bordered surface and no repeated author heading. Copy,
 
 The composer uses a neutral raised shell around a distinct writing area, followed by compact mode, model/effort, context, and send controls. Mode and model controls rest on transparent backgrounds. The effort knob stays white; its fill ends at the thumb center, pointer motion snaps smoothly, and keyboard input moves between stops. Clicking context usage opens details; only its explicit action compacts context. An empty running composer shows Stop; text or attachments restore Send with a separate Stop control. Git context stays in the composer, with the branch shown once and the working-folder path below.
 
+New threads start with a centered composer, up to (640px) wide, near the top of the work area. The compact toolbar holds the title and project switcher. Quiet text suggestions below the composer appear only for an empty project draft; choosing one prepares an editable plan and focuses the input without sending it. Recent activity stays behind a keyboard-accessible disclosure, with requests needing attention flagged while collapsed. Model, permission, workspace, attachment, Git, and optional work-panel controls retain their existing behavior.
+
 Work-panel tabs keep their full names at every panel width. The strip uses available space and scrolls horizontally only when its tabs no longer fit; add-tool, expand, and hide actions stay reachable alongside it. Clicking a web link reveals Preview and selects its tab, including when the panel was closed or showing another tool. The address and loading or error state remain visible while the page opens.
 
 ### Tasks, settings, and recovery
 
-Tasks use the compact window toolbar for their title, project scope, and New task action. One filter row holds Active/Done/Archived, a status selector with counts, and search; it wraps at narrow widths. The grouped list starts immediately below, with 46px rows, keyboard navigation, and status menus. Saving a task to backlog and starting its work are separate actions. Drafts survive navigation. Starter prompts prepare an editable plan and never send automatically.
+Tasks use the compact window toolbar for their title, project scope, and New task action. One filter row holds Active/Done/Archived, a status selector with counts, and search; it wraps at narrow widths. The grouped list starts immediately below, with 46px rows, keyboard navigation, and status menus. Saving a task to backlog and starting its work are separate actions. Drafts survive navigation.
 
 Settings uses flat preference groups and a 40px row of text categories below the window toolbar. Categories keep their natural width and scroll horizontally in narrow windows; arrow keys, Home, and End select and reveal each section. Palette changes update the app live. Usage is an account ledger: each allowance shows its reported remaining or used amount, a thin meter, and reset timing. Missing, stale, and failed reports remain explicit; provider details and local activity stay separate.
 

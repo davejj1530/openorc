@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { WORKSPACE_ID, harnessIds, harnessInfo, harnessLoggedIn, type HarnessId, type Project, type TeamDetail, type WorkspaceMode } from "@openorc/protocol";
-import { FolderGit2, GitBranch, Laptop } from "../components/icons";
+import { ChevronRight, FolderGit2, GitBranch, Laptop } from "../components/icons";
 import { Composer, ComposerChoice } from "../components/Composer";
 import { Panel } from "../components/Panel";
 import { useComposerChanges } from "../lib/composer-changes";
-import { NewThreadWelcome } from "../components/NewThreadWelcome";
+import { NewThreadStarters } from "../components/NewThreadStarters";
 import { ArrivalPanel, useArrivalActivity } from "../components/NewThreadActivity";
 import { ComposerModelPicker, defaultChoice, ModelPicker, type ModelChoice, type OrclingPickerChoices, type TeamPickerChoices } from "../components/ModelPicker";
 import { useOrclings } from "../lib/orclings";
@@ -132,6 +132,7 @@ function NewThreadProject({
   const start = useRpcMutation("threads.start");
   const orclings = useOrclings();
   const mounted = useRef(true);
+  const composer = useRef<HTMLDivElement>(null);
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -242,11 +243,10 @@ function NewThreadProject({
     <>
       <main className="workspace-main well flex flex-1 flex-col min-w-0 min-h-0">
         <TopBar projectId={projectId} projectName={selected?.name} onProjectChange={(id) => onProject(id ?? WORKSPACE_ID)} panel={Boolean(panelContext)}>
-          New thread
+          <h1 className="px-1 text-base font-medium">New thread</h1>
         </TopBar>
         <div className="new-thread-body flex-1 min-h-0 flex flex-col overflow-y-auto">
-          <NewThreadWelcome isWorkspace={isWorkspace} hasProject={projects?.length !== 0} onStart={(prompt) => changeDraft({ prompt, mode: "plan" })} />
-          <div className="new-thread-composer shrink-0 w-full max-w-chat mx-auto px-6 pb-2">
+          <div ref={composer} className="new-thread-composer">
             {projects?.length === 0 ? (
               <div className="rounded-xl border border-line bg-surface p-4 text-base text-ink-2">
                 Import a project to start.
@@ -363,14 +363,29 @@ function NewThreadProject({
                 ) : null}
               </>
             )}
-            <div className="h-4" />
-            {/* <p className="text-xs text-ink-3 mt-3 text-center">{revision ? "Each agent uses an isolated workspace. You direct the lead, which delegates to the team." : draft.mode === "plan" ? "Plan investigates first. Tasks save to backlog." : "Tasks save to backlog. Ask to start them when you’re ready."}</p> */}
+            {selected && !isWorkspace && !draft.prompt.trim() ? (
+              <NewThreadStarters
+                disabled={start.isPending}
+                onStart={(prompt) => {
+                  changeDraft({ prompt, mode: "plan" });
+                  composer.current?.querySelector<HTMLTextAreaElement>(".composer-input")?.focus();
+                }}
+              />
+            ) : null}
           </div>
           {activity.any ? (
-            <div className="new-thread-recent">
-              <h2>Pick up where you left off</h2>
+            <details className="new-thread-activity">
+              <summary>
+                <ChevronRight size={13} aria-hidden="true" />
+                <span>Recent activity</span>
+                {activity.waiting.length > 0 ? (
+                  <span className="ml-auto text-warn">
+                    {activity.waiting.length} {activity.waiting.length === 1 ? "needs" : "need"} you
+                  </span>
+                ) : null}
+              </summary>
               <ArrivalPanel activity={activity} />
-            </div>
+            </details>
           ) : null}
         </div>
       </main>

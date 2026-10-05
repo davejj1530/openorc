@@ -5,7 +5,7 @@ import { treeChanges } from "./tree-changes.js";
 
 /**
  * What one thread turn changed: the checkpoint it saved against the one before it,
- * or against the thread's starting commit for the first. Immutable trees only, so a
+ * or against the thread's starting commit for legacy turns without a starting checkpoint. Immutable trees only, so a
  * later edit in the working directory never leaks into an earlier turn's card.
  */
 export async function threadTurnChanges(db: Db, input: { threadId: string; checkpointId: string; includePatch?: boolean; paths?: string[] }): Promise<TurnFileChanges> {

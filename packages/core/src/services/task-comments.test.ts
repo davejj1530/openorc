@@ -31,6 +31,16 @@ async function response(commentId: string, index = 0) {
   await vi.waitFor(() => expect(taskComments.list(core.db, taskId).attempts.filter((a) => a.commentId === commentId)[index]?.runId).toBeTruthy());
   return taskComments.list(core.db, taskId).attempts.filter((a) => a.commentId === commentId)[index]!;
 }
+async function executionStarted(attemptId: string) {
+  // onCreated records the run before its starting checkpoint and provider are ready.
+  await vi.waitFor(() => {
+    const runId = taskComments.attempt(core.db, attemptId)?.executionRunId;
+    expect(runId).toBeTruthy();
+    expect(sessions.has(runId!)).toBe(true);
+    expect(tasks.get(core.db, taskId)?.status).toBe("in_progress");
+  });
+  return taskComments.attempt(core.db, attemptId)!;
+}
 async function event(runId: string, input: Omit<Extract<AgentEvent, { type: "turn.completed" }>, "runId" | "ts"> | Omit<Extract<AgentEvent, { type: "message.completed" }>, "runId" | "ts">) {
   sessions.get(runId)!.handle.emit("event", { ...input, runId, ts: Date.now() });
   await new Promise((r) => setTimeout(r, 20));
@@ -240,8 +250,7 @@ it("hands off clear work to one linked thread and posts one durable outcome", as
   const discussionSession = announceSession(a.runId!);
   await core.comments.intent(a.runId!, { intent: "execution", quote: "Can you implement this?" });
   await finish(a.runId!, "I’ll hand this to the execution thread.");
-  await vi.waitFor(() => expect(taskComments.attempt(core.db, a.id)?.executionRunId).toBeTruthy());
-  const launched = taskComments.attempt(core.db, a.id)!;
+  const launched = await executionStarted(a.id);
   expect(tasks.get(core.db, taskId)?.status).toBe("in_progress");
   expect(launched.threadId).toBeTruthy();
   expect(sessions.get(launched.executionRunId!)?.spec).toMatchObject({ model: "test-model", effort: "high", mode: "act" });
@@ -275,8 +284,7 @@ it.each(["codex", "claude"] as const)("starts sibling tasks independently while 
   const first = await response(firstComment.id);
   await core.comments.intent(first.runId!, { intent: "execution", quote: "Implement task A" });
   await finish(first.runId!);
-  await vi.waitFor(() => expect(taskComments.attempt(core.db, first.id)?.executionRunId).toBeTruthy());
-  const firstExecution = taskComments.attempt(core.db, first.id)!;
+  const firstExecution = await executionStarted(first.id);
   expect(firstExecution.threadId).toBe(owner.id);
 
   taskId = (await call("tasks.create", { projectId: firstTask.projectId, threadId: owner.id, title: "Task B", workspaceMode: "current" })).id;
@@ -285,7 +293,7 @@ it.each(["codex", "claude"] as const)("starts sibling tasks independently while 
   await core.comments.intent(second.runId!, { intent: "execution", quote: "Implement task B" });
   await finish(second.runId!);
   await vi.waitFor(() => expect(["working", "error"]).toContain(taskComments.attempt(core.db, second.id)?.state));
-  const secondExecution = taskComments.attempt(core.db, second.id)!;
+  const secondExecution = await executionStarted(second.id);
   expect(secondExecution.error).toBeNull();
   expect(secondExecution.executionRunId).toBeTruthy();
   expect(secondExecution.threadId).not.toBe(owner.id);
@@ -402,7 +410,7 @@ it("queues another comment as a follow-up while the task is already working", as
   const a = await response(c.id);
   await core.comments.intent(a.runId!, { intent: "execution", quote: "Implement this" });
   await finish(a.runId!);
-  await vi.waitFor(() => expect(taskComments.attempt(core.db, a.id)?.executionRunId).toBeTruthy());
+  await executionStarted(a.id);
   const next = await post("Implement this too");
   const b = await response(next.id);
   await core.comments.intent(b.runId!, { intent: "execution", quote: "Implement this too" });

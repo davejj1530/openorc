@@ -40,6 +40,8 @@ OpenOrc release updates share that upper-right notice stack, above agent updates
 
 Responsive behavior follows available column width. Allow properties and toolbars to wrap; secondary labels may yield while accessible names remain. Check narrow windows, split conversations, enlarged text, keyboard focus, and reduced motion.
 
+Typing `/` opens commands and skills for the selected agent; Codex also accepts `$` for skills. Selection inserts the agent's native skill prefix. Suggestions float below new-thread composers and above conversation composers, adjust to available space, and keep keyboard selection visible without moving focus out of the textarea.
+
 ## Icons and motion
 
 The [Precision Outline family](precision-outline-icons.md) uses original Codex-generated geometry on a 24-unit grid, 1.75-unit strokes, rounded caps and joins, and `currentColor`. Reuse the shared components rather than adding another icon library. Controls retain accessible labels. Filled collaboration status marks and the original Hollow conversation indicator are deliberate exceptions to the outline family.

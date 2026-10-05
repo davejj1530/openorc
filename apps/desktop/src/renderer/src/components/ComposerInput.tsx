@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { AtSign, Slash, Zap } from "./icons";
 import type { SlashCommand } from "./Composer";
+import { ComposerSuggestions } from "./ComposerSuggestions";
 import { cn } from "../lib/cn";
 import { useRpc } from "../lib/query";
 import { filterMentions, insertMention, mentionQueryAt, type MentionEntry } from "../lib/composer-mentions";
@@ -17,6 +18,8 @@ interface ComposerInputProps {
   projectId?: string;
   mentions?: MentionEntry[];
   commands?: SlashCommand[];
+  suggestionAnchor: RefObject<HTMLDivElement | null>;
+  suggestionSide: "top" | "bottom";
 }
 
 /** The word being typed at the caret, with the character that started it. */
@@ -30,7 +33,8 @@ function tokenAtCaret(text: string, caret: number): { start: number; token: stri
 
 function matchingCommands(commands: SlashCommand[] | undefined, query: string | null, prefix: string | undefined, start: number | undefined): SlashCommand[] {
   if (query === null) return [];
-  return (commands ?? []).filter((command) => (command.insert ? command.prefix === prefix : prefix === "/" && start === 0) && command.name.startsWith(query.toLowerCase()));
+  // Slash opens the skill picker for either harness; selection still inserts its native prefix.
+  return (commands ?? []).filter((command) => (command.insert ? prefix === "/" || command.prefix === prefix : prefix === "/" && start === 0) && command.name.startsWith(query.toLowerCase()));
 }
 
 function commandQueryAt(token: { token: string } | null, commands: SlashCommand[] | undefined): string | null {
@@ -40,7 +44,8 @@ function commandQueryAt(token: { token: string } | null, commands: SlashCommand[
 }
 
 /** Owns text interaction: suggestions, selection, focus and the highlight mirror. */
-export function ComposerInput({ value, onChange, onSubmit, onFiles, disabled, placeholder, autoFocus, projectId, mentions, commands }: ComposerInputProps) {
+export function ComposerInput(props: ComposerInputProps) {
+  const { value, onChange, onSubmit, onFiles, disabled, placeholder, autoFocus, projectId, mentions, commands } = props;
   const [caret, setCaret] = useState(0);
   const [cursor, setCursor] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -120,9 +125,7 @@ export function ComposerInput({ value, onChange, onSubmit, onFiles, disabled, pl
       },
     }));
   }, [memberQuery, memberMatches, mentionQuery, files.data, commandMatches, token, caret, value, onChange, placeCaret]);
-  // A project can have sixty skills and a popover is not a place to read them;
-  // Settings is. Ten is what fits above the composer without covering the
-  // conversation, and it matches the cap the file list has always had.
+  // Keep ten suggestions visible; typing narrows the rest.
   // Only a name this project actually has is a token, which is why the set
   // comes from the same commands the popover offers rather than from a shape.
   const skillNames = useMemo(() => new Set((commands ?? []).filter((command) => command.insert).map((command) => command.name)), [commands]);
@@ -139,7 +142,7 @@ export function ComposerInput({ value, onChange, onSubmit, onFiles, disabled, pl
   return (
     <>
       {suggestions.length > 0 ? (
-        <div className={cn("composer-suggestions absolute left-3 bottom-full mb-1.5 rounded-lg border border-line bg-surface p-1 z-20", memberList ? "min-w-56 max-w-full" : "right-3")}>
+        <ComposerSuggestions anchor={props.suggestionAnchor} side={props.suggestionSide} members={memberList} cursor={cursor}>
           {/* The count belongs to the popover, not to the listbox: a listbox
                 may only hold options, and a stray paragraph inside one is read
                 out as if it were selectable. */}
@@ -179,7 +182,7 @@ export function ComposerInput({ value, onChange, onSubmit, onFiles, disabled, pl
               {hidden} more. Keep typing to narrow.
             </p>
           ) : null}
-        </div>
+        </ComposerSuggestions>
       ) : null}
       <div className="composer-input-shell">
         <div ref={mirrorRef} aria-hidden="true" className="composer-input-mirror">

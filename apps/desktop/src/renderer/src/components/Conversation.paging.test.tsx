@@ -1,19 +1,21 @@
-import { act, cleanup, render, renderHook } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, renderHook, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { AgentEvent, Project, Run, ThreadSummary } from "@openorc/protocol";
 import { applyFrame, flushTranscripts, resetTranscripts } from "../lib/transcript";
 import { core } from "../lib/rpc";
 import { Conversation } from "./Conversation";
+import { ThreadChangeCard } from "./ThreadChangeCard";
 import { useConversationTranscript } from "../lib/conversation-transcript";
 
 const queries = vi.hoisted(() => new Map<string, unknown>());
+const restore = vi.hoisted(() => vi.fn(async () => undefined));
 vi.mock("../lib/rpc", () => ({
   core: new Proxy({ call: vi.fn() } as Record<string, unknown>, { get: (target, key: string) => (key in target ? target[key] : () => () => undefined) }),
 }));
 vi.mock("../lib/query", () => ({
   useRpc: (method: string) => ({ data: queries.get(method), isLoading: false, isPending: false, isError: false, error: null, refetch: () => undefined }),
-  useRpcMutation: () => ({ mutate: () => undefined, mutateAsync: async () => undefined, isPending: false, error: null }),
+  useRpcMutation: () => ({ mutate: () => undefined, mutateAsync: restore, isPending: false, error: null }),
   invalidateTags: () => undefined,
 }));
 vi.mock("./Composer", async (original) => ({ ...(await original<object>()), Composer: () => null }));
@@ -88,6 +90,7 @@ beforeEach(() => {
   resetTranscripts();
   ledger.clear();
   queries.clear();
+  restore.mockClear();
   vi.mocked(core.call).mockReset();
   vi.mocked(core.call).mockImplementation((async (method: string, params: { runId: string; fromTurn?: number; turns?: number }) => {
     if (method !== "events.page") return undefined;
@@ -168,4 +171,37 @@ it("places each checkpoint after its completed turn and preserves cards while th
   });
   expect(result.current.merged?.blocks.at(-1)).toMatchObject({ text: "Working", streaming: true });
   expect(result.current.turnCards).toBe(cards);
+});
+
+it("offers Undo on the first turn using its starting files without a separate baseline card", async () => {
+  ledger.set("A", session("A", 1, 1000));
+  queries.set("threads.checkpoints", [
+    { id: "starting-files", runId: null, turn: 0 },
+    { id: "first", runId: "A", turn: 1 },
+  ]);
+  queries.set("threads.turnChanges", { files: [{ path: "README.md", added: 1, removed: 1 }] });
+  const runs = [run("A", 1000)];
+  const { result } = renderHook(() => useConversationTranscript({ runs, threadId: "thread", basePath: "/tmp/project" }));
+  await settle();
+  expect(result.current.turnCards.size).toBe(1);
+  const card = result.current.turnCards.get("turn-A-turn-0")!;
+  expect(card.previousCheckpointId).toBe("starting-files");
+  const { rerender } = render(<ThreadChangeCard threadId="thread" {...card} working={true} />);
+  expect(screen.getByRole("button", { name: "Undo this turn's changes" }).hasAttribute("disabled")).toBe(true);
+  rerender(<ThreadChangeCard threadId="thread" {...card} working={false} />);
+  const undo = screen.getByRole("button", { name: "Undo this turn's changes" });
+  expect(undo.hasAttribute("disabled")).toBe(false);
+  fireEvent.click(undo);
+  expect(restore).not.toHaveBeenCalled();
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Confirm undo" })));
+  expect(restore).toHaveBeenCalledExactlyOnceWith({ id: "thread", checkpointId: "starting-files" });
+});
+
+it("keeps legacy Undo disabled when the turn has no starting checkpoint", () => {
+  queries.set("threads.turnChanges", { files: [{ path: "README.md", added: 1, removed: 1 }] });
+  render(<ThreadChangeCard threadId="thread" checkpointId="legacy" previousCheckpointId={null} paths={[]} working={false} />);
+  const undo = screen.getByRole("button", { name: "Undo this turn's changes" });
+  expect(undo.hasAttribute("disabled")).toBe(true);
+  fireEvent.click(undo);
+  expect(restore).not.toHaveBeenCalled();
 });

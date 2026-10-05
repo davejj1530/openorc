@@ -149,6 +149,7 @@ LC_ALL=C                # stable, parseable output</code></pre>
 
   <section aria-labelledby="checkpoints">
     <h2 id="checkpoints">Checkpoints and restore</h2>
+    <p>In project conversations without a team, OpenOrc saves a "Starting files" checkpoint before the first agent run, including existing uncommitted and untracked files. The first turn's Undo returns to those files, and its saved diff shows only what changed from that starting point. Older turns without a starting checkpoint cannot use Undo.</p>
     <p>When a turn ends in a project conversation, OpenOrc saves its files as a Git tree, untracked files included, through a temporary index. A ref under <code>refs/openorc/checkpoints/&lt;conversation&gt;/</code> pins each saved tree, so <code>git gc</code> never removes them. The refs last as long as their conversation; deleting it deletes them. A checkpoint also records the folder it was read from.</p>
     <p>A restore, from the Checkpoints panel or a turn's Undo, works like this:</p>
     <ol class="docs-steps">
@@ -158,7 +159,7 @@ LC_ALL=C                # stable, parseable output</code></pre>
       <li>The restored files become a checkpoint named "Restored", so the next turn's changes are shown against them.</li>
     </ol>
     <p>A checkpoint restores only into the folder it was saved from, so after a move, move the conversation back to use it. Checkpoints saved before OpenOrc pinned them may already be gone if Git cleaned them up; a restore then says so.</p>
-    <p class="docs-source">Source: <code>packages/core/src/services/threads.ts</code> (<code>restore</code>), <code>run-settlement.ts</code> (<code>checkpoint</code>), <code>checkpoint-refs.ts</code></p>
+    <p class="docs-source">Source: <code>packages/core/src/services/threads.ts</code> (<code>restore</code>), <code>thread-start-checkpoint.ts</code>, <code>run-settlement.ts</code> (<code>checkpoint</code>), <code>checkpoint-refs.ts</code></p>
   </section>
 
   <section aria-labelledby="comments">

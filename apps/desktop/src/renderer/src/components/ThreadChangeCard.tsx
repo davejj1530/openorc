@@ -9,7 +9,7 @@ import { useLayout } from "../lib/layout";
 const CONFIRM_MS = 4000;
 
 function undoDisabledReason(previousCheckpointId: string | null, working: boolean): string | null {
-  if (!previousCheckpointId) return "This is the thread's first checkpoint; there is nothing earlier to return to.";
+  if (!previousCheckpointId) return "No starting checkpoint was saved for this turn, so Undo is unavailable.";
   if (working) return "Wait for the current turn to finish before undoing.";
   return null;
 }
@@ -34,7 +34,7 @@ export function ThreadChangeCard({
 }: {
   threadId: string;
   checkpointId: string;
-  /** The checkpoint this turn started from; Undo restores it. Absent for the first turn. */
+  /** The checkpoint this turn started from; Undo restores it. Older turns may have no starting checkpoint. */
   previousCheckpointId: string | null;
   /** Files the turn's tool calls named, shown until the saved diff is read. */
   paths: string[];

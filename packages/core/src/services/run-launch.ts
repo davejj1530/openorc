@@ -22,6 +22,7 @@ import {
 import type { AgentLaunchEnvironment } from "@openorc/agents";
 import type { Logger } from "../transport.js";
 import type { EnvSnapshot } from "./shell-environment.js";
+import { captureThreadStart } from "./thread-start-checkpoint.js";
 import {
   working,
   type LiveProcessBinding,
@@ -184,6 +185,7 @@ export class RunLaunch {
     const internalMcp = this.internalMcp(input, runId, mcp);
     const spec = this.runSpec(prepared, lease, internalMcp);
     await this.lockTaskWorkspace(attempt);
+    await captureThreadStart(this.deps.db, input, lease.paths[0]!);
     assertAdmission();
     const orclingCeiling = input.orclingId ? this.deps.hooks.orclings?.ceiling(input.orclingId) : undefined;
     // No await occurs between this permission read and the provider launch.

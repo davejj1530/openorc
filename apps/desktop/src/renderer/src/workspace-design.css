@@ -1123,6 +1123,15 @@ html[data-transparent-shell="true"] .app-shell :is(.app-topbar, .browser-toolbar
 html[data-transparent-shell="true"] .app-shell .panel-pane {
   background: transparent;
 }
+/* Overlays cover the conversation; only a docked panel can expose the window tint. */
+html[data-transparent-shell="true"] .app-shell .panel-shell[data-expanded="true"] .panel-pane {
+  background: var(--surface);
+}
+@container work-row (max-width: 788px) {
+  html[data-transparent-shell="true"] .app-shell .panel-pane {
+    background: var(--surface);
+  }
+}
 .app-shell .workspace-navigation button:focus-visible,
 .thread-rail-title button:focus-visible,
 .thread-starters button:focus-visible,

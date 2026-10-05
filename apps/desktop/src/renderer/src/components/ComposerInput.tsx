@@ -43,11 +43,18 @@ function commandQueryAt(token: { token: string } | null, commands: SlashCommand[
   return prefix === "/" || prefix === "$" ? token.token.slice(1) : null;
 }
 
+function suggestionLabel(members: boolean, files: boolean): string {
+  if (members) return "Mention a member";
+  if (files) return "Mention a file";
+  return "Commands";
+}
+
 /** Owns text interaction: suggestions, selection, focus and the highlight mirror. */
 export function ComposerInput(props: ComposerInputProps) {
   const { value, onChange, onSubmit, onFiles, disabled, placeholder, autoFocus, projectId, mentions, commands } = props;
   const [caret, setCaret] = useState(0);
   const [cursor, setCursor] = useState(0);
+  const [suggestionsActive, setSuggestionsActive] = useState(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const mirrorRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -135,18 +142,16 @@ export function ComposerInput(props: ComposerInputProps) {
   const hidden = suggestions.length - shown.length;
   useEffect(() => setCursor(0), [suggestions.length, memberQuery?.query, mentionQuery, commandQuery]);
   const memberList = suggestions.length > 0 && Boolean(suggestions[0]?.mention);
-  let suggestionsLabel = "Commands";
-  if (memberList) suggestionsLabel = "Mention a member";
-  else if (mentionQuery !== null) suggestionsLabel = "Mention a file";
+  const suggestionsOpen = suggestionsActive && suggestions.length > 0;
 
   return (
     <>
-      {suggestions.length > 0 ? (
-        <ComposerSuggestions anchor={props.suggestionAnchor} side={props.suggestionSide} members={memberList} cursor={cursor}>
+      {suggestionsOpen ? (
+        <ComposerSuggestions anchor={props.suggestionAnchor} side={props.suggestionSide} members={memberList} cursor={cursor} onDismiss={() => setSuggestionsActive(false)}>
           {/* The count belongs to the popover, not to the listbox: a listbox
                 may only hold options, and a stray paragraph inside one is read
                 out as if it were selectable. */}
-          <div role="listbox" aria-label={suggestionsLabel} data-team-mention-list={memberList || undefined}>
+          <div role="listbox" aria-label={suggestionLabel(memberList, mentionQuery !== null)} data-team-mention-list={memberList || undefined}>
             {shown.map((suggestion, index) => {
               let SuggestionIcon = Slash;
               if (memberList || mentionQuery !== null) SuggestionIcon = AtSign;
@@ -208,9 +213,12 @@ export function ComposerInput(props: ComposerInputProps) {
           aria-label="Message"
           disabled={disabled}
           value={value}
+          onFocus={() => setSuggestionsActive(true)}
+          onBlur={() => setSuggestionsActive(false)}
           onChange={(e) => {
             onChange(e.target.value);
             setCaret(e.target.selectionStart);
+            setSuggestionsActive(true);
           }}
           onSelect={(e) => setCaret(e.currentTarget.selectionStart)}
           onPaste={(e) => {
@@ -221,7 +229,7 @@ export function ComposerInput(props: ComposerInputProps) {
             }
           }}
           onKeyDown={(e) => {
-            if (suggestions.length > 0) {
+            if (suggestionsOpen) {
               if (e.key === "ArrowDown") {
                 e.preventDefault();
                 setCursor((current) => Math.min(shown.length - 1, current + 1));

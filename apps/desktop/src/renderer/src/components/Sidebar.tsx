@@ -26,6 +26,7 @@ export function Sidebar() {
   const trafficLights = useTrafficLights();
   const nativeOrclings = useOrclingsRail(route, useOrclings());
   const orclings = useContext(OrclingsRailContext) ?? nativeOrclings;
+  const browsingThreads = !orclings.active && (route.view === "thread" || route.view === "newthread");
   return (
     <>
       <aside className="sidebar-shell workspace-navigation h-full shrink-0" data-open={open} data-traffic-lights={trafficLights} aria-hidden={!open} inert={!open}>
@@ -44,7 +45,12 @@ export function Sidebar() {
           <SidebarNav route={route} projectId={projectId} />
         </div>
         <div className="sidebar-browser-tabs" aria-label="Conversations">
-          <button aria-current={!orclings.active ? "page" : undefined} onClick={() => nativeOrclings.openThreads(() => newThread(projectId ?? undefined))}>
+          <button
+            aria-current={!orclings.active ? "page" : undefined}
+            onClick={() => {
+              if (!browsingThreads) nativeOrclings.openThreads(() => newThread(projectId ?? undefined));
+            }}
+          >
             Threads
           </button>
           <button aria-current={orclings.active ? "page" : undefined} onClick={orclings.open}>
@@ -127,10 +133,26 @@ function HistoryNav() {
   const canForward = useRouter((s) => s.future.length > 0);
   return (
     <>
-      <IconButton onClick={back} disabled={!canBack} aria-label="Back" className="no-drag window-history-control">
+      <IconButton
+        onClick={() => {
+          back();
+          dismissCompactNavigation();
+        }}
+        disabled={!canBack}
+        aria-label="Back"
+        className="no-drag window-history-control"
+      >
         <ArrowLeft size={15} />
       </IconButton>
-      <IconButton onClick={forward} disabled={!canForward} aria-label="Forward" className="no-drag window-history-control">
+      <IconButton
+        onClick={() => {
+          forward();
+          dismissCompactNavigation();
+        }}
+        disabled={!canForward}
+        aria-label="Forward"
+        className="no-drag window-history-control"
+      >
         <ArrowRight size={15} />
       </IconButton>
     </>
@@ -151,7 +173,10 @@ function InboxButton() {
   return (
     <Tooltip label="Inbox">
       <IconButton
-        onClick={() => useRouter.getState().navigate({ view: "inbox" })}
+        onClick={() => {
+          useRouter.getState().navigate({ view: "inbox" });
+          dismissCompactNavigation();
+        }}
         aria-label={count ? `Inbox, ${count}` : "Inbox"}
         aria-current={current ? "page" : undefined}
         className={cn("inbox-control nav-row no-drag", current && "text-ink")}

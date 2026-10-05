@@ -9,10 +9,13 @@ const native = vi.hoisted(() => ({
   template: [] as MenuItemConstructorOptions[],
   item: { label: "", enabled: true },
   show: vi.fn(),
+  windowById: vi.fn(),
+  focusedWindow: vi.fn(),
 }));
 vi.mock("electron", () => ({
   app: { getVersion: () => "0.1.0" },
   dialog: { showMessageBox: native.show },
+  BrowserWindow: { fromId: native.windowById, getFocusedWindow: native.focusedWindow },
   Menu: {
     buildFromTemplate(template: MenuItemConstructorOptions[]) {
       native.template = template;
@@ -104,4 +107,73 @@ it("honors Download confirmed in the native dialog while an automatic recheck is
   expect(updates.state).toEqual({ phase: "ready", version: "0.2.0" });
   expect(native.show).toHaveBeenLastCalledWith(expect.objectContaining({ message: "OpenOrc 0.2.0 is ready" }));
   expect(updater.quitAndInstall).not.toHaveBeenCalled();
+});
+
+function zoomControl(label: string): MenuItemConstructorOptions {
+  const view = native.template.find((item) => item.role === "viewMenu");
+  const items = Array.isArray(view?.submenu) ? view.submenu : [];
+  const control = items.find((item) => item.label === label);
+  expect(control, `${label} must target the app window instead of Electron's focused Preview contents`).toBeDefined();
+  return control!;
+}
+
+function zoomWindow(initial = 1) {
+  let factor = initial;
+  return {
+    id: 42,
+    isDestroyed: () => false,
+    webContents: {
+      isDestroyed: () => false,
+      getZoomFactor: () => factor,
+      setZoomFactor: vi.fn((next: number) => {
+        factor = next;
+      }),
+    },
+  };
+}
+
+function clickZoom(label: string, windowId?: number) {
+  const control = zoomControl(label);
+  control.click!({} as Electron.MenuItem, windowId === undefined ? undefined : ({ id: windowId } as Electron.BaseWindow), {} as Electron.KeyboardEvent);
+}
+
+it("zooms the app window supplied by the menu while an embedded Preview has focus", () => {
+  fixture();
+  const window = zoomWindow();
+  native.windowById.mockReturnValue(window);
+  clickZoom("Zoom In", window.id);
+  expect(window.webContents.getZoomFactor()).toBeGreaterThan(1);
+  expect(native.windowById).toHaveBeenCalledWith(window.id);
+  expect(native.focusedWindow).not.toHaveBeenCalled();
+  clickZoom("Zoom Out", window.id);
+  expect(window.webContents.getZoomFactor()).toBeCloseTo(1);
+  clickZoom("Zoom In", window.id);
+  clickZoom("Actual Size", window.id);
+  expect(window.webContents.getZoomFactor()).toBe(1);
+});
+
+it("uses the focused app window when the native menu supplies no window", () => {
+  fixture();
+  const window = zoomWindow();
+  native.focusedWindow.mockReturnValue(window);
+  clickZoom("Zoom In");
+  expect(window.webContents.getZoomFactor()).toBeGreaterThan(1);
+});
+
+it.each([0.5, 3])("keeps app zoom within the supported range at %s", (factor) => {
+  fixture();
+  const window = zoomWindow(factor);
+  native.windowById.mockReturnValue(window);
+  clickZoom(factor === 3 ? "Zoom In" : "Zoom Out", window.id);
+  expect(window.webContents.getZoomFactor()).toBe(factor);
+});
+
+it("keeps the zoom shortcuts available and safely ignores a closed window", () => {
+  fixture();
+  expect(zoomControl("Zoom In").accelerator).toBe("CommandOrControl+Plus");
+  expect(zoomControl("Zoom Out").accelerator).toBe("CommandOrControl+-");
+  expect(zoomControl("Actual Size").accelerator).toBe("CommandOrControl+0");
+  expect(() => clickZoom("Zoom In")).not.toThrow();
+  native.windowById.mockReturnValue({ isDestroyed: () => true });
+  expect(() => clickZoom("Zoom Out", 42)).not.toThrow();
 });

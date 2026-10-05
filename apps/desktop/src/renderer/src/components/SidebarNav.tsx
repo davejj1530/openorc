@@ -43,7 +43,7 @@ interface Screen {
 const SCREENS: Screen[] = [
   { id: "tasks", label: "Tasks", Icon: ListTodo, route: () => ({ view: "tasks" }), views: ["tasks", "task", "newtask"] },
   { id: "pulls", label: "Pull requests", Icon: GitPullRequest, route: () => ({ view: "pulls" }), views: ["pulls", "pull"] },
-  { id: "scheduled", label: "Scheduled", Icon: CalendarClock, route: () => ({ view: "scheduled" }), views: ["scheduled"] },
+  { id: "scheduled", label: "Schedules", Icon: CalendarClock, route: () => ({ view: "scheduled" }), views: ["scheduled"] },
   { id: "orchestration", label: "Orchestration", Icon: Workflow, route: (projectId) => ({ view: "orchestration", ...(projectId ? { projectId } : {}) }), views: ["orchestration"] },
   { id: "memory", label: "Memory", Icon: Brain, route: () => ({ view: "memory" }), views: ["memory"] },
 ];

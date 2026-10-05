@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "katex/dist/katex.min.css";
 @import "@fontsource-variable/jetbrains-mono";
+@import "@fontsource-variable/inter";
 @import "./rich-text.css";
 @import "./appearance.css";
 @import "./workspace-design.css";
@@ -8,6 +9,10 @@
 @source "../../../node_modules/streamdown/dist/*.js";
 @source "../../../node_modules/@streamdown/mermaid/dist/*.js";
 @custom-variant dark (&:where(.dark, .dark *));
+
+html[data-palette="cursor"] {
+  --font-sans: "Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
 
 /*
  * Codex startup fallback. lib/theme-palettes.ts supplies the saved product palette.
@@ -453,14 +458,14 @@
   --height-control-lg: var(--control-lg);
   --height-control-send: var(--control-send);
   /* Layout measures, so no screen hardcodes a pixel width. The resizable ones are set on :root by the layout store. */
-  --width-sidebar: var(--layout-sidebar, 248px);
-  --width-panel: var(--layout-panel, 440px);
+  --width-sidebar: var(--layout-sidebar, 267px);
+  --width-panel: var(--layout-panel, 640px);
   /* The floors the work row keeps: the conversation's, then the panel's. The panel floor is
      limits.panel.min in lib/layout.ts. */
   --width-main-min: 440px;
   --width-panel-min: 340px;
   --width-details: 72px;
-  --height-topbar: max(52px, calc(32px / var(--window-zoom, 1)));
+  --height-topbar: max(40px, calc(32px / var(--window-zoom, 1)));
   --container-chat: 760px;
   --container-document: 800px;
   --document-gutter: 48px;

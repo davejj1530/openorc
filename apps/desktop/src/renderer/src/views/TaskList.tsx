@@ -256,7 +256,6 @@ export function TaskListView({ onNewTask }: { onNewTask: () => void }) {
       <div className="task-page">
         <div className="task-page-heading">
           <div>
-            <div className="document-eyebrow">Your workspace</div>
             <h1>Make space for what’s next.</h1>
             <p>Shape an idea, hand it off, and follow it through.</p>
           </div>

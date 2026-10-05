@@ -18,7 +18,7 @@ export type SidebarFilter = "active" | "archived";
 export type SidebarScreen = "tasks" | "pulls" | "scheduled" | "orchestration" | "memory";
 
 /** Screens most people open rarely start under More, until the user lists them. */
-const DEFAULT_HIDDEN_SCREENS: SidebarScreen[] = ["scheduled", "memory"];
+const DEFAULT_HIDDEN_SCREENS: SidebarScreen[] = ["pulls", "orchestration", "memory"];
 
 interface LayoutState {
   sidebarOpen: boolean;
@@ -69,8 +69,8 @@ interface LayoutState {
 }
 
 export const limits = {
-  sidebar: { min: 224, max: 380, default: 288 },
-  panel: { min: 340, max: 900, default: 460 },
+  sidebar: { min: 224, max: 380, default: 267 },
+  panel: { min: 340, max: 900, default: 640 },
 };
 
 const KEY = "openorc.layout";

@@ -79,7 +79,7 @@ export function TopBar({
       {windowDragSurface ? <span className="thread-header-drag-surface" aria-hidden="true" /> : null}
       <div className="flex items-center gap-2 min-w-0 flex-1 text-base font-medium truncate">
         {inSplit ? null : (
-          <span className="flex items-center gap-1 mr-1">
+          <span className="workspace-window-nav flex items-center gap-1 mr-1" data-sidebar-open={sidebarOpen}>
             <WindowNav open={sidebarOpen} />
           </span>
         )}

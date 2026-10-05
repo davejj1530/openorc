@@ -60,11 +60,14 @@ export function ThreadRow({ thread, active }: { thread: ThreadSummary; active: b
               active && "text-ink",
               split && !active && "ring-1 ring-inset ring-line-strong",
             )}
-            title={thread.title}
+            title={`${thread.title}\n${place.label} · ${agentLabel} · ${relativeTime(thread.lastActivityAt)}`}
           />
         }
       >
         <span className="thread-preview-heading flex min-w-0 items-start">
+          <span className="thread-preview-icon" aria-hidden="true">
+            {place.icon}
+          </span>
           <span className={cn("thread-preview-title flex-1 min-w-0 text-left", (active || thread.unread || thread.activity === "waiting") && "text-ink")}>{thread.title}</span>
           <ThreadStatusIndicator thread={thread} />
         </span>

@@ -137,6 +137,9 @@ export function ThreadView({ threadId, first, last, focused, onClose }: { thread
           <ForkParent parent={t.forkedFromId} />
           <ThreadOrcling threadId={t.id} orclingId={t.orclingId} />
           <ThreadTitle title={t.title} editing={renaming} onEditingChange={setRenaming} onSave={(title) => update.mutate({ id: t.id, patch: { title } })} />
+          <span className="thread-header-project" title={p.rootPath}>
+            {p.name}
+          </span>
         </TopBar>
         {/* Header controls own their thread explicitly; only conversation interaction activates a pane. */}
         <div className="thread-pane-content flex-1 min-h-0" onPointerDownCapture={activate} onFocusCapture={activate}>

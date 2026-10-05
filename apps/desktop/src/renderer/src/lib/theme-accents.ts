@@ -41,10 +41,17 @@ export function resolveAccentColors(base: Record<string, string>, overrides: Rec
     const pair = accentPair(accentHex(accent), ground);
     colors[token] = accent;
     colors[`--${role}-ink`] = pair.ink;
-    colors[`--${role}-soft`] = pair.soft;
+    // Curated selections belong to the palette until that role or its ground is edited.
+    colors[`--${role}-soft`] = selectionTint(role, base, overrides, pair.soft);
   }
   if (overrides["--content-accent"] || overrides["--surface"]) {
     colors["--selection"] = overrides["--selection"] ?? mixColor(accentHex(colors["--content-ink"]), surface, 0.26);
   }
   return colors;
+}
+
+function selectionTint(role: string, base: Record<string, string>, overrides: Record<string, string>, derived: string): string {
+  const ground = role === "navigation" ? "--bg" : "--surface";
+  if (overrides[`--${role}-accent`] || overrides[ground]) return derived;
+  return base[`--${role}-soft`] || derived;
 }

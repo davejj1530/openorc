@@ -2,6 +2,7 @@
 const path = require("node:path");
 const desktop = path.resolve(__dirname, "../apps/desktop");
 const root = path.resolve(__dirname, "..");
+const port = Number(process.env.OPENORC_PREVIEW_PORT ?? 5177);
 
 async function main() {
   const { createServer } = await import(require.resolve("vite", { paths: [desktop] }));
@@ -45,10 +46,10 @@ async function main() {
     resolve: {
       alias: { "@": path.join(desktop, "src/renderer/src"), ...Object.fromEntries(["react", "react-dom", "@tanstack/react-query"].map((name) => [name, path.join(desktop, "node_modules", name)])) },
     },
-    server: { host: "127.0.0.1", port: 5177, strictPort: true, fs: { allow: [root] } },
+    server: { host: "127.0.0.1", port, strictPort: true, fs: { allow: [root] } },
   });
   await server.listen();
-  console.log("OpenOrc design preview: http://127.0.0.1:5177/?design=1&theme=light\nSynthetic data; no live projects or providers are connected.");
+  console.log(`OpenOrc design preview: http://127.0.0.1:${port}/?design=1&theme=light\nSynthetic data; no live projects or providers are connected.`);
 }
 
 main().catch((error) => {

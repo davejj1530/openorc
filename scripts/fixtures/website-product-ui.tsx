@@ -1,5 +1,6 @@
 /** Marketing captures use the production app and deterministic sample data.
  * No live RPC, account, project files, or provider calls are available here. */
+import { defaultOrclingLook } from "../../packages/protocol/src/index";
 import { createRoot } from "react-dom/client";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { createDesignSettingsRpc } from "./design-settings";
@@ -70,7 +71,8 @@ async function main() {
     activity: "idle",
     unread: false,
     session: { status: "idle", message: null },
-    context: null,
+    hasStarted: true,
+    context: { used: 36000, window: 200000 },
     queued: [],
     taskCount: 0,
     openTaskCount: 0,
@@ -83,6 +85,17 @@ async function main() {
     { ...base, id: "welcome", projectId: "website", title: "Tell the product story" },
     { ...base, id: "perf", projectId: "atlas", title: "Review the search endpoint" },
   ];
+  const orclings = ["Rini", "Atlas", "Pip"].map((name, index) => ({
+    id: name.toLowerCase(),
+    name,
+    threadId: `orcling-${name.toLowerCase()}`,
+    look: { ...defaultOrclingLook, shape: index },
+    settings: { agent: "codex", model: "gpt-6-astra", effort: "high", fastMode: false },
+    permission: "approve",
+    createdAt: now,
+    updatedAt: now,
+  }));
+  threads.push(...orclings.map((orcling) => ({ ...base, id: orcling.threadId, title: orcling.name, projectId: "openorc-workspace", orclingId: orcling.id, branch: null })));
   const tasks = [
     ["welcome", "Create the welcome flow", "review", "high"],
     ["picker", "Polish the project picker", "review", "medium"],
@@ -248,9 +261,14 @@ async function main() {
         { id: "dependency-review", title: "Check dependency updates", everyMinutes: 10080, agent: "claude", model: "claude-opus-5-5[1m]", enabled: true },
         { id: "docs-review", title: "Check docs against the code", everyMinutes: 10080, agent: "codex", model: "gpt-6-astra", enabled: false },
       ].map((schedule) => ({ ...schedule, projectId: "studio", version: 1, lastRunAt: now - 3600000, nextRunAt: now + 3600000, lastThreadId: "onboarding" }));
+    if (method === "orclings.list") return orclings;
+    if (method === "threads.lastMessage") return messages[1];
+    if (method === "orclings.instructions") return [{ version: 1, body: "Help me make clear decisions. Keep project work and personal memory separate.", author: "user", note: null, createdAt: now }];
     if (method === "projects.list") return projects;
     if (method === "projects.git") return "ready";
-    if (method === "projects.get") return projects.find((p) => p.id === params.id) ?? project;
+    if (method === "projects.get")
+      return params.id === "openorc-workspace" ? { ...project, id: "openorc-workspace", name: "Workspace", rootPath: "/Projects" } : (projects.find((p) => p.id === params.id) ?? project);
+    if (method === "projects.checkoutBranch") return "main";
     if (method === "workspace.get") return { ...project, id: "openorc-workspace", name: "Workspace" };
     if (method === "threads.list") return threads.filter((t) => (!params.projectId || t.projectId === params.projectId) && (params.filter === "archived" ? Boolean(t.archivedAt) : !t.archivedAt));
     if (method === "threads.get") return threads.find((t) => t.id === params.id) ?? threads[0];
@@ -266,7 +284,7 @@ async function main() {
     if (method === "tasks.update") return Object.assign(tasks.find((t) => t.id === params.id) ?? tasks[0], params.patch, { updatedAt: Date.now() });
     if (method === "tasks.executionThread") return null;
     if (method === "orchestration.taskState") return null;
-    if (method === "review.threadDiff" || method === "review.projectDiff" || method === "review.diff") return diff;
+    if (method === "review.threadDiff" || method === "review.projectDiff" || method === "review.diff") return String(params.threadId).startsWith("orcling-") ? { ...diff, files: [], patch: "" } : diff;
     if (method === "git.threadPushState") return { branch: "main", blocked: null, published: true, unpushedCount: 0, unpushed: [] };
     if (method === "orchestration.runtime") return team;
     if (method === "orchestration.availability") return { enabled: true, maxHierarchyDepth: 3 };
@@ -287,15 +305,21 @@ async function main() {
     return [];
   }) as typeof core.call;
   queryClient.setDefaultOptions({ queries: { retry: false } });
-  useTheme.getState().setPreset("openorc");
+  useTheme.getState().setPreset(query.get("palette") === "cursor" ? "cursor" : "openorc");
   useTheme.getState().set(query.get("theme") === "light" ? "light" : "dark");
   const { accentCombinations } = await import("../../apps/desktop/src/renderer/src/lib/theme-accents");
   const accent = accentCombinations.find((entry) => entry.id === query.get("accent"));
   if (accent) useTheme.getState().setAccentCombination(accent.id);
   else if (query.get("accent") === "default") useTheme.getState().resetAccents();
-  useLayout.setState({ sidebarOpen: !designPreview || window.innerWidth > 900, panelOpen: false, projectId: null, collapsed: [] });
-  useLayout.getState().setSidebarWidth(270);
-  useLayout.getState().setPanelWidth(450);
+  useLayout.setState({
+    sidebarOpen: window.innerWidth > 900,
+    panelOpen: false,
+    projectId: null,
+    collapsed: ["project:openorc-workspace", "project:atlas"],
+    hiddenScreens: ["pulls", "orchestration", "memory"],
+  });
+  useLayout.getState().setSidebarWidth(267);
+  useLayout.getState().setPanelWidth(640);
   // Detail captures render the same production components at readable widths.
   // They are panel crops, so no window chrome is invented around them.
   if (mode === "discussion" || mode === "plan" || mode === "delivery") {
@@ -330,17 +354,14 @@ async function main() {
   else useRouter.getState().navigate({ view: "thread", threadId: mode === "teams" ? "team" : "onboarding" });
   if (mode === "review") useLayout.getState().openWorkspaceChanges({ kind: "thread", id: "onboarding" });
   const { App } = await import("../../apps/desktop/src/renderer/src/App");
-  const { DesignOrclings } = await import("./design-orclings");
   createRoot(document.getElementById("root")!).render(
     <QueryClientProvider client={queryClient}>
-      <DesignOrclings>
-        <App />
-      </DesignOrclings>
+      <App />
       {designPreview ? <DesignPreviewBar /> : null}
       {/* Browser captures omit Electron's native chrome. Reproduce only the
           buttons in the space already reserved by the production header:
-          main/index.ts trafficLightPosition (14, 20), 12px buttons, 8px gaps. */}
-      <div aria-hidden="true" style={{ position: "fixed", left: 14, top: 20, display: "flex", gap: 8, pointerEvents: "none", zIndex: 100 }}>
+          main/index.ts trafficLightPosition (14, 14), 12px buttons, 8px gaps. */}
+      <div aria-hidden="true" style={{ position: "fixed", left: 14, top: 14, display: "flex", gap: 8, pointerEvents: "none", zIndex: 100 }}>
         {["#ff5f57", "#febc2e", "#28c840"].map((background) => (
           <span key={background} style={{ width: 12, height: 12, borderRadius: "50%", background }} />
         ))}

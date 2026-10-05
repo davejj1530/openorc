@@ -254,16 +254,6 @@ export function Composer(props: ComposerProps) {
             box with transparent ink, and only the skill tokens carry a fill;
             the real characters come from the textarea sitting on top, which
             stays the only thing the caret, selection and IME ever touch. */}
-        {props.location.directory ? (
-          <div className="composer-rail">
-            {props.location.directory ? (
-              <span className="inline-flex items-center gap-1 min-w-0 truncate" title={props.location.directory}>
-                <Laptop size={14} className="shrink-0" />
-                <span className="truncate">{props.location.directory}</span>
-              </span>
-            ) : null}
-          </div>
-        ) : null}
         <ComposerInput
           value={props.value}
           onChange={props.onChange}
@@ -379,47 +369,57 @@ export function Composer(props: ComposerProps) {
             )}
           </div>
         </div>
-      </div>
-      {changed && props.changes ? (
-        <section className="composer-changes" aria-label="Uncommitted changes">
-          <div className="composer-changes-body">
-            <div className="composer-changes-identity">
-              <span className="composer-changes-project" title={props.changes.projectName}>
-                {props.changes.projectName}
-              </span>
-              {props.location.branch ? (
-                <span className="composer-changes-branch" title={props.location.branch}>
-                  <GitBranch size={14} />
-                  <span>{props.location.branch}</span>
+        {changed && props.changes ? (
+          <section className="composer-changes" aria-label="Uncommitted changes">
+            <div className="composer-changes-body">
+              <div className="composer-changes-identity">
+                <span className="composer-changes-project" title={props.changes.projectName}>
+                  {props.changes.projectName}
                 </span>
-              ) : null}
+                {props.location.branch ? (
+                  <span className="composer-changes-branch" title={props.location.branch}>
+                    <GitBranch size={14} />
+                    <span>{props.location.branch}</span>
+                  </span>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                className="composer-changes-summary"
+                onClick={props.changes.onReview}
+                aria-label={`Review ${props.changes.files} changed ${props.changes.files === 1 ? "file" : "files"}, ${props.changes.insertions} added and ${props.changes.deletions} removed lines`}
+              >
+                {props.changes.insertions + props.changes.deletions > 0 ? (
+                  <>
+                    {props.changes.insertions > 0 ? <span className="text-ok">+{props.changes.insertions.toLocaleString()}</span> : null}
+                    {props.changes.deletions > 0 ? <span className="text-bad">−{props.changes.deletions.toLocaleString()}</span> : null}
+                  </>
+                ) : (
+                  <span>
+                    {props.changes.files} {props.changes.files === 1 ? "file" : "files"}
+                  </span>
+                )}
+              </button>
+              <Tooltip label={props.changes.commitDisabledReason ?? "Commit changes"}>
+                <span className="composer-changes-commit-wrap">
+                  <button type="button" className="composer-changes-commit" aria-label="Commit changes" disabled={Boolean(props.changes.commitDisabledReason)} onClick={props.changes.onCommit}>
+                    Commit<span className="composer-commit-suffix"> changes</span>
+                  </button>
+                </span>
+              </Tooltip>
             </div>
-            <button
-              type="button"
-              className="composer-changes-summary"
-              onClick={props.changes.onReview}
-              aria-label={`Review ${props.changes.files} changed ${props.changes.files === 1 ? "file" : "files"}, ${props.changes.insertions} added and ${props.changes.deletions} removed lines`}
-            >
-              {props.changes.insertions + props.changes.deletions > 0 ? (
-                <>
-                  {props.changes.insertions > 0 ? <span className="text-ok">+{props.changes.insertions.toLocaleString()}</span> : null}
-                  {props.changes.deletions > 0 ? <span className="text-bad">−{props.changes.deletions.toLocaleString()}</span> : null}
-                </>
-              ) : (
-                <span>
-                  {props.changes.files} {props.changes.files === 1 ? "file" : "files"}
-                </span>
-              )}
-            </button>
-            <Tooltip label={props.changes.commitDisabledReason ?? "Commit changes"}>
-              <span className="composer-changes-commit-wrap">
-                <button type="button" className="composer-changes-commit" aria-label="Commit changes" disabled={Boolean(props.changes.commitDisabledReason)} onClick={props.changes.onCommit}>
-                  Commit<span className="composer-commit-suffix"> changes</span>
-                </button>
-              </span>
-            </Tooltip>
-          </div>
-        </section>
+          </section>
+        ) : null}
+      </div>
+      {props.location.directory ? (
+        <div className="composer-rail">
+          {props.location.directory ? (
+            <span className="inline-flex items-center gap-1 min-w-0 truncate" title={props.location.directory}>
+              <Laptop size={14} className="shrink-0" />
+              <span className="truncate">{props.location.directory}</span>
+            </span>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );

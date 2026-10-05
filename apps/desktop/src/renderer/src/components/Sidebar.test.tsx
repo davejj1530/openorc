@@ -129,7 +129,7 @@ it("collapses a whole project and removes its pinned, ordinary, and open snoozed
   expect(toggle.getAttribute("aria-expanded")).toBe("false");
   expect(document.getElementById(toggle.getAttribute("aria-controls")!)?.hidden).toBe(true);
   expect(screen.queryByRole("button", { name: /Pinned notes|Regular notes|Snoozed notes/ })).toBeNull();
-  expect(screen.getByRole("button", { name: /Other notes/ })).toBeTruthy();
+  expect(await screen.findByRole("button", { name: /Other notes/ })).toBeTruthy();
   expect(useUi.getState().threadOrder).toEqual(["other"]);
   expect(JSON.parse(localStorage.getItem("openorc.layout")!).collapsed).toContain("project:one");
   fireEvent.click(toggle);
@@ -137,7 +137,7 @@ it("collapses a whole project and removes its pinned, ordinary, and open snoozed
   expect(useUi.getState().threadOrder).toEqual(["pinned", "regular", "snoozed", "other"]);
 });
 
-it("retains saved project folds across remounts and always shows rows in single-project browsing", async () => {
+it("retains saved project folds across remounts and scope changes without hiding other projects", async () => {
   projectThreads();
   const view = mountSidebar();
   await screen.findByRole("button", { name: /Regular notes/ });
@@ -147,10 +147,11 @@ it("retains saved project folds across remounts and always shows rows in single-
   expect(screen.getByRole("button", { name: "Expand First project threads" })).toBeTruthy();
   expect(screen.queryByRole("button", { name: /Regular notes/ })).toBeNull();
   act(() => useLayout.getState().setProject("one"));
-  await screen.findByRole("button", { name: /Regular notes/ });
-  expect(screen.queryByRole("button", { name: /First project threads/ })).toBeNull();
+  expect(screen.queryByRole("button", { name: /Regular notes/ })).toBeNull();
+  expect(screen.getByRole("button", { name: "Expand First project threads" })).toBeTruthy();
+  expect(await screen.findByRole("button", { name: /Other notes/ })).toBeTruthy();
   expect(useLayout.getState().collapsed).toContain("project:one");
-  expect(useUi.getState().threadOrder).toEqual(["pinned", "regular"]);
+  expect(useUi.getState().threadOrder).toEqual(["other"]);
   act(() => useLayout.getState().setProject(null));
   expect(screen.getByRole("button", { name: "Expand First project threads" })).toBeTruthy();
   expect(useUi.getState().threadOrder).toEqual(["other"]);
@@ -162,7 +163,8 @@ it("keeps a project folded while searching and changing pinned filters", async (
   await screen.findByRole("button", { name: /Regular notes/ });
   fireEvent.click(screen.getByRole("button", { name: "Collapse First project threads" }));
   fireEvent.change(screen.getByRole("textbox", { name: "Filter loaded threads" }), { target: { value: "notes" } });
-  fireEvent.click(within(screen.getByRole("region", { name: "Thread browser" })).getByRole("button", { name: "Pinned" }));
+  fireEvent.click(screen.getByRole("button", { name: "Filter threads" }));
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Pinned threads" }));
   expect(screen.getByRole("button", { name: "Expand First project threads" })).toBeTruthy();
   expect(useUi.getState().threadOrder).toEqual([]);
   fireEvent.click(screen.getByRole("button", { name: "Expand First project threads" }));
@@ -180,4 +182,27 @@ it("reveals a folded project when a thread there is opened through navigation", 
   expect(screen.getByRole("button", { name: "Collapse First project threads" })).toBeTruthy();
   expect(screen.getByRole("button", { name: /Regular notes/ }).getAttribute("aria-current")).toBe("page");
   expect(useLayout.getState().projectId).toBeNull();
+});
+
+it("creates a new thread in the requested project while every project stays available", async () => {
+  projectThreads();
+  mountSidebar();
+  await screen.findByRole("button", { name: /Regular notes/ });
+  fireEvent.click(screen.getByRole("button", { name: "New thread in Second project" }));
+  expect(useRouter.getState().route).toEqual({ view: "newthread", projectId: "two" });
+  expect(useLayout.getState().projectId).toBe("two");
+  expect(screen.getByRole("button", { name: /Regular notes/ })).toBeTruthy();
+  expect(await screen.findByRole("button", { name: /Other notes/ })).toBeTruthy();
+});
+
+it("keeps activity visible in folded projects and keeps project navigation on task screens", async () => {
+  projectThreads();
+  fixture.threads[1]!.activity = "running";
+  useRouter.setState({ route: { view: "tasks" } });
+  mountSidebar();
+  await screen.findByRole("button", { name: /Regular notes/ });
+  fireEvent.click(screen.getByRole("button", { name: "Collapse First project threads" }));
+  expect(within(screen.getByRole("region", { name: "First project threads" })).getByText("Running")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: /Regular notes/ })).toBeNull();
+  expect(screen.getByRole("button", { name: "New thread in First project" })).toBeTruthy();
 });

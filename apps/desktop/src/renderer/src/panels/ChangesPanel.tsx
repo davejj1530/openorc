@@ -118,7 +118,7 @@ export function ChangesPanel({ thread, project, task }: { thread?: ThreadSummary
         ) : null}
         <span className="flex-1" />
         {commits ? (
-          <Button size="sm" disabled={!canCommit} title={actions.commit.reason ?? undefined} onClick={() => setCommitOpen(true)}>
+          <Button size="sm" variant="primary" disabled={!canCommit} title={actions.commit.reason ?? undefined} onClick={() => setCommitOpen(true)}>
             <GitCommitHorizontal size={12} /> Commit
           </Button>
         ) : null}

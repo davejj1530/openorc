@@ -85,7 +85,7 @@ const icons = {
 const labels: Record<PanelTab, string> = {
   orcling: "Orcling",
   plan: "Plan",
-  file: "Code",
+  file: "Files",
   changes: "Changes",
   tasks: "Tasks",
   task: "Task",
@@ -228,7 +228,7 @@ function PanelTabs({ tabs, current }: { tabs: PanelTab[]; current: PanelTab | un
           aria-label={labels[t]}
           title={labels[t]}
           onClick={() => setPanel(!(open && current === t), t)}
-          className={cn("inline-flex items-center gap-1.5 h-7 px-2 rounded-md text-sm text-ink-3 hover:text-ink hover:bg-surface-2", open && current === t && "text-ink font-medium")}
+          className={cn("panel-tab inline-flex items-center gap-1.5 h-7 px-2 rounded-md text-sm text-ink-3 hover:text-ink hover:bg-surface-2", open && current === t && "text-ink font-medium")}
         >
           {(() => {
             const Icon = icons[t];
@@ -428,7 +428,7 @@ export function Panel({ context }: { context: PanelContext }) {
               </IconButton>
             </Tooltip>
           </header>
-          <div className="flex-1 min-h-0 bg-bg">{mounted ? <Suspense fallback={null}>{body}</Suspense> : null}</div>
+          <div className="panel-content flex-1 min-h-0">{mounted ? <Suspense fallback={null}>{body}</Suspense> : null}</div>
         </div>
       </aside>
     </>

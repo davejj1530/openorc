@@ -2103,8 +2103,8 @@ diffs-container {
   height: var(--control-send);
   margin-left: 4px;
   border-radius: var(--radius-pill);
-  background: var(--ink);
-  color: var(--surface);
+  background: var(--accent);
+  color: var(--accent-fg);
   transition:
     opacity 120ms ease-out,
     background-color 120ms ease-out;

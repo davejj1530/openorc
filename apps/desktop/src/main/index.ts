@@ -28,6 +28,7 @@ const here = import.meta.dirname;
 const appIcon = join(here, "../../resources/icon.png");
 const launchedAt = Date.now();
 const TOPBAR_HEIGHT = 40;
+const TRAFFIC_LIGHT_DIAMETER = 14;
 
 // Before anything starts a child process, so no terminal, agent or Git command inherits them.
 const ignoredLaunchVariables = removeInjectedVariables(process.env);
@@ -114,8 +115,8 @@ function createWindow(route?: string): BrowserWindow {
     show: false,
     // Linux ignores hiddenInset and would keep its own title bar and menu bar above our headers.
     titleBarStyle: process.platform === "linux" ? "hidden" : "hiddenInset",
-    // Center the native buttons in the shared column headers (12px buttons).
-    trafficLightPosition: { x: 14, y: (TOPBAR_HEIGHT - 12) / 2 },
+    // Native macOS buttons are 14px tall and keep their size when the page zooms.
+    trafficLightPosition: { x: 14, y: (TOPBAR_HEIGHT - TRAFFIC_LIGHT_DIAMETER) / 2 },
     // Windows and Linux keep their own controls, drawn over the header; the renderer leaves them room.
     ...(process.platform !== "darwin" ? { titleBarOverlay: { height: TOPBAR_HEIGHT, color: "#00000000", symbolColor: "#b1b1b8" } } : {}),
     // Must equal the default palette's dark --bg (codex). The compositor paints this into
@@ -274,7 +275,7 @@ app.whenReady().then(async () => {
     // and reserve their physical footprint in renderer CSS instead of scaling it.
     const height = Math.max(32, TOPBAR_HEIGHT * zoom);
     if (win && process.platform === "darwin" && !win.isFullScreen()) {
-      win.setWindowButtonPosition({ x: 14, y: Math.round((height - 12) / 2) });
+      win.setWindowButtonPosition({ x: 14, y: Math.round((height - TRAFFIC_LIGHT_DIAMETER) / 2) });
     } else if (win && process.platform !== "darwin") {
       win.setTitleBarOverlay({ height: Math.round(height) });
     }

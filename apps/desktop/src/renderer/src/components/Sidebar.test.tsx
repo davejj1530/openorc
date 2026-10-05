@@ -55,7 +55,7 @@ beforeEach(() => {
   fixture.projects = [];
   fixture.threads = [];
   localStorage.clear();
-  useLayout.setState({ collapsed: [], projectId: null, sidebarOpen: true, sidebarFilter: "active" });
+  useLayout.setState({ collapsed: [], projectId: null, sidebarOpen: true, sidebarFilter: "active", pinnedOnly: false });
   useRouter.setState({ route: { view: "newthread" }, history: [], future: [], threadIds: [] });
 });
 
@@ -145,6 +145,55 @@ function projectThreads() {
     { id: "other", title: "Other notes", projectId: "two", pinnedAt: null, snoozedUntil: null },
   ].map((thread) => ({ ...thread, agent: "codex", activity: "idle", unread: false, session: { status: "idle", message: null }, lastActivityAt: Date.now() }));
 }
+
+it("narrows to orcmode's working set, hides projects with nothing in it, and keeps search and the rest one step away", async () => {
+  const day = 86_400_000;
+  fixture.projects = [
+    { id: "one", name: "First project", rootPath: "/projects/one" },
+    { id: "quiet", name: "Quiet project", rootPath: "/projects/quiet" },
+  ];
+  fixture.threads = [
+    { id: "today", title: "Today's work", projectId: "one", lastActivityAt: Date.now() - 60_000 },
+    { id: "old", title: "Old notes", projectId: "one", lastActivityAt: Date.now() - 3 * day },
+    { id: "dusty", title: "Dusty idea", projectId: "quiet", lastActivityAt: Date.now() - 9 * day },
+  ].map((thread) => ({ ...thread, agent: "codex", activity: "idle", unread: false, session: { status: "idle", message: null }, pinnedAt: null, snoozedUntil: null }));
+  mountSidebar();
+  await screen.findByRole("button", { name: /Old notes/ });
+  fireEvent.click(screen.getByRole("button", { name: "Filter threads" }));
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Orcmode" }));
+  expect(screen.getByRole("button", { name: /Today's work/ })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: /Old notes|Dusty idea/ })).toBeNull();
+  expect(screen.queryByText("Quiet project")).toBeNull();
+  expect(screen.getByRole("button", { name: "Filter threads: Orcmode" })).toBeTruthy();
+  expect(useUi.getState().threadOrder).toEqual(["today"]);
+  // A search reaches every thread, and the end of the list leads back to all of them.
+  fireEvent.change(screen.getByRole("textbox", { name: "Filter loaded threads" }), { target: { value: "dusty" } });
+  expect(screen.getByRole("button", { name: /Dusty idea/ })).toBeTruthy();
+  fireEvent.change(screen.getByRole("textbox", { name: "Filter loaded threads" }), { target: { value: "" } });
+  fireEvent.click(screen.getByRole("button", { name: "Show 2 more" }));
+  expect(screen.getByRole("button", { name: /Old notes/ })).toBeTruthy();
+  expect(useLayout.getState().sidebarFilter).toBe("active");
+});
+
+it("says so when nothing needs you, with every thread still one click away", async () => {
+  projectThreads();
+  fixture.threads = fixture.threads.map((thread) => ({ ...thread, pinnedAt: null, lastActivityAt: Date.now() - 2 * 86_400_000 }));
+  useLayout.setState({ sidebarFilter: "orc" });
+  mountSidebar();
+  expect(await screen.findByText("Nothing needs you today.")).toBeTruthy();
+  expect(screen.queryByText("First project")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Show 4 more" }));
+  expect(await screen.findByRole("button", { name: /Regular notes/ })).toBeTruthy();
+});
+
+it("toggles orcmode from the keyboard, leaving pinned-only behind and remembering the choice", () => {
+  useLayout.setState({ sidebarFilter: "active", pinnedOnly: true });
+  useLayout.getState().toggleOrcMode();
+  expect(useLayout.getState()).toMatchObject({ sidebarFilter: "orc", pinnedOnly: false });
+  expect(JSON.parse(localStorage.getItem("openorc.layout") ?? "{}")).toMatchObject({ sidebarFilter: "orc" });
+  useLayout.getState().toggleOrcMode();
+  expect(useLayout.getState().sidebarFilter).toBe("active");
+});
 
 it("collapses a whole project and removes its pinned, ordinary, and open snoozed rows from keyboard order", async () => {
   projectThreads();

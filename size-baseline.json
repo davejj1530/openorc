@@ -187,9 +187,6 @@
     "apps/desktop/src/renderer/src/components/Transcript.tsx::ThinkingRow": {
       "complexity": 16
     },
-    "apps/desktop/src/renderer/src/components/Transcript.tsx::toolCallPresentation": {
-      "complexity": 43
-    },
     "apps/desktop/src/renderer/src/components/editor/TaskImage.tsx::TaskImageView": {
       "lines": 104
     },
@@ -204,6 +201,9 @@
     },
     "apps/desktop/src/renderer/src/components/orbs/renderer.ts::createOrbRenderer": {
       "lines": 107
+    },
+    "apps/desktop/src/renderer/src/components/tool-presentation.ts::toolCallPresentation": {
+      "complexity": 43
     },
     "apps/desktop/src/renderer/src/components/useTeamConversationSettings.ts::useTeamConversationSettings": {
       "lines": 143

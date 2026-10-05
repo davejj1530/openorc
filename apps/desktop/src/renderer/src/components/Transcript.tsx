@@ -1,6 +1,6 @@
 import { lazy, memo, Suspense, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type ComponentProps, type RefObject } from "react";
 import { harnessCatalog, type ActivityRecovery } from "@openorc/protocol";
-import { WorkRead, WorkEdit, WorkCommand, WorkSearch, WorkMessage, WorkDelegate, WorkAgent, WorkLive, Check, ChevronRight, FileText, GitFork, Globe, Hammer, Search, Terminal, X } from "./icons";
+import { WorkMessage, WorkAgent, WorkLive, Check, ChevronRight, FileText, GitFork, X } from "./icons";
 import { workTurns, workParts, workTiming, workDuration } from "../lib/work-transcript";
 import { cn } from "../lib/cn";
 import { core } from "../lib/rpc";
@@ -9,17 +9,22 @@ import type { Block, RunTranscript } from "../lib/transcript";
 import { QuestionCard } from "./QuestionCard";
 import { AgentPresence } from "./AgentPresence";
 import { useTurnAuthor } from "../lib/turn-authors";
+import { toolCallPresentation, type Tone } from "./tool-presentation";
+import { foldable } from "./work-steps";
+import { WorkNow, WorkSteps } from "./WorkSteps";
+import { turnReceipt } from "./work-receipt";
 export { AgentPresence } from "./AgentPresence";
 import { StartedThreadCard } from "./StartedThreadCard";
 import { TaskCard } from "./TaskCard";
-import { startedWorkFromTool, taskIdFromTool, toolShowsCard, uniqueTaskCards } from "../lib/task-progress";
+import { startedWorkFromTool, taskIdFromTool, uniqueTaskCards } from "../lib/task-progress";
 import { ToolResult } from "./ToolResult";
 import { UsageRecovery } from "./UsageRecovery";
 import { SignInRecovery } from "./SignInRecovery";
 import { TranscriptErrorCard } from "./TranscriptErrorCard";
 const McpAppResult = lazy(() => import("./McpAppResult"));
 import { Button, IconButton, TextButton } from "./ui";
-import { ImageGenerationRow, ImageViewRow, isImageGeneration, isImageView, ThreadImage, ThreadMedia, ThreadRichText } from "./ThreadImages";
+import { ImageGenerationRow, ImageViewRow, ThreadImage, ThreadMedia, ThreadRichText } from "./ThreadImages";
+import { isImageGeneration, isImageView } from "../lib/image-activity";
 import { isUnifiedDiff, toolDiff } from "../lib/chat-diff";
 import { isImagePath } from "../../../shared/image-paths";
 import { CopyMessage, MessageTime } from "./MessageActions";
@@ -237,17 +242,6 @@ function lastPromptAt(blocks: Block[]): number {
 /** A run of finished steps reads as one line until opened, the way the agent apps fold their work. */
 type Item = { kind: "block"; block: Block } | { kind: "group"; id: string; blocks: Block[] };
 
-/** Tool attempts share one summary, including failures; their original status stays in the expanded details. */
-function foldable(block: Block, taskCards: boolean): boolean {
-  // Collaboration milestones are individually meaningful in the work timeline.
-  if (block.kind === "tool" && /(?:spawn_agent|thread_send|send_message|team_say|team_complete)$/.test(block.name)) return false;
-  if (block.kind === "activity" && /finished|completed/i.test(block.label)) return false;
-  if (block.kind === "thinking") return !block.status || block.status === "success" || block.status === "running";
-  if (block.kind === "tool") return (!block.status || ["running", "success", "error"].includes(block.status)) && !(taskCards && toolShowsCard(block));
-  if (block.kind === "activity") return ["running", "success"].includes(block.status) && !isImageGeneration(block) && !isImageView(block);
-  return false;
-}
-
 export function groupBlocks(blocks: Block[], taskCards = true, pinned?: string, groupTools = true): Item[] {
   const items: Item[] = [];
   let run: Block[] = [];
@@ -392,17 +386,11 @@ const WorkTurn = memo(function WorkTurn({ id, blocks, live = false, ambient = fa
   let outcome: string | null = null;
   if (timing.outcome === "error") outcome = "Failed";
   else if (timing.outcome === "cancelled") outcome = "Stopped";
-  const label = timing.live ? `Working${elapsed === undefined ? "" : ` · ${workDuration(elapsed)}`}` : `${outcome ?? "Worked"}${elapsed === undefined ? "" : ` for ${workDuration(elapsed)}`}`;
-  const current = timing.live
-    ? work.findLast(
-        (b) => (b.kind === "tool" && !b.done) || (b.kind === "thinking" && b.endedAt === null) || (b.kind === "activity" && b.status === "running") || (b.kind === "message" && b.streaming),
-      )
-    : undefined;
-  let activity: string | null = null;
-  if (current?.kind === "tool") activity = liveVerb(toolCallPresentation(current.name, current.input).verb);
-  else if (current?.kind === "activity") activity = current.label;
-  else if (current?.kind === "thinking") activity = "Thinking";
-  else if (current) activity = "Writing";
+  // A finished turn says what it came to: "Worked for 4m · 2 files changed · tests passed".
+  const receipt = timing.live ? [] : turnReceipt(blocks);
+  const label = timing.live
+    ? `Working${elapsed === undefined ? "" : ` · ${workDuration(elapsed)}`}`
+    : [`${outcome ?? "Worked"}${elapsed === undefined ? "" : ` for ${workDuration(elapsed)}`}`, ...receipt].join(" · ");
   // Even a tool-free failed turn needs a terminal status; never leave it saying Working.
   const hasWork = work.length > 0 || Boolean(outcome);
   const footer = trailing?.(blocks);
@@ -426,12 +414,7 @@ const WorkTurn = memo(function WorkTurn({ id, blocks, live = false, ambient = fa
             </span>
             <ChevronRight size={14} className={cn("work-chevron", open && "rotate-90")} />
           </button>
-          {!open && timing.live && showActivity ? (
-            <div className="work-current" role="status">
-              <WorkLive size={16} className="work-live" />
-              <span>{activity ?? "Working"}</span>
-            </div>
-          ) : null}
+          {!open && timing.live && showActivity ? <WorkNow blocks={work} turn={blocks} taskCards={props.taskCards} /> : null}
           <div
             id={contentId}
             hidden={!open}
@@ -440,7 +423,16 @@ const WorkTurn = memo(function WorkTurn({ id, blocks, live = false, ambient = fa
               if ((event.target as HTMLElement).closest("button, summary")) setChoice({ mode: showActivity, open: true });
             }}
           >
-            {open || visited ? <TranscriptContents {...props} blocks={work} /> : null}
+            {open || visited ? (
+              <WorkSteps
+                blocks={work}
+                turn={blocks}
+                live={timing.live}
+                taskCards={props.taskCards}
+                pinned={props.replyAction?.blockId}
+                renderBlocks={(items, openTools) => <TranscriptContents {...props} blocks={items} groupTools={false} openTools={openTools} />}
+              />
+            ) : null}
           </div>
         </section>
       ) : null}
@@ -461,6 +453,7 @@ export function TranscriptContents({
   taskCards = true,
   groupTools = true,
   pendingApproval,
+  openTools = false,
 }: {
   runId: string;
   blocks: Block[];
@@ -470,6 +463,8 @@ export function TranscriptContents({
   taskCards?: boolean;
   groupTools?: boolean;
   pendingApproval?: ((block: Extract<Block, { kind: "approval" }>) => ReactNode) | undefined;
+  /** Tool calls start open, for a call the reader picked from the work list. */
+  openTools?: boolean;
 }) {
   const items: Item[] = useMemo(() => groupBlocks(blocks, taskCards, replyAction?.blockId, groupTools), [blocks, taskCards, replyAction?.blockId, groupTools]);
   const compact = (item: Item | undefined) => Boolean(item && (item.kind === "group" || isCompact(item.block)));
@@ -486,7 +481,7 @@ export function TranscriptContents({
             {item.block.kind === "approval" && !item.block.decision && pendingApproval ? (
               pendingApproval(item.block)
             ) : (
-              <BlockView block={item.block} runId={runId} onFork={onFork} taskCards={taskCards} />
+              <BlockView block={item.block} runId={runId} onFork={onFork} taskCards={taskCards} openTools={openTools} />
             )}
             {replyAction?.blockId === item.block.id ? replyAction.content : null}
             {trailing?.([item.block])}
@@ -504,7 +499,19 @@ function isCompact(block: Block | undefined): boolean {
 /** One object for every message, so the rich-text memo holds while another row streams. */
 const wordFade = { animation: "fadeIn", sep: "word", duration: 240 } as const;
 
-const BlockView = memo(function BlockView({ block, runId, onFork, taskCards }: { block: Block; runId: string; onFork?: ((runId: string) => void) | undefined; taskCards: boolean }) {
+const BlockView = memo(function BlockView({
+  block,
+  runId,
+  onFork,
+  taskCards,
+  openTools = false,
+}: {
+  block: Block;
+  runId: string;
+  onFork?: ((runId: string) => void) | undefined;
+  taskCards: boolean;
+  openTools?: boolean;
+}) {
   const author = useTurnAuthor(undefined, block.runId ?? runId);
   switch (block.kind) {
     case "message":
@@ -549,7 +556,7 @@ const BlockView = memo(function BlockView({ block, runId, onFork, taskCards }: {
     case "thinking":
       return <ThinkingRow block={block} />;
     case "tool":
-      return <ToolBlock block={block} cards={taskCards} />;
+      return <ToolBlock block={block} cards={taskCards} open={openTools} />;
     case "approval":
       return block.approvalKind === "user_input" ? (
         <QuestionCard runId={runId} approvalId={block.approvalId} input={block.input} decided={block.decision} answers={block.answers} />
@@ -637,15 +644,15 @@ function liveVerb(verb: string): string {
 }
 
 /** A tool call that saved or started work shows that work as a live card; any other call is a row. */
-function ToolBlock({ block, cards }: { block: Extract<Block, { kind: "tool" }>; cards: boolean }) {
+function ToolBlock({ block, cards, open = false }: { block: Extract<Block, { kind: "tool" }>; cards: boolean; open?: boolean }) {
   const taskId = cards ? taskIdFromTool(block) : null;
   if (taskId) return <TaskCard taskId={taskId} />;
   const started = cards ? startedWorkFromTool(block) : null;
-  return started ? <StartedThreadCard threadId={started.threadId} /> : <ToolRow block={block} />;
+  return started ? <StartedThreadCard threadId={started.threadId} /> : <ToolRow block={block} defaultOpen={open} />;
 }
 
-function ToolRow({ block }: { block: Extract<Block, { kind: "tool" }> }) {
-  const [open, setOpen] = useState(false);
+function ToolRow({ block, defaultOpen = false }: { block: Extract<Block, { kind: "tool" }>; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
   // An output left out of the page starts loading when the pointer reaches the row, so it is there by the click.
   const [near, setNear] = useState(false);
   const output = useToolOutput(block, open || near);
@@ -897,79 +904,6 @@ function SystemNotice({ text }: { text: string }) {
       </div>
     </div>
   );
-}
-
-type Icon = typeof Terminal;
-
-/** Verb and object for a tool call, from the names Claude Code and Codex use. */
-type Tone = "read" | "edit" | "run" | "search" | "web" | "task" | "memory" | "plan" | "think" | "context" | "neutral";
-
-function editedObject(paths: string[]): string {
-  if (paths.length === 1) return paths[0]!;
-  if (paths.length) return `${paths.length} files`;
-  return "";
-}
-
-function toolCallPresentation(name: string, input: unknown): { icon: Icon; verb: string; object: string; tone: Tone; summary?: string } {
-  const i = (input ?? {}) as Record<string, unknown>;
-  const str = (k: string) => (typeof i[k] === "string" ? (i[k] as string) : "");
-  const mcp = mcpCall(name);
-  const n = mcp?.tool ?? name;
-  const command = str("cmd") || str("command") || (Array.isArray(i["command"]) ? (i["command"] as string[]).join(" ") : "");
-  if (/^(shell|bash|exec|exec_command|run_command|execute)$/i.test(n) || command)
-    return { icon: WorkCommand, verb: "Ran", object: command.replace(/^\/bin\/zsh -lc /, "").replace(/^'(.*)'$/, "$1"), tone: "run" };
-  if (/^(read|read_file|view|cat|notebookread)$/i.test(n)) return { icon: WorkRead, verb: "Read", object: str("file_path") || str("path"), tone: "read" };
-  if (/^(edit|multiedit|write|apply_patch|write_file|str_replace|create_file|notebookedit)$/i.test(n)) {
-    if (Array.isArray(input)) {
-      const paths = input.flatMap((entry) => (entry && typeof entry.path === "string" ? [entry.path] : []));
-      return { icon: WorkEdit, verb: "Edited", object: editedObject(paths), tone: "edit" };
-    }
-    const patch = str("patch") || str("input");
-    const files = patch ? patch.split("\n").filter((l) => /^\*\*\* (Add|Update|Delete) File: /.test(l)).length : 0;
-    return { icon: WorkEdit, verb: "Edited", object: str("file_path") || str("path") || (files ? `${files} file${files === 1 ? "" : "s"}` : ""), tone: "edit" };
-  }
-  if (/^(grep|glob|search|rg|find|ls)$/i.test(n)) return { icon: WorkSearch, verb: "Searched", object: str("pattern") || str("query") || str("path"), tone: "search" };
-  if (/^(webfetch|fetch)$/i.test(n)) return { icon: Globe, verb: "Fetched", object: str("url"), tone: "web" };
-  if (/^websearch$/i.test(n)) return { icon: Globe, verb: "Searched the web for", object: str("query"), tone: "web" };
-  if (/thread_send$|send_message$|team_say$/.test(n)) return { icon: WorkMessage, verb: "Sent message", object: str("target") || str("recipient") || "", tone: "neutral" };
-  if (/task_start$/.test(n)) return { icon: WorkDelegate, verb: "Started task", object: str("title") || str("id"), tone: "task" };
-  if (/spawn_agent$/.test(n)) return { icon: WorkDelegate, verb: "Delegated", object: str("title") || str("task_name"), tone: "task" };
-  if (/task_create$/.test(n)) return { icon: WorkDelegate, verb: "Created task", object: str("title"), tone: "task" };
-  if (/task_list$/.test(n)) return { icon: WorkDelegate, verb: "Listed tasks", object: "", tone: "task" };
-  if (/task_get$/.test(n)) return { icon: WorkDelegate, verb: "Checked task", object: str("id").slice(0, 8), tone: "task" };
-  if (/task_update$/.test(n)) return { icon: WorkDelegate, verb: "Updated task", object: str("id").slice(0, 8), tone: "task" };
-  if (/memory_search$/.test(n)) return { icon: Search, verb: "Searched memory for", object: str("query"), tone: "memory" };
-  if (/memory_record$/.test(n)) return { icon: WorkRead, verb: "Remembered", object: str("title"), tone: "memory" };
-  if (/memory_feedback$/.test(n)) return { icon: WorkRead, verb: "Rated a memory", object: "", tone: "memory" };
-  if (/task_context$/.test(n)) return { icon: FileText, verb: "Read the task brief", object: "", tone: "task" };
-  if (/^(task|agent|subagent)$/i.test(n)) return { icon: WorkDelegate, verb: "Delegated", object: str("description"), tone: "task" };
-  if (/^todowrite$/i.test(n)) return { icon: Check, verb: "Updated the plan", object: "", tone: "plan" };
-  const object = str("description") || str("query") || str("path");
-  if (mcp) {
-    const { label, source } = mcpNames(mcp);
-    return { icon: Hammer, verb: label, object, tone: "neutral", summary: `Used ${source}` };
-  }
-  return { icon: Hammer, verb: n, object, tone: "neutral" };
-}
-
-type McpCall = { server: string; tool: string };
-
-/**
- * An MCP tool call in each provider's naming: Claude Code's `mcp__server__tool`, Codex's `server.tool`, and OpenCode's
- * `server_tool`, which only splits reliably for OpenOrc's own `openorc_<id>` server.
- */
-function mcpCall(name: string): McpCall | null {
-  const match = /^mcp__(.+?)__(.+)$/.exec(name) ?? /^([^.]+)\.(.+)$/.exec(name) ?? /^(openorc_[0-9a-f]{32})_(.+)$/.exec(name);
-  return match ? { server: match[1]!, tool: match[2]! } : null;
-}
-
-/** "Codegraph: explore" for codegraph's `codegraph_explore`: the server as configured, minus Claude's claude.ai connector prefix, and the tool without a repeated server name. */
-function mcpNames({ server, tool }: McpCall): { label: string; source: string } {
-  const base = /^openorc(?:_[0-9a-f]{32})?$/.test(server) ? "OpenOrc" : server.replace(/^claude_ai_/, "");
-  const action = tool.toLowerCase().startsWith(`${base.toLowerCase()}_`) ? tool.slice(base.length + 1) : tool;
-  const spaced = (s: string) => s.replace(/[_-]+/g, " ").trim();
-  const source = spaced(base).replace(/^./, (c) => c.toUpperCase());
-  return { label: `${source}: ${spaced(action)}`, source };
 }
 
 function summaryText(v: unknown): string {

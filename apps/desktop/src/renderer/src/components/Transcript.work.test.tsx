@@ -12,6 +12,7 @@ vi.mock("./ThreadImages", () => ({
   ThreadMedia: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   useThreadMedia: () => ({ fileScope: { kind: "thread", id: "thread-1" }, openImage: () => {} }),
   ThreadImage: () => null,
+  ThreadLink: ({ children }: { children: React.ReactNode }) => <a>{children}</a>,
   isImageView: () => false,
   ImageViewRow: () => <div>Viewed image</div>,
   isImageGeneration: (b: Block) => b.kind === "activity" && b.activityKind === "image_generation",
@@ -21,7 +22,7 @@ vi.mock("./AgentOrb", () => ({ AgentOrb: ({ state }: { state: string }) => <div 
 vi.mock("./TaskCard", () => ({ TaskCard: ({ taskId }: { taskId: string }) => <div>Task {taskId}</div> }));
 vi.mock("./QuestionCard", () => ({ QuestionCard: () => <div>Question for you</div> }));
 afterEach(cleanup);
-const tool: Block = { id: "read", kind: "tool", name: "read_file", input: { path: "source.ts" }, output: "source contents", done: false, at: 1000 };
+const tool: Block = { id: "read", kind: "tool", name: "read_file", input: { path: "src/source.ts" }, output: "source contents", done: false, at: 1000 };
 const thought: Block = { id: "think", kind: "thinking", text: "Available reasoning summary", startedAt: 1100, endedAt: 1200 };
 const reply: Block = { id: "reply", kind: "message", role: "assistant", text: "The final answer.", streaming: false };
 const end: Block = { id: "end", kind: "status", boundary: "turn", durationMs: 222000, outcome: "success", text: "turn finished", tone: "ok" };
@@ -68,16 +69,39 @@ it("names MCP tool calls by server and tool in each provider's naming", () => {
   ];
   render(<WorkTranscript runId="run" blocks={blocks} />);
   fireEvent.click(screen.getByRole("button", { name: "Worked for 3m 42s" }));
-  fireEvent.click(screen.getByRole("button", { name: "Used Codegraph, used Mobbin, used Figma, used OpenOrc" }));
-  for (const label of [/^Codegraph: explore who calls describe/, /^Mobbin: search screens onboarding/, /^Figma: get design context/, /^OpenOrc: thread list/])
-    expect(screen.getByRole("button", { name: label })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Used Codegraph, used Mobbin" }));
+  for (const [chip, call] of [
+    ["explore", /^Codegraph: explore who calls describe/],
+    ["search screens", /^Mobbin: search screens onboarding/],
+    ["get design context", /^Figma: get design context/],
+    ["thread list", /^OpenOrc: thread list/],
+  ] as const) {
+    fireEvent.click(screen.getByRole("button", { name: chip }));
+    expect(screen.getByRole("button", { name: call }).getAttribute("aria-expanded")).toBe("true");
+  }
   expect(groupSummary([call("task", `${own}.task_create`, { title: "Ship it" })])).toBe("Created task");
 });
 
+it("reads a described command as its description, with the command one click deeper", () => {
+  const run: Block = { ...tool, id: "bash", name: "Bash", input: { command: "pnpm --filter desktop test", description: "Run the desktop tests" }, output: "48 passed", done: true };
+  render(<WorkTranscript runId="run" blocks={[run, reply, end]} />);
+  fireEvent.click(screen.getByRole("button", { name: "Worked for 3m 42s · tests passed" }));
+  fireEvent.click(screen.getByRole("button", { name: "Run the desktop tests" }));
+  expect(screen.getByRole("button", { name: /^Ran pnpm --filter desktop test/ }).getAttribute("aria-expanded")).toBe("true");
+  expect(screen.getByText("48 passed")).toBeTruthy();
+});
+it("carries the live step on one line, open or folded", () => {
+  const reasoning: Block = { id: "think-r", kind: "thinking", text: "**Running the desktop tests**\n\nThey cover the row.", startedAt: Date.now() - 4000, endedAt: Date.now() - 3000 };
+  const running: Block = { ...tool, id: "cmd", name: "shell", input: { command: "pnpm test" }, at: Date.now() };
+  render(<WorkTranscript runId="run" blocks={[reasoning, running]} live />);
+  expect(screen.getByRole("button", { name: /^Running the desktop tests/ }).querySelector(".work-shimmer")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: /^Working/ }));
+  expect(screen.getByRole("status").textContent).toMatch(/^Running the desktop tests/);
+});
 it("preserves an inspected command when it fails and a retry arrives", () => {
   const command: Block = { ...tool, name: "shell", input: { command: "pnpm test" } };
   const { rerender } = render(<WorkTranscript runId="run" blocks={[command]} live />);
-  fireEvent.click(screen.getByRole("button", { name: "Running command" }));
+  fireEvent.click(screen.getByRole("button", { name: "Running" }));
   fireEvent.click(screen.getByRole("button", { name: /Running command pnpm test/ }));
   const failed: Block = { ...command, done: true, isError: true, status: "error", output: "7 tests failed" };
   rerender(<WorkTranscript runId="run" blocks={[failed, { ...command, id: "retry" }]} live />);
@@ -92,11 +116,12 @@ it("defaults completed work closed, preserves the final answer and reveals neste
   expect(screen.queryByRole("button", { name: "Read a file" })).toBeNull();
   fireEvent.click(work);
   fireEvent.click(screen.getByRole("button", { name: "Read a file" }));
-  fireEvent.click(screen.getByRole("button", { name: /Read source.ts/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Read" }));
+  fireEvent.click(screen.getByRole("button", { name: /Read src\/source.ts/ }));
   expect(screen.getByText("source contents")).toBeTruthy();
   fireEvent.click(work);
   fireEvent.click(work);
-  expect(screen.getByRole("button", { name: /Read source.ts/ }).getAttribute("aria-expanded")).toBe("true");
+  expect(screen.getByRole("button", { name: /Read src\/source.ts/ }).getAttribute("aria-expanded")).toBe("true");
 });
 it("keeps pending input visible and failed tools inside collapsed work", () => {
   const attention: Block[] = [
@@ -109,6 +134,7 @@ it("keeps pending input visible and failed tools inside collapsed work", () => {
   fireEvent.click(screen.getByRole("button", { name: "Worked for 3m 42s" }));
   expect(screen.queryByRole("button", { name: /failed-test.*Failed/ })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Read a file, ran a command" }));
+  fireEvent.click(screen.getByRole("button", { name: "Ran" }));
   expect(screen.getByRole("button", { name: /failed-test.*Failed/ })).toBeTruthy();
 });
 
@@ -135,11 +161,11 @@ it.each([["individual", WorkTranscript]] as const)("keeps failed attempts in %s 
   applyFrame({ runId, seq: 1, events: events.slice(0, 3) });
   const { rerender, unmount } = render(<Component runId={runId} blocks={getRun(runId)!.blocks} live />);
   expect(screen.queryByRole("button", { name: /pnpm test.*Failed/ })).toBeNull();
-  expect(screen.getByRole("button", { name: "Ran 3 commands" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Running pnpm test" })).toBeTruthy();
 
   applyFrame({ runId, seq: 2, events: events.slice(3) });
   rerender(<Component runId={runId} blocks={getRun(runId)!.blocks} />);
-  expect(screen.getByRole("button", { name: "Worked for 6m 21s" }).getAttribute("aria-expanded")).toBe("false");
+  expect(screen.getByRole("button", { name: "Worked for 6m 21s · tests passed" }).getAttribute("aria-expanded")).toBe("false");
   expect(screen.queryByRole("button", { name: /.*Failed/ })).toBeNull();
   expect(screen.getByText("Verified all 37 tests.")).toBeTruthy();
 
@@ -149,9 +175,10 @@ it.each([["individual", WorkTranscript]] as const)("keeps failed attempts in %s 
   await hydrate(runId);
   render(<Component runId={runId} blocks={getRun(runId)!.blocks} />);
   expect(screen.queryByRole("button", { name: /.*Failed/ })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Worked for 6m 21s" }));
+  fireEvent.click(screen.getByRole("button", { name: "Worked for 6m 21s · tests passed" }));
   expect(screen.queryByRole("button", { name: /.*Failed/ })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Ran 3 commands" }));
+  fireEvent.click(screen.getByRole("button", { name: "Ran 2 commands" }));
+  fireEvent.click(screen.getByRole("button", { name: "Ran 2" }));
   fireEvent.click(screen.getByRole("button", { name: /cat scripts\/build-mascot-review.cjs.*Failed/ }));
   fireEvent.click(screen.getByRole("button", { name: /pnpm test.*Failed/ }));
   expect(screen.getByText("No such file or directory")).toBeTruthy();

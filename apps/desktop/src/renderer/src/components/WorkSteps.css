@@ -1,0 +1,399 @@
+/* A turn's work on a rail. Each phase is a dot and a title; the live phase is open and carries the accent, with a
+   slow light passing through its words. Class names stay under work-rail, work-phase, work-group and work-chip:
+   app.css already owns .work-row and .work-section for the window layout, and .work-row draws a window drag
+   region. */
+.work-rail {
+  display: grid;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  container-type: inline-size;
+}
+.work-rail-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  column-gap: 10px;
+  min-width: 0;
+}
+/* The spine, from below this item's dot to the next one. */
+.work-rail-item:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 7.5px;
+  top: 22px;
+  bottom: -6px;
+  width: 1px;
+  background: var(--line);
+  pointer-events: none;
+}
+.work-rail-dot {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  color: var(--ink-3);
+}
+.work-done {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklab, var(--ok) 18%, transparent);
+  color: var(--ok);
+}
+.work-pulse {
+  position: relative;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-ink);
+}
+.work-pulse::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  border: 1.5px solid var(--accent-ink);
+  opacity: 0;
+  animation: work-pulse 1.8s ease-out infinite;
+}
+@keyframes work-pulse {
+  from {
+    transform: scale(0.5);
+    opacity: 0.8;
+  }
+  to {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+.work-phase-title {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  min-height: 28px;
+  text-align: left;
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+}
+button.work-phase-title:enabled {
+  cursor: pointer;
+}
+button.work-phase-title:enabled:hover {
+  color: var(--ink);
+}
+button.work-phase-title:focus-visible,
+.work-group-label:focus-visible,
+.work-more:focus-visible {
+  outline: 2px solid var(--accent-ink);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+.work-line-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.work-phase-meta {
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.work-plan-count {
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+/* A narrow column keeps the title whole rather than a clipped hint. */
+@container (max-width: 420px) {
+  .work-phase-meta {
+    display: none;
+  }
+}
+.work-elapsed {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.work-phase-title > .work-chevron {
+  flex-shrink: 0;
+  margin-left: auto;
+  opacity: 0;
+}
+.work-elapsed + .work-chevron {
+  margin-left: 0;
+}
+button.work-phase-title:hover > .work-chevron,
+button.work-phase-title:focus-visible > .work-chevron,
+button.work-phase-title[aria-expanded="true"] > .work-chevron {
+  opacity: 1;
+}
+.work-phase-body {
+  grid-column: 2;
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 2px 0 12px;
+}
+.work-phase-body[hidden],
+.work-group-calls[hidden] {
+  display: none;
+}
+.work-phase-detail {
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.work-phase-narration > .transcript-block:first-child,
+.work-phase-extras > .transcript-block:first-child,
+.work-group-calls > .transcript-block:first-child,
+.work-rail-blocks > .transcript-block:first-child,
+.work-group > .transcript-block:first-child {
+  margin-top: 0;
+}
+/* The work's header already names who is talking, so narration here drops its own author line, and it reads as
+   a note under its phase rather than as a reply. */
+.work-rail .journal-author {
+  display: none;
+}
+/* Without that line there is no corner for the time and copy to float in, so they take their own row under the note. */
+.work-rail .journal-message {
+  padding-bottom: 0;
+}
+.work-rail .journal-reply-actions {
+  position: static;
+  justify-content: flex-end;
+  margin-top: 0;
+}
+.work-phase-narration .text-prose {
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--ink-3);
+}
+.work-rail-blocks {
+  grid-column: 2;
+  min-width: 0;
+  padding: 4px 0 8px;
+}
+
+/* Codex's reasoning titles inside a phase: the steps it took, quieter than what it touched. */
+.work-thoughts {
+  display: grid;
+  gap: 2px;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+.work-thoughts > li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.work-thoughts > li::before {
+  content: "";
+  flex-shrink: 0;
+  width: 4px;
+  height: 4px;
+  margin-bottom: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--ink-4);
+}
+
+.work-group {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.work-group-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-self: start;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  cursor: pointer;
+}
+.work-group-label:hover {
+  color: var(--ink-2);
+}
+.work-group-label > .work-chevron {
+  opacity: 0;
+}
+.work-group-label:hover > .work-chevron,
+.work-group-label[aria-expanded="true"] > .work-chevron {
+  opacity: 1;
+}
+.work-count {
+  color: var(--ink-4);
+  font-variant-numeric: tabular-nums;
+}
+.work-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+.work-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-size: var(--text-xs);
+}
+.work-chip > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+.work-chip:has(> a):hover,
+button.work-chip:hover,
+button.work-chip[aria-pressed="true"] {
+  background: var(--surface-3);
+  color: var(--ink);
+}
+button.work-chip {
+  cursor: pointer;
+}
+button.work-chip:focus-visible {
+  outline: 2px solid var(--accent-ink);
+  outline-offset: 1px;
+}
+.work-chip-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.work-chip:is([data-kind="file"], [data-kind="folder"], [data-kind="query"], [data-kind="command"]) .work-chip-label {
+  font-family: var(--font-mono);
+}
+.work-chip-icon {
+  flex-shrink: 0;
+  color: var(--ink-3);
+}
+.work-chip[data-live] {
+  color: var(--accent-ink);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent-ink) 35%, transparent);
+}
+.work-stat-added,
+.work-stat-removed {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.work-stat-added {
+  color: var(--ok);
+}
+.work-stat-removed {
+  color: var(--bad);
+}
+.work-more {
+  font-size: var(--text-xs);
+  color: var(--accent-ink);
+  cursor: pointer;
+}
+.work-group-calls {
+  min-width: 0;
+  padding-left: 2px;
+}
+
+.work-plan-items {
+  grid-column: 2;
+  display: grid;
+  padding: 0 0 8px;
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+}
+.work-plan-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 2px 0;
+}
+.work-plan-icon {
+  display: inline-flex;
+  align-self: center;
+}
+.work-plan-item[data-status="in_progress"] {
+  color: var(--ink-2);
+}
+
+/* The folded work's line: the same pulse and words, under the header. */
+.work-now {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 28px;
+  margin-top: 4px;
+  font-size: var(--text-sm);
+}
+.work-now-dot {
+  display: flex;
+  justify-content: center;
+  width: 16px;
+  flex-shrink: 0;
+}
+
+.work-shimmer {
+  --work-shimmer-rest: color-mix(in oklab, var(--accent-ink) 70%, transparent);
+  color: var(--accent-ink);
+  background: linear-gradient(100deg, var(--work-shimmer-rest) 40%, var(--accent-ink) 50%, var(--work-shimmer-rest) 60%) 0 0 / 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: work-shimmer 2.4s linear infinite;
+}
+@keyframes work-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0% 0;
+  }
+}
+/* What arrives while a phase runs fades in, so the work reads as it happens. */
+.work-rail-item[data-state="running"] .work-chip {
+  animation: work-chip-in 280ms ease-out both;
+}
+@keyframes work-chip-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px) scale(0.97);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .work-shimmer {
+    animation: none;
+    background: none;
+    -webkit-text-fill-color: currentColor;
+  }
+  .work-pulse::after,
+  .work-rail-item[data-state="running"] .work-chip {
+    animation: none;
+  }
+}

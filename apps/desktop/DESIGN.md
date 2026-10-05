@@ -232,9 +232,9 @@ Work-panel tabs keep their full names at every panel width. The strip uses avail
 
 ### Tasks, settings, and recovery
 
-Tasks use a sans-serif document heading, status summaries, distinct Active/Done/Archived filters, and grouped (46px) rows. Keyboard navigation and status menus remain available. Saving a task to backlog and starting its work are separate actions. Drafts survive navigation. Starter prompts prepare an editable plan and never send automatically.
+Tasks use the compact window toolbar for their title, project scope, and New task action. One filter row holds Active/Done/Archived, a status selector with counts, and search; it wraps at narrow widths. The grouped list starts immediately below, with 46px rows, keyboard navigation, and status menus. Saving a task to backlog and starting its work are separate actions. Drafts survive navigation. Starter prompts prepare an editable plan and never send automatically.
 
-Settings uses flat preference groups and horizontal categories with arrow-key navigation. Palette changes update the app live. Usage is an account ledger: each allowance shows its reported remaining or used amount, a thin meter, and reset timing. Missing, stale, and failed reports remain explicit; provider details and local activity stay separate.
+Settings uses flat preference groups and a 40px row of text categories below the window toolbar. Categories keep their natural width and scroll horizontally in narrow windows; arrow keys, Home, and End select and reveal each section. Palette changes update the app live. Usage is an account ledger: each allowance shows its reported remaining or used amount, a thin meter, and reset timing. Missing, stale, and failed reports remain explicit; provider details and local activity stay separate.
 
 **The Save Feedback Rule.** Announce actual saves and errors in normal document flow; leave the idle state empty.
 

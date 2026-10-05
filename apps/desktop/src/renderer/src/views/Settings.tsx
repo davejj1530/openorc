@@ -2,7 +2,7 @@ import { settingsTabIndex, idleTimeoutLabel, memoryModelAgent, learningStatus } 
 import { AgentConnections } from "./settings-agent-updates";
 import { useRouter } from "../lib/router";
 import { useEffect, useRef, useState } from "react";
-import { RefreshCw, Signal, Link2, MessageSquare, BookText, SunMoon, SlidersHorizontal, Brain, Folder } from "../components/icons";
+import { RefreshCw } from "../components/icons";
 import { distillationHarnessIds, harnessCatalog, type AppSettings, type ExtractionProviderChoice } from "@openorc/protocol";
 import { TopBar } from "../components/TopBar";
 import { MemoryControl } from "../components/MemoryControl";
@@ -18,14 +18,14 @@ import { TextGenerationSettings } from "./settings-text-generation";
 import { UpdateSettingsSection } from "./settings-updates";
 
 const sections = [
-  { id: "usage", label: "Usage", icon: Signal, description: "Account allowances, across your providers." },
-  { id: "connections", label: "Connections", icon: Link2, description: "The agents and tools connected to OpenOrc." },
-  { id: "slack", label: "Slack", icon: MessageSquare, description: "Bring requests from Slack to this computer." },
-  { id: "skills", label: "Skills", icon: BookText, description: "Browse the skills your agents can use." },
-  { id: "appearance", label: "Appearance", icon: SunMoon, description: "Your workspace, in your own colors." },
-  { id: "general", label: "General", icon: SlidersHorizontal, description: "Everyday preferences for the way you work." },
-  { id: "memory", label: "Memory & models", icon: Brain, description: "What OpenOrc remembers, and which models help." },
-  { id: "data", label: "Data", icon: Folder, description: "Your work lives on this device." },
+  { id: "usage", label: "Usage", description: "Account allowances, across your providers." },
+  { id: "connections", label: "Connections", description: "The agents and tools connected to OpenOrc." },
+  { id: "slack", label: "Slack", description: "Bring requests from Slack to this computer." },
+  { id: "skills", label: "Skills", description: "Browse the skills your agents can use." },
+  { id: "appearance", label: "Appearance", description: "Your workspace, in your own colors." },
+  { id: "general", label: "General", description: "Everyday preferences for the way you work." },
+  { id: "memory", label: "Memory & models", description: "What OpenOrc remembers, and which models help." },
+  { id: "data", label: "Data", description: "Your work lives on this device." },
 ] as const;
 
 export function Settings() {
@@ -78,10 +78,9 @@ export function Settings() {
                 tabs[next]?.click();
               }}
             >
-              {sections.map(({ id, label, icon: Icon }) => (
+              {sections.map(({ id, label }) => (
                 <button key={id} id={`settings-tab-${id}`} role="tab" aria-selected={active === id} tabIndex={active === id ? 0 : -1} aria-controls={`settings-${id}`} onClick={() => select(id)}>
-                  <Icon size={20} aria-hidden="true" />
-                  <span>{label}</span>
+                  {label}
                 </button>
               ))}
             </div>

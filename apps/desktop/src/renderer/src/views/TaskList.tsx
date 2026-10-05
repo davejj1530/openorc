@@ -6,7 +6,7 @@ import { PriorityIcon, StatusIcon, statusLabel, statusOrder } from "../component
 import { TopBar } from "../components/TopBar";
 import { TaskStart } from "../components/TaskStart";
 import { menuItem, menuPopup } from "../components/ThreadActions";
-import { Badge, Button, Empty, IconButton, Kbd, metaSlot, Segmented, Tooltip } from "../components/ui";
+import { Badge, Button, Empty, IconButton, Kbd, metaSlot, Segmented, Select } from "../components/ui";
 import { CoversPreview } from "../lib/browser-preview";
 import { cn } from "../lib/cn";
 import { useLayout } from "../lib/layout";
@@ -244,43 +244,15 @@ export function TaskListView({ onNewTask }: { onNewTask: () => void }) {
     <>
       <TopBar
         actions={
-          <Tooltip label="New task">
-            <IconButton aria-label="New task" onClick={onNewTask}>
-              <Plus size={16} />
-            </IconButton>
-          </Tooltip>
-        }
-      >
-        Tasks
-      </TopBar>
-      <div className="task-page">
-        <div className="task-page-heading">
-          <div>
-            <h1>Make space for what’s next.</h1>
-            <p>Shape an idea, hand it off, and follow it through.</p>
-          </div>
-          <Button onClick={onNewTask}>
-            <Plus size={15} />
+          <Button size="sm" onClick={onNewTask}>
             New task
           </Button>
-        </div>
-        <div className="task-stage-picker" aria-label="Task status">
-          {(["backlog", "in_progress", "review"] as const).map((status) => (
-            <button
-              key={status}
-              aria-pressed={stage === status}
-              onClick={() => {
-                setShelf("active");
-                setStage(stage === status ? null : status);
-              }}
-            >
-              <StatusIcon status={status} />
-              <span>{statusLabel[status]}</span>
-              <span className="task-stage-count">{all.filter((task) => task.status === status).length}</span>
-            </button>
-          ))}
-        </div>
-        <div className="sub-header task-page-filters py-2">
+        }
+      >
+        <h1 className="px-1 text-base font-medium">Tasks</h1>
+      </TopBar>
+      <div className="task-page">
+        <div className="task-page-filters">
           <Segmented
             label="Task filter"
             value={shelf}
@@ -290,16 +262,24 @@ export function TaskListView({ onNewTask }: { onNewTask: () => void }) {
             }}
             options={shelfOptions}
           />
-          <label className="flex min-w-0 items-center gap-2 ml-auto text-ink-3">
-            <Search size={13} />
-            <input
-              aria-label="Filter tasks"
-              className="bg-transparent min-w-0 w-36 text-sm py-1 placeholder:text-ink-4"
-              value={query}
-              placeholder="Filter tasks…"
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </label>
+          <div className="task-page-tools">
+            {shelf === "active" ? (
+              <Select aria-label="Task status" className="task-status-filter" value={stage ?? ""} onChange={(event) => setStage((event.target.value as TaskStatus) || null)}>
+                <option value="">All statuses</option>
+                {statusOrder
+                  .filter((status) => status !== "done" && status !== "archived")
+                  .map((status) => (
+                    <option key={status} value={status}>
+                      {statusLabel[status]} ({all.filter((task) => task.status === status).length})
+                    </option>
+                  ))}
+              </Select>
+            ) : null}
+            <label className="task-page-search">
+              <Search size={13} className="shrink-0" />
+              <input aria-label="Filter tasks" value={query} placeholder="Filter tasks…" onChange={(e) => setQuery(e.target.value)} />
+            </label>
+          </div>
         </div>
         {taskListBody({ error: tasks.error, loading: tasks.isLoading, list, query, shelf, stage, showProject: !projectId, retry: () => void tasks.refetch(), onNewTask })}
       </div>

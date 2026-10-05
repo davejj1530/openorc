@@ -2827,7 +2827,7 @@ diffs-container {
   opacity: 0;
   transform: translateY(2px);
 }
-/* Settings uses a native category toolbar over one continuous preference sheet. */
+/* Compact text navigation above one continuous preference sheet. */
 .settings-shell {
   --settings-content-width: 960px;
   --settings-control-width: 240px;
@@ -2850,12 +2850,11 @@ diffs-container {
 }
 .settings-nav {
   min-width: 0;
-  padding: 12px var(--settings-inset);
-  border-bottom: 1px solid var(--line);
+  padding: 6px var(--settings-inset);
 }
 .settings-tablist {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   max-width: var(--settings-content-width);
   margin-inline: auto;
   overflow-x: auto;
@@ -2863,18 +2862,16 @@ diffs-container {
 }
 .settings-tablist button {
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 7px;
   position: relative;
-  flex: 1 0 auto;
-  min-height: 60px;
-  padding: 8px 12px;
-  border-radius: 8px;
+  flex: 0 0 auto;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
   color: var(--ink-3);
-  font-size: 11px;
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 400;
   white-space: nowrap;
   transition:
     background-color 120ms var(--ease-out),
@@ -2896,7 +2893,7 @@ diffs-container {
   min-width: 0;
   overflow-y: auto;
   scrollbar-gutter: stable;
-  padding: 24px var(--settings-inset) 32px;
+  padding: 20px var(--settings-inset) 32px;
 }
 .settings-content > div {
   max-width: var(--settings-content-width);
@@ -2904,9 +2901,9 @@ diffs-container {
   overflow-wrap: anywhere;
 }
 .settings-heading {
-  margin-bottom: 24px;
-  color: var(--ink-2);
-  font-size: 14px;
+  margin-bottom: 16px;
+  color: var(--ink-3);
+  font-size: 13px;
 }
 .settings-section {
   margin-bottom: 24px;
@@ -3266,12 +3263,6 @@ diffs-container {
 @container (max-width: 500px) {
   .settings-layout {
     --settings-inset: 16px;
-  }
-  .settings-tablist {
-    gap: 4px;
-  }
-  .settings-content {
-    padding-top: 24px;
   }
   .skills-toolbar {
     flex-wrap: wrap;

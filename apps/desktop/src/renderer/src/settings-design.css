@@ -320,14 +320,6 @@
   }
 }
 @container (max-width: 540px) {
-  .settings-shell .settings-nav {
-    padding: 8px 12px;
-  }
-  .settings-tablist button {
-    flex-grow: 0;
-    min-width: 72px;
-    padding-inline: 8px;
-  }
   .usage-window {
     grid-template-columns: minmax(0, 1fr) 80px;
     gap: 8px 18px;

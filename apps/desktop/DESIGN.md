@@ -228,6 +228,8 @@ User prompts have a quiet bordered surface and no repeated author heading. Copy,
 
 The composer uses a neutral raised shell around a distinct writing area, followed by compact mode, model/effort, context, and send controls. Mode and model controls rest on transparent backgrounds. The effort knob stays white; its fill ends at the thumb center, pointer motion snaps smoothly, and keyboard input moves between stops. Clicking context usage opens details; only its explicit action compacts context. An empty running composer shows Stop; text or attachments restore Send with a separate Stop control. Git context stays in the composer, with the branch shown once and the working-folder path below.
 
+Work-panel tabs keep their full names at every panel width. The strip uses available space and scrolls horizontally only when its tabs no longer fit; add-tool, expand, and hide actions stay reachable alongside it.
+
 ### Tasks, settings, and recovery
 
 Tasks use a sans-serif document heading, status summaries, distinct Active/Done/Archived filters, and grouped (46px) rows. Keyboard navigation and status menus remain available. Saving a task to backlog and starting its work are separate actions. Drafts survive navigation. Starter prompts prepare an editable plan and never send automatically.

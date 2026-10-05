@@ -234,9 +234,7 @@ function PanelTabs({ tabs, current }: { tabs: PanelTab[]; current: PanelTab | un
             const Icon = icons[t];
             return <Icon size={14} />;
           })()}
-          <span className="panel-tab-label" data-selected={open && current === t}>
-            {labels[t]}
-          </span>
+          <span className="panel-tab-label">{labels[t]}</span>
         </button>
       ))}
     </div>

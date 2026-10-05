@@ -349,10 +349,33 @@
   padding: 0 10px 20px;
 }
 .browser-group-title {
-  padding: 12px 12px 4px;
+  padding: 8px 4px 0;
   color: var(--ink-3);
   font-size: 11px;
   font-weight: 550;
+}
+.browser-group-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 28px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  text-align: left;
+}
+.browser-group-toggle:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.browser-group-toggle > svg {
+  flex-shrink: 0;
+}
+.browser-group-toggle > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .app-shell .thread-preview {
   position: relative;

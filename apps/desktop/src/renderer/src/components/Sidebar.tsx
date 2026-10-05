@@ -20,6 +20,7 @@ import { WorkspaceRail } from "./WorkspaceRail";
 import { ProjectPicker } from "./ProjectPicker";
 import { ThreadRow } from "./ThreadLibraryRow";
 import { SidebarOrclings } from "./SidebarOrclings";
+import { SidebarProjectGroup } from "./SidebarProjectGroup";
 import { useOrclings } from "../lib/orclings";
 import { useOrclingsRail } from "../lib/orclings-rail";
 import { cn } from "../lib/cn";
@@ -112,10 +113,7 @@ export function Sidebar() {
       snoozed: pinnedOnly ? [] : group.snoozed.filter((thread) => thread.title.toLowerCase().includes(search.toLowerCase())),
     }))
     .filter((group) => projectId !== null || group.query.isPending || group.query.isError || group.hasMore || group.pinned.length + group.rest.length + group.snoozed.length > 0);
-  const order = visibleSidebarThreadIds(
-    visible,
-    collapsed.filter((id) => !id.startsWith("project:")),
-  );
+  const order = visibleSidebarThreadIds(visible, collapsed, projectId);
   const orderKey = JSON.stringify(order);
   useEffect(() => {
     useUi.getState().setThreadOrder(JSON.parse(orderKey) as string[]);
@@ -197,8 +195,7 @@ export function Sidebar() {
             <div className="browser-threads">
               {visible.length === 0 ? <p className="browser-empty">{emptyBrowserMessage(search, pinnedOnly)}</p> : null}
               {visible.map((group) => (
-                <section key={group.id} aria-label={`${group.name} threads`}>
-                  {projectId === null ? <h3 className="browser-group-title">{group.name}</h3> : null}
+                <SidebarProjectGroup key={group.id} id={group.id} name={group.name} collapsible={projectId === null}>
                   {group.pinned.length > 0 ? (
                     <Section id={`pinned:${group.id}`} label="Pinned" count={group.pinned.length}>
                       {group.pinned.map(row)}
@@ -222,7 +219,7 @@ export function Sidebar() {
                       {group.snoozed.map(row)}
                     </Section>
                   ) : null}
-                </section>
+                </SidebarProjectGroup>
               ))}
             </div>
             <ThreadBrowserHint />

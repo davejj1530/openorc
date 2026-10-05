@@ -25,7 +25,7 @@ useLayout.getState().setPanelWidth(420);
 
 function Fixture() {
   return (
-    <div style={{ display: "flex", height: "100vh", containerType: "inline-size" }} className="app-shell bg-surface text-ink">
+    <div style={{ display: "flex", height: "100vh" }} className="app-shell work-row relative bg-surface text-ink">
       <main style={{ flex: 1, minWidth: 0, padding: 32 }} className="prose-chat">
         <h1 className="text-lg font-semibold mb-6">Thread links</h1>
         <ThreadRichText mode="static">{`Here is the [first page](${location.origin}/page-a).\n\nRead the [second page](${location.origin}/page-b).`}</ThreadRichText>

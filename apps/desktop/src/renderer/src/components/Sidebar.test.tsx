@@ -56,7 +56,7 @@ beforeEach(() => {
   fixture.threads = [];
   localStorage.clear();
   useLayout.setState({ collapsed: [], projectId: null, sidebarOpen: true, sidebarFilter: "active" });
-  useRouter.setState({ route: { view: "newthread" } });
+  useRouter.setState({ route: { view: "newthread" }, history: [], future: [], threadIds: [] });
 });
 
 const mountSidebar = () =>
@@ -104,6 +104,33 @@ it("opens project conversations when Threads is chosen from an initial Orcling c
   fireEvent.click(screen.getByRole("button", { name: "Threads" }));
   expect(useRouter.getState().route).toMatchObject({ view: "newthread" });
   expect(screen.queryByRole("region", { name: "Orclings" })).toBeNull();
+});
+
+it.each([false, true])("keeps the current conversation destination when the selected Threads tab is clicked (draft=%s)", (draft) => {
+  open("notes");
+  if (draft) fireEvent.click(screen.getByRole("button", { name: "New thread" }));
+  const { route, history } = useRouter.getState();
+  fireEvent.click(screen.getByRole("button", { name: "Threads" }));
+  expect(useRouter.getState().route).toEqual(route);
+  expect(useRouter.getState().history).toEqual(history);
+});
+
+it.each([
+  ["Inbox", "inbox"],
+  ["Back", "tasks"],
+  ["Forward", "settings"],
+])("dismisses compact navigation after choosing %s in the footer", (label, destination) => {
+  const matchMedia = window.matchMedia;
+  window.matchMedia = (query) => ({ ...matchMedia(query), matches: query === "(max-width: 900px)" });
+  try {
+    useRouter.setState({ history: [{ view: "tasks" }], future: [{ view: "settings" }] });
+    mountSidebar();
+    fireEvent.click(screen.getByRole("button", { name: label }));
+    expect(useRouter.getState().route.view).toBe(destination);
+    expect(useLayout.getState().sidebarOpen).toBe(false);
+  } finally {
+    window.matchMedia = matchMedia;
+  }
 });
 
 function projectThreads() {

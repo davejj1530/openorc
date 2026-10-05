@@ -155,6 +155,17 @@ async function check() {
       await pause(100);
       await fs.writeFile(path.join(dir, `${theme}.png`), (await win.webContents.capturePage()).toPNG());
     }
+    await read("document.documentElement.dataset.transparentShell = 'true'");
+    await read("document.querySelector('[aria-label=\"Expand panel\"]').click()");
+    await until(() => read("document.querySelector('.panel-shell').dataset.expanded === 'true'"));
+    const paneFill = () => read("getComputedStyle(document.querySelector('.panel-pane')).backgroundColor");
+    assert.match(await paneFill(), /^rgb\(/, "Expanded panels must cover the conversation with an opaque surface when transparency is enabled");
+    await fs.writeFile(path.join(dir, "transparent-expanded.png"), (await win.webContents.capturePage()).toPNG());
+    await read("document.querySelector('[aria-label=\"Collapse panel\"]').click()");
+    win.setContentSize(720, 720);
+    await until(() => read("getComputedStyle(document.querySelector('.panel-shell')).position === 'absolute'"));
+    assert.match(await paneFill(), /^rgb\(/, "Narrow overlay panels must also cover the conversation with an opaque surface");
+    await fs.writeFile(path.join(dir, "transparent-compact.png"), (await win.webContents.capturePage()).toPNG());
     assert.equal(win.webContents.getURL(), site + "/");
     page().debugger.attach("1.3");
     const pageImage = await page().debugger.sendCommand("Page.captureScreenshot", { format: "png" });

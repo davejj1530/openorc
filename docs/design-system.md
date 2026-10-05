@@ -40,7 +40,7 @@ OpenOrc release updates share that upper-right notice stack, above agent updates
 
 Responsive behavior follows available column width. Allow properties and toolbars to wrap; secondary labels may yield while accessible names remain. Check narrow windows, split conversations, enlarged text, keyboard focus, and reduced motion.
 
-Typing `/` opens commands and skills for the selected agent; Codex also accepts `$` for skills. Selection inserts the agent's native skill prefix. Suggestions float below new-thread composers and above conversation composers, adjust to available space, and keep keyboard selection visible without moving focus out of the textarea.
+Typing `/` opens commands and skills for the selected agent; Codex also accepts `$` for skills. Selection inserts the agent's native skill prefix. Suggestions float below new-thread composers and above conversation composers, adjust to available space, and keep keyboard selection visible without moving focus out of the textarea. Moving focus away or clicking outside dismisses the popup and releases the native Preview without changing the draft.
 
 ## Icons and motion
 

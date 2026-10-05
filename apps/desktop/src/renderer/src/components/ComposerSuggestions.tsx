@@ -9,12 +9,14 @@ export function ComposerSuggestions({
   side,
   members,
   cursor,
+  onDismiss,
   children,
 }: {
   anchor: RefObject<HTMLDivElement | null>;
   side: "top" | "bottom";
   members: boolean;
   cursor: number;
+  onDismiss: () => void;
   children: ReactNode;
 }) {
   const popup = useRef<HTMLDivElement>(null);
@@ -22,7 +24,13 @@ export function ComposerSuggestions({
     popup.current?.querySelector<HTMLElement>('[role="option"][aria-selected="true"]')?.scrollIntoView?.({ block: "nearest" });
   }, [cursor]);
   return (
-    <Popover.Root open modal={false}>
+    <Popover.Root
+      open
+      modal={false}
+      onOpenChange={(open) => {
+        if (!open) onDismiss();
+      }}
+    >
       <Popover.Portal>
         <CoversPreview />
         <Popover.Positioner

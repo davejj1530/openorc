@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Composer, type ComposerProps } from "./Composer";
 import { readDraft, writeDraft } from "../lib/drafts";
 import { core } from "../lib/rpc";
+import { isPreviewCovered } from "../lib/browser-preview";
 
 afterEach(cleanup);
 
@@ -151,6 +152,21 @@ describe("slash suggestions", () => {
     mount({ commands, value });
     selectAt(value.length);
     expect(screen.queryByRole("listbox", { name: "Commands" })).toBeNull();
+  });
+
+  it("dismisses suggestions when focus leaves the composer and releases the Preview", async () => {
+    mount({ commands, value: "" });
+    act(() => message().focus());
+    fireEvent.change(message(), { target: { value: "/co", selectionStart: 3 } });
+    expect(screen.getByRole("listbox", { name: "Commands" })).toBeTruthy();
+    expect(isPreviewCovered()).toBe(true);
+    const mode = screen.getByRole("button", { name: /^Mode:/ });
+    act(() => mode.focus());
+    await waitFor(() => expect(screen.queryByRole("listbox", { name: "Commands" })).toBeNull());
+    expect(isPreviewCovered()).toBe(false);
+    expect(message().value).toBe("/co");
+    act(() => message().focus());
+    expect(screen.getByRole("listbox", { name: "Commands" })).toBeTruthy();
   });
 });
 

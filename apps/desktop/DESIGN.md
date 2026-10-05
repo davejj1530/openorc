@@ -24,7 +24,7 @@ Settings → Appearance separates Actions, Navigation, and Content accents. Four
 
 ## Typography
 
-Thread titles use compact 13px semibold system type in the top toolbar. Charter (with platform serif fallbacks) remains for task and welcome-page headings. Native sans-serif stays in controls and 15px conversation prose at 1.65 line height; code keeps JetBrains Mono. Settings uses compact section headings and supporting descriptions. Usage percentages and time labels use aligned numerals.
+Thread titles use compact 13px semibold system type in the top toolbar. The new-thread welcome heading also uses the normal system sans-serif. Charter (with platform serif fallbacks) remains for task headings. Native sans-serif stays in controls and 15px conversation prose at 1.65 line height; code keeps JetBrains Mono. Settings uses compact section headings and supporting descriptions. Usage percentages and time labels use aligned numerals.
 
 ## Layout
 

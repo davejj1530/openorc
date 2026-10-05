@@ -811,7 +811,7 @@
 .app-shell .new-thread-body h1 {
   max-width: 500px;
   margin: 0 0 12px;
-  font-family: var(--document-font);
+  font-family: var(--font-sans);
   font-size: clamp(28px, 2.5vw, 36px);
   letter-spacing: -0.8px;
   line-height: 1.12;

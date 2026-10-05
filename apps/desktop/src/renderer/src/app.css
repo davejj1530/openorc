@@ -2222,7 +2222,7 @@ diffs-container {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  padding: 16px 16px 0;
+  padding: 16px 16px 12px;
 }
 .composer-thumbnail {
   width: 88px;

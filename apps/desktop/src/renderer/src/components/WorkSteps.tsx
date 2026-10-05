@@ -5,7 +5,7 @@ import { workDuration } from "../lib/work-transcript";
 import { Brain, Check, ChevronRight, CircleDashed, Folder, Globe, Hammer, ListChecks, Search, Terminal, WorkDelegate, WorkLive } from "./icons";
 import { FileGlyph } from "./FileGlyph";
 import { ThreadLink } from "./ThreadImages";
-import type { WorkChip } from "./work-chips";
+import { chipCalls, type WorkChip } from "./work-chips";
 import { isLive, liveHeadline, liveSectionLabel, workEntries, type LiveHeadline, type PlanItem, type WorkEntry, type WorkPhase, type WorkSection } from "./work-steps";
 import "./WorkSteps.css";
 
@@ -275,7 +275,7 @@ function ChipGroup({ section, live, renderBlocks }: { section: WorkSection; live
           ) : null}
         </div>
       ) : null}
-      {pick ? <div className="work-group-calls">{renderBlocks(pick.blocks, true)}</div> : null}
+      {pick ? <div className="work-group-calls">{renderBlocks(chipCalls(pick), true)}</div> : null}
       <div id={callsId} hidden={!calls} className="work-group-calls">
         {visited ? renderBlocks(section.blocks) : null}
       </div>
@@ -287,7 +287,7 @@ const kindIcons = { folder: Folder, query: Search, command: Terminal, intent: Te
 
 /** A file shows its language's mark; anything else shows what kind of thing it is. */
 function ChipIcon({ chip }: { chip: WorkChip }) {
-  if (chip.kind === "file") return <FileGlyph path={chip.label} className="work-chip-icon" />;
+  if (chip.kind === "file" || chip.kind === "edit") return <FileGlyph path={chip.label} className="work-chip-icon" />;
   const Icon = kindIcons[chip.kind];
   return <Icon size={12} className="work-chip-icon" />;
 }
@@ -301,7 +301,8 @@ function ChipView({ chip, live, picked, onPick }: { chip: WorkChip; live: boolea
       {chip.removed ? <span className="work-stat-removed">−{chip.removed}</span> : null}
     </>
   );
-  if (chip.path)
+  // A file read opens the file; an edit, like any other call, opens below the chips to show what it did.
+  if (chip.kind === "file" && chip.path)
     return (
       <span className="work-chip" data-kind={chip.kind} data-live={live || undefined} title={chip.title}>
         <ThreadLink href={chip.path}>{content}</ThreadLink>

@@ -290,7 +290,7 @@ button.work-chip:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.work-chip:is([data-kind="file"], [data-kind="folder"], [data-kind="query"], [data-kind="command"]) .work-chip-label {
+.work-chip:is([data-kind="file"], [data-kind="edit"], [data-kind="folder"], [data-kind="query"], [data-kind="command"]) .work-chip-label {
   font-family: var(--font-mono);
 }
 .work-chip-icon {

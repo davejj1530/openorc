@@ -1,11 +1,24 @@
 import { useEffect, useMemo, useRef } from "react";
-import { parseDiffFromFile, parsePatchFiles, type CodeViewItem } from "@pierre/diffs";
+import { parseDiffFromFile, parsePatchFiles, type CodeViewItem, type FileDiffMetadata, type Hunk } from "@pierre/diffs";
 import { CodeView, WorkerPoolContextProvider, type CodeViewHandle } from "@pierre/diffs/react";
 import DiffWorker from "@pierre/diffs/worker/worker.js?worker";
 import { useTheme } from "../lib/theme";
 import { applyDiffIcons } from "./icons-diff";
 
 const workerFactory = () => new DiffWorker();
+
+/** A hunk's share of a diff's height: 20 a line, and the separator folding the unchanged lines above it. */
+function hunkHeight(hunk: Hunk, index: number): number {
+  // The separator is 32 with 8 below it, and 8 above unless it opens the file.
+  const separator = hunk.collapsedBefore > 0 ? 40 + Math.min(index, 1) * 8 : 0;
+  return hunk.unifiedLineCount * 20 + separator;
+}
+
+/** The height a diff takes, so its box fits it: 60 a file for its header and padding, its hunks, 10 for the list's edges. Long diffs scroll. */
+function diffHeight(files: FileDiffMetadata[]): number {
+  const height = files.reduce((sum, file) => sum + 60 + file.hunks.reduce((lines, hunk, index) => lines + hunkHeight(hunk, index), 0), 10);
+  return Math.min(420, Math.max(96, height));
+}
 
 /** The shared read-only diff viewer for chat rows. Long diffs scroll inside the row. */
 function DiffItems({ items, height, label, lineNumbers = true }: { items: CodeViewItem<undefined>[]; height: number; label: string; lineNumbers?: boolean }) {
@@ -45,9 +58,8 @@ export function InlineDiff({ patch }: { patch: string }) {
       if (patch.split("\n").some((line) => line.startsWith("@@") && !/^@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@/.test(line))) return null;
       const files = parsePatchFiles(patch, undefined, true).flatMap((part) => part.files);
       if (!files.length) return null;
-      const height = files.reduce((sum, file) => sum + 48 + file.unifiedLineCount * 20 + file.hunks.length * 28, 0);
       const items: CodeViewItem<undefined>[] = files.map((fileDiff, index) => ({ id: `${index}:${fileDiff.name}`, type: "diff", fileDiff }));
-      return { items, height: Math.min(420, Math.max(96, height)) };
+      return { items, height: diffHeight(files) };
     } catch {
       return null;
     }
@@ -67,17 +79,17 @@ export function InlineDiff({ patch }: { patch: string }) {
  * snippet's own, so they stay hidden.
  */
 export function EditDiff({ path, before, after }: { path: string; before: string; after: string }) {
-  const items = useMemo<CodeViewItem<undefined>[] | null>(() => {
+  const fileDiff = useMemo(() => {
     try {
       const name = path || "edit";
       // Snippets end where the edit ends, not at the end of a file, so neither side is "missing" its last newline.
       const line = (text: string) => (text.endsWith("\n") ? text : `${text}\n`);
-      return [{ id: `edit:${name}`, type: "diff", fileDiff: parseDiffFromFile({ name, contents: line(before) }, { name, contents: line(after) }) }];
+      return parseDiffFromFile({ name, contents: line(before) }, { name, contents: line(after) });
     } catch {
       return null;
     }
   }, [path, before, after]);
-  if (!items) return <pre className="my-2 max-h-72 overflow-auto whitespace-pre-wrap font-mono text-xs rounded-lg border border-line p-3">{after}</pre>;
-  const lines = before.split("\n").length + after.split("\n").length;
-  return <DiffItems key={`${path}\n${before}\n${after}`} items={items} height={Math.min(420, Math.max(96, 48 + lines * 20))} label="Edit" lineNumbers={false} />;
+  if (!fileDiff) return <pre className="my-2 max-h-72 overflow-auto whitespace-pre-wrap font-mono text-xs rounded-lg border border-line p-3">{after}</pre>;
+  const items: CodeViewItem<undefined>[] = [{ id: `edit:${fileDiff.name}`, type: "diff", fileDiff }];
+  return <DiffItems key={`${path}\n${before}\n${after}`} items={items} height={diffHeight([fileDiff])} label="Edit" lineNumbers={false} />;
 }

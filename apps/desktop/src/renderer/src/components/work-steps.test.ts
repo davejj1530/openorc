@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
 import type { Block } from "../lib/transcript";
 import { liveHeadline, narrationTitle, reasoningSections, workEntries, type WorkEntry } from "./work-steps";
+import { callParts, chipCalls } from "./work-chips";
 import { turnReceipt } from "./work-receipt";
 
 const tool = (id: string, name: string, input: unknown, done = true, extra: Partial<Extract<Block, { kind: "tool" }>> = {}): Block => ({ id, kind: "tool", name, input, done, at: 1000, ...extra });
@@ -135,6 +136,18 @@ it("drops waiting and startup signals, keeps reasoning with the call it led to, 
   expect(outline(entries)).toEqual(["~ Read a file", "  Read: [a.ts]", "  + send", "# The edit", "blocks after"]);
   expect(entries[0]?.kind === "phase" && entries[0].phase.sections[0]!.blocks.map((block) => block.id)).toEqual(["empty", "why", "t1"]);
   expect(outline(workEntries(blocks, true, "send"))).toEqual(["~ Read a file", "  Read: [a.ts]", "blocks send", "# The edit", "blocks after"]);
+});
+
+it("opens an edit chip to its own file's part of a patch, so the diff is the one its numbers count", () => {
+  const patch = tool("p1", "apply_patch", [
+    { path: "src/a.ts", kind: "update", diff: "@@ -1 +1 @@\n-a\n+b" },
+    { path: "src/b.ts", kind: "add", diff: "+c" },
+  ]);
+  const [first] = callParts(patch);
+  expect(first?.chip).toMatchObject({ kind: "edit", path: "src/a.ts", added: 1, removed: 1 });
+  const calls = chipCalls({ ...first!.chip!, blocks: [patch] });
+  expect(calls.map((block) => block.kind === "tool" && block.input)).toEqual([[{ path: "src/a.ts", kind: "update", diff: "@@ -1 +1 @@\n-a\n+b" }]]);
+  expect(callParts(tool("r1", "Read", { file_path: "src/a.ts" }))[0]?.chip).toMatchObject({ kind: "file", path: "src/a.ts" });
 });
 
 it("still shows a turn that only started or only thought", () => {

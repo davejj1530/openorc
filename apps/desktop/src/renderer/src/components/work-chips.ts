@@ -5,14 +5,14 @@ import { patchStat } from "./diff-stat";
 import { toolCallPresentation } from "./tool-presentation";
 
 /** What a chip stands for, which decides its icon and whether it opens anything. */
-export type ChipKind = "file" | "folder" | "query" | "command" | "intent" | "web" | "tool" | "agent" | "memory";
+export type ChipKind = "file" | "edit" | "folder" | "query" | "command" | "intent" | "web" | "tool" | "agent" | "memory";
 
 export interface WorkChip {
   key: string;
   label: string;
   title: string;
   kind: ChipKind;
-  /** A local file the chip opens. */
+  /** The local file the chip is about. A read opens it; an edit shows its diff. */
   path?: string;
   added?: number;
   removed?: number;
@@ -105,8 +105,18 @@ function editStats(block: ToolBlock): Map<string, { added?: number; removed?: nu
   return stats;
 }
 
-function fileChip(path: string, stat?: { added?: number; removed?: number }): Omit<WorkChip, "blocks"> {
-  return { key: path, label: basename(path), title: path, kind: "file", path, ...stat };
+function fileChip(path: string, stat?: { added?: number; removed?: number }, kind: "file" | "edit" = "file"): Omit<WorkChip, "blocks"> {
+  return { key: path, label: basename(path), title: path, kind, path, ...stat };
+}
+
+/** The calls a chip opens. An edit opens only its own file's part of each patch, so the diff is the one its numbers count. */
+export function chipCalls(chip: WorkChip): Block[] {
+  if (chip.kind !== "edit") return chip.blocks;
+  return chip.blocks.map((block) => {
+    if (block.kind !== "tool" || !Array.isArray(block.input)) return block;
+    const own = (block.input as { path?: unknown }[]).filter((entry) => entry?.path === chip.path);
+    return own.length ? { ...block, input: own } : block;
+  });
 }
 
 /** Codex reads each command for what it does: a `sed` that prints a file is a read, an `rg` is a search. */
@@ -148,10 +158,11 @@ function presentedParts(block: ToolBlock): CallPart[] {
   }
   if (verb === "Edited") {
     const stats = editStats(block);
-    // A patch that names no single file reads as its count ("3 files"), which is not a path to open.
-    if (/^\d+ files?$/.test(object)) return [{ section: "Edited", chip: { key: object, label: object, title: object, kind: "tool" } }];
-    const paths = Array.isArray(block.input) ? (block.input as { path?: unknown }[]).flatMap((entry) => (typeof entry?.path === "string" ? [entry.path] : [])) : [object].filter(Boolean);
-    return paths.length ? paths.map((path) => ({ section: "Edited", chip: fileChip(path, stats.get(path)) })) : [{ section: "Edited", chip: null }];
+    const listed = Array.isArray(block.input) ? (block.input as { path?: unknown }[]).flatMap((entry) => (typeof entry?.path === "string" ? [entry.path] : [])) : [];
+    // A patch that names no file reads as its count ("3 files"), which is not a path to open.
+    if (!listed.length && /^\d+ files?$/.test(object)) return [{ section: "Edited", chip: { key: object, label: object, title: object, kind: "tool" } }];
+    const paths = listed.length ? listed : [object].filter(Boolean);
+    return paths.length ? paths.map((path) => ({ section: "Edited", chip: fileChip(path, stats.get(path), "edit") })) : [{ section: "Edited", chip: null }];
   }
   const known = sectionFor[verb];
   if (!object) return [{ section: known?.section ?? verb, chip: null }];

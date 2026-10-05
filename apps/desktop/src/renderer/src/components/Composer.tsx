@@ -31,7 +31,7 @@ export const permissionLabel: Record<PermissionPreset, string> = { review: "Revi
 export type { Attachment } from "../lib/composer-attachments";
 
 function composerDestination(props: ComposerProps): ReactNode {
-  if (props.hasStarted) return null;
+  if (props.hasStarted || props.presentation === "new-thread") return null;
   if (props.children) return <div className="composer-destination">{props.children}</div>;
   if (!props.location.label) return null;
   return (
@@ -129,6 +129,8 @@ export interface ComposerProps {
   commands?: SlashCommand[];
   autoFocus?: boolean;
   size?: "md" | "lg";
+  /** The landing screen keeps destination choices above the prompt and attachment/send actions together. */
+  presentation?: "conversation" | "new-thread";
   error?: string | null;
   children?: ReactNode;
 }
@@ -142,6 +144,7 @@ export interface ComposerProps {
  * conversation is.
  */
 export function Composer(props: ComposerProps) {
+  const isNewThread = props.presentation === "new-thread";
   const files = useComposerAttachments({ draftKey: props.draftKey, disabledReason: props.attachmentsDisabledReason });
   const { attachments, uploading, addFiles, remove: removeAttachments } = files;
   const { value, onChange } = props;
@@ -198,7 +201,7 @@ export function Composer(props: ComposerProps) {
   };
 
   return (
-    <div className={cn("composer min-w-0", props.size === "lg" && "composer-large")}>
+    <div className={cn("composer min-w-0", props.size === "lg" && "composer-large", isNewThread && "composer-new-thread")}>
       {interrupt.error || files.error || submission?.error || props.error ? (
         <div role="alert" className="mb-2 text-sm text-bad break-words">
           {interrupt.error ? `Couldn’t stop the agent. ${interrupt.error.message}` : files.error || submission?.error || props.error}
@@ -268,39 +271,24 @@ export function Composer(props: ComposerProps) {
         />
         {/* Workspace context and settings share the shell's bottom row. */}
         <div className="composer-foot">
-          <div className="composer-lead">
-            <Tooltip label={props.attachmentsDisabledReason ?? "Attach a file. Paste or drop works too."}>
-              <button onClick={pickFiles} disabled={Boolean(props.attachmentsDisabledReason)} aria-label="Attach file" className="composer-icon-button">
-                <Plus size={16} />
-              </button>
-            </Tooltip>
-          </div>
+          {!isNewThread ? (
+            <div className="composer-lead">
+              <ComposerAttach onAttach={pickFiles} disabledReason={props.attachmentsDisabledReason} />
+            </div>
+          ) : null}
           {/* Metadata truncates first; narrow layouts let the action group use a second row. */}
           <div className="composer-meta">
             {props.projectControl}
             {composerDestination(props)}
+            {isNewThread ? composerModelControl(props) : null}
+            {isNewThread ? composerModeControl(props) : null}
             {!changed && props.location.branch ? (
               <span className="composer-branch" title={props.location.branch}>
                 <GitBranch size={14} />
                 <span>{props.location.branch}</span>
               </span>
             ) : null}
-            <ComposerChoice
-              ariaLabel="Mode"
-              value={executionMode(props.mode, props.permission)}
-              options={modeOptions(props.model?.agent)}
-              onChange={(value) => {
-                const next = executionModeSettings(value);
-                if (props.onExecutionMode) props.onExecutionMode(next);
-                else {
-                  props.onPermission(next.permissionMode);
-                  props.onMode(next.mode);
-                }
-              }}
-              disabled={props.permissionDisabled || props.settingsDisabled}
-              disabledReason={props.permissionDisabledReason ?? props.settingsDisabledReason}
-              describedBy={props.permissionDescriptionId ?? props.modeDescriptionId}
-            />
+            {!isNewThread ? composerModeControl(props) : null}
           </div>
           <div className="composer-actions">
             {props.context ? (
@@ -316,14 +304,7 @@ export function Composer(props: ComposerProps) {
                 Compacting context…
               </span>
             ) : null}
-            {props.modelControl ?? <ComposerModelPicker value={props.model} onChange={props.onModel} />}
-            {props.model && executionModeUnavailable(props.model.agent, executionMode(props.mode, props.permission)) ? (
-              <Tooltip label={executionModeUnavailable(props.model.agent, executionMode(props.mode, props.permission))!}>
-                <span className="text-xs text-ink-3" role="status">
-                  Mode unavailable
-                </span>
-              </Tooltip>
-            ) : null}
+            {isNewThread ? <ComposerAttach onAttach={pickFiles} disabledReason={props.attachmentsDisabledReason} /> : composerModelControl(props)}
             {canStop && !stopInsteadOfSend ? (
               <Tooltip label="Stop this turn">
                 <button onClick={stop} disabled={stopping} aria-label="Stop" className="composer-icon-button">
@@ -425,6 +406,53 @@ export function Composer(props: ComposerProps) {
   );
 }
 
+function ComposerAttach({ onAttach, disabledReason }: { onAttach: () => void; disabledReason?: string | null }) {
+  return (
+    <Tooltip label={disabledReason ?? "Attach a file. Paste or drop works too."}>
+      <button onClick={onAttach} disabled={Boolean(disabledReason)} aria-label="Attach file" className="composer-icon-button">
+        <Plus size={16} />
+      </button>
+    </Tooltip>
+  );
+}
+
+function composerModelControl(props: ComposerProps): ReactNode {
+  const unavailable = props.model ? executionModeUnavailable(props.model.agent, executionMode(props.mode, props.permission)) : null;
+  return (
+    <>
+      {props.modelControl ?? <ComposerModelPicker value={props.model} onChange={props.onModel} />}
+      {unavailable ? (
+        <Tooltip label={unavailable}>
+          <span className="text-xs text-ink-3" role="status">
+            Mode unavailable
+          </span>
+        </Tooltip>
+      ) : null}
+    </>
+  );
+}
+
+function composerModeControl(props: ComposerProps): ReactNode {
+  return (
+    <ComposerChoice
+      ariaLabel="Mode"
+      value={executionMode(props.mode, props.permission)}
+      options={modeOptions(props.model?.agent)}
+      onChange={(value) => {
+        const next = executionModeSettings(value);
+        if (props.onExecutionMode) props.onExecutionMode(next);
+        else {
+          props.onPermission(next.permissionMode);
+          props.onMode(next.mode);
+        }
+      }}
+      disabled={props.permissionDisabled || props.settingsDisabled}
+      disabledReason={props.permissionDisabledReason ?? props.settingsDisabledReason}
+      describedBy={props.permissionDescriptionId ?? props.modeDescriptionId}
+    />
+  );
+}
+
 /** Every mode keeps its label for the trigger; the menu offers only the ones the agent can run. */
 function modeOptions(agent: AgentKind | undefined) {
   return ExecutionMode.options.map((value) => ({ value, ...executionModePresentation(agent, value), hidden: !executionModeAvailable(agent, value) }));
@@ -511,6 +539,8 @@ export function ComposerChoice<T extends string>({
   describedBy,
   ariaLabel,
   className,
+  side = "top",
+  align = "end",
 }: {
   value: T;
   /** A hidden option can still be the current value; the menu just doesn't offer it. */
@@ -521,6 +551,8 @@ export function ComposerChoice<T extends string>({
   describedBy?: string;
   ariaLabel: string;
   className?: string;
+  side?: "top" | "bottom";
+  align?: "start" | "end";
 }) {
   const current = options.find((o) => o.value === value) ?? options[0];
   const Icon = current?.icon;
@@ -539,7 +571,7 @@ export function ComposerChoice<T extends string>({
       </Menu.Trigger>
       <Menu.Portal>
         <CoversPreview />
-        <Menu.Positioner side="top" align="end" sideOffset={6} collisionPadding={8}>
+        <Menu.Positioner side={side} align={align} sideOffset={6} collisionPadding={8}>
           <Menu.Popup className="menu-popup w-64 rounded-lg border border-line bg-surface p-1 shadow-panel outline-none">
             {options
               .filter((o) => !o.hidden)

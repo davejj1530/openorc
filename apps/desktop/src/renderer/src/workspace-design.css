@@ -441,13 +441,15 @@
   flex: 0 0 0;
   margin: var(--height-topbar) 0 0;
   align-self: stretch;
+  z-index: 10;
 }
 .app-shell .resize-handle[data-edge="sidebar"]::after {
   inset: 0 -7px 0 0;
 }
 .app-shell .resize-handle[data-edge="sidebar"] .resize-grip {
-  left: 0;
-  width: 2px;
+  /* Center the full pill over the 1px seam border; the hit area stays on the work side. */
+  left: -0.5px;
+  width: 4px;
 }
 .thread-rail-title {
   flex: 1 1 auto;

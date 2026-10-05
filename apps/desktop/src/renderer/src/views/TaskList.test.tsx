@@ -131,16 +131,11 @@ it("disables only the saving row, retains its status on failure and lets the use
 
 it("filters by stage and clears that filter when changing shelves", async () => {
   await show();
-  const stages = screen.getByLabelText("Task status");
-  fireEvent.click(within(stages).getByRole("button", { name: /Review/ }));
+  fireEvent.change(screen.getByRole("combobox", { name: "Task status" }), { target: { value: "review" } });
   expect(screen.queryByRole("button", { name: "Export rows, Backlog" })).toBeNull();
   expect(screen.getByRole("button", { name: "Review copy, Review" })).toBeTruthy();
   fireEvent.click(screen.getByRole("radio", { name: "Done" }));
   fireEvent.click(screen.getByRole("radio", { name: "Active" }));
   expect(screen.getByRole("button", { name: "Export rows, Backlog" })).toBeTruthy();
-  expect(
-    within(stages)
-      .getByRole("button", { name: /Review/ })
-      .getAttribute("aria-pressed"),
-  ).toBe("false");
+  expect((screen.getByRole("combobox", { name: "Task status" }) as HTMLSelectElement).value).toBe("");
 });

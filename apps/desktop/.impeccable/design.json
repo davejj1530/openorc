@@ -293,8 +293,8 @@
         "purpose": "Browser tabs, filters, and secondary controls."
       },
       "document": {
-        "displayName": "Task heading",
-        "purpose": "Sans-serif task page heading."
+        "displayName": "Document heading",
+        "purpose": "Sans-serif title inside task documents and drafts; list pages use the compact toolbar title."
       },
       "code": {
         "displayName": "Code",

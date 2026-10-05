@@ -274,9 +274,6 @@
   flex-shrink: 0;
   color: var(--ink-3);
 }
-.project-option .sidebar-project-add {
-  opacity: 1;
-}
 .project-picker-add {
   display: flex;
   align-items: center;
@@ -385,13 +382,6 @@
 }
 .project-group-activity[data-waiting="true"] {
   color: var(--warn);
-}
-.browser-group-title .sidebar-project-add {
-  /* Revealing project options must not move the adjacent New thread target. */
-  width: 24px;
-  flex-shrink: 0;
-  padding: 0;
-  overflow: hidden;
 }
 .app-shell .thread-preview {
   position: relative;

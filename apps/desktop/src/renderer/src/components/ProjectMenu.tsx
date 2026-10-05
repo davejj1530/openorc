@@ -1,42 +1,33 @@
 import { useState, type ReactNode } from "react";
 import { ContextMenu } from "@base-ui/react/context-menu";
-import { Menu } from "@base-ui/react/menu";
 import { WORKSPACE_ID } from "@openorc/protocol";
 import { CoversPreview } from "../lib/browser-preview";
 import { useLayout } from "../lib/layout";
 import { useRpcMutation } from "../lib/query";
-import { MoreHorizontal, X } from "./icons";
+import { X } from "./icons";
 import { menuItem, menuPopup } from "./ThreadActions";
-import { Button, Dialog, IconButton, Tooltip } from "./ui";
+import { Button, Dialog } from "./ui";
 
 export const projectHeadingClassName = "flex items-center gap-1 h-8 pl-1 pr-1";
 
-/** Both the context menu and options button share one removal flow. */
+/** Project removal lives in the heading's context menu. */
 export function ProjectMenu({ project, children }: { project: { id: string; name: string }; children: ReactNode }) {
   const [confirm, setConfirm] = useState(false);
   const requestRemoval = () => setConfirm(true);
   return (
     <>
       <ContextMenu.Root>
-        <ContextMenu.Trigger className={projectHeadingClassName}>
+        <ContextMenu.Trigger
+          className={projectHeadingClassName}
+          onKeyDown={(event) => {
+            if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10")) return;
+            event.preventDefault();
+            // macOS does not emit a contextmenu event for the keyboard shortcut.
+            const { left, bottom } = event.currentTarget.getBoundingClientRect();
+            event.currentTarget.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: left, clientY: bottom }));
+          }}
+        >
           {children}
-          <Menu.Root>
-            <Tooltip label={`Project options for ${project.name}`}>
-              <Menu.Trigger render={<IconButton aria-label={`Project options for ${project.name}`} size="sm" className="sidebar-project-add no-drag data-[popup-open]:opacity-100" />}>
-                <MoreHorizontal size={14} />
-              </Menu.Trigger>
-            </Tooltip>
-            <Menu.Portal>
-              <CoversPreview />
-              <Menu.Positioner sideOffset={4} align="end" collisionPadding={8} className="z-40">
-                <Menu.Popup className={menuPopup}>
-                  <Menu.Item className={menuItem} onClick={requestRemoval}>
-                    <X size={13} /> Remove project…
-                  </Menu.Item>
-                </Menu.Popup>
-              </Menu.Positioner>
-            </Menu.Portal>
-          </Menu.Root>
         </ContextMenu.Trigger>
         <ContextMenu.Portal>
           <CoversPreview />

@@ -6,7 +6,7 @@ import { core } from "../lib/rpc";
 import { queryClient } from "../lib/query";
 import { useLayout } from "../lib/layout";
 import { useRouter } from "../lib/router";
-import { SidebarProjectHeading } from "./SidebarProjectHeading";
+import { SidebarProjectGroup } from "./SidebarProjectGroup";
 
 vi.mock("../lib/browser-preview", () => ({ CoversPreview: () => null }));
 beforeEach(() => {
@@ -21,12 +21,16 @@ afterEach(() => {
 function show(id = "repo", name = "Studio") {
   return render(
     <QueryClientProvider client={queryClient}>
-      <SidebarProjectHeading group={{ id, name }} expanded />
+      <SidebarProjectGroup id={id} name={name} threads={[]}>
+        {null}
+      </SidebarProjectGroup>
     </QueryClientProvider>,
   );
 }
-async function confirmFromOptions() {
-  fireEvent.click(screen.getByRole("button", { name: "Project options for Studio" }));
+async function confirmFromContextMenu(input: "pointer" | "keyboard" = "pointer") {
+  const heading = screen.getByRole("button", { name: "Collapse Studio threads" });
+  if (input === "keyboard") fireEvent.keyDown(heading, { key: "F10", shiftKey: true });
+  else fireEvent.contextMenu(heading);
   fireEvent.click(await screen.findByRole("menuitem", { name: "Remove project…" }));
   return screen.findByRole("button", { name: "Remove project" });
 }
@@ -34,7 +38,8 @@ async function confirmFromOptions() {
 it("offers removal on right-click without toggling the project, and cancellation makes no write", async () => {
   const call = vi.spyOn(core, "call");
   show();
-  fireEvent.contextMenu(screen.getByRole("button", { name: "Studio" }));
+  expect(screen.queryByRole("button", { name: /Project options/ })).toBeNull();
+  fireEvent.contextMenu(screen.getByRole("button", { name: "Collapse Studio threads" }));
   fireEvent.click(await screen.findByRole("menuitem", { name: "Remove project…" }));
   expect((await screen.findByRole("dialog")).textContent).toContain("Files, worktrees, and history are kept");
   expect(useLayout.getState().collapsed).toEqual([]);
@@ -43,10 +48,10 @@ it("offers removal on right-click without toggling the project, and cancellation
   expect(call).not.toHaveBeenCalled();
 });
 
-it("removes through the options button and resets its scope while keeping the open conversation", async () => {
+it("removes through the keyboard context menu and resets its scope while keeping the open conversation", async () => {
   const call = vi.spyOn(core, "call").mockResolvedValue({ ok: true });
   show();
-  fireEvent.click(await confirmFromOptions());
+  fireEvent.click(await confirmFromContextMenu("keyboard"));
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   expect(call).toHaveBeenCalledExactlyOnceWith("projects.remove", { id: "repo" });
   expect(useLayout.getState().projectId).toBe(WORKSPACE_ID);
@@ -66,7 +71,7 @@ it("keeps errors visible, prevents repeat submission while pending, and allows r
     .mockResolvedValue({ ok: true });
   useLayout.setState({ projectId: "other" });
   show();
-  const remove = await confirmFromOptions();
+  const remove = await confirmFromContextMenu();
   fireEvent.click(remove);
   await waitFor(() => expect(remove.hasAttribute("disabled")).toBe(true));
   fireEvent.click(remove);
@@ -83,6 +88,6 @@ it("keeps errors visible, prevents repeat submission while pending, and allows r
 it("keeps Workspace permanent", () => {
   show(WORKSPACE_ID, "Workspace");
   expect(screen.queryByRole("button", { name: /Project options/ })).toBeNull();
-  fireEvent.contextMenu(screen.getByRole("button", { name: "Workspace" }));
+  fireEvent.contextMenu(screen.getByRole("button", { name: "Collapse Workspace threads" }));
   expect(screen.queryByRole("menuitem", { name: "Remove project…" })).toBeNull();
 });

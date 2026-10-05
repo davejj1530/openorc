@@ -1,16 +1,17 @@
 import { useEffect, useRef, useState } from "react";
-import { WORKSPACE_ID, harnessIds, harnessInfo, harnessLoggedIn, type HarnessId, type Project, type TeamDetail, type WorkspaceMode } from "@openorc/protocol";
-import { ChevronRight, FolderGit2, GitBranch, Laptop } from "../components/icons";
-import { Composer, ComposerChoice } from "../components/Composer";
+import { WORKSPACE_ID, harnessIds, harnessInfo, harnessLoggedIn, type HarnessId, type Project, type TeamDetail } from "@openorc/protocol";
+import { ChevronRight, FolderGit2 } from "../components/icons";
+import { Composer } from "../components/Composer";
 import { Panel } from "../components/Panel";
 import { useComposerChanges } from "../lib/composer-changes";
 import { NewThreadStarters } from "../components/NewThreadStarters";
+import { NewThreadContext } from "../components/NewThreadContext";
 import { ArrivalPanel, useArrivalActivity } from "../components/NewThreadActivity";
 import { ComposerModelPicker, defaultChoice, ModelPicker, type ModelChoice, type OrclingPickerChoices, type TeamPickerChoices } from "../components/ModelPicker";
 import { useOrclings } from "../lib/orclings";
 import { pickerTeam } from "../lib/team-settings";
 import { TopBar } from "../components/TopBar";
-import { Button, Select, TextButton } from "../components/ui";
+import { Button, TextButton } from "../components/ui";
 import { teamMentionEntries } from "../lib/composer-mentions";
 import { useLayout } from "../lib/layout";
 import { readOnboardingState } from "../lib/onboarding";
@@ -33,45 +34,6 @@ import { useSkillCommands } from "../lib/skill-commands";
 import { useUi } from "../lib/ui";
 import { usePermissionSelection } from "../lib/permission-default";
 import { startNewThread } from "./new-thread-start";
-
-const workspaceOptions = [
-  {
-    value: "current" as const,
-    label: "Local checkout",
-    hint: "The repository as it is checked out now",
-    icon: Laptop,
-  },
-  {
-    value: "worktree" as const,
-    label: "Worktree",
-    hint: "A branch and folder of its own, so other threads never collide with it",
-    icon: GitBranch,
-  },
-];
-
-/** Where the thread works: a folder of your choice in Workspace, the checkout or a worktree in a project. */
-function ThreadPlace(props: { isWorkspace: boolean; mode: WorkspaceMode; blocked: string | null; disabled: boolean; onFolder: (folder: string) => void; onMode: (mode: WorkspaceMode) => void }) {
-  const chooseFolder = async () => {
-    const folder = await window.openorc.pickDirectory();
-    if (folder) props.onFolder(folder);
-  };
-  if (!props.isWorkspace)
-    return (
-      <ComposerChoice
-        ariaLabel="Where the thread works"
-        value={props.mode}
-        options={workspaceOptions}
-        onChange={props.onMode}
-        disabled={props.disabled || Boolean(props.blocked)}
-        disabledReason={props.blocked ?? undefined}
-      />
-    );
-  return (
-    <Button variant="ghost" size="sm" disabled={props.disabled} title="Choose the folder for this conversation" onClick={() => void chooseFolder()}>
-      Choose folder
-    </Button>
-  );
-}
 
 /** Project changes remount the composer so prompt, target and image drafts move together. */
 export function NewThread({ projectId }: { projectId?: string }) {
@@ -242,7 +204,7 @@ function NewThreadProject({
   return (
     <>
       <main className="workspace-main well flex flex-1 flex-col min-w-0 min-h-0">
-        <TopBar projectId={projectId} projectName={selected?.name} onProjectChange={(id) => onProject(id ?? WORKSPACE_ID)} panel={Boolean(panelContext)}>
+        <TopBar showProject={false} panel={Boolean(panelContext)}>
           <h1 className="px-1 text-base font-medium">New thread</h1>
         </TopBar>
         <div className="new-thread-body flex-1 min-h-0 flex flex-col overflow-y-auto">
@@ -259,14 +221,25 @@ function NewThreadProject({
             ) : (
               <>
                 <div className="relative">
+                  <NewThreadContext
+                    projectId={projectId}
+                    projects={projects}
+                    mode={workspaceMode}
+                    blocked={branchingReason(git.state, "Worktrees")}
+                    disabled={start.isPending}
+                    onProject={onProject}
+                    onFolder={(workingDirectory) => changeDraft({ workingDirectory })}
+                    onMode={(workspace) => changeDraft({ workspace })}
+                  />
                   <Composer
                     draftKey={`newthread.${projectId}.attachments`}
                     autoFocus
                     value={draft.prompt}
                     onChange={(prompt) => changeDraft({ prompt })}
                     onSubmit={submit}
-                    placeholder={revision ? "Message the team… (@name to address a member)" : "What would you like to do?"}
+                    placeholder={revision ? "Message the team… (@name to address a member)" : "Ask OpenOrc to build, fix bugs, explore"}
                     size="lg"
+                    presentation="new-thread"
                     {...(revision ? { mentions: teamMentionEntries(revision) } : {})}
                     model={choice}
                     onModel={changeSettings}
@@ -297,34 +270,7 @@ function NewThreadProject({
                     busy={start.isPending}
                     disabledReason={disabledReason}
                     error={start.error?.message ?? permissionError ?? storageError}
-                    projectControl={
-                      !selected && projects?.length ? (
-                        <Select
-                          aria-label="New thread project"
-                          value={projectId}
-                          disabled={start.isPending}
-                          onChange={(event) => onProject(event.target.value)}
-                          className="h-6 text-base max-w-48 border-0 bg-transparent hover:bg-surface-2"
-                        >
-                          {!selected ? <option value={projectId}>Unavailable project</option> : null}
-                          {(projects ?? []).map((project) => (
-                            <option key={project.id} value={project.id}>
-                              {project.name}
-                            </option>
-                          ))}
-                        </Select>
-                      ) : null
-                    }
-                  >
-                    <ThreadPlace
-                      isWorkspace={isWorkspace}
-                      mode={workspaceMode}
-                      blocked={branchingReason(git.state, "Worktrees")}
-                      disabled={start.isPending}
-                      onFolder={(workingDirectory) => changeDraft({ workingDirectory })}
-                      onMode={(workspace) => changeDraft({ workspace })}
-                    />
-                  </Composer>
+                  />
                 </div>
                 {targetIssue || projectIssue ? (
                   <p role="status" className="text-xs text-warn mt-2 break-words">

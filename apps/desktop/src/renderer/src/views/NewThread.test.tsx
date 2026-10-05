@@ -147,6 +147,30 @@ describe("NewThread", () => {
     expect(readNewThreadDraft("p1").prompt).toBe("First project");
   });
 
+  it("switches projects beside the prompt, restores that draft, and sends to the chosen project", async () => {
+    saveModelDraft("p1", "First project");
+    saveModelDraft("p2", "Second project");
+    render(<NewThread projectId="p1" />);
+    fireEvent.click(screen.getByRole("button", { name: "Project: p1" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "p2 /p2" }));
+    const message = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Message" });
+    expect(message.value).toBe("Second project");
+    expect(screen.getByRole("button", { name: "Project: p2" })).toBeTruthy();
+    fireEvent.keyDown(message, { key: "Enter", code: "Enter" });
+    await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ projectId: "p2", prompt: "Second project" })));
+    expect(readNewThreadDraft("p1").prompt).toBe("First project");
+  });
+
+  it("chooses a worktree above the prompt and uses it for the first turn", async () => {
+    saveModelDraft("p1", "Build in a separate checkout");
+    render(<NewThread projectId="p1" />);
+    fireEvent.click(screen.getByRole("button", { name: "Where the thread works: Local checkout" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: /^Worktree / }));
+    expect(readNewThreadDraft("p1").workspace).toBe("worktree");
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ projectId: "p1", workspaceMode: "worktree", prompt: "Build in a separate checkout" })));
+  });
+
   it("keeps the recovered prompt when its saved solo model is unavailable", () => {
     saveModelDraft("p1", "Retain this request");
     models = [];

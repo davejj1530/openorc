@@ -132,6 +132,11 @@ components:
     backgroundColor: "{colors.raised-light}"
     rounded: "{rounded.composer}"
     padding: "{spacing.xs}"
+  composer-new-thread:
+    backgroundColor: "var(--composer-input)"
+    typography: "{typography.composer}"
+    rounded: "{rounded.lg}"
+    padding: "6px"
   work-panel:
     backgroundColor: "{colors.paper-light}"
     rounded: "{rounded.panel}"
@@ -177,6 +182,8 @@ OpenOrc and Cursor use Inter Variable throughout the interface, including task d
 
 The frontmatter defines the observed hierarchy. Toolbar titles use the compact semibold title role. Ordinary controls use the interface or label role; conversation prose uses the body role, while the composer has its own smaller text. Task document headings use the document role. New-thread and list pages use the compact toolbar title. Dates, counts, usage, and diff statistics use tabular numerals.
 
+New-thread context and composer controls use the label role (12px). Branch, Git summary, and working-path details deliberately use smaller secondary metadata (11px), so destination and execution choices remain the primary controls.
+
 Thread rows have single-line titles with ellipsis. Provider and branch details remain in accessible labels and hover text. Long prose wraps; code and tables may scroll within their own containers.
 
 ## Layout
@@ -187,11 +194,13 @@ The sidebar orders New thread and app destinations above Threads/Orclings tabs, 
 
 The conversation measure is at most (800px), with (16px) reading gutters. The right work panel is inset (12px) from its sides and bottom. Each column owns its scrolling. Sidebar and panel resizing support dragging, keyboard input, and reset. Split conversations retain their own toolbar and panel ownership.
 
+New-thread content is centered at a maximum width of (640px), with (32px) of top body padding. Project and working-location choices sit immediately above the prompt. At viewport widths of (900px) or less, the top padding becomes (24px).
+
 Responsive rules follow the available space:
 
 - At viewport widths of (900px) or less, navigation becomes an overlay. Selecting a conversation or destination dismisses it; switching Threads/Orclings keeps the list open.
 - At work-row widths of (788px) or less, an open work panel overlays the work area. It can still expand independently.
-- At composer widths of (440px) or less, action controls move to a second row and wrap.
+- In conversation composers at widths of (440px) or less, action controls move to a second row and wrap. The new-thread variant keeps metadata and actions inline while space permits; at composer widths of (300px) or less, metadata takes a full row and actions follow.
 - At viewport widths of (520px) or less, reading gutters shrink to (12px). Expanded new-thread activity uses one column when its available width is (480px) or less.
 - Settings retains its horizontal category toolbar and maximum (960px) content width. Preference rows stack below an (800px) container; usage rows reflow below (540px).
 
@@ -205,7 +214,7 @@ The optional native-blur setting paints the surrounding shell tint once through 
 
 ## Shapes
 
-Compact controls use the shared small and medium radii. Navigation rows and browser tabs use the navigation radius; the composer pairs its outer radius with a smaller writing area. User prompts use the large radius and a fine border. Inset work panels use the panel radius; diff files inside them use the medium radius. These boundaries carry structure without stacked shadows.
+Compact controls use the shared small and medium radii. Navigation rows and browser tabs use the navigation radius; the conversation composer pairs its outer radius with a smaller writing area. The new-thread composer uses the large radius for one continuous prompt surface, with quiet starter pills below (14px radius). User prompts use the large radius and a fine border. Inset work panels use the panel radius; diff files inside them use the medium radius. These boundaries carry structure without stacked shadows.
 
 New app icons follow the [Precision Outline family](../../docs/precision-outline-icons.md): original Codex-generated geometry on a (24-unit) grid with (1.75-unit) strokes, rounded joins and caps, and `currentColor`. Reuse shared icon components and accessible names. Filled collaboration-status marks, the original Hollow conversation indicator, and bundled upstream framework/language logos remain deliberate exceptions. Individual Orclings retain their own shapes and colors.
 
@@ -227,9 +236,11 @@ Threads and Orclings share the sidebar through tabs and remember their last sele
 
 User prompts align to the right, fit their content, and wrap within 88% of the reading column, capped at 72ch. They have a quiet bordered surface and no repeated author heading. Copy, Fork, and timestamp controls sit in a reserved row below the prompt, so revealing them on hover or focus does not overlap the bubble or move content. Assistant responses are unboxed with a compact author line; named team replies keep one avatar/name/model/time line. The editable thread title and contextual tools share the top toolbar. Team revision details, activity visibility, and context compaction remain in the team menu, with pending compaction identifiable on its trigger.
 
-The composer uses a neutral raised shell around a distinct writing area, followed by compact mode, model/effort, context, and send controls. Mode and model controls rest on transparent backgrounds. The effort knob stays white; its fill ends at the thumb center, pointer motion snaps smoothly, and keyboard input moves between stops. Clicking context usage opens details; only its explicit action compacts context. An empty running composer shows Stop; text or attachments restore Send with a separate Stop control. Git context stays in the composer, with the branch shown once and the working-folder path below.
+In conversations, the shared composer uses a neutral raised shell around a distinct writing area, followed by compact mode, model/effort, context, and send controls. Mode and model controls rest on transparent backgrounds. The effort knob stays white; its fill ends at the thumb center, pointer motion snaps smoothly, and keyboard input moves between stops. Clicking context usage opens details; only its explicit action compacts context. An empty running composer shows Stop; text or attachments restore Send with a separate Stop control. Git context stays in the composer, with the branch shown once and the working-folder path below.
 
-New threads start with a centered composer, up to (640px) wide, near the top of the work area. The compact toolbar holds the title and project switcher. Quiet text suggestions below the composer appear only for an empty project draft; choosing one prepares an editable plan and focuses the input without sending it. Recent activity stays behind a keyboard-accessible disclosure, with requests needing attention flagged while collapsed. Model, permission, workspace, attachment, Git, and optional work-panel controls retain their existing behavior.
+New threads use a presentation variant of the shared composer. Its shell and writing area share `--composer-input`, with (6px) shell padding and an (88px) minimum input height. Model/effort and mode lead on the left; Attach and Send sit on the right, in the same visual and keyboard order. The compact toolbar retains the title and window/panel controls. The project picker sits above the prompt beside Local checkout/Worktree, or Choose folder for Workspace.
+
+Quiet starter pills appear below only for an empty project draft; choosing one prepares an editable plan and focuses the input without sending it. Recent activity is collapsed by default behind a keyboard-accessible disclosure, with requests needing attention flagged while collapsed. Prompt and attachment drafts remain separate per project. Model, team, Orcling, permission, working-folder, worktree, Git, and optional work-panel behavior remains shared with the existing flow.
 
 Work-panel tabs keep their full names at every panel width. The strip uses available space and scrolls horizontally only when its tabs no longer fit; add-tool, expand, and hide actions stay reachable alongside it. Clicking a web link reveals Preview and selects its tab, including when the panel was closed or showing another tool. The address and loading or error state remain visible while the page opens.
 

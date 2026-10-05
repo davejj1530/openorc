@@ -199,6 +199,12 @@ export const ThreadSummary = Thread.extend({
    * absent. While non-null it never goes backwards.
    */
   lastAgentEventAt: z.number().nullable(),
+  /**
+   * The run whose events stream for this thread now: its own live run, or a team's most recently active attempt.
+   * The renderer already holds a live run's transcript, so a row can say what the agent is doing from it.
+   * Absent in older cached summaries.
+   */
+  liveRunId: z.string().nullable().optional(),
   taskCount: z.number().int(),
   openTaskCount: z.number().int(),
 });

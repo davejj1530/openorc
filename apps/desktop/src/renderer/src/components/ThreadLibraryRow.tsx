@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { Folder, GitBranch, GitPullRequest } from "./icons";
 import { HarnessLogo } from "./HarnessLogo";
 import { ThreadStatusIndicator } from "./ThreadStatusIndicator";
+import { ThreadRowHeadline } from "./ThreadHeadline";
 import { menuPopup, ThreadMenuItems, type MenuParts } from "./ThreadActions";
 import { cn } from "../lib/cn";
 import { useLayout } from "../lib/layout";
@@ -71,6 +72,7 @@ export function ThreadRow({ thread, active }: { thread: ThreadSummary; active: b
           <span className={cn("thread-preview-title flex-1 min-w-0 text-left", (active || thread.unread || thread.activity === "waiting") && "text-ink")}>{thread.title}</span>
           <ThreadStatusIndicator thread={thread} />
         </span>
+        <ThreadRowHeadline thread={thread} />
         <span className="thread-preview-meta flex min-w-0 items-center gap-2 text-xs leading-4 text-ink-3">
           <span className="flex flex-1 min-w-0 items-center gap-1" title={place.title}>
             {place.icon}

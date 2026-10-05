@@ -142,6 +142,7 @@ export class ThreadService {
           return at !== null && (latest === null || at > latest) ? at : latest;
         }, null)
       : this.runs.threadLastAgentEventAt(t.id);
+    const liveRunId = this.liveRunId(t.id, execution, executionRuns);
     return {
       ...t,
       hasStarted: Boolean(this.db.stmt("SELECT 1 FROM runs WHERE thread_id = ? LIMIT 1").get(t.id) || this.db.stmt("SELECT 1 FROM team_executions WHERE thread_id = ? LIMIT 1").get(t.id)),
@@ -155,9 +156,21 @@ export class ThreadService {
       context: this.runs.threadContext(t.id),
       queued: threadQueue.list(this.db, t.id),
       lastAgentEventAt,
+      liveRunId,
       taskCount: own.filter((x) => x.status !== "archived").length,
       openTaskCount: own.filter((x) => x.status === "proposed" || x.status === "backlog" || x.status === "in_progress" || x.status === "review").length,
     };
+  }
+
+  /** The run streaming for a thread now: its own live run, or the team attempt that spoke last, as its silence is measured. */
+  private liveRunId(threadId: string, execution: unknown, executionRuns: Set<string>): string | null {
+    if (!execution) return this.runs.liveRunForThread(threadId)?.id ?? null;
+    let latest: { runId: string; at: number } | null = null;
+    for (const runId of executionRuns) {
+      const at = this.runs.lastAgentEventAt(runId);
+      if (at !== null && this.runs.isLive(runId) && (!latest || at > latest.at)) latest = { runId, at };
+    }
+    return latest?.runId ?? null;
   }
 
   private thread(id: string): Thread {

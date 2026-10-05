@@ -603,7 +603,10 @@
 .journal-prompt > .journal-author {
   display: none;
 }
-.journal-message-actions,
+.journal-message-actions {
+  /* Keep the hover controls in their own row below the prompt, including at narrow widths. */
+  justify-content: flex-end;
+}
 .journal-reply-actions {
   position: absolute;
   top: 0;

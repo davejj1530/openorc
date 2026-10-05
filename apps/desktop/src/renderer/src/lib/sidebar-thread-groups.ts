@@ -31,11 +31,15 @@ export function sidebarThreadPage({
   return { list, pinned, rest, snoozed, hasMore: (fetched?.length ?? 0) > limit };
 }
 
-/** Match the rows actually expanded in the sidebar, including the opt-in snoozed section. */
-export function visibleSidebarThreadIds(sections: readonly { id: string; pinned: ThreadSummary[]; rest: ThreadSummary[]; snoozed: ThreadSummary[] }[], collapsed: readonly string[]): string[] {
+/** Match expanded rows, including opt-in snoozed rows. Single-project browsing ignores project folds. */
+export function visibleSidebarThreadIds(
+  sections: readonly { id: string; pinned: ThreadSummary[]; rest: ThreadSummary[]; snoozed: ThreadSummary[] }[],
+  collapsed: readonly string[],
+  projectId: string | null = null,
+): string[] {
   return sections
     .flatMap((section) =>
-      collapsed.includes(`project:${section.id}`)
+      projectId === null && collapsed.includes(`project:${section.id}`)
         ? []
         : [...(collapsed.includes(`pinned:${section.id}`) ? [] : section.pinned), ...section.rest, ...(collapsed.includes(`snoozed-open:${section.id}`) ? section.snoozed : [])],
     )

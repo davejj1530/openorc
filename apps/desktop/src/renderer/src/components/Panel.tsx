@@ -209,9 +209,10 @@ function usePanelSignals(context: PanelContext, savedChanges: boolean): PanelSig
   };
 }
 
-/** The tab this panel was switched to since it mounted. It stays in the strip even when empty. */
-function usePinnedTab(tab: PanelTab): PanelTab | null {
+/** Keep explicit tool requests, including a restored tab, visible as soon as the panel opens. */
+function usePinnedTab(tab: PanelTab, open: boolean): PanelTab | null {
   const initial = useRef(tab);
+  if (open && isPanelTool(tab)) return tab;
   return tab === initial.current ? null : tab;
 }
 
@@ -310,7 +311,7 @@ export function Panel({ context }: { context: PanelContext }) {
   const opened = useLayout((s) => (scope ? s.panelTools[scope] : undefined)) ?? noTools;
   const rememberPanelTool = useLayout((s) => s.rememberPanelTool);
   const signals = usePanelSignals(context, scopedChanges !== null);
-  const pinned = usePinnedTab(tab);
+  const pinned = usePinnedTab(tab, open);
   const candidates = tabsFor(context);
   if (file) candidates.unshift("file");
   const tabs = visibleTabs(candidates, signals, opened, pinned);

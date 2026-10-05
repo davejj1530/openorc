@@ -224,7 +224,7 @@ Threads and Orclings share the sidebar through tabs and remember their last sele
 
 ### Conversation and composer
 
-User prompts have a quiet bordered surface and no repeated author heading. Assistant responses are unboxed with a compact author line; named team replies keep one avatar/name/model/time line. The editable thread title and contextual tools share the top toolbar. Team revision details, activity visibility, and context compaction remain in the team menu, with pending compaction identifiable on its trigger.
+User prompts have a quiet bordered surface and no repeated author heading. Copy, Fork, and timestamp controls sit in a reserved row below the prompt, so revealing them on hover or focus does not overlap the bubble or move content. Assistant responses are unboxed with a compact author line; named team replies keep one avatar/name/model/time line. The editable thread title and contextual tools share the top toolbar. Team revision details, activity visibility, and context compaction remain in the team menu, with pending compaction identifiable on its trigger.
 
 The composer uses a neutral raised shell around a distinct writing area, followed by compact mode, model/effort, context, and send controls. Mode and model controls rest on transparent backgrounds. The effort knob stays white; its fill ends at the thumb center, pointer motion snaps smoothly, and keyboard input moves between stops. Clicking context usage opens details; only its explicit action compacts context. An empty running composer shows Stop; text or attachments restore Send with a separate Stop control. Git context stays in the composer, with the branch shown once and the working-folder path below.
 

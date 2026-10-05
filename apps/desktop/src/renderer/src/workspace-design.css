@@ -1,6 +1,6 @@
 /* One thread sidebar, a compact app rail, and the working document. */
 .app-shell {
-  --rail-width: max(72px, var(--spacing-traffic));
+  --rail-width: 56px;
   --reading-gutter: 48px;
   --container-chat: 860px;
   --document-font: "Charter", "Bitstream Charter", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
@@ -26,8 +26,18 @@
   border-radius: 0;
   box-shadow: none;
 }
-.app-shell .app-topbar {
-  border-bottom: 1px solid var(--line);
+/* Leave the shared window frame outside the opaque reading plane. */
+.app-shell .well:has(.app-topbar)::before {
+  top: var(--height-topbar);
+}
+.app-shell .app-topbar,
+.app-shell .panel-pane > header {
+  background: var(--bg);
+  border-bottom: 0;
+}
+/* Window-control clearance belongs to the header, independently of the icon rail. */
+.app-shell:has(.workspace-navigation[data-browsing="false"][data-open="true"][data-traffic-lights="true"]) .app-topbar[data-traffic-lights="true"] {
+  padding-left: max(12px, calc(var(--spacing-traffic) - var(--rail-width)));
 }
 .app-shell .header-chip {
   background: transparent;
@@ -36,11 +46,21 @@
   color: var(--ink-3);
 }
 .app-shell .workspace-navigation {
+  position: relative;
   display: flex;
   width: var(--rail-width);
   overflow: hidden;
   background: var(--bg);
-  border-right: 1px solid var(--line);
+}
+.app-shell .workspace-navigation::after {
+  content: "";
+  position: absolute;
+  top: var(--height-topbar);
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--line);
+  pointer-events: none;
 }
 .app-shell .workspace-navigation[data-browsing="true"] {
   width: calc(var(--rail-width) + var(--width-sidebar));
@@ -261,12 +281,12 @@
 }
 .conversation-browser {
   position: relative;
+  isolation: isolate;
   flex: 0 0 var(--width-sidebar);
   width: var(--width-sidebar);
   min-height: 0;
   display: flex;
   flex-direction: column;
-  border-left: 1px solid var(--line);
   background: color-mix(in srgb, var(--surface) 55%, var(--bg));
 }
 .browser-toolbar {
@@ -277,7 +297,11 @@
   flex-shrink: 0;
   color: var(--ink-3);
   font-size: 12px;
-  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+  border-bottom: 0;
+}
+.workspace-navigation[data-traffic-lights="true"] .browser-toolbar {
+  padding-left: max(22px, calc(var(--spacing-traffic) - var(--rail-width)));
 }
 .browser-heading {
   padding: 18px 22px 12px;
@@ -874,6 +898,10 @@
   }
 }
 @media (max-width: 900px) {
+  /* The workspace still starts at the window edge while navigation slides over it. */
+  .app-shell .app-topbar[data-traffic-lights="true"] {
+    padding-left: var(--spacing-traffic);
+  }
   .app-shell .resize-handle[data-edge="sidebar"] {
     display: none;
   }
@@ -884,8 +912,11 @@
   .browser-toolbar > span:not(.browser-close) {
     display: none;
   }
-  .app-shell:has(.workspace-navigation[data-browsing="false"][data-open="true"]) .app-topbar {
+  .app-shell:has(.workspace-navigation[data-browsing="false"][data-open="true"]) .app-topbar[data-window-navigation="true"] {
     padding-left: calc(var(--rail-width) + 12px);
+  }
+  .app-shell:has(.workspace-navigation[data-browsing="false"][data-open="true"][data-traffic-lights="true"]) .app-topbar[data-traffic-lights="true"] {
+    padding-left: max(calc(var(--rail-width) + 12px), var(--spacing-traffic));
   }
   .app-shell .workspace-navigation {
     position: absolute;
@@ -963,7 +994,22 @@ html[data-transparent-shell="true"] .app-shell .workspace-navigation {
   background: transparent;
 }
 html[data-transparent-shell="true"] .app-shell .conversation-browser {
+  background: transparent;
+}
+html[data-transparent-shell="true"] .app-shell :is(.app-topbar, .browser-toolbar, .panel-pane > header) {
+  background: transparent;
+}
+html[data-transparent-shell="true"] .app-shell .panel-shell[data-expanded="true"] .panel-pane {
+  background: transparent;
+}
+/* The browser's tint starts below its toolbar so the window frame is painted once. */
+html[data-transparent-shell="true"] .app-shell .conversation-browser::before {
+  content: "";
+  position: absolute;
+  inset: var(--height-topbar) 0 0;
   background: color-mix(in srgb, var(--surface) calc(var(--shell-opacity, 65%) * 0.55), transparent);
+  pointer-events: none;
+  z-index: -1;
 }
 .app-shell .workspace-navigation button:focus-visible,
 .thread-rail-title button:focus-visible,

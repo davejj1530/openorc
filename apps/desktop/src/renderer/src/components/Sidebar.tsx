@@ -12,6 +12,7 @@ import { useLayout, type SidebarFilter } from "../lib/layout";
 import { newThread, useRouter } from "../lib/router";
 import { usePendingApprovals } from "../lib/transcript";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
+import { useTrafficLights } from "../lib/window";
 import { useUi } from "../lib/ui";
 import { CoversPreview } from "../lib/browser-preview";
 import { sidebarThreadPage, visibleSidebarThreadIds } from "../lib/sidebar-thread-groups";
@@ -53,6 +54,7 @@ export function Sidebar() {
   useProjectIconChanges();
   const route = useRouter((s) => s.route);
   const open = useLayout((s) => s.sidebarOpen);
+  const trafficLights = useTrafficLights();
   const projectId = useLayout((s) => s.projectId);
   const setProject = useLayout((s) => s.setProject);
   const filter = useLayout((s) => s.sidebarFilter);
@@ -134,7 +136,7 @@ export function Sidebar() {
   };
   return (
     <>
-      <aside className="sidebar-shell workspace-navigation h-full shrink-0" data-open={open} data-browsing={browsing} aria-hidden={!open} inert={!open}>
+      <aside className="sidebar-shell workspace-navigation h-full shrink-0" data-open={open} data-browsing={browsing} data-traffic-lights={trafficLights} aria-hidden={!open} inert={!open}>
         <WorkspaceRail
           route={route}
           projectId={projectId}

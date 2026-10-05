@@ -187,8 +187,19 @@ it("prepares a starter as an editable plan without starting a run", () => {
   fireEvent.click(screen.getByRole("button", { name: "Explore this project" }));
   const message = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Message" });
   expect(message.value).toContain("Walk me through this project");
+  expect(document.activeElement).toBe(message);
+  expect(screen.queryByRole("group", { name: "Suggested prompts" })).toBeNull();
   expect(readNewThreadDraft("p1").mode).toBe("plan");
   expect(start).not.toHaveBeenCalled();
   fireEvent.change(message, { target: { value: "Explore just the renderer" } });
   expect(readNewThreadDraft("p1").prompt).toBe("Explore just the renderer");
+});
+
+it("offers starters only for an empty draft", () => {
+  saveModelDraft("p1", "Keep my current request");
+  render(<NewThread projectId="p1" />);
+  expect(screen.queryByRole("group", { name: "Suggested prompts" })).toBeNull();
+  fireEvent.change(screen.getByRole("textbox", { name: "Message" }), { target: { value: "" } });
+  expect(screen.getByRole("button", { name: "Explore this project" })).toBeTruthy();
+  expect(start).not.toHaveBeenCalled();
 });

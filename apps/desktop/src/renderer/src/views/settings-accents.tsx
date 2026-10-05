@@ -14,10 +14,10 @@ export function AccentSettings({ report }: { report: (saved: boolean) => void })
   const colors = resolveAccentColors(base, overrides);
   const changed = accentTokens.some((token) => token in overrides);
   return (
-    <Section flush title="Accent colors" description="Give actions, navigation, and content their own colors. Light and dark keep separate choices.">
+    <Section flush title="Accent colors" description="Start with your theme's accents, or customize actions, navigation, and content. Light and dark keep separate choices.">
       <div className="accent-combinations" role="group" aria-label="Accent combinations">
         <button type="button" aria-pressed={!changed} onClick={() => report(resetAccents())}>
-          <AccentSwatches colors={accentRoles.map(() => accentHex(base["--accent"]))} />
+          <AccentSwatches colors={accentRoles.map(({ token }) => accentHex(base[token]))} />
           Palette default
         </button>
         {accentCombinations.map((combination) => {

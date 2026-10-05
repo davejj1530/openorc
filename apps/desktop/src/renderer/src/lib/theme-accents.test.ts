@@ -1,18 +1,45 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { contrastRatio } from "./accent-colors";
 import { accentCombinations, combinationColors, resolveAccentColors } from "./theme-accents";
 import { themePresets } from "./theme-palettes";
 import { overridesFor, parseCustomColors, withAccents, withColor, withoutAccents } from "./theme-custom";
 
 const palette = themePresets.find((theme) => theme.id === "openorc")!;
+// CSS color conversion runs in the browser; these tests cover role ownership and hex contrast.
+vi.mock("./color", () => ({ toHex: () => "#808080" }));
 
 describe("accent colors", () => {
-  it("keeps existing custom colors and lets unspecified roles follow the original accent", () => {
+  it("resolves a theme's navigation and content defaults independently of its action fill", () => {
+    const base = { ...palette.colors.light, "--navigation-accent": "#a65234", "--content-accent": "#2768a5" };
+    const colors = resolveAccentColors(base, {});
+    expect(colors["--navigation-accent"]).toBe("#a65234");
+    expect(colors["--content-accent"]).toBe("#2768a5");
+    expect(colors["--navigation-ink"]).not.toBe(colors["--accent-ink"]);
+    expect(colors["--content-ink"]).not.toBe(colors["--accent-ink"]);
+  });
+
+  it("keeps native roles when editing or resetting Actions", () => {
+    for (const theme of themePresets) {
+      for (const mode of ["light", "dark"] as const) {
+        const base = theme.colors[mode];
+        const colors = resolveAccentColors(base, { "--accent": "#ff00ff" });
+        expect(colors["--navigation-accent"], `${theme.id} ${mode}`).toBe(base["--navigation-accent"]);
+        expect(colors["--content-accent"], `${theme.id} ${mode}`).toBe(base["--content-accent"]);
+      }
+    }
+    const custom = withAccents({}, "openorc", "light", { "--accent": "#ff00ff", "--content-accent": "#2768a5" });
+    const selected = withColor(custom, "openorc", "light", "--selection", "#abcdef");
+    const edited = withAccents(selected, "openorc", "light", { "--accent": "#0000ff" });
+    expect(overridesFor(edited, "openorc", "light")["--selection"]).toBe("#abcdef");
+    expect(overridesFor(withoutAccents(selected, "openorc", "light", "--accent"), "openorc", "light")).toEqual({ "--content-accent": "#2768a5", "--selection": "#abcdef" });
+  });
+
+  it("keeps existing fine-grained custom colors and the theme's independent role defaults", () => {
     const old = { "--accent": "#123456", "--accent-ink": "#345678", "--accent-soft": "#ddeeff", "--accent-fg": "#ffffff", "--selection": "#abcdef" };
     const result = resolveAccentColors(palette.colors.light, old);
     expect(result).toMatchObject(old);
-    expect(result["--navigation-ink"]).toBe(old["--accent-ink"]);
-    expect(result["--content-soft"]).toBe(old["--accent-soft"]);
+    expect(result["--navigation-accent"]).toBe(palette.colors.light["--navigation-accent"]);
+    expect(result["--content-accent"]).toBe(palette.colors.light["--content-accent"]);
   });
 
   it("persists independent roles without affecting another palette, appearance, or surface", () => {
@@ -36,7 +63,7 @@ describe("accent colors", () => {
     expect(overrides).toEqual({ "--accent": "#0000ff" });
     const colors = resolveAccentColors(palette.colors.light, overrides);
     expect(colors["--accent-ink"]).toBe("#0000ff");
-    expect(colors["--content-ink"]).toBe("#0000ff");
+    expect(colors["--content-accent"]).toBe(palette.colors.light["--content-accent"]);
   });
 
   for (const mode of ["light", "dark"] as const) {

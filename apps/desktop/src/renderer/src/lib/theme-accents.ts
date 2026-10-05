@@ -8,7 +8,7 @@ export const accentRoles = [
 ] as const;
 export type AccentToken = (typeof accentRoles)[number]["token"];
 
-// A role can use its own hue. Omitted roles continue following the palette's action accent.
+// Each role starts from the selected theme. Overrides customize only their own role.
 export const accentTokens = ["--accent", "--accent-ink", "--accent-fg", "--accent-soft", "--selection", "--navigation-accent", "--content-accent"];
 export const accentCombinations = [
   { id: "rose-sage", name: "Rose & sage", light: ["#b64e48", "#497463", "#87613f"], dark: ["#c76660", "#8cbaa5", "#d9ad80"] },
@@ -35,14 +35,15 @@ export function resolveAccentColors(base: Record<string, string>, overrides: Rec
     colors["--accent-fg"] = overrides["--accent-fg"] ?? onColor(action);
   }
   for (const role of ["navigation", "content"]) {
-    const custom = overrides[`--${role}-accent`];
+    const token = `--${role}-accent`;
+    const accent = overrides[token] ?? base[token] ?? base["--accent"]!;
     const ground = role === "navigation" ? accentHex(colors["--bg"]) : surface;
-    const pair = custom ? accentPair(custom, ground) : { ink: colors["--accent-ink"] ?? action, soft: colors["--accent-soft"] ?? surface };
-    colors[`--${role}-accent`] = custom ?? action;
+    const pair = accentPair(accentHex(accent), ground);
+    colors[token] = accent;
     colors[`--${role}-ink`] = pair.ink;
     colors[`--${role}-soft`] = pair.soft;
   }
-  if (overrides["--accent"] || overrides["--content-accent"]) {
+  if (overrides["--content-accent"] || overrides["--surface"]) {
     colors["--selection"] = overrides["--selection"] ?? mixColor(accentHex(colors["--content-ink"]), surface, 0.26);
   }
   return colors;

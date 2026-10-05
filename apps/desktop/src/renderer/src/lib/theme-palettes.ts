@@ -44,8 +44,8 @@ function palette(neutrals: Neutrals, accent: string, accentInk: string, accentFo
     "--accent": accent,
     "--accent-ink": accentInk,
     "--accent-fg": accentForeground,
-    "--navigation-accent": accent,
-    "--content-accent": accent,
+    "--navigation-accent": accentInk,
+    "--content-accent": accentInk,
     "--accent-soft": `color-mix(in srgb, ${accentInk} 14%, ${neutrals.body})`,
     "--selection": `color-mix(in srgb, ${accentInk} 26%, ${neutrals.body})`,
     // The house mascot is ink on the ground; brand palettes give it their own color below.
@@ -328,7 +328,14 @@ const presets: ThemeTemplate[] = [
         "#0b0b0b",
         "#184f95",
         "#ffffff",
-        { "--mascot-body": "#d97757", "--mascot-eyes": "#ffffff", "--accent-soft": "color-mix(in srgb, #2a78d6 10%, #faf9f5)", "--selection": "color-mix(in srgb, #2a78d6 25%, #faf9f5)" },
+        {
+          "--mascot-body": "#d97757",
+          "--mascot-eyes": "#ffffff",
+          "--navigation-accent": "#d97757",
+          "--content-accent": "#184f95",
+          "--accent-soft": "color-mix(in srgb, #2a78d6 10%, #faf9f5)",
+          "--selection": "color-mix(in srgb, #2a78d6 25%, #faf9f5)",
+        },
       ),
       dark: palette(
         {
@@ -350,6 +357,8 @@ const presets: ThemeTemplate[] = [
         {
           "--mascot-body": "#d97757",
           "--mascot-eyes": "#1b1a19",
+          "--navigation-accent": "#d97757",
+          "--content-accent": "#6da7ec",
           "--accent-soft": "color-mix(in srgb, #2a78d6 14%, #1b1a19)",
           "--selection": "color-mix(in srgb, #2a78d6 30%, #1b1a19)",
           "--surface-gradient": fadeFromSidebar,
@@ -360,7 +369,7 @@ const presets: ThemeTemplate[] = [
   {
     id: "github",
     name: "GitHub",
-    description: "Slate surfaces · GitHub blue",
+    description: "Slate surfaces · green actions · blue links",
     colors: {
       light: palette(
         {
@@ -376,10 +385,16 @@ const presets: ThemeTemplate[] = [
           faintText: "#7e8794",
           bubble: "#f6f8fa",
         },
-        "#0969da",
-        "#0969da",
+        "#1f883d",
+        "#1a7f37",
         "#ffffff",
-        { "--mascot-body": "#1f883d", "--mascot-eyes": "#ffffff", "--accent-soft": "#ddf4ff" },
+        {
+          "--mascot-body": "#1f883d",
+          "--mascot-eyes": "#ffffff",
+          "--navigation-accent": "#0969da",
+          "--content-accent": "#0969da",
+          "--accent-soft": "#dafbe1",
+        },
       ),
       dark: palette(
         {
@@ -395,10 +410,16 @@ const presets: ThemeTemplate[] = [
           faintText: "#6e7681",
           bubble: "#1a212b",
         },
-        "#1f6feb",
-        "#4493f8",
+        "#238636",
+        "#3fb950",
         "#ffffff",
-        { "--mascot-body": "#3fb950", "--mascot-eyes": "#121721", "--accent-soft": "#388bfd1a", "--surface-gradient": fadeFromSidebar },
+        {
+          "--mascot-body": "#3fb950",
+          "--mascot-eyes": "#121721",
+          "--navigation-accent": "#4493f8",
+          "--content-accent": "#4493f8",
+          "--surface-gradient": fadeFromSidebar,
+        },
       ),
     },
   },
@@ -666,6 +687,8 @@ const presets: ThemeTemplate[] = [
         {
           "--mascot-body": "#ffc9ff",
           "--mascot-eyes": "#191c20",
+          "--navigation-accent": "#ffc9ff",
+          "--content-accent": "#415ba0",
           "--accent-soft": "color-mix(in srgb, #cbefff 55%, #ffffff)",
           "--selection": "#ffc9ff",
           "--ok": "#187029",
@@ -694,6 +717,8 @@ const presets: ThemeTemplate[] = [
         {
           "--mascot-body": "#ffc9ff",
           "--mascot-eyes": "#191c20",
+          "--navigation-accent": "#ffc9ff",
+          "--content-accent": "#cbefff",
           "--selection": "color-mix(in srgb, #ffc9ff 26%, #191c20)",
           "--surface-gradient": fadeIntoSidebar,
           "--ok": "#9ef2a4",

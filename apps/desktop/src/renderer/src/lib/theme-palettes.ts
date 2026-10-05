@@ -264,7 +264,7 @@ const presets: ThemeTemplate[] = [
   {
     id: "claude",
     name: "Claude",
-    description: "Soft neutrals · ink controls",
+    description: "Soft neutrals · clay accents",
     colors: {
       light: palette(
         {
@@ -280,8 +280,10 @@ const presets: ThemeTemplate[] = [
           faintText: "#706e69",
           bubble: "#f0efec",
         },
-        "#0b0b0b",
-        "#184f95",
+        // Claude's brand/clay role drives actions; its blue accent role is for content.
+        // Deepen the light fill and text slightly so small labels stay readable.
+        "#b95b3b",
+        "#a94f2e",
         "#ffffff",
         {
           "--mascot-body": "#d97757",
@@ -290,7 +292,7 @@ const presets: ThemeTemplate[] = [
           "--navigation-soft": "#f0efec",
           "--composer-input": "#ffffff",
           "--content-accent": "#184f95",
-          "--accent-soft": "color-mix(in srgb, #2a78d6 10%, #f9f9f7)",
+          "--accent-soft": "color-mix(in srgb, #c6613f 10%, #f9f9f7)",
           "--selection": "color-mix(in srgb, #2a78d6 25%, #f9f9f7)",
         },
       ),
@@ -308,9 +310,9 @@ const presets: ThemeTemplate[] = [
           faintText: "#97958d",
           bubble: "#20201f",
         },
-        "#ffffff",
-        "#9ec5f4",
-        "#0b0b0b",
+        "#d97757",
+        "#d97757",
+        "#151515",
         {
           "--mascot-body": "#d97757",
           "--mascot-eyes": "#151515",
@@ -318,7 +320,7 @@ const presets: ThemeTemplate[] = [
           "--navigation-soft": "#20201f",
           "--composer-input": "#20201f",
           "--content-accent": "#9ec5f4",
-          "--accent-soft": "color-mix(in srgb, #2a78d6 14%, #151515)",
+          "--accent-soft": "color-mix(in srgb, #d97757 14%, #151515)",
           "--selection": "color-mix(in srgb, #2a78d6 30%, #151515)",
         },
       ),

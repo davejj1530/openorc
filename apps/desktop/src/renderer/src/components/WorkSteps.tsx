@@ -1,10 +1,9 @@
 import { memo, useEffect, useId, useMemo, useState, type ReactNode } from "react";
-import type { ProjectStackIconId } from "../../../shared/project-stack-icons";
 import type { Block } from "../lib/transcript";
 import { cn } from "../lib/cn";
 import { workDuration } from "../lib/work-transcript";
-import { Brain, Check, ChevronRight, CircleDashed, FileCode2, FileText, Folder, Globe, Hammer, Image, ListChecks, Search, Terminal, WorkDelegate, WorkLive } from "./icons";
-import { ProjectStackIcon } from "./ProjectStackIcon";
+import { Brain, Check, ChevronRight, CircleDashed, Folder, Globe, Hammer, ListChecks, Search, Terminal, WorkDelegate, WorkLive } from "./icons";
+import { FileGlyph } from "./FileGlyph";
 import { ThreadLink } from "./ThreadImages";
 import type { WorkChip } from "./work-chips";
 import { isLive, liveHeadline, liveSectionLabel, workEntries, type LiveHeadline, type PlanItem, type WorkEntry, type WorkPhase, type WorkSection } from "./work-steps";
@@ -284,50 +283,15 @@ function ChipGroup({ section, live, renderBlocks }: { section: WorkSection; live
   );
 }
 
-const languages: Record<string, ProjectStackIconId> = {
-  ts: "typescript",
-  mts: "typescript",
-  cts: "typescript",
-  tsx: "react",
-  jsx: "react",
-  js: "javascript",
-  mjs: "javascript",
-  cjs: "javascript",
-  py: "python",
-  go: "go",
-  rs: "rust",
-  java: "java",
-  cs: "csharp",
-  rb: "ruby",
-  php: "php",
-  swift: "swift",
-  c: "c",
-  h: "c",
-  cpp: "cpp",
-  cc: "cpp",
-  hpp: "cpp",
-  vue: "vue",
-  svelte: "svelte",
-  astro: "astro",
-};
-
 const kindIcons = { folder: Folder, query: Search, command: Terminal, intent: Terminal, web: Globe, tool: Hammer, agent: WorkDelegate, memory: Brain } as const;
 
-/** A file shows its language's mark where we ship one; anything else shows what kind of thing it is. */
+/** A file shows its language's mark; anything else shows what kind of thing it is. */
 function ChipIcon({ chip }: { chip: WorkChip }) {
-  if (chip.kind !== "file") {
-    const Icon = kindIcons[chip.kind];
-    return <Icon size={12} className="work-chip-icon" />;
-  }
-  const extension = /\.([a-z0-9]+)$/i.exec(chip.label)?.[1]?.toLowerCase() ?? "";
-  const language = languages[extension];
-  if (language) return <ProjectStackIcon id={language} size={12} />;
-  if (/^(png|jpe?g|gif|webp|svg|avif|ico)$/.test(extension)) return <Image size={12} className="work-chip-icon" />;
-  if (/^(md|mdx|txt|rst)$/.test(extension)) return <FileText size={12} className="work-chip-icon" />;
-  return <FileCode2 size={12} className="work-chip-icon" />;
+  if (chip.kind === "file") return <FileGlyph path={chip.label} className="work-chip-icon" />;
+  const Icon = kindIcons[chip.kind];
+  return <Icon size={12} className="work-chip-icon" />;
 }
 
-/** A file chip opens the file; any other chip shows the call behind it. */
 function ChipView({ chip, live, picked, onPick }: { chip: WorkChip; live: boolean; picked: boolean; onPick: () => void }) {
   const content = (
     <>

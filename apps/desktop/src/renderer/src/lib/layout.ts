@@ -11,8 +11,8 @@ export type FileSelection = FileReference & { scope: RpcParams<"files.read">["sc
 export type WorkspaceChangesTarget = { kind: "thread" | "project"; id: string };
 export type WorkspaceChangesRequest = WorkspaceChangesTarget & { comparison: "base" | "head"; commit: boolean; requestId: number };
 
-/** Which threads the sidebar lists: the working set or the archive. */
-export type SidebarFilter = "active" | "archived";
+/** Which threads the sidebar lists: every active thread, orcmode's working set of them, or the archive. */
+export type SidebarFilter = "active" | "orc" | "archived";
 
 /** A screen the sidebar can list. The ones the user hides wait under More; Inbox sits in the window's header instead. */
 export type SidebarScreen = "tasks" | "pulls" | "scheduled" | "orchestration" | "memory";
@@ -41,6 +41,8 @@ interface LayoutState {
   toggleThreadPanel: (id: string) => void;
   openThreadPanel: (id: string, tab: PanelTab) => void;
   sidebarFilter: SidebarFilter;
+  /** Only the pinned active threads. Never persisted: a relaunch lists them all again. */
+  pinnedOnly: boolean;
   /** Screens the sidebar leaves under More. */
   hiddenScreens: SidebarScreen[];
   /** Sidebar sections the user folded: namespaced project/pinned keys, plus opt-in snoozed-open keys. */
@@ -60,7 +62,10 @@ interface LayoutState {
   setPanel: (open: boolean, tab?: PanelTab) => void;
   setPanelWidth: (px: number) => void;
   setProject: (id: string | null) => void;
-  setSidebarFilter: (filter: SidebarFilter) => void;
+  /** Choosing a filter clears pinned-only unless it is asked for again. */
+  setSidebarFilter: (filter: SidebarFilter, pinnedOnly?: boolean) => void;
+  /** Orcmode on, or back to every active thread. */
+  toggleOrcMode: () => void;
   setScreenShown: (screen: SidebarScreen, shown: boolean) => void;
   toggleCollapsed: (key: string) => void;
   rememberPreviewUrl: (key: string, url: string) => void;
@@ -131,7 +136,8 @@ export const useLayout = create<LayoutState>((set, get) => {
     workspaceChanges: null,
     projectId: saved.projectId === undefined ? WORKSPACE_ID : saved.projectId,
     panelThreadId: null,
-    sidebarFilter: saved.sidebarFilter === "archived" ? ("archived" as const) : ("active" as const),
+    sidebarFilter: (["orc", "archived"] as const).find((filter) => filter === saved.sidebarFilter) ?? ("active" as const),
+    pinnedOnly: false,
     hiddenScreens: saved.hiddenScreens ?? DEFAULT_HIDDEN_SCREENS,
     collapsed: saved.collapsed ?? ["snoozed"],
     previewUrls: saved.previewUrls ?? {},
@@ -182,7 +188,8 @@ export const useLayout = create<LayoutState>((set, get) => {
       const open = get().panelThreadId !== id || !get().panelOpen;
       commit({ panelThreadId: id, panelOpen: open, ...(open ? {} : { panelExpanded: false }) });
     },
-    setSidebarFilter: (sidebarFilter) => commit({ sidebarFilter }),
+    setSidebarFilter: (sidebarFilter, pinnedOnly = false) => commit({ sidebarFilter, pinnedOnly }),
+    toggleOrcMode: () => commit({ sidebarFilter: get().sidebarFilter === "orc" ? "active" : "orc", pinnedOnly: false }),
     setScreenShown: (screen, shown) => {
       const others = get().hiddenScreens.filter((hidden) => hidden !== screen);
       commit({ hiddenScreens: shown ? others : [...others, screen] });

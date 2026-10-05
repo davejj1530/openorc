@@ -53,6 +53,23 @@ function threadShortcut(key: string, threadId: string): boolean {
   }
 }
 
+/** ⌘⇧ shortcuts that act on the window: a new task, message search, and orcmode in the sidebar. */
+function windowShortcut(key: string, projectId: string | undefined): boolean {
+  switch (key) {
+    case "n":
+      useUi.getState().openNewTask(projectId);
+      return true;
+    case "f":
+      useUi.getState().setPalette(true, "messages");
+      return true;
+    case "o":
+      useLayout.getState().toggleOrcMode();
+      return true;
+    default:
+      return false;
+  }
+}
+
 function projectForRoute(route: ReturnType<typeof useRouter.getState>["route"], savedProjectId: string | null): string | undefined {
   if (route.view === "project" || route.view === "newthread" || route.view === "newtask" || route.view === "orchestration") return route.projectId;
   return savedProjectId ?? undefined;
@@ -120,18 +137,12 @@ export function App() {
       const order = useUi.getState().threadOrder;
       const openId = useRouter.getState().route.view === "thread" ? (useRouter.getState().route as { threadId: string }).threadId : null;
       if (e.shiftKey) {
-        if (key === "n") {
-          e.preventDefault();
-          useUi.getState().openNewTask(currentProject);
-        } else if (key === "f") {
-          e.preventDefault();
-          useUi.getState().setPalette(true, "messages");
-        } else if (key === "]" || key === "[") {
+        if (key === "]" || key === "[") {
           e.preventDefault();
           const at = openId ? order.indexOf(openId) : -1;
           const next = order[key === "]" ? Math.min(order.length - 1, at + 1) : Math.max(0, at - 1)];
           if (next && next !== openId) openThread(next);
-        } else if (openId && threadShortcut(key, openId)) e.preventDefault();
+        } else if (windowShortcut(key, currentProject) || (openId && threadShortcut(key, openId))) e.preventDefault();
         return;
       }
       if (key === "n") {

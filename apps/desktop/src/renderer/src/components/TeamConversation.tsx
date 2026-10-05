@@ -1,5 +1,5 @@
 import { SavedTeamTaskHint, TeamActorExplanation } from "./TeamActivityNotes";
-import { durableActionLabel, teamMessageHint, teamAttentionLabel, teamActorStateLabel, teamReplyForkDescription } from "../lib/conversation-status-presentation";
+import { durableActionLabel, teamConversationLocation, teamMessageHint, teamAttentionLabel, teamActorStateLabel, teamReplyForkDescription } from "../lib/conversation-status-presentation";
 import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from "react";
 import type {
   ModelExecutionSettings,
@@ -322,7 +322,7 @@ export function TeamConversation({
                     permissionDisabledReason={permissionControlReason}
                     permissionDescriptionId={permissionDescriptionId}
                     hasStarted={data.executions.length > 0}
-                    location={{ label: thread.workspaceMode === "current" ? "Local checkout" : "Worktree", branch: thread.branch }}
+                    location={teamConversationLocation(thread, project)}
                     changes={composerChanges}
                     projectId={project.id}
                     commands={skillCommands}

@@ -1,102 +1,486 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-02T15:29:05.515625+00:00",
-  "title": "Design System: OpenOrc rail and document study",
+  "generatedAt": "2026-10-03T14:33:09.223Z",
+  "title": "Design System: OpenOrc desktop",
   "extensions": {
     "colorMeta": {
-      "accent": {
+      "action-light": {
         "role": "primary",
-        "displayName": "Actions (blue by default)"
+        "displayName": "Action Light",
+        "tonalRamp": [
+          "oklch(15% 0.1587 258.96)",
+          "oklch(27% 0.1587 258.96)",
+          "oklch(39% 0.1587 258.96)",
+          "oklch(51% 0.1587 258.96)",
+          "oklch(63% 0.1587 258.96)",
+          "oklch(75% 0.1587 258.96)",
+          "oklch(87% 0.1587 258.96)",
+          "oklch(95% 0.1587 258.96)"
+        ]
       },
-      "surface-light": {
-        "role": "neutral",
-        "displayName": "Pearl"
+      "action-dark": {
+        "role": "primary",
+        "displayName": "Action Dark",
+        "tonalRamp": [
+          "oklch(15% 0.1565 258.69)",
+          "oklch(27% 0.1565 258.69)",
+          "oklch(39% 0.1565 258.69)",
+          "oklch(51% 0.1565 258.69)",
+          "oklch(63% 0.1565 258.69)",
+          "oklch(75% 0.1565 258.69)",
+          "oklch(87% 0.1565 258.69)",
+          "oklch(95% 0.1565 258.69)"
+        ]
       },
-      "surface-dark": {
+      "accent-text-light": {
+        "role": "primary",
+        "displayName": "Accent Text Light",
+        "tonalRamp": [
+          "oklch(15% 0.1289 256.12)",
+          "oklch(27% 0.1289 256.12)",
+          "oklch(39% 0.1289 256.12)",
+          "oklch(51% 0.1289 256.12)",
+          "oklch(63% 0.1289 256.12)",
+          "oklch(75% 0.1289 256.12)",
+          "oklch(87% 0.1289 256.12)",
+          "oklch(95% 0.1289 256.12)"
+        ]
+      },
+      "accent-text-dark": {
+        "role": "primary",
+        "displayName": "Accent Text Dark",
+        "tonalRamp": [
+          "oklch(15% 0.0817 257.10)",
+          "oklch(27% 0.0817 257.10)",
+          "oklch(39% 0.0817 257.10)",
+          "oklch(51% 0.0817 257.10)",
+          "oklch(63% 0.0817 257.10)",
+          "oklch(75% 0.0817 257.10)",
+          "oklch(87% 0.0817 257.10)",
+          "oklch(95% 0.0817 257.10)"
+        ]
+      },
+      "on-action": {
+        "role": "primary",
+        "displayName": "On Action",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.00)",
+          "oklch(27% 0.0000 0.00)",
+          "oklch(39% 0.0000 0.00)",
+          "oklch(51% 0.0000 0.00)",
+          "oklch(63% 0.0000 0.00)",
+          "oklch(75% 0.0000 0.00)",
+          "oklch(87% 0.0000 0.00)",
+          "oklch(95% 0.0000 0.00)"
+        ]
+      },
+      "navigation-soft-light": {
+        "role": "primary",
+        "displayName": "Navigation Soft Light",
+        "tonalRamp": [
+          "oklch(15% 0.0160 253.90)",
+          "oklch(27% 0.0160 253.90)",
+          "oklch(39% 0.0160 253.90)",
+          "oklch(51% 0.0160 253.90)",
+          "oklch(63% 0.0160 253.90)",
+          "oklch(75% 0.0160 253.90)",
+          "oklch(87% 0.0160 253.90)",
+          "oklch(95% 0.0160 253.90)"
+        ]
+      },
+      "navigation-soft-dark": {
+        "role": "primary",
+        "displayName": "Navigation Soft Dark",
+        "tonalRamp": [
+          "oklch(15% 0.0414 254.39)",
+          "oklch(27% 0.0414 254.39)",
+          "oklch(39% 0.0414 254.39)",
+          "oklch(51% 0.0414 254.39)",
+          "oklch(63% 0.0414 254.39)",
+          "oklch(75% 0.0414 254.39)",
+          "oklch(87% 0.0414 254.39)",
+          "oklch(95% 0.0414 254.39)"
+        ]
+      },
+      "sidebar-light": {
         "role": "neutral",
-        "displayName": "Cool charcoal"
+        "displayName": "Sidebar Light",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.00)",
+          "oklch(27% 0.0000 0.00)",
+          "oklch(39% 0.0000 0.00)",
+          "oklch(51% 0.0000 0.00)",
+          "oklch(63% 0.0000 0.00)",
+          "oklch(75% 0.0000 0.00)",
+          "oklch(87% 0.0000 0.00)",
+          "oklch(95% 0.0000 0.00)"
+        ]
+      },
+      "sidebar-dark": {
+        "role": "neutral",
+        "displayName": "Sidebar Dark",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.00)",
+          "oklch(27% 0.0000 0.00)",
+          "oklch(39% 0.0000 0.00)",
+          "oklch(51% 0.0000 0.00)",
+          "oklch(63% 0.0000 0.00)",
+          "oklch(75% 0.0000 0.00)",
+          "oklch(87% 0.0000 0.00)",
+          "oklch(95% 0.0000 0.00)"
+        ]
+      },
+      "canvas-light": {
+        "role": "neutral",
+        "displayName": "Canvas Light",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.00)",
+          "oklch(27% 0.0000 0.00)",
+          "oklch(39% 0.0000 0.00)",
+          "oklch(51% 0.0000 0.00)",
+          "oklch(63% 0.0000 0.00)",
+          "oklch(75% 0.0000 0.00)",
+          "oklch(87% 0.0000 0.00)",
+          "oklch(95% 0.0000 0.00)"
+        ]
+      },
+      "canvas-dark": {
+        "role": "neutral",
+        "displayName": "Canvas Dark",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.00)",
+          "oklch(27% 0.0000 0.00)",
+          "oklch(39% 0.0000 0.00)",
+          "oklch(51% 0.0000 0.00)",
+          "oklch(63% 0.0000 0.00)",
+          "oklch(75% 0.0000 0.00)",
+          "oklch(87% 0.0000 0.00)",
+          "oklch(95% 0.0000 0.00)"
+        ]
+      },
+      "paper-light": {
+        "role": "neutral",
+        "displayName": "Paper Light",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.00)",
+          "oklch(27% 0.0000 0.00)",
+          "oklch(39% 0.0000 0.00)",
+          "oklch(51% 0.0000 0.00)",
+          "oklch(63% 0.0000 0.00)",
+          "oklch(75% 0.0000 0.00)",
+          "oklch(87% 0.0000 0.00)",
+          "oklch(95% 0.0000 0.00)"
+        ]
+      },
+      "paper-dark": {
+        "role": "neutral",
+        "displayName": "Paper Dark",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.00)",
+          "oklch(27% 0.0000 0.00)",
+          "oklch(39% 0.0000 0.00)",
+          "oklch(51% 0.0000 0.00)",
+          "oklch(63% 0.0000 0.00)",
+          "oklch(75% 0.0000 0.00)",
+          "oklch(87% 0.0000 0.00)",
+          "oklch(95% 0.0000 0.00)"
+        ]
+      },
+      "raised-light": {
+        "role": "neutral",
+        "displayName": "Raised Light",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.00)",
+          "oklch(27% 0.0000 0.00)",
+          "oklch(39% 0.0000 0.00)",
+          "oklch(51% 0.0000 0.00)",
+          "oklch(63% 0.0000 0.00)",
+          "oklch(75% 0.0000 0.00)",
+          "oklch(87% 0.0000 0.00)",
+          "oklch(95% 0.0000 0.00)"
+        ]
+      },
+      "raised-dark": {
+        "role": "neutral",
+        "displayName": "Raised Dark",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.00)",
+          "oklch(27% 0.0000 0.00)",
+          "oklch(39% 0.0000 0.00)",
+          "oklch(51% 0.0000 0.00)",
+          "oklch(63% 0.0000 0.00)",
+          "oklch(75% 0.0000 0.00)",
+          "oklch(87% 0.0000 0.00)",
+          "oklch(95% 0.0000 0.00)"
+        ]
+      },
+      "border-light": {
+        "role": "neutral",
+        "displayName": "Border Light",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.00)",
+          "oklch(27% 0.0000 0.00)",
+          "oklch(39% 0.0000 0.00)",
+          "oklch(51% 0.0000 0.00)",
+          "oklch(63% 0.0000 0.00)",
+          "oklch(75% 0.0000 0.00)",
+          "oklch(87% 0.0000 0.00)",
+          "oklch(95% 0.0000 0.00)"
+        ]
+      },
+      "border-dark": {
+        "role": "neutral",
+        "displayName": "Border Dark",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.00)",
+          "oklch(27% 0.0000 0.00)",
+          "oklch(39% 0.0000 0.00)",
+          "oklch(51% 0.0000 0.00)",
+          "oklch(63% 0.0000 0.00)",
+          "oklch(75% 0.0000 0.00)",
+          "oklch(87% 0.0000 0.00)",
+          "oklch(95% 0.0000 0.00)"
+        ]
+      },
+      "ink-light": {
+        "role": "neutral",
+        "displayName": "Ink Light",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.00)",
+          "oklch(27% 0.0000 0.00)",
+          "oklch(39% 0.0000 0.00)",
+          "oklch(51% 0.0000 0.00)",
+          "oklch(63% 0.0000 0.00)",
+          "oklch(75% 0.0000 0.00)",
+          "oklch(87% 0.0000 0.00)",
+          "oklch(95% 0.0000 0.00)"
+        ]
+      },
+      "ink-dark": {
+        "role": "neutral",
+        "displayName": "Ink Dark",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.00)",
+          "oklch(27% 0.0000 0.00)",
+          "oklch(39% 0.0000 0.00)",
+          "oklch(51% 0.0000 0.00)",
+          "oklch(63% 0.0000 0.00)",
+          "oklch(75% 0.0000 0.00)",
+          "oklch(87% 0.0000 0.00)",
+          "oklch(95% 0.0000 0.00)"
+        ]
       }
     },
     "typographyMeta": {
-      "base": {
+      "interface": {
         "displayName": "Interface",
-        "purpose": "Compact desktop navigation and controls."
+        "purpose": "Navigation and ordinary controls."
       },
-      "prose": {
+      "title": {
+        "displayName": "Toolbar title",
+        "purpose": "Editable thread title in the compact top toolbar."
+      },
+      "body": {
         "displayName": "Conversation",
-        "purpose": "Readable agent messages and documents."
+        "purpose": "Unboxed assistant prose."
       },
-      "display": {
-        "displayName": "Document title",
-        "purpose": "Task and welcome-page headings use Charter with platform serif fallbacks. Thread titles use 13px semibold system type in the top toolbar."
+      "composer": {
+        "displayName": "Writing area",
+        "purpose": "Compact message input."
+      },
+      "label": {
+        "displayName": "Small controls",
+        "purpose": "Browser tabs, filters, and secondary controls."
+      },
+      "document": {
+        "displayName": "Task heading",
+        "purpose": "Sans-serif task page heading."
+      },
+      "code": {
+        "displayName": "Code",
+        "purpose": "Source, diffs, and monospace content."
+      },
+      "cursor-interface": {
+        "displayName": "Cursor interface",
+        "purpose": "Palette-specific font override with the same layout and type sizes."
       }
     },
     "shadows": [
       {
-        "name": "composer",
+        "name": "persistent-surfaces",
         "value": "none",
-        "purpose": "A flat writing surface with a fine border and tonal settings toolbar."
+        "purpose": "Sidebar selection, prompt cards, composer, work panels, and preference groups remain flat."
       },
       {
-        "name": "current-row",
-        "value": "none",
-        "purpose": "Selected navigation uses tonal fill instead of cast depth."
+        "name": "floating",
+        "value": "var(--shadow)",
+        "purpose": "Existing palette-aware menu and popover elevation."
+      },
+      {
+        "name": "modal",
+        "value": "var(--shadow-far)",
+        "purpose": "Existing dialog and overlay-panel elevation."
       }
     ],
     "motion": [
       {
-        "name": "search-hover",
-        "value": "background-color 160ms ease-out",
-        "purpose": "Short feedback on the sidebar search control."
+        "name": "ease-out",
+        "value": "cubic-bezier(0.2, 0, 0, 1)",
+        "purpose": "Shared easing token for short state transitions."
+      },
+      {
+        "name": "thinking-presence",
+        "value": "1800ms ease-in-out infinite; opacity 0.55 at 50%",
+        "purpose": "Generic agent presence while thinking; disabled by prefers-reduced-motion."
       }
     ],
     "breakpoints": [
       {
-        "name": "reading-column",
-        "value": "620px container"
-      },
-      {
         "name": "navigation-overlay",
         "value": "900px viewport"
+      },
+      {
+        "name": "work-panel-overlay",
+        "value": "788px work-row container"
+      },
+      {
+        "name": "composer-second-row",
+        "value": "440px composer container"
+      },
+      {
+        "name": "compact-reading-gutters",
+        "value": "520px viewport"
+      },
+      {
+        "name": "settings-stacked-rows",
+        "value": "800px settings container"
+      },
+      {
+        "name": "usage-reflow",
+        "value": "540px settings container"
       }
     ]
   },
-  "components": [],
+  "components": [
+    {
+      "name": "Primary button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The shared Button primary variant at its default size.",
+      "html": "<button type=\"button\" class=\"ds-button-primary\">Save changes</button>",
+      "css": ".ds-button-primary{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:28px;padding:0 10px;border:1px solid transparent;border-radius:8px;background:var(--accent,#2865c2);color:var(--accent-fg,#fff);font:500 13px/20px var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif);white-space:nowrap;transition:background-color 150ms,color 150ms,filter 150ms}.ds-button-primary:hover{filter:brightness(1.1)}.ds-button-primary:focus-visible{background:var(--surface-3,#eaeaea);color:var(--ink,#303030)}.ds-button-primary:active{filter:brightness(.95)}.ds-button-primary:disabled{background:var(--surface-3,#eaeaea);color:var(--ink-3,#626262);border-color:transparent;pointer-events:none}"
+    },
+    {
+      "name": "Secondary button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "The shared Button secondary variant at its default size.",
+      "html": "<button type=\"button\" class=\"ds-button-secondary\">New task</button>",
+      "css": ".ds-button-secondary{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:28px;padding:0 10px;border:1px solid transparent;border-radius:8px;background:var(--surface-2,#efefef);color:var(--ink,#303030);font:500 13px/20px var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif);white-space:nowrap;transition:background-color 150ms,color 150ms,filter 150ms}.ds-button-secondary:hover{background:var(--surface-3,#eaeaea)}.ds-button-secondary:focus-visible{background:var(--surface-3,#eaeaea);color:var(--ink,#303030)}.ds-button-secondary:active{filter:brightness(.95)}.ds-button-secondary:disabled{background:var(--surface-3,#eaeaea);color:var(--ink-3,#626262);border-color:transparent;pointer-events:none}"
+    },
+    {
+      "name": "Ghost button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "The shared Button ghost variant at its default size.",
+      "html": "<button type=\"button\" class=\"ds-button-ghost\">Cancel</button>",
+      "css": ".ds-button-ghost{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:28px;padding:0 10px;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--ink-2,#444);font:500 13px/20px var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif);white-space:nowrap;transition:background-color 150ms,color 150ms,filter 150ms}.ds-button-ghost:hover{background:var(--surface-2,#efefef);color:var(--ink,#303030)}.ds-button-ghost:focus-visible{background:var(--surface-3,#eaeaea);color:var(--ink,#303030)}.ds-button-ghost:active{filter:brightness(.95)}.ds-button-ghost:disabled{color:var(--ink-4,#626262);pointer-events:none}"
+    },
+    {
+      "name": "Danger button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "The shared Button danger variant at its default size.",
+      "html": "<button type=\"button\" class=\"ds-button-danger\">Delete</button>",
+      "css": ".ds-button-danger{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:28px;padding:0 10px;border:1px solid var(--line,#e1e1e1);border-radius:8px;background:var(--surface,#f7f7f7);color:var(--bad,#aa4538);font:500 13px/20px var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif);white-space:nowrap;transition:background-color 150ms,color 150ms,filter 150ms}.ds-button-danger:hover{background:var(--bad-soft,color-mix(in srgb,#aa4538 8%,#f7f7f7))}.ds-button-danger:focus-visible{background:var(--surface-3,#eaeaea);color:var(--ink,#303030)}.ds-button-danger:active{filter:brightness(.95)}.ds-button-danger:disabled{background:var(--surface-3,#eaeaea);color:var(--ink-3,#626262);border-color:transparent;pointer-events:none}"
+    },
+    {
+      "name": "Thread filter",
+      "kind": "input",
+      "refersTo": "thread-filter",
+      "description": "Loaded-title search with a neutral focus surface and no focus halo.",
+      "html": "<label class=\"ds-thread-search\"><svg aria-hidden=\"true\" width=\"13\" height=\"13\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"10.5\" cy=\"10.5\" r=\"6.5\"/><path d=\"m15.3 15.3 5.2 5.2\"/></svg><input aria-label=\"Filter loaded threads\" placeholder=\"Filter threads…\"></label>",
+      "css": ".ds-thread-search{display:flex;align-items:center;gap:6px;height:28px;padding:0 8px;border-radius:6px;color:var(--ink-3,#626262);max-width:240px}.ds-thread-search:focus-within{background:var(--surface-2,#efefef)}.ds-thread-search input{width:100%;min-width:0;padding:5px 0;border:0;background:transparent;color:var(--ink,#303030);font:400 12px/18px var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif)}.ds-thread-search input:focus{outline:none;box-shadow:none;caret-color:var(--accent-ink,#2159a0)}.ds-thread-search input::placeholder{color:var(--ink-3,#626262);opacity:1}"
+    },
+    {
+      "name": "Conversation tabs",
+      "kind": "nav",
+      "refersTo": "navigation-selected",
+      "description": "Threads and Orclings share the same navigation column.",
+      "html": "<nav class=\"ds-conversation-tabs\" aria-label=\"Conversations\"><button type=\"button\" aria-current=\"page\">Threads</button><button type=\"button\">Orclings</button></nav>",
+      "css": ".ds-conversation-tabs{display:flex;align-items:center;gap:4px}.ds-conversation-tabs button{height:28px;padding:0 12px;border:0;border-radius:7px;background:transparent;color:var(--ink-3,#626262);font:400 12px/18px var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif)}.ds-conversation-tabs button:hover{background:var(--surface-3,#eaeaea)}.ds-conversation-tabs button[aria-current=\"page\"]{background:var(--navigation-soft,#e8f0fa);color:var(--navigation-ink,#2159a0)}.ds-conversation-tabs button:focus-visible{outline:2px solid var(--ring,#2159a0);outline-offset:2px;background:var(--surface-3,#eaeaea);color:var(--ink,#303030)}"
+    },
+    {
+      "name": "Task filters",
+      "kind": "chip",
+      "refersTo": "task-filter-selected",
+      "description": "Distinct padded targets with a soft selected state.",
+      "html": "<div class=\"ds-task-filters\" role=\"radiogroup\" aria-label=\"Task filter\"><button type=\"button\" role=\"radio\" aria-checked=\"true\">Active</button><button type=\"button\" role=\"radio\" aria-checked=\"false\">Done</button><button type=\"button\" role=\"radio\" aria-checked=\"false\">Archived</button></div>",
+      "css": ".ds-task-filters{display:flex;gap:4px}.ds-task-filters button{min-height:28px;padding:0 10px;border:0;border-radius:6px;background:transparent;color:var(--ink-3,#626262);font:400 12px/18px var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif)}.ds-task-filters button:hover,.ds-task-filters button:focus-visible{background:var(--surface-2,#efefef);color:var(--ink,#303030)}.ds-task-filters button[aria-checked=\"true\"]{background:var(--navigation-soft,#e8f0fa);color:var(--navigation-ink,#2159a0)}"
+    },
+    {
+      "name": "User prompt",
+      "kind": "card",
+      "refersTo": "user-prompt",
+      "description": "A quiet boundary around the user's message; assistant responses remain unboxed.",
+      "html": "<div class=\"ds-user-prompt\">Help people connect their first project, then give them a clear next step.</div>",
+      "css": ".ds-user-prompt{max-width:520px;padding:10px 12px;border:1px solid var(--line,#e1e1e1);border-radius:12px;background:var(--bubble,#fff);color:var(--bubble-ink,#303030);box-shadow:none;font:400 14px/1.55 var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif)}"
+    },
+    {
+      "name": "Composer",
+      "kind": "custom",
+      "refersTo": "composer-shell",
+      "description": "Raised shell, distinct writing area, and compact transparent controls. This example shows appearance only.",
+      "html": "<div class=\"ds-composer\"><div class=\"ds-composer-shell\"><textarea class=\"ds-composer-input\" rows=\"2\" aria-label=\"Message\" placeholder=\"Message Codex…\"></textarea><div class=\"ds-composer-foot\"><button type=\"button\" class=\"ds-composer-mode\">Review changes</button><div class=\"ds-composer-actions\"><button type=\"button\" class=\"ds-composer-model\">Model · High</button><button type=\"button\" class=\"ds-composer-send\" aria-label=\"Send message\"><svg aria-hidden=\"true\" width=\"15\" height=\"15\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 20V4m-6 6 6-6 6 6\"/></svg></button></div></div><div class=\"ds-composer-git\">main</div></div></div>",
+      "css": ".ds-composer{container:ds-composer / inline-size;max-width:520px;width:100%}.ds-composer-shell{display:flex;flex-direction:column;padding:4px;border:1px solid var(--line,#e1e1e1);border-radius:11px;background:var(--surface-2,#efefef);box-shadow:none}.ds-composer-input{display:block;min-height:48px;padding:9px 8px;resize:vertical;border:0;border-radius:8px;background:var(--composer-input,#fff);color:var(--ink,#303030);font:400 13px/1.6 var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif)}.ds-composer-input:focus{outline:none;box-shadow:none;caret-color:var(--accent-ink,#2159a0)}.ds-composer-input::placeholder{color:var(--ink-3,#626262)}.ds-composer-foot{display:flex;flex-wrap:wrap;gap:2px;padding:3px 2px 0}.ds-composer-foot button{min-height:28px;border:0;border-radius:5px;background:transparent;color:var(--ink,#303030);font:400 12px/18px var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif)}.ds-composer-foot button:hover,.ds-composer-foot button:focus-visible{background:var(--surface-3,#eaeaea)}.ds-composer-actions{display:flex;align-items:center;flex:1;gap:3px;min-width:130px}.ds-composer-model{margin-right:auto}.ds-composer-foot .ds-composer-send{display:grid;place-items:center;width:26px;height:26px;min-height:26px;border-radius:999px;background:var(--accent,#2865c2);color:var(--accent-fg,#fff)}.ds-composer-git{padding:1px 5px;color:var(--ink-3,#626262);font:400 11px/16px var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif)}@container ds-composer (max-width:440px){.ds-composer-actions{flex-basis:100%;flex-wrap:wrap;min-width:0}}"
+    },
+    {
+      "name": "Inset work panel",
+      "kind": "card",
+      "refersTo": "work-panel",
+      "description": "Opaque paper inside a neutral canvas, separated with a fine border and no cast shadow.",
+      "html": "<section class=\"ds-work-panel\"><header class=\"ds-work-panel-header\">Changes</header><div class=\"ds-work-panel-body\">Review the current changes alongside the conversation.</div></section>",
+      "css": ".ds-work-panel{margin:0 12px 12px;max-width:520px;min-height:160px;border:1px solid var(--line,#e1e1e1);border-radius:14px;overflow:hidden;background:var(--paper,#fff);color:var(--ink,#303030);box-shadow:none;font:400 13px/20px var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif)}.ds-work-panel-header{padding:8px 12px;border-bottom:1px solid var(--line,#e1e1e1)}.ds-work-panel-body{padding:12px;color:var(--ink-2,#444)}"
+    }
+  ],
   "narrative": {
     "northStar": "A calm place to think with coding agents",
-    "overview": "A compact app rail and a single thread sidebar, with project selection in a popover, document conversations, a task workspace, and contextual inspector. Settings uses a horizontal category toolbar, aligned preference rows, and an account usage ledger.",
+    "overview": "OpenOrc is a compact desktop workspace for several projects at once. A shared sidebar keeps projects and conversations visible; the conversation occupies the center, and an optional work panel holds review and tools. The approved Cursor-inspired composition uses neutral gray, white, or charcoal grounds with blue accents in the OpenOrc palette. The Cursor palette uses the same structure with monochrome accents.\n\nThis record describes the built desktop interface. It preserves the workflows in [PRODUCT.md](../../PRODUCT.md), including drafts, task authorization, Orcling privacy, and project context. Packaged application artwork is unchanged.",
     "keyCharacteristics": [
-      "Threads and Orclings have separate rail destinations sharing one navigation sidebar",
-      "Flat persistent surfaces and a sidebar resize grip on the seam",
-      "A single-color face mark and an interactive Orcling study with sample data",
-      "Compact thread titles in one toolbar and one author line per conversation turn",
-      "A writing surface with a settings toolbar and separate Git strip",
-      "Flat responsive settings with one category toolbar",
-      "Usage limits show one primary reported amount and secondary report details"
+      "One resizable sidebar with expandable project groups and Threads/Orclings tabs.",
+      "Compact toolbar titles, bounded user prompts, and unboxed assistant responses.",
+      "Flat neutral surfaces, a distinct writing area, and an inset work panel.",
+      "Independent action, navigation, and content accents across saved palettes.",
+      "Existing keyboard controls, window chrome, split panes, and recovery states remain available."
     ],
     "rules": [
       {
-        "name": "Semantic Color",
-        "body": "Read live palette roles instead of hardcoding study colors into components.",
+        "name": "The Semantic Color Rule",
+        "body": "Read live palette roles instead of hardcoding OpenOrc colors into components.",
         "section": "colors"
       },
       {
-        "name": "Context once",
-        "body": "Keep agent and project identity with the composer instead of repeating it in the conversation header.",
+        "name": "The Opaque Work Plane Rule",
+        "body": "Keep reading, writing, and tool content opaque when Transparent surroundings is enabled.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Save Feedback Rule",
+        "body": "Announce actual saves and errors in normal document flow; leave the idle state empty.",
         "section": "components"
       },
       {
-        "name": "Text input focus",
-        "body": "Use a surface and caret change without an outline or halo for text inputs. Preserve visible keyboard focus on buttons, tabs, and disclosures.",
-        "section": "components"
-      },
-      {
-        "name": "Reported allowances",
-        "body": "Show remaining allowance when reported, otherwise used allowance. Keep unknown and stale values explicit and preserve reset outcomes.",
+        "name": "The Recovery Visibility Rule",
+        "body": "Keep actionable resets and unresolved attempts visible. Preserve the reset attempt's state when the provider inventory changes.",
         "section": "components"
       }
     ],
-    "dos": ["Do preserve saved palettes and custom colors.", "Do keep native window-control clearance and existing product workflows."],
-    "donts": ["Do not treat this study as global product identity approval.", "Do not treat synthetic preview content as product facts."]
+    "dos": [
+      "Do keep neutral OpenOrc and Cursor grounds with accents on controls, selection, and content.",
+      "Do preserve saved widths, palettes, custom colors, independent accent roles, and semantic statuses.",
+      "Do preserve native window-control clearance, keyboard access, private Orcling memory, drafts, and existing workflows.",
+      "Do keep project actions stationary on hover and composer controls reachable in narrow columns."
+    ],
+    "donts": ["Don't reintroduce a separate icon rail, blue-tinted OpenOrc grounds, or serif task headings.", "Don't turn synthetic preview identities, activity, or account data into product claims."]
   }
 }

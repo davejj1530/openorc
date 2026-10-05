@@ -1,4 +1,4 @@
-import { WORKSPACE_ID, defaultHarnessId, harnessShortName, type AgentKind, type Project, type WorkspaceMode } from "@openorc/protocol";
+import { WORKSPACE_ID, defaultHarnessId, harnessShortName, type AgentKind, type Project, type Thread, type WorkspaceMode } from "@openorc/protocol";
 import type { ConversationScope } from "../components/Conversation";
 
 export function conversationWorkspaceMode({ scope, firstTaskRun, selected }: { scope: ConversationScope; firstTaskRun: boolean; selected: WorkspaceMode | null }): WorkspaceMode {
@@ -24,9 +24,10 @@ export function conversationLocation({
   plainFolder?: boolean;
 }) {
   if (project.id === WORKSPACE_ID || plainFolder) return { label: null, branch: null, directory: basePath };
-  if (scope.kind === "task") return { label: mode === "worktree" ? "Worktree" : "Local checkout", branch: mode === "current" ? (scope.task.branch ?? project.defaultBranch) : scope.task.branch };
-  if (scope.thread.workspaceMode === "worktree") return { label: "Worktree", branch: scope.thread.branch };
-  return { label: "Local checkout", branch: checkoutBranch ?? null };
+  if (scope.kind === "task")
+    return { label: mode === "worktree" ? "Worktree" : "Local checkout", branch: mode === "current" ? (scope.task.branch ?? project.defaultBranch) : scope.task.branch, directory: basePath };
+  if (scope.thread.workspaceMode === "worktree") return { label: "Worktree", branch: scope.thread.branch, directory: basePath };
+  return { label: "Local checkout", branch: checkoutBranch ?? null, directory: basePath };
 }
 
 export function conversationEmptyHint({ task, workspace }: { task: boolean; workspace: boolean }): string {
@@ -88,4 +89,9 @@ export function teamActorStateLabel({ pending, heldForPlan, stateLabel }: { pend
 export function teamReplyForkDescription({ mutating, saved }: { mutating: boolean; saved: boolean }): string {
   if (mutating) return "Wait for the current task action to finish.";
   return saved ? "Confirm the saved fork from this lead turn." : "Create an independent team task with history and files through this lead turn.";
+}
+
+/** The team's composer names its actual working copy, including a custom folder. */
+export function teamConversationLocation(thread: Thread, project: Project) {
+  return { label: thread.workspaceMode === "current" ? "Local checkout" : "Worktree", branch: thread.branch, directory: thread.workingDirectory ?? thread.worktreePath ?? project.rootPath };
 }

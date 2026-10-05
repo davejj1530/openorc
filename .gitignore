@@ -21,3 +21,4 @@ coverage/
 # Local agent instructions and development notes.
 /AGENTS.md
 /.local-development/
+.impeccable

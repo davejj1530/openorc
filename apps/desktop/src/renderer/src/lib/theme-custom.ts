@@ -20,6 +20,8 @@ export const colorGroups = [
     tokens: [
       { token: "--bg", label: "Sidebar" },
       { token: "--surface", label: "Background" },
+      { token: "--paper", label: "Work panels" },
+      { token: "--composer-input", label: "Writing area" },
       { token: "--surface-2", label: "Raised" },
       { token: "--surface-3", label: "Hover" },
       { token: "--bubble", label: "Message bubble" },

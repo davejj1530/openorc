@@ -67,6 +67,20 @@ describe("accent colors", () => {
   });
 
   for (const mode of ["light", "dark"] as const) {
+    it(`updates a customized navigation tint without recoloring other roles in ${mode} mode`, () => {
+      const base = palette.colors[mode];
+      const original = resolveAccentColors(base, {});
+      const navigation = resolveAccentColors(base, { "--navigation-accent": "#86518a" });
+      expect(navigation["--navigation-soft"]).not.toBe(original["--navigation-soft"]);
+      expect(navigation["--content-soft"]).toBe(original["--content-soft"]);
+      expect(navigation["--accent"]).toBe(original["--accent"]);
+      expect(contrastRatio(navigation["--navigation-ink"]!, navigation["--navigation-soft"]!)).toBeGreaterThanOrEqual(4.5);
+      const actions = resolveAccentColors(base, { "--accent": "#86518a" });
+      expect(actions["--navigation-soft"]).toBe(original["--navigation-soft"]);
+      const background = resolveAccentColors(base, { "--bg": "#808080" });
+      expect(background["--navigation-soft"]).not.toBe(original["--navigation-soft"]);
+    });
+
     it(`keeps OpenOrc's default labels and accents readable in ${mode} mode`, () => {
       const colors = resolveAccentColors(palette.colors[mode], {});
       expect(contrastRatio(colors["--accent"]!, colors["--accent-fg"]!)).toBeGreaterThanOrEqual(4.5);

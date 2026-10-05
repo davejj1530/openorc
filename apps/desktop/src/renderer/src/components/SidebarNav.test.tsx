@@ -13,19 +13,19 @@ const listed = () =>
     .map((button) => button.textContent);
 const show = () => render(<SidebarNav route={useRouter.getState().route} projectId={null} />);
 
-it("lists the everyday screens and keeps Scheduled and Memory under More until the user lists them", async () => {
-  expect(useLayout.getState().hiddenScreens).toEqual(["scheduled", "memory"]);
+it("lists Tasks and Schedules and keeps other destinations under More", async () => {
+  expect(useLayout.getState().hiddenScreens).toEqual(["pulls", "orchestration", "memory"]);
   show();
-  expect(listed()).toEqual(["Tasks", "Pull requests", "Orchestration", "More"]);
+  expect(listed()).toEqual(["Tasks", "Schedules", "More"]);
 
   fireEvent.click(screen.getByRole("button", { name: "More" }));
-  expect((await screen.findAllByRole("menuitem")).map((item) => item.textContent)).toEqual(["Scheduled", "Memory", "Edit sidebar…"]);
+  expect((await screen.findAllByRole("menuitem")).map((item) => item.textContent)).toEqual(["Pull requests", "Orchestration", "Memory", "Edit sidebar…"]);
   fireEvent.click(screen.getByRole("menuitem", { name: "Memory" }));
   expect(useRouter.getState().route).toEqual({ view: "memory" });
 });
 
 it("reads More as current while one of its screens is open", () => {
-  useRouter.setState({ route: { view: "scheduled" } });
+  useRouter.setState({ route: { view: "orchestration" } });
   show();
   expect(screen.getByRole("button", { name: "More" }).getAttribute("aria-current")).toBe("page");
 });
@@ -40,6 +40,6 @@ it("edits which screens the sidebar lists, and remembers the choice", async () =
   fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 
-  expect(listed()).toEqual(["Tasks", "Orchestration", "Memory", "More"]);
-  expect(JSON.parse(localStorage.getItem("openorc.layout") ?? "{}").hiddenScreens).toEqual(["scheduled", "pulls"]);
+  expect(listed()).toEqual(["Tasks", "Pull requests", "Schedules", "Memory", "More"]);
+  expect(JSON.parse(localStorage.getItem("openorc.layout") ?? "{}").hiddenScreens).toEqual(["orchestration"]);
 });

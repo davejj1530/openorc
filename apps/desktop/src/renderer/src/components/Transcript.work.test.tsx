@@ -18,6 +18,7 @@ vi.mock("./ThreadImages", () => ({
   isImageGeneration: (b: Block) => b.kind === "activity" && b.activityKind === "image_generation",
   ImageGenerationRow: () => <div>Generated image</div>,
 }));
+vi.mock("./InlineDiff", () => ({ InlineDiff: ({ patch }: { patch: string }) => <pre data-testid="diff">{patch}</pre>, EditDiff: () => null }));
 vi.mock("./AgentOrb", () => ({ AgentOrb: ({ state }: { state: string }) => <div data-testid="orb31" data-state={state} /> }));
 vi.mock("./TaskCard", () => ({ TaskCard: ({ taskId }: { taskId: string }) => <div>Task {taskId}</div> }));
 vi.mock("./QuestionCard", () => ({ QuestionCard: () => <div>Question for you</div> }));
@@ -89,6 +90,23 @@ it("reads a described command as its description, with the command one click dee
   fireEvent.click(screen.getByRole("button", { name: "Run the desktop tests" }));
   expect(screen.getByRole("button", { name: /^Ran pnpm --filter desktop test/ }).getAttribute("aria-expanded")).toBe("true");
   expect(screen.getByText("48 passed")).toBeTruthy();
+});
+it("opens an edited file's chip to its diff, not the file", async () => {
+  const input = [
+    { path: "src/a.ts", kind: "update", diff: "@@ -1 +1 @@\n-old a\n+new a" },
+    { path: "src/b.ts", kind: "update", diff: "@@ -1 +1 @@\n-old b\n+new b" },
+  ];
+  const patch: Block = { ...tool, id: "patch", name: "apply_patch", input, output: "Success", done: true };
+  render(<WorkTranscript runId="run" blocks={[patch, reply, end]} />);
+  fireEvent.click(screen.getByRole("button", { name: /^Worked for 3m 42s/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Edited 2 files" }));
+  const chip = screen.getByTitle("src/a.ts");
+  expect(chip.tagName).toBe("BUTTON");
+  fireEvent.click(chip);
+  expect(chip.getAttribute("aria-pressed")).toBe("true");
+  const diff = await screen.findByTestId("diff");
+  expect(diff.textContent).toContain("+new a");
+  expect(diff.textContent).not.toContain("new b");
 });
 it("carries the live step on one line, open or folded", () => {
   const reasoning: Block = { id: "think-r", kind: "thinking", text: "**Running the desktop tests**\n\nThey cover the row.", startedAt: Date.now() - 4000, endedAt: Date.now() - 3000 };

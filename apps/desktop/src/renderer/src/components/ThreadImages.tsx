@@ -275,11 +275,6 @@ export const threadRehypePlugins: StreamdownProps["rehypePlugins"] = [
     .map(([, plugin]) => plugin),
 ];
 
-/** Existing ledgers retain the original provider item in detail. */
-export function isImageView(block: Block): boolean {
-  return block.kind === "activity" && (block.detail as { type?: unknown } | undefined)?.type === "imageView";
-}
-
 export function ImageViewRow({ block }: { block: Extract<Block, { kind: "activity" }> }) {
   const [open, setOpen] = useState(true);
   const detail = block.detail as { path?: unknown } | undefined;
@@ -314,10 +309,6 @@ export function ImageViewRow({ block }: { block: Extract<Block, { kind: "activit
       ) : null}
     </section>
   );
-}
-
-export function isImageGeneration(block: Block): boolean {
-  return block.kind === "activity" && (block.activityKind === "image_generation" || (block.detail as { type?: unknown } | undefined)?.type === "imageGeneration");
 }
 
 export function ImageGenerationRow({ block }: { block: Extract<Block, { kind: "activity" }> }) {

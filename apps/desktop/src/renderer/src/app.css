@@ -1185,14 +1185,6 @@ body[data-resizing] .sidebar-shell {
   padding: 4px 0 8px;
   min-width: 0;
 }
-.work-current {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--ink-3);
-  font-size: var(--text-sm);
-  margin-top: 4px;
-}
 .work-live {
   color: var(--accent-ink);
   flex-shrink: 0;

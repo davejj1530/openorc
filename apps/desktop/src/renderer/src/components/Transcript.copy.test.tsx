@@ -7,6 +7,7 @@ vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onFrame: vi.fn(), onInvali
 vi.mock("./ThreadImages", () => ({
   ThreadRichText: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   ThreadImage: () => null,
+  ThreadLink: ({ children }: { children: React.ReactNode }) => <a>{children}</a>,
   isImageView: () => false,
   isImageGeneration: () => false,
 }));

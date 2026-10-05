@@ -9,7 +9,7 @@ import { Transcript } from "./Transcript";
 import { MessageQueue } from "./MessageQueue";
 import { BackgroundCommands } from "./BackgroundCommands";
 import { ThreadChangeCard } from "./ThreadChangeCard";
-import { isImageGeneration } from "./ThreadImages";
+import { isImageGeneration } from "../lib/image-activity";
 import { useComposerChanges } from "../lib/composer-changes";
 import { useProjectGit } from "../lib/project-git";
 import { Button, Empty } from "./ui";

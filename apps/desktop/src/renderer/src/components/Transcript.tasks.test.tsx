@@ -55,8 +55,9 @@ it("keeps different task IDs with the same title visible", () => {
 it("keeps failed task actions available in the work history", () => {
   render(<WorkTranscript runId="run" blocks={[created, { ...started, isError: true, status: "error", output: "Could not start task" }]} live />);
   expect(screen.getAllByText(`Task ${taskId}`)).toHaveLength(1);
-  fireEvent.click(screen.getByRole("button", { name: "Started task" }));
-  fireEvent.click(screen.getByRole("button", { name: /Started task.*Failed/ }));
+  // The newest phase of a live turn stays open, so its chip is right there.
+  fireEvent.click(screen.getByRole("button", { name: taskId }));
+  expect(screen.getByRole("button", { name: /Started task.*Failed/ }).getAttribute("aria-expanded")).toBe("true");
   expect(screen.getByText("Could not start task")).toBeTruthy();
 });
 

@@ -65,6 +65,8 @@ export function TopBar({
   const panelLabel = panelActive ? "Hide panel" : "Show panel";
   return (
     <header
+      data-window-navigation={!inSplit || undefined}
+      data-traffic-lights={(trafficLights && !inSplit) || undefined}
       className={cn(
         "drag-region app-topbar h-topbar shrink-0 flex items-center justify-between",
         windowDragSurface ? "thread-header" : "gap-2",

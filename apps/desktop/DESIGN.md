@@ -28,7 +28,7 @@ Thread titles use compact 13px semibold system type in the top toolbar. Charter 
 
 ## Layout
 
-Thread rows use 13px titles with dates, branch, and provider on one metadata line, typically 62px tall. Conversations start directly beneath the toolbar, without a second title or metadata header. Message spacing follows a tighter working rhythm. The thread browser retains the persisted sidebar width (default 288px). The rail is at least 72px and clears native window controls at the current zoom; it is 84px at the default macOS zoom. Window navigation lives in the main toolbar. The reading measure is up to 860px with 48px gutters, reduced in narrower columns. Below 900px, navigation overlays the workspace. Opening a thread or an app destination dismisses it. The independent tools panel retains its existing resize, overlay, and expansion behavior.
+Thread rows use 13px titles with dates, branch, and provider on one metadata line, typically 62px tall. Conversations start directly beneath the toolbar, without a second title or metadata header. Message spacing follows a tighter working rhythm. The thread browser retains the persisted sidebar width (default 288px), without a left divider. The rail is 56px wide with 40px navigation buttons. Native window-control clearance is reserved independently in the thread browser and main toolbars, including rail-only views, compact overlays, fullscreen, and zoom. Window navigation lives in the main toolbar. The reading measure is up to 860px with 48px gutters, reduced in narrower columns. Below 900px, navigation overlays the workspace. Opening a thread or an app destination dismisses it. The independent tools panel retains its existing resize, overlay, and expansion behavior.
 
 Project selection scopes the current view. In a conversation it changes the thread list; in Tasks it filters tasks without navigating away. Global All threads retains all projects when opening a thread. The local filter searches loaded titles; Load more remains available. Command-click or Control-click opens a split pane. Context menus retain pinning, archiving, snoozing, and other thread actions. Native window controls, history, keyboard shortcuts, and resize handles remain supported.
 
@@ -37,6 +37,8 @@ Settings uses a horizontal icon-and-label category toolbar, with a content width
 ## Elevation & Depth
 
 Working documents, selection rows, composers, settings groups, and persistent controls stay flat, separated by spacing, type, tonal fills, and quiet rules. App-scoped material tokens remove cast and inset shadows from these surfaces. Popovers and temporary overlays keep their floating material.
+
+The top and left rails share the sidebar color without header dividers, forming one continuous frame. The thread-browser seam starts below the toolbar. Transparent surroundings paints the frame once, with the reading plane and thread browser's separate tint beginning below their headers.
 
 The sidebar resize grip sits directly on the seam between navigation and the workspace. Its hit area extends into the workspace without covering the sidebar scrollbar. The existing drag, keyboard resize, and reset behavior remains intact.
 

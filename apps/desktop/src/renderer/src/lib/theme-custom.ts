@@ -100,7 +100,7 @@ export function withAccents(custom: CustomColors, preset: ThemePreset, mode: Mod
   }
   if (Object.keys(accepted).length === 0) return custom;
   const overrides = { ...overridesFor(custom, preset, mode), ...accepted };
-  if (accepted["--accent"]) for (const token of ["--accent-ink", "--accent-fg", "--accent-soft", "--selection"]) delete overrides[token];
+  if (accepted["--accent"]) for (const token of ["--accent-ink", "--accent-fg", "--accent-soft"]) delete overrides[token];
   if (accepted["--content-accent"]) delete overrides["--selection"];
   return replace(custom, preset, mode, overrides);
 }
@@ -110,7 +110,7 @@ export function withoutAccents(custom: CustomColors, preset: ThemePreset, mode: 
   let tokens = role ? [role] : accentTokens;
   if (role === "--accent") tokens = ["--accent", "--accent-ink", "--accent-fg", "--accent-soft"];
   for (const token of tokens) delete overrides[token];
-  if (role !== "--navigation-accent") delete overrides["--selection"];
+  if (!role || role === "--content-accent") delete overrides["--selection"];
   return replace(custom, preset, mode, overrides);
 }
 

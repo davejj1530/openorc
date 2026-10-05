@@ -27,7 +27,7 @@ it("applies a combination, saves a custom role, and restores it when returning f
   await act(() => useTheme.getState().set("light"));
   expect(screen.getByLabelText<HTMLInputElement>("Navigation hex value").value).toBe("#abcdef");
   fireEvent.click(screen.getByRole("button", { name: "Reset Navigation to the palette" }));
-  expect(screen.getByLabelText<HTMLInputElement>("Navigation hex value").value).toBe("#2768a5");
+  expect(screen.getByLabelText<HTMLInputElement>("Navigation hex value").value).toBe("#4058c1");
 });
 
 it("syncs another window's saved choices and reports a failed save without discarding the preview", async () => {
@@ -43,4 +43,38 @@ it("syncs another window's saved choices and reports a failed save without disca
   expect(report).toHaveBeenLastCalledWith(false);
   expect(screen.getByLabelText<HTMLInputElement>("Navigation hex value").value).toBe("#497463");
   save.mockRestore();
+});
+
+it.each([
+  ["claude", "light", ["#0b0b0b", "#d97757", "#184f95"]],
+  ["claude", "dark", ["#ffffff", "#d97757", "#6da7ec"]],
+  ["github", "light", ["#1f883d", "#0969da", "#0969da"]],
+  ["github", "dark", ["#238636", "#4493f8", "#4493f8"]],
+  ["eliron", "light", ["#191c20", "#ffc9ff", "#415ba0"]],
+  ["eliron", "dark", ["#f5f7f8", "#ffc9ff", "#cbefff"]],
+] as const)("restores %s's native accents in %s without removing surface edits", async (preset, mode, defaults) => {
+  render(<AccentSettings report={vi.fn()} />);
+  await act(() => {
+    useTheme.getState().setPreset(preset);
+    useTheme.getState().set(mode);
+  });
+  const fields = ["Actions", "Navigation", "Content"].map((label) => screen.getByLabelText<HTMLInputElement>(`${label} hex value`));
+  expect(fields.map((field) => field.value)).toEqual(defaults);
+  const button = screen.getByRole("button", { name: "Palette default" });
+  const swatches = button.querySelectorAll<HTMLElement>("i");
+  expect([...swatches].map((swatch) => swatch.style.background)).toEqual(
+    defaults.map((color) => {
+      const swatch = document.createElement("i");
+      swatch.style.background = color;
+      return swatch.style.background;
+    }),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Ocean" }));
+  const surface = mode === "light" ? "#fafafa" : "#171717";
+  await act(() => useTheme.getState().setColor("--surface", surface));
+  fireEvent.click(button);
+  expect(fields.map((field) => field.value)).toEqual(defaults);
+  expect(document.documentElement.style.getPropertyValue("--navigation-accent")).toBe(defaults[1]);
+  expect(document.documentElement.style.getPropertyValue("--content-accent")).toBe(defaults[2]);
+  expect(useTheme.getState().custom[preset]?.[mode]).toEqual({ "--surface": surface });
 });

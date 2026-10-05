@@ -1,3 +1,5 @@
+import { shellSteps, unwrapShell } from "../lib/shell";
+import { commandOf } from "../lib/tool-view";
 import type { Block } from "../lib/transcript";
 import { patchStat } from "./diff-stat";
 import { toolCallPresentation } from "./tool-presentation";
@@ -45,20 +47,16 @@ function hostname(url: string): string {
   }
 }
 
-/** A command as a chip: its first line, without the quotes a shell wrapper left around it. The title keeps it whole. */
+/** A command as a chip: the first line of its first step that does something, past a `cd` or a comment. The title keeps it whole. */
 export function commandLabel(command: string): string {
-  const first = (command.trim().split("\n")[0] ?? "").trim();
-  const quote = first[0];
-  if (quote !== '"' && quote !== "'") return first;
-  return first.slice(1, first.length > 1 && first.endsWith(quote) ? -1 : undefined);
+  const steps = shellSteps(unwrapShell(command.trim()));
+  const step = steps.find((candidate) => !/^(cd\s|#)/.test(candidate.text)) ?? steps[0];
+  return (step?.text.split("\n")[0] ?? "").trim();
 }
 
 /** The shell command a call ran, whichever field its provider used. */
 export function commandText(block: ToolBlock): string {
-  const input = (block.input ?? {}) as Record<string, unknown>;
-  const command = input["command"] ?? input["cmd"];
-  if (Array.isArray(command)) return command.filter((part): part is string => typeof part === "string").join(" ");
-  return text(command).replace(/^\/bin\/zsh -lc /, "");
+  return commandOf(block.input as Record<string, unknown> | null);
 }
 
 /** The agent's own words for what a call is for. Only shells and subagents carry them; other tools' descriptions are content. */

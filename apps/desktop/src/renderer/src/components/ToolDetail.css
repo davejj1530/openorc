@@ -1,0 +1,306 @@
+/* An opened tool call. Each part is styled for what it is, quiet enough to sit inside the work list: a command as
+   its steps on a recessed plane, code highlighted as in replies, matches and files as lists with their marks. */
+.tool-view {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 4px 0 10px;
+  font-size: var(--text-xs);
+  line-height: 18px;
+  color: var(--ink-2);
+}
+.tool-view-command {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  box-shadow: var(--material-recess);
+}
+.tool-view-step {
+  display: grid;
+  min-width: 0;
+}
+.tool-view-step > code {
+  font-family: var(--font-mono);
+  color: var(--ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+/* A comment the agent left between steps reads as a note, not as something that ran. */
+.tool-view-step > code[data-comment] {
+  color: var(--ink-3);
+}
+.tool-view-prompt {
+  margin-right: 8px;
+  color: var(--ink-3);
+  user-select: none;
+}
+.tool-view-cwd {
+  font-family: var(--font-mono);
+  color: var(--ink-3);
+}
+.tool-view-target {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.tool-view-icon {
+  flex-shrink: 0;
+  color: var(--ink-3);
+}
+.tool-view-link {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+}
+.tool-view-link a {
+  color: var(--ink);
+  text-decoration: none;
+}
+.tool-view-link a:hover {
+  text-decoration: underline;
+}
+.tool-view-dir {
+  color: var(--ink-3);
+}
+.tool-view-note {
+  flex-shrink: 0;
+  color: var(--ink-3);
+}
+.tool-view-pattern {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 6px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-family: var(--font-mono);
+  color: var(--ink);
+}
+.tool-view-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  justify-self: start;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  color: var(--ink-3);
+}
+.tool-view-more {
+  justify-self: start;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  cursor: pointer;
+}
+.tool-view-more:hover {
+  color: var(--ink-2);
+}
+.tool-view-more:focus-visible {
+  outline: 2px solid var(--accent-ink);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+.tool-view-plain {
+  max-height: 18rem;
+  margin: 0;
+  overflow: auto;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  box-shadow: var(--material-recess);
+  font-family: var(--font-mono);
+  color: var(--ink-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+/* A failed call's output carries the failure at its edge. */
+.tool-view[data-error] > .tool-view-plain {
+  box-shadow: inset 2px 0 0 var(--bad);
+}
+.tool-view-code {
+  min-width: 0;
+}
+.tool-view-code [data-streamdown="code-block"] {
+  margin: 0;
+}
+/* A script a step feeds in sits under its line inside the command, set off by a rule rather than a second box.
+   It has no header, so the copy bar that floats over a header has nowhere to sit; the raw call has the script. */
+.tool-view-code[data-script] {
+  min-width: 0;
+  margin: 2px 0 4px 3px;
+  padding-left: 12px;
+  border-left: 1px solid var(--line);
+}
+.tool-view-code[data-script] [data-streamdown="code-block"] {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.tool-view-code[data-script] [data-streamdown="code-block-header"],
+.tool-view-code[data-script] [data-streamdown="code-block"] > :has(> [data-streamdown="code-block-actions"]) {
+  display: none;
+}
+.tool-view-code[data-script] [data-streamdown="code-block-body"] {
+  padding: 0;
+  background: transparent;
+  font-size: inherit;
+}
+.tool-view-code[data-script] pre {
+  font-size: inherit;
+  line-height: inherit;
+}
+.tool-view-prose {
+  max-height: 20rem;
+  overflow: auto;
+  font-size: var(--text-sm);
+}
+.tool-view-brief,
+.tool-view-raw {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.tool-view-matches {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.tool-view-matches > section {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.tool-view-matches ol {
+  display: grid;
+  margin: 0 0 0 5px;
+  padding: 0 0 0 12px;
+  border-left: 1px solid var(--line);
+  list-style: none;
+}
+.tool-view-matches li {
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+  font-family: var(--font-mono);
+}
+.tool-view-line {
+  flex-shrink: 0;
+  min-width: 2.5em;
+  text-align: right;
+  color: var(--ink-4);
+  font-variant-numeric: tabular-nums;
+}
+/* A match's number opens its file at that line. */
+.tool-view-line a {
+  color: inherit;
+  text-decoration: none;
+}
+.tool-view-line a:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+.tool-view-matches li > code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: pre;
+  color: var(--ink-2);
+}
+/* Lines printed around a match are there to place it; they step back. */
+.tool-view-matches li[data-context] > code {
+  color: var(--ink-3);
+}
+.tool-view-matches mark {
+  border-radius: 2px;
+  background: color-mix(in oklab, var(--warn) 32%, transparent);
+  color: var(--ink);
+}
+
+.tool-view-files {
+  display: grid;
+  gap: 6px;
+}
+.tool-view-files ul {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* What `git status` says happened to each file: new work in the success tone, removals and conflicts in the failure tone. */
+.tool-view-note [data-status="added"],
+.tool-view-note [data-status="untracked"] {
+  color: var(--ok);
+}
+.tool-view-note [data-status="deleted"],
+.tool-view-note [data-status="conflict"] {
+  color: var(--bad);
+}
+
+.tool-view-tests {
+  display: grid;
+  gap: 8px;
+}
+.tool-view-tally {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.tool-view-tally > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.tool-view-tally > span[data-tone="ok"] {
+  background: color-mix(in oklab, var(--ok) 14%, transparent);
+  color: var(--ok);
+}
+.tool-view-tally > span[data-tone="bad"] {
+  background: color-mix(in oklab, var(--bad) 14%, transparent);
+  color: var(--bad);
+}
+
+/* One grid for every field, so the values line up whatever the longest name. */
+.tool-view-fields {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 6px 12px;
+  margin: 0;
+}
+.tool-view-fields > div {
+  display: contents;
+}
+.tool-view-fields dt {
+  font-family: var(--font-mono);
+  color: var(--ink-3);
+}
+.tool-view-fields dd {
+  max-height: 12rem;
+  margin: 0;
+  min-width: 0;
+  overflow: auto;
+  color: var(--ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.tool-view-fields dd pre {
+  margin: 0;
+  font-family: var(--font-mono);
+  color: var(--ink-2);
+}

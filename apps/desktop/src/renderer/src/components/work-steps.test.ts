@@ -117,7 +117,7 @@ it("opens Claude's phases at its narration and names earlier calls after what th
 it("names a phase with one described command after it, and shows a raw command by its first line", () => {
   expect(outline(workEntries([tool("t1", "Bash", { command: "pnpm test", description: "Run the desktop tests" })]))).toEqual(["~ Run the desktop tests", "  Ran: [Run the desktop tests]"]);
   const raw = [tool("c1", "shell", { command: `/bin/zsh -lc "python3 - <<'PY'\nprint(1)\nPY"` }), tool("c2", "shell", { command: "git status --short" })];
-  expect(outline(workEntries(raw))).toEqual(["~ Ran 2 commands", "  Ran: [python3 - <<'PY'] [git status --short]"]);
+  expect(outline(workEntries(raw))).toEqual(["~ Ran 2 commands", "  Ran: [python3 -] [git status --short]"]);
 });
 
 it("drops waiting and startup signals, keeps reasoning with the call it led to, and keeps milestones in their phase", () => {

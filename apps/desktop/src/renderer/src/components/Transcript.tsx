@@ -17,7 +17,7 @@ export { AgentPresence } from "./AgentPresence";
 import { StartedThreadCard } from "./StartedThreadCard";
 import { TaskCard } from "./TaskCard";
 import { startedWorkFromTool, taskIdFromTool, uniqueTaskCards } from "../lib/task-progress";
-import { ToolResult } from "./ToolResult";
+import { ToolDetail } from "./ToolDetail";
 import { UsageRecovery } from "./UsageRecovery";
 import { SignInRecovery } from "./SignInRecovery";
 import { TranscriptErrorCard } from "./TranscriptErrorCard";
@@ -25,7 +25,7 @@ const McpAppResult = lazy(() => import("./McpAppResult"));
 import { Button, IconButton, TextButton } from "./ui";
 import { ImageGenerationRow, ImageViewRow, ThreadImage, ThreadMedia, ThreadRichText } from "./ThreadImages";
 import { isImageGeneration, isImageView } from "../lib/image-activity";
-import { isUnifiedDiff, toolDiff } from "../lib/chat-diff";
+import { isUnifiedDiff } from "../lib/chat-diff";
 import { isImagePath } from "../../../shared/image-paths";
 import { CopyMessage, MessageTime } from "./MessageActions";
 
@@ -656,7 +656,6 @@ function ToolRow({ block, defaultOpen = false }: { block: Extract<Block, { kind:
   // An output left out of the page starts loading when the pointer reaches the row, so it is there by the click.
   const [near, setNear] = useState(false);
   const output = useToolOutput(block, open || near);
-  const patch = useMemo(() => (open && /(?:^|__)apply_patch$/.test(block.name) ? toolDiff(block.input) : null), [open, block.name, block.input]);
   const { icon: Icon, verb, object, tone } = toolCallPresentation(block.name, block.input);
   const label = block.done ? verb : liveVerb(verb);
   return (
@@ -684,22 +683,7 @@ function ToolRow({ block, defaultOpen = false }: { block: Extract<Block, { kind:
       ) : null}
       {open ? (
         <div className="ml-5 min-w-0">
-          {patch ? (
-            <Suspense fallback={diffLoading}>
-              <InlineDiff patch={patch} />
-            </Suspense>
-          ) : null}
-          <div className="tool-detail my-1 rounded-lg border border-line bg-surface-2/50 text-xs grid min-w-0">
-            {patch ? (
-              <details>
-                <summary className="cursor-pointer px-3 py-2 text-ink-3">Tool details</summary>
-                <pre className="px-3 py-2 whitespace-pre-wrap break-words text-ink-2 max-h-60 overflow-auto">{pretty(block.input, Infinity)}</pre>
-              </details>
-            ) : (
-              <pre className="px-3 py-2 whitespace-pre-wrap break-words text-ink-2 max-h-60 overflow-auto">{pretty(block.input, Infinity)}</pre>
-            )}
-            {output !== undefined ? <ToolResult output={output} /> : null}
-          </div>
+          <ToolDetail block={block} output={output} />
         </div>
       ) : null}
     </div>

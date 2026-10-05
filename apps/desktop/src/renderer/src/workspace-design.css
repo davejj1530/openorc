@@ -788,9 +788,6 @@
   background: var(--navigation-soft);
   box-shadow: none;
 }
-.app-shell .panel-tab-label {
-  display: inline;
-}
 .app-shell .panel-content .diff-file {
   margin: 12px;
   border: 1px solid var(--line);

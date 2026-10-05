@@ -2747,6 +2747,8 @@ diffs-container {
     max-width: 250px;
   }
 }
+/* Keep tab names at their natural width. Only the strip scrolls when the available
+   space is exhausted; labels never disappear at a fixed panel-width breakpoint. */
 .panel-tabs {
   min-width: 0;
   overflow-x: auto;
@@ -2813,11 +2815,6 @@ diffs-container {
   }
 }
 
-@container review-panel (max-width: 600px) {
-  .panel-tab-label:not([data-selected="true"]) {
-    display: none;
-  }
-}
 /* Menus communicate opening with a short native pop; workspace content never flies in. */
 .menu-popup {
   transform-origin: var(--transform-origin);

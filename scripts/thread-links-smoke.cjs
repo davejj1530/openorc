@@ -21,7 +21,15 @@ async function build() {
     format: "cjs",
     external: ["electron"],
   });
-  await build({ entryPoints: [path.join(desktop, "src/preload/index.ts")], outfile: path.join(dir, "preload.cjs"), bundle: true, platform: "node", format: "cjs", external: ["electron"] });
+  await build({
+    entryPoints: [path.join(desktop, "src/preload/index.ts")],
+    outfile: path.join(dir, "preload.cjs"),
+    bundle: true,
+    platform: "node",
+    format: "cjs",
+    external: ["electron"],
+    define: { __OPENORC_QA__: "false" },
+  });
   const server = require("node:http").createServer(async (req, res) => {
     if (req.url.startsWith("/page-")) {
       res.setHeader("Content-Type", "text/html");
@@ -69,6 +77,7 @@ async function check() {
     external.push(url);
   };
   const win = new BrowserWindow({ show: false, width: 1060, height: 720, webPreferences: { preload: path.join(dir, "preload.cjs"), sandbox: true, contextIsolation: true } });
+  ipcMain.handle("window:appearance", () => {});
   api.installBrowserPane(ipcMain, { getWindow: () => win });
   api.installLinkNavigation(win, (url) => url === site + "/");
   api.installImageContextMenu(win, dir);
@@ -95,18 +104,28 @@ async function check() {
     win.webContents.sendInputEvent({ type: "mouseUp", ...point, button, clickCount: 1 });
   };
   const page = () => win.contentView.children.find((view) => view.webContents)?.webContents;
+  const expectPreview = async (url) => {
+    await until(() => read("document.querySelector('.panel-shell[data-open=true] [role=tab][aria-selected=true]')?.getAttribute('aria-label') === 'Preview'"));
+    await until(() => page()?.getURL() === url);
+    await until(() => read(`document.querySelector('input[aria-label="Preview address"]')?.value === ${JSON.stringify(url)}`));
+    await until(() => win.contentView.children.some((view) => view.webContents === page() && view.getVisible() && view.getBounds().width > 0 && view.getBounds().height > 0));
+  };
   try {
     await win.loadURL(site);
     win.showInactive();
     await until(() => read("document.querySelectorAll('a').length === 3"));
+    assert.equal(await read("typeof window.openorc?.browser"), "object", "The production preload is available");
     await click("first page");
-    await until(() => page()?.getURL() === site + "/page-a");
+    await expectPreview(site + "/page-a");
     assert.equal(await read("!!document.querySelector('[role=dialog]')"), false);
     assert.deepEqual(external, []);
+    await read("document.querySelector('[aria-label=\"Hide panel\"]').click()");
     await click("second page");
-    await until(() => page()?.getURL() === site + "/page-b");
+    await expectPreview(site + "/page-b");
+    await read("document.querySelector('[data-show-tasks]').click()");
+    await until(() => read("document.querySelector('[role=tab][aria-selected=true]')?.getAttribute('aria-label') === 'Tasks'"));
     await click("document link");
-    await until(() => page()?.getURL() === site + "/page-c");
+    await expectPreview(site + "/page-c");
     await click("first page", "middle");
     await until(() => page()?.getURL() === site + "/page-a");
     await read("Array.from(document.querySelectorAll('a')).find(a => a.textContent === 'second page').focus()");

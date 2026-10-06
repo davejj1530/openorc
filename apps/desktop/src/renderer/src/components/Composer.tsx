@@ -580,7 +580,7 @@ export function ComposerChoice<T extends string>({
             {options
               .filter((o) => !o.hidden)
               .map((o) => (
-                <Menu.Item key={o.value} className="grid gap-0.5 px-2 py-1.5 rounded-md cursor-pointer data-[highlighted]:bg-surface-2 outline-none" onClick={() => onChange(o.value)}>
+                <Menu.Item key={o.value} className="grid gap-0.5 px-2 py-1.5 rounded-md data-[highlighted]:bg-surface-2 outline-none" onClick={() => onChange(o.value)}>
                   <span className={cn("text-base", value === o.value ? "text-ink font-medium" : "text-ink-2")}>{o.label}</span>
                   {o.hint ? <span className="text-xs text-ink-3">{o.hint}</span> : null}
                 </Menu.Item>

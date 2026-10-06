@@ -22,7 +22,7 @@ function ForwardedTaskNotice({ record, destination }: { record: ForwardingRecord
           </TextButton>
         </p>
         <details>
-          <summary className="cursor-pointer text-ink-3">Previous results</summary>
+          <summary className="text-ink-3">Previous results</summary>
           <p className="mt-2 whitespace-pre-wrap break-words">{record.context}</p>
         </details>
       </>

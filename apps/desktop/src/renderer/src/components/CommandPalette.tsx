@@ -79,7 +79,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
                     key={`${h.runId}-${h.ts}`}
                     value={`message ${h.threadTitle} ${h.snippet} ${h.ts}`}
                     onSelect={() => go(() => (h.taskId ? openTask(h.taskId, "chat") : openThread(h.threadId)))}
-                    className="grid gap-0.5 px-2 py-1.5 rounded-md text-base text-ink-2 cursor-pointer data-[selected=true]:bg-surface-2 data-[selected=true]:text-ink"
+                    className="grid gap-0.5 px-2 py-1.5 rounded-md text-base text-ink-2 data-[selected=true]:bg-surface-2 data-[selected=true]:text-ink"
                   >
                     <span className="flex items-center gap-2 min-w-0">
                       <Search size={13} className="text-ink-3 shrink-0" />
@@ -175,11 +175,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
 
 function Item({ children, icon, onSelect, value }: { children: React.ReactNode; icon: React.ReactNode; onSelect: () => void; value?: string }) {
   return (
-    <Command.Item
-      value={value}
-      onSelect={onSelect}
-      className="flex items-center gap-2 h-8 px-2 rounded-md text-base text-ink-2 cursor-pointer data-[selected=true]:bg-surface-2 data-[selected=true]:text-ink"
-    >
+    <Command.Item value={value} onSelect={onSelect} className="flex items-center gap-2 h-8 px-2 rounded-md text-base text-ink-2 data-[selected=true]:bg-surface-2 data-[selected=true]:text-ink">
       <span className="text-ink-3">{icon}</span>
       <span className="truncate">{children}</span>
     </Command.Item>

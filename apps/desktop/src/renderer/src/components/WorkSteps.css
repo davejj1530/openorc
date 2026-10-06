@@ -87,9 +87,6 @@
   font-size: var(--text-sm);
   color: var(--ink-2);
 }
-button.work-phase-title:enabled {
-  cursor: pointer;
-}
 button.work-phase-title:enabled:hover {
   color: var(--ink);
 }
@@ -228,7 +225,6 @@ button.work-phase-title[aria-expanded="true"] > .work-chevron {
   justify-self: start;
   font-size: var(--text-xs);
   color: var(--ink-3);
-  cursor: pointer;
 }
 .work-group-label:hover {
   color: var(--ink-2);
@@ -277,9 +273,6 @@ button.work-chip[aria-pressed="true"] {
   background: var(--surface-3);
   color: var(--ink);
 }
-button.work-chip {
-  cursor: pointer;
-}
 button.work-chip:focus-visible {
   outline: 2px solid var(--accent-ink);
   outline-offset: 1px;
@@ -315,7 +308,6 @@ button.work-chip:focus-visible {
 .work-more {
   font-size: var(--text-xs);
   color: var(--accent-ink);
-  cursor: pointer;
 }
 .work-group-calls {
   min-width: 0;

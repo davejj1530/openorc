@@ -132,7 +132,6 @@
   accent-color: var(--accent);
   width: 14px;
   height: 14px;
-  cursor: pointer;
 }
 .task-rich-editor blockquote {
   border-left: 1px solid var(--line-strong);

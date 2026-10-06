@@ -119,7 +119,7 @@ function EditSidebar({ open, onOpenChange }: { open: boolean; onOpenChange: (ope
     <Dialog open={open} onOpenChange={onOpenChange} title="Edit sidebar" width={360}>
       <div className="grid gap-px">
         {SCREENS.map(({ id, label, Icon }) => (
-          <label key={id} className="flex items-center gap-3 h-9 px-2 rounded-md cursor-pointer hover:bg-surface-2">
+          <label key={id} className="flex items-center gap-3 h-9 px-2 rounded-md hover:bg-surface-2">
             <Icon size={15} className="text-ink-3" />
             <span className="flex-1 text-base text-ink">{label}</span>
             <Switch checked={!hidden.includes(id)} onChange={(event) => setScreenShown(id, event.target.checked)} />

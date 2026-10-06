@@ -1031,7 +1031,6 @@
   padding: 0 8px;
   border-radius: 6px;
   list-style: none;
-  cursor: pointer;
   font-size: 12px;
   color: var(--ink-3);
 }

@@ -61,7 +61,7 @@ export function ImportSessionsDialog({ open, projectId: given, onOpenChange }: {
             {sessions.map((s) => {
               const done = Boolean(s.threadId);
               return (
-                <label key={s.path} className={cn("flex items-center gap-3 px-3 h-10 text-base", done ? "text-ink-4" : "cursor-pointer hover:bg-surface-2")}>
+                <label key={s.path} className={cn("flex items-center gap-3 px-3 h-10 text-base", done ? "text-ink-4" : "hover:bg-surface-2")}>
                   <input type="checkbox" disabled={done} checked={done || picked.has(s.path)} onChange={() => toggle(s)} />
                   <span className="flex-1 min-w-0 truncate">{s.title}</span>
                   <span className="text-xs text-ink-3">{agentLabel[s.agent] ?? s.agent}</span>

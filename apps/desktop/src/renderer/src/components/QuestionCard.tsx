@@ -106,7 +106,7 @@ export function QuestionCard({
                 <label
                   key={o.label}
                   className={cn(
-                    "flex min-h-10 items-start gap-3 rounded-md px-3 py-2.5 text-base cursor-pointer transition-colors hover:bg-surface-2 focus-within:outline focus-within:outline-2 focus-within:outline-accent",
+                    "flex min-h-10 items-start gap-3 rounded-md px-3 py-2.5 text-base transition-colors hover:bg-surface-2 focus-within:outline focus-within:outline-2 focus-within:outline-accent",
                     (picked[q.key] ?? []).includes(o.label) && "bg-surface-2",
                   )}
                 >

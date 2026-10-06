@@ -1,17 +1,9 @@
 ---
 import ArtPanel from "./ArtPanel.astro";
+import LogoSprite from "./hero/LogoSprite.astro";
 import DiscussionScene from "./hero/DiscussionScene.astro";
 import HandoffScene from "./hero/HandoffScene.astro";
 import TeamScene from "./hero/TeamScene.astro";
-import openai from "../../public/openai.svg?raw";
-import claude from "../../public/claude.svg?raw";
-import opencode from "../../public/opencode.svg?raw";
-
-/** The provider marks the app ships, in their own colors on the scenes' light theme, as in the app. */
-const logoPaths = (svg: string, fill?: string) => {
-  const paths = svg.match(/<path\b[^>]*>(?:<\/path>)?/g)?.join("") ?? "";
-  return fill ? paths.replace(/fill="[^"]*"/g, `fill="${fill}"`) : paths;
-};
 
 const demos = [
   {
@@ -40,11 +32,7 @@ const demos = [
   if (!matchMedia("(prefers-reduced-motion: reduce)").matches) document.documentElement.setAttribute("data-hero-motion", "");
 </script>
 <section class="product-showcase" id="product" data-product-gallery aria-label="OpenOrc product demos">
-  <svg class="hs-sprite" aria-hidden="true">
-    <symbol id="hs-logo-codex" viewBox="0 0 41 41" set:html={logoPaths(openai, "#0d0d0d")} />
-    <symbol id="hs-logo-claude" viewBox="0 0 125 125" set:html={logoPaths(claude)} />
-    <symbol id="hs-logo-opencode" viewBox="96 64 320 384" set:html={logoPaths(opencode)} />
-  </svg>
+  <LogoSprite />
   <div class="demo-tabs" role="tablist" aria-label="Explore OpenOrc demos" hidden data-demo-tabs>
     {demos.map((demo, i) => (
       <button type="button" role="tab" id={`demo-tab-${demo.id}`} aria-controls={`demo-${demo.id}`} aria-selected={i === 0 ? "true" : "false"} tabindex={i === 0 ? 0 : -1}>

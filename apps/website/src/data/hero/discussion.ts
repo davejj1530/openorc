@@ -69,7 +69,6 @@ export const discussion = {
     help: "Mention a model to discuss this task. Clear work requests continue in a linked thread.",
     placeholder: "Leave a note, or type @ to ask a model…",
     hint: "Type @ to choose a model and effort",
-    editor: "Text, images, and / commands",
   },
 };
 

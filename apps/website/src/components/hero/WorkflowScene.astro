@@ -5,8 +5,7 @@
  * it, and follows the change into the thread that starts. Content and timing:
  * data/hero/workflow.ts.
  */
-import { Image } from "astro:assets";
-import mark from "../../assets/openorc-mark.png";
+import PresenceMark from "./PresenceMark.astro";
 import ProductIcon from "./ProductIcon.astro";
 import Prose from "./Prose.astro";
 import SceneFrame from "./SceneFrame.astro";
@@ -28,11 +27,8 @@ const rows = [
   { id: "b", title: work.title, branch: branches.cacheThread, providers: [{ harness: "codex", label: "Codex" }], busy: busy.b, show: ">bStart" },
 ];
 const codex = { harness: "codex", label: models.codex.label, effort: models.codex.effort };
-const hints = [
-  ["@", "mention a file"],
-  ["⌘V", "paste an image"],
-  ["⌘K", "search"],
-];
+const starters = ["Explore this project", "Plan a change", "Review my changes"];
+const file = (path: string) => path.slice(path.lastIndexOf("/") + 1);
 const options = [
   { name: task.mentions.codex, harness: "Codex" },
   { name: task.mentions.claude, harness: "Claude Code" },
@@ -50,50 +46,59 @@ const code = (text: string) => text.split(/(`[^`]+`)/).map((part) => (part.start
         <span class="hs-header-lead">
           <span class="hs-window-nav">
             <span class="hs-icon-button"><ProductIcon name="panelLeft" /></span>
-            <span class="hs-icon-button"><ProductIcon name="search" /></span>
+            <span class="hs-icon-button"><ProductIcon name="inbox" /></span>
             <span class="hs-icon-button"><ProductIcon name="arrowLeft" /></span>
             <span class="hs-icon-button" data-disabled><ProductIcon name="arrowRight" /></span>
           </span>
-          <span class="hs-title">New thread</span>
-          <span class="hs-chip"><span>{project.name}</span><ProductIcon name="chevronDown" /></span>
+          <span class="hs-title hs-title-page">New thread</span>
         </span>
         <span class="hs-header-actions">
           <span class="hs-icon-button"><ProductIcon name="panelRight" /></span>
         </span>
       </header>
       <div class="hs-new-body">
-        <div class="hs-new-greeting">
-          <svg class="hs-mascot" viewBox="0 0 500 500" fill="none" aria-hidden="true">
-            <g transform="translate(250 235)">
-              <path fill="#f080b8" d="M0-110C70-110 105-101 110-50C114-25 114 29 108 60C102 101 78 111 25 112C-5 113-40 113-64 106C-103 98-112 74-113 29C-114 2-113-31-106-57C-95-102-64-110 0-110Z" />
-              <g transform="translate(-18 -10)" fill="#141417"><rect x="-38" y="-28" width="22" height="56" rx="11" /><rect x="16" y="-28" width="22" height="56" rx="11" /></g>
-            </g>
-          </svg>
-          <div class="hs-new-title">What should we work on?</div>
-          <p class="hs-new-lead">The agent works in your repository. You may create a task first or go straight into building.</p>
-          <ul class="hs-new-hints">{hints.map(([key, hint]) => <li><kbd>{key}</kbd>{hint}</li>)}</ul>
+        <div class="hs-new-column">
+          <div class="hs-new-context">
+            <span class="hs-new-picker">{project.name}<ProductIcon name="chevronDown" /></span>
+            <span class="hs-new-picker"><ProductIcon name="laptop" />Local checkout<ProductIcon name="chevronDown" /></span>
+          </div>
+          <Composer journey={workflowJourney} layout="new" placeholder="Ask OpenOrc to build, fix bugs, explore" model={codex} permission={models.codex.permission} prompt={{ text: thread.prompt, typo: thread.typo, window: "typeStart~typeEnd", typed: "typeStart~aSend" }} />
+          <div class="hs-starters">{starters.map((starter) => <span>{starter}</span>)}</div>
+          <div class="hs-new-activity"><ProductIcon name="chevronRight" />Recent activity</div>
         </div>
-      </div>
-      <div class="hs-composer-area hs-composer-area-new">
-        <Composer journey={workflowJourney} placeholder="What would you like to do?" model={codex} permission={models.codex.permission} prompt={{ text: thread.prompt, typo: thread.typo, window: "typeStart~typeEnd", typed: "typeStart~aSend" }} large />
       </div>
     </section>
 
     <ThreadPane id="a" journey={workflowJourney} title={thread.title} busy={busy.a} model={codex} permission={models.codex.permission} placeholder="Message Codex…">
       <div class="hs-user hs-block" {...at(">aSend")}><div class="hs-bubble">{thread.prompt}</div></div>
       <div class="hs-work hs-block" {...at(">aSend")}>
-        <span class="hs-work-toggle" data-open {...at("aSend~aDone")}><span data-clock="aSend">Working · 0s</span><ProductIcon name="chevronRight" /></span>
+        <span class="hs-work-toggle" {...at("aSend~aDone")}><span data-clock="aSend">Working · 0s</span><ProductIcon name="chevronDown" /></span>
         <span class="hs-work-toggle" {...at(">aDone")}><span data-duration="aSend~aDone">Worked for 7s</span><ProductIcon name="chevronRight" /></span>
         <div class="hs-work-content" {...at("aSend~aDone")}>
-          <span class="hs-step" {...at("aSend~aThought")}><ProductIcon name="message" />Thinking<i class="hs-pulse"></i></span>
-          <span class="hs-step" {...at("aThought~aDone")}><ProductIcon name="message" />Thought for 1s</span>
-          <span class="hs-step hs-group-step hs-block" {...at("aThought~aRead")}><ProductIcon name="live" class="hs-live" />Reading files<ProductIcon name="chevronRight" /></span>
-          <span class="hs-step hs-group-step" {...at("aRead~aDone")}><ProductIcon name="read" />Read 6 files<ProductIcon name="chevronRight" /></span>
-          <span class="hs-step hs-group-step hs-block" {...at("aRead~aRan")}><ProductIcon name="live" class="hs-live" />Running command<ProductIcon name="chevronRight" /></span>
-          <span class="hs-step hs-group-step" {...at("aRan~aDone")}><ProductIcon name="command" />Ran a command<ProductIcon name="chevronRight" /></span>
+          <ol class="hs-rail">
+            <li class="hs-rail-item">
+              <span class="hs-rail-dot"><span class="hs-live-dot" {...at("<aRan")}></span><span class="hs-done" {...at(">aRan")}><ProductIcon name="check" /></span></span>
+              <span class="hs-rail-line">
+                <span class="hs-rail-title" {...at("<aThought")}>Thinking</span>
+                <span class="hs-rail-title" {...at(">aThought")}>{thread.phase}</span>
+                <span class="hs-rail-meta" {...at(">aRan")}>6 files · 1 command</span>
+              </span>
+              <div class="hs-rail-body" {...at("aThought~aRan")}>
+                <div {...at("aThought~aRead")}>
+                  <span class="hs-rail-label">Reading</span>
+                  <div class="hs-chips">{thread.reads.map((path) => <span class="hs-file-chip" data-live><ProductIcon name="fileCode" />{file(path)}</span>)}</div>
+                </div>
+                <div {...at("aRead~aRan")}>
+                  <span class="hs-rail-label">Running</span>
+                  <div class="hs-chips"><span class="hs-file-chip" data-live><ProductIcon name="command" />{thread.command}</span></div>
+                </div>
+              </div>
+            </li>
+          </ol>
         </div>
       </div>
       <div class="hs-reply hs-block" {...at(">aIntroStart")}>
+        <div class="hs-author">Assistant</div>
         <Prose text={thread.intro} stream="aIntroStart~aIntroEnd" />
         <div class="hs-table-wrap hs-block" {...at(">aTable")}>
           <div class="hs-table-tools"><ProductIcon name="copy" /><ProductIcon name="download" /><ProductIcon name="maximize" /></div>
@@ -128,10 +133,18 @@ const code = (text: string) => text.split(/(`[^`]+`)/).map((part) => (part.start
         <div class="hs-question-answered" {...at(">aPick")}>answered</div>
       </div>
       <div class="hs-work hs-block" {...at(">aPick")}>
-        <span class="hs-work-toggle" data-open {...at("aPick~aCreated")}><span data-clock="aPick">Working · 0s</span><ProductIcon name="chevronRight" /></span>
+        <span class="hs-work-toggle" {...at("aPick~aCreated")}><span data-clock="aPick">Working · 0s</span><ProductIcon name="chevronDown" /></span>
         <span class="hs-work-toggle" {...at(">aCreated")}><span data-duration="aPick~aCreated">Worked for 3s</span><ProductIcon name="chevronRight" /></span>
+        <div class="hs-work-content" {...at("aPick~aCreatedStart")}>
+          <ol class="hs-rail">
+            <li class="hs-rail-item">
+              <span class="hs-rail-dot"><span class="hs-live-dot"></span></span>
+              <span class="hs-rail-line"><span class="hs-rail-title">Creating the three tasks</span></span>
+            </li>
+          </ol>
+        </div>
       </div>
-      <div class="hs-reply hs-block" {...at(">aCreatedStart")}><Prose text={thread.created} stream="aCreatedStart~aCreatedEnd" /></div>
+      <div class="hs-reply hs-block" {...at(">aCreatedStart")}><div class="hs-author">Assistant</div><Prose text={thread.created} stream="aCreatedStart~aCreatedEnd" /></div>
       <div class="hs-task-cards">
         {workflow.tasks.map((item, i) => (
           <div class="hs-task-card hs-block" {...at(`>aCard${i + 1}`)}>
@@ -140,19 +153,19 @@ const code = (text: string) => text.split(/(`[^`]+`)/).map((part) => (part.start
               <span class="hs-task-card-title">{item.title}</span>
               <ProductIcon name="arrowUpRight" class="hs-task-card-open" />
             </div>
-            <div class="hs-task-card-meta"><span>Backlog</span><span class="hs-task-card-time">just now</span></div>
+            <div class="hs-task-card-meta"><span>Backlog</span><span class="hs-task-card-branch"><ProductIcon name="branch" />{project.branch}</span><span class="hs-task-card-time">just now</span></div>
           </div>
         ))}
       </div>
-      <div class="hs-presence"><span class="hs-orb"><Image src={mark} alt="" width={48} height={48} format="webp" loading="lazy" /></span></div>
+      <PresenceMark />
     </ThreadPane>
 
     <TaskPane id="task" journey={workflowJourney} title={task.title} start="bStart" branch={branches.cacheThread}>
       <div class="hs-doc-title">{task.title}</div>
       <div class="hs-props">
-        <span class="hs-prop" {...at("<bStart")}><ProductIcon name="circleDashed" class="hs-status-glyph hs-status-circleDashed" />Backlog<ProductIcon name="chevronDown" class="hs-prop-chevron" /></span>
-        <span class="hs-prop" {...at(">bStart")}><ProductIcon name="loader" class="hs-status-glyph hs-status-in_progress" />In progress<ProductIcon name="chevronDown" class="hs-prop-chevron" /></span>
-        <span class="hs-prop"><ProductIcon name="signalHigh" class="hs-priority" />High<ProductIcon name="chevronDown" class="hs-prop-chevron" /></span>
+        <span class="hs-prop hs-prop-select" {...at("<bStart")}><ProductIcon name="circleDashed" class="hs-status-glyph hs-status-circleDashed" />Backlog<ProductIcon name="chevronDown" class="hs-prop-chevron" /></span>
+        <span class="hs-prop hs-prop-select" {...at(">bStart")}><ProductIcon name="loader" class="hs-status-glyph hs-status-in_progress" />In progress<ProductIcon name="chevronDown" class="hs-prop-chevron" /></span>
+        <span class="hs-prop hs-prop-select"><ProductIcon name="signalHigh" class="hs-priority" />High<ProductIcon name="chevronDown" class="hs-prop-chevron" /></span>
         <span class="hs-prop">{project.name}</span>
       </div>
       <div class="hs-spec">
@@ -249,23 +262,38 @@ const code = (text: string) => text.split(/(`[^`]+`)/).map((part) => (part.start
       model={codex}
       permission={models.codex.permission}
       placeholder="Message Codex…"
-      worktree
       branch={branches.cacheThread}
       changes=">bDone"
       changeStat={{ added, removed }}
     >
       <div class="hs-user"><div class="hs-bubble">{work.prompt}</div></div>
       <div class="hs-work">
-        <span class="hs-work-toggle" data-open {...at("<bDone")}><span data-clock="bStart">Working · 0s</span><ProductIcon name="chevronRight" /></span>
-        <span class="hs-work-toggle" {...at(">bDone")}><span data-duration="bStart~bDone">Worked for 9s</span><ProductIcon name="chevronRight" /></span>
+        <span class="hs-work-toggle" {...at("<bDone")}><span data-clock="bStart">Working · 0s</span><ProductIcon name="chevronDown" /></span>
+        <span class="hs-work-toggle" {...at(">bDone")}>{work.receipt}<ProductIcon name="chevronRight" /></span>
         <div class="hs-work-content" {...at("<bDone")}>
-          <span class="hs-step hs-group-step" {...at("<bRead")}><ProductIcon name="live" class="hs-live" />Reading files<ProductIcon name="chevronRight" /></span>
-          <span class="hs-step hs-group-step" {...at(">bRead")}><ProductIcon name="read" />Read 4 files<ProductIcon name="chevronRight" /></span>
-          <span class="hs-step hs-group-step hs-block" {...at("bRead~bEdited")}><ProductIcon name="live" class="hs-live" />Editing files<ProductIcon name="chevronRight" /></span>
-          <span class="hs-step hs-group-step" {...at(">bEdited")}><ProductIcon name="edit" />Edited 3 files<ProductIcon name="chevronRight" /></span>
+          <ol class="hs-rail">
+            <li class="hs-rail-item">
+              <span class="hs-rail-dot"><span class="hs-live-dot" {...at("<bRead")}></span><span class="hs-done" {...at(">bRead")}><ProductIcon name="check" /></span></span>
+              <span class="hs-rail-line"><span class="hs-rail-title">{work.phases.read}</span><span class="hs-rail-meta" {...at(">bRead")}>4 files</span></span>
+            </li>
+            <li class="hs-rail-item hs-block" {...at(">bRead")}>
+              <span class="hs-rail-dot"><span class="hs-live-dot" {...at("bRead~bEdited")}></span><span class="hs-done" {...at(">bEdited")}><ProductIcon name="check" /></span></span>
+              <span class="hs-rail-line"><span class="hs-rail-title">{work.phases.edit}</span><span class="hs-rail-meta" {...at(">bEdited")}>3 files changed</span></span>
+              <div class="hs-rail-body" {...at("bRead~bEdited")}>
+                <div>
+                  <span class="hs-rail-label">Editing</span>
+                  <div class="hs-chips">
+                    {work.change.files.map((change) => (
+                      <span class="hs-file-chip" data-live><ProductIcon name="fileCode" />{file(change.path)}<span class="hs-added">+{change.added}</span><span class="hs-removed">−{change.removed}</span></span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </li>
+          </ol>
         </div>
       </div>
-      <div class="hs-reply hs-block" {...at(">bReplyStart")}><Prose text={work.reply} stream="bReplyStart~bReplyEnd" /></div>
+      <div class="hs-reply hs-block" {...at(">bReplyStart")}><div class="hs-author">Assistant</div><Prose text={work.reply} stream="bReplyStart~bReplyEnd" /></div>
       <section class="hs-change hs-block" {...at(">bDone")}>
         <div class="hs-change-heading">
           <span class="hs-change-icon"><ProductIcon name="pencil" /></span>
@@ -274,18 +302,18 @@ const code = (text: string) => text.split(/(`[^`]+`)/).map((part) => (part.start
             <span class="hs-counts"><span class="hs-added">+{added}</span><span class="hs-removed">−{removed}</span></span>
           </span>
           <span class="hs-change-actions">
-            <span class="hs-button hs-button-ghost"><ProductIcon name="undo" />Undo</span>
+            <span class="hs-button hs-button-ghost">Undo<ProductIcon name="undo" /></span>
             <span class="hs-button">Review</span>
           </span>
         </div>
-        {work.change.files.map((file) => (
+        {work.change.files.map((change) => (
           <div class="hs-change-file">
-            <span>{file.path.slice(0, file.path.lastIndexOf("/") + 1)}<span class="hs-file-name">{file.path.slice(file.path.lastIndexOf("/") + 1)}</span></span>
-            <span class="hs-counts"><span class="hs-added">+{file.added}</span><span class="hs-removed">−{file.removed}</span></span>
+            <span>{change.path.slice(0, change.path.lastIndexOf("/") + 1)}<span class="hs-file-name">{file(change.path)}</span></span>
+            <span class="hs-counts"><span class="hs-added">+{change.added}</span><span class="hs-removed">−{change.removed}</span></span>
           </div>
         ))}
       </section>
-      <div class="hs-presence"><span class="hs-orb"><Image src={mark} alt="" width={48} height={48} format="webp" loading="lazy" /></span></div>
+      <PresenceMark />
     </ThreadPane>
   </div>
 </SceneFrame>

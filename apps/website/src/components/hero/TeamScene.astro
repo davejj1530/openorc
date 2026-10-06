@@ -6,11 +6,11 @@
  * timing: data/hero/team.ts.
  */
 import { Image } from "astro:assets";
-import mark from "../../assets/openorc-mark.png";
 import lead from "../../assets/team-avatars/avatar-01-facet.png";
 import server from "../../assets/team-avatars/avatar-02-ripple.png";
 import reviewer from "../../assets/team-avatars/avatar-03-helix.png";
 import client from "../../assets/team-avatars/avatar-04-portal.png";
+import PresenceMark from "./PresenceMark.astro";
 import ProductIcon from "./ProductIcon.astro";
 import Prose from "./Prose.astro";
 import SceneFrame from "./SceneFrame.astro";
@@ -38,39 +38,31 @@ const at = (windows: string) => timed(teamJourney, windows);
       model={{ icon: "orchestration", label: team.name, effort: "High" }}
       permission={models.codex.permission}
       placeholder="Message the team…"
-      worktree
+      context={null}
       branch={branches.team}
       changes={`>${fixed.id}End`}
       changeStat={fixed.change}
       prompt={{ text: team.prompt, typo: team.typo, window: "typeStart~typeEnd", typed: "typeStart~send" }}
     >
-      <div slot="bar" class="hs-team-bar">
+      <span slot="status" class="hs-team-status">
         <ProductIcon name="orchestration" />
-        <span class="hs-team-name">{team.name}</span>
-        <span class="hs-team-version">{team.version}</span>
-        <span class="hs-team-status">
-          <span {...at("<send")}>Ready</span>
-          <span {...at("send~done")}>Working</span>
-          <span {...at(">done")}>Completed</span>
-        </span>
-        <span class="hs-ghost">Show activity</span>
-        <span class="hs-ghost">Compact lead context</span>
-      </div>
+        <span {...at("<send")}>Ready</span>
+        <span {...at("send~done")}>Working</span>
+        <span {...at(">done")}>Completed</span>
+        <ProductIcon name="chevronDown" />
+      </span>
 
       <p class="hs-team-empty" {...at("<send")}>Send an instruction to start this team.</p>
-      <div class="hs-user hs-block" data-grow {...at(">send")}>
-        <div class="hs-bubble">{team.prompt}</div>
-        <span class="hs-seen" {...at("seenLead~seenAll")}>Seen by Lead</span>
-        <span class="hs-seen" {...at(">seenAll")}>Seen by everyone</span>
-      </div>
+      <div class="hs-user hs-block" data-grow {...at(">send")}><div class="hs-bubble">{team.prompt}</div></div>
+      <p class="hs-seen" {...at("seenLead~seenAll")}>Seen by Lead</p>
+      <p class="hs-seen" {...at(">seenAll")}>Seen by everyone</p>
       {team.turns.map((turn) => (
         <section class="hs-turn hs-block" data-grow {...at(`>${turn.id}Start`)}>
-          <header class="hs-author">
-            <Image class="hs-avatar" src={portraits[turn.member]} alt="" width={80} height={80} format="webp" loading="lazy" />
+          <header class="hs-turn-author">
+            <Image class="hs-avatar" src={portraits[turn.member]} alt="" width={48} height={48} format="webp" loading="lazy" />
             <strong>{members[turn.member].name}</strong>
             <span>{members[turn.member].model}</span>
             <time>{team.time}</time>
-            <i class="hs-pulse" {...at(`${turn.id}Start~${turn.id}End`)}></i>
           </header>
           <div class="hs-writing" data-grow {...at(`${turn.id}Start~${turn.id}Text`)}>Writing response</div>
           <div class="hs-reply" data-grow {...at(`>${turn.id}Text`)}><Prose text={turn.reply} stream={`${turn.id}Text~${turn.id}End`} /></div>
@@ -93,8 +85,8 @@ const at = (windows: string) => timed(teamJourney, windows);
           ) : null}
         </section>
       ))}
-      <div class="hs-presence">
-        <span class="hs-orb"><Image src={mark} alt="" width={48} height={48} format="webp" loading="eager" /></span>
+      <div class="hs-presence-row">
+        <PresenceMark />
         <span {...at("send~done")} data-clock="send" data-clock-text="Working for {s}s">Working for 0s</span>
       </div>
 

@@ -1,13 +1,16 @@
 ---
-/** The app sidebar: navigation, then the sample workspace's projects and threads. */
-import { Image } from "astro:assets";
-import mark from "../../assets/openorc-mark.png";
+/**
+ * The app sidebar as the desktop app lays it out (Sidebar.tsx): New thread and the main views, the Threads and
+ * Orclings tabs, the filter, then projects and their threads. A working thread says what its agent is doing under
+ * its title, and the Inbox, history and Settings sit at the foot. Stills pass no journey.
+ */
 import ProductIcon from "./ProductIcon.astro";
 import { otherThreads, project, type SidebarRow } from "../../data/hero/workspace";
 import { timed, type Journey } from "../../data/hero/timeline";
 
 interface Props {
-  journey: Journey;
+  /** The scene's journey; stills pass none. */
+  journey?: Journey;
   /** Navigation row shown as the current view, if the scene is not a thread. */
   nav?: "Tasks";
   /** Threads listed under the studio project ahead of the shared ones. */
@@ -17,89 +20,95 @@ interface Props {
 }
 const { journey, nav, rows, inboxPending } = Astro.props;
 const navigation = [
-  { icon: "inbox", label: "Inbox", count: 2 },
+  { icon: "compose", label: "New thread" },
   { icon: "tasks", label: "Tasks" },
-  { icon: "scheduled", label: "Scheduled" },
-  { icon: "orchestration", label: "Orchestration" },
-  { icon: "memory", label: "Memory" },
+  { icon: "scheduled", label: "Schedules" },
+  { icon: "more", label: "More" },
 ] as const;
 const studio = [...rows, ...otherThreads.filter((thread) => !rows.some((row) => row.title === thread.title))];
+const show = (windows: string) => (journey ? timed(journey, windows) : {});
+/** A row or project is busy for a scene's windows, or always in a still. */
+const busyAttributes = (busy: string | true | undefined) => (busy === true ? { "data-busy": "" } : busy ? { "data-flag": `busy:${busy}` } : {});
+// The project says Running while any of its threads works.
+const busyRows = studio.map((row) => row.busy).filter((busy) => busy !== undefined);
+const running = busyRows.includes(true) ? true : busyRows.join(" ") || undefined;
+const inbox = 2;
+const [pendingFrom, pendingTo] = inboxPending?.split("~") ?? [];
 ---
 
 <aside class="hs-sidebar">
   <div class="hs-sidebar-inner">
-    <div class="hs-toolbar">
+    <div class="hs-sidebar-head">
+      <span class="hs-app-name">OpenOrc</span>
       <span class="hs-icon-button"><ProductIcon name="panelLeft" /></span>
       <span class="hs-icon-button"><ProductIcon name="search" /></span>
-      <span class="hs-icon-button"><ProductIcon name="arrowLeft" /></span>
-      <span class="hs-icon-button" data-disabled><ProductIcon name="arrowRight" /></span>
-    </div>
-    <div class="hs-brand">
-      <Image src={mark} alt="" width={48} height={48} format="webp" loading="eager" />
-      <span class="hs-wordmark">OpenOrc</span>
-      <span class="hs-icon-button hs-new-thread"><ProductIcon name="compose" /></span>
     </div>
     <div class="hs-nav">
       {navigation.map((item) => (
         <span class="hs-nav-row" data-nav={item.label} data-current={item.label === nav ? "" : undefined}>
-          <span class="hs-nav-icon">
-            <ProductIcon name={item.icon} />
-            {"count" in item ? (
-              <span class="hs-nav-badge">
-                {inboxPending ? <span {...timed(journey, `<${inboxPending.split("~")[0]} >${inboxPending.split("~")[1]}`)}>{item.count}</span> : item.count}
-                {inboxPending ? <span {...timed(journey, inboxPending)}>{item.count + 1}</span> : null}
-              </span>
-            ) : null}
-          </span>
+          <span class="hs-nav-icon"><ProductIcon name={item.icon} /></span>
           {item.label}
         </span>
       ))}
     </div>
-    <div class="hs-projects-head">
-      <span>Projects</span>
-      <span class="hs-projects-filter"><ProductIcon name="filter" /></span>
-      <span class="hs-icon-button hs-small"><ProductIcon name="plus" /></span>
+    <div class="hs-browser-tabs">
+      <span data-selected>Threads</span>
+      <span>Orclings</span>
+    </div>
+    <div class="hs-filter">
+      <ProductIcon name="search" />
+      <span>Filter threads…</span>
+      <span class="hs-icon-button hs-small"><ProductIcon name="filter" /></span>
     </div>
     <div class="hs-threads">
       <div class="hs-group">
-        <span class="hs-group-head"><ProductIcon name="globe" />Workspace<ProductIcon name="chevronDown" class="hs-group-chevron" /></span>
-        <span class="hs-empty">No threads yet</span>
+        <span class="hs-group-head"><span class="hs-group-icon"><ProductIcon name="globe" /></span><span class="hs-group-name">Workspace</span><ProductIcon name="chevronRight" class="hs-group-chevron" /><span class="hs-icon-button hs-small"><ProductIcon name="plus" /></span></span>
       </div>
       <div class="hs-group">
-        <span class="hs-group-head"><ProductIcon name="folder" />{project.name}<ProductIcon name="chevronDown" class="hs-group-chevron" /></span>
+        <span class="hs-group-head" {...busyAttributes(running)}>
+          <span class="hs-group-icon"><ProductIcon name="folder" /></span>
+          <span class="hs-group-name">{project.name}</span>
+          <span class="hs-group-activity">Running</span>
+          <ProductIcon name="chevronDown" class="hs-group-chevron" />
+          <span class="hs-icon-button hs-small"><ProductIcon name="plus" /></span>
+        </span>
         {studio.map((row) => (
-          <span class:list={["hs-row", { "hs-block": row.show }]} data-row={row.id} data-grow={row.show ? "" : undefined} data-flag={row.busy ? `busy:${row.busy}` : undefined} {...(row.show ? timed(journey, row.show) : {})}>
-            <span class="hs-row-title">
-              <span>{row.title}</span>
+          <span class:list={["hs-row", { "hs-block": row.show }]} data-row={row.id} data-current={row.current ? "" : undefined} data-grow={row.show ? "" : undefined} {...busyAttributes(row.busy)} {...(row.show ? show(row.show) : {})}>
+            <span class="hs-row-heading">
+              <ProductIcon name="branch" class="hs-row-icon" />
+              <span class="hs-row-title">{row.title}</span>
               <span class="hs-status"><ProductIcon name="loader" /></span>
             </span>
-            <span class="hs-row-meta">
-              <span class="hs-row-branch"><ProductIcon name="branch" /><span>{row.branch ?? project.branch}</span></span>
-              <span class="hs-row-providers">
-                {row.providers.map((provider) => (
-                  <span>
-                    <svg class="hs-logo" aria-hidden="true"><use href={`#hs-logo-${provider.harness}`} /></svg>
-                    {provider.label}
-                  </span>
-                ))}
-              </span>
+            <span class="hs-row-headline">
+              {Array.isArray(row.headline) ? row.headline.map((step) => <span {...show(step.show)}>{step.text}</span>) : (row.headline ?? "Working")}
             </span>
           </span>
         ))}
       </div>
       <div class="hs-group">
-        <span class="hs-group-head"><ProductIcon name="folder" />website<ProductIcon name="chevronDown" class="hs-group-chevron" /></span>
+        <span class="hs-group-head"><span class="hs-group-icon"><ProductIcon name="folder" /></span><span class="hs-group-name">website</span><ProductIcon name="chevronDown" class="hs-group-chevron" /><span class="hs-icon-button hs-small"><ProductIcon name="plus" /></span></span>
         <span class="hs-row">
-          <span class="hs-row-title"><span>Tell the product story</span></span>
-          <span class="hs-row-meta">
-            <span class="hs-row-branch"><ProductIcon name="branch" /><span>dev</span></span>
-            <span class="hs-row-providers"><span><svg class="hs-logo" aria-hidden="true"><use href="#hs-logo-codex" /></svg>Codex</span></span>
-          </span>
+          <span class="hs-row-heading"><ProductIcon name="branch" class="hs-row-icon" /><span class="hs-row-title">Tell the product story</span></span>
         </span>
+      </div>
+      <div class="hs-group">
+        <span class="hs-group-head"><span class="hs-group-icon"><ProductIcon name="folder" /></span><span class="hs-group-name">atlas-api</span><ProductIcon name="chevronRight" class="hs-group-chevron" /><span class="hs-icon-button hs-small"><ProductIcon name="plus" /></span></span>
       </div>
     </div>
     <div class="hs-sidebar-foot">
-      <span class="hs-nav-row"><span class="hs-nav-icon"><ProductIcon name="settings" /></span>Settings</span>
+      <span class="hs-add-project"><ProductIcon name="plus" />Add project</span>
+      <div class="hs-foot-controls">
+        <span class="hs-settings"><ProductIcon name="settings" />Settings</span>
+        <span class="hs-icon-button hs-inbox">
+          <ProductIcon name="inbox" />
+          <span class="hs-nav-badge">
+            {inboxPending ? <span {...show(`<${pendingFrom} >${pendingTo}`)}>{inbox}</span> : inbox}
+            {inboxPending ? <span {...show(inboxPending)}>{inbox + 1}</span> : null}
+          </span>
+        </span>
+        <span class="hs-icon-button"><ProductIcon name="arrowLeft" /></span>
+        <span class="hs-icon-button" data-disabled><ProductIcon name="arrowRight" /></span>
+      </div>
     </div>
   </div>
 </aside>

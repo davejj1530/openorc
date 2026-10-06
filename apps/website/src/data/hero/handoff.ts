@@ -34,6 +34,18 @@ export const threads = {
     flight: "What does the plan look like after your migration?",
     result: "Built against `user.subscription`: plan, card, and invoices. Trial users see when their trial ends instead of an empty invoice list.",
     change: { path: "src/settings/Billing.tsx", added: 52, removed: 0 },
+    /** Phase titles, as the app names a phase after the agent's narration. */
+    phases: {
+      read: "Reading the settings pages",
+      ask: "Asking Plans migration for the plan's new shape",
+      build: "Building the page against user.subscription",
+    },
+    receipt: "Worked · 1 file changed",
+    headline: [
+      { text: "Reading the settings pages", show: "<aSending" },
+      { text: "Asking Plans migration", show: "aSending~aDone" },
+      { text: "Building the billing page", show: ">aDone" },
+    ],
   },
   b: {
     ...models.codex,
@@ -46,6 +58,20 @@ export const threads = {
     },
     flight: "user.subscription, and no invoices on trials",
     answer: "It becomes `user.subscription`, with `status` and `trialEndsAt`. Trial users have no card yet, so I told Billing page to hide invoices for them. Back to the migration.",
+    phases: {
+      read: "Reading the plan models",
+      migrate: "Moving plans into subscriptions",
+      answer: "Answering Billing page",
+      resume: "Updating the billing queries",
+    },
+    edited: ["src/db/subscriptions.ts", "src/db/plans.ts"],
+    editing: "src/db/migrations/0042_subscriptions.ts",
+    change: { added: 41, removed: 17 },
+    headline: [
+      { text: "Moving plans into subscriptions", show: "<bWork" },
+      { text: "Answering Billing page", show: "bWork~bDone" },
+      { text: "Updating the billing queries", show: ">bDone" },
+    ],
   },
 };
 

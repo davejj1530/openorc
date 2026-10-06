@@ -15,8 +15,12 @@ export interface SidebarRow {
   /** The checkout's branch, or the thread's own branch when it runs in a worktree. */
   branch?: string;
   providers: { harness: string; label: string }[];
-  /** Windows during which the thread's agent is working. */
-  busy?: string;
+  /** Windows during which the thread's agent is working, or `true` in a still. */
+  busy?: string | true;
+  /** The row is the open thread, in a still that has no scene state. */
+  current?: boolean;
+  /** What the row says under the title while the agent works: the step it is on, as the app's sidebar shows it. Steps can follow the scene's windows. */
+  headline?: string | { text: string; show: string }[];
   /** Windows during which the row exists, for threads the journey creates. */
   show?: string;
 }

@@ -5,12 +5,12 @@
  * needs and asks it with thread_send; the question joins that thread's running
  * turn as a message notice, Codex answers the same way from its unmerged work
  * and goes back to the migration, and the page is built against the new shape.
- * Content and timing: data/hero/handoff.ts.
+ * The transcripts follow the app's work steps: a rail of phases while a turn
+ * runs, then one receipt line above the reply. Content and timing: data/hero/handoff.ts.
  * With motion, blocks open with springs and each message flies to the thread
  * it reaches, opening into that thread's notice.
  */
-import { Image } from "astro:assets";
-import mark from "../../assets/openorc-mark.png";
+import PresenceMark from "./PresenceMark.astro";
 import ProductIcon from "./ProductIcon.astro";
 import Prose from "./Prose.astro";
 import SceneFrame from "./SceneFrame.astro";
@@ -25,10 +25,11 @@ interface Props {
 const { label } = Astro.props;
 const { a, b } = threads;
 const rows = [
-  { id: "a", title: a.title, providers: [{ harness: a.harness, label: a.agent }], busy: busy.a },
-  { id: "b", title: b.title, branch: branches.plansThread, providers: [{ harness: b.harness, label: b.agent }], busy: busy.b },
+  { id: "a", title: a.title, providers: [{ harness: a.harness, label: a.agent }], busy: busy.a, headline: a.headline },
+  { id: "b", title: b.title, branch: branches.plansThread, providers: [{ harness: b.harness, label: b.agent }], busy: busy.b, headline: b.headline },
 ];
 const at = (windows: string) => timed(handoff, windows);
+const file = (path: string) => path.slice(path.lastIndexOf("/") + 1);
 ---
 
 <SceneFrame id="handoff" journey={handoff} label={label} view="a" rows={rows} motion>
@@ -47,43 +48,64 @@ const at = (windows: string) => timed(handoff, windows);
     >
       <div class="hs-user"><div class="hs-bubble">{a.earlier.request}</div></div>
       <div class="hs-work"><span class="hs-work-toggle">{a.earlier.worked}<ProductIcon name="chevronRight" /></span></div>
-      <div class="hs-reply"><Prose text={a.earlier.reply} /></div>
+      <div class="hs-reply"><div class="hs-author">Assistant</div><Prose text={a.earlier.reply} /></div>
 
       <div class="hs-user hs-block" data-grow {...at(">aSend")}><div class="hs-bubble">{a.prompt}</div></div>
+      <!-- First turn: read the settings pages, then ask the migration thread before building. -->
       <div class="hs-work hs-block" data-grow {...at(">aSend")}>
-        <span class="hs-work-toggle" data-open {...at("aSend~aDone")}><span data-clock="aSend">Working · 0s</span><ProductIcon name="chevronRight" /></span>
-        <span class="hs-work-toggle" {...at(">aDone")}><span data-duration="aSend~aDone">Worked for 4s</span><ProductIcon name="chevronRight" /></span>
+        <span class="hs-work-toggle" {...at("aSend~aDone")}><span data-clock="aSend">Working · 0s</span><ProductIcon name="chevronDown" /></span>
+        <span class="hs-work-toggle" {...at(">aDone")}><span data-duration="aSend~aDone">Worked for 5s</span><ProductIcon name="chevronRight" /></span>
         <div class="hs-work-content" data-grow {...at("aSend~aDone")}>
-          <span class="hs-step" {...at("aSend~aThought")}><ProductIcon name="message" />Thinking<i class="hs-pulse"></i></span>
-          <span class="hs-step" {...at("aThought~aDone")}><ProductIcon name="message" />Thought for 1s</span>
-          <span class="hs-step-slot hs-block" data-grow {...at("aThought~aDone")}>
-            <span class="hs-step hs-group-step" {...at("aThought~aRead")}><ProductIcon name="live" class="hs-live" />Reading files<ProductIcon name="chevronRight" /></span>
-            <span class="hs-step hs-group-step" {...at("aRead~aDone")}><ProductIcon name="read" />Read 4 files<ProductIcon name="chevronRight" /></span>
-          </span>
-          <span class="hs-step-slot hs-block" data-grow data-anchor="a-sending" {...at("aSending~aDone")}>
-            <span class="hs-step" {...at("aSending~aSent")}><ProductIcon name="message" />Sending message<i class="hs-pulse"></i></span>
-            <span class="hs-step" {...at("aSent~aDone")}><ProductIcon name="message" />Sent message</span>
-          </span>
+          <ol class="hs-rail">
+            <li class="hs-rail-item">
+              <span class="hs-rail-dot"><span class="hs-live-dot" {...at("aSend~aRead")}></span><span class="hs-done" {...at(">aRead")}><ProductIcon name="check" /></span></span>
+              <span class="hs-rail-line">
+                <span class="hs-rail-title" {...at("aSend~aThought")}>Thinking</span>
+                <span class="hs-rail-title" {...at(">aThought")}>{a.phases.read}</span>
+                <span class="hs-rail-meta" {...at(">aRead")}>4 files</span>
+              </span>
+            </li>
+            <li class="hs-rail-item hs-block" data-grow data-anchor="a-sending" {...at(">aSending")}>
+              <span class="hs-rail-dot"><span class="hs-live-dot" {...at("aSending~aSent")}></span><span class="hs-done" {...at(">aSent")}><ProductIcon name="check" /></span></span>
+              <span class="hs-rail-line"><span class="hs-rail-title">{a.phases.ask}</span></span>
+              <div class="hs-rail-body">
+                <span class="hs-rail-note"><ProductIcon name="workMessage" /><span {...at("aSending~aSent")}>Sending message</span><span {...at(">aSent")}>Sent message</span></span>
+              </div>
+            </li>
+          </ol>
         </div>
       </div>
-      <div class="hs-reply hs-block" data-grow {...at(">aAskedStart")}><Prose text={a.asked} stream="aAskedStart~aAskedEnd" /></div>
+      <div class="hs-reply hs-block" data-grow {...at(">aAskedStart")}><div class="hs-author">Assistant</div><Prose text={a.asked} stream="aAskedStart~aAskedEnd" /></div>
 
-      <div class="hs-work hs-block" data-grow {...at(">aWork")}>
-        <span class="hs-work-toggle" data-open {...at("aWork~aFinish")}><span data-clock="bSent">Working · 0s</span><ProductIcon name="chevronRight" /></span>
-        <span class="hs-work-toggle" {...at(">aFinish")}><span data-duration="bSent~aFinish">Worked for 6s</span><ProductIcon name="chevronRight" /></span>
-        <div class="hs-work-content" data-grow {...at("aWork~aFinish")}>
-          <span class="hs-step hs-group-step" {...at("aWork~aEdited")}><ProductIcon name="live" class="hs-live" />Editing files<ProductIcon name="chevronRight" /></span>
-          <span class="hs-step hs-group-step" {...at("aEdited~aFinish")}><ProductIcon name="edit" />Edited a file<ProductIcon name="chevronRight" /></span>
-        </div>
-      </div>
       <div class="hs-notice hs-block" data-grow data-anchor="a-notice" {...at(">bSent")}>
-        <ProductIcon name="message" />
+        <ProductIcon name="workMessage" />
         <span class="hs-notice-body">
           <span class="hs-notice-head">{a.notice.head}</span>
           <span class="hs-notice-toggle">Show details</span>
         </span>
       </div>
-      <div class="hs-reply hs-block" data-grow {...at(">aResultStart")}><Prose text={a.result} stream="aResultStart~aResultEnd" /></div>
+      <!-- The answer starts a new turn: build the page against the new shape. -->
+      <div class="hs-work hs-block" data-grow {...at(">aWork")}>
+        <span class="hs-work-toggle" {...at("aWork~aFinish")}><span data-clock="bSent">Working · 0s</span><ProductIcon name="chevronDown" /></span>
+        <span class="hs-work-toggle" {...at(">aFinish")}>{a.receipt}<ProductIcon name="chevronRight" /></span>
+        <div class="hs-work-content" data-grow {...at("aWork~aFinish")}>
+          <ol class="hs-rail">
+            <li class="hs-rail-item">
+              <span class="hs-rail-dot"><span class="hs-live-dot" {...at("aWork~aEdited")}></span><span class="hs-done" {...at(">aEdited")}><ProductIcon name="check" /></span></span>
+              <span class="hs-rail-line"><span class="hs-rail-title">{a.phases.build}</span><span class="hs-rail-meta" {...at(">aEdited")}>1 file changed</span></span>
+              <div class="hs-rail-body" {...at("aWork~aEdited")}>
+                <div>
+                  <span class="hs-rail-label">Editing</span>
+                  <div class="hs-chips">
+                    <span class="hs-file-chip" data-live><ProductIcon name="fileCode" />{file(a.change.path)}<span class="hs-added">+{a.change.added}</span></span>
+                  </div>
+                </div>
+              </div>
+            </li>
+          </ol>
+        </div>
+      </div>
+      <div class="hs-reply hs-block" data-grow {...at(">aResultStart")}><div class="hs-author">Assistant</div><Prose text={a.result} stream="aResultStart~aResultEnd" /></div>
       <section class="hs-change hs-block" data-grow {...at(">aFinish")}>
         <div class="hs-change-heading">
           <span class="hs-change-icon"><ProductIcon name="pencil" /></span>
@@ -92,32 +114,62 @@ const at = (windows: string) => timed(handoff, windows);
             <span class="hs-counts"><span class="hs-added">+{a.change.added}</span><span class="hs-removed">−{a.change.removed}</span></span>
           </span>
           <span class="hs-change-actions">
-            <span class="hs-button hs-button-ghost"><ProductIcon name="undo" />Undo</span>
+            <span class="hs-button hs-button-ghost">Undo<ProductIcon name="undo" /></span>
             <span class="hs-button">Review</span>
           </span>
         </div>
         <div class="hs-change-file">
-          <span>{a.change.path.slice(0, a.change.path.lastIndexOf("/") + 1)}<span class="hs-file-name">{a.change.path.slice(a.change.path.lastIndexOf("/") + 1)}</span></span>
+          <span>{a.change.path.slice(0, a.change.path.lastIndexOf("/") + 1)}<span class="hs-file-name">{file(a.change.path)}</span></span>
           <span class="hs-counts"><span class="hs-added">+{a.change.added}</span><span class="hs-removed">−{a.change.removed}</span></span>
         </div>
       </section>
-      <div class="hs-presence"><span class="hs-orb"><Image src={mark} alt="" width={48} height={48} format="webp" loading="eager" /></span></div>
+      <PresenceMark />
     </ThreadPane>
 
-    <ThreadPane id="b" journey={handoff} title={b.title} busy={busy.b} model={{ harness: b.harness, label: b.label, effort: b.effort }} permission={b.permission} placeholder={`Message ${b.agent}…`} worktree branch={branches.plansThread}>
+    <ThreadPane id="b" journey={handoff} title={b.title} busy={busy.b} model={{ harness: b.harness, label: b.label, effort: b.effort }} permission={b.permission} placeholder={`Message ${b.agent}…`} branch={branches.plansThread} changes changeStat={b.change}>
       <div class="hs-user"><div class="hs-bubble">{b.request}</div></div>
-      <!-- Mid-migration when the scene opens: the message joins this turn. -->
+      <!-- Mid-migration when the scene opens: the message joins this turn, so its rail keeps going. -->
       <div class="hs-work">
-        <span class="hs-work-toggle" data-open {...at("<aSent")}><span data-clock="bStart">Working · 0s</span><ProductIcon name="chevronRight" /></span>
-        <span class="hs-work-toggle hs-block" {...at(">aSent")}><span data-duration="bStart~aSent">Worked for 44s</span><ProductIcon name="chevronRight" /></span>
-        <div class="hs-work-content" data-grow {...at("<aSent")}>
-          <span class="hs-step hs-group-step"><ProductIcon name="read" />Read 6 files<ProductIcon name="chevronRight" /></span>
-          <span class="hs-step hs-group-step"><ProductIcon name="edit" />Edited 3 files<ProductIcon name="chevronRight" /></span>
-          <span class="hs-step hs-group-step"><ProductIcon name="live" class="hs-live" />Editing files<ProductIcon name="chevronRight" /></span>
+        <span class="hs-work-toggle"><span data-clock="bStart">Working · 0s</span><ProductIcon name="chevronDown" /></span>
+        <div class="hs-work-content">
+          <ol class="hs-rail">
+            <li class="hs-rail-item">
+              <span class="hs-rail-dot"><span class="hs-done"><ProductIcon name="check" /></span></span>
+              <span class="hs-rail-line"><span class="hs-rail-title">{b.phases.read}</span><span class="hs-rail-meta">6 files · 2 searches</span></span>
+            </li>
+            <li class="hs-rail-item">
+              <span class="hs-rail-dot"><span class="hs-live-dot" {...at("<aSent")}></span><span class="hs-done" {...at(">aSent")}><ProductIcon name="check" /></span></span>
+              <span class="hs-rail-line"><span class="hs-rail-title">{b.phases.migrate}</span><span class="hs-rail-meta" {...at(">aSent")}>3 files changed</span></span>
+              <div class="hs-rail-body" {...at("<aSent")}>
+                <div>
+                  <span class="hs-rail-label">Edited<span class="hs-rail-count">2</span></span>
+                  <div class="hs-chips">
+                    {b.edited.map((path) => <span class="hs-file-chip"><ProductIcon name="fileCode" />{file(path)}</span>)}
+                  </div>
+                </div>
+                <div>
+                  <span class="hs-rail-label">Editing</span>
+                  <div class="hs-chips"><span class="hs-file-chip" data-live><ProductIcon name="fileCode" />{file(b.editing)}</span></div>
+                </div>
+              </div>
+            </li>
+            <li class="hs-rail-item hs-block" data-grow data-anchor="b-sending" {...at(">bWork")}>
+              <span class="hs-rail-dot"><span class="hs-live-dot" {...at("bWork~bSent")}></span><span class="hs-done" {...at(">bSent")}><ProductIcon name="check" /></span></span>
+              <span class="hs-rail-line"><span class="hs-rail-title">{b.phases.answer}</span></span>
+              <div class="hs-rail-body">
+                <div class="hs-rail-narration hs-block" data-grow {...at(">bAnswerStart")}><Prose text={b.answer} stream="bAnswerStart~bAnswerEnd" /></div>
+                <span class="hs-rail-note" {...at(">bSending")}><ProductIcon name="workMessage" /><span {...at("bSending~bSent")}>Sending message</span><span {...at(">bSent")}>Sent message</span></span>
+              </div>
+            </li>
+            <li class="hs-rail-item hs-block" data-grow {...at(">bDone")}>
+              <span class="hs-rail-dot"><span class="hs-live-dot"></span></span>
+              <span class="hs-rail-line"><span class="hs-rail-title">{b.phases.resume}</span><span class="hs-rail-elapsed" data-clock="bDone" data-clock-text="{s}s">0s</span></span>
+            </li>
+          </ol>
         </div>
       </div>
       <div class="hs-notice hs-block" data-grow data-anchor="b-notice" {...at(">aSent")}>
-        <ProductIcon name="message" />
+        <ProductIcon name="workMessage" />
         <span class="hs-notice-body">
           <span class="hs-notice-head">{b.notice.head}</span>
           <span class="hs-notice-details" {...at(">bDetails")}>{b.notice.details}</span>
@@ -125,29 +177,9 @@ const at = (windows: string) => timed(handoff, windows);
           <span class="hs-notice-toggle" {...at(">bDetails")}>Hide details</span>
         </span>
       </div>
-      <div class="hs-work hs-block" data-grow {...at(">bWork")}>
-        <span class="hs-work-toggle" data-open {...at("bWork~bAnswerStart")}><span data-clock="bWork">Working · 0s</span><ProductIcon name="chevronRight" /></span>
-        <span class="hs-work-toggle" {...at(">bAnswerStart")}><span data-duration="bWork~bAnswerStart">Worked for 3s</span><ProductIcon name="chevronRight" /></span>
-        <div class="hs-work-content" data-grow {...at("bWork~bAnswerStart")}>
-          <span class="hs-step" {...at("bWork~bThought")}><ProductIcon name="message" />Thinking<i class="hs-pulse"></i></span>
-          <span class="hs-step" {...at("bThought~bAnswerStart")}><ProductIcon name="message" />Thought for 1s</span>
-          <span class="hs-step-slot hs-block" data-grow data-anchor="b-sending" {...at("bSending~bAnswerStart")}>
-            <span class="hs-step" {...at("bSending~bSent")}><ProductIcon name="message" />Sending message<i class="hs-pulse"></i></span>
-            <span class="hs-step" {...at("bSent~bAnswerStart")}><ProductIcon name="message" />Sent message</span>
-          </span>
-        </div>
-      </div>
-      <div class="hs-reply hs-block" data-grow {...at(">bAnswerStart")}><Prose text={b.answer} stream="bAnswerStart~bAnswerEnd" /></div>
-      <!-- Then back to the migration, still working when the scene ends. -->
-      <div class="hs-work hs-block" data-grow {...at(">bDone")}>
-        <span class="hs-work-toggle" data-open><span data-clock="bDone">Working · 0s</span><ProductIcon name="chevronRight" /></span>
-        <div class="hs-work-content">
-          <span class="hs-step hs-group-step"><ProductIcon name="live" class="hs-live" />Editing files<ProductIcon name="chevronRight" /></span>
-        </div>
-      </div>
-      <div class="hs-presence"><span class="hs-orb"><Image src={mark} alt="" width={48} height={48} format="webp" loading="eager" /></span></div>
+      <PresenceMark />
     </ThreadPane>
   </div>
-  <div class="hs-flight" data-from="a-sending" data-to="b-notice" data-start="aSending" data-land="aLand" aria-hidden="true" hidden><ProductIcon name="message" /><span class="hs-flight-label">{a.flight}</span></div>
-  <div class="hs-flight" data-from="b-sending" data-to="a-notice" data-start="bSending" data-land="bLand" aria-hidden="true" hidden><ProductIcon name="message" /><span class="hs-flight-label">{b.flight}</span></div>
+  <div class="hs-flight" data-from="a-sending" data-to="b-notice" data-start="aSending" data-land="aLand" aria-hidden="true" hidden><ProductIcon name="workMessage" /><span class="hs-flight-label">{a.flight}</span></div>
+  <div class="hs-flight" data-from="b-sending" data-to="a-notice" data-start="bSending" data-land="bLand" aria-hidden="true" hidden><ProductIcon name="workMessage" /><span class="hs-flight-label">{b.flight}</span></div>
 </SceneFrame>

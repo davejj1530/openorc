@@ -208,7 +208,7 @@
 @media (min-width: 701px) {
   .home-page .worktree-art .hs-mock-worktree {
     --hs-canvas: 1000;
-    height: calc(620 * var(--u));
+    height: calc(660 * var(--u));
   }
 }
 .home-page .slack-art .art-panel-stage {

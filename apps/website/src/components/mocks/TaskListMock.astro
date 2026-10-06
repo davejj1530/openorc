@@ -1,6 +1,7 @@
 ---
-/** The Tasks view, still: active tasks grouped by status, as views/TaskList.tsx lays them out. */
+/** The Tasks view, still: active tasks grouped by status, as views/TaskList.tsx lays them out, with its keyboard hints. */
 import ProductIcon from "../hero/ProductIcon.astro";
+import "../../styles/hero-scene.css";
 
 type Priority = "low" | "medium" | "high";
 interface Task {
@@ -37,17 +38,18 @@ const priorityIcon: Record<Priority, "signalLow" | "signalMedium" | "signalHigh"
 <div class="hs-mock hs-mock-tasks">
   <header class="hs-header hs-header-flat">
     <span class="hs-header-lead">
-      <span class="hs-title">Tasks</span>
+      <span class="hs-title hs-title-page">Tasks</span>
       <span class="hs-chip"><span>All projects</span><ProductIcon name="chevronDown" /></span>
     </span>
     <span class="hs-header-actions">
-      <span class="hs-icon-button"><ProductIcon name="plus" /></span>
+      <span class="hs-button">New task</span>
     </span>
   </header>
   <div class="hs-tasks-sub">
     <span class="hs-tasks-shelf">
       <span data-selected>Active</span><span>Done</span><span>Archived</span>
     </span>
+    <span class="hs-tasks-select">All statuses<ProductIcon name="chevronDown" /></span>
     <span class="hs-tasks-filter"><ProductIcon name="search" />Filter tasks…</span>
   </div>
   {groups.map((group) => (
@@ -66,9 +68,10 @@ const priorityIcon: Record<Priority, "signalLow" | "signalMedium" | "signalHigh"
           {task.label ? <span class="hs-label-chip">{task.label}</span> : null}
           <span class="hs-task-row-project">studio</span>
           <span class="hs-task-row-time">just now</span>
-          {group.status === "backlog" ? <span class="hs-icon-button hs-small"><ProductIcon name="messageSquare" /></span> : null}
+          {group.status === "backlog" ? <span class="hs-icon-button hs-small"><ProductIcon name="messageSquare" /></span> : <span class="hs-task-row-spacer" />}
         </div>
       ))}
     </section>
   ))}
+  <footer class="hs-tasks-keys"><kbd>j</kbd><kbd>k</kbd>move<kbd>↵</kbd>open</footer>
 </div>

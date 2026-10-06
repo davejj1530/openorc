@@ -22,6 +22,8 @@ module.exports = async function buildTranscriptFixture(dir, fixture) {
       root: desktop,
       base: "./",
       logLevel: "error",
+      // Fixtures render the production renderer, so QA-only code stays out as it does in a release build.
+      define: { __OPENORC_QA__: "false" },
       plugins: [react(), tailwind(), typegpu()],
       resolve: {
         alias: { "@": path.join(desktop, "src/renderer/src"), ...Object.fromEntries(["react", "react-dom", "@tanstack/react-query"].map((name) => [name, path.join(desktop, "node_modules", name)])) },

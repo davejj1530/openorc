@@ -1,0 +1,22 @@
+---
+/**
+ * The provider marks the app ships, as symbols the scenes and stills draw with
+ * <use href="#hs-logo-…">. Render it once per page that shows product views; it takes no space even where
+ * the scene styles are not loaded.
+ * Codex is drawn near-black for the light theme; Claude and OpenCode keep their colors.
+ */
+import openai from "../../../public/openai.svg?raw";
+import claude from "../../../public/claude.svg?raw";
+import opencode from "../../../public/opencode.svg?raw";
+
+const logoPaths = (svg: string, fill?: string) => {
+  const paths = svg.match(/<path\b[^>]*>(?:<\/path>)?/g)?.join("") ?? "";
+  return fill ? paths.replace(/fill="[^"]*"/g, `fill="${fill}"`) : paths;
+};
+---
+
+<svg class="hs-sprite" width="0" height="0" style="position: absolute" aria-hidden="true">
+  <symbol id="hs-logo-codex" viewBox="0 0 41 41" set:html={logoPaths(openai, "#0d0d0d")} />
+  <symbol id="hs-logo-claude" viewBox="0 0 125 125" set:html={logoPaths(claude)} />
+  <symbol id="hs-logo-opencode" viewBox="96 64 320 384" set:html={logoPaths(opencode)} />
+</svg>

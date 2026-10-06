@@ -1,6 +1,6 @@
 # OpenOrc website
 
-Static Astro website for OpenOrc. The site follows Cursor's light look: warm paper, calm type, and product demos rebuilt in HTML and CSS from the desktop renderer's styles, each standing on a generated landscape painting. Geist is self-hosted; the page ships no React runtime. Google Analytics loads from Google to measure website visits.
+Static Astro website for OpenOrc. The site follows Cursor's light look: warm paper, calm type, and product demos rebuilt in HTML and CSS from the desktop renderer's styles, each standing on a generated landscape painting. Zalando Sans, the closest open font to Cursor's typeface, is self-hosted, and the product demos use the app's own Inter and JetBrains Mono; the page ships no React runtime. Google Analytics loads from Google to measure website visits.
 
 ```sh
 pnpm install
@@ -52,7 +52,7 @@ Slack copy follows [the integration documentation](../../docs/slack.md): agent w
 - `src/assets/team-avatars/*`: unchanged copies of the first four default team portraits from `apps/desktop/src/renderer/src/assets/team-avatars/` (Hollow, Ripple, Helix, Portal), used by the Agent team scene. Their mapping and processing are documented there.
 - `public/favicon-64.png`: 64px derivative of `apps/desktop/resources/icon.png` for the browser tab. Source and build instructions are in `apps/desktop/resources/README.md`.
 - Provider SVGs: copied from the desktop app's provider assets. OpenCode's adapted mark removes the background, crops the viewBox, and recolors its paths; its original MIT text is preserved at `public/licenses/opencode-MIT.txt`. The homepage recolors some marks: `AgentLogos.astro` fills all three with the text color and `ProductPreview.astro` draws the OpenAI mark near-black; the agent picker in `SetupGrid.astro` shows the files unchanged. Provider marks retain separate rights; see [artwork provenance](../../docs/artwork-provenance.md#provider-marks).
-- Geist: `@fontsource-variable/geist@5.3.0`, under SIL OFL 1.1. Its original copyright and license text are copied to `public/licenses/geist-OFL-1.1.txt` and shipped at `/licenses/geist-OFL-1.1.txt`.
+- Fonts: `@fontsource-variable/zalando-sans`, `@fontsource-variable/inter` and `@fontsource-variable/jetbrains-mono` 5.3.0, under SIL OFL 1.1. Their original copyright and license texts are copied to `public/licenses/` and shipped at `/licenses/zalando-sans-OFL-1.1.txt`, `/licenses/inter-OFL-1.1.txt` and `/licenses/jetbrains-mono-OFL-1.1.txt`.
 
 The build verifies reviewed dependency versions and notice hashes before Astro runs. After building, run `node scripts/distribution-notices.cjs website /absolute/path/to/apps/website/dist` to check both notice copies in the output. See [the distribution audit](../../docs/distribution-notices.md).
 

@@ -17,7 +17,15 @@
   --rule: #e1e0d9;
   --accent: #0b7268;
   --ink-button: #1f1e1b;
-  font-family: "Geist Variable", sans-serif;
+  /* Zalando Sans, set a touch narrow, is the closest open font to Cursor's CursorGothic. */
+  font-family:
+    "Zalando Sans Variable",
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+  font-stretch: 97.5%;
+  font-weight: 425;
+  letter-spacing: 0.005em;
   color: var(--text);
   background: var(--bg);
   font-synthesis: none;
@@ -43,6 +51,10 @@ a {
 }
 button {
   font: inherit;
+}
+strong,
+b {
+  font-weight: 600;
 }
 button,
 a,
@@ -80,24 +92,24 @@ h1,
 h2,
 h3 {
   margin: 0;
-  font-weight: 400;
+  font-weight: 425;
   text-wrap: balance;
   overflow-wrap: anywhere;
 }
 h1 {
-  line-height: 1.08;
-  letter-spacing: -0.03em;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
   font-size: var(--type-display);
 }
 h2 {
   line-height: 1.15;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.0125em;
   max-width: 22ch;
   font-size: var(--type-heading);
 }
 h3 {
   line-height: 1.35;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.005em;
   font-size: var(--type-title);
 }
 .container {

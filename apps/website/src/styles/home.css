@@ -54,7 +54,7 @@
   max-width: 19ch;
   font-size: var(--type-hero);
   line-height: 1.15;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.02em;
 }
 .home-page .hero-actions {
   display: flex;

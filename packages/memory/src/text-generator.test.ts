@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -16,6 +16,7 @@ beforeAll(async () => {
 const fs = require('node:fs');
 const args = process.argv.slice(2);
 fs.writeFileSync(process.env.CAPTURE_ARGS, JSON.stringify(args));
+if (process.env.CAPTURE_CWD) fs.writeFileSync(process.env.CAPTURE_CWD, JSON.stringify({ cwd: process.cwd(), mode: fs.statSync(process.cwd()).mode & 0o777 }));
 if (process.env.STALL_GENERATION) setTimeout(() => {}, 60000);
 else if (args.includes('-o')) {
   process.stdin.resume();
@@ -73,6 +74,19 @@ describe("shared background CLI runner", () => {
     expect(args).toContain("--standalone");
     expect(JSON.parse(await readFile(config, "utf8"))).toMatchObject({ permission: "deny", share: "disabled", agent: { "openorc-text-generation": { steps: 1, permission: "deny" } } });
     expect(await new TextGenerator({ ...options, env: { ...options.env, FAIL_OPEN_CODE: "1" } }).title({ request: "CSV", reply: null })).toBeNull();
+  });
+
+  it("runs Claude with only the user's settings, in a private folder that is removed afterwards", async () => {
+    const capture = join(dir, "claude-title-args.json");
+    const where = join(dir, "claude-cwd.json");
+    const generator = new TextGenerator({ provider: "claude", binary, env: { CAPTURE_ARGS: capture, CAPTURE_CWD: where } });
+    expect(await generator.title({ request: "Add CSV", reply: null })).toBe("CSV export filters");
+    const args: string[] = JSON.parse(await readFile(capture, "utf8"));
+    expect(args[args.indexOf("--setting-sources") + 1]).toBe("user");
+    const { cwd, mode } = JSON.parse(await readFile(where, "utf8")) as { cwd: string; mode: number };
+    expect(cwd).not.toBe(await realpath(tmpdir()));
+    if (process.platform !== "win32") expect(mode).toBe(0o700);
+    await expect(access(cwd)).rejects.toThrow();
   });
 
   it("returns null when the selected CLI is missing", async () => {

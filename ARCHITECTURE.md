@@ -48,6 +48,7 @@ flowchart TD
   CORE --> MEMORY[memory]
   CORE --> MCP[mcp]
   CORE --> PROTOCOL[protocol]
+  MEMORY --> AGENTS
   MEMORY --> DB
   MEMORY --> PROTOCOL
   AGENTS --> PROTOCOL

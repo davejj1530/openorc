@@ -3383,13 +3383,6 @@ diffs-container {
 body:has(.sidebar-shell[data-open="false"]) .thread-pane:first-child > .well {
   margin-left: var(--spacing-well);
 }
-.thread-pane[data-focused="true"] > .well::before {
-  outline: 1px solid var(--line-strong);
-  outline-offset: -1px;
-}
-.thread-workspace[data-pane-count="1"] .thread-pane > .well::before {
-  outline: none;
-}
 .thread-pane-divider .resize-grip {
   margin-left: calc(var(--spacing-well) / -2);
 }

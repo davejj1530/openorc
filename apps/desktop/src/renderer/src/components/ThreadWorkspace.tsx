@@ -48,7 +48,7 @@ export function ThreadWorkspace() {
 
   return (
     <>
-      <div className="thread-workspace" data-pane-count={ids.length}>
+      <div className="thread-workspace">
         <div
           ref={viewport}
           className="thread-pane-viewport"

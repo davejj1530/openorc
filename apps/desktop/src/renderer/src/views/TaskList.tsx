@@ -1,7 +1,9 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { Menu } from "@base-ui/react/menu";
 import type { Task, TaskStatus } from "@openorc/protocol";
-import { Check, ChevronDown, ChevronRight, Plus, Search } from "../components/icons";
+import { Check, Plus } from "../components/icons";
+import { ListGroupHeading } from "../components/ListGroupHeading";
+import { PageFilters, PageSearch } from "../components/PageFilters";
 import { PriorityIcon, StatusIcon, statusLabel, statusOrder } from "../components/status";
 import { TopBar } from "../components/TopBar";
 import { TaskStart } from "../components/TaskStart";
@@ -110,25 +112,16 @@ export function TaskRows({ tasks, showProject }: { tasks: Task[]; showProject: b
     <div className="flex-1 min-h-0 flex flex-col">
       <div ref={listRef} tabIndex={0} onKeyDown={onKeyDown} className="task-list flex-1 min-h-0 overflow-y-auto outline-none" autoFocus>
         {groups.map(({ status, tasks: group }) => (
-          <section key={status} data-status-group={status} aria-labelledby={`${groupId}-${status}-header`}>
-            <h2 className="well-fill sticky top-0 z-10 mx-3 pt-2">
-              <button
-                type="button"
-                id={`${groupId}-${status}-header`}
-                data-status-toggle
-                aria-expanded={!collapsed[status]}
-                aria-controls={`${groupId}-${status}-tasks`}
-                onClick={() => setCollapsed((current) => ({ ...current, [status]: !current[status] }))}
-                className={cn("task-group-header w-full flex items-center gap-2 h-8 px-3 text-left text-sm font-medium text-ink-2", collapsed[status] ? "rounded-md" : "rounded-t-md")}
-              >
-                {collapsed[status] ? <ChevronRight size={13} aria-hidden="true" /> : <ChevronDown size={13} aria-hidden="true" />}
-                <StatusIcon status={status} />
-                {statusLabel[status]}
-                <span className="text-ink-4 tabular" aria-label={`${group.length} ${group.length === 1 ? "task" : "tasks"}`}>
-                  {group.length}
-                </span>
-              </button>
-            </h2>
+          <section key={status} className="list-group" data-status-group={status} aria-labelledby={`${groupId}-${status}-header`}>
+            <ListGroupHeading
+              id={`${groupId}-${status}-header`}
+              controls={`${groupId}-${status}-tasks`}
+              collapsed={Boolean(collapsed[status])}
+              onToggle={() => setCollapsed((current) => ({ ...current, [status]: !current[status] }))}
+              icon={<StatusIcon status={status} />}
+              label={statusLabel[status]}
+              count={{ value: group.length, label: `${group.length} ${group.length === 1 ? "task" : "tasks"}` }}
+            />
             <div id={`${groupId}-${status}-tasks`} hidden={Boolean(collapsed[status])}>
               {group.map((t) => {
                 if (!collapsed[status]) index += 1;
@@ -249,38 +242,36 @@ export function TaskListView({ onNewTask }: { onNewTask: () => void }) {
           </Button>
         }
       >
-        <h1 className="px-1 text-base font-medium">Tasks</h1>
+        Tasks
       </TopBar>
-      <div className="task-page">
-        <div className="task-page-filters">
-          <Segmented
-            label="Task filter"
-            value={shelf}
-            onChange={(value) => {
-              setShelf(value);
-              setStage(null);
-            }}
-            options={shelfOptions}
-          />
-          <div className="task-page-tools">
-            {shelf === "active" ? (
-              <Select aria-label="Task status" className="task-status-filter" value={stage ?? ""} onChange={(event) => setStage((event.target.value as TaskStatus) || null)}>
-                <option value="">All statuses</option>
-                {statusOrder
-                  .filter((status) => status !== "done" && status !== "archived")
-                  .map((status) => (
-                    <option key={status} value={status}>
-                      {statusLabel[status]} ({all.filter((task) => task.status === status).length})
-                    </option>
-                  ))}
-              </Select>
-            ) : null}
-            <label className="task-page-search">
-              <Search size={13} className="shrink-0" />
-              <input aria-label="Filter tasks" value={query} placeholder="Filter tasks…" onChange={(e) => setQuery(e.target.value)} />
-            </label>
-          </div>
-        </div>
+      <div className="page-column">
+        <PageFilters
+          tabs={
+            <Segmented
+              label="Task filter"
+              value={shelf}
+              onChange={(value) => {
+                setShelf(value);
+                setStage(null);
+              }}
+              options={shelfOptions}
+            />
+          }
+          end={<PageSearch label="Filter tasks" placeholder="Filter tasks…" value={query} onChange={setQuery} />}
+        >
+          {shelf === "active" ? (
+            <Select aria-label="Task status" className="page-filter-select" value={stage ?? ""} onChange={(event) => setStage((event.target.value as TaskStatus) || null)}>
+              <option value="">All statuses</option>
+              {statusOrder
+                .filter((status) => status !== "done" && status !== "archived")
+                .map((status) => (
+                  <option key={status} value={status}>
+                    {statusLabel[status]} ({all.filter((task) => task.status === status).length})
+                  </option>
+                ))}
+            </Select>
+          ) : null}
+        </PageFilters>
         {taskListBody({ error: tasks.error, loading: tasks.isLoading, list, query, shelf, stage, showProject: !projectId, retry: () => void tasks.refetch(), onNewTask })}
       </div>
     </>

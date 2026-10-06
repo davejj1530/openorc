@@ -1038,10 +1038,10 @@ body[data-resizing] .sidebar-shell {
 .task-list [data-current] {
   box-shadow: var(--material-sheen);
 }
-.task-group-header {
+.list-group-header {
   background-color: var(--surface-2);
 }
-.task-group-header:hover {
+.list-group-header:hover {
   background-color: var(--surface-3);
 }
 .task-list-row:hover,

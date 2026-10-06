@@ -65,9 +65,11 @@ function savedSchedule() {
 }
 
 let schedule: Schedule | null;
+let paused: Schedule[];
 let saveFailure: boolean;
 beforeEach(() => {
   schedule = null;
+  paused = [];
   saveFailure = false;
   useLayout.setState({ projectId: null });
   vi.mocked(core.call).mockImplementation(async (method, input) => {
@@ -76,7 +78,7 @@ beforeEach(() => {
         { id: "project", name: "Project" },
         { id: "other", name: "Other project" },
       ] as never;
-    if (method === "schedules.list") return (schedule ? [schedule] : []) as never;
+    if (method === "schedules.list") return [...(schedule ? [schedule] : []), ...paused] as never;
     if (method === "orchestration.list") return ((input as { projectId: string }).projectId === "project" ? [{ team: { id: "team", projectId: "project", archivedAt: null }, revision }] : []) as never;
     if (method === "orchestration.availability") return { enabled: true, reason: null, maxHierarchyDepth: 3 } as never;
     if (method === "agents.models") return [];
@@ -94,6 +96,27 @@ afterEach(() => {
   cleanup();
   queryClient.clear();
   vi.resetAllMocks();
+});
+
+it("keeps active and paused schedules on separate tabs and filters them by name", async () => {
+  schedule = savedSchedule();
+  paused = [{ ...savedSchedule(), id: "paused", title: "Nightly docs", enabled: false }];
+  render(
+    <QueryClientProvider client={queryClient}>
+      <Scheduled />
+    </QueryClientProvider>,
+  );
+  await screen.findByRole("button", { name: /Review/ });
+  expect(screen.queryByText("Nightly docs")).toBeNull();
+  fireEvent.click(screen.getByRole("radio", { name: "Paused" }));
+  await screen.findByText("Nightly docs");
+  expect(screen.queryByRole("button", { name: /Review/ })).toBeNull();
+  fireEvent.change(screen.getByRole("textbox", { name: "Filter schedules" }), { target: { value: "weekly" } });
+  await screen.findByText("No matching schedules");
+  fireEvent.change(screen.getByRole("textbox", { name: "Filter schedules" }), { target: { value: "" } });
+  paused = [];
+  await queryClient.invalidateQueries({ queryKey: ["schedules.list", {}] });
+  await screen.findByText("No paused schedules");
 });
 
 it("retains an edited schedule when a newer version arrives and reloads only on request", async () => {

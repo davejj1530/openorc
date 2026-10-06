@@ -111,7 +111,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
                   All tasks
                 </Item>
                 <Item onSelect={() => go(() => navigate({ view: "scheduled" }))} icon={<CalendarClock size={14} />}>
-                  Scheduled prompts
+                  Schedules
                 </Item>
                 <Item onSelect={() => go(() => navigate({ view: "orchestration", projectId: useLayout.getState().projectId ?? undefined }))} icon={<Workflow size={14} />}>
                   Orchestration

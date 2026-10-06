@@ -49,20 +49,20 @@ function useMemoryPage(filters: MemoryFilters) {
 
 function emptyMemoryCopy(filtered: boolean, disabled: boolean): string {
   if (filtered) return "Try another search or clear your filters.";
-  if (disabled) return "Turn on OpenOrc memory above when you want agents to start saving and using project knowledge.";
+  if (disabled) return "Turn on OpenOrc memory in Settings when you want agents to start saving and using project knowledge.";
   return "Useful knowledge saved by your agents will appear here.";
 }
 
 function memoryStatus(input: { error: Error | null; loading: boolean; searching: boolean; retry: () => void }): ReactNode {
   if (input.error)
     return (
-      <p role="alert" className="text-bad py-6">
+      <p role="alert" className="text-bad px-2 py-6">
         Could not load memories. <Button onClick={input.retry}>Try again</Button>
       </p>
     );
   if (input.loading)
     return (
-      <p role="status" className="text-ink-2 py-6">
+      <p role="status" className="text-ink-2 px-2 py-6">
         {input.searching ? "Searching memories…" : "Loading memories…"}
       </p>
     );
@@ -89,7 +89,7 @@ export function MemoryResults(props: MemoryFilters & { disabled: boolean; clear:
   });
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-2 px-2">
         {!status && (
           <p className="text-sm text-ink-3" role="status" aria-live="polite">
             {memoryCount(page, items.length, hasNext, searching)}

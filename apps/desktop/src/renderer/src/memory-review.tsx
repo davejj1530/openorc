@@ -8,6 +8,7 @@ import { queryClient } from "./lib/query";
 import { core } from "./lib/rpc";
 import { useTheme } from "./lib/theme";
 import { useLayout } from "./lib/layout";
+import "./lib/app-font";
 import "./app.css";
 const params = new URLSearchParams(location.search);
 useTheme.getState().setPreset("openorc");

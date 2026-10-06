@@ -376,7 +376,10 @@
         "path": "PROVENANCE.txt"
       },
       "sha256": "9e6f6c9044d5b151c4ea987e585d5e2673ca5410fa67561ab27ea49de55be800",
-      "website": "licenses/immaculate-gothic-PROVENANCE.txt"
+      "website": "licenses/immaculate-gothic-PROVENANCE.txt",
+      "desktop": {
+        "resource": "licenses/vendor/immaculate-gothic-PROVENANCE.txt"
+      }
     },
     {
       "id": "fastdom",

@@ -3,6 +3,7 @@
 @import "@fontsource-variable/jetbrains-mono";
 @import "@fontsource-variable/inter";
 @import "@fontsource-variable/geist";
+@import "./fonts.css";
 @import "./rich-text.css";
 @import "./appearance.css";
 @import "./workspace-design.css";
@@ -10,15 +11,6 @@
 @source "../../../node_modules/streamdown/dist/*.js";
 @source "../../../node_modules/@streamdown/mermaid/dist/*.js";
 @custom-variant dark (&:where(.dark, .dark *));
-
-html[data-palette="openorc"],
-html[data-palette="cursor"] {
-  --font-sans: "Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-}
-
-html[data-palette="conductor"] {
-  --font-sans: "Geist Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-}
 
 /*
  * Codex startup fallback. lib/theme-palettes.ts supplies the saved product palette.
@@ -455,6 +447,7 @@ html[data-palette="conductor"] {
   --shadow-panel: var(--shadow);
   --shadow-modal: var(--shadow-far);
   --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  /* Only until lib/app-font.ts applies the chosen face from fonts.css. */
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   --font-mono: "JetBrains Mono Variable", "SF Mono", Menlo, Consolas, monospace;
   /* Height utilities over the control ramp, so components stay off raw pixels. */

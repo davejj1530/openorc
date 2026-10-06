@@ -12,6 +12,7 @@ import { MascotStill } from "../components/MascotStill";
 import { ColorRow } from "../components/ColorRow";
 import { AccentSettings } from "./settings-accents";
 import { resolveAccentColors } from "../lib/theme-accents";
+import { appFonts, useAppFont } from "../lib/app-font";
 
 const modes = [
   { id: "system", name: "System", icon: Monitor },
@@ -41,6 +42,7 @@ export function AppearanceSettings() {
       <Section flush title="Palette" description="Product palettes for your workspace. Every palette works in light and dark.">
         <PaletteSelector preset={preset} mode={resolved} custom={custom} onChange={(next) => report(setPreset(next))} />
       </Section>
+      <FontSettings report={report} />
       <WindowAppearanceSettings report={report} />
       <details className="appearance-advanced">
         <summary>Fine-tune individual colors</summary>
@@ -50,6 +52,21 @@ export function AppearanceSettings() {
         {status}
       </p>
     </>
+  );
+}
+
+function FontSettings({ report }: { report: Report }) {
+  const { font, setFont } = useAppFont();
+  return (
+    <Section title="Font" description="The typeface across the app. Code stays monospaced.">
+      <div className="appearance-modes font-choices" role="group" aria-label="Font">
+        {appFonts.map(({ id, name }) => (
+          <button key={id} type="button" data-font={id} aria-pressed={font === id} onClick={() => report(setFont(id))}>
+            <span>{name}</span>
+          </button>
+        ))}
+      </div>
+    </Section>
   );
 }
 

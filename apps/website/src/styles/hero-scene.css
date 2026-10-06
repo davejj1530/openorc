@@ -1,9 +1,9 @@
 /*
  * The hero's product scene. Values come from the desktop app's light OpenOrc
  * palette and app.css, the one the app shares with Cursor. The scene is laid out in design pixels (--u) and scales
- * with its frame, so text is rendered, never scaled as an image:
- * 1360 × 850 with the sidebar and two panes, 960 × 600 with the sidebar hidden,
- * and 430 × 602 on phones, one pane at a time.
+ * with its desktop frame, so text is rendered, never scaled as an image.
+ * Small screens look through a crop of that desktop window; the app itself
+ * keeps its sidebar, split panes, and desktop controls at every viewport size.
  */
 @import "@fontsource-variable/jetbrains-mono";
 
@@ -130,8 +130,8 @@
   --hs-syn-tag: #7ee787;
   --hs-syn-component: #79c0ff;
 }
-/* The mock's parent is the size container, so cqi measures the frame the mock fills.
-   Each mock names its design width; phones use the app's narrow panel widths. */
+/* The mock's parent is the size container, so cqi measures its desktop frame.
+   Each mock names its design width, independent of the visitor's device. */
 .hs-mock {
   --u: calc(100cqi / var(--hs-canvas));
   position: relative;
@@ -146,27 +146,6 @@
   display: flex;
   height: clamp(440px, 44vw, 620px);
   background: var(--hs-bg);
-}
-@media (max-width: 700px) {
-  .hs-mock-tasks {
-    --hs-canvas: 520;
-  }
-  .hs-mock-changes {
-    --hs-canvas: 450;
-  }
-  .hs-mock-worktree {
-    --hs-canvas: 430;
-    height: 500px;
-  }
-  .hs-mock-worktree .hs-sidebar {
-    display: none;
-  }
-  .hs-mock-worktree .hs-pane {
-    min-width: 0;
-  }
-  .hs-mock-worktree .hs-header {
-    padding-left: calc(84 * var(--u));
-  }
 }
 .hs-sprite {
   position: absolute;
@@ -2462,87 +2441,5 @@
 @keyframes hs-breathe {
   50% {
     scale: 1.025;
-  }
-}
-
-/* Under 1100px the window is too narrow for two panes: one view at a time, the
-   sidebar closed. It opens to move between threads and pushes the pane aside,
-   as it does in a narrow app window. The first pane carries the window controls. */
-@media (max-width: 1100px) {
-  .hero-scene {
-    --u: calc(100cqi / 960);
-  }
-  .hs-sidebar {
-    width: 0;
-    border-right-width: 0;
-  }
-  .hero-scene[data-sidebar="open"] .hs-sidebar {
-    width: calc(267 * var(--u));
-    border-right-width: var(--u);
-  }
-  .hs-pane {
-    min-width: calc(360 * var(--u));
-  }
-  .hero-scene[data-view="a"] .hs-pane[data-pane="b"],
-  .hero-scene[data-view="b"] .hs-pane[data-pane="a"],
-  .hs-close-pane {
-    display: none;
-  }
-  /* With the sidebar closed, the header carries the window controls after the traffic lights. */
-  .hs-pane .hs-header {
-    padding-left: calc(84 * var(--u));
-  }
-  .hs-pane .hs-window-nav {
-    display: flex;
-  }
-  .hero-scene[data-sidebar="open"] .hs-pane .hs-header {
-    padding-left: calc(12 * var(--u));
-  }
-  .hero-scene[data-sidebar="open"] .hs-pane .hs-window-nav {
-    display: none;
-  }
-  /* One pane shows at a time here, so only the thread on screen is filled. */
-  .hero-scene:has(.hs-panes[data-split]) .hs-row[data-row="b"] {
-    background: none;
-  }
-  .hero-scene[data-view="b"] .hs-row[data-row="b"] {
-    background: var(--hs-active);
-  }
-  .hs-panes[data-split] .hs-commit-suffix {
-    display: inline;
-  }
-}
-
-/* Phone: the composer's controls wrap as the app's narrow composer does, the model on its own line. */
-@media (max-width: 700px) {
-  .hero-scene {
-    --u: calc(100cqi / 430);
-  }
-  .hs-chip {
-    flex: 0 1 auto;
-    max-width: calc(88 * var(--u));
-  }
-  /* A phone-width header keeps the title: the project name and the extra tools give way. */
-  .hs-window-nav .hs-icon-button:is(:nth-child(2), :nth-child(3)),
-  .hs-header-project,
-  .hs-header-extra {
-    display: none;
-  }
-  .hs-title {
-    flex: 0 1 auto;
-  }
-  .hs-foot {
-    flex-wrap: wrap;
-    height: auto;
-    row-gap: 0;
-  }
-  .hs-model {
-    order: -1;
-    flex-basis: 100%;
-    justify-content: flex-end;
-    height: calc(28 * var(--u));
-  }
-  .hs-commit-suffix {
-    display: none;
   }
 }

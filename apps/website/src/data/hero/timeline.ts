@@ -1,8 +1,8 @@
 /**
  * Timing primitives for the hero scenes. Moments are named instants in
  * seconds; elements appear during windows written against those names.
- * A journey has one timeline per layout, because narrow screens visit
- * views one at a time and need more room between moments.
+ * A journey has one timeline per framing: narrow screens pan across the
+ * desktop window and need more room between moments for those camera moves.
  */
 
 export type Timeline = Record<string, number>;

@@ -162,7 +162,7 @@ function destination(to: HTMLElement) {
   return { left: box.left + (parseFloat(style.paddingLeft) || 0), top: next ? next.getBoundingClientRect().top : box.bottom, width: column.clientWidth - inset };
 }
 
-/** A flight runs while both threads are on screen; one pane at a time has nothing to cross. */
+/** Flights cross the rendered desktop panes, including when the page crops their window. */
 const flying = (f: Flight, t: number) => t >= f.start && t < f.land + 0.05 && Boolean(f.from.offsetParent) && Boolean(f.to.closest<HTMLElement>(".hs-pane")?.offsetParent);
 
 function renderFlights(root: HTMLElement, flights: Flight[], t: number) {
@@ -170,7 +170,7 @@ function renderFlights(root: HTMLElement, flights: Flight[], t: number) {
   for (const f of flights) f.el.hidden = !active.includes(f);
   if (!active.length) return;
   const origin = root.getBoundingClientRect();
-  const unit = origin.width / 1360;
+  const unit = parseFloat(getComputedStyle(root).getPropertyValue("--u"));
   const rects = active.map((f) => ({ a: f.from.getBoundingClientRect(), b: destination(f.to), natural: f.to.scrollHeight + (f.to.offsetHeight - f.to.clientHeight) }));
   active.forEach((f, i) => {
     const { a, b, natural } = rects[i];

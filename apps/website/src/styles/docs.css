@@ -435,6 +435,23 @@ kbd {
   font-size: 0.8125rem;
 }
 
+/* Documentation previews also show the desktop product through a crop. */
+@media (max-width: 700px) {
+  .docs-visual .art-panel {
+    container-type: inline-size;
+  }
+  .docs-visual .art-panel-stage {
+    padding: 24px;
+  }
+  .docs-visual .mock-window {
+    width: 640px;
+  }
+  .docs-visual .mock-window:has(.hs-mock-worktree) {
+    width: 900px;
+    transform: translateX(calc(-1 * min(170px, max(0px, 948px - 100cqi))));
+  }
+}
+
 /* Diagrams draw a narrow composition instead of shrinking labels. */
 .docs-diagram {
   margin: 26px 0 34px;

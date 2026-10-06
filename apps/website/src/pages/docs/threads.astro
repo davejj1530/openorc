@@ -90,13 +90,10 @@ const sections = [
   <section aria-labelledby="fork">
     <h2 id="fork">Fork a thread</h2>
     <p>A fork is a new thread that continues the conversation while the original stays as it is. Use it to try another approach without losing the first.</p>
-    <ul>
-      <li>To fork from an earlier point, hover one of your messages and click <strong>Fork from here</strong>.</li>
-      <li>To fork from the latest turn, choose <strong>Fork</strong> in the <strong>Thread actions</strong> menu (⋯) in the thread's header, or type <code>/fork</code>.</li>
-    </ul>
+    <p>To fork, choose <strong>Fork</strong> in the <strong>Thread actions</strong> menu (⋯) in the thread's header, type <code>/fork</code>, or hover your latest message and click <strong>Fork thread</strong>.</p>
     <p>The fork opens with the original title followed by "(fork)", and the same agent, model, and mode. It shares its parent's folder and branch, so both threads edit the same files.</p>
     <Callout>
-      <p>A fork copies history by <a href={docHref("concepts") + "#conversations"}>run</a>, and one run can hold several turns, so forking from an earlier message can bring later turns from that run along. The agent also continues the parent's latest session and may remember messages the fork doesn't show.</p>
+      <p>A fork always takes the whole conversation. Its agent continues the original's session, which holds every turn, so there is no forking from an earlier message.</p>
     </Callout>
   </section>
 

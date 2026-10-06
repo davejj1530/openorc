@@ -42,7 +42,10 @@ export function createThreadWorkspaceHandlers({
       return null;
     },
     "threads.fork": ({ id, upToRunId, requestKey }) => {
-      if (!orchestration.getInstance(db, id) && !(requestKey && (teamForks.find(db, id, requestKey) || teamForks.rejection(db, id, requestKey)))) return threadService.fork(id, upToRunId);
+      if (!orchestration.getInstance(db, id) && !(requestKey && (teamForks.find(db, id, requestKey) || teamForks.rejection(db, id, requestKey)))) {
+        if (upToRunId) throw new Error("A thread forks with its whole conversation; only a team can fork from an earlier reply.");
+        return threadService.fork(id);
+      }
       if (!requestKey) throw new Error("Forking a team needs a request key so an interrupted response can be recovered.");
       return teamForksService.fork({ threadId: id, upToRunId, requestKey });
     },

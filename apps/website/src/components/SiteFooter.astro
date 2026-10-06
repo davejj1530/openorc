@@ -1,6 +1,5 @@
 ---
-import { Image } from "astro:assets";
-import mark from "../assets/openorc-mark.png";
+import BrandMark from "./BrandMark.astro";
 import { getPublishedReleases } from "../data/changelog";
 const hasPublishedReleases = (await getPublishedReleases()).length > 0;
 ---
@@ -9,7 +8,7 @@ const hasPublishedReleases = (await getPublishedReleases()).length > 0;
   <div class="container footer-grid">
     <div>
       <a class="wordmark" href="/">
-        <Image src={mark} alt="" width={28} height={28} format="webp" />
+        <BrandMark />
         OpenOrc
       </a>
       <p class="footer-credit">Made by <a href="https://www.eliasdavidceriola.com/">David C.</a></p>

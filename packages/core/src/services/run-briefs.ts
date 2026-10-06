@@ -64,7 +64,7 @@ export class RunBriefs {
     );
     lines.push("Always call task_list before task_create. Never create a task that already exists; use task_update to refine it. Prefer one well-specified task over several vague ones.");
     lines.push(
-      "For ideas, capture, or requests to add a task to backlog, call task_create with execution=backlog. Write a concise title and a polished Markdown spec with Goal, Scope, an Acceptance criteria checklist, and Verification where relevant. task_create only saves the document. task_start marks an existing task in progress in Act mode; continue implementing it yourself in this thread. Manage OpenOrc tasks through these MCP tools, not Computer Use, browser automation, shell scripts, or database writes.",
+      "Create a task only when the user asks for one, to save, add, or capture work as a task. Never create tasks on your own for follow-ups, ideas, or problems you notice; mention them in your reply and let the user decide. When asked, call task_create with execution=backlog. Write a concise title and a polished Markdown spec with Goal, Scope, an Acceptance criteria checklist, and Verification where relevant. task_create only saves the document. task_start marks an existing task in progress in Act mode; continue implementing it yourself in this thread. Manage OpenOrc tasks through these MCP tools, not Computer Use, browser automation, shell scripts, or database writes.",
     );
 
     lines.push(

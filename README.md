@@ -43,7 +43,7 @@ Memory is optional. Turn it off or configure automatic extraction in Settings.
 
 Capture an idea as a task, ask multiple models for input, then start implementation when you're ready. Work in your local checkout or an isolated worktree, and review changes beside the conversation.
 
-![OpenOrc with project threads in the sidebar, a Codex conversation with the Hollow orb, and a source diff in the Changes pane](docs/images/readme/workspace.png)
+![OpenOrc with project threads in the sidebar, a Codex conversation ending in the OpenOrc cube, and a source diff in the Changes panel](docs/images/readme/workspace.png)
 
 ![OpenOrc team conversation showing the lead, builder, and reviewer with their models, contributions, and shared composer](docs/images/readme/teams.png)
 
@@ -154,6 +154,6 @@ OpenOrc takes inspiration from the [Codex desktop app](https://developers.openai
 
 OpenOrc's original code and documentation are licensed under the [Apache License, Version 2.0](LICENSE). See [NOTICE](NOTICE) for project attribution. Third-party dependencies and separately licensed assets retain their respective licenses and notices.
 
-The conversation indicator uses the original Apache-2.0 Hollow shader with a separately licensed MIT runtime. Provider marks retain separate rights. See [third-party notices](THIRD_PARTY_NOTICES.md) and [artwork provenance](docs/artwork-provenance.md) for attribution, asset sources, and permission limits.
+Provider marks retain separate rights. See [third-party notices](THIRD_PARTY_NOTICES.md) and [artwork provenance](docs/artwork-provenance.md) for attribution, asset sources, and permission limits.
 
 The license does not grant trademark rights to the OpenOrc name or branding, except for the descriptive uses permitted by the license.

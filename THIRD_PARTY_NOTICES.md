@@ -22,7 +22,7 @@ The original Rive mascot and its source availability are described in [the masco
 
 These font files remain under OFL rather than Apache-2.0. Preserve their license files and any reserved-font-name requirements when replacing or modifying them.
 
-The website's Immaculate Gothic Text and Bold faces are David's custom font from family package 1.101. Their supplied provenance is preserved in `licenses/vendor/immaculate-gothic-PROVENANCE.txt` and published at `/licenses/immaculate-gothic-PROVENANCE.txt`. The font is separate from the Apache-2.0 code license; its package does not assign an open-source license. See the [font record](apps/website/src/assets/fonts/README.md) for file hashes and use.
+The website and desktop app's Immaculate Gothic Text and Bold faces are David's custom font from family package 1.101. Their supplied provenance is preserved in `licenses/vendor/immaculate-gothic-PROVENANCE.txt`, published at `/licenses/immaculate-gothic-PROVENANCE.txt`, and included in the desktop app's `licenses/vendor/` resources. The font is separate from the Apache-2.0 code license; its package does not assign an open-source license. See the [font record](apps/website/src/assets/fonts/README.md) for file hashes and use.
 
 ## Dependency notices
 

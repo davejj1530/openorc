@@ -24,41 +24,39 @@ colors:
   ink-dark: "#e5e5e5"
 typography:
   interface:
-    fontFamily: '"Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+    fontFamily: '"Immaculate Gothic", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
     fontSize: "13px"
     fontWeight: 400
     lineHeight: "20px"
   title:
-    fontFamily: '"Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+    fontFamily: '"Immaculate Gothic", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
     fontSize: "13px"
     fontWeight: 600
     lineHeight: "20px"
     letterSpacing: "-0.15px"
   body:
-    fontFamily: '"Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+    fontFamily: '"Immaculate Gothic", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
     fontSize: "14px"
     fontWeight: 400
     lineHeight: 1.6
   composer:
-    fontFamily: '"Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+    fontFamily: '"Immaculate Gothic", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
     fontSize: "13px"
     fontWeight: 400
     lineHeight: 1.6
   label:
-    fontFamily: '"Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+    fontFamily: '"Immaculate Gothic", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
     fontSize: "12px"
     fontWeight: 400
     lineHeight: "18px"
   document:
-    fontFamily: '"Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+    fontFamily: '"Immaculate Gothic", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
     fontSize: "30px"
     fontWeight: 500
     lineHeight: 1.16
     letterSpacing: "-0.9px"
   code:
     fontFamily: '"JetBrains Mono Variable", "SF Mono", Menlo, Consolas, monospace'
-  cursor-interface:
-    fontFamily: '"Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
 rounded:
   sm: "5px"
   compact: "6px"
@@ -148,7 +146,7 @@ components:
 
 **Creative North Star: "A calm place to think with coding agents"**
 
-OpenOrc is a compact desktop workspace for several projects at once. A shared sidebar keeps projects and conversations visible; the conversation occupies the center, and an optional work panel holds review and tools. OpenOrc and Cursor share one palette: neutral gray, white, or charcoal grounds, monochrome accents, and Inter typography.
+OpenOrc is a compact desktop workspace for several projects at once. A shared sidebar keeps projects and conversations visible; the conversation occupies the center, and an optional work panel holds review and tools. OpenOrc and Cursor share one palette: neutral gray, white, or charcoal grounds and monochrome accents. The interface is set in Immaculate Gothic.
 
 This record describes the built desktop interface. It preserves the workflows in [PRODUCT.md](../../PRODUCT.md), including drafts, task authorization, Orcling privacy, and project context. Packaged application artwork is unchanged.
 
@@ -178,7 +176,7 @@ Appearance mode and palette selection remain independent. Accent choices and fin
 
 ## Typography
 
-OpenOrc and Cursor use Inter Variable throughout the interface, including task document headings. Conductor uses Geist Variable from its published app styles. Other presets use system sans-serif. Code uses JetBrains Mono Variable with platform monospace fallbacks.
+Immaculate Gothic sets the whole interface by default, including task document headings. Settings > Appearance can switch it to Inter, Geist, or the system font, independent of the palette; `fonts.css` maps each choice to its family. Immaculate Gothic has two static faces, Text 450 and Bold 700: regular and medium text render in Text, semibold titles in Bold. Code uses JetBrains Mono Variable with platform monospace fallbacks.
 
 The frontmatter defines the observed hierarchy. Toolbar titles use the compact semibold title role. Ordinary controls use the interface or label role; conversation prose uses the body role, while the composer has its own smaller text. Task document headings use the document role. New-thread and list pages use the compact toolbar title. Dates, counts, usage, and diff statistics use tabular numerals.
 

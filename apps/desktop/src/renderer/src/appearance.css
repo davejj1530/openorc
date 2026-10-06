@@ -40,6 +40,14 @@
 .appearance-modes button:focus-visible {
   background: var(--surface-3);
 }
+/* Each choice reads --font-sans from its own data-font (fonts.css), so it shows in its face. Centering on
+   the capitals keeps faces with different ascents on one line. */
+.font-choices button {
+  font-family: var(--font-sans);
+}
+.font-choices span {
+  text-box: trim-both cap alphabetic;
+}
 .appearance-status {
   min-height: 20px;
   color: var(--ink-2);

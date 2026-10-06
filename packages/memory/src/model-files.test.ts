@@ -2,7 +2,6 @@ import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { gzipSync } from "node:zlib";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FlagEmbedding } from "fastembed";
 import { ensureModel, type ModelSource } from "./model-files.js";
@@ -12,37 +11,30 @@ afterEach(async () => {
   await Promise.all(dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
 
-const sha256 = (data: Buffer | string) => createHash("sha256").update(data).digest("hex");
+const sha256 = (data: string) => createHash("sha256").update(data).digest("hex");
 const name = "fast-all-MiniLM-L6-v2";
 const config = '{"fixture":true}';
+const served = '{\n  "model_max_length": 256,\n  "do_lower_case": true\n}';
+const edited = '{\n  "model_max_length": 512,\n  "do_lower_case": true\n}';
+const source: ModelSource = {
+  name,
+  baseUrl: "https://models.example/minilm/",
+  files: {
+    "config.json": { sha256: sha256(config), bytes: config.length },
+    "tokenizer_config.json": { sha256: sha256(edited), bytes: served.length, edits: [['"model_max_length": 256,', '"model_max_length": 512,']] },
+  },
+};
+const bodies: Record<string, string> = { "config.json": config, "tokenizer_config.json": served };
 
-/** One USTAR file entry followed by the end-of-archive blocks. */
-function archive(file: string, body: string): Buffer {
-  const data = Buffer.from(body);
-  const header = Buffer.alloc(512);
-  header.write(file, 0, 100);
-  header.write("0000644", 100);
-  header.write("0000000", 108);
-  header.write("0000000", 116);
-  header.write(data.length.toString(8).padStart(11, "0"), 124);
-  header.write("00000000000", 136);
-  header.fill(32, 148, 156);
-  header.write("0", 156);
-  header.write("ustar\0", 257);
-  header.write("00", 263);
-  header.write(
-    `${header
-      .reduce((sum, byte) => sum + byte, 0)
-      .toString(8)
-      .padStart(6, "0")}\0 `,
-    148,
-  );
-  return gzipSync(Buffer.concat([header, data, Buffer.alloc((512 - (data.length % 512)) % 512), Buffer.alloc(1024)]));
+/** Serves each fixture file by name; `changes` swaps in another body, or an HTTP status instead of one. */
+function serve(changes: Record<string, string | number> = {}) {
+  return vi.fn<typeof fetch>(async (input) => {
+    const file = String(input).slice(source.baseUrl.length);
+    const change = changes[file];
+    if (typeof change === "number") return new Response("Not Found", { status: change });
+    return new Response(change ?? bodies[file]);
+  });
 }
-
-const bytes = archive(`${name}/config.json`, config);
-const source: ModelSource = { name, url: "https://models.example/minilm.tar.gz", sha256: sha256(bytes), bytes: bytes.length, files: { "config.json": sha256(config) } };
-const serve = (body: Buffer, status = 200) => vi.fn<typeof fetch>(async () => new Response(new Uint8Array(body), { status }));
 
 async function cache() {
   const root = await mkdtemp(path.join(os.tmpdir(), "openorc-model-files-"));
@@ -51,23 +43,30 @@ async function cache() {
 }
 
 describe("ensureModel", () => {
-  it("downloads and checks the archive, then leaves it for fastembed to extract", async () => {
+  it("downloads and checks each file, then lays the model out where fastembed reads it", async () => {
     const dir = await cache();
-    const fetchModel = serve(bytes);
+    const fetchModel = serve();
     await ensureModel(dir, source, fetchModel);
-    expect(fetchModel).toHaveBeenCalledWith(source.url);
-    expect(await readdir(dir)).toEqual([`${name}.tar.gz`]);
-    await expect(FlagEmbedding.init({ model: name as never, cacheDir: dir, showDownloadProgress: false })).rejects.toThrow("Tokenizer file not found");
+    expect(fetchModel.mock.calls.map(([url]) => String(url))).toEqual([`${source.baseUrl}config.json`, `${source.baseUrl}tokenizer_config.json`]);
+    expect(await readdir(dir)).toEqual([name]);
     expect(await readFile(path.join(dir, name, "config.json"), "utf8")).toBe(config);
+    // fastembed takes the folder as its model and moves on to the tokenizer instead of downloading anything.
+    await expect(FlagEmbedding.init({ model: name as never, cacheDir: dir, showDownloadProgress: false })).rejects.toThrow("Tokenizer file not found");
     await ensureModel(dir, source, fetchModel);
-    expect(fetchModel).toHaveBeenCalledTimes(1);
+    expect(fetchModel).toHaveBeenCalledTimes(2);
   });
 
-  it("refuses a download that does not match its checksum, an HTTP error, or an oversized body, leaving nothing behind", async () => {
+  it("makes a file's edits before checking it against its pin", async () => {
     const dir = await cache();
-    await expect(ensureModel(dir, source, serve(archive(`${name}/config.json`, '{"altered":true}')))).rejects.toThrow("does not match its pinned SHA-256");
-    await expect(ensureModel(dir, source, serve(Buffer.from("Not Found"), 404))).rejects.toThrow("HTTP 404");
-    await expect(ensureModel(dir, { ...source, bytes: bytes.length - 1 }, serve(bytes))).rejects.toThrow("larger than the pinned archive");
+    await ensureModel(dir, source, serve());
+    expect(await readFile(path.join(dir, name, "tokenizer_config.json"), "utf8")).toBe(edited);
+  });
+
+  it("refuses a file that does not match its checksum, an HTTP error, or an oversized body, leaving nothing behind", async () => {
+    const dir = await cache();
+    await expect(ensureModel(dir, source, serve({ "config.json": '{"altered":true}' }))).rejects.toThrow("does not match its pinned SHA-256");
+    await expect(ensureModel(dir, source, serve({ "tokenizer_config.json": 404 }))).rejects.toThrow("HTTP 404");
+    await expect(ensureModel(dir, source, serve({ "config.json": `${config} ` }))).rejects.toThrow("larger than its pinned size");
     expect(await readdir(dir)).toEqual([]);
   });
 
@@ -75,9 +74,8 @@ describe("ensureModel", () => {
     const dir = await cache();
     await mkdir(path.join(dir, name), { recursive: true });
     await writeFile(path.join(dir, name, "config.json"), '{"partial":');
-    await writeFile(path.join(dir, `${name}.tar.gz`), bytes.subarray(0, 20));
-    await ensureModel(dir, source, serve(bytes));
-    expect(await readdir(dir)).toEqual([`${name}.tar.gz`]);
-    expect(sha256(await readFile(path.join(dir, `${name}.tar.gz`)))).toBe(source.sha256);
+    await ensureModel(dir, source, serve());
+    expect(await readdir(dir)).toEqual([name]);
+    expect(await readFile(path.join(dir, name, "config.json"), "utf8")).toBe(config);
   });
 });

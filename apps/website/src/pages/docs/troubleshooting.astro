@@ -41,7 +41,7 @@ const sections = [
       OpenOrc gives your shell 8 seconds to answer. When it takes longer, agents keep starting with what the shell reported last time, but Connections shows <strong>Connection check failed</strong> until a check succeeds. Speed up your
       shell's startup files, then refresh.
     </p>
-    <p>On Windows, OpenOrc doesn't search for agents. Set <code>OPENORC_CODEX_BIN</code>, <code>OPENORC_CLAUDE_BIN</code>, or <code>OPENORC_OPENCODE_BIN</code> to the agent's full path, then restart OpenOrc.</p>
+    <p>On Windows, OpenOrc looks for agents on the <code>PATH</code> it started with. Add the agent's folder to <code>PATH</code>, or set <code>OPENORC_CODEX_BIN</code>, <code>OPENORC_CLAUDE_BIN</code>, or <code>OPENORC_OPENCODE_BIN</code> to its full path, then restart OpenOrc.</p>
     <h3>Fails to start</h3>
     <p>
       OpenOrc found the agent, but its <code>--version</code> command failed, so nothing can run through it. After an update check, a row OpenOrc can repair shows a reinstall button, such as <strong>Reinstall Claude</strong>. Otherwise

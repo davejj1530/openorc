@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import type { AgentSkill } from "@openorc/protocol";
 import { agentBinary } from "../bin.js";
+import { launchCommand } from "../command-launch.js";
 import { stopProcess, waitForProcessGroup } from "../process-lifetime.js";
 
 interface OpenCodeSkill {
@@ -40,7 +41,9 @@ export function openCodeSkillRows(rows: OpenCodeSkill[], sources: ReadonlyMap<st
 
 /** A private, short-lived server keeps discovery scoped to this project and needs no stored credentials. */
 export async function listNativeOpenCodeSkills(projectRoot: string): Promise<OpenCodeSkill[] | null> {
-  const proc = spawn(agentBinary("opencode"), ["serve", "--hostname", "127.0.0.1", "--port", "0"], {
+  const command = launchCommand(agentBinary("opencode"), ["serve", "--hostname", "127.0.0.1", "--port", "0"]);
+  const proc = spawn(command.file, command.args, {
+    ...command.options,
     cwd: projectRoot,
     stdio: ["ignore", "pipe", "pipe"],
     detached: process.platform !== "win32",

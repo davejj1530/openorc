@@ -1,14 +1,31 @@
 import { EventEmitter } from "node:events";
-import type { ChildProcess } from "node:child_process";
+import { execFile, type ChildProcess } from "node:child_process";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { stopProcess, waitForProcessGroup } from "./process-lifetime.js";
 
+vi.mock("node:child_process", async (original) => ({ ...(await original<typeof import("node:child_process")>()), execFile: vi.fn() }));
+
 const error = (code: string) => Object.assign(new Error(`kill ${code}`), { code });
-const child = () => Object.assign(new EventEmitter(), { pid: 987654, kill: vi.fn(() => true) }) as unknown as ChildProcess;
+const child = () => Object.assign(new EventEmitter(), { pid: 987654, exitCode: null, signalCode: null, kill: vi.fn(() => true) }) as unknown as ChildProcess;
+const platform = process.platform;
 afterEach(() => {
   vi.clearAllTimers();
   vi.useRealTimers();
   vi.restoreAllMocks();
+  Object.defineProperty(process, "platform", { value: platform });
+});
+
+it("ends the whole process tree on Windows, and the launcher itself when taskkill cannot", () => {
+  vi.useFakeTimers();
+  Object.defineProperty(process, "platform", { value: "win32" });
+  const proc = child();
+  stopProcess(proc);
+  const [file, args, , done] = vi.mocked(execFile).mock.calls[0] as unknown as [string, string[], object, (error: Error | null) => void];
+  expect(file).toMatch(/System32.taskkill\.exe$/);
+  expect(args).toEqual(["/pid", "987654", "/T", "/F"]);
+  expect(proc.kill).not.toHaveBeenCalled();
+  done(new Error("Access is denied"));
+  expect(proc.kill).toHaveBeenCalledWith("SIGKILL");
 });
 
 describe.skipIf(process.platform === "win32")("process group teardown races", () => {

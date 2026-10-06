@@ -1,10 +1,9 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { realpath, readFile } from "node:fs/promises";
 import { detectAgentInstallation, type UpdateRunner } from "./agent-update-installation.js";
-import { resolveBinary } from "./system.js";
-import type { EnvSnapshot } from "./shell-environment.js";
+import { resolveBinary, type EnvSnapshot } from "./shell-environment.js";
 vi.mock("node:fs/promises", () => ({ realpath: vi.fn(), readFile: vi.fn() }));
-vi.mock("./system.js", () => ({ resolveBinary: vi.fn() }));
+vi.mock("./shell-environment.js", () => ({ resolveBinary: vi.fn() }));
 const snapshot: EnvSnapshot = {
   revision: 1,
   shell: "/bin/zsh",

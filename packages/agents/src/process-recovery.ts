@@ -3,6 +3,7 @@ import { closeSync, fsyncSync, mkdirSync, openSync, readdirSync, readFileSync, u
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import type { Writable } from "node:stream";
+import { launchCommand } from "./command-launch.js";
 import { stopProcess } from "./process-lifetime.js";
 
 interface ProcessReceipt {
@@ -45,7 +46,10 @@ function remove(file: string): void {
 /** The provider cannot execute until its process identity is durably retained. */
 export function spawnAgentProcess(binary: string, args: string[], options: LaunchOptions): ChildProcessWithoutNullStreams {
   const { registry, ...launch } = options;
-  if (!registry || process.platform === "win32") return spawn(binary, args, { ...launch, stdio: ["pipe", "pipe", "pipe"], detached: process.platform !== "win32" });
+  if (!registry || process.platform === "win32") {
+    const command = launchCommand(binary, args);
+    return spawn(command.file, command.args, { ...launch, ...command.options, stdio: ["pipe", "pipe", "pipe"], detached: process.platform !== "win32" });
+  }
   mkdirSync(registry, { recursive: true, mode: 0o700 });
   const proc = spawn("/bin/sh", ["-c", 'IFS= read -r ready <&3 || exit 125; [ "$ready" = start ] || exit 125; exec 3<&-; exec "$@"', "openorc-agent", binary, ...args], {
     ...launch,

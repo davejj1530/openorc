@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import os from "node:os";
 import readline from "node:readline";
+import { launchCommand } from "../command-launch.js";
 import { stopProcess, waitForProcessGroup } from "../process-lifetime.js";
 import type { AgentLaunchEnvironment } from "../launch-environment.js";
 
@@ -32,28 +33,25 @@ export async function withClaudeControlSession<T>(
 ): Promise<T> {
   const env = { ...launch.env };
   delete env["CLAUDECODE"];
-  const proc = spawn(
-    launch.binary,
-    [
-      "-p",
-      "--input-format",
-      "stream-json",
-      "--output-format",
-      "stream-json",
-      "--verbose",
-      "--no-session-persistence",
-      "--setting-sources",
-      "user",
-      "--tools",
-      "",
-      "--strict-mcp-config",
-      "--mcp-config",
-      JSON.stringify({ mcpServers: {} }),
-      "--settings",
-      JSON.stringify({ disableAllHooks: true, ...options.settings }),
-    ],
-    { cwd: os.homedir(), env, stdio: ["pipe", "pipe", "pipe"], detached: process.platform !== "win32" },
-  );
+  const command = launchCommand(launch.binary, [
+    "-p",
+    "--input-format",
+    "stream-json",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--no-session-persistence",
+    "--setting-sources",
+    "user",
+    "--tools",
+    "",
+    "--strict-mcp-config",
+    "--mcp-config",
+    JSON.stringify({ mcpServers: {} }),
+    "--settings",
+    JSON.stringify({ disableAllHooks: true, ...options.settings }),
+  ]);
+  const proc = spawn(command.file, command.args, { ...command.options, cwd: os.homedir(), env, stdio: ["pipe", "pipe", "pipe"], detached: process.platform !== "win32" });
   const closed = new Promise<void>((resolve) => proc.once("close", () => resolve()));
   const output = readline.createInterface({ input: proc.stdout, crlfDelay: Infinity });
   proc.stderr.resume();

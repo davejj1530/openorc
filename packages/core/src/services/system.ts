@@ -1,9 +1,7 @@
 import { execFile } from "node:child_process";
-import { access, constants } from "node:fs/promises";
-import path from "node:path";
-import { captureProcessEnvironment } from "@openorc/agents";
+import { captureProcessEnvironment, launchCommand } from "@openorc/agents";
 import { harnessIds, type HarnessId, type HarnessInfo, type SystemInfo } from "@openorc/protocol";
-import type { EnvSnapshot, RefreshResult, ShellEnvironment } from "./shell-environment.js";
+import { resolveBinary, type EnvSnapshot, type RefreshResult, type ShellEnvironment } from "./shell-environment.js";
 
 type CommandResult = { status: "ok"; output: string } | { status: "exit"; output: string } | { status: "failed"; output: string };
 
@@ -54,7 +52,8 @@ export const harnessProbes: Record<HarnessId, HarnessProbe> = {
 /** Runs a CLI and preserves output from known non-zero auth responses. */
 const runCommand: CommandProbe = (binary, args, env) =>
   new Promise((resolve) => {
-    const child = execFile(binary, [...args], { timeout: 8000, env: { ...env }, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+    const command = launchCommand(binary, args);
+    const child = execFile(command.file, command.args, { ...command.options, timeout: 8000, env: { ...env }, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
       const output = `${stdout}\n${stderr}`.trim();
       if (!error) {
         resolve({ status: "ok", output });
@@ -66,20 +65,6 @@ const runCommand: CommandProbe = (binary, args, env) =>
     });
     child.stdin?.end();
   });
-
-/** The file a bare command name resolves to on one immutable PATH. */
-export async function resolveBinary(name: string, envPath = process.env["PATH"] ?? ""): Promise<string | null> {
-  for (const dir of envPath.split(path.delimiter).filter(Boolean)) {
-    const candidate = path.join(dir, name);
-    try {
-      await access(candidate, constants.X_OK);
-      return candidate;
-    } catch {
-      // Keep looking through the admitted PATH.
-    }
-  }
-  return null;
-}
 
 /** What agents and tools this machine has, derived from the environment that launches them. */
 export class SystemService {

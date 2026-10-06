@@ -1,4 +1,5 @@
-import type { ChildProcess } from "node:child_process";
+import { execFile, type ChildProcess } from "node:child_process";
+import path from "node:path";
 
 const stopped = new WeakSet<ChildProcess>();
 
@@ -22,12 +23,27 @@ export async function waitForProcessGroup(proc: ChildProcess): Promise<void> {
     });
 }
 
+/**
+ * Windows has no process groups, and ending a launcher there leaves what it started running. taskkill ends the
+ * whole tree; if it cannot, the launcher itself is still ended.
+ */
+function endWindowsTree(proc: ChildProcess, pid: number): void {
+  const taskkill = path.join(process.env["SystemRoot"] ?? "C:\\Windows", "System32", "taskkill.exe");
+  execFile(taskkill, ["/pid", String(pid), "/T", "/F"], { windowsHide: true }, (error) => {
+    if (error && proc.exitCode === null && proc.signalCode === null) proc.kill("SIGKILL");
+  });
+}
+
 /** The CLI may be an npm wrapper. Its native child owns the session writer. */
 export function stopProcess(proc: ChildProcess): void {
   if (stopped.has(proc)) return;
   stopped.add(proc);
   const signal = (kind: NodeJS.Signals): boolean => {
-    if (process.platform !== "win32" && proc.pid) {
+    if (proc.pid && process.platform === "win32") {
+      endWindowsTree(proc, proc.pid);
+      return false;
+    }
+    if (proc.pid) {
       try {
         process.kill(-proc.pid, kind);
         return false;

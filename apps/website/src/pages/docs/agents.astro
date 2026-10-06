@@ -120,7 +120,7 @@ const sections = [
     </ol>
     <p>If Codex or Claude Code signs out while you work, the thread shows <strong>Sign in</strong>, which runs the agent's sign-in command in the thread's terminal.</p>
     <Callout>
-      <p>On Windows, OpenOrc doesn't ask a login shell. It finds an agent only when <code>OPENORC_CODEX_BIN</code>, <code>OPENORC_CLAUDE_BIN</code>, or <code>OPENORC_OPENCODE_BIN</code> holds the agent's full path.</p>
+      <p>On Windows, OpenOrc doesn't ask a login shell. It looks for each agent on your <code>PATH</code>, including the <code>.cmd</code> launchers npm installs. To use a different copy, set <code>OPENORC_CODEX_BIN</code>, <code>OPENORC_CLAUDE_BIN</code>, or <code>OPENORC_OPENCODE_BIN</code> to its full path before you start OpenOrc.</p>
     </Callout>
   </section>
 

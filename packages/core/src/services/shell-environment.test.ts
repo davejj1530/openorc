@@ -1,8 +1,15 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
+import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ShellEnvironment, loginShell, parseShellProbe, type ShellProbe, type ShellProbeResult } from "./shell-environment.js";
+import { ShellEnvironment, loginShell, parseShellProbe, windowsProbe, type ShellProbe, type ShellProbeResult } from "./shell-environment.js";
 
-afterEach(() => vi.restoreAllMocks());
+const platform = process.platform;
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllEnvs();
+  Object.defineProperty(process, "platform", { value: platform });
+});
 
 const answer = (path: string, claude: string | null = null, codex: string | null = null): ShellProbeResult => ({ path, binaries: { claude, codex, opencode: null } });
 
@@ -141,5 +148,34 @@ describe("ShellEnvironment", () => {
     pending[1]!.resolve(answer("/opt/homebrew/bin:/usr/bin"));
     await third;
     expect(shellEnv.current().revision).toBe(2);
+  });
+});
+
+describe("Windows", () => {
+  it("finds each harness on PATH as Windows names it, keeps one the launcher named, and forgets one uninstalled", async () => {
+    Object.defineProperty(process, "platform", { value: "win32" });
+    vi.stubEnv("PATHEXT", ".COM;.EXE;.BAT;.CMD;.JS");
+    const dir = await mkdtemp(path.join(os.tmpdir(), "openorc-windows-path-"));
+    try {
+      // npm writes a shell script beside its launcher, and only Windows Script Host runs a .js file.
+      for (const file of ["codex", "codex.cmd", "opencode.js"]) await writeFile(path.join(dir, file), "", { mode: 0o755 });
+      const env: NodeJS.ProcessEnv = { PATH: dir, OPENORC_CLAUDE_BIN: "C:\\Tools\\claude.exe" };
+      expect(await windowsProbe(env)("cmd.exe")).toEqual({ path: dir, binaries: { claude: "C:\\Tools\\claude.exe", codex: path.join(dir, "codex.cmd"), opencode: null } });
+
+      const shellEnv = new ShellEnvironment({ env: { PATH: dir }, shell: () => "cmd.exe" });
+      await shellEnv.refresh();
+      expect(shellEnv.current().binaries.codex).toBe(path.join(dir, "codex.cmd"));
+      await rm(path.join(dir, "codex.cmd"));
+      await shellEnv.refresh();
+      expect(shellEnv.current().binaries.codex).toBeNull();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("reads PATH under the name Windows gives it", () => {
+    Object.defineProperty(process, "platform", { value: "win32" });
+    const shellEnv = new ShellEnvironment({ env: { Path: "C:\\Windows\\System32" }, probe: async () => answer(""), shell: () => "cmd.exe" });
+    expect(shellEnv.current().path).toBe("C:\\Windows\\System32");
   });
 });

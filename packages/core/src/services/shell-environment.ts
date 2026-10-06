@@ -1,5 +1,7 @@
 import { execFile } from "node:child_process";
+import { access, constants } from "node:fs/promises";
 import os from "node:os";
+import path from "node:path";
 import { promisify } from "node:util";
 import { harnessBinaryVariable, harnessIds, type HarnessId } from "@openorc/protocol";
 
@@ -110,9 +112,50 @@ export const probeLoginShell: ShellProbe = async (shell) => {
   return parsed;
 };
 
-/** A probe that reports the inherited environment unchanged: for tests and for platforms without a login shell to ask. */
+/** A probe that reports the inherited environment unchanged, for tests. */
 export function inheritedProbe(env: NodeJS.ProcessEnv = process.env): ShellProbe {
   return async () => ({ path: env["PATH"] ?? "", binaries: harnessBinaries((id) => env[harnessBinaryVariable(id)] || null) });
+}
+
+/**
+ * Windows has no login shell to ask, and the environment it starts the app with is already the user's. So PATH is
+ * kept as it is and each harness is looked up on it, unless whatever launched the app named that harness's binary.
+ */
+export function windowsProbe(env: NodeJS.ProcessEnv = process.env): ShellProbe {
+  const named = harnessBinaries((id) => env[harnessBinaryVariable(id)] || null);
+  return async () => {
+    const envPath = env["PATH"] ?? "";
+    const found = new Map(await Promise.all(harnessIds.map(async (id) => [id, named[id] ?? (await resolveBinary(id, envPath))] as const)));
+    return { path: envPath, binaries: harnessBinaries((id) => found.get(id) ?? null) };
+  };
+}
+
+/** What Windows can start, directly or through cmd.exe, in the order PATHEXT puts them. */
+function windowsExtensions(pathext = ".COM;.EXE;.BAT;.CMD"): string[] {
+  return pathext
+    .split(";")
+    .map((extension) => extension.toLowerCase())
+    .filter((extension) => [".com", ".exe", ".bat", ".cmd"].includes(extension));
+}
+
+/**
+ * The file a bare command name resolves to on one immutable PATH. Windows names programs with an extension, gh.exe
+ * or codex.cmd, so there each one PATHEXT lists is tried in turn, as its own shell does.
+ */
+export async function resolveBinary(name: string, envPath = process.env["PATH"] ?? ""): Promise<string | null> {
+  const files = process.platform === "win32" ? windowsExtensions(process.env["PATHEXT"]).map((extension) => name + extension) : [name];
+  for (const dir of envPath.split(path.delimiter).filter(Boolean)) {
+    for (const file of files) {
+      const candidate = path.join(dir, file);
+      try {
+        await access(candidate, constants.X_OK);
+        return candidate;
+      } catch {
+        // Keep looking through the admitted PATH.
+      }
+    }
+  }
+  return null;
 }
 
 export interface ShellEnvironmentOptions {
@@ -126,7 +169,7 @@ export interface ShellEnvironmentOptions {
 
 /** The launcher's PATH entries after the login shell's, deduplicated, so nothing the launcher could find is lost. */
 export function mergePath(login: string, launcher: string): string {
-  return [...new Set([...login.split(":"), ...launcher.split(":")])].filter(Boolean).join(":");
+  return [...new Set([...login.split(path.delimiter), ...launcher.split(path.delimiter)])].filter(Boolean).join(path.delimiter);
 }
 
 export class ShellEnvironment {
@@ -141,7 +184,7 @@ export class ShellEnvironment {
 
   constructor(options: ShellEnvironmentOptions = {}) {
     this.env = options.env ?? process.env;
-    this.probe = options.probe ?? (process.platform === "win32" ? inheritedProbe(this.env) : probeLoginShell);
+    this.probe = options.probe ?? (process.platform === "win32" ? windowsProbe(this.env) : probeLoginShell);
     this.shell = options.shell ?? (() => loginShell(this.env));
     this.launcherPath = this.env["PATH"] ?? "";
     this.snapshot = freezeSnapshot(0, this.shell(), this.env);
@@ -208,16 +251,20 @@ export class ShellEnvironment {
   }
 }
 
-/** A frozen copy of `env` as it stands, with PATH and the harness overrides read back from it so the fields cannot disagree. */
+/**
+ * A frozen copy of `env` as it stands, with PATH and the harness overrides read back from it so the fields cannot
+ * disagree. Windows spells the variable Path and matches names in any case; the copy is a plain object, which does not.
+ */
 function freezeSnapshot(revision: number, shell: string, env: NodeJS.ProcessEnv): EnvSnapshot {
   const copy: Record<string, string> = {};
   for (const [key, value] of Object.entries(env)) {
     if (value !== undefined) copy[key] = value;
   }
+  const pathKey = process.platform === "win32" ? (Object.keys(copy).find((key) => key.toUpperCase() === "PATH") ?? "PATH") : "PATH";
   return Object.freeze({
     revision,
     shell,
-    path: copy["PATH"] ?? "",
+    path: copy[pathKey] ?? "",
     binaries: Object.freeze(harnessBinaries((id) => copy[harnessBinaryVariable(id)] || null)),
     env: Object.freeze(copy),
   });

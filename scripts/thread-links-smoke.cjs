@@ -129,6 +129,15 @@ async function check() {
     );
     await click("second page");
     await expectPreview(site + "/page-b");
+    const reloaded = new Promise((resolve) => win.webContents.once("did-finish-load", resolve));
+    win.webContents.reload();
+    await reloaded;
+    await until(() => read("document.querySelectorAll('a').length === 3"));
+    assert.equal(
+      win.contentView.children.some((view) => view.webContents && view.getVisible()),
+      false,
+      "Reloading the window hides the native preview the old page left open",
+    );
     await read("document.querySelector('[data-show-tasks]').click()");
     await until(() => read("document.querySelector('[role=tab][aria-selected=true]')?.getAttribute('aria-label') === 'Tasks'"));
     await click("document link");

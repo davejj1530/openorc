@@ -1,7 +1,7 @@
-/* Lines up under the title, past the row's place icon and the gap after it. */
+/* Lines up under the title, past the row's status slot and the gap after it. */
 .thread-preview-headline {
   display: block;
-  margin-left: calc(13px + 8px);
+  margin-left: calc(14px + 11px);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

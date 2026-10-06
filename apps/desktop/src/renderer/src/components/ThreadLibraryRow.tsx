@@ -25,9 +25,23 @@ function threadPlace(thread: ThreadSummary): { icon: ReactNode; label: string; t
   return { icon: <Folder size={11} className="shrink-0" />, label: thread.projectId === WORKSPACE_ID ? "Local" : "No branch", title: thread.workingDirectory ?? "No recorded branch" };
 }
 
+const pullRequestTone = { open: "text-ink-3", merged: "text-ok", closed: "text-bad" } as const;
+
+/** A resting thread's mark: the state of its pull request, if it has one. Most threads have none and show nothing. */
+function PullRequestMark({ thread }: { thread: ThreadSummary }) {
+  const pull = pullRequestNumber(thread.prUrl);
+  if (pull === null) return null;
+  const state = thread.prState ?? "open";
+  return (
+    <span role="img" aria-label={`Pull request #${pull}, ${state}`} title={`Pull request #${pull}, ${state}`} className="size-3.5 shrink-0 inline-flex items-center justify-center">
+      <GitPullRequest size={13} className={pullRequestTone[state]} />
+    </span>
+  );
+}
+
 /**
- * A thread row: title, then what matters at a glance. ⌘-click opens it in
- * the split; right-click gives every action.
+ * A thread row: what the thread needs from you before its title, then the title. ⌘-click opens it in the split;
+ * right-click gives every action.
  */
 export function ThreadRow({ thread, active }: { thread: ThreadSummary; active: boolean }) {
   const navigate = useRouter((s) => s.navigate);
@@ -66,11 +80,10 @@ export function ThreadRow({ thread, active }: { thread: ThreadSummary; active: b
         }
       >
         <span className="thread-preview-heading flex min-w-0 items-start">
-          <span className="thread-preview-icon" aria-hidden="true">
-            {place.icon}
+          <span className="thread-preview-status">
+            <ThreadStatusIndicator thread={thread} idle={<PullRequestMark thread={thread} />} />
           </span>
           <span className={cn("thread-preview-title flex-1 min-w-0 text-left", (active || thread.unread || thread.activity === "waiting") && "text-ink")}>{thread.title}</span>
-          <ThreadStatusIndicator thread={thread} />
         </span>
         <ThreadRowHeadline thread={thread} />
         <span className="thread-preview-meta flex min-w-0 items-center gap-2 text-xs leading-4 text-ink-3">

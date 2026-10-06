@@ -84,6 +84,7 @@ const at = (windows: string) => timed(teamJourney, windows);
           ) : null}
         </section>
       ))}
+      <span slot="presence" {...at("send~done")} data-clock="send" data-clock-text="Working for {s}s">Working for 0s</span>
 
       <p slot="hint" class="hs-hint">
         <span {...at("<send >done")}>{team.hints.idle}</span>

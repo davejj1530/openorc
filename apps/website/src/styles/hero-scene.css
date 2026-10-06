@@ -257,18 +257,15 @@
   width: calc(266 * var(--u));
   height: 100%;
 }
+/* The header holds only the Inbox, the sidebar toggle and search, right-aligned past the traffic lights. */
 .hs-sidebar-head {
   display: flex;
   flex: none;
   align-items: center;
+  justify-content: flex-end;
   gap: calc(2 * var(--u));
   height: calc(40 * var(--u));
   padding: 0 calc(11 * var(--u)) 0 calc(84 * var(--u));
-}
-.hs-app-name {
-  flex: 1;
-  color: var(--hs-ink-3);
-  font-size: calc(12 * var(--u));
 }
 .hs-nav {
   display: grid;
@@ -345,13 +342,13 @@
 .hs-group {
   margin-bottom: calc(12 * var(--u));
 }
+/* 32 units of heading and 4 below it, inside the box as the app's group title has them, so no margin collapses. */
 .hs-group-head {
   display: flex;
   align-items: center;
   gap: calc(4 * var(--u));
-  height: calc(32 * var(--u));
-  margin-bottom: calc(4 * var(--u));
-  padding: 0 calc(4 * var(--u));
+  height: calc(36 * var(--u));
+  padding: 0 calc(4 * var(--u)) calc(4 * var(--u));
   color: var(--hs-ink-2);
   font-size: calc(12 * var(--u));
 }
@@ -369,7 +366,7 @@
 .hs-group-name {
   flex: 1;
   min-width: 0;
-  padding-left: calc(6 * var(--u));
+  padding-left: calc(2 * var(--u));
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -388,25 +385,20 @@
   margin: 0 calc(6 * var(--u));
   color: var(--hs-ink-3);
 }
+/* The status slot sits under the project icon and the title under the project name, so rows need no indent. */
 .hs-row {
   display: flex;
   flex-direction: column;
-  margin-bottom: var(--u);
-  padding: calc(7 * var(--u)) calc(10 * var(--u)) calc(7 * var(--u)) calc(24 * var(--u));
+  margin: var(--u) 0;
+  padding: calc(7 * var(--u)) calc(10 * var(--u)) calc(7 * var(--u)) calc(9 * var(--u));
   border-radius: calc(7 * var(--u));
   color: var(--hs-ink);
 }
 .hs-row-heading {
   display: flex;
   align-items: center;
-  gap: calc(8 * var(--u));
+  gap: calc(11 * var(--u));
   height: calc(18 * var(--u));
-}
-.hs-row-icon {
-  width: calc(11 * var(--u));
-  height: calc(11 * var(--u));
-  margin-inline: var(--u);
-  color: var(--hs-ink-3);
 }
 .hs-row-title {
   flex: 1;
@@ -416,23 +408,25 @@
   white-space: nowrap;
 }
 .hs-status {
-  display: none;
+  display: inline-grid;
+  flex: none;
   place-items: center;
   width: calc(14 * var(--u));
   height: calc(14 * var(--u));
   color: var(--hs-ink);
 }
-.hs-row[data-busy] .hs-status {
-  display: inline-grid;
-}
 .hs-status .hs-icon {
+  display: none;
   width: calc(14 * var(--u));
   height: calc(14 * var(--u));
   animation: hs-spin 1s linear infinite;
 }
+.hs-row[data-busy] .hs-status .hs-icon {
+  display: block;
+}
 .hs-row-headline {
   display: none;
-  padding-left: calc(21 * var(--u));
+  padding-left: calc(25 * var(--u));
   overflow: hidden;
   color: var(--hs-ink-2);
   font-size: calc(11 * var(--u));
@@ -453,16 +447,14 @@
 .hero-scene[data-view="task"] .hs-panes[data-views] > [data-pane="task"] {
   display: flex;
 }
-/* The current view's row or navigation item is filled; another thread open in a pane gets a ring. */
+/* The current view's row or navigation item is filled, and so is every other thread open in a pane. */
 .hero-scene[data-view="a"] .hs-row[data-row="a"],
 .hero-scene[data-view="b"] .hs-row[data-row="b"],
 .hero-scene[data-view="team"] .hs-row[data-row="team"],
 .hero-scene[data-view="task"] .hs-nav-row[data-nav="Tasks"],
+.hero-scene:has(.hs-panes[data-split]) .hs-row[data-row="b"],
 .hs-nav-row[data-current] {
   background: var(--hs-active);
-}
-.hero-scene:has(.hs-panes[data-split]) .hs-row[data-row="b"] {
-  box-shadow: inset 0 0 0 var(--u) var(--hs-line-strong);
 }
 .hs-row[data-current] {
   background: var(--hs-active);
@@ -516,6 +508,52 @@
   font-weight: 600;
   line-height: 1;
   font-variant-numeric: tabular-nums;
+}
+
+/* The end of a conversation: the cube in a 36-unit box, its light moving around the faces while the pane works. */
+.hs-presence {
+  display: flex;
+  align-items: center;
+  gap: calc(8 * var(--u));
+  margin-top: calc(12 * var(--u));
+  color: var(--hs-ink-3);
+  font-size: calc(13 * var(--u));
+}
+.hs-orb {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: calc(36 * var(--u));
+  height: calc(36 * var(--u));
+}
+.hs-orb svg {
+  width: calc(22 * var(--u));
+  height: calc(22 * var(--u));
+}
+.hs-pane[data-busy] .hs-orb {
+  color: var(--hs-ink);
+}
+.hs-mark-face:not([data-face="top"]) {
+  opacity: 0;
+}
+.hs-pane[data-busy] .hs-mark-face {
+  animation: hs-mark-face 2400ms ease-in-out infinite;
+}
+.hs-pane[data-busy] .hs-mark-face[data-face="right"] {
+  animation-delay: -1600ms;
+}
+.hs-pane[data-busy] .hs-mark-face[data-face="left"] {
+  animation-delay: -800ms;
+}
+@keyframes hs-mark-face {
+  0%,
+  26% {
+    opacity: 1;
+  }
+  34%,
+  92% {
+    opacity: 0;
+  }
 }
 
 /* Panes: flat, on the conversation surface, with a quiet header and no rules (ThreadView.tsx). */
@@ -2450,8 +2488,9 @@
   .hero-scene[data-sidebar="open"] .hs-pane .hs-window-nav {
     display: none;
   }
+  /* One pane shows at a time here, so only the thread on screen is filled. */
   .hero-scene:has(.hs-panes[data-split]) .hs-row[data-row="b"] {
-    box-shadow: none;
+    background: none;
   }
   .hero-scene[data-view="b"] .hs-row[data-row="b"] {
     background: var(--hs-active);
@@ -2471,7 +2510,7 @@
     max-width: calc(88 * var(--u));
   }
   /* A phone-width header keeps the title: the project name and the extra tools give way. */
-  .hs-window-nav .hs-icon-button:nth-child(2),
+  .hs-window-nav .hs-icon-button:is(:nth-child(2), :nth-child(3)),
   .hs-header-project,
   .hs-header-extra {
     display: none;

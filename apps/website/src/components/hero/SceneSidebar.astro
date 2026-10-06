@@ -1,8 +1,9 @@
 ---
 /**
- * The app sidebar as the desktop app lays it out (Sidebar.tsx): New thread, Tasks and Pull requests, the Threads and
- * Orclings tabs, the filter, then projects and their threads. A working thread says what its agent is doing under
- * its title, and the Inbox, history and Settings sit at the foot. Stills pass no journey.
+ * The app sidebar as the desktop app lays it out (Sidebar.tsx): the Inbox, sidebar toggle and search in the header;
+ * New thread, Tasks, Pull requests and More; the Threads and Orclings tabs, the filter, then projects and their
+ * threads. A thread's status sits before its title, and a working thread says what its agent is doing under it.
+ * Settings and history sit at the foot. Stills pass no journey.
  */
 import ProductIcon from "./ProductIcon.astro";
 import { otherThreads, project, type SidebarRow } from "../../data/hero/workspace";
@@ -23,6 +24,7 @@ const navigation = [
   { icon: "compose", label: "New thread" },
   { icon: "tasks", label: "Tasks" },
   { icon: "pullRequest", label: "Pull requests" },
+  { icon: "more", label: "More" },
 ] as const;
 const studio = [...rows, ...otherThreads.filter((thread) => !rows.some((row) => row.title === thread.title))];
 const show = (windows: string) => (journey ? timed(journey, windows) : {});
@@ -38,7 +40,13 @@ const [pendingFrom, pendingTo] = inboxPending?.split("~") ?? [];
 <aside class="hs-sidebar">
   <div class="hs-sidebar-inner">
     <div class="hs-sidebar-head">
-      <span class="hs-app-name">OpenOrc</span>
+      <span class="hs-icon-button hs-inbox">
+        <ProductIcon name="inbox" />
+        <span class="hs-nav-badge">
+          {inboxPending ? <span {...show(`<${pendingFrom} >${pendingTo}`)}>{inbox}</span> : inbox}
+          {inboxPending ? <span {...show(inboxPending)}>{inbox + 1}</span> : null}
+        </span>
+      </span>
       <span class="hs-icon-button"><ProductIcon name="panelLeft" /></span>
       <span class="hs-icon-button"><ProductIcon name="search" /></span>
     </div>
@@ -74,9 +82,8 @@ const [pendingFrom, pendingTo] = inboxPending?.split("~") ?? [];
         {studio.map((row) => (
           <span class:list={["hs-row", { "hs-block": row.show }]} data-row={row.id} data-current={row.current ? "" : undefined} data-grow={row.show ? "" : undefined} {...busyAttributes(row.busy)} {...(row.show ? show(row.show) : {})}>
             <span class="hs-row-heading">
-              <ProductIcon name="branch" class="hs-row-icon" />
-              <span class="hs-row-title">{row.title}</span>
               <span class="hs-status"><ProductIcon name="loader" /></span>
+              <span class="hs-row-title">{row.title}</span>
             </span>
             <span class="hs-row-headline">
               {Array.isArray(row.headline) ? row.headline.map((step) => <span {...show(step.show)}>{step.text}</span>) : (row.headline ?? "Working")}
@@ -87,7 +94,7 @@ const [pendingFrom, pendingTo] = inboxPending?.split("~") ?? [];
       <div class="hs-group">
         <span class="hs-group-head"><span class="hs-group-icon"><ProductIcon name="folder" /></span><span class="hs-group-name">website</span><ProductIcon name="chevronDown" class="hs-group-chevron" /><span class="hs-icon-button hs-small"><ProductIcon name="plus" /></span></span>
         <span class="hs-row">
-          <span class="hs-row-heading"><ProductIcon name="branch" class="hs-row-icon" /><span class="hs-row-title">Tell the product story</span></span>
+          <span class="hs-row-heading"><span class="hs-status"></span><span class="hs-row-title">Tell the product story</span></span>
         </span>
       </div>
       <div class="hs-group">
@@ -98,13 +105,6 @@ const [pendingFrom, pendingTo] = inboxPending?.split("~") ?? [];
       <span class="hs-add-project"><ProductIcon name="plus" />Add project</span>
       <div class="hs-foot-controls">
         <span class="hs-settings"><ProductIcon name="settings" />Settings</span>
-        <span class="hs-icon-button hs-inbox">
-          <ProductIcon name="inbox" />
-          <span class="hs-nav-badge">
-            {inboxPending ? <span {...show(`<${pendingFrom} >${pendingTo}`)}>{inbox}</span> : inbox}
-            {inboxPending ? <span {...show(inboxPending)}>{inbox + 1}</span> : null}
-          </span>
-        </span>
         <span class="hs-icon-button"><ProductIcon name="arrowLeft" /></span>
         <span class="hs-icon-button" data-disabled><ProductIcon name="arrowRight" /></span>
       </div>

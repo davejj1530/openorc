@@ -2,6 +2,7 @@
 import Icon from "./Icon.astro";
 import DownloadButton from "./DownloadButton.astro";
 import BrandMark from "./BrandMark.astro";
+import ThemeToggle from "./ThemeToggle.astro";
 import { getPublishedReleases } from "../data/changelog";
 const docs = Astro.url.pathname.startsWith("/docs");
 const changelog = Astro.url.pathname.startsWith("/changelog");
@@ -28,6 +29,7 @@ const home = Astro.url.pathname === "/" ? "" : "/";
       {hasPublishedReleases && <a href="/changelog/" aria-current={changelog ? "page" : undefined}>Changelog</a>}
     </div>
     <div class="nav-actions">
+      <ThemeToggle />
       <a class="nav-github" href="https://github.com/davejj1530/openorc" aria-label="OpenOrc on GitHub" target="_blank" rel="noopener noreferrer">
         <Icon name="github" size={18} />
         <span>GitHub</span>

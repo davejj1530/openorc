@@ -4,13 +4,24 @@
  */
 :root {
   --window-shadow: 0 0 0 1px rgb(0 0 0 / 0.09), 0 2px 6px rgb(0 0 0 / 0.05), 0 30px 70px -28px rgb(36 40 30 / 0.5);
+  --panel-ground: #d9d6ca;
+  --window-ground: #f3f3f3;
+}
+/* In the dark the paintings dim a little, so the page doesn't glare around them. */
+:root[data-theme="dark"] {
+  --window-shadow: 0 0 0 1px rgb(255 255 255 / 0.08), 0 2px 6px rgb(0 0 0 / 0.3), 0 30px 70px -28px rgb(0 0 0 / 0.8);
+  --panel-ground: #2a2925;
+  --window-ground: #161616;
+}
+:root[data-theme="dark"] .art-panel-painting img {
+  filter: brightness(0.82);
 }
 .art-panel {
   position: relative;
   isolation: isolate;
   overflow: hidden;
   border-radius: 8px;
-  background: #d9d6ca;
+  background: var(--panel-ground);
 }
 .art-panel-painting {
   position: absolute;
@@ -33,7 +44,7 @@
   overflow: hidden;
   container-type: inline-size;
   border-radius: 10px;
-  background: #f3f3f3;
+  background: var(--window-ground);
   box-shadow: var(--window-shadow);
 }
 @media (forced-colors: active) {

@@ -9,14 +9,24 @@
   --type-control: 0.875rem;
   --section-space: 7.5rem;
 
-  /* Warm paper, ink, and OpenOrc's teal kept for links and focus. */
+  /* Warm paper, ink, and OpenOrc's teal kept for links and focus. Dark mode below swaps every one. */
   --bg: #f7f7f4;
   --surface: #efeee9;
   --text: #1f1e1b;
+  --text-2: #4a4944;
   --muted: #6b6a64;
+  --faint: #a3a29b;
   --rule: #e1e0d9;
+  --rule-strong: #d6d4cc;
+  --tint: #f2f1ec;
+  --card-hover: #e8e7e1;
+  --paper: #ffffff;
   --accent: #0b7268;
   --ink-button: #1f1e1b;
+  --ink-button-hover: #000000;
+  --on-ink: #ffffff;
+  --selection: #cfe9e4;
+  --scrollbar: #c8c6bf;
   /* Zalando Sans, set a touch narrow, is the closest open font to Cursor's CursorGothic. */
   font-family:
     "Zalando Sans Variable",
@@ -32,7 +42,28 @@
   scroll-behavior: smooth;
   scroll-padding-top: 100px;
   caret-color: var(--accent);
-  scrollbar-color: #c8c6bf var(--bg);
+  scrollbar-color: var(--scrollbar) var(--bg);
+}
+/* Dark mode: warm near-black, as on Cursor's site, with the Download pill turned light. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #151410;
+  --surface: #1d1c18;
+  --text: #ecebe6;
+  --text-2: #c9c8c1;
+  --muted: #a3a29a;
+  --faint: #6f6e67;
+  --rule: #2c2b26;
+  --rule-strong: #3a3934;
+  --tint: #24231f;
+  --card-hover: #25241f;
+  --paper: #1f1e1a;
+  --accent: #5cc4b5;
+  --ink-button: #ecebe6;
+  --ink-button-hover: #ffffff;
+  --on-ink: #151410;
+  --selection: #1f4a44;
+  --scrollbar: #3a3934;
 }
 * {
   box-sizing: border-box;
@@ -73,7 +104,7 @@ svg {
   flex-shrink: 0;
 }
 ::selection {
-  background: #cfe9e4;
+  background: var(--selection);
   color: var(--text);
 }
 :focus-visible {
@@ -199,6 +230,28 @@ h3 {
 .nav-github:hover {
   color: var(--text);
 }
+.theme-toggle {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  transition: color 160ms ease;
+}
+.theme-toggle:hover {
+  color: var(--text);
+}
+/* The button shows where it goes: a moon in light mode, a sun in dark. */
+.theme-toggle-sun,
+:root[data-theme="dark"] .theme-toggle-moon {
+  display: none;
+}
+:root[data-theme="dark"] .theme-toggle-sun {
+  display: block;
+}
 .nav-links a:hover,
 .nav-links a[aria-current="page"],
 .text-link:hover,
@@ -234,17 +287,17 @@ h3 {
   min-height: 32px;
   padding: 5px 14px;
   background: var(--ink-button);
-  color: #fff;
+  color: var(--on-ink);
 }
 .button-small:not(:disabled):hover {
-  background: #000;
+  background: var(--ink-button-hover);
 }
 .button-primary {
   background: var(--ink-button);
-  color: #fff;
+  color: var(--on-ink);
 }
 .button-primary:not(:disabled):hover {
-  background: #000;
+  background: var(--ink-button-hover);
 }
 .text-link {
   display: inline-flex;

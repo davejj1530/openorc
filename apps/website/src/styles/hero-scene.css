@@ -27,7 +27,7 @@
   --hs-ink: #333333;
   --hs-ink-2: #444444;
   --hs-ink-3: #626262;
-  --hs-ink-4: #949494;
+  --hs-ink-4: #626262;
   --hs-accent: #171717;
   --hs-accent-ink: #333333;
   --hs-accent-soft: #e8e8e8;
@@ -54,6 +54,14 @@
   --hs-code-bg: #dfdfdf;
   --hs-notice: #f2f2f2;
   --hs-ok-soft: rgb(30 115 89 / 0.18);
+  --hs-on-accent: #ffffff;
+  --hs-live-ring: rgb(51 51 51 / 0.35);
+  --hs-review: #4f62c7;
+  --hs-syn-keyword: #cf222e;
+  --hs-syn-name: #8250df;
+  --hs-syn-string: #0a3069;
+  --hs-syn-tag: #116329;
+  --hs-syn-component: #0550ae;
   --hs-mono: "JetBrains Mono Variable", "SF Mono", Menlo, Consolas, monospace;
   --hs-ease: cubic-bezier(0.2, 0, 0, 1);
   color: var(--hs-ink);
@@ -77,6 +85,50 @@
   display: flex;
   overflow: hidden;
   background: var(--hs-bg);
+}
+/* The site in dark mode shows the app's dark theme (the OpenOrc palette, as app.css sets it). */
+:root[data-theme="dark"] :is(.hero-scene, .hs-mock) {
+  --hs-bg: #161616;
+  --hs-surface: #181818;
+  --hs-surface-2: #242424;
+  --hs-surface-3: #303030;
+  --hs-line: #333333;
+  --hs-line-strong: #505050;
+  --hs-ink: #e5e5e5;
+  --hs-ink-2: #cacaca;
+  --hs-ink-3: #adadad;
+  --hs-ink-4: #adadad;
+  --hs-accent: #e3e3e3;
+  --hs-accent-ink: #e5e5e5;
+  --hs-accent-soft: #303030;
+  --hs-ok: #8bc6aa;
+  --hs-bad: #d06557;
+  --hs-warn: #a47f29;
+  --hs-sheen: none;
+  --hs-popover: #202020;
+  --hs-bubble: #1e1e1e;
+  --hs-tint: rgb(255 255 255 / 0.05);
+  --hs-code: #e1e4e8;
+  --hs-diff-add: #1c2b21;
+  --hs-diff-add-gutter: #22392a;
+  --hs-diff-add-word: #2c5136;
+  --hs-diff-del: #2e1d1c;
+  --hs-diff-del-gutter: #3d2322;
+  --hs-diff-del-word: #5c2c29;
+  --hs-pane: #181818;
+  --hs-active: #303030;
+  --hs-badge: #3a3a3a;
+  --hs-code-bg: #313131;
+  --hs-notice: #1f1f1f;
+  --hs-ok-soft: rgb(139 198 170 / 0.18);
+  --hs-on-accent: #161616;
+  --hs-live-ring: rgb(229 229 229 / 0.35);
+  --hs-review: #8b9bea;
+  --hs-syn-keyword: #ff7b72;
+  --hs-syn-name: #d2a8ff;
+  --hs-syn-string: #a5d6ff;
+  --hs-syn-tag: #7ee787;
+  --hs-syn-component: #79c0ff;
 }
 /* The mock's parent is the size container, so cqi measures the frame the mock fills.
    Each mock names its design width; phones use the app's narrow panel widths. */
@@ -132,6 +184,10 @@
   flex: none;
   width: calc(12 * var(--u));
   height: calc(12 * var(--u));
+}
+/* Codex and OpenCode marks are dark, so the app's dark theme inverts them; the demos do the same. */
+:root[data-theme="dark"] .hs-logo:is([data-provider="codex"], [data-provider="opencode"]) {
+  filter: invert(1);
 }
 
 /* Before the player starts, the page shows the first moment when it will play
@@ -892,7 +948,7 @@
   white-space: nowrap;
 }
 .hs-file-chip[data-live] {
-  box-shadow: inset 0 0 0 var(--u) rgb(51 51 51 / 0.35);
+  box-shadow: inset 0 0 0 var(--u) var(--hs-live-ring);
 }
 .hs-file-chip .hs-icon {
   width: calc(12 * var(--u));
@@ -1188,7 +1244,7 @@
 }
 .hs-button-primary[data-ready] {
   background: var(--hs-accent);
-  color: #fff;
+  color: var(--hs-on-accent);
 }
 
 /* Task cards the agent leaves in the thread */
@@ -1426,7 +1482,7 @@
 .hs-check[data-done] i {
   border-color: var(--hs-accent);
   background: var(--hs-accent);
-  color: #fff;
+  color: var(--hs-on-accent);
 }
 .hs-check i .hs-icon {
   width: calc(10 * var(--u));
@@ -1811,7 +1867,7 @@
   color: var(--hs-accent);
 }
 .hs-status-review {
-  color: #4f62c7;
+  color: var(--hs-review);
 }
 
 /* Changes panel mock */
@@ -1938,24 +1994,24 @@
   background: var(--hs-diff-del);
 }
 .hs-diff-code [data-tone="keyword"] {
-  color: #cf222e;
+  color: var(--hs-syn-keyword);
 }
 .hs-diff-code [data-tone="name"],
 .hs-diff-code [data-tone="attr"] {
-  color: #8250df;
+  color: var(--hs-syn-name);
 }
 .hs-diff-code [data-tone="string"] {
-  color: #0a3069;
+  color: var(--hs-syn-string);
 }
 .hs-diff-code [data-tone="tag"] {
-  color: #116329;
+  color: var(--hs-syn-tag);
 }
 .hs-diff-code [data-tone="component"] {
-  color: #0550ae;
+  color: var(--hs-syn-component);
 }
 .hs-diff-code [data-tone="mark"] {
   border-radius: calc(3 * var(--u));
-  color: #0a3069;
+  color: var(--hs-syn-string);
 }
 .hs-diff-row[data-type="add"] [data-tone="mark"] {
   background: var(--hs-diff-add-word);
@@ -2030,7 +2086,7 @@
 }
 .hs-button-ink {
   background: var(--hs-accent);
-  color: #fff;
+  color: var(--hs-on-accent);
 }
 .hs-button .hs-icon {
   width: calc(14 * var(--u));
@@ -2233,7 +2289,7 @@
 .hs-composer[data-typed] .hs-send,
 .hs-pane[data-busy] .hs-send {
   background: var(--hs-accent);
-  color: #fff;
+  color: var(--hs-on-accent);
 }
 .hs-checkout {
   display: flex;

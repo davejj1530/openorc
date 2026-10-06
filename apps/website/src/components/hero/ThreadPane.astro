@@ -1,6 +1,10 @@
 ---
-/** One conversation pane as the app draws it (ThreadView.tsx): a quiet header, the transcript, and the composer. */
+/**
+ * One conversation pane as the app draws it (ThreadView.tsx): a quiet header, the transcript ending in the OpenOrc
+ * cube, and the composer. The `presence` slot sits beside the cube, as a team's working clock does.
+ */
 import Composer from "./Composer.astro";
+import PresenceMark from "./PresenceMark.astro";
 import ProductIcon from "./ProductIcon.astro";
 import { project } from "../../data/hero/workspace";
 import type { Journey } from "../../data/hero/timeline";
@@ -34,6 +38,7 @@ const { id, journey, title, busy, model, permission, placeholder, branch = proje
       <span class="hs-window-nav">
         <span class="hs-icon-button"><ProductIcon name="panelLeft" /></span>
         <span class="hs-icon-button"><ProductIcon name="inbox" /></span>
+        <span class="hs-icon-button"><ProductIcon name="search" /></span>
         <span class="hs-icon-button"><ProductIcon name="arrowLeft" /></span>
         <span class="hs-icon-button" data-disabled><ProductIcon name="arrowRight" /></span>
       </span>
@@ -53,6 +58,7 @@ const { id, journey, title, busy, model, permission, placeholder, branch = proje
   <div class="hs-transcript">
     <div class="hs-column">
       <slot />
+      <PresenceMark><slot name="presence" /></PresenceMark>
     </div>
   </div>
   <div class="hs-composer-area">

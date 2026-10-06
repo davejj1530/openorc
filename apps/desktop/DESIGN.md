@@ -176,7 +176,7 @@ Appearance mode and palette selection remain independent. Accent choices and fin
 
 ## Typography
 
-Immaculate Gothic sets the whole interface by default, including task document headings. Settings > Appearance can switch it to Inter, Geist, or the system font, independent of the palette; `fonts.css` maps each choice to its family. Immaculate Gothic has two static faces, Text 450 and Bold 700: regular and medium text render in Text, semibold titles in Bold. Code uses JetBrains Mono Variable with platform monospace fallbacks.
+Immaculate Gothic sets the whole interface by default, including task document headings. Settings > Appearance can switch it to Inter, Geist, or the system font, independent of the palette; `fonts.css` maps each choice to its family. Immaculate Gothic has two static faces, Text 450 and Bold 700: regular and medium text render in Text, semibold titles in Bold. Code has a separate Appearance picker and live preview: JetBrains Mono Variable by default, Geist Mono Variable, or the system monospace font. `code-fonts.css` maps the choice to `--font-mono`, a runtime token shared by code blocks, editors, and diffs. Open terminals load the selected face and refit without restarting the shell. Both font choices persist independently and follow changes made in another window.
 
 The frontmatter defines the observed hierarchy. Toolbar titles use the compact semibold title role. Ordinary controls use the interface or label role; conversation prose uses the body role, while the composer has its own smaller text. Task document headings use the document role. New-thread and list pages use the compact toolbar title. Dates, counts, usage, and diff statistics use tabular numerals.
 

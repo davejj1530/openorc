@@ -10,3 +10,5 @@ Unmodified WOFF2 files from David's `Immaculate-Gothic-Family-1.101` package, su
 The supplied [provenance](../../../../../licenses/vendor/immaculate-gothic-PROVENANCE.txt) is retained byte for byte, published at `/licenses/immaculate-gothic-PROVENANCE.txt`, and included in the desktop app's `licenses/vendor/` resources. It records custom authorship without assigning an open-source license; the font is separate from the repository's Apache-2.0 code license.
 
 `global.css` registers the two faces with `font-display: swap`, normal kerning, and no synthetic weights or italics. `Layout.astro` preloads Text; Bold loads where used. Astro emits both files with content hashes. System fallbacks cover characters outside the supplied Latin faces. Product demos use Immaculate Gothic to match the app's default font, with JetBrains Mono for code.
+
+The desktop app's `fonts.css` registers the same faces. Its interface font defaults to Immaculate Gothic and can be changed in Appearance; a separate Code font setting selects JetBrains Mono, Geist Mono, or the system monospace face.

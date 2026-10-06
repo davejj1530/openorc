@@ -20,6 +20,8 @@ The original Rive mascot and its source availability are described in [the masco
 | `@fontsource-variable/jetbrains-mono` | 5.3.0            | SIL OFL 1.1; original copyright and license are retained in the desktop archive's package directory and published at `/licenses/jetbrains-mono-OFL-1.1.txt` on the website. |
 | `@fontsource-variable/geist`          | 5.3.0            | SIL OFL 1.1; original copyright and license are retained in the desktop package.                                                                                            |
 
+`@fontsource-variable/geist-mono` 5.3.0 is also bundled for the desktop Code font setting under SIL OFL 1.1. Its original copyright and license remain in the desktop archive at `node_modules/@fontsource-variable/geist-mono/LICENSE`.
+
 These font files remain under OFL rather than Apache-2.0. Preserve their license files and any reserved-font-name requirements when replacing or modifying them.
 
 The website and desktop app's Immaculate Gothic Text and Bold faces are David's custom font from family package 1.101. Their supplied provenance is preserved in `licenses/vendor/immaculate-gothic-PROVENANCE.txt`, published at `/licenses/immaculate-gothic-PROVENANCE.txt`, and included in the desktop app's `licenses/vendor/` resources. The font is separate from the Apache-2.0 code license; its package does not assign an open-source license. See the [font record](apps/website/src/assets/fonts/README.md) for file hashes and use.

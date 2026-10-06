@@ -6,6 +6,7 @@ import { Button, Empty, IconButton, TextButton } from "../components/ui";
 import { typeAtPrompt } from "../lib/terminal-requests";
 import { useTheme } from "../lib/theme";
 import { terminalTheme } from "./terminal-theme";
+import { followTerminalFont } from "./terminal-font";
 import "@xterm/xterm/css/xterm.css";
 
 /**
@@ -36,7 +37,8 @@ type Status = { kind: "starting" } | { kind: "running" } | { kind: "exited"; cod
 function openXterm(element: HTMLElement): { term: Xterm; fit: FitAddon } {
   const term = new Xterm({
     cursorBlink: true,
-    fontFamily: getComputedStyle(document.documentElement).getPropertyValue("--font-mono").trim() || "monospace",
+    // The selected face is applied after loading, so xterm never caches its fallback's metrics.
+    fontFamily: "monospace",
     fontSize: 12,
     lineHeight: 1.35,
     macOptionIsMeta: true,
@@ -76,14 +78,16 @@ export function TerminalPanel({ id, cwd }: { id: string; cwd: string }) {
 
     const keys = term.onData((data: string) => api.write(id, data));
     let settle = 0;
+    const resize = (): void => {
+      fit.fit();
+      api.resize(id, term.cols, term.rows);
+    };
     const observer = new ResizeObserver(() => {
       window.clearTimeout(settle);
-      settle = window.setTimeout(() => {
-        fit.fit();
-        api.resize(id, term.cols, term.rows);
-      }, RESIZE_SETTLE_MS);
+      settle = window.setTimeout(resize, RESIZE_SETTLE_MS);
     });
     observer.observe(element);
+    const stopFont = followTerminalFont(term, resize);
 
     let live = true;
     let offData = (): void => {};
@@ -125,6 +129,7 @@ export function TerminalPanel({ id, cwd }: { id: string; cwd: string }) {
       live = false;
       window.clearTimeout(settle);
       observer.disconnect();
+      stopFont();
       requests.dispose();
       offData();
       offExit();

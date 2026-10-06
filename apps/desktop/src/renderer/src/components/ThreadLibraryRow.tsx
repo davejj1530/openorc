@@ -46,7 +46,8 @@ function PullRequestMark({ thread }: { thread: ThreadSummary }) {
 export function ThreadRow({ thread, active }: { thread: ThreadSummary; active: boolean }) {
   const navigate = useRouter((s) => s.navigate);
   const addPane = useRouter((s) => s.addThreadPane);
-  const split = useRouter((s) => s.threadIds.includes(thread.id));
+  // Every thread open in a pane is marked alike; aria-current names only the focused one.
+  const open = useRouter((s) => s.threadIds.includes(thread.id)) || active;
   const orcling = orclingById(useOrclings(), thread.orclingId);
   const agents = thread.agents?.length ? thread.agents : [thread.agent];
   const providers = [...new Set(agents)].map((agent) => ({ agent, count: agents.filter((item) => item === agent).length }));
@@ -70,10 +71,10 @@ export function ThreadRow({ thread, active }: { thread: ThreadSummary; active: b
               }
             }}
             aria-current={active ? "page" : undefined}
+            data-open={open || undefined}
             className={cn(
               "sidebar-thread-row thread-preview no-drag min-w-0 w-full flex flex-col items-stretch gap-0.5 px-2 py-1.5 rounded-md text-base text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink",
-              active && "text-ink",
-              split && !active && "ring-1 ring-inset ring-line-strong",
+              open && "text-ink",
             )}
             title={`${thread.title}\n${place.label} · ${agentLabel} · ${relativeTime(thread.lastActivityAt)}`}
           />
@@ -83,7 +84,7 @@ export function ThreadRow({ thread, active }: { thread: ThreadSummary; active: b
           <span className="thread-preview-status">
             <ThreadStatusIndicator thread={thread} idle={<PullRequestMark thread={thread} />} />
           </span>
-          <span className={cn("thread-preview-title flex-1 min-w-0 text-left", (active || thread.unread || thread.activity === "waiting") && "text-ink")}>{thread.title}</span>
+          <span className={cn("thread-preview-title flex-1 min-w-0 text-left", (open || thread.unread || thread.activity === "waiting") && "text-ink")}>{thread.title}</span>
         </span>
         <ThreadRowHeadline thread={thread} />
         <span className="thread-preview-meta flex min-w-0 items-center gap-2 text-xs leading-4 text-ink-3">

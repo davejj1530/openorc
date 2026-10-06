@@ -416,7 +416,7 @@
   width: 14px;
   justify-content: center;
 }
-.app-shell .sidebar-shell .thread-preview[aria-current="page"]:not(:focus-visible) {
+.app-shell .sidebar-shell .thread-preview[data-open]:not(:focus-visible) {
   background: var(--navigation-soft);
   box-shadow: none;
 }
@@ -428,7 +428,7 @@
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.thread-preview[aria-current="page"] .thread-preview-title {
+.thread-preview[data-open] .thread-preview-title {
   color: var(--navigation-ink);
 }
 /* Keep branch/provider details in the accessible label and hover title without a second row. */
@@ -1106,7 +1106,7 @@
 @media (forced-colors: active) {
   .sidebar-browser-tabs button[aria-current="page"],
   .project-option[data-selected="true"],
-  .thread-preview[aria-current="page"],
+  .thread-preview[data-open],
   .task-page-filters [role="radio"][aria-checked="true"],
   .settings-tablist button[aria-selected="true"] {
     outline: 1px solid Highlight;

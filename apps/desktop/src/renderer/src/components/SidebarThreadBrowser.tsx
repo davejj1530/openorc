@@ -10,7 +10,8 @@ import { useRouter } from "../lib/router";
 import { core } from "../lib/rpc";
 import { listedThreads, sidebarThreadPage, visibleSidebarThreadIds } from "../lib/sidebar-thread-groups";
 import { useUi } from "../lib/ui";
-import { Check, ChevronDown, ChevronRight, ListFilter, Pin, Search, Zap } from "./icons";
+import { Check, ChevronDown, ChevronRight, ListFilter, Pin, Search } from "./icons";
+import { OpenOrcMark } from "./OpenOrcMark";
 import { SidebarProjectGroup } from "./SidebarProjectGroup";
 import { ThreadRow } from "./ThreadLibraryRow";
 import { menuItem, menuPopup } from "./ThreadActions";
@@ -169,7 +170,7 @@ const FILTER_NAMES: Record<SidebarFilter | "pinned", string> = { active: "Active
 
 /** The filter's mark: orcmode and pins show their own, so a narrowed list never looks like the whole one. */
 function FilterMark({ selection }: { selection: SidebarFilter | "pinned" }) {
-  if (selection === "orc") return <Zap size={14} />;
+  if (selection === "orc") return <OpenOrcMark size={14} />;
   return selection === "pinned" ? <Pin size={14} /> : <ListFilter size={14} />;
 }
 

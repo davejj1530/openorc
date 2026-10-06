@@ -1,11 +1,20 @@
+/*
+ * The docs, after Cursor's: a quiet grouped sidebar, one readable column, and an
+ * outline beside it on wide screens. Pages explain a feature first and point to
+ * the internals in Reference.
+ */
 .docs {
   --docs-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --docs-body: 0.9375rem;
   display: grid;
-  grid-template-columns: 200px minmax(0, 1fr) 200px;
+  grid-template-columns: 220px minmax(0, 768px) 200px;
+  justify-content: space-between;
   align-items: start;
-  gap: 64px;
-  padding-block: 56px var(--section-space);
+  gap: 56px;
+  padding-block: 40px var(--section-space);
 }
+
+/* Sidebar */
 .docs-nav,
 .docs-toc {
   position: sticky;
@@ -17,124 +26,142 @@
 /* The links' highlight reaches 12px past the column, so the scroll box starts there too and doesn't clip it. */
 .docs-nav {
   margin-left: -12px;
+  padding-bottom: 24px;
 }
-.docs-nav ol,
-.docs-toc ol,
-.docs-menu ol {
-  list-style: none;
+.docs-nav-group + .docs-nav-group {
+  margin-top: 22px;
+}
+.docs-nav-group-title {
+  margin: 0 0 4px;
+  padding-left: 12px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 450;
+}
+.docs-nav-groups ul,
+.docs-toc ol {
   margin: 0;
   padding: 0;
+  list-style: none;
 }
-.docs-nav a,
-.docs-menu a {
+.docs-nav-groups a {
   display: flex;
   align-items: center;
-  min-height: 36px;
-  padding: 6px 12px;
-  border-radius: 7px;
+  min-height: 30px;
+  padding: 4px 12px;
+  border-radius: 6px;
   color: var(--muted);
   font-size: var(--type-control);
   line-height: 1.4;
 }
-.docs-nav a:hover,
-.docs-menu a:hover {
-  color: var(--text);
-}
-.docs-nav a[aria-current="page"],
-.docs-menu a[aria-current="page"] {
+.docs-nav-groups a:hover {
   background: var(--surface);
   color: var(--text);
 }
-.docs-toc p {
-  margin-bottom: 8px;
-  color: var(--text);
-  font-size: var(--type-control);
+.docs-nav-groups a[aria-current="page"] {
+  color: var(--accent);
+  font-weight: 500;
 }
-.docs-toc a {
-  display: block;
-  padding-block: 6px;
-  color: var(--muted);
-  font-size: 0.8125rem;
-  line-height: 1.45;
-}
-.docs-toc a:hover {
-  color: var(--text);
+.docs-nav-groups a[aria-current="page"]:hover {
+  background: none;
 }
 .docs-menu {
   display: none;
 }
+
+/* Outline */
+.docs-toc a {
+  display: block;
+  padding-block: 5px;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+.docs-toc a:hover,
+.docs-toc a[aria-current="location"] {
+  color: var(--text);
+}
+
+/* Page */
 .docs-article {
   min-width: 0;
-  max-width: 800px;
   container-type: inline-size;
 }
 .docs-header {
-  padding-bottom: 40px;
-  margin-bottom: 8px;
+  margin-bottom: 36px;
 }
 .docs-header h1 {
-  max-width: 20ch;
-  font-size: clamp(2.25rem, 3.2vw, 2.75rem);
+  max-width: 22ch;
+  font-size: 2.125rem;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
 }
 .docs-lead {
   max-width: 62ch;
-  margin-top: 20px;
-  color: var(--muted);
+  margin-top: 14px;
   font-size: 1.0625rem;
-  line-height: 1.7;
+  line-height: 1.6;
 }
 .docs-reviewed {
-  margin-top: 16px;
+  margin-top: 64px;
+  padding-top: 20px;
+  border-top: 1px solid var(--rule);
   color: var(--muted);
-  font-size: var(--type-control);
+  font-size: 0.8125rem;
 }
 
 /* Prose */
 .docs-article h2 {
   max-width: none;
-  margin: 56px 0 20px;
-  padding-top: 40px;
-  border-top: 1px solid var(--rule);
-  font-size: 1.5rem;
+  margin: 48px 0 14px;
+  font-size: 1.3rem;
+  font-weight: 450;
+  letter-spacing: -0.015em;
   scroll-margin-top: 88px;
 }
-.docs-header + section > h2:first-child {
-  margin-top: 8px;
-  padding-top: 0;
-  border-top: 0;
+.docs-header + section > h2:first-child,
+.docs-header + .docs-visual + section > h2:first-child {
+  margin-top: 0;
 }
 .docs-article h3 {
-  margin: 36px 0 12px;
-  font-size: var(--type-title);
+  margin: 32px 0 10px;
+  font-size: 1.125rem;
+  font-weight: 450;
   scroll-margin-top: 88px;
 }
 .docs-article h4 {
-  margin: 28px 0 10px;
+  margin: 24px 0 8px;
   color: var(--text);
-  font-size: var(--type-body);
-  font-weight: 450;
+  font-size: var(--docs-body);
+  font-weight: 500;
 }
 .docs-article p {
   max-width: 72ch;
-  line-height: 1.75;
+  color: #4a4944;
+  font-size: var(--docs-body);
+  line-height: 1.7;
 }
 .docs-article p + p,
 .docs-article p + ul,
 .docs-article p + ol,
 .docs-article ul + p,
 .docs-article ol + p {
-  margin-top: 16px;
+  margin-top: 14px;
 }
 .docs-article ul,
 .docs-article ol:not(.docs-steps) {
   max-width: 72ch;
   margin-block: 0;
   padding-left: 1.25em;
-  color: var(--muted);
+  color: #4a4944;
+  font-size: var(--docs-body);
   line-height: 1.7;
 }
+.docs-article ul {
+  list-style: square;
+}
 .docs-article li + li {
-  margin-top: 8px;
+  margin-top: 6px;
 }
 .docs-article li::marker {
   color: #a3a29b;
@@ -145,7 +172,8 @@
 }
 .docs-article p a,
 .docs-article li a,
-.docs-article td a {
+.docs-article td a,
+.docs-callout a {
   color: var(--text);
   text-decoration: underline;
   text-decoration-color: #b5b3ab;
@@ -153,7 +181,8 @@
 }
 .docs-article p a:hover,
 .docs-article li a:hover,
-.docs-article td a:hover {
+.docs-article td a:hover,
+.docs-callout a:hover {
   text-decoration-color: currentColor;
 }
 .docs-article code {
@@ -168,11 +197,11 @@
 }
 .docs-article pre {
   max-width: 100%;
-  margin: 20px 0 24px;
-  padding: 16px 20px;
+  margin: 18px 0 22px;
+  padding: 14px 18px;
   overflow-x: auto;
   border: 1px solid var(--rule);
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--surface);
   color: var(--text);
   font-family: var(--docs-mono);
@@ -188,13 +217,27 @@
   background: none;
   font-size: inherit;
 }
+kbd {
+  display: inline-block;
+  min-width: 1.6em;
+  padding: 0 0.4em;
+  border: 1px solid var(--rule);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: #fff;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  text-align: center;
+}
 
 /* Structures */
 .docs-table {
-  margin: 20px 0 28px;
+  margin: 18px 0 26px;
   overflow-x: auto;
   border: 1px solid var(--rule);
-  border-radius: 10px;
+  border-radius: 8px;
 }
 .docs-table table {
   width: 100%;
@@ -208,7 +251,7 @@
 }
 .docs-table th,
 .docs-table td {
-  padding: 12px 16px;
+  padding: 11px 16px;
   text-align: left;
   vertical-align: top;
 }
@@ -220,7 +263,7 @@
 }
 .docs-table td {
   border-top: 1px solid var(--rule);
-  color: var(--muted);
+  color: #4a4944;
 }
 .docs-table td:first-child {
   color: var(--text);
@@ -230,13 +273,13 @@
   overflow-wrap: normal;
 }
 .docs-terms {
-  margin: 20px 0 28px;
+  margin: 18px 0 26px;
 }
 .docs-terms > div {
   display: grid;
-  grid-template-columns: 9rem minmax(0, 1fr);
+  grid-template-columns: 10rem minmax(0, 1fr);
   gap: 24px;
-  padding-block: 14px;
+  padding-block: 13px;
   border-top: 1px solid var(--rule);
 }
 .docs-terms > div:last-child {
@@ -244,17 +287,19 @@
 }
 .docs-terms dt {
   color: var(--text);
+  font-size: var(--docs-body);
   line-height: 1.7;
 }
 .docs-terms dd {
   margin: 0;
-  color: var(--muted);
+  color: #4a4944;
+  font-size: var(--docs-body);
   line-height: 1.7;
 }
 .docs-steps {
   display: grid;
-  gap: 16px;
-  margin: 20px 0 28px;
+  gap: 14px;
+  margin: 18px 0 26px;
   padding: 0;
   list-style: none;
   counter-reset: step;
@@ -263,8 +308,9 @@
   position: relative;
   max-width: 72ch;
   margin: 0;
-  padding-left: 44px;
-  color: var(--muted);
+  padding-left: 40px;
+  color: #4a4944;
+  font-size: var(--docs-body);
   line-height: 1.7;
   counter-increment: step;
 }
@@ -275,33 +321,112 @@
   left: 0;
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   border: 1px solid var(--rule);
   border-radius: 50%;
+  background: #fff;
   color: var(--text);
   font-size: 0.8125rem;
 }
-.docs-note {
-  max-width: 72ch;
-  margin: 24px 0;
-  padding: 16px 20px;
-  border: 1px solid var(--rule);
-  border-radius: 10px;
-  background: var(--surface);
-}
-.docs-note p {
-  font-size: 0.9375rem;
+.docs-steps > li + li {
+  margin-top: 0;
 }
 .docs-source {
-  margin-top: 16px;
+  margin-top: 14px;
   color: var(--muted);
-  font-size: var(--type-control);
+  font-size: 0.8125rem;
+}
+
+/* Callouts */
+.docs-callout {
+  max-width: 72ch;
+  margin: 22px 0;
+  padding: 13px 16px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--surface);
+  color: #4a4944;
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+.docs-callout[data-tone="warning"] {
+  border-color: #ecdcb0;
+  background: #fbf4e0;
+}
+.docs-callout-title {
+  margin-bottom: 4px;
+  color: var(--text);
+  font-weight: 500;
+}
+.docs-article .docs-callout p {
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+.docs-callout p + p {
+  margin-top: 8px;
+}
+.docs-callout[data-tone="warning"] .docs-callout-title {
+  color: #5c4710;
+}
+
+/* Cards */
+.docs-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0 26px;
+}
+.docs-cards[data-columns="3"] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.docs-card {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  padding: 15px 18px 17px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+.docs-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 6px 18px -12px rgb(36 40 30 / 0.35);
+}
+.docs-card-title {
+  color: var(--text);
+  font-size: var(--docs-body);
+  font-weight: 500;
+}
+.docs-card-text {
+  color: var(--muted);
+  font-size: 0.84375rem;
+  line-height: 1.55;
+}
+
+/* Product stills on a painting */
+.docs-visual {
+  margin: 26px 0 32px;
+}
+.docs-visual .art-panel-stage {
+  padding: clamp(14px, 5%, 40px);
+}
+/* The worktree still is drawn narrower here, as on the homepage, so its text stays readable in the column. */
+.docs-visual .hs-mock-worktree {
+  --hs-canvas: 1000;
+  height: calc(640 * var(--u));
+}
+.docs-visual figcaption {
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 0.8125rem;
 }
 
 /* Diagrams draw a narrow composition instead of shrinking labels. */
 .docs-diagram {
-  margin: 28px 0 36px;
+  margin: 26px 0 34px;
 }
 .docs-diagram > svg {
   display: block;
@@ -354,9 +479,9 @@
 }
 .docs-diagram figcaption {
   max-width: 72ch;
-  margin-top: 16px;
+  margin-top: 14px;
   color: var(--muted);
-  font-size: var(--type-control);
+  font-size: 0.8125rem;
   line-height: 1.7;
 }
 @container (max-width: 640px) {
@@ -368,39 +493,16 @@
     max-width: 400px;
     margin-inline: auto;
   }
-}
-
-/* Pager */
-.docs-pager {
-  display: flex;
-  justify-content: space-between;
-  gap: 24px;
-  margin-top: 72px;
-  padding-top: 24px;
-  border-top: 1px solid var(--rule);
-}
-.docs-pager a {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 44px;
-  color: var(--muted);
-  font-size: var(--type-control);
-}
-.docs-pager a:hover {
-  color: var(--text);
-}
-.docs-pager-previous svg {
-  transform: rotate(180deg);
-}
-.docs-pager-next {
-  margin-left: auto;
+  .docs-cards,
+  .docs-cards[data-columns="3"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 @media (max-width: 1240px) {
   .docs {
-    grid-template-columns: 200px minmax(0, 1fr);
-    gap: 56px;
+    grid-template-columns: 210px minmax(0, 1fr);
+    gap: 48px;
   }
   .docs-toc {
     display: none;
@@ -409,14 +511,14 @@
 @media (max-width: 860px) {
   .docs {
     grid-template-columns: minmax(0, 1fr);
-    padding-top: 24px;
+    padding-top: 20px;
   }
   .docs-nav {
     display: none;
   }
   .docs-menu {
     display: block;
-    margin-bottom: 32px;
+    margin-bottom: 28px;
     border-block: 1px solid var(--rule);
   }
   .docs-menu summary {
@@ -439,18 +541,17 @@
   .docs-menu[open] summary svg {
     transform: rotate(-90deg);
   }
-  .docs-menu nav {
-    padding-bottom: 12px;
+  .docs-menu .docs-nav-groups {
+    padding-bottom: 16px;
+  }
+  .docs-header h1 {
+    font-size: 1.875rem;
   }
 }
 @media (max-width: 700px) {
   .docs-terms > div {
     grid-template-columns: minmax(0, 1fr);
     gap: 4px;
-  }
-  .docs-article h2 {
-    margin-top: 44px;
-    padding-top: 32px;
   }
 }
 @media (forced-colors: active) {
@@ -460,8 +561,7 @@
     --text: CanvasText;
     --muted: CanvasText;
   }
-  .docs-nav a[aria-current="page"],
-  .docs-menu a[aria-current="page"] {
+  .docs-nav-groups a[aria-current="page"] {
     outline: 1px solid CanvasText;
   }
 }

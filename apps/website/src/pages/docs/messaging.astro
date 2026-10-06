@@ -1,0 +1,120 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import Callout from "../../components/docs/Callout.astro";
+import LinkCards from "../../components/docs/LinkCards.astro";
+import { docHref } from "../../data/docs";
+
+const sections = [
+  { id: "how-it-works", title: "How it works" },
+  { id: "ask", title: "Ask in plain words" },
+  { id: "helper-threads", title: "Helper threads" },
+  { id: "messages", title: "Messages between threads" },
+  { id: "limits", title: "How exchanges end" },
+  { id: "next-steps", title: "Next steps" },
+];
+
+const notice = `Message from the thread "API work" (id …):`;
+---
+
+<DocsLayout slug="messaging" sections={sections}>
+  <p>Agents in different threads of a project can talk to each other. One agent can ask another what it knows, tell it something its work depends on, or start a helper thread to take on part of the job. You ask for this in the conversation, and the agents do it with OpenOrc's thread tools.</p>
+
+  <section aria-labelledby="how-it-works">
+    <h2 id="how-it-works">How it works</h2>
+    <p>A thread's agent has four tools for reaching the other threads of its project:</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Tool</th>
+            <th scope="col">What the agent does with it</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>thread_list</code></td>
+            <td>Sees the project's active threads: what each one is doing and its last reply.</td>
+          </tr>
+          <tr>
+            <td><code>thread_read</code></td>
+            <td>Reads the latest messages of another thread.</td>
+          </tr>
+          <tr>
+            <td><code>thread_send</code></td>
+            <td>Sends a short message to another thread.</td>
+          </tr>
+          <tr>
+            <td><code>thread_start</code></td>
+            <td>Starts a helper thread that works beside it, in the same folder.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>A thread reaches only the threads of its own project. An <a href={docHref("orclings")}>Orcling</a> can reach threads in all your projects.</p>
+  </section>
+
+  <section aria-labelledby="ask">
+    <h2 id="ask">Ask in plain words</h2>
+    <p>Say what you want in your message. You don't need to name a tool. For example:</p>
+    <ul>
+      <li>"Start a Codex thread to write tests for the parser while you finish the refactor."</li>
+      <li>"Hand the icons to Claude in a separate thread."</li>
+      <li>"Ask the API thread whether the new endpoint is ready."</li>
+      <li>"Tell the docs thread that the flag is now called <code>--quiet</code>."</li>
+    </ul>
+    <p>When you ask for a helper thread, OpenOrc tells the agent to start it without checking with you again. The agent asks first only when it's unclear what to start or which agent should do it.</p>
+  </section>
+
+  <section aria-labelledby="helper-threads">
+    <h2 id="helper-threads">Helper threads</h2>
+    <p>A helper thread is a regular thread in the project, and it shows in the sidebar like any other. It starts with these settings from the thread that started it:</p>
+    <dl class="docs-terms">
+      <div>
+        <dt>Folder</dt>
+        <dd>The same folder: the project checkout, or the starting thread's worktree when it has one.</dd>
+      </div>
+      <div>
+        <dt>Mode</dt>
+        <dd>The same mode and permissions.</dd>
+      </div>
+      <div>
+        <dt>Agent and model</dt>
+        <dd>The same agent and model, unless you name others. You can name a model the way you'd say it. If the name fits no model or several, the agent gets the list to choose from.</dd>
+      </div>
+    </dl>
+    <p>The helper's first message is a notice saying which thread started it and how to reach that thread. Click <strong>Show details</strong> under the notice to read the task it was given. In the thread that started it, a card shows the helper's title, whether it's <strong>Working</strong>, <strong>Needs you</strong> or <strong>Idle</strong>, and its project. Click the card to open the helper.</p>
+    <p>The two threads keep in touch with messages. The helper is told to message the thread that started it when it has results or needs something.</p>
+    <ul>
+      <li>A thread can have up to three helpers working at once. Helpers that are idle or archived don't count.</li>
+      <li>A helper can't start helpers of its own. OpenOrc tells it to ask the thread that started it instead.</li>
+      <li>A thread in Plan can't start helpers until you switch it to another mode.</li>
+      <li>Team conversations can't start helpers. A team divides work among its own members.</li>
+      <li>Starting a helper doesn't ask for your approval.</li>
+    </ul>
+    <Callout tone="warning" title="Helpers share the folder">
+      A helper and the thread that started it edit the same files, so give each a separate part of the work. <strong>Undo</strong> on either thread's change card rolls back the whole folder, including the other thread's changes.
+    </Callout>
+  </section>
+
+  <section aria-labelledby="messages">
+    <h2 id="messages">Messages between threads</h2>
+    <p>A message goes to one thread. If that thread's agent is working, the message joins its current turn. Otherwise the message starts a new turn.</p>
+    <p>In the receiving thread, the message appears as a notice from OpenOrc that names the sender:</p>
+    <pre><code set:text={notice} /></pre>
+    <p>Click <strong>Show details</strong> to read the message. In the sending thread, the agent's work shows a <strong>Sent message</strong> row.</p>
+    <p>The receiving agent acts on a message with its own thread's permissions, which can be more than the sender has. So a message to a thread in the same or a stricter mode goes straight through. A message to a more permissive thread, such as from Review everything to Autonomous, asks you first. From Plan, an agent can message only threads that are also in Plan. See <a href={docHref("permissions") + "#openorc-tools"}>Modes and permissions</a>.</p>
+    <p>A message to a <a href={docHref("teams")}>team conversation</a> goes to the team's lead, which reads it on its next turn. In the team's conversation it's labeled <strong>From thread</strong> and the sender's title. A team receives these messages only while it's running.</p>
+  </section>
+
+  <section aria-labelledby="limits">
+    <h2 id="limits">How exchanges end</h2>
+    <p>OpenOrc tells agents to message another thread only when its work depends on theirs or they need something from it, and never just to say thanks. An exchange ends when one side has nothing to send back.</p>
+    <p>As a backstop, OpenOrc counts agent messages in a row with no person writing in between. After 20, it refuses to send more and tells the agent to ask you to continue. When you write in a thread, its count starts over.</p>
+    <Callout>The count is kept in memory while OpenOrc runs, so quitting OpenOrc also starts it over.</Callout>
+  </section>
+
+  <section aria-labelledby="next-steps">
+    <h2 id="next-steps">Next steps</h2>
+    <LinkCards cards={[{ slug: "permissions" }, { slug: "work" }, { slug: "teams" }, { slug: "orclings" }]} />
+  </section>
+</DocsLayout>

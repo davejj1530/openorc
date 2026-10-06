@@ -1,0 +1,148 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import Callout from "../../components/docs/Callout.astro";
+import LinkCards from "../../components/docs/LinkCards.astro";
+import DocsVisual from "../../components/docs/DocsVisual.astro";
+import ChangesPanelMock from "../../components/mocks/ChangesPanelMock.astro";
+import { docHref } from "../../data/docs";
+
+const sections = [
+  { id: "changes-panel", title: "The Changes panel" },
+  { id: "turn", title: "Review one turn" },
+  { id: "comments", title: "Comment on lines" },
+  { id: "commit", title: "Commit" },
+  { id: "push", title: "Push and open a pull request" },
+  { id: "tasks", title: "Changes in a task" },
+  { id: "requirements", title: "What each action needs" },
+  { id: "next-steps", title: "Next steps" },
+];
+---
+
+<DocsLayout slug="review" sections={sections}>
+  <DocsVisual
+    art="feature-plan"
+    label="The Changes panel for one modified file, src/Welcome.tsx, with eight lines added and two removed shown as a unified diff, under the Commit button."
+  >
+    <ChangesPanelMock />
+  </DocsVisual>
+
+  <section aria-labelledby="changes-panel">
+    <h2 id="changes-panel">The Changes panel</h2>
+    <p>The Changes panel sits beside a thread and shows what has changed in the thread's folder. Open it in any of these ways:</p>
+    <ul>
+      <li>Choose <strong>Changes</strong> in the thread's header.</li>
+      <li>Press <kbd>⌘J</kbd> to show or hide the panel, then pick its <strong>Changes</strong> tab.</li>
+      <li>Click the line counts in the row at the bottom of the composer, beside the branch. They appear when the folder has uncommitted changes.</li>
+    </ul>
+    <p>What the panel compares depends on where the thread works:</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Thread works in</th>
+            <th scope="col">The panel shows</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>A worktree</td>
+            <td>Everything since the worktree started, commits included (<strong>All branch changes</strong>), or only what isn't committed yet (<strong>Uncommitted changes</strong>). <strong>Show uncommitted</strong> and <strong>Show branch changes</strong> switch between them.</td>
+          </tr>
+          <tr>
+            <td>Your checkout</td>
+            <td>Every uncommitted change in the checkout, whoever made it.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>The header counts the changed files and lines. When several files changed, a list above the diff marks each one A (added), U (new, not yet tracked), M (modified), D (deleted) or R (renamed), and the diff folds each file to a header row; click a header to open it. An untracked file over 1 MB shows as a one-line placeholder instead of its contents. The diff reads unified in a narrow panel and side by side once the panel is wide enough. <strong>Expand panel</strong> widens it, and <kbd>Esc</kbd> or <strong>Collapse panel</strong> docks it again.</p>
+    <p>The panel updates as the agent edits, when you come back to the OpenOrc window, and after a command you run in the terminal. <strong>Refresh</strong> reloads it at once.</p>
+  </section>
+
+  <section aria-labelledby="turn">
+    <h2 id="turn">Review one turn</h2>
+    <p>When a turn edits files, a card appears under the agent's reply: <strong>Edited 3 files</strong>, with the lines added and removed and the first few file names.</p>
+    <ul>
+      <li><strong>Review</strong> opens that turn's changes in the Changes panel, as they were saved when the turn ended, so later edits don't mix in. <strong>All changes</strong> returns to the full view.</li>
+      <li>Click a file name to see only that file's changes from the turn.</li>
+      <li><strong>Undo</strong> puts the files back as they were before the turn. It asks for a second click to confirm. See <a href={docHref("work")}>Following the work</a>.</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="comments">
+    <h2 id="comments">Comment on lines</h2>
+    <p>Leave comments on the diff for the agent to address, the way you would on a pull request.</p>
+    <ol class="docs-steps">
+      <li>Click a line number. To comment on several lines, drag or shift-click across line numbers in the same hunk.</li>
+      <li>Write what should change and choose <strong>Add comment</strong>, or press <kbd>⌘↵</kbd>.</li>
+      <li>Add as many comments as you need. Each shows on the diff, marked <strong>not sent yet</strong>, and in a list under it.</li>
+      <li>Choose <strong>Send 2 to the conversation</strong> (the number counts your unsent comments).</li>
+    </ol>
+    <p>OpenOrc sends them as one message that quotes each comment's lines and asks the agent to address every comment, or to say why one is wrong. If the agent is busy, the message waits in the queue; removing it from the queue returns the comments to the review. A comment whose lines change later is marked <strong>Outdated</strong>. Agent team conversations don't take line comments.</p>
+  </section>
+
+  <section aria-labelledby="commit">
+    <h2 id="commit">Commit</h2>
+    <ol class="docs-steps">
+      <li>Choose <strong>Commit</strong> in the Changes panel, or <strong>Commit changes</strong> in the row at the bottom of the composer.</li>
+      <li>Write the message. OpenOrc doesn't write commit messages for you, so the field starts empty.</li>
+      <li>Choose <strong>Commit</strong>.</li>
+    </ol>
+    <p>OpenOrc stages every change in the thread's folder and commits it, and your Git hooks run as they would for your own commit. The panel then shows <strong>Committed</strong> with the commit's short hash.</p>
+    <Callout>In a thread on your checkout, <strong>Commit</strong> includes every uncommitted change in the checkout, your own edits and other threads' included. Check the file list before you commit.</Callout>
+  </section>
+
+  <section aria-labelledby="push">
+    <h2 id="push">Push and open a pull request</h2>
+    <p>The thread's commits are listed in the panel's <strong>Commits</strong> tab, which appears once there are commits to show. Commits that origin doesn't have yet are marked <strong>Not pushed</strong>.</p>
+    <ol class="docs-steps">
+      <li>Choose <strong>Publish branch</strong> the first time, and <strong>Push 2 commits</strong> (or however many) after that. OpenOrc never force-pushes. If origin has newer commits, it asks you to pull them in first.</li>
+      <li>Once the branch is on origin with every commit, <strong>PR</strong> appears. Choose it.</li>
+      <li>In <strong>Open a pull request</strong>, pick the <strong>Target branch</strong>, check the <strong>Title</strong> and <strong>Body</strong>, and choose <strong>Open PR</strong>.</li>
+    </ol>
+    <p>The title starts as your newest commit's subject, and the body as the repository's pull request template when it has one. The target starts as the branch the thread started from, or else the project's default branch. Afterwards, the thread's header shows the pull request's state, <strong>open</strong>, <strong>merged</strong> or <strong>closed</strong>. While it is open, OpenOrc checks it again about every five minutes.</p>
+  </section>
+
+  <section aria-labelledby="tasks">
+    <h2 id="tasks">Changes in a task</h2>
+    <p>A task's <strong>Changes</strong> tab shows the Changes panel of the task's thread beside the task, and <strong>Commits</strong> shows that thread's commits. Line comments you write from a task are labeled with it, and sending them moves the task back to <strong>In progress</strong>.</p>
+    <p>A task that belongs to an <a href={docHref("teams")}>agent team</a> shows a review of its assignment's workspace instead. <strong>Since last review</strong> shows only what changed since you chose <strong>Mark reviewed</strong>. <strong>Export patch</strong> writes the changes to a patch file in OpenOrc's data folder and shows it in your file manager. Its <strong>Commit</strong>, <strong>Push</strong> and <strong>PR</strong> buttons work on the assignment's own branch, when the team allows it.</p>
+  </section>
+
+  <section aria-labelledby="requirements">
+    <h2 id="requirements">What each action needs</h2>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Action</th>
+            <th scope="col">Needs</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Changes panel, change cards, <strong>Undo</strong></td>
+            <td>A project folder that is a Git repository. See <a href={docHref("git") + "#no-git"}>Projects without Git</a>.</td>
+          </tr>
+          <tr>
+            <td><strong>Commit</strong></td>
+            <td>Uncommitted changes, a Git user name and email, and hooks that pass.</td>
+          </tr>
+          <tr>
+            <td><strong>Publish branch</strong>, <strong>Push</strong></td>
+            <td>A remote named <code>origin</code>, a branch to push, and Git credentials that work without a prompt, such as an SSH key or a credential helper.</td>
+          </tr>
+          <tr>
+            <td><strong>PR</strong></td>
+            <td>The GitHub CLI, <code>gh</code>, installed and signed in with <code>gh auth login</code>, and a branch other than the default branch, pushed with every commit. Without <code>gh</code>, a worktree thread on a GitHub remote gets a <strong>PR</strong> button that opens GitHub's compare page in your browser instead.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="next-steps">
+    <h2 id="next-steps">Next steps</h2>
+    <LinkCards cards={[{ slug: "git" }, { slug: "pull-requests" }, { slug: "work" }]} columns={3} />
+  </section>
+</DocsLayout>

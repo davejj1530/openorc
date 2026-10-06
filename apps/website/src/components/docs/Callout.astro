@@ -1,0 +1,13 @@
+---
+/** An aside in a docs page: a gray note for limits and tips, or a yellow warning for what can lose work. */
+interface Props {
+  tone?: "note" | "warning";
+  title?: string;
+}
+const { tone = "note", title } = Astro.props;
+---
+
+<div class="docs-callout" data-tone={tone} role="note">
+  {title && <p class="docs-callout-title">{title}</p>}
+  <slot />
+</div>

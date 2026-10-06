@@ -1,0 +1,210 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import Callout from "../../components/docs/Callout.astro";
+import LinkCards from "../../components/docs/LinkCards.astro";
+import { docHref } from "../../data/docs";
+
+const sections = [
+  { id: "supported", title: "Supported agents" },
+  { id: "differences", title: "How they differ" },
+  { id: "finding", title: "How OpenOrc finds them" },
+  { id: "choose", title: "Choose the agent and model" },
+  { id: "effort", title: "Effort and Fast mode" },
+  { id: "switch", title: "Switch agents in a thread" },
+  { id: "usage", title: "Usage and allowances" },
+  { id: "updates", title: "Update the agents" },
+  { id: "next-steps", title: "Next steps" },
+];
+---
+
+<DocsLayout slug="agents" sections={sections}>
+  <section aria-labelledby="supported">
+    <h2 id="supported">Supported agents</h2>
+    <p>OpenOrc works with three coding agents. Each is a command-line tool that you install and sign in to yourself. OpenOrc starts it for your threads with that sign-in, and the agent sends your requests to its own provider.</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Agent</th>
+            <th scope="col">Install</th>
+            <th scope="col">Sign in</th>
+            <th scope="col">Account it uses</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Codex</td>
+            <td><a href="https://developers.openai.com/codex/cli">Codex CLI guide</a></td>
+            <td><code>codex login</code></td>
+            <td>Your ChatGPT account</td>
+          </tr>
+          <tr>
+            <td>Claude Code</td>
+            <td><a href="https://code.claude.com/docs/en/setup">Claude Code setup</a></td>
+            <td><code>claude auth login</code></td>
+            <td>Your Claude account</td>
+          </tr>
+          <tr>
+            <td>OpenCode</td>
+            <td><a href="https://opencode.ai/docs/">OpenCode docs</a></td>
+            <td><code>opencode auth login</code></td>
+            <td>The provider accounts you signed in to OpenCode</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="differences">
+    <h2 id="differences">How they differ</h2>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col"></th>
+            <th scope="col">Codex</th>
+            <th scope="col">Claude Code</th>
+            <th scope="col">OpenCode</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Messages sent mid-turn</td>
+            <td>Read during the turn</td>
+            <td>Read during the turn</td>
+            <td>Queued until the turn ends</td>
+          </tr>
+          <tr>
+            <td>Modes</td>
+            <td>All four</td>
+            <td>All four, except Plan and Accept edits on Windows</td>
+            <td>Plan and Autonomous only</td>
+          </tr>
+          <tr>
+            <td>Fast mode</td>
+            <td>Models that offer it</td>
+            <td>Models and accounts that allow it</td>
+            <td>Not available</td>
+          </tr>
+          <tr>
+            <td>Usage in Settings</td>
+            <td>Allowances and resets</td>
+            <td>Allowances</td>
+            <td>On each provider's dashboard</td>
+          </tr>
+          <tr>
+            <td>Import terminal sessions</td>
+            <td>Yes</td>
+            <td>Yes</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td>Can summarize runs for memory</td>
+            <td>Yes</td>
+            <td>Yes</td>
+            <td>No</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>For Codex, the mode menu calls the last three modes <strong>Review changes</strong>, <strong>Ask for approval</strong>, and <strong>Full access</strong>, after how its sandbox behaves. <a href={docHref("permissions")}>Modes and permissions</a> compares the modes.</p>
+  </section>
+
+  <section aria-labelledby="finding">
+    <h2 id="finding">How OpenOrc finds them</h2>
+    <p>On macOS and Linux, OpenOrc asks your login shell where each agent is, the way a terminal would, so it finds the same <code>codex</code>, <code>claude</code>, and <code>opencode</code> you use there. Then it runs each agent's own status command to see whether you're signed in. It checks when it starts and again whenever you ask.</p>
+    <ol class="docs-steps">
+      <li>Install the agent or sign in from a terminal.</li>
+      <li>Open Settings → <strong>Connections</strong> and click <strong>Refresh connections</strong>. During setup, click <strong>Rescan</strong> instead.</li>
+      <li>Check the agent's status. <strong>Connected</strong> means it's ready. <strong>Not logged in</strong> shows the sign-in command to run, and <strong>Not installed</strong> links to the install guide.</li>
+    </ol>
+    <p>If Codex or Claude Code signs out while you work, the thread shows <strong>Sign in</strong>, which runs the agent's sign-in command in the thread's terminal.</p>
+    <Callout>
+      <p>On Windows, OpenOrc doesn't ask a login shell. It finds an agent only when <code>OPENORC_CODEX_BIN</code>, <code>OPENORC_CLAUDE_BIN</code>, or <code>OPENORC_OPENCODE_BIN</code> holds the agent's full path.</p>
+    </Callout>
+  </section>
+
+  <section aria-labelledby="choose">
+    <h2 id="choose">Choose the agent and model</h2>
+    <p>Every thread has its own agent and model. To change them, click the model name in the composer's bottom row.</p>
+    <ul>
+      <li>The rail on the left switches between Codex, Claude Code, and OpenCode. An agent that isn't installed or signed in is marked, and its models stay unavailable until you fix that.</li>
+      <li><strong>Search models</strong> filters the list. Older models wait under <strong>Legacy models</strong>.</li>
+      <li>A model the installed CLI can't run stays in the list with the reason, such as a model that needs a newer Claude Code.</li>
+      <li>OpenOrc asks each agent for its models and keeps the list for 5 minutes. <strong>Refresh models</strong> asks again.</li>
+    </ul>
+    <p>New threads start with the agent you picked during setup, or the first agent that's signed in. The New thread page then remembers your last choice for each project.</p>
+  </section>
+
+  <section aria-labelledby="effort">
+    <h2 id="effort">Effort and Fast mode</h2>
+    <p>Under the model list, <strong>Reasoning effort</strong> sets how much the model reasons before it acts. Each model offers its own levels, such as <strong>Low</strong>, <strong>Medium</strong>, <strong>High</strong>, and <strong>Extra high</strong>. Higher effort usually takes longer and uses more of your allowance. Choosing another model resets effort to that model's default, and <strong>Reset to model default</strong> does the same for the current one.</p>
+    <p>With Claude Code 2.1.278 or newer, models that offer <strong>Extra high</strong> also offer <strong>Ultracode</strong>. It runs at Extra high and tells the model to orchestrate dynamic workflows by default.</p>
+    <p>The lightning button in the picker's rail requests Fast mode, which trades a higher cost for faster output. A lightning mark beside the model name shows it's on. If Fast mode can't run, the picker says why, such as <strong>This Claude plan does not include Fast mode.</strong></p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Agent</th>
+            <th scope="col">Fast mode</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Codex</td>
+            <td>On models that advertise it. Uses more credits and depends on your account.</td>
+          </tr>
+          <tr>
+            <td>Claude Code</td>
+            <td>On models and accounts that allow it. Costs more and bills to paid usage credits. Off when <code>CLAUDE_CODE_DISABLE_FAST_MODE=1</code> is set, or when Claude Code runs through Amazon Bedrock, Google Vertex AI, or Microsoft Foundry.</td>
+          </tr>
+          <tr>
+            <td>OpenCode</td>
+            <td>Not available.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="switch">
+    <h2 id="switch">Switch agents in a thread</h2>
+    <p>You can give a thread to another agent at any time: pick one of its models in the picker, and your next message goes to it. Agents can't read each other's sessions, so the new agent starts a fresh session with a short brief: your last four requests and the previous agent's last reply. The composer tells you so before you send.</p>
+    <ul>
+      <li>In a project thread, switching back to an agent that worked there before resumes its own earlier session, without a brief.</li>
+      <li>In the Workspace, every change of agent or folder starts a fresh session with a brief.</li>
+      <li>While the agent is working, a message for the new agent waits in the queue until the turn ends.</li>
+    </ul>
+    <p>Changing the model, effort, or Fast mode within the same agent applies to your next message without starting over.</p>
+    <Callout>
+      <p>In a project thread, an agent you switch back to doesn't see what the other agent did in between. Ask it to check the files before it continues.</p>
+    </Callout>
+  </section>
+
+  <section aria-labelledby="usage">
+    <h2 id="usage">Usage and allowances</h2>
+    <p>Settings → <strong>Usage</strong> shows each account's limits as the agents report them, read through their own CLIs.</p>
+    <ul>
+      <li>For Codex and Claude Code, each allowance window, such as <strong>5-hour window</strong> or <strong>7-day window</strong>, shows how much is used or remaining and when it resets. <strong>Open usage</strong> opens the account's own page.</li>
+      <li>Codex also shows any usage resets you have. When Codex allows it, <strong>Use reset</strong> spends one after you confirm.</li>
+      <li>OpenCode bills each model through the provider account you signed in to it, so its allowances are on that provider's dashboard.</li>
+    </ul>
+    <p>The limits include activity outside OpenOrc. When a thread hits one, its error links to <strong>Manage usage</strong>.</p>
+  </section>
+
+  <section aria-labelledby="updates">
+    <h2 id="updates">Update the agents</h2>
+    <p>Settings → <strong>Connections</strong> lists each agent with its version and how it was installed.</p>
+    <ol class="docs-steps">
+      <li>Click <strong>Check for updates</strong>.</li>
+      <li>Click <strong>Update all</strong>, or the update button on one agent's row.</li>
+    </ol>
+    <p>OpenOrc can update an agent installed with npm, with a Homebrew cask, or with the agent's own installer. For any other installation, and on Windows, it links to instructions instead. An agent that's installed but fails to start offers <strong>Reinstall</strong>. Updates start only when agent work has finished, and idle sessions reconnect on your next message.</p>
+    <p><strong>Check for agent updates automatically</strong> looks every six hours while OpenOrc is open, using public version information from npm or Homebrew. When it finds one, a notice offers <strong>Review updates</strong>.</p>
+  </section>
+
+  <section aria-labelledby="next-steps">
+    <h2 id="next-steps">Next steps</h2>
+    <LinkCards cards={[{ slug: "permissions" }, { slug: "threads" }, { slug: "settings" }, { slug: "troubleshooting" }]} />
+  </section>
+</DocsLayout>

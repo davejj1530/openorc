@@ -3,37 +3,29 @@ import Layout from "./Layout.astro";
 import SiteHeader from "../components/SiteHeader.astro";
 import SiteFooter from "../components/SiteFooter.astro";
 import Icon from "../components/Icon.astro";
-import { docHref, docLabel, docPages, docsReviewed, type DocSection } from "../data/docs";
+import DocsNav from "../components/docs/DocsNav.astro";
+import LogoSprite from "../components/hero/LogoSprite.astro";
+import { docPage, docsReviewed, type DocSection } from "../data/docs";
 import "../styles/docs.css";
 
 interface Props {
   slug: string;
-  sections: DocSection[];
+  /** The page's h2 sections, for the outline beside it. */
+  sections?: DocSection[];
 }
 
-const { slug, sections } = Astro.props;
-const index = docPages.findIndex((page) => page.slug === slug);
-const page = docPages[index];
+const { slug, sections = [] } = Astro.props;
+const page = docPage(slug);
 if (!page) throw new Error(`Unknown docs page: ${slug}`);
-const previous = docPages[index - 1];
-const next = docPages[index + 1];
+const home = slug === "";
 ---
 
-<Layout title={slug ? `${page.title} · OpenOrc docs` : "How OpenOrc works · OpenOrc docs"} description={page.description}>
+<Layout title={home ? "OpenOrc documentation" : `${page.title} · OpenOrc docs`} description={page.description}>
   <SiteHeader />
-  <main id="main" class="container docs">
+  <LogoSprite />
+  <main id="main" class:list={["container docs", { "docs-home": home }]}>
     <aside class="docs-nav">
-      <nav aria-label="Documentation">
-        <ol>
-          {docPages.map((item) => (
-            <li>
-              <a href={docHref(item.slug)} aria-current={item.slug === slug ? "page" : undefined}>
-                {docLabel(item)}
-              </a>
-            </li>
-          ))}
-        </ol>
-      </nav>
+      <DocsNav slug={slug} />
     </aside>
 
     <article class="docs-article">
@@ -41,56 +33,35 @@ const next = docPages[index + 1];
         <summary>
           All documentation <Icon name="chevron" size={15} />
         </summary>
-        <nav aria-label="Documentation">
-          <ol>
-            {docPages.map((item) => (
-              <li>
-                <a href={docHref(item.slug)} aria-current={item.slug === slug ? "page" : undefined}>
-                  {docLabel(item)}
-                </a>
-              </li>
-            ))}
-          </ol>
-        </nav>
+        <DocsNav slug={slug} />
       </details>
       <header class="docs-header">
         <h1>{page.title}</h1>
         <p class="docs-lead">{page.description}</p>
-        <p class="docs-reviewed">
-          Checked against the source on {docsReviewed.date}.
-        </p>
       </header>
       <slot />
-      <nav class="docs-pager" aria-label="Previous and next pages">
-        {previous && (
-          <a class="docs-pager-previous" href={docHref(previous.slug)} rel="prev">
-            <Icon name="arrow" size={16} />
-            {docLabel(previous)}
-          </a>
-        )}
-        {next && (
-          <a class="docs-pager-next" href={docHref(next.slug)} rel="next">
-            {docLabel(next)}
-            <Icon name="arrow" size={16} />
-          </a>
-        )}
-      </nav>
+      <p class="docs-reviewed">Checked against OpenOrc's source on {docsReviewed.date}.</p>
     </article>
 
-    {sections.length > 0 && (
-      <aside class="docs-toc">
-        <nav aria-labelledby="docs-toc-title">
-          <p id="docs-toc-title">On this page</p>
-          <ol>
-            {sections.map((section) => (
-              <li>
-                <a href={`#${section.id}`}>{section.title}</a>
-              </li>
-            ))}
-          </ol>
-        </nav>
-      </aside>
-    )}
+    {
+      sections.length > 0 && (
+        <aside class="docs-toc">
+          <nav aria-label="On this page">
+            <ol>
+              {sections.map((section) => (
+                <li>
+                  <a href={`#${section.id}`}>{section.title}</a>
+                </li>
+              ))}
+            </ol>
+          </nav>
+        </aside>
+      )
+    }
   </main>
   <SiteFooter />
 </Layout>
+
+<script>
+  import "../scripts/docs-outline";
+</script>

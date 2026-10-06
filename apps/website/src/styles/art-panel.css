@@ -1,0 +1,43 @@
+/*
+ * A painting with a product view standing on it (ArtPanel.astro), shared by the
+ * homepage and the docs. Windows on a painting get a soft ring and shadow.
+ */
+:root {
+  --window-shadow: 0 0 0 1px rgb(0 0 0 / 0.09), 0 2px 6px rgb(0 0 0 / 0.05), 0 30px 70px -28px rgb(36 40 30 / 0.5);
+}
+.art-panel {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #d9d6ca;
+}
+.art-panel-painting {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+}
+.art-panel-painting img {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+}
+.art-panel-stage {
+  position: relative;
+  padding: clamp(16px, 6%, 72px);
+}
+.mock-window,
+.demo-window {
+  position: relative;
+  overflow: hidden;
+  container-type: inline-size;
+  border-radius: 10px;
+  background: #f3f3f3;
+  box-shadow: var(--window-shadow);
+}
+@media (forced-colors: active) {
+  .art-panel-painting {
+    display: none;
+  }
+}

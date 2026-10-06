@@ -1,0 +1,106 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import Callout from "../../components/docs/Callout.astro";
+import LinkCards from "../../components/docs/LinkCards.astro";
+import { docHref } from "../../data/docs";
+
+const sections = [
+  { id: "open", title: "Open a terminal" },
+  { id: "shell", title: "Shell and folder" },
+  { id: "lifetime", title: "How long a shell runs" },
+  { id: "processes", title: "Processes agents start" },
+  { id: "finishing", title: "When the turn ends" },
+  { id: "next-steps", title: "Next steps" },
+];
+---
+
+<DocsLayout slug="terminal" sections={sections}>
+  <section aria-labelledby="open">
+    <h2 id="open">Open a terminal</h2>
+    <p>Every conversation has a terminal of its own in the side panel. Use it to run commands yourself in the folder the agent works in, such as your tests or a dev server.</p>
+    <ol class="docs-steps">
+      <li>Open a conversation and press <kbd>⌘J</kbd>, or click <strong>Changes</strong> at the top of the conversation, to show the side panel.</li>
+      <li>Click <strong>+</strong> next to the panel's tabs and choose <strong>Terminal</strong>.</li>
+    </ol>
+    <p>The <strong>Terminal</strong> tab then stays in that conversation's panel. A task's side panel has a terminal too.</p>
+    <p>If an agent signs out while you work, the transcript offers <strong>Sign in</strong>. It opens this terminal and runs the agent's sign-in command, such as <code>claude auth login</code>.</p>
+  </section>
+
+  <section aria-labelledby="shell">
+    <h2 id="shell">Shell and folder</h2>
+    <p>
+      The terminal starts in the folder the <strong>Changes</strong> tab reads: the conversation's worktree if it has one, otherwise the project folder. A Workspace conversation uses its own folder. The header shows the end of the
+      path.
+    </p>
+    <p>
+      The shell is the one set for your user account, usually zsh on macOS. It starts as an interactive, non-login shell, so zsh reads <code>~/.zshrc</code> but not <code>~/.zprofile</code>. Its <code>PATH</code> is the one
+      OpenOrc found by asking your login shell, the same one agents get, so tools resolve the way they do in your own terminal. OpenOrc also sets <code>TERM=xterm-256color</code>, <code>COLORTERM=truecolor</code>, and <code
+        >TERM_PROGRAM=OpenOrc</code
+      >.
+    </p>
+    <p>When a command you typed finishes, the <strong>Changes</strong> tab refreshes, so edits you make by hand show up next to the agent's.</p>
+  </section>
+
+  <section aria-labelledby="lifetime">
+    <h2 id="lifetime">How long a shell runs</h2>
+    <p>
+      A shell keeps running when you switch tabs, close the panel, move to another conversation, or reload the window. When you come back, the terminal replays its recent output, up to the last 256 KB.
+    </p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Button</th>
+            <th scope="col">What it does</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>End shell</strong></td>
+            <td>Stops the shell and forgets its output.</td>
+          </tr>
+          <tr>
+            <td><strong>Restart shell</strong></td>
+            <td>Stops the shell and starts a new one in the conversation's folder.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>When a shell exits, the terminal says so and offers <strong>Start a new one</strong>. Quitting OpenOrc ends every shell.</p>
+    <Callout>
+      Deleting a conversation doesn't end its shell, which then runs until you quit OpenOrc. End it before you delete the conversation. OpenOrc doesn't limit how many shells run, and it won't restart to install an update
+      while any shell runs, including one in a closed panel. With more than one OpenOrc window open, a terminal's live output reaches only one of them.
+    </Callout>
+  </section>
+
+  <section aria-labelledby="processes">
+    <h2 id="processes">Processes agents start</h2>
+    <p>Agents run commands with their own tools, outside your terminal. Most commands end within the turn. Some keep running, such as a dev server or a file watcher.</p>
+    <p>
+      Claude Code reports the commands it leaves running in the background. OpenOrc lists them above the composer, each with its description, <strong>Running</strong>, and a <strong>Stop</strong> button. Codex and OpenCode don't
+      report theirs, so OpenOrc can't list them or stop them one by one. Ask the agent to stop a server, or end it yourself.
+    </p>
+  </section>
+
+  <section aria-labelledby="finishing">
+    <h2 id="finishing">When the turn ends</h2>
+    <p>
+      A background command that OpenOrc lists outlives the turn that started it. The turn ends and the conversation stops showing as working, while the command keeps running. A dev server stays up for you, for the <a href={docHref("browser")}
+        >Preview</a
+      >, and for the agent's next turn.
+    </p>
+    <p>The command belongs to the agent's process, and closing that process would end it. So OpenOrc keeps the process open while any of its commands run, even past the idle time that normally closes it. A command ends when:</p>
+    <ul>
+      <li>you click <strong>Stop</strong> next to it,</li>
+      <li>it exits on its own, or</li>
+      <li>the agent's process closes. That happens when you quit OpenOrc, delete the conversation, or send a message after switching the conversation's agent or mode, which starts a new process.</li>
+    </ul>
+    <Callout>OpenOrc won't restart to install an update, or update an agent, while a background command runs. Stop the commands first.</Callout>
+    <p>If OpenOrc quits unexpectedly on macOS or Linux, it stops the agent processes left over from that session the next time it starts.</p>
+  </section>
+
+  <section aria-labelledby="next-steps">
+    <h2 id="next-steps">Next steps</h2>
+    <LinkCards cards={[{ slug: "browser" }, { slug: "work" }, { slug: "permissions" }]} columns={3} />
+  </section>
+</DocsLayout>

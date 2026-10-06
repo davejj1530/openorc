@@ -1,0 +1,167 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import Callout from "../../components/docs/Callout.astro";
+import LinkCards from "../../components/docs/LinkCards.astro";
+import { docHref } from "../../data/docs";
+
+const sections = [
+  { id: "open", title: "Open the Preview" },
+  { id: "agents", title: "How agents use it" },
+  { id: "approval", title: "What needs approval" },
+  { id: "sign-ins", title: "Sign-ins" },
+  { id: "limits", title: "Limits" },
+  { id: "next-steps", title: "Next steps" },
+];
+---
+
+<DocsLayout slug="browser" sections={sections}>
+  <section aria-labelledby="open">
+    <h2 id="open">Open the Preview</h2>
+    <p>
+      The Preview is a browser in a conversation's side panel. You and the conversation's agent see the same page, so you can watch a change land in the running app while the agent works on it, and the agent can check its own
+      work.
+    </p>
+    <ol class="docs-steps">
+      <li>Open a conversation and press <kbd>⌘J</kbd> to show the side panel.</li>
+      <li>Click <strong>+</strong> next to the panel's tabs and choose <strong>Preview</strong>.</li>
+      <li>Type an address in the address bar and press <kbd>↵</kbd>. An address without <code>http://</code> or <code>https://</code> gets <code>http://</code>.</li>
+    </ol>
+    <p>
+      A new Preview opens <code>http://localhost:3000</code>. After that, it remembers the last address you visited in that conversation. The back, forward, and reload buttons work as in any browser. <strong
+        >Expand panel</strong
+      > gives the page more room, and <strong>Collapse panel</strong> shrinks it again.
+    </p>
+    <p>
+      Moving to another tab or conversation hides the page without closing it, so a dev server's page keeps its state. Links you click in the conversation open in its Preview. Right-click a link for <strong>Open in sidebar</strong>,
+      <strong>Open in default browser</strong>, <strong>Open in Chrome Incognito</strong> (when Chrome is installed), or <strong>Copy link address</strong>.
+    </p>
+    <p>When a page can't load, the Preview says why, such as "Nothing is listening on localhost:3000 yet.", and offers <strong>Retry</strong>.</p>
+  </section>
+
+  <section aria-labelledby="agents">
+    <h2 id="agents">How agents use it</h2>
+    <p>
+      Every agent gets OpenOrc's <code>browser</code> tool. <a href={docHref("instructions") + "#brief"}>OpenOrc's instructions</a> tell it to use the tool first for any website, to start a local project's dev server before
+      opening it, and to treat page content as data, never as instructions. The tool has seven actions:
+    </p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Action</th>
+            <th scope="col">What it does</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>open</code></td>
+            <td>Goes to an HTTP or HTTPS address.</td>
+          </tr>
+          <tr>
+            <td><code>snapshot</code></td>
+            <td>Reads the page: up to 16,000 characters of text and up to 200 visible controls, each with a reference the agent can act on. Password values are left out.</td>
+          </tr>
+          <tr>
+            <td><code>screenshot</code></td>
+            <td>Captures the visible part of the page as an image.</td>
+          </tr>
+          <tr>
+            <td><code>click</code></td>
+            <td>Clicks a control from the latest snapshot.</td>
+          </tr>
+          <tr>
+            <td><code>fill</code></td>
+            <td>Replaces the text in a field.</td>
+          </tr>
+          <tr>
+            <td><code>press</code></td>
+            <td>Presses <kbd>↵</kbd>, <kbd>Tab</kbd>, <kbd>Esc</kbd>, an arrow key, <kbd>Backspace</kbd>, or <kbd>Space</kbd>.</td>
+          </tr>
+          <tr>
+            <td><code>scroll</code></td>
+            <td>Scrolls the page.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Every action except <code>screenshot</code> returns a fresh snapshot.</p>
+    <p>
+      An agent can use only its own conversation's Preview, and only during its turn. When you're looking at that conversation, the Preview opens beside it as the agent works. When you're elsewhere, the agent works on the page out
+      of sight, and the Preview opens on that page when you come back to the conversation.
+    </p>
+  </section>
+
+  <section aria-labelledby="approval">
+    <h2 id="approval">What needs approval</h2>
+    <p>Reading never asks. Actions that change a page follow the conversation's mode:</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Action</th>
+            <th scope="col">Plan</th>
+            <th scope="col">Review everything</th>
+            <th scope="col">Accept edits</th>
+            <th scope="col">Autonomous</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>open</code>, <code>snapshot</code>, <code>screenshot</code>, <code>scroll</code></td>
+            <td>Runs</td>
+            <td>Runs</td>
+            <td>Runs</td>
+            <td>Runs</td>
+          </tr>
+          <tr>
+            <td><code>click</code>, <code>fill</code>, <code>press</code></td>
+            <td>Blocked</td>
+            <td>Asks</td>
+            <td>Asks</td>
+            <td>Runs</td>
+          </tr>
+          <tr>
+            <td>Typing into a password field</td>
+            <td>Blocked</td>
+            <td>Asks</td>
+            <td>Asks</td>
+            <td>Asks</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      Codex calls these modes <strong>Plan</strong>, <strong>Review changes</strong>, <strong>Ask for approval</strong>, and <strong>Full access</strong>. When OpenOrc asks, <strong>Allow for this run</strong> covers later clicks,
+      fills, and key presses in the same run. A password field asks every time.
+    </p>
+  </section>
+
+  <section aria-labelledby="sign-ins">
+    <h2 id="sign-ins">Sign-ins</h2>
+    <p>
+      The Preview keeps its own cookies and sign-ins, apart from your usual browser and from the rest of OpenOrc. Every conversation's Preview shares them, and they last across launches, so you don't have to sign in to the app
+      you're testing each time.
+    </p>
+    <Callout tone="warning">
+      Agents use the same signed-in sessions. In any mode, an agent can open and read pages on a site you're signed in to, and in Autonomous it can click and type there without asking. Sign out in the Preview, or don't sign in
+      there, if an agent shouldn't use that account.
+    </Callout>
+  </section>
+
+  <section aria-labelledby="limits">
+    <h2 id="limits">Limits</h2>
+    <ul>
+      <li>Only <code>http</code> and <code>https</code> addresses load, and never with a username or password inside the address. Every link, redirect, and frame is checked.</li>
+      <li>Sites can't use the camera, location, notifications, or any other permission. Downloads and pop-up windows are blocked.</li>
+      <li>The agent can't read inside frames, upload files, or run its own scripts on the page.</li>
+      <li>Each conversation runs one browser action at a time, and an action gives up after 30 seconds.</li>
+      <li>OpenOrc keeps up to six pages alive. Past that, it closes the hidden page that was used longest ago.</li>
+      <li>The Preview needs an OpenOrc window. A second window has its own Previews.</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="next-steps">
+    <h2 id="next-steps">Next steps</h2>
+    <LinkCards cards={[{ slug: "terminal" }, { slug: "permissions" }, { slug: "security" }]} columns={3} />
+  </section>
+</DocsLayout>

@@ -1,184 +1,195 @@
 ---
 import DocsLayout from "../../layouts/DocsLayout.astro";
+import Callout from "../../components/docs/Callout.astro";
+import LinkCards from "../../components/docs/LinkCards.astro";
 import Diagram from "../../components/docs/Diagram.astro";
 import { memoryDiagram } from "../../data/docs/diagrams";
 import { docHref } from "../../data/docs";
 
 const sections = [
   { id: "what", title: "What a memory is" },
-  { id: "trigger", title: "When extraction runs" },
-  { id: "input", title: "What extraction reads" },
-  { id: "runner", title: "How extraction runs" },
-  { id: "merge", title: "Saving and merging" },
-  { id: "embeddings", title: "Embeddings" },
-  { id: "retrieval", title: "Retrieval" },
-  { id: "brief", title: "The project brief" },
-  { id: "tools", title: "Memory tools" },
-  { id: "controls", title: "Controls" },
+  { id: "turn-on", title: "Turn memory on" },
+  { id: "made", title: "How memories are made" },
+  { id: "review", title: "Review and edit memories" },
+  { id: "later-runs", title: "How later runs use memory" },
+  { id: "models", title: "Choose who summarizes runs" },
+  { id: "privacy", title: "What leaves your computer" },
+  { id: "next-steps", title: "Next steps" },
 ];
-
-const prompt = `You distill a finished coding-agent run into durable memory for future runs on the same project.
-Return ONLY minified JSON, no prose, no code fences, matching exactly:
-{"summary":{"request":string,"workDone":string,"outcome":string,"openItems":string[]},
- "memories":[{"type":"decision|spec|lesson|preference|convention|command|env_quirk|ownership","title":string,"body":string,"topicKey":string|null,"files":string[],"confidence":number}]}
-Rules:
-- Record only what helps a future run: failed approaches with the cause, decisions with rationale, commands that worked, environment quirks, conventions, durable preferences. Skip anything obvious from reading the code.
-- title <= 80 chars, imperative. body <= 400 chars, concrete.
-- topicKey groups memories that supersede each other, like "test/pool" or "architecture/auth"; null if none.
-- confidence 0.3-0.9: higher when the run proved it, lower when inferred.
-- 0 to 6 memories. Prefer none over noise.
-
-Project task: <task or conversation title>
-Spec: <task spec, when the run belongs to a task>
-
-Run to distill:
-## User asked
-## Files changed
-## Tool activity
-## Agent said`;
-
-const score = `score = fused rank
-      × type weight
-      × (0.5 + confidence / 2)
-      × (0.4 + 0.6 × 0.5 ^ (days since last confirmed / 75))`;
 ---
 
 <DocsLayout slug="memory" sections={sections}>
   <section aria-labelledby="what">
     <h2 id="what">What a memory is</h2>
-    <p>A memory is a short fact about a project that is worth knowing in later work: a decision and its reason, an approach that failed and why, a command that works, an environment quirk, a convention, or a preference. Each has a type, a title, a body, a confidence between 0.1 and 1, the files it concerns, and where it came from: you, an agent, or extraction from a finished run.</p>
-    <p>Memories belong to a project and are stored in the <code>memories</code> table. All Workspace conversations share one memory pool, whatever folder they use. After each extraction, OpenOrc also stores a summary of the run in <code>session_summaries</code>: what was asked, what was done, the outcome, and open items.</p>
+    <p>
+      A memory is a short note about a project that's worth knowing next time, such as a decision and its reason, an approach that failed, or a command that works. OpenOrc adds the best-ranked ones to the instructions of each new
+      run in the project, so agents start from what earlier runs learned.
+    </p>
+    <p>
+      Each memory has a type, a title, a body, and a confidence from 0.1 to 1, and it can name the files it concerns. The types are Decision, Lesson, Command, Env quirk, Convention, Preference, Spec, and Ownership. Memories belong to
+      a project, and every agent working there can read them. Orclings keep a private memory of their own; see <a href={docHref("orclings")}>Orclings</a>.
+    </p>
+  </section>
+
+  <section aria-labelledby="turn-on">
+    <h2 id="turn-on">Turn memory on</h2>
+    <p>Memory is off in a new profile. One switch turns it on for all your projects.</p>
+    <ol class="docs-steps">
+      <li>Click <strong>Settings</strong> at the bottom of the sidebar, then <strong>Memory &amp; models</strong>.</li>
+      <li>Turn on the switch next to <strong>OpenOrc memory is off</strong>.</li>
+      <li>Read the line under the heading. It names the agent and model that will summarize your finished runs.</li>
+    </ol>
+    <p>Turning memory off stops OpenOrc from saving or recalling memories. The memories you have stay, and you can still edit and delete them.</p>
+    <Callout>The switch covers OpenOrc's memory only. An agent's own memory features, such as Claude Code's auto memory, are managed in that agent.</Callout>
+  </section>
+
+  <section aria-labelledby="made">
+    <h2 id="made">How memories are made</h2>
+    <p>Memories come from two places:</p>
+    <ul>
+      <li>
+        After a run, a small model reads a digest of it and saves up to six memories, plus a summary of what was asked, what was done, and what was left open. These memories are marked <strong>Learned after a run</strong>.
+      </li>
+      <li>An agent can save one while it works. These are marked <strong>Saved by an agent</strong>, and the transcript shows a <strong>Remembered</strong> step.</li>
+    </ul>
     <Diagram diagram={memoryDiagram} />
+    <p>
+      A run is over when the agent's process exits. In a conversation, that happens once the agent has been idle for the time in <strong>Close idle processes after</strong> (<strong>Settings</strong> → <strong>General</strong>, 10
+      minutes by default), so a conversation is usually summarized once per working session.
+    </p>
+    <p>When a new memory has the same topic as an existing one, it updates that memory and raises its confidence by 0.1.</p>
+    <Callout>
+      OpenOrc skips task discussions, conversations that never finished a turn, and runs still open when you quit OpenOrc. It doesn't retry a summary that failed. With <strong>Automatic · per agent</strong>, OpenCode runs
+      aren't summarized.
+    </Callout>
   </section>
 
-  <section aria-labelledby="trigger">
-    <h2 id="trigger">When extraction runs</h2>
-    <p>Extraction runs when an agent process exits, not after every message. A conversation's process stays open between turns and closes after it has been idle (10 minutes by default), so a conversation is usually distilled once per working session. Team assignment runs close after every turn, so each of their turns is distilled.</p>
-    <ul>
-      <li>A conversation run must have finished at least one turn; runs that belong to a task, such as team assignments, are queued either way. Task discussion runs are never distilled.</li>
-      <li>Memory must be on. It is off in a new profile until you turn it on. Extraction must not be turned off in settings.</li>
-      <li>Runs that end because you quit OpenOrc are skipped.</li>
-    </ul>
-    <p>Jobs wait in an in-memory queue, and at most 2 run at once, so extraction does not compete with your agents. Quitting OpenOrc discards the jobs still waiting. There is no retry: a failed job is recorded in <code>extraction_jobs</code> and skipped. If memory or extraction is turned off while a job waits, the job is skipped.</p>
-    <p class="docs-source">Source: <code>packages/core/src/services/memory.ts</code>, <code>packages/core/src/services/runs.ts</code> (<code>onExit</code>)</p>
-  </section>
-
-  <section aria-labelledby="input">
-    <h2 id="input">What extraction reads</h2>
-    <p>Extraction reads the newest 5,000 of the run's message, tool, and file-change events from the ledger, which holds them <a href={docHref("storage") + "#redaction"}>redacted</a>. If that window no longer includes your first message, the first message is added back so the original request is not lost. The events become a digest:</p>
-    <ul>
-      <li><strong>User asked</strong>: every message you sent.</li>
-      <li><strong>Files changed</strong>: the first 60 changed paths.</li>
-      <li><strong>Tool activity</strong>: the last 60 tool calls, one line each with the tool name, whether it failed, and the first 160 characters of its output. Tool inputs, such as the exact commands, are not included.</li>
-      <li><strong>Agent said</strong>: the last 6 messages that are not from you, which can include notices OpenOrc added to the conversation.</li>
-    </ul>
-    <p>The digest is cut at 12,000 characters. It is sent with the task or conversation title, the task's spec when there is one, and this prompt:</p>
-    <pre><code>{prompt}</code></pre>
-    <p class="docs-source">Source: <code>packages/memory/src/transcript.ts</code>, <code>extractor.ts</code></p>
-  </section>
-
-  <section aria-labelledby="runner">
-    <h2 id="runner">How extraction runs</h2>
-    <p>OpenOrc has no language model of its own, so it runs one of your agent CLIs once, in the system's temporary folder:</p>
-    <ul>
-      <li><strong>Claude Code</strong>: <code>claude -p --model &lt;model&gt; --output-format json --max-turns 1 --strict-mcp-config --disallowed-tools Bash Edit Write WebFetch WebSearch</code>, with the prompt on stdin and a 180-second timeout: a single turn, without shell, write, or web tools, and without your MCP servers. The default model is Claude Haiku 4.5. When the Anthropic API key is the chosen provider, the same command runs with that key in <code>ANTHROPIC_API_KEY</code>.</li>
-      <li><strong>Codex</strong>: <code>codex exec --model &lt;model&gt; --skip-git-repo-check --sandbox read-only -c mcp_servers={"{}"} --output-schema &lt;schema&gt; -o &lt;file&gt; -</code>, with the prompt on stdin, in a read-only sandbox without MCP servers. The JSON schema makes Codex return valid JSON. The default model is the first one whose name contains spark, mini, or nano, or your account's default model if none does.</li>
-    </ul>
-    <p>Which agent summarizes a run depends on the extraction setting:</p>
-    <ul>
-      <li><strong>Automatic</strong>, the default, keeps each run with the agent that did the work: Claude Code runs are summarized by Claude Code, and Codex runs by Codex, each with its default model above. OpenCode cannot run extraction yet, so OpenCode runs are not summarized. Extraction does not send a run's content to another provider this way, but the memories it saves reach every agent that later works in the project, through the brief and memory search.</li>
-      <li><strong>A chosen provider</strong>, or the Anthropic API key, summarizes every run, whichever agent did the work. You can also pick its model.</li>
-      <li><strong>Off</strong> stops extraction while keeping memory itself on, so agents can still search and save memories.</li>
-    </ul>
-    <p>The memory settings show, in a sentence, which agent and model summarize runs under the current choice. The digest goes to that provider under your account's terms.</p>
-    <p class="docs-source">Source: <code>packages/memory/src/text-generator.ts</code>, <code>packages/core/src/services/memory.ts</code></p>
-  </section>
-
-  <section aria-labelledby="merge">
-    <h2 id="merge">Saving and merging</h2>
-    <p>Titles, bodies, and summaries are <a href={docHref("storage") + "#redaction"}>redacted</a> before they are saved, whoever wrote them, because they return in later prompts. OpenOrc parses the reply leniently: it strips code fences and reads from the first <code>{"{"}</code> to the last <code>{"}"}</code>. It keeps up to 6 memories, turns unknown types into lessons, cuts titles at 120 characters and bodies at 800, and clamps confidence to 0.1 to 1 (0.6 when missing). The summary and the memories are saved in one transaction.</p>
-    <p>Memories with the same <code>topicKey</code> in a project merge: the newer title and body replace the older ones, confidence rises by 0.1 (up to 1), the evidence count goes up, and the age resets to now. A unique index allows one active memory per topic key. Memories without a topic key are never merged, and only you can replace a memory you wrote.</p>
-    <p>Feedback changes a memory's standing: helpful raises confidence by 0.1 and resets its age; wrong marks it retracted; stale marks it stale. Only active memories are searched and briefed.</p>
-    <p class="docs-source">Source: <code>packages/memory/src/extractor.ts</code>, <code>packages/db/src/memories.ts</code></p>
-  </section>
-
-  <section aria-labelledby="embeddings">
-    <h2 id="embeddings">Embeddings</h2>
-    <p>For search by meaning, every memory gets a 384-dimension vector from the all-MiniLM-L6-v2 model, computed on your CPU with ONNX Runtime through the <code>fastembed</code> package. The model runs in a worker thread, so loading it never blocks the core. OpenOrc embeds the title and body together, in batches of 32, and stores vectors in a <code>memory_vec</code> table from the sqlite-vec extension.</p>
-    <p>The model is not part of the app. The first time memory needs a vector, OpenOrc downloads fastembed's 83 MB archive of it from <code>storage.googleapis.com</code>. The download must succeed, must not be larger than the archive, and must match a SHA-256 written into OpenOrc's source; otherwise nothing is kept. fastembed then unpacks it into <code>models/</code> in the profile folder. The model file matches the checksum Hugging Face publishes for <code>Qdrant/all-MiniLM-L6-v2-onnx</code>.</p>
-    <p>Every time the model loads, OpenOrc checks each of its files against a pinned SHA-256 again. A folder that does not match, such as one a failed download left behind, is deleted and downloaded again. OpenOrc replaced fastembed's native tokenizer with a JavaScript one through a patch, documented in <code>docs/tokenizer-replacement.md</code>.</p>
-    <p>While memory is off, nothing is embedded, and the Memory page searches by words only, so browsing your memories never downloads the model. If the model or the extension is unavailable, memory keeps working with full-text search only.</p>
-    <p class="docs-source">Source: <code>packages/memory/src/model-files.ts</code>, <code>embedder.ts</code>, <code>worker-embedder.ts</code>, <code>packages/db/src/database.ts</code></p>
-  </section>
-
-  <section aria-labelledby="retrieval">
-    <h2 id="retrieval">Retrieval</h2>
-    <p>A search combines two candidate lists of up to 40 memories each:</p>
-    <ul>
-      <li><strong>Full text</strong>: an FTS5 query over titles and bodies, with the title weighted twice. The query uses up to 12 words of more than one letter, matching any of them.</li>
-      <li><strong>Meaning</strong>: the query is embedded (with a 500 ms limit) and compared with memory vectors.</li>
-    </ul>
-    <p>The lists are merged with reciprocal rank fusion (a memory at position <em>n</em> in a list gets 1 / (60 + <em>n</em>) from that list), then scored:</p>
-    <pre><code>{score}</code></pre>
-    <p>Type weights favor what most often prevents repeated mistakes: lesson 1.3, environment quirk 1.25, decision 1.2, command 1.15, convention 1.0, ownership and preference 0.95, spec 0.85. At most 3 results come from any single run, so one long session cannot fill the list. There is no minimum similarity.</p>
-    <p class="docs-source">Source: <code>packages/memory/src/retriever.ts</code></p>
-  </section>
-
-  <section aria-labelledby="brief">
-    <h2 id="brief">The project brief</h2>
-    <p>When a run starts in a project that has active memories, OpenOrc adds a brief to its instructions. The brief takes the 400 most recently updated active memories, groups them by type, and ranks each group by confidence, halving the weight every 90 days since the memory was last confirmed. It shows at most 6 decisions, 8 lessons, 6 commands, 4 environment quirks, 5 conventions, and 5 preferences. Specs and ownership notes are only available through search.</p>
-    <p>Each line shows the memory's age: today, yesterday, a number of days, or a number of months. The brief also lists up to 8 tasks in progress or review and up to 6 open items from the last 5 run summaries. It is cut at 5,000 characters.</p>
-    <p>The brief is built when the agent process starts and delivered with the rest of OpenOrc's instructions. The template is on <a href={docHref("instructions") + "#memory"}>What OpenOrc tells agents</a>.</p>
-    <p class="docs-source">Source: <code>packages/memory/src/brief.ts</code></p>
-  </section>
-
-  <section aria-labelledby="tools">
-    <h2 id="tools">Memory tools</h2>
-    <p>Agents can use memory through OpenOrc's MCP server while they work:</p>
+  <section aria-labelledby="review">
+    <h2 id="review">Review and edit memories</h2>
+    <ol class="docs-steps">
+      <li>In the sidebar, open <strong>More</strong> and choose <strong>Memory</strong>. To keep it in the sidebar, choose <strong>Edit sidebar…</strong> in the same menu.</li>
+      <li>Choose a project in the menu next to <strong>Saved memories</strong>.</li>
+      <li>Type in <strong>Search active memories</strong>, or filter by type and by who saved them.</li>
+    </ol>
+    <p>Each memory shows who saved it and when it was created, updated, and last confirmed. Its three-dot menu has these actions:</p>
     <div class="docs-table">
       <table>
         <thead>
           <tr>
-            <th scope="col">Tool</th>
+            <th scope="col">Action</th>
             <th scope="col">What it does</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td><code>memory_search</code></td>
-            <td>Runs the retrieval above for a query and returns up to 20 memories (8 by default), each with its type, title, the first 200 characters of its body, its age, and its confidence.</td>
+            <td><strong>Edit</strong></td>
+            <td>Change the title and details, then click <strong>Save</strong>.</td>
           </tr>
           <tr>
-            <td><code>task_context</code></td>
-            <td>For a run that belongs to a task, such as a team assignment: the task and its spec, the last 4 run summaries, and the 8 most relevant memories. In an ordinary conversation it returns "No task context."</td>
+            <td><strong>Mark helpful</strong></td>
+            <td>Raises its confidence by 0.1 and counts as a fresh confirmation, so it ranks higher.</td>
           </tr>
           <tr>
-            <td><code>memory_record</code></td>
-            <td>Saves a memory from the agent, with a type, title, body, and optional topic key. Agents can use six types: decision, lesson, command, environment quirk, convention, and spec.</td>
+            <td><strong>Add to CLAUDE.md</strong>, <strong>Add to AGENTS.md</strong></td>
+            <td>Adds it as a bullet under a "Project memory (from OpenOrc)" heading in that file, in the project's root folder.</td>
           </tr>
           <tr>
-            <td><code>memory_feedback</code></td>
-            <td>Marks a memory as helpful, wrong, or stale.</td>
+            <td><strong>Retract</strong></td>
+            <td>Marks it as wrong. Agents stop seeing it, and it stays in the list, dimmed.</td>
+          </tr>
+          <tr>
+            <td><strong>Delete</strong></td>
+            <td>Removes it.</td>
           </tr>
         </tbody>
       </table>
     </div>
-    <p>All four work only in the run's own project. While memory is off, agents are not offered <code>memory_search</code>, <code>memory_record</code>, or <code>memory_feedback</code>, and a call from an agent that saw them earlier is refused. <code>task_context</code> stays and returns only the task itself.</p>
-    <p>Saving and feedback change what every later run reads, so they follow the conversation's mode: Plan refuses them, Review everything asks you first, and Accept edits and Autonomous allow them. See <a href={docHref("permissions") + "#actions"}>Permissions and app tools</a>. Whatever the mode:</p>
-    <ul>
-      <li>An agent cannot use the topic key of a memory you wrote, so it cannot overwrite it, and it cannot mark one of yours wrong or stale.</li>
-      <li><code>memory_record</code> takes a title of up to 120 characters, a body of up to 800, and a topic key of up to 80.</li>
-      <li>The brief labels every memory with who saved it: you, an agent, or a run summary.</li>
-    </ul>
+    <p>
+      In a conversation, the side panel's <strong>Memory</strong> tab lists the project's memories once there are any. A task's <strong>Memory</strong> tab shows the same list, except on an agent team's assignment, where it
+      shows <strong>Run history</strong> and <strong>Memory from this task</strong>. Workspace conversations, Slack ones included, share one memory that the project menu doesn't list; open the <strong>Memory</strong> tab in a
+      Workspace conversation to see it.
+    </p>
   </section>
 
-  <section aria-labelledby="controls">
-    <h2 id="controls">Controls</h2>
+  <section aria-labelledby="later-runs">
+    <h2 id="later-runs">How later runs use memory</h2>
+    <p>
+      When memory is on and the project has memories, OpenOrc adds a project memory section to the <a href={docHref("instructions") + "#brief"}>brief each run gets</a>. It holds up to 6 decisions, 8 lessons, 6 commands, 4 env
+      quirks, 5 conventions, and 5 preferences, ranked by confidence and by how recently each was confirmed. Spec and Ownership memories stay out. The section also lists tasks in progress or in review, and items that recent runs left open. Each
+      line shows its age and who saved it, and the section stops at 5,000 characters.
+    </p>
+    <p>
+      OpenOrc builds the brief when an agent's process starts, so a new memory reaches a conversation the next time its agent starts. During a run, agents can also search memory by words and by meaning with <code
+        >memory_search</code
+      >, save a memory with <code>memory_record</code>, and mark one helpful, wrong, or stale with <code>memory_feedback</code>. A run on a task can call <code>task_context</code> for the task's spec, its earlier runs, and the most
+      relevant memories.
+    </p>
+    <p>
+      Saving and rating follow the conversation's mode: Plan blocks them, Review everything asks you first, and Accept edits and Autonomous allow them. See <a href={docHref("permissions") + "#openorc-tools"}>OpenOrc's tools</a>.
+      While memory is off, agents get only <code>task_context</code>.
+    </p>
+  </section>
+
+  <section aria-labelledby="models">
+    <h2 id="models">Choose who summarizes runs</h2>
+    <p>
+      In <strong>Settings</strong> → <strong>Memory &amp; models</strong>, the <strong>Learn from completed runs</strong> section decides who writes the summaries. With memory on, choose a <strong>Provider</strong>:
+    </p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Provider</th>
+            <th scope="col">Who summarizes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Automatic · per agent</strong></td>
+            <td>
+              The agent that did the work, with a small model: Claude Haiku 4.5 for Claude Code, and for Codex the first model whose name contains spark, mini, or nano (Codex's default if none does). This is the default.
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Codex subscription</strong>, <strong>Claude Code subscription</strong></td>
+            <td>That agent summarizes every run, whichever agent did the work. Pick its <strong>Model</strong> or keep <strong>Default</strong>.</td>
+          </tr>
+          <tr>
+            <td><strong>Anthropic API key</strong></td>
+            <td>Claude Code with a key you enter and save with <strong>Save API key</strong>. The key is billed separately from a Claude subscription.</td>
+          </tr>
+          <tr>
+            <td><strong>Off · no background learning</strong></td>
+            <td>Nothing is summarized. Agents can still save and search memories.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      Except with an API key, the agent that summarizes must be signed in. The line under the section says who will summarize runs, or why no one can. <strong>Text generation</strong>, on the same page, picks the model that names
+      new threads and works separately from memory.
+    </p>
+  </section>
+
+  <section aria-labelledby="privacy">
+    <h2 id="privacy">What leaves your computer</h2>
     <ul>
-      <li><strong>Memory on or off</strong> is one switch for all projects, and it is off in a new profile. When it is off, nothing is extracted or embedded, no brief is added, and agents are not offered the memory tools, except <code>task_context</code>. Saved memories stay, and you can still browse, edit, and delete them. A profile that saved a choice before memory became opt-in keeps it.</li>
-      <li><strong>Extraction</strong> has its own setting for provider and model, and can be turned off separately. When memory is on, the setting says which agent and model will summarize runs.</li>
-      <li><strong>The Memory page</strong> lets you edit a memory's title and details, mark it helpful, retract it, delete it, or add it to the project's <code>CLAUDE.md</code> or <code>AGENTS.md</code> under a "Project memory (from OpenOrc)" heading.</li>
+      <li>Memories, run summaries, and the search index stay in OpenOrc's data folder. Searches run on your computer.</li>
+      <li>
+        Searching by meaning needs a small embedding model. The first time memory needs it, OpenOrc downloads it (about 83 MB, from <code>storage.googleapis.com</code>) and checks it against a fixed checksum. Nothing is downloaded
+        while memory is off.
+      </li>
+      <li>
+        Each summary sends a digest of the run to the summarizing provider under your account: your messages, changed files, recent tool calls, and the agent's last messages, up to 12,000 characters. It comes from OpenOrc's
+        stored copy of the run, which has been through a best-effort filter for well-known secrets such as API keys.
+      </li>
+      <li>With <strong>Automatic · per agent</strong>, a run's digest goes only to the provider that ran it. A provider you choose receives every run's digest.</li>
     </ul>
-    <p>Deleting a memory removes its row, search entry, and vector. Deleting the conversation or task a memory came from does not delete the memory.</p>
+    <Callout>Memories move between agents. A lesson saved from a Claude Code run can appear in the brief of a later Codex run in the same project.</Callout>
+  </section>
+
+  <section aria-labelledby="next-steps">
+    <h2 id="next-steps">Next steps</h2>
+    <LinkCards cards={[{ slug: "instructions" }, { slug: "permissions" }, { slug: "orclings" }, { slug: "storage" }]} />
   </section>
 </DocsLayout>

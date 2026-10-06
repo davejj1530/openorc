@@ -1,0 +1,171 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import Callout from "../../components/docs/Callout.astro";
+import LinkCards from "../../components/docs/LinkCards.astro";
+import DocsVisual from "../../components/docs/DocsVisual.astro";
+import TaskListMock from "../../components/mocks/TaskListMock.astro";
+import { docHref } from "../../data/docs";
+
+const sections = [
+  { id: "how-tasks-work", title: "How tasks work" },
+  { id: "create", title: "Create a task" },
+  { id: "spec", title: "Write the spec" },
+  { id: "status", title: "Status and priority" },
+  { id: "tabs", title: "The task's tabs" },
+  { id: "start", title: "Start a task" },
+  { id: "list", title: "The Tasks list" },
+  { id: "next-steps", title: "Next steps" },
+];
+---
+
+<DocsLayout slug="tasks" sections={sections}>
+  <DocsVisual
+    art="feature-plan"
+    label="The Tasks view on its Active shelf, with six tasks grouped under Backlog, In progress and Review. Each row shows a priority icon, a title, the project and when the task last changed, and most rows also show a label."
+  >
+    <TaskListMock />
+  </DocsVisual>
+
+  <section aria-labelledby="how-tasks-work">
+    <h2 id="how-tasks-work">How tasks work</h2>
+    <p>A task is a piece of work written down before anyone builds it. It has a title, a spec in Markdown, a status and a priority, and it belongs to one project.</p>
+    <p>Saving a task starts nothing: no agent runs and no worktree is created. When you are ready, the work happens in a thread, the task's execution thread, where you follow it like any other conversation.</p>
+    <p>Use a task to plan work you want to read and edit before an agent builds it, or to keep a backlog. An agent can also save a task for you when you want work noted for later instead of done now.</p>
+  </section>
+
+  <section aria-labelledby="create">
+    <h2 id="create">Create a task</h2>
+    <h3>From the Tasks view</h3>
+    <ol class="docs-steps">
+      <li>Open <strong>Tasks</strong> in the sidebar and choose <strong>New task</strong>, or press <kbd>⌘⇧N</kbd> from anywhere.</li>
+      <li>Write a title. Under it, pick a priority and the project.</li>
+      <li>Write the spec below.</li>
+      <li>Choose <strong>Create task</strong>, or press <kbd>⌘↵</kbd>.</li>
+    </ol>
+    <p>The task is saved to <strong>Backlog</strong> and opens on its Overview. While you write, the draft is kept on your computer, so leaving the screen loses nothing.</p>
+    <h3>From a thread</h3>
+    <p>Choose <strong>Tasks</strong> in the thread's header, then <strong>Add</strong>. The new task is linked to the thread, belongs to its project and uses its location.</p>
+    <h3>By an agent</h3>
+    <p>Agents in a thread have task tools. Ask one to "add a task for the login redirect" and it saves the task with <code>task_create</code>. The task appears as a card in the transcript and under the thread's <strong>Tasks</strong>. Agents can also list, read and update tasks in the project. If the thread already has a task with the same title, or with mostly the same words, OpenOrc returns that task instead of saving a second one.</p>
+  </section>
+
+  <section aria-labelledby="spec">
+    <h2 id="spec">Write the spec</h2>
+    <p>The spec lives on the task's <strong>Overview</strong> tab, in an editor that saves Markdown.</p>
+    <ul>
+      <li>Type <kbd>/</kbd> to insert a heading, a list, a checklist, a quote, a code block, a divider or an image.</li>
+      <li>Select text to make it bold or italic, or to add a link.</li>
+      <li>Paste or drop images into the spec.</li>
+      <li>Choose <strong>Markdown</strong> to edit the source, and <strong>Rich text</strong> to go back.</li>
+    </ul>
+    <p>Changes save shortly after you stop typing, and <kbd>⌘S</kbd> saves at once. The footer says <strong>Saved</strong> when the task is up to date. Below the spec, <strong>Labels</strong> takes a comma-separated list. Further down are the task's comments (see <a href={docHref("discussions")}>Task discussions</a>), its <strong>Execution settings</strong>, a short history and <strong>Delete task</strong>. Deleting a task removes it and its discussion; its thread keeps its messages and changes.</p>
+  </section>
+
+  <section aria-labelledby="status">
+    <h2 id="status">Status and priority</h2>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Status</th>
+            <th scope="col">Meaning</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Backlog</strong></td>
+            <td>Saved and not started. Every new task starts here.</td>
+          </tr>
+          <tr>
+            <td><strong>In progress</strong></td>
+            <td>Work on it has started.</td>
+          </tr>
+          <tr>
+            <td><strong>Review</strong></td>
+            <td>The work is ready for you to check. These tasks also wait in the Inbox.</td>
+          </tr>
+          <tr>
+            <td><strong>Done</strong></td>
+            <td>Finished.</td>
+          </tr>
+          <tr>
+            <td><strong>Archived</strong></td>
+            <td>Put away. Agents no longer see it when they list tasks.</td>
+          </tr>
+          <tr>
+            <td><strong>Proposed</strong></td>
+            <td>Suggested by an <a href={docHref("teams")}>agent team</a> and waiting for your go-ahead.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Change a status from the status menu on the Overview, or click a task's status icon in the Tasks list. When an agent starts the work, the task moves to <strong>In progress</strong>, and the agent records later progress with its task tools, so a task can reach <strong>Review</strong> or <strong>Done</strong> without you. You can always set the status yourself.</p>
+    <p>Priority is one of <strong>No priority</strong>, <strong>Low</strong>, <strong>Medium</strong>, <strong>High</strong> or <strong>Urgent</strong>. The Tasks list shows it as an icon at the start of each row.</p>
+  </section>
+
+  <section aria-labelledby="tabs">
+    <h2 id="tabs">The task's tabs</h2>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Tab</th>
+            <th scope="col">What it shows</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Overview</strong></td>
+            <td>The spec, the task's properties, comments, execution settings and history.</td>
+          </tr>
+          <tr>
+            <td><strong>Activity</strong></td>
+            <td>Activity saved with the task itself, such as a team's work on it. Work done in the task's thread stays in that thread.</td>
+          </tr>
+          <tr>
+            <td><strong>Changes</strong></td>
+            <td>The changes in the task's thread, in the panel beside the task. See <a href={docHref("review")}>Changes and review</a>.</td>
+          </tr>
+          <tr>
+            <td><strong>Commits</strong></td>
+            <td>The commits made in the task's thread, with the controls to push and open a pull request.</td>
+          </tr>
+          <tr>
+            <td><strong>Memory</strong></td>
+            <td>The project's memory, beside the task. See <a href={docHref("memory")}>Project memory</a>.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Changes, Commits and Memory show the panel of the task's thread, so they stay empty until the task has one. Changes and Commits say <strong>No execution yet</strong> until then.</p>
+  </section>
+
+  <section aria-labelledby="start">
+    <h2 id="start">Start a task</h2>
+    <ol class="docs-steps">
+      <li>Choose <strong>Open thread</strong> at the bottom of the task's Overview. In the Tasks list, a backlog task's row has the same button as a message icon.</li>
+      <li>OpenOrc opens the task's thread. If the task has none yet, it reuses the thread the task came from when that thread is idle and works in the same place. Otherwise it creates a thread named after the task, with the task already written in the message box.</li>
+      <li>Check the model in the message box, add any direction, and send. Opening a thread starts nothing; the agent starts when you send.</li>
+    </ol>
+    <p>The work runs in that thread's folder: your checkout, or a worktree of the thread's own. When OpenOrc creates a thread for the task, the task's <strong>Execution location</strong> decides where it works: <strong>Local checkout</strong> or <strong>Worktree</strong>, under <strong>Execution settings</strong> on the Overview. A new task takes the location of the thread it came from, or else your <strong>New thread workspace</strong> setting. Once the thread has started, changing the location moves the thread and its uncommitted changes. See <a href={docHref("git")}>Git and worktrees</a>.</p>
+    <p>You can also start the work from the task's comments, by asking a model to build it. See <a href={docHref("discussions") + "#work"}>From discussion to work</a>.</p>
+    <Callout>Once a task has a thread, its work stays there. An agent in another thread can't start it, so continue in the task's thread, and move that thread if the work belongs somewhere else.</Callout>
+  </section>
+
+  <section aria-labelledby="list">
+    <h2 id="list">The Tasks list</h2>
+    <ul>
+      <li><strong>Active</strong>, <strong>Done</strong> and <strong>Archived</strong> split the list. Active holds every task that is neither done nor archived.</li>
+      <li>On Active, the status menu narrows the list to one status. Each option shows how many tasks it has.</li>
+      <li><strong>Filter tasks…</strong> matches titles and labels.</li>
+      <li>The project chip in the header switches between one project and <strong>All projects</strong>. With all projects, each row names its project.</li>
+      <li>Tasks are grouped by status. Click a group's heading to fold it.</li>
+    </ul>
+    <p>The list works from the keyboard: <kbd>j</kbd> and <kbd>k</kbd>, or the arrow keys, move between tasks, and <kbd>↵</kbd> opens one.</p>
+  </section>
+
+  <section aria-labelledby="next-steps">
+    <h2 id="next-steps">Next steps</h2>
+    <LinkCards cards={[{ slug: "discussions" }, { slug: "review" }, { slug: "git" }]} columns={3} />
+  </section>
+</DocsLayout>

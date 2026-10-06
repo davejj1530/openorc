@@ -1,206 +1,178 @@
 ---
 import DocsLayout from "../../layouts/DocsLayout.astro";
+import Callout from "../../components/docs/Callout.astro";
+import LinkCards from "../../components/docs/LinkCards.astro";
+import DocsVisual from "../../components/docs/DocsVisual.astro";
+import WorktreeMock from "../../components/mocks/WorktreeMock.astro";
 import { docHref } from "../../data/docs";
 
 const sections = [
-  { id: "running", title: "How OpenOrc runs Git" },
-  { id: "locations", title: "Checkout or worktree" },
-  { id: "worktrees", title: "Worktrees" },
-  { id: "moving", title: "Moving a conversation" },
-  { id: "removing", title: "Removing worktrees" },
-  { id: "changes", title: "Showing changes" },
-  { id: "checkpoints", title: "Checkpoints and restore" },
-  { id: "comments", title: "Review comments" },
-  { id: "publish", title: "Commit, push, pull request" },
-  { id: "writes", title: "What OpenOrc writes to your repository" },
+  { id: "where", title: "Checkout or worktree" },
+  { id: "choose", title: "Choose for each thread" },
+  { id: "worktrees", title: "How a worktree is made" },
+  { id: "move", title: "Move a thread" },
+  { id: "merge", title: "Bring the work back" },
+  { id: "delete", title: "Delete a thread" },
+  { id: "repository", title: "What OpenOrc adds to your repository" },
+  { id: "no-git", title: "Projects without Git" },
+  { id: "next-steps", title: "Next steps" },
 ];
 ---
 
 <DocsLayout slug="git" sections={sections}>
-  <section aria-labelledby="running">
-    <h2 id="running">How OpenOrc runs Git</h2>
-    <p>The core runs your installed <code>git</code> and <code>gh</code>, found through the <code>PATH</code> from your login shell. Commands run with <code>execFile</code>, never through a shell, with these environment additions:</p>
-    <pre><code>GIT_TERMINAL_PROMPT=0   # fail instead of waiting for a password prompt
-LC_ALL=C                # stable, parseable output</code></pre>
-    <p>Most commands have a 60-second timeout and a 64 MiB output limit. Some have their own:</p>
+  <DocsVisual
+    art="feature-worktree"
+    label="OpenOrc with the thread Simplify the design tokens open. It works in its own worktree, and the row under the composer names its branch, openorc/design-tokens-2c91f0, with 12 lines added, 4 removed, and Commit changes. In the sidebar, another thread in the project is still working."
+  >
+    <WorktreeMock />
+  </DocsVisual>
+
+  <section aria-labelledby="where">
+    <h2 id="where">Checkout or worktree</h2>
+    <p>Each thread in a project works in one of two places.</p>
+    <dl class="docs-terms">
+      <div>
+        <dt>Local checkout</dt>
+        <dd>Your repository folder, on whatever branch you have checked out. The agent edits the same files you do, and so does every other thread on the checkout.</dd>
+      </div>
+      <div>
+        <dt>Worktree</dt>
+        <dd>A separate folder with a branch of its own, linked to the same repository. The thread's edits stay out of your checkout until you bring them over.</dd>
+      </div>
+    </dl>
+    <p>Use the checkout for small changes you want to run and try right away. Use a worktree when several threads work on one project at once, or when you want the work kept apart until you have reviewed it.</p>
+  </section>
+
+  <section aria-labelledby="choose">
+    <h2 id="choose">Choose for each thread</h2>
+    <ol class="docs-steps">
+      <li>Start a new thread with <kbd>⌘N</kbd>.</li>
+      <li>Next to the project, open the location menu and pick <strong>Local checkout</strong> or <strong>Worktree</strong>.</li>
+      <li>Send your first message. A worktree is created now, before the agent starts.</li>
+    </ol>
+    <p>New threads start with the location set in <strong>Settings</strong> under <strong>General</strong>, <strong>New thread workspace</strong>: <strong>Local checkout</strong> or <strong>Isolated worktree</strong>. Tasks have their own <strong>Execution location</strong>, and schedules a <strong>Works in</strong> field. Forks, and threads an agent starts with <code>thread_start</code>, work in the same folder as the thread they came from.</p>
+    <p>The message box shows the branch a thread works on, and the sidebar shows it under each thread's title.</p>
+  </section>
+
+  <section aria-labelledby="worktrees">
+    <h2 id="worktrees">How a worktree is made</h2>
+    <div class="docs-table">
+      <table>
+        <tbody>
+          <tr>
+            <td>Branch</td>
+            <td><code>openorc/&lt;slug&gt;-&lt;id&gt;</code>: the thread's title when the worktree is made, in lowercase with hyphens and cut to 40 characters, then the first six characters of the thread's ID. A new thread whose first message is "Fix the login redirect" gets a branch like <code>openorc/fix-the-login-redirect-3f2a91</code>.</td>
+          </tr>
+          <tr>
+            <td>Folder</td>
+            <td><code>worktrees/&lt;project&gt;-&lt;id&gt;/thread-&lt;slug&gt;-&lt;id&gt;</code> inside OpenOrc's data folder, which is <code>~/Library/Application Support/OpenOrc</code> on macOS.</td>
+          </tr>
+          <tr>
+            <td>Starting point</td>
+            <td>For a new thread, the project's default branch. OpenOrc fetches it from origin first and starts from origin's copy when the fetch works.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Before the agent starts, OpenOrc copies your <code>.env</code> and <code>.env.*</code> files into the new folder, sets up any submodules, and runs the project's setup script. Change the prefix, the copied files and the script on the project's <strong>Settings</strong> tab: press <kbd>⌘K</kbd>, choose the project, then <strong>Settings</strong>.</p>
     <div class="docs-table">
       <table>
         <thead>
           <tr>
-            <th scope="col">Command</th>
-            <th scope="col">Timeout</th>
+            <th scope="col">Project setting</th>
+            <th scope="col">What it does</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td><code>git fetch</code></td>
-            <td>20 seconds</td>
+            <td><strong>Branch prefix</strong></td>
+            <td>Replaces <code>openorc</code> at the start of new branch names.</td>
           </tr>
           <tr>
-            <td><code>git push</code></td>
-            <td>120 seconds</td>
+            <td><strong>Copy these gitignored files into new worktrees</strong></td>
+            <td>One file pattern per line, matched from the repository's root. Only regular files inside the repository are copied.</td>
           </tr>
           <tr>
-            <td><code>git submodule update</code></td>
-            <td>300 seconds</td>
-          </tr>
-          <tr>
-            <td><code>gh pr create</code></td>
-            <td>60 seconds</td>
-          </tr>
-          <tr>
-            <td><code>gh pr view</code></td>
-            <td>20 seconds</td>
-          </tr>
-          <tr>
-            <td>Per-turn diffs</td>
-            <td>15 seconds, 8 MiB</td>
+            <td><strong>Setup script</strong></td>
+            <td>Runs in each new worktree before the agent starts, for example <code>pnpm install --frozen-lockfile</code>. It gets <code>OPENORC_WORKSPACE_PATH</code> (the worktree), <code>OPENORC_ROOT_PATH</code> (your checkout), <code>OPENORC_WORKSPACE_NAME</code> and <code>OPENORC_PORT</code>, the first of ten ports set aside for the worktree.</td>
           </tr>
         </tbody>
       </table>
     </div>
-    <p>OpenOrc never runs <code>git stash</code>, <code>rebase</code>, <code>cherry-pick</code>, <code>gc</code>, <code>tag</code>, or <code>config</code>, and never force-pushes.</p>
-    <p class="docs-source">Source: <code>packages/git/src/exec.ts</code></p>
+    <Callout>If the setup script fails, the thread doesn't start, but the worktree stays. The next message uses that worktree without running the script again, so fix the problem in the worktree yourself, or delete the thread and start over.</Callout>
   </section>
 
-  <section aria-labelledby="locations">
-    <h2 id="locations">Checkout or worktree</h2>
-    <p>Each project conversation works in one of two places:</p>
+  <section aria-labelledby="move">
+    <h2 id="move">Move a thread</h2>
+    <p>Open the thread's menu, from the three-dot button in its header or by right-clicking it in the sidebar, and choose <strong>Move to a worktree</strong> or <strong>Move to the checkout</strong>. A dialog lists every file that will move. Moving doesn't start an agent, and you can't move a thread while its agent is working.</p>
     <ul>
-      <li><strong>The checkout</strong>: your repository folder, on whatever branch you have checked out. This is the default. Agents edit the same files you do.</li>
-      <li><strong>A worktree</strong>: a separate folder linked to the same repository, with its own branch. Its edits do not touch your checkout until you bring them over.</li>
+      <li><strong>Move to a worktree</strong> takes every uncommitted change in the checkout, including yours and other threads', into a new worktree on its own branch. The worktree starts at the checkout's current commit. Those files in the checkout then go back to its last commit.</li>
+      <li><strong>Move to the checkout</strong> merges everything the worktree changed since it started, committed or not, into your checkout's files, unstaged. Then the worktree is removed. Its branch stays, with any commits made on it.</li>
     </ul>
-    <p>Workspace conversations work in any folder you choose, which does not need to be a Git repository. They have no worktree, commit, push, or pull request controls.</p>
+    <p>If a file changed in both places in ways Git can't combine, nothing moves and the dialog names the files. A move also stops when a file's staged version differs from the file on disk; commit or unstage it first.</p>
   </section>
 
-  <section aria-labelledby="worktrees">
-    <h2 id="worktrees">Worktrees</h2>
-    <p>A worktree is created the first time a worktree conversation needs it. A task works in its execution conversation, so a task set to Worktree uses that conversation's worktree. Team assignments have worktrees of their own; see <a href={docHref("teams") + "#workspaces"}>Agent teams</a>.</p>
+  <section aria-labelledby="merge">
+    <h2 id="merge">Bring the work back</h2>
+    <p><strong>Move to the checkout</strong> puts a worktree's changes in your own files, to keep editing or to commit yourself. You can also commit in the worktree, push the branch and open a pull request (see <a href={docHref("review") + "#push"}>Push and open a pull request</a>), or merge the branch into your checkout with Git, for example <code>git merge openorc/fix-the-login-redirect-3f2a91</code>. Only committed work is on the branch, so commit in the worktree before you merge.</p>
+  </section>
+
+  <section aria-labelledby="delete">
+    <h2 id="delete">Delete a thread</h2>
+    <p><strong>Delete thread</strong>, in the thread's menu, removes the conversation and its worktree:</p>
+    <ol class="docs-steps">
+      <li>OpenOrc commits the worktree's uncommitted changes to its branch, with the message "Save uncommitted work before removing the worktree".</li>
+      <li>It removes the worktree folder. Ignored files in it, such as a copied <code>.env</code>, go with it.</li>
+      <li>The branch stays, with all its commits.</li>
+    </ol>
+    <p>If that commit fails, for example because Git has no user name set, nothing is deleted. Deleting never touches your checkout, and tasks the thread created stay. Archiving a thread keeps its worktree. A worktree shared with a fork or a helper thread goes only with the last thread that uses it.</p>
+  </section>
+
+  <section aria-labelledby="repository">
+    <h2 id="repository">What OpenOrc adds to your repository</h2>
+    <ul>
+      <li>Branches under <code>openorc/</code>, or your <strong>Branch prefix</strong>, one for each thread that used a worktree. Agent teams use branches named <code>openorc/team-…</code>.</li>
+      <li>Worktree registrations under <code>.git/worktrees/</code>. The folders themselves live in OpenOrc's data folder, never inside your repository.</li>
+      <li>Refs under <code>refs/openorc/</code> that keep saved file states from being cleaned up by Git: <code>checkpoints/</code> for each thread's turns, which Undo and the change cards use, and <code>snapshots/</code> for tasks that run on their own. They go when you delete the thread or task. Moves and patch exports hold a ref only while they run, and agent teams keep their own. These refs point at trees, so <code>git log --all</code> skips them and <code>git for-each-ref refs/openorc</code> lists them.</li>
+      <li>Commits you make from OpenOrc, and the commit that saves a worktree's work before it is removed.</li>
+      <li>Remote-tracking refs from fetching a worktree's starting branch, and the upstream that pushing sets.</li>
+      <li>For a pull request a model reviews, a worktree of the pull request on no branch, and the fetched commits.</li>
+    </ul>
+    <p>OpenOrc installs no hooks and doesn't edit <code>.gitignore</code> or <code>.git/info/exclude</code>. It never runs <code>git stash</code> or <code>git rebase</code>, and never force-pushes.</p>
+  </section>
+
+  <section aria-labelledby="no-git">
+    <h2 id="no-git">Projects without Git</h2>
+    <p>OpenOrc reads a project folder's Git state each time it needs it, so you can run <code>git init</code> or make a first commit later without adding the project again.</p>
     <div class="docs-table">
       <table>
+        <thead>
+          <tr>
+            <th scope="col">The project folder is</th>
+            <th scope="col">What works</th>
+          </tr>
+        </thead>
         <tbody>
           <tr>
-            <td>Folder</td>
-            <td><code>&lt;profile&gt;/worktrees/&lt;project&gt;-&lt;id&gt;/thread-&lt;title&gt;-&lt;id&gt;</code></td>
+            <td>Not a Git repository</td>
+            <td>Threads work in the folder. Changes, change cards, Undo, commits and worktrees aren't available.</td>
           </tr>
           <tr>
-            <td>Branch</td>
-            <td><code>openorc/&lt;title&gt;-&lt;id&gt;</code>; the prefix is a project setting</td>
+            <td>A repository without commits</td>
+            <td>Changes, change cards, Undo and commits work. Worktrees and agent teams need a first commit.</td>
           </tr>
           <tr>
-            <td>Starting point</td>
-            <td>The project's default branch, or the base branch a task names, after <code>git fetch origin &lt;branch&gt;</code>. OpenOrc uses <code>origin/&lt;branch&gt;</code> when the fetch works, and the local branch otherwise.</td>
+            <td>A repository with commits</td>
+            <td>Everything on this page.</td>
           </tr>
         </tbody>
       </table>
     </div>
-    <ol class="docs-steps">
-      <li><code>git worktree add</code> creates the folder and the branch. If the branch already exists, it is checked out instead.</li>
-      <li>Files matching the project's include list are copied from your checkout: <code>.env</code> and <code>.env.*</code> by default, or the patterns in the repository's <code>.worktreeinclude</code> file when the project was imported. You can edit the list in the project's settings. Only regular files inside the repository are copied: a match that leaves it, such as <code>../secrets</code>, passes through a symbolic link, or is itself a link is skipped, and the skip is logged.</li>
-      <li>If the repository has submodules, <code>git submodule update --init --recursive</code> runs.</li>
-      <li>If the project has a setup script, it runs with <code>/bin/bash -lc</code>, with <code>OPENORC_WORKSPACE_PATH</code>, <code>OPENORC_ROOT_PATH</code>, <code>OPENORC_WORKSPACE_NAME</code>, and <code>OPENORC_PORT</code> set. If it exits with anything but 0, that start fails. The worktree and branch are kept, and the next start uses them without running the script again.</li>
-    </ol>
-    <p>A conversation's worktree stays, even when the conversation is archived, until you move the conversation to the checkout or delete it. Archiving a task never removes a worktree that a conversation uses.</p>
-    <p class="docs-source">Source: <code>packages/core/src/services/workspace.ts</code>, <code>packages/git/src/worktree.ts</code>, <code>packages/core/src/services/projects.ts</code></p>
+    <p>When a worktree isn't possible, the location menu says why, such as <strong>Worktrees need git and a first commit.</strong> Workspace conversations always work in a plain folder. See <a href={docHref("threads")}>Threads</a>.</p>
   </section>
 
-  <section aria-labelledby="moving">
-    <h2 id="moving">Moving a conversation</h2>
-    <p>A conversation's menu moves it between the checkout and a worktree of its own. A dialog first lists every file that will move. Moving does not start an agent.</p>
-    <h3>From the checkout to a worktree</h3>
-    <ol class="docs-steps">
-      <li>OpenOrc reads the checkout's files as a Git tree through a temporary index: every uncommitted change, staged or not, and every new file that is not ignored. Every change in the checkout moves, whoever made it. What moves is each file as it is on disk, so if a file's staged version differs from the file on disk, the move stops before it starts and names the file. Commit or unstage that version, then move again.</li>
-      <li>A new worktree starts at the checkout's current commit, on a branch of its own. If a branch with the conversation's name already exists, OpenOrc adds a number to the new name instead of using that branch.</li>
-      <li>Git writes the changed files into the worktree through a temporary index, so filters such as Git LFS and line endings apply. OpenOrc then checks that the worktree holds exactly those files.</li>
-      <li>Only then do those files in the checkout go back to its last commit, and any staged versions of them are unstaged.</li>
-    </ol>
-    <p>If anything fails before the last step, OpenOrc removes the worktree it created, and its branch while nothing was committed on it, and the checkout stays as it was. If a file in the checkout changed during the move, Git refuses to change the checkout, and both places keep a copy.</p>
-    <h3>From a worktree to the checkout</h3>
-    <p>The worktree's work since its starting commit, committed or not, merges into the checkout's current files. A file changed on only one side takes that side's version; a file changed on both sides goes through Git's builtin text merge. If Git cannot combine a file, nothing moves, and OpenOrc names the files. The result is written into the checkout through a temporary index, so your staged changes stay as they are and the moved changes arrive unstaged. The worktree is removed only if it still holds exactly what moved. Its branch stays, with any commits made on it.</p>
-    <p>A move is refused when it would carry a change to a submodule or a nested repository. Both directions read and write files through Git, so any file arrives whatever its size or name, with Git's filters, such as Git LFS and line endings, applied as in a checkout.</p>
-    <p class="docs-source">Source: <code>packages/core/src/services/thread-moves.ts</code>, <code>packages/git/src/snapshot.ts</code> (<code>switchFiles</code>), <code>team-transfer.ts</code> (<code>mergeTrees</code>)</p>
-  </section>
-
-  <section aria-labelledby="removing">
-    <h2 id="removing">Removing worktrees</h2>
-    <p>Every way a conversation's worktree goes away keeps its uncommitted work:</p>
-    <ul>
-      <li><strong>Deleting a conversation</strong> commits any uncommitted changes to the worktree's branch first, with the pre-commit and commit-msg hooks skipped, then removes the folder. The branch stays. Ignored files, such as a copied <code>.env</code>, are not committed and are deleted with the folder. If that commit fails, for example because Git has no user name set, nothing is removed.</li>
-      <li><strong>Moving a conversation to the checkout</strong> removes its worktree without a commit, because its changes are in the checkout by then. The branch stays.</li>
-      <li><strong>Deleting a team conversation</strong> removes its team workspaces and deletes a branch only when its commits are merged or pushed. See <a href={docHref("teams") + "#workspaces"}>Agent teams</a>.</li>
-    </ul>
-    <p class="docs-source">Source: <code>packages/core/src/services/workspace.ts</code> (<code>cleanupThread</code>, <code>cleanup</code>), <code>packages/git/src/worktree.ts</code></p>
-  </section>
-
-  <section aria-labelledby="changes">
-    <h2 id="changes">Showing changes</h2>
-    <p>The Changes panel shows a unified diff:</p>
-    <ul>
-      <li>For a worktree conversation, against the commit the worktree started from, so it includes the agent's commits, staged and unstaged edits, and new files. "Show uncommitted" compares with <code>HEAD</code> instead.</li>
-      <li>For a conversation in the checkout, against <code>HEAD</code>. This shows every uncommitted change in the checkout, whoever made it.</li>
-      <li>For a task, the Changes tab shows its execution conversation's changes, compared as above.</li>
-    </ul>
-    <p>Tracked files come from <code>git diff -M</code>. New files are added to a temporary index as intent-to-add and diffed from there, so your real index is untouched. New files over 1 MiB, and things that are not regular files, appear as a one-line placeholder in the diff instead of their content.</p>
-    <p>Each turn's changes are shown separately by comparing the <a href="#checkpoints">checkpoints</a> saved when turns end. A checkpoint is a Git tree object written through a temporary index, so it never touches your staging area.</p>
-    <h3>Keeping it current</h3>
-    <p>OpenOrc does not watch the file system. The Changes panel refreshes when an agent finishes a tool that can change files (at most once a second, and every 8 seconds while a turn runs), when a turn or background task ends, when a terminal command finishes, and when the window regains focus. Edits made in another app appear on the next refresh.</p>
-    <p class="docs-source">Source: <code>packages/core/src/services/review.ts</code>, <code>packages/git/src/repo.ts</code>, <code>snapshot.ts</code></p>
-  </section>
-
-  <section aria-labelledby="checkpoints">
-    <h2 id="checkpoints">Checkpoints and restore</h2>
-    <p>In project conversations without a team, OpenOrc saves a "Starting files" checkpoint before the first agent run, including existing uncommitted and untracked files. The first turn's Undo returns to those files, and its saved diff shows only what changed from that starting point. Older turns without a starting checkpoint cannot use Undo.</p>
-    <p>When a turn ends in a project conversation, OpenOrc saves its files as a Git tree, untracked files included, through a temporary index. A ref under <code>refs/openorc/checkpoints/&lt;conversation&gt;/</code> pins each saved tree, so <code>git gc</code> never removes them. The refs last as long as their conversation; deleting it deletes them. A checkpoint also records the folder it was read from.</p>
-    <p>A restore, from the Checkpoints panel or a turn's Undo, works like this:</p>
-    <ol class="docs-steps">
-      <li>In the Checkpoints panel, a dialog first lists the files that will change. Undo asks for a second click instead.</li>
-      <li>The files as they are now become a checkpoint named "Before restoring", so the restore can itself be undone.</li>
-      <li>Git changes the files through a temporary index: changes made since are undone, files created since are deleted, and ignored files are left alone. Staged changes stay staged. If a file changed after OpenOrc read it, Git refuses and nothing changes.</li>
-      <li>The restored files become a checkpoint named "Restored", so the next turn's changes are shown against them.</li>
-    </ol>
-    <p>A checkpoint restores only into the folder it was saved from, so after a move, move the conversation back to use it. Checkpoints saved before OpenOrc pinned them may already be gone if Git cleaned them up; a restore then says so.</p>
-    <p class="docs-source">Source: <code>packages/core/src/services/threads.ts</code> (<code>restore</code>), <code>thread-start-checkpoint.ts</code>, <code>run-settlement.ts</code> (<code>checkpoint</code>), <code>checkpoint-refs.ts</code></p>
-  </section>
-
-  <section aria-labelledby="comments">
-    <h2 id="comments">Review comments</h2>
-    <p>In a conversation's Changes panel you can comment on the diff. Click a line number to comment on one line, or drag or shift-click across line numbers in the same hunk to comment on a range. Comments are stored in <code>review_comments</code> with the file, the lines, the side of the diff, and the text of those lines. When those lines change later, the comment is shown as outdated. Comments written from a task's Changes tab also carry that task. Team conversations have no line comments.</p>
-    <p>Send, shown as "Send N to the conversation", queues one message in the conversation. It is delivered like any queued message, with the conversation's own agent, mode, and permission level. Sending also moves the tasks the comments carry back to in progress. Removing the message from the queue returns its comments to the review. The message lists every unsent comment:</p>
-    <pre><code>Review comments on the current changes:
-
-1. src/app.ts:42
-   &gt; const total = items.reduce((sum, item) =&gt; sum + item.price, 0);
-   Use the shared helper here.
-
-Address each comment. When a comment is wrong, say why instead of changing the code. Finish with a short list of what changed.</code></pre>
-    <p>A range reads <code>10-12</code>. A removed line has a minus sign, <code>-12</code>, and a range that includes one marks both ends, <code>-10 to +12</code>; the message then adds a line under its heading explaining the minus sign. Each comment quotes up to 20 of its lines.</p>
-    <p class="docs-source">Source: <code>packages/core/src/services/review.ts</code> (<code>sendComments</code>), <code>packages/protocol/src/review-comments.ts</code>, <code>apps/desktop/src/renderer/src/panels/ConversationReview.tsx</code></p>
-  </section>
-
-  <section aria-labelledby="publish">
-    <h2 id="publish">Commit, push, pull request</h2>
-    <p>No model writes commit messages or pull request descriptions for you. The commit message and the pull request description start empty. The pull request title starts as the conversation's title, which a model may have written (see <a href={docHref("conversations") + "#titles"}>Conversation titles</a>), so read it before you confirm.</p>
-    <ul>
-      <li><strong>Commit</strong> runs <code>git add -A</code>, then <code>git commit -m &lt;your message&gt;</code>. Everything in the working folder is included, and your Git hooks run.</li>
-      <li><strong>Push</strong> runs <code>git push -u origin &lt;branch&gt;</code>. When the remote has newer commits, OpenOrc says "origin has newer commits on &lt;branch&gt;. Pull them in first, then push again."; other failures show Git's own message. OpenOrc never retries with force.</li>
-      <li><strong>Pull request</strong> runs <code>gh pr create --title --body --base --head</code>, if the GitHub CLI is installed. A conversation's branch must be pushed first. Without <code>gh</code>, a GitHub remote gets a button that opens GitHub's compare page in your browser, except for conversations that work in the checkout.</li>
-    </ul>
-    <p>For conversations with an open pull request, OpenOrc checks its state with <code>gh pr view &lt;url&gt; --json state</code> about every 5 minutes, to show whether it was merged or closed.</p>
-    <p class="docs-source">Source: <code>packages/git/src/publish.ts</code>, <code>packages/core/src/services/review.ts</code>, <code>lifecycle.ts</code></p>
-  </section>
-
-  <section aria-labelledby="writes">
-    <h2 id="writes">What OpenOrc writes to your repository</h2>
-    <ul>
-      <li><strong>Branches</strong> for worktrees (<code>openorc/…</code>) and for teams (<code>openorc/team-…</code>).</li>
-      <li><strong>Worktree registrations</strong> under <code>.git/worktrees/</code>, including a lock while a team assignment's agent runs in its own worktree.</li>
-      <li><strong>Objects</strong>: trees and blobs for checkpoints and captures.</li>
-      <li><strong>Refs</strong> under <code>refs/openorc/</code> that keep them alive: <code>checkpoints/</code> for as long as their conversation exists, <code>thread-moves/</code> for the length of a move, <code>exports/</code> (deleted right after an export), and, for teams, <code>teams/</code>, <code>forks/</code>, <code>restores/</code>, and <code>moves/</code>. Most of these refs point at trees, not commits, so <code>git log --all</code> does not show them. A capture also keeps a ref ending in <code>/head</code> on the commit its folder was on.</li>
-      <li><strong>Config</strong>: <code>git push -u</code> sets the branch's upstream, and submodule setup records submodule URLs.</li>
-      <li><strong>Remote-tracking refs</strong> from <code>git fetch</code> when a worktree is created.</li>
-      <li><strong>Commits</strong> you make from the Changes panel, and the commit that saves a worktree's uncommitted work before OpenOrc removes it.</li>
-    </ul>
-    <p>Moving a conversation, restoring a checkpoint, and deleting a conversation also change your files, commits, or branches, as the sections above describe. None of them changes your staging area except a move out of the checkout, which unstages the files it took.</p>
-    <p>OpenOrc installs no hooks and does not edit <code>.git/info/exclude</code> or <code>.gitignore</code>.</p>
+  <section aria-labelledby="next-steps">
+    <h2 id="next-steps">Next steps</h2>
+    <LinkCards cards={[{ slug: "review" }, { slug: "pull-requests" }, { slug: "storage" }]} columns={3} />
   </section>
 </DocsLayout>

@@ -1,142 +1,203 @@
 ---
 import DocsLayout from "../../layouts/DocsLayout.astro";
-import Diagram from "../../components/docs/Diagram.astro";
-import { teamDiagram } from "../../data/docs/diagrams";
+import Callout from "../../components/docs/Callout.astro";
+import LinkCards from "../../components/docs/LinkCards.astro";
+import { docHref } from "../../data/docs";
 
 const sections = [
-  { id: "status", title: "Status" },
-  { id: "definitions", title: "Team definitions" },
-  { id: "execution", title: "How a team runs" },
-  { id: "messages", title: "Messages and delivery" },
-  { id: "workspaces", title: "Workspaces" },
-  { id: "context", title: "What each member sees" },
-  { id: "recovery", title: "Restarts and recovery" },
-  { id: "unfinished", title: "Not available yet" },
+  { id: "what-a-team-is", title: "What a team is" },
+  { id: "turn-on", title: "Turn on team execution" },
+  { id: "create", title: "Create a team" },
+  { id: "start", title: "Start a team conversation" },
+  { id: "talk", title: "Talk to the team" },
+  { id: "members", title: "How members work together" },
+  { id: "changes", title: "Review and combine changes" },
+  { id: "needs-you", title: "When the team needs you" },
+  { id: "limits", title: "Limits" },
+  { id: "next-steps", title: "Next steps" },
 ];
 ---
 
 <DocsLayout slug="teams" sections={sections}>
-  <section aria-labelledby="status">
-    <h2 id="status">Status</h2>
-    <p>Agent teams are in Beta and enabled for new profiles. The switch is Team execution (Beta) in Settings, General, Orchestration. Saved on/off choices are preserved.</p>
-    <p>The switch controls starting new team work: new team conversations, new executions in an existing team conversation, and starting a saved team task. You can design and save teams while it is off. Work that is already open keeps running if you turn it off: you can still chat, delegate, retry, and stop.</p>
+  <p>You talk to a team the way you talk to a single agent. The lead answers, other members join in when you address them, and the lead can hand pieces of the work to the members who report to it.</p>
+
+  <section aria-labelledby="what-a-team-is">
+    <h2 id="what-a-team-is">What a team is</h2>
+    <p>You save teams per project. A team has up to 12 members:</p>
+    <dl class="docs-terms">
+      <div>
+        <dt>Lead</dt>
+        <dd>The member who replies when you don't address anyone else. It plans, answers, and hands out work.</dd>
+      </div>
+      <div>
+        <dt>Members</dt>
+        <dd>Each one has a name, a responsibility in your own words, and its own model and effort. A seat can also go to one of your <a href={docHref("orclings")}>Orclings</a>.</dd>
+      </div>
+      <div>
+        <dt>Hierarchy</dt>
+        <dd>Every member reports to the lead or to another member, at most three levels deep: lead, managers and workers.</dd>
+      </div>
+    </dl>
+    <p>There are no fixed roles. The lead reads each member's responsibility to decide what to hand it. Every save makes a new version of the team, and a team conversation keeps the version it started with.</p>
   </section>
 
-  <section aria-labelledby="definitions">
-    <h2 id="definitions">Team definitions</h2>
-    <p>A team is a saved roster. Every save creates a new, sealed revision; database triggers stop sealed revisions from changing. A team conversation stays pinned to the revision it started with.</p>
-    <ul>
-      <li>1 to 12 members, each with a name, a free-text responsibility (up to 8,000 characters), and its own provider, model, effort, and Fast setting.</li>
-      <li>Exactly one lead. Other members report to the lead or to another member, at most 3 levels deep. There are no fixed roles; the responsibility text is the role.</li>
-    </ul>
+  <section aria-labelledby="turn-on">
+    <h2 id="turn-on">Turn on team execution</h2>
+    <p><strong>Team execution (Beta)</strong> is on by default. It's in <a href={docHref("settings") + "#general"}>Settings</a> under <strong>General</strong>, in the <strong>Orchestration</strong> group. With it off, you can still design and save teams, but no team work can start. A team that's already working keeps going, and <strong>Stop</strong> stays available.</p>
+  </section>
+
+  <section aria-labelledby="create">
+    <h2 id="create">Create a team</h2>
+    <ol class="docs-steps">
+      <li>Open <strong>Orchestration</strong> in the sidebar. If you've hidden it, it's under <strong>More</strong>.</li>
+      <li>Choose the project. If it already has a team, click <strong>New team</strong>, the plus button beside the team list.</li>
+      <li>Enter a <strong>Team name</strong>.</li>
+      <li>Click <strong>Add member</strong> once for each agent. The first member is the lead, and <strong>Make lead</strong> moves the role to someone else.</li>
+      <li>For each member, set the <strong>Member name</strong>, who it <strong>Reports to</strong>, its <strong>Model and effort</strong>, and its <strong>Responsibility</strong>.</li>
+      <li>Click <strong>Check readiness</strong>. OpenOrc checks that each member's agent is installed and signed in, and that its model is available.</li>
+      <li>Click <strong>Save team</strong>.</li>
+    </ol>
+    <p>The editor also holds the team's <strong>Discussion</strong> settings and, under <strong>Execution limits</strong>, how far each run may go.</p>
+  </section>
+
+  <section aria-labelledby="start">
+    <h2 id="start">Start a team conversation</h2>
+    <ol class="docs-steps">
+      <li>Click <strong>New thread</strong> and choose the project. Teams aren't available in the Workspace.</li>
+      <li>Open the model picker and switch to <strong>Project teams</strong>. Each team shows its size and version, such as <strong>4 agents · Revision 2</strong>. Pick one.</li>
+      <li>Choose <strong>Local checkout</strong> or <strong>Worktree</strong> for where the team works.</li>
+      <li>Write your first message and send it.</li>
+    </ol>
+    <p>The project needs Git and at least one commit. If no team can start, the picker shows what to fix, such as <strong>Open Settings</strong> or <strong>Create a team in Orchestration</strong>.</p>
+  </section>
+
+  <section aria-labelledby="talk">
+    <h2 id="talk">Talk to the team</h2>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">You write</th>
+            <th scope="col">Who gets the message</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>No mention</td>
+            <td>The lead.</td>
+          </tr>
+          <tr>
+            <td><code>@Name</code></td>
+            <td>That member. Type <code>@</code> to pick from the team.</td>
+          </tr>
+          <tr>
+            <td><code>@everyone</code></td>
+            <td>The whole team. <code>@all</code> works too.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>When the team has finished, your next message starts it again. While it's working, <kbd>Enter</kbd> sends your message into the turns already running, where the agent can take it. <strong>Queue</strong> holds it for the next turn instead. Under your message, each recipient's delivery reads <strong>Sent</strong>, <strong>Sending…</strong> or <strong>Queued for next turn</strong>, and <strong>Seen by</strong> lists who has read it. A message waiting for the lead offers <strong>Send now</strong> and <strong>Cancel queued message</strong>.</p>
+    <p>The mode menu applies to the whole team. Agents already working switch after they finish their turn. From the composer you can change the lead's effort and Fast mode, but not its model. An Orcling lead keeps its own settings.</p>
+  </section>
+
+  <section aria-labelledby="members">
+    <h2 id="members">How members work together</h2>
+    <p>Every member takes part in the conversation and shares the team's folder. A member you address replies in the chat, where you see it. Members address each other the same way, and anything said in the chat reaches the rest as context on their next turn.</p>
+    <p>Members are told to claim files before they edit them in the shared folder. A member's turn then shows <strong>Holding:</strong> with the files. A colleague can't claim those files until they're released, but nothing locks the files themselves.</p>
+    <p>For larger, bounded work, the lead or a manager hands an assignment to a member who reports to it. An assignment runs in a worktree of its own, built from its manager's current files. Its card shows the member, <strong>Delegated by</strong> and the manager's name, and a state such as <strong>Working</strong> or <strong>Waiting for reports</strong>. <strong>Open assignment</strong> opens it as a task.</p>
+    <p>By default, members work only when addressed. In the team's <strong>Discussion</strong> settings, <strong>Reads per message</strong> lets members read new messages on their own and chime in, and <strong>Follow-ups after colleagues</strong> lets them answer each other. Each read is an extra model turn, so the default is <strong>Off (recommended)</strong>.</p>
+    <p>To see each member's steps, open the team menu in the toolbar, which shows the team's status, and turn on <strong>Show activity</strong>.</p>
+  </section>
+
+  <section aria-labelledby="changes">
+    <h2 id="changes">Review and combine changes</h2>
+    <p>A turn that changes files in the shared folder ends with a change card and a <strong>Review</strong> button. Its note, <strong>Shared workspace checkpoint · may include concurrent edits</strong>, means other members may have edited the folder at the same time. Team change cards have no <strong>Undo</strong>.</p>
+    <p>Assignments come back on their own. When one finishes, OpenOrc merges its files into its manager's folder before the manager's next turn, and the manager reports the combined result up the hierarchy. If the merge conflicts, a <strong>Changes need review</strong> card lists the conflicting files:</p>
+    <ol class="docs-steps">
+      <li>Click <strong>Open retained integration</strong> to open the folder where the merge stopped.</li>
+      <li>Resolve the conflicting files there.</li>
+      <li>Click <strong>Accept resolved changes</strong>.</li>
+    </ol>
+    <p><strong>Retry integration</strong> merges the current folders again in a new folder instead. When the team is done, review and commit its changes as you would for any thread. See <a href={docHref("review")}>Changes and review</a>.</p>
+  </section>
+
+  <section aria-labelledby="needs-you">
+    <h2 id="needs-you">When the team needs you</h2>
+    <p>Approvals and questions from any member collect in a <strong>Needs you</strong> panel above the composer. When several are waiting, a list shows how many are pending. <strong>View context</strong> scrolls to the request in the conversation.</p>
+    <p>A member that fails shows what went wrong, with buttons to recover:</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Button</th>
+            <th scope="col">What it does</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Retry assignment</strong></td>
+            <td>Runs the turn again. Each retry counts toward <strong>Attempts per assignment</strong>.</td>
+          </tr>
+          <tr>
+            <td><strong>Start fresh session</strong></td>
+            <td>Starts the agent in a new session from a short handoff. History and files are kept.</td>
+          </tr>
+          <tr>
+            <td><strong>Open workspace</strong></td>
+            <td>Opens the member's folder so you can look at its files.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>If OpenOrc quits while a member is mid-turn, that member needs your attention when OpenOrc starts again, since OpenOrc can't tell what the turn did. Retrying that turn doesn't count toward its attempts. Turns that hadn't started yet run on their own.</p>
+    <p><strong>Stop</strong> in the composer stops the team. OpenOrc notifies you when the team finishes, when a member needs attention, and when one waits for an approval or an answer.</p>
+  </section>
+
+  <section aria-labelledby="limits">
+    <h2 id="limits">Limits</h2>
+    <p>Each time the team runs, from your message until every member is done, it works within the team's <strong>Execution limits</strong>:</p>
     <div class="docs-table">
       <table>
         <thead>
           <tr>
             <th scope="col">Limit</th>
-            <th scope="col">Range</th>
             <th scope="col">Default</th>
+            <th scope="col">Range</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td>Agents running at once</td>
-            <td>1 to 12</td>
+            <td><strong>Concurrent agents</strong></td>
             <td>3</td>
+            <td>1 to 12</td>
           </tr>
           <tr>
-            <td>Assignments per execution</td>
-            <td>1 to 100</td>
+            <td><strong>Assignments per execution</strong></td>
             <td>24</td>
+            <td>1 to 100</td>
           </tr>
           <tr>
-            <td>Execution time</td>
-            <td>1 to 480 minutes</td>
+            <td><strong>Execution time (minutes)</strong></td>
             <td>60</td>
+            <td>1 to 480</td>
           </tr>
           <tr>
-            <td>Attempts per assignment</td>
-            <td>1 to 5</td>
+            <td><strong>Attempts per assignment</strong></td>
             <td>2</td>
+            <td>1 to 5</td>
           </tr>
         </tbody>
       </table>
     </div>
-    <p>Discussion settings control how much members talk among themselves: ambient rounds (0 to 3) and peer follow-ups (0 to 2), both 0 by default.</p>
-    <p class="docs-source">Source: <code>packages/protocol/src/orchestration.ts</code>, <code>packages/core/src/services/orchestration.ts</code></p>
+    <p>When the time runs out, OpenOrc stops the team. Each run also has fixed caps: 1,000 agent turns, 2,000 messages, and 2 MiB of message text. Past a cap, OpenOrc refuses new turns or messages.</p>
+    <Callout title="Beta limits">
+      Every member's turn runs on your account with that member's agent, so a team uses your plan limits faster than a single agent does. Teams don't work with repositories that contain submodules or special files, such as sockets.
+    </Callout>
   </section>
 
-  <section aria-labelledby="execution">
-    <h2 id="execution">How a team runs</h2>
-    <Diagram diagram={teamDiagram} />
-    <p>An execution is one burst of team work. Its coordination state is a journal stored as rows: the execution itself in <code>team_executions</code>, members in <code>team_actors</code>, every attempt in <code>team_attempts</code> with its prompt in <code>team_attempt_prompts</code>, messages and their delivery in <code>team_messages</code>, and file claims in <code>team_claims</code>. The team chat, workspaces, and integrations are stored in their own tables. Each change is validated and written with a revision number, so two writers cannot overwrite each other. A conversation has at most one open execution.</p>
-    <ol class="docs-steps">
-      <li><strong>Start.</strong> OpenOrc checks that every member's provider is installed and signed in, creates the conversation, and opens an execution with a deadline.</li>
-      <li><strong>Routing.</strong> Mentions choose recipients: <code>@Name</code>, <code>@lead</code>, or <code>@all</code>. A message without a mention goes to the lead.</li>
-      <li><strong>Scheduling.</strong> The coordinator decides who runs next. The lead goes first, then members, then assignments, then turns nobody is waiting for. It keeps the number of running agents within the team's limit, with one extra slot for the lead when you are waiting for it. A child does not start while its manager's turn is running.</li>
-      <li><strong>Delegation.</strong> The lead delegates by calling OpenOrc's <code>task_create</code> tool with a member and a request key, then calls <code>team_wait</code> and ends its turn, which frees its slot. The coordinator accepts only direct reports, one active assignment per member, and no more than the team's assignment limit. Delegation works only in Act mode; in Plan mode the same call saves a proposal.</li>
-      <li><strong>Results.</strong> An assignment finishes with <code>team_complete</code>. Its result goes to its manager as a message, and its files are merged into the manager's folder before the manager's next turn. Participants in the shared conversation simply reply.</li>
-      <li><strong>Completion.</strong> The execution completes when everyone is idle. After delegating, the lead must end each turn with <code>team_wait</code> or <code>team_complete</code>; otherwise it is marked as needing attention.</li>
-    </ol>
-    <p>Hard limits stop runaway work: 1,000 attempts, 2,000 messages, and 2 MiB of message text per execution, plus the execution's time limit.</p>
-    <p class="docs-source">Source: <code>packages/core/src/services/team-coordinator.ts</code>, <code>team-conversation.ts</code>, <code>packages/db/src/team-runtime.ts</code></p>
-  </section>
-
-  <section aria-labelledby="messages">
-    <h2 id="messages">Messages and delivery</h2>
-    <p>Members talk through OpenOrc's team tools: <code>team_say</code> for the shared conversation, <code>team_message</code> between a manager and its direct reports, <code>team_status</code> to read the execution, <code>team_history</code> for older room messages, and <code>team_claim</code> to claim files. A mention of <code>@lead</code> in a member's reply wakes the lead.</p>
-    <p>A message is only marked delivered after the recipient's turn that carried it succeeds. When the recipient is busy, the coordinator tries to deliver it into the running turn:</p>
-    <ul>
-      <li>Codex receives it with <code>turn/steer</code>, with a 15-second limit.</li>
-      <li>Claude receives it as a new stdin message, which it reads at its next tool boundary.</li>
-      <li>OpenCode cannot receive messages mid-turn, so the message waits for the next turn.</li>
-    </ul>
-    <p>The interface shows each message as Sent, Sending, Queued for next turn, or a failure such as "Couldn't confirm delivery". Delivery into a turn does not prove the agent acted on it. If a Codex steer times out, the recipient is stopped and marked as needing attention, because OpenOrc cannot tell whether the message arrived.</p>
-  </section>
-
-  <section aria-labelledby="workspaces">
-    <h2 id="workspaces">Workspaces</h2>
-    <p>A team conversation has a lead workspace, and each assignment can have its own.</p>
-    <ul>
-      <li><strong>Local mode</strong>, the default, uses your checkout as the lead workspace. The lead and every participant edit your files directly, and several can run at the same time. File claims made with <code>team_claim</code> are advisory; nothing stops two agents from editing the same file.</li>
-      <li><strong>Worktree mode</strong> builds the lead workspace in <code>team-workspaces/</code> from a capture of your checkout, including uncommitted and untracked files.</li>
-      <li><strong>Assignments</strong> each get a detached worktree built from their manager's current files. Include files are copied and the project's setup script runs, with a 5-minute limit.</li>
-    </ul>
-    <p>When an assignment finishes, its result is merged into its manager's workspace with a three-way tree merge in a scratch worktree, then written file by file. Each write checks that the file still has the content the merge expected, and every write goes through a temporary file and a rename. If the merge conflicts, the scratch worktree is kept so you can resolve it, then Retry or Accept.</p>
-    <p>Each turn's files are checkpointed under <code>refs/openorc/teams/</code> in your repository, so a team conversation can be forked or restored from a checkpoint into a new folder. Moves switch the conversation between local and worktree mode and can be cancelled. Deleting a team conversation removes its folders, refs, and branches; branches are removed only if they are merged or pushed. A team conversation with saved tasks is hidden instead of deleted, so the tasks keep their history.</p>
-    <p class="docs-source">Source: <code>packages/core/src/services/team-workspaces.ts</code>, <code>team-file-publication.ts</code>, <code>packages/git/src/team-transfer.ts</code></p>
-  </section>
-
-  <section aria-labelledby="context">
-    <h2 id="context">What each member sees</h2>
-    <p>Each member's instructions are the usual conversation or task instructions, including the memory brief, followed by team rules: its responsibility, the roster, who it reports to, how to delegate and wait, how to claim files, and how to report results. Each turn's message adds:</p>
-    <ul>
-      <li>The member's assignment, up to 100,000 characters.</li>
-      <li>Room messages the member missed, up to the newest 48 KiB.</li>
-      <li>For the lead and conversation members: files colleagues have claimed, files they changed since the member's last turn, and files the member and a colleague both changed at the same time.</li>
-      <li>Messages addressed to the member.</li>
-    </ul>
-    <p>The lead and participants resume their provider sessions across executions. When a context is reset, the new session gets a seed of up to 64 KiB: the original instructions, directions, short results, and recent replies. History that does not fit in the seed is stored outside it, and the agent can read it with <code>team_context</code>. Recent replies that do not fit are dropped.</p>
-  </section>
-
-  <section aria-labelledby="recovery">
-    <h2 id="recovery">Restarts and recovery</h2>
-    <p>After OpenOrc restarts, only turns that had already started need you. A member whose agent had started a turn is marked as needing attention, and so is its execution, because OpenOrc cannot tell what that turn did. You inspect it and decide whether to retry; retrying a turn that a restart interrupted does not count against the member's attempts. Turns that had not started yet are queued again and run on their own, and members that were waiting for a message keep waiting. Interrupted workspace operations are fenced and flagged.</p>
-    <p>On macOS and Linux, OpenOrc records new agent process identities before they run. After a hard crash, startup stops surviving process groups before recovering queues or starting replacement agents. If it cannot verify ownership or confirm the group stopped, startup blocks with a recovery message. This mechanism is not available on Windows, and cannot track agents launched by older versions.</p>
-    <p>A failed fork or restore can be cancelled; the source conversation, original workspace and saved recovery copies stay intact. Forks are optional, useful when you want to explore an alternative in an independent conversation and folder. A failed delete can be cancelled before cleanup starts. Once cleanup has started, choose “Finish deletion, keep remaining files” to remove the conversation while keeping all remaining folders and Git references; this does not restore files already removed. These choices retain the operation's journal, so delayed retries cannot perform the cancelled operation.</p>
-    <p>The automatic stop at the deadline is set again at startup, so an execution already past its time limit is stopped, and no new turn starts after the limit.</p>
-    <p>OpenOrc sends notifications when an execution finishes, when something needs attention, and when a member waits for an approval or an answer. Stopping an execution, including by its deadline, does not notify.</p>
-    <p class="docs-source">Source: <code>packages/core/src/services/team-attempt-recovery.ts</code>, <code>team-scheduler.ts</code></p>
-  </section>
-
-  <section aria-labelledby="unfinished">
-    <h2 id="unfinished">Not available yet</h2>
-    <ul>
-      <li>Changing a team conversation's agent or model, or a member's settings. You can change the lead's effort and Fast mode from the composer, and Queue holds a message for its recipient's next turn.</li>
-      <li>Preparing a team-owned task's worktree, removing it, or deleting the task from the task's own controls while its team conversation exists. The task's Start button works and routes the request through the team.</li>
-      <li>Cleaning up kept folders and refs, except by deleting the whole conversation.</li>
-      <li>Resolving a move conflict in place.</li>
-      <li>Repositories with submodules, nested repositories, special files, and changes that turn a file into a folder or back.</li>
-    </ul>
+  <section aria-labelledby="next-steps">
+    <h2 id="next-steps">Next steps</h2>
+    <LinkCards cards={[{ slug: "messaging" }, { slug: "permissions" }, { slug: "review" }, { slug: "orclings" }]} />
   </section>
 </DocsLayout>

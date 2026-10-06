@@ -1,0 +1,22 @@
+---
+/** A product still standing on a painting, as Cursor's docs show their app. The still is HTML from src/components/mocks/. */
+import ArtPanel from "../ArtPanel.astro";
+
+interface Props {
+  /** The painting in src/assets/art. */
+  art: string;
+  /** What the still shows, for people who cannot see it. */
+  label: string;
+  caption?: string;
+}
+const { art, label, caption } = Astro.props;
+---
+
+<figure class="docs-visual">
+  <ArtPanel art={art} sizes="(max-width: 860px) 100vw, 768px">
+    <div class="mock-window" role="img" aria-label={label}>
+      <slot />
+    </div>
+  </ArtPanel>
+  {caption && <figcaption>{caption}</figcaption>}
+</figure>

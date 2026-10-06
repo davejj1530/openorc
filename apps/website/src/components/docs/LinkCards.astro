@@ -1,0 +1,34 @@
+---
+/**
+ * Cards that send the reader on, as Cursor's docs close a page with "Next steps".
+ * A card names a docs page by slug and takes its title and description, or gives its own.
+ */
+import { docHref, docPage } from "../../data/docs";
+
+interface Card {
+  slug?: string;
+  href?: string;
+  title?: string;
+  description?: string;
+}
+interface Props {
+  cards: Card[];
+  columns?: 2 | 3;
+}
+const { cards, columns = 2 } = Astro.props;
+const resolved = cards.map((card) => {
+  if (card.slug === undefined) return { href: card.href ?? "", title: card.title ?? "", description: card.description ?? "" };
+  const page = docPage(card.slug);
+  if (!page) throw new Error(`No docs page with the slug "${card.slug}"`);
+  return { href: docHref(card.slug), title: card.title ?? page.title, description: card.description ?? page.description };
+});
+---
+
+<div class="docs-cards" data-columns={columns}>
+  {resolved.map((card) => (
+    <a class="docs-card" href={card.href}>
+      <span class="docs-card-title">{card.title}</span>
+      <span class="docs-card-text">{card.description}</span>
+    </a>
+  ))}
+</div>

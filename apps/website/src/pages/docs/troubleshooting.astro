@@ -1,0 +1,259 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import Callout from "../../components/docs/Callout.astro";
+import LinkCards from "../../components/docs/LinkCards.astro";
+import { docHref } from "../../data/docs";
+
+const sections = [
+  { id: "agent", title: "An agent is missing or signed out" },
+  { id: "stuck", title: "A thread seems stuck" },
+  { id: "approvals", title: "Approvals don't appear" },
+  { id: "slack", title: "Slack doesn't reply" },
+  { id: "git", title: "Worktree and Git errors" },
+  { id: "updates", title: "Updates won't install" },
+  { id: "next-steps", title: "Next steps" },
+];
+---
+
+<DocsLayout slug="troubleshooting" sections={sections}>
+  <section aria-labelledby="agent">
+    <h2 id="agent">An agent is missing or signed out</h2>
+    <p>
+      OpenOrc uses the agent CLIs installed on your computer and the sign-ins they already have. <strong>Settings</strong>, then <strong>Connections</strong>, shows each agent as <strong>Connected</strong>, <strong>Not logged in</strong>,
+      <strong>Not installed</strong>, <strong>Fails to start</strong>, or <strong>Connection check failed</strong>. If no agent is ready when you come back to OpenOrc, it opens <strong>Reconnect your coding agent</strong>, which runs the same
+      checks and shows each agent as <strong>Ready</strong>, <strong>Sign-in needed</strong>, <strong>Not installed</strong>, or <strong>Couldn't check</strong>.
+    </p>
+    <ol class="docs-steps">
+      <li>For an agent that is <strong>Not installed</strong>, press its install button to open the setup guide, and install it.</li>
+      <li>For an agent that is <strong>Not logged in</strong>, run its sign-in command in a terminal: <code>codex login</code>, <code>claude auth login</code>, or <code>opencode auth login</code>.</li>
+      <li>Press <strong>Refresh connections</strong> in Settings, or <strong>Rescan</strong> on the setup screen.</li>
+    </ol>
+    <p>
+      When Claude Code signs out in the middle of your work, the thread shows <strong>Claude is signed out</strong> with a <strong>Sign in</strong> button. It opens the thread's Terminal and runs <code>claude auth login</code> there. Finish
+      signing in, then send your message again.
+    </p>
+    <h3>Installed, but OpenOrc can't find it</h3>
+    <p>
+      On macOS and Linux, OpenOrc finds agents through your login shell, the way a new terminal window would. Open a new terminal and run <code>command -v claude</code> (or <code>codex</code>, or <code>opencode</code>). It has to print a
+      full path. If it prints nothing, or an alias, add the agent's folder to <code>PATH</code> in your shell's startup file, then refresh.
+    </p>
+    <p>
+      OpenOrc gives your shell 8 seconds to answer. When it takes longer, agents keep starting with what the shell reported last time, but Connections shows <strong>Connection check failed</strong> until a check succeeds. Speed up your
+      shell's startup files, then refresh.
+    </p>
+    <p>On Windows, OpenOrc doesn't search for agents. Set <code>OPENORC_CODEX_BIN</code>, <code>OPENORC_CLAUDE_BIN</code>, or <code>OPENORC_OPENCODE_BIN</code> to the agent's full path, then restart OpenOrc.</p>
+    <h3>Fails to start</h3>
+    <p>
+      OpenOrc found the agent, but its <code>--version</code> command failed, so nothing can run through it. After an update check, a row OpenOrc can repair shows a reinstall button, such as <strong>Reinstall Claude</strong>. Otherwise
+      reinstall the agent with the tool that installed it, and refresh. To see what OpenOrc sees, run <code>claude --version</code> (or <code>codex</code>, or <code>opencode</code>) in a terminal. For the sign-in, run
+      <code>claude auth status</code>, <code>codex login status</code>, or <code>opencode auth list</code>.
+    </p>
+  </section>
+
+  <section aria-labelledby="stuck">
+    <h2 id="stuck">A thread seems stuck</h2>
+    <ol class="docs-steps">
+      <li>
+        Check whether the agent is waiting for you. Its row in the sidebar says <strong>Needs your approval</strong> (or <strong>Needs approval</strong> and the command) or <strong>Has a question for you</strong>, and the thread shows the
+        approval or question.
+      </li>
+      <li>Press Stop (<strong>Stop this turn</strong>). With an empty message box, the Send button turns into Stop. Stopping keeps the session, so your next message continues where the agent was.</li>
+      <li>
+        If nothing responds, not even Stop, reload the window: View, then <strong>Reload</strong> (<kbd>⌘R</kbd>). If OpenOrc's core had stopped, this starts a new one, and the interrupted run is marked as failed. Send a message to continue.
+      </li>
+    </ol>
+    <p>Other things that look like a stuck thread:</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">You see</th>
+            <th scope="col">What to do</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>A command marked <strong>Running</strong> above the message box</td>
+            <td>A command the agent left running, such as a dev server. It outlives the turn. Press its <strong>Stop</strong> when you are done with it.</td>
+          </tr>
+          <tr>
+            <td>The agent starts again after you stop it</td>
+            <td>Stop sends the next queued message. Remove queued messages you don't want first.</td>
+          </tr>
+          <tr>
+            <td>A queued message with <strong>Retry</strong></td>
+            <td>Its delivery failed, or was cut off when OpenOrc closed, and it holds the messages behind it. Check the thread, then press <strong>Retry</strong> or remove it.</td>
+          </tr>
+          <tr>
+            <td><strong>The last turn failed.</strong></td>
+            <td>Send a message to resume, or press <strong>Retry with a fresh session</strong>.</td>
+          </tr>
+          <tr>
+            <td><strong>Claude no longer has this session.</strong> (or Codex, or OpenCode)</td>
+            <td>Press <strong>Start a fresh session with a handoff</strong>. The new session gets a summary of your recent requests.</td>
+          </tr>
+          <tr>
+            <td><strong>Usage limit reached.</strong></td>
+            <td>Press <strong>Manage usage</strong> to see when the limit resets. For Codex, <strong>Use reset</strong> appears when your account has a reset to spend.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="approvals">
+    <h2 id="approvals">Approvals don't appear</h2>
+    <p>
+      An approval shows as a card in the thread, <strong>Allow</strong> followed by the tool's name, with <strong>Allow</strong>, <strong>Allow for this run</strong>, and <strong>Deny</strong>. The thread's row in the sidebar says it needs
+      your approval, and the request is listed in the Inbox.
+    </p>
+    <ul>
+      <li>
+        <strong>Check the mode.</strong> Autonomous, which Codex calls <strong>Full access</strong>, runs tools without asking. Accept edits changes files in the project without asking, and asks before commands and before edits outside the
+        project. Codex's <strong>Ask for approval</strong> asks only for work outside its sandbox. See <a href={docHref("permissions")}>Modes and permissions</a>.
+      </li>
+      <li>
+        <strong>Check notifications.</strong> A desktop notification comes only while <strong>Desktop notifications</strong> is on under General, your system allows notifications from OpenOrc, and you aren't looking at that thread.
+      </li>
+      <li><strong>After a restart.</strong> Pending approvals live only while OpenOrc runs. Quitting denies them, and the agent's turn ends.</li>
+      <li>
+        <strong>For a request from Slack.</strong> The approval is posted in the Slack thread, and its buttons stop working after 10 minutes. It still waits in OpenOrc. Questions from the agent appear only in OpenOrc.
+      </li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="slack">
+    <h2 id="slack">Slack doesn't reply</h2>
+    <ol class="docs-steps">
+      <li>Make sure OpenOrc is open and your computer is awake. Slack can't reach an agent on a computer that is asleep or a closed app.</li>
+      <li>
+        Open <strong>Settings</strong>, then <strong>Slack</strong>. After OpenOrc restarts, Slack isn't connected: press <strong>Connect and check</strong>. With a team relay, press <strong>Connect this computer</strong>, and the host
+        presses <strong>Save and connect relay</strong>.
+      </li>
+      <li>
+        If the status says <strong>Needs attention</strong> or <strong>Delivery pending</strong>, read the error under it and fix it. Then press <strong>Connect and check</strong> again, or <strong>Check connection</strong> while Slack is
+        connected. A team relay offers <strong>Retry Slack delivery</strong> or <strong>Reconnect to send result</strong> instead.
+      </li>
+      <li>Mention the bot in a channel it was invited to, from the Slack member ID you entered. A personal bot ignores requests from anyone else.</li>
+      <li>Check that your default agent is signed in under Connections.</li>
+    </ol>
+    <p>If the bot stays silent, check that both tokens came from the same Slack app. Replies sent with "Also send to channel" are never picked up. With a team relay, OpenOrc also has to be open on the computer that hosts it.</p>
+  </section>
+
+  <section aria-labelledby="git">
+    <h2 id="git">Worktree and Git errors</h2>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Message</th>
+            <th scope="col">What to do</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>… isn't a git repository yet. Worktrees and teams need git and a first commit.</td>
+            <td>Make the project a Git repository with at least one commit, or work in the Local checkout.</td>
+          </tr>
+          <tr>
+            <td>… has no commits yet. Worktrees and teams need a first commit.</td>
+            <td>Make a first commit.</td>
+          </tr>
+          <tr>
+            <td>setup script exited with …</td>
+            <td>The project's setup script failed in the new worktree; the message ends with its last lines of output. Fix it in the project's <strong>Settings</strong> tab under <strong>Setup script</strong>. The worktree is kept and the script won't run there again, so run the missing steps in the thread's Terminal.</td>
+          </tr>
+          <tr>
+            <td>end the current turn before moving the thread</td>
+            <td>
+              The thread's agent process is still open, even between turns. It closes after the time set in <strong>Close idle processes after</strong> (10 minutes by default), unless that is <strong>Keep running</strong> or a command it
+              left running in the background is still going. Try the move again then.
+            </td>
+          </tr>
+          <tr>
+            <td>These files changed in both the worktree and the checkout: … Nothing was moved.</td>
+            <td>Commit or undo the changes on one side, then move again.</td>
+          </tr>
+          <tr>
+            <td>… is in use by … Finish or stop that operation before …</td>
+            <td>Another operation, such as an agent's turn or a commit, holds that folder. Wait for it, or stop it.</td>
+          </tr>
+          <tr>
+            <td>Push … to origin before opening its pull request.</td>
+            <td>Push the branch first. OpenOrc checks against the remote branches Git already knows about.</td>
+          </tr>
+          <tr>
+            <td>GitHub CLI (gh) is not installed …</td>
+            <td>Install <code>gh</code> and run <code>gh auth login</code>, or push and open the pull request in your browser.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      Commits in a worktree can fail when the repository's Git hooks need dependencies the worktree doesn't have yet, such as <code>node_modules</code>. Install them in the setup script so every new worktree gets them. See <a
+        href={docHref("git")}>Git and worktrees</a
+      >.
+    </p>
+  </section>
+
+  <section aria-labelledby="updates">
+    <h2 id="updates">Updates won't install</h2>
+    <p>OpenOrc installs an app update only when nothing is in the middle of work. When it can't, it says what to finish first:</p>
+    <ul>
+      <li>Close your running terminal panels before restarting to update.</li>
+      <li>Wait for agent work, approvals, and context maintenance to finish before restarting to update.</li>
+      <li>Stop the background commands running in your conversations before restarting to update.</li>
+      <li>Finish or stop your active teams before restarting to update.</li>
+      <li>Wait for memory processing to finish before restarting to update.</li>
+      <li>Wait for agent updates to finish before restarting.</li>
+      <li>A scheduled task is starting. Try again when it has finished.</li>
+      <li>OpenOrc is processing a request. Try restarting to update again in a moment.</li>
+    </ul>
+    <p>Closing a Terminal panel doesn't end its shell. Press <strong>End shell</strong> in each Terminal that still runs one, then restart to update.</p>
+    <p>
+      If an installation fails, OpenOrc says <strong>The update could not be installed</strong>, or <strong>OpenOrc could not restart to update</strong> in the window. When your work has finished, quit and reopen OpenOrc, then try again.
+      Linux releases don't update themselves: install the new rpm, deb, or AppImage over the old one.
+    </p>
+    <h3>Agent updates</h3>
+    <p>
+      OpenOrc refuses to update an agent while agent work, approvals, background commands, teams, or background processing such as memory summaries are still running. Finish or stop them, then try again. Your conversations are kept. Some
+      messages on an agent's row in Connections:
+    </p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Message</th>
+            <th scope="col">Meaning</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Update using the tool that installed this agent, then check again.</td>
+            <td>OpenOrc can't update this installation, for example one made with pnpm or bun, or any install on Windows. Update it yourself.</td>
+          </tr>
+          <tr>
+            <td>Update this installation with Homebrew, then check again.</td>
+            <td>Homebrew installed the agent in a way OpenOrc doesn't update, such as a formula or any OpenCode install. Upgrade it with <code>brew</code>.</td>
+          </tr>
+          <tr>
+            <td>The newer version is not active yet …</td>
+            <td>The update ran, but your package manager or release channel is still serving the old version. Check the installation in a terminal.</td>
+          </tr>
+          <tr>
+            <td>Reinstall using the tool that installed this agent, then check again.</td>
+            <td>The installation is broken and OpenOrc can't repair it. Reinstall the agent yourself.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <Callout>
+      If an agent shows <strong>Fails to start</strong> right after an update, its installation may be incomplete. Press the reinstall button on its row, such as <strong>Reinstall Codex</strong>, or reinstall it in a terminal.
+    </Callout>
+  </section>
+
+  <section aria-labelledby="next-steps">
+    <h2 id="next-steps">Next steps</h2>
+    <LinkCards cards={[{ slug: "known-issues" }, { slug: "settings" }, { slug: "how-it-works" }]} columns={3} />
+  </section>
+</DocsLayout>

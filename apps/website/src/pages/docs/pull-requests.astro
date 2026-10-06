@@ -1,0 +1,116 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import Callout from "../../components/docs/Callout.astro";
+import LinkCards from "../../components/docs/LinkCards.astro";
+import { docHref } from "../../data/docs";
+
+const sections = [
+  { id: "open", title: "Open pull requests" },
+  { id: "browse", title: "Browse and filter" },
+  { id: "read", title: "Read a pull request" },
+  { id: "draft", title: "Draft a review" },
+  { id: "model", title: "Let a model review" },
+  { id: "submit", title: "Submit the review" },
+  { id: "requirements", title: "What it needs" },
+  { id: "next-steps", title: "Next steps" },
+];
+---
+
+<DocsLayout slug="pull-requests" sections={sections}>
+  <section aria-labelledby="open">
+    <h2 id="open">Open pull requests</h2>
+    <p><strong>Pull requests</strong> lists your projects' pull requests on GitHub and lets you review them without leaving OpenOrc. It reads everything through your own GitHub CLI, <code>gh</code>. Your review stays a draft in OpenOrc, and nothing reaches GitHub until you submit it.</p>
+    <p>At first the sidebar keeps <strong>Pull requests</strong> under <strong>More</strong>. Open <strong>More</strong>, then <strong>Pull requests</strong>. To keep it in the sidebar, choose <strong>Edit sidebar…</strong> under More and switch it on.</p>
+  </section>
+
+  <section aria-labelledby="browse">
+    <h2 id="browse">Browse and filter</h2>
+    <p>The project chip in the header picks one project, or <strong>All projects</strong>: every project whose remote is on github.com, each under its own heading.</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Filter</th>
+            <th scope="col">Shows</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Open</strong></td>
+            <td>Every open pull request.</td>
+          </tr>
+          <tr>
+            <td><strong>To review</strong></td>
+            <td>Open pull requests that ask for your review.</td>
+          </tr>
+          <tr>
+            <td><strong>Yours</strong></td>
+            <td>Open pull requests you wrote.</td>
+          </tr>
+          <tr>
+            <td><strong>Closed</strong></td>
+            <td>Closed and merged pull requests.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p><strong>Filter pull requests…</strong> narrows the list by title, number, author or branch. Each row shows the number, the author, the branch it merges from and into, the lines added and removed, and when it last changed. Drafts are marked <strong>Draft</strong>, and GitHub's review state shows as <strong>Approved</strong>, <strong>Changes requested</strong> or <strong>Review required</strong>. Each project lists up to 50 pull requests per filter.</p>
+  </section>
+
+  <section aria-labelledby="read">
+    <h2 id="read">Read a pull request</h2>
+    <p>Click a row to open it. The header shows its title, state, author, branches, line counts and number of files. Switch between <strong>Changes</strong>, the diff as GitHub shows it, and <strong>Description</strong>, the author's text. <strong>Open on GitHub</strong> opens it in your browser, and <strong>Refresh</strong> loads it again.</p>
+  </section>
+
+  <section aria-labelledby="draft">
+    <h2 id="draft">Draft a review</h2>
+    <p>You can write comments yourself whichever reviewer is chosen:</p>
+    <ol class="docs-steps">
+      <li>On <strong>Changes</strong>, click a line number. Drag or shift-click across line numbers to comment on several lines.</li>
+      <li>Write the comment and choose <strong>Add comment</strong>.</li>
+      <li>Repeat for each finding.</li>
+    </ol>
+    <p>The bar under the diff counts your draft comments. Click the count to list them, and use the buttons beside each one to edit or remove it. A comment belongs to the commit it was written on. When the author pushes new commits, the bar warns that the comments were written on an earlier version and will post there. To comment on the new commits, post or discard the draft first.</p>
+  </section>
+
+  <section aria-labelledby="model">
+    <h2 id="model">Let a model review</h2>
+    <ol class="docs-steps">
+      <li>Set <strong>Reviewer</strong> to <strong>Model</strong>.</li>
+      <li>Pick a model, or an <a href={docHref("orclings")}>Orcling</a> to review with its own model.</li>
+      <li>Choose <strong>Start review</strong>.</li>
+    </ol>
+    <p>The model reviews in a thread of its own, named <code>Review #&lt;number&gt;: &lt;title&gt;</code>, in Plan mode. It works on a separate copy of the pull request on no branch, so your checkout isn't touched. It records each finding as a draft comment on the changed line and finishes with a summary. Its comments join your draft, labeled with the model's name. A link beside <strong>Reviewer</strong> opens the review thread. It says the model is reviewing while it works, and reads <strong>Review conversation</strong> once it is done.</p>
+    <p>After the author pushes again, choose <strong>Review again</strong>. The same thread continues on the new commits, checks whether its earlier findings were addressed and comments only on what is left or new. A draft with comments on the older commits has to be posted or discarded first. If you archived the review thread, the next review starts a fresh one.</p>
+    <p>The model can't post, push or change files. You edit or remove its comments and decide what to submit.</p>
+  </section>
+
+  <section aria-labelledby="submit">
+    <h2 id="submit">Submit the review</h2>
+    <ol class="docs-steps">
+      <li>Choose <strong>Submit review</strong>.</li>
+      <li>Write a <strong>Summary</strong>. A model's summary fills the field when you haven't written one; otherwise it appears below as <strong>Model's summary</strong>, with <strong>Add to summary</strong>.</li>
+      <li>Under <strong>Post as</strong>, pick <strong>You</strong>, or <strong>Reviewer app</strong> if you set one up.</li>
+      <li>Under <strong>Verdict</strong>, pick <strong>Comment</strong>, <strong>Approve</strong> or <strong>Request changes</strong>.</li>
+      <li>Choose <strong>Post review</strong>.</li>
+    </ol>
+    <p>OpenOrc posts the summary, the verdict and every draft comment as one GitHub review, then clears what it posted from the draft. The bar then shows <strong>Review posted.</strong> and a <strong>View on GitHub</strong> link.</p>
+    <p>A review needs a summary or at least one comment, unless you approve. When you post as yourself, you can't approve or request changes on your own pull request. <strong>Discard draft</strong> deletes the draft's comments and summary instead.</p>
+    <Callout>You can't post or discard a draft while a model is still reviewing. Wait for it to finish, or stop it in its thread.</Callout>
+  </section>
+
+  <section aria-labelledby="requirements">
+    <h2 id="requirements">What it needs</h2>
+    <ul>
+      <li>The GitHub CLI, installed and signed in. Run <code>gh auth login</code> in a terminal. Without <code>gh</code>, the view says <strong>GitHub CLI not found</strong>.</li>
+      <li>A project whose remote is on GitHub.</li>
+      <li>To let a model review, an agent you are signed in to.</li>
+      <li>To post as a bot, a reviewer app: in <strong>Settings</strong>, open <strong>Connections</strong>, find <strong>Reviewer app</strong> under GitHub and choose <strong>Set up</strong>. The app can approve only when <strong>Let it approve</strong> is on. See <a href={docHref("settings")}>Settings</a>.</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="next-steps">
+    <h2 id="next-steps">Next steps</h2>
+    <LinkCards cards={[{ slug: "review" }, { slug: "git" }, { slug: "agents" }]} columns={3} />
+  </section>
+</DocsLayout>

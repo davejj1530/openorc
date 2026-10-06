@@ -1,0 +1,377 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import Callout from "../../components/docs/Callout.astro";
+import LinkCards from "../../components/docs/LinkCards.astro";
+
+const sections = [
+  { id: "navigation", title: "Navigation" },
+  { id: "threads", title: "Threads" },
+  { id: "composer", title: "Composer" },
+  { id: "tasks", title: "Tasks list and task pages" },
+  { id: "review", title: "Review and editing" },
+  { id: "layout", title: "Resizing and menus" },
+  { id: "app-menu", title: "App menu" },
+  { id: "next-steps", title: "Next steps" },
+];
+---
+
+<DocsLayout slug="shortcuts" sections={sections}>
+  <p>
+    This page uses the Mac keys. On Windows and Linux, press <kbd>Ctrl</kbd> wherever it shows <kbd>⌘</kbd>. <kbd>⇧</kbd> is Shift and <kbd>↵</kbd> is Return or Enter. OpenOrc has no setting to change these keys.
+  </p>
+
+  <section aria-labelledby="navigation">
+    <h2 id="navigation">Navigation</h2>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Keys</th>
+            <th scope="col">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><kbd>⌘K</kbd></td>
+            <td>Open or close the command palette: threads, tasks, projects, messages, and actions such as <strong>New task</strong> and <strong>Settings</strong></td>
+          </tr>
+          <tr>
+            <td><kbd>⌘⇧F</kbd></td>
+            <td>Search what was said in every thread. Type at least two characters.</td>
+          </tr>
+          <tr>
+            <td><kbd>⌘N</kbd></td>
+            <td>Start a new thread in the current project</td>
+          </tr>
+          <tr>
+            <td><kbd>⌘⇧N</kbd></td>
+            <td>Write a new task</td>
+          </tr>
+          <tr>
+            <td><kbd>⌘B</kbd></td>
+            <td>Show or hide the sidebar</td>
+          </tr>
+          <tr>
+            <td><kbd>⌘J</kbd></td>
+            <td>Show or hide the panel beside the conversation</td>
+          </tr>
+          <tr>
+            <td><kbd>⌘[</kbd> and <kbd>⌘]</kbd></td>
+            <td>Go back or forward, like the arrows in the sidebar</td>
+          </tr>
+          <tr>
+            <td><kbd>Esc</kbd></td>
+            <td>Close the command palette. In an expanded panel that has focus, collapse it.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="threads">
+    <h2 id="threads">Threads</h2>
+    <p>Most of these act on the thread that is open and focused.</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Keys</th>
+            <th scope="col">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><kbd>⌘1</kbd> to <kbd>⌘9</kbd></td>
+            <td>Open the first to ninth thread, in the order the sidebar lists them</td>
+          </tr>
+          <tr>
+            <td><kbd>⌘⇧[</kbd> and <kbd>⌘⇧]</kbd></td>
+            <td>Open the previous or next thread in the sidebar's order</td>
+          </tr>
+          <tr>
+            <td><kbd>⌘</kbd>-click a thread</td>
+            <td>Open it in another pane beside the current one, up to three panes</td>
+          </tr>
+          <tr>
+            <td><kbd>⌘\</kbd></td>
+            <td>Close the other panes and keep the focused thread</td>
+          </tr>
+          <tr>
+            <td><kbd>⌘⇧P</kbd></td>
+            <td>Pin or unpin the thread</td>
+          </tr>
+          <tr>
+            <td><kbd>⌘⇧A</kbd></td>
+            <td>Archive or unarchive the thread</td>
+          </tr>
+          <tr>
+            <td><kbd>⌘⇧U</kbd></td>
+            <td>Mark the thread as read or unread</td>
+          </tr>
+          <tr>
+            <td><kbd>⌘⇧O</kbd></td>
+            <td>Turn orcmode on or off. Orcmode lists only threads that are working, need you, are unread or pinned, or saw work in the last day.</td>
+          </tr>
+          <tr>
+            <td><kbd>↵</kbd> or <kbd>Esc</kbd> while renaming</td>
+            <td>Save or cancel the new title</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="composer">
+    <h2 id="composer">Composer</h2>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Keys</th>
+            <th scope="col">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><kbd>↵</kbd></td>
+            <td>Send. While the agent is working, the message joins the current turn if the agent can take it; otherwise it waits for the next turn.</td>
+          </tr>
+          <tr>
+            <td><kbd>⇧↵</kbd></td>
+            <td>Start a new line</td>
+          </tr>
+          <tr>
+            <td><kbd>@</kbd></td>
+            <td>Mention a file in the project, an Orcling, or a member in a team conversation</td>
+          </tr>
+          <tr>
+            <td><kbd>/</kbd></td>
+            <td>Commands, at the start of a message, and skills. Picking a Codex skill inserts it as <code>$name</code>.</td>
+          </tr>
+          <tr>
+            <td><kbd>$</kbd></td>
+            <td>Codex skills</td>
+          </tr>
+          <tr>
+            <td><kbd>↑</kbd> and <kbd>↓</kbd></td>
+            <td>Move through the suggestions</td>
+          </tr>
+          <tr>
+            <td><kbd>↵</kbd> or <kbd>Tab</kbd></td>
+            <td>Pick the highlighted suggestion</td>
+          </tr>
+          <tr>
+            <td><kbd>Esc</kbd></td>
+            <td>Remove the mention or command you were typing</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>In a thread, <kbd>/</kbd> offers these commands:</p>
+    <dl class="docs-terms">
+      <div>
+        <dt><code>/compact</code></dt>
+        <dd>Fold the conversation so far into a summary. Offered while the agent is not working.</dd>
+      </div>
+      <div>
+        <dt><code>/plan</code></dt>
+        <dd>Switch the thread to Plan mode.</dd>
+      </div>
+      <div>
+        <dt><code>/act</code></dt>
+        <dd>Switch the thread to Act mode.</dd>
+      </div>
+      <div>
+        <dt><code>/fork</code></dt>
+        <dd>Continue in a new thread from here.</dd>
+      </div>
+    </dl>
+    <Callout>While the agent works, the <strong>Queue</strong> button beside Send holds your message until the current turn ends, even when the agent could take it now.</Callout>
+  </section>
+
+  <section aria-labelledby="tasks">
+    <h2 id="tasks">Tasks list and task pages</h2>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Keys</th>
+            <th scope="col">Where</th>
+            <th scope="col">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><kbd>J</kbd> or <kbd>↓</kbd></td>
+            <td>Tasks list</td>
+            <td>Next task</td>
+          </tr>
+          <tr>
+            <td><kbd>K</kbd> or <kbd>↑</kbd></td>
+            <td>Tasks list</td>
+            <td>Previous task</td>
+          </tr>
+          <tr>
+            <td><kbd>↵</kbd></td>
+            <td>Tasks list</td>
+            <td>Open the task</td>
+          </tr>
+          <tr>
+            <td><kbd>↵</kbd></td>
+            <td>New task, in the title</td>
+            <td>Move to the description</td>
+          </tr>
+          <tr>
+            <td><kbd>⌘↵</kbd></td>
+            <td>New task</td>
+            <td><strong>Create task</strong></td>
+          </tr>
+          <tr>
+            <td><kbd>⌘↵</kbd> or <kbd>⌘S</kbd></td>
+            <td>A task's page</td>
+            <td>Save the task now</td>
+          </tr>
+          <tr>
+            <td><kbd>⌘↵</kbd></td>
+            <td>Task comment box</td>
+            <td>Post the comment</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>In a task description:</p>
+    <ul>
+      <li><kbd>/</kbd> at the start of an empty line opens the insert menu: headings, lists, a checklist, a quote, a code block, a divider, or an image.</li>
+      <li>Markdown shortcuts work as you type, such as <code>#</code> and a space for a heading, <code>-</code> and a space for a list, or <code>[]</code> and a space for a checklist.</li>
+      <li><kbd>⌘B</kbd> and <kbd>⌘I</kbd> make text bold or italic, and <kbd>⌘K</kbd> edits a link. Inside the description, these keys format text instead of their usual action.</li>
+      <li><kbd>⌘⇧V</kbd> pastes as plain text.</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="review">
+    <h2 id="review">Review and editing</h2>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Keys</th>
+            <th scope="col">Where</th>
+            <th scope="col">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><kbd>⌘↵</kbd></td>
+            <td>A comment on a changed line</td>
+            <td><strong>Add comment</strong></td>
+          </tr>
+          <tr>
+            <td><kbd>⌘↵</kbd></td>
+            <td>Editing a draft comment in a pull request review</td>
+            <td><strong>Save</strong></td>
+          </tr>
+          <tr>
+            <td><kbd>Esc</kbd></td>
+            <td>Either comment box</td>
+            <td>Cancel</td>
+          </tr>
+          <tr>
+            <td><kbd>⌘S</kbd></td>
+            <td>The panel's instruction file editor</td>
+            <td>Save the file</td>
+          </tr>
+          <tr>
+            <td><kbd>⌘S</kbd></td>
+            <td>The team editor</td>
+            <td><strong>Save team</strong></td>
+          </tr>
+          <tr>
+            <td><kbd>↵</kbd></td>
+            <td>A typed answer to an agent's question</td>
+            <td>Submit, once every question has an answer</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="layout">
+    <h2 id="layout">Resizing and menus</h2>
+    <p>Press <kbd>Tab</kbd> to focus the divider beside the sidebar, the panel, or a thread pane, then:</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Keys</th>
+            <th scope="col">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><kbd>←</kbd> and <kbd>→</kbd></td>
+            <td>Resize by 8 pixels, or 32 with <kbd>⇧</kbd></td>
+          </tr>
+          <tr>
+            <td><kbd>Home</kbd> and <kbd>End</kbd></td>
+            <td>Make it as narrow or as wide as it goes</td>
+          </tr>
+          <tr>
+            <td><kbd>↵</kbd></td>
+            <td>Reset to the default width. Double-clicking the divider does the same.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      In Settings, <kbd>←</kbd> and <kbd>→</kbd> move between sections, and <kbd>Home</kbd> and <kbd>End</kbd> jump to the first and last. On a project's name in the sidebar, <kbd>⇧F10</kbd> or the Menu key opens its menu, the same as a
+      right-click.
+    </p>
+  </section>
+
+  <section aria-labelledby="app-menu">
+    <h2 id="app-menu">App menu</h2>
+    <p>On macOS, the View menu has these:</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Keys</th>
+            <th scope="col">Menu item</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><kbd>⌘R</kbd></td>
+            <td><strong>Reload</strong>, which reloads the window. Agents keep working.</td>
+          </tr>
+          <tr>
+            <td><kbd>⇧⌘R</kbd></td>
+            <td><strong>Force Reload</strong></td>
+          </tr>
+          <tr>
+            <td><kbd>⌘0</kbd></td>
+            <td><strong>Actual Size</strong></td>
+          </tr>
+          <tr>
+            <td><kbd>⌘+</kbd></td>
+            <td><strong>Zoom In</strong></td>
+          </tr>
+          <tr>
+            <td><kbd>⌘-</kbd></td>
+            <td><strong>Zoom Out</strong></td>
+          </tr>
+          <tr>
+            <td><kbd>⌃⌘F</kbd></td>
+            <td><strong>Toggle Full Screen</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="docs-source">Source: <code>apps/desktop/src/renderer/src/App.tsx</code>, <code>components/CommandPalette.tsx</code>, <code>components/ComposerInput.tsx</code>, <code>apps/desktop/src/main/view-menu.ts</code></p>
+  </section>
+
+  <section aria-labelledby="next-steps">
+    <h2 id="next-steps">Next steps</h2>
+    <LinkCards cards={[{ slug: "threads" }, { slug: "work" }, { slug: "tasks" }, { slug: "settings" }]} />
+  </section>
+</DocsLayout>

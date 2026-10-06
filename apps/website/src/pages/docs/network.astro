@@ -57,7 +57,7 @@ const sections = [
           </tr>
           <tr>
             <td>Embedding model</td>
-            <td><code>storage.googleapis.com</code></td>
+            <td><code>huggingface.co</code> and its download servers on <code>hf.co</code></td>
             <td>Once, the first time memory needs it</td>
             <td>Leave memory off</td>
           </tr>
@@ -166,8 +166,8 @@ const sections = [
     <h2 id="downloads">Downloads and update checks</h2>
     <h3>The embedding model</h3>
     <p>
-      Memory's search by meaning uses a small model that runs on your computer, and it isn't part of the app. The first time memory needs it, OpenOrc downloads an 83 MB archive from <code>storage.googleapis.com</code> and keeps it only if it
-      matches a SHA-256 checksum written into OpenOrc's source. While memory is off, it is never downloaded.
+      Memory's search by meaning uses a small model that runs on your computer, and it isn't part of the app. The first time memory needs it, OpenOrc downloads the model's files, 91 MB in all, from <code>huggingface.co</code>, which serves the largest through
+      its download servers on <code>hf.co</code>. It keeps them only if each one matches a SHA-256 checksum written into OpenOrc's source. While memory is off, it is never downloaded.
     </p>
     <h3>App updates</h3>
     <p>

@@ -460,7 +460,7 @@ export function ComposerModelPicker({
   });
   const label = effort ? effortLabel(effort) : "Default";
   const hint = effortHint(effort);
-  const title = team ? `${team.name} · Revision ${team.revision} · ${team.leadName}: ${label}` : `${modelTitle(current, value?.model) ?? "Choose a model"} · ${label}`;
+  const title = team ? `${team.name} · Version ${team.revision} · ${team.leadName}: ${label}` : `${modelTitle(current, value?.model) ?? "Choose a model"} · ${label}`;
   return (
     <Popover.Root
       open={popup.open}

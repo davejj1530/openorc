@@ -206,7 +206,7 @@ app.whenReady().then(async () => {
   installProjectIcons(isAppOrigin, app.getPath("userData"));
   const disabledUpdates = updateUnavailableReason() ?? configureReleaseFeed(electronUpdater.autoUpdater, join(process.resourcesPath, "app-update.yml"));
   const updates = new AppUpdates(electronUpdater.autoUpdater, disabledUpdates, async () => {
-    if (!preparePtysForUpdate()) return "Close your running terminal panels before restarting to update.";
+    if (!preparePtysForUpdate()) return "A terminal still has a shell running. Use End shell in each terminal, then restart to update.";
     preparingUpdate = true;
     if (!core) throw new Error("The core is unavailable. Quit and reopen OpenOrc before installing an update.");
     const blocked = await closeCoreForUpdate(core);

@@ -301,9 +301,9 @@ function NewThreadProject({
                 ) : null}
                 {revision && selectedTeam && selectedTeam.revision.id !== revision.id ? (
                   <p className="text-xs text-ink-3 mt-2">
-                    Revision {revision.number} is selected.{" "}
+                    Version {revision.number} is selected.{" "}
                     <TextButton type="button" underline tone="strong" disabled={start.isPending} onClick={() => chooseTeam(selectedTeam)}>
-                      Use revision {selectedTeam.revision.number}
+                      Use version {selectedTeam.revision.number}
                     </TextButton>
                   </p>
                 ) : null}

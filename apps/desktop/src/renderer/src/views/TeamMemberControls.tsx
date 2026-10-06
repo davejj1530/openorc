@@ -256,7 +256,7 @@ function AvatarEditor({
         </p>
       ) : null}
       <Dialog open={pickerOpen} onOpenChange={setPickerOpen} title={`Profile picture for ${memberName}`} width={360}>
-        <p className="text-sm text-ink-3 mb-3">Choose a bundled profile picture. The selection stays with this member across team revisions.</p>
+        <p className="text-sm text-ink-3 mb-3">Choose a bundled profile picture. The selection stays with this member across team versions.</p>
         <div className="orchestration-avatar-grid" role="radiogroup" aria-label={`Default profile picture for ${memberName}`}>
           {TEAM_AVATARS.map((option, index) => (
             <button

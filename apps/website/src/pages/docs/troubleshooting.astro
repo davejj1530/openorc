@@ -201,13 +201,13 @@ const sections = [
     <h2 id="updates">Updates won't install</h2>
     <p>OpenOrc installs an app update only when nothing is in the middle of work. When it can't, it says what to finish first:</p>
     <ul>
-      <li>Close your running terminal panels before restarting to update.</li>
+      <li>A terminal still has a shell running. Use End shell in each terminal, then restart to update.</li>
       <li>Wait for agent work, approvals, and context maintenance to finish before restarting to update.</li>
       <li>Stop the background commands running in your conversations before restarting to update.</li>
       <li>Finish or stop your active teams before restarting to update.</li>
       <li>Wait for memory processing to finish before restarting to update.</li>
       <li>Wait for agent updates to finish before restarting.</li>
-      <li>A scheduled task is starting. Try again when it has finished.</li>
+      <li>A schedule is starting a thread. Try again when it has started.</li>
       <li>OpenOrc is processing a request. Try restarting to update again in a moment.</li>
     </ul>
     <p>Closing a Terminal panel doesn't end its shell. Press <strong>End shell</strong> in each Terminal that still runs one, then restart to update.</p>

@@ -193,7 +193,7 @@ export function ComposerEffortPanel({
 function TeamLeadNote({ team }: { team: EffortTeam }) {
   return (
     <p className="text-xs text-ink-3 text-center mt-2">
-      {team.leadName} · Revision {team.revision}
+      {team.leadName} · Version {team.revision}
       <br />
       {team.leadOrcling ? `${team.leadOrcling} leads with its own model and effort. Edit ${team.leadOrcling} to change them.` : "Effort and Fast apply to this task’s lead."}
     </p>

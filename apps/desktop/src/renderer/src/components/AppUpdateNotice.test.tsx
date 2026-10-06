@@ -41,8 +41,8 @@ it("shows an automatically discovered update, streams progress, and explicitly r
   f.push({ phase: "ready", version: "0.2.0" });
   fireEvent.click(screen.getByRole("button", { name: "Restart to update" }));
   await waitFor(() => expect(f.api.install).toHaveBeenCalledOnce());
-  f.push({ phase: "ready", version: "0.2.0", error: "Close your running terminal panels before restarting to update." });
-  expect(screen.getByRole("alert").textContent).toContain("Close your running terminal");
+  f.push({ phase: "ready", version: "0.2.0", error: "A terminal still has a shell running. Use End shell in each terminal, then restart to update." });
+  expect(screen.getByRole("alert").textContent).toContain("Use End shell");
 });
 
 it("dismisses through main and follows shared dismissal and notification-click events", async () => {

@@ -171,7 +171,7 @@ function GeneralSettings() {
         </Field>
         <Toggle
           label="Your Claude Code MCP servers"
-          hint="Connect the MCP servers from your own Claude Code configuration in every thread. They finish connecting after Claude starts, so a slow one can miss the first message; OpenOrc's own tools always load."
+          hint="Connect the MCP servers from your own Claude Code configuration in Act threads set to Autonomous. Other modes give Claude only OpenOrc's own tools. Servers finish connecting after Claude starts, so a slow one can miss the first message."
           checked={v.claudeUserMcpServers ?? true}
           disabled={s.disabled}
           onChange={(claudeUserMcpServers) => void s.commit({ claudeUserMcpServers })}

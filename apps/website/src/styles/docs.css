@@ -4,6 +4,10 @@
  * the internals in Reference.
  */
 .docs {
+  --warning-bg: #fbf4e0;
+  --warning-rule: #ecdcb0;
+  --warning-ink: #5c4710;
+  --card-shadow: rgb(36 40 30 / 0.35);
   --docs-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --docs-body: 0.9375rem;
   display: grid;
@@ -12,6 +16,13 @@
   align-items: start;
   gap: 56px;
   padding-block: 40px var(--section-space);
+}
+
+:root[data-theme="dark"] .docs {
+  --warning-bg: #2a2414;
+  --warning-rule: #4a3f1f;
+  --warning-ink: #e8cf8a;
+  --card-shadow: rgb(0 0 0 / 0.6);
 }
 
 /* Sidebar */
@@ -137,7 +148,7 @@
 }
 .docs-article p {
   max-width: 72ch;
-  color: #4a4944;
+  color: var(--text-2);
   font-size: var(--docs-body);
   line-height: 1.7;
 }
@@ -153,7 +164,7 @@
   max-width: 72ch;
   margin-block: 0;
   padding-left: 1.25em;
-  color: #4a4944;
+  color: var(--text-2);
   font-size: var(--docs-body);
   line-height: 1.7;
 }
@@ -164,7 +175,7 @@
   margin-top: 6px;
 }
 .docs-article li::marker {
-  color: #a3a29b;
+  color: var(--faint);
 }
 .docs-article strong {
   color: var(--text);
@@ -176,7 +187,7 @@
 .docs-callout a {
   color: var(--text);
   text-decoration: underline;
-  text-decoration-color: #b5b3ab;
+  text-decoration-color: var(--rule-strong);
   text-underline-offset: 0.2em;
 }
 .docs-article p a:hover,
@@ -224,7 +235,7 @@ kbd {
   border: 1px solid var(--rule);
   border-bottom-width: 2px;
   border-radius: 5px;
-  background: #fff;
+  background: var(--paper);
   color: var(--text);
   font-family: inherit;
   font-size: 0.8125rem;
@@ -263,7 +274,7 @@ kbd {
 }
 .docs-table td {
   border-top: 1px solid var(--rule);
-  color: #4a4944;
+  color: var(--text-2);
 }
 .docs-table td:first-child {
   color: var(--text);
@@ -292,7 +303,7 @@ kbd {
 }
 .docs-terms dd {
   margin: 0;
-  color: #4a4944;
+  color: var(--text-2);
   font-size: var(--docs-body);
   line-height: 1.7;
 }
@@ -309,7 +320,7 @@ kbd {
   max-width: 72ch;
   margin: 0;
   padding-left: 40px;
-  color: #4a4944;
+  color: var(--text-2);
   font-size: var(--docs-body);
   line-height: 1.7;
   counter-increment: step;
@@ -325,7 +336,7 @@ kbd {
   height: 26px;
   border: 1px solid var(--rule);
   border-radius: 50%;
-  background: #fff;
+  background: var(--paper);
   color: var(--text);
   font-size: 0.8125rem;
 }
@@ -346,13 +357,13 @@ kbd {
   border: 1px solid var(--rule);
   border-radius: 8px;
   background: var(--surface);
-  color: #4a4944;
+  color: var(--text-2);
   font-size: 0.875rem;
   line-height: 1.6;
 }
 .docs-callout[data-tone="warning"] {
-  border-color: #ecdcb0;
-  background: #fbf4e0;
+  border-color: var(--warning-rule);
+  background: var(--warning-bg);
 }
 .docs-callout-title {
   margin-bottom: 4px;
@@ -367,7 +378,7 @@ kbd {
   margin-top: 8px;
 }
 .docs-callout[data-tone="warning"] .docs-callout-title {
-  color: #5c4710;
+  color: var(--warning-ink);
 }
 
 /* Cards */
@@ -393,7 +404,7 @@ kbd {
 }
 .docs-card:hover {
   border-color: var(--accent);
-  box-shadow: 0 6px 18px -12px rgb(36 40 30 / 0.35);
+  box-shadow: 0 6px 18px -12px var(--card-shadow);
 }
 .docs-card-title {
   color: var(--text);
@@ -445,7 +456,7 @@ kbd {
 }
 .diagram-node-shape {
   fill: var(--bg);
-  stroke: #a3a29b;
+  stroke: var(--faint);
   stroke-width: 1;
 }
 .diagram-emphasis .diagram-node-shape {

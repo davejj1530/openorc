@@ -40,7 +40,7 @@ const fresh = layout === "new";
       {!fresh && <span class="hs-attach"><ProductIcon name="plus" /></span>}
       {!fresh && <span class="hs-picker">{permission}<ProductIcon name="chevronDown" /></span>}
       <span class="hs-model">
-        {model.icon ? <ProductIcon name={model.icon} class="hs-model-icon" /> : <svg class="hs-logo" aria-hidden="true"><use href={`#hs-logo-${model.harness}`} /></svg>}
+        {model.icon ? <ProductIcon name={model.icon} class="hs-model-icon" /> : <svg class="hs-logo" data-provider={model.harness} aria-hidden="true"><use href={`#hs-logo-${model.harness}`} /></svg>}
         <span class="hs-model-name">{model.label}</span>
         <span class="hs-model-effort">{model.effort}</span>
         <ProductIcon name="chevronDown" />

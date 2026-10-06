@@ -31,6 +31,18 @@ const {
     <meta name="description" content={description} />
     {noindex && <meta name="robots" content="noindex" />}
     <meta name="theme-color" content="#f7f7f4" />
+    <script is:inline>
+      // Before the first paint: the saved theme, or the system's until one is chosen.
+      (() => {
+        let saved = null;
+        try {
+          saved = localStorage.getItem("openorc-site-theme");
+        } catch {}
+        const theme = saved === "dark" || saved === "light" ? saved : matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        document.documentElement.dataset.theme = theme;
+        document.querySelector('meta[name="theme-color"]').setAttribute("content", theme === "dark" ? "#151410" : "#f7f7f4");
+      })();
+    </script>
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />

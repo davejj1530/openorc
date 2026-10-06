@@ -127,7 +127,7 @@ export function registerOrclingTools(mcp: McpServer, tools: OrclingTools, runId:
     "orcling_thread_send",
     {
       description:
-        "Send a short message to a thread in any project, to hand it work or ask what it knows. If its agent is working, the message joins the current turn; otherwise it starts one. A thread in a more permissive mode than yours acts with its own permissions, so the user is asked first. Pass the same request_key when retrying. After 4 agent messages in a row with no one writing, sending stops until a person writes.",
+        "Send a short message to a thread in any project, to hand it work or ask what it knows. If its agent is working, the message joins the current turn; otherwise it starts one. A thread in a more permissive mode than yours acts with its own permissions, so the user is asked first. Pass the same request_key when retrying. After 20 agent messages in a row with no one writing, sending stops until a person writes.",
       inputSchema: { thread_id: z.string().min(1), text: z.string().min(1).max(4000), request_key: z.string().min(1).max(200).optional() },
     },
     async ({ thread_id, text: message, request_key }) => text(await tools.sendThread(runId, { threadId: thread_id, text: message, ...(request_key ? { requestKey: request_key } : {}) })),

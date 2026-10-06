@@ -23,9 +23,9 @@ Choose an agent for each job while keeping the work connected through shared con
 
 ### Share context across threads and providers
 
-Let a Claude Code thread building your interface ask a Codex thread about an API decision. Agents can find, read, and message other OpenOrc threads in the same project, saving you from copying context between conversations.
+Let a Claude Code thread building your interface ask a Codex thread about an API decision. Agents can find, read, and message other OpenOrc threads in the same project, and start a helper thread in the same folder when you ask, saving you from copying context between conversations.
 
-An idle thread starts a new turn to read a message; a busy thread receives it during its current turn. Agents can send up to 4 messages in a row across threads. After that, a person has to write before they can send more.
+An idle thread starts a new turn to read a message; a busy thread receives it during its current turn. Agents can send up to 20 messages in a row across threads, and an exchange ends when one agent doesn't reply. After 20, a person has to write before they can send more.
 
 ### Give each agent a role
 

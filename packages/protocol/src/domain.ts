@@ -129,6 +129,8 @@ export const Thread = z.object({
   importedFrom: z.string().nullable(),
   /** The Orcling who works in this conversation: its own, or one chosen to work here. */
   orclingId: z.string().nullable().optional(),
+  /** The thread that started this one with thread_start, working in the same folder. */
+  parentThreadId: z.string().nullable().optional(),
   createdAt: z.number(),
   updatedAt: z.number(),
   lastActivityAt: z.number(),

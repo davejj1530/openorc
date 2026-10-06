@@ -10,6 +10,7 @@ import { memories, plans, orchestration, settings, threads, runs, tasks } from "
 import { internalToolNames } from "@openorc/mcp";
 import { DEFAULT_TEAM_LIMITS, type BrowserCommand, type Project, type CorePush, type PermissionPreset, type RunMode } from "@openorc/protocol";
 import { OpenOrc } from "../openorc.js";
+import { MAX_AGENT_HOPS } from "./thread-agent-tools.js";
 
 vi.mock("node:child_process", async (importOriginal) => {
   const original = await importOriginal<typeof import("node:child_process")>();
@@ -661,12 +662,15 @@ describe("app actions follow the conversation's mode", () => {
       await vi.waitFor(() => expect(p.ready()).toBe(true));
       const url = (await core.mcpServer()).urlForRun(run.id);
       // Each delivered message makes the receiver one hop deeper; here the sender plays both ends of the chain.
-      for (const hop of [1, 2, 3, 4]) {
+      for (let hop = 1; hop <= MAX_AGENT_HOPS; hop++) {
         core.runs.noteAgentMessage(first!.id, hop - 1);
         expect(JSON.parse((await toolCall(url, "thread_send", { id: second!.id, text: `Message ${hop}` })).text).delivered).toBe(true);
       }
-      core.runs.noteAgentMessage(first!.id, 4);
-      expect(JSON.parse((await toolCall(url, "thread_send", { id: second!.id, text: "Message 5" })).text)).toMatchObject({ delivered: false, message: expect.stringMatching(/limit is 4/) });
+      core.runs.noteAgentMessage(first!.id, MAX_AGENT_HOPS);
+      expect(JSON.parse((await toolCall(url, "thread_send", { id: second!.id, text: "One too many" })).text)).toMatchObject({
+        delivered: false,
+        message: expect.stringMatching(new RegExp(`limit is ${MAX_AGENT_HOPS}`)),
+      });
       // The same retried call is delivered once.
       core.runs.noteAgentMessage(first!.id, 0);
       await toolCall(url, "thread_send", { id: second!.id, text: "Once", request_key: "retry" });

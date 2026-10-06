@@ -766,4 +766,7 @@ export const migrations: Migration[] = [
   orclingMigration,
   /** The Orcling that drafted a pull request review comment, so the draft names it beside its model. */
   `ALTER TABLE pull_request_review_comments ADD COLUMN author_orcling_id TEXT REFERENCES orclings(id) ON DELETE SET NULL;`,
+  /** The thread that started this one with thread_start. A parent counts its working children by it. */
+  `ALTER TABLE threads ADD COLUMN parent_thread_id TEXT REFERENCES threads(id) ON DELETE SET NULL;
+  CREATE INDEX threads_parent ON threads(parent_thread_id) WHERE parent_thread_id IS NOT NULL;`,
 ];

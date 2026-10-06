@@ -1,14 +1,73 @@
-import { audit, listEvents, projects, runs as runRepo, taskForwardings, tasks, teamDeletedThreads, teamRuntime, threads, type Db } from "@openorc/db";
+import { audit, listEvents, orchestration, projects, runs as runRepo, taskForwardings, tasks, teamDeletedThreads, teamRuntime, threads, type Db } from "@openorc/db";
 import type { TaskCard, ThreadCard } from "@openorc/mcp";
-import { WORKSPACE_ID, executionMode, executionModeLabel, type Run, type Task, type TaskStatus, type Thread, type ThreadMessage, type WorkspaceMode } from "@openorc/protocol";
+import {
+  WORKSPACE_ID,
+  executionMode,
+  executionModeLabel,
+  type AgentKind,
+  type ModelOption,
+  type Run,
+  type Task,
+  type TaskStatus,
+  type Thread,
+  type ThreadMessage,
+  type WorkspaceMode,
+} from "@openorc/protocol";
 import { createHash } from "node:crypto";
 import type { RunService } from "./runs.js";
 import { checkoutBranch } from "./checkout-branch.js";
 import { projectGit } from "./project-git.js";
+import { titleFromPrompt, type StartThreadInput } from "./thread-inputs.js";
 import type { SpawnTaskInput, ThreadService } from "./threads.js";
 
-/** How many agent messages in a row may pass between conversations before a person has to write. */
-export const MAX_AGENT_HOPS = 4;
+/**
+ * How many agent messages in a row may pass between conversations before a person has to write. Agents end an
+ * exchange by not replying; this only stops two of them that never do.
+ */
+export const MAX_AGENT_HOPS = 20;
+
+/** How many threads one conversation may have working at once from thread_start. */
+export const MAX_WORKING_CHILDREN = 3;
+
+export interface ThreadStartInput {
+  prompt: string;
+  title?: string;
+  agent?: AgentKind;
+  model?: string;
+  effort?: string;
+}
+
+const squash = (text: string) => text.toLowerCase().replace(/[^a-z0-9.]/g, "");
+
+/**
+ * The model a name stands for: the one whose id or label it is, else the only one whose id or label contains it, so
+ * "6.1 sol" finds "GPT-6.1 Sol". A name that fits none or several is answered with the choices rather than a guess.
+ */
+export function pickModel(options: ModelOption[], agent: AgentKind, name: string): ModelOption {
+  const wanted = squash(name).replace(new RegExp(`^${agent}`), "");
+  const exact = options.find((option) => squash(option.id) === wanted || squash(option.label) === wanted);
+  const near = exact ? [exact] : options.filter((option) => wanted && (squash(option.id).includes(wanted) || squash(option.label).includes(wanted)));
+  const model = near.length === 1 ? near[0]! : null;
+  if (!model) {
+    const choices = options.map((option) => `${option.label} (${option.id})`).join(", ") || "none available";
+    throw new Error(`${near.length ? `"${name}" fits several ${agent} models` : `No ${agent} model is called "${name}"`}. Choose one of: ${choices}.`);
+  }
+  if (model.unavailable) throw new Error(`${model.label} can't run right now: ${model.unavailable}`);
+  return model;
+}
+
+/** Where a started thread works: in its parent's worktree, checkout, or Workspace folder. */
+function childFolder(parent: Thread): Pick<StartThreadInput, "workingDirectory" | "workspaceMode" | "checkout"> {
+  if (parent.projectId === WORKSPACE_ID) return parent.workingDirectory ? { workingDirectory: parent.workingDirectory } : {};
+  if (!parent.worktreePath) return { workspaceMode: "current" };
+  if (!parent.baseSha) throw new Error("This thread's worktree has no recorded starting commit, so a thread can't join it. Start one from OpenOrc instead.");
+  return { checkout: { path: parent.worktreePath, baseSha: parent.baseSha } };
+}
+
+/** What a started thread reads first, ahead of its work: who started it and how to reach them. */
+function opener(parent: Thread): string {
+  return `The thread "${parent.title}" (id ${parent.id}) started this thread and works in the same folder. Message it with thread_send when you have results or need something from it; don't reply just to acknowledge.`;
+}
 
 const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0, max).trimEnd()}…` : text);
 
@@ -27,6 +86,7 @@ interface AgentToolContext {
   send: ThreadService["send"];
   messages: ThreadService["messages"];
   withCheckoutBranches: ThreadService["withCheckoutBranches"];
+  start: ThreadService["start"];
 }
 
 /** Resolves run-scoped task and thread access, including message retry identity. */
@@ -246,6 +306,74 @@ export class ThreadAgentTools {
         .slice(-limit)
         .map((m) => ({ role: m.role, text: clip(m.text.trim(), 1200) })),
     };
+  }
+
+  /**
+   * Starts a thread that works beside the caller: in its folder, in its mode and with its permissions, with the caller
+   * as its parent. The two talk through thread_send. A started thread can't start its own, and a parent has at most
+   * MAX_WORKING_CHILDREN of them working at once.
+   */
+  async toolThreadStart(runId: string, input: ThreadStartInput): Promise<{ thread: { id: string; title: string }; agent: AgentKind; model: string | null; message: string }> {
+    const { parent, run } = this.startingParent(runId);
+    const settings = await this.childModel(parent, input);
+    const { thread } = await this.context.start(
+      {
+        projectId: parent.projectId,
+        ...childFolder(parent),
+        ...settings,
+        mode: run.mode,
+        permissionMode: run.permissionMode,
+        prompt: `${opener(parent)}\n\n${input.prompt.trim()}`,
+        promptRole: "system",
+        attachments: undefined,
+        // Named for its work, not for the note about who started it.
+        title: input.title ?? titleFromPrompt(input.prompt),
+      },
+      {
+        assertCanAdmit: () => this.assertRoomForChild(parent),
+        onAdmitted: (child) => threads.update(this.db, child.id, { parentThreadId: parent.id }),
+      },
+    );
+    audit.record(this.db, { actor: "agent", action: "thread.start", resourceType: "thread", resourceId: thread.id, metadata: { runId, parentThreadId: parent.id, agent: settings.agent } });
+    this.invalidate(["threads", `thread:${parent.id}`]);
+    return {
+      thread: { id: thread.id, title: thread.title },
+      agent: settings.agent,
+      model: thread.model,
+      message: `Started "${thread.title}" in this thread's folder. It knows you started it and can reach you with thread_send; reach it the same way.`,
+    };
+  }
+
+  /** The thread a run starts a thread from, when it may. */
+  private startingParent(runId: string): { parent: Thread; run: Run } {
+    const { thread, task } = this.scopeOf(runId);
+    const run = runRepo.get(this.db, runId);
+    if (!thread || task || !run) throw new Error("Only a thread can start threads.");
+    if (run.mode !== "act") throw new Error("Plan mode can't start threads. Switch this thread to Act first.");
+    if (thread.parentThreadId) {
+      const title = threads.get(this.db, thread.parentThreadId)?.title ?? "the thread that started this one";
+      throw new Error(`A thread started by another thread can't start its own. Ask "${title}" with thread_send.`);
+    }
+    if (orchestration.getInstance(this.db, thread.id)) throw new Error("A team starts work through its own tools.");
+    return { parent: thread, run };
+  }
+
+  /** The started thread's agent and model: the parent's, unless the call names others. */
+  private async childModel(parent: Thread, input: ThreadStartInput): Promise<Pick<StartThreadInput, "agent" | "model" | "effort" | "fastMode">> {
+    const agent = input.agent ?? parent.agent;
+    if (input.model) {
+      const model = pickModel(await this.runs.models(agent), agent, input.model);
+      return { agent, model: model.id, effort: input.effort ?? model.defaultEffort ?? undefined, fastMode: false };
+    }
+    if (agent !== parent.agent) return { agent, model: undefined, effort: input.effort, fastMode: false };
+    return { agent, model: parent.model ?? undefined, effort: input.effort ?? parent.effort ?? undefined, fastMode: parent.fastMode };
+  }
+
+  private assertRoomForChild(parent: Thread): void {
+    const working = threads.children(this.db, parent.id).filter((child) => this.runs.threadActivity(child.id) !== "idle");
+    if (working.length < MAX_WORKING_CHILDREN) return;
+    const names = working.map((child) => `"${child.title}"`).join(", ");
+    throw new Error(`${working.length} threads this thread started are still working (${names}). Wait for one to finish, or give it more work with thread_send.`);
   }
 
   /** The thread a run speaks for: its own thread, or the thread that owns its task. */

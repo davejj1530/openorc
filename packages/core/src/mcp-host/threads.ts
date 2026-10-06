@@ -6,7 +6,7 @@ import { ThreadService } from "../services/threads.js";
 import { reachesThread } from "../services/thread-agent-tools.js";
 import type { RunContext } from "./context.js";
 type Dependencies = {
-  threadService: Pick<ThreadService, "toolThreadList" | "toolThreadRead" | "sourceThreadFor" | "toolThreadSend">;
+  threadService: Pick<ThreadService, "toolThreadList" | "toolThreadRead" | "sourceThreadFor" | "toolThreadSend" | "toolThreadStart">;
   teamConversations: Pick<TeamConversationService, "senderAttribution" | "relay">;
   db: Db;
   assertTeamActor: RunContext["assertTeamActor"];
@@ -21,6 +21,10 @@ export function createThreadsHost({ threadService, teamConversations, db, assert
       read: (runId, id, limit) => {
         assertTeamActor(runId);
         return threadService.toolThreadRead(runId, id, limit);
+      },
+      start: (runId, input) => {
+        assertTeamActor(runId);
+        return threadService.toolThreadStart(runId, input);
       },
       send: async (runId, id, text, requestKey) => {
         assertTeamActor(runId);

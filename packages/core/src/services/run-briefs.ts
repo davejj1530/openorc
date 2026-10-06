@@ -76,7 +76,7 @@ export class RunBriefs {
     }
     lines.push(
       "",
-      "Other threads of this project are reachable with thread_list, thread_read, and thread_send. Message a thread only when its work depends on yours or you need something it knows; keep the message short and specific.",
+      "Other threads of this project are reachable with thread_list, thread_read, and thread_send. Message a thread only when its work depends on yours or you need something it knows; keep the message short and specific, and don't reply just to acknowledge. When the user asks you to hand work to another agent or have something done alongside yours, start a thread with thread_start; ask first only if it's unclear what to start or with which agent.",
     );
     lines.push(
       "",

@@ -20,7 +20,7 @@ export function ThreadTasksPanel({ thread, project }: { thread: Thread; project:
         </Button>
       </div>
       {own.length === 0 && !tasks.isLoading ? (
-        <Empty title="No tasks yet">The agent creates one when a change deserves its own branch. You can add one too.</Empty>
+        <Empty title="No tasks yet">The agent saves a task when it finds work for later. You can add one too.</Empty>
       ) : (
         <div className="flex-1 min-h-0 overflow-y-auto p-3 grid gap-2 content-start">
           {own.map((x) => (

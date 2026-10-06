@@ -45,7 +45,7 @@ export function TeamRows({ teams, disabled, closeOnSelect, close, moveRowFocus }
           className="model-picker-row model-picker-team-row"
           aria-pressed={teams.selectedRevisionId === option.revisionId}
           disabled={disabled || Boolean(option.disabledReason)}
-          title={option.disabledReason ?? `${option.memberCount} agents · Revision ${option.revision}`}
+          title={option.disabledReason ?? `${option.memberCount} agents · Version ${option.revision}`}
           onClick={() => {
             teams.onSelect(option.revisionId);
             if (closeOnSelect) close();
@@ -53,7 +53,7 @@ export function TeamRows({ teams, disabled, closeOnSelect, close, moveRowFocus }
           onKeyDown={moveRowFocus}
         >
           <span className="model-picker-row-name">{option.name}</span>
-          <span className="model-picker-row-meta">{option.disabledReason ?? `${option.memberCount} agents · Revision ${option.revision}`}</span>
+          <span className="model-picker-row-meta">{option.disabledReason ?? `${option.memberCount} agents · Version ${option.revision}`}</span>
           {teams.selectedRevisionId === option.revisionId ? <Check size={15} className="model-picker-check" aria-hidden="true" /> : null}
         </button>
       ))}

@@ -27,8 +27,8 @@ const intervalLabel = (m: number) => intervals.find((i) => i.minutes === m)?.lab
 function scheduleTargetLabel(schedule: Schedule): string {
   const target = schedule.executionTarget;
   if (target?.kind === "team") {
-    if (schedule.team) return `${schedule.team.revision.name} · Revision ${schedule.team.revision.number}`;
-    return "Saved team · pinned revision";
+    if (schedule.team) return `${schedule.team.revision.name} · Version ${schedule.team.revision.number}`;
+    return "Saved team · pinned version";
   }
   if (target?.kind === "model") return target.settings.model;
   return schedule.model ?? `${harnessName(schedule.agent)} default model`;
@@ -39,7 +39,7 @@ function scheduleFireLabel(fire: Schedule["lastFire"]): string | null {
     case "pending":
       return "Run request pending";
     case "started":
-      return "Task created";
+      return "Thread started";
     case "skipped":
       return "Run skipped";
     case "cancelled":
@@ -56,7 +56,7 @@ function scheduleSubmitLabel(pending: boolean, existing: boolean): string {
   return existing ? "Save" : "Create";
 }
 
-/** Prompts that start a task on a timer with a saved model or pinned team. */
+/** Prompts that start a thread on a timer with a saved model or pinned team. */
 export function Scheduled() {
   const projectId = useLayout((s) => s.projectId);
   const projects = useRpc("projects.list", {});
@@ -69,7 +69,7 @@ export function Scheduled() {
   else if (!list.error && items.length === 0) {
     listContent = (
       <Empty title="Nothing scheduled">
-        A schedule starts a new task with a prompt on a timer: a nightly review, a dependency check, a daily summary.
+        A schedule starts a new thread with a prompt on a timer: a nightly review, a dependency check, a daily summary.
         <div className="mt-3">
           <Button onClick={() => setEditing("new")} disabled={!canCreate}>
             <Plus size={13} /> New schedule
@@ -195,13 +195,13 @@ function ScheduleRow({ schedule: s, projectName, onEdit }: { schedule: Schedule;
           </div>
           <div className="text-xs text-ink-3 break-words">
             {targetLabel}
-            {s.team?.archived ? " · archived team, saved revision retained" : ""}
+            {s.team?.archived ? " · archived team, saved version kept" : ""}
           </div>
         </button>
         <div className="schedule-actions ml-auto flex items-center gap-1.5">
           {threadId ? (
-            <Tooltip label="Open task">
-              <IconButton aria-label="Open task" size="sm" onClick={() => openThread(threadId)}>
+            <Tooltip label="Open thread">
+              <IconButton aria-label="Open thread" size="sm" onClick={() => openThread(threadId)}>
                 <ArrowUpRight size={14} />
               </IconButton>
             </Tooltip>
@@ -333,7 +333,7 @@ function ScheduleDialog({
         <Field label="Name">
           <Input autoFocus value={title} disabled={pending} onChange={(event) => setTitle(event.target.value)} placeholder="Nightly dependency check" />
         </Field>
-        <Field label="Prompt" hint="Sent as the first message of a new task each time.">
+        <Field label="Prompt" hint="Sent as the first message of a new thread each time.">
           <Textarea
             rows={4}
             value={prompt}
@@ -393,13 +393,13 @@ function ScheduleDialog({
         {target.kind === "team" ? (
           <div className="text-xs text-ink-3 mb-3 space-y-2" data-schedule-team={target.target.teamRevisionId}>
             <p>
-              {revision ? `${revision.name} · Revision ${revision.number}.` : "The exact saved team revision is retained."}{" "}
+              {revision ? `${revision.name} · Version ${revision.number}.` : "The exact saved team version is kept."}{" "}
               {lead && choice
                 ? `${lead.name}: ${choice.model}${choice.effort ? ` · ${choice.effort}` : ""} · ${choice.fastMode ? "Fast" : "Standard"}.`
                 : "Reload team details to inspect the lead settings."}
             </p>
-            <p>Each run uses isolated team workspaces. If this schedule’s previous team task is still active, the next run is skipped.</p>
-            {archived && retainedTeam ? <p>This team is archived. This schedule keeps its authorized saved revision.</p> : null}
+            <p>Each run uses isolated team workspaces. If this schedule’s previous team run still has unfinished work, the next run is skipped.</p>
+            {archived && retainedTeam ? <p>This team is archived. This schedule keeps the saved version it was given.</p> : null}
             {revision && currentTeam && !archived && currentTeam.revision.id !== revision.id ? (
               <p>
                 A newer revision is available.{" "}

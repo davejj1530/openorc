@@ -61,7 +61,8 @@ export function Transcript({
   mentionNames?: ReadonlyMap<string, string>;
   run: RunTranscript;
   scrollKey?: string;
-  onFork?: (runId: string) => void;
+  /** Continues the whole conversation in a new thread. */
+  onFork?: () => void;
   trailing?: (blocks: Block[]) => ReactNode;
   children?: ReactNode;
   working?: boolean;
@@ -330,12 +331,14 @@ type WorkTranscriptProps = ComponentProps<typeof TranscriptContents> & { live?: 
 type WorkTurnProps = WorkTranscriptProps & { id?: string };
 
 /** The same disclosure hierarchy serves solo turns, warm sessions, and team members. */
-export function WorkTranscript({ blocks, live = false, ...props }: WorkTranscriptProps) {
+export function WorkTranscript({ blocks, live = false, onFork, ...props }: WorkTranscriptProps) {
   const turns = useSteadyTurns(blocks);
+  // A fork carries the whole conversation and the agent's latest session, so it is offered only at the latest message.
+  const forkTurn = onFork ? turns.findLastIndex((turn) => turn.blocks.some((block) => block.kind === "message" && block.role === "user")) : -1;
   return (
     <>
       {turns.map((turn, index) => (
-        <WorkTurn key={turn.id} id={turn.id} {...props} blocks={turn.blocks} live={live && index === turns.length - 1} />
+        <WorkTurn key={turn.id} id={turn.id} {...props} onFork={index === forkTurn ? onFork : undefined} blocks={turn.blocks} live={live && index === turns.length - 1} />
       ))}
     </>
   );
@@ -457,7 +460,7 @@ export function TranscriptContents({
 }: {
   runId: string;
   blocks: Block[];
-  onFork?: ((runId: string) => void) | undefined;
+  onFork?: (() => void) | undefined;
   replyAction?: { blockId: string; content: ReactNode } | undefined;
   /** Content that follows a block or a folded group of blocks, such as a turn's change card. */ trailing?: ((blocks: Block[]) => ReactNode) | undefined;
   taskCards?: boolean;
@@ -508,15 +511,14 @@ const BlockView = memo(function BlockView({
 }: {
   block: Block;
   runId: string;
-  onFork?: ((runId: string) => void) | undefined;
+  onFork?: (() => void) | undefined;
   taskCards: boolean;
   openTools?: boolean;
 }) {
   const author = useTurnAuthor(undefined, block.runId ?? runId);
   switch (block.kind) {
     case "message":
-      if (block.role === "user")
-        return <UserMessage text={block.text} at={block.at} attachments={block.attachments} onFork={onFork && block.runId ? () => onFork(block.runId as string) : undefined} />;
+      if (block.role === "user") return <UserMessage text={block.text} at={block.at} attachments={block.attachments} onFork={onFork} />;
       if (block.role === "system")
         return (
           <div>
@@ -590,9 +592,9 @@ function UserMessage({ text, at, attachments, onFork }: { text: string; at?: num
           {onFork ? (
             <IconButton
               size="sm"
-              onClick={onFork}
-              title="Fork the thread from this point"
-              aria-label="Fork from here"
+              onClick={() => onFork()}
+              title="Continue this conversation in a new thread"
+              aria-label="Fork thread"
               className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity"
             >
               <GitFork size={13} />

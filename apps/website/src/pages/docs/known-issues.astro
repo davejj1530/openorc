@@ -70,11 +70,8 @@ const sections = [
         <dd>In a project thread, going back to an agent that already worked there resumes its own older session, without a summary of what the other agent did. Ask it to check the files. Workspace threads start fresh with a summary instead.</dd>
       </div>
       <div>
-        <dt>Forks remember too much</dt>
-        <dd>
-          <strong>Fork from here</strong>, the fork button on one of your messages, copies whole runs. A run covers every turn one agent process handled, often several in a row, so the turns after your message in that run come along too. The
-          agent also continues the parent's latest session, so it may know about later messages. A fork shares the parent's folder and branch.
-        </dd>
+        <dt>A fork can know newer messages from the original</dt>
+        <dd>A fork's agent continues the original thread's latest session when you send the fork its first message. If you kept working in the original before that, the fork's agent knows those newer turns too, though the fork doesn't show them.</dd>
       </div>
       <div>
         <dt>A fork moved to a new agent starts without the history</dt>

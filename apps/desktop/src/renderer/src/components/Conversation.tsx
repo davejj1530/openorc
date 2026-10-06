@@ -162,12 +162,9 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   const fork = useRpcMutation("threads.fork");
   const forkThread = fork.mutate;
   const threadId = thread?.id;
-  const forkFrom = useCallback(
-    (runId: string) => {
-      if (threadId) forkThread({ id: threadId, upToRunId: runId }, { onSuccess: (t) => void (!("rejected" in t) && openThread(t.id)) });
-    },
-    [threadId, forkThread],
-  );
+  const forkConversation = useCallback(() => {
+    if (threadId) forkThread({ id: threadId }, { onSuccess: (t) => void (!("rejected" in t) && openThread(t.id)) });
+  }, [threadId, forkThread]);
 
   const live = Boolean(activeRun && liveTranscript?.live);
   const generatingImage = Boolean(liveTranscript?.blocks.some((b) => isImageGeneration(b) && b.kind === "activity" && b.status === "running"));
@@ -245,19 +242,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
           ...(!working ? [{ name: "compact", hint: "Fold the conversation so far into a summary", run: () => compact.mutate({ id: thread.id }) }] : []),
           { name: "plan", hint: "Switch this thread to plan mode", run: () => settings.selectMode("plan") },
           { name: "act", hint: "Switch this thread to act mode", run: () => settings.selectMode("act") },
-          {
-            name: "fork",
-            hint: "Continue in a new thread from here",
-            run: () =>
-              fork.mutate(
-                { id: thread.id },
-                {
-                  onSuccess: (t) => {
-                    if (!("rejected" in t)) openThread(t.id);
-                  },
-                },
-              ),
-          },
+          { name: "fork", hint: "Continue in a new thread from here", run: forkConversation },
         ]
       : []),
     ...skills,
@@ -279,7 +264,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
             run={merged}
             scrollKey={scope.kind === "thread" ? scope.thread.id : scope.task.id}
             followKey={sends}
-            onFork={thread ? forkFrom : undefined}
+            onFork={thread ? forkConversation : undefined}
             hasOlder={hasOlder}
             onLoadOlder={loadOlder}
             trailing={changeCard}

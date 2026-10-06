@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import type { Block } from "../lib/transcript";
-import { TranscriptContents } from "./Transcript";
+import { TranscriptContents, WorkTranscript } from "./Transcript";
 
 vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onFrame: vi.fn(), onInvalidate: vi.fn(), onReady: vi.fn() } }));
 vi.mock("./ThreadImages", () => ({
@@ -30,7 +30,7 @@ it("copies each thread message's original text and reports success", async () =>
   render(<TranscriptContents runId="run" blocks={blocks} groupTools={false} onFork={vi.fn()} />);
   const buttons = screen.getAllByRole("button", { name: "Copy message" });
   expect(buttons).toHaveLength(2);
-  const userFooter = screen.getByRole("button", { name: "Fork from here" }).parentElement;
+  const userFooter = screen.getByRole("button", { name: "Fork thread" }).parentElement;
   expect(userFooter?.contains(buttons[0]!)).toBe(true);
   expect(userFooter?.querySelector("div[title]")?.textContent).toBeTruthy();
   fireEvent.click(buttons[0]!);
@@ -45,4 +45,20 @@ it("reports a clipboard failure on the message control", async () => {
   render(<TranscriptContents runId="run" blocks={[{ kind: "message", id: "reply", role: "assistant", text: "Reply", streaming: false }]} groupTools={false} />);
   fireEvent.click(screen.getByRole("button", { name: "Copy message" }));
   expect(await screen.findByRole("button", { name: "Could not copy message" })).toBeTruthy();
+});
+
+it("offers a fork only at the latest message, since a fork carries the whole conversation", () => {
+  const onFork = vi.fn();
+  const message = (id: string, role: "user" | "assistant", text: string): Block => ({ kind: "message", id, role, text, streaming: false, runId: "run" });
+  render(
+    <WorkTranscript
+      runId="run"
+      blocks={[message("first", "user", "Start"), message("one", "assistant", "Done"), message("second", "user", "Again"), message("two", "assistant", "Done again")]}
+      onFork={onFork}
+    />,
+  );
+  const fork = screen.getByRole("button", { name: "Fork thread" });
+  expect(fork.closest(".journal-message")?.textContent).toContain("Again");
+  fireEvent.click(fork);
+  expect(onFork).toHaveBeenCalledWith();
 });

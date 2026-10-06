@@ -592,15 +592,15 @@ export class ThreadService {
   }
 
   /**
-   * A new thread that carries this conversation forward from a chosen point,
-   * leaving the original as it is. Same settings, same workspace; the first
-   * message resumes the parent's session as a fork.
+   * A new thread that carries this whole conversation forward, leaving the
+   * original as it is. Same settings, same workspace; the first message resumes
+   * the parent's latest session as a fork. There is no earlier cut point: the
+   * provider's session holds every turn, so the fork would remember turns its
+   * transcript leaves out.
    */
-  fork(id: string, upToRunId?: string): Thread {
+  fork(id: string): Thread {
     const parent = this.thread(id);
-    const own = runRepo.listForThread(this.db, id);
-    const at = upToRunId ? own.find((r) => r.id === upToRunId) : own.at(-1);
-    if (upToRunId && !at) throw new Error(`run ${upToRunId} is not part of this thread`);
+    const at = runRepo.listForThread(this.db, id).at(-1);
     const forked = threads.insert(this.db, {
       projectId: parent.projectId,
       title: `${parent.title} (fork)`,

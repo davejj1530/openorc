@@ -1073,20 +1073,20 @@ describe("thread lifecycle", () => {
     expect(listEvents(core.db, "run-open")).toContainEqual(expect.objectContaining({ type: "session.completed", status: "error", eventId: expect.any(String) }));
   });
 
-  it("forks a thread and reads the conversation across the fork point", () => {
+  it("forks a thread with its whole conversation, and leaves the parent's later turns out of it", () => {
     const parent = insert("Parent");
     const ins = core.db.stmt("INSERT INTO runs (id, thread_id, agent, mode, permission_mode, state, started_at, external_session_id) VALUES (?, ?, 'codex', 'act', 'trusted', 'success', ?, ?)");
     ins.run("p-1", parent.id, 1, "sess-1");
     ins.run("p-2", parent.id, 2, "sess-2");
-    const fork = core.threads.fork(parent.id, "p-1");
+    const fork = core.threads.fork(parent.id);
     expect(fork.forkedFromId).toBe(parent.id);
-    expect(fork.forkedAtRunId).toBe("p-1");
+    expect(fork.forkedAtRunId).toBe("p-2");
     expect(fork.title).toBe("Parent (fork)");
-    expect(core.threads.conversationRuns(fork.id).map((r) => r.id)).toEqual(["p-1"]);
-    ins.run("f-1", fork.id, 3, "sess-3");
-    expect(core.threads.conversationRuns(fork.id).map((r) => r.id)).toEqual(["p-1", "f-1"]);
-    expect(core.threads.conversationRuns(parent.id).map((r) => r.id)).toEqual(["p-1", "p-2"]);
-    expect(() => core.threads.fork(parent.id, "nope")).toThrow(/not part of this thread/);
+    expect(core.threads.conversationRuns(fork.id).map((r) => r.id)).toEqual(["p-1", "p-2"]);
+    ins.run("p-3", parent.id, 3, "sess-3");
+    ins.run("f-1", fork.id, 4, "sess-4");
+    expect(core.threads.conversationRuns(fork.id).map((r) => r.id)).toEqual(["p-1", "p-2", "f-1"]);
+    expect(core.threads.conversationRuns(parent.id).map((r) => r.id)).toEqual(["p-1", "p-2", "p-3"]);
   });
 
   it("keeps failed queued messages and prevents concurrent double delivery", async () => {

@@ -142,7 +142,7 @@ function Actions({
   onDelete: () => void;
   onPromote: (file: "CLAUDE.md" | "AGENTS.md") => void;
 }) {
-  const item = "flex items-center gap-2 h-7 px-2 rounded-md text-base text-ink-2 cursor-pointer data-[highlighted]:bg-surface-2 outline-none";
+  const item = "flex items-center gap-2 h-7 px-2 rounded-md text-base text-ink-2 data-[highlighted]:bg-surface-2 outline-none";
   // An Orcling's memory is about the person, not a project's instruction files.
   const promotable = !memory.orclingId;
   return (

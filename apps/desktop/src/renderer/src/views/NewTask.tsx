@@ -64,7 +64,7 @@ function NewTaskLocation(props: {
 }) {
   return (
     <details className="task-execution-settings">
-      <summary className="cursor-pointer text-sm text-ink-3 hover:text-ink select-none">Execution settings</summary>
+      <summary className="text-sm text-ink-3 hover:text-ink select-none">Execution settings</summary>
       <div className="grid gap-4 mt-4">
         <ExecutionLocationSelect
           value={props.worktree ? "worktree" : "current"}

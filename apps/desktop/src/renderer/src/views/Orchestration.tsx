@@ -285,7 +285,7 @@ function TeamLoadError({ error, title = "Teams couldn’t load", onRetry, retryi
         {outdatedCore ? "Restart OpenOrc to load the updated team editor, then try again." : "Try again to load your saved teams. Drafts kept on this device are preserved."}
       </p>
       <details className="mt-2 text-sm text-ink-3">
-        <summary className="cursor-pointer">Error details</summary>
+        <summary>Error details</summary>
         <p className="mt-1 break-words">{error.message}</p>
       </details>
       <Button className="mt-3" disabled={retrying} onClick={onRetry}>
@@ -362,7 +362,7 @@ function TeamEditor({ projectId, detail, onSaved }: { projectId: string; detail:
           </label>
           <TeamMembers draft={draft} teamId={detail?.team.id ?? null} onChange={patch} />
           <details className="orchestration-card mt-6">
-            <summary className="cursor-pointer text-base font-medium py-2">Execution limits</summary>
+            <summary className="text-base font-medium py-2">Execution limits</summary>
             <p className="text-sm text-ink-3 mb-3">These limits apply each time this saved team runs.</p>
             <div className="orchestration-fields">
               {(

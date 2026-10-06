@@ -42,7 +42,7 @@ function ResultText({ text, hasMedia }: { text: string; hasMedia: boolean }) {
   if (!hasMedia) return <pre className={textStyle}>{text}</pre>;
   return (
     <details>
-      <summary className="cursor-pointer px-3 py-2 text-ink-3">Result text</summary>
+      <summary className="px-3 py-2 text-ink-3">Result text</summary>
       <pre className={textStyle}>{text}</pre>
     </details>
   );
@@ -53,7 +53,7 @@ function ResultData({ output }: { output: unknown }) {
   const text = useMemo(() => (open ? toolResultDetails(output) : ""), [open, output]);
   return (
     <details onToggle={(event) => setOpen(event.currentTarget.open)}>
-      <summary className="cursor-pointer px-3 py-2 text-ink-3">Result data</summary>
+      <summary className="px-3 py-2 text-ink-3">Result data</summary>
       {open ? <pre className={textStyle}>{text}</pre> : null}
     </details>
   );

@@ -159,7 +159,7 @@ export function TeamTaskAdmissions({ task, kind }: { task: TeamTaskView; kind?: 
           {admission.error ? <p className="text-bad mt-1">{admission.error}</p> : null}
           {admission.result ? (
             <details className="mt-1 text-ink-2">
-              <summary className="cursor-pointer text-ink-3">Result</summary>
+              <summary className="text-ink-3">Result</summary>
               <p className="mt-2 whitespace-pre-wrap">{admission.result}</p>
             </details>
           ) : null}

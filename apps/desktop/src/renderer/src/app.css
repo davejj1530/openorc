@@ -539,6 +539,15 @@ html[data-palette="conductor"] {
     -webkit-user-select: none;
     user-select: none;
   }
+  /* Tailwind 4's Preflight no longer gives buttons the hand cursor, so every clickable control takes it here. */
+  :is(button, select, summary, [role="button"], [role="option"], [role^="menuitem"], input:is([type="checkbox"], [type="radio"], [type="color"])):not(:disabled, [aria-disabled="true"]),
+  label:has(input:is([type="checkbox"], [type="radio"]):enabled) {
+    cursor: pointer;
+  }
+  /* Disabled native controls fall back to the arrow on their own; ARIA-disabled ones need it set. */
+  [aria-disabled="true"] {
+    cursor: default;
+  }
   input,
   textarea,
   .prose-chat {
@@ -930,7 +939,6 @@ body[data-resizing] .sidebar-shell {
   font-weight: var(--font-weight-medium);
   max-width: 40%;
   min-width: 0;
-  cursor: pointer;
   transition:
     background-color 120ms ease,
     color 120ms ease;
@@ -1149,7 +1157,6 @@ body[data-resizing] .sidebar-shell {
   text-align: left;
   font-size: var(--text-sm);
   color: var(--ink-3);
-  cursor: pointer;
 }
 .work-toggle:hover,
 .work-step-toggle:hover {
@@ -1449,7 +1456,6 @@ diffs-container {
   background-color: transparent;
   padding-left: 0;
   font-size: var(--text-sm);
-  cursor: default;
   text-overflow: ellipsis;
 }
 .property-select:hover {
@@ -2107,7 +2113,6 @@ diffs-container {
 .composer-send:disabled {
   background: var(--surface-3);
   color: var(--ink-3);
-  cursor: default;
 }
 /* Queue content stays inside the reading column, including unbroken logs and paths. */
 .message-queue {
@@ -2168,7 +2173,6 @@ diffs-container {
   gap: 8px;
   min-width: 0;
   padding: 2px 0;
-  cursor: pointer;
   list-style: none;
   border-radius: var(--radius-sm);
 }
@@ -2330,7 +2334,6 @@ diffs-container {
 }
 .model-picker-rail-button:disabled {
   opacity: 0.4;
-  cursor: default;
 }
 .model-picker-fast {
   margin-top: auto;
@@ -2382,7 +2385,6 @@ diffs-container {
 }
 .model-picker-search button:disabled {
   opacity: 0.4;
-  cursor: default;
 }
 .model-picker-results {
   min-height: 0;
@@ -2422,7 +2424,6 @@ diffs-container {
 }
 .model-picker-row:disabled {
   opacity: 0.45;
-  cursor: default;
 }
 .model-picker-row-name {
   flex: 1;
@@ -2507,7 +2508,6 @@ diffs-container {
 }
 .model-picker-reset:disabled {
   opacity: 0.35;
-  cursor: default;
 }
 .model-picker-footer .composer-effort-slider {
   margin-top: 8px;
@@ -2981,7 +2981,6 @@ diffs-container {
   border-bottom: 2px solid transparent;
   color: var(--ink-2);
   font-size: var(--text-sm);
-  cursor: pointer;
 }
 .skills-harness:hover,
 .skills-harness[aria-pressed="true"] {
@@ -3060,7 +3059,6 @@ diffs-container {
   gap: 16px;
   min-width: 0;
   padding: 12px 16px;
-  cursor: pointer;
   list-style: none;
 }
 .skills-item-summary::-webkit-details-marker {

@@ -53,7 +53,7 @@ export function DirectSlackSettings({ active }: { active: boolean }) {
       <p className="text-ink-2 mb-4">Connect your own Slack bot to this computer. Each teammate creates a separate bot. Keep OpenOrc open and your computer awake to receive requests.</p>
       {status.isError && <LoadError retry={() => void status.refetch()} />}
       <details open={!direct?.configured} className="mb-6">
-        <summary className="cursor-pointer text-lg font-semibold py-2">Set up your Slack app</summary>
+        <summary className="text-lg font-semibold py-2">Set up your Slack app</summary>
         <ol className="list-decimal pl-5 space-y-5 mt-3 text-md">
           <li>
             <p className="font-medium">Create a personal app</p>

@@ -115,7 +115,6 @@
 }
 .team-permission-details summary {
   width: fit-content;
-  cursor: pointer;
   border-radius: var(--radius-sm);
 }
 .team-permission-details summary:hover {

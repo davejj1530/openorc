@@ -146,7 +146,7 @@ export function TaskCard({ taskId, compact = false }: { taskId: string; compact?
       ) : null}
       {!compact && activity.steps.length > 0 ? (
         <details className="mt-2 text-xs text-ink-3 group/activity">
-          <summary className="list-none flex items-center gap-1.5 cursor-pointer hover:text-ink-2">
+          <summary className="list-none flex items-center gap-1.5 hover:text-ink-2">
             <ChevronRight size={12} className="group-open/activity:rotate-90 transition-transform" />
             Recent activity<span className="ml-auto truncate">{taskStepLabel(activity.steps.at(-1)!.name)}</span>
           </summary>

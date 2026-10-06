@@ -119,7 +119,7 @@ export function TaskExecutionSettings({ execution }: { execution: ReturnType<typ
   const { cannotBranch } = useProjectGit(execution.projectId);
   return (
     <details className="task-execution-settings" open>
-      <summary className="cursor-pointer text-sm text-ink-3 hover:text-ink select-none">Execution settings</summary>
+      <summary className="text-sm text-ink-3 hover:text-ink select-none">Execution settings</summary>
       <div className="grid gap-3 mt-4">
         <ExecutionLocationSelect value={execution.mode} onChange={execution.change} disabled={execution.isPending || Boolean(execution.reason)} worktreeBlocked={cannotBranch} />
         <p className="text-sm text-ink-3">

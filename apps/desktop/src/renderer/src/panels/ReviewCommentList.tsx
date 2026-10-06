@@ -43,7 +43,7 @@ export function ReviewCommentList({
                 onClick={() => onRemove(c.id)}
                 disabled={state?.removeDisabled}
                 tone="danger"
-                className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 disabled:cursor-default shrink-0"
+                className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 shrink-0"
                 aria-label="Remove comment"
                 title={state?.reason ?? "Remove"}
               >

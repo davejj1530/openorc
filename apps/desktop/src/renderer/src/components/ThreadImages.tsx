@@ -334,7 +334,7 @@ export function ImageGenerationRow({ block }: { block: Extract<Block, { kind: "a
       {block.status === "error" && block.text ? <p className="mt-1 text-sm text-bad whitespace-pre-wrap break-words">{block.text}</p> : null}
       {typeof detail?.revisedPrompt === "string" ? (
         <details className="mt-1 text-xs text-ink-3">
-          <summary className="cursor-pointer">Image prompt</summary>
+          <summary>Image prompt</summary>
           <p className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-words">{detail.revisedPrompt}</p>
         </details>
       ) : null}

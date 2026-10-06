@@ -65,7 +65,6 @@
 }
 .settings-agent-location summary {
   width: fit-content;
-  cursor: pointer;
 }
 .settings-agent-location code {
   display: block;
@@ -262,7 +261,6 @@
   align-items: center;
   gap: 5px;
   width: fit-content;
-  cursor: pointer;
   list-style: none;
 }
 .usage-report-details > summary::before {
@@ -372,7 +370,6 @@
 }
 .usage-reset-details > summary {
   width: fit-content;
-  cursor: pointer;
   padding-block: 4px;
 }
 .usage-reset-details > summary:focus-visible {

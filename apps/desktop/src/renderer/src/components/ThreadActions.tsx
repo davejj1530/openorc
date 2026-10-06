@@ -24,8 +24,7 @@ import { TeamRecoveryActions } from "./TeamRecoveryActions";
 /** The parts a dropdown and a context menu share, so one item list serves both. */
 export type MenuParts = Pick<typeof Menu, "Item" | "Separator" | "SubmenuRoot" | "SubmenuTrigger" | "Portal" | "Positioner" | "Popup">;
 
-export const menuItem =
-  "flex items-center gap-2 h-7 px-2 rounded-md text-base text-ink-2 cursor-pointer data-[highlighted]:bg-surface-2 data-[highlighted]:text-ink data-[disabled]:opacity-50 data-[disabled]:cursor-default outline-none";
+export const menuItem = "flex items-center gap-2 h-7 px-2 rounded-md text-base text-ink-2 data-[highlighted]:bg-surface-2 data-[highlighted]:text-ink data-[disabled]:opacity-50 outline-none";
 export const menuPopup = "menu-popup min-w-48 rounded-lg border border-line bg-surface p-1 shadow-panel outline-none";
 
 /** When a snoozed thread comes back, from now. */

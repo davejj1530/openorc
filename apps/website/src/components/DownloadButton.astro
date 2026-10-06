@@ -1,13 +1,25 @@
 ---
-import Icon from "./Icon.astro";
-interface Props { compact?: boolean }
+/**
+ * The download call to action. It is written for macOS, the main platform, and
+ * scripts/download-cta.ts names the visitor's own platform once the page loads.
+ * Every version opens /download/, which picks the installer.
+ */
+import { platformIcons } from "../lib/platform-icons";
+interface Props {
+  compact?: boolean;
+}
 const { compact = false } = Astro.props;
 ---
 
 {compact ? (
   <a class="button button-small" href="/download/">Download</a>
 ) : (
-  <a class="button button-primary" href="/download/">
-    Download OpenOrc<Icon name="download" size={18} />
+  <a class="button button-primary" href="/download/" data-download-cta>
+    <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor" aria-hidden="true"><path d={platformIcons.mac} /></svg>
+    <span>Download for macOS</span>
   </a>
 )}
+
+<script>
+  import "../scripts/download-cta";
+</script>

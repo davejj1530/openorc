@@ -5,7 +5,6 @@
  * it, and follows the change into the thread that starts. Content and timing:
  * data/hero/workflow.ts.
  */
-import PresenceMark from "./PresenceMark.astro";
 import ProductIcon from "./ProductIcon.astro";
 import Prose from "./Prose.astro";
 import SceneFrame from "./SceneFrame.astro";
@@ -157,7 +156,6 @@ const code = (text: string) => text.split(/(`[^`]+`)/).map((part) => (part.start
           </div>
         ))}
       </div>
-      <PresenceMark />
     </ThreadPane>
 
     <TaskPane id="task" journey={workflowJourney} title={task.title} start="bStart" branch={branches.cacheThread}>
@@ -313,7 +311,6 @@ const code = (text: string) => text.split(/(`[^`]+`)/).map((part) => (part.start
           </div>
         ))}
       </section>
-      <PresenceMark />
     </ThreadPane>
   </div>
 </SceneFrame>

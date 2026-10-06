@@ -997,22 +997,6 @@
   font-size: calc(11 * var(--u));
   line-height: calc(16 * var(--u));
 }
-/* The agent's mark ends the transcript: gray at rest, ink while the agent works. */
-.hs-presence {
-  display: grid;
-  place-items: center;
-  width: calc(36 * var(--u));
-  height: calc(36 * var(--u));
-  color: var(--hs-ink-3);
-}
-.hs-presence svg {
-  width: calc(22 * var(--u));
-  height: calc(22 * var(--u));
-}
-.hs-pane[data-busy] .hs-presence {
-  color: var(--hs-ink);
-  animation: hs-breathe 2.4s ease-in-out infinite;
-}
 
 /* Team conversation (TeamConversation.tsx): the team's status sits in the header; members speak under a portrait. */
 .hs-team-status {
@@ -1085,13 +1069,6 @@
 }
 .hs-turn > .hs-change {
   margin-top: calc(12 * var(--u));
-}
-.hs-presence-row {
-  display: flex;
-  align-items: center;
-  gap: calc(6 * var(--u));
-  color: var(--hs-ink-3);
-  font-size: calc(12 * var(--u));
 }
 .hs-hint {
   max-width: calc(768 * var(--u));

@@ -33,12 +33,16 @@ const demos = [
 </script>
 <section class="product-showcase" id="product" data-product-gallery aria-label="OpenOrc product demos">
   <LogoSprite />
-  <div class="demo-tabs" role="tablist" aria-label="Explore OpenOrc demos" hidden data-demo-tabs>
-    {demos.map((demo, i) => (
-      <button type="button" role="tab" id={`demo-tab-${demo.id}`} aria-controls={`demo-${demo.id}`} aria-selected={i === 0 ? "true" : "false"} tabindex={i === 0 ? 0 : -1}>
-        {demo.label}
-      </button>
-    ))}
+  {/* The page's calls to action share a row with the demo tabs, so the painting follows straight after. */}
+  <div class="demo-bar">
+    <slot name="actions" />
+    <div class="demo-tabs" role="tablist" aria-label="Explore OpenOrc demos" hidden data-demo-tabs>
+      {demos.map((demo, i) => (
+        <button type="button" role="tab" id={`demo-tab-${demo.id}`} aria-controls={`demo-${demo.id}`} aria-selected={i === 0 ? "true" : "false"} tabindex={i === 0 ? 0 : -1}>
+          {demo.label}
+        </button>
+      ))}
+    </div>
   </div>
   <ArtPanel art="hero" phoneArt="hero-mobile" eager class="demo-art">
     {demos.map(({ id, alt, Scene }, i) => (

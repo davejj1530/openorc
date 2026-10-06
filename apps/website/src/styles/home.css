@@ -31,14 +31,24 @@
   margin-top: 28px;
 }
 .home-page .product-showcase {
-  margin-top: clamp(48px, 5vw, 72px);
+  margin-top: 28px;
   scroll-margin-top: 90px;
+}
+.home-page .demo-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px 24px;
+  margin-bottom: 20px;
+}
+.home-page .demo-bar .hero-actions {
+  margin-top: 0;
 }
 .home-page .demo-tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  margin-bottom: 14px;
 }
 .home-page .demo-tabs button {
   min-height: 40px;
@@ -757,6 +767,7 @@
   }
   .home-page .demo-tabs {
     flex-wrap: nowrap;
+    width: calc(100% + 40px);
     margin-inline: -20px;
     padding-inline: 20px;
     overflow-x: auto;

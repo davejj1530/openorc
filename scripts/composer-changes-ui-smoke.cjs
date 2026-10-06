@@ -49,8 +49,8 @@ async function smoke() {
       const root = document.querySelector('.composer'); const r = root.getBoundingClientRect();
       const errors = [];
       if(root.scrollWidth > root.clientWidth + 1) errors.push('composer overflow');
-      const tab = root.querySelector('.composer-changes-body');
-      if(tab && tab.scrollWidth > tab.clientWidth + 1) errors.push('changes tab overflow');
+      const rail = root.querySelector('.composer-rail');
+      if(rail && rail.scrollWidth > rail.clientWidth + 1) errors.push('workspace footer overflow');
       for(const button of root.querySelectorAll('button')) {
         const b=button.getBoundingClientRect(); if(!b.width || !b.height) continue;
         if(b.left < r.left - 1 || b.right > r.right + 1) errors.push(button.getAttribute('aria-label') + ' outside composer');
@@ -74,7 +74,7 @@ async function smoke() {
             win.setSize(width, 560);
             await pause(100);
             await geometry();
-            assert.equal(await read(`Boolean(document.querySelector('.composer > .composer-changes + .composer-shell'))`), dirty);
+            assert.equal(await read(`Boolean(document.querySelector('.composer-rail .composer-changes'))`), dirty);
             if (width === 1000 || width === 480) await capture(`${theme}-${dirty ? "dirty" : "clean"}-${width}`);
           }
         }

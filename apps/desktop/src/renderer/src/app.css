@@ -1564,16 +1564,17 @@ diffs-container {
   --composer-track: color-mix(in srgb, var(--surface-2) 50%, var(--surface));
   --composer-context-track: var(--composer-track);
   --composer-context-hover: var(--surface-3);
-  /* The shell's --material-lift lights its top edge in dark; the changes tab draws the same line. */
+  /* The shell's --material-lift lights its top edge in dark. */
   --composer-sheen: var(--material-hi);
 }
-/* Ordinary folder chats retain their visible working directory. Git facts live below
-   the input when clean, or in a raised strip above the shell when dirty. */
+/* The working folder leads; branch, diff totals, and commit share its quiet footer. */
 .composer-rail {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
   min-width: 0;
+  min-height: var(--control-badge);
   padding: 4px 12px 0;
   font-size: var(--text-sm);
   color: var(--ink-3);
@@ -1583,84 +1584,41 @@ diffs-container {
   flex-shrink: 0;
   color: var(--ink-3);
 }
-/* Uncommitted work rises out of the shell's top-right as a tab of the same material, so it
-   never costs the writing surface a row. It hugs its content, runs straight up from the
-   shell's right side, and eases down into the top edge on the left, never closer to the left
-   edge than the shell's corner. The tab reaches down over the shell's 1px edge and the
-   input's 8px lead-in (9px), so its row shares that space and sits as close to the input as
-   it does to its own top edge. */
-.composer-changes {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: flex-start;
-  width: fit-content;
-  max-width: calc(100% - var(--radius-xl) - 8px);
-  margin: 0 0 -9px auto;
-  font-size: var(--text-sm);
-  color: var(--ink-3);
-  white-space: nowrap;
+.composer-directory {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
 }
-.composer-changes-shoulder {
-  display: block;
-  flex-shrink: 0;
-}
-.composer-changes-shoulder-fill {
-  fill: var(--composer-surface);
-}
-.composer-changes-shoulder-sheen,
-.composer-changes-shoulder-edge {
-  fill: none;
-  transition: stroke 120ms ease-out;
-}
-.composer-changes-shoulder-sheen {
-  stroke: var(--composer-sheen);
-}
-.composer-changes-shoulder-edge {
-  stroke: var(--composer-edge);
-}
-.composer-changes-body {
+.composer-git {
   display: flex;
   align-items: center;
   gap: 8px;
   flex: 0 1 auto;
   min-width: 0;
-  /* 8px on the right lines Commit up with the send button below. */
-  padding: 4px 8px 4px 4px;
-  border-top: 1px solid var(--composer-edge);
-  border-right: 1px solid var(--composer-edge);
-  border-top-right-radius: var(--radius-xl);
-  background: var(--composer-surface);
-  box-shadow: inset 0 1px 0 var(--composer-sheen);
-  transition: border-color 120ms ease-out;
+  margin-left: auto;
 }
-.composer-changes-identity {
+.composer-changes {
   display: flex;
   align-items: center;
-  gap: 12px;
-  flex: 0 1 auto;
-  min-width: 0;
+  gap: 8px;
+  flex-shrink: 0;
 }
-.composer-changes-project,
-.composer-changes-branch,
-.composer-changes-branch span {
+.composer-directory span,
+.composer-branch,
+.composer-branch span {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
   min-width: 0;
 }
-.composer-changes-project {
-  flex: 0 1 auto;
-}
-.composer-changes-branch {
+.composer-branch {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   flex: 0 1 auto;
-}
-.composer-changes-branch svg {
-  flex-shrink: 0;
-  color: var(--ink-3);
+  max-width: min(180px, 24cqi);
 }
 .composer-changes-summary,
 .composer-changes-commit {
@@ -1670,8 +1628,8 @@ diffs-container {
   height: var(--control-badge);
   padding-inline: 8px;
   border-radius: var(--radius-sm);
-  background: var(--surface-2);
-  color: var(--ink-2);
+  background: transparent;
+  color: var(--ink-3);
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -1727,20 +1685,13 @@ diffs-container {
   flex-shrink: 0;
   color: var(--ink-3);
 }
-.composer-location,
-.composer-branch {
+.composer-location {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   min-width: 0;
 }
-.composer-branch {
-  max-width: 180px;
-  color: var(--ink-3);
-  font-size: var(--text-sm);
-}
-.composer-location span,
-.composer-branch span {
+.composer-location span {
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -1805,11 +1756,6 @@ diffs-container {
     background-color 120ms ease-out,
     box-shadow 120ms ease-out;
 }
-/* The changes tab takes over the shell's top-right corner, so the shell's side runs straight up into it. */
-.composer-changes + .composer-shell {
-  border-top-right-radius: 0;
-}
-/* The changes tab shares the shell's outline, so both answer focus and drag together. */
 .composer:has(.composer-shell:focus-within) {
   --composer-edge: var(--line-strong);
 }
@@ -2702,19 +2648,7 @@ diffs-container {
 .composer-effort-slider:has(input:focus-visible) .composer-effort-thumb {
   border: 3px solid var(--accent-ink);
 }
-/* One line at every width. The facts truncate from the branch inward rather than taking a
-   row of their own: a second row costs 28px of the composer's height permanently, and the
-   facts are the part of the foot you read least. */
-@container composer (max-width: 720px) {
-  .composer-branch {
-    max-width: 120px;
-  }
-}
 @container composer (max-width: 560px) {
-  .composer-branch {
-    display: none;
-  }
-  .composer-changes-project,
   .composer-commit-suffix {
     display: none;
   }
@@ -2788,9 +2722,6 @@ diffs-container {
   .task-document {
     padding-left: 16px;
     padding-right: 16px;
-  }
-  .composer-branch {
-    max-width: 100px;
   }
   .model-effort {
     display: none;

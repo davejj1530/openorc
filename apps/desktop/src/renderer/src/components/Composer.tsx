@@ -91,12 +91,12 @@ export interface ComposerProps {
   permissionDisabledReason?: string;
   permissionDescriptionId?: string;
   attachmentsDisabledReason?: string | null;
-  /** Where the agent runs: checkout and branch beside the mode, or a working folder above the input. */
+  /** Where the agent runs: the working folder and Git context share the footer below the input. */
   /** A caller supplying its own destination control may omit the static label. */
   location: { label: string | null; branch: string | null; directory?: string };
   /** Initial execution location is chosen before the conversation starts. */
   hasStarted?: boolean;
-  /** Uncommitted changes and actions in the shell’s original top rail. */
+  /** Uncommitted changes and actions beside the working folder. */
   changes?: ComposerChanges | null;
   /** The project, only when the caller lets you change it. The name alone is TopBar’s job. */
   projectControl?: ReactNode;
@@ -139,7 +139,7 @@ export interface ComposerProps {
  * The one composer, for the landing screen and every conversation. Files
  * paste or drop in and ride along with the prompt, images as thumbnails and
  * everything else as a named chip; the model, effort, mode,
- * and permission live under the text; uncommitted changes sit above it. @
+ * and permission live under the text; Git context shares the working-folder footer. @
  * mentions a file, / runs a command, and the ring says how full the
  * conversation is.
  */
@@ -162,7 +162,6 @@ export function Composer(props: ComposerProps) {
   const attachmentBlock = attachments.length > 0 ? props.attachmentsDisabledReason : null;
   const canSend = Boolean(props.allowEmpty || props.value.trim() || attachments.length > 0) && !props.busy && !submitting && !props.disabledReason && !attachmentBlock && uploading === 0;
 
-  const changed = Boolean(props.changes && props.changes.files > 0);
   const submit = (now = Boolean(props.liveByDefault && queueing)) => {
     if (!canSend) return;
     files.clearError();
@@ -286,12 +285,6 @@ export function Composer(props: ComposerProps) {
             {composerDestination(props)}
             {isNewThread ? composerModelControl(props) : null}
             {isNewThread ? composerModeControl(props) : null}
-            {!changed && props.location.branch ? (
-              <span className="composer-branch" title={props.location.branch}>
-                <GitBranch size={14} />
-                <span>{props.location.branch}</span>
-              </span>
-            ) : null}
             {!isNewThread ? composerModeControl(props) : null}
           </div>
           <div className="composer-actions">
@@ -354,55 +347,59 @@ export function Composer(props: ComposerProps) {
             )}
           </div>
         </div>
-        {changed && props.changes ? (
-          <section className="composer-changes" aria-label="Uncommitted changes">
-            <div className="composer-changes-body">
-              <div className="composer-changes-identity">
-                <span className="composer-changes-project" title={props.changes.projectName}>
-                  {props.changes.projectName}
-                </span>
-                {props.location.branch ? (
-                  <span className="composer-changes-branch" title={props.location.branch}>
-                    <GitBranch size={14} />
-                    <span>{props.location.branch}</span>
-                  </span>
-                ) : null}
-              </div>
+      </div>
+      <ComposerWorkspace location={props.location} changes={props.changes} />
+    </div>
+  );
+}
+
+function ComposerWorkspace({ location, changes }: Pick<ComposerProps, "location" | "changes">) {
+  const changed = changes && changes.files > 0;
+  if (!location.directory && !location.branch && !changed) return null;
+  const fileLabel = changes?.files === 1 ? "file" : "files";
+  return (
+    <div className="composer-rail">
+      {location.directory ? (
+        <span className="composer-directory" title={location.directory}>
+          <Laptop size={14} />
+          <span>{location.directory}</span>
+        </span>
+      ) : null}
+      {location.branch || changed ? (
+        <div className="composer-git">
+          {location.branch ? (
+            <span className="composer-branch" title={location.branch}>
+              <GitBranch size={14} />
+              <span>{location.branch}</span>
+            </span>
+          ) : null}
+          {changed ? (
+            <section className="composer-changes" aria-label="Uncommitted changes">
               <button
                 type="button"
                 className="composer-changes-summary"
-                onClick={props.changes.onReview}
-                aria-label={`Review ${props.changes.files} changed ${props.changes.files === 1 ? "file" : "files"}, ${props.changes.insertions} added and ${props.changes.deletions} removed lines`}
+                onClick={changes.onReview}
+                aria-label={`Review ${changes.files} changed ${fileLabel}, ${changes.insertions} added and ${changes.deletions} removed lines`}
               >
-                {props.changes.insertions + props.changes.deletions > 0 ? (
+                {changes.insertions + changes.deletions > 0 ? (
                   <>
-                    {props.changes.insertions > 0 ? <span className="text-ok">+{props.changes.insertions.toLocaleString()}</span> : null}
-                    {props.changes.deletions > 0 ? <span className="text-bad">−{props.changes.deletions.toLocaleString()}</span> : null}
+                    {changes.insertions > 0 ? <span className="text-ok">+{changes.insertions.toLocaleString()}</span> : null}
+                    {changes.deletions > 0 ? <span className="text-bad">−{changes.deletions.toLocaleString()}</span> : null}
                   </>
                 ) : (
                   <span>
-                    {props.changes.files} {props.changes.files === 1 ? "file" : "files"}
+                    {changes.files} {fileLabel}
                   </span>
                 )}
               </button>
-              <Tooltip label={props.changes.commitDisabledReason ?? "Commit changes"}>
+              <Tooltip label={changes.commitDisabledReason ?? "Commit changes"}>
                 <span className="composer-changes-commit-wrap">
-                  <button type="button" className="composer-changes-commit" aria-label="Commit changes" disabled={Boolean(props.changes.commitDisabledReason)} onClick={props.changes.onCommit}>
+                  <button type="button" className="composer-changes-commit" aria-label="Commit changes" disabled={Boolean(changes.commitDisabledReason)} onClick={changes.onCommit}>
                     Commit<span className="composer-commit-suffix"> changes</span>
                   </button>
                 </span>
               </Tooltip>
-            </div>
-          </section>
-        ) : null}
-      </div>
-      {props.location.directory ? (
-        <div className="composer-rail">
-          {props.location.directory ? (
-            <span className="inline-flex items-center gap-1 min-w-0 truncate" title={props.location.directory}>
-              <Laptop size={14} className="shrink-0" />
-              <span className="truncate">{props.location.directory}</span>
-            </span>
+            </section>
           ) : null}
         </div>
       ) : null}

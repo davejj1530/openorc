@@ -2310,10 +2310,9 @@
   display: flex;
   align-items: center;
   gap: calc(8 * var(--u));
-  height: calc(22 * var(--u));
-  padding: 0 calc(5 * var(--u));
-  color: var(--hs-ink-3);
-  font-size: calc(11 * var(--u));
+  min-width: 0;
+  max-width: 70%;
+  margin-left: auto;
   white-space: nowrap;
 }
 .hs-checkout-branch {
@@ -2321,6 +2320,7 @@
   align-items: center;
   gap: calc(4 * var(--u));
   min-width: 0;
+  max-width: calc(180 * var(--u));
 }
 .hs-checkout-branch > span {
   min-width: 0;
@@ -2353,16 +2353,29 @@
 .hs-location-rail {
   display: flex;
   align-items: center;
-  gap: calc(4 * var(--u));
+  justify-content: space-between;
+  gap: calc(12 * var(--u));
   height: calc(20 * var(--u));
   margin-top: calc(7 * var(--u));
-  padding-left: calc(8 * var(--u));
+  padding-inline: calc(8 * var(--u));
   color: var(--hs-ink-3);
   font-size: calc(11 * var(--u));
 }
 .hs-location-rail .hs-icon {
   width: calc(14 * var(--u));
   height: calc(14 * var(--u));
+}
+.hs-directory {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(4 * var(--u));
+  flex: 1;
+  min-width: 0;
+}
+.hs-directory > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Scenes with data-motion: scripts/hero-motion.ts opens and closes [data-grow]

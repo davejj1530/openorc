@@ -44,7 +44,7 @@ core.call = async <M extends RpcMethod>(method: M, input: RpcParams<M>): Promise
   }
   if (method === "orchestration.runtime") {
     const action = { allowed: !blocked, reason: blocked ? "The team is still working." : null };
-    result = { actions: { commit: action, push: action, createPr: action } };
+    result = { executions: [], actions: { commit: action, push: action, createPr: action } };
   }
   if (method === "system.info") result = { gh: { installed: false } };
   if (method === "agents.models") result = [{ agent: "codex", id: "gpt-6-astra", label: "GPT-6-Astra", isDefault: true, efforts: ["high", "xhigh", "ultra"] }];
@@ -101,7 +101,7 @@ function App() {
     },
   });
   return (
-    <div className="h-full flex bg-surface text-ink overflow-hidden">
+    <div className="app-shell h-full flex bg-surface text-ink overflow-hidden">
       <main className="flex-1 min-w-0 flex flex-col justify-end p-6">
         <div className="w-full max-w-chat mx-auto">
           <Composer
@@ -115,7 +115,7 @@ function App() {
             onMode={() => {}}
             permission="review"
             onPermission={() => {}}
-            location={{ label: null, branch }}
+            location={{ label: null, branch, directory: "/Projects/studio/packages/desktop" }}
             changes={changes}
             size="lg"
             queueing={working}

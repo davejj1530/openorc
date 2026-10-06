@@ -1,7 +1,7 @@
 ---
 /**
  * The message composer as the app draws it (Composer.tsx): a white writing well inside a gray shell, the controls
- * row, the checkout row with any uncommitted changes, and the conversation's folder beneath.
+ * row, and a footer with the conversation's folder beside its branch and any uncommitted changes.
  */
 import ProductIcon from "./ProductIcon.astro";
 import { project } from "../../data/hero/workspace";
@@ -60,6 +60,9 @@ const fresh = layout === "new";
         </span>
       </span>
     </div>
+  </div>
+  <div class="hs-location-rail">
+    <span class="hs-directory"><ProductIcon name="laptop" /><span>/Projects/{project.name}</span></span>
     <div class="hs-checkout">
       <span class="hs-checkout-branch"><ProductIcon name="branch" /><span>{branch}</span></span>
       {changes ? (
@@ -70,5 +73,4 @@ const fresh = layout === "new";
       ) : null}
     </div>
   </div>
-  <div class="hs-location-rail"><ProductIcon name="laptop" /><span>/Projects/{project.name}</span></div>
 </div>

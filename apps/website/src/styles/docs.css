@@ -71,7 +71,7 @@
 }
 .docs-nav-groups a[aria-current="page"] {
   color: var(--accent);
-  font-weight: 500;
+  font-weight: 700;
 }
 .docs-nav-groups a[aria-current="page"]:hover {
   background: none;
@@ -144,7 +144,7 @@
   margin: 24px 0 8px;
   color: var(--text);
   font-size: var(--docs-body);
-  font-weight: 500;
+  font-weight: 700;
 }
 .docs-article p {
   max-width: 72ch;
@@ -179,7 +179,7 @@
 }
 .docs-article strong {
   color: var(--text);
-  font-weight: 500;
+  font-weight: 700;
 }
 .docs-article p a,
 .docs-article li a,
@@ -368,7 +368,7 @@ kbd {
 .docs-callout-title {
   margin-bottom: 4px;
   color: var(--text);
-  font-weight: 500;
+  font-weight: 700;
 }
 .docs-article .docs-callout p {
   font-size: 0.875rem;
@@ -409,7 +409,7 @@ kbd {
 .docs-card-title {
   color: var(--text);
   font-size: var(--docs-body);
-  font-weight: 500;
+  font-weight: 700;
 }
 .docs-card-text {
   color: var(--muted);

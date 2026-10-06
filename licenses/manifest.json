@@ -79,11 +79,6 @@
       "distribution": "desktop"
     },
     {
-      "name": "@fontsource-variable/inter",
-      "version": "5.3.0",
-      "distribution": "website"
-    },
-    {
       "name": "@fontsource-variable/jetbrains-mono",
       "version": "5.3.0",
       "distribution": "desktop"
@@ -97,11 +92,6 @@
       "name": "@fontsource-variable/geist",
       "version": "5.3.0",
       "distribution": "desktop"
-    },
-    {
-      "name": "@fontsource-variable/zalando-sans",
-      "version": "5.3.0",
-      "distribution": "website"
     },
     {
       "name": "rehype-katex",
@@ -293,7 +283,6 @@
         "path": "LICENSE"
       },
       "sha256": "3b0a5fca3d17942cde889069889dedbbbd075e9b599968c82a95f4d944e9b345",
-      "website": "licenses/inter-OFL-1.1.txt",
       "desktop": {
         "asar": "node_modules/@fontsource-variable/inter/LICENSE"
       }
@@ -380,14 +369,14 @@
       }
     },
     {
-      "id": "zalando-sans",
-      "input": "apps/website/node_modules/@fontsource-variable/zalando-sans/LICENSE",
+      "id": "immaculate-gothic-provenance",
+      "input": "licenses/vendor/immaculate-gothic-PROVENANCE.txt",
       "source": {
-        "package": "@fontsource-variable/zalando-sans",
-        "path": "LICENSE"
+        "package": "Immaculate-Gothic-Family-1.101",
+        "path": "PROVENANCE.txt"
       },
-      "sha256": "aef4b7266d8333367fbd9ba508d12042bf04d4df7a85eb09f0a73389dd8d9f5a",
-      "website": "licenses/zalando-sans-OFL-1.1.txt"
+      "sha256": "479139a02bbea6a9262c294f98fc313e2314efdbbe9e945a13eed5359b0adcdf",
+      "website": "licenses/immaculate-gothic-PROVENANCE.txt"
     },
     {
       "id": "fastdom",

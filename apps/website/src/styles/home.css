@@ -100,7 +100,7 @@
   align-items: center;
   gap: 10px;
   font-size: 1.125rem;
-  font-weight: 500;
+  font-weight: 450;
   letter-spacing: -0.015em;
 }
 .home-page .agent-logos svg {
@@ -328,7 +328,7 @@
   background: var(--tint);
   color: var(--muted);
   font-size: 0.6875rem;
-  font-weight: 500;
+  font-weight: 450;
 }
 .home-page .setup-ref-dot {
   display: grid;
@@ -390,7 +390,7 @@
   border: 1px solid var(--rule-strong);
   border-radius: 999px;
   color: var(--text);
-  font-weight: 500;
+  font-weight: 450;
   font-variant-numeric: tabular-nums;
 }
 .home-page .release-summary {

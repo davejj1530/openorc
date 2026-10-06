@@ -16,12 +16,13 @@ The original Rive mascot and its source availability are described in [the masco
 
 | Font package                          | Reviewed version | Terms and distribution                                                                                                                                                      |
 | ------------------------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@fontsource-variable/inter`          | 5.3.0            | SIL OFL 1.1; original copyright and license are retained in the desktop archive's package directory and published at `/licenses/inter-OFL-1.1.txt` on the website.          |
+| `@fontsource-variable/inter`          | 5.3.0            | SIL OFL 1.1; original copyright and license are retained in the desktop archive's package directory.                                                                        |
 | `@fontsource-variable/jetbrains-mono` | 5.3.0            | SIL OFL 1.1; original copyright and license are retained in the desktop archive's package directory and published at `/licenses/jetbrains-mono-OFL-1.1.txt` on the website. |
 | `@fontsource-variable/geist`          | 5.3.0            | SIL OFL 1.1; original copyright and license are retained in the desktop package.                                                                                            |
-| `@fontsource-variable/zalando-sans`   | 5.3.0            | SIL OFL 1.1; original copyright and license are published at `/licenses/zalando-sans-OFL-1.1.txt` on the website.                                                           |
 
 These font files remain under OFL rather than Apache-2.0. Preserve their license files and any reserved-font-name requirements when replacing or modifying them.
+
+The website's Immaculate Gothic Text and Bold faces are David's custom font from family package 1.101. Their supplied provenance is preserved in `licenses/vendor/immaculate-gothic-PROVENANCE.txt` and published at `/licenses/immaculate-gothic-PROVENANCE.txt`. The font is separate from the Apache-2.0 code license; its package does not assign an open-source license. See the [font record](apps/website/src/assets/fonts/README.md) for file hashes and use.
 
 ## Dependency notices
 

@@ -1,0 +1,16 @@
+Immaculate Gothic family package 1.101
+Created 5 October 2026
+
+Original AI-assisted custom type design for the requesting user.
+
+The letterforms began as independently constructed outlines for this project. The user selected the slightly heavier Text450 direction. The Text release extended that approved design into a bounded Latin face. This family package adds the requested Bold700 through real outline expansion, independent optical corrections, rebuilt composites, new hinting and weight-specific spacing. No external font files or proprietary font outlines were used as source material.
+
+General visual direction referenced contemporary grotesk typography, including the Cursor Gothic feel requested by the user. Immaculate Gothic is an independent typeface and is not affiliated with Cursor or Kimera.
+
+Engineering tools included FontTools, Skia PathOps, HarfBuzz, ttfautohint and Brotli. Hinting is automatic, not hand-tuned. These tools were used for construction, shaping, validation or compression; their application code is not bundled here.
+
+No open-source licence has been imposed on the user's font. This note records provenance and scope; it is not a trademark search, legal clearance, warranty or restriction on the user's choice of licensing for onward distribution.
+
+The supplied upright Text450 and Bold700 faces are included. Read README.md for exact coverage and tested/unverified environments.
+
+Family renamed to Immaculate Gothic at the user’s request. This update changes naming only; glyph outlines, spacing, features and metrics are unchanged.

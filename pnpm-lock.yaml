@@ -407,6 +407,9 @@ importers:
 
   packages/memory:
     dependencies:
+      '@openorc/agents':
+        specifier: workspace:*
+        version: link:../agents
       '@openorc/db':
         specifier: workspace:*
         version: link:../db

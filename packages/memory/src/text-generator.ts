@@ -2,10 +2,8 @@ import { execFile } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { harnessBinaryVariable, type HarnessId } from "@openorc/protocol";
-
-/** The same binaries the run adapters spawn: what the app resolved from the user's shell, else the bare name. */
-const agentBinary = (kind: HarnessId) => process.env[harnessBinaryVariable(kind)] || kind;
+import { agentBinary, launchCommand } from "@openorc/agents";
+import type { HarnessId } from "@openorc/protocol";
 
 const TITLE_PROMPT = `Name this conversation between a user and a coding agent.
 Return ONLY minified JSON, no prose, no code fences: {"title":string}
@@ -62,7 +60,25 @@ export class TextGenerator {
   private runClaude(prompt: string): Promise<string | null> {
     const binary = this.options.binary ?? agentBinary("claude");
     const model = this.options.model ?? "claude-haiku-4-5-20251001";
-    const args = ["-p", "--model", model, "--output-format", "json", "--max-turns", "1", "--strict-mcp-config", "--disallowed-tools", "Bash", "Edit", "Write", "WebFetch", "WebSearch"];
+    // Only the user's own settings: project settings come from the working folder, which is not the user's project here.
+    const args = [
+      "-p",
+      "--model",
+      model,
+      "--output-format",
+      "json",
+      "--max-turns",
+      "1",
+      "--setting-sources",
+      "user",
+      "--strict-mcp-config",
+      "--disallowed-tools",
+      "Bash",
+      "Edit",
+      "Write",
+      "WebFetch",
+      "WebSearch",
+    ];
     const env: NodeJS.ProcessEnv = { ...(this.options.env ?? process.env) };
     delete env["CLAUDECODE"];
     if (this.options.apiKey) env["ANTHROPIC_API_KEY"] = this.options.apiKey;
@@ -108,7 +124,6 @@ export class TextGenerator {
     const args = ["run", "--standalone", "--format", "json", "--model", this.options.model, "--agent", agent, "--title", "Background text generation"];
     const env: NodeJS.ProcessEnv = {
       ...(this.options.env ?? process.env),
-      PWD: tmpdir(),
       OPENCODE_DISABLE_PROJECT_CONFIG: "true",
       OPENCODE_CONFIG_CONTENT: JSON.stringify({
         share: "disabled",
@@ -133,25 +148,40 @@ export class TextGenerator {
     });
   }
 
-  private spawn({ binary, args, env, read, stdin }: SpawnInput): Promise<string | null> {
-    return new Promise((resolve) => {
-      try {
-        const child = execFile(binary, args, { env, cwd: tmpdir(), timeout: this.options.timeoutMs ?? 180_000, maxBuffer: 16 * 1024 * 1024 }, (error, stdout) => {
-          if (error && !stdout) {
-            resolve(null);
-            return;
-          }
-          Promise.resolve()
-            .then(() => read(String(stdout)))
-            .then(resolve, () => resolve(null));
-        });
-        if (stdin !== undefined) child.stdin?.end(stdin);
-        else child.stdin?.end();
-      } catch {
-        // A malformed or unavailable CLI invocation is an extraction fallback, not a run failure.
-        resolve(null);
-      }
-    });
+  /**
+   * Each job runs in a folder of its own, made for it and removed after. The system temp folder is shared between
+   * accounts on Linux, so settings or hooks someone else left there must never reach the agent.
+   */
+  private async spawn({ binary, args, env, read, stdin }: SpawnInput): Promise<string | null> {
+    const cwd = await mkdtemp(join(tmpdir(), "openorc-text-"));
+    try {
+      return await new Promise<string | null>((resolve) => {
+        try {
+          const command = launchCommand(binary, args);
+          const child = execFile(
+            command.file,
+            command.args,
+            { ...command.options, env: { ...env, PWD: cwd }, cwd, timeout: this.options.timeoutMs ?? 180_000, maxBuffer: 16 * 1024 * 1024 },
+            (error, stdout) => {
+              if (error && !stdout) {
+                resolve(null);
+                return;
+              }
+              Promise.resolve()
+                .then(() => read(String(stdout)))
+                .then(resolve, () => resolve(null));
+            },
+          );
+          if (stdin !== undefined) child.stdin?.end(stdin);
+          else child.stdin?.end();
+        } catch {
+          // A malformed or unavailable CLI invocation is an extraction fallback, not a run failure.
+          resolve(null);
+        }
+      });
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
   }
 }
 

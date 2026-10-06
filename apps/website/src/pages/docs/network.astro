@@ -140,7 +140,7 @@ const sections = [
 
   <section aria-labelledby="background">
     <h2 id="background">Background requests</h2>
-    <p>OpenOrc has no model of its own. When it needs one in the background, it runs an agent CLI once, in your system's temporary folder, and sends the prompt over standard input:</p>
+    <p>OpenOrc has no model of its own. When it needs one in the background, it runs an agent CLI once, in a new folder of its own inside your system's temporary folder, removed afterwards, and sends the prompt over standard input:</p>
     <ul>
       <li>
         <strong>Thread titles</strong> send the first 1,500 characters of your first message and of the reply. By default the thread's own agent answers with a small model: Claude Haiku 4.5 for Claude Code, or a small Codex model, so the

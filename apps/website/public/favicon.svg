@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="80 80 864 864">
+  <title>OpenOrc</title>
+  <rect x="80" y="80" width="864" height="864" rx="192" fill="#242424" />
+  <!-- The idle cube from OpenOrcMark.tsx and BrandMark.astro, with its top face cut out. -->
+  <path transform="translate(192 192) scale(20)" fill="#f5f5f2" fill-rule="evenodd" d="M17.91 2.5L26.74 7.6Q28.64 8.7 28.64 10.9L28.64 21.1Q28.64 23.3 26.74 24.4L17.91 29.5Q16 30.6 14.09 29.5L5.26 24.4Q3.36 23.3 3.36 21.1L3.36 10.9Q3.36 8.7 5.26 7.6L14.09 2.5Q16 1.4 17.91 2.5ZM16.78 4.27L23.66 8.25Q24.44 8.7 23.66 9.15L16.43 13.33Q16 13.58 15.57 13.33L8.34 9.15Q7.56 8.7 8.34 8.25L15.22 4.27Q16 3.82 16.78 4.27Z" />
+</svg>

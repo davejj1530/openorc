@@ -53,6 +53,8 @@ beforeEach(async () => {
   vi.spyOn(core.runs, "models").mockResolvedValue([
     { id: "fixture-codex", label: "Scripted provider", agent: "codex", isDefault: true, efforts: ["high"], defaultEffort: "high", fastMode: { supported: false } },
   ]);
+  // An ended turn names its thread; a real titler would still be running when the core closes.
+  vi.spyOn(core.textGeneration, "title").mockResolvedValue(null);
 });
 afterEach(async () => {
   if (core) await core.close();

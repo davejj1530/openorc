@@ -53,6 +53,8 @@ beforeEach(async () => {
   await commitAll(root, "Fixture baseline");
   project = projects.insert(core.db, { name: "Fixture", rootPath: root, defaultBranch: "main", gitRemote: null, settings: {} });
   vi.spyOn(core.runs, "models").mockResolvedValue([model("fixture-codex", "Scripted provider"), model("gpt-6.1-sol", "GPT-6.1 Sol"), model("gpt-6.1-mini", "GPT-6.1 Mini")]);
+  // An ended turn names its thread; a real titler would still be running when the core closes.
+  vi.spyOn(core.textGeneration, "title").mockResolvedValue(null);
 });
 afterEach(async () => {
   if (core) await core.close();

@@ -181,12 +181,10 @@
   right: 6%;
   width: 60%;
 }
-/* A narrower canvas than the hero's, so the sidebar and pane read at the feature's size. */
-@media (min-width: 701px) {
-  .home-page .worktree-art .hs-mock-worktree {
-    --hs-canvas: 1000;
-    height: calc(660 * var(--u));
-  }
+/* A compact desktop window, with the sidebar visible even when the painting crops it. */
+.home-page .worktree-art .hs-mock-worktree {
+  --hs-canvas: 1000;
+  height: calc(660 * var(--u));
 }
 .home-page .slack-art .art-panel-stage {
   display: grid;
@@ -745,6 +743,35 @@
 }
 
 @media (max-width: 1100px) {
+  /* The page adapts to the phone; the product remains a desktop window.
+     The camera follows the journey through the same sidebar and split panes. */
+  .home-page .demo-art {
+    container-type: inline-size;
+  }
+  .home-page .demo-art .art-panel-stage {
+    padding: 24px;
+  }
+  .home-page .demo-window {
+    --crop-offset: 220px;
+    width: 1000px;
+    height: 560px;
+    aspect-ratio: auto;
+    transform: translateX(calc(-1 * min(var(--crop-offset), max(0px, 1048px - 100cqi))));
+    transition: transform 700ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .home-page .demo-window .hero-scene {
+    --u: calc(100cqi / 1120);
+  }
+  .home-page .demo-window:has([data-scene="handoff"]) {
+    --crop-offset: 180px;
+  }
+  .home-page .demo-window:has([data-scene="handoff"][data-view="b"]) {
+    --crop-offset: 560px;
+  }
+  .home-page .demo-window:has([data-scene="handoff"][data-sidebar="open"]),
+  .home-page .demo-window:has([data-scene="workflow"][data-sidebar="open"]) {
+    --crop-offset: 0px;
+  }
   .home-page .feature {
     grid-template-columns: minmax(0, 1fr);
     gap: 28px;
@@ -773,12 +800,6 @@
     overflow-x: auto;
     scrollbar-width: none;
   }
-  .home-page .demo-art .art-panel-stage {
-    padding: 12px;
-  }
-  .home-page .demo-window {
-    aspect-ratio: 5 / 7;
-  }
   .home-page .agent-logos {
     gap: 16px 28px;
   }
@@ -788,19 +809,33 @@
   .home-page .feature {
     padding: 16px 16px 20px;
   }
-  /* On a phone the two stills stack, each at full width. */
+  /* Preserve the desktop stills' overlapping composition inside a tighter crop. */
   .home-page .review-art .art-panel-stage {
-    display: grid;
-    gap: 12px;
+    height: 480px;
     aspect-ratio: auto;
-    padding: 12px;
+    padding: 0;
   }
-  .home-page .review-tasks,
+  .home-page .review-tasks {
+    top: 24px;
+    left: 24px;
+    width: 620px;
+  }
   .home-page .review-changes {
-    position: static;
-    width: 100%;
+    top: 168px;
+    left: 64px;
+    right: auto;
+    width: 620px;
   }
-  .home-page .worktree-art .art-panel-stage,
+  .home-page .worktree-art {
+    container-type: inline-size;
+  }
+  .home-page .worktree-art .art-panel-stage {
+    padding: 24px;
+  }
+  .home-page .worktree-art .mock-window {
+    width: 900px;
+    transform: translateX(calc(-1 * min(170px, max(0px, 948px - 100cqi))));
+  }
   .home-page .slack-art .art-panel-stage {
     padding: 12px;
   }
@@ -828,6 +863,12 @@
 @media (max-width: 360px) {
   .home-page .slack-card {
     height: 700px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-page .demo-window {
+    transition: none;
   }
 }
 

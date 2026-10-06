@@ -150,7 +150,7 @@ const fake = vi.hoisted(() => {
 
 vi.mock("electron", () => ({ BrowserWindow: fake.BrowserWindow, session: fake.session, WebContentsView: fake.FakeView }));
 
-const { closeAllPanes, installBrowserPane, isAllowedPaneUrl, loadErrorMessage, toViewBounds, openBrowserLink } = await import("./browser-pane");
+const { closeAllPanes, hasBrowserContext, installBrowserPane, isAllowedPaneUrl, loadErrorMessage, toViewBounds, openBrowserLink } = await import("./browser-pane");
 
 type FakeView = InstanceType<typeof fake.FakeView>;
 type FakeWindow = InstanceType<typeof fake.FakeWindow>;
@@ -489,6 +489,30 @@ describe("one pane per window", () => {
 
     expect(going.webContents.destroyed).toBe(true);
     expect(kept.webContents.destroyed).toBe(false);
+  });
+});
+
+describe("a window that reloads", () => {
+  it("takes its panes off the window, keeps their pages, and forgets the panel that went with the old page", () => {
+    const ipc = install();
+    const reloading = new fake.FakeWindow();
+    const other = new fake.FakeWindow();
+    ipc.call("browser:context", reloading, "thread-1");
+    const view = loaded(ipc, reloading, "thread-1", "http://localhost:5173/");
+    const kept = loaded(ipc, other, "thread-1", "http://localhost:5173/");
+
+    // A reload runs no React cleanup, so this is all main hears of the panel going.
+    reloading.webContents.emit("did-navigate");
+
+    expect(reloading.children).toEqual([]);
+    expect(view.visible).toBe(false);
+    expect(other.children).toContain(kept);
+    expect(hasBrowserContext(reloading as unknown as Electron.BrowserWindow)).toBe(false);
+
+    // The new page opens the panel again and gets the same page back, not a fresh load of it.
+    show(ipc, reloading, "thread-1", "http://localhost:5173/");
+    expect(reloading.children).toContain(view);
+    expect(view.webContents.loaded).toEqual(["http://localhost:5173/"]);
   });
 });
 

@@ -206,6 +206,12 @@ function detach(pane: Pane): void {
   pane.window.contentView.removeChildView(pane.view);
 }
 
+/** Off the window until the panel asks for it again. The page keeps running, so coming back does not reload it. */
+function hide(pane: Pane): void {
+  pane.desired = false;
+  detach(pane);
+}
+
 /**
  * Put the view on screen once there is a page to see. The panel draws the
  * loading line and the failure message into the very rectangle the view is
@@ -250,6 +256,13 @@ function evict(keep?: Pane): void {
  * Closing a window takes its child views with it. Without this the map would
  * keep handing out panes whose WebContents are already gone. Guarded, because
  * a window paints many panes over its life and each one arrives here.
+ *
+ * A reload loses the panel the same way but keeps the views: the page goes
+ * without running React cleanup, so no panel sends the hide it owes, and the
+ * view stays composited over whatever the new page draws there. Every pane
+ * comes off the window, and the new page shows again the one it opens. Not
+ * did-start-navigation: a link the app window refuses starts a navigation
+ * too, and the page that clicked it is still there.
  */
 function watch(window: BrowserWindow): void {
   if (watchedWindows.has(window)) return;
@@ -257,6 +270,10 @@ function watch(window: BrowserWindow): void {
   window.on("closed", () => {
     contexts.delete(window);
     for (const [key, pane] of [...panes]) if (pane.window === window) destroy(key, pane);
+  });
+  window.webContents.on("did-navigate", () => {
+    contexts.delete(window);
+    for (const pane of panes.values()) if (pane.window === window) hide(pane);
   });
 }
 
@@ -488,9 +505,7 @@ export function installBrowserPane(ipcMain: Electron.IpcMain, options: { getWind
 
   ipcMain.on("browser:hide", (event, id: unknown) => {
     const pane = senders(event, id);
-    if (!pane) return;
-    pane.desired = false;
-    detach(pane);
+    if (pane) hide(pane);
   });
 
   // The still the panel paints in the view's place while a dialog or menu is

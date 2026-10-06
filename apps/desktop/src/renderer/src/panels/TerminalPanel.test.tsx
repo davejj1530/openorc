@@ -2,10 +2,15 @@ import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { OpenOrcApi } from "../../../shared/types";
 import { runInTerminal } from "../lib/terminal-requests";
+import { useCodeFont } from "../lib/code-font";
 import { TerminalPanel } from "./TerminalPanel";
 
+const fontChange = vi.hoisted(() => ({ create: vi.fn(), fit: vi.fn() }));
 vi.mock("@xterm/xterm", () => ({
   Terminal: class {
+    constructor() {
+      fontChange.create();
+    }
     cols = 80;
     rows = 24;
     options = {};
@@ -20,7 +25,9 @@ vi.mock("@xterm/xterm", () => ({
 }));
 vi.mock("@xterm/addon-fit", () => ({
   FitAddon: class {
-    fit() {}
+    fit() {
+      fontChange.fit();
+    }
   },
 }));
 vi.mock("./terminal-theme", () => ({ terminalTheme: () => ({}) }));
@@ -54,6 +61,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  document.documentElement.style.removeProperty("--font-mono");
   vi.useRealTimers();
   vi.clearAllMocks();
 });
@@ -98,4 +106,19 @@ it("keeps the command for the next shell when this one has ended", async () => {
   runInTerminal({ kind: "thread", id: "ended" }, "claude auth login");
   await openShell("thread:ended");
   expect(terminal.write).not.toHaveBeenCalled();
+});
+
+it("refits a running terminal after changing fonts without reopening or ending its shell", async () => {
+  await openShell("thread:font");
+  const fits = fontChange.fit.mock.calls.length;
+  document.documentElement.style.setProperty("--font-mono", '"Geist Mono Variable", monospace');
+  await act(async () => {
+    useCodeFont.getState().setFont("geist-mono");
+  });
+  expect(fontChange.create).toHaveBeenCalledOnce();
+  expect(fontChange.fit.mock.calls.length).toBeGreaterThan(fits);
+  expect(terminal.resize).toHaveBeenLastCalledWith("thread:font", 80, 24);
+  expect(terminal.open).toHaveBeenCalledOnce();
+  expect(terminal.detach).not.toHaveBeenCalled();
+  expect(terminal.kill).not.toHaveBeenCalled();
 });

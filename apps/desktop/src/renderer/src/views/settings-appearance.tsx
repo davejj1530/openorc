@@ -13,6 +13,7 @@ import { ColorRow } from "../components/ColorRow";
 import { AccentSettings } from "./settings-accents";
 import { resolveAccentColors } from "../lib/theme-accents";
 import { appFonts, useAppFont } from "../lib/app-font";
+import { CodeFontSettings } from "./settings-code-font";
 
 const modes = [
   { id: "system", name: "System", icon: Monitor },
@@ -43,6 +44,7 @@ export function AppearanceSettings() {
         <PaletteSelector preset={preset} mode={resolved} custom={custom} onChange={(next) => report(setPreset(next))} />
       </Section>
       <FontSettings report={report} />
+      <CodeFontSettings report={report} />
       <WindowAppearanceSettings report={report} />
       <details className="appearance-advanced">
         <summary>Fine-tune individual colors</summary>

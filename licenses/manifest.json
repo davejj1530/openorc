@@ -94,6 +94,11 @@
       "distribution": "desktop"
     },
     {
+      "name": "@fontsource-variable/geist-mono",
+      "version": "5.3.0",
+      "distribution": "desktop"
+    },
+    {
       "name": "rehype-katex",
       "version": "7.0.1",
       "distribution": "desktop"
@@ -379,6 +384,18 @@
       "website": "licenses/immaculate-gothic-PROVENANCE.txt",
       "desktop": {
         "resource": "licenses/vendor/immaculate-gothic-PROVENANCE.txt"
+      }
+    },
+    {
+      "id": "geist-mono",
+      "input": "apps/desktop/node_modules/@fontsource-variable/geist-mono/LICENSE",
+      "source": {
+        "package": "@fontsource-variable/geist-mono",
+        "path": "LICENSE"
+      },
+      "sha256": "cc815ed4fc045f0e991abb10395b7932bd028c6a067deb13316d6002105074e6",
+      "desktop": {
+        "asar": "node_modules/@fontsource-variable/geist-mono/LICENSE"
       }
     },
     {

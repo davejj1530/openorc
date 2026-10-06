@@ -11,6 +11,7 @@ import { installNotifications } from "./lib/notifications";
 import { installWindowState } from "./lib/window";
 import "./lib/theme";
 import "./lib/app-font";
+import "./lib/code-font";
 import "./lib/transcript";
 import "./app.css";
 

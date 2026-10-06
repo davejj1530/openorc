@@ -1,0 +1,25 @@
+@import "@fontsource-variable/geist-mono";
+
+/* The saved code face applies to code blocks, editors, diffs, and font-mono utilities. */
+:root[data-code-font="jetbrains-mono"] {
+  --font-mono: "JetBrains Mono Variable", "SF Mono", Menlo, Consolas, monospace;
+}
+:root[data-code-font="geist-mono"] {
+  --font-mono: "Geist Mono Variable", "SF Mono", Menlo, Consolas, monospace;
+}
+:root[data-code-font="system"] {
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
+.settings-group > pre.code-font-preview {
+  margin: 16px 0 0;
+  padding: 12px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+}

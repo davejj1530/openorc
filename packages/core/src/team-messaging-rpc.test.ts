@@ -7,6 +7,7 @@ import { projects, settings, teamRuntime, threads } from "@openorc/db";
 import { commitAll, git } from "@openorc/git";
 import { DEFAULT_TEAM_LIMITS, type CorePush, type Project, type RpcMethod, type RpcParams, type RpcResults, type RunSpec } from "@openorc/protocol";
 import { OpenOrc } from "./openorc.js";
+import { MAX_AGENT_HOPS } from "./services/thread-agent-tools.js";
 
 let core: OpenOrc;
 let folder: string;
@@ -138,11 +139,11 @@ describe("same-project cross-thread messaging", () => {
     expect(await mcpCall(solo.run!.id, "thread_send", { id: team.thread.id, text: "Implement this now" })).toMatchObject({ delivered: false, message: /Plan mode/ });
     expect(leadMessages(team.execution.id)).toHaveLength(0);
     const other = await startTeam("Other work", "Other team");
-    core.runs.noteAgentMessage(other.thread.id, 3);
-    const input = { id: team.thread.id, text: "Fourth hop", request_key: "hop-four" };
+    core.runs.noteAgentMessage(other.thread.id, MAX_AGENT_HOPS - 1);
+    const input = { id: team.thread.id, text: "Last hop", request_key: "hop-last" };
     expect(await mcpCall(other.runId, "thread_send", input)).toMatchObject({ delivered: true });
-    expect(core.runs.agentChain(team.thread.id)).toBe(4);
-    expect(await mcpCall(team.runId, "thread_send", { id: other.thread.id, text: "Fifth hop" })).toMatchObject({ delivered: false, message: /limit is 4/ });
+    expect(core.runs.agentChain(team.thread.id)).toBe(MAX_AGENT_HOPS);
+    expect(await mcpCall(team.runId, "thread_send", { id: other.thread.id, text: "One hop too many" })).toMatchObject({ delivered: false, message: new RegExp(`limit is ${MAX_AGENT_HOPS}`) });
     expect(await mcpCall(other.runId, "thread_send", input)).toMatchObject({ delivered: true });
     expect(await mcpCall(other.runId, "thread_send", { ...input, text: "Different work with the same key" })).toMatchObject({ delivered: false, message: /different message/ });
     expect(leadMessages(team.execution.id)).toHaveLength(1);

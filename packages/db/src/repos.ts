@@ -221,6 +221,7 @@ interface ThreadRow {
   draft: string | null;
   imported_from: string | null;
   orcling_id?: string | null;
+  parent_thread_id?: string | null;
   created_at: number;
   updated_at: number;
   last_activity_at: number;
@@ -255,6 +256,7 @@ function threadFromRow(r: ThreadRow): Thread {
     draft: r.draft,
     importedFrom: r.imported_from,
     orclingId: r.orcling_id ?? null,
+    parentThreadId: r.parent_thread_id ?? null,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     lastActivityAt: r.last_activity_at,
@@ -285,6 +287,7 @@ export interface ThreadPatch {
   draft?: string | null;
   archivedAt?: number | null;
   orclingId?: string | null;
+  parentThreadId?: string | null;
 }
 
 const threadColumns: Record<keyof ThreadPatch, string> = {
@@ -310,6 +313,7 @@ const threadColumns: Record<keyof ThreadPatch, string> = {
   draft: "draft",
   archivedAt: "archived_at",
   orclingId: "orcling_id",
+  parentThreadId: "parent_thread_id",
 };
 
 export type ThreadListFilter = "active" | "done" | "archived" | "all";
@@ -405,6 +409,10 @@ export const threads = {
   },
   withOpenPr(db: Db): Thread[] {
     return (db.stmt(`SELECT * FROM threads WHERE ${VISIBLE} AND pr_url IS NOT NULL AND (pr_state IS NULL OR pr_state = 'open')`).all() as unknown as ThreadRow[]).map(threadFromRow);
+  },
+  /** The unarchived threads `parentId` started with thread_start. */
+  children(db: Db, parentId: string): Thread[] {
+    return (db.stmt(`SELECT * FROM threads WHERE ${VISIBLE} AND parent_thread_id = ? AND archived_at IS NULL`).all(parentId) as unknown as ThreadRow[]).map(threadFromRow);
   },
   /** Snoozed threads whose time has come. */
   dueFromSnooze(db: Db, at: number): Thread[] {

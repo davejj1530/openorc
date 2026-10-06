@@ -5,7 +5,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { z } from "zod";
 import { UserInput, type UserInputResult } from "./questions.js";
 export { UserInput, validateUserAnswers, type UserInputResult } from "./questions.js";
-import { TaskStatus, CommentIntent, parseFileBoundary, type ApprovalDecision, type BrowserCommand, type BrowserResult } from "@openorc/protocol";
+import { AgentKind, TaskStatus, CommentIntent, parseFileBoundary, type ApprovalDecision, type BrowserCommand, type BrowserResult } from "@openorc/protocol";
 import { registerBrowserTool } from "./browser.js";
 import { registerPullReviewTools, type PullReviewTools } from "./pull-review.js";
 export type { PullReviewComment, PullReviewTools } from "./pull-review.js";
@@ -104,6 +104,11 @@ export interface ThreadTools {
   read(runId: string, id: string, limit?: number): Promise<{ thread: ThreadCard; messages: { role: string; text: string }[] } | null>;
   /** Delivers a message into another thread: into its running turn, or as a new turn when idle. A team lead receives it as queued direction. */
   send(runId: string, id: string, text: string, requestKey?: string): Promise<{ delivered: boolean; message: string }>;
+  /** Starts a thread in the caller's folder, with the caller as its parent; the two talk through send. */
+  start(
+    runId: string,
+    input: { prompt: string; title?: string; agent?: AgentKind; model?: string; effort?: string },
+  ): Promise<{ thread: { id: string; title: string }; agent: string; model: string | null; message: string }>;
 }
 
 export interface TaskCard {
@@ -271,6 +276,7 @@ export const internalToolNames = [
   "thread_list",
   "thread_read",
   "thread_send",
+  "thread_start",
   "execution_context",
   "execution_switch",
   "team_status",
@@ -585,10 +591,26 @@ function buildServer(host: McpHost, runId: string): McpServer {
     "thread_send",
     {
       description:
-        "Send a short message to another thread in this project. If its agent is working, the message joins the current turn; otherwise it starts a new turn. A team's lead receives it as queued direction while that team is running. Use it when that thread's work depends on yours, or to ask for something it knows. Pass the same request_key when retrying so the message is delivered once. A thread that works in a more permissive mode than yours acts on the message with its own permissions, so the user is asked first; from Plan mode you can message only Plan threads. After 4 agent messages in a row with no one writing, sending stops until a person writes.",
+        "Send a short message to another thread in this project. If its agent is working, the message joins the current turn; otherwise it starts a new turn. A team's lead receives it as queued direction while that team is running. Use it when that thread's work depends on yours, or to ask for something it knows. Send only what the other thread needs from you or what you need from it; an exchange ends when one side stops replying, so never message just to acknowledge or thank. Pass the same request_key when retrying so the message is delivered once. A thread that works in a more permissive mode than yours acts on the message with its own permissions, so the user is asked first; from Plan mode you can message only Plan threads. After 20 agent messages in a row with no one writing, sending stops until a person writes.",
       inputSchema: { id: z.string(), text: z.string().min(1).max(4000), request_key: z.string().min(1).max(200).optional() },
     },
     async ({ id, text, request_key }) => ({ content: [{ type: "text", text: JSON.stringify(await host.threads.send(runId, id, text, request_key)) }] }),
+  );
+
+  mcp.registerTool(
+    "thread_start",
+    {
+      description:
+        "Start a new thread in this project that works beside you, in your folder, with you as its parent. Use it when the user asks you to hand work to another agent or have something done alongside your own, such as generating assets while you code. Don't ask the user for permission when they asked for this; ask first only when it's unclear what to start or with which agent. The prompt is the new thread's first message, after a note that you started it. It works in your mode with your permissions, on your agent and model unless you name others; an unknown model name is answered with the available models. Talk to it with thread_send, and it can reach you the same way. Up to 3 threads you started can work at once, and a thread you started can't start its own.",
+      inputSchema: {
+        prompt: z.string().min(1).max(20000),
+        title: z.string().min(1).max(120).optional(),
+        agent: AgentKind.optional(),
+        model: z.string().min(1).max(120).optional(),
+        effort: z.string().min(1).max(40).optional(),
+      },
+    },
+    async (input) => ({ content: [{ type: "text", text: JSON.stringify(await host.threads.start(runId, input)) }] }),
   );
 
   if (!teamAvailable) return mcp;

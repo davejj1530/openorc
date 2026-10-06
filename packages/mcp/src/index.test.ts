@@ -78,6 +78,9 @@ async function fixture(t: TestContext, includeTeam = true) {
       async send() {
         return { delivered: true, message: "Delivered" };
       },
+      async start() {
+        return { thread: { id: "started", title: "Assets" }, agent: "codex", model: "fixture-codex", message: "Started" };
+      },
     },
     ...(includeTeam
       ? {
@@ -312,6 +315,7 @@ void test("an Orcling's own conversation has its own tools instead of the genera
     "thread_list",
     "thread_read",
     "thread_send",
+    "thread_start",
   ];
   const home = (await (await connect("home-run")).listTools()).tools.map((tool) => tool.name);
   const elsewhere = (await (await connect("guest-run")).listTools()).tools.map((tool) => tool.name);

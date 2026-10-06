@@ -99,6 +99,7 @@ export class ThreadService {
       send: (id, text, from, attribution, options) => this.send(id, text, from, attribution, options),
       messages: (id) => this.messages(id),
       withCheckoutBranches: (rows) => this.withCheckoutBranches(rows),
+      start: (input, internal) => this.start(input, internal),
     });
   }
 
@@ -856,6 +857,9 @@ export class ThreadService {
   }
   sourceThreadFor(...args: Parameters<ThreadAgentTools["sourceThreadFor"]>) {
     return this.agentTools.sourceThreadFor(...args);
+  }
+  toolThreadStart(...args: Parameters<ThreadAgentTools["toolThreadStart"]>) {
+    return this.agentTools.toolThreadStart(...args);
   }
   toolThreadSend(...args: Parameters<ThreadAgentTools["toolThreadSend"]>) {
     return this.agentTools.toolThreadSend(...args);

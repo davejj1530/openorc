@@ -38,7 +38,19 @@ export type Block = { at?: number; turnKey?: string; runId?: string } & (
       imagePath?: string;
       recovery?: ActivityRecovery;
     }
-  | { id: string; kind: "approval"; approvalId: string; approvalKind: string; toolName?: string; input: unknown; reason?: string; decision?: string; answers?: Record<string, string[]> }
+  | {
+      id: string;
+      kind: "approval";
+      approvalId: string;
+      approvalKind: string;
+      toolName?: string;
+      input: unknown;
+      reason?: string;
+      /** Only Allow applies; nothing would keep allowing it for the rest of the run. */
+      onceOnly?: boolean;
+      decision?: string;
+      answers?: Record<string, string[]>;
+    }
   | { id: string; kind: "status"; text: string; tone: "muted" | "ok" | "bad"; boundary?: "turn" | "session"; durationMs?: number; outcome?: "success" | "error" | "cancelled" }
 );
 
@@ -353,6 +365,19 @@ function sessionCloseStatus(status: Extract<AgentEvent, { type: "session.complet
   return "disconnected";
 }
 
+function approvalBlock(ev: Extract<AgentEvent, { type: "approval.requested" }>): Block {
+  return {
+    id: `approval-${ev.approvalId}`,
+    kind: "approval",
+    approvalId: ev.approvalId,
+    approvalKind: ev.kind,
+    input: ev.input,
+    ...(ev.toolName ? { toolName: ev.toolName } : {}),
+    ...(ev.reason ? { reason: ev.reason } : {}),
+    ...(ev.onceOnly ? { onceOnly: true } : {}),
+  };
+}
+
 function applyEvent(run: RunTranscript, ev: AgentEvent): void {
   if (ev.eventId) {
     run.eventIds ??= new Set();
@@ -450,15 +475,7 @@ function applyEvent(run: RunTranscript, ev: AgentEvent): void {
     }
     case "approval.requested":
       run.pendingApprovals += 1;
-      upsert(run, {
-        id: `approval-${ev.approvalId}`,
-        kind: "approval",
-        approvalId: ev.approvalId,
-        approvalKind: ev.kind,
-        input: ev.input,
-        ...(ev.toolName ? { toolName: ev.toolName } : {}),
-        ...(ev.reason ? { reason: ev.reason } : {}),
-      });
+      upsert(run, approvalBlock(ev));
       return;
     case "approval.resolved": {
       const existing = get(run, `approval-${ev.approvalId}`, "approval");

@@ -556,6 +556,26 @@ it("offers plan_write only to Plan runs of harnesses without a native plan docum
   expect(core.threads.plans(thread.id)).toEqual([]);
 });
 
+it("remembers Allow for this run for the same Claude command, and asks again for another", async () => {
+  const thread = threads.insert(core.db, { projectId: project.id, title: "Allowed for the run", agent: "claude", model: "fixture", mode: "act", permissionMode: "review" });
+  provider("claude");
+  const run = await core.runs.start({ scope: { thread, task: null }, project, agent: "claude", model: "fixture", mode: "act", permissionMode: "review", prompt: "Run the tests", resume: false });
+  const asked = (approvalId: string) => vi.waitFor(() => expect(core.runs.pending().map((approval) => approval.approvalId)).toContain(approvalId));
+  try {
+    const first = core.runs.requestApproval(run.id, "tests", "Bash", { command: "pnpm test", description: "Run the tests" });
+    await asked("tests");
+    core.runs.resolveApproval(run.id, "tests", "allow_for_run");
+    expect(await first).toMatchObject({ decision: "allow_for_run" });
+    expect(await core.runs.requestApproval(run.id, "again", "Bash", { command: "pnpm test", description: "Run them again" })).toEqual({ decision: "allow" });
+    const other = core.runs.requestApproval(run.id, "clean", "Bash", { command: "rm -rf dist" });
+    await asked("clean");
+    core.runs.resolveApproval(run.id, "clean", "deny");
+    expect(await other).toMatchObject({ decision: "deny" });
+  } finally {
+    await core.runs.closeAndWait(run.id);
+  }
+});
+
 describe("app actions follow the conversation's mode", () => {
   /** An MCP call that may fail: returns whether it failed and its text. */
   async function toolCall(url: string, name: string, args: Record<string, unknown>): Promise<{ isError: boolean; text: string }> {
@@ -643,9 +663,10 @@ describe("app actions follow the conversation's mode", () => {
         task_list: await outcome(run.id, url, "task_list", {}),
       };
       expect(results).toEqual(Object.fromEntries(Object.entries(expected).map(([key, values]) => [key, values[index]])));
-      // A password reaches the page only after the user allowed it.
+      // A password reaches the page only after the user allowed it, and only ever this once.
       const passwords = browsed.filter((command) => command.action === "fill" && command.ref === "pw" && command.secret);
       expect(passwords.length > 0).toBe(mode !== "plan");
+      await vi.waitFor(() => expect(questionEvents(run.id).filter((event) => event.type === "approval.requested" && event.onceOnly)).toHaveLength(mode === "plan" ? 0 : 1));
     } finally {
       delivered.mockRestore();
       browsed.length = 0;

@@ -853,9 +853,11 @@ function ApprovalRow({ block, runId }: { block: Extract<Block, { kind: "approval
         <Button size="sm" variant="primary" onClick={() => decide("allow")}>
           Allow
         </Button>
-        <Button size="sm" onClick={() => decide("allow_for_run")}>
-          Allow for this run
-        </Button>
+        {block.onceOnly ? null : (
+          <Button size="sm" onClick={() => decide("allow_for_run")}>
+            Allow for this run
+          </Button>
+        )}
         <Button size="sm" variant="danger" onClick={() => decide("deny")}>
           Deny
         </Button>

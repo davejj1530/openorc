@@ -42,6 +42,8 @@ export interface AcpApprovalRequest {
   toolName: string;
   detail: string;
   input: unknown;
+  /** The agent offered no option that keeps allowing this, so it can only be allowed once. */
+  onceOnly: boolean;
 }
 
 export interface AcpAdapterOptions {
@@ -373,7 +375,8 @@ export class AcpAdapter {
         resolve(response);
       };
       pending.set(approvalId, respond);
-      void this.options.onApproval({ runId, approvalId, kind, toolName, detail, input }).then(
+      const onceOnly = !params.options.some((option) => option.kind === "allow_always");
+      void this.options.onApproval({ runId, approvalId, kind, toolName, detail, input, onceOnly }).then(
         (answer) => {
           const decision = typeof answer === "string" ? answer : answer.decision;
           const option = optionKindsFor[decision].map((kind) => params.options.find((candidate) => candidate.kind === kind)).find(Boolean);

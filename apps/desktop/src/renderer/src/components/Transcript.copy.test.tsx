@@ -62,3 +62,13 @@ it("offers a fork only at the latest message, since a fork carries the whole con
   fireEvent.click(fork);
   expect(onFork).toHaveBeenCalledWith();
 });
+
+it("offers Allow for this run only where something keeps allowing it", () => {
+  const approval = (id: string, onceOnly?: boolean): Block => ({ kind: "approval", id, approvalId: id, approvalKind: "tool", toolName: "browser", input: {}, ...(onceOnly ? { onceOnly } : {}) });
+  const { unmount } = render(<TranscriptContents runId="run" blocks={[approval("click")]} />);
+  expect(screen.getByRole("button", { name: "Allow for this run" })).toBeTruthy();
+  unmount();
+  render(<TranscriptContents runId="run" blocks={[approval("password", true)]} />);
+  expect(screen.getByRole("button", { name: "Allow" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Allow for this run" })).toBeNull();
+});

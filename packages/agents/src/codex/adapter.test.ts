@@ -168,7 +168,7 @@ it("rejects a malformed elicitation form without approval and answers the next v
 
     s.request(902, "mcpServer/elicitation/request", { mode: "form", requestedSchema: { properties: { choice: { enum: ["first", "second"] } } } });
     await vi.waitFor(() => expect(s.responses.find((response) => response.id === 902)).toMatchObject({ result: { action: "accept", content: { choice: "first" } } }));
-    expect(approvals).toHaveLength(1);
+    expect(approvals).toEqual([expect.objectContaining({ kind: "tool", onceOnly: true })]);
   } finally {
     s.handle.close();
     await s.handle.wait();

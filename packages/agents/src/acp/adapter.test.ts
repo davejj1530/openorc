@@ -129,24 +129,18 @@ function agent(permissionMode: PermissionPreset = "autonomous", overrides: Parti
     if (id === undefined) throw new Error("no prompt in flight");
     write({ jsonrpc: "2.0", id, result });
   };
-  const askPermission = (toolCall: Record<string, unknown>) =>
+  const askPermission = (
+    toolCall: Record<string, unknown>,
+    options = [
+      { optionId: "once", kind: "allow_once", name: "Allow once" },
+      { optionId: "always", kind: "allow_always", name: "Always allow" },
+      { optionId: "reject", kind: "reject_once", name: "Reject" },
+    ],
+  ) =>
     new Promise<unknown>((resolve) => {
       const id = ++permissionId;
       permissions.push({ id, resolve });
-      write({
-        jsonrpc: "2.0",
-        id,
-        method: "session/request_permission",
-        params: {
-          sessionId: "ses_1",
-          toolCall,
-          options: [
-            { optionId: "once", kind: "allow_once", name: "Allow once" },
-            { optionId: "always", kind: "allow_always", name: "Always allow" },
-            { optionId: "reject", kind: "reject_once", name: "Reject" },
-          ],
-        },
-      });
+      write({ jsonrpc: "2.0", id, method: "session/request_permission", params: { sessionId: "ses_1", toolCall, options } });
     });
   const fail = (message: string) => {
     const id = prompts.shift();
@@ -285,8 +279,21 @@ describe("AcpAdapter", () => {
     await vi.waitFor(() => expect(s.promptCalls()).toHaveLength(1));
     const answer = s.askPermission({ toolCallId: "c1", title: "rm -rf build", kind: "execute", status: "pending", rawInput: { command: "rm -rf build" } });
     await expect(answer).resolves.toEqual({ outcome: { outcome: "selected", optionId: "always" } });
-    expect(decide).toHaveBeenCalledWith(expect.objectContaining({ runId: "run-1", kind: "command", toolName: "shell", detail: "rm -rf build", input: { command: "rm -rf build" } }));
+    expect(decide).toHaveBeenCalledWith(expect.objectContaining({ runId: "run-1", kind: "command", toolName: "shell", detail: "rm -rf build", input: { command: "rm -rf build" }, onceOnly: false }));
     expect(s.events.find((event) => event.type === "approval.resolved")).toMatchObject({ decision: "allow_for_run" });
+    s.handle.close();
+  });
+
+  it("marks a request the agent cannot keep allowing as once only", async () => {
+    const decide = vi.fn(async (): Promise<ApprovalDecision> => "allow");
+    const s = agent("autonomous", {}, decide);
+    await vi.waitFor(() => expect(s.promptCalls()).toHaveLength(1));
+    const answer = s.askPermission({ toolCallId: "c1", title: "rm -rf build", kind: "execute", status: "pending" }, [
+      { optionId: "once", kind: "allow_once", name: "Allow once" },
+      { optionId: "reject", kind: "reject_once", name: "Reject" },
+    ]);
+    await expect(answer).resolves.toEqual({ outcome: { outcome: "selected", optionId: "once" } });
+    expect(decide).toHaveBeenCalledWith(expect.objectContaining({ onceOnly: true }));
     s.handle.close();
   });
 

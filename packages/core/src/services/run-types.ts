@@ -128,6 +128,8 @@ export interface LiveRun {
   orclingCeiling?: PermissionPreset;
   /** App actions the user allowed for the rest of this run. */
   appActionsAllowed?: Set<AppAction>;
+  /** Tool calls the user allowed for the rest of this run, from Claude or an MCP App, by `runAllowance`. */
+  toolsAllowed?: Set<string>;
   scope: RunScope;
   handle: RunHandle;
   workspaceLease: WorkspaceLease;

@@ -43,6 +43,21 @@ function codexApprovalDetail(kind: CodexApprovalRequest["kind"], input: Record<s
   return questions.map((question) => String(question["question"] ?? "")).join(" / ") || "The agent has a question";
 }
 
+/**
+ * What "Allow for this run" covers for one of Claude's own tool calls, the way Claude's own "don't ask again" reads:
+ * the same command, the same file, the same site, or the same MCP tool. Anything else only as exactly the same call.
+ */
+function runAllowance(toolName: string, input: unknown): string {
+  const value = (input ?? {}) as Record<string, unknown>;
+  const file = value["file_path"] ?? value["notebook_path"];
+  const url = value["url"];
+  if (toolName === "Bash" && typeof value["command"] === "string") return `${toolName} ${value["command"]}`;
+  if (typeof file === "string") return `${toolName} ${file}`;
+  if (toolName === "WebFetch" && typeof url === "string" && URL.canParse(url)) return `${toolName} ${new URL(url).host}`;
+  if (toolName.startsWith("mcp__")) return toolName;
+  return `${toolName} ${JSON.stringify(input)}`;
+}
+
 function codexNeedsAnswer(kind: CodexApprovalRequest["kind"], input: Record<string, unknown>): boolean {
   if (kind === "user_input") return true;
   if (kind !== "tool") return false;
@@ -81,7 +96,7 @@ export class RunApprovals {
     return this.pendingApprovals.has(this.approvalKey(runId, approvalId));
   }
 
-  handleCodexApproval({ runId, approvalId, kind, params }: CodexApprovalRequest): Promise<ApprovalResolution> {
+  handleCodexApproval({ runId, approvalId, kind, params, onceOnly }: CodexApprovalRequest): Promise<ApprovalResolution> {
     const { detail, reason, toolName, needsAnswer, serverName } = codexApprovalPresentation(kind, params);
     // serverName is supplied by the provider transport, not the MCP tool or its input.
     const integration = this.deps.live.get(runId)?.internalMcp;
@@ -90,21 +105,39 @@ export class RunApprovals {
       runId,
       approvalId,
       detail,
-      () => this.deps.emit({ type: "approval.requested", runId, ts: Date.now(), approvalId, kind, input: params, ...(toolName ? { toolName } : {}), ...(reason ? { reason } : {}) }),
+      () =>
+        this.deps.emit({
+          type: "approval.requested",
+          runId,
+          ts: Date.now(),
+          approvalId,
+          kind,
+          input: params,
+          ...(toolName ? { toolName } : {}),
+          ...(reason ? { reason } : {}),
+          ...(onceOnly ? { onceOnly } : {}),
+        }),
       needsAnswer,
       category,
     );
   }
 
-  handleOpenCodeApproval({ runId, approvalId, kind, toolName, detail, input }: AcpApprovalRequest): Promise<ApprovalResolution> {
+  handleOpenCodeApproval({ runId, approvalId, kind, toolName, detail, input, onceOnly }: AcpApprovalRequest): Promise<ApprovalResolution> {
     // OpenCode names its MCP tools `<server>_<tool>`.
     const integration = this.deps.live.get(runId)?.internalMcp;
     const category = integration && toolName.startsWith(`${integration.serverName}_`) ? "internal_app" : "external";
-    return this.awaitApproval(runId, approvalId, detail, () => this.deps.emit({ type: "approval.requested", runId, ts: Date.now(), approvalId, kind, toolName, input }), false, category);
+    return this.awaitApproval(
+      runId,
+      approvalId,
+      detail,
+      () => this.deps.emit({ type: "approval.requested", runId, ts: Date.now(), approvalId, kind, toolName, input, ...(onceOnly ? { onceOnly } : {}) }),
+      false,
+      category,
+    );
   }
 
-  requestApproval(runId: string, approvalId: string, toolName: string, input: unknown): Promise<ApprovalResolution> {
-    if (toolName === "ExitPlanMode") return Promise.resolve(this.presentPlan(runId, input));
+  async requestApproval(runId: string, approvalId: string, toolName: string, input: unknown): Promise<ApprovalResolution> {
+    if (toolName === "ExitPlanMode") return this.presentPlan(runId, input);
     if (toolName === "AskUserQuestion") {
       const questions = Array.isArray((input as Record<string, unknown>)?.["questions"]) ? ((input as Record<string, unknown>)["questions"] as Record<string, unknown>[]) : [];
       const detail = questions.map((q) => String(q["question"] ?? "")).join(" / ") || "Claude has a question";
@@ -116,9 +149,25 @@ export class RunApprovals {
         true,
       );
     }
-    const integration = this.deps.live.get(runId)?.internalMcp;
+    const entry = this.deps.live.get(runId);
+    const integration = entry?.internalMcp;
     const category = integration?.toolNames.some((name) => toolName === `mcp__${integration.serverName}__${name}`) ? "internal_app" : "external";
-    return this.awaitApproval(runId, approvalId, toolName, () => this.deps.emit({ type: "approval.requested", runId, ts: Date.now(), approvalId, kind: "tool", toolName, input }), false, category);
+    // Claude and MCP Apps ask for every call, so OpenOrc remembers what the user allowed for the rest of the run. Plan mode still refuses it.
+    const allowance = runAllowance(toolName, input);
+    if (entry?.toolsAllowed?.has(allowance) && entry.run.mode !== "plan") {
+      audit.record(this.deps.db, { actor: "openorc", action: "approval.auto_allow", resourceType: "run", resourceId: runId, metadata: { approvalId, policy: "allowed_for_run" } });
+      return { decision: "allow" };
+    }
+    const result = await this.awaitApproval(
+      runId,
+      approvalId,
+      toolName,
+      () => this.deps.emit({ type: "approval.requested", runId, ts: Date.now(), approvalId, kind: "tool", toolName, input }),
+      false,
+      category,
+    );
+    if (result.decision === "allow_for_run" && entry) (entry.toolsAllowed ??= new Set()).add(allowance);
+    return result;
   }
 
   private presentPlan(runId: string, input: unknown): ApprovalResolution {
@@ -186,7 +235,20 @@ export class RunApprovals {
       throw new Error(blockedInPlan[action]);
     }
     const approvalId = `app-${randomUUID()}`;
-    const announce = () => this.deps.emit({ type: "approval.requested", runId, ts: Date.now(), approvalId, kind: "tool", toolName: request.toolName, input: request.input, reason: request.reason });
+    // A password is never allowed for the rest of the run, so its request offers only Allow.
+    const onceOnly = action === "secret_input";
+    const announce = () =>
+      this.deps.emit({
+        type: "approval.requested",
+        runId,
+        ts: Date.now(),
+        approvalId,
+        kind: "tool",
+        toolName: request.toolName,
+        input: request.input,
+        reason: request.reason,
+        ...(onceOnly ? { onceOnly } : {}),
+      });
     const result = await this.awaitApproval(runId, approvalId, request.reason, announce, false, action === "secret_input" ? "confirm_always" : "confirm");
     if (result.decision === "deny") throw new Error("The user declined this action.");
     if (result.decision === "allow_for_run" && entry) (entry.appActionsAllowed ??= new Set()).add(action);

@@ -28,6 +28,8 @@ export interface CodexApprovalRequest {
   approvalId: string;
   kind: ApprovalKind;
   params: unknown;
+  /** An MCP tool's confirmation form is answered once; OpenOrc has no way to have Codex remember it. */
+  onceOnly: boolean;
 }
 
 export interface CodexAdapterOptions {
@@ -477,7 +479,7 @@ export class CodexAdapter {
     // The host announces the request (it derives a better tool name and detail); the adapter reports how it was resolved.
     let answer: ApprovalDecision | ApprovalResolution;
     try {
-      answer = await this.options.onApproval({ runId, approvalId, kind, params: req.params });
+      answer = await this.options.onApproval({ runId, approvalId, kind, params: req.params, onceOnly: req.method === "mcpServer/elicitation/request" });
     } catch (error) {
       rpc.respondError(req.id, -32000, error instanceof Error ? error.message : String(error));
       return;

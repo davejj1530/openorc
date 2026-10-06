@@ -101,7 +101,7 @@ const sections = [
           </tr>
           <tr>
             <td><strong>Allow for this run</strong></td>
-            <td>This request runs, and the same kind of request runs without asking until the run ends. A password field still asks every time.</td>
+            <td>This request runs, and the same kind of request runs without asking until the run ends.</td>
           </tr>
           <tr>
             <td><strong>Deny</strong></td>
@@ -112,7 +112,10 @@ const sections = [
     </div>
     <p>A run lasts as long as the agent's process, across turns. It ends when OpenOrc closes an idle agent, or when you change the thread's mode or agent.</p>
     <p>A waiting request also shows in the thread's row in the sidebar, as <strong>Needs approval</strong> with the command, and in the <strong>Inbox</strong>. If you're looking elsewhere, a desktop notification tells you. Stopping the turn or quitting OpenOrc denies every request still waiting.</p>
-    <Callout>With Claude Code, <strong>Allow for this run</strong> covers only the request in front of you when it's one of Claude's own tools, such as a command or an edit. For OpenOrc's tools it lasts for the run.</Callout>
+    <Callout>
+      For Claude Code's own tools, the same kind of request means the same command, the same file, the same site, or the same MCP tool. When nothing can keep allowing a request, such as a password field or a Codex MCP tool's confirmation, the
+      card offers only <strong>Allow</strong> and <strong>Deny</strong>.
+    </Callout>
     <p>A question card waits for your answer in every mode, Autonomous included. See <a href={docHref("work") + "#questions-and-approvals"}>Following the work</a>.</p>
   </section>
 

@@ -177,6 +177,8 @@ export const AgentEvent = z.discriminatedUnion("type", [
     toolName: z.string().optional(),
     input: z.unknown(),
     reason: z.string().optional(),
+    /** The request can only be allowed this once: nothing would remember an allowance for the rest of the run. */
+    onceOnly: z.boolean().optional(),
   }),
   z.object({
     type: z.literal("approval.resolved"),

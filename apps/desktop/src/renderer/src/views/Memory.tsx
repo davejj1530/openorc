@@ -1,14 +1,13 @@
 import { useEffect, useState, type ReactNode } from "react";
 import type { MemorySource, MemoryType } from "@openorc/protocol";
-import { Search } from "../components/icons";
 import { memorySourceLabel } from "../components/MemoryCard";
-import { MemoryControl } from "../components/MemoryControl";
 import { memoryTypeLabel, memoryTypeOrder } from "../components/memory";
+import { PageFilters, PageSearch } from "../components/PageFilters";
 import { TopBar } from "../components/TopBar";
-import { Button, Empty, Input, Select } from "../components/ui";
+import { Button, Empty, Select, TextButton } from "../components/ui";
 import { useLayout } from "../lib/layout";
 import { useRpc } from "../lib/query";
-import { newThread } from "../lib/router";
+import { newThread, useRouter } from "../lib/router";
 import { MemoryResults } from "./memory-results";
 
 function MemoryBrowser({ projectId }: { projectId: string }) {
@@ -17,11 +16,14 @@ function MemoryBrowser({ projectId }: { projectId: string }) {
   const [type, setType] = useState<MemoryType | "all">("all");
   const [source, setSource] = useState<MemorySource | "all">("all");
   const settings = useRpc("memory.settings.get", {});
+  const navigate = useRouter((s) => s.navigate);
   useEffect(() => {
     const timer = setTimeout(() => setSearchQuery(query.trim()), 200);
     return () => clearTimeout(timer);
   }, [query]);
   const filtered = Boolean(query || type !== "all" || source !== "all");
+  // Only an acknowledged Off is shown; an unknown setting stays quiet rather than claiming Off.
+  const off = settings.data?.enabled === false;
   const clear = () => {
     setQuery("");
     setSearchQuery("");
@@ -30,12 +32,8 @@ function MemoryBrowser({ projectId }: { projectId: string }) {
   };
   return (
     <>
-      <div className="memory-toolbar">
-        <div className="memory-search">
-          <Search size={14} />
-          <Input aria-label="Search memories" placeholder="Search active memories" value={query} onChange={(e) => setQuery(e.target.value)} />
-        </div>
-        <Select aria-label="Memory type" value={type} onChange={(e) => setType(e.target.value as MemoryType | "all")}>
+      <PageFilters end={<PageSearch label="Search memories" placeholder="Search memories…" value={query} onChange={setQuery} />}>
+        <Select aria-label="Memory type" className="page-filter-select" value={type} onChange={(e) => setType(e.target.value as MemoryType | "all")}>
           <option value="all">All types</option>
           {memoryTypeOrder.map((t) => (
             <option key={t} value={t}>
@@ -43,7 +41,7 @@ function MemoryBrowser({ projectId }: { projectId: string }) {
             </option>
           ))}
         </Select>
-        <Select aria-label="Memory source" value={source} onChange={(e) => setSource(e.target.value as MemorySource | "all")}>
+        <Select aria-label="Memory source" className="page-filter-select" value={source} onChange={(e) => setSource(e.target.value as MemorySource | "all")}>
           <option value="all">All sources</option>
           {Object.entries(memorySourceLabel).map(([key, label]) => (
             <option key={key} value={key}>
@@ -56,21 +54,32 @@ function MemoryBrowser({ projectId }: { projectId: string }) {
             Clear filters
           </Button>
         )}
+      </PageFilters>
+      <div className="memory-list flex-1 min-h-0 overflow-y-auto pb-4">
+        {off ? (
+          <p className="memory-off-notice" role="status">
+            OpenOrc memory is off. Agents won’t save or recall these memories.{" "}
+            <TextButton underline onClick={() => navigate({ view: "settings", section: "memory" })}>
+              Turn on in Settings
+            </TextButton>
+          </p>
+        ) : null}
+        <MemoryResults
+          key={JSON.stringify([searchQuery, type, source])}
+          projectId={projectId}
+          query={searchQuery}
+          queryPending={query.trim() !== searchQuery}
+          type={type}
+          source={source}
+          disabled={off}
+          clear={clear}
+        />
       </div>
-      <MemoryResults
-        key={JSON.stringify([searchQuery, type, source])}
-        projectId={projectId}
-        query={searchQuery}
-        queryPending={query.trim() !== searchQuery}
-        type={type}
-        source={source}
-        disabled={settings.data?.enabled === false}
-        clear={clear}
-      />
     </>
   );
 }
 
+/** A project's saved memories. Turning memory on or off lives in Settings. */
 export function Memory() {
   const projects = useRpc("projects.list", {});
   const railProject = useLayout((s) => s.projectId);
@@ -80,13 +89,13 @@ export function Memory() {
   let status: ReactNode = null;
   if (projects.error)
     status = (
-      <p role="alert" className="text-bad">
+      <p role="alert" className="text-bad px-2">
         Could not load projects. <Button onClick={() => void projects.refetch()}>Try again</Button>
       </p>
     );
   else if (projects.isLoading)
     status = (
-      <p role="status" className="text-ink-2 py-6">
+      <p role="status" className="text-ink-2 px-2 py-6">
         Loading projects…
       </p>
     );
@@ -103,29 +112,7 @@ export function Memory() {
       >
         Memory
       </TopBar>
-      <div className="memory-page">
-        <div className="memory-content">
-          <header className="mb-6">
-            <h1 className="text-xl font-semibold">Project memory</h1>
-            <p className="text-md text-ink-2 mt-1">Decisions, lessons, and working knowledge shared across your agents.</p>
-          </header>
-          <MemoryControl />
-          <section className="mt-6" aria-label="Saved memories">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold">Saved memories</h2>
-              <Select aria-label="Project" value={projectId} disabled={!projects.data?.length} onChange={(e) => setSelection(e.target.value)} className="max-w-full">
-                {!projects.data?.length && <option value="">{projects.isLoading ? "Loading projects…" : "No projects"}</option>}
-                {projects.data?.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            {status ?? <MemoryBrowser key={projectId} projectId={projectId} />}
-          </section>
-        </div>
-      </div>
+      <div className="page-column">{status ?? <MemoryBrowser key={projectId} projectId={projectId} />}</div>
     </>
   );
 }

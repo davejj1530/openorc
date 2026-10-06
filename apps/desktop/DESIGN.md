@@ -220,9 +220,9 @@ New app icons follow the [Precision Outline family](../../docs/precision-outline
 
 ### Buttons, fields, and filters
 
-Use the shared Button, IconButton, input, menu, dialog, and segmented-control primitives. Buttons offer primary, secondary, ghost, and danger variants; default controls are (28px) high, with (24px) and (32px) sizes. Routine toolbar actions use quiet icon buttons with accessible names and tooltips. Primary actions use the action role, secondary actions use neutral raised fills, and destructive actions retain their semantic styling.
+Use the shared Button, IconButton, input, menu, dialog, and segmented-control primitives. Buttons offer primary, secondary, ghost, and danger variants; default controls are (28px) high, with (24px) and (32px) sizes. Routine toolbar actions use quiet icon buttons with accessible names and tooltips; a page's one create action is a compact neutral text button. Primary actions use the action role, secondary actions use neutral raised fills, and destructive actions retain their semantic styling.
 
-Text fields indicate focus with a surface/caret change and no ring or shadow. Buttons, tabs, swatches, and disclosures retain visible keyboard focus. Task filters have separate padded targets and a soft selected fill; generic segmented controls retain transparent resting backgrounds and text emphasis.
+Text fields indicate focus with a surface/caret change and no ring or shadow. Buttons, tabs, swatches, and disclosures retain visible keyboard focus. Page filter tabs have separate padded targets and a soft selected fill; generic segmented controls retain transparent resting backgrounds and text emphasis.
 
 ### Navigation and Orclings
 
@@ -244,7 +244,9 @@ Work-panel tabs keep their full names at every panel width. The strip uses avail
 
 ### Tasks, settings, and recovery
 
-Tasks use the compact window toolbar for their title, project scope, and New task action. One filter row holds Active/Done/Archived, a status selector with counts, and search; it wraps at narrow widths. The grouped list starts immediately below, with 46px rows, keyboard navigation, and status menus. Saving a task to backlog and starting its work are separate actions. Drafts survive navigation.
+Tasks, Pull requests, Schedules, Orchestration, and Memory share one page header. The compact window toolbar holds the page name, its project scope, and the page's action: New task, New schedule, New team, or Refresh. One filter row below holds tabs and filters on the left and search or Show archived on the right; it wraps at narrow widths. Content follows in the same (1120px) column, and grouped lists share collapsible group headings.
+
+Tasks filter Active/Done/Archived with a status selector with counts. The grouped list has 46px rows, keyboard navigation, and status menus. Saving a task to backlog and starting its work are separate actions. Drafts survive navigation. Pull requests group by project when every project is shown. Schedules split Active and Paused. Orchestration shows saved teams as tabs, with team execution status beside the team's version. Memory filters by type and source; turning memory on or off lives in Settings, and the page says when it is off.
 
 Settings uses flat preference groups and a 40px row of text categories below the window toolbar. Categories keep their natural width and scroll horizontally in narrow windows; arrow keys, Home, and End select and reveal each section. Palette changes update the app live. Usage is an account ledger: each allowance shows its reported remaining or used amount, a thin meter, and reset timing. Missing, stale, and failed reports remain explicit; provider details and local activity stay separate.
 

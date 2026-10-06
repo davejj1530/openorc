@@ -3,8 +3,9 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { harnessName, type Schedule, type WorkspaceMode } from "@openorc/protocol";
 import { ArrowUpRight, CalendarClock, Pause, Play, Plus, RefreshCw, Trash2, Zap } from "../components/icons";
 import { ComposerModelPicker, ModelPicker } from "../components/ModelPicker";
+import { PageFilters, PageSearch } from "../components/PageFilters";
 import { TopBar } from "../components/TopBar";
-import { Badge, Button, Dialog, Empty, Field, IconButton, Input, Select, Textarea, Tooltip } from "../components/ui";
+import { Button, Dialog, Empty, Field, IconButton, Input, Segmented, Select, Textarea, Tooltip } from "../components/ui";
 import { cn } from "../lib/cn";
 import { useLayout } from "../lib/layout";
 import { useOrclings } from "../lib/orclings";
@@ -56,69 +57,95 @@ function scheduleSubmitLabel(pending: boolean, existing: boolean): string {
   return existing ? "Save" : "Create";
 }
 
+const shelfOptions = [
+  { value: "active", label: "Active" },
+  { value: "paused", label: "Paused" },
+] as const;
+
+type ScheduleShelf = (typeof shelfOptions)[number]["value"];
+
+/** The list area: loading, an empty state that fits the tab or search, or the rows. A failed load keeps its rows. */
+function scheduleListBody(input: {
+  loading: boolean;
+  failed: boolean;
+  total: number;
+  shown: Schedule[];
+  shelf: ScheduleShelf;
+  query: string;
+  canCreate: boolean;
+  onNew: () => void;
+  row: (schedule: Schedule) => ReactNode;
+}): ReactNode {
+  if (input.loading) return <p className="px-2 py-3 text-sm text-ink-3">Loading schedules…</p>;
+  if (input.shown.length > 0 || input.failed) return <div className="flex-1 min-h-0 overflow-y-auto pb-4">{input.shown.map(input.row)}</div>;
+  if (input.query) return <Empty title="No matching schedules">Try a different name.</Empty>;
+  if (input.total > 0) return <Empty title={input.shelf === "active" ? "No active schedules" : "No paused schedules"} />;
+  return (
+    <Empty title="Nothing scheduled">
+      A schedule starts a new thread with a prompt on a timer: a nightly review, a dependency check, a daily summary.
+      <div className="mt-3">
+        <Button onClick={input.onNew} disabled={!input.canCreate}>
+          <Plus size={13} /> New schedule
+        </Button>
+      </div>
+    </Empty>
+  );
+}
+
 /** Prompts that start a thread on a timer with a saved model or pinned team. */
 export function Scheduled() {
   const projectId = useLayout((s) => s.projectId);
   const projects = useRpc("projects.list", {});
   const list = useRpc("schedules.list", projectId ? { projectId } : {});
   const [editing, setEditing] = useState<Schedule | "new" | null>(null);
+  const [shelf, setShelf] = useState<ScheduleShelf>("active");
+  const [query, setQuery] = useState("");
   const items = list.data ?? [];
+  const shown = items.filter((schedule) => schedule.enabled === (shelf === "active") && schedule.title.toLowerCase().includes(query.toLowerCase()));
   const canCreate = (projects.data?.length ?? 0) > 0;
-  let listContent: ReactNode;
-  if (list.isLoading) listContent = <p className="px-6 py-3 text-sm text-ink-3">Loading schedules…</p>;
-  else if (!list.error && items.length === 0) {
-    listContent = (
-      <Empty title="Nothing scheduled">
-        A schedule starts a new thread with a prompt on a timer: a nightly review, a dependency check, a daily summary.
-        <div className="mt-3">
-          <Button onClick={() => setEditing("new")} disabled={!canCreate}>
-            <Plus size={13} /> New schedule
-          </Button>
-        </div>
-      </Empty>
-    );
-  } else {
-    listContent = (
-      <div className="flex-1 overflow-y-auto">
-        {items.map((schedule) => (
-          <ScheduleRow
-            key={schedule.id}
-            schedule={schedule}
-            projectName={!projectId ? projects.data?.find((project) => project.id === schedule.projectId)?.name : undefined}
-            onEdit={() => setEditing(schedule)}
-          />
-        ))}
-      </div>
-    );
-  }
+  const projectName = (schedule: Schedule) => (projectId ? undefined : projects.data?.find((project) => project.id === schedule.projectId)?.name);
   return (
     <>
       <TopBar
         actions={
-          <Tooltip label="New schedule">
-            <IconButton aria-label="New schedule" onClick={() => setEditing("new")} disabled={!canCreate}>
-              <Plus size={16} />
-            </IconButton>
-          </Tooltip>
+          <Button size="sm" onClick={() => setEditing("new")} disabled={!canCreate}>
+            New schedule
+          </Button>
         }
       >
-        Scheduled
+        Schedules
       </TopBar>
-      {list.error || projects.error ? (
-        <div className="px-6 py-3 text-sm text-bad" role="alert">
-          {list.error?.message ?? projects.error?.message}{" "}
-          <Button
-            size="sm"
-            onClick={() => {
-              void list.refetch();
-              void projects.refetch();
-            }}
-          >
-            Retry
-          </Button>
-        </div>
-      ) : null}
-      {listContent}
+      <div className="page-column">
+        <PageFilters
+          tabs={<Segmented label="Schedule filter" value={shelf} onChange={setShelf} options={shelfOptions} />}
+          end={<PageSearch label="Filter schedules" placeholder="Filter schedules…" value={query} onChange={setQuery} />}
+        />
+        {list.error || projects.error ? (
+          <div className="px-2 pb-3 text-sm text-bad" role="alert">
+            {list.error?.message ?? projects.error?.message}{" "}
+            <Button
+              size="sm"
+              onClick={() => {
+                void list.refetch();
+                void projects.refetch();
+              }}
+            >
+              Retry
+            </Button>
+          </div>
+        ) : null}
+        {scheduleListBody({
+          loading: list.isLoading,
+          failed: Boolean(list.error),
+          total: items.length,
+          shown,
+          shelf,
+          query,
+          canCreate,
+          onNew: () => setEditing("new"),
+          row: (schedule) => <ScheduleRow key={schedule.id} schedule={schedule} projectName={projectName(schedule)} onEdit={() => setEditing(schedule)} />,
+        })}
+      </div>
       {editing ? (
         <ScheduleDialog
           key={editing === "new" ? "new" : `${editing.id}:${editing.version}`}
@@ -182,7 +209,7 @@ function ScheduleRow({ schedule: s, projectName, onEdit }: { schedule: Schedule;
     }
   };
   return (
-    <div data-schedule={s.id} className="schedule-row px-6 py-3 border-b border-line">
+    <div data-schedule={s.id} className="schedule-row px-2 py-3 border-t border-line last:border-b">
       <div className="flex items-center flex-wrap gap-3">
         <CalendarClock size={16} className="text-ink-3 shrink-0" />
         <button onClick={onEdit} className="flex-1 min-w-40 text-left">
@@ -206,7 +233,6 @@ function ScheduleRow({ schedule: s, projectName, onEdit }: { schedule: Schedule;
               </IconButton>
             </Tooltip>
           ) : null}
-          <Badge tone={s.enabled ? "ok" : "muted"}>{s.enabled ? "on" : "off"}</Badge>
           <Tooltip label={s.enabled ? "Pause schedule" : "Resume schedule"}>
             <IconButton
               size="sm"

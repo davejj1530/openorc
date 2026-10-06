@@ -6,9 +6,17 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { Memory } from "./Memory";
 import { core } from "../lib/rpc";
 import { queryClient } from "../lib/query";
+import { useRouter } from "../lib/router";
 
 vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onInvalidate: vi.fn(), onReady: vi.fn() } }));
-vi.mock("../components/TopBar", () => ({ TopBar: () => null }));
+// The title bar's project chip is the page's only project picker.
+vi.mock("../components/TopBar", () => ({
+  TopBar: ({ onProjectChange }: { onProjectChange?: (id: string | null) => void }) => (
+    <button type="button" onClick={() => onProjectChange?.("other")}>
+      Switch to Other project
+    </button>
+  ),
+}));
 let saved: MemorySettings;
 let entries: MemoryEntry[];
 let failSave: boolean;
@@ -164,14 +172,17 @@ it("finds browse filter matches beyond the old 500-entry cap and resets paging",
   expect(screen.getByText("Page 1")).toBeTruthy();
 });
 
-it.each(["Memory type", "Project"])("resets to the first page when %s changes", async (label) => {
+it.each([
+  { change: "memory type", act: () => fireEvent.change(screen.getByLabelText("Memory type"), { target: { value: "lesson" } }), first: "Memory 1" },
+  { change: "project", act: () => fireEvent.click(screen.getByRole("button", { name: "Switch to Other project" })), first: "Other project memory" },
+])("resets to the first page when the $change changes", async ({ act, first }) => {
   fillEntries(55);
   entries.push({ ...entries[0]!, id: "other-entry", projectId: "other", title: "Other project memory" });
   show();
   fireEvent.click(await screen.findByRole("button", { name: "Next page" }));
   await screen.findByRole("article", { name: "Memory 26" });
-  fireEvent.change(screen.getByLabelText(label), { target: { value: label === "Project" ? "other" : "lesson" } });
-  await screen.findByRole("article", { name: label === "Project" ? "Other project memory" : "Memory 1" });
+  act();
+  await screen.findByRole("article", { name: first });
   expect(screen.queryByText("Page 2")).toBeNull();
 });
 
@@ -226,22 +237,12 @@ it("keeps paging recoverable when the next page fails to load", async () => {
   expect(screen.getByText("Page 2")).toBeTruthy();
 });
 
-it("keeps the acknowledged On state after a failed Off save and retries the same choice", async () => {
-  saved.enabled = true;
-  failSave = true;
+it("says memory is off and points to its setting, without a switch on the page", async () => {
   show();
-  await screen.findByText("OpenOrc memory is on");
-  fireEvent.click(screen.getByRole("switch", { name: "OpenOrc memory" }));
-  await screen.findByRole("alert");
-  expect(screen.getByText("OpenOrc memory is on")).toBeTruthy();
-  expect((screen.getByRole("switch", { name: "OpenOrc memory" }) as HTMLInputElement).checked).toBe(true);
-  failSave = false;
-  fireEvent.click(screen.getByRole("button", { name: "Retry save" }));
-  await screen.findByText("OpenOrc memory is off");
-  expect(vi.mocked(core.call).mock.calls.filter(([method]) => method === "memory.settings.set")).toEqual([
-    ["memory.settings.set", { enabled: false }],
-    ["memory.settings.set", { enabled: false }],
-  ]);
+  const notice = await screen.findByText(/OpenOrc memory is off/);
+  expect(screen.queryByRole("switch")).toBeNull();
+  fireEvent.click(within(notice).getByRole("button", { name: "Turn on in Settings" }));
+  expect(useRouter.getState().route).toEqual({ view: "settings", section: "memory" });
 });
 it("filters by type and source, clears filters, and searches retained entries while Off", async () => {
   show();
@@ -256,7 +257,7 @@ it("filters by type and source, clears filters, and searches retained entries wh
   fireEvent.change(screen.getByRole("textbox", { name: "Search memories" }), { target: { value: "targeted" } });
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("memory.search", { projectId: "project", query: "targeted", limit: 50 }));
   await waitFor(() => expect(screen.getAllByRole("article")).toHaveLength(1));
-  expect(screen.getByText("OpenOrc memory is off")).toBeTruthy();
+  expect(screen.getByText(/OpenOrc memory is off/)).toBeTruthy();
 });
 it("supports editing and deleting retained memory while Off", async () => {
   show();
@@ -284,13 +285,14 @@ it("gives a memory-specific error and recovers after retry", async () => {
 it("does not pretend an unknown setting is Off", async () => {
   failSettings = true;
   show();
-  await screen.findByText(/Could not check memory status/);
-  expect(screen.queryByText("OpenOrc memory is off")).toBeNull();
-  expect(screen.queryByRole("switch")).toBeNull();
+  await screen.findByRole("article", { name: "Retain the command" });
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("memory.settings.get", {}));
+  expect(screen.queryByText(/OpenOrc memory is off/)).toBeNull();
+  expect(screen.queryByText(/Turn on OpenOrc memory/)).toBeNull();
 });
 it("explains the empty Off state without promising automatic extraction", async () => {
   entries = [];
   show();
   await screen.findByText("No saved memories yet");
-  expect(await screen.findByText(/Turn on OpenOrc memory above/)).toBeTruthy();
+  expect(await screen.findByText(/Turn on OpenOrc memory in Settings/)).toBeTruthy();
 });

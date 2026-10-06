@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { Orchestration } from "./Orchestration";
@@ -13,6 +13,7 @@ vi.mock("../components/TopBar", () => ({ TopBar: () => null }));
 let enabled = false;
 let availabilityError = false;
 let detail: TeamDetail | null = null;
+let listed: TeamDetail[] | null = null;
 let saveFailure = false;
 let avatarIndex = 0;
 let orclingList: Orcling[] = [];
@@ -37,6 +38,7 @@ beforeEach(() => {
   enabled = false;
   availabilityError = false;
   detail = null;
+  listed = null;
   saveFailure = false;
   avatarIndex = 0;
   orclingList = [];
@@ -44,7 +46,7 @@ beforeEach(() => {
   useRouter.setState({ route: { view: "orchestration", projectId: "project" }, threadIds: [], history: [], future: [] });
   vi.mocked(core.call).mockImplementation(async (method, input) => {
     if (method === "projects.list") return [{ id: "project", name: "Example" }] as never;
-    if (method === "orchestration.list") return (detail ? [detail] : []) as never;
+    if (method === "orchestration.list") return (listed ?? (detail ? [detail] : [])) as never;
     if (method === "orchestration.get") return detail as never;
     if (method === "orchestration.avatars.list") return [{ teamId: "team", memberKey: "lead", avatar: { kind: "default", index: avatarIndex }, updatedAt: 1 }] as never;
     if (method === "orchestration.avatars.set") {
@@ -184,7 +186,7 @@ it("shows when team execution is off, links to its setting, and updates when ena
     </QueryClientProvider>,
   );
 
-  expect((await screen.findByText("Team execution off")).closest('[role="status"]')?.textContent).toContain("You can design and save teams");
+  expect((await screen.findByText("Team execution off")).closest('[role="status"]')?.textContent).toContain("Turn on in Settings");
   enabled = true;
   await queryClient.invalidateQueries({ queryKey: ["orchestration.availability", {}] });
   await waitFor(() => expect(screen.getByText("Team execution on · Beta")).toBeTruthy());
@@ -196,6 +198,28 @@ it("shows when team execution is off, links to its setting, and updates when ena
   enabled = false;
   await queryClient.invalidateQueries({ queryKey: ["orchestration.availability", {}] });
   await screen.findByText("Team execution off");
-  fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+  fireEvent.click(screen.getByRole("button", { name: "Turn on in Settings" }));
   expect(useRouter.getState().route).toEqual({ view: "settings", section: "general", setting: "team-execution" });
+});
+
+it("shows saved teams as tabs, keeps archived ones out until asked, and opens the chosen team", async () => {
+  detail = savedTeam();
+  listed = [detail, TeamDetail.parse({ team: { ...detail.team, id: "old", archivedAt: 5 }, revision: { ...detail.revision, id: "old-revision", teamId: "old", name: "Old team" } })];
+  render(
+    <QueryClientProvider client={queryClient}>
+      <Orchestration projectId="project" />
+    </QueryClientProvider>,
+  );
+  const tabs = await screen.findByRole("radiogroup", { name: "Teams" });
+  await waitFor(() =>
+    expect(
+      within(tabs)
+        .getAllByRole("radio")
+        .map((tab) => tab.textContent),
+    ).toEqual(["Review team"]),
+  );
+  expect(within(tabs).getByRole("radio", { name: "Review team" }).getAttribute("aria-checked")).toBe("true");
+  fireEvent.click(screen.getByRole("switch", { name: "Show archived" }));
+  fireEvent.click(within(tabs).getByRole("radio", { name: "Old team · Archived" }));
+  expect(useRouter.getState().route).toEqual({ view: "orchestration", projectId: "project", teamId: "old" });
 });

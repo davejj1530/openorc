@@ -20,6 +20,7 @@ import { CoversPreview } from "../lib/browser-preview";
 
 /**
  * The main column's header: the screen's title with a quiet project switcher.
+ * A plain-text title is the page's heading.
  * Window navigation stays here. With the sidebar hidden this is the window's
  * leftmost header, so it also clears the native window controls.
  * When a panel is available but closed, its toggle lives here so the third
@@ -83,7 +84,7 @@ export function TopBar({
             <WindowNav open={sidebarOpen} />
           </span>
         )}
-        {typeof children === "string" ? <span className="inline-flex items-center h-7 px-1 truncate text-ink">{children}</span> : children}
+        {typeof children === "string" ? <h1 className="inline-flex items-center h-7 px-1 truncate text-ink">{children}</h1> : children}
         {showProject && <HeaderProjectPicker projectId={projectId} projectName={projectName} onProjectChange={onProjectChange} />}
       </div>
       {/* A clipped navigation control can still contribute its full native no-drag

@@ -1,8 +1,9 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { TEAM_LIMIT_BOUNDS, type TeamDetail } from "@openorc/protocol";
-import { Archive, ArchiveRestore, Check, Plus } from "../components/icons";
+import { Archive, ArchiveRestore, Check } from "../components/icons";
+import { PageFilters } from "../components/PageFilters";
 import { TopBar } from "../components/TopBar";
-import { Badge, Button, Empty, IconButton, Input, Select, Switch, TextButton, Tooltip } from "../components/ui";
+import { Badge, Button, Empty, Input, Segmented, Switch, TextButton } from "../components/ui";
 import { useLayout } from "../lib/layout";
 import { queryClient, useRpc } from "../lib/query";
 import { newThread, useRouter } from "../lib/router";
@@ -11,10 +12,13 @@ import { useUi } from "../lib/ui";
 import { TeamMembers } from "./TeamMemberControls";
 import "./Orchestration.css";
 
-function teamSelectorLabel(loading: boolean, unavailable: boolean): string {
-  if (loading) return "Loading teams…";
-  if (unavailable) return "Teams unavailable";
-  return "New team";
+/** Saved teams as tabs. The open team keeps its tab while it loads, once archived, and before its first save. */
+function teamTabs(input: { teams: TeamDetail[]; selectedId: string; detail: TeamDetail | null | undefined; detailLoading: boolean; showNew: boolean }): { value: string; label: string }[] {
+  const tabs = input.teams.map((item) => ({ value: item.team.id, label: item.team.archivedAt ? `${item.revision.name} · Archived` : item.revision.name }));
+  if (input.showNew) tabs.push({ value: "new", label: "New team" });
+  else if (input.selectedId !== "new" && !input.teams.some((item) => item.team.id === input.selectedId))
+    tabs.push({ value: input.selectedId, label: input.detail?.revision.name ?? (input.detailLoading ? "Loading team…" : "Team unavailable") });
+  return tabs;
 }
 
 function projectGate(input: { loading: boolean; error: Error | null; selected: boolean; requestedProject: boolean; retry: () => void; importProject: () => void }): ReactNode {
@@ -39,42 +43,43 @@ function projectGate(input: { loading: boolean; error: Error | null; selected: b
   return null;
 }
 
-function teamAvailabilityStatus(input: { error: boolean; available: boolean; enabled: boolean; maxHierarchyDepth?: number; retry: () => void; openSettings: () => void }): ReactNode {
+function teamAvailabilityStatus(input: { error: boolean; available: boolean; enabled: boolean; retry: () => void; openSettings: () => void }): ReactNode {
   if (input.error)
     return (
       <>
-        <Badge className="mr-2">Status unavailable</Badge> Design and save teams. Team execution availability could not be checked.{" "}
+        <Badge>Status unavailable</Badge>
         <TextButton type="button" underline onClick={input.retry}>
           Retry
         </TextButton>
       </>
     );
-  if (input.available && input.enabled)
-    return (
-      <>
-        <Badge tone="ok" className="mr-2">
-          Team execution on · Beta
-        </Badge>
-        Choose a saved team in a new task’s model selector. Teams can include a lead, managers and workers (up to {input.maxHierarchyDepth} levels).
-      </>
-    );
+  if (input.available && input.enabled) return <Badge tone="ok">Team execution on · Beta</Badge>;
   if (input.available)
     return (
       <>
-        <Badge tone="warn" className="mr-2">
-          Team execution off
-        </Badge>
-        You can design and save teams. Enable Team execution (Beta) in{" "}
+        <Badge tone="warn">Team execution off</Badge>
         <TextButton type="button" underline onClick={input.openSettings}>
-          Settings
-        </TextButton>{" "}
-        to run them.
+          Turn on in Settings
+        </TextButton>
       </>
     );
+  return <Badge>Checking…</Badge>;
+}
+
+/** Whether saved teams can run, shown beside the team's version, with the way to turn team execution on. */
+function TeamAvailability() {
+  const availability = useRpc("orchestration.availability", {});
+  const navigate = useRouter((s) => s.navigate);
   return (
-    <>
-      <Badge className="mr-2">Checking…</Badge> You can design and save teams. Checking team execution availability…
-    </>
+    <span role="status" className="flex flex-wrap items-center gap-2 text-sm text-ink-3">
+      {teamAvailabilityStatus({
+        error: availability.isError,
+        available: Boolean(availability.data),
+        enabled: Boolean(availability.data?.enabled),
+        retry: () => void availability.refetch(),
+        openSettings: () => navigate({ view: "settings", section: "general", setting: "team-execution" }),
+      })}
+    </span>
   );
 }
 
@@ -138,6 +143,17 @@ export function Orchestration({ projectId, teamId }: { projectId?: string; teamI
           if (id && projects.data?.some((p) => p.id === id)) navigate({ view: "orchestration", projectId: id });
           else newThread(id ?? undefined);
         }}
+        actions={
+          <Button
+            size="sm"
+            disabled={!selected}
+            onClick={() => {
+              if (selected) navigate({ view: "orchestration", projectId: selected.id, teamId: "new" });
+            }}
+          >
+            New team
+          </Button>
+        }
       >
         Orchestration
       </TopBar>
@@ -149,40 +165,13 @@ export function Orchestration({ projectId, teamId }: { projectId?: string; teamI
           </TextButton>
         </div>
       ) : null}
-      {gate ??
-        (selected ? (
-          <ProjectTeams
-            key={selected.id}
-            projectId={selected.id}
-            teamId={teamId}
-            projectPicker={
-              <label className="orchestration-switcher">
-                Project
-                <Select
-                  aria-label="Orchestration project"
-                  value={selected.id}
-                  onChange={(event) => {
-                    useLayout.getState().setProject(event.target.value);
-                    navigate({ view: "orchestration", projectId: event.target.value });
-                  }}
-                >
-                  {projects.data?.map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {project.name}
-                    </option>
-                  ))}
-                </Select>
-              </label>
-            }
-          />
-        ) : null)}
+      {gate ?? (selected ? <ProjectTeams key={selected.id} projectId={selected.id} teamId={teamId} /> : null)}
     </div>
   );
 }
 
-function ProjectTeams({ projectId, teamId, projectPicker }: { projectId: string; teamId?: string; projectPicker: ReactNode }) {
+function ProjectTeams({ projectId, teamId }: { projectId: string; teamId?: string }) {
   const list = useRpc("orchestration.list", { projectId, includeArchived: true });
-  const availability = useRpc("orchestration.availability", {});
   const [showArchived, setShowArchived] = useState(false);
   const [initialTeamId, setInitialTeamId] = useState<string | null>(null);
   const navigate = useRouter((s) => s.navigate);
@@ -229,47 +218,19 @@ function ProjectTeams({ projectId, teamId, projectPicker }: { projectId: string;
         <Button onClick={() => select("new")}>Create a team</Button>
       </Empty>
     );
+  // The new-team form gets a tab once it is really showing, not while saved teams are still loading.
+  const tabs = teamTabs({ teams, selectedId, detail: detail.data, detailLoading: detail.isLoading, showNew: selectedId === "new" && (teamId === "new" || Boolean(list.data)) });
   return (
-    <div className="orchestration-layout">
-      <div className="orchestration-toolbar">
-        <div className="orchestration-controls">
-          {projectPicker}
-          <label className="orchestration-switcher orchestration-team-switcher">
-            Team
-            <Select aria-label="Orchestration team" value={selectedId} disabled={!list.data} onChange={(event) => select(event.target.value)}>
-              {selectedId === "new" ? <option value="new">{teamSelectorLabel(list.isLoading, Boolean(list.error && !list.data))}</option> : null}
-              {selectedId !== "new" && !teams.some((item) => item.team.id === selectedId) ? (
-                <option value={selectedId}>{detail.data?.revision.name ?? (detail.isLoading ? "Loading team…" : "Team unavailable")}</option>
-              ) : null}
-              {teams.map((item) => (
-                <option key={item.team.id} value={item.team.id}>
-                  {item.revision.name}
-                  {item.team.archivedAt ? " · Archived" : ""}
-                </option>
-              ))}
-            </Select>
-          </label>
-          <Tooltip label="New team">
-            <IconButton aria-label="New team" disabled={!list.data} onClick={() => select("new")}>
-              <Plus size={16} />
-            </IconButton>
-          </Tooltip>
+    <div className="page-column">
+      <PageFilters
+        tabs={<Segmented label="Teams" className="orchestration-team-tabs" value={selectedId} onChange={select} options={tabs} />}
+        end={
           <label className="orchestration-archive-filter">
             <Switch checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} />
             Show archived
           </label>
-        </div>
-        <p className="orchestration-availability" role="status">
-          {teamAvailabilityStatus({
-            error: availability.isError,
-            available: Boolean(availability.data),
-            enabled: Boolean(availability.data?.enabled),
-            maxHierarchyDepth: availability.data?.maxHierarchyDepth,
-            retry: () => void availability.refetch(),
-            openSettings: () => navigate({ view: "settings", section: "general", setting: "team-execution" }),
-          })}
-        </p>
-      </div>
+        }
+      />
       {list.error && !initialListError ? <TeamLoadError error={list.error} onRetry={() => void list.refetch()} retrying={list.isFetching} /> : null}
       <div className="orchestration-editor-region">{editor}</div>
     </div>
@@ -291,6 +252,21 @@ function TeamLoadError({ error, title = "Teams couldn’t load", onRetry, retryi
       <Button className="mt-3" disabled={retrying} onClick={onRetry}>
         {retrying ? "Retrying…" : "Retry"}
       </Button>
+    </div>
+  );
+}
+
+function TeamEditorHeader({ detail, archived }: { detail: TeamDetail | null; archived: boolean }) {
+  return (
+    <div className="flex items-start justify-between gap-3 mb-6">
+      <div className="min-w-0">
+        <h2 className="text-xl font-semibold">{detail ? "Edit team" : "Create a team"}</h2>
+        <p className="mt-1 text-sm text-ink-3">Choose a lead, then define who reports to whom.</p>
+      </div>
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <TeamAvailability />
+        {detail ? <Badge>{archived ? "Archived" : `Version ${detail.revision.number}`}</Badge> : null}
+      </div>
     </div>
   );
 }
@@ -337,13 +313,7 @@ function TeamEditor({ projectId, detail, onSaved }: { projectId: string; detail:
       }}
     >
       <div className="orchestration-editor-scroll">
-        <div className="flex items-start justify-between gap-3 mb-6">
-          <div className="min-w-0">
-            <h1 className="text-xl font-semibold">{detail ? "Edit team" : "Create a team"}</h1>
-            <p className="mt-1 text-sm text-ink-3">Choose a lead, then define who reports to whom.</p>
-          </div>
-          {detail ? <Badge>{archived ? "Archived" : `Version ${detail.revision.number}`}</Badge> : null}
-        </div>
+        <TeamEditorHeader detail={detail} archived={archived} />
         {conflict ? (
           <div role="alert" data-tone="warn" className="orchestration-notice text-warn">
             A newer version was saved in another window. Your draft is kept. Save it as a separate team, or discard it to load the saved version.

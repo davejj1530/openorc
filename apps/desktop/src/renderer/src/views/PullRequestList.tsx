@@ -1,7 +1,9 @@
-import { useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { useQueries } from "@tanstack/react-query";
 import { WORKSPACE_ID, type Project, type PullRequestFilter, type PullRequestSummary } from "@openorc/protocol";
-import { GitPullRequest, RefreshCw, Search } from "../components/icons";
+import { Folder, GitPullRequest, RefreshCw } from "../components/icons";
+import { ListGroupHeading } from "../components/ListGroupHeading";
+import { PageFilters, PageSearch } from "../components/PageFilters";
 import { TopBar } from "../components/TopBar";
 import { Badge, Button, Empty, IconButton, metaSlot, Segmented, Tooltip } from "../components/ui";
 import { cn } from "../lib/cn";
@@ -25,11 +27,11 @@ function PullRequestRow({ pull, projectId }: { pull: PullRequestSummary; project
   // A merged or closed pull request says so in words as well as in the icon's color.
   const ended = pull.state === "open" ? "" : `${pullRequestToneLabel[tone]} · `;
   return (
-    <div className="mx-3 border-t border-line first:border-t-0 last:border-b">
+    <div className="border-t border-line last:border-b">
       <button
         type="button"
         onClick={() => openPullRequest(projectId, pull.number)}
-        className="flex w-full min-w-0 items-center gap-3 px-3 py-2 text-left hover:bg-surface-2"
+        className="flex w-full min-w-0 items-center gap-3 px-2 py-2 text-left hover:bg-surface-2"
         aria-label={`${pull.title}, #${pull.number}, ${pullRequestToneLabel[tone]}`}
       >
         <GitPullRequest size={15} className={cn("mt-0.5 shrink-0 self-start", pullRequestToneClass[tone])} aria-hidden="true" />
@@ -59,33 +61,44 @@ function PullRequestRow({ pull, projectId }: { pull: PullRequestSummary; project
 
 type ProjectPulls = { project: Project; pulls: PullRequestSummary[] | undefined; error: Error | null; loading: boolean; retry: () => void };
 
-/** One project's pull requests; a list of several projects names each and keeps its failures to itself. */
+/**
+ * One project's pull requests. A list of several projects names each one as a
+ * group that folds away like a task group, and keeps its failures to itself.
+ */
 function ProjectSection({ entry, query, named }: { entry: ProjectPulls; query: string; named: boolean }) {
+  const id = useId();
+  const [collapsed, setCollapsed] = useState(false);
   const pulls = (entry.pulls ?? []).filter((pull) => matchesPullRequest(pull, query));
   let body: ReactNode = pulls.map((pull) => <PullRequestRow key={pull.number} pull={pull} projectId={entry.project.id} />);
   if (entry.error) {
     body = (
-      <p className="mx-3 border-t border-line px-3 py-2 text-sm text-ink-3">
+      <p className="border-y border-line px-2 py-2 text-sm text-ink-3">
         {entry.error.message}{" "}
         <button type="button" className="underline hover:text-ink" onClick={entry.retry}>
           Retry
         </button>
       </p>
     );
-  } else if (entry.loading) body = <p className="mx-3 border-t border-line px-3 py-2 text-sm text-ink-3">Loading…</p>;
+  } else if (entry.loading) body = <p className="border-y border-line px-2 py-2 text-sm text-ink-3">Loading…</p>;
   else if (pulls.length === 0) body = null;
   if (named && !body) return null;
+  const count = entry.pulls ? { value: pulls.length, label: `${pulls.length} ${pulls.length === 1 ? "pull request" : "pull requests"}` } : null;
   return (
-    <section aria-label={`${entry.project.name} pull requests`}>
+    <section aria-label={`${entry.project.name} pull requests`} className="list-group">
       {named ? (
-        <h2 className="well-fill sticky top-0 z-10 mx-3 pt-2">
-          <span className="flex h-8 items-center gap-2 rounded-t-md bg-surface-2 px-3 text-sm font-medium text-ink-2">
-            {entry.project.name}
-            {entry.pulls ? <span className="text-ink-4 tabular">{pulls.length}</span> : null}
-          </span>
-        </h2>
+        <ListGroupHeading
+          id={`${id}-heading`}
+          controls={`${id}-pulls`}
+          collapsed={collapsed}
+          onToggle={() => setCollapsed((current) => !current)}
+          icon={<Folder size={13} className="text-ink-3" />}
+          label={entry.project.name}
+          count={count}
+        />
       ) : null}
-      {body}
+      <div id={`${id}-pulls`} hidden={collapsed}>
+        {body}
+      </div>
     </section>
   );
 }
@@ -163,20 +176,13 @@ export function PullRequestList() {
       >
         Pull requests
       </TopBar>
-      <div className="sub-header py-2">
-        <Segmented label="Pull request filter" value={filter} onChange={setFilter} options={pullRequestFilters} />
-        <label className="flex min-w-0 items-center gap-2 ml-auto text-ink-3">
-          <Search size={13} />
-          <input
-            aria-label="Filter pull requests"
-            className="bg-transparent min-w-0 w-40 text-sm py-1 placeholder:text-ink-4"
-            value={query}
-            placeholder="Filter pull requests…"
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </label>
+      <div className="page-column">
+        <PageFilters
+          tabs={<Segmented label="Pull request filter" value={filter} onChange={setFilter} options={pullRequestFilters} />}
+          end={<PageSearch label="Filter pull requests" placeholder="Filter pull requests…" value={query} onChange={setQuery} />}
+        />
+        {body}
       </div>
-      {body}
     </>
   );
 }

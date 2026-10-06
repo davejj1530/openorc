@@ -796,7 +796,9 @@
 .app-shell .task-document-header {
   padding-top: 24px;
 }
-.task-page {
+/* Tasks, Pull requests, Schedules, Orchestration and Memory share one column under the title
+   bar: the filter row, then the page's own content, so their edges line up page to page. */
+.page-column {
   width: 100%;
   max-width: 1120px;
   flex: 1;
@@ -806,24 +808,29 @@
   margin: 0 auto;
   padding: 16px 28px 0;
 }
-.app-shell .task-page-filters {
+.page-filters {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   flex-shrink: 0;
   gap: 8px 12px;
   padding: 0 0 12px;
-  border: 0;
 }
-.task-page-tools {
+.page-filter-tools {
   display: flex;
-  flex: 1 1 284px;
+  flex: 1 1 auto;
   min-width: 0;
   align-items: center;
-  justify-content: flex-end;
   gap: 12px;
 }
-.app-shell .task-status-filter {
+.page-filter-end {
+  display: flex;
+  flex: 0 1 176px;
+  min-width: 0;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+.app-shell .page-filter-select {
   flex-shrink: 0;
   max-width: 144px;
   border-color: transparent;
@@ -831,65 +838,63 @@
   box-shadow: none;
   font-size: 12px;
 }
-.task-page-search {
+.page-search {
   display: flex;
-  flex: 1 1 140px;
+  flex: 1;
   min-width: 0;
-  max-width: 176px;
   align-items: center;
   gap: 8px;
-  margin-left: auto;
   color: var(--ink-3);
 }
-.task-page-search input {
+.page-search input {
   width: 100%;
   min-width: 0;
   padding: 4px 0;
   background: transparent;
   font-size: 12px;
 }
-.task-page-search input::placeholder {
+.page-search input::placeholder {
   color: var(--ink-4);
 }
-.task-page-filters [role="radiogroup"] {
+.page-filters [role="radiogroup"] {
   flex-shrink: 0;
   gap: 4px;
 }
-.task-page-filters [role="radio"] {
+.page-filters [role="radio"] {
   min-height: 28px;
   padding: 0 10px;
   border-radius: 6px;
   color: var(--ink-3);
 }
-.task-page-filters [role="radio"]:hover {
+.page-filters [role="radio"]:hover {
   background: var(--surface-2);
   color: var(--ink);
 }
-.task-page-filters [role="radio"][aria-checked="true"] {
+.page-filters [role="radio"][aria-checked="true"] {
   background: var(--navigation-soft);
   color: var(--navigation-ink);
 }
-.app-shell .task-page .task-list > section {
+.app-shell .page-column .list-group {
   margin-bottom: 16px;
 }
-.app-shell .task-page .task-list h2 {
+.app-shell .page-column .list-group-heading {
   margin-inline: 0;
   padding-top: 0;
 }
-.app-shell .task-page .task-group-header {
+.app-shell .page-column .list-group-header {
   padding: 0 8px;
   height: 38px;
   background: transparent;
 }
-.app-shell .task-page .task-list-row {
+.app-shell .page-column .task-list-row {
   margin-inline: 0;
   padding-inline: 8px;
 }
-.app-shell .task-page [data-task-open] {
+.app-shell .page-column [data-task-open] {
   height: 46px;
   gap: 10px;
 }
-.app-shell .task-page [data-task-open] > span:first-of-type {
+.app-shell .page-column [data-task-open] > span:first-of-type {
   font-size: 14px;
 }
 .app-shell .new-thread-body {
@@ -1062,7 +1067,7 @@
   .app-shell .workspace-navigation[data-open="false"] {
     visibility: hidden;
   }
-  .task-page {
+  .page-column {
     padding: 16px 24px 0;
   }
   .app-shell .new-thread-body {
@@ -1073,7 +1078,7 @@
   .app-shell {
     --reading-gutter: 12px;
   }
-  .task-page {
+  .page-column {
     padding: 12px 16px 0;
   }
 }
@@ -1081,7 +1086,7 @@
   .sidebar-browser-tabs button[aria-current="page"],
   .project-option[data-selected="true"],
   .thread-preview[data-open],
-  .task-page-filters [role="radio"][aria-checked="true"] {
+  .page-filters [role="radio"][aria-checked="true"] {
     outline: 1px solid Highlight;
   }
 }
@@ -1112,8 +1117,8 @@ html[data-transparent-shell="true"] .app-shell .panel-shell[data-expanded="true"
 .thread-rail-title button:focus-visible,
 .thread-starters button:focus-visible,
 .new-thread-activity > summary:focus-visible,
-.task-page-filters button:focus-visible,
-.task-status-filter:focus-visible {
+.page-filters button:focus-visible,
+.page-filter-select:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }

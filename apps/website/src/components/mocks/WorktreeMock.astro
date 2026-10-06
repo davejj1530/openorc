@@ -1,80 +1,40 @@
 ---
 /**
- * Worktrees, still: threads on their own branches beside threads on the checkout,
- * and one of them open with its branch in the header and on its uncommitted changes.
+ * Worktrees, still: threads on their own branches beside threads on the checkout, and one of them open. As in the
+ * app, the composer names the thread's branch with its uncommitted changes; the sidebar is the scenes' own.
  */
-import Composer from "../hero/Composer.astro";
+import "../../styles/hero-scene.css";
+import PresenceMark from "../hero/PresenceMark.astro";
 import ProductIcon from "../hero/ProductIcon.astro";
 import Prose from "../hero/Prose.astro";
-import { slackJourney } from "../../data/hero/slack";
-import { branches, models, project } from "../../data/hero/workspace";
+import SceneSidebar from "../hero/SceneSidebar.astro";
+import ThreadPane from "../hero/ThreadPane.astro";
+import { branches, models } from "../../data/hero/workspace";
 
-const branch = branches.tokens;
 const rows = [
-  { title: "Simplify the design tokens", branch, providers: [{ harness: "codex", label: "Codex" }], current: true },
+  { title: "Simplify the design tokens", branch: branches.tokens, providers: [{ harness: "codex", label: "Codex" }], current: true },
   { title: "Build a thoughtful onboarding", branch: "openorc/onboarding-7c2e1a", providers: [{ harness: "claude", label: "Claude" }] },
-  { title: "Make the first five minutes count", branch: project.branch, providers: [{ harness: "codex", label: "Codex" }] },
-  { title: "A faster command menu", branch: project.branch, providers: [{ harness: "claude", label: "Claude" }], busy: true },
+  { title: "Make the first five minutes count", providers: [{ harness: "codex", label: "Codex" }] },
+  { title: "A faster command menu", providers: [{ harness: "claude", label: "Claude" }], busy: true as const, headline: "Caching the search index" },
 ];
 ---
 
 <div class="hs-mock hs-mock-worktree">
-  <aside class="hs-sidebar">
-    <div class="hs-sidebar-inner">
-      <div class="hs-projects-head"><span>Projects</span><span class="hs-projects-filter"><ProductIcon name="filter" /></span><span class="hs-icon-button hs-small"><ProductIcon name="plus" /></span></div>
-      <div class="hs-threads">
-        <div class="hs-group">
-          <span class="hs-group-head"><ProductIcon name="folder" />{project.name}<ProductIcon name="chevronDown" class="hs-group-chevron" /></span>
-          {rows.map((row) => (
-            <span class="hs-row" data-current={row.current ? "" : undefined} data-busy={row.busy ? "" : undefined}>
-              <span class="hs-row-title">
-                <span>{row.title}</span>
-                <span class="hs-status"><ProductIcon name="loader" /></span>
-              </span>
-              <span class="hs-row-meta">
-                <span class="hs-row-branch"><ProductIcon name="branch" /><span>{row.branch}</span></span>
-                <span class="hs-row-providers">
-                  {row.providers.map((provider) => (
-                    <span><svg class="hs-logo" aria-hidden="true"><use href={`#hs-logo-${provider.harness}`} /></svg>{provider.label}</span>
-                  ))}
-                </span>
-              </span>
-            </span>
-          ))}
-        </div>
-        <div class="hs-group">
-          <span class="hs-group-head"><ProductIcon name="folder" />website<ProductIcon name="chevronDown" class="hs-group-chevron" /></span>
-          <span class="hs-row">
-            <span class="hs-row-title"><span>Tell the product story</span></span>
-            <span class="hs-row-meta">
-              <span class="hs-row-branch"><ProductIcon name="branch" /><span>dev</span></span>
-              <span class="hs-row-providers"><span><svg class="hs-logo" aria-hidden="true"><use href="#hs-logo-codex" /></svg>Codex</span></span>
-            </span>
-          </span>
-        </div>
-      </div>
-    </div>
-  </aside>
-  <section class="hs-pane">
-    <header class="hs-header">
-      <span class="hs-header-lead">
-        <span class="hs-title">Simplify the design tokens</span>
-        <span class="hs-thread-branch"><ProductIcon name="branch" /><span>{branch}</span></span>
-        <span class="hs-chip"><span>{project.name}</span><ProductIcon name="chevronDown" /></span>
-      </span>
-      <span class="hs-header-actions">
-        <span class="hs-icon-button"><ProductIcon name="more" /></span>
-        <span class="hs-icon-button"><ProductIcon name="panelRight" /></span>
-      </span>
-    </header>
-    <div class="hs-transcript">
-      <div class="hs-column">
-        <div class="hs-work"><span class="hs-work-toggle">Worked for 41s<ProductIcon name="chevronRight" /></span></div>
-        <div class="hs-reply"><Prose text="Every color, radius, and spacing step now comes from one `tokens.css`. The old per-component values are gone, and nothing outside this worktree has changed." /></div>
-      </div>
-    </div>
-    <div class="hs-composer-area">
-      <Composer journey={slackJourney} placeholder="Message Codex…" model={{ harness: "codex", label: models.codex.label, effort: models.codex.effort }} permission={models.codex.permission} branch={branch} changes=">message" changeStat={{ added: 12, removed: 4 }} />
-    </div>
-  </section>
+  <span class="hs-lights" aria-hidden="true"><i></i><i></i><i></i></span>
+  <SceneSidebar rows={rows} />
+  <ThreadPane
+    id="tokens"
+    title="Simplify the design tokens"
+    model={{ harness: "codex", label: models.codex.label, effort: models.codex.effort }}
+    permission={models.codex.permission}
+    placeholder="Message Codex…"
+    branch={branches.tokens}
+    changes
+    changeStat={{ added: 12, removed: 4 }}
+  >
+    <div class="hs-user"><div class="hs-bubble">Move every color, radius, and spacing value into one tokens file.</div></div>
+    <div class="hs-work"><span class="hs-work-toggle">Worked · 3 files changed<ProductIcon name="chevronRight" /></span></div>
+    <div class="hs-reply"><div class="hs-author">Assistant</div><Prose text="Every color, radius, and spacing step now comes from one `tokens.css`. The old per-component values are gone, and nothing outside this worktree has changed." /></div>
+    <PresenceMark />
+  </ThreadPane>
 </div>

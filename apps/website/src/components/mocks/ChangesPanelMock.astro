@@ -1,9 +1,10 @@
 ---
 /**
- * The Changes panel docked beside a conversation, still: the sample diff with
- * its Git actions. Row numbering follows the app's unified view.
+ * The Changes panel beside a conversation, still: the sample diff under its
+ * Commit button. Row numbering follows the app's unified view.
  */
 import ProductIcon from "../hero/ProductIcon.astro";
+import "../../styles/hero-scene.css";
 
 type Token = [text: string, tone?: "keyword" | "name" | "string" | "tag" | "component" | "attr" | "mark"];
 interface Row {
@@ -40,10 +41,8 @@ const rows: Row[] = [
     <span class="hs-cp-count">1</span>
     <span class="hs-cp-stat"><span class="hs-added">+8</span> <span class="hs-removed">-2</span></span>
     <span class="hs-cp-spacer"></span>
-    <span class="hs-button"><ProductIcon name="commit" />Commit</span>
-    <span class="hs-button"><ProductIcon name="upload" />Push</span>
-    <span class="hs-button"><ProductIcon name="pullRequest" />PR</span>
-    <span class="hs-icon-button hs-small hs-cp-refresh"><ProductIcon name="refresh" /></span>
+    <span class="hs-button hs-button-ink"><ProductIcon name="commit" />Commit</span>
+    <span class="hs-icon-button hs-small"><ProductIcon name="refresh" /></span>
   </div>
   <section class="hs-diff-file">
     <div class="hs-diff-head">

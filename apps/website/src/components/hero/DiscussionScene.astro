@@ -26,15 +26,14 @@ const at = (windows: string) => timed(discussionJourney, windows);
     <TaskPane id="task" journey={discussionJourney} title={discussion.title} start="replyDone" branch={discussion.thread.branch}>
       <div class="hs-doc-title">{discussion.title}</div>
       <div class="hs-props">
-        <span class="hs-prop" {...at("<replyDone")}><ProductIcon name="circleDashed" class="hs-status-glyph hs-status-circleDashed" />Backlog</span>
-        <span class="hs-prop" {...at(">replyDone")}><ProductIcon name="loader" class="hs-status-glyph hs-status-in_progress" />In progress</span>
-        <span class="hs-prop"><ProductIcon name="signalHigh" />High</span>
+        <span class="hs-prop hs-prop-select" {...at("<replyDone")}><ProductIcon name="circleDashed" class="hs-status-glyph hs-status-circleDashed" />Backlog<ProductIcon name="chevronDown" class="hs-prop-chevron" /></span>
+        <span class="hs-prop hs-prop-select" {...at(">replyDone")}><ProductIcon name="loader" class="hs-status-glyph hs-status-in_progress" />In progress<ProductIcon name="chevronDown" class="hs-prop-chevron" /></span>
+        <span class="hs-prop hs-prop-select"><ProductIcon name="signalHigh" />High<ProductIcon name="chevronDown" class="hs-prop-chevron" /></span>
         <span class="hs-prop">{project.name}</span>
       </div>
       <div class="hs-editor-controls">
         <span class="hs-icon-button"><ProductIcon name="plus" /></span>
         <span class="hs-icon-button"><ProductIcon name="image" /></span>
-        <span class="hs-editor-hint">{copy.editor}</span>
         <span class="hs-editor-mode">Markdown</span>
       </div>
       <div class="hs-spec">

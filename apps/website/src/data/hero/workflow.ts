@@ -33,6 +33,10 @@ export const workflow = {
       ],
     },
     created: "Created three tasks. Each one carries the finding, the scope, and what done looks like.",
+    /** The investigation's step, named the way the app names a phase after the agent's narration. */
+    phase: "Measuring where the app spends its time",
+    reads: ["src/dashboard/Dashboard.tsx", "src/transcript/Row.tsx", "src/main.tsx"],
+    command: "pnpm perf",
   },
   tasks: [
     { title: "Cache dashboard queries", priority: "High", label: "Performance" },
@@ -78,6 +82,8 @@ export const workflow = {
     prompt: "Cache dashboard queries. Memoize listProjects and listThreads per project, invalidate on thread events, and serve the first paint from the cache.",
     reply:
       "Dashboard queries are cached per project. Selection changes reuse the cache, thread events invalidate it, and the first paint comes from the last known state. The dashboard now makes **two requests on open** instead of one per render.",
+    phases: { read: "Reading the dashboard hooks", edit: "Caching the queries per project" },
+    receipt: "Worked · 3 files changed",
     change: {
       files: [
         { path: "src/dashboard/useProjects.ts", added: 18, removed: 6 },

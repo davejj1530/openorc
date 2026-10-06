@@ -1,0 +1,91 @@
+---
+/**
+ * "Your setup stays yours" as four cards, each with a small still of the part of
+ * the app it describes. Labels follow the app: the agent picker, Import terminal
+ * sessions, project memory types, and the branches and refs OpenOrc owns.
+ */
+import Icon from "./Icon.astro";
+import { branches, project } from "../data/hero/workspace";
+
+const agents = [
+  { name: "Codex", logo: "/openai.svg", current: true },
+  { name: "Claude Code", logo: "/claude.svg" },
+  { name: "OpenCode", logo: "/opencode.svg" },
+];
+const sessions = [
+  { title: "Fix the flaky upload test", agent: "Claude Code", detail: "42 msgs" },
+  { title: "Add the pricing table", agent: "Codex", detail: "18 msgs" },
+  { title: "Tidy the auth middleware", agent: "Codex", detail: "imported", done: true },
+];
+const memories = [
+  { type: "Decision", text: "Keep the design tokens in one file" },
+  { type: "Lesson", text: "Run the size check before pushing" },
+  { type: "Command", text: "pnpm test --filter core", code: true },
+];
+const refs = [
+  { name: project.branch, branch: true },
+  { name: branches.tokens, branch: true, own: true },
+  { name: "refs/openorc/checkpoints/…", own: true },
+];
+---
+
+<div class="setup-grid">
+  <article class="setup-card">
+    <div class="setup-visual" aria-hidden="true">
+      <div class="setup-window">
+        {agents.map((agent) => (
+          <span class="setup-row" data-current={agent.current ? "" : undefined}>
+            <img src={agent.logo} alt="" width="16" height="16" loading="lazy" decoding="async" />
+            <span class="setup-grow">{agent.name}</span>
+            {agent.current && <Icon name="check" size={14} />}
+          </span>
+        ))}
+      </div>
+    </div>
+    <h3>Keep your provider setup</h3>
+    <p>Choose Codex, Claude Code, or OpenCode for each conversation, with the sign-in and configuration you already have.</p>
+  </article>
+  <article class="setup-card">
+    <div class="setup-visual" aria-hidden="true">
+      <div class="setup-window">
+        {sessions.map((session) => (
+          <span class="setup-row" data-done={session.done ? "" : undefined}>
+            <span class="setup-check"><Icon name="check" size={10} /></span>
+            <span class="setup-grow">{session.title}</span>
+            <span class="setup-quiet">{session.detail}</span>
+          </span>
+        ))}
+      </div>
+    </div>
+    <h3>Bring conversations forward</h3>
+    <p>Import Claude Code and Codex sessions and continue them with their history intact.</p>
+  </article>
+  <article class="setup-card">
+    <div class="setup-visual" aria-hidden="true">
+      <div class="setup-window">
+        {memories.map((memory) => (
+          <span class="setup-row">
+            <span class="setup-tag">{memory.type}</span>
+            {memory.code ? <code class="setup-grow">{memory.text}</code> : <span class="setup-grow">{memory.text}</span>}
+          </span>
+        ))}
+      </div>
+    </div>
+    <h3>Carry the useful context</h3>
+    <p>Keep decisions and lessons in optional shared project memory, so the next task starts with what you already learned.</p>
+  </article>
+  <article class="setup-card">
+    <div class="setup-visual" aria-hidden="true">
+      <div class="setup-window">
+        {refs.map((ref) => (
+          <span class="setup-row" data-own={ref.own ? "" : undefined}>
+            {ref.branch ? <Icon name="branch" size={14} /> : <span class="setup-ref-dot" />}
+            <code class="setup-grow">{ref.name}</code>
+          </span>
+        ))}
+      </div>
+    </div>
+    <h3>Keep your repository tidy</h3>
+    <p>In your repositories, OpenOrc adds only its own branches under openorc/, Git refs under refs/openorc/, and worktrees for isolated work.</p>
+  </article>
+</div>

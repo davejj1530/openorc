@@ -14,6 +14,10 @@
   overflow-y: auto;
   scrollbar-width: thin;
 }
+/* The links' highlight reaches 12px past the column, so the scroll box starts there too and doesn't clip it. */
+.docs-nav {
+  margin-left: -12px;
+}
 .docs-nav ol,
 .docs-toc ol,
 .docs-menu ol {
@@ -27,7 +31,6 @@
   align-items: center;
   min-height: 36px;
   padding: 6px 12px;
-  margin-left: -12px;
   border-radius: 7px;
   color: var(--muted);
   font-size: var(--type-control);
@@ -76,13 +79,13 @@
 .docs-lead {
   max-width: 62ch;
   margin-top: 20px;
-  color: #c4c4cc;
+  color: var(--muted);
   font-size: 1.0625rem;
   line-height: 1.7;
 }
 .docs-reviewed {
   margin-top: 16px;
-  color: #8e8e98;
+  color: var(--muted);
   font-size: var(--type-control);
 }
 
@@ -134,7 +137,7 @@
   margin-top: 8px;
 }
 .docs-article li::marker {
-  color: #7c7c86;
+  color: #a3a29b;
 }
 .docs-article strong {
   color: var(--text);
@@ -145,7 +148,7 @@
 .docs-article td a {
   color: var(--text);
   text-decoration: underline;
-  text-decoration-color: #6a6a73;
+  text-decoration-color: #b5b3ab;
   text-underline-offset: 0.2em;
 }
 .docs-article p a:hover,
@@ -155,10 +158,10 @@
 }
 .docs-article code {
   padding: 0.1em 0.35em;
-  border: 1px solid #2c2c33;
+  border: 1px solid var(--rule);
   border-radius: 5px;
-  background: #1a1a1f;
-  color: #dcdce2;
+  background: var(--surface);
+  color: var(--text);
   font-family: var(--docs-mono);
   font-size: 0.84em;
   overflow-wrap: anywhere;
@@ -171,7 +174,7 @@
   border: 1px solid var(--rule);
   border-radius: 10px;
   background: var(--surface);
-  color: #dcdce2;
+  color: var(--text);
   font-family: var(--docs-mono);
   font-size: 0.8125rem;
   line-height: 1.7;
@@ -292,7 +295,7 @@
 }
 .docs-source {
   margin-top: 16px;
-  color: #8e8e98;
+  color: var(--muted);
   font-size: var(--type-control);
 }
 
@@ -317,7 +320,7 @@
 }
 .diagram-node-shape {
   fill: var(--bg);
-  stroke: #6a6a73;
+  stroke: #a3a29b;
   stroke-width: 1;
 }
 .diagram-emphasis .diagram-node-shape {
@@ -352,7 +355,7 @@
 .docs-diagram figcaption {
   max-width: 72ch;
   margin-top: 16px;
-  color: #8e8e98;
+  color: var(--muted);
   font-size: var(--type-control);
   line-height: 1.7;
 }
@@ -438,9 +441,6 @@
   }
   .docs-menu nav {
     padding-bottom: 12px;
-  }
-  .docs-menu a {
-    margin-left: 0;
   }
 }
 @media (max-width: 700px) {

@@ -1,14 +1,15 @@
 ---
-/** The workflow section's demo: the same window, floor, and player as the hero. */
+/** The workflow section's demo: the hero's window and player, standing on its own painting. */
+import ArtPanel from "./ArtPanel.astro";
 import WorkflowScene from "./hero/WorkflowScene.astro";
 ---
 
-<div class="demo-stage" data-workflow-demo>
-  <div class="demo-platform">
+<div data-workflow-demo>
+  <ArtPanel art="feature-workflow" class="demo-art">
     <div class="demo-window">
       <WorkflowScene label="Sample OpenOrc journey. A question about app performance becomes three tasks. Inside the first task the user asks GPT-6-Astra and Opus 5.5 for their views, asks GPT-6-Astra to build it, and a new thread finishes with a change ready for review." />
     </div>
-  </div>
+  </ArtPanel>
 </div>
 
 <script>

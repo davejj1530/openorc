@@ -1,4 +1,5 @@
 ---
+import ArtPanel from "./ArtPanel.astro";
 import DiscussionScene from "./hero/DiscussionScene.astro";
 import HandoffScene from "./hero/HandoffScene.astro";
 import TeamScene from "./hero/TeamScene.astro";
@@ -6,7 +7,7 @@ import openai from "../../public/openai.svg?raw";
 import claude from "../../public/claude.svg?raw";
 import opencode from "../../public/opencode.svg?raw";
 
-/** The provider marks the app ships. The OpenAI and OpenCode marks are dark and turn light on dark, as in the app. */
+/** The provider marks the app ships, in their own colors on the scenes' light theme, as in the app. */
 const logoPaths = (svg: string, fill?: string) => {
   const paths = svg.match(/<path\b[^>]*>(?:<\/path>)?/g)?.join("") ?? "";
   return fill ? paths.replace(/fill="[^"]*"/g, `fill="${fill}"`) : paths;
@@ -40,29 +41,26 @@ const demos = [
 </script>
 <section class="product-showcase" id="product" data-product-gallery aria-label="OpenOrc product demos">
   <svg class="hs-sprite" aria-hidden="true">
-    <symbol id="hs-logo-codex" viewBox="0 0 41 41" set:html={logoPaths(openai, "#fff")} />
+    <symbol id="hs-logo-codex" viewBox="0 0 41 41" set:html={logoPaths(openai, "#0d0d0d")} />
     <symbol id="hs-logo-claude" viewBox="0 0 125 125" set:html={logoPaths(claude)} />
-    <symbol id="hs-logo-opencode" viewBox="96 64 320 384" set:html={logoPaths(opencode).replace(/#131010/gi, "#ececef").replace(/#7A7676/gi, "#8e8e98")} />
+    <symbol id="hs-logo-opencode" viewBox="96 64 320 384" set:html={logoPaths(opencode)} />
   </svg>
-  <div class="demo-tabs container" role="tablist" aria-label="Explore OpenOrc demos" hidden data-demo-tabs>
+  <div class="demo-tabs" role="tablist" aria-label="Explore OpenOrc demos" hidden data-demo-tabs>
     {demos.map((demo, i) => (
       <button type="button" role="tab" id={`demo-tab-${demo.id}`} aria-controls={`demo-${demo.id}`} aria-selected={i === 0 ? "true" : "false"} tabindex={i === 0 ? 0 : -1}>
-        <span class="demo-tab-index">0{i + 1}</span>
-        <span>{demo.label}</span>
+        {demo.label}
       </button>
     ))}
   </div>
-  {demos.map(({ id, alt, Scene }, i) => (
-    <article id={`demo-${id}`} class="demo-panel" data-panel hidden={i !== 0}>
-      <div class="demo-stage">
-        <div class="demo-platform">
-          <div class="demo-window">
-            <Scene label={alt} />
-          </div>
+  <ArtPanel art="hero" phoneArt="hero-mobile" eager class="demo-art">
+    {demos.map(({ id, alt, Scene }, i) => (
+      <article id={`demo-${id}`} class="demo-panel" data-panel hidden={i !== 0}>
+        <div class="demo-window">
+          <Scene label={alt} />
         </div>
-      </div>
-    </article>
-  ))}
+      </article>
+    ))}
+  </ArtPanel>
 </section>
 
 <script>

@@ -1,6 +1,6 @@
 ---
 /**
- * The app sidebar as the desktop app lays it out (Sidebar.tsx): New thread and the main views, the Threads and
+ * The app sidebar as the desktop app lays it out (Sidebar.tsx): New thread, Tasks and Pull requests, the Threads and
  * Orclings tabs, the filter, then projects and their threads. A working thread says what its agent is doing under
  * its title, and the Inbox, history and Settings sit at the foot. Stills pass no journey.
  */
@@ -22,8 +22,7 @@ const { journey, nav, rows, inboxPending } = Astro.props;
 const navigation = [
   { icon: "compose", label: "New thread" },
   { icon: "tasks", label: "Tasks" },
-  { icon: "scheduled", label: "Schedules" },
-  { icon: "more", label: "More" },
+  { icon: "pullRequest", label: "Pull requests" },
 ] as const;
 const studio = [...rows, ...otherThreads.filter((thread) => !rows.some((row) => row.title === thread.title))];
 const show = (windows: string) => (journey ? timed(journey, windows) : {});

@@ -10,7 +10,6 @@ import lead from "../../assets/team-avatars/avatar-01-facet.png";
 import server from "../../assets/team-avatars/avatar-02-ripple.png";
 import reviewer from "../../assets/team-avatars/avatar-03-helix.png";
 import client from "../../assets/team-avatars/avatar-04-portal.png";
-import PresenceMark from "./PresenceMark.astro";
 import ProductIcon from "./ProductIcon.astro";
 import Prose from "./Prose.astro";
 import SceneFrame from "./SceneFrame.astro";
@@ -85,10 +84,6 @@ const at = (windows: string) => timed(teamJourney, windows);
           ) : null}
         </section>
       ))}
-      <div class="hs-presence-row">
-        <PresenceMark />
-        <span {...at("send~done")} data-clock="send" data-clock-text="Working for {s}s">Working for 0s</span>
-      </div>
 
       <p slot="hint" class="hs-hint">
         <span {...at("<send >done")}>{team.hints.idle}</span>

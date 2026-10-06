@@ -10,7 +10,6 @@
  * With motion, blocks open with springs and each message flies to the thread
  * it reaches, opening into that thread's notice.
  */
-import PresenceMark from "./PresenceMark.astro";
 import ProductIcon from "./ProductIcon.astro";
 import Prose from "./Prose.astro";
 import SceneFrame from "./SceneFrame.astro";
@@ -123,7 +122,6 @@ const file = (path: string) => path.slice(path.lastIndexOf("/") + 1);
           <span class="hs-counts"><span class="hs-added">+{a.change.added}</span><span class="hs-removed">−{a.change.removed}</span></span>
         </div>
       </section>
-      <PresenceMark />
     </ThreadPane>
 
     <ThreadPane id="b" journey={handoff} title={b.title} busy={busy.b} model={{ harness: b.harness, label: b.label, effort: b.effort }} permission={b.permission} placeholder={`Message ${b.agent}…`} branch={branches.plansThread} changes changeStat={b.change}>
@@ -177,7 +175,6 @@ const file = (path: string) => path.slice(path.lastIndexOf("/") + 1);
           <span class="hs-notice-toggle" {...at(">bDetails")}>Hide details</span>
         </span>
       </div>
-      <PresenceMark />
     </ThreadPane>
   </div>
   <div class="hs-flight" data-from="a-sending" data-to="b-notice" data-start="aSending" data-land="aLand" aria-hidden="true" hidden><ProductIcon name="workMessage" /><span class="hs-flight-label">{a.flight}</span></div>

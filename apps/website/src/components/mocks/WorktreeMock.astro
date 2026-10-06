@@ -4,7 +4,6 @@
  * app, the composer names the thread's branch with its uncommitted changes; the sidebar is the scenes' own.
  */
 import "../../styles/hero-scene.css";
-import PresenceMark from "../hero/PresenceMark.astro";
 import ProductIcon from "../hero/ProductIcon.astro";
 import Prose from "../hero/Prose.astro";
 import SceneSidebar from "../hero/SceneSidebar.astro";
@@ -35,6 +34,5 @@ const rows = [
     <div class="hs-user"><div class="hs-bubble">Move every color, radius, and spacing value into one tokens file.</div></div>
     <div class="hs-work"><span class="hs-work-toggle">Worked · 3 files changed<ProductIcon name="chevronRight" /></span></div>
     <div class="hs-reply"><div class="hs-author">Assistant</div><Prose text="Every color, radius, and spacing step now comes from one `tokens.css`. The old per-component values are gone, and nothing outside this worktree has changed." /></div>
-    <PresenceMark />
   </ThreadPane>
 </div>

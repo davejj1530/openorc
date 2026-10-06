@@ -72,7 +72,8 @@ export function Sidebar() {
 function SidebarHeader() {
   return (
     <header className="sidebar-header drag-region h-topbar">
-      <span className="sidebar-app-name">OpenOrc</span>
+      <span className="flex-1" />
+      <InboxButton />
       <SidebarToggle open />
       <Tooltip label="Search">
         <IconButton onClick={() => useUi.getState().setPalette(true)} aria-label="Search" className="no-drag">
@@ -103,7 +104,6 @@ function SidebarFooter() {
           <Settings size={16} />
           <span>Settings</span>
         </button>
-        <InboxButton />
         <HistoryNav />
       </div>
     </footer>

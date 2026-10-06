@@ -1,0 +1,10 @@
+Immaculate Gothic family package 1.101
+Created 5 October 2026
+
+An original typeface by David Ceriola, designed with AI assistance for OpenOrc.
+
+The letterforms were constructed independently for this project. The family has two upright faces: Text at weight 450 and Bold at weight 700. Bold was made by real outline expansion, with its own optical corrections, rebuilt composites, hinting and spacing. No external font files or proprietary font outlines were used as source material.
+
+Built with FontTools, Skia PathOps, HarfBuzz, ttfautohint and Brotli. Hinting is automatic, not hand-tuned. These tools were used for construction, shaping, validation and compression; none of their code is included.
+
+No open-source license has been assigned to the font. It is separate from the repository's Apache-2.0 code license. This note records provenance and scope; it is not a trademark search, legal clearance or warranty.

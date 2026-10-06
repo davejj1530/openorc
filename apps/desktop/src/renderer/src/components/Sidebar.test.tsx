@@ -115,6 +115,45 @@ it.each([false, true])("keeps the current conversation destination when the sele
   expect(useRouter.getState().history).toEqual(history);
 });
 
+it("lists Settings' sections in place of the app's navigation, then goes back to the screen Settings was opened from", () => {
+  useRouter.setState({ route: { view: "settings", section: "slack" }, history: [{ view: "tasks" }, { view: "settings" }] });
+  mountSidebar();
+  const sections = screen.getByRole("navigation", { name: "Settings" });
+  expect(
+    within(sections)
+      .getAllByRole("button")
+      .map((row) => row.textContent),
+  ).toEqual(["Usage", "Connections", "Slack", "Skills", "Appearance", "General", "Memory & models", "Data"]);
+  expect(within(sections).getByRole("button", { name: "Slack" }).getAttribute("aria-current")).toBe("page");
+  expect(screen.queryByRole("button", { name: "New thread" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Add project" })).toBeNull();
+  // The thread list waits underneath, so its loaded pages and scroll survive the visit.
+  expect(screen.getByRole("region", { name: "Thread browser", hidden: true })).toBeTruthy();
+  expect(screen.queryByRole("region", { name: "Thread browser" })).toBeNull();
+
+  fireEvent.click(within(sections).getByRole("button", { name: "Appearance" }));
+  expect(useRouter.getState().route).toEqual({ view: "settings", section: "appearance" });
+  expect(within(sections).getByRole("button", { name: "Appearance" }).getAttribute("aria-current")).toBe("page");
+
+  fireEvent.click(screen.getByRole("button", { name: "Back to app" }));
+  expect(useRouter.getState().route).toEqual({ view: "tasks" });
+  expect(screen.queryByRole("navigation", { name: "Settings" })).toBeNull();
+  expect(screen.getByRole("button", { name: "New thread" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Settings" })).toBeTruthy();
+});
+
+it("goes back to a new thread when Settings was opened first", () => {
+  useRouter.setState({ route: { view: "settings" } });
+  mountSidebar();
+  expect(
+    within(screen.getByRole("navigation", { name: "Settings" }))
+      .getByRole("button", { name: "Usage" })
+      .getAttribute("aria-current"),
+  ).toBe("page");
+  fireEvent.click(screen.getByRole("button", { name: "Back to app" }));
+  expect(useRouter.getState().route).toEqual({ view: "newthread" });
+});
+
 it.each([
   ["Inbox", "inbox"],
   ["Back", "tasks"],

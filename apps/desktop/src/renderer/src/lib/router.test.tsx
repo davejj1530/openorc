@@ -89,15 +89,20 @@ describe("adjacent pane widths", () => {
   });
 });
 
-it("round-trips provider-targeted usage routes while keeping old Settings routes valid", async () => {
-  const { routeFromSpec, specFromRoute } = await import("./router");
+it("round-trips every Settings section and what a link points at there, while keeping old Settings routes valid", async () => {
+  const { routeFromSpec, specFromRoute, SETTINGS_SECTIONS } = await import("./router");
   expect(routeFromSpec("settings")).toEqual({ view: "settings" });
+  for (const section of SETTINGS_SECTIONS) expect(routeFromSpec(specFromRoute({ view: "settings", section }))).toEqual({ view: "settings", section });
   for (const provider of ["claude", "codex"] as const) {
     const route = { view: "settings" as const, section: "usage" as const, provider };
     expect(routeFromSpec(specFromRoute(route))).toEqual(route);
   }
+  const teamExecution = { view: "settings" as const, section: "general" as const, setting: "team-execution" as const };
+  expect(specFromRoute(teamExecution)).toBe("settings:general:team-execution");
+  expect(routeFromSpec(specFromRoute(teamExecution))).toEqual(teamExecution);
   expect(routeFromSpec("settings:usage:unknown")).toEqual({ view: "settings", section: "usage" });
-  expect(routeFromSpec(specFromRoute({ view: "settings", section: "general" }))).toEqual({ view: "settings", section: "general" });
+  expect(routeFromSpec("settings:general:codex")).toEqual({ view: "settings", section: "general" });
+  expect(routeFromSpec("settings:unknown")).toEqual({ view: "settings" });
 });
 
 it("round-trips pull request routes and rejects a pull request without a number", async () => {

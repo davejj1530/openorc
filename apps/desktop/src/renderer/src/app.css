@@ -2751,75 +2751,52 @@ diffs-container {
   opacity: 0;
   transform: translateY(2px);
 }
-/* Compact text navigation above one continuous preference sheet. */
+/* One preference sheet per section. The sidebar lists the sections. */
 .settings-shell {
   --settings-content-width: 960px;
   --settings-control-width: 240px;
-  --settings-inset: 36px;
   container-type: inline-size;
   flex: 1;
   min-height: 0;
   min-width: 0;
   overflow: hidden;
 }
-.settings-layout {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  height: 100%;
-}
 .settings-window-title {
+  display: flex;
+  min-width: 0;
   padding-inline: 4px;
   font-size: 13px;
   font-weight: 500;
 }
-.settings-nav {
-  min-width: 0;
-  padding: 6px var(--settings-inset);
-}
-.settings-tablist {
-  display: flex;
-  gap: 4px;
-  max-width: var(--settings-content-width);
-  margin-inline: auto;
-  overflow-x: auto;
-  scrollbar-width: thin;
-}
-.settings-tablist button {
-  display: flex;
+/* With the sidebar hidden, the title opens the section list. */
+.settings-section-menu {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  position: relative;
-  flex: 0 0 auto;
-  min-height: 28px;
-  padding: 0 10px;
+  gap: 4px;
+  min-width: 0;
+  height: 28px;
+  margin-inline: -4px;
+  padding: 0 6px 0 4px;
   border-radius: 6px;
-  color: var(--ink-3);
-  font-size: 12px;
-  font-weight: 400;
-  white-space: nowrap;
-  transition:
-    background-color 120ms var(--ease-out),
-    color 120ms var(--ease-out);
-}
-.settings-tablist button:hover {
-  background: var(--surface-2);
   color: var(--ink);
+  transition: background-color 120ms var(--ease-out);
 }
-.settings-tablist button[aria-selected="true"] {
-  color: var(--navigation-ink);
-  background: var(--navigation-soft);
+.settings-section-menu > svg {
+  color: var(--ink-3);
 }
-.settings-tablist button:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: -2px;
+.settings-section-menu:hover,
+.settings-section-menu[data-popup-open] {
+  background: var(--surface-2);
 }
 .settings-content {
+  --settings-inset: 36px;
+  height: 100%;
   min-width: 0;
   overflow-y: auto;
   scrollbar-gutter: stable;
   padding: 20px var(--settings-inset) 32px;
 }
-.settings-content > div {
+.settings-content > section {
   max-width: var(--settings-content-width);
   margin-inline: auto;
   overflow-wrap: anywhere;
@@ -3168,7 +3145,7 @@ diffs-container {
   border-bottom: 1px solid var(--line);
 }
 @container (max-width: 720px) {
-  .settings-layout {
+  .settings-content {
     --settings-inset: 24px;
   }
   .skills-scope {
@@ -3183,7 +3160,7 @@ diffs-container {
   }
 }
 @container (max-width: 500px) {
-  .settings-layout {
+  .settings-content {
     --settings-inset: 16px;
   }
   .skills-toolbar {

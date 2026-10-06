@@ -346,15 +346,11 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .settings-tablist button {
+  .settings-section-menu {
     transition: none;
   }
 }
 @media (forced-colors: active) {
-  .settings-tablist button[aria-selected="true"] {
-    outline: 1px solid Highlight;
-    outline-offset: -1px;
-  }
   .usage-meter {
     border: 1px solid CanvasText;
   }

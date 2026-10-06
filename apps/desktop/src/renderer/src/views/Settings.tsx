@@ -1,9 +1,16 @@
-import { settingsTabIndex, idleTimeoutLabel, memoryModelAgent, learningStatus } from "./settings-presentation";
-import { AgentConnections } from "./settings-agent-updates";
-import { useRouter } from "../lib/router";
+import type { UseQueryResult } from "@tanstack/react-query";
+import { Menu } from "@base-ui/react/menu";
 import { useEffect, useRef, useState } from "react";
-import { RefreshCw } from "../components/icons";
-import { distillationHarnessIds, harnessCatalog, type AppSettings, type ExtractionProviderChoice } from "@openorc/protocol";
+import { distillationHarnessIds, harnessCatalog, type AppSettings, type ExtractionProviderChoice, type RpcResults } from "@openorc/protocol";
+import { idleTimeoutLabel, memoryModelAgent, learningStatus } from "./settings-presentation";
+import { AgentConnections } from "./settings-agent-updates";
+import { useRouter, type Route, type SettingsSection } from "../lib/router";
+import { useLayout } from "../lib/layout";
+import { cn } from "../lib/cn";
+import { CoversPreview } from "../lib/browser-preview";
+import { settingsSection, settingsSections } from "../lib/settings-sections";
+import { Check, ChevronDown, RefreshCw } from "../components/icons";
+import { menuItem, menuPopup } from "../components/ThreadActions";
 import { TopBar } from "../components/TopBar";
 import { MemoryControl } from "../components/MemoryControl";
 import { Button, Input, Select } from "../components/ui";
@@ -17,112 +24,116 @@ import { ProviderUsageOverview } from "./settings-usage";
 import { TextGenerationSettings } from "./settings-text-generation";
 import { UpdateSettingsSection } from "./settings-updates";
 
-const sections = [
-  { id: "usage", label: "Usage", description: "Account allowances, across your providers." },
-  { id: "connections", label: "Connections", description: "The agents and tools connected to OpenOrc." },
-  { id: "slack", label: "Slack", description: "Bring requests from Slack to this computer." },
-  { id: "skills", label: "Skills", description: "Browse the skills your agents can use." },
-  { id: "appearance", label: "Appearance", description: "Your workspace, in your own colors." },
-  { id: "general", label: "General", description: "Everyday preferences for the way you work." },
-  { id: "memory", label: "Memory & models", description: "What OpenOrc remembers, and which models help." },
-  { id: "data", label: "Data", description: "Your work lives on this device." },
-] as const;
+type SettingsRoute = Extract<Route, { view: "settings" }>;
 
-export function Settings() {
-  const route = useRouter((state) => state.route);
-  const [active, setActive] = useState<string>("usage");
+/** The sidebar lists the sections, and the route says which one is open. */
+export function Settings({ route }: { route: SettingsRoute }) {
+  const current = settingsSection(route);
+  const content = useRef<HTMLDivElement>(null);
+  // Each section opens at its top, unless the link that opened it points further down.
   useEffect(() => {
-    document.getElementById(`settings-tab-${active}`)?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
-  }, [active]);
-  useEffect(() => {
-    if (route.view !== "settings" || !route.section) return;
-    setActive(route.section);
-    const frame = requestAnimationFrame(() => {
-      if (route.section === "general") {
-        document.getElementById("team-execution-setting")?.scrollIntoView?.({ block: "center" });
-        return;
-      }
-      if (route.section !== "usage" || !route.provider) return;
-      const target = document.getElementById(`provider-usage-${route.provider}`);
-      target?.scrollIntoView?.({ block: "start" });
-      target?.focus({ preventScroll: true });
-    });
+    if (content.current) content.current.scrollTop = 0;
+    const frame = requestAnimationFrame(() => revealSetting(route));
     return () => cancelAnimationFrame(frame);
   }, [route]);
-  const content = useRef<HTMLDivElement>(null);
-  const select = (id: string) => {
-    setActive(id);
-    if (content.current) content.current.scrollTop = 0;
-  };
   const info = useRpc("system.info", { refresh: true });
   return (
     <>
       <TopBar showProject={false}>
-        <h1 className="settings-window-title">Settings</h1>
+        <SettingsTitle current={current} />
       </TopBar>
       <div className="settings-shell">
-        <div className="settings-layout">
-          <nav className="settings-nav" aria-label="Settings sections">
-            <div
-              className="settings-tablist"
-              role="tablist"
-              aria-label="Settings sections"
-              onKeyDown={(event) => {
-                const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
-                const index = tabs.indexOf(event.target as HTMLButtonElement);
-                if (index < 0) return;
-                const next = settingsTabIndex(event.key, index, tabs.length);
-                if (next === null) return;
-                event.preventDefault();
-                tabs[next]?.focus();
-                tabs[next]?.click();
-              }}
-            >
-              {sections.map(({ id, label }) => (
-                <button key={id} id={`settings-tab-${id}`} role="tab" aria-selected={active === id} tabIndex={active === id ? 0 : -1} aria-controls={`settings-${id}`} onClick={() => select(id)}>
-                  {label}
-                </button>
-              ))}
-            </div>
-          </nav>
-          <div ref={content} className="settings-content">
-            {sections.map(({ id, description }) => (
-              <div key={id} id={`settings-${id}`} role="tabpanel" aria-labelledby={`settings-tab-${id}`} tabIndex={0} hidden={active !== id}>
-                <header className="settings-heading">
-                  <p>{description}</p>
-                  {id === "connections" && (
-                    <Button disabled={info.isFetching} onClick={() => void info.refetch()}>
-                      <RefreshCw size={13} />
-                      {info.isFetching ? "Checking…" : "Refresh connections"}
-                    </Button>
-                  )}
-                </header>
-                {id === "usage" && <ProviderUsageOverview active={active === id} />}
+        <div ref={content} className="settings-content">
+          {settingsSections.map(({ id, label, description }) => (
+            <section key={id} id={`settings-${id}`} aria-label={label} hidden={id !== current.id}>
+              <header className="settings-heading">
+                <p>{description}</p>
                 {id === "connections" && (
-                  <>
-                    {info.isError && <LoadError retry={() => void info.refetch()} />}
-                    <AgentConnections info={info.data} />
-                    <GitHubSettings info={info.data} />
-                  </>
+                  <Button disabled={info.isFetching} onClick={() => void info.refetch()}>
+                    <RefreshCw size={13} />
+                    {info.isFetching ? "Checking…" : "Refresh connections"}
+                  </Button>
                 )}
-                {id === "skills" && <SkillsSettings active={active === id} />}
-                {id === "slack" && <SlackSettings active={active === id} />}
-                {id === "appearance" && <AppearanceSettings />}
-                {id === "general" && <GeneralSettings />}
-                {id === "memory" && (
-                  <>
-                    <MemorySettings />
-                    <TextGenerationSettings />
-                  </>
-                )}
-                {id === "data" && <DataSettings dataDir={info.data?.dataDir} error={info.isError} retry={() => void info.refetch()} />}
-              </div>
-            ))}
-          </div>
+              </header>
+              <SectionSettings id={id} active={id === current.id} info={info} />
+            </section>
+          ))}
         </div>
       </div>
     </>
   );
+}
+
+/** Brings what a link into Settings points at into view: a provider's usage, or team execution. */
+function revealSetting(route: SettingsRoute) {
+  if (route.setting === "team-execution") document.getElementById("team-execution-setting")?.scrollIntoView?.({ block: "center" });
+  if (route.section !== "usage" || !route.provider) return;
+  const target = document.getElementById(`provider-usage-${route.provider}`);
+  target?.scrollIntoView?.({ block: "start" });
+  target?.focus({ preventScroll: true });
+}
+
+/** The open section's name. While the sidebar is hidden, it also switches sections. */
+export function SettingsTitle({ current }: { current: { id: SettingsSection; label: string } }) {
+  const sidebarOpen = useLayout((s) => s.sidebarOpen);
+  const navigate = useRouter((s) => s.navigate);
+  if (sidebarOpen) return <h1 className="settings-window-title">{current.label}</h1>;
+  return (
+    <h1 className="settings-window-title">
+      <Menu.Root>
+        <Menu.Trigger className="settings-section-menu no-drag">
+          <span className="truncate">{current.label}</span>
+          <ChevronDown size={12} className="shrink-0" />
+        </Menu.Trigger>
+        <Menu.Portal>
+          <CoversPreview />
+          <Menu.Positioner sideOffset={6} align="start" className="z-40" collisionPadding={8}>
+            <Menu.Popup className={menuPopup}>
+              {settingsSections.map(({ id, label }) => (
+                <Menu.Item key={id} className={menuItem} onClick={() => navigate({ view: "settings", section: id })}>
+                  <Check size={13} className={cn("text-transparent", id === current.id && "text-ink")} />
+                  <span className="truncate">{label}</span>
+                </Menu.Item>
+              ))}
+            </Menu.Popup>
+          </Menu.Positioner>
+        </Menu.Portal>
+      </Menu.Root>
+    </h1>
+  );
+}
+
+/** One section's settings. Every section stays mounted, so a change in progress survives a look at another. */
+function SectionSettings({ id, active, info }: { id: SettingsSection; active: boolean; info: UseQueryResult<RpcResults["system.info"]> }) {
+  switch (id) {
+    case "usage":
+      return <ProviderUsageOverview active={active} />;
+    case "connections":
+      return (
+        <>
+          {info.isError && <LoadError retry={() => void info.refetch()} />}
+          <AgentConnections info={info.data} />
+          <GitHubSettings info={info.data} />
+        </>
+      );
+    case "slack":
+      return <SlackSettings active={active} />;
+    case "skills":
+      return <SkillsSettings active={active} />;
+    case "appearance":
+      return <AppearanceSettings />;
+    case "general":
+      return <GeneralSettings />;
+    case "memory":
+      return (
+        <>
+          <MemorySettings />
+          <TextGenerationSettings />
+        </>
+      );
+    case "data":
+      return <DataSettings dataDir={info.data?.dataDir} error={info.isError} retry={() => void info.refetch()} />;
+  }
 }
 
 const days = (v: number | null | undefined) => (v == null ? "" : String(v));

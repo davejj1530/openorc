@@ -3,6 +3,11 @@ import { useLayout } from "./layout";
 
 export type TaskTab = "chat" | "spec" | "files" | "commits" | "memory";
 
+/** The sections Settings is divided into, in the order it lists them. */
+export const SETTINGS_SECTIONS = ["usage", "connections", "slack", "skills", "appearance", "general", "memory", "data"] as const;
+export type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
+const settingsSections: ReadonlySet<string> = new Set<SettingsSection>(SETTINGS_SECTIONS);
+
 export type Route =
   | { view: "onboarding"; mode?: "first_run" | "recovery"; preview?: boolean }
   | { view: "newthread"; projectId?: string }
@@ -19,7 +24,8 @@ export type Route =
   | { view: "orchestration"; projectId?: string; teamId?: string }
   /** The Orcling designer: a new Orcling, or one being changed. */
   | { view: "orcling"; orclingId?: string }
-  | { view: "settings"; section?: "usage" | "connections" | "general"; provider?: "codex" | "claude" }
+  /** A section, optionally with what to bring into view there: a provider's usage, or team execution. */
+  | { view: "settings"; section?: SettingsSection; provider?: "codex" | "claude"; setting?: "team-execution" }
   | { view: "diagnostics" };
 
 interface RouterState {
@@ -153,18 +159,25 @@ export function routeFromSpec(spec: string): Route | null {
       ...(id ? { projectId: id } : {}),
       ...(tab ? { teamId: tab } : {}),
     };
-  if (view === "settings")
-    return {
-      view,
-      ...(id === "usage" ? { section: "usage" as const, ...(tab === "codex" || tab === "claude" ? { provider: tab } : {}) } : {}),
-      ...(id === "general" ? { section: "general" as const } : {}),
-    };
+  if (view === "settings") return settingsFromSpec(id, tab);
   if (isPlainView(view)) return { view };
   return null;
 }
 
+function isSettingsSection(value: string | undefined): value is SettingsSection {
+  return value !== undefined && settingsSections.has(value);
+}
+
+/** "settings:<section>", with a provider after usage or a setting after general. */
+function settingsFromSpec(section: string | undefined, detail: string | undefined): Route {
+  if (!isSettingsSection(section)) return { view: "settings" };
+  if (section === "usage" && (detail === "codex" || detail === "claude")) return { view: "settings", section, provider: detail };
+  if (section === "general" && detail === "team-execution") return { view: "settings", section, setting: detail };
+  return { view: "settings", section };
+}
+
 function settingsSpec(route: Extract<Route, { view: "settings" }>): string {
-  return route.section ? `settings:${route.section}${route.provider ? `:${route.provider}` : ""}` : "settings";
+  return route.section ? ["settings", route.section, route.provider ?? route.setting].filter(Boolean).join(":") : "settings";
 }
 
 function onboardingSpec(route: Extract<Route, { view: "onboarding" }>): string {

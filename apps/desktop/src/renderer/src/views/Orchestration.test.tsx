@@ -197,5 +197,5 @@ it("shows when team execution is off, links to its setting, and updates when ena
   await queryClient.invalidateQueries({ queryKey: ["orchestration.availability", {}] });
   await screen.findByText("Team execution off");
   fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-  expect(useRouter.getState().route).toEqual({ view: "settings", section: "general" });
+  expect(useRouter.getState().route).toEqual({ view: "settings", section: "general", setting: "team-execution" });
 });

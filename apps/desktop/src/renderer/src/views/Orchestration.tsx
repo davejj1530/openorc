@@ -266,7 +266,7 @@ function ProjectTeams({ projectId, teamId, projectPicker }: { projectId: string;
             enabled: Boolean(availability.data?.enabled),
             maxHierarchyDepth: availability.data?.maxHierarchyDepth,
             retry: () => void availability.refetch(),
-            openSettings: () => navigate({ view: "settings", section: "general" }),
+            openSettings: () => navigate({ view: "settings", section: "general", setting: "team-execution" }),
           })}
         </p>
       </div>

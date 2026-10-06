@@ -1,10 +1,12 @@
+import type { ReactNode } from "react";
 import type { ThreadSummary } from "@openorc/protocol";
+import { cn } from "../lib/cn";
 import { AlertCircle, CircleHelp, LoaderCircle } from "./icons";
 
 type StatusFields = Pick<ThreadSummary, "activity" | "session" | "unread" | "doneAt">;
 
-/** Live activity takes priority over session health, unread activity. */
-export function ThreadStatusIndicator({ thread }: { thread: StatusFields }) {
+/** Live activity takes priority over session health, unread activity. With nothing to report, `idle` shows instead. */
+export function ThreadStatusIndicator({ thread, idle = null, className }: { thread: StatusFields; idle?: ReactNode; className?: string }) {
   let label: string;
   let indicator;
   if (thread.activity === "waiting") {
@@ -25,11 +27,11 @@ export function ThreadStatusIndicator({ thread }: { thread: StatusFields }) {
     label = "Unread";
     indicator = <span className="size-1.5 rounded-full bg-ink" />;
   } else {
-    return null;
+    return idle;
   }
 
   return (
-    <span role="img" aria-label={label} title={label} className="ml-1.5 size-3.5 shrink-0 inline-flex items-center justify-center">
+    <span role="img" aria-label={label} title={label} className={cn("size-3.5 shrink-0 inline-flex items-center justify-center", className)}>
       {indicator}
     </span>
   );

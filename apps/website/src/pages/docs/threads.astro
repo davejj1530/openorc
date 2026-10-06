@@ -112,7 +112,7 @@ const sections = [
   <section aria-labelledby="sidebar">
     <h2 id="sidebar">The sidebar</h2>
     <p>The sidebar lists the Workspace and each project with its threads. A project shows <strong>Running</strong> or <strong>Needs you</strong> when one of its threads does. Click <strong>+</strong> beside a project to start a thread there. To take a project off the list, right-click it and choose <strong>Remove project…</strong>. Its files, worktrees, and history are kept.</p>
-    <p>Each row shows a thread's title and a status icon, and below them its branch, its agent, and when it last changed. The icon tells you the agent is working, needs you, has failed, or has a result you haven't read. While there's something to report, an extra line appears under the title:</p>
+    <p>Each row shows a thread's title with a status icon before it. The icon tells you the agent is working, needs you, has failed, or has a result you haven't read. A thread with nothing to report shows its pull request's state instead, if it has one. Hover a row for its branch, agent, and when it last changed. While there's something to report, an extra line appears under the title:</p>
     <ul>
       <li>While the agent works, the step it's on, such as <strong>Running pnpm test</strong> or <strong>Thinking</strong>.</li>
       <li>While it waits for you, <strong>Needs approval</strong> with the command, or <strong>Has a question for you</strong>.</li>

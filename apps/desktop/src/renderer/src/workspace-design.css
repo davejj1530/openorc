@@ -383,10 +383,11 @@
 .project-group-activity[data-waiting="true"] {
   color: var(--warn);
 }
+/* The status slot sits under the project icon and the title under the project name, so the list needs no indent. */
 .app-shell .thread-preview {
   position: relative;
   border-radius: 7px;
-  padding: 7px 10px 7px 24px;
+  padding: 7px 10px 7px 9px;
   margin: 1px 0;
   gap: 0;
   min-height: 32px;
@@ -395,17 +396,14 @@
   text-align: left;
 }
 .thread-preview-heading {
-  gap: 8px;
+  gap: 11px;
   align-items: center;
 }
-.thread-preview-icon {
+.thread-preview-status {
   display: flex;
   flex-shrink: 0;
-  color: var(--ink-3);
-}
-.thread-preview-icon svg {
-  width: 13px;
-  height: 13px;
+  width: 14px;
+  justify-content: center;
 }
 .app-shell .sidebar-shell .thread-preview[aria-current="page"]:not(:focus-visible) {
   background: var(--navigation-soft);
@@ -419,7 +417,7 @@
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.thread-preview[aria-current="page"] :is(.thread-preview-title, .thread-preview-icon) {
+.thread-preview[aria-current="page"] .thread-preview-title {
   color: var(--navigation-ink);
 }
 /* Keep branch/provider details in the accessible label and hover title without a second row. */
@@ -433,20 +431,14 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
-.browser-thread-section {
-  margin-left: 12px;
-}
-.browser-thread-section .thread-preview {
-  padding-left: 12px;
-}
 .browser-empty {
-  padding: 6px 14px 10px 28px;
+  padding: 6px 14px 10px 34px;
   font-size: 12px;
   line-height: 1.5;
   color: var(--ink-3);
 }
 .browser-load-more {
-  padding: 8px 14px 8px 45px;
+  padding: 8px 14px 8px 34px;
   font-size: 12px;
   color: var(--ink-3);
 }

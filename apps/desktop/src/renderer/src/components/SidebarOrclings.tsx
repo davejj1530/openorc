@@ -64,7 +64,7 @@ function OrclingRow({ orcling, active }: { orcling: Orcling; active: boolean }) 
       <span className="flex flex-1 min-w-0 flex-col text-left">
         <span className="flex min-w-0 items-center">
           <span className="flex-1 min-w-0 truncate">{orcling.name}</span>
-          {thread.data ? <ThreadStatusIndicator thread={thread.data} /> : null}
+          {thread.data ? <ThreadStatusIndicator thread={thread.data} className="ml-1.5" /> : null}
         </span>
         {preview ? <span className="truncate text-sm text-ink-3">{last?.role === "user" ? `You: ${preview}` : preview}</span> : null}
       </span>

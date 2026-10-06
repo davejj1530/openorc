@@ -154,7 +154,7 @@ function Section({ id, label, count, children, defaultCollapsed = false }: { id:
   const toggle = useLayout((s) => s.toggleCollapsed);
   const open = defaultCollapsed ? collapsed.includes(id) : !collapsed.includes(id);
   return (
-    <div className="browser-thread-section">
+    <div>
       <button aria-expanded={open} onClick={() => toggle(id)} className="w-full flex items-center gap-1 h-6 pl-2 pr-2 text-xs text-ink-3 hover:text-ink">
         {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
         <span>{label}</span>

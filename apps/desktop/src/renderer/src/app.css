@@ -663,7 +663,7 @@ html[data-transparent-shell="true"] body {
 }
 html[data-transparent-shell="true"] .app-shell {
   /* Tint the native blur once, behind all outer rails. Content planes stay opaque. */
-  background: color-mix(in srgb, var(--bg) var(--shell-opacity, 65%), transparent);
+  background: color-mix(in srgb, var(--bg) var(--shell-opacity, 42%), transparent);
 }
 @media (prefers-reduced-transparency: reduce) {
   html[data-transparent-shell="true"] .app-shell {

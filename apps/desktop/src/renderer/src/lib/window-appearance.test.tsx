@@ -66,36 +66,37 @@ it("reports unavailable storage while still applying the current session prefere
   expect(useWindowAppearance.getState().setTransparent(true)).toBe(false);
   expect(useWindowAppearance.getState().transparent).toBe(true);
   expect(useWindowAppearance.getState().setTransparency(60)).toBe(false);
-  expect(document.documentElement.style.getPropertyValue("--shell-opacity")).toBe("40%");
+  expect(document.documentElement.style.getPropertyValue("--shell-opacity")).toBe("16%");
   save.mockRestore();
 });
 
 it("updates tint live without native calls and preserves the amount across toggles and theme changes", () => {
   expect(useWindowAppearance.getState().setTransparency(72)).toBe(true);
   expect(localStorage.getItem("openorc.shellTransparency")).toBe("72");
-  expect(document.documentElement.style.getPropertyValue("--shell-opacity")).toBe("28%");
+  expect(document.documentElement.style.getPropertyValue("--shell-opacity")).toBe("8%");
   expect(sync).not.toHaveBeenCalled();
   useWindowAppearance.getState().setTransparent(true);
   useWindowAppearance.getState().setTransparent(false);
   useTheme.getState().set("light");
   useWindowAppearance.getState().setTransparent(true);
   expect(useWindowAppearance.getState().transparency).toBe(72);
-  expect(document.documentElement.style.getPropertyValue("--shell-opacity")).toBe("28%");
+  expect(document.documentElement.style.getPropertyValue("--shell-opacity")).toBe("8%");
 });
 
 it.each([
-  ["80", 80],
-  ["100", 100],
-  ["0", 0],
-  ["120", 100],
-  ["-10", 0],
-  ["NaN", 35],
-  ["", 35],
-  [null, 35],
-] as const)("restores saved transparency %s safely across windows", (stored, expected) => {
+  ["80", 80, "4%"],
+  ["100", 100, "0%"],
+  ["0", 0, "100%"],
+  ["120", 100, "0%"],
+  ["-10", 0, "100%"],
+  ["30", 30, "49%"],
+  ["NaN", 35, "42%"],
+  ["", 35, "42%"],
+  [null, 35, "42%"],
+] as const)("restores saved transparency %s safely across windows", (stored, expected, tint) => {
   if (stored !== null) localStorage.setItem("openorc.shellTransparency", stored);
   window.dispatchEvent(new StorageEvent("storage", { key: "openorc.shellTransparency" }));
   expect(useWindowAppearance.getState().transparency).toBe(expected);
-  expect(document.documentElement.style.getPropertyValue("--shell-opacity")).toBe(`${100 - expected}%`);
+  expect(document.documentElement.style.getPropertyValue("--shell-opacity")).toBe(tint);
   expect(sync).not.toHaveBeenCalled();
 });

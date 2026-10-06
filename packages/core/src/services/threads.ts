@@ -653,7 +653,7 @@ export class ThreadService {
     const thread = this.thread(id);
     if (thread.projectId === WORKSPACE_ID) throw new Error("Workspace conversations use their selected folder. Open a project for Git worktree actions.");
     if (thread.workspaceMode === to) return thread;
-    if (this.runs.liveRunForThread(id)) throw new Error("end the current turn before moving the thread");
+    await this.closeIdleRun(id, "moving the thread");
     const project = executionProject(this.db, thread);
     const from = thread.worktreePath ?? project.rootPath;
     const destination = to === "worktree" ? { ...thread, workspaceMode: to, worktreePath: null, branch: null, baseSha: null } : { ...thread, workspaceMode: to, worktreePath: null };
@@ -772,7 +772,7 @@ export class ThreadService {
    * checkpoint of their own, so a restore can itself be undone, and the restored state becomes the next one.
    */
   async restore(id: string, checkpointId: string): Promise<void> {
-    if (this.runs.liveRunForThread(id)) throw new Error("end the current turn before restoring");
+    await this.closeIdleRun(id, "restoring");
     const { thread, checkpoint, cwd } = await this.restoreTarget(id, checkpointId);
     await this.writers.withLease(cwd, `restoring thread ${id}`, async () => {
       const root = await realpath(cwd);
@@ -788,6 +788,19 @@ export class ThreadService {
       audit.record(this.db, { actor: "user", action: "thread.restore", resourceType: "thread", resourceId: id, metadata: { checkpointId, treeSha: checkpoint.treeSha, before: current } });
       this.invalidate(["workspace-diff", `threaddiff:${id}`, `threadlog:${id}`, `checkpoints:${id}`, "threads", `thread:${id}`]);
     });
+  }
+
+  /**
+   * Changing the files under a conversation needs its agent stopped. A turn in progress blocks the change, and so do
+   * commands it left running, such as a dev server, which closing would end without a word. An agent waiting between
+   * turns is closed first, as deleting does; the next message resumes the conversation.
+   */
+  private async closeIdleRun(id: string, action: string): Promise<void> {
+    const live = this.runs.liveRunForThread(id);
+    if (!live) return;
+    if (this.runs.threadActivity(id) !== "idle") throw new Error(`end the current turn before ${action}`);
+    if (this.runs.threadBackgroundCommands(id).length > 0) throw new Error(`stop the thread's background commands before ${action}`);
+    await this.runs.closeAndWait(live.id);
   }
 
   /** A checkpoint restores only into the folder it was read from, and only while Git still has its files. */

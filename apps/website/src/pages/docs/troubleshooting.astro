@@ -165,10 +165,11 @@ const sections = [
           </tr>
           <tr>
             <td>end the current turn before moving the thread</td>
-            <td>
-              The thread's agent process is still open, even between turns. It closes after the time set in <strong>Close idle processes after</strong> (10 minutes by default), unless that is <strong>Keep running</strong> or a command it
-              left running in the background is still going. Try the move again then.
-            </td>
+            <td>The agent is in the middle of a turn. Wait for it to finish, or stop it, then move again. Undo says the same with "restoring".</td>
+          </tr>
+          <tr>
+            <td>stop the thread's background commands before moving the thread</td>
+            <td>A command the agent left running, such as a dev server, would end with its agent. Stop it in the thread, then move again. Undo says the same with "restoring".</td>
           </tr>
           <tr>
             <td>These files changed in both the worktree and the checkout: … Nothing was moved.</td>

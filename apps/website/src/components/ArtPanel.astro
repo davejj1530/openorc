@@ -1,0 +1,57 @@
+---
+/**
+ * A painting with a product view standing on it, as on Cursor's site. Paintings live in src/assets/art; Astro
+ * resizes them to AVIF and WebP at build, and phones can get a taller crop.
+ */
+import { getImage } from "astro:assets";
+import type { ImageMetadata } from "astro";
+
+interface Props {
+  /** The painting's file name in src/assets/art, without its extension. */
+  art: string;
+  /** A tall version of the painting for phones. */
+  phoneArt?: string;
+  /** How wide the panel shows on the page, to pick the image size. */
+  sizes?: string;
+  /** The first painting on the page loads at once; the rest load as they near the screen. */
+  eager?: boolean;
+  class?: string;
+}
+
+const paintings = import.meta.glob<{ default: ImageMetadata }>("../assets/art/*.webp", { eager: true });
+function painting(name: string) {
+  const image = paintings[`../assets/art/${name}.webp`]?.default;
+  if (!image) throw new Error(`No painting named "${name}" in src/assets/art`);
+  return image;
+}
+
+/** AVIF and WebP sources at the widths a painting can fill. */
+async function sources(src: ImageMetadata) {
+  const widths = [720, 1200, 1800, 2400].filter((width) => width <= src.width);
+  return Promise.all((["avif", "webp"] as const).map(async (format) => ({ format, image: await getImage({ src, format, widths }) })));
+}
+
+const { art, phoneArt, sizes = "(max-width: 1100px) 100vw, 1376px", eager = false, class: className } = Astro.props;
+const wideArt = painting(art);
+const [wide, tall] = await Promise.all([sources(wideArt), phoneArt ? sources(painting(phoneArt)) : []]);
+const fallback = await getImage({ src: wideArt, format: "webp", width: Math.min(1200, wideArt.width) });
+---
+
+<div class:list={["art-panel", className]}>
+  <picture class="art-panel-painting">
+    {tall.map(({ format, image }) => (
+      <source media="(max-width: 700px)" type={`image/${format}`} srcset={image.srcSet.attribute} sizes="100vw" />
+    ))}
+    {wide.map(({ format, image }) => (
+      <source type={`image/${format}`} srcset={image.srcSet.attribute} sizes={sizes} />
+    ))}
+    <img src={fallback.src} alt="" width={wideArt.width} height={wideArt.height} loading={eager ? "eager" : "lazy"} fetchpriority={eager ? "high" : "auto"} decoding="async" />
+  </picture>
+  {
+    Astro.slots.has("default") && (
+      <div class="art-panel-stage">
+        <slot />
+      </div>
+    )
+  }
+</div>

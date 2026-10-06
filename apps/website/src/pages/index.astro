@@ -1,6 +1,7 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import Icon from "../components/Icon.astro";
+import ArtPanel from "../components/ArtPanel.astro";
 import DownloadButton from "../components/DownloadButton.astro";
 import SiteHeader from "../components/SiteHeader.astro";
 import SiteFooter from "../components/SiteFooter.astro";
@@ -8,9 +9,11 @@ import ProductPreview from "../components/ProductPreview.astro";
 import AgentLogos from "../components/AgentLogos.astro";
 import WorkflowDemo from "../components/WorkflowDemo.astro";
 import SlackDemo from "../components/SlackDemo.astro";
+import SetupGrid from "../components/SetupGrid.astro";
 import WorktreeMock from "../components/mocks/WorktreeMock.astro";
 import ChangesPanelMock from "../components/mocks/ChangesPanelMock.astro";
 import TaskListMock from "../components/mocks/TaskListMock.astro";
+import { getPublishedReleases, releaseAnchor } from "../data/changelog";
 import "../styles/home.css";
 
 const faqs = [
@@ -21,111 +24,118 @@ const faqs = [
   ["Can I review changes before they ship?", "Yes. The Changes panel sits beside the conversation. Read the diff, ask for another pass in the thread, then commit, push, or open a pull request when your Git setup supports it."],
   ["Does scheduled or Slack work run while OpenOrc is closed?", "No. Agents run on your computer. Keep OpenOrc open and your computer awake for scheduled work and Slack replies."],
 ];
+
+const releases = (await getPublishedReleases()).slice(0, 4);
+const releaseDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+const featureSizes = "(max-width: 1100px) 100vw, 900px";
 ---
 
 <Layout>
   <SiteHeader />
   <main id="main" class="home-page">
-    <section class="hero" aria-labelledby="hero-title">
-      <div class="container hero-content">
-        <h1 id="hero-title">Your coding agents,<br /><span>working together.</span></h1>
-        <p class="hero-description">Free and open-source desktop workspace for Codex, Claude Code, and OpenCode. Carry context between threads, decide in tasks, and read the diff before you commit.</p>
-        <div class="hero-actions">
-          <DownloadButton />
-          <a class="text-link" href="#workflow">Explore the workflow <Icon name="chevron" size={15} /></a>
-        </div>
-      </div>
-      <div class="hero-art" aria-hidden="true">
-        <picture>
-          <source media="(max-width: 1100px)" srcset="/hero-orchestra-linework-subtle-mobile.avif" type="image/avif" />
-          <source media="(max-width: 1100px)" srcset="/hero-orchestra-linework-subtle-mobile.webp" type="image/webp" />
-          <source srcset="/hero-orchestra-linework-subtle.avif" type="image/avif" />
-          <img src="/hero-orchestra-linework-subtle.webp" alt="" width="1672" height="941" decoding="async" fetchpriority="high" />
-        </picture>
+    <section class="hero container" aria-labelledby="hero-title">
+      <h1 id="hero-title">Your coding agents, working together.</h1>
+      <div class="hero-actions">
+        <DownloadButton />
+        <a class="text-link" href="#workflow">Explore the workflow <Icon name="chevron" size={15} /></a>
       </div>
       <ProductPreview />
     </section>
 
     <section class="agents-section container" aria-labelledby="agents-title">
-      <AgentLogos />
       <p class="agents-caption">Works with the agents you already run</p>
+      <AgentLogos />
       <h2 id="agents-title" class="agents-statement"><strong>Built for the agents you already have.</strong> Bring your Codex and Claude Code subscriptions, and the provider accounts you sign into in OpenCode. Keep their own tools and configuration. OpenOrc gives their conversations, tasks, and reviews one home.</h2>
     </section>
 
-    <section class="review-section" id="review" aria-labelledby="review-title">
-      <div class="container review-layout">
-        <h2 id="review-title">Plan, Review, Ship</h2>
-        <div class="review-copy">
+    <div class="features container">
+      <section class="feature" id="review" aria-labelledby="review-title">
+        <div class="feature-copy">
+          <h2 id="review-title">Plan, Review, Ship</h2>
           <p>Turn a conversation into tasks, weigh the approach with more than one model, and read the diff where the work happened. Commit, push, or open a pull request when it is ready.</p>
-          <a class="review-link" href="#workflow">See the workflow <Icon name="arrow" size={16} /></a>
+          <a class="feature-link" href="#workflow">See the workflow <Icon name="arrow" size={16} /></a>
         </div>
-      </div>
-      <div class="container review-stage">
-        <div class="review-tasks mock-window" role="img" aria-label="OpenOrc Tasks view with active tasks grouped by Backlog, In progress, and Review.">
-          <TaskListMock />
-        </div>
-        <div class="review-changes mock-window" role="img" aria-label="OpenOrc Changes panel showing a sample code diff with Commit, Push, and PR actions.">
-          <ChangesPanelMock />
-        </div>
-      </div>
-    </section>
+        <ArtPanel art="feature-plan" sizes={featureSizes} class="feature-art review-art">
+          <div class="review-tasks mock-window" role="img" aria-label="OpenOrc Tasks view with active tasks grouped by Backlog, In progress, and Review.">
+            <TaskListMock />
+          </div>
+          <div class="review-changes mock-window" role="img" aria-label="OpenOrc Changes panel showing a sample code diff with Commit, Push, and PR actions.">
+            <ChangesPanelMock />
+          </div>
+        </ArtPanel>
+      </section>
 
-    <section class="workflow-section" aria-labelledby="workflow">
-      <div class="container section-heading">
+      <section class="feature" id="worktrees" aria-labelledby="worktree-title">
+        <div class="feature-copy">
+          <h2 id="worktree-title">Parallel work, without collisions.</h2>
+          <p>Give a thread its own worktree and branch. Agents work side by side without touching each other’s files, and you decide when a branch lands.</p>
+        </div>
+        <ArtPanel art="feature-worktree" sizes={featureSizes} class="feature-art worktree-art">
+          <div class="mock-window" role="img" aria-label="A worktree thread, with its branch named in the header and beside its uncommitted changes above the composer. The sidebar shows another worktree branch beside threads on main.">
+            <WorktreeMock />
+          </div>
+        </ArtPanel>
+      </section>
+    </div>
+
+    <section class="workflow-section container" aria-labelledby="workflow">
+      <div class="section-heading">
         <h2 id="workflow">Organize the work without losing the thread.</h2>
         <p>Questions, decisions, and results stay connected, even when different agents take a turn.</p>
       </div>
       <WorkflowDemo />
     </section>
 
-    <section class="worktree-section container" id="worktrees" aria-labelledby="worktree-title">
+    <div class="features container">
+      <section class="feature" id="slack" aria-labelledby="slack-title">
+        <div class="feature-copy">
+          <h2 id="slack-title">Pick up the conversation from Slack.</h2>
+          <p>Mention your personal bot in a channel. Your agent works on your computer and replies in the thread. Open the same conversation in OpenOrc whenever you want the full picture.</p>
+          <dl class="slack-points">
+            <div><dt>Start where you are</dt><dd>Ask from a channel, then keep going with ordinary replies.</dd></div>
+            <div><dt>Stay in control</dt><dd>Follow progress and answer permission requests without leaving the thread.</dd></div>
+            <div><dt>Return to the workspace</dt><dd>Open the conversation on desktop to inspect its work and continue.</dd></div>
+          </dl>
+          <p class="slack-note">Slack runs through your desktop connection. Keep OpenOrc open and your computer awake.</p>
+        </div>
+        <ArtPanel art="feature-slack" sizes={featureSizes} class="feature-art slack-art">
+          <SlackDemo />
+        </ArtPanel>
+      </section>
+    </div>
+
+    <section class="setup-section container" id="your-tools" aria-labelledby="tools-title">
       <div class="section-heading">
-        <h2 id="worktree-title">Parallel work, without collisions.</h2>
-        <p>Give a thread its own worktree and branch. Agents work side by side without touching each other’s files, and you decide when a branch lands.</p>
-      </div>
-      <div class="worktree-stage mock-window" role="img" aria-label="A worktree thread, with its branch named beside its uncommitted changes above the composer. The wider view also shows the branch in the header, and another worktree branch beside threads on main in the sidebar.">
-        <WorktreeMock />
-      </div>
-    </section>
-
-    <section class="slack-section container" id="slack" aria-labelledby="slack-title">
-      <div class="slack-layout">
-        <div>
-          <div class="slack-heading">
-            <img src="/slack.svg" alt="" width="34" height="34" loading="lazy" />
-            <h2 id="slack-title">Pick up the conversation from Slack.</h2>
-          </div>
-          <p class="slack-intro">Mention your personal bot in a channel. Your agent works on your computer and replies in the thread. Open the same conversation in OpenOrc whenever you want the full picture.</p>
-        </div>
-        <SlackDemo />
-      </div>
-      <div class="slack-features">
-        <div><h3>Start where you are</h3><p>Ask from a channel, then keep going with ordinary replies.</p></div>
-        <div><h3>Stay in control</h3><p>Follow progress and answer permission requests without leaving the thread.</p></div>
-        <div><h3>Return to the workspace</h3><p>Open the conversation on desktop to inspect its work and continue.</p></div>
-      </div>
-      <p class="slack-note">Slack runs through your desktop connection. Keep OpenOrc open and your computer awake.</p>
-    </section>
-
-    <section class="local-section container" id="your-tools" aria-labelledby="tools-title">
-      <div class="local-heading">
         <h2 id="tools-title">Your setup stays yours.</h2>
-        <p>Your accounts and agent configuration stay as they are. In your repositories, OpenOrc adds only its own branches under openorc/, Git refs under refs/openorc/, and worktrees for isolated work.</p>
+        <p>Your accounts and agent configuration stay as they are.</p>
       </div>
-      <div class="local-facts">
-        <div>
-          <h3>Keep your provider setup</h3>
-          <p>Choose Codex, Claude Code, or OpenCode for each conversation, with the sign-in and configuration you already have.</p>
-          <div class="provider-names">
-            <span><img src="/openai.svg" alt="" width="20" height="20" loading="lazy" decoding="async" />Codex</span>
-            <span><img src="/claude.svg" alt="" width="20" height="20" loading="lazy" decoding="async" />Claude Code</span>
-            <span><img src="/opencode.svg" alt="" width="20" height="20" loading="lazy" decoding="async" />OpenCode</span>
-          </div>
-        </div>
-        <div><h3>Bring conversations forward</h3><p>Import Claude Code and Codex sessions and continue them with their history intact.</p></div>
-        <div><h3>Carry the useful context</h3><p>Keep decisions and lessons in optional shared project memory, so the next task starts with what you already learned.</p></div>
-      </div>
+      <SetupGrid />
     </section>
+
+    {
+      releases.length > 0 && (
+        <section class="releases-section container" aria-labelledby="releases-title">
+          <div class="releases-head">
+            <h2 id="releases-title">Changelog</h2>
+            <a class="feature-link" href="/changelog/">See what’s new <Icon name="arrow" size={16} /></a>
+          </div>
+          <ol class="releases-grid">
+            {releases.map((release) => (
+              <li>
+                <a class="release-card" href={`/changelog/#${releaseAnchor(release.tag)}`}>
+                  <span class="release-meta">
+                    <span class="release-tag">{release.tag}</span>
+                    {release.prerelease ? "Beta" : "Stable"}
+                  </span>
+                  {release.highlights[0] && <span class="release-summary">{release.highlights[0]}</span>}
+                  <time datetime={release.publishedAt}>{releaseDate.format(new Date(release.publishedAt))}</time>
+                </a>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )
+    }
 
     <section class="faq-section container" id="questions" aria-labelledby="faq-title">
       <h2 id="faq-title">Good to know.</h2>
@@ -139,23 +149,14 @@ const faqs = [
       </div>
     </section>
 
-    <section class="closing" aria-labelledby="closing-title">
-      <div class="container closing-layout">
-        <h2 id="closing-title">Every agent. One workspace.</h2>
-        <p>Start a conversation with the agents you already have, and keep every decision and review in one place.</p>
-        <div class="hero-actions">
-          <DownloadButton />
-          <a class="text-link" href="/docs/">Read how it works <Icon name="chevron" size={15} /></a>
-        </div>
+    <section class="closing container" aria-labelledby="closing-title">
+      <h2 id="closing-title">Every agent. One workspace.</h2>
+      <p>Start a conversation with the agents you already have, and keep every decision and review in one place.</p>
+      <div class="hero-actions">
+        <DownloadButton />
+        <a class="text-link" href="/docs/">Read how it works <Icon name="chevron" size={15} /></a>
       </div>
-      <div class="closing-art" aria-hidden="true">
-        <picture>
-          <source media="(max-width: 1100px)" srcset="/closing-orchestra-linework-subtle-mobile.avif" type="image/avif" />
-          <source media="(max-width: 1100px)" srcset="/closing-orchestra-linework-subtle-mobile.webp" type="image/webp" />
-          <source srcset="/closing-orchestra-linework-subtle.avif" type="image/avif" />
-          <img src="/closing-orchestra-linework-subtle.webp" alt="" width="1672" height="941" loading="lazy" decoding="async" />
-        </picture>
-      </div>
+      <ArtPanel art="closing" class="closing-art" />
     </section>
   </main>
   <SiteFooter />

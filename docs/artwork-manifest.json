@@ -28,54 +28,39 @@
       "sha256": "bc2f1d693f1cef0baeb5140770f33770f202007496ad33a0f2f44cfff5546617"
     },
     {
-      "group": "website-hero",
-      "path": "assets/website/hero-orchestra-linework-subtle-source.png",
-      "sha256": "9eeaf2b55bde6191be32feac36579feb4a8478c2305f576ccfaa332ff9a67f9f"
+      "group": "website-paintings",
+      "path": "apps/website/src/assets/art/closing.webp",
+      "sha256": "3a50984f7a9cb8361740de48834380723c87a227852616d7df7a9377dedadeed"
     },
     {
-      "group": "website-hero",
-      "path": "apps/website/public/hero-orchestra-linework-subtle.avif",
-      "sha256": "14b14c23cc358515cd08994064a2f185b9f97371f1ef4dabdf8c10164bb2d20a"
+      "group": "website-paintings",
+      "path": "apps/website/src/assets/art/feature-plan.webp",
+      "sha256": "080ccb532fa856c596524b57728d943b521e3b92e36534ccbe19e0526f131f11"
     },
     {
-      "group": "website-hero",
-      "path": "apps/website/public/hero-orchestra-linework-subtle.webp",
-      "sha256": "4a6d3f9c89e887dc0f265e515ad10f17d7732be7afca094c3e3a327ea56f5d59"
+      "group": "website-paintings",
+      "path": "apps/website/src/assets/art/feature-slack.webp",
+      "sha256": "df849b190653a65ddca78cbdbb96118fd891e33d8a912123efee37a5a50db049"
     },
     {
-      "group": "website-hero",
-      "path": "apps/website/public/hero-orchestra-linework-subtle-mobile.avif",
-      "sha256": "22ac53fe39f137dd180e91f76a9a419c17f766284ea470a7de9c353e4973cbb9"
+      "group": "website-paintings",
+      "path": "apps/website/src/assets/art/feature-workflow.webp",
+      "sha256": "f5a85df79bdcc4a5c3a86f70f330b12f2a2acd649c5400dd95d4c3bb8291deb8"
     },
     {
-      "group": "website-hero",
-      "path": "apps/website/public/hero-orchestra-linework-subtle-mobile.webp",
-      "sha256": "c96eb5ec5b028fa48324fc3fdcea3b2f0a725e2d26255737a9b7df085075a4fe"
+      "group": "website-paintings",
+      "path": "apps/website/src/assets/art/feature-worktree.webp",
+      "sha256": "3665b509a7d443d85c173bc1bd0147f425533acbd41bbc12e620085b2bdbfa22"
     },
     {
-      "group": "website-closing",
-      "path": "assets/website/closing-orchestra-linework-subtle-source.png",
-      "sha256": "0dfcf114a39a37508d999280d2ee0d5bc54d09ea5469f505e0e6cbe95b7656ba"
+      "group": "website-paintings",
+      "path": "apps/website/src/assets/art/hero-mobile.webp",
+      "sha256": "0df0b6388a357e47b132d4b705a72a07261a33baafcc2693a1ae5fe42ef52457"
     },
     {
-      "group": "website-closing",
-      "path": "apps/website/public/closing-orchestra-linework-subtle.avif",
-      "sha256": "7d0a0539b260e008cedc409cc068ef20a112eb1aeaef95d8d6d9309a0510b139"
-    },
-    {
-      "group": "website-closing",
-      "path": "apps/website/public/closing-orchestra-linework-subtle.webp",
-      "sha256": "dc7bf643f276c1a607d9d92a5e4b77692d97484d4de3d967c7e4d9556eb1f9f5"
-    },
-    {
-      "group": "website-closing",
-      "path": "apps/website/public/closing-orchestra-linework-subtle-mobile.avif",
-      "sha256": "ca04d1cf6520fd9f712d0898d1c7e2fe648179cc411b1fbcb89565ede931e229"
-    },
-    {
-      "group": "website-closing",
-      "path": "apps/website/public/closing-orchestra-linework-subtle-mobile.webp",
-      "sha256": "a7649c51743783f6d241449f794c2b24d98fca115e2532e0f307f5c63ed4a940"
+      "group": "website-paintings",
+      "path": "apps/website/src/assets/art/hero.webp",
+      "sha256": "18a6e43c371e58cfab184cc616c0c04063ce55ba7a6bc1efe22aed84312e7651"
     },
     {
       "group": "mascot",
@@ -206,11 +191,6 @@
       "group": "provider-marks",
       "path": "apps/website/public/opencode.svg",
       "sha256": "a0738b2fc95b2f6c8955cfeeb9e825f423eb6a49d34feba63d1269225f789c39"
-    },
-    {
-      "group": "provider-marks",
-      "path": "apps/website/public/slack.svg",
-      "sha256": "1f40066b694020057218c46eb2a11982b278d89b2dc8f96a21e4ea04e2b9db3b"
     },
     {
       "group": "readme-product",

@@ -42,6 +42,9 @@ function releaseHighlights(body: string): string[] {
   return highlights;
 }
 
+/** The release's place on the changelog page. */
+export const releaseAnchor = (tag: string) => `release-${tag.replace(/[^a-zA-Z0-9-]/g, "-")}`;
+
 export function publishedReleases(input: unknown): ChangelogRelease[] {
   if (!Array.isArray(input)) throw new Error("GitHub returned an invalid releases list.");
 

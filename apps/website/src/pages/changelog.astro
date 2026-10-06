@@ -3,7 +3,7 @@ import Layout from "../layouts/Layout.astro";
 import SiteHeader from "../components/SiteHeader.astro";
 import SiteFooter from "../components/SiteFooter.astro";
 import Icon from "../components/Icon.astro";
-import { getPublishedReleases } from "../data/changelog";
+import { getPublishedReleases, releaseAnchor } from "../data/changelog";
 import "../styles/changelog.css";
 
 const releases = await getPublishedReleases();
@@ -26,7 +26,7 @@ const dateFormat = new Intl.DateTimeFormat("en-US", { month: "long", day: "numer
     ) : (
       <ol class="changelog-list" aria-label="Published releases">
         {releases.map((release) => (
-          <li class="changelog-entry" id={`release-${release.tag.replace(/[^a-zA-Z0-9-]/g, "-")}`}>
+          <li class="changelog-entry" id={releaseAnchor(release.tag)}>
             <article class="changelog-release">
               <div class="changelog-release-content">
                 <div class="changelog-release-heading">

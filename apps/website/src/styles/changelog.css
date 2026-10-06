@@ -1,22 +1,19 @@
 .changelog-page {
-  --changelog-copy-size: clamp(0.8rem, 1vw, 1.2rem);
-  padding-block: clamp(42px, 4vw, 60px) var(--section-space);
+  --changelog-copy-size: var(--type-lead);
+  padding-block: clamp(56px, 7vw, 104px) var(--section-space);
 }
 .changelog-intro {
   padding-bottom: 48px;
 }
+/* Set like the homepage's hero; the second phrase in the muted ink. */
 .changelog-intro h1 {
-  max-width: 21ch;
-  font-size: clamp(2.75rem, 4.2vw, 3.75rem);
-  font-weight: 420;
-  line-height: 1.03;
-  letter-spacing: -0.036em;
+  max-width: 19ch;
+  font-size: var(--type-hero);
+  line-height: 1.15;
+  letter-spacing: -0.025em;
 }
 .changelog-intro h1 span {
-  background: linear-gradient(100deg, #8d9098 0%, #c9ccd2 34%, #eef0f2 47%, #b4b8bf 61%, #8a8e96 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: var(--muted);
 }
 .changelog-intro > p {
   max-width: 62ch;
@@ -114,15 +111,10 @@
 }
 @media (max-width: 700px) {
   .changelog-page {
-    --changelog-copy-size: 0.8rem;
-    padding-top: 66px;
+    padding-top: 48px;
   }
   .changelog-intro {
     padding-bottom: 32px;
-  }
-  .changelog-intro h1 {
-    font-size: clamp(2.2rem, 9.5vw, 3rem);
-    letter-spacing: -0.035em;
   }
   .changelog-release {
     flex-direction: column;
@@ -130,11 +122,5 @@
   }
   .changelog-release-meta {
     align-items: flex-start;
-  }
-}
-@media (forced-colors: active) {
-  .changelog-intro h1 span {
-    background: none;
-    color: CanvasText;
   }
 }

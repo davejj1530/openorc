@@ -1,6 +1,6 @@
 /*
- * The hero's product scene. Values come from the desktop app's dark OpenOrc
- * palette and app.css. The scene is laid out in design pixels (--u) and scales
+ * The hero's product scene. Values come from the desktop app's light OpenOrc
+ * palette and app.css, the one the app shares with Cursor. The scene is laid out in design pixels (--u) and scales
  * with its frame, so text is rendered, never scaled as an image:
  * 1360 × 850 with the sidebar and two panes, 960 × 600 with the sidebar hidden,
  * and 430 × 602 on phones, one pane at a time.
@@ -15,23 +15,35 @@
 .hero-scene,
 .hs-mock {
   --u: calc(100cqi / 1360);
-  --hs-bg: #141417;
-  --hs-surface: #1c1c21;
-  --hs-surface-2: #24242a;
-  --hs-surface-3: #2c2c33;
-  --hs-line: #2a2a31;
-  --hs-line-strong: #3a3a42;
-  --hs-ink: #ececef;
-  --hs-ink-2: #b8b8c0;
-  --hs-ink-3: #8e8e98;
-  --hs-ink-4: #6e6e78;
-  --hs-accent: #008375;
-  --hs-accent-ink: #4ed7c5;
-  --hs-accent-soft: #233638;
-  --hs-ok: #22975d;
-  --hs-bad: #d06557;
-  --hs-warn: #a47f29;
-  --hs-sheen: inset 0 var(--u) 0 rgb(236 236 239 / 0.12);
+  --hs-bg: #f3f3f3;
+  --hs-surface: #f7f7f7;
+  --hs-surface-2: #efefef;
+  --hs-surface-3: #eaeaea;
+  --hs-line: #e5e5e5;
+  --hs-line-strong: #cccccc;
+  --hs-ink: #333333;
+  --hs-ink-2: #444444;
+  --hs-ink-3: #626262;
+  --hs-ink-4: #949494;
+  --hs-accent: #171717;
+  --hs-accent-ink: #333333;
+  --hs-accent-soft: #e8e8e8;
+  --hs-ok: #1e7359;
+  --hs-bad: #c4382c;
+  --hs-warn: #8b5c0a;
+  --hs-sheen: inset 0 var(--u) 0 rgb(255 255 255 / 0.7);
+  /* Floating surfaces (cards, questions, menus), the user's bubble, and a hover wash. */
+  --hs-popover: #ffffff;
+  --hs-bubble: #fdfdfd;
+  --hs-tint: rgb(0 0 0 / 0.045);
+  /* Diffs and code, in GitHub's light colors. */
+  --hs-code: #24292f;
+  --hs-diff-add: #e8f5ec;
+  --hs-diff-add-gutter: #d5efdd;
+  --hs-diff-add-word: #bfe8cb;
+  --hs-diff-del: #fcebe9;
+  --hs-diff-del-gutter: #f8d8d4;
+  --hs-diff-del-word: #f5c6bf;
   --hs-ease: cubic-bezier(0.2, 0, 0, 1);
   color: var(--hs-ink);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
@@ -199,7 +211,7 @@
   letter-spacing: -0.03em;
 }
 .hs-new-thread {
-  background: rgb(236 236 239 / 0.07);
+  background: var(--hs-tint);
   color: var(--hs-ink-2);
 }
 .hs-new-thread .hs-icon {
@@ -664,7 +676,7 @@
   margin-bottom: calc(32 * var(--u));
   padding: calc(10 * var(--u)) calc(16 * var(--u));
   border-radius: calc(14 * var(--u));
-  background: #26262c;
+  background: var(--hs-bubble);
   box-shadow: var(--hs-sheen);
   font-size: calc(14 * var(--u));
   line-height: calc(22 * var(--u));
@@ -738,8 +750,8 @@
   padding: calc(12 * var(--u)) calc(16 * var(--u));
   border: var(--u) solid var(--hs-line);
   border-radius: calc(14 * var(--u));
-  background: rgb(36 36 42 / 0.6);
-  box-shadow: inset 0 calc(-1 * var(--u)) 0 rgb(236 236 239 / 0.05);
+  background: var(--hs-surface-2);
+  box-shadow: inset 0 calc(-1 * var(--u)) 0 rgb(0 0 0 / 0.04);
   font-size: calc(12 * var(--u));
   line-height: calc(18 * var(--u));
 }
@@ -948,11 +960,11 @@
   padding: calc(16 * var(--u));
   border: var(--u) solid var(--hs-line);
   border-radius: calc(10 * var(--u));
-  background: #212126;
+  background: var(--hs-popover);
   box-shadow:
     var(--hs-sheen),
-    0 var(--u) calc(2 * var(--u)) calc(-1 * var(--u)) rgb(2 2 4 / 0.55),
-    0 calc(4 * var(--u)) calc(12 * var(--u)) calc(-6 * var(--u)) rgb(2 2 4 / 0.7);
+    0 var(--u) calc(2 * var(--u)) calc(-1 * var(--u)) rgb(0 0 0 / 0.08),
+    0 calc(4 * var(--u)) calc(12 * var(--u)) calc(-6 * var(--u)) rgb(0 0 0 / 0.12);
 }
 .hs-question[data-answered] {
   color: var(--hs-ink-2);
@@ -1046,11 +1058,11 @@
   padding: calc(12 * var(--u)) calc(16 * var(--u));
   border: var(--u) solid var(--hs-line);
   border-radius: calc(14 * var(--u));
-  background: #212126;
+  background: var(--hs-popover);
   box-shadow:
     var(--hs-sheen),
-    0 var(--u) calc(2 * var(--u)) calc(-1 * var(--u)) rgb(2 2 4 / 0.55),
-    0 calc(4 * var(--u)) calc(12 * var(--u)) calc(-6 * var(--u)) rgb(2 2 4 / 0.7);
+    0 var(--u) calc(2 * var(--u)) calc(-1 * var(--u)) rgb(0 0 0 / 0.08),
+    0 calc(4 * var(--u)) calc(12 * var(--u)) calc(-6 * var(--u)) rgb(0 0 0 / 0.12);
 }
 .hs-task-card-row {
   display: flex;
@@ -1094,7 +1106,7 @@
 .hs-prop-chevron {
   width: calc(14 * var(--u));
   height: calc(14 * var(--u));
-  color: #777;
+  color: var(--hs-ink-3);
 }
 .hs-label-chip {
   display: inline-flex;
@@ -1370,7 +1382,7 @@
   margin-top: calc(24 * var(--u));
   border: var(--u) solid var(--hs-edge);
   border-radius: calc(10 * var(--u));
-  background: #37373c;
+  background: var(--hs-surface-3);
 }
 .hs-tc[data-focused] {
   --hs-edge: var(--hs-line-strong);
@@ -1597,7 +1609,7 @@
   color: var(--hs-accent);
 }
 .hs-status-review {
-  color: #9aacf4;
+  color: #4f62c7;
 }
 
 /* Changes panel mock */
@@ -1675,7 +1687,7 @@
 .hs-diff {
   padding: calc(8 * var(--u)) 0 calc(2 * var(--u));
   overflow: hidden;
-  color: #e1e4e8;
+  color: var(--hs-code);
   font-family: var(--hs-mono);
   font-size: calc(13 * var(--u));
   line-height: calc(20 * var(--u));
@@ -1695,11 +1707,11 @@
   text-align: right;
 }
 .hs-diff-row[data-type="add"] .hs-diff-num {
-  background: #162a23;
+  background: var(--hs-diff-add-gutter);
   color: var(--hs-ok);
 }
 .hs-diff-row[data-type="del"] .hs-diff-num {
-  background: #342222;
+  background: var(--hs-diff-del-gutter);
   color: var(--hs-bad);
 }
 /* Change bars: solid for additions, hairline stripes for deletions, as the app draws them. */
@@ -1712,7 +1724,7 @@
   background: var(--hs-ok);
 }
 .hs-diff-row[data-type="del"] .hs-diff-num::before {
-  background: repeating-linear-gradient(0deg, #2c1f1f 0 var(--u), var(--hs-bad) var(--u) calc(2 * var(--u)));
+  background: repeating-linear-gradient(0deg, var(--hs-diff-del-gutter) 0 var(--u), var(--hs-bad) var(--u) calc(2 * var(--u)));
 }
 .hs-diff-code {
   flex: 1;
@@ -1720,36 +1732,36 @@
   white-space: pre;
 }
 .hs-diff-row[data-type="add"] .hs-diff-code {
-  background: #162520;
+  background: var(--hs-diff-add);
 }
 .hs-diff-row[data-type="del"] .hs-diff-code {
-  background: #2c1f1f;
+  background: var(--hs-diff-del);
 }
 .hs-diff-code [data-tone="keyword"] {
-  color: #f97583;
+  color: #cf222e;
 }
 .hs-diff-code [data-tone="name"],
 .hs-diff-code [data-tone="attr"] {
-  color: #b392f0;
+  color: #8250df;
 }
 .hs-diff-code [data-tone="string"] {
-  color: #9ecbff;
+  color: #0a3069;
 }
 .hs-diff-code [data-tone="tag"] {
-  color: #85e89d;
+  color: #116329;
 }
 .hs-diff-code [data-tone="component"] {
-  color: #79b8ff;
+  color: #0550ae;
 }
 .hs-diff-code [data-tone="mark"] {
   border-radius: calc(3 * var(--u));
-  color: #9ecbff;
+  color: #0a3069;
 }
 .hs-diff-row[data-type="add"] [data-tone="mark"] {
-  background: #18392b;
+  background: var(--hs-diff-add-word);
 }
 .hs-diff-row[data-type="del"] [data-tone="mark"] {
-  background: #492b29;
+  background: var(--hs-diff-del-word);
 }
 /* End-of-turn change card */
 .hs-column > .hs-change {
@@ -1759,11 +1771,11 @@
   overflow: hidden;
   border: var(--u) solid var(--hs-line);
   border-radius: calc(12 * var(--u));
-  background: #212126;
+  background: var(--hs-popover);
   box-shadow:
     var(--hs-sheen),
-    0 var(--u) calc(2 * var(--u)) calc(-1 * var(--u)) rgb(2 2 4 / 0.55),
-    0 calc(4 * var(--u)) calc(12 * var(--u)) calc(-6 * var(--u)) rgb(2 2 4 / 0.7);
+    0 var(--u) calc(2 * var(--u)) calc(-1 * var(--u)) rgb(0 0 0 / 0.08),
+    0 calc(4 * var(--u)) calc(12 * var(--u)) calc(-6 * var(--u)) rgb(0 0 0 / 0.12);
 }
 .hs-change-heading {
   display: flex;
@@ -1853,7 +1865,7 @@
   padding: calc(8 * var(--u)) calc(16 * var(--u)) calc(24 * var(--u));
 }
 .hs-composer {
-  --hs-edge: rgb(42 42 49 / 0.65);
+  --hs-edge: var(--hs-line);
   max-width: calc(760 * var(--u));
   margin: 0 auto;
 }
@@ -1884,7 +1896,7 @@
   fill: var(--hs-surface-2);
 }
 .hs-shoulder-sheen {
-  stroke: rgb(236 236 239 / 0.12);
+  stroke: rgb(0 0 0 / 0.06);
 }
 .hs-shoulder-edge {
   stroke: var(--hs-edge);
@@ -1926,8 +1938,8 @@
   background: var(--hs-surface-2);
   box-shadow:
     var(--hs-sheen),
-    0 var(--u) calc(2 * var(--u)) calc(-1 * var(--u)) rgb(2 2 4 / 0.55),
-    0 calc(4 * var(--u)) calc(12 * var(--u)) calc(-4 * var(--u)) rgb(2 2 4 / 0.7);
+    0 var(--u) calc(2 * var(--u)) calc(-1 * var(--u)) rgb(0 0 0 / 0.08),
+    0 calc(4 * var(--u)) calc(12 * var(--u)) calc(-4 * var(--u)) rgb(0 0 0 / 0.12);
 }
 .hs-changes:not([hidden]) + .hs-shell {
   border-top-right-radius: 0;
@@ -1938,8 +1950,8 @@
   margin: calc(8 * var(--u)) calc(8 * var(--u)) 0;
   padding: calc(12 * var(--u));
   border-radius: calc(7 * var(--u));
-  background: #202026;
-  box-shadow: inset 0 calc(-1 * var(--u)) 0 rgb(236 236 239 / 0.05);
+  background: var(--hs-surface-2);
+  box-shadow: inset 0 calc(-1 * var(--u)) 0 rgb(0 0 0 / 0.04);
   font-size: calc(15 * var(--u));
   line-height: 1.65;
   white-space: pre-wrap;
@@ -2121,10 +2133,10 @@
   overflow: hidden;
   padding: 0 calc(14 * var(--u));
   border: var(--u) solid var(--hs-line-strong);
-  background: #26262c;
+  background: var(--hs-popover);
   box-shadow:
     var(--hs-sheen),
-    0 calc(10 * var(--u)) calc(28 * var(--u)) calc(-10 * var(--u)) rgb(0 0 0 / 0.8);
+    0 calc(10 * var(--u)) calc(28 * var(--u)) calc(-10 * var(--u)) rgb(0 0 0 / 0.16);
   color: var(--hs-ink);
   font-size: calc(13 * var(--u));
   font-weight: 500;

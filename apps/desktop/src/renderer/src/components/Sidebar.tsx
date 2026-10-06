@@ -33,7 +33,7 @@ export function Sidebar() {
         <SidebarHeader />
         <div className="sidebar-destinations">
           <button
-            className="sidebar-new-thread nav-row"
+            className="sidebar-new-thread nav-row transition-colors hover:bg-surface-2"
             onClick={() => {
               newThread(projectId ?? undefined);
               dismissCompactNavigation();

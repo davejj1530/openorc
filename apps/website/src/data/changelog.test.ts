@@ -81,6 +81,7 @@ void test("does not hide an authenticated access failure as an empty changelog",
 
 void test("the static build authenticates release requests without publishing its token or drafts", { timeout: 30_000 }, async (t) => {
   const { build } = await import("astro");
+  const { passthroughImageService } = await import("astro/config");
   const directory = await mkdtemp(join(tmpdir(), "openorc-website-build-test-"));
   const outDir = join(directory, "dist");
   t.after(() => rm(directory, { recursive: true, force: true }));
@@ -107,7 +108,8 @@ void test("the static build authenticates release requests without publishing it
     return Promise.resolve(Response.json([release({ assets: [asset] }), release({ draft: true, body: "## Highlights\n- Unpublished draft detail" })]));
   });
 
-  await build({ root: fileURLToPath(new URL("../../", import.meta.url)), outDir, cacheDir: join(directory, "cache"), logLevel: "silent" });
+  // Images pass through unencoded: this checks release requests, and encoding every painting outlasts the timeout on CI.
+  await build({ root: fileURLToPath(new URL("../../", import.meta.url)), outDir, cacheDir: join(directory, "cache"), logLevel: "silent", image: { service: passthroughImageService() } });
   assert.ok(releaseRequests > 0);
   const html = await readFile(join(outDir, "changelog/index.html"), "utf8");
   assert.match(html, /First public release/);

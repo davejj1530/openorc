@@ -280,7 +280,7 @@ function MainScreen({ route, currentProject }: { route: Route; currentProject: s
       screen = <OrclingDesigner orclingId={route.orclingId} />;
       break;
     case "settings":
-      screen = <Settings />;
+      screen = <Settings route={route} />;
       break;
     case "diagnostics":
       screen = Diagnostics ? (

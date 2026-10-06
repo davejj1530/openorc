@@ -2,13 +2,6 @@ import { harnessCatalog, harnessFailsToStart, isHarnessId, type ExtractionProvid
 import { extractionSummary } from "../lib/memory-extraction";
 import { formatUsageTime } from "../lib/provider-usage";
 
-export function settingsTabIndex(key: string, index: number, count: number): number | null {
-  if (key === "ArrowRight") return (index + 1) % count;
-  if (key === "ArrowLeft") return (index + count - 1) % count;
-  if (key === "Home") return 0;
-  if (key === "End") return count - 1;
-  return null;
-}
 export function installationLabel(loaded: boolean, installed: boolean): string {
   if (!loaded) return "Checking…";
   return installed ? "Installed" : "Not installed";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { directSlackStatus, learningStatus, relayClientStatus, settingsTabIndex, textGenerationStatus, usageReportStatus } from "./settings-presentation";
+import { directSlackStatus, learningStatus, relayClientStatus, textGenerationStatus, usageReportStatus } from "./settings-presentation";
 
 describe("Settings decision priority", () => {
   it("keeps refresh failure visible during a retry and stale reports ahead of exhausted limits", () => {
@@ -24,10 +24,5 @@ describe("Settings decision priority", () => {
     const input = { loading: true, error: true, saved: null, provider: "off" as const, storageError: null, reason: null };
     expect(learningStatus(input)).toBe("Checking available providers…");
     expect(learningStatus({ ...input, loading: false })).toBe("Learning controls are unavailable until your memory settings load.");
-  });
-  it("wraps tab arrows while leaving unhandled keys alone", () => {
-    expect(settingsTabIndex("ArrowLeft", 0, 4)).toBe(3);
-    expect(settingsTabIndex("ArrowRight", 3, 4)).toBe(0);
-    expect(settingsTabIndex("Enter", 1, 4)).toBeNull();
   });
 });

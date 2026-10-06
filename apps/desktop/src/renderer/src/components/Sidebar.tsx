@@ -14,6 +14,7 @@ import { cn } from "../lib/cn";
 import { ResizeHandle } from "./ResizeHandle";
 import { SidebarNav } from "./SidebarNav";
 import { SidebarOrclings } from "./SidebarOrclings";
+import { SidebarSettings } from "./SidebarSettings";
 import { SidebarThreadBrowser } from "./SidebarThreadBrowser";
 import { IconButton, Tooltip } from "./ui";
 
@@ -31,38 +32,42 @@ export function Sidebar() {
     <>
       <aside className="sidebar-shell workspace-navigation h-full shrink-0" data-open={open} data-traffic-lights={trafficLights} aria-hidden={!open} inert={!open}>
         <SidebarHeader />
-        <div className="sidebar-destinations">
-          <button
-            className="sidebar-new-thread nav-row transition-colors hover:bg-surface-2"
-            onClick={() => {
-              newThread(projectId ?? undefined);
-              dismissCompactNavigation();
-            }}
-          >
-            <PenSquare size={16} />
-            <span>New thread</span>
-          </button>
-          <SidebarNav route={route} projectId={projectId} />
+        {route.view === "settings" ? <SidebarSettings route={route} /> : null}
+        {/* Settings takes the column over; the app's navigation keeps its pages, filters and scroll for the way back. */}
+        <div className="sidebar-workspace" hidden={route.view === "settings"}>
+          <div className="sidebar-destinations">
+            <button
+              className="sidebar-new-thread nav-row transition-colors hover:bg-surface-2"
+              onClick={() => {
+                newThread(projectId ?? undefined);
+                dismissCompactNavigation();
+              }}
+            >
+              <PenSquare size={16} />
+              <span>New thread</span>
+            </button>
+            <SidebarNav route={route} projectId={projectId} />
+          </div>
+          <div className="sidebar-browser-tabs" aria-label="Conversations">
+            <button
+              aria-current={!orclings.active ? "page" : undefined}
+              onClick={() => {
+                if (!browsingThreads) nativeOrclings.openThreads(() => newThread(projectId ?? undefined));
+              }}
+            >
+              Threads
+            </button>
+            <button aria-current={orclings.active ? "page" : undefined} onClick={orclings.open}>
+              Orclings
+            </button>
+          </div>
+          {/* Keep loaded pages and filters when switching to a companion. */}
+          <div className="sidebar-browser-slot" hidden={orclings.active}>
+            <SidebarThreadBrowser />
+          </div>
+          {orclings.active ? <SidebarOrclings route={route} /> : null}
         </div>
-        <div className="sidebar-browser-tabs" aria-label="Conversations">
-          <button
-            aria-current={!orclings.active ? "page" : undefined}
-            onClick={() => {
-              if (!browsingThreads) nativeOrclings.openThreads(() => newThread(projectId ?? undefined));
-            }}
-          >
-            Threads
-          </button>
-          <button aria-current={orclings.active ? "page" : undefined} onClick={orclings.open}>
-            Orclings
-          </button>
-        </div>
-        {/* Keep loaded pages and filters when switching to a companion. */}
-        <div className="sidebar-browser-slot" hidden={orclings.active}>
-          <SidebarThreadBrowser />
-        </div>
-        {orclings.active ? <SidebarOrclings route={route} /> : null}
-        <SidebarFooter />
+        <SidebarFooter settings={route.view === "settings"} />
       </aside>
       {open ? <ResizeHandle edge="sidebar" /> : null}
     </>
@@ -84,26 +89,29 @@ function SidebarHeader() {
   );
 }
 
-function SidebarFooter() {
-  const settings = useRouter((s) => s.route.view === "settings");
+/** Settings already fills the sidebar, so while it is open only window history stays here. */
+function SidebarFooter({ settings }: { settings: boolean }) {
   return (
     <footer className="sidebar-footer">
-      <button className="sidebar-add-project" onClick={() => useUi.getState().setImportProject(true)}>
-        <Plus size={15} />
-        Add project
-      </button>
-      <div className="sidebar-footer-controls">
-        <button
-          className="sidebar-settings nav-row"
-          aria-current={settings ? "page" : undefined}
-          onClick={() => {
-            useRouter.getState().navigate({ view: "settings" });
-            dismissCompactNavigation();
-          }}
-        >
-          <Settings size={16} />
-          <span>Settings</span>
+      {settings ? null : (
+        <button className="sidebar-add-project" onClick={() => useUi.getState().setImportProject(true)}>
+          <Plus size={15} />
+          Add project
         </button>
+      )}
+      <div className="sidebar-footer-controls">
+        {settings ? null : (
+          <button
+            className="sidebar-settings nav-row"
+            onClick={() => {
+              useRouter.getState().navigate({ view: "settings" });
+              dismissCompactNavigation();
+            }}
+          >
+            <Settings size={16} />
+            <span>Settings</span>
+          </button>
+        )}
         <HistoryNav />
       </div>
     </footer>

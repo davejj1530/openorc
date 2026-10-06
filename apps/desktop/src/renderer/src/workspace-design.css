@@ -96,8 +96,7 @@
 .sidebar-new-thread > svg {
   color: var(--ink-3);
 }
-.sidebar-destinations .nav-row[aria-current="page"],
-.sidebar-settings[aria-current="page"] {
+.sidebar-destinations .nav-row[aria-current="page"] {
   color: var(--navigation-ink);
 }
 .sidebar-browser-tabs {
@@ -131,6 +130,24 @@
 .sidebar-browser-slot[hidden] {
   display: none;
 }
+/* Settings takes the column over; the app's navigation waits underneath it. */
+.sidebar-workspace {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+.sidebar-workspace[hidden] {
+  display: none;
+}
+.settings-destinations {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.settings-destinations > .nav-row {
+  margin-bottom: 12px;
+}
 .sidebar-footer {
   flex-shrink: 0;
   padding: 8px 12px 12px;
@@ -159,6 +176,7 @@
 .sidebar-footer-controls {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 2px;
 }
 .sidebar-settings {
@@ -1063,8 +1081,7 @@
   .sidebar-browser-tabs button[aria-current="page"],
   .project-option[data-selected="true"],
   .thread-preview[data-open],
-  .task-page-filters [role="radio"][aria-checked="true"],
-  .settings-tablist button[aria-selected="true"] {
+  .task-page-filters [role="radio"][aria-checked="true"] {
     outline: 1px solid Highlight;
   }
 }

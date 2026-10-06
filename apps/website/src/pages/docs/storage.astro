@@ -1,110 +1,147 @@
 ---
 import DocsLayout from "../../layouts/DocsLayout.astro";
+import Callout from "../../components/docs/Callout.astro";
+import LinkCards from "../../components/docs/LinkCards.astro";
 import { docHref } from "../../data/docs";
 
 const sections = [
-  { id: "profile", title: "The profile folder" },
+  { id: "data-folder", title: "The data folder" },
+  { id: "outside", title: "Outside the data folder" },
   { id: "database", title: "The database" },
-  { id: "tables", title: "Tables" },
-  { id: "ledger", title: "The event ledger" },
-  { id: "search", title: "Search" },
+  { id: "ledger", title: "Agent events" },
   { id: "redaction", title: "Redaction" },
-  { id: "upkeep", title: "Upkeep and retention" },
-  { id: "settings", title: "Settings and secrets" },
-  { id: "browser", title: "Window storage" },
+  { id: "secrets", title: "Settings and secrets" },
+  { id: "window", title: "Window storage" },
+  { id: "retention", title: "How long things stay" },
   { id: "deleting", title: "What deleting removes" },
+  { id: "next-steps", title: "Next steps" },
 ];
 ---
 
 <DocsLayout slug="storage" sections={sections}>
-  <p>On macOS and Linux, <code>agent-processes/</code> in the app data folder holds process IDs and start times for agent recovery. These receipts contain no prompts or credentials. Startup verifies them before allowing replacement agents, then removes settled receipts.</p>
+  <p>
+    OpenOrc keeps your work on your computer, almost all of it in one data folder. It has no server of its own, and <a href={docHref("network")}>Network connections</a> lists everything that leaves your computer.
+  </p>
 
-  <section aria-labelledby="profile">
-    <h2 id="profile">The profile folder</h2>
-    <p>OpenOrc keeps its own data in one folder: <code>~/Library/Application Support/OpenOrc</code> on macOS, <code>%APPDATA%\OpenOrc</code> on Windows, <code>~/.config/OpenOrc</code> on Linux, or the folder named by <code>OPENORC_USER_DATA</code>. Electron keeps its own browser data in the same folder. Git data OpenOrc creates, such as worktree branches and refs under <code>refs/openorc/</code>, lives in your repositories (see <a href={docHref("git") + "#writes"}>Git and review</a>), and three actions write files into your project: exporting a plan, adding a memory to <code>CLAUDE.md</code> or <code>AGENTS.md</code>, and saving a file in a conversation's Instructions tab. That tab can also save the agent's personal instruction file outside the project, such as <code>~/.claude/CLAUDE.md</code> (see <a href={docHref("instructions") + "#delivery"}>What OpenOrc tells agents</a>).</p>
-    <p>OpenOrc also makes short-lived private folders in your system's temporary folder: one per Claude Code process for the file that holds OpenOrc's MCP address, scratch space for background text jobs such as memory extraction, and scratch copies for Git operations. Each is deleted when its job ends. When a Claude Code conversation runs in Plan mode, OpenOrc creates Claude's plans folder, <code>~/.claude/plans</code> (or <code>plans</code> inside <code>CLAUDE_CONFIG_DIR</code>), if it does not exist.</p>
+  <section aria-labelledby="data-folder">
+    <h2 id="data-folder">The data folder</h2>
+    <p>
+      The folder is <code>~/Library/Application Support/OpenOrc</code> on macOS, <code>%APPDATA%\OpenOrc</code> on Windows, and <code>~/.config/OpenOrc</code> on Linux. The <code>OPENORC_USER_DATA</code> environment variable picks another folder.
+      <strong>Settings</strong>, then <strong>Data</strong>, shows the path in use.
+    </p>
     <div class="docs-table">
       <table>
         <thead>
           <tr>
             <th scope="col">Path</th>
-            <th scope="col">Contents</th>
+            <th scope="col">What it holds</th>
           </tr>
         </thead>
         <tbody>
           <tr>
             <td><code>openorc.sqlite</code>, <code>-wal</code>, <code>-shm</code></td>
-            <td>The database and its write-ahead log. Back up all three together.</td>
+            <td>The database: threads, tasks, agent events, memories, and settings. Back up all three files together.</td>
           </tr>
           <tr>
             <td><code>attachments/</code></td>
-            <td>Files you attached: images under a random name, other files under a random ID followed by their original name</td>
+            <td>Files you attached. Images get a random name; other files get a random ID followed by their own name.</td>
           </tr>
           <tr>
-            <td><code>tool-images/&lt;run&gt;/</code></td>
-            <td>Images that tools returned as base64</td>
+            <td><code>tool-images/</code></td>
+            <td>Images that agents' tools returned, one folder per run</td>
           </tr>
           <tr>
-            <td><code>worktrees/&lt;project&gt;/…</code></td>
-            <td>Worktrees for conversations and tasks that use them</td>
+            <td><code>worktrees/</code></td>
+            <td>Worktrees for threads and tasks, and copies of pull requests under review, one folder per project</td>
           </tr>
           <tr>
             <td><code>workspace/</code></td>
-            <td>The default folder for Workspace conversations</td>
+            <td>The default folder for Workspace threads</td>
+          </tr>
+          <tr>
+            <td><code>orclings/</code></td>
+            <td>A folder for each Orcling to work in</td>
           </tr>
           <tr>
             <td><code>logs/provider/</code></td>
-            <td>Native agent output, kept up to 14 days or 512 MB</td>
+            <td>The agents' native output, kept for debugging. Streamed pieces are left out, and a line over 64 KiB is cut to a preview.</td>
           </tr>
           <tr>
             <td><code>models/</code></td>
-            <td>The embedding model used by project memory, downloaded the first time memory needs it</td>
+            <td>The model that memory search runs on this computer, downloaded the first time memory needs it</td>
+          </tr>
+          <tr>
+            <td><code>project-icons/</code></td>
+            <td>Icons OpenOrc found for your projects, and the one you chose</td>
+          </tr>
+          <tr>
+            <td><code>agent-processes/</code></td>
+            <td>On macOS and Linux, a record of each running agent process: its ID and start time, and OpenOrc's own. The next launch uses it to stop any left behind by a crash. No prompts or credentials.</td>
+          </tr>
+          <tr>
+            <td><code>slack-secrets.enc</code>, <code>memory-extraction-key.enc</code>, <code>github-reviewer-app.enc</code></td>
+            <td>Encrypted secrets; see <a href="#secrets">Settings and secrets</a></td>
           </tr>
           <tr>
             <td><code>updates.json</code>, <code>.updaterId</code></td>
-            <td>Whether installed releases check for updates on their own, and a random ID the update library keeps for gradual rollouts. OpenOrc does not send the ID.</td>
-          </tr>
-          <tr>
-            <td><code>slack-secrets.enc</code>, <code>memory-extraction-key.enc</code></td>
-            <td>Encrypted Slack configuration and the optional memory API key</td>
+            <td>Whether OpenOrc checks for updates on its own and which version you dismissed or were told about, and a random ID the update library keeps. OpenOrc sends that ID empty.</td>
           </tr>
           <tr>
             <td><code>exports/</code></td>
             <td>Patch files you exported from a task</td>
           </tr>
           <tr>
-            <td><code>task-checkout/</code>, <code>task-forwardings/</code></td>
-            <td>Scratch copies used when applying a task to your checkout or moving a task</td>
+            <td><code>task-checkout/</code></td>
+            <td>Scratch copies made while applying a task to your checkout</td>
           </tr>
           <tr>
-            <td><code>team-workspaces/</code>, <code>team-integrations/</code>, <code>team-forks/</code>, <code>team-restores/</code>, <code>team-moves/</code>, <code>team-avatars/</code></td>
-            <td>Folders used by teams</td>
+            <td><code>task-forwardings/</code></td>
+            <td>The worktrees of team tasks you hand off as independent tasks</td>
+          </tr>
+          <tr>
+            <td><code>team-workspaces/</code> and the other <code>team-*</code> folders</td>
+            <td>Workspaces, merges, forks, restores, moves, and avatars for <a href={docHref("teams")}>agent teams</a></td>
           </tr>
         </tbody>
       </table>
     </div>
-    <p>Worktrees include copies of your project's <code>.env</code> and <code>.env.*</code> files by default, so agents can run the project. The list of copied files is a project setting. Treat the whole profile folder as private: it holds your prompts, source snippets, command output, and those copies.</p>
+    <p>Electron keeps the app window's own browser data in the same folder, including the <a href="#window">window storage</a> below.</p>
+    <Callout>
+      Treat the whole folder as private. It holds your prompts, code the agents read, command output, and the <code>.env</code> files that new worktrees get a copy of. A project setting, <strong
+        >Copy these gitignored files into new worktrees</strong
+      >, controls which files are copied.
+    </Callout>
+  </section>
+
+  <section aria-labelledby="outside">
+    <h2 id="outside">Outside the data folder</h2>
+    <ul>
+      <li>
+        <strong>Your repositories.</strong> Worktree branches, and refs under <code>refs/openorc/</code> that keep each turn's checkpoint, task snapshots, and team operations. See <a href={docHref("git")}>Git and worktrees</a>.
+      </li>
+      <li>
+        <strong>Your project's files</strong>, only when you ask: exporting a plan, adding a memory to <code>CLAUDE.md</code> or <code>AGENTS.md</code>, saving a file in a thread's Instructions tab, or a Git action such as committing,
+        restoring a checkpoint, moving a thread, or applying a task to your checkout. The Instructions tab can also save your personal instruction file, such as <code>~/.claude/CLAUDE.md</code>.
+      </li>
+      <li><strong>Claude's plans folder.</strong> A Claude Code thread in Plan mode creates <code>~/.claude/plans</code>, or <code>plans</code> inside <code>CLAUDE_CONFIG_DIR</code>, if it doesn't exist.</li>
+      <li>
+        <strong>Temporary folders.</strong> Private folders in your system's temporary folder: one per Claude Code process for the files that hold OpenOrc's tool address, scratch space when Codex writes a title or summary in the
+        background, and throwaway Git index files. Each is deleted when its job ends.
+      </li>
+      <li><strong>Downloaded updates.</strong> The update library keeps a downloaded app update in your system's cache folder.</li>
+      <li>
+        <strong>The agents' own records.</strong> Each CLI keeps its own transcripts, such as <code>~/.claude/projects</code> and <code>~/.codex/sessions</code>. OpenOrc never redacts or deletes them, and the provider may keep data on its
+        servers under its own terms.
+      </li>
+    </ul>
   </section>
 
   <section aria-labelledby="database">
     <h2 id="database">The database</h2>
-    <p>OpenOrc uses SQLite through Node's built-in <code>node:sqlite</code> module. The core opens one connection at startup and keeps it; the main process and the interface never open the database. The connection is synchronous: one writer, and no locks held across <code>await</code>.</p>
-    <pre><code>PRAGMA auto_vacuum = INCREMENTAL;
-PRAGMA journal_mode = WAL;
-PRAGMA synchronous = NORMAL;
-PRAGMA busy_timeout = 5000;
-PRAGMA foreign_keys = ON;</code></pre>
-    <p>With write-ahead logging and <code>synchronous = NORMAL</code>, committed writes survive an app crash, but the last moments before an OS crash or power loss can be lost.</p>
-    <h3>Transactions</h3>
-    <p>Every transaction is a named savepoint, so a function that opens a transaction can call another that does too. Only the outermost savepoint commits. An error rolls back to the savepoint and is rethrown.</p>
-    <h3>Migrations</h3>
-    <p>The schema is an ordered list of migrations in <code>packages/db/src/schema.ts</code>, and <code>PRAGMA user_version</code> records how many have run. Each pending migration runs in its own transaction with foreign keys switched off, must pass <code>PRAGMA foreign_key_check</code>, then bumps <code>user_version</code>. A failed migration rolls back and stops startup. Migrations that have shipped are never edited; changes are always new migrations. Tests build older databases by running a prefix of the list and then open them with the current code.</p>
-    <p class="docs-source">Source: <code>packages/db/src/database.ts</code>, <code>schema.ts</code></p>
-  </section>
-
-  <section aria-labelledby="tables">
-    <h2 id="tables">Tables</h2>
-    <p>The tables by area are below. Most of the schema's triggers protect teams' records.</p>
+    <p>
+      The database is SQLite, opened by OpenOrc's core process and nothing else. It runs in write-ahead mode with <code>synchronous = NORMAL</code>: a committed write survives an app crash, but the last moments before an operating
+      system crash or power loss can be lost. The schema is a list of migrations, and <code>PRAGMA user_version</code> records how many have run. A migration that fails rolls back and stops startup.
+    </p>
     <div class="docs-table">
       <table>
         <thead>
@@ -124,7 +161,7 @@ PRAGMA foreign_keys = ON;</code></pre>
           </tr>
           <tr>
             <td>Changes and review</td>
-            <td><code>thread_checkpoints</code>, <code>snapshots</code>, <code>review_comments</code></td>
+            <td><code>thread_checkpoints</code>, <code>snapshots</code>, <code>review_comments</code>, <code>pull_request_reviews</code>, <code>pull_request_review_comments</code></td>
           </tr>
           <tr>
             <td>Task discussions</td>
@@ -139,125 +176,211 @@ PRAGMA foreign_keys = ON;</code></pre>
             <td><code>memories</code>, <code>memory_files</code>, <code>session_summaries</code>, <code>extraction_jobs</code></td>
           </tr>
           <tr>
+            <td>Orclings</td>
+            <td><code>orclings</code>, <code>orcling_instructions</code></td>
+          </tr>
+          <tr>
             <td>Settings</td>
             <td><code>settings</code></td>
           </tr>
           <tr>
             <td>Search</td>
-            <td><code>messages_fts</code> and <code>memories_fts</code> (SQLite FTS5), <code>memory_vec</code> (sqlite-vec)</td>
+            <td><code>messages_fts</code> and <code>memories_fts</code> (SQLite full-text search), <code>memory_vec</code> (vectors for memory search)</td>
           </tr>
           <tr>
             <td>Teams (Beta)</td>
-            <td>Team definitions and revisions (<code>orchestration_*</code>), executions and their journals (<code>team_executions</code>, <code>team_actors</code>, <code>team_attempts</code>, <code>team_attempt_prompts</code>, <code>team_messages</code>, <code>team_claims</code>), bindings between runs, assignments, and team members, workspaces and their publication, room messages and deliveries, task admissions and completions, and receipts for forks, restores, moves, and deletions</td>
+            <td>About 40 tables named <code>orchestration_*</code> and <code>team_*</code>: team definitions, executions, messages, workspaces, and the records that make team operations safe to retry</td>
           </tr>
         </tbody>
       </table>
     </div>
-    <p><code>audit_events</code> records about 50 kinds of action with who took them (you, an agent, or OpenOrc itself): starting runs, creating tasks, committing, pushing, restoring files, approvals OpenOrc decided without asking, and so on.</p>
+    <p>
+      <code>threads.parent_thread_id</code> links a thread to the thread whose agent started it with <code>thread_start</code>. <code>audit_events</code> records about 70 kinds of action and who took it (you, an agent, or OpenOrc): starting
+      runs, creating tasks, committing, pushing, restoring files, approval decisions, and more.
+    </p>
+    <p class="docs-source">Source: <code>packages/db/src/database.ts</code>, <code>schema.ts</code>, <code>repos.ts</code></p>
   </section>
 
   <section aria-labelledby="ledger">
-    <h2 id="ledger">The event ledger</h2>
-    <p>The <code>events</code> table holds every event agents produced, one row each: the run, a sequence number within the run, the time, the event type, the tool name if any, and the event as JSON. <code>raw</code> events are not stored here; they go to the provider log.</p>
+    <h2 id="ledger">Agent events</h2>
+    <p>Everything an agent does arrives as events: text, tool calls, command output, file changes, and approvals. The <code>events</code> table keeps them in order, one row each.</p>
     <ul>
-      <li><strong>Batching.</strong> Events are queued in memory and written in one transaction every 50 ms, or as soon as 500 are waiting. Reads flush the queue first. An event still in the queue when the process crashes is lost.</li>
-      <li><strong>Large payloads.</strong> An event over 8 KiB is stored in <code>artifacts</code>, and the event row keeps a 1 KiB preview. Both are in the same database file.</li>
-      <li><strong>Images.</strong> Base64 images in tool results are written to <code>tool-images/</code> first, and the event stores an <code>openorc-asset:</code> link.</li>
-      <li><strong>Streaming fragments.</strong> A streamed message arrives as many small deltas followed by a completed event. Once the completed event is written, the deltas in between are deleted in the same transaction. The first delta is kept, because the transcript places the item at its first row. Thinking, tool output, and activity updates follow the same rule when their final event carries the full content.</li>
+      <li>Events are written in batches, every 50 ms or as soon as 500 are waiting. An event still waiting when the process crashes is lost.</li>
+      <li>An event over 8 KiB goes to <code>artifacts</code>, and its row keeps a short preview.</li>
+      <li>Images in tool results are written to <code>tool-images/</code>, and the event keeps a link.</li>
+      <li>A streamed reply arrives as many small pieces. Once the finished message is stored, the pieces in between are deleted.</li>
+      <li>The agents' native output isn't stored here. It goes to <code>logs/provider/</code>.</li>
     </ul>
-    <p>The interface reads the ledger a few turns at a time with <code>events.page</code>, using an index on turn boundaries. Tool results whose stored event is over 4,096 characters are returned without their output until you open them.</p>
-    <p class="docs-source">Source: <code>packages/db/src/ledger.ts</code>, <code>fragments.ts</code>, <code>transcript-page.ts</code></p>
-  </section>
-
-  <section aria-labelledby="search">
-    <h2 id="search">Search</h2>
-    <p>Conversation search uses <code>messages_fts</code>, an FTS5 table that stores the redacted text of every user and assistant message. Tool output and reasoning are not indexed. A query keeps up to 8 words, and every word must match as a prefix. Results are ranked with BM25, newest first on ties; the command palette shows up to 20.</p>
-    <p>Memory search uses its own index; see <a href={docHref("memory") + "#retrieval"}>Project memory</a>.</p>
-    <p class="docs-source">Source: <code>packages/db/src/search.ts</code></p>
+    <p>
+      Message search uses <code>messages_fts</code>, which indexes the redacted text of your messages and the agents' replies, not tool output or reasoning. Every word you type must match the start of a word, up to 8 words, and the command
+      palette shows the best 20 matches.
+    </p>
+    <p class="docs-source">Source: <code>packages/db/src/ledger.ts</code>, <code>fragments.ts</code>, <code>search.ts</code></p>
   </section>
 
   <section aria-labelledby="redaction">
     <h2 id="redaction">Redaction</h2>
-    <p>Before OpenOrc writes an agent event, it redacts each string inside the event on its own. A secret that starts a new line is found, and a match never runs from one string into the next. The same filter runs before OpenOrc stores:</p>
+    <p>Before OpenOrc stores an agent's events, run results, the audit log, the provider log, memories, and Slack requests, it replaces text that looks like a secret with a marker such as <code>[redacted:github-token]</code>. It looks for:</p>
     <ul>
-      <li>ledger events, including large payloads and the previews kept in their place, and the search index built from them;</li>
-      <li>run results and errors, the audit log, the provider log, and the conversation message log;</li>
-      <li>memories, run summaries, and extraction errors;</li>
-      <li>Slack requests waiting for your computer.</li>
+      <li>Known token shapes: GitHub, GitLab, Slack, Anthropic, OpenAI, Stripe, npm, and Hugging Face tokens, Google API keys, AWS access key IDs, OpenOrc device keys, JSON Web Tokens, and private keys, even one cut off before its end line.</li>
+      <li>Credentials in context: the token after <code>Bearer</code> or <code>Basic</code>, the password in a URL such as <code>postgres://user:password@host</code>, and a value of 8 or more characters given to a secret name, as in <code>DB_PASSWORD=…</code>.</li>
+      <li>Secret fields: in structured data, such as a tool's input, the whole value of a field with a secret name, or one named <code>cookie</code> or <code>set-cookie</code>.</li>
     </ul>
-    <p>A match is replaced with a marker such as <code>[redacted:github-token]</code>. The filter looks for:</p>
+    <p>
+      A secret name ends in api key, secret, secret key, client secret, access token, auth token, refresh token, private key, password, passwd, or authorization, in any case and with any prefix. Code that only names a secret, such as <code
+        >apiKey: process.env.API_KEY</code
+      >, is left alone.
+    </p>
+    <p>Some text is stored as written:</p>
     <ul>
-      <li><strong>Known token shapes</strong>: GitHub (<code>ghp_</code>, <code>github_pat_</code>), GitLab (<code>glpat-</code>), Slack (<code>xoxb-</code> and similar, <code>xapp-</code>), Anthropic (<code>sk-ant-</code>), OpenAI (<code>sk-</code>), Stripe, npm (<code>npm_</code>), and Hugging Face (<code>hf_</code>) tokens, Google API keys, AWS access key IDs, OpenOrc device keys, JSON Web Tokens, and private keys, including one cut off before its end line.</li>
-      <li><strong>Credentials in context</strong>: the token after <code>Bearer</code> or <code>Basic</code>, the password in a URL such as <code>postgres://user:password@host</code>, and a value of 8 or more characters assigned to a secret name, as in <code>DB_PASSWORD=…</code>, <code>"api_key": "…"</code>, or <code>X-Api-Key: …</code>.</li>
-      <li><strong>Secret fields</strong>: in structured data, such as a tool's input, the whole value of a field with a secret name, or one named <code>cookie</code>.</li>
+      <li>Text an agent reads later, such as plans, task comments, review comments, team messages, and messages you queue, which stay stored after they are sent. Redacting it would change what the agent gets.</li>
+      <li>Text you write and edit: drafts, task descriptions, schedule prompts, pull request review drafts, and Orcling instructions.</li>
+      <li>Everything outside OpenOrc's records, such as your project, its Git history, and the agents' own transcripts.</li>
     </ul>
-    <p>A secret name ends in api key, secret, client secret, access token, auth token, refresh token, private key, password, passwd, or authorization, in any case and with any prefix, such as <code>PGPASSWORD</code>. Code that only refers to a secret is left alone, such as <code>apiKey: process.env.API_KEY</code>, <code>password: form.password</code>, or a function call.</p>
-    <p>This filter catches common formats. It is not a guarantee: it misses a secret with no known shape or name, such as a password written in a sentence, and it sometimes hides ordinary text that looks like one. Some text is stored as written:</p>
-    <ul>
-      <li>Text an agent receives later: plans, task comments, review comments, team messages, and messages you queue in a conversation, which stay stored after they are sent. Redacting them would change what the agent gets.</li>
-      <li>Text you write and edit: drafts, task specs, and schedule prompts.</li>
-      <li>Everything outside OpenOrc's records: your project and its Git history, <code>.env</code> copies in worktrees, and the transcripts the agent CLIs keep for themselves, such as <code>~/.claude/projects</code> and <code>~/.codex/sessions</code>.</li>
-    </ul>
-    <p>Redaction changes only what OpenOrc stores. The agent receives your messages and its tool output as they are. The filter runs when text is written, so improving it later does not rewrite what is already stored.</p>
-    <p class="docs-source">Source: <code>packages/db/src/redact.ts</code>, <code>ledger.ts</code>, <code>repos.ts</code>, <code>memories.ts</code></p>
+    <Callout>
+      Redaction catches common formats, not every secret. It misses a password written in a sentence, and it sometimes hides ordinary text. It runs when text is stored, so a later improvement doesn't change what is already saved. The agent
+      always receives your messages and its tool output unchanged.
+    </Callout>
+    <p class="docs-source">Source: <code>packages/db/src/redact.ts</code></p>
   </section>
 
-  <section aria-labelledby="upkeep">
-    <h2 id="upkeep">Upkeep and retention</h2>
-    <p>At startup, if the database file predates incremental vacuuming and at least 64 MiB and a quarter of it are free space, OpenOrc rebuilds it once with <code>VACUUM</code> on a separate connection in a worker thread. It skips this when disk space is low, or when it failed in the last 3 days.</p>
-    <p>A background pass runs 60 seconds after startup and then every 6 hours:</p>
-    <ol class="docs-steps">
-      <li>Deletes <code>raw</code> event rows older than 14 days, in batches of 500. Newer versions no longer write these rows.</li>
-      <li>Once, removes redundant streaming fragments that older versions stored.</li>
-      <li>Returns free pages to the file system with <code>PRAGMA incremental_vacuum</code>.</li>
-      <li>Removes search rows and tool image folders that belong to deleted runs.</li>
-    </ol>
-    <p>Nothing else expires. Conversations, events, runs, and memories stay until you delete them, and OpenOrc never removes attachments or audit log entries. There is no size limit on the database.</p>
-    <p class="docs-source">Source: <code>packages/core/src/services/ledger-upkeep.ts</code>, <code>packages/db/src/maintenance.ts</code></p>
+  <section aria-labelledby="secrets">
+    <h2 id="secrets">Settings and secrets</h2>
+    <p>
+      App settings are one JSON row in the <code>settings</code> table. The same table holds memory and text generation settings, the reviewer app's details, the Workspace entrypoint, records of Slack requests (redacted), the last usage
+      reports, upkeep markers, and small records that keep an action from running twice. Each project's settings are stored on its row. <a href={docHref("settings") + "#saved"}>Settings</a> lists where each choice lives.
+    </p>
+    <p>Secrets never go in the database. OpenOrc encrypts them with your system's protected storage (the macOS Keychain, Windows DPAPI, or the Secret Service or KWallet on Linux) and writes each to its own file:</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">File</th>
+            <th scope="col">Holds</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>slack-secrets.enc</code></td>
+            <td>Slack tokens, device keys, and Slack connection settings</td>
+          </tr>
+          <tr>
+            <td><code>memory-extraction-key.enc</code></td>
+            <td>The optional Anthropic API key for memory</td>
+          </tr>
+          <tr>
+            <td><code>github-reviewer-app.enc</code></td>
+            <td>The private key of your GitHub reviewer app</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <ul>
+      <li>Each file is written to a temporary file that only you can read, synced to disk, then moved into place.</li>
+      <li>The window can save a secret but never read one back. The one exception is a new Slack device key, shown once so you can pass it on; the relay keeps only a hash of it.</li>
+      <li>On Linux, OpenOrc refuses to save a secret when the system would store it as plain text.</li>
+      <li>On macOS and Linux, development and installed builds use different keychain entries, so one can't read the other's secrets.</li>
+    </ul>
+    <p>OpenOrc never reads or stores the agents' sign-ins. Each CLI keeps its own credentials.</p>
+    <p class="docs-source">Source: <code>packages/core/src/services/settings.ts</code>, <code>apps/desktop/src/main/protected-secrets.ts</code></p>
   </section>
 
-  <section aria-labelledby="settings">
-    <h2 id="settings">Settings and secrets</h2>
-    <p>App settings are one JSON row in the <code>settings</code> table, validated with zod when read. The same key-value table holds memory settings, text generation settings, receipts that stop an action from running twice (such as implementing a plan revision), and Slack bookkeeping. Project settings are stored as JSON on each project row.</p>
-    <p>Secrets are not stored in the database. Slack tokens and the optional memory API key are encrypted by the main process with Electron's <code>safeStorage</code>, which uses the macOS Keychain, Windows DPAPI, or the Linux secret service. OpenOrc refuses to save them on Linux systems where <code>safeStorage</code> falls back to plain text.</p>
+  <section aria-labelledby="window">
+    <h2 id="window">Window storage</h2>
     <ul>
-      <li>Writes go to a temporary file with owner-only permissions, are synced to disk, and then replace the old file.</li>
-      <li>The interface can submit secrets but can never read them back; it only sees whether one is saved. The one exception is a new Slack device key, which is shown once when you add a device so you can pass it on. The relay host keeps only a hash of it.</li>
-      <li>Older versions stored the memory API key in the settings table. On first read, it is moved to the encrypted file, deleted with SQLite's <code>secure_delete</code>, and the database is rebuilt so no copy remains in free pages.</li>
+      <li>
+        Local storage holds drafts and pending requests (<code>openorc.draft.*</code>), such as composer text, task descriptions and comments, and edits in the Instructions tab. It also holds the layout and Preview addresses
+        (<code>openorc.layout</code>), appearance (<code>openorc.theme</code>, <code>openorc.palette</code>, <code>openorc.colors</code>, and two window transparency keys), setup progress (<code>openorc.onboarding</code>), and a few
+        small choices: the project for a new thread, how you last reviewed a pull request, and which notifications were already shown. A thread's draft is also saved in the database.
+      </li>
+      <li>IndexedDB holds images pasted into task descriptions (<code>openorc-image-drafts</code>).</li>
+      <li>
+        The Preview browser has its own persistent session, shared by every Preview. It keeps the cookies and site data of pages you open there, including sign-ins, across restarts. The cookies are encrypted on disk, but on Linux without
+        the Secret Service or KWallet they are only obscured; see <a href={docHref("security") + "#package"}>Security model</a>.
+      </li>
     </ul>
-    <p>On macOS and Linux, development and packaged builds use different keychain entries, so a key saved by one cannot be decrypted by the other.</p>
-    <p class="docs-source">Source: <code>packages/core/src/services/settings.ts</code>, <code>extraction-credentials.ts</code>, <code>apps/desktop/src/main/protected-secrets.ts</code></p>
   </section>
 
-  <section aria-labelledby="browser">
-    <h2 id="browser">Window storage</h2>
-    <p>The interface also keeps a little data in Chromium's storage inside the profile folder:</p>
-    <ul>
-      <li>Local storage: composer drafts (<code>openorc.draft.*</code>), layout, and theme.</li>
-      <li>IndexedDB: images pasted into task documents (<code>openorc-image-drafts</code>).</li>
-      <li>The Preview browser's own session, with the cookies and site data of pages you open there.</li>
-    </ul>
+  <section aria-labelledby="retention">
+    <h2 id="retention">How long things stay</h2>
+    <p>
+      Almost nothing expires. Threads, events, runs, and memories stay until you delete them, and the database has no size limit. Attachments and audit log entries are never deleted. OpenOrc never archives or completes a thread on its
+      own.
+    </p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Data</th>
+            <th scope="col">How long</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Native agent output in <code>logs/provider/</code></td>
+            <td>14 days. A new file starts every 10 MiB or every day, and the oldest files go first once the folder passes 512 MiB.</td>
+          </tr>
+          <tr>
+            <td>Native output rows that older versions stored in the database</td>
+            <td>14 days</td>
+          </tr>
+          <tr>
+            <td>Search entries and tool images of deleted runs</td>
+            <td>Removed when you delete the thread or task. Anything left over goes in the next upkeep pass.</td>
+          </tr>
+          <tr>
+            <td>Attachments and audit log entries</td>
+            <td>Never deleted, even with their thread</td>
+          </tr>
+          <tr>
+            <td>Pending approvals</td>
+            <td>Held in memory only. Quitting denies them.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      The upkeep pass runs 60 seconds after launch and every 6 hours after that. It also returns free space in the database to your disk. A database made by an older version, which can't return free space bit by bit, is rebuilt once at
+      startup if at least 64 MiB and a quarter of the file are free space, the disk has room for the rebuild, and no rebuild failed in the last 3 days. The window then says
+      <strong>Tidying up saved history. This happens once and can take a minute.</strong>
+    </p>
+    <p class="docs-source">Source: <code>packages/core/src/services/ledger-upkeep.ts</code>, <code>provider-log.ts</code>, <code>packages/db/src/maintenance.ts</code></p>
   </section>
 
   <section aria-labelledby="deleting">
     <h2 id="deleting">What deleting removes</h2>
-    <h3>Deleting a conversation</h3>
-    <p>OpenOrc closes its agent process and removes its worktree, if it has one and no fork of the conversation still uses it. Uncommitted changes there are committed to the worktree's branch first, and the branch stays. The refs that pinned its checkpoints are deleted. In the database, the delete cascades to its runs and their events, artifacts, run summaries, plans, snapshots of its files, review comments, queued messages, and Slack messages. Search rows and tool images for those runs are removed right after.</p>
-    <p>These stay:</p>
+    <h3>A thread</h3>
+    <p>Choose <strong>Delete thread</strong> in a thread's menu, then confirm. OpenOrc closes the thread's agent and removes:</p>
     <ul>
-      <li>Tasks that belonged to the conversation, now unlinked.</li>
-      <li>Attachments you sent in it.</li>
-      <li>Memories extracted from it.</li>
-      <li>Audit log entries.</li>
-      <li>Its lines in the provider log, until they expire.</li>
-      <li>The providers' own session files, such as <code>~/.claude/projects/…</code> and <code>~/.codex/sessions/…</code>, which OpenOrc never deletes.</li>
-      <li>Anything the provider keeps on its servers under its own terms.</li>
+      <li>Its runs, events, run summaries, message log, plans, checkpoints, queued messages, and review comments, plus the refs that kept its checkpoints in Git.</li>
+      <li>Its worktree, unless another thread still uses it, as forks and threads it started do. Uncommitted changes are committed to the worktree's branch first, and the branch stays. A pull request copy's changes are discarded instead.</li>
     </ul>
-    <h3>Deleting a task</h3>
-    <p>Delete task is at the bottom of a task's page, or in the Task panel for a team task. Deleting a task removes it, its discussion with the runs of the replies, and any runs that belonged to the task itself. Work done on the task in its conversation stays in that conversation, and so do review comments left on that conversation's changes; they only lose their link to the task. Review comments that belong to the task alone, which come from team review, are deleted with it.</p>
-    <h3>Projects</h3>
-    <p>Projects cannot be deleted yet.</p>
-    <p>SQLite reuses the space of deleted rows but does not overwrite it, so deleted text can remain in the file until those pages are reused or compacted.</p>
-    <p class="docs-source">Source: <code>packages/core/src/services/threads.ts</code> (<code>delete</code>), <code>packages/core/src/openorc.ts</code>, <code>packages/db/src/schema.ts</code>, <code>repos.ts</code></p>
+    <p>These stay: tasks the thread created, threads it started, its attachments and memories, audit log entries, its lines in the provider log until they expire, and the agents' own session files.</p>
+    <p>An Orcling's own conversation goes only with the Orcling. A team conversation is deleted through the team's own steps; see <a href={docHref("teams")}>Agent teams</a>.</p>
+    <h3>A task</h3>
+    <p>
+      <strong>Delete task</strong> is at the bottom of a task's page, or in the Task panel for a team task. It removes the task, its discussion, its own runs, and its own worktree unless a thread uses it. Uncommitted changes in that
+      worktree are committed to its branch first, and the branch stays, unless you tick <strong>Also delete branch</strong> where the Task panel offers it. The thread that worked on the task keeps its messages and changes.
+    </p>
+    <h3>A project</h3>
+    <p>
+      Right-click a project's name in the sidebar and choose <strong>Remove project…</strong>. This takes it off the Projects list and deletes nothing: files, worktrees, and history stay, and running work and schedules continue. Add the
+      folder again to bring it back.
+    </p>
+    <h3>An Orcling</h3>
+    <p><strong>Delete</strong> followed by the Orcling's name removes its conversation, instructions, and memories. Its folder goes only if it is empty. Threads it worked in keep their history.</p>
+    <Callout tone="warning">
+      SQLite marks deleted rows as free space without overwriting them, so deleted text can stay in the database file until that space is reused or returned to the disk. Copies outside OpenOrc, such as the agents' own transcripts, are never
+      touched.
+    </Callout>
+    <p class="docs-source">
+      Source: <code>packages/core/src/services/threads.ts</code> (<code>delete</code>), <code>workspace.ts</code>, <code>orclings.ts</code>, <code>projects.ts</code>, <code>packages/core/src/handlers/thread-workspace.ts</code>,
+      <code>task-delete.ts</code>
+    </p>
+  </section>
+
+  <section aria-labelledby="next-steps">
+    <h2 id="next-steps">Next steps</h2>
+    <LinkCards cards={[{ slug: "network" }, { slug: "security" }, { slug: "settings" }, { slug: "git" }]} />
   </section>
 </DocsLayout>

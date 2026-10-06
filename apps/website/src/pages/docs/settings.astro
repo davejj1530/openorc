@@ -1,0 +1,418 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import Callout from "../../components/docs/Callout.astro";
+import LinkCards from "../../components/docs/LinkCards.astro";
+import { docHref } from "../../data/docs";
+
+const sections = [
+  { id: "usage", title: "Usage" },
+  { id: "connections", title: "Connections" },
+  { id: "slack", title: "Slack" },
+  { id: "skills", title: "Skills" },
+  { id: "appearance", title: "Appearance" },
+  { id: "general", title: "General" },
+  { id: "memory", title: "Memory & models" },
+  { id: "data", title: "Data" },
+  { id: "saved", title: "Where settings are saved" },
+  { id: "next-steps", title: "Next steps" },
+];
+---
+
+<DocsLayout slug="settings" sections={sections}>
+  <p>
+    Open <strong>Settings</strong> at the bottom of the sidebar, or choose <strong>Settings</strong> in the command palette (<kbd>⌘K</kbd>). The sections are listed down the side. With a section name focused, the left and right arrow keys move
+    between them.
+  </p>
+  <p>
+    Most choices save as soon as you make them, and the page shows <strong>Saving…</strong> and then <strong>Saved</strong>. If a save fails, the page says <strong>Could not save. Your change is still here.</strong> and offers <strong
+      >Retry save</strong
+    >.
+  </p>
+
+  <section aria-labelledby="usage">
+    <h2 id="usage">Usage</h2>
+    <p>
+      Usage shows the allowances that each agent's account reports: Codex, Claude Code, and OpenCode. An <strong>Anthropic API</strong> report joins them when you choose or save an Anthropic API key under Memory &amp; models.
+    </p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Part</th>
+            <th scope="col">What it shows or does</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Status</td>
+            <td><strong>Usage reported</strong>, <strong>Limit reached</strong>, <strong>Stale report</strong>, <strong>Disconnected</strong>, <strong>Metrics unavailable</strong>, or <strong>Refresh failed</strong>.</td>
+          </tr>
+          <tr>
+            <td>Limits</td>
+            <td>Each limit the provider reports, as a percentage remaining or used, with its reset time.</td>
+          </tr>
+          <tr>
+            <td>Refresh button</td>
+            <td>Asks for a new report. OpenOrc also asks again when you come back from the provider's page.</td>
+          </tr>
+          <tr>
+            <td><strong>Open usage</strong></td>
+            <td>Opens the provider's usage page in your browser. The Anthropic API report has <strong>Open Console</strong> instead.</td>
+          </tr>
+          <tr>
+            <td><strong>Report details</strong></td>
+            <td>Where the report came from, when it arrived, and how many runs this device has made with the agent.</td>
+          </tr>
+          <tr>
+            <td>Resets</td>
+            <td>
+              For Codex, the resets your account has. <strong>Use reset</strong> asks you to confirm, then spends one. For Claude Code, <strong>Reset options</strong> says where to use a free reset: Claude's usage settings on the web
+              or in Claude Desktop.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>OpenCode bills each model through the provider account you signed in to it with, so its report has no limits. Check that provider's own dashboard.</p>
+    <Callout>A limit belongs to the provider account, so it can include work you did outside OpenOrc. Reset times use your device's time zone.</Callout>
+  </section>
+
+  <section aria-labelledby="connections">
+    <h2 id="connections">Connections</h2>
+    <p>Connections lists the coding agents and GitHub tools OpenOrc found on this computer. <strong>Refresh connections</strong> checks each agent again, so it picks up an agent you just installed or signed in to.</p>
+    <h3>Coding agents</h3>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Part</th>
+            <th scope="col">What it shows or does</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Status</td>
+            <td><strong>Connected</strong>, <strong>Not logged in</strong>, <strong>Not installed</strong>, <strong>Fails to start</strong> (found, but its version check failed), or <strong>Connection check failed</strong>.</td>
+          </tr>
+          <tr>
+            <td>Version</td>
+            <td>The installed version and how it was installed. <strong>Installation location</strong> shows the path.</td>
+          </tr>
+          <tr>
+            <td>Sign-in hint</td>
+            <td>For an agent that is installed but signed out: <strong>Connect in a terminal</strong> with <code>codex login</code>, <code>claude auth login</code>, or <code>opencode auth login</code>.</td>
+          </tr>
+          <tr>
+            <td>Install button</td>
+            <td>For an agent that is not installed, <strong>Install Codex</strong>, <strong>Install Claude Code</strong>, or <strong>Install OpenCode</strong> opens its setup guide.</td>
+          </tr>
+          <tr>
+            <td><strong>Check for updates</strong></td>
+            <td>
+              Looks for newer agent versions now. <strong>Update all</strong> installs every update found, and each row has its own button, such as <strong>Update Claude</strong>. A broken installation shows a reinstall button instead,
+              such as <strong>Reinstall Codex</strong>. When OpenOrc can't update an agent itself, the row links to instructions instead.
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Check for agent updates automatically</strong></td>
+            <td>On by default. Checks every six hours while OpenOrc is open, asking npm or Homebrew for public version numbers. Nothing installs until you press a button.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Updates start only when agent work has finished. Idle agents close for the update and reconnect with your next message.</p>
+    <h3>GitHub</h3>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Setting</th>
+            <th scope="col">What it does</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>GitHub CLI</strong></td>
+            <td>Shows whether <code>gh</code> is installed. OpenOrc needs it to create and browse pull requests. Without it, pushing still works, and OpenOrc opens GitHub's compare page instead of creating the pull request.</td>
+          </tr>
+          <tr>
+            <td><strong>Reviewer app</strong></td>
+            <td><strong>Set up</strong> creates a GitHub App on your account, so reviews you post from OpenOrc appear as a bot instead of as you. Then <strong>Choose repositories</strong> picks where it can review.</td>
+          </tr>
+          <tr>
+            <td><strong>Let it approve</strong></td>
+            <td>Off by default. Lets the app approve pull requests. Its approval can count toward required reviews, including on your own pull requests.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p><strong>Remove</strong> forgets the reviewer app and its key on this computer. The app stays on GitHub until you delete it there.</p>
+  </section>
+
+  <section aria-labelledby="slack">
+    <h2 id="slack">Slack</h2>
+    <p>
+      Slack connects a Slack bot to this computer, so you can mention it in a channel and an agent here replies. <strong>Connect Slack</strong> picks the kind of connection: <strong>Personal bot · no server needed</strong> or <strong
+        >Team relay · advanced</strong
+      >. The setup steps are on <a href={docHref("slack")}>Slack</a>.
+    </p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Setting</th>
+            <th scope="col">What it does</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Bot token</strong>, <strong>App token</strong></td>
+            <td>The two tokens from your Slack app, starting with <code>xoxb-</code> and <code>xapp-</code>. Leave a saved token blank to keep it.</td>
+          </tr>
+          <tr>
+            <td><strong>Your Slack member ID</strong></td>
+            <td>Only requests and approvals from this Slack member control your computer.</td>
+          </tr>
+          <tr>
+            <td><strong>Workspace entrypoint</strong></td>
+            <td>The folder where Slack requests look for projects, besides your imported projects. It is also where Workspace threads work unless you pick another folder. <strong>Choose folder</strong> changes it.</td>
+          </tr>
+          <tr>
+            <td><strong>Default coding agent</strong>, <strong>Default model</strong></td>
+            <td>What new Slack conversations use. Codex is the default agent. Leave the model blank for the agent's default; you can ask for another model in Slack.</td>
+          </tr>
+          <tr>
+            <td><strong>Mode</strong></td>
+            <td>Applies to every Slack turn, including existing threads. A stricter mode set on a conversation always wins. The default is the level that asks before changes: <strong>Review everything</strong>, which Codex calls <strong>Review changes</strong>.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      <strong>Connect and check</strong> saves these and connects. While Slack is connected, the fields are locked; <strong>Disconnect Slack</strong> unlocks them. The team relay has the same defaults under <strong>This computer</strong>, plus a
+      relay address and a device key from the person who hosts it.
+    </p>
+    <Callout>Slack requests reach your agents only while OpenOrc is open and your computer is awake. After OpenOrc restarts, open this section and connect again.</Callout>
+  </section>
+
+  <section aria-labelledby="skills">
+    <h2 id="skills">Skills</h2>
+    <p>Skills lists the skills each agent can use in a project. It only reads them; nothing here changes or runs a skill.</p>
+    <ul>
+      <li><strong>Project</strong> chooses which project's skills you see. Each agent also has personal and plugin skills that apply in every project.</li>
+      <li>The <strong>Codex</strong>, <strong>Claude Code</strong>, and <strong>OpenCode</strong> buttons switch agents and show how many skills each one has.</li>
+      <li>Skills are grouped as <strong>Project skills</strong>, <strong>Your skills</strong>, <strong>Plugin skills</strong>, and <strong>Built-in skills</strong>. Open one to see its location.</li>
+      <li><strong>Search skills</strong> filters by name, description, or path. <strong>Refresh skills</strong> reads the folders again.</li>
+    </ul>
+    <p>To use a skill, type <code>$name</code> in a Codex message or <code>/name</code> in a Claude Code message. OpenCode loads skills with its own skill tool, so ask it to use one by name. See <a href={docHref("skills")}>Skills</a>.</p>
+  </section>
+
+  <section aria-labelledby="appearance">
+    <h2 id="appearance">Appearance</h2>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Setting</th>
+            <th scope="col">What it does</th>
+            <th scope="col">Default</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Color appearance</strong></td>
+            <td><strong>System</strong>, <strong>Light</strong>, or <strong>Dark</strong>.</td>
+            <td>System</td>
+          </tr>
+          <tr>
+            <td><strong>Accent colors</strong></td>
+            <td>A ready-made set (<strong>Rose &amp; sage</strong>, <strong>Ocean</strong>, <strong>Plum &amp; amber</strong>, <strong>Graphite</strong>), or your own colors for <strong>Actions</strong>, <strong>Navigation</strong>, and <strong>Content</strong>.</td>
+            <td>Palette default</td>
+          </tr>
+          <tr>
+            <td><strong>Palette</strong></td>
+            <td>The colors of the whole workspace. Every palette has a light and a dark version.</td>
+            <td>OpenOrc</td>
+          </tr>
+          <tr>
+            <td><strong>Transparent surroundings</strong></td>
+            <td>Lets the desktop show through the sidebar and outer rails, blurred. Needs macOS, or Windows 11 22H2 or later.</td>
+            <td>Off</td>
+          </tr>
+          <tr>
+            <td><strong>Transparency</strong></td>
+            <td>How much of the desktop shows through, from 0 to 100%.</td>
+            <td>35%</td>
+          </tr>
+          <tr>
+            <td><strong>Fine-tune individual colors</strong></td>
+            <td>Changes any single color of the palette you picked. <strong>Reset all</strong> undoes your changes.</td>
+            <td>No changes</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Light and dark keep separate color choices. The command palette also has <strong>Theme: light</strong>, <strong>Theme: dark</strong>, and <strong>Theme: system</strong>.</p>
+  </section>
+
+  <section aria-labelledby="general">
+    <h2 id="general">General</h2>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Setting</th>
+            <th scope="col">What it does</th>
+            <th scope="col">Default</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Desktop notifications</strong></td>
+            <td>Notifies you when a thread finishes, asks a question, needs an approval, or fails while you are looking at something else.</td>
+            <td>On</td>
+          </tr>
+          <tr>
+            <td><strong>Notification sound</strong></td>
+            <td>Plays a sound with each desktop notification.</td>
+            <td>Off</td>
+          </tr>
+          <tr>
+            <td><strong>Check for updates automatically</strong></td>
+            <td>
+              Checks for a new OpenOrc release shortly after launch and every six hours, then shows a notice. Nothing downloads until you choose to. With it off, use <strong>Check for updates…</strong> in the OpenOrc menu on macOS, or the
+              Help menu on Windows. Linux releases don't update themselves.
+            </td>
+            <td>On</td>
+          </tr>
+          <tr>
+            <td><strong>New thread workspace</strong></td>
+            <td>Where new threads work: <strong>Local checkout</strong> or <strong>Isolated worktree</strong>. A task created in a conversation uses that conversation's workspace instead.</td>
+            <td>Local checkout</td>
+          </tr>
+          <tr>
+            <td><strong>Close idle processes after</strong></td>
+            <td>How long an agent process may wait between turns before OpenOrc closes it: <strong>Keep running</strong>, 5, 10, or 30 minutes, or 1 hour. The session resumes with your next message.</td>
+            <td>10 minutes</td>
+          </tr>
+          <tr>
+            <td><strong>Your Claude Code MCP servers</strong></td>
+            <td>Lets Claude Code connect the MCP servers from your own Claude Code configuration. They load only in Autonomous; the other modes connect only OpenOrc's tools. A slow server can miss the first message.</td>
+            <td>On</td>
+          </tr>
+          <tr>
+            <td><strong>Team execution (Beta)</strong></td>
+            <td>Lets a team lead coordinate managers and workers. Turning it off keeps existing team activity and <strong>Stop</strong> available.</td>
+            <td>On</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="memory">
+    <h2 id="memory">Memory &amp; models</h2>
+    <p>This section turns project memory on or off and chooses the small models OpenOrc uses in the background. See <a href={docHref("memory")}>Project memory</a>.</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Setting</th>
+            <th scope="col">What it does</th>
+            <th scope="col">Default</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>OpenOrc memory</strong></td>
+            <td>Lets agents save and recall knowledge across conversations, in every project. Turning it off keeps saved memories for you to review.</td>
+            <td>Off</td>
+          </tr>
+          <tr>
+            <td><strong>Provider</strong>, under <strong>Learn from completed runs</strong></td>
+            <td>
+              Which model summarizes a finished run into memories: <strong>Automatic · per agent</strong> uses the agent that did the work; <strong>Codex subscription</strong> or <strong>Claude Code subscription</strong> summarizes every
+              run; <strong>Anthropic API key</strong> bills a key you enter; <strong>Off · no background learning</strong> runs no extra model.
+            </td>
+            <td>Automatic · per agent</td>
+          </tr>
+          <tr>
+            <td><strong>Model</strong></td>
+            <td>Shown when you choose a subscription or the API key. <strong>Default</strong> names the model OpenOrc picks for it.</td>
+            <td>Default</td>
+          </tr>
+          <tr>
+            <td><strong>Harness</strong>, under <strong>Text generation</strong></td>
+            <td>
+              Which agent names new threads. <strong>Automatic · per conversation</strong> uses a small model from the thread's own agent; choosing <strong>Codex</strong>, <strong>Claude Code</strong>, or <strong>OpenCode</strong> names every
+              thread with that agent; <strong>Off · use opening message</strong> keeps the first line of your message.
+            </td>
+            <td>Automatic · per conversation</td>
+          </tr>
+          <tr>
+            <td><strong>Model</strong>, under <strong>Text generation</strong></td>
+            <td>Shown when you choose a harness. <strong>Use low-cost default</strong> goes back to its small model; a larger one can cost more.</td>
+            <td>Low-cost default</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Learning is paused while OpenOrc memory is off. With memory on and the provider set to Off, agents can still save memories themselves.</p>
+    <Callout>An Anthropic API key is billed separately from a Claude subscription. OpenOrc keeps it in your system's protected storage; <strong>Remove API key</strong> deletes it.</Callout>
+  </section>
+
+  <section aria-labelledby="data">
+    <h2 id="data">Data</h2>
+    <p>
+      Data shows the path of the <strong>Data folder</strong>, where OpenOrc keeps its database, memories, and worktrees. Below it, <strong>How your data is used</strong> summarizes where requests go: memory search runs on this device, each agent's
+      requests go to its own provider, and background models use the same agent unless you chose another under Memory &amp; models. <a href={docHref("storage")}>Data and storage</a> lists everything in the folder.
+    </p>
+  </section>
+
+  <section aria-labelledby="saved">
+    <h2 id="saved">Where settings are saved</h2>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Settings</th>
+            <th scope="col">Saved in</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>General (except updates), Memory &amp; models (except the API key), automatic agent update checks, the reviewer app and <strong>Let it approve</strong>, the Workspace entrypoint</td>
+            <td>The <code>settings</code> table of <code>openorc.sqlite</code>, in the data folder</td>
+          </tr>
+          <tr>
+            <td><strong>Check for updates automatically</strong></td>
+            <td><code>updates.json</code> in the data folder, because the main process reads it before the core starts</td>
+          </tr>
+          <tr>
+            <td>Slack tokens and Slack settings</td>
+            <td><code>slack-secrets.enc</code>, encrypted</td>
+          </tr>
+          <tr>
+            <td>The Anthropic API key</td>
+            <td><code>memory-extraction-key.enc</code>, encrypted</td>
+          </tr>
+          <tr>
+            <td>The reviewer app's private key</td>
+            <td><code>github-reviewer-app.enc</code>, encrypted</td>
+          </tr>
+          <tr>
+            <td>Appearance</td>
+            <td>The app window's local storage, under keys such as <code>openorc.theme</code> and <code>openorc.palette</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>The encrypted files use your system's protected storage: the macOS Keychain, Windows DPAPI, or the Secret Service or KWallet on Linux. Settings show whether a token or key is saved, never its value.</p>
+    <p class="docs-source">Source: <code>apps/desktop/src/renderer/src/views/Settings.tsx</code> and <code>settings-*.tsx</code>, <code>packages/core/src/services/settings.ts</code>, <code>apps/desktop/src/main/protected-secrets.ts</code>, <code>update-preferences.ts</code></p>
+  </section>
+
+  <section aria-labelledby="next-steps">
+    <h2 id="next-steps">Next steps</h2>
+    <LinkCards cards={[{ slug: "storage" }, { slug: "agents" }, { slug: "slack" }, { slug: "troubleshooting" }]} />
+  </section>
+</DocsLayout>

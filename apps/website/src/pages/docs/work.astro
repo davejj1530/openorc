@@ -1,0 +1,160 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import Callout from "../../components/docs/Callout.astro";
+import LinkCards from "../../components/docs/LinkCards.astro";
+import { docHref } from "../../data/docs";
+
+const sections = [
+  { id: "while-it-works", title: "While the agent works" },
+  { id: "open-a-step", title: "Open a step" },
+  { id: "when-it-finishes", title: "When a turn finishes" },
+  { id: "changes", title: "Review or undo a turn" },
+  { id: "questions-and-approvals", title: "Questions and approvals" },
+  { id: "inbox", title: "The Inbox" },
+  { id: "next-steps", title: "Next steps" },
+];
+---
+
+<DocsLayout slug="work" sections={sections}>
+  <p>Each turn's work sits between your message and the agent's reply. While the agent works, you see the step it's on. When it finishes, the work folds into one line that says what the turn came to, and a card lists the files it changed.</p>
+
+  <section aria-labelledby="while-it-works">
+    <h2 id="while-it-works">While the agent works</h2>
+    <p>Under your message, a header shows how long the turn has been running, such as <strong>Working · 12s</strong>. Below it, the agent's work reads as steps on a rail. Click the header to fold the steps away. The step in progress then stays visible as a single line. To end the turn early, click <strong>Stop</strong> in the composer.</p>
+    <p>A step starts when the agent says what it's about to do, and takes its title from those words. With Claude Code, that's the sentence it writes before a batch of tool calls. With Codex, it's usually the title of its reasoning. When the agent says nothing first, the step is named after what it did, such as <strong>Read 3 files, ran 2 commands</strong>.</p>
+    <p>The current step has a pulsing dot and shows how long it has been running. A finished step gets a check and folds to its title. When the agent named the step, the folded title also hints at what's inside, such as <strong>6 files · 2 commands</strong>.</p>
+    <p>Inside a step, what the agent touched is grouped by kind. Each group has a label and a chip for each item:</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Label</th>
+            <th scope="col">Chips</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Read</strong></td>
+            <td>The files the agent read.</td>
+          </tr>
+          <tr>
+            <td><strong>Searched</strong></td>
+            <td>What it searched for.</td>
+          </tr>
+          <tr>
+            <td><strong>Edited</strong></td>
+            <td>The files it changed, with the lines added and removed.</td>
+          </tr>
+          <tr>
+            <td><strong>Ran</strong></td>
+            <td>Each command, by its first line or by the agent's own description of it.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Other groups appear when the agent does other things, such as <strong>Fetched</strong> for web pages, <strong>Searched the web</strong>, or <strong>Used</strong> and the name of an MCP server. A group shows up to six chips, and <strong>+3 more</strong> shows the rest.</p>
+    <p>When the agent keeps a to-do list, it appears on the rail as <strong>Plan</strong> with a count such as <strong>2 of 5</strong>, and the items update as the agent works through them. Before the first step, the live line reads <strong>Thinking</strong> while the agent reasons. Reasoning the agent shares can appear as a row such as <strong>Thought for 8s</strong>, which opens to the text.</p>
+  </section>
+
+  <section aria-labelledby="open-a-step">
+    <h2 id="open-a-step">Open a step</h2>
+    <p>Click a step's title to open or fold it. Inside, each chip opens what's behind it:</p>
+    <ul>
+      <li>A file the agent read opens beside the conversation.</li>
+      <li>A file it edited shows that file's diff under the chips.</li>
+      <li>Any other chip opens its call. A command shows the folder it ran in and its output, a search shows its matches, and a test run shows how many tests passed and failed.</li>
+    </ul>
+    <p>Click a group's label, such as <strong>Read</strong>, to list every call in the group. In an open call, <strong>Raw call</strong> shows the exact input and output.</p>
+  </section>
+
+  <section aria-labelledby="when-it-finishes">
+    <h2 id="when-it-finishes">When a turn finishes</h2>
+    <p>The header becomes a receipt, such as <strong>Worked for 4m 12s · 2 files changed · tests passed</strong>, and the steps fold away. Click it to open them again.</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Part</th>
+            <th scope="col">What it says</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Worked</strong>, <strong>Failed</strong> or <strong>Stopped</strong></td>
+            <td>How the turn ended, and how long it ran.</td>
+          </tr>
+          <tr>
+            <td><strong>2 files changed</strong></td>
+            <td>How many files the agent edited successfully.</td>
+          </tr>
+          <tr>
+            <td><strong>tests passed</strong></td>
+            <td>The last check the agent ran (tests, typecheck, lint or build) and whether it passed or failed. It says <strong>ran</strong> when the agent piped the command's output, since OpenOrc can't tell the result.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>A part with nothing to report is left out. The sidebar gives you the same news without opening the thread. A thread's row shows the step its agent is on, <strong>Needs approval</strong> with the command it's waiting on, or <strong>Has a question for you</strong>. A finished turn you haven't read shows its receipt, such as <strong>Done · 2 files changed · tests passed</strong>, until OpenOrc closes the idle agent.</p>
+  </section>
+
+  <section aria-labelledby="changes">
+    <h2 id="changes">Review or undo a turn</h2>
+    <p>A turn that changed files ends with a change card. It reads <strong>Edited 3 files</strong>, with the lines added and removed, and lists the first three files. <strong>Show 2 more files</strong> lists the rest.</p>
+    <ul>
+      <li>Click a file, or <strong>Review</strong> for all of them, to read the turn's diff in the <strong>Changes</strong> tab.</li>
+      <li>Click <strong>Undo</strong>, then <strong>Confirm undo</strong> within four seconds, to put the files back as they were before the turn.</li>
+    </ul>
+    <p>Undo is unavailable while the agent is working, and for older turns that have no starting checkpoint. In a folder that isn't a Git repository, turns get no change card at all.</p>
+    <Callout tone="warning" title="Undo rolls back the whole folder">
+      Undo returns the thread's folder to how it was before that turn. Every change made since is undone and new files are deleted, including later turns, your own edits, and work by other threads in the same folder. Files Git ignores are left alone. OpenOrc first saves the files as a checkpoint in the <strong>Checkpoints</strong> tab, so you can bring them back with <strong>Restore</strong>.
+    </Callout>
+  </section>
+
+  <section aria-labelledby="questions-and-approvals">
+    <h2 id="questions-and-approvals">Questions and approvals</h2>
+    <p>An agent can stop to ask you something. The question card shows its options, or a text field when there are none.</p>
+    <ol class="docs-steps">
+      <li>Pick an option. When the card has a <strong>Write a different answer…</strong> field, you can type your own answer there instead.</li>
+      <li>Click <strong>Answer</strong>. <strong>Decline</strong> closes the question without an answer.</li>
+    </ol>
+    <p>A question waits for you in every mode, Autonomous included. When it asks for something secret, the field hides what you type, and the card shows <strong>Answer hidden</strong> afterwards.</p>
+    <p>An approval card looks similar. It asks whether to <strong>Allow</strong> a tool and offers <strong>Allow</strong>, <strong>Allow for this run</strong> and <strong>Deny</strong>. Which requests ask first depends on the thread's mode. See <a href={docHref("permissions") + "#approvals"}>Modes and permissions</a>.</p>
+    <p>Both cards appear under the turn's work, and the turn waits until you answer.</p>
+  </section>
+
+  <section aria-labelledby="inbox">
+    <h2 id="inbox">The Inbox</h2>
+    <p>The <strong>Inbox</strong> collects what's waiting on you across every project. Open it with the inbox button at the bottom of the sidebar. The number on the button counts what's waiting.</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Item</th>
+            <th scope="col">What the row says</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>An approval or a question</td>
+            <td>The request itself, such as the command or the question.</td>
+          </tr>
+          <tr>
+            <td>A task an agent proposed</td>
+            <td><strong>Proposed by the agent, waiting for your go-ahead</strong></td>
+          </tr>
+          <tr>
+            <td>A task whose run finished</td>
+            <td><strong>Finished run waiting for your review</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Click a row to open its thread or task. When nothing is waiting, the Inbox says <strong>Inbox zero</strong>.</p>
+    <Callout>Desktop notifications cover the same moments when you're looking at something else: a finished turn, a question, an approval, or a failure. Turn them off in <a href={docHref("settings") + "#general"}>Settings</a>.</Callout>
+  </section>
+
+  <section aria-labelledby="next-steps">
+    <h2 id="next-steps">Next steps</h2>
+    <LinkCards cards={[{ slug: "permissions" }, { slug: "review" }, { slug: "threads" }, { slug: "tasks" }]} />
+  </section>
+</DocsLayout>

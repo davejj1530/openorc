@@ -1,0 +1,96 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import LinkCards from "../../components/docs/LinkCards.astro";
+import { docHref } from "../../data/docs";
+
+const sections = [
+  { id: "where", title: "Where agents work" },
+  { id: "conversations", title: "Conversations" },
+  { id: "planning", title: "Planning and context" },
+  { id: "companions", title: "Orclings and teams" },
+  { id: "next-steps", title: "Next steps" },
+];
+---
+
+<DocsLayout slug="concepts" sections={sections}>
+  <section aria-labelledby="where">
+    <h2 id="where">Where agents work</h2>
+    <dl class="docs-terms">
+      <div>
+        <dt>Project</dt>
+        <dd>A folder you added to OpenOrc, usually a Git repository. OpenOrc keeps its threads, tasks, and memory together, and your files stay where they are. Change tracking and commits need Git, and worktrees also need a first commit. See <a href={docHref("git")}>Git and worktrees</a>.</dd>
+      </div>
+      <div>
+        <dt>Workspace</dt>
+        <dd>The built-in place for threads that don't belong to a project. A Workspace thread works in a folder you choose, by default one inside OpenOrc's data folder, and never uses Git. It's listed first in the sidebar.</dd>
+      </div>
+      <div>
+        <dt>Local checkout</dt>
+        <dd>Your repository as it is checked out now. A thread in the local checkout edits the same files you see in your editor. This is where new threads work unless you choose otherwise. See <a href={docHref("git")}>Git and worktrees</a>.</dd>
+      </div>
+      <div>
+        <dt>Worktree</dt>
+        <dd>A separate folder and branch for one thread, so threads working at the same time don't edit each other's files. OpenOrc creates it in its data folder and names the branch after the thread, under <code>openorc/</code> by default. See <a href={docHref("git")}>Git and worktrees</a>.</dd>
+      </div>
+    </dl>
+  </section>
+
+  <section aria-labelledby="conversations">
+    <h2 id="conversations">Conversations</h2>
+    <dl class="docs-terms">
+      <div>
+        <dt>Thread</dt>
+        <dd>A conversation with an agent about your code. It has a current agent, model, and mode, and it never closes: you can always send another message. See <a href={docHref("threads")}>Threads</a>.</dd>
+      </div>
+      <div>
+        <dt>Turn</dt>
+        <dd>One message and the agent's work until it stops: what it read, the commands it ran, the files it edited, and its reply. A turn ends when the agent finishes, fails, or you stop it. See <a href={docHref("work")}>Following the work</a>.</dd>
+      </div>
+      <div>
+        <dt>Run</dt>
+        <dd>One agent process, which can hold many turns. In a thread it stays open between turns, so your next message starts at once, and closes after 10 idle minutes by default. To change that, use <strong>Close idle processes after</strong> in Settings → General.</dd>
+      </div>
+      <div>
+        <dt>Session</dt>
+        <dd>The agent's own record of the conversation, kept by its CLI. OpenOrc remembers which session each thread uses, so a new run continues where the last one stopped. See <a href={docHref("agents")}>Agents and models</a>.</dd>
+      </div>
+      <div>
+        <dt>Mode</dt>
+        <dd>How much the agent may do without asking, set per thread in the composer: <strong>Plan</strong>, <strong>Review everything</strong>, <strong>Accept edits</strong>, or <strong>Autonomous</strong>. Codex names the last three <strong>Review changes</strong>, <strong>Ask for approval</strong>, and <strong>Full access</strong>. See <a href={docHref("permissions")}>Modes and permissions</a>.</dd>
+      </div>
+    </dl>
+  </section>
+
+  <section aria-labelledby="planning">
+    <h2 id="planning">Planning and context</h2>
+    <dl class="docs-terms">
+      <div>
+        <dt>Task</dt>
+        <dd>A piece of work written down as a Markdown spec, with a status and a priority. Its status moves from <strong>Proposed</strong> or <strong>Backlog</strong> through <strong>In progress</strong> and <strong>Review</strong> to <strong>Done</strong>. Saving a task never starts an agent. See <a href={docHref("tasks")}>Tasks</a>.</dd>
+      </div>
+      <div>
+        <dt>Project memory</dt>
+        <dd>Short facts about a project, such as a decision and its reason or a command that works. OpenOrc can save them from finished work, and agents can record and search them, so later threads start with what earlier ones learned. Memory is off until you turn it on. See <a href={docHref("memory")}>Project memory</a>.</dd>
+      </div>
+    </dl>
+  </section>
+
+  <section aria-labelledby="companions">
+    <h2 id="companions">Orclings and teams</h2>
+    <dl class="docs-terms">
+      <div>
+        <dt>Orcling</dt>
+        <dd>A personal companion with its own look, model, instructions, and private memory. Each Orcling has a conversation of its own, and you can also choose one to work in a project thread. See <a href={docHref("orclings")}>Orclings</a>.</dd>
+      </div>
+      <div>
+        <dt>Agent team</dt>
+        <dd>A saved group of up to 12 agents in a project, each with a name, a responsibility, and its own agent and model. One member leads, and the others report to the lead or to another member. The team works together in one conversation. Team execution is in Beta. See <a href={docHref("teams")}>Agent teams</a>.</dd>
+      </div>
+    </dl>
+  </section>
+
+  <section aria-labelledby="next-steps">
+    <h2 id="next-steps">Next steps</h2>
+    <LinkCards cards={[{ slug: "threads" }, { slug: "agents" }, { slug: "permissions" }, { slug: "git" }]} />
+  </section>
+</DocsLayout>

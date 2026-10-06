@@ -4,46 +4,12 @@
  * page's surface color; the one strong color is the black Download pill.
  */
 .home-page {
-  --window-shadow: 0 0 0 1px rgb(0 0 0 / 0.09), 0 2px 6px rgb(0 0 0 / 0.05), 0 30px 70px -28px rgb(36 40 30 / 0.5);
   --card-radius: 10px;
   --section-gap: clamp(96px, 10vw, 152px);
   overflow: clip;
 }
 .home-page h2 {
   max-width: none;
-}
-
-/* Paintings */
-.home-page .art-panel {
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-  border-radius: 8px;
-  background: #d9d6ca;
-}
-.home-page .art-panel-painting {
-  position: absolute;
-  z-index: -1;
-  inset: 0;
-}
-.home-page .art-panel-painting img {
-  width: 100%;
-  height: 100%;
-  max-width: none;
-  object-fit: cover;
-}
-.home-page .art-panel-stage {
-  position: relative;
-  padding: clamp(16px, 6%, 72px);
-}
-.home-page .mock-window,
-.home-page .demo-window {
-  position: relative;
-  overflow: hidden;
-  container-type: inline-size;
-  border-radius: 10px;
-  background: #f3f3f3;
-  box-shadow: var(--window-shadow);
 }
 
 /* Hero */
@@ -831,9 +797,6 @@
 }
 
 @media (forced-colors: active) {
-  .home-page .art-panel-painting {
-    display: none;
-  }
   .home-page .demo-tabs button[aria-selected="true"] {
     outline: 2px solid Highlight;
     outline-offset: -3px;

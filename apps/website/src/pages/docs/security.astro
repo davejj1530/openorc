@@ -1,15 +1,19 @@
 ---
 import DocsLayout from "../../layouts/DocsLayout.astro";
+import Callout from "../../components/docs/Callout.astro";
+import LinkCards from "../../components/docs/LinkCards.astro";
 import { docHref } from "../../data/docs";
 
 const sections = [
   { id: "scope", title: "What this covers" },
   { id: "servers", title: "Local servers" },
   { id: "window", title: "The app window and the Preview" },
+  { id: "agents", title: "What agents can do through OpenOrc" },
   { id: "package", title: "The installed app" },
   { id: "secrets", title: "Secrets and your data" },
   { id: "limits", title: "What OpenOrc cannot protect against" },
   { id: "report", title: "Reporting a vulnerability" },
+  { id: "next-steps", title: "Next steps" },
 ];
 
 const fuses = `RunAsNode                              off
@@ -18,6 +22,8 @@ EnableNodeCliInspectArguments          off
 EnableCookieEncryption                 on
 EnableEmbeddedAsarIntegrityValidation  on
 OnlyLoadAppFromAsar                    on`;
+
+const address = "http://127.0.0.1:<port>/mcp/<random UUID without dashes>";
 ---
 
 <DocsLayout slug="security" sections={sections}>
@@ -25,81 +31,169 @@ OnlyLoadAppFromAsar                    on`;
     <h2 id="scope">What this covers</h2>
     <p>OpenOrc runs coding agents with your account's access to your computer. This page covers who else could try to use that access, and what stops them:</p>
     <ul>
-      <li><strong>Agents</strong> do what the conversation's mode allows. The rules are on <a href={docHref("permissions")}>Permissions and app tools</a>.</li>
-      <li><strong>Web pages</strong>, in your browser or in the Preview, cannot reach OpenOrc's local servers or the app's own interface.</li>
-      <li><strong>Other accounts</strong> on the same computer cannot read the secret addresses OpenOrc gives agents.</li>
-      <li><strong>Other programs running as you</strong> cannot start OpenOrc in a way that runs their code inside the app, drives its window, or makes it start agents or approve requests on its own.</li>
+      <li>Agents do what the thread's mode allows. The rules are on <a href={docHref("permissions")}>Modes and permissions</a>.</li>
+      <li>Web pages, in your browser or in the Preview, can't reach OpenOrc's local servers or the app's own interface.</li>
+      <li>Other accounts on the same computer can't read the secret addresses OpenOrc gives agents.</li>
+      <li>
+        Other programs running as you can't start OpenOrc in a way that runs their code inside the app or drives its window, and release builds have no test switch that makes it start agents or approve requests on its own.
+      </li>
     </ul>
-    <p>A program that already runs as you can read your files, including OpenOrc's, and can choose the environment OpenOrc starts with. <a href="#limits">What OpenOrc cannot protect against</a> lists what follows from that.</p>
+    <p>
+      A program that already runs as you can read and change your files, including OpenOrc's, and can choose the environment OpenOrc starts with. <a href="#limits">What OpenOrc cannot protect against</a> lists what follows from that.
+    </p>
   </section>
 
   <section aria-labelledby="servers">
     <h2 id="servers">Local servers</h2>
-    <p>Agents reach OpenOrc's tools through its MCP server. It listens on <code>127.0.0.1</code> on a random port, so other computers cannot connect to it. Each agent process gets its own address:</p>
-    <pre><code>http://127.0.0.1:&lt;port&gt;/mcp/&lt;random UUID without dashes&gt;</code></pre>
+    <p>Agents reach OpenOrc's tools through its MCP server. It listens on <code>127.0.0.1</code> on a random port, so other computers can't connect to it. Each agent process gets its own address:</p>
+    <pre><code set:text={address} /></pre>
     <ul>
       <li>The address is the only credential, and it belongs to one run. A call through it acts for that run and follows that run's mode.</li>
-      <li>It works only while the run's process is running. When the run ends, OpenOrc deletes it, so a copy left in a file or a log no longer works.</li>
-      <li>A request that carries an <code>Origin</code> header, or names any host other than <code>127.0.0.1:&lt;port&gt;</code>, is refused. Agent CLIs send neither, and every web page does, including one that points its own domain name at your computer.</li>
-      <li>The address never appears on a command line, which every account on the computer can list. Claude Code reads it from a file only you can read, deleted when its process closes. Codex and OpenCode receive it over the process's standard input.</li>
+      <li>It works only while the run is live. When the run ends, OpenOrc forgets it, so a copy left in a file or a log no longer works.</li>
+      <li>
+        A request with an <code>Origin</code> header, or one that names any host other than <code>127.0.0.1:&lt;port&gt;</code>, is refused. Agent CLIs send neither. A page that points its own domain at your computer sends that domain as
+        the host, scripts on a page send an <code>Origin</code> header, and no page can guess the random path.
+      </li>
+      <li>The address never appears on a command line. Claude Code reads it from a file only you can read, deleted when its process closes. Codex and OpenCode receive it over the process's standard input.</li>
     </ul>
-    <p>The same address answers Claude Code's file check in Plan and Accept edits: for each file edit, the hook sends Claude Code's whole request, including the edit's content, to <code>&lt;address&gt;/file-boundary</code> with <code>curl</code>, and OpenOrc answers from the real path. See <a href={docHref("providers") + "#claude"}>Claude Code</a>.</p>
-    <p>Other servers also listen on <code>127.0.0.1</code>. The MCP Apps sandbox serves each interface from an MCP server at its own random path, on its own port, so it runs apart from the app. The <a href={docHref("slack") + "#relay"}>team relay</a> requires a device key on every request and refuses requests with an <code>Origin</code> header. On macOS, while a downloaded app update waits to be installed, the update library also serves it to the system installer from <code>127.0.0.1</code>, on a random port and behind a random password.</p>
-    <p class="docs-source">Source: <code>packages/mcp/src/index.ts</code>, <code>packages/mcp/src/file-boundary.ts</code>, <code>apps/desktop/src/main/mcp-app-sandbox.ts</code></p>
+    <p>
+      The same address checks Claude Code's file edits in Plan and Accept edits. Before each edit, a hook sends Claude's request to <code>&lt;address&gt;/file-boundary</code> with <code>curl</code>, and OpenOrc answers from the real path,
+      following symlinks. Plan allows writing only in Claude's plans folder; Accept edits asks you about anything outside the project. If OpenOrc doesn't answer, the edit is blocked.
+    </p>
+    <p>The other local servers have their own checks:</p>
+    <ul>
+      <li>
+        The MCP Apps sandbox has a port of its own, so apps run apart from the app window. It serves each app at its own random path, in a sandboxed frame, and answers only <code>GET</code> requests that name its own address as the host.
+      </li>
+      <li>The <a href={docHref("slack")}>Slack team relay</a> accepts only POST requests with a device key, and refuses any request with an <code>Origin</code> header. It keeps only a hash of each key.</li>
+      <li>The reviewer app's setup page runs only while you set the app up, for at most 15 minutes. It answers only requests that carry a random value from the link OpenOrc opened, and its form can post only to <code>github.com</code>.</li>
+      <li>On macOS, while a downloaded update waits to install, the update library serves it to the system installer behind a random password.</li>
+    </ul>
+    <p class="docs-source">Source: <code>packages/mcp/src/index.ts</code>, <code>packages/agents/src/claude/file-boundary.ts</code>, <code>apps/desktop/src/main/mcp-app-sandbox.ts</code>, <code>packages/core/src/services/reviewer-app.ts</code></p>
   </section>
 
   <section aria-labelledby="window">
     <h2 id="window">The app window and the Preview</h2>
-    <p>The interface runs in a sandboxed Chromium page with context isolation and no Node.js. It reaches the rest of OpenOrc only through a fixed set of functions and one validated message channel to the core. See <a href={docHref("processes")}>Processes and messaging</a>.</p>
+    <p>The interface runs in a sandboxed Chromium page with context isolation and no Node.js. It reaches the rest of OpenOrc only through a fixed set of functions and one channel to the core, where every request is checked against a schema.</p>
     <ul>
       <li>The window loads only the files that ship with OpenOrc and never navigates away from them. Embedded <code>&lt;webview&gt;</code> tags are refused.</li>
-      <li>A web link opens in the Preview or in your browser. Files and other schemes do not open, and only the app's own page can ask to open a link.</li>
-      <li>The app may show notifications and copy text to the clipboard. Every other web permission, such as the camera, microphone, or location, is refused, and so is any request from another page or frame.</li>
+      <li>A web link opens in the Preview or in your browser, or in Chrome Incognito if you choose that from the link's menu. Files and other schemes don't open, and only the app's own page can ask to open a link.</li>
+      <li>The app's page may show notifications and copy text to the clipboard. Every other web permission, such as the camera, microphone, or location, is refused.</li>
     </ul>
-    <p>The Preview is a separate sandboxed page with its own storage. It is refused every web permission, cannot download files, and cannot open windows. Because it keeps the sessions you sign in to there, typing and clicking in it follow the mode; see <a href={docHref("permissions") + "#browser"}>The browser Preview</a>.</p>
-    <p class="docs-source">Source: <code>apps/desktop/src/main/app-origin.ts</code>, <code>apps/desktop/src/main/index.ts</code>, <code>apps/desktop/src/main/browser-pane.ts</code></p>
+    <p>
+      The Preview is a separate sandboxed page with a session of its own. It is refused every web permission, can't download files or open windows, and loads only <code>http</code> and <code>https</code> addresses without a user name or
+      password in them. Its session keeps your sign-ins across restarts, so an agent's clicks and typing in it follow the thread's mode: blocked in Plan, and asked about unless the thread is Autonomous. Typing into a password field asks even
+      in Autonomous. Opening pages, reading them, and taking screenshots are allowed in every mode, Plan included, in that same signed-in session.
+    </p>
+    <p class="docs-source">Source: <code>apps/desktop/src/main/index.ts</code>, <code>app-origin.ts</code>, <code>link-navigation.ts</code>, <code>browser-pane.ts</code>, <code>packages/core/src/services/app-actions.ts</code></p>
+  </section>
+
+  <section aria-labelledby="agents">
+    <h2 id="agents">What agents can do through OpenOrc</h2>
+    <p>OpenOrc's own tools let an agent reach beyond its thread. Each follows the calling thread's mode:</p>
+    <ul>
+      <li>
+        <strong>Messaging another thread.</strong> A message to a thread in the same or a stricter mode is delivered at once. One to a more permissive thread asks you first, and from Plan an agent can message only Plan threads. After 20
+        agent messages in a row with nobody writing, sending stops until a person writes.
+      </li>
+      <li>
+        <strong>Starting a thread.</strong> An agent in Act can start a thread with <code>thread_start</code> without asking. The new thread works in the same folder, with the same mode and permissions. An agent can start one only while
+        fewer than 3 of the threads it started are working, and a started thread can't start its own.
+      </li>
+      <li><strong>Orclings</strong> can read every project, save tasks, and message any thread. Starting work in a project asks first unless the Orcling works in Autonomous, and is blocked in Plan.</li>
+      <li>
+        <strong>Reviewing a pull request.</strong> The review runs in a copy of the pull request, and no agent loads settings, hooks, or MCP servers from that copy. Agents only add comments to your draft; you decide what to post.
+      </li>
+    </ul>
+    <p>
+      The reviewer app asks GitHub only for write access to pull requests and has no active webhook, and OpenOrc uses it only to post reviews. Each access token covers one repository for one hour, and approving is off until you turn on
+      <strong>Let it approve</strong>.
+    </p>
   </section>
 
   <section aria-labelledby="package">
     <h2 id="package">The installed app</h2>
-    <p>Electron has switches that let any program run code as the app, and on macOS the system attributes that code to the app, with the access you gave it. OpenOrc turns them off with Electron's fuses, flags written into the app's binary when it is built:</p>
-    <pre><code>{fuses}</code></pre>
+    <p>Electron has switches that let another program run code as the app, which macOS then attributes to the app, with the access you gave it. OpenOrc turns them off with Electron's fuses, flags written into the app when it is built:</p>
+    <pre><code set:text={fuses} /></pre>
     <ul>
-      <li>The app itself cannot be started as plain Node.js, and ignores <code>NODE_OPTIONS</code> and <code>--inspect</code>.</li>
-      <li>It loads its code only from its <code>app.asar</code> archive. The build records the archive's SHA-256 in the app, on macOS in the signed <code>Info.plist</code>, and Electron checks it before loading. Electron has no such check on Linux: the rpm and deb install the archive where only root can change it, and an AppImage is as protected as the file you keep it in.</li>
-      <li>Cookies, including the Preview's signed-in sessions, are encrypted on disk with a key kept in the macOS Keychain or protected by Windows DPAPI. On Linux the key lives in the Secret Service or KWallet; without either, Chromium's built-in fallback key only obscures them.</li>
-      <li>An installed app refuses to start with <code>--remote-debugging-port</code> or <code>--remote-debugging-pipe</code>, before it opens a window or a debugging port.</li>
-      <li>Release builds read no test switches: nothing that starts agents, approves requests, runs benchmarks, takes screenshots, answers the folder picker, or forces a theme or screen, and no diagnostics screen. These exist only in development and test builds, so no environment variable can make an installed app act on its own.</li>
+      <li>The app can't be started as plain Node.js, and ignores <code>NODE_OPTIONS</code> and <code>--inspect</code>.</li>
+      <li>
+        It loads its code only from its <code>app.asar</code> archive. On macOS and Windows, Electron checks the archive's integrity before loading it. Linux has no such check: the rpm and deb install the archive where only root can change
+        it, and an AppImage is as protected as the file you keep it in.
+      </li>
+      <li>
+        Cookies, including the Preview's sign-ins, are encrypted on disk with a key kept in the macOS Keychain or protected by Windows DPAPI. On Linux the key lives in the Secret Service or KWallet; without either, Chromium's fallback key
+        only obscures them.
+      </li>
+      <li>An installed app refuses to start with <code>--remote-debugging-port</code> or <code>--remote-debugging-pipe</code>, before it opens a window.</li>
+      <li>Release builds leave out every test hook: nothing that starts agents, approves requests, runs benchmarks, takes screenshots, or answers the folder picker, and no diagnostics screen.</li>
     </ul>
-    <p>On macOS the app runs with the hardened runtime and one entitlement, <code>com.apple.security.cs.allow-jit</code>, which V8 needs to compile JavaScript. Library validation stays on: the app loads only native code signed by Apple or by the same developer, and all of its own native code sits outside the archive, where signing covers it.</p>
-    <p>Before a release is published, a check runs on the signed macOS app, the installed Windows app, and the installed Linux app. It reads the fuses, looks for native code inside the archive and, on macOS, for any executable file not signed by the same team, starts the app, and confirms that <code>ELECTRON_RUN_AS_NODE</code>, <code>--inspect</code>, and remote debugging do nothing.</p>
-    <p class="docs-source">Source: <code>apps/desktop/electron-builder.yml</code>, <code>apps/desktop/build/entitlements.mac.plist</code>, <code>scripts/packaged-release-check.cjs</code></p>
+    <p>
+      On macOS the release runs with the hardened runtime and one entitlement, <code>com.apple.security.cs.allow-jit</code>, which JavaScript needs. Library validation stays on, so the app loads only native code signed by Apple or by the same
+      developer.
+    </p>
+    <p>
+      Before a release is published, a check runs on the signed macOS app, the installed Windows app, and the installed Linux app. It reads the fuses, looks for native code inside the archive and, on macOS, for any executable not signed by
+      the same team, then starts the app and confirms that <code>ELECTRON_RUN_AS_NODE</code>, <code>--inspect</code>, and <code>--remote-debugging-port</code> do nothing.
+    </p>
+    <p class="docs-source">Source: <code>apps/desktop/electron-builder.yml</code>, <code>apps/desktop/build/entitlements.mac.plist</code>, <code>scripts/desktop-release.cjs</code>, <code>scripts/packaged-release-check.cjs</code></p>
   </section>
 
   <section aria-labelledby="secrets">
     <h2 id="secrets">Secrets and your data</h2>
     <ul>
-      <li>Slack tokens and the optional memory API key are encrypted with Electron's <code>safeStorage</code>, which uses the macOS Keychain, Windows DPAPI, or the Linux Secret Service or KWallet, and written to files only you can read. They are never in the database. See <a href={docHref("storage") + "#settings"}>Settings and secrets</a>.</li>
-      <li>OpenOrc never reads or stores the agents' logins. Each CLI signs in and keeps its credentials itself.</li>
+      <li>
+        Slack tokens, the optional Anthropic API key for memory, and the reviewer app's private key are encrypted with your system's protected storage and written to files only you can read. They are never in the database. See <a
+          href={docHref("storage") + "#secrets"}>Data and storage</a
+        >.
+      </li>
+      <li>OpenOrc never reads or stores the agents' sign-ins. Each CLI keeps its own credentials.</li>
       <li>Text that looks like a secret is replaced before it is stored. See <a href={docHref("storage") + "#redaction"}>Redaction</a>.</li>
-      <li>The database is a plain SQLite file in your profile folder, and it is not encrypted. Your conversations, plans, and memories are as private as the rest of your files.</li>
-      <li>Conversation titles and memory summaries reach every agent over standard input, never on the command line, so other accounts cannot read your conversation text from the process list. See <a href={docHref("network") + "#background"}>Background requests through agents</a>.</li>
+      <li>The database is a plain SQLite file in your data folder, and it isn't encrypted. Your threads, plans, and memories are as private as the rest of your files.</li>
+      <li>Your messages reach every agent over standard input. So do background requests, such as titles and memory summaries.</li>
     </ul>
+    <Callout title="Claude Code's brief is on its command line">
+      OpenOrc gives Claude Code its brief for a thread with <code>--append-system-prompt</code>, and other accounts on the computer can list a process's command line. The brief can include the thread's title, the project's folder and
+      branch, task titles and a task's description, the project's memory brief, an Orcling's instructions and its memories about you, and, after a switch of agent or a compaction, your last few requests and the previous agent's last reply.
+      Codex and OpenCode receive the same brief over standard input.
+    </Callout>
   </section>
 
   <section aria-labelledby="limits">
     <h2 id="limits">What OpenOrc cannot protect against</h2>
     <ul>
-      <li><strong>Programs that run as you.</strong> They can read OpenOrc's database, its log files, and the files that hold the running agents' addresses, and they can call those addresses while the runs last. Encrypted secrets stay protected by the Keychain or DPAPI.</li>
-      <li><strong>Your shell's startup files.</strong> OpenOrc starts your login shell to find the agents and their environment, and the terminal panels run your shell. A program that changes those files changes what runs there.</li>
-      <li><strong>The environment OpenOrc starts with.</strong> At startup OpenOrc removes the variables that make shells, Node, Git, or the system loader run extra code, such as <code>NODE_OPTIONS</code>, <code>BASH_ENV</code>, <code>ZDOTDIR</code>, <code>DYLD_*</code>, and <code>GIT_*</code>. Terminal panels run your account's login shell, not the <code>SHELL</code> OpenOrc was given (on Windows, they run <code>COMSPEC</code>). Other variables, such as proxy settings and extra <code>PATH</code> entries, still reach terminals and agents.</li>
-      <li><strong>Access you grant on macOS.</strong> Agents and terminal shells started by OpenOrc share the privacy access you give OpenOrc, such as Documents, Desktop, or Full Disk Access. The fuses stop other programs from running their code inside OpenOrc itself. They do not stop code that reaches a terminal or an agent through the files above, or a request that asks an agent to use that access.</li>
-      <li><strong>What agents are allowed to do.</strong> In Autonomous mode, an agent's commands run without asking, with your account's access. Choose the mode for the work.</li>
+      <li>
+        <strong>Programs that run as you.</strong> They can read and change OpenOrc's database and logs, for example to add a schedule that starts an agent. They can read the files that hold running agents' addresses and call those
+        addresses while the runs last. On macOS, the Keychain asks before another program reads the key that protects OpenOrc's secrets; on Windows and Linux, a program running as you can decrypt them.
+      </li>
+      <li>
+        <strong>Your shell's startup files.</strong> To find the agents, OpenOrc runs your login shell and keeps only its <code>PATH</code> and where each agent lives. Terminal panels run your shell, so its startup files run there. A
+        program that changes those files changes what runs.
+      </li>
+      <li>
+        <strong>The environment OpenOrc starts with.</strong> At startup OpenOrc removes the variables that make shells, Node, Git, or the system loader run extra code: <code>NODE_OPTIONS</code>, <code>BASH_ENV</code>, <code>ENV</code>,
+        <code>ZDOTDIR</code>, <code>PROMPT_COMMAND</code>, <code>LD_PRELOAD</code>, <code>LD_AUDIT</code>, <code>LD_LIBRARY_PATH</code>, and every variable starting with <code>DYLD_</code> or <code>GIT_</code>. Others, such as proxy
+        settings and extra <code>PATH</code> entries, still reach terminals and agents. <code>OPENORC_USER_DATA</code> picks the data folder in every build. <code>OPENORC_CLAUDE_BIN</code> and its siblings pick the agent programs on
+        Windows, and on macOS and Linux when OpenOrc can't read your login shell.
+      </li>
+      <li>
+        <strong>Access you grant on macOS.</strong> Agents and terminals that OpenOrc starts share the privacy access you give OpenOrc, such as Documents, Desktop, or Full Disk Access. The fuses stop other programs from running code inside
+        OpenOrc; they don't stop a request that asks an agent to use that access.
+      </li>
+      <li><strong>What agents are allowed to do.</strong> In Autonomous, an agent's commands run without asking, with your account's access. Choose the mode for the work.</li>
     </ul>
   </section>
 
   <section aria-labelledby="report">
     <h2 id="report">Reporting a vulnerability</h2>
-    <p>Report suspected vulnerabilities privately through GitHub: on the <a href="https://github.com/davejj1530/openorc">repository page</a>, open the <strong>Security and quality</strong> tab and click <strong>Report a vulnerability</strong>. Please do not post details in a public issue. <a href="https://github.com/davejj1530/openorc/blob/main/SECURITY.md">SECURITY.md</a> lists what to include.</p>
+    <p>
+      Report suspected vulnerabilities privately through GitHub. On the <a href="https://github.com/davejj1530/openorc">repository page</a>, open the <strong>Security and quality</strong> tab and click <strong>Report a vulnerability</strong>.
+      Don't post details in a public issue. <a href="https://github.com/davejj1530/openorc/blob/main/SECURITY.md">SECURITY.md</a> lists what to include. OpenOrc is in beta, and fixes go to the current development branch.
+    </p>
+  </section>
+
+  <section aria-labelledby="next-steps">
+    <h2 id="next-steps">Next steps</h2>
+    <LinkCards cards={[{ slug: "permissions" }, { slug: "network" }, { slug: "storage" }]} columns={3} />
   </section>
 </DocsLayout>

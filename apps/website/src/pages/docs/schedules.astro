@@ -1,0 +1,131 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import Callout from "../../components/docs/Callout.astro";
+import LinkCards from "../../components/docs/LinkCards.astro";
+import { docHref } from "../../data/docs";
+
+const sections = [
+  { id: "how-it-works", title: "How schedules work" },
+  { id: "create", title: "Create a schedule" },
+  { id: "results", title: "Where results go" },
+  { id: "manage", title: "Pause, run now and delete" },
+  { id: "timing", title: "When a schedule runs" },
+  { id: "next-steps", title: "Next steps" },
+];
+---
+
+<DocsLayout slug="schedules" sections={sections}>
+  <section aria-labelledby="how-it-works">
+    <h2 id="how-it-works">How schedules work</h2>
+    <p>A schedule sends the same prompt to an agent on a timer. Each run starts a new thread in the schedule's project, with the model, mode and location you saved. Use one for work that repeats, such as a nightly dependency check or a weekly look for flaky tests.</p>
+    <p>Schedules run on your computer, inside OpenOrc. Nothing runs while OpenOrc is closed.</p>
+  </section>
+
+  <section aria-labelledby="create">
+    <h2 id="create">Create a schedule</h2>
+    <ol class="docs-steps">
+      <li>Open <strong>Schedules</strong> in the sidebar.</li>
+      <li>Choose <strong>New schedule</strong>, the <strong>+</strong> button in the header.</li>
+      <li>Fill in the fields below and choose <strong>Create</strong>.</li>
+    </ol>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Field</th>
+            <th scope="col">What it sets</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Project</strong></td>
+            <td>Where the runs work. You can't change it after saving.</td>
+          </tr>
+          <tr>
+            <td><strong>Name</strong></td>
+            <td>The schedule's name. Each run's thread is titled with it.</td>
+          </tr>
+          <tr>
+            <td><strong>Prompt</strong></td>
+            <td>The first message of every run.</td>
+          </tr>
+          <tr>
+            <td><strong>Runs</strong></td>
+            <td><strong>Every 30 minutes</strong>, <strong>Every hour</strong>, <strong>Every 6 hours</strong>, <strong>Every day</strong> or <strong>Every week</strong>. New schedules start at Every day.</td>
+          </tr>
+          <tr>
+            <td><strong>Model or team</strong></td>
+            <td>The model and effort that run the prompt, or a saved <a href={docHref("teams")}>agent team</a> (Beta).</td>
+          </tr>
+          <tr>
+            <td><strong>Mode</strong></td>
+            <td>What the agent may do. New schedules start in <strong>Plan</strong>, which reads and proposes without changing files. See <a href={docHref("permissions")}>Modes and permissions</a>.</td>
+          </tr>
+          <tr>
+            <td><strong>Works in</strong></td>
+            <td><strong>A fresh worktree</strong> for each run, the default, or <strong>The checkout</strong>. A project without Git or without a first commit can only use the checkout. Team schedules always give the team its own workspaces.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Write the prompt as you would the first message of a thread, and say what a good result looks like. For example: "Look for outdated dependencies with known vulnerabilities and propose one task per upgrade worth doing."</p>
+  </section>
+
+  <section aria-labelledby="results">
+    <h2 id="results">Where results go</h2>
+    <p>Each run creates a thread in the schedule's project, titled with the schedule's name followed by a date and time. The agent's work and its reply are in that thread, in the sidebar with your other threads. If desktop notifications are on, you also get one saying the run started.</p>
+    <p>In Schedules, each row shows how often the schedule runs, when it last ran and when it runs next. <strong>Open task</strong>, the arrow button, opens the thread of the latest run. A line under the row reports the latest run: <strong>Task created</strong> when it started, or <strong>Run skipped</strong>, <strong>Run cancelled</strong> or <strong>Run failed</strong> with the reason.</p>
+    <Callout>Every run is a new thread, and a run in a fresh worktree also gets its own worktree and branch. Delete the run threads you are done with; see <a href={docHref("git") + "#delete"}>Delete a thread</a> for what stays.</Callout>
+  </section>
+
+  <section aria-labelledby="manage">
+    <h2 id="manage">Pause, run now and delete</h2>
+    <p>The buttons on each row:</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Button</th>
+            <th scope="col">What it does</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Pause schedule</strong></td>
+            <td>Stops timed runs. The row's badge changes from <strong>on</strong> to <strong>off</strong>.</td>
+          </tr>
+          <tr>
+            <td><strong>Resume schedule</strong></td>
+            <td>Turns timed runs back on. The next run comes one interval from now.</td>
+          </tr>
+          <tr>
+            <td><strong>Run now</strong></td>
+            <td>Starts a run at once and opens its thread. The next timed run comes one interval after it.</td>
+          </tr>
+          <tr>
+            <td><strong>Delete schedule</strong></td>
+            <td>Removes the schedule. Threads from earlier runs stay.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>To change a schedule, click its name, edit the fields and choose <strong>Save</strong>. A changed <strong>Runs</strong> interval starts counting from the moment you save.</p>
+  </section>
+
+  <section aria-labelledby="timing">
+    <h2 id="timing">When a schedule runs</h2>
+    <ul>
+      <li>OpenOrc checks its schedules once a minute, and only while it is running and your computer is awake.</li>
+      <li>The first run comes one interval after you create the schedule. Use <strong>Run now</strong> to try a schedule straight away.</li>
+      <li>If a run came due while OpenOrc was closed or the computer was asleep, it runs once at the next check. Missed runs don't pile up.</li>
+      <li>On macOS, OpenOrc keeps running after you close its window, until you quit it. On Windows and Linux, closing the last window quits it.</li>
+      <li>A team schedule skips a run while the team from its previous run still has unfinished work.</li>
+    </ul>
+    <Callout>The mode decides what a run does while you are away. In a mode that asks before commands or edits, the run stops at the first request and waits in its thread until you answer.</Callout>
+  </section>
+
+  <section aria-labelledby="next-steps">
+    <h2 id="next-steps">Next steps</h2>
+    <LinkCards cards={[{ slug: "permissions" }, { slug: "threads" }, { slug: "git" }]} columns={3} />
+  </section>
+</DocsLayout>

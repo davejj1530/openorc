@@ -1,0 +1,76 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import Callout from "../../components/docs/Callout.astro";
+import LinkCards from "../../components/docs/LinkCards.astro";
+import { docHref } from "../../data/docs";
+
+const sections = [
+  { id: "how-it-works", title: "How discussions work" },
+  { id: "ask", title: "Ask a model" },
+  { id: "replies", title: "How replies arrive" },
+  { id: "several", title: "Ask several models" },
+  { id: "work", title: "From discussion to work" },
+  { id: "next-steps", title: "Next steps" },
+];
+---
+
+<DocsLayout slug="discussions" sections={sections}>
+  <section aria-labelledby="how-it-works">
+    <h2 id="how-it-works">How discussions work</h2>
+    <p>Every task has <strong>Comments</strong> on its Overview, under the spec. A comment without a mention is a note to yourself. Mention a model with <kbd>@</kbd> and it reads the task and the discussion so far, then replies under your comment.</p>
+    <p>Use a discussion before anything gets built, for example to ask how a model would approach the task or to find gaps in the spec. Replies are read-only. The model runs in Plan mode in the task's folder, so it can read the code but can't change files or the task.</p>
+  </section>
+
+  <section aria-labelledby="ask">
+    <h2 id="ask">Ask a model</h2>
+    <ol class="docs-steps">
+      <li>Open the task's <strong>Overview</strong> and scroll to <strong>Comments</strong>.</li>
+      <li>In the comment box, type <kbd>@</kbd>. A list of models and efforts opens, with entries such as <code>@Opus 5.5 - High</code>. Keep typing to narrow it, use the arrow keys to move, and press <kbd>↵</kbd> or <kbd>Tab</kbd> to pick one.</li>
+      <li>Write your question.</li>
+      <li>Choose <strong>Comment</strong>, or press <kbd>⌘↵</kbd>.</li>
+    </ol>
+    <p>A mention names the model as the model picker does, followed by the effort. When two models share a name, the list adds the harness or provider in parentheses. You can also mention an <a href={docHref("orclings")}>Orcling</a> by name; it replies with the model it uses.</p>
+    <p>Mentions inside code or quoted lines are ignored. If a mention matches no available model, the comment isn't sent and the error names the mention.</p>
+    <p>When the spec itself mentions models with <kbd>@</kbd>, <strong>Ask tagged agents</strong> appears beside the Comments heading. It asks those models to discuss the saved description with you. A mention in the description never starts work.</p>
+  </section>
+
+  <section aria-labelledby="replies">
+    <h2 id="replies">How replies arrive</h2>
+    <p>Each model's reply appears under your comment as it is written, signed with the model, the effort and the harness. Until it finishes, the reply says <strong>Queued</strong> or <strong>Replying…</strong>. A model answers your comments one at a time, in the order you wrote them.</p>
+    <ul>
+      <li><strong>Reply</strong> on a model's reply addresses that model. It continues the same session, so it remembers what it said.</li>
+      <li><strong>Reply</strong> on your own comment addresses the models that comment mentioned. Each one shows above the box; click it to leave that model out.</li>
+      <li><strong>Cancel response</strong> stops a reply that is queued or being written. <strong>Retry response</strong> asks again after a reply fails or is cancelled.</li>
+      <li>A model can stop to ask you a question. The question appears in its reply, which says <strong>Waiting for your answer</strong> until you answer.</li>
+    </ul>
+    <p>Each reply gets the task's spec, the earlier discussion and your newest comment. Very long discussions are trimmed to their most recent part.</p>
+    <Callout>Quitting OpenOrc cancels replies that are queued or still being written. Choose <strong>Retry response</strong> to ask again.</Callout>
+  </section>
+
+  <section aria-labelledby="several">
+    <h2 id="several">Ask several models</h2>
+    <p>Mention more than one model in the same comment, up to eight. Each one replies on its own, so you can compare answers from different providers or efforts side by side. Their replies run at the same time.</p>
+    <p>If any of them reads your comment as a request to build, nothing starts on its own. OpenOrc asks <strong>Who should implement?</strong> with a button for each model you asked. Choose one; the work starts with that model, and the other replies stay as they are.</p>
+  </section>
+
+  <section aria-labelledby="work">
+    <h2 id="work">From discussion to work</h2>
+    <p>Under the Comments heading, OpenOrc notes that clear work requests continue in a linked thread. Each model decides whether your newest comment is discussion, needs clarifying, or clearly asks for the work to be done, and only your own words in that comment count. "How would you implement this?" is discussion; "Can you implement this?" is a request. The spec, quoted text and other models' replies never count as a request.</p>
+    <p>When a model reads your comment as a request:</p>
+    <ol class="docs-steps">
+      <li>Its reply finishes as usual.</li>
+      <li>OpenOrc starts the work in the task's thread, with that model and effort. It uses the thread the task came from when that thread is idle and runs the same model in the same place; otherwise it creates a thread named after the task.</li>
+      <li>The reply says <strong>Starting work…</strong>, then <strong>Working in thread</strong>, and gains <strong>Open thread</strong>. The task moves to <strong>In progress</strong>, and that thread becomes the task's thread.</li>
+      <li>When the work ends, the reply adds whether it completed, failed or was cancelled, followed by the agent's final message.</li>
+    </ol>
+    <p>Once the task's thread has started, a later request starts nothing new. It is queued in that thread as a follow-up, using the thread's current model and settings.</p>
+    <Callout title="When work can't start">
+      <p>A task that is Done or Archived has to be reopened first. If the task's thread is in Plan mode, switch it to another <a href={docHref("permissions")}>mode</a> before asking; otherwise the reply shows an error and nothing starts. Tasks that belong to an agent team start through the team's own controls.</p>
+    </Callout>
+  </section>
+
+  <section aria-labelledby="next-steps">
+    <h2 id="next-steps">Next steps</h2>
+    <LinkCards cards={[{ slug: "tasks" }, { slug: "agents" }, { slug: "work" }]} columns={3} />
+  </section>
+</DocsLayout>

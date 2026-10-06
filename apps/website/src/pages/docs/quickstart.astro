@@ -1,0 +1,127 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import Callout from "../../components/docs/Callout.astro";
+import LinkCards from "../../components/docs/LinkCards.astro";
+import { docHref } from "../../data/docs";
+
+const sections = [
+  { id: "install", title: "Install OpenOrc" },
+  { id: "agent", title: "Set up an agent" },
+  { id: "setup", title: "Finish setup" },
+  { id: "first-thread", title: "Start your first thread" },
+  { id: "review", title: "Review and commit" },
+  { id: "next-steps", title: "Next steps" },
+];
+---
+
+<DocsLayout slug="quickstart" sections={sections}>
+  <section aria-labelledby="install">
+    <h2 id="install">Install OpenOrc</h2>
+    <p>Get the installer from the <a href="/download/">download page</a>, which highlights the one for your computer when it can tell. OpenOrc is free and open source, and you don't need an OpenOrc account.</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Computer</th>
+            <th scope="col">Installer</th>
+            <th scope="col">Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Mac with Apple silicon or Intel</td>
+            <td>DMG</td>
+            <td>Signed and notarized. Open it and move OpenOrc to your Applications folder.</td>
+          </tr>
+          <tr>
+            <td>Windows, 64-bit</td>
+            <td>EXE</td>
+            <td>An installer that lets you choose the folder. Beta installers are unsigned, so Windows may warn that it doesn't recognize the app.</td>
+          </tr>
+          <tr>
+            <td>Linux, x64</td>
+            <td>RPM, DEB, or AppImage</td>
+            <td>OpenOrc doesn't update itself on Linux. Install each new release over the old one.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="agent">
+    <h2 id="agent">Set up an agent</h2>
+    <p>OpenOrc runs the coding agents you install yourself, signed in with your own accounts. Install at least one and sign in from a terminal. You can also do this during setup, which links to each guide.</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Agent</th>
+            <th scope="col">Install</th>
+            <th scope="col">Sign in</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Codex</td>
+            <td><a href="https://developers.openai.com/codex/cli">Codex CLI guide</a></td>
+            <td><code>codex login</code></td>
+          </tr>
+          <tr>
+            <td>Claude Code</td>
+            <td><a href="https://code.claude.com/docs/en/setup">Claude Code setup</a></td>
+            <td><code>claude auth login</code></td>
+          </tr>
+          <tr>
+            <td>OpenCode</td>
+            <td><a href="https://opencode.ai/docs/">OpenCode docs</a></td>
+            <td><code>opencode auth login</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <Callout>
+      <p>On Windows, OpenOrc finds agents only through environment variables. Before you start it, set <code>OPENORC_CODEX_BIN</code>, <code>OPENORC_CLAUDE_BIN</code>, or <code>OPENORC_OPENCODE_BIN</code> to the full path of each agent you use.</p>
+    </Callout>
+  </section>
+
+  <section aria-labelledby="setup">
+    <h2 id="setup">Finish setup</h2>
+    <p>The first time it opens, OpenOrc walks you through three steps: <strong>Agents</strong>, <strong>Appearance</strong>, and <strong>Project</strong>.</p>
+    <ol class="docs-steps">
+      <li>On <strong>Agents</strong>, OpenOrc checks each agent and marks it <strong>Ready</strong>, <strong>Sign-in needed</strong>, <strong>Not installed</strong>, or <strong>Couldn't check</strong>. Fix the ones you want with <strong>Install</strong> or <strong>Sign-in guide</strong>, then click <strong>Rescan</strong>. Ready agents are selected for you. If you keep more than one, choose which one starts new threads under <strong>Start new threads with</strong>. Click <strong>Continue</strong>.</li>
+      <li>On <strong>Appearance</strong>, choose <strong>System</strong>, <strong>Light</strong>, or <strong>Dark</strong>, and a palette. Click <strong>Continue</strong>.</li>
+      <li>On <strong>Project</strong>, click <strong>Choose repository</strong> and pick the folder that holds your Git repository. Your files stay where they are. Click <strong>Finish setup</strong>.</li>
+      <li>On <strong>Ready to work</strong>, click <strong>Start your first thread</strong>.</li>
+    </ol>
+    <p>To add another project later, click <strong>Add project</strong> at the bottom of the sidebar.</p>
+  </section>
+
+  <section aria-labelledby="first-thread">
+    <h2 id="first-thread">Start your first thread</h2>
+    <p>The <strong>New thread</strong> page opens on your project.</p>
+    <ol class="docs-steps">
+      <li>Above the composer, keep <strong>Local checkout</strong> to work in your repository as it is, or choose <strong>Worktree</strong> to give the thread a branch and folder of its own.</li>
+      <li>Check the agent and model in the composer's bottom row, and the mode beside them. By default the agent edits files on its own: Claude Code asks before running commands (<strong>Accept edits</strong>), and Codex asks only for actions outside its sandbox (<strong>Ask for approval</strong>). OpenCode runs only in <strong>Plan</strong> or <strong>Autonomous</strong>.</li>
+      <li>Type what you want done, or click a suggestion such as <strong>Explore this project</strong>. Press <kbd>Enter</kbd>.</li>
+      <li>Follow the work in the thread. When the agent asks before acting, choose <strong>Allow</strong>, <strong>Allow for this run</strong>, or <strong>Deny</strong>.</li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="review">
+    <h2 id="review">Review and commit</h2>
+    <ol class="docs-steps">
+      <li>When the turn ends, a card under the reply lists the files it changed. Click <strong>Review</strong> to read the diff beside the conversation, or <strong>Undo</strong> to put the files back as they were before the turn.</li>
+      <li>At the bottom of the composer, a row shows the thread's uncommitted changes and how many lines were added and removed. Click <strong>Commit changes</strong>.</li>
+      <li>Write a message and click <strong>Commit</strong>.</li>
+    </ol>
+    <Callout>
+      <p>Commit includes every change in the thread's folder, even files you edited yourself, and runs your Git hooks. For a thread in the local checkout, that is your whole working tree.</p>
+    </Callout>
+    <p>To push the commit or open a pull request, open the <strong>Commits</strong> tab in the same panel. <a href={docHref("review")}>Changes and review</a> covers both.</p>
+  </section>
+
+  <section aria-labelledby="next-steps">
+    <h2 id="next-steps">Next steps</h2>
+    <LinkCards cards={[{ slug: "concepts" }, { slug: "threads" }, { slug: "agents" }, { slug: "review" }]} />
+  </section>
+</DocsLayout>

@@ -1,0 +1,371 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import Callout from "../../components/docs/Callout.astro";
+import LinkCards from "../../components/docs/LinkCards.astro";
+import Diagram from "../../components/docs/Diagram.astro";
+import { systemDiagram, turnDiagram } from "../../data/docs/diagrams";
+import { docHref } from "../../data/docs";
+
+const sections = [
+  { id: "parts", title: "The parts" },
+  { id: "processes", title: "Every process" },
+  { id: "interface", title: "How the interface talks to the core" },
+  { id: "agents", title: "How OpenOrc runs each agent" },
+  { id: "message", title: "The path a message takes" },
+  { id: "runs", title: "Runs, turns, and sessions" },
+  { id: "lifecycle", title: "Startup, shutdown, and recovery" },
+  { id: "next-steps", title: "Next steps" },
+];
+
+const envelope = `{ "type": "rpc", "id": 42, "method": "runs.start", "params": { … } }`;
+---
+
+<DocsLayout slug="how-it-works" sections={sections}>
+  <section aria-labelledby="parts">
+    <h2 id="parts">The parts</h2>
+    <p>
+      OpenOrc is an Electron app with no language model of its own. It starts the agent CLIs you already installed and signed in to (Claude Code, Codex, and OpenCode) and talks to them through their machine-readable interfaces. Each CLI
+      calls its model provider directly with your login; OpenOrc doesn't proxy that traffic.
+    </p>
+    <Diagram diagram={systemDiagram} />
+    <dl class="docs-terms">
+      <div>
+        <dt>Interface</dt>
+        <dd>A React app in each window. Everything it shows from OpenOrc's records comes from the core.</dd>
+      </div>
+      <div>
+        <dt>Core</dt>
+        <dd>A Node.js process that owns the database, starts the agents, runs Git, and offers OpenOrc's tools to agents through a local <a href="https://modelcontextprotocol.io">Model Context Protocol</a> (MCP) server.</dd>
+      </div>
+      <div>
+        <dt>Agent CLIs</dt>
+        <dd>One child process of the core per active run. Agents read and edit files and run commands in the thread's folder themselves.</dd>
+      </div>
+      <div>
+        <dt>Electron main</dt>
+        <dd>Creates the windows and starts the core. It also runs terminals and the Preview browser, and encrypts secrets.</dd>
+      </div>
+    </dl>
+  </section>
+
+  <section aria-labelledby="processes">
+    <h2 id="processes">Every process</h2>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Process</th>
+            <th scope="col">Started by</th>
+            <th scope="col">What it does</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Electron main</td>
+            <td>Your system</td>
+            <td>Windows and menus, terminal shells, Preview views, encrypted secrets, project icons, and app update checks on macOS and Windows</td>
+          </tr>
+          <tr>
+            <td>Renderer</td>
+            <td>Main, one per window</td>
+            <td>The interface, sandboxed, with no Node.js access</td>
+          </tr>
+          <tr>
+            <td>Preview pages</td>
+            <td>Main</td>
+            <td>One renderer per Preview, in a separate browser session. Up to six are kept alive.</td>
+          </tr>
+          <tr>
+            <td>Core</td>
+            <td>Main</td>
+            <td>A Node.js process named <code>openorc-core</code>. It owns the SQLite database, starts agents, runs Git, serves OpenOrc's tools, and runs schedules, Slack, and upkeep.</td>
+          </tr>
+          <tr>
+            <td>Embedding worker</td>
+            <td>Core, on first use</td>
+            <td>A thread that computes memory search vectors, so loading the model never blocks the core</td>
+          </tr>
+          <tr>
+            <td>Agent CLIs</td>
+            <td>Core</td>
+            <td><code>claude</code>, <code>codex app-server</code>, or <code>opencode acp</code>, one long-lived process per active run</td>
+          </tr>
+          <tr>
+            <td>Short-lived CLIs</td>
+            <td>Core</td>
+            <td>Sign-in checks, model lists, usage, skills, update checks, and background jobs such as titles and memory summaries</td>
+          </tr>
+          <tr>
+            <td><code>git</code> and <code>gh</code></td>
+            <td>Core</td>
+            <td>Worktrees, diffs, checkpoints, commits, pushes, and pull requests</td>
+          </tr>
+          <tr>
+            <td>Login shell</td>
+            <td>Core</td>
+            <td>Runs at startup, on Rescan, when Settings opens, and before agent update checks, to find the agents. Not on Windows.</td>
+          </tr>
+          <tr>
+            <td>Setup scripts</td>
+            <td>Core</td>
+            <td>A project's setup script, run with <code>/bin/bash -lc</code> in each new worktree</td>
+          </tr>
+          <tr>
+            <td>Terminal shells</td>
+            <td>Main</td>
+            <td>Your shell, one per terminal panel</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>The core also listens on <code>127.0.0.1</code> for agents' tool calls. <a href={docHref("network") + "#local"}>Network connections</a> lists every local server.</p>
+    <p class="docs-source">Source: <code>apps/desktop/src/main/index.ts</code>, <code>apps/desktop/src/core/index.ts</code></p>
+  </section>
+
+  <section aria-labelledby="interface">
+    <h2 id="interface">How the interface talks to the core</h2>
+    <p>
+      When a window loads, it asks main for a connection to the core. Main creates a message channel, hands one end to the core and the other to the window, and takes no further part. The window asks main directly only for what needs
+      Electron, such as terminals, the Preview, the folder picker, opening links, window controls, and app updates.
+    </p>
+    <p>Every request is a small JSON object with a number the window chose:</p>
+    <pre><code set:text={envelope} /></pre>
+    <ul>
+      <li>
+        About 200 methods are grouped by name, such as <code>threads.*</code>, <code>runs.*</code>, <code>tasks.*</code>, <code>review.*</code>, <code>pulls.*</code>, and <code>memory.*</code>. Each has a parameter schema, and
+        <code>packages/protocol/src/rpc.ts</code> collects them all.
+      </li>
+      <li>The core checks the envelope, then the method's parameters, and replies with a result or an error. A malformed message is dropped without a reply. Requests have no timeout.</li>
+      <li>The core posts every reply to every window, and each window keeps the ones whose number it is waiting for.</li>
+    </ul>
+    <p>Besides replies, the core pushes these to every window:</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Message</th>
+            <th scope="col">What it carries</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>frame</code></td>
+            <td>New agent events for one run, at most one frame per run every 16 ms</td>
+          </tr>
+          <tr>
+            <td><code>invalidate</code></td>
+            <td>Names of data that changed, such as <code>threads</code>. The window waits 50 ms to collect more, then fetches only what is on screen again.</td>
+          </tr>
+          <tr>
+            <td><code>notify</code></td>
+            <td>A desktop notification, sent only while notifications are on. The window shows it only if you aren't looking at that thread.</td>
+          </tr>
+          <tr>
+            <td><code>startup</code>, <code>ready</code></td>
+            <td>Startup progress, then the core's process ID and MCP port</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      Frames feed a live transcript store, separate from fetched data, and the screen updates at most once per animation frame. Opening a long thread loads its last 4 turns, then 4 more at a time as you scroll up. Before the core reads stored
+      events, it flushes what is still in flight, so a loaded transcript never misses events.
+    </p>
+    <p class="docs-source">Source: <code>packages/protocol/src/rpc.ts</code>, <code>packages/core/src/openorc.ts</code> (<code>handle</code>), <code>packages/core/src/frames.ts</code>, <code>apps/desktop/src/renderer/src/lib/rpc.ts</code></p>
+  </section>
+
+  <section aria-labelledby="agents">
+    <h2 id="agents">How OpenOrc runs each agent</h2>
+    <h3>Finding the agents</h3>
+    <p>
+      Apps started from the Dock or a menu don't get your terminal's <code>PATH</code>, so on macOS and Linux the core asks your login shell. It runs your shell with <code>-ilc</code> and a short script that prints <code>PATH</code> and where
+      <code>codex</code>, <code>claude</code>, and <code>opencode</code> are. The shell gets 8 seconds and a minimal environment, and only those answers are kept. On Windows there is no probe: set <code>OPENORC_CODEX_BIN</code>,
+      <code>OPENORC_CLAUDE_BIN</code>, or <code>OPENORC_OPENCODE_BIN</code> instead.
+    </p>
+    <p>
+      Each agent is then checked with its own commands: <code>--version</code>, plus <code>codex login status</code>, <code>claude auth status</code>, or <code>opencode auth list</code> to see whether you are signed in. Results are cached for
+      60 seconds. OpenOrc never reads the credentials these tools store.
+    </p>
+    <h3>Speaking to them</h3>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Agent</th>
+            <th scope="col">Command</th>
+            <th scope="col">Protocol</th>
+            <th scope="col">OpenOrc's brief goes in</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Claude Code</td>
+            <td><code>claude -p</code></td>
+            <td>One JSON message per line over standard input and output</td>
+            <td><code>--append-system-prompt</code></td>
+          </tr>
+          <tr>
+            <td>Codex</td>
+            <td><code>codex app-server</code></td>
+            <td>JSON-RPC over standard input and output</td>
+            <td>The session's developer instructions</td>
+          </tr>
+          <tr>
+            <td>OpenCode</td>
+            <td><code>opencode acp</code></td>
+            <td>Agent Client Protocol over standard input and output</td>
+            <td>A text block before your first message</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      Each process gets its own address on OpenOrc's MCP server, which carries OpenOrc's tools: tasks, memory, messages between threads, the browser, and approvals. Claude Code reads the address from a private file; Codex and OpenCode
+      receive it over standard input. When an agent wants permission, the request comes back to OpenOrc, which shows it in the thread or decides it by the mode. What the brief says is on <a href={docHref("instructions")}>Instructions</a>.
+    </p>
+    <h3>One process per run</h3>
+    <ul>
+      <li>A thread keeps its agent process between turns, so the next message starts at once. An idle process closes after 10 minutes by default (<strong>Close idle processes after</strong>, under General).</li>
+      <li>Task runs and replies in task discussions close their process after every turn.</li>
+      <li>Changing the agent, the mode, or the permission level starts a new process with your next message. It resumes the session where that is possible.</li>
+      <li>Stopping a process sends <code>SIGTERM</code> to its process group, then <code>SIGKILL</code> after 2 seconds. An idle Claude process first has its input closed, so it can exit on its own.</li>
+    </ul>
+    <h3>Live controls</h3>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Control</th>
+            <th scope="col">Claude Code</th>
+            <th scope="col">Codex</th>
+            <th scope="col">OpenCode</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Message during a turn</td>
+            <td>Read at the next tool boundary</td>
+            <td>Steers the running turn</td>
+            <td>Waits in the queue</td>
+          </tr>
+          <tr>
+            <td>Stop the turn</td>
+            <td>Interrupt request</td>
+            <td><code>turn/interrupt</code></td>
+            <td><code>session/cancel</code></td>
+          </tr>
+          <tr>
+            <td>Change model or effort</td>
+            <td>In place</td>
+            <td>With the next turn</td>
+            <td>In place</td>
+          </tr>
+          <tr>
+            <td>Fast mode</td>
+            <td>Where your account has it</td>
+            <td>Priority service tier</td>
+            <td>Not available</td>
+          </tr>
+          <tr>
+            <td>Usage limits</td>
+            <td>Asked of Claude Code</td>
+            <td>Read from your account</td>
+            <td>Not available</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Stopping a turn keeps the process and the session, so the next message continues with the same context. See <a href={docHref("agents")}>Agents and models</a> for choosing models and effort.</p>
+    <p class="docs-source">Source: <code>packages/core/src/services/shell-environment.ts</code>, <code>system.ts</code>, <code>packages/agents/src/claude/adapter.ts</code>, <code>codex/adapter.ts</code>, <code>acp/adapter.ts</code>, <code>process-lifetime.ts</code></p>
+  </section>
+
+  <section aria-labelledby="message">
+    <h2 id="message">The path a message takes</h2>
+    <Diagram diagram={turnDiagram} />
+    <ol class="docs-steps">
+      <li>
+        You press Send. A new thread sends <code>threads.start</code>. While the agent is working, the composer sends <code>runs.send</code> if the turn can take the message, or <code>threads.queue</code> to hold it. Between turns it sends
+        <code>runs.send</code> when the thread's process is still running and nothing that needs a restart has changed, and <code>runs.start</code> otherwise.
+      </li>
+      <li>
+        The core checks the request and works out the thread's folder, agent, model, and mode. It decides whether to resume the agent's last session or start fresh with a handoff, and takes a shared hold on the folder, so Git operations that
+        need it alone wait or fail while the agent works.
+      </li>
+      <li>If the thread uses a worktree that doesn't exist yet, the core creates it and runs the project's setup script.</li>
+      <li>
+        For <code>runs.start</code>, the core records the run and your message. In a Git project, before a thread's first run, it saves the starting files so the first change can be undone. Then it builds the brief and starts the agent
+        CLI. For <code>runs.send</code>, it passes the message to the process that is already running.
+      </li>
+      <li>
+        The CLI calls its provider and reports what it does. An adapter translates that into OpenOrc's events, and each event goes to the database in batches (every 50 ms or 500 events), to the window in frames, and to Slack or a task
+        discussion when they are watching. The Changes panel refreshes at most once a second, and every 8 seconds while the turn runs.
+      </li>
+      <li>
+        When the turn ends, the core saves the token usage and the final reply. In a Git project it records a checkpoint of the thread's files, so each turn's changes can be shown and undone on their own. It sends a notification and the
+        next queued message, if there is one.
+      </li>
+      <li>When the process exits, the run gets its final state, the hold on the folder is released, and, if memory is on, the run is queued for summarizing.</li>
+    </ol>
+    <p class="docs-source">Source: <code>packages/core/src/services/threads.ts</code> (<code>continueThread</code>), <code>run-launch.ts</code>, <code>runs.ts</code>, <code>run-settlement.ts</code>, <code>apps/desktop/src/renderer/src/components/Conversation.tsx</code></p>
+  </section>
+
+  <section aria-labelledby="runs">
+    <h2 id="runs">Runs, turns, and sessions</h2>
+    <dl class="docs-terms">
+      <div>
+        <dt>Run</dt>
+        <dd>The life of one agent process: its agent and model, its folder, the provider's session ID, its state (starting, running, success, error, or cancelled), token usage, and final reply. Each run belongs to exactly one thread, task, or task comment.</dd>
+      </div>
+      <div>
+        <dt>Turn</dt>
+        <dd>One request and the agent's work until it stops. A run can hold many turns.</dd>
+      </div>
+      <div>
+        <dt>Session</dt>
+        <dd>The provider's own conversation. OpenOrc stores its ID, and the next run with the same agent resumes the newest one. A fork uses the provider's own fork call, so it gets a session of its own.</dd>
+      </div>
+      <div>
+        <dt>Event</dt>
+        <dd>One of 23 shared types that every adapter translates into: session and turn events, text and thinking, tool calls and output, file changes, status updates, and approvals.</dd>
+      </div>
+    </dl>
+    <p>
+      One agent can't continue another's session. Switching a thread to an agent that hasn't worked in it starts a fresh session with a handoff: your last 4 requests (up to 400 characters each) and the previous agent's last reply (up to
+      1,500 characters), added to the new agent's brief. In a project thread, switching back to an agent that already worked there resumes its own older session. In a Workspace thread, every change of agent or folder starts fresh with a
+      handoff.
+    </p>
+    <p>If a provider reports that a session no longer exists, the thread offers <strong>Start a fresh session with a handoff</strong>.</p>
+  </section>
+
+  <section aria-labelledby="lifecycle">
+    <h2 id="lifecycle">Startup, shutdown, and recovery</h2>
+    <h3>Startup</h3>
+    <ol class="docs-steps">
+      <li>Main picks the data folder, takes the single-instance lock (a second copy focuses the first window and quits), starts the core, and opens the window.</li>
+      <li>On macOS and Linux, the core stops any agent processes that the last session of OpenOrc left behind, using the records it keeps in the data folder.</li>
+      <li>It opens the database and applies any pending migrations.</li>
+      <li>
+        It recovers from the last session: runs that were still open are marked as failed with <strong>OpenOrc closed while this session was open. Send a message to continue where you left off.</strong> Interrupted discussion replies and
+        plans are marked as such, and team turns that were running wait for you.
+      </li>
+      <li>On macOS and Linux, it asks your login shell for <code>PATH</code> and the agents. Then it starts the MCP server and tells every window it is ready.</li>
+      <li>It starts its timers and sends messages still waiting in a thread's queue, which can start an agent right after launch.</li>
+    </ol>
+    <p>
+      The timers wake snoozed threads and check schedules every 60 seconds, check open pull requests every 5 minutes, run database upkeep after 60 seconds and then every 6 hours, and check for agent updates after 30 seconds and then every 6
+      hours.
+    </p>
+    <h3>Shutdown</h3>
+    <p>
+      Main closes every terminal and Preview, then asks the core to shut down and waits up to 12 seconds. The core denies pending approvals, closes every agent process, flushes the database and the provider log, and closes. If you quit
+      while an agent is working, its turn stops and the run is recorded as failed; your next message resumes the session.
+    </p>
+    <Callout>If the core process crashes, windows aren't told, and requests wait. Reload the window (<kbd>⌘R</kbd>) to start a new core. See <a href={docHref("known-issues") + "#restarts"}>Known issues</a>.</Callout>
+    <p class="docs-source">Source: <code>packages/core/src/openorc.ts</code> (<code>create</code>, <code>close</code>), <code>packages/agents/src/process-recovery.ts</code>, <code>packages/core/src/services/runs.ts</code></p>
+  </section>
+
+  <section aria-labelledby="next-steps">
+    <h2 id="next-steps">Next steps</h2>
+    <LinkCards cards={[{ slug: "instructions" }, { slug: "storage" }, { slug: "network" }, { slug: "security" }]} />
+  </section>
+</DocsLayout>

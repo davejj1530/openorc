@@ -1,0 +1,121 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import Callout from "../../components/docs/Callout.astro";
+import LinkCards from "../../components/docs/LinkCards.astro";
+import { docHref } from "../../data/docs";
+
+const sections = [
+  { id: "what", title: "What a skill is" },
+  { id: "browse", title: "Browse skills" },
+  { id: "sources", title: "Where skills come from" },
+  { id: "use", title: "Use a skill in a conversation" },
+  { id: "next-steps", title: "Next steps" },
+];
+---
+
+<DocsLayout slug="skills" sections={sections}>
+  <section aria-labelledby="what">
+    <h2 id="what">What a skill is</h2>
+    <p>
+      A skill is a Markdown file, usually a <code>SKILL.md</code> in a folder of its own, with a name, a description of when to use it, and instructions for the agent. Plugins can bring skills too, and some agents ship with skills
+      of their own.
+    </p>
+    <p>
+      Each agent finds and runs its own skills. OpenOrc lists the skills each agent can use in a project and helps you call one from the composer. It doesn't install or change skills.
+    </p>
+  </section>
+
+  <section aria-labelledby="browse">
+    <h2 id="browse">Browse skills</h2>
+    <ol class="docs-steps">
+      <li>Click <strong>Settings</strong> at the bottom of the sidebar, then <strong>Skills</strong>.</li>
+      <li>Choose a project in <strong>Project</strong>. Project skills differ from one project to the next.</li>
+      <li>Choose an agent: <strong>Codex</strong>, <strong>Claude Code</strong>, or <strong>OpenCode</strong>. Each button shows how many skills that agent has in the project.</li>
+      <li>Type in <strong>Search skills</strong> to filter by name, description, or path. Click a skill to see its <strong>Location</strong>.</li>
+    </ol>
+    <p>The list groups skills by where they come from:</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Group</th>
+            <th scope="col">What it holds</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Project skills</strong></td>
+            <td>Skills in the project's own skill folders</td>
+          </tr>
+          <tr>
+            <td><strong>Your skills</strong></td>
+            <td>Skills in your home folder, available in every project</td>
+          </tr>
+          <tr>
+            <td><strong>Plugin skills</strong></td>
+            <td>Skills from plugins you installed</td>
+          </tr>
+          <tr>
+            <td><strong>Built-in skills</strong></td>
+            <td>Skills that come with the agent</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Click <strong>Refresh skills</strong> after you add or remove a skill. The <strong>Project</strong> menu lists the projects you've added to OpenOrc. Workspace conversations have their own list, described below.</p>
+  </section>
+
+  <section aria-labelledby="sources">
+    <h2 id="sources">Where skills come from</h2>
+    <p>Each agent has its own skill folders and its own rule for which skill wins when two share a name. OpenOrc applies the same rules, so the list shows the skill the agent would pick.</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Agent</th>
+            <th scope="col">How OpenOrc finds its skills</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Codex</td>
+            <td>Asks Codex for its list in the project folder. The list includes Codex's plugin and built-in skills, and only the skills that are turned on.</td>
+          </tr>
+          <tr>
+            <td>Claude Code</td>
+            <td>
+              Reads <code>.claude/skills</code> in the project folder, <code>~/.claude/skills</code> (or the <code>skills</code> folder in <code>CLAUDE_CONFIG_DIR</code>), and the skills of plugins installed in Claude Code. Plugin
+              skills are named <code>plugin:skill</code>. When a personal skill and a project skill share a name, the personal one wins. Skills bundled with Claude Code itself aren't listed.
+            </td>
+          </tr>
+          <tr>
+            <td>OpenCode</td>
+            <td>
+              Starts OpenCode for a moment in the project folder and asks it for its skills, built-in ones included. If that fails, OpenOrc reads the folders OpenCode uses, such as <code>.opencode/skills</code> and <code
+                >~/.config/opencode/skills</code
+              >, and any sources listed under <code>skills</code> in <code>opencode.json</code>.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="use">
+    <h2 id="use">Use a skill in a conversation</h2>
+    <p>The composer suggests the skills of the conversation's current agent:</p>
+    <ul>
+      <li>Claude Code: type <kbd>/</kbd> and pick a skill. OpenOrc inserts <code>/name</code>, which Claude Code runs as that skill.</li>
+      <li>Codex: type <kbd>/</kbd> or <kbd>$</kbd> and pick a skill. OpenOrc inserts <code>$name</code>, the form Codex uses.</li>
+      <li>OpenCode: there's no picker. Ask it to use a skill by name, and it loads the skill with its own skill tool.</li>
+    </ul>
+    <p>The suggestions refresh every minute, so a skill you install while a conversation is open shows up without restarting anything.</p>
+    <p>A Workspace conversation works in a folder you choose, so its picker lists that folder's project skills, along with your personal and plugin skills.</p>
+    <Callout>A skill is instructions for the agent. Commands and edits it leads to go through the conversation's <a href={docHref("permissions")}>mode</a> like any others.</Callout>
+  </section>
+
+  <section aria-labelledby="next-steps">
+    <h2 id="next-steps">Next steps</h2>
+    <LinkCards cards={[{ slug: "instructions" }, { slug: "agents" }, { slug: "settings" }]} columns={3} />
+  </section>
+</DocsLayout>

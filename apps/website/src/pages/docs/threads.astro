@@ -1,0 +1,214 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import Callout from "../../components/docs/Callout.astro";
+import LinkCards from "../../components/docs/LinkCards.astro";
+import { docHref } from "../../data/docs";
+
+const sections = [
+  { id: "start", title: "Start a thread" },
+  { id: "composer", title: "Write a message" },
+  { id: "while-working", title: "Send while the agent works" },
+  { id: "stop", title: "Stop a turn" },
+  { id: "fork", title: "Fork a thread" },
+  { id: "side-by-side", title: "Open threads side by side" },
+  { id: "sidebar", title: "The sidebar" },
+  { id: "import", title: "Import terminal sessions" },
+  { id: "next-steps", title: "Next steps" },
+];
+---
+
+<DocsLayout slug="threads" sections={sections}>
+  <section aria-labelledby="start">
+    <h2 id="start">Start a thread</h2>
+    <p>Start a thread for each piece of work you hand to an agent. Every thread keeps its own agent, model, mode, and folder, so several can work at once.</p>
+    <ol class="docs-steps">
+      <li>Click <strong>New thread</strong> at the top of the sidebar, or press <kbd>⌘N</kbd>. To start in a particular project, click <strong>+</strong> beside its name. (On Windows and Linux, use <kbd>Ctrl</kbd> wherever this page shows <kbd>⌘</kbd>.)</li>
+      <li>Above the composer, choose the project and where the thread works: <strong>Local checkout</strong> for the repository as it is now, or <strong>Worktree</strong> for a branch and folder of its own. In the Workspace, <strong>Choose folder</strong> picks the folder instead.</li>
+      <li>In the composer's bottom row, choose the agent and model, and the mode.</li>
+      <li>Type your request and press <kbd>Enter</kbd>.</li>
+    </ol>
+    <p>For a project, the New thread page shows three suggestions while the composer is empty: <strong>Explore this project</strong>, <strong>Plan a change</strong>, and <strong>Review my changes</strong>. Each writes a prompt for you and switches the mode to <strong>Plan</strong>, and nothing is sent until you press <kbd>Enter</kbd>.</p>
+    <p>After the first reply, a small model gives the thread a short title. To rename it, click the title in the thread's header.</p>
+  </section>
+
+  <section aria-labelledby="composer">
+    <h2 id="composer">Write a message</h2>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Input</th>
+            <th scope="col">What it does</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><kbd>Enter</kbd></td>
+            <td>Sends the message.</td>
+          </tr>
+          <tr>
+            <td><kbd>Shift+Enter</kbd></td>
+            <td>Starts a new line.</td>
+          </tr>
+          <tr>
+            <td><code>@</code></td>
+            <td>Mentions a file from the project.</td>
+          </tr>
+          <tr>
+            <td><code>/</code></td>
+            <td>Lists commands and your agent's skills. In a thread, <code>/compact</code> folds the conversation so far into a summary, <code>/plan</code> and <code>/act</code> switch the mode, and <code>/fork</code> continues in a new thread.</td>
+          </tr>
+          <tr>
+            <td><strong>+</strong>, paste, or drop</td>
+            <td>Attaches files of up to 20 MB each. Images show as thumbnails.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>The ring beside the model shows how full the agent's context is. Click it for the numbers or to <strong>Compact context</strong>, which summarizes earlier messages and may lose some detail.</p>
+  </section>
+
+  <section aria-labelledby="while-working">
+    <h2 id="while-working">Send while the agent works</h2>
+    <p>You don't have to wait for a turn to end. Type while the agent works and press <kbd>Enter</kbd>:</p>
+    <ul>
+      <li>Codex and Claude Code read the message during the current turn, so you can correct course without stopping them. The placeholder reads <strong>Say it during this turn…</strong></li>
+      <li>OpenCode reads new messages only after its turn, so the message waits in the queue. The placeholder reads <strong>Queue a message for when it finishes…</strong></li>
+    </ul>
+    <p>A message also waits after you switch the agent or change the mode, and while the conversation compacts. To hold a message for the next turn on purpose, click <strong>Queue</strong> instead of sending.</p>
+    <p>Queued messages wait above the composer under <strong>Queued</strong> and go out one at a time, each as a new turn. Each has <strong>Send now</strong>, which hands it to the running turn when the agent can take it, and <strong>×</strong> to remove it. The queue survives a restart: OpenOrc sends what's left when it opens again.</p>
+  </section>
+
+  <section aria-labelledby="stop">
+    <h2 id="stop">Stop a turn</h2>
+    <p>While the agent works and the composer is empty, the send button becomes a stop button (<strong>Stop this turn</strong>). Once you type, the send button comes back with a separate stop button beside it. Stopping ends the turn and denies any approval the agent was waiting for. The agent keeps its session, so your next message continues the conversation.</p>
+    <Callout>
+      <p>Stopping doesn't clear the queue. When the turn ends, the next queued message is sent, so remove queued messages first if you want the agent to stay idle.</p>
+    </Callout>
+  </section>
+
+  <section aria-labelledby="fork">
+    <h2 id="fork">Fork a thread</h2>
+    <p>A fork is a new thread that continues the conversation while the original stays as it is. Use it to try another approach without losing the first.</p>
+    <ul>
+      <li>To fork from an earlier point, hover one of your messages and click <strong>Fork from here</strong>.</li>
+      <li>To fork from the latest turn, choose <strong>Fork</strong> in the <strong>Thread actions</strong> menu (⋯) in the thread's header, or type <code>/fork</code>.</li>
+    </ul>
+    <p>The fork opens with the original title followed by "(fork)", and the same agent, model, and mode. It shares its parent's folder and branch, so both threads edit the same files.</p>
+    <Callout>
+      <p>A fork copies history by <a href={docHref("concepts") + "#conversations"}>run</a>, and one run can hold several turns, so forking from an earlier message can bring later turns from that run along. The agent also continues the parent's latest session and may remember messages the fork doesn't show.</p>
+    </Callout>
+  </section>
+
+  <section aria-labelledby="side-by-side">
+    <h2 id="side-by-side">Open threads side by side</h2>
+    <p>You can show up to three threads at once, each in its own pane.</p>
+    <ul>
+      <li>To add a pane, <kbd>⌘</kbd>-click a thread in the sidebar, drag it onto the open thread, or choose <strong>Open beside</strong> in its menu.</li>
+      <li>Click inside a pane to focus it. Clicking a thread in the sidebar replaces the focused pane.</li>
+      <li>Drag the divider between two panes to resize them, and double-click it to reset.</li>
+      <li>To close a pane, click its <strong>Close pane</strong> button (×). <kbd>⌘\</kbd> closes every pane except the focused one.</li>
+    </ul>
+    <p>The panes share one side panel, which shows the thread whose controls opened it last. To give a thread a window of its own, choose <strong>Open in new window</strong> in its menu.</p>
+  </section>
+
+  <section aria-labelledby="sidebar">
+    <h2 id="sidebar">The sidebar</h2>
+    <p>The sidebar lists the Workspace and each project with its threads. A project shows <strong>Running</strong> or <strong>Needs you</strong> when one of its threads does. Click <strong>+</strong> beside a project to start a thread there. To take a project off the list, right-click it and choose <strong>Remove project…</strong>. Its files, worktrees, and history are kept.</p>
+    <p>Each row shows a thread's title and a status icon, and below them its branch, its agent, and when it last changed. The icon tells you the agent is working, needs you, has failed, or has a result you haven't read. While there's something to report, an extra line appears under the title:</p>
+    <ul>
+      <li>While the agent works, the step it's on, such as <strong>Running pnpm test</strong> or <strong>Thinking</strong>.</li>
+      <li>While it waits for you, <strong>Needs approval</strong> with the command, or <strong>Has a question for you</strong>.</li>
+      <li>After a turn you haven't read, what it came to, such as <strong>Done · 2 files changed · tests passed</strong>.</li>
+    </ul>
+    <h3>Filter the list</h3>
+    <p>Type in <strong>Filter threads…</strong> to narrow the loaded threads by title. The filter button beside it switches the list:</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Filter</th>
+            <th scope="col">Shows</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Orcmode</strong></td>
+            <td>Your working set: threads with an agent working or waiting on you, unread results, pinned threads, the open thread, and anything active in the last 24 hours. Projects with none of these are hidden, and a button at the end shows the rest. <kbd>⌘⇧O</kbd> turns it on or off.</td>
+          </tr>
+          <tr>
+            <td><strong>Active threads</strong></td>
+            <td>Every thread that isn't archived.</td>
+          </tr>
+          <tr>
+            <td><strong>Archived threads</strong></td>
+            <td>The threads you archived.</td>
+          </tr>
+          <tr>
+            <td><strong>Pinned threads</strong></td>
+            <td>Only pinned threads.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Text in the filter box reaches every loaded thread, even in orcmode. To search everything, including what was said, press <kbd>⌘K</kbd>.</p>
+    <h3>Thread actions</h3>
+    <p>Right-click a thread, or open <strong>Thread actions</strong> (⋯) in its header:</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Action</th>
+            <th scope="col">What it does</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Pin</strong></td>
+            <td>Keeps the thread in a <strong>Pinned</strong> section at the top of its project. <kbd>⌘⇧P</kbd></td>
+          </tr>
+          <tr>
+            <td><strong>Snooze</strong></td>
+            <td>Moves the thread to a folded <strong>Snoozed</strong> section until the time you pick, from <strong>In 1 hour</strong> to <strong>Next week</strong>. A finished turn wakes it early, and so does <strong>Wake now</strong>.</td>
+          </tr>
+          <tr>
+            <td><strong>Mark as unread</strong></td>
+            <td>Flags the thread for later. Opening it marks it read again. <kbd>⌘⇧U</kbd></td>
+          </tr>
+          <tr>
+            <td><strong>Move to a worktree</strong></td>
+            <td>Moves a project thread and its uncommitted changes into a worktree, or back with <strong>Move to the checkout</strong>. See <a href={docHref("git")}>Git and worktrees</a>.</td>
+          </tr>
+          <tr>
+            <td><strong>Archive</strong></td>
+            <td>Takes the thread off the active list. <kbd>⌘⇧A</kbd></td>
+          </tr>
+          <tr>
+            <td><strong>Delete thread</strong></td>
+            <td>Removes the conversation, and its worktree if it has one. Uncommitted work in the worktree is first committed to the thread's branch, which stays. Tasks the thread created stay too.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p><kbd>⌘1</kbd> to <kbd>⌘9</kbd> open the first nine threads in the list, and <kbd>⌘⇧[</kbd> and <kbd>⌘⇧]</kbd> move to the previous or next one.</p>
+  </section>
+
+  <section aria-labelledby="import">
+    <h2 id="import">Import terminal sessions</h2>
+    <p>You can continue a Claude Code or Codex session that you started in a terminal.</p>
+    <ol class="docs-steps">
+      <li>Click the filter button above the thread list and choose <strong>Import terminal sessions…</strong></li>
+      <li>If you have more than one project, choose the one the session ran in.</li>
+      <li>Check the sessions you want, or click <strong>Select all</strong>, then click <strong>Import</strong>.</li>
+    </ol>
+    <p>Each session becomes a thread that continues where the terminal left off. Sessions you already imported are marked <strong>imported</strong>.</p>
+    <Callout>
+      <p>OpenOrc looks for sessions in <code>~/.claude</code> and <code>~/.codex</code> only. Sessions kept elsewhere through <code>CLAUDE_CONFIG_DIR</code> or <code>CODEX_HOME</code> don't appear.</p>
+    </Callout>
+  </section>
+
+  <section aria-labelledby="next-steps">
+    <h2 id="next-steps">Next steps</h2>
+    <LinkCards cards={[{ slug: "agents" }, { slug: "permissions" }, { slug: "work" }, { slug: "messaging" }]} />
+  </section>
+</DocsLayout>

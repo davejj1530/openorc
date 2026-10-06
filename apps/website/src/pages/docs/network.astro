@@ -1,22 +1,25 @@
 ---
 import DocsLayout from "../../layouts/DocsLayout.astro";
+import Callout from "../../components/docs/Callout.astro";
+import LinkCards from "../../components/docs/LinkCards.astro";
 import { docHref } from "../../data/docs";
 
 const sections = [
   { id: "summary", title: "Every connection" },
   { id: "agents", title: "Agents" },
-  { id: "background", title: "Background requests through agents" },
+  { id: "background", title: "Background requests" },
   { id: "downloads", title: "Downloads and update checks" },
   { id: "git", title: "Git and GitHub" },
   { id: "local", title: "Local servers" },
   { id: "never", title: "What OpenOrc does not send" },
+  { id: "next-steps", title: "Next steps" },
 ];
 ---
 
 <DocsLayout slug="network" sections={sections}>
   <section aria-labelledby="summary">
     <h2 id="summary">Every connection</h2>
-    <p>OpenOrc has no server of its own. Everything it sends goes to a service you already use, from your computer. This table lists every connection the app makes, when it happens, and how to stop it.</p>
+    <p>OpenOrc has no server of its own. Every connection goes straight from your computer to one of the services below. This table lists each one, when it happens, and how to stop it.</p>
     <div class="docs-table">
       <table>
         <thead>
@@ -31,74 +34,86 @@ const sections = [
           <tr>
             <td>Agent turns</td>
             <td>The agent's own service: Anthropic for Claude Code, OpenAI for Codex, the providers you set up in OpenCode</td>
-            <td>Each message you send</td>
-            <td>Use another agent</td>
+            <td>Each message you send, and each turn a schedule, Slack request, pull request review, team, or another thread's agent starts</td>
+            <td>Pause schedules, disconnect Slack</td>
           </tr>
           <tr>
-            <td>Conversation titles</td>
-            <td>The conversation's own agent, or the provider you chose</td>
-            <td>Once, after a new conversation's first turn</td>
-            <td>Set titles to Off under Memory &amp; models</td>
+            <td>Thread titles</td>
+            <td>The thread's own agent, or the harness you chose</td>
+            <td>Once, after a new thread's first turn</td>
+            <td><strong>Harness</strong> set to <strong>Off · use opening message</strong>, under Memory &amp; models</td>
           </tr>
           <tr>
             <td>Run summaries</td>
-            <td>The agent that did the work, or the provider you chose</td>
+            <td>The agent that did the work, the provider you chose, or the Anthropic API with your key</td>
             <td>After each run, while memory is on</td>
-            <td>Leave memory off, the default</td>
+            <td>Leave memory off, the default, or set <strong>Provider</strong> to <strong>Off · no background learning</strong></td>
           </tr>
           <tr>
-            <td>Usage and allowances</td>
+            <td>Usage and limits</td>
             <td>Claude Code's and Codex's services, through their CLIs</td>
-            <td>While the Usage settings are open, or a usage limit notice is shown</td>
-            <td>Close those screens</td>
+            <td>While Settings shows Usage, which it opens on, and when a thread shows a Codex usage limit</td>
+            <td>Close Settings</td>
           </tr>
           <tr>
             <td>Embedding model</td>
             <td><code>storage.googleapis.com</code></td>
             <td>Once, the first time memory needs it</td>
-            <td>Leave memory off, the default</td>
+            <td>Leave memory off</td>
           </tr>
           <tr>
             <td>App updates</td>
             <td>GitHub Releases</td>
-            <td>30 seconds after launch, then every 6 hours, in installed releases</td>
-            <td>Turn off automatic checks under General</td>
+            <td>30 seconds after launch, then every 6 hours, in installed macOS and Windows releases</td>
+            <td><strong>Check for updates automatically</strong>, under General</td>
           </tr>
           <tr>
             <td>Agent updates</td>
-            <td><code>registry.npmjs.org</code>, or <code>formulae.brew.sh</code> for Homebrew installs</td>
+            <td><code>registry.npmjs.org</code>, or <code>formulae.brew.sh</code> for Codex or Claude Code installed as a Homebrew cask</td>
             <td>30 seconds after launch, then every 6 hours</td>
-            <td>Turn off automatic checks under Connections</td>
+            <td><strong>Check for agent updates automatically</strong>, under Connections</td>
           </tr>
           <tr>
             <td>Git</td>
-            <td>Your repository's <code>origin</code> remote</td>
-            <td>Creating a worktree from a branch, pushing, and checks before a pull request</td>
-            <td>Use Local checkout</td>
+            <td>Your repository's remotes</td>
+            <td>Creating a worktree, pushing, and reviewing a pull request</td>
+            <td>Work in the Local checkout</td>
           </tr>
           <tr>
             <td>GitHub CLI</td>
             <td>GitHub, through <code>gh</code></td>
-            <td>Creating a pull request, and every 5 minutes for each conversation with an open one</td>
-            <td>Create pull requests outside OpenOrc</td>
+            <td>Using the Pull requests pages or creating a pull request, and every 5 minutes for each thread with an open pull request</td>
+            <td>The check stops once the pull request is merged or closed</td>
+          </tr>
+          <tr>
+            <td>Reviewer app</td>
+            <td><code>github.com</code> and <code>api.github.com</code></td>
+            <td>Setting the app up, and posting a review as the app</td>
+            <td>Don't set it up, or <strong>Remove</strong> it</td>
           </tr>
           <tr>
             <td>Slack</td>
             <td>Slack, or your team's relay</td>
             <td>While Slack is connected</td>
-            <td>Disconnect Slack</td>
+            <td><strong>Disconnect Slack</strong>, or <strong>Disconnect desktop</strong> and <strong>Disconnect relay</strong> for a team relay</td>
           </tr>
           <tr>
             <td>Browser preview</td>
             <td>The pages you or an agent open</td>
-            <td>When a page loads</td>
-            <td>Close the preview</td>
+            <td>When a page loads, including pages an agent opens with no Preview on screen</td>
+            <td>No setting; agents can open pages in every mode</td>
           </tr>
           <tr>
             <td>MCP Apps</td>
             <td>The <code>https</code> domains the app's MCP server declares</td>
             <td>While a Codex tool result shows an interactive app</td>
             <td>Remove that MCP server from Codex</td>
+          </tr>
+          <tr>
+            <td>OpenCode skill catalogs</td>
+            <td>Web addresses listed as skill sources in your OpenCode configuration, or in the project's</td>
+            <td>When the Skills section of Settings is open</td>
+            <td>Remove those addresses from the configuration that lists them</td>
           </tr>
         </tbody>
       </table>
@@ -107,54 +122,99 @@ const sections = [
 
   <section aria-labelledby="agents">
     <h2 id="agents">Agents</h2>
-    <p>OpenOrc runs the agent CLIs you installed, signed in with your own accounts, and they connect to their services themselves. OpenOrc does not sit between an agent and its provider. It decides what a request starts with: your message, the conversation so far, and <a href={docHref("instructions")}>its own instructions</a>. The agent adds whatever it reads while it works, such as files and command output.</p>
-    <p>The CLIs also make connections of their own, under their own terms: their telemetry, their own update checks, and the MCP servers in your configuration. In Autonomous, Claude Code also connects the MCP servers from your Claude Code settings, unless you turn off "Your Claude Code MCP servers" under General. In the other modes it connects only OpenOrc's.</p>
-    <p>The CLIs keep their own transcripts on your computer, such as <code>~/.claude/projects</code> for Claude Code and <code>~/.codex/sessions</code> for Codex. OpenOrc does not redact or delete these.</p>
+    <p>
+      OpenOrc runs the agent CLIs you installed, signed in with your own accounts, and they connect to their services themselves. OpenOrc doesn't sit between an agent and its provider. It decides what a request starts with: your message, the
+      conversation so far, and <a href={docHref("instructions")}>a short brief of its own</a>. The agent adds whatever it reads while it works, such as files and command output.
+    </p>
+    <p>
+      The CLIs also make connections of their own, under their own terms: telemetry, their own update checks, and the MCP servers in your configuration. OpenOrc runs them for short jobs too, such as sign-in checks, model lists, usage,
+      and skills; whether those go online is up to the CLI.
+    </p>
+    <ul>
+      <li>Claude Code connects the MCP servers from your Claude Code settings only in Autonomous, and only while <strong>Your Claude Code MCP servers</strong> is on under General. Other modes connect only OpenOrc's tools.</li>
+      <li>Codex turns off the MCP servers in your Codex configuration only in Plan mode.</li>
+      <li>In a copy of a pull request under review, no agent loads settings or MCP servers from the copied project.</li>
+    </ul>
+    <p>The CLIs keep their own transcripts on your computer, such as <code>~/.claude/projects</code> for Claude Code and <code>~/.codex/sessions</code> for Codex. OpenOrc doesn't redact or delete them.</p>
   </section>
 
   <section aria-labelledby="background">
-    <h2 id="background">Background requests through agents</h2>
-    <p>OpenOrc has no model of its own. When it needs one in the background, it runs an agent CLI once, in the system's temporary folder, without MCP servers and with limited tools:</p>
+    <h2 id="background">Background requests</h2>
+    <p>OpenOrc has no model of its own. When it needs one in the background, it runs an agent CLI once, in your system's temporary folder, and sends the prompt over standard input:</p>
     <ul>
-      <li><strong>Conversation titles</strong> send the first 1,500 characters of your first message and of the reply. By default the conversation's own agent answers, so nothing reaches a provider that did not already have it. See <a href={docHref("conversations") + "#titles"}>Conversation titles</a>.</li>
-      <li><strong>Run summaries</strong> for memory send a digest of the run of up to 12,000 characters, with the task's title and spec. Memory is off in a new profile. When it is on, the agent that did the work summarizes it by default; choosing a provider sends every run's digest to that provider. See <a href={docHref("memory") + "#runner"}>How extraction runs</a>.</li>
-      <li><strong>Usage</strong>: Claude Code answers a usage request over its own control channel, and Codex's app-server reads your account's limits. OpenOrc never reads the credentials these CLIs store. OpenCode's usage is not read; the settings point to each provider's dashboard.</li>
+      <li>
+        <strong>Thread titles</strong> send the first 1,500 characters of your first message and of the reply. By default the thread's own agent answers with a small model: Claude Haiku 4.5 for Claude Code, or a small Codex model, so the
+        text stays with that provider. For an OpenCode thread, the small model can come from any provider you set up in OpenCode. A thread whose agent has no small model keeps its first line.
+      </li>
+      <li>
+        <strong>Run summaries</strong> for memory send a digest of the run, up to 12,000 characters, with the thread's or task's title and a task's description. Memory is off in a new profile. Choosing a provider under Memory &amp; models
+        sends every run's digest to that provider.
+      </li>
     </ul>
-    <p>For titles and summaries, Claude Code runs without shell, edit, or web tools but can still read and search files. Codex runs in a read-only sandbox, where it can still run commands that only read. OpenCode is denied every tool. Every agent receives the prompt over standard input, never on its command line.</p>
+    <p>
+      For titles and summaries, Claude Code runs with Bash, Edit, Write, WebFetch, and WebSearch turned off and without MCP servers, but can still read and search files. Codex runs in a read-only sandbox with no MCP servers, where it can
+      still run commands that only read. OpenCode is denied every tool.
+    </p>
+    <p>
+      For <strong>usage</strong>, Claude Code answers a usage request with its own sign-in, and Codex reads your account's limits through its app server. Pressing <strong>Use reset</strong> asks Codex to spend a reset. OpenOrc never reads
+      the credentials these CLIs store, and doesn't read OpenCode's usage at all.
+    </p>
+    <p class="docs-source">Source: <code>packages/memory/src/text-generator.ts</code>, <code>packages/core/src/services/text-generation.ts</code>, <code>provider-usage.ts</code></p>
   </section>
 
   <section aria-labelledby="downloads">
     <h2 id="downloads">Downloads and update checks</h2>
     <h3>The embedding model</h3>
-    <p>Memory's search by meaning uses a small model that runs on your computer. It is not part of the app. The first time memory needs it, OpenOrc downloads an 83 MB archive from <code>storage.googleapis.com</code> and keeps it only if it matches a SHA-256 checksum written into OpenOrc's source. The request carries no information about you beyond what any download does. While memory is off, the model is never downloaded. See <a href={docHref("memory") + "#embeddings"}>Embeddings</a>.</p>
+    <p>
+      Memory's search by meaning uses a small model that runs on your computer, and it isn't part of the app. The first time memory needs it, OpenOrc downloads an 83 MB archive from <code>storage.googleapis.com</code> and keeps it only if it
+      matches a SHA-256 checksum written into OpenOrc's source. While memory is off, it is never downloaded.
+    </p>
     <h3>App updates</h3>
-    <p>Installed releases ask GitHub Releases whether a newer version exists, 30 seconds after launch and then every 6 hours. Development builds never check. A check only compares versions: downloading and installing each wait for you to choose them from the app menu. The update library OpenOrc uses keeps a random ID in <code>.updaterId</code> in the profile folder, meant for releasing to a share of installations first. OpenOrc does not release that way and sends the ID empty. You can turn automatic checks off under General; Check for updates in the app menu still works.</p>
+    <p>
+      Installed macOS and Windows releases ask GitHub Releases whether a newer version exists, including beta versions. Development builds and Linux releases never check. A check only compares versions: downloading and installing each wait
+      until you choose them from the update notice or the app menu.
+    </p>
+    <p>The update library keeps a random ID in <code>.updaterId</code> in the data folder, meant for releasing to a share of installs first. OpenOrc doesn't release that way and sends the ID empty.</p>
     <h3>Agent updates</h3>
-    <p>OpenOrc checks whether the agent CLIs you installed have newer versions, 30 seconds after launch and then every 6 hours. It asks <code>registry.npmjs.org</code> for the latest version of each package, or <code>formulae.brew.sh</code> when Homebrew installed the agent, without cookies or credentials. Installing an update waits for you. You can turn these checks off under Connections.</p>
-    <p class="docs-source">Source: <code>packages/memory/src/model-files.ts</code>, <code>apps/desktop/src/main/app-updates.ts</code>, <code>packages/core/src/services/agent-updates.ts</code></p>
+    <p>
+      OpenOrc asks <code>registry.npmjs.org</code> for the latest version of each agent's package, or <code>formulae.brew.sh</code> when a Homebrew cask installed Codex or Claude Code. The request carries no cookies or credentials.
+      Installing waits for you to press <strong>Update</strong>, and then runs the installer that put the agent there, such as <code>npm</code>, <code>brew</code>, or <code>claude update</code>.
+    </p>
+    <p class="docs-source">Source: <code>packages/memory/src/model-files.ts</code>, <code>apps/desktop/src/main/app-updates.ts</code>, <code>packages/core/src/services/agent-update-installation.ts</code></p>
   </section>
 
   <section aria-labelledby="git">
     <h2 id="git">Git and GitHub</h2>
-    <p>OpenOrc runs your own <code>git</code> and <code>gh</code>, so they use your credentials and configuration. Automatic network use is limited to two cases:</p>
+    <p>OpenOrc runs your own <code>git</code> and <code>gh</code>, so they use your credentials and configuration. Three things use the network without you pressing a Git button:</p>
     <ul>
       <li>Creating a worktree from a branch fetches that branch from <code>origin</code> first, so the work starts from what your team sees. If the fetch fails, the local branch is used. Work in the Local checkout never fetches.</li>
-      <li>For each conversation with an open pull request, OpenOrc runs <code>gh pr view &lt;url&gt; --json state</code> every 5 minutes to show when it is merged or closed.</li>
+      <li>A new worktree of a repository with submodules runs <code>git submodule update --init --recursive</code>, which can clone each submodule from its own remote.</li>
+      <li>For each thread with an open pull request, OpenOrc runs <code>gh pr view &lt;url&gt; --json state</code> every 5 minutes to show when it is merged or closed.</li>
     </ul>
-    <p>Everything else happens when you ask: pushing, creating a pull request, and the <code>git ls-remote</code> check that the branch is pushed before one is created. See <a href={docHref("git")}>Git and review</a>.</p>
-    <p class="docs-source">Source: <code>packages/core/src/services/workspace.ts</code>, <code>lifecycle.ts</code>, <code>review.ts</code></p>
+    <p>
+      Everything else happens when you ask: pushing, creating a pull request, listing and reading pull requests on the <a href={docHref("pull-requests")}>Pull requests</a> pages, fetching a pull request to review it, and posting a review.
+      Before creating a pull request from a thread, OpenOrc checks that your branch is pushed using the remote branches Git already knows about, without going online. For a team's branch, OpenOrc asks <code>origin</code> with
+      <code>git ls-remote</code> instead.
+    </p>
+    <p class="docs-source">Source: <code>packages/core/src/services/workspace.ts</code>, <code>lifecycle.ts</code>, <code>review.ts</code>, <code>packages/git/src/github.ts</code>, <code>github-app.ts</code></p>
   </section>
 
   <section aria-labelledby="local">
     <h2 id="local">Local servers</h2>
-    <p>These parts of OpenOrc listen for connections, all on <code>127.0.0.1</code>, so other computers cannot reach them:</p>
+    <p>These parts of OpenOrc listen for connections, all on <code>127.0.0.1</code>, so other computers can't reach them:</p>
     <ul>
       <li>OpenOrc's MCP server, which gives agents OpenOrc's tools, on a random port.</li>
-      <li>The MCP Apps sandbox, which serves interfaces from MCP servers into isolated frames, on a random port. An interface can load files from, and connect to, the <code>https</code> domains its MCP server declares, except <code>localhost</code>, <code>.local</code> names, and IP addresses.</li>
-      <li>The team relay, on the computer that hosts it, when you use one. See <a href={docHref("slack") + "#relay"}>The team relay</a>.</li>
-      <li>On macOS, the update library's handoff to the system installer, on a random port and behind a random password, while a downloaded app update waits to be installed.</li>
+      <li>
+        The MCP Apps sandbox, which serves interactive tool results in isolated frames, on a random port. An app can load files from, and connect to, the <code>https</code> domains its MCP server declares, except <code>localhost</code>,
+        <code>.local</code> names, and IP addresses.
+      </li>
+      <li>The Slack team relay, on the computer that hosts it, at the port you set (47831 by default). Teammates reach it through an SSH tunnel.</li>
+      <li>The reviewer app's setup page, on a random port, only while you set the app up, for at most 15 minutes.</li>
+      <li>OpenCode's own server, <code>opencode serve</code>, which OpenOrc starts briefly to list OpenCode's skills. It is protected by a password OpenCode makes up.</li>
+      <li>On macOS, the update library's handoff to the system installer, on a random port behind a random password, while a downloaded update waits to install.</li>
     </ul>
-    <p>The app window itself loads only files that ship with OpenOrc. Its content security policy blocks remote scripts, styles, fonts, and images.</p>
+    <p>The app window loads only files that ship with OpenOrc. Its content security policy blocks remote scripts, styles, fonts, and images.</p>
+    <p>See <a href={docHref("security") + "#servers"}>Security model</a> for what keeps web pages and other programs out of these servers.</p>
   </section>
 
   <section aria-labelledby="never">
@@ -162,8 +222,14 @@ const sections = [
     <ul>
       <li>No usage analytics or crash reports. OpenOrc has no account of its own.</li>
       <li>No identifier for your installation with update checks or downloads.</li>
-      <li>Nothing to an OpenOrc server: there is none.</li>
+      <li>Nothing to an OpenOrc server, because there is none.</li>
     </ul>
-    <p>The <a href="/privacy/">privacy policy</a> covers the website as well, which does use analytics.</p>
+    <p>OpenOrc does name itself: Codex and OpenCode see the client name <code>openorc</code>, and the reviewer app's requests to GitHub say <code>OpenOrc</code>. The <a href="/privacy/">privacy policy</a> also covers this website, which does use analytics.</p>
+    <Callout>What an agent connects to while it works, such as when it runs a command or fetches a page, depends on the agent and the thread's mode. See <a href={docHref("permissions")}>Modes and permissions</a>.</Callout>
+  </section>
+
+  <section aria-labelledby="next-steps">
+    <h2 id="next-steps">Next steps</h2>
+    <LinkCards cards={[{ slug: "security" }, { slug: "storage" }, { slug: "how-it-works" }]} columns={3} />
   </section>
 </DocsLayout>

@@ -1,0 +1,138 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import Callout from "../../components/docs/Callout.astro";
+import LinkCards from "../../components/docs/LinkCards.astro";
+import { docHref } from "../../data/docs";
+
+const sections = [
+  { id: "create", title: "Create an Orcling" },
+  { id: "own-conversation", title: "Its own conversation" },
+  { id: "what-it-sees", title: "What it sees" },
+  { id: "instructions-and-memory", title: "Instructions and memory" },
+  { id: "project-work", title: "Bring it into project work" },
+  { id: "edit-or-delete", title: "Edit or delete an Orcling" },
+  { id: "next-steps", title: "Next steps" },
+];
+---
+
+<DocsLayout slug="orclings" sections={sections}>
+  <p>You give each Orcling a name, a look, a model and a permission, and its memory goes with it wherever it works. Talk to one when you want to think something through away from project work, or to check on all your projects at once. When there's code to change, it starts the work in a project.</p>
+
+  <section aria-labelledby="create">
+    <h2 id="create">Create an Orcling</h2>
+    <ol class="docs-steps">
+      <li>In the sidebar, switch from <strong>Threads</strong> to <strong>Orclings</strong>.</li>
+      <li>Click <strong>New Orcling</strong>, the plus button beside the search field. If you have no Orclings yet, the tab opens the designer right away.</li>
+      <li>Pick its look from <strong>Shape</strong>, <strong>Eyes</strong>, <strong>Texture</strong>, <strong>Glasses</strong> and <strong>Accessories</strong>, and choose a <strong>Body color</strong>. <strong>Eye color</strong> appears under <strong>Eyes</strong>.</li>
+      <li>Type a <strong>Name</strong>. Two Orclings can't share a name, whatever the case or punctuation.</li>
+      <li>Choose its <strong>Model</strong> and its <strong>Permission</strong>.</li>
+      <li>Click <strong>Create Orcling</strong>. Its conversation opens and invites you to say hi.</li>
+    </ol>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Permission</th>
+            <th scope="col">What the Orcling does</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Approve</strong></td>
+            <td>Asks before every command or edit, like Review everything, and before saving a memory, rewriting its instructions or starting work in a project. On OpenCode, which can't ask before each command, it stays in Plan instead.</td>
+          </tr>
+          <tr>
+            <td><strong>Allow</strong></td>
+            <td>Runs without asking, like Autonomous.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Wherever an Orcling works, it never gets more freedom than its permission. See <a href={docHref("permissions")}>Modes and permissions</a>.</p>
+  </section>
+
+  <section aria-labelledby="own-conversation">
+    <h2 id="own-conversation">Its own conversation</h2>
+    <p>The <strong>Orclings</strong> tab lists your Orclings like contacts, with each one's face, name and the last thing said. Click one to open your conversation with it. <strong>Find an Orcling…</strong> filters the list. These conversations don't appear under <strong>Threads</strong>.</p>
+    <p>The conversation never ends, and you can't archive it. After six hours without a turn, or once the conversation fills most of the model's context, your next message starts a fresh session that picks up where you left off. The Orcling can still search everything said before.</p>
+    <p>Choosing a model in its composer changes the Orcling's own model, as editing it in the designer would.</p>
+  </section>
+
+  <section aria-labelledby="what-it-sees">
+    <h2 id="what-it-sees">What it sees</h2>
+    <p>An Orcling knows different things in its own conversation than when it works in a project.</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col"></th>
+            <th scope="col">Its own conversation</th>
+            <th scope="col">A project conversation</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Folder</td>
+            <td>A folder of its own, for notes and files. It's not a project or a repository.</td>
+            <td>The thread's folder: the project checkout or its worktree.</td>
+          </tr>
+          <tr>
+            <td>Starts with</td>
+            <td>Its instructions and its memory. No project's memory or rules come with it.</td>
+            <td>Its instructions and memory, plus the project's instruction files and memory.</td>
+          </tr>
+          <tr>
+            <td>Reaches</td>
+            <td>All your projects, through its own tools. It can look up a project's open tasks, recent threads and memory, read any thread, save a task to a backlog, start work in a project, and message any thread.</td>
+            <td>The project's code, tasks and threads, like any agent there, and its own tools as well.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Its own conversation isn't meant for changing project files. When you ask for changes in a project, the Orcling starts a thread there, does the work in that thread, and tells you where it runs.</p>
+  </section>
+
+  <section aria-labelledby="instructions-and-memory">
+    <h2 id="instructions-and-memory">Instructions and memory</h2>
+    <p>Every Orcling starts with short instructions about how it works with you, and they're its to change. When you tell it how you'd like it to be, it rewrites them and says what it changed.</p>
+    <p>To read or edit them yourself, open the <strong>Orcling</strong> tab beside its conversation. Change the text under <strong>Instructions</strong> and click <strong>Save</strong>. Every version is kept, whether you or the Orcling wrote it, and <strong>Restore</strong> brings an earlier one back as the newest. New instructions apply when its agent next starts.</p>
+    <p>Its memory holds what lasts about you, such as your preferences, goals, decisions and the people you work with. The Orcling saves a memory when it learns something worth keeping. OpenOrc can also learn from its own conversation in the background. The memory goes with the Orcling into every conversation, and no project sees it.</p>
+    <p>The <strong>Memory</strong> list in the <strong>Orcling</strong> tab shows everything it remembers. Each entry's menu has <strong>Edit</strong>, <strong>Mark helpful</strong>, <strong>Retract</strong> and <strong>Delete</strong>.</p>
+    <Callout>Orcling memory uses OpenOrc memory, which stays off until you turn it on in <a href={docHref("settings") + "#memory"}>Settings</a> under <strong>Memory &amp; models</strong>. While it's off, an Orcling can't save or recall memories.</Callout>
+  </section>
+
+  <section aria-labelledby="project-work">
+    <h2 id="project-work">Bring it into project work</h2>
+    <dl class="docs-terms">
+      <div>
+        <dt>Mention it</dt>
+        <dd>In another conversation, type <code>@</code> and the Orcling's name. Your message goes to the Orcling, which answers in the thread under its own name. The thread's own agent reads the answer on its next turn. Wait until the thread is idle before you ask.</dd>
+      </div>
+      <div>
+        <dt>Give it a thread</dt>
+        <dd>In a project thread, open the model picker, switch to <strong>Orclings</strong>, and pick one. It takes over the thread on its own model, and the thread's mode can't be looser than its permission. Pick a plain model to take the thread back.</dd>
+      </div>
+      <div>
+        <dt>Start a thread with it</dt>
+        <dd>On the <strong>New thread</strong> screen, pick it under <strong>Orclings</strong> in the model picker. This works in projects, not in the Workspace.</dd>
+      </div>
+      <div>
+        <dt>Ask it to start work</dt>
+        <dd>In its own conversation, ask for something to be done in a project. It starts a thread there and works in it.</dd>
+      </div>
+    </dl>
+    <p>You can also seat an Orcling in an <a href={docHref("teams")}>agent team</a>, mention it in a task comment, or pick it to review a pull request. Team conversations and other Orclings' conversations don't take mentions.</p>
+  </section>
+
+  <section aria-labelledby="edit-or-delete">
+    <h2 id="edit-or-delete">Edit or delete an Orcling</h2>
+    <p>Open its conversation and click <strong>Edit</strong> in the <strong>Orcling</strong> tab. The thread's menu also has <strong>Edit</strong> followed by its name. In the designer, change its look, name, model or permission, and click <strong>Save</strong>. A new name also renames its folder, so wait until it isn't working.</p>
+    <p>To delete it, click <strong>Delete</strong> and its name at the bottom of the designer, then confirm with <strong>Delete</strong>.</p>
+    <Callout tone="warning">Deleting an Orcling removes its conversation, instructions and memories. Threads it worked in keep their history.</Callout>
+  </section>
+
+  <section aria-labelledby="next-steps">
+    <h2 id="next-steps">Next steps</h2>
+    <LinkCards cards={[{ slug: "memory" }, { slug: "messaging" }, { slug: "teams" }, { slug: "permissions" }]} />
+  </section>
+</DocsLayout>

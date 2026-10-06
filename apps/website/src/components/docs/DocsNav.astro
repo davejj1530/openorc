@@ -1,0 +1,26 @@
+---
+/** The docs sidebar: groups named after parts of the app, then their pages. */
+import { docGroups, docHref, docLabel } from "../../data/docs";
+
+interface Props {
+  slug: string;
+}
+const { slug } = Astro.props;
+---
+
+<nav class="docs-nav-groups" aria-label="Documentation">
+  {docGroups.map((group) => (
+    <div class="docs-nav-group">
+      <p class="docs-nav-group-title">{group.title}</p>
+      <ul>
+        {group.pages.map((page) => (
+          <li>
+            <a href={docHref(page.slug)} aria-current={page.slug === slug ? "page" : undefined}>
+              {docLabel(page)}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  ))}
+</nav>

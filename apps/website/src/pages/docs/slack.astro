@@ -1,146 +1,150 @@
 ---
 import DocsLayout from "../../layouts/DocsLayout.astro";
+import Callout from "../../components/docs/Callout.astro";
+import LinkCards from "../../components/docs/LinkCards.astro";
 import { docHref } from "../../data/docs";
 
 const sections = [
-  { id: "connections", title: "Two ways to connect" },
-  { id: "inbound", title: "Which messages count" },
-  { id: "conversation", title: "From a mention to a conversation" },
-  { id: "roles", title: "Who can do what" },
-  { id: "switching", title: "Switching model or folder" },
-  { id: "replies", title: "What OpenOrc posts" },
-  { id: "approvals", title: "Approvals in Slack" },
-  { id: "images", title: "Images" },
-  { id: "offline", title: "When your computer is offline" },
-  { id: "relay", title: "The team relay" },
-  { id: "data", title: "What is stored" },
+  { id: "how", title: "How it works" },
+  { id: "connect", title: "Connect your bot" },
+  { id: "mention", title: "Mention your bot" },
+  { id: "in-slack", title: "What you see in Slack" },
+  { id: "approvals", title: "Approve from Slack" },
+  { id: "desktop", title: "Find the conversation in OpenOrc" },
+  { id: "limits", title: "Limits" },
+  { id: "next-steps", title: "Next steps" },
 ];
 ---
 
 <DocsLayout slug="slack" sections={sections}>
-  <section aria-labelledby="connections">
-    <h2 id="connections">Two ways to connect</h2>
-    <p>Slack support is optional and off until you connect it. The agent always runs on your computer; Slack is only where you talk to it.</p>
-    <h3>Personal bot (default)</h3>
-    <p>You create your own Slack app from a manifest OpenOrc generates, install it, and give OpenOrc three things: the bot token (<code>xoxb-…</code>), an app-level token with <code>connections:write</code> (<code>xapp-…</code>), and your Slack member ID. OpenOrc connects from your computer with Slack's <a href="https://api.slack.com/apis/socket-mode">Socket Mode</a>, an outgoing WebSocket, so there is no public URL, no server to host, and no OpenOrc service in between.</p>
-    <p>The manifest asks for these bot scopes: <code>app_mentions:read</code>, <code>chat:write</code>, <code>channels:history</code>, <code>groups:history</code>, <code>users:read</code>, and <code>files:read</code>. It subscribes to mentions and to messages in public and private channels the bot is in. Before connecting, OpenOrc calls <code>auth.test</code> and <code>users.info</code> to check that the bot token and the member ID belong to the same workspace, and that the owner is a real person, not a bot. The app token is only used to open the connection; OpenOrc does not check that it belongs to the same Slack app.</p>
-    <h3>Team relay (advanced)</h3>
-    <p>One computer holds the Slack connection and relays requests to teammates' desktops. See <a href="#relay">The team relay</a>.</p>
-    <p class="docs-source">Source: <code>packages/core/src/services/slack/service.ts</code>, <code>apps/desktop/src/renderer/src/lib/slack-setup.ts</code></p>
+  <section aria-labelledby="how">
+    <h2 id="how">How it works</h2>
+    <p>
+      You create your own Slack app, a personal bot, and connect it to OpenOrc. When you mention the bot in a channel, an agent runs on your computer with your agent sign-ins, and the Slack thread shows its progress, its reply, and
+      its permission requests. OpenOrc connects through Slack's Socket Mode, an outgoing connection from your computer, so there's no server to host. Each person creates a separate bot.
+    </p>
+    <Callout>
+      For a group that shares one bot, <strong>Connect Slack</strong> also offers <strong>Team relay · advanced</strong>. One computer holds the Slack connection, and each teammate's desktop connects to it through an SSH tunnel
+      to receive that teammate's requests.
+    </Callout>
   </section>
 
-  <section aria-labelledby="inbound">
-    <h2 id="inbound">Which messages count</h2>
-    <p>Slack sends the bot every message in the channels it has joined. OpenOrc acknowledges each one and ignores it unless all of these hold:</p>
-    <ul>
-      <li>It comes from the connected workspace, in a channel (not a direct message).</li>
-      <li>It was written by a person, not a bot, and is an ordinary message or a file share.</li>
-      <li>It mentions the bot, or it is a reply in a Slack thread where the bot was already mentioned.</li>
-    </ul>
-    <p>With a personal bot, mentions by anyone other than the owner are ignored. Each Slack event ID is recorded, so an event Slack delivers twice is handled once.</p>
-  </section>
-
-  <section aria-labelledby="conversation">
-    <h2 id="conversation">From a mention to a conversation</h2>
+  <section aria-labelledby="connect">
+    <h2 id="connect">Connect your bot</h2>
+    <p>You need a signed-in agent (see <strong>Settings</strong> → <strong>Connections</strong>). Your Slack workspace may need an admin to approve the new app.</p>
     <ol class="docs-steps">
-      <li>OpenOrc posts "Request received for your OpenOrc desktop." in the Slack thread.</li>
-      <li>It reads the Slack thread's history up to that message with <code>conversations.replies</code>.</li>
-      <li>It finds the Workspace conversation linked to this Slack thread, or creates one titled "Slack:" followed by the start of your message, in the Workspace folder you set for Slack.</li>
-      <li>Your messages are recorded in the conversation as yours; other participants' messages are recorded as context, labeled "Slack participant".</li>
-      <li>A new conversation starts with the agent and model you set for Slack; later turns keep the conversation's current model. Every turn uses the stricter of the conversation's and the Slack setting's permission level, and Plan wins over Act.</li>
+      <li>Open <strong>Settings</strong> → <strong>Slack</strong>. Leave <strong>Connect Slack</strong> set to <strong>Personal bot · no server needed</strong>.</li>
+      <li>
+        Under <strong>Set up your Slack app</strong>, enter an <strong>App name</strong> and click <strong>Create Slack app</strong>. In Slack, choose your workspace, review the prefilled settings, and create the app. If the form
+        isn't prefilled, click <strong>Copy manifest</strong> and create the app from a manifest.
+      </li>
+      <li>In the app's settings in Slack, open OAuth &amp; Permissions, click Install to Workspace, and copy the Bot User OAuth Token (<code>xoxb-…</code>).</li>
+      <li>Open Basic Information → App-Level Tokens → Generate Token and Scopes, add <code>connections:write</code>, and copy the token (<code>xapp-…</code>). Both tokens must come from the same app.</li>
+      <li>In Slack, open your own profile, then More → Copy member ID.</li>
+      <li>In OpenOrc, paste the tokens into <strong>Bot token</strong> and <strong>App token</strong>, and the ID into <strong>Your Slack member ID</strong>.</li>
+      <li>Fill in <strong>Execution defaults</strong>, described in the table below.</li>
+      <li>Click <strong>Connect and check</strong>. OpenOrc checks the tokens and that the ID belongs to an active person in the bot's workspace, then connects. The badge reads <strong>Connected</strong>.</li>
     </ol>
-    <p>The agent receives the whole Slack thread as quoted context, your message, and instructions to treat other participants' messages as context rather than as permission to act. The exact text is on <a href={docHref("instructions") + "#slack"}>What OpenOrc tells agents</a>.</p>
-    <p>Later replies in the same Slack thread continue the same conversation. While the agent is busy, replies in that thread wait in a queue of up to 20; a mention in another thread gets a notice to wait for the current reply.</p>
-    <p class="docs-source">Source: <code>packages/core/src/services/slack/relay.ts</code>, <code>runner.ts</code></p>
-  </section>
-
-  <section aria-labelledby="roles">
-    <h2 id="roles">Who can do what</h2>
     <div class="docs-table">
       <table>
         <thead>
           <tr>
-            <th scope="col">Person</th>
-            <th scope="col">Can</th>
+            <th scope="col">Setting</th>
+            <th scope="col">What it does</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td>The owner</td>
-            <td>Start work by mentioning the bot, continue by replying in the thread, answer approval buttons, and ask to switch model, effort, or folder.</td>
+            <td><strong>Workspace entrypoint</strong></td>
+            <td>The folder new Slack conversations start in. The agent can also move to a project you've added, or to a folder up to three levels inside this one. <strong>Choose folder</strong> changes it.</td>
           </tr>
           <tr>
-            <td>Other people in the channel</td>
-            <td>Add context. Their messages and images in an active thread are passed to the agent. Their mentions do not start work on the owner's computer, and they cannot press the owner's approval buttons.</td>
+            <td><strong>Default coding agent</strong>, <strong>Default model</strong></td>
+            <td>What a new Slack conversation starts with. The agent is Codex unless you change it; a blank model means the agent's default.</td>
+          </tr>
+          <tr>
+            <td><strong>Mode</strong></td>
+            <td>
+              Applies to every Slack turn, existing threads included, and a stricter mode set on the conversation still wins. The default is <strong>Review everything</strong>, which Codex calls <strong>Review changes</strong>. OpenCode
+              offers only <strong>Plan</strong> and <strong>Autonomous</strong> here.
+            </td>
           </tr>
         </tbody>
       </table>
     </div>
-    <p>With the team relay, each registered person is the owner of their own requests: their mentions run on their own desktop, never on someone else's.</p>
-    <p>Written questions from the agent, and stopping a run, are only available on the desktop. Slack shows a notice when the agent is waiting for a written answer.</p>
+    <p>While Slack is connected, these fields are locked. Click <strong>Disconnect Slack</strong> to change them.</p>
   </section>
 
-  <section aria-labelledby="switching">
-    <h2 id="switching">Switching model or folder</h2>
-    <p>Slack runs have two extra OpenOrc tools. <code>execution_context</code> reports the current provider, model, effort, and the folders available. <code>execution_switch</code> queues a change when you ask for another model, effort, or folder:</p>
-    <ul>
-      <li>The model and effort must match an entry in the provider's catalog exactly.</li>
-      <li>Folders come from your imported projects, the Workspace folder, and up to 250 folders at most 3 levels below it, skipping hidden folders and build output.</li>
-      <li>The switch happens after the current turn succeeds, in a fresh session with the same mode and permission level. A request can switch at most 4 times.</li>
-    </ul>
-    <p>If a run fails, OpenOrc tries once more with the agent and model you set for Slack, and tells that model what failed.</p>
+  <section aria-labelledby="mention">
+    <h2 id="mention">Mention your bot</h2>
+    <ol class="docs-steps">
+      <li>Invite the bot to a channel. Private channels need an invite too.</li>
+      <li>From the Slack account you connected, mention the bot with a request, such as <code>@your-bot what does this project do?</code></li>
+      <li>To continue, reply in the same Slack thread. You don't need to mention the bot again.</li>
+    </ol>
+    <p>The bot answers "Request received for your OpenOrc desktop." The agent gets the whole Slack thread as context, including messages from before the mention.</p>
+    <p>
+      To switch to another model, a higher reasoning effort, a different folder, or one of your <a href={docHref("orclings")}>Orclings</a>, ask in plain words. The agent switches after its current turn and carries on with the same
+      request, up to four switches per request.
+    </p>
+    <p>Your computer handles one Slack request at a time. Up to 20 replies in the same Slack thread wait their turn. A mention in another thread gets a reply asking you to wait for the current request.</p>
   </section>
 
-  <section aria-labelledby="replies">
-    <h2 id="replies">What OpenOrc posts</h2>
+  <section aria-labelledby="in-slack">
+    <h2 id="in-slack">What you see in Slack</h2>
     <ul>
-      <li><strong>Progress</strong>: one message that is edited as the agent works, at most every 2 seconds, showing a status line and the last 9,000 characters of the agent's reply. The status line names the model and the tool the agent is using, such as "Working · &lt;model&gt; · &lt;tool&gt;". Reasoning and tool output are never posted.</li>
-      <li><strong>The final reply</strong>: the agent's last message, replacing the progress message, up to 11,500 characters.</li>
-      <li><strong>Notices</strong>: for example when your desktop is not connected, when a message is too long (over 20,000 characters), or when the agent is waiting for you on the desktop. When a request fails, the notice includes the provider's error message, redacted.</li>
+      <li>A progress message that OpenOrc edits as the agent works, at most every 2 seconds, with a status line such as <code>Working · &lt;model&gt; · &lt;tool&gt;</code> and the latest text of the reply.</li>
+      <li>The final reply, which replaces the progress message. Slack shows up to 11,500 characters of it; the conversation in OpenOrc has all of it.</li>
+      <li>Notices, for example when the agent is waiting for you or a request failed.</li>
     </ul>
-    <p>Every message starts by mentioning the owner. <code>@</code> mentions in the agent's text are escaped so the agent cannot ping people, and link previews are turned off.</p>
+    <p>
+      Every message mentions you. The agent's reasoning and tool output aren't posted, and mentions in its text are escaped, so it can't ping anyone. Before posting, OpenOrc also hides well-known secrets, such as API keys,
+      on a best-effort basis.
+    </p>
+    <Callout>Everyone in the channel can read the replies and the details of permission requests. Use a private channel for private work.</Callout>
   </section>
 
   <section aria-labelledby="approvals">
-    <h2 id="approvals">Approvals in Slack</h2>
-    <p>When a Slack-started run asks for permission, OpenOrc posts the request in the thread: the reason, the tool name, and its input, split into Slack messages of up to 11,200 characters (four 2,800-character sections each). The last message has Allow once and Deny buttons. Questions that need a written answer are not posted; they wait on the desktop.</p>
+    <h2 id="approvals">Approve from Slack</h2>
+    <p>
+      When the agent needs permission, OpenOrc posts the request in the Slack thread with <strong>Allow once</strong> and <strong>Deny</strong> buttons. A long request is split across several messages, and the buttons come with the
+      last one.
+    </p>
     <ul>
-      <li>A click counts only if it comes from the owner, in the same workspace, channel, and thread, on the latest approval message, within 10 minutes.</li>
-      <li>The desktop checks again that the request is still waiting before applying the answer.</li>
-      <li>When a request is answered or no longer pending, its message is edited to say so. Buttons from before a restart stop working.</li>
+      <li>Only you can decide. A click counts only from the member ID you connected, on the latest request message.</li>
+      <li>Buttons expire after 10 minutes, and restarting OpenOrc retires them.</li>
+      <li>If you answer on the desktop instead, the Slack message changes to say the request is no longer pending.</li>
+    </ul>
+    <p>Questions that need a written answer aren't posted. Slack says the agent is waiting, and you answer in OpenOrc.</p>
+    <p>
+      Other people in the channel can add context: their messages and images in the thread reach the agent, which is told not to act on their instructions. Their mentions don't start work on your computer, and
+      they can't press your buttons.
+    </p>
+  </section>
+
+  <section aria-labelledby="desktop">
+    <h2 id="desktop">Find the conversation in OpenOrc</h2>
+    <p>
+      Each Slack thread becomes a conversation in the <strong>Workspace</strong> group of the sidebar, titled "Slack:" and the start of your first message. It has the full record, including other people's messages, the agent's
+      steps, and complete replies. A new Slack conversation doesn't change what your window shows.
+    </p>
+    <p>Stop a run or answer a written question on the desktop. If you're running a turn there yourself, the bot asks you to wait until it finishes.</p>
+  </section>
+
+  <section aria-labelledby="limits">
+    <h2 id="limits">Limits</h2>
+    <ul>
+      <li>Slack reaches your agent only while OpenOrc is open and connected and your computer is awake. Nothing waits on a server.</li>
+      <li>After OpenOrc restarts, click <strong>Connect and check</strong> again. A connection that drops while OpenOrc is open, for example while your computer sleeps, comes back by itself.</li>
+      <li>OpenOrc doesn't go back for mentions it missed while offline. Mention the bot again; earlier messages reach the agent as part of the thread.</li>
+      <li>Disconnecting doesn't stop a running agent; its reply is posted once you reconnect. Quitting OpenOrc ends the request, and after you reconnect the Slack thread gets a note that it was interrupted.</li>
+      <li>The bot works in channels only. It ignores direct messages and replies sent with Also send to channel.</li>
+      <li>A request can be up to 20,000 characters. PNG, JPEG, GIF, and WebP images up to 20 MB reach the agent; other files don't.</li>
     </ul>
   </section>
 
-  <section aria-labelledby="images">
-    <h2 id="images">Images</h2>
-    <p>Images in an active Slack thread, from anyone, are passed to the agent. OpenOrc checks each file with <code>files.info</code>, accepts PNG, JPEG, GIF, and WebP up to 20 MB, and downloads it from <code>files.slack.com</code> with the bot token, following at most 3 redirects and checking each one before sending the token. Downloaded images are validated like attachments and cached in the profile folder.</p>
-  </section>
-
-  <section aria-labelledby="offline">
-    <h2 id="offline">When your computer is offline</h2>
-    <p>Slack can only reach your agent while OpenOrc is open, connected, and your computer is awake. Nothing queues on a server.</p>
-    <ul>
-      <li>After restarting OpenOrc, press Connect again; Slack does not reconnect automatically.</li>
-      <li>If the connection drops while OpenOrc is open, for example when your computer sleeps, OpenOrc reconnects on its own, at once and then with waits that grow to a minute. Settings show Slack as disconnected until the new connection is up.</li>
-      <li>Messages sent while you were disconnected are not fetched later, except as history when the next mention arrives in that thread.</li>
-      <li>If you disconnect while an agent is working, the agent keeps going, and the final reply is posted when you reconnect.</li>
-      <li>If you quit while a Slack request is running, the request ends. After you reconnect, the thread gets a message saying it was interrupted.</li>
-    </ul>
-  </section>
-
-  <section aria-labelledby="relay">
-    <h2 id="relay">The team relay</h2>
-    <p>The team relay lets several people use one Slack app. One OpenOrc desktop, the host, holds the Slack tokens, runs Socket Mode, and serves a small HTTP API on <code>127.0.0.1</code> (port 47831 by default). The relay only listens on the host's loopback address, so teammates' desktops reach it through an SSH tunnel they set up themselves; OpenOrc does not create one.</p>
-    <ul>
-      <li>The host registers each teammate's Slack member ID and gets a device key (<code>oqd_</code> followed by 64 hex characters) to give them. The key is shown once and works until the host removes that device. Only a SHA-256 hash of the key is stored.</li>
-      <li>Each desktop polls <code>/poll</code> every second with its key. It receives only jobs for its own member ID, and can post results, request approvals, and download images only for its own jobs.</li>
-      <li>Requests with an <code>Origin</code> header are refused, so a web page cannot call the relay.</li>
-    </ul>
-    <p>The host sees all relayed messages, and the Slack tokens never leave it. When the person who mentions the bot has no connected desktop, including people with none registered, the bot replies that their desktop is not connected.</p>
-  </section>
-
-  <section aria-labelledby="data">
-    <h2 id="data">What is stored</h2>
-    <p>Slack tokens and relay settings are in <code>slack-secrets.enc</code>, encrypted with Electron <code>safeStorage</code>; see <a href={docHref("storage") + "#settings"}>Settings and secrets</a>. In the database, OpenOrc keeps the Slack messages of each conversation, the IDs of events it handled, receipts that stop a request from running twice, and a journal of active jobs and of every Slack thread the bot takes part in. The journal holds the full text of each thread's messages, including other people's. These records are not pruned.</p>
+  <section aria-labelledby="next-steps">
+    <h2 id="next-steps">Next steps</h2>
+    <LinkCards cards={[{ slug: "permissions" }, { slug: "orclings" }, { slug: "security" }]} columns={3} />
   </section>
 </DocsLayout>

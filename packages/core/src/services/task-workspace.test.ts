@@ -338,6 +338,19 @@ describe("tasks stay in conversations", () => {
     expect(tasks.get(core.db, task.id)).toMatchObject({ status: "backlog", threadId: null, executionThreadId: opened.id, worktreePath: null });
   });
 
+  it("starts a thread opened from a task on the task's base branch when its first message is sent", async () => {
+    await git(root, ["stash", "-u"]);
+    await git(root, ["switch", "-q", "-c", "release"]);
+    await writeFile(path.join(root, "release.txt"), "release only\n");
+    await commitAll(root, "release work");
+    await git(root, ["switch", "-q", "user-branch"]);
+    const task = await call("tasks.create", { projectId: project.id, title: "Patch the release", workspaceMode: "worktree", baseRef: "release" });
+    const thread = await call("tasks.openThread", { taskId: task.id });
+    await call("runs.start", { threadId: thread.id, agent: "codex", mode: "act", permissionMode: "trusted", prompt: "Go" });
+    const worktree = threads.get(core.db, thread.id)!.worktreePath!;
+    expect(await readFile(path.join(worktree, "release.txt"), "utf8")).toBe("release only\n");
+  });
+
   it("starts an unlinked task as a thread run and preserves the chosen workspace and task ID", async () => {
     const task = await call("tasks.create", { projectId: project.id, title: "Use local checkout", workspaceMode: "current" });
     const [run, repeated] = await Promise.all([call("tasks.start", { taskId: task.id }), call("tasks.start", { taskId: task.id })]);

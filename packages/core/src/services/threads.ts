@@ -432,7 +432,7 @@ export class ThreadService {
         }
         if (thread.snoozedUntil) threads.update(this.db, thread.id, { snoozedUntil: null });
         // Task-opened local conversations need initial Git metadata too; missing worktrees are re-created before starting.
-        const fresh = await this.workspaces.prepareThread(this.thread(id), project, input.baseRef, workspaceLease);
+        const fresh = await this.workspaces.prepareThread(this.thread(id), project, this.worktreeBase(thread, input.baseRef), workspaceLease);
         const run = await this.runs.start({
           scope: { task: null, thread: fresh },
           project,
@@ -801,6 +801,17 @@ export class ThreadService {
     if (this.runs.threadActivity(id) !== "idle") throw new Error(`end the current turn before ${action}`);
     if (this.runs.threadBackgroundCommands(id).length > 0) throw new Error(`stop the thread's background commands before ${action}`);
     await this.runs.closeAndWait(live.id);
+  }
+
+  /**
+   * Where a new worktree for this thread starts: the base asked for, else, for a thread a task opened, the base the
+   * task names, the same as starting the task from its page.
+   */
+  private worktreeBase(thread: Thread, requested: string | undefined): string | undefined {
+    if (requested) return requested;
+    const taskId = thread.importedFrom?.startsWith("task:") ? thread.importedFrom.slice("task:".length) : null;
+    const task = taskId ? tasks.get(this.db, taskId) : null;
+    return task?.executionThreadId === thread.id ? (task.baseRef ?? undefined) : undefined;
   }
 
   /** A checkpoint restores only into the folder it was read from, and only while Git still has its files. */

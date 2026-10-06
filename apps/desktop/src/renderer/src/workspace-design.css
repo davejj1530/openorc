@@ -722,43 +722,6 @@
     min-width: 0;
   }
 }
-.app-shell .composer-changes {
-  position: static;
-  width: 100%;
-  max-width: 100%;
-  margin: 0;
-  padding: 1px 5px;
-  background: transparent;
-  border-radius: 0;
-  box-shadow: none;
-}
-.app-shell .composer-changes-body {
-  width: 100%;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-  padding: 0;
-  font-size: 11px;
-}
-.app-shell .composer-changes-body {
-  display: flex;
-  gap: 8px;
-}
-.app-shell .composer-changes-identity {
-  flex: 0 1 auto;
-}
-.app-shell .composer-changes-project {
-  display: none;
-}
-.app-shell .composer-changes-commit {
-  margin-left: auto;
-  background: transparent;
-  color: var(--ink-3);
-}
-.app-shell .composer-changes-commit-wrap {
-  margin-left: auto;
-}
 .app-shell .composer-rail {
   margin-top: 7px;
   padding: 0 8px;
@@ -978,12 +941,6 @@
   flex-wrap: nowrap;
   min-width: 0;
   gap: 4px;
-}
-.app-shell .composer-new-thread .composer-branch {
-  display: inline-flex;
-  max-width: min(140px, 100%);
-  padding-inline: 6px;
-  font-size: 11px;
 }
 .app-shell .composer-new-thread .composer-send {
   margin-left: 0;

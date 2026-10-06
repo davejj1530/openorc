@@ -178,16 +178,33 @@
 }
 .agent-presence-mark[data-state="thinking"] {
   color: var(--content-ink);
-  animation: presence-breathe 1800ms ease-in-out infinite;
 }
-@keyframes presence-breathe {
-  50% {
-    opacity: 0.55;
+/* While a turn runs, the light moves around the cube: top, right, then left. Reduced motion keeps the top lit. */
+.openorc-mark-face {
+  animation: openorc-mark-face 2400ms ease-in-out infinite;
+}
+.openorc-mark-face[data-face="right"] {
+  animation-delay: -1600ms;
+}
+.openorc-mark-face[data-face="left"] {
+  animation-delay: -800ms;
+}
+@keyframes openorc-mark-face {
+  0%,
+  26% {
+    opacity: 1;
+  }
+  34%,
+  92% {
+    opacity: 0;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .agent-presence-mark[data-state="thinking"] {
+  .openorc-mark-face {
     animation: none;
+  }
+  .openorc-mark-face:not([data-face="top"]) {
+    opacity: 0;
   }
 }
 .thread-project-picker {

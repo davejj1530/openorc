@@ -6,7 +6,7 @@ export type OrbState = "idle" | "thinking";
 export function AgentOrb({ state }: { state: OrbState }) {
   return (
     <span className="agent-orb agent-presence-mark" data-state={state} aria-hidden="true">
-      <OpenOrcMark size={22} />
+      <OpenOrcMark size={22} working={state === "thinking"} />
     </span>
   );
 }

@@ -79,17 +79,27 @@
       "distribution": "desktop"
     },
     {
+      "name": "@fontsource-variable/inter",
+      "version": "5.3.0",
+      "distribution": "website"
+    },
+    {
       "name": "@fontsource-variable/jetbrains-mono",
       "version": "5.3.0",
       "distribution": "desktop"
     },
     {
+      "name": "@fontsource-variable/jetbrains-mono",
+      "version": "5.3.0",
+      "distribution": "website"
+    },
+    {
       "name": "@fontsource-variable/geist",
       "version": "5.3.0",
       "distribution": "desktop"
     },
     {
-      "name": "@fontsource-variable/geist",
+      "name": "@fontsource-variable/zalando-sans",
       "version": "5.3.0",
       "distribution": "website"
     },
@@ -283,6 +293,7 @@
         "path": "LICENSE"
       },
       "sha256": "3b0a5fca3d17942cde889069889dedbbbd075e9b599968c82a95f4d944e9b345",
+      "website": "licenses/inter-OFL-1.1.txt",
       "desktop": {
         "asar": "node_modules/@fontsource-variable/inter/LICENSE"
       }
@@ -295,6 +306,7 @@
         "path": "LICENSE"
       },
       "sha256": "403581b69dac5cff4079205e01c6b467e56af449ecbd7247693ddb1baafa005b",
+      "website": "licenses/jetbrains-mono-OFL-1.1.txt",
       "desktop": {
         "asar": "node_modules/@fontsource-variable/jetbrains-mono/LICENSE"
       }
@@ -357,16 +369,25 @@
     },
     {
       "id": "geist",
-      "input": "apps/website/node_modules/@fontsource-variable/geist/LICENSE",
+      "input": "apps/desktop/node_modules/@fontsource-variable/geist/LICENSE",
       "source": {
         "package": "@fontsource-variable/geist",
         "path": "LICENSE"
       },
       "sha256": "71609cbb5c78b5870d712eab73a31d76622635c6ed034ab5cee3b9ecbda8685f",
-      "website": "licenses/geist-OFL-1.1.txt",
       "desktop": {
         "asar": "node_modules/@fontsource-variable/geist/LICENSE"
       }
+    },
+    {
+      "id": "zalando-sans",
+      "input": "apps/website/node_modules/@fontsource-variable/zalando-sans/LICENSE",
+      "source": {
+        "package": "@fontsource-variable/zalando-sans",
+        "path": "LICENSE"
+      },
+      "sha256": "aef4b7266d8333367fbd9ba508d12042bf04d4df7a85eb09f0a73389dd8d9f5a",
+      "website": "licenses/zalando-sans-OFL-1.1.txt"
     },
     {
       "id": "fastdom",

@@ -14,11 +14,12 @@ The original Rive mascot and its source availability are described in [the masco
 
 ## Fonts
 
-| Font package                          | Reviewed version | Terms and distribution                                                                                                                         |
-| ------------------------------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@fontsource-variable/inter`          | 5.3.0            | SIL OFL 1.1; original copyright and license are retained in the desktop archive's package directory.                                           |
-| `@fontsource-variable/jetbrains-mono` | 5.3.0            | SIL OFL 1.1; original copyright and license are retained in the desktop archive's package directory.                                           |
-| `@fontsource-variable/geist`          | 5.3.0            | SIL OFL 1.1; original copyright and license are retained in the desktop package and published at `/licenses/geist-OFL-1.1.txt` on the website. |
+| Font package                          | Reviewed version | Terms and distribution                                                                                                                                                      |
+| ------------------------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@fontsource-variable/inter`          | 5.3.0            | SIL OFL 1.1; original copyright and license are retained in the desktop archive's package directory and published at `/licenses/inter-OFL-1.1.txt` on the website.          |
+| `@fontsource-variable/jetbrains-mono` | 5.3.0            | SIL OFL 1.1; original copyright and license are retained in the desktop archive's package directory and published at `/licenses/jetbrains-mono-OFL-1.1.txt` on the website. |
+| `@fontsource-variable/geist`          | 5.3.0            | SIL OFL 1.1; original copyright and license are retained in the desktop package.                                                                                            |
+| `@fontsource-variable/zalando-sans`   | 5.3.0            | SIL OFL 1.1; original copyright and license are published at `/licenses/zalando-sans-OFL-1.1.txt` on the website.                                                           |
 
 These font files remain under OFL rather than Apache-2.0. Preserve their license files and any reserved-font-name requirements when replacing or modifying them.
 

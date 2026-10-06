@@ -221,18 +221,10 @@ const sections = [
   <section aria-labelledby="windows-os">
     <h2 id="windows-os">Windows</h2>
     <ul>
-      <li>
-        OpenOrc finds agents on Windows only through the <code>OPENORC_CODEX_BIN</code>, <code>OPENORC_CLAUDE_BIN</code>, and <code>OPENORC_OPENCODE_BIN</code> environment variables. Set each one you use to the agent's full path before you
-        start OpenOrc.
-      </li>
+      <li>OpenOrc finds agents on the <code>PATH</code> it started with. After installing one, restart OpenOrc so it sees the new <code>PATH</code>.</li>
       <li>Claude Code can't use Plan or Accept edits on Windows. Choose Review everything or Autonomous.</li>
       <li>For the same reason, Claude Code can't reply in task discussions or review pull requests on Windows, since both always run in Plan. Ask another agent instead.</li>
-      <li>
-        OpenOrc looks for the GitHub CLI as a file named exactly <code>gh</code>, so it misses the usual <code>gh.exe</code>. The Pull requests pages say <strong>GitHub CLI not found</strong>, and creating a thread's pull request opens
-        GitHub's compare page instead.
-      </li>
       <li>Project setup scripts run with <code>/bin/bash</code>, which Windows doesn't have.</li>
-      <li>Stopping an agent signals only its main process, not the processes it started.</li>
       <li>Agents update by hand. Connections shows <strong>Update instructions</strong> instead of an update button.</li>
       <li>The beta installers are not signed.</li>
     </ul>

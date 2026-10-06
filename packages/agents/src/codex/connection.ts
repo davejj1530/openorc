@@ -1,11 +1,14 @@
 import { spawn } from "node:child_process";
 import { agentBinary } from "../bin.js";
+import { launchCommand } from "../command-launch.js";
 import { StdioJsonRpc } from "../jsonrpc.js";
 import { stopProcess, waitForProcessGroup } from "../process-lifetime.js";
 
 /** A bounded, metadata-only connection; no thread or turn is created. */
 export async function withCodexConnection<T>(options: { binary?: string; env?: Readonly<NodeJS.ProcessEnv> }, work: (rpc: StdioJsonRpc) => Promise<T>): Promise<T> {
-  const proc = spawn(options.binary ?? agentBinary("codex"), ["app-server", "--listen", "stdio://"], {
+  const command = launchCommand(options.binary ?? agentBinary("codex"), ["app-server", "--listen", "stdio://"]);
+  const proc = spawn(command.file, command.args, {
+    ...command.options,
     env: options.env ? { ...options.env } : process.env,
     stdio: ["pipe", "pipe", "pipe"],
     detached: process.platform !== "win32",

@@ -10,6 +10,7 @@ export { captureLaunchEnvironment, captureProcessEnvironment, type AgentLaunchEn
 export { stopProcess, waitForProcessGroup } from "./process-lifetime.js";
 export { recoverAgentProcesses } from "./process-recovery.js";
 export { agentBinary } from "./bin.js";
+export { launchCommand, type CommandLaunch } from "./command-launch.js";
 export { isImageAttachment, partitionAttachments, withAttachedFiles } from "./attachments.js";
 export { listSkills } from "./skills.js";
 export { instructionFiles } from "./instructions.js";

@@ -103,7 +103,7 @@ const envelope = `{ "type": "rpc", "id": 42, "method": "runs.start", "params": {
           <tr>
             <td>Login shell</td>
             <td>Core</td>
-            <td>Runs at startup, on Rescan, when Settings opens, and before agent update checks, to find the agents. Not on Windows.</td>
+            <td>Runs at startup, on Rescan, when Settings opens, and before agent update checks, to find the agents. Not on Windows, where OpenOrc searches <code>PATH</code> itself.</td>
           </tr>
           <tr>
             <td>Setup scripts</td>
@@ -179,8 +179,8 @@ const envelope = `{ "type": "rpc", "id": 42, "method": "runs.start", "params": {
     <h3>Finding the agents</h3>
     <p>
       Apps started from the Dock or a menu don't get your terminal's <code>PATH</code>, so on macOS and Linux the core asks your login shell. It runs your shell with <code>-ilc</code> and a short script that prints <code>PATH</code> and where
-      <code>codex</code>, <code>claude</code>, and <code>opencode</code> are. The shell gets 8 seconds and a minimal environment, and only those answers are kept. On Windows there is no probe: set <code>OPENORC_CODEX_BIN</code>,
-      <code>OPENORC_CLAUDE_BIN</code>, or <code>OPENORC_OPENCODE_BIN</code> instead.
+      <code>codex</code>, <code>claude</code>, and <code>opencode</code> are. The shell gets 8 seconds and a minimal environment, and only those answers are kept. On Windows there is no probe: OpenOrc looks for each agent on the
+      <code>PATH</code> it started with, trying the extensions <code>PATHEXT</code> lists, so npm's <code>.cmd</code> launchers count. <code>OPENORC_CODEX_BIN</code>, <code>OPENORC_CLAUDE_BIN</code>, or <code>OPENORC_OPENCODE_BIN</code>, set before OpenOrc starts, take precedence.
     </p>
     <p>
       Each agent is then checked with its own commands: <code>--version</code>, plus <code>codex login status</code>, <code>claude auth status</code>, or <code>opencode auth list</code> to see whether you are signed in. Results are cached for
@@ -228,7 +228,7 @@ const envelope = `{ "type": "rpc", "id": 42, "method": "runs.start", "params": {
       <li>A thread keeps its agent process between turns, so the next message starts at once. An idle process closes after 10 minutes by default (<strong>Close idle processes after</strong>, under General).</li>
       <li>Task runs and replies in task discussions close their process after every turn.</li>
       <li>Changing the agent, the mode, or the permission level starts a new process with your next message. It resumes the session where that is possible.</li>
-      <li>Stopping a process sends <code>SIGTERM</code> to its process group, then <code>SIGKILL</code> after 2 seconds. An idle Claude process first has its input closed, so it can exit on its own.</li>
+      <li>Stopping a process sends <code>SIGTERM</code> to its process group, then <code>SIGKILL</code> after 2 seconds. On Windows, <code>taskkill</code> ends the process and every process it started. An idle Claude process first has its input closed, so it can exit on its own.</li>
     </ul>
     <h3>Live controls</h3>
     <div class="docs-table">

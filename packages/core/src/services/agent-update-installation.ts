@@ -3,8 +3,7 @@ import { readFile, realpath } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { HarnessId } from "@openorc/protocol";
-import type { EnvSnapshot } from "./shell-environment.js";
-import { resolveBinary } from "./system.js";
+import { resolveBinary, type EnvSnapshot } from "./shell-environment.js";
 
 export interface UpdateCommand {
   binary: string;

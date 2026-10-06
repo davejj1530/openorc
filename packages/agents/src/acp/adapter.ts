@@ -24,6 +24,7 @@ import {
 } from "@agentclientprotocol/sdk";
 import type { AgentEvent, ApprovalDecision, ApprovalKind, ApprovalResolution, RunSpec, RunStatus, Usage } from "@openorc/protocol";
 import { agentBinary } from "../bin.js";
+import { launchCommand } from "../command-launch.js";
 import type { AgentLaunchEnvironment } from "../launch-environment.js";
 import { partitionAttachments, withAttachedFiles } from "../attachments.js";
 import { stopProcess, waitForProcessGroup } from "../process-lifetime.js";
@@ -126,7 +127,8 @@ export class AcpAdapter {
     const binary = launch?.binary ?? this.options.binary ?? agentBinary("opencode");
     const env = launch ? { ...launch.env, ...this.options.env } : { ...process.env, ...this.options.env };
     const cwd = this.options.modelsCwd ?? os.homedir();
-    const proc = spawn(binary, ["acp"], { cwd, env, stdio: ["pipe", "pipe", "pipe"] });
+    const command = launchCommand(binary, ["acp"]);
+    const proc = spawn(command.file, command.args, { ...command.options, cwd, env, stdio: ["pipe", "pipe", "pipe"] });
     const connection = client({ name: "openorc" }).connect(streamOf(proc));
     let sessionId: string | undefined;
     try {

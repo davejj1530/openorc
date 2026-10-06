@@ -34,8 +34,17 @@ function readAmount(): number {
   return value?.trim() ? normalizeAmount(Number(value)) : defaultTransparency;
 }
 
+/**
+ * How much of the app's own ground covers the native material, for a transparency between 0 and 100. The material
+ * underneath is itself dark, so a tint that fell in step with the slider kept the window looking opaque until the top
+ * of its range. The tint falls off with the square instead, so the middle of the slider reads as frosted glass.
+ */
+export function shellTint(transparency: number): number {
+  return Math.round((100 - transparency) ** 2 / 100);
+}
+
 function applyAmount(value: number): void {
-  document.documentElement.style.setProperty("--shell-opacity", `${100 - value}%`);
+  document.documentElement.style.setProperty("--shell-opacity", `${shellTint(value)}%`);
 }
 
 interface WindowAppearanceState {

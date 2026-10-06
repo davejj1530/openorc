@@ -32,13 +32,17 @@ async function response(commentId: string, index = 0) {
   return taskComments.list(core.db, taskId).attempts.filter((a) => a.commentId === commentId)[index]!;
 }
 async function executionStarted(attemptId: string) {
-  // onCreated records the run before its starting checkpoint and provider are ready.
-  await vi.waitFor(() => {
-    const runId = taskComments.attempt(core.db, attemptId)?.executionRunId;
-    expect(runId).toBeTruthy();
-    expect(sessions.has(runId!)).toBe(true);
-    expect(tasks.get(core.db, taskId)?.status).toBe("in_progress");
-  });
+  // onCreated records the run before its starting checkpoint and provider are ready. Git makes that take over a
+  // second on CI runners, past waitFor's default.
+  await vi.waitFor(
+    () => {
+      const runId = taskComments.attempt(core.db, attemptId)?.executionRunId;
+      expect(runId).toBeTruthy();
+      expect(sessions.has(runId!)).toBe(true);
+      expect(tasks.get(core.db, taskId)?.status).toBe("in_progress");
+    },
+    { timeout: 5000 },
+  );
   return taskComments.attempt(core.db, attemptId)!;
 }
 async function event(runId: string, input: Omit<Extract<AgentEvent, { type: "turn.completed" }>, "runId" | "ts"> | Omit<Extract<AgentEvent, { type: "message.completed" }>, "runId" | "ts">) {

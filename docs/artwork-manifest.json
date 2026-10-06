@@ -4,18 +4,33 @@
   "assets": [
     {
       "group": "app-icon",
+      "path": "apps/desktop/resources/icon.svg",
+      "sha256": "dd1173905418be3d1fa39ac68059f83b76220d0a99f5bbf6c13823b9fe565da1"
+    },
+    {
+      "group": "app-icon",
       "path": "apps/desktop/resources/icon.png",
-      "sha256": "28189883b5d8b9aadf9f201dc106bc3a6c11ba78ce9a5a8d7104d04a3a490d24"
+      "sha256": "e0d10c0080f7d5b575fcd9ba120c873a2a46d0be5127da7fc895d5a145c85cf8"
     },
     {
       "group": "app-icon",
       "path": "apps/desktop/build/icon.icns",
-      "sha256": "4461115d67f0e055054a00d0da65688e526076c9de12d2d5830c18781bf09703"
+      "sha256": "3ee8448b050dd7ea2ea34afb40ad561f97ec7239134b849145ed493f8516ef4b"
+    },
+    {
+      "group": "app-icon",
+      "path": "apps/desktop/src/renderer/src/assets/favicon.svg",
+      "sha256": "ea11584b166fb03f89c4d13e5d2ff62b798a32a749c20a8596527acec0e56c7f"
+    },
+    {
+      "group": "app-icon",
+      "path": "apps/website/public/favicon.svg",
+      "sha256": "ea11584b166fb03f89c4d13e5d2ff62b798a32a749c20a8596527acec0e56c7f"
     },
     {
       "group": "app-icon",
       "path": "apps/website/public/favicon-64.png",
-      "sha256": "5b60ba9a0a71881083a852ccecbde0e9696f2a6b58d8bae0d71edd6e85bb85bb"
+      "sha256": "8324b6635cab734ec9229d1f9b3bf35e51ab6a789bb328a467a9676d8fc9384d"
     },
     {
       "group": "openorc-mark",

@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
 import { mkdtemp, mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -105,6 +107,42 @@ it("imports a plain folder and a repository without commits as they are", async 
       .map((project) => project.name)
       .sort(),
   ).toEqual(["fresh", "plain", "repo"]);
+});
+
+it("creates a missing folder only when the import asks to, then imports it like any other folder", async () => {
+  const handlers = createProjectsHandlers({ db, projectService: service, invalidate: vi.fn(), transport: { push() {} } });
+  const folder = path.join(dir, "new", "nested", "app");
+  await expect(handlers["projects.import"]({ rootPath: folder })).rejects.toThrow("This folder does not exist or is unavailable.");
+  expect(existsSync(path.join(dir, "new"))).toBe(false);
+  const project = await handlers["projects.import"]({ rootPath: folder, create: true });
+  expect(project).toMatchObject({ name: "app", rootPath: await realpath(folder), gitRemote: null, defaultBranch: null });
+  expect(await handlers["projects.import"]({ rootPath: folder, create: true })).toEqual(project);
+  expect(service.list()).toEqual([project]);
+});
+
+it("reports a folder missing only when nothing exists at an absolute path", async () => {
+  const handlers = createProjectsHandlers({ db, projectService: service, invalidate: vi.fn(), transport: { push() {} } });
+  const missing = (rootPath: string) => handlers["projects.folderMissing"]({ rootPath });
+  const file = path.join(dir, "notes.txt");
+  await writeFile(file, "Not a folder\n");
+  expect(await missing(path.join(dir, "new", "nested"))).toBe(true);
+  expect(await missing(`~/openorc-missing-${randomUUID()}`)).toBe(true);
+  expect(await missing(root)).toBe(false);
+  expect(await missing("~")).toBe(false);
+  expect(await missing(file)).toBe(false);
+  expect(await missing(path.join(file, "inside"))).toBe(false);
+  expect(await missing(path.relative(process.cwd(), path.join(dir, "new")))).toBe(false);
+});
+
+it("creates nothing for a relative path, and explains a folder that cannot be created", async () => {
+  const handlers = createProjectsHandlers({ db, projectService: service, invalidate: vi.fn(), transport: { push() {} } });
+  const relativeIntoTempDir = path.relative(process.cwd(), path.join(dir, "relative", "nested"));
+  await expect(handlers["projects.import"]({ rootPath: relativeIntoTempDir, create: true })).rejects.toThrow("Choose an absolute folder path.");
+  expect(existsSync(path.join(dir, "relative"))).toBe(false);
+  const file = path.join(dir, "notes.txt");
+  await writeFile(file, "Not a folder\n");
+  await expect(handlers["projects.import"]({ rootPath: path.join(file, "inside"), create: true })).rejects.toThrow("This folder could not be created.");
+  expect(service.list()).toEqual([]);
 });
 
 it("fills in the remote and default branch once a folder added without git gains them", async () => {

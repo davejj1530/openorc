@@ -1,4 +1,4 @@
-import { realpath, stat, mkdir } from "node:fs/promises";
+import { lstat, realpath, stat, mkdir } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import { projects, settings, type Db } from "@openorc/db";
@@ -17,16 +17,33 @@ export async function ensureWorkspaceHome(db: Db, dataDir: string): Promise<void
   );
 }
 
-export async function directory(value: string): Promise<string> {
-  let expanded = value;
-  if (value === "~") expanded = os.homedir();
-  else if (value.startsWith("~/")) expanded = path.join(os.homedir(), value.slice(2));
+function expandHome(value: string): string {
+  if (value === "~") return os.homedir();
+  return value.startsWith("~/") ? path.join(os.homedir(), value.slice(2)) : value;
+}
+
+export async function directory(value: string, { create = false }: { create?: boolean } = {}): Promise<string> {
+  const expanded = expandHome(value);
   if (!path.isAbsolute(expanded)) throw new Error("Choose an absolute folder path.");
+  if (create) {
+    await mkdir(expanded, { recursive: true }).catch(() => {
+      throw new Error("This folder could not be created.");
+    });
+  }
   const resolved = await realpath(expanded).catch(() => {
     throw new Error("This folder does not exist or is unavailable.");
   });
   if (!(await stat(resolved)).isDirectory()) throw new Error("Choose a folder, not a file.");
   return resolved;
+}
+
+export async function folderMissing(value: string): Promise<boolean> {
+  const expanded = expandHome(value);
+  if (!path.isAbsolute(expanded)) return false;
+  return lstat(expanded).then(
+    () => false,
+    (error: NodeJS.ErrnoException) => error.code === "ENOENT",
+  );
 }
 
 export function workspaceHome(db: Db): Project {

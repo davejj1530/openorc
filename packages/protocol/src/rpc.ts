@@ -8,6 +8,7 @@ import type { AgentUpdates } from "./agent-updates.js";
 import { slackRpcParams, type SlackStatus } from "./slack.js";
 import { BranchName, pullRequestRpcParams, type PullRequestRpcResults } from "./pull-requests.js";
 import { orclingRpcParams, type OrclingRpcResults } from "./orclings.js";
+import { projectRpcParams, type ProjectRpcResults } from "./projects.js";
 import { HarnessId, type HarnessInfo } from "./harness.js";
 import { AgentEvent, AgentKind, ApprovalDecision, Frame } from "./events.js";
 import type { McpAppOpenResult } from "./mcp-apps.js";
@@ -26,8 +27,6 @@ import {
   MemoryStatus,
   MemoryType,
   PermissionPreset,
-  Project,
-  type ProjectGit,
   PushState,
   QueuedMessage,
   ReviewComment,
@@ -67,6 +66,7 @@ export const rpcParams = {
   ...slackRpcParams,
   ...pullRequestRpcParams,
   ...orclingRpcParams,
+  ...projectRpcParams,
   "tasks.comments.list": z.object({ taskId: z.string() }),
   "tasks.comments.post": z
     .object({
@@ -88,18 +88,6 @@ export const rpcParams = {
   "agents.updates.configure": z.object({ automatic: z.boolean().optional(), dismissed: z.string().max(300).optional() }).strict(),
   "providers.usage": z.object({ provider: z.enum([...HarnessId.options, "anthropic-api"]) }),
   "providers.codex.reset": z.object({ attemptId: z.string().uuid(), creditId: z.string().min(1).optional(), confirmationToken: z.string().min(1) }),
-  "workspace.get": z.object({}),
-  "workspace.configure": z.object({ entrypoint: z.string().min(1).max(4096) }).strict(),
-  "projects.list": z.object({}),
-  "projects.get": z.object({ id: z.string() }),
-  "projects.git": z.object({ id: z.string() }),
-  "projects.checkoutBranch": z.object({ id: z.string() }),
-  "projects.import": z.object({ rootPath: z.string() }),
-  "projects.remove": z.object({ id: z.string().min(1) }).strict(),
-  "projects.updateSettings": z.object({
-    id: z.string(),
-    settings: z.object({ setupScript: z.string().nullable().optional(), worktreeInclude: z.array(z.string()).optional(), branchPrefix: z.string().optional() }),
-  }),
   "orchestration.list": z.object({ projectId: z.string().min(1), includeArchived: z.boolean().optional() }),
   "orchestration.get": z.object({ id: z.string().min(1) }),
   "orchestration.save": z.object({ projectId: z.string().min(1), teamId: z.string().min(1).optional(), expectedRevisionId: z.string().min(1).nullable(), draft: TeamDraft }).strict(),
@@ -580,7 +568,7 @@ export interface ResolvedExtraction {
   viaApiKey: boolean;
 }
 
-export interface RpcResults extends PullRequestRpcResults, OrclingRpcResults {
+export interface RpcResults extends PullRequestRpcResults, OrclingRpcResults, ProjectRpcResults {
   "tasks.comments.list": TaskDiscussion;
   "tasks.comments.post": TaskComment;
   "tasks.comments.retry": CommentAttempt;
@@ -605,15 +593,6 @@ export interface RpcResults extends PullRequestRpcResults, OrclingRpcResults {
   "agents.updates.configure": AgentUpdates;
   "providers.usage": import("./provider-usage.js").ProviderUsage;
   "providers.codex.reset": import("./provider-usage.js").ResetResult;
-  "workspace.get": Project;
-  "workspace.configure": Project;
-  "projects.list": Project[];
-  "projects.get": Project | null;
-  "projects.git": ProjectGit;
-  "projects.checkoutBranch": string | null;
-  "projects.import": Project;
-  "projects.remove": { ok: true };
-  "projects.updateSettings": Project;
   "orchestration.list": TeamDetail[];
   "orchestration.get": TeamDetail | null;
   "orchestration.save": TeamDetail;

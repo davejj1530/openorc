@@ -17,7 +17,6 @@ import { useRpc, useRpcMutation } from "../lib/query";
 import { useConversationDraft } from "../lib/conversation-draft";
 import { openThread } from "../lib/router";
 import { useSkillCommands } from "../lib/skill-commands";
-import { type Block } from "../lib/transcript";
 import { useConversationTranscript } from "../lib/conversation-transcript";
 import { conversationCanSteer, conversationSteerReason, conversationSendDisabledReason } from "../lib/conversation-presentation";
 import { useConversationSettings } from "../lib/conversation-settings";
@@ -140,6 +139,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   const [selectedWorkspace, setWorkspace] = useState<WorkspaceMode | null>(null);
   const workspaceMode = conversationWorkspaceMode({ scope, firstTaskRun, selected: selectedWorkspace });
   const thread = scope.kind === "thread" ? scope.thread : null;
+  const conversation = { kind: scope.kind, id: scope.kind === "thread" ? scope.thread.id : scope.task.id };
   const { checkout, changes: composerChanges, git } = useCheckout(thread, project);
 
   const activeRun: Run | undefined = runs[runs.length - 1];
@@ -149,7 +149,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   const settings = useConversationSettings({ thread, activeRun });
   const { choice, mode, permission, permissionReady, permissionError } = settings;
   const orclings = useOrclingConversation({ thread, runs, choice, onModel: settings.selectModel });
-  const draftKey = `conversation.${scope.kind === "thread" ? scope.thread.id : scope.task.id}`;
+  const draftKey = `conversation.${conversation.id}`;
   const { prompt, setPrompt, clearDraft, error: draftError } = useConversationDraft({ draftKey, threadId: thread?.id ?? null, initialText: thread?.draft ?? "" });
   const start = useRpcMutation("runs.start");
   const send = useRpcMutation("runs.send");
@@ -247,15 +247,15 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
         <ConversationVoice.Provider value={orclings.voice}>
           <Transcript
             working={working}
-            fileScope={{ kind: scope.kind, id: scope.kind === "thread" ? scope.thread.id : scope.task.id }}
+            fileScope={conversation}
             basePath={basePath}
             run={merged}
-            scrollKey={scope.kind === "thread" ? scope.thread.id : scope.task.id}
+            scrollKey={conversation.id}
             followKey={sends}
             onFork={thread ? forkConversation : undefined}
             hasOlder={hasOlder}
             onLoadOlder={loadOlder}
-            trailing={changeCard}
+            trailing={turnFooter}
           />
         </ConversationVoice.Provider>
       );
@@ -328,7 +328,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
             generatingImage={generatingImage}
             onCompact={thread && !working ? () => compact.mutate({ id: thread.id }) : undefined}
             compactDisabledReason={working ? "Available after this turn finishes." : undefined}
-            projectId={project.id === WORKSPACE_ID ? undefined : project.id}
+            fileSearch={conversation}
             commands={commands}
             error={
               (start.error ?? send.error ?? queue.error ?? sendQueued.error ?? stopCommand.error ?? compact.error ?? unqueue.error ?? fork.error ?? settings.error ?? draftError)?.message ??

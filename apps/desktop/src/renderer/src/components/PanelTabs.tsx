@@ -1,6 +1,8 @@
-import { useEffect, useRef } from "react";
-import { currentPage, pageType, type PanelSession, type WorkTab } from "../lib/panel-tabs";
-import { pageLabel, panelTools } from "./panel-tools";
+import { useEffect, useRef, type KeyboardEvent } from "react";
+import type { FileSelection } from "../lib/layout";
+import { currentPage, type PanelPage, type PanelSession, type WorkTab } from "../lib/panel-tabs";
+import { useUnsavedFile } from "../lib/use-file-buffer";
+import { pageIcon, pageLabel } from "./panel-tools";
 import { X } from "./icons";
 
 function nextTab(session: PanelSession, index: number, key: string): WorkTab | undefined {
@@ -11,6 +13,51 @@ function nextTab(session: PanelSession, index: number, key: string): WorkTab | u
   return undefined;
 }
 
+interface TabProps {
+  tab: WorkTab;
+  page: PanelPage;
+  active: boolean;
+  onSelect: (id: string) => void;
+  onClose: (id: string) => void;
+  onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void;
+}
+
+/** One tab. Unsaved edits show as a dot where the close button sits, and the close button returns on hover. */
+function PanelTab({ tab, page, active, unsaved, onSelect, onClose, onKeyDown }: TabProps & { unsaved: boolean }) {
+  const label = pageLabel(page);
+  const Icon = pageIcon(page);
+  return (
+    <div role="presentation" className="panel-browser-tab" data-active={active}>
+      <button
+        role="tab"
+        id={`panel-tab-${tab.id}`}
+        aria-controls="panel-tab-content"
+        aria-label={unsaved ? `${label}, unsaved changes` : label}
+        aria-selected={active}
+        tabIndex={active ? 0 : -1}
+        title={label}
+        onClick={() => onSelect(tab.id)}
+        onAuxClick={(event) => {
+          if (event.button === 1) {
+            event.preventDefault();
+            onClose(tab.id);
+          }
+        }}
+        onKeyDown={onKeyDown}
+      >
+        <Icon size={14} />
+        <span>{label}</span>
+      </button>
+      <button className="panel-tab-close" data-unsaved={unsaved || undefined} aria-label={`Close ${label}`} title={`Close ${label}`} onClick={() => onClose(tab.id)}>
+        <span className="panel-tab-dot" aria-hidden="true" />
+        <X size={12} />
+      </button>
+    </div>
+  );
+}
+
+function FileTab({ selection, ...props }: TabProps & { selection: FileSelection }) {
+  return <PanelTab {...props} unsaved={useUnsavedFile(selection)} />;
 }
 
 export function PanelTabs({ session, onSelect, onClose }: { session: PanelSession; onSelect: (id: string) => void; onClose: (id: string) => void }) {
@@ -22,47 +69,20 @@ export function PanelTabs({ session, onSelect, onClose }: { session: PanelSessio
     <div ref={strip} role="tablist" aria-label="Panel tabs" className="panel-browser-tabs no-drag">
       {session.tabs.map((tab, index) => {
         const page = currentPage(tab);
-        const label = pageLabel(page);
-        const Icon = panelTools[pageType(page)].icon;
-        const active = tab.id === session.activeId;
-        return (
-          <div key={tab.id} role="presentation" className="panel-browser-tab" data-active={active}>
-            <button
-              role="tab"
-              id={`panel-tab-${tab.id}`}
-              aria-controls="panel-tab-content"
-              aria-label={label}
-              aria-selected={active}
-              tabIndex={active ? 0 : -1}
-              title={label}
-              onClick={() => onSelect(tab.id)}
-              onAuxClick={(event) => {
-                if (event.button === 1) {
-                  event.preventDefault();
-                  onClose(tab.id);
-                }
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Delete") {
-                  event.preventDefault();
-                  onClose(tab.id);
-                  return;
-                }
-                const next = nextTab(session, index, event.key);
-                if (!next) return;
-                event.preventDefault();
-                onSelect(next.id);
-                document.getElementById(`panel-tab-${next.id}`)?.focus();
-              }}
-            >
-              <Icon size={14} />
-              <span>{label}</span>
-            </button>
-            <button className="panel-tab-close" aria-label={`Close ${label}`} title={`Close ${label}`} onClick={() => onClose(tab.id)}>
-              <X size={12} />
-            </button>
-          </div>
-        );
+        const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+          if (event.key === "Delete") {
+            event.preventDefault();
+            onClose(tab.id);
+            return;
+          }
+          const next = nextTab(session, index, event.key);
+          if (!next) return;
+          event.preventDefault();
+          onSelect(next.id);
+          document.getElementById(`panel-tab-${next.id}`)?.focus();
+        };
+        const props = { tab, page, active: tab.id === session.activeId, onSelect, onClose, onKeyDown };
+        return page.kind === "file" && page.selection ? <FileTab key={tab.id} {...props} selection={page.selection} /> : <PanelTab key={tab.id} {...props} unsaved={false} />;
       })}
     </div>
   );

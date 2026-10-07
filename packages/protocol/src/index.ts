@@ -28,5 +28,6 @@ export * from "./execution-mode.js";
 export * from "./model-effort.js";
 export * from "./browser.js";
 export * from "./file-boundary.js";
+export * from "./files.js";
 export * from "./tool-images.js";
 export * from "./agent-updates.js";

@@ -51,6 +51,12 @@ it("groups search matches by file with the pattern marked, and opens each where 
   expect(container.querySelectorAll(".tool-view-line")[0]?.textContent).toBe("3");
 });
 
+it("marks a pattern that has its own groups without repeating any of the line", () => {
+  const { container } = render(<ToolDetail block={call("Bash", { command: "rg -n '(agent|team)Quiet' src" })} output={"src/a.ts:3:const q = agentQuiet(teamQuiet);"} />);
+  expect(container.querySelector(".tool-view-matches li code")?.textContent).toBe("const q = agentQuiet(teamQuiet);");
+  expect([...container.querySelectorAll("mark")].map((mark) => mark.textContent)).toEqual(["agentQuiet", "teamQuiet"]);
+});
+
 it("shows each step at its prompt with the script it feeds in highlighted below", () => {
   const command = "cd /repo && # check the ledger\npython3 - <<'PY'\nimport sqlite3\nprint(1)\nPY";
   const { container } = render(<ToolDetail block={call("Bash", { command })} output="1" />);

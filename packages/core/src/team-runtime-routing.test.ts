@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -7,6 +7,7 @@ import { checkpoints, memories, orchestration, projects, runs, settings, tasks, 
 import { commitAll, git, teamTransfer } from "@openorc/git";
 import { DEFAULT_TEAM_LIMITS, TeamExecutionRecord, type Project, type RunSpec, type TeamDraft, type Thread, type HarnessId } from "@openorc/protocol";
 import { OpenOrc } from "./openorc.js";
+import { conversationFolder } from "./services/conversation-folder.js";
 import { ShellEnvironment } from "./services/shell-environment.js";
 import { SystemService, type CommandProbe } from "./services/system.js";
 import { rpcClient } from "./rpc-test-client.js";
@@ -983,6 +984,19 @@ describe("team runtime through the core and real MCP server", () => {
     await mcpCall(resumedLead.spec.runId, "team_complete", { result: "Integrated the recovered manager output once." });
     await finish(resumedLead, started.execution.id, "completed");
     await expect(readFile(path.join(root, "recovery-proof.txt"))).rejects.toThrow(/ENOENT/);
+  });
+
+  it("resolves a member's assignment task to the read-only copy its run works in", async () => {
+    const started = await startPublic(draft("codex", true));
+    const lead = leadTurn(started.execution.id);
+    const delegated = await mcpCall(lead.spec.runId, "task_create", { title: "Work in your copy", spec: "Write the result.", execution: "delegate", member_key: "worker", request_key: "worker" });
+    const workerId = core.teams.status(started.execution.id).actors.find((actor) => actor.taskId === delegated.task.id)!.id;
+    await mcpCall(lead.spec.runId, "team_wait", { assignment_ids: [workerId] });
+    await finish(lead, started.execution.id, "waiting");
+    const worker = actorTurn(started.execution.id, workerId);
+    const folder = await conversationFolder(core.db, { kind: "task", id: delegated.task.id });
+    expect(folder).toMatchObject({ root: runs.get(core.db, worker.spec.runId)?.workingDirectory, kind: "member", readOnly: "Team member copies are read-only." });
+    expect(folder.root).not.toBe(await realpath(root));
   });
 
   it("retains lossless output when a lead-only team completes without an explicit completion tool", async () => {

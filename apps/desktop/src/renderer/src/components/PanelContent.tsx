@@ -23,9 +23,9 @@ function commitSource(context: PanelContext): CommitSource | null {
   return context.kind === "newthread" && context.changes ? { kind: "checkout", project: context.project } : null;
 }
 
-function FileContent({ context, page, onNavigate }: ContentProps & { page: Extract<PanelPage, { kind: "file" }> }) {
+function FileContent({ context, page }: ContentProps & { page: Extract<PanelPage, { kind: "file" }> }) {
   if (page.selection) return <FilePanel selection={page.selection} />;
-  return <FilesPanel projectId={context.project.id} scope={panelFileScope(context)} onOpen={(selection) => onNavigate({ kind: "file", selection })} />;
+  return <FilesPanel scope={panelFileScope(context)} />;
 }
 
 function ChangesContent({ context, page }: ContentProps & { page: Extract<PanelPage, { kind: "changes" }> }) {

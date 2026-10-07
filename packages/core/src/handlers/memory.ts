@@ -1,15 +1,18 @@
 import { Db, tasks } from "@openorc/db";
+import type { FileService } from "../services/files.js";
 import { MemoryService } from "../services/memory.js";
 import { promoteMemory } from "./context.js";
 import type { Handlers } from "./types.js";
 type Dependencies = {
   memory: Pick<MemoryService, "list" | "searchSaved" | "summariesForTask" | "record" | "update" | "feedback" | "remove" | "settings" | "updateSettings">;
   db: Db;
+  files: Pick<FileService, "read" | "write">;
 };
 
 export function createMemoryHandlers({
   memory,
   db,
+  files,
 }: Dependencies): Pick<
   Handlers,
   "memory.list" | "memory.search" | "memory.forTask" | "memory.record" | "memory.update" | "memory.feedback" | "memory.remove" | "memory.promote" | "memory.settings.get" | "memory.settings.set"
@@ -29,7 +32,7 @@ export function createMemoryHandlers({
       memory.remove(id);
       return null;
     },
-    "memory.promote": async ({ id, file }) => promoteMemory(db, id, file),
+    "memory.promote": async ({ id, file }) => promoteMemory({ db, files }, id, file),
     "memory.settings.get": () => memory.settings(),
     "memory.settings.set": (patch) => memory.updateSettings(patch),
   };

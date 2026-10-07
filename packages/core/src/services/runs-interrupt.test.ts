@@ -5,14 +5,13 @@ import { afterAll, afterEach, beforeAll, expect, it, vi } from "vitest";
 import { CodexAdapter, RunHandle } from "@openorc/agents";
 import { threads } from "@openorc/db";
 import { git, commitAll } from "@openorc/git";
-import type { CorePush, Project } from "@openorc/protocol";
+import type { Project } from "@openorc/protocol";
 import { OpenOrc } from "../openorc.js";
 
 let root: string;
 let dataDir: string;
 let core: OpenOrc;
 let project: Project;
-const pushed: CorePush[] = [];
 const live: string[] = [];
 
 beforeAll(async () => {
@@ -23,13 +22,12 @@ beforeAll(async () => {
   await git(root, ["config", "user.name", "Test"]);
   await writeFile(path.join(root, "README.md"), "# Stop fixture\n");
   await commitAll(root, "init");
-  core = await OpenOrc.create({ dataDir, ephemeral: true, transport: { push: (message) => pushed.push(message) } });
+  core = await OpenOrc.create({ dataDir, ephemeral: true, transport: { push: () => {} } });
   project = await core.projects.import(root);
 });
 afterEach(async () => {
   await Promise.all(live.splice(0).map((id) => core.runs.closeAndWait(id)));
   vi.restoreAllMocks();
-  pushed.length = 0;
 });
 afterAll(async () => {
   await core.close();
@@ -60,15 +58,11 @@ async function session(interrupt: () => Promise<void>) {
   return run;
 }
 
-const reply = (id: number) => pushed.find((message) => (message.type === "rpc.result" || message.type === "rpc.error") && message.id === id);
-
 it("returns cancellation errors to the renderer and allows a later successful retry", async () => {
   const interrupt = vi.fn().mockRejectedValueOnce(new Error("Cancellation rejected")).mockResolvedValue(undefined);
   const run = await session(interrupt);
-  await core.handle({ type: "rpc", id: 901, method: "runs.interrupt", params: { runId: run.id } });
-  expect(reply(901)).toEqual({ type: "rpc.error", id: 901, message: "Cancellation rejected" });
-  await core.handle({ type: "rpc", id: 902, method: "runs.interrupt", params: { runId: run.id } });
-  expect(reply(902)).toEqual({ type: "rpc.result", id: 902, result: null });
+  expect(await core.handle({ type: "rpc", id: 901, method: "runs.interrupt", params: { runId: run.id } })).toEqual({ type: "rpc.error", id: 901, message: "Cancellation rejected" });
+  expect(await core.handle({ type: "rpc", id: 902, method: "runs.interrupt", params: { runId: run.id } })).toEqual({ type: "rpc.result", id: 902, result: null });
   expect(interrupt).toHaveBeenCalledTimes(2);
 });
 

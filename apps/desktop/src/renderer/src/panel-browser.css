@@ -64,6 +64,23 @@
   background: var(--surface-3);
   color: var(--ink);
 }
+.panel-tab-dot {
+  display: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ink-2);
+}
+/* Unsaved edits take the close button's place until the pointer or focus reaches it. */
+.panel-tab-close[data-unsaved] .panel-tab-dot {
+  display: block;
+}
+.panel-tab-close[data-unsaved] svg,
+.panel-tab-close[data-unsaved]:is(:hover, :focus-visible) .panel-tab-dot {
+  display: none;
+}
+.panel-tab-close[data-unsaved]:is(:hover, :focus-visible) svg {
+  display: block;
 }
 .panel-navigation {
   display: flex;

@@ -249,4 +249,6 @@ export interface RunHooks {
   /** Whether Claude Code should also connect the user's own MCP servers; each one adds to its start-up time. */
   claudeUserMcpServers?(): boolean;
   orclings?: OrclingRunHooks;
+  /** Folder-relative paths the editor saved under `root` since `since`, for crediting changes between turns to the user. */
+  editorSaves?(root: string, since: number): string[];
 }

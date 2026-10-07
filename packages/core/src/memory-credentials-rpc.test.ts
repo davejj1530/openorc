@@ -40,9 +40,11 @@ afterEach(async () => {
   vi.unstubAllEnvs();
   await rm(folder, { recursive: true, force: true });
 });
+/** The reply joins the pushes, so the leak checks below cover everything a window receives. */
 async function set(params: unknown) {
-  await core.handle({ type: "rpc", id: 1, method: "memory.settings.set", params });
-  return pushed.find((message) => (message.type === "rpc.result" || message.type === "rpc.error") && message.id === 1);
+  const reply = await core.handle({ type: "rpc", id: 1, method: "memory.settings.set", params });
+  pushed.push(reply);
+  return reply;
 }
 describe("memory credentials through RPC", () => {
   it.each([false, true])("never logs or returns a submitted key with diagnostic logging enabled (save fails: %s)", async (failure) => {

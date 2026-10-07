@@ -381,6 +381,33 @@ describe("Stop delivery", () => {
   });
 });
 
+describe("file mentions", () => {
+  const message = () => screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Message" });
+
+  it("searches the conversation's own folder, and nowhere without one", async () => {
+    const searched: unknown[] = [];
+    const originalCall = core.call.bind(core);
+    const call = vi.spyOn(core, "call").mockImplementation((method, params) => {
+      if (method !== "files.search") return originalCall(method, params);
+      searched.push(params);
+      return Promise.resolve(["src/app.ts"] as never);
+    });
+    try {
+      mount({ value: "", fileSearch: { kind: "thread", id: "worktree-thread" } });
+      fireEvent.change(message(), { target: { value: "@app", selectionStart: 4 } });
+      expect(await screen.findByRole("option", { name: "src/app.ts" })).toBeTruthy();
+      expect(searched).toEqual([{ scope: { kind: "thread", id: "worktree-thread" }, query: "app", limit: 8 }]);
+      cleanup();
+      mount({ value: "" });
+      fireEvent.change(message(), { target: { value: "@app", selectionStart: 4 } });
+      expect(screen.queryByRole("option", { name: "src/app.ts" })).toBeNull();
+      expect(searched).toHaveLength(1);
+    } finally {
+      call.mockRestore();
+    }
+  });
+});
+
 describe("mode picker", () => {
   const offered = async () => (await screen.findAllByRole("menuitem")).map((item) => item.firstElementChild?.textContent);
   it("offers Claude every mode", async () => {

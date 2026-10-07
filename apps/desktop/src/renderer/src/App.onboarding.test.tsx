@@ -18,6 +18,7 @@ vi.mock("./dialogs/ImportProjectDialog", () => ({
 vi.mock("./dialogs/ImportSessionsDialog", () => ({
   ImportSessionsDialog: () => null,
 }));
+vi.mock("./dialogs/NewFileDialog", () => ({ NewFileDialog: () => null }));
 vi.mock("./views/Inbox", () => ({ Inbox: () => null }));
 vi.mock("./views/Memory", () => ({ Memory: () => null }));
 vi.mock("./views/NewThread", () => ({

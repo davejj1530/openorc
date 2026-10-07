@@ -6,11 +6,12 @@ import { TeamMoveDialog } from "./components/TeamMoveDialog";
 import { ThreadMoveDialog } from "./components/ThreadMoveDialog";
 import { ImportProjectDialog } from "./dialogs/ImportProjectDialog";
 import { ImportSessionsDialog } from "./dialogs/ImportSessionsDialog";
+import { NewFileDialog } from "./dialogs/NewFileDialog";
+import { useAppShortcuts } from "./lib/app-shortcuts";
 import { useLayout } from "./lib/layout";
 import { readOnboardingState, resolveOnboarding, writeOnboardingState, type PersistedOnboardingState } from "./lib/onboarding";
 import { useRpc } from "./lib/query";
-import { core } from "./lib/rpc";
-import { newThread, openThread, useRouter, type Route } from "./lib/router";
+import { useRouter, type Route } from "./lib/router";
 import { useUi } from "./lib/ui";
 import { useTrafficLights } from "./lib/window";
 import { Inbox } from "./views/Inbox";
@@ -33,42 +34,6 @@ import { ThreadWorkspace } from "./components/ThreadWorkspace";
 const Diagnostics = __OPENORC_QA__ ? lazy(() => import("./views/Diagnostics").then((m) => ({ default: m.Diagnostics }))) : null;
 const NewTask = lazy(() => import("./views/NewTask").then((m) => ({ default: m.NewTask })));
 const TaskView = lazy(() => import("./views/TaskView").then((m) => ({ default: m.TaskView })));
-
-/** ⌘⇧ shortcuts that act on the open thread, as in the Codex and t3code sidebars. */
-function threadShortcut(key: string, threadId: string): boolean {
-  const patch = (p: { pinned?: boolean; archived?: boolean; seen?: boolean }) => void core.call("threads.update", { id: threadId, patch: p });
-  const current = () => core.call("threads.get", { id: threadId });
-  switch (key) {
-    case "p":
-      void current().then((t) => t && patch({ pinned: !t.pinnedAt }));
-      return true;
-    case "a":
-      void current().then((t) => t && patch({ archived: !t.archivedAt }));
-      return true;
-    case "u":
-      void current().then((t) => t && patch({ seen: t.unread }));
-      return true;
-    default:
-      return false;
-  }
-}
-
-/** ⌘⇧ shortcuts that act on the window: a new task, message search, and orcmode in the sidebar. */
-function windowShortcut(key: string, projectId: string | undefined): boolean {
-  switch (key) {
-    case "n":
-      useUi.getState().openNewTask(projectId);
-      return true;
-    case "f":
-      useUi.getState().setPalette(true, "messages");
-      return true;
-    case "o":
-      useLayout.getState().toggleOrcMode();
-      return true;
-    default:
-      return false;
-  }
-}
 
 function projectForRoute(route: ReturnType<typeof useRouter.getState>["route"], savedProjectId: string | null): string | undefined {
   if (route.view === "project" || route.view === "newthread" || route.view === "newtask" || route.view === "orchestration") return route.projectId;
@@ -129,53 +94,7 @@ export function App() {
     return true;
   };
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const mod = e.metaKey || e.ctrlKey;
-      if (!mod) return;
-      const key = e.key.toLowerCase();
-      const order = useUi.getState().threadOrder;
-      const openId = useRouter.getState().route.view === "thread" ? (useRouter.getState().route as { threadId: string }).threadId : null;
-      if (e.shiftKey) {
-        if (key === "]" || key === "[") {
-          e.preventDefault();
-          const at = openId ? order.indexOf(openId) : -1;
-          const next = order[key === "]" ? Math.min(order.length - 1, at + 1) : Math.max(0, at - 1)];
-          if (next && next !== openId) openThread(next);
-        } else if (windowShortcut(key, currentProject) || (openId && threadShortcut(key, openId))) e.preventDefault();
-        return;
-      }
-      if (key === "n") {
-        e.preventDefault();
-        newThread(currentProject);
-      } else if (key === "b") {
-        e.preventDefault();
-        useLayout.getState().toggleSidebar();
-      } else if (key === "j") {
-        e.preventDefault();
-        const l = useLayout.getState();
-        if (openId) l.toggleThreadPanel(openId);
-        else l.setPanel(!l.panelOpen);
-      } else if (key === "[") {
-        e.preventDefault();
-        useRouter.getState().back();
-      } else if (key === "]") {
-        e.preventDefault();
-        useRouter.getState().forward();
-      } else if (key === "\\") {
-        e.preventDefault();
-        useRouter.getState().closeOtherThreadPanes();
-      } else if (/^[1-9]$/.test(key)) {
-        const id = order[Number(key) - 1];
-        if (id) {
-          e.preventDefault();
-          openThread(id);
-        }
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [currentProject]);
+  useAppShortcuts(currentProject);
 
   if (route.view === "onboarding") {
     return <Onboarding mode={route.mode ?? "first_run"} previewInitially={route.preview ?? false} persisted={onboardingState} onPersist={persistOnboarding} onComplete={dismissOnboarding} />;
@@ -243,6 +162,7 @@ export function App() {
       <DeleteThreadDialog />
       <TeamMoveDialog />
       <ThreadMoveDialog />
+      <NewFileDialog />
     </div>
   );
 }

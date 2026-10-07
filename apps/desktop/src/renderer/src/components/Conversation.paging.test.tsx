@@ -160,8 +160,8 @@ it("places each checkpoint after its completed turn and preserves cards while th
   const runs = [run("A", 1000)];
   const { result } = renderHook(() => useConversationTranscript({ runs, threadId: "thread", basePath: "/tmp/project" }));
   await settle();
-  const cards = result.current.turnCards;
-  expect([...cards]).toEqual([
+  const footers = result.current.footers;
+  expect([...footers.cards]).toEqual([
     ["turn-A-turn-0", { checkpointId: "first", previousCheckpointId: null, paths: [] }],
     ["turn-A-turn-1", { checkpointId: "second", previousCheckpointId: "first", paths: [] }],
   ]);
@@ -170,7 +170,7 @@ it("places each checkpoint after its completed turn and preserves cards while th
     flushTranscripts();
   });
   expect(result.current.merged?.blocks.at(-1)).toMatchObject({ text: "Working", streaming: true });
-  expect(result.current.turnCards).toBe(cards);
+  expect(result.current.footers).toBe(footers);
 });
 
 it("offers Undo on the first turn using its starting files without a separate baseline card", async () => {
@@ -183,8 +183,8 @@ it("offers Undo on the first turn using its starting files without a separate ba
   const runs = [run("A", 1000)];
   const { result } = renderHook(() => useConversationTranscript({ runs, threadId: "thread", basePath: "/tmp/project" }));
   await settle();
-  expect(result.current.turnCards.size).toBe(1);
-  const card = result.current.turnCards.get("turn-A-turn-0")!;
+  expect(result.current.footers.cards.size).toBe(1);
+  const card = result.current.footers.cards.get("turn-A-turn-0")!;
   expect(card.previousCheckpointId).toBe("starting-files");
   const { rerender } = render(<ThreadChangeCard threadId="thread" {...card} working={true} />);
   expect(screen.getByRole("button", { name: "Undo this turn's changes" }).hasAttribute("disabled")).toBe(true);

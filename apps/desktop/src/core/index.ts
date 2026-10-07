@@ -4,8 +4,8 @@ import { windowPorts } from "./reply";
 import { join } from "node:path";
 import { Worker } from "node:worker_threads";
 import type { MessagePortMain } from "electron";
-import { OpenOrc, WorkerEmbedder, type EnvSnapshot, type Transport } from "@openorc/core";
-import { RpcRequest, type CorePush } from "@openorc/protocol";
+import { OpenOrc, WorkerEmbedder, WorkerFormatter, type Broadcast, type EnvSnapshot, type RpcReply, type Transport } from "@openorc/core";
+import type { RpcRequest } from "@openorc/protocol";
 
 /**
  * Utility-process entry. Main forks this once and hands it a MessagePort per
@@ -40,6 +40,8 @@ const corePromise = OpenOrc.create({
   githubSecrets: secrets.store("github.secrets"),
   // The embedding model runs in its own thread, so loading it and embedding memories never stall the core.
   embedder: new WorkerEmbedder(() => new Worker(join(import.meta.dirname, "embedder-worker.mjs"), { workerData: { cacheDir: dataDir } })),
+  // Prettier formats in its own thread too, so a large file never stalls the core.
+  formatter: new WorkerFormatter(() => new Worker(join(import.meta.dirname, "formatter-worker.mjs"))),
   benchmarks: __OPENORC_QA__,
 });
 

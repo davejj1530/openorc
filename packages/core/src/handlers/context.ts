@@ -1,6 +1,8 @@
 import { audit, Db, memories, orchestration, projects, tasks, teamRuntime, threads } from "@openorc/db";
-import { access, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
+import { access } from "node:fs/promises";
+import { FolderPath } from "@openorc/protocol";
+import { conversationFolder } from "../services/conversation-folder.js";
+import type { FileService } from "../services/files.js";
 import { executionProject } from "../services/workspace-home.js";
 
 async function pathExists(p: string): Promise<boolean> {
@@ -35,29 +37,27 @@ export async function reviewWorkspace(db: Db, taskId: string) {
   return { task, project };
 }
 
-export async function promoteMemory(db: Db, id: string, file: "CLAUDE.md" | "AGENTS.md"): Promise<{ file: string }> {
+/**
+ * Adds a memory to the project's instruction file through the editor's versioned write: the file is read with its
+ * version and written back only while still the same, so an edit made meanwhile is never overwritten. It skips
+ * formatting, which would restyle the rest of the user's file.
+ */
+export async function promoteMemory(deps: { db: Db; files: Pick<FileService, "read" | "write"> }, id: string, file: "CLAUDE.md" | "AGENTS.md"): Promise<{ file: string }> {
+  const { db } = deps;
   const memory = memories.get(db, id);
   if (!memory || !memory.projectId) throw new Error("memory not found");
-  const project = projects.get(db, memory.projectId);
-  if (!project) throw new Error("project not found");
-  const target = path.join(project.rootPath, file);
+  const folder = await conversationFolder(db, { kind: "project", id: memory.projectId });
+  const path = FolderPath.parse(file);
+  const current = await deps.files.read(folder, path);
+  if (current.kind === "unreadable") throw new Error(`${file} can't be edited here: ${current.reason}`);
   const header = "## Project memory (from OpenOrc)";
   const bullet = `- ${memory.title}: ${memory.body}`;
-  let content = "";
-  try {
-    content = await readFile(target, "utf8");
-  } catch (error) {
-    // A failed read is not an empty file: preserve user instructions on
-    // permission and I/O errors instead of replacing them with this memory.
-    if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
-  }
+  const content = current.kind === "file" ? current.text : "";
   if (content.includes(bullet)) return { file };
-  if (content.includes(header)) {
-    content = content.replace(header, `${header}\n${bullet}`);
-  } else {
-    content = `${content.trimEnd()}\n\n${header}\n${bullet}\n`.trimStart();
-  }
-  await writeFile(target, content);
+  const text = content.includes(header) ? content.replace(header, `${header}\n${bullet}`) : `${content.trimEnd()}\n\n${header}\n${bullet}\n`.trimStart();
+  const expected = current.kind === "file" ? { kind: "version" as const, version: current.version } : { kind: "absent" as const };
+  const saved = await deps.files.write(folder, { path, text, expected, format: false });
+  if (saved.kind === "conflict") throw new Error(`${file} changed while the memory was being added. Try again.`);
   audit.record(db, { actor: "user", action: "memory.promote", resourceType: "memory", resourceId: id, metadata: { file } });
   return { file };
 }

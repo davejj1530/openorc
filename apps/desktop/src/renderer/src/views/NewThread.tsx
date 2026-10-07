@@ -275,7 +275,7 @@ function NewThreadProject({
                     settingsDisabled={start.isPending}
                     location={location}
                     changes={composerChanges}
-                    projectId={isWorkspace ? undefined : projectId || undefined}
+                    fileSearch={isWorkspace || !projectId ? undefined : { kind: "project", id: projectId }}
                     commands={skillCommands}
                     busy={start.isPending}
                     disabledReason={disabledReason}

@@ -36,8 +36,16 @@ const sections = [
             <td>Open or close the command palette: threads, tasks, projects, messages, and actions such as <strong>New task</strong> and <strong>Settings</strong></td>
           </tr>
           <tr>
-            <td><kbd>⌘⇧F</kbd></td>
+            <td><kbd>⌘F</kbd></td>
             <td>Search what was said in every thread. Type at least two characters.</td>
+          </tr>
+          <tr>
+            <td><kbd>⌘P</kbd></td>
+            <td>Find a file in the conversation's folder by name and open it in the panel</td>
+          </tr>
+          <tr>
+            <td><kbd>⌘⇧F</kbd></td>
+            <td>Find text in the conversation's files</td>
           </tr>
           <tr>
             <td><kbd>⌘N</kbd></td>
@@ -282,6 +290,16 @@ const sections = [
           </tr>
           <tr>
             <td><kbd>⌘S</kbd></td>
+            <td>A file open in the panel</td>
+            <td>Save the file</td>
+          </tr>
+          <tr>
+            <td><kbd>⌘F</kbd></td>
+            <td>A file open in the panel</td>
+            <td>Find or replace text in the file, instead of searching threads</td>
+          </tr>
+          <tr>
+            <td><kbd>⌘S</kbd></td>
             <td>The team editor</td>
             <td><strong>Save team</strong></td>
           </tr>
@@ -367,7 +385,7 @@ const sections = [
         </tbody>
       </table>
     </div>
-    <p class="docs-source">Source: <code>apps/desktop/src/renderer/src/App.tsx</code>, <code>components/CommandPalette.tsx</code>, <code>components/ComposerInput.tsx</code>, <code>apps/desktop/src/main/view-menu.ts</code></p>
+    <p class="docs-source">Source: <code>apps/desktop/src/renderer/src/lib/app-shortcuts.ts</code>, <code>components/CommandPalette.tsx</code>, <code>components/ComposerInput.tsx</code>, <code>components/code-editor/extensions.ts</code>, <code>apps/desktop/src/main/view-menu.ts</code></p>
   </section>
 
   <section aria-labelledby="next-steps">

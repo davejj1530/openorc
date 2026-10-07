@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { memories, projects, runs, settings, threads } from "@openorc/db";
 import { Embedder } from "@openorc/memory";
-import type { CorePush, RpcMethod, RpcParams } from "@openorc/protocol";
+import type { RpcMethod, RpcParams } from "@openorc/protocol";
 import { OpenOrc } from "./openorc.js";
 
 let core: OpenOrc;
@@ -12,13 +12,12 @@ let folder: string;
 let projectId: string;
 let memoryId: string;
 let coreClosed: boolean;
-const pushed: CorePush[] = [];
 beforeEach(async () => {
   coreClosed = false;
   vi.spyOn(Embedder.prototype, "embed").mockResolvedValue(null);
   vi.spyOn(Embedder.prototype, "embedQuery").mockResolvedValue(null);
   folder = await mkdtemp(join(tmpdir(), "openorc-memory-policy-"));
-  core = await OpenOrc.create({ dataDir: folder, ephemeral: true, transport: { push: (m) => pushed.push(m) } });
+  core = await OpenOrc.create({ dataDir: folder, ephemeral: true, transport: { push: () => {} } });
   settings.set(core.db, "memory.enabled", "true");
   projectId = projects.insert(core.db, { name: "Policy", rootPath: folder, gitRemote: null, defaultBranch: null, settings: {} }).id;
   const thread = threads.insert(core.db, { projectId, title: "Policy", agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
@@ -59,9 +58,7 @@ it("keeps the database open until an admitted extraction finishes during core sh
   expect(core.db.raw.isOpen).toBe(false);
 });
 async function rpc<M extends RpcMethod>(method: M, params: RpcParams<M>) {
-  pushed.length = 0;
-  await core.handle({ type: "rpc", id: 1, method, params });
-  return pushed.find((m) => (m.type === "rpc.result" || m.type === "rpc.error") && m.id === 1);
+  return core.handle({ type: "rpc", id: 1, method, params });
 }
 async function mcpRequest(method: string, params: object = {}) {
   const mcp = await core.mcpServer();

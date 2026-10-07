@@ -1,10 +1,10 @@
 import { lazy, Suspense, useMemo, useState, type ReactNode } from "react";
 import { toolResult, toolResultDetails } from "../lib/tool-result";
-import { languageFor, type ChangedFile, type ChangeStatus, type MatchGroup, type MatchLine, type TestTally } from "../lib/tool-text";
+import { languageFor, type ChangedFile, type ChangeStatus, type TestTally } from "../lib/tool-text";
 import { joinPath, toolInputView, toolOutputView, type CommandStep, type Field, type InputView, type OutputView } from "../lib/tool-view";
 import type { Block } from "../lib/transcript";
-import { FileGlyph } from "./FileGlyph";
 import { Check, Globe, Search, WorkDelegate, X } from "./icons";
+import { FileLine, Matches } from "./Matches";
 import { ThreadLink, ThreadRichText } from "./ThreadImages";
 import { ToolResult } from "./ToolResult";
 import "./ToolDetail.css";
@@ -84,7 +84,7 @@ function OutputPart({ view, cwd }: { view: OutputView; cwd: string | null }) {
     case "code":
       return <Code code={view.code} language={view.language} startLine={view.startLine} />;
     case "matches":
-      return <Matches groups={view.groups} pattern={view.pattern} cwd={cwd} />;
+      return <Matches groups={view.groups} highlight={highlighter(view.pattern)} href={(path) => joinPath(cwd, path)} />;
     case "files":
       return <FileList items={view.paths.map((path) => ({ path }))} cwd={cwd} />;
     case "changes":
@@ -114,17 +114,6 @@ function OutputPart({ view, cwd }: { view: OutputView; cwd: string | null }) {
 function shortPath(path: string): string {
   const parts = path.split(/[\\/]/).filter(Boolean);
   return parts.length > 2 ? `…/${parts.slice(-2).join("/")}` : path;
-}
-
-/** A path with its folder quiet and its name plain. */
-function PathText({ path }: { path: string }) {
-  const cut = path.replace(/[\\/]$/, "").search(/[^\\/]*$/);
-  return (
-    <>
-      <span className="tool-view-dir">{path.slice(0, cut)}</span>
-      {path.slice(cut)}
-    </>
-  );
 }
 
 const COMMAND_LINES = 12;
@@ -183,25 +172,6 @@ function Step({ step }: { step: CommandStep }) {
         {step.text}
       </code>
       {step.body ? <Code code={step.body.code} language={step.body.language} startLine={null} script /> : null}
-    </div>
-  );
-}
-
-/** A file as a row: its mark, its path as a link that opens it, and a note after. */
-function FileLine({ path, href = path, note, linked = true }: { path: string; href?: string; note?: ReactNode; linked?: boolean }) {
-  return (
-    <div className="tool-view-target">
-      <FileGlyph path={path} />
-      <span className="tool-view-link" title={href}>
-        {linked ? (
-          <ThreadLink href={href}>
-            <PathText path={path} />
-          </ThreadLink>
-        ) : (
-          <PathText path={path} />
-        )}
-      </span>
-      {note ? <span className="tool-view-note">{note}</span> : null}
     </div>
   );
 }
@@ -286,64 +256,10 @@ function Code({ code, language, startLine, script }: { code: string; language: s
 function highlighter(pattern: string | null): RegExp | null {
   if (!pattern) return null;
   try {
-    return new RegExp(`(${pattern})`, "gi");
+    return new RegExp(pattern, "gi");
   } catch {
-    return new RegExp(`(${pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi");
+    return new RegExp(pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
   }
-}
-
-function marked(text: string, pattern: RegExp | null): ReactNode {
-  if (!pattern) return text;
-  return text.split(pattern).map((part, index) => (index % 2 ? <mark key={index}>{part}</mark> : part));
-}
-
-const MATCH_FILES = 6;
-const MATCH_LINES = 5;
-
-const matchCount = (group: MatchGroup) => group.lines.filter((line) => !line.context).length;
-
-/** A group's lines up to its `count`th match, with the context printed around those matches. */
-function firstMatches(lines: MatchLine[], count: number): MatchLine[] {
-  const shown: MatchLine[] = [];
-  let matches = 0;
-  for (const line of lines) {
-    if (!line.context && ++matches > count) break;
-    shown.push(line);
-  }
-  return shown;
-}
-
-function Matches({ groups, pattern, cwd }: { groups: MatchGroup[]; pattern: string | null; cwd: string | null }) {
-  const [all, setAll] = useState(false);
-  const highlight = useMemo(() => highlighter(pattern), [pattern]);
-  const total = groups.reduce((sum, group) => sum + matchCount(group), 0);
-  const shown = all ? groups : groups.slice(0, MATCH_FILES);
-  const hidden = total - shown.reduce((sum, group) => sum + Math.min(matchCount(group), MATCH_LINES), 0);
-  return (
-    <div className="tool-view-matches">
-      {shown.map((group) => {
-        const href = joinPath(cwd, group.path);
-        return (
-          <section key={group.path}>
-            <FileLine path={group.path} href={href} note={matchCount(group)} />
-            <ol>
-              {(all ? group.lines : firstMatches(group.lines, MATCH_LINES)).map((line, index) => (
-                <li key={index} title={line.text} data-context={line.context || undefined}>
-                  <span className="tool-view-line">{line.line === null ? null : <ThreadLink href={`${href}:${line.line}`}>{line.line}</ThreadLink>}</span>
-                  <code>{line.context ? line.text : marked(line.text, highlight)}</code>
-                </li>
-              ))}
-            </ol>
-          </section>
-        );
-      })}
-      {!all && hidden > 0 ? (
-        <button type="button" className="tool-view-more" onClick={() => setAll(true)}>
-          Show all {total} matches
-        </button>
-      ) : null}
-    </div>
-  );
 }
 
 interface FileItem {

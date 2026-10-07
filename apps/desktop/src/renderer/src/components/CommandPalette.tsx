@@ -1,11 +1,10 @@
 import { Command } from "cmdk";
-import { CalendarClock, FolderGit2, ListTodo, MessageSquare, Moon, Plus, Search, Settings, Sun, SunMoon, Workflow } from "./icons";
+import { FolderGit2, MessageSquare, Search } from "./icons";
 import { useEffect, useState } from "react";
+import { paletteActions } from "../lib/palette-actions";
 import { useRpc } from "../lib/query";
-import { newThread, openTask, openThread, useRouter } from "../lib/router";
-import { useTheme } from "../lib/theme";
+import { openTask, openThread, useRouter } from "../lib/router";
 import { useUi } from "../lib/ui";
-import { useLayout } from "../lib/layout";
 import { CoversPreview } from "../lib/browser-preview";
 import { StatusIcon } from "./status";
 
@@ -21,24 +20,10 @@ function messageSender(role: string, member: { name: string } | null | undefined
   return "Agent";
 }
 
-export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
-  const onNewTask = () => useUi.getState().openNewTask();
-  const onImportProject = () => useUi.getState().setImportProject(true);
-  const mode = useUi((s) => s.paletteMode);
-  const [query, setQuery] = useState("");
-  const tasks = useRpc("tasks.list", {}, { enabled: open && mode === "all" });
-  const threads = useRpc("threads.list", { limit: 40 }, { enabled: open && mode === "all" });
-  const projects = useRpc("projects.list", {}, { enabled: open && mode === "all" });
-  // Messages match by prefix from two characters on, across every thread's conversation.
-  const hits = useRpc("threads.search", { query, limit: 20 }, { enabled: open && query.trim().length >= 2, staleTime: 5_000 });
-  const navigate = useRouter((s) => s.navigate);
-  const setTheme = useTheme((s) => s.set);
-  useEffect(() => {
-    if (!open) setQuery("");
-  }, [open]);
-
+function usePaletteKeys(open: boolean, onOpenChange: (open: boolean) => void): void {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented) return;
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         onOpenChange(!open);
@@ -48,6 +33,21 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onOpenChange]);
+}
+
+export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const mode = useUi((s) => s.paletteMode);
+  const [query, setQuery] = useState("");
+  const tasks = useRpc("tasks.list", {}, { enabled: open && mode === "all" });
+  const threads = useRpc("threads.list", { limit: 40 }, { enabled: open && mode === "all" });
+  const projects = useRpc("projects.list", {}, { enabled: open && mode === "all" });
+  // Messages match by prefix from two characters on, across every thread's conversation.
+  const hits = useRpc("threads.search", { query, limit: 20 }, { enabled: open && query.trim().length >= 2, staleTime: 5_000 });
+  const navigate = useRouter((s) => s.navigate);
+  useEffect(() => {
+    if (!open) setQuery("");
+  }, [open]);
+  usePaletteKeys(open, onOpenChange);
 
   if (!open) return null;
   const go = (fn: () => void) => {
@@ -98,36 +98,13 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
                 heading="Actions"
                 className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:text-ink-3 [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide"
               >
-                <Item onSelect={() => go(() => newThread())} icon={<MessageSquare size={14} />}>
-                  New thread
-                </Item>
-                <Item onSelect={() => go(onNewTask)} icon={<Plus size={14} />}>
-                  New task
-                </Item>
-                <Item onSelect={() => go(onImportProject)} icon={<FolderGit2 size={14} />}>
-                  Import project
-                </Item>
-                <Item onSelect={() => go(() => navigate({ view: "tasks" }))} icon={<ListTodo size={14} />}>
-                  All tasks
-                </Item>
-                <Item onSelect={() => go(() => navigate({ view: "scheduled" }))} icon={<CalendarClock size={14} />}>
-                  Schedules
-                </Item>
-                <Item onSelect={() => go(() => navigate({ view: "orchestration", projectId: useLayout.getState().projectId ?? undefined }))} icon={<Workflow size={14} />}>
-                  Orchestration
-                </Item>
-                <Item onSelect={() => go(() => navigate({ view: "settings" }))} icon={<Settings size={14} />}>
-                  Settings
-                </Item>
-                <Item onSelect={() => go(() => setTheme("light"))} icon={<Sun size={14} />}>
-                  Theme: light
-                </Item>
-                <Item onSelect={() => go(() => setTheme("dark"))} icon={<Moon size={14} />}>
-                  Theme: dark
-                </Item>
-                <Item onSelect={() => go(() => setTheme("system"))} icon={<SunMoon size={14} />}>
-                  Theme: system
-                </Item>
+                {paletteActions
+                  .filter((action) => action.available?.() ?? true)
+                  .map(({ label, icon: Icon, run }) => (
+                    <Item key={label} onSelect={() => go(run)} icon={<Icon size={14} />}>
+                      {label}
+                    </Item>
+                  ))}
               </Command.Group>
             )}
             {mode === "all" && (threads.data ?? []).length > 0 ? (

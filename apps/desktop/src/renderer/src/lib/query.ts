@@ -1,5 +1,6 @@
 import { QueryClient, useMutation, useQuery, type Query, type UseQueryOptions } from "@tanstack/react-query";
 import type { RpcMethod, RpcParams, RpcResults } from "@openorc/protocol";
+import { mutationRules, readRules } from "./query-rules";
 import { core } from "./rpc";
 
 export const queryClient = new QueryClient({
@@ -31,7 +32,6 @@ const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
   "projects.checkoutBranch": ["projects", "workspace-diff"],
   "threads.list": ["threads"],
   "threads.search": ["threads", "messages"],
-  "files.search": ["files"],
   "inbox.list": ["inbox", "tasks"],
   // GitHub's side of a pull request, and the draft review kept here.
   "pulls.list": ["pulls"],
@@ -51,9 +51,11 @@ const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
  * tags each mutation touches. Every read has at least one tag so no screen
  * can go stale after a write.
  */
-export function tagsFor(method: RpcMethod, params: unknown): string[] {
+export function tagsFor<M extends RpcMethod>(method: M, params: RpcParams<M>): string[] {
   const fixed = fixedTags[method];
   if (fixed) return [...fixed];
+  const rule = readRules[method];
+  if (rule) return rule(params);
   const p = (params ?? {}) as Record<string, unknown>;
   switch (method) {
     case "skills.list":
@@ -125,8 +127,6 @@ export function tagsFor(method: RpcMethod, params: unknown): string[] {
       return [`log:${String(p["taskId"])}`];
     case "tasks.comments.list":
       return [`task-comments:${String(p["taskId"])}`];
-    case "review.comments.list":
-      return reviewCommentTags(p);
     case "workspace.usage":
       return [`task:${String(p["taskId"])}`];
     case "memory.list":
@@ -134,17 +134,9 @@ export function tagsFor(method: RpcMethod, params: unknown): string[] {
       return ["memory", `memory:${String(p["projectId"])}`];
     case "memory.forTask":
       return ["memory", `memory:task:${String(p["taskId"])}`];
-    // Agents edit these files in turns, which settle as workspace-diff; changing the thread's agent changes which files they are.
-    case "instructions.list":
-      return ["instructions", "workspace-diff", `thread:${String(p["threadId"])}`];
     default:
       return [];
   }
-}
-
-/** A conversation's review comments and a task's are tagged apart; a task screen reads both. */
-function reviewCommentTags(p: Record<string, unknown>): string[] {
-  return [...(p["threadId"] ? [`comments:thread:${String(p["threadId"])}`] : []), ...(p["taskId"] ? [`comments:${String(p["taskId"])}`] : [])];
 }
 
 /**
@@ -199,9 +191,11 @@ function workspaceMutationTags(id: string): string[] {
   return ["workspace-diff", "threads", "tasks", "inbox", "orchestration", `thread:${id}`, `threaddiff:${id}`, `threadlog:${id}`, `checkpoints:${id}`];
 }
 
-export function invalidatesFor(method: RpcMethod, params: unknown): string[] {
+export function invalidatesFor<M extends RpcMethod>(method: M, params: RpcParams<M>): string[] {
   const fixed = fixedInvalidations[method];
   if (fixed) return [...fixed];
+  const rule = mutationRules[method];
+  if (rule) return rule(params);
   if (method.startsWith("agents.updates.")) return ["agent-updates", ...(method === "agents.updates.install" ? ["system", "models"] : [])];
   if (method.startsWith("projects.")) return ["projects", "tasks"];
   const p = (params ?? {}) as Record<string, unknown>;
@@ -278,12 +272,6 @@ export function invalidatesFor(method: RpcMethod, params: unknown): string[] {
     case "workspace.cleanup":
     case "review.markReviewed":
       return ["tasks", task, `diff:${String(p["taskId"])}`];
-    case "review.comments.add":
-    case "review.comments.remove":
-      return reviewCommentTags(p);
-    // The comments leave as a queued message in the conversation, and reopen the task they were written from.
-    case "review.comments.send":
-      return [...reviewCommentTags(p), "threads", `thread:${String(p["threadId"])}`, ...(p["taskId"] ? ["tasks", task] : [])];
     case "review.commitProject":
       return ["workspace-diff", `projectdiff:${String(p["projectId"])}`];
     case "review.pushProject":
@@ -336,7 +324,11 @@ core.onInvalidate(invalidateTags);
 // A core that (re)started probes the machine afresh; what the renderer remembered about CLIs and models is stale.
 core.onReady(() => invalidateTags(["system", "models", "agent-updates"]));
 
-export function useRpc<M extends RpcMethod>(method: M, params: RpcParams<M>, options: Partial<Pick<UseQueryOptions<RpcResults[M]>, "enabled" | "staleTime" | "refetchInterval">> = {}) {
+export function useRpc<M extends RpcMethod>(
+  method: M,
+  params: RpcParams<M>,
+  options: Partial<Pick<UseQueryOptions<RpcResults[M]>, "enabled" | "staleTime" | "refetchInterval" | "placeholderData">> = {},
+) {
   return useQuery<RpcResults[M]>({
     queryKey: [method, params],
     queryFn: () => core.call(method, params),

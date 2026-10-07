@@ -8,20 +8,20 @@ import { OpenOrc } from "./openorc.js";
 
 vi.mock("node:fs/promises", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:fs/promises")>();
-  return { ...actual, readFile: vi.fn(actual.readFile) };
+  return { ...actual, open: vi.fn(actual.open) };
 });
 
 let folder: string;
 let core: OpenOrc;
 let memoryId: string;
-const pushed: CorePush[] = [];
+let pushed: CorePush[];
 
 beforeEach(async () => {
-  folder = await fs.mkdtemp(path.join(os.tmpdir(), "openorc-memory-promotion-"));
+  folder = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "openorc-memory-promotion-")));
+  pushed = [];
   core = await OpenOrc.create({ dataDir: folder, ephemeral: true, transport: { push: (message) => pushed.push(message) } });
   const project = projects.insert(core.db, { name: "Promotion fixture", rootPath: folder, gitRemote: null, defaultBranch: null, settings: {} });
   memoryId = memories.upsert(core.db, { projectId: project.id, type: "decision", title: "Keep work", body: "Preserve existing instructions.", source: "user" }).memory.id;
-  pushed.length = 0;
 });
 
 afterEach(async () => {
@@ -31,16 +31,18 @@ afterEach(async () => {
 });
 
 async function promote(file: "AGENTS.md" | "CLAUDE.md") {
-  pushed.length = 0;
-  await core.handle({ type: "rpc", id: 1, method: "memory.promote", params: { id: memoryId, file } });
-  return pushed.find((message) => (message.type === "rpc.result" || message.type === "rpc.error") && message.id === 1);
+  return core.handle({ type: "rpc", id: 1, method: "memory.promote", params: { id: memoryId, file } });
 }
 
+const invalidations = () => pushed.flatMap((message) => (message.type === "invalidate" ? [message.keys] : []));
+
 describe("memory promotion through RPC", () => {
-  it.each(["CLAUDE.md"] as const)("creates missing %s and adds a memory only once", async (file) => {
+  it.each(["CLAUDE.md"] as const)("creates missing %s, adds a memory only once, and refreshes the diff views", async (file) => {
+    pushed = [];
     expect(await promote(file)).toMatchObject({ type: "rpc.result", result: { file } });
     const content = await fs.readFile(path.join(folder, file), "utf8");
     expect(content).toBe("## Project memory (from OpenOrc)\n- Keep work: Preserve existing instructions.\n");
+    expect(invalidations()).toEqual([["workspace-diff", "files"]]);
     expect(await promote(file)).toMatchObject({ type: "rpc.result" });
     expect(await fs.readFile(path.join(folder, file), "utf8")).toBe(content);
     expect(core.db.stmt("SELECT COUNT(*) AS count FROM audit_events WHERE action = 'memory.promote'").get()).toMatchObject({ count: 1 });
@@ -57,10 +59,25 @@ describe("memory promotion through RPC", () => {
     const target = path.join(folder, "AGENTS.md");
     const original = "# Instructions\n\nUser-authored content must survive.\n";
     await fs.writeFile(target, original);
-    vi.mocked(fs.readFile).mockRejectedValueOnce(Object.assign(new Error("Cannot read instructions"), { code }));
+    vi.mocked(fs.open).mockRejectedValueOnce(Object.assign(new Error("Cannot read instructions"), { code }));
     const reply = await promote("AGENTS.md");
     expect(await fs.readFile(target, "utf8")).toBe(original);
     expect(reply).toMatchObject({ type: "rpc.error", message: "Cannot read instructions" });
+    expect(core.db.stmt("SELECT COUNT(*) AS count FROM audit_events WHERE action = 'memory.promote'").get()).toMatchObject({ count: 0 });
+  });
+
+  it("keeps an edit made between reading the file and writing it, and reports the clash instead of success", async () => {
+    const target = path.join(folder, "AGENTS.md");
+    await fs.writeFile(target, "# Instructions\n");
+    const read = core.files.read.bind(core.files);
+    vi.spyOn(core.files, "read").mockImplementationOnce(async (folder, file) => {
+      const current = await read(folder, file);
+      await fs.writeFile(target, "# Instructions\n\nEdited while the memory was being added.\n");
+      return current;
+    });
+    const reply = await promote("AGENTS.md");
+    expect(reply).toMatchObject({ type: "rpc.error", message: expect.stringContaining("AGENTS.md changed") });
+    expect(await fs.readFile(target, "utf8")).toBe("# Instructions\n\nEdited while the memory was being added.\n");
     expect(core.db.stmt("SELECT COUNT(*) AS count FROM audit_events WHERE action = 'memory.promote'").get()).toMatchObject({ count: 0 });
   });
 });

@@ -28,6 +28,7 @@ import { RunBriefs } from "./run-briefs.js";
 import { RunCatalog } from "./run-catalog.js";
 import { RunEvents } from "./run-events.js";
 import { RunLaunch } from "./run-launch.js";
+import { TurnStartCapture } from "./turn-start-checkpoint.js";
 import { RunLive } from "./run-live.js";
 import { McpAppService } from "./mcp-apps.js";
 import { RunProcess } from "./run-process.js";
@@ -163,6 +164,7 @@ export class RunService {
 
   private readonly briefs: RunBriefs;
   private readonly liveView: RunLive;
+  private readonly turnStarts: TurnStartCapture;
   private readonly events: RunEvents;
   private readonly settlement: RunSettlement;
   private readonly launcher: RunLaunch;
@@ -214,6 +216,7 @@ export class RunService {
       keysFor: (scope) => this.keysFor(scope),
       log: this.log,
     });
+    this.turnStarts = new TurnStartCapture({ db: this.db, log: this.log, invalidate: this.invalidate, live: this.live, editorSaves: (root, since) => this.hooks.editorSaves?.(root, since) ?? [] });
     this.settlement = this.createSettlement();
     this.launcher = this.createLauncher();
     this.events = new RunEvents({
@@ -247,6 +250,7 @@ export class RunService {
       compactions: this.compactions,
       isClosing: () => this.closing,
       hooks: this.hooks,
+      turnStarts: this.turnStarts,
       resetAgentChain: (id) => this.agentHops.delete(id),
       disarmIdle: (runId) => this.liveView.disarmIdle(runId),
       armIdle: (entry) => this.liveView.armIdle(entry),
@@ -289,6 +293,7 @@ export class RunService {
       ledger: this.ledger,
       mcp: this.mcp,
       writers: this.writers,
+      turnStarts: this.turnStarts,
       adapters: this.adapters,
       hooks: this.hooks,
       log: this.log,

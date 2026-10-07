@@ -22,7 +22,8 @@ import {
 import type { AgentLaunchEnvironment } from "@openorc/agents";
 import type { Logger } from "../transport.js";
 import type { EnvSnapshot } from "./shell-environment.js";
-import { captureThreadStart } from "./thread-start-checkpoint.js";
+import { executionFolder } from "./conversation-folder.js";
+import { withOutsideNote, type OutsideChanges, type TurnStartCapture } from "./turn-start-checkpoint.js";
 import {
   working,
   type LiveProcessBinding,
@@ -54,6 +55,7 @@ interface RunLaunchDependencies {
   ledger: LedgerWriter;
   mcp: () => Promise<OpenOrcMcpServer>;
   writers: WorkspaceWriters;
+  turnStarts: Pick<TurnStartCapture, "capture">;
   adapters: RunAdapterRegistry;
   hooks: Pick<RunHooks, "assertStart" | "taskImages" | "browserAvailable" | "claudeUserMcpServers" | "processRegistry" | "untrustedCheckout" | "orclings">;
   log: Logger;
@@ -187,7 +189,9 @@ export class RunLaunch {
     const internalMcp = this.internalMcp(input, runId, mcp);
     const spec = this.runSpec(prepared, lease, internalMcp);
     await this.lockTaskWorkspace(attempt);
-    await captureThreadStart(this.deps.db, input, lease.paths[0]!);
+    // Captured before the spec is built, so the prompt the provider receives can carry the outside-changes note.
+    const outside = await this.captureTurnStart(input, lease);
+    const spec = this.runSpec(prepared, lease, internalMcp, outside);
     assertAdmission();
     const orclingCeiling = input.orclingId ? this.deps.hooks.orclings?.ceiling(input.orclingId) : undefined;
     // No await occurs between this permission read and the provider launch.
@@ -260,7 +264,14 @@ export class RunLaunch {
     };
   }
 
-  private runSpec(prepared: PreparedSession, lease: WorkspaceLease, internalMcp: NonNullable<RunSpec["internalMcp"]>): RunSpec {
+  /** The folder as this thread's turn begins. Tasks and comment runs keep their own capture at the end of the turn. */
+  private captureTurnStart(input: StartRunInput, lease: WorkspaceLease): Promise<OutsideChanges | null> {
+    const thread = input.scope.thread;
+    if (!thread) return Promise.resolve(null);
+    return this.deps.turnStarts.capture({ thread, project: input.project, cwd: lease.paths[0]!, team: Boolean(input.teamAttemptId) });
+  }
+
+  private runSpec(prepared: PreparedSession, lease: WorkspaceLease, internalMcp: NonNullable<RunSpec["internalMcp"]>, outside: OutsideChanges | null): RunSpec {
     const { input, runId, model, taskImages, resumeSessionId, forkSession } = prepared;
     return {
       mode: input.mode,
@@ -268,7 +279,7 @@ export class RunLaunch {
       agent: input.agent,
       fastMode: input.fastMode ?? false,
       cwd: lease.paths[0]!,
-      prompt: input.prompt,
+      prompt: withOutsideNote(input.prompt, outside),
       permissionMode: input.mode === "plan" ? "review" : input.permissionMode,
       systemPromptAppendix: this.systemPrompt(input, taskImages),
       internalMcp,

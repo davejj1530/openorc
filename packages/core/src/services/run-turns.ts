@@ -3,7 +3,8 @@ import { randomUUID } from "node:crypto";
 import { type LiveSettings } from "@openorc/agents";
 import { type AgentEvent, type AgentKind, type Run, type Thread } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
-import type { ContinueSettings, LiveRun, RunHooks, RunScope, SendOptions, StartRunInput } from "./run-types.js";
+import { working, type ContinueSettings, type LiveRun, type RunHooks, type RunScope, type SendOptions, type StartRunInput } from "./run-types.js";
+import { withOutsideNote, type OutsideChanges, type TurnStartCapture } from "./turn-start-checkpoint.js";
 import { executionProject } from "./workspace-home.js";
 
 /** Settings fixed at process launch must match before another turn can reuse it. */
@@ -25,6 +26,7 @@ interface RunTurnsDependencies {
   compactions: ReadonlyMap<string, Promise<void>>;
   isClosing: () => boolean;
   hooks: Pick<RunHooks, "assertSend" | "orclings">;
+  turnStarts: Pick<TurnStartCapture, "capture">;
   resetAgentChain: (threadId: string) => void;
   disarmIdle: (runId: string) => void;
   armIdle: (entry: LiveRun) => void;
@@ -100,7 +102,8 @@ export class RunTurns {
     }
     this.deps.invalidate(this.deps.keysFor(entry.scope));
     try {
-      await entry.handle.send(text, attachments);
+      const outside = startsTurn ? await this.captureTurnStart(entry) : null;
+      await entry.handle.send(withOutsideNote(text, outside), attachments);
     } catch (error) {
       this.restoreRejectedSend(entry, previous);
       throw error;
@@ -117,6 +120,13 @@ export class RunTurns {
     if (recordPrompt) this.deps.emit({ type: "message.completed", runId, ts: Date.now(), messageId: `${role}-${randomUUID()}`, role, text, ...(attachments?.length ? { attachments } : {}) });
     if (entry.scope.thread) threads.touch(this.deps.db, entry.scope.thread.id);
     this.deps.invalidate(this.deps.keysFor(entry.scope));
+  }
+
+  /** The folder as this thread's turn begins, before the provider can touch it. The transcript records the message alone. */
+  private captureTurnStart(entry: LiveRun): Promise<OutsideChanges | null> {
+    const thread = entry.scope.thread ? threads.get(this.deps.db, entry.scope.thread.id) : null;
+    if (!thread) return Promise.resolve(null);
+    return this.deps.turnStarts.capture({ thread, project: executionProject(this.deps.db, thread), cwd: entry.workspaceLease.paths[0]!, team: entry.team });
   }
 
   private restoreRejectedSend(entry: LiveRun, previous: { busy: boolean; prompt: string | null; reply: string | null; turns: number; questionsInterrupted?: boolean }): void {

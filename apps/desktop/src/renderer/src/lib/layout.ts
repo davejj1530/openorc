@@ -2,9 +2,8 @@ import { create } from "zustand";
 import { WORKSPACE_ID } from "@openorc/protocol";
 import type { RpcParams } from "@openorc/protocol";
 import type { FileReference } from "../../../shared/file-reference";
-import type { PanelTool } from "./panel-tabs";
 
-export type PanelTab = "orcling" | "plan" | "file" | "changes" | "tasks" | "task" | "terminal" | "browser" | "commits" | "checkpoints" | "memory" | "instructions";
+export type PanelTab = "newtab" | "orcling" | "plan" | "file" | "changes" | "tasks" | "task" | "terminal" | "browser" | "commits" | "checkpoints" | "memory" | "instructions";
 /** One turn's saved diff, opened from its change card: a team attempt's checkpoint or a thread turn's. */
 export type ChangeSelection = ({ kind: "team" } & Omit<RpcParams<"orchestration.turnChanges">, "includePatch">) | ({ kind: "thread" } & Omit<RpcParams<"threads.turnChanges">, "includePatch">);
 export type FileSelection = FileReference & { scope: RpcParams<"files.read">["scope"] };
@@ -26,6 +25,7 @@ interface LayoutState {
   panelOpen: boolean;
   panelWidth: number;
   panelTab: PanelTab;
+  panelRequest: { tab: PanelTab } | null;
   selectedChanges: ChangeSelection | null;
   openChanges: (selection: ChangeSelection) => void;
   clearChanges: () => void;
@@ -53,9 +53,7 @@ interface LayoutState {
    * the only honest default is the one the reader already chose here.
    */
   previewUrls: Record<string, string>;
-  /** Tools opened in each panel scope, keyed like previewUrls, so their tabs stay for that thread. */
-  panelTools: Record<string, PanelTool[]>;
-  /** The preview fills the work row. Never persisted: a relaunch opens the panel at its width. */
+  /** The panel fills the work row. Never persisted: a relaunch opens it at its saved width. */
   panelExpanded: boolean;
   toggleSidebar: () => void;
   setSidebarWidth: (px: number) => void;
@@ -69,7 +67,6 @@ interface LayoutState {
   setScreenShown: (screen: SidebarScreen, shown: boolean) => void;
   toggleCollapsed: (key: string) => void;
   rememberPreviewUrl: (key: string, url: string) => void;
-  rememberPanelTool: (key: string, tool: PanelTool) => void;
   setPanelExpanded: (expanded: boolean) => void;
 }
 
@@ -80,9 +77,7 @@ export const limits = {
 
 const KEY = "openorc.layout";
 
-function read(): Partial<
-  Pick<LayoutState, "sidebarOpen" | "sidebarWidth" | "panelOpen" | "panelWidth" | "panelTab" | "projectId" | "sidebarFilter" | "hiddenScreens" | "collapsed" | "previewUrls" | "panelTools">
-> {
+function read(): Partial<Pick<LayoutState, "sidebarOpen" | "sidebarWidth" | "panelOpen" | "panelWidth" | "projectId" | "sidebarFilter" | "hiddenScreens" | "collapsed" | "previewUrls">> {
   try {
     return JSON.parse(localStorage.getItem(KEY) ?? "{}") as Partial<LayoutState>;
   } catch {
@@ -99,13 +94,11 @@ function persist(s: LayoutState): void {
         sidebarWidth: s.sidebarWidth,
         panelOpen: s.panelOpen,
         panelWidth: s.panelWidth,
-        panelTab: s.panelTab,
         projectId: s.projectId,
         sidebarFilter: s.sidebarFilter,
         hiddenScreens: s.hiddenScreens,
         collapsed: s.collapsed,
         previewUrls: s.previewUrls,
-        panelTools: s.panelTools,
       }),
     );
   } catch {
@@ -130,7 +123,8 @@ export const useLayout = create<LayoutState>((set, get) => {
     sidebarWidth: clamp(saved.sidebarWidth ?? limits.sidebar.default, limits.sidebar),
     panelOpen: saved.panelOpen ?? false,
     panelWidth: clamp(saved.panelWidth ?? limits.panel.default, limits.panel),
-    panelTab: saved.panelTab ?? ("changes" as PanelTab),
+    panelTab: "newtab" as PanelTab,
+    panelRequest: null,
     selectedFile: null,
     selectedChanges: null,
     workspaceChanges: null,
@@ -141,7 +135,6 @@ export const useLayout = create<LayoutState>((set, get) => {
     hiddenScreens: saved.hiddenScreens ?? DEFAULT_HIDDEN_SCREENS,
     collapsed: saved.collapsed ?? ["snoozed"],
     previewUrls: saved.previewUrls ?? {},
-    panelTools: saved.panelTools ?? {},
     panelExpanded: false,
   };
   applyWidths(initial.sidebarWidth, initial.panelWidth);
@@ -155,7 +148,7 @@ export const useLayout = create<LayoutState>((set, get) => {
     ...initial,
     toggleSidebar: () => commit({ sidebarOpen: !get().sidebarOpen }),
     setSidebarWidth: (px) => commit({ sidebarWidth: clamp(px, limits.sidebar) }),
-    setPanel: (open, tab) => commit({ panelOpen: open, ...(tab ? { panelTab: tab } : {}), ...(open ? {} : { panelExpanded: false }) }),
+    setPanel: (open, tab) => commit({ panelOpen: open, ...(tab ? { panelTab: tab, panelRequest: { tab } } : {}), ...(open ? {} : { panelExpanded: false }) }),
     openChanges: (selectedChanges) => {
       let threadSelection: Partial<Pick<LayoutState, "panelThreadId">> = {};
       if (selectedChanges.kind === "thread") threadSelection = { panelThreadId: selectedChanges.id };
@@ -164,6 +157,7 @@ export const useLayout = create<LayoutState>((set, get) => {
         selectedChanges,
         panelOpen: true,
         panelTab: "changes",
+        panelRequest: { tab: "changes" },
         ...threadSelection,
       });
     },
@@ -174,16 +168,18 @@ export const useLayout = create<LayoutState>((set, get) => {
         selectedChanges: null,
         panelOpen: true,
         panelTab: "changes",
+        panelRequest: { tab: "changes" },
         panelThreadId: target.kind === "thread" ? target.id : null,
       }),
     consumeWorkspaceCommit: (requestId) => {
       const request = get().workspaceChanges;
       if (request?.requestId === requestId) set({ workspaceChanges: { ...request, commit: false } });
     },
-    openFile: (selectedFile) => commit({ selectedFile, panelOpen: true, panelTab: "file", ...(selectedFile.scope.kind === "thread" ? { panelThreadId: selectedFile.scope.id } : {}) }),
+    openFile: (selectedFile) =>
+      commit({ selectedFile, panelOpen: true, panelTab: "file", panelRequest: { tab: "file" }, ...(selectedFile.scope.kind === "thread" ? { panelThreadId: selectedFile.scope.id } : {}) }),
     setPanelWidth: (px) => commit({ panelWidth: clamp(px, limits.panel) }),
     setProject: (projectId) => commit({ projectId }),
-    openThreadPanel: (id, tab) => commit({ panelThreadId: id, panelOpen: true, panelTab: tab }),
+    openThreadPanel: (id, tab) => commit({ panelThreadId: id, panelOpen: true, panelTab: tab, panelRequest: { tab } }),
     toggleThreadPanel: (id) => {
       const open = get().panelThreadId !== id || !get().panelOpen;
       commit({ panelThreadId: id, panelOpen: open, ...(open ? {} : { panelExpanded: false }) });
@@ -202,15 +198,6 @@ export const useLayout = create<LayoutState>((set, get) => {
         .filter(([k]) => k !== key)
         .slice(-49);
       commit({ previewUrls: Object.fromEntries([...kept, [key, url]]) });
-    },
-    // Bounded the same way: the oldest scopes are the threads the reader has stopped opening.
-    rememberPanelTool: (key, tool) => {
-      const tools = get().panelTools[key] ?? [];
-      if (tools.includes(tool)) return;
-      const kept = Object.entries(get().panelTools)
-        .filter(([k]) => k !== key)
-        .slice(-99);
-      commit({ panelTools: Object.fromEntries([...kept, [key, [...tools, tool]]]) });
     },
     setPanelExpanded: (panelExpanded) => set({ panelExpanded }),
   };

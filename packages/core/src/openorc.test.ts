@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { CodexAdapter, RunHandle } from "@openorc/agents";
 import { projects, runs, scheduleFirings, schedules, threads } from "@openorc/db";
 import { commitAll, git } from "@openorc/git";
-import { harnessIds, type CorePush, type Project, type RpcMethod, type RpcParams, type RpcResults, type Task } from "@openorc/protocol";
+import { WORKSPACE_ID, harnessIds, type CorePush, type Project, type RpcMethod, type RpcParams, type RpcResults, type Task } from "@openorc/protocol";
 import { OpenOrc } from "./openorc.js";
 
 let root: string;
@@ -79,11 +79,20 @@ describe("core", () => {
   it("reads file citations from the selected thread or task workspace", async () => {
     const p = await call("projects.import", { rootPath: root });
     const thread = threads.insert(core.db, { projectId: p.id, title: "File citations", agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
+    expect((await call("files.read", { scope: { kind: "project", id: p.id }, path: "README.md" })).content).toBe("# demo\n");
+    expect(await call("files.search", { projectId: p.id, query: "worktree-only" })).toEqual([]);
     expect((await call("files.read", { scope: { kind: "thread", id: thread.id }, path: "README.md" })).content).toBe("# demo\n");
     const workspace = await mkdtemp(path.join(dataDir, "citation-worktree-"));
     await writeFile(path.join(workspace, "README.md"), "# worktree source\n");
+    await writeFile(path.join(workspace, "worktree-only.ts"), "export const worktree = true;\n");
     threads.update(core.db, thread.id, { worktreePath: workspace, workspaceMode: "worktree" });
     expect((await call("files.read", { scope: { kind: "thread", id: thread.id }, path: "README.md" })).content).toBe("# worktree source\n");
+    expect(await call("files.search", { projectId: p.id, scope: { kind: "thread", id: thread.id }, query: "worktree-only" })).toEqual(["worktree-only.ts"]);
+    expect(await call("files.search", { projectId: p.id, query: "worktree-only" })).toEqual([]);
+    await expect(call("files.search", { projectId: "other", scope: { kind: "thread", id: thread.id }, query: "" })).rejects.toThrow("another project");
+    await expect(call("files.read", { scope: { kind: "project", id: p.id, workingDirectory: workspace }, path: "README.md" })).rejects.toThrow("Only Workspace");
+    expect((await call("files.read", { scope: { kind: "project", id: WORKSPACE_ID, workingDirectory: workspace }, path: "README.md" })).content).toBe("# worktree source\n");
+    expect(await call("files.search", { projectId: WORKSPACE_ID, scope: { kind: "project", id: WORKSPACE_ID, workingDirectory: workspace }, query: "worktree-only" })).toEqual(["worktree-only.ts"]);
     await expect(call("files.read", { scope: { kind: "thread", id: thread.id }, path: path.join(root, "README.md") })).rejects.toThrow("outside");
     const task = await call("tasks.create", { projectId: p.id, title: "Preview source", useWorktree: false });
     expect((await call("files.read", { scope: { kind: "task", id: task.id }, path: "README.md" })).content).toBe("# demo\n");

@@ -276,7 +276,7 @@ it("signs a signed-out Claude back in from the thread's Terminal, under the fold
   expect(signIn.parentElement!.textContent).toBe("Claude is signed out. Sign in");
   fireEvent.click(signIn);
   expect(useLayout.getState()).toMatchObject({ panelOpen: true, panelTab: "terminal", panelThreadId: "thread-1" });
-  expect(useLayout.getState().panelTools["thread:thread-1"]).toEqual(["terminal"]);
+  expect(useLayout.getState().panelRequest).toEqual({ tab: "terminal" });
   const typed: string[] = [];
   const shell = typeAtPrompt("thread:thread-1", (command) => typed.push(command));
   shell.output("\x1b[?2004h");

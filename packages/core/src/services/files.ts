@@ -93,13 +93,14 @@ export class FileService {
   }
 
   private async list(project: Project): Promise<string[]> {
-    const hit = this.cache.get(project.id);
+    const key = `${project.id}:${project.rootPath}`;
+    const hit = this.cache.get(key);
     if (hit && Date.now() - hit.at < 30_000) return hit.files;
     const files =
       (await projectGit(project)) === "none"
         ? await folderFiles(project.rootPath)
         : (await git(project.rootPath, ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], { maxBuffer: 256 * 1024 * 1024 })).stdout.split("\0").filter(Boolean);
-    this.cache.set(project.id, { at: Date.now(), files });
+    this.cache.set(key, { at: Date.now(), files });
     return files;
   }
 }

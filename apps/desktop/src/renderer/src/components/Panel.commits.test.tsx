@@ -4,6 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { Commit, Project, PushState, RpcMethod, RpcParams, RpcResults, ThreadSummary } from "@openorc/protocol";
 import { core } from "../lib/rpc";
 import { queryClient } from "../lib/query";
+import { usePanelSessions } from "../lib/panel-tabs";
 import { useLayout } from "../lib/layout";
 import { Panel } from "./Panel";
 
@@ -38,12 +39,13 @@ let log: Commit[];
 let changed: string[];
 
 beforeEach(() => {
+  usePanelSessions.setState({ sessions: {} });
   log = [commit];
   changed = [];
   state = { branch: "feat/bots", blocked: null, published: true, unpushedCount: 1, unpushed: [commit.sha] };
   queryClient.clear();
   queryClient.setDefaultOptions({ queries: { retry: false, staleTime: Infinity } });
-  useLayout.setState({ panelOpen: true, panelTab: "commits" });
+  useLayout.setState({ panelOpen: true, panelTab: "commits", panelRequest: { tab: "commits" } });
   vi.spyOn(core, "call").mockImplementation(async <M extends RpcMethod>(method: M): Promise<RpcResults[M]> => {
     if (method === "projects.git") return "ready" as RpcResults[M];
     if (method === "git.threadLog" || method === "git.projectLog") return log as RpcResults[M];
@@ -78,10 +80,11 @@ it("offers Push in a conversation for commits origin lacks, even ones made befor
 });
 
 it("offers Push on a new thread's panel after committing the checkout", async () => {
-  useLayout.setState({ panelTab: "changes" });
+  useLayout.setState({ panelTab: "changes", panelRequest: { tab: "changes" } });
   mount({ kind: "newthread", project, workingDirectory: project.rootPath, changes: true });
   // Opened by the reader, the tab stays once there's nothing left to push.
-  fireEvent.click(await screen.findByRole("tab", { name: "Commits" }));
+  fireEvent.click(screen.getByRole("button", { name: "New tab" }));
+  fireEvent.click(screen.getByRole("button", { name: "Commits" }));
   fireEvent.click(await screen.findByRole("button", { name: "Push 1 commit" }));
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("review.pushProject", { projectId: project.id } satisfies RpcParams<"review.pushProject">));
   expect(await screen.findByText("Pushed feat/bots to origin")).toBeTruthy();
@@ -97,7 +100,7 @@ it("offers Push in a worktree conversation whose unpushed commits come from befo
 
 it("offers no Commit, Push or pull request in a pull request's copy under review", async () => {
   changed = ["README.md"];
-  useLayout.setState({ panelTab: "changes" });
+  useLayout.setState({ panelTab: "changes", panelRequest: { tab: "changes" } });
   mount({ kind: "thread", thread: { ...thread, workspaceMode: "worktree", worktreePath: "/tmp/review-copy", branch: null }, project });
   expect(await screen.findByText("README.md")).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Commit" })).toBeNull();

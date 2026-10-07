@@ -1,33 +1,104 @@
-import type { PanelTab } from "./layout";
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import type { ChangeSelection, FileSelection, PanelTab } from "./layout";
 
-/** Tabs that hold something only when the thread does. */
-type ContentTab = "changes" | "plan" | "tasks" | "checkpoints" | "commits" | "memory";
-/** Tabs that are tools rather than content: they join the strip once opened for a scope. */
-export type PanelTool = "terminal" | "browser" | "instructions";
-/** Whether each content tab has something to show. Null leaves content tabs unfiltered. */
-export type PanelSignals = Partial<Record<ContentTab, boolean>> | null;
+export type PanelPage =
+  | { kind: "newtab" }
+  | { kind: "browser"; url: string; title: string }
+  | { kind: "file"; selection: FileSelection | null }
+  | { kind: "changes"; selection: ChangeSelection | null }
+  | { kind: "tool"; tool: Exclude<PanelTab, "newtab" | "browser" | "file" | "changes"> };
 
-export const panelTools: readonly PanelTool[] = ["terminal", "browser", "instructions"];
-const contentTabs: readonly PanelTab[] = ["changes", "plan", "tasks", "checkpoints", "commits", "memory"];
+export type WorkTab = { id: string; entries: [PanelPage, ...PanelPage[]]; index: number };
+export type PanelSession = { tabs: [WorkTab, ...WorkTab[]]; activeId: string };
 
-export function isPanelTool(tab: PanelTab): tab is PanelTool {
-  return (panelTools as readonly PanelTab[]).includes(tab);
+export const currentPage = (tab: WorkTab): PanelPage => tab.entries[tab.index] ?? tab.entries[0];
+export const pageType = (page: PanelPage): PanelTab => (page.kind === "tool" ? page.tool : page.kind);
+export const activeTab = (session: PanelSession): WorkTab => session.tabs.find((tab) => tab.id === session.activeId) ?? session.tabs[0];
+
+const newTab = (id: string = crypto.randomUUID()): WorkTab => ({ id, entries: [{ kind: "newtab" }], index: 0 });
+export const newPanelSession = (scope: string): PanelSession => ({ tabs: [newTab(scope)], activeId: scope });
+
+function navigateTab(tab: WorkTab, page: PanelPage): WorkTab {
+  const entries: [PanelPage, ...PanelPage[]] = [tab.entries[0], ...tab.entries.slice(1, tab.index + 1), page];
+  return { ...tab, entries, index: entries.length - 1 };
 }
 
-/**
- * The strip keeps the context's own order and drops what has nothing to show: a content tab
- * needs its signal, a tool needs to have been opened here. The pinned tab, the one the reader
- * opened in this panel, always stays so nothing is pulled out from under them.
- */
-export function visibleTabs(candidates: readonly PanelTab[], signals: PanelSignals, opened: readonly PanelTool[], pinned: PanelTab | null): PanelTab[] {
-  return candidates.filter((tab) => {
-    if (tab === pinned) return true;
-    if (isPanelTool(tab)) return opened.includes(tab);
-    return signals === null || !contentTabs.includes(tab) || signals[tab as ContentTab] === true;
-  });
+function updateTab(session: PanelSession, id: string, update: (tab: WorkTab) => WorkTab): PanelSession {
+  const [first, ...rest] = session.tabs;
+  const change = (tab: WorkTab) => (tab.id === id ? update(tab) : tab);
+  return { ...session, tabs: [change(first), ...rest.map(change)] };
 }
 
-/** Tools this context offers that are not in the strip yet, for the add menu. */
-export function closedTools(candidates: readonly PanelTab[], visible: readonly PanelTab[]): PanelTool[] {
-  return panelTools.filter((tool) => candidates.includes(tool) && !visible.includes(tool));
+function replacePage(tab: WorkTab, page: PanelPage): WorkTab {
+  const replace = (entry: PanelPage, index: number) => (index === tab.index ? page : entry);
+  return { ...tab, entries: [replace(tab.entries[0], 0), ...tab.entries.slice(1).map((entry, index) => replace(entry, index + 1))] };
 }
+
+function samePage(left: PanelPage, right: PanelPage): boolean {
+  if (left.kind === "file" && right.kind === "file") return left.selection?.path === right.selection?.path;
+  return pageType(left) === pageType(right);
+}
+
+interface PanelSessions {
+  sessions: Record<string, PanelSession>;
+  add: (scope: string) => void;
+  select: (scope: string, id: string) => void;
+  close: (scope: string, id: string) => void;
+  navigate: (scope: string, page: PanelPage) => void;
+  open: (scope: string, page: PanelPage, id?: string) => void;
+  move: (scope: string, delta: number) => void;
+  reportBrowser: (scope: string, id: string, url: string, title: string) => void;
+}
+
+/** Tabs belong to their conversation. Hiding the panel or visiting another thread preserves them. */
+export const usePanelSessions = create<PanelSessions>()(
+  persist(
+    (set, get) => {
+      const change = (scope: string, update: (session: PanelSession) => PanelSession) => {
+        const sessions = get().sessions;
+        const next = update(sessions[scope] ?? newPanelSession(scope));
+        const kept = Object.entries(sessions)
+          .filter(([key]) => key !== scope)
+          .slice(-99);
+        set({ sessions: Object.fromEntries([...kept, [scope, next]]) });
+      };
+      return {
+        sessions: {},
+        add: (scope) =>
+          change(scope, (session) => {
+            const tab = newTab(`${scope}:tab:${crypto.randomUUID()}`);
+            return { tabs: [...session.tabs, tab], activeId: tab.id };
+          }),
+        select: (scope, id) => change(scope, (session) => ({ ...session, activeId: id })),
+        close: (scope, id) =>
+          change(scope, (session) => {
+            const index = session.tabs.findIndex((tab) => tab.id === id);
+            const [first, ...rest] = session.tabs.filter((tab) => tab.id !== id);
+            if (!first) return newPanelSession(scope);
+            const tabs: PanelSession["tabs"] = [first, ...rest];
+            return { tabs, activeId: session.activeId === id ? (tabs[Math.max(0, index - 1)] ?? first).id : session.activeId };
+          }),
+        navigate: (scope, page) => change(scope, (session) => updateTab(session, session.activeId, (tab) => navigateTab(tab, page))),
+        open: (scope, page, id) =>
+          change(scope, (session) => {
+            const existing = id ? session.tabs.find((tab) => tab.id === id) : session.tabs.find((tab) => samePage(currentPage(tab), page));
+            const blank = currentPage(activeTab(session)).kind === "newtab" ? activeTab(session) : null;
+            const target = existing ?? (id ? null : blank);
+            if (target) return { ...updateTab(session, target.id, (tab) => (samePage(currentPage(tab), page) ? replacePage(tab, page) : navigateTab(tab, page))), activeId: target.id };
+            const tab = navigateTab(newTab(id ?? `${scope}:tab:${crypto.randomUUID()}`), page);
+            return { tabs: [...session.tabs, tab], activeId: tab.id };
+          }),
+        move: (scope, delta) => change(scope, (session) => updateTab(session, session.activeId, (tab) => ({ ...tab, index: Math.max(0, Math.min(tab.entries.length - 1, tab.index + delta)) }))),
+        reportBrowser: (scope, id, url, title) =>
+          change(scope, (session) =>
+            updateTab(session, id, (tab) => {
+              if (currentPage(tab).kind !== "browser") return tab;
+              return replacePage(tab, { kind: "browser", url, title });
+            }),
+          ),
+      };
+    },
+    { name: "openorc.panel-sessions", version: 1, partialize: (state) => ({ sessions: state.sessions }) },
+  ),
+);

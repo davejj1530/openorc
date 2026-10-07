@@ -226,7 +226,7 @@ function settle(pane: Pane): void {
 }
 
 function destroy(key: string, pane: Pane): void {
-  if (agentPanes.get(pane.surface) === pane) agentPanes.delete(pane.surface);
+  for (const [surface, active] of agentPanes) if (active === pane) agentPanes.delete(surface);
   panes.delete(key);
   pane.desired = false;
   detach(pane);
@@ -413,15 +413,21 @@ export function hasBrowserContext(window: BrowserWindow): boolean {
 export function openBrowserLink(window: BrowserWindow, url: string): boolean {
   const surface = contexts.get(window);
   if (!surface || window.isDestroyed() || url === "about:blank" || !isAllowedPaneUrl(url)) return false;
-  const pane = lookup(window, surface)?.pane ?? create(paneKey(window, surface), surface, window);
+  const active = agentPanes.get(surface);
+  const pane = active?.window === window ? active : (lookup(window, surface)?.pane ?? create(paneKey(window, surface), surface, window));
   pane.requested = url;
   pane.error = null;
   pane.revealRequested = true;
   pane.shown = ++reveals;
   load(pane, url);
   publish(pane);
-  window.webContents.send("browser:reveal", surface);
+  window.webContents.send("browser:reveal", pane.surface);
   return true;
+}
+
+function selectBrowserTab(window: BrowserWindow, pane: Pane, context: unknown): void {
+  if (typeof context !== "string" || contexts.get(window) !== context) return;
+  if (pane.surface === context || pane.surface.startsWith(`${context}:tab:`)) agentPanes.set(context, pane);
 }
 
 /**
@@ -455,13 +461,14 @@ export function installBrowserPane(ipcMain: Electron.IpcMain, options: { getWind
     }
     contexts.set(window, surface);
     watch(window);
-    const pane = lookup(window, surface)?.pane;
-    if (pane?.revealRequested) window.webContents.send("browser:reveal", surface);
+    const active = agentPanes.get(surface);
+    const pane = active?.window === window ? active : lookup(window, surface)?.pane;
+    if (pane?.revealRequested) window.webContents.send("browser:reveal", pane.surface);
   });
 
   ipcMain.handle("browser:show", (event, raw: unknown): BrowserPaneState => {
     if (typeof raw !== "object" || raw === null) return blankState("The panel asked for a preview without an id.");
-    const { id, bounds, url } = raw as Record<string, unknown>;
+    const { id, bounds, url, context } = raw as Record<string, unknown>;
     const surface = toId(id);
     const rect = toRect(bounds);
     if (surface === null || rect === null) return blankState("The panel asked for a preview without an id or a rectangle.");
@@ -470,6 +477,7 @@ export function installBrowserPane(ipcMain: Electron.IpcMain, options: { getWind
 
     const existing = lookup(window, surface)?.pane ?? null;
     const pane = existing ?? create(paneKey(window, surface), surface, window);
+    selectBrowserTab(window, pane, context);
     pane.desired = true;
     pane.revealRequested = false;
     pane.shown = ++reveals;
@@ -597,7 +605,7 @@ export async function executeBrowserCommand(surface: string, command: BrowserCom
   target.agentBusy = true;
   target.shown = ++reveals;
   target.revealRequested = true;
-  if (contexts.get(target.window) === surface) target.window.webContents.send("browser:reveal", surface);
+  if (contexts.get(target.window) === surface) target.window.webContents.send("browser:reveal", target.surface);
   try {
     return await runBrowserAction({
       contents,

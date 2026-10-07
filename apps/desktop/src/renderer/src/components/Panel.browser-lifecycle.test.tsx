@@ -4,6 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { Project, RpcMethod, RpcResults, ThreadSummary } from "@openorc/protocol";
 import type { BrowserPaneState } from "../../../shared/types";
 import { CoversPreview } from "../lib/browser-preview";
+import { usePanelSessions } from "../lib/panel-tabs";
 import { useLayout } from "../lib/layout";
 import { queryClient } from "../lib/query";
 import { core } from "../lib/rpc";
@@ -31,6 +32,7 @@ beforeEach(() => {
   visible.clear();
   capture = Promise.withResolvers();
   showing = Promise.resolve(page);
+  usePanelSessions.setState({ sessions: {} });
   queryClient.clear();
   queryClient.setDefaultOptions({ queries: { retry: false, staleTime: Infinity } });
   vi.stubGlobal(
@@ -58,7 +60,16 @@ beforeEach(() => {
     if (method === "projects.git") return "none" as RpcResults[M];
     return [] as unknown as RpcResults[M];
   });
-  useLayout.setState({ panelOpen: true, panelTab: "browser", panelThreadId: thread.id, panelTools: {}, previewUrls: {}, selectedChanges: null, selectedFile: null, panelExpanded: false });
+  useLayout.setState({
+    panelOpen: true,
+    panelTab: "browser",
+    panelThreadId: thread.id,
+    panelRequest: { tab: "browser" },
+    previewUrls: {},
+    selectedChanges: null,
+    selectedFile: null,
+    panelExpanded: false,
+  });
 });
 
 afterEach(() => {
@@ -80,10 +91,10 @@ async function openPreview() {
   return view;
 }
 
-it.each(["button", "tab"])("hides the native preview when the %s closes the panel, before the close animation ends", async (role) => {
+it("hides the native preview when the panel closes, before the close animation ends", async () => {
   await openPreview();
   vi.useFakeTimers();
-  fireEvent.click(screen.getByRole(role, { name: role === "button" ? "Hide panel" : "Preview" }));
+  fireEvent.click(screen.getByRole("button", { name: "Hide panel" }));
   expect(useLayout.getState().panelOpen).toBe(false);
   expect(document.querySelector(".panel-shell")?.getAttribute("aria-hidden")).toBe("true");
   expect([...visible]).toEqual([]);

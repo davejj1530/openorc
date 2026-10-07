@@ -8,6 +8,7 @@
 @import "./rich-text.css";
 @import "./appearance.css";
 @import "./workspace-design.css";
+@import "./panel-browser.css";
 @import "./settings-design.css";
 @source "../../../node_modules/streamdown/dist/*.js";
 @source "../../../node_modules/@streamdown/mermaid/dist/*.js";

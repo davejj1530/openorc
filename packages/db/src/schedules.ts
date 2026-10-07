@@ -1,9 +1,11 @@
+import { claudeAccounts } from "./claude-accounts.js";
 import { randomUUID } from "node:crypto";
 import { ExecutionTarget, ScheduleLaunchSnapshot, type Schedule, type ScheduleFiringRecord } from "@openorc/protocol";
 import type { Db } from "./database.js";
 import { orchestration } from "./orchestration.js";
 
 interface ScheduleRow {
+  claude_account_id: string | null;
   id: string;
   project_id: string;
   title: string;
@@ -64,6 +66,7 @@ function fromRow(db: Db, row: ScheduleRow): Schedule {
   return {
     id: row.id,
     projectId: row.project_id,
+    claudeAccountId: row.claude_account_id ?? "claude-cli",
     title: row.title,
     prompt: row.prompt,
     agent: row.agent,
@@ -87,6 +90,7 @@ function fromRow(db: Db, row: ScheduleRow): Schedule {
 }
 
 export interface SchedulePatch {
+  claudeAccountId?: string;
   title?: string;
   prompt?: string;
   everyMinutes?: number;
@@ -104,6 +108,7 @@ export interface SchedulePatch {
   lastThreadId?: string | null;
 }
 const columns = {
+  claudeAccountId: "claude_account_id",
   title: "title",
   prompt: "prompt",
   everyMinutes: "every_minutes",
@@ -140,9 +145,10 @@ export const schedules = {
     const id = randomUUID(),
       time = Date.now();
     db.stmt(
-      `INSERT INTO schedules (id,project_id,title,prompt,agent,model,effort,mode,permission_mode,workspace_mode,every_minutes,execution_target,team_revision_id,enabled,next_run_at,created_at,updated_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?)`,
+      `INSERT INTO schedules (claude_account_id,id,project_id,title,prompt,agent,model,effort,mode,permission_mode,workspace_mode,every_minutes,execution_target,team_revision_id,enabled,next_run_at,created_at,updated_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?)`,
     ).run(
+      s.claudeAccountId ?? claudeAccounts.defaultId(db),
       id,
       s.projectId,
       s.title,

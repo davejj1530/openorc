@@ -165,6 +165,7 @@ export class ThreadTaskExecution {
         projectId: task.projectId,
         title: task.title,
         ...target,
+        claudeAccountId: previous?.claudeAccountId ?? creator?.claudeAccountId,
         fastMode: previous?.fastMode ?? creator?.fastMode ?? false,
         mode,
         permissionMode: previous?.permissionMode ?? creator?.permissionMode ?? defaultPermissionMode,

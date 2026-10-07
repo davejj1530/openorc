@@ -1,3 +1,4 @@
+import { insertLegacyThread } from "./fixtures/legacy-thread.js";
 import { insertLegacyRun } from "./fixtures/legacy-run.js";
 import { legacyTeamRuntime, readLegacyJournals, teamJournalWriter } from "./fixtures/legacy-team-journal.js";
 import { randomUUID } from "node:crypto";
@@ -10,7 +11,7 @@ import { TeamTaskCompletionIntent, type TeamAttemptRecord } from "@openorc/proto
 import { Db } from "./database.js";
 import { orchestration } from "./orchestration.js";
 import { checkpoints } from "./checkpoints.js";
-import { projects, runs, snapshots, tasks, threads } from "./repos.js";
+import { projects, runs, snapshots, tasks } from "./repos.js";
 import { migrations } from "./schema.js";
 import { teamRuntime } from "./team-runtime.js";
 import { teamTasks } from "./team-tasks.js";
@@ -28,7 +29,7 @@ const stat = { files: 1, insertions: 1, deletions: 0, untracked: 0 };
 function fixture(db = Db.memory(), message = false) {
   opened.add(db);
   const project = projects.insert(db, { name: "Lead completion", rootPath: `/tmp/completion-${randomUUID()}`, defaultBranch: "main", gitRemote: null, settings: {} });
-  const thread = threads.insert(db, { projectId: project.id, title: "Lead work", ...settings, mode: "act", permissionMode: "trusted" });
+  const thread = insertLegacyThread(db, { projectId: project.id, title: "Lead work", ...settings, mode: "act", permissionMode: "trusted" });
   const saved = orchestration.save(db, {
     projectId: project.id,
     expectedRevisionId: null,

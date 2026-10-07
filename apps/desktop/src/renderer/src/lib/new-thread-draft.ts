@@ -11,6 +11,7 @@ export type NewThreadTarget =
   | { kind: "unavailable"; label: string; reason: string };
 
 export interface NewThreadDraft {
+  claudeAccountId?: string;
   projectId: string;
   workingDirectory?: string;
   prompt: string;
@@ -31,6 +32,7 @@ export function decodeNewThreadDraft(projectId: string, value: unknown, legacyPr
       ? { key: raw.launchRequest.key, fingerprint: raw.launchRequest.fingerprint }
       : null;
   const fallback: NewThreadDraft = {
+    ...(typeof raw.claudeAccountId === "string" && raw.claudeAccountId.length <= 100 ? { claudeAccountId: raw.claudeAccountId } : {}),
     projectId,
     ...(typeof raw.workingDirectory === "string" && raw.workingDirectory.length <= 4096 ? { workingDirectory: raw.workingDirectory } : {}),
     prompt: typeof raw.prompt === "string" ? raw.prompt : legacyPrompt,
@@ -151,7 +153,7 @@ export function newThreadStartInput(
 ): RpcParams<"threads.start"> {
   const choice = targetModel(draft.target);
   if (!choice || draft.target.kind === "unavailable") throw new Error("Choose an execution target first.");
-  return { projectId: draft.projectId, mode: draft.mode, ...input, ...startTarget(draft.target, choice) };
+  return { projectId: draft.projectId, mode: draft.mode, ...input, ...startTarget(draft.target, choice), ...(draft.claudeAccountId ? { claudeAccountId: draft.claudeAccountId } : {}) };
 }
 
 function startTarget(target: Exclude<NewThreadTarget, { kind: "unavailable" }>, choice: ModelChoice): Partial<RpcParams<"threads.start">> {

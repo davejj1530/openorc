@@ -1,9 +1,12 @@
+import { useClaudeAccountId } from "./claude-account";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRpc, useRpcMutation } from "./query";
 
 export function useModelCatalog() {
   const client = useQueryClient();
-  const query = useRpc("agents.modelCatalog", {}, { staleTime: 5 * 60_000 });
+  const claudeAccountId = useClaudeAccountId();
+  const params = claudeAccountId ? { claudeAccountId } : {};
+  const query = useRpc("agents.modelCatalog", params, { staleTime: 5 * 60_000 });
   const refresh = useRpcMutation("agents.models.refresh");
   return {
     ...query,
@@ -13,8 +16,8 @@ export function useModelCatalog() {
     isError: query.isError || refresh.isError,
     refreshModels: async () => {
       try {
-        const catalog = await refresh.mutateAsync({});
-        client.setQueryData(["agents.modelCatalog", {}], catalog);
+        const catalog = await refresh.mutateAsync(params);
+        client.setQueryData(["agents.modelCatalog", params], catalog);
         await client.invalidateQueries({ queryKey: ["agents.models"] });
       } catch {
         /* The picker displays the mutation's error and keeps its last list. */

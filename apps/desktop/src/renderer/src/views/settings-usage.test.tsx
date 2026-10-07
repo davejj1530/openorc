@@ -104,7 +104,7 @@ it("refreshes only the opened provider once on return and does not infer a Claud
         },
   );
   mount(<ProviderUsageOverview active />);
-  const claude = await screen.findByRole("region", { name: "Claude Code usage" });
+  const claude = await screen.findByRole("region", { name: "Claude · Existing CLI login usage" });
   await within(claude).findByText("Use your free reset in Claude Settings → Usage.");
   expect(within(claude).queryByText(/resets available/)).toBeNull();
   expect(within(claude).queryByRole("button", { name: "Use reset" })).toBeNull();

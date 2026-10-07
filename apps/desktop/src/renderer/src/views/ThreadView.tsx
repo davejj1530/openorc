@@ -1,3 +1,5 @@
+import { ClaudeAccountScope } from "../lib/claude-account";
+import { ThreadClaudeAccount } from "../components/ClaudeAccountPicker";
 import { useEffect, useRef, useState } from "react";
 import { AlarmClock, ArrowLeft, GitFork, GitPullRequest, MoreHorizontal, X } from "../components/icons";
 import { Menu } from "@base-ui/react/menu";
@@ -81,7 +83,7 @@ export function ThreadView({ threadId, first, last, focused, onClose }: { thread
   }
 
   return (
-    <>
+    <ClaudeAccountScope id={t.claudeAccountId ?? "claude-cli"}>
       <RevealEmittedPlan key={threadId} threadId={threadId} focused={focused} team={Boolean(t.teamInstanceId)} />
       <main className="workspace-main well flex-1 min-w-0 flex flex-col">
         <TopBar
@@ -91,6 +93,7 @@ export function ThreadView({ threadId, first, last, focused, onClose }: { thread
           rightmost={last && !panelOpen}
           actions={
             <>
+              {t.agent === "claude" ? <ThreadClaudeAccount /> : null}
               {t.teamInstanceId ? <span ref={setTeamToolbar} className="thread-team-toolbar" /> : null}
               {!t.teamInstanceId && t.activity !== "idle" ? <Badge tone={t.activity === "waiting" ? "warn" : "accent"}>{t.activity === "waiting" ? "needs you" : "working"}</Badge> : null}
               {t.prUrl ? (
@@ -146,7 +149,7 @@ export function ThreadView({ threadId, first, last, focused, onClose }: { thread
           <Conversation key={t.id} scope={{ kind: "thread", thread: t }} project={p} toolbarTarget={teamToolbar} />
         </div>
       </main>
-    </>
+    </ClaudeAccountScope>
   );
 }
 

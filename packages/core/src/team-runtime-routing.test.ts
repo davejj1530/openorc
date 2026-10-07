@@ -246,7 +246,9 @@ async function readinessProbes(loggedIn = () => true) {
   const system = new SystemService(directory, environment, command);
   vi.mocked(core.orchestration.preflight).mockRestore();
   vi.spyOn(core.system, "info").mockImplementation((refresh) => system.info(refresh));
+  vi.spyOn(core.system, "infoFor").mockImplementation((snapshot) => system.infoFor({ ...environment.current(), scope: snapshot.scope }));
   await system.info();
+  await system.infoFor({ ...environment.current(), scope: "claude-cli:0" });
   probe.mockClear();
   command.mockClear();
   return { probe, command };

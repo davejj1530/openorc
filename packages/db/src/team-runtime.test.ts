@@ -1,3 +1,4 @@
+import { insertLegacyThread } from "./fixtures/legacy-thread.js";
 import { insertLegacyRun } from "./fixtures/legacy-run.js";
 import { LEGACY_TEAM_PROMPT, legacyTeamRuntime, readLegacyJournals, teamJournalWriter } from "./fixtures/legacy-team-journal.js";
 import { randomUUID } from "node:crypto";
@@ -26,7 +27,7 @@ const settings = { agent: "codex" as const, model: "gpt-6-astra", effort: "high"
 function fixture(db = Db.memory()) {
   opened.push(db);
   const project = projects.insert(db, { name: "Runtime", rootPath: `/tmp/runtime-${randomUUID()}`, defaultBranch: "main", gitRemote: null, settings: {} });
-  const thread = threads.insert(db, { projectId: project.id, title: "Team work", ...settings, mode: "act", permissionMode: "trusted" });
+  const thread = insertLegacyThread(db, { projectId: project.id, title: "Team work", ...settings, mode: "act", permissionMode: "trusted" });
   const draft: TeamDraft = {
     name: "Team",
     limits: { maxConcurrentAgents: 3, maxAssignments: 24, maxExecutionMinutes: 60, maxAttemptsPerAssignment: 2 },
@@ -1321,7 +1322,7 @@ describe("historical assignment ownership", () => {
     expect(teamRuntime.prompt(migrated, initial.id, first.record.attempts[0]!.id)).toBe(LEGACY_TEAM_PROMPT);
     expect(teamContexts.get(migrated, checkpoint.id)).toEqual(checkpoint);
     expect(teamWorkspaces.publications(migrated, initial.id)).toEqual([applied]);
-    expect(runs.get(migrated, oldRun.id)).toEqual({ ...oldRun, workingDirectory: null, commentTurnId: null });
+    expect(runs.get(migrated, oldRun.id)).toEqual({ ...oldRun, claudeAccountId: null, workingDirectory: null, commentTurnId: null });
     const updated = teamRuntime.update(migrated, initial.id, (draft) => followup(draft, first.value, "after-migration")).record;
     expect(
       teamContexts.create(migrated, {

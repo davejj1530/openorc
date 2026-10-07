@@ -10,6 +10,7 @@ import { executionProject } from "./workspace-home.js";
 export function matchesContinueSettings(entry: LiveRun, desired: ContinueSettings): boolean {
   const launched = entry.run.mode === "plan" ? entry.run.permissionMode : entry.providerPermissionMode;
   if (entry.run.agent !== desired.agent || entry.run.mode !== desired.mode) return false;
+  if (desired.agent === "claude" && desired.claudeAccountId !== undefined && entry.run.claudeAccountId !== desired.claudeAccountId) return false;
   if (launched !== desired.permissionMode) return false;
   if ((entry.run.effort ?? null) !== (desired.effort ?? null)) return false;
   if (Boolean(entry.run.fastMode) !== Boolean(desired.fastMode)) return false;
@@ -31,7 +32,7 @@ interface RunTurnsDependencies {
   keysFor: (scope: RunScope) => string[];
   start: (input: StartRunInput) => Promise<Run>;
   emit: (event: AgentEvent) => void;
-  validateFastMode: (agent: AgentKind, model: string | undefined, fastMode: boolean | undefined) => Promise<void>;
+  validateFastMode: (agent: AgentKind, model: string | undefined, fastMode: boolean | undefined, claudeAccountId?: string) => Promise<void>;
   log: Logger;
 }
 
@@ -141,7 +142,7 @@ export class RunTurns {
     const settings = this.requestedSettings(entry, thread);
     if (!settings) return false;
     if (settings.model === undefined && settings.effort === undefined && settings.fastMode === undefined) return true;
-    if (settings.fastMode) await this.deps.validateFastMode(thread.agent, thread.model ?? entry.run.model ?? undefined, true);
+    if (settings.fastMode) await this.deps.validateFastMode(thread.agent, thread.model ?? entry.run.model ?? undefined, true, thread.claudeAccountId ?? "claude-cli");
     if (!entry.handle.canApplySettings) return false;
     try {
       await entry.handle.applySettings(settings);

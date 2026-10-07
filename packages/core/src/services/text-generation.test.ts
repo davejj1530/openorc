@@ -30,12 +30,12 @@ describe("independent text generation", () => {
     const title = vi.spyOn(TextGenerator.prototype, "title").mockResolvedValue("CSV export filters");
     expect(await service.settings()).toEqual({ provider: "auto", model: null, resolved: null, reason: null });
     await expect(service.title({ request: "Add CSV", reply: "Done" }, "codex")).resolves.toBe("CSV export filters");
-    expect(providers.launch).toHaveBeenCalledWith("codex");
-    expect(providers.launch).not.toHaveBeenCalledWith("claude");
+    expect(providers.launch).toHaveBeenCalledWith("codex", undefined);
+    expect(providers.launch).not.toHaveBeenCalledWith("claude", undefined);
     vi.mocked(providers.launch).mockClear();
     await expect(service.title({ request: "Add CSV", reply: "Done" }, "claude")).resolves.toBe("CSV export filters");
-    expect(providers.launch).toHaveBeenCalledWith("claude");
-    expect(providers.launch).not.toHaveBeenCalledWith("codex");
+    expect(providers.launch).toHaveBeenCalledWith("claude", undefined);
+    expect(providers.launch).not.toHaveBeenCalledWith("codex", undefined);
     expect(title).toHaveBeenCalledTimes(2);
   });
 
@@ -43,7 +43,7 @@ describe("independent text generation", () => {
     const { service, providers } = fixture({ claude: true, codex: false, opencode: false });
     const title = vi.spyOn(TextGenerator.prototype, "title");
     await expect(service.title({ request: "Export", reply: null }, "codex")).resolves.toBeNull();
-    expect(providers.launch).not.toHaveBeenCalledWith("claude");
+    expect(providers.launch).not.toHaveBeenCalledWith("claude", undefined);
     expect(title).not.toHaveBeenCalled();
   });
 
@@ -62,8 +62,8 @@ describe("independent text generation", () => {
     const title = vi.spyOn(TextGenerator.prototype, "title").mockResolvedValue("Named");
     expect((await service.updateSettings({ provider: "claude" })).resolved).toMatchObject({ provider: "claude", model: "claude-haiku-4-5-20251001" });
     await expect(service.title({ request: "Export", reply: null }, "codex")).resolves.toBe("Named");
-    expect(providers.launch).toHaveBeenCalledWith("claude");
-    expect(providers.launch).not.toHaveBeenCalledWith("codex");
+    expect(providers.launch).toHaveBeenCalledWith("claude", undefined);
+    expect(providers.launch).not.toHaveBeenCalledWith("codex", undefined);
     expect(title).toHaveBeenCalledTimes(1);
   });
 
@@ -119,4 +119,13 @@ describe("independent text generation", () => {
     expect((await service.updateSettings({ provider: "claude" })).resolved).toBeNull();
     expect(title).not.toHaveBeenCalled();
   });
+});
+
+it("uses the conversation's account for model checks, login checks and title generation", async () => {
+  const { service, providers } = fixture();
+  vi.spyOn(TextGenerator.prototype, "title").mockResolvedValue("Work title");
+  await expect(service.title({ request: "Work request", reply: null }, "claude", "work-account")).resolves.toBe("Work title");
+  expect(providers.models).toHaveBeenCalledWith("claude", "work-account");
+  expect(providers.loggedIn).toHaveBeenCalledWith("work-account");
+  expect(providers.launch).toHaveBeenCalledWith("claude", "work-account");
 });

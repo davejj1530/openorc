@@ -1,5 +1,16 @@
 import { audit, orchestration, projects, type Db } from "@openorc/db";
-import { TeamDraft, harnessCatalog, type ExecutableAgent, type ModelOption, type RpcParams, type TeamDetail, type TeamMemberAvatar, type TeamPreflight } from "@openorc/protocol";
+import {
+  DEFAULT_TEAM_LIMITS,
+  type ModelExecutionSettings,
+  TeamDraft,
+  harnessCatalog,
+  type ExecutableAgent,
+  type ModelOption,
+  type RpcParams,
+  type TeamDetail,
+  type TeamMemberAvatar,
+  type TeamPreflight,
+} from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
 import { normalizeModelSettings } from "@openorc/protocol";
 import { copyFile, mkdir, rm, stat } from "node:fs/promises";
@@ -13,8 +24,8 @@ function editableTeam(detail: TeamDetail): TeamDetail {
 }
 
 export interface TeamCatalog {
-  models(agent: ExecutableAgent): Promise<ModelOption[]>;
-  status(agent: ExecutableAgent, refresh: boolean): Promise<{ installed: boolean; loggedIn: boolean | null }>;
+  models(agent: ExecutableAgent, claudeAccountId?: string | null): Promise<ModelOption[]>;
+  status(agent: ExecutableAgent, refresh: boolean, claudeAccountId?: string | null): Promise<{ installed: boolean; loggedIn: boolean | null }>;
 }
 
 /**
@@ -174,7 +185,21 @@ export class OrchestrationService {
    * Local readiness, not a promise of account entitlement or runtime availability.
    * User-requested checks refresh by default; automatic turn checks can reuse recent provider readiness.
    */
-  async preflight(input: RpcParams<"orchestration.preflight">, options: { refresh?: boolean } = {}): Promise<TeamPreflight> {
+  async validateExecution(settings: ModelExecutionSettings, projectId: string, claudeAccountId?: string | null): Promise<void> {
+    const input = {
+      projectId,
+      draft: {
+        name: "Execution check",
+        limits: DEFAULT_TEAM_LIMITS,
+        members: [{ key: "member", name: "Member", managerKey: null, responsibility: "Validate the captured execution settings.", settings }],
+      },
+    };
+    let result = await this.preflight(input, { refresh: false, claudeAccountId });
+    if (!result.ready) result = await this.preflight(input, { claudeAccountId });
+    if (!result.ready) throw new Error(result.issues.map((issue) => issue.message).join("\n"));
+  }
+
+  async preflight(input: RpcParams<"orchestration.preflight">, options: { refresh?: boolean; claudeAccountId?: string | null } = {}): Promise<TeamPreflight> {
     this.requireProject(input.projectId);
     const draft = TeamDraft.parse(input.draft);
     const providers = [...new Set(draft.members.map((member) => member.settings.agent))];
@@ -189,7 +214,7 @@ export class OrchestrationService {
         };
         let status: Awaited<ReturnType<TeamCatalog["status"]>>;
         try {
-          status = await this.catalog.status(agent, options.refresh ?? true);
+          status = await this.catalog.status(agent, options.refresh ?? true, options.claudeAccountId);
         } catch {
           return providerIssue("provider_unavailable", "Could not check this provider. Try checking readiness again.");
         }
@@ -199,7 +224,7 @@ export class OrchestrationService {
         if (status.loggedIn !== true) return providerIssue("login_unknown", `Could not confirm login for ${label}.`);
         let models: ModelOption[];
         try {
-          models = await this.catalog.models(agent);
+          models = await this.catalog.models(agent, options.claudeAccountId);
         } catch {
           return providerIssue("catalog_unavailable", `Could not load ${label} models. Your saved choices are unchanged.`);
         }

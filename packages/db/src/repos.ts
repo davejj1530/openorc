@@ -1,3 +1,5 @@
+import { claudeAccounts } from "./claude-accounts.js";
+import { DEFAULT_CLAUDE_ACCOUNT } from "@openorc/protocol";
 import { threadListOrder } from "./thread-list-order.js";
 import { randomUUID } from "node:crypto";
 import { WORKSPACE_ID } from "@openorc/protocol";
@@ -195,6 +197,7 @@ export const tasks = {
 /* Threads */
 
 interface ThreadRow {
+  claude_account_id: string | null;
   id: string;
   working_directory: string | null;
   project_id: string;
@@ -230,6 +233,7 @@ interface ThreadRow {
 
 function threadFromRow(r: ThreadRow): Thread {
   return {
+    claudeAccountId: r.claude_account_id,
     workingDirectory: r.working_directory,
     id: r.id,
     projectId: r.project_id,
@@ -265,6 +269,7 @@ function threadFromRow(r: ThreadRow): Thread {
 }
 
 export interface ThreadPatch {
+  claudeAccountId?: string | null;
   workingDirectory?: string | null;
   title?: string;
   mode?: Thread["mode"];
@@ -291,6 +296,7 @@ export interface ThreadPatch {
 }
 
 const threadColumns: Record<keyof ThreadPatch, string> = {
+  claudeAccountId: "claude_account_id",
   workingDirectory: "working_directory",
   title: "title",
   mode: "mode",
@@ -319,6 +325,7 @@ const threadColumns: Record<keyof ThreadPatch, string> = {
 export type ThreadListFilter = "active" | "done" | "archived" | "all";
 
 export interface ThreadInsert {
+  claudeAccountId?: string | null;
   /** Preallocated when workspace admission must precede persistence. */
   id?: string;
   projectId: string;
@@ -378,8 +385,9 @@ export const threads = {
     const id = t.id ?? randomUUID();
     const ts = t.createdAt ?? now();
     db.stmt(
-      "INSERT INTO threads (id, project_id, title, agent, model, effort, fast_mode, mode, permission_mode, workspace_mode, forked_from_id, forked_at_run_id, imported_from, seen_at, created_at, updated_at, last_activity_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO threads (claude_account_id, id, project_id, title, agent, model, effort, fast_mode, mode, permission_mode, workspace_mode, forked_from_id, forked_at_run_id, imported_from, seen_at, created_at, updated_at, last_activity_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     ).run(
+      t.claudeAccountId ?? claudeAccounts.defaultId(db),
       id,
       t.projectId,
       t.title,
@@ -447,6 +455,7 @@ export const threads = {
 /* Runs */
 
 interface RunRow {
+  claude_account_id: string | null;
   comment_turn_id: string | null;
   id: string;
   working_directory: string | null;
@@ -470,6 +479,7 @@ interface RunRow {
 
 function runFromRow(r: RunRow): Run {
   return {
+    claudeAccountId: r.claude_account_id,
     commentTurnId: r.comment_turn_id,
     workingDirectory: r.working_directory,
     id: r.id,
@@ -506,6 +516,7 @@ export const runs = {
   insert(
     db: Db,
     r: {
+      claudeAccountId?: string | null;
       id: string;
       commentTurnId?: string;
       workingDirectory?: string;
@@ -522,8 +533,22 @@ export const runs = {
   ): Run {
     if ([r.taskId, r.threadId, r.commentTurnId].filter(Boolean).length !== 1) throw new Error("a run belongs to exactly one task, thread or comment turn");
     db.stmt(
-      "INSERT INTO runs (id, task_id, thread_id, agent, model, effort, fast_mode, mode, permission_mode, state, started_at, working_directory, comment_turn_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'starting', ?, ?, ?)",
-    ).run(r.id, r.taskId, r.threadId, r.agent, r.model, r.effort ?? null, Number(r.fastMode ?? false), r.mode, r.permissionMode, now(), r.workingDirectory ?? null, r.commentTurnId ?? null);
+      "INSERT INTO runs (claude_account_id, id, task_id, thread_id, agent, model, effort, fast_mode, mode, permission_mode, state, started_at, working_directory, comment_turn_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'starting', ?, ?, ?)",
+    ).run(
+      r.agent === "claude" ? (r.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT) : null,
+      r.id,
+      r.taskId,
+      r.threadId,
+      r.agent,
+      r.model,
+      r.effort ?? null,
+      Number(r.fastMode ?? false),
+      r.mode,
+      r.permissionMode,
+      now(),
+      r.workingDirectory ?? null,
+      r.commentTurnId ?? null,
+    );
     // Set apart so ledgers from before Orclings accept every other run unchanged.
     if (r.orclingId) db.stmt("UPDATE runs SET orcling_id = ? WHERE id = ?").run(r.orclingId, r.id);
     return runs.get(db, r.id) as Run;
@@ -601,12 +626,14 @@ export const runs = {
   },
   /** The most recent session id for a task or thread, so a new run can resume it. */
   /** The newest session of this provider in a task or thread, spoken by the same Orcling or, without one, by no Orcling. */
-  lastSession(db: Db, scope: { taskId: string } | { threadId: string }, agent: Run["agent"], orclingId: string | null = null): string | null {
+  lastSession(db: Db, scope: { taskId: string } | { threadId: string }, agent: Run["agent"], orclingId: string | null = null, claudeAccountId = DEFAULT_CLAUDE_ACCOUNT): string | null {
     const column = "taskId" in scope ? "task_id" : "thread_id";
     const id = "taskId" in scope ? scope.taskId : scope.threadId;
     const r = db
-      .stmt(`SELECT external_session_id FROM runs WHERE ${column} = ? AND agent = ? AND orcling_id IS ? AND external_session_id IS NOT NULL ORDER BY started_at DESC LIMIT 1`)
-      .get(id, agent, orclingId) as { external_session_id: string } | undefined;
+      .stmt(
+        `SELECT external_session_id FROM runs WHERE ${column} = ? AND agent = ? AND orcling_id IS ? AND (agent != 'claude' OR claude_account_id = ?) AND external_session_id IS NOT NULL ORDER BY started_at DESC LIMIT 1`,
+      )
+      .get(id, agent, orclingId, claudeAccountId) as { external_session_id: string } | undefined;
     return r?.external_session_id ?? null;
   },
 };

@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRpc } from "../lib/query";
 
 export function ProviderUsageOverview({ active }: { active: boolean }) {
+  const accounts = useRpc("claude.accounts.list", {}, { enabled: active });
   const memory = useRpc("memory.settings.get", {});
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
@@ -19,9 +20,18 @@ export function ProviderUsageOverview({ active }: { active: boolean }) {
   }, [active]);
   return (
     <div className="usage-overview">
-      {harnessIds.map((id) => (
-        <ProviderReport key={id} provider={id} name={harnessCatalog[id].name} active={active} now={now} />
-      ))}
+      {harnessIds
+        .filter((id) => id !== "claude")
+        .map((id) => (
+          <ProviderReport key={id} provider={id} name={harnessCatalog[id].name} active={active} now={now} />
+        ))}
+      <div id="provider-usage-claude" tabIndex={-1}>
+        {(accounts.data?.accounts ?? [{ id: "claude-cli", name: "Existing CLI login", enabled: true }])
+          .filter((account) => account.enabled)
+          .map((account) => (
+            <ProviderReport key={account.id} provider="claude" claudeAccountId={account.id} name={`Claude · ${account.name}`} active={active} now={now} />
+          ))}
+      </div>
       {(memory.data?.hasApiKey || memory.data?.provider === "apikey") && <ProviderReport provider="anthropic-api" name="Anthropic API" active={active} now={now} />}
       {memory.isError && (
         <p className="text-bad mt-3" role="alert">
@@ -36,8 +46,8 @@ export function ProviderUsageOverview({ active }: { active: boolean }) {
   );
 }
 
-function ProviderReport({ provider, name, active, now }: { provider: ProviderUsage["provider"]; name: string; active: boolean; now: number }) {
-  const q = useRpc("providers.usage", { provider }, { enabled: active, staleTime: 60_000 });
+function ProviderReport({ provider, claudeAccountId, name, active, now }: { provider: ProviderUsage["provider"]; claudeAccountId?: string; name: string; active: boolean; now: number }) {
+  const q = useRpc("providers.usage", { provider, ...(claudeAccountId ? { claudeAccountId } : {}) }, { enabled: active, staleTime: 60_000 });
   const d = q.data;
   const returning = useRef(false);
   useEffect(() => {
@@ -54,7 +64,7 @@ function ProviderReport({ provider, name, active, now }: { provider: ProviderUsa
   const state = usageReportStatus({ error: q.isError, fetching: q.isFetching, report: d, stale, exhausted });
   const failed = q.isError || d?.status === "error";
   return (
-    <section id={`provider-usage-${provider}`} tabIndex={-1} className="usage-account" aria-label={`${name} usage`} aria-busy={q.isFetching}>
+    <section id={`provider-usage-${claudeAccountId ?? provider}`} tabIndex={-1} className="usage-account" aria-label={`${name} usage`} aria-busy={q.isFetching}>
       <header className="usage-account-heading">
         <div className="usage-account-identity">
           <HarnessLogo id={provider === "anthropic-api" ? "claude" : provider} size={26} />

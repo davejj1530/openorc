@@ -1,3 +1,4 @@
+import { insertLegacyThread } from "./fixtures/legacy-thread.js";
 import { insertLegacyRun } from "./fixtures/legacy-run.js";
 import { afterEach, describe, expect, it } from "vitest";
 import { DatabaseSync } from "node:sqlite";
@@ -42,7 +43,7 @@ function draft(): TeamDraft {
 }
 
 function addThread(db: Db, projectId: string) {
-  return threads.insert(db, { projectId, title: "A conversation", agent: "codex", model: "gpt-6-astra", mode: "act", permissionMode: "trusted" });
+  return insertLegacyThread(db, { projectId, title: "A conversation", agent: "codex", model: "gpt-6-astra", mode: "act", permissionMode: "trusted" });
 }
 
 function rowCount(db: Db, table: string): number {

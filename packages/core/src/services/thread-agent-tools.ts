@@ -321,6 +321,7 @@ export class ThreadAgentTools {
         projectId: parent.projectId,
         ...childFolder(parent),
         ...settings,
+        claudeAccountId: parent.claudeAccountId ?? undefined,
         mode: run.mode,
         permissionMode: run.permissionMode,
         prompt: `${opener(parent)}\n\n${input.prompt.trim()}`,

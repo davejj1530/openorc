@@ -1,6 +1,7 @@
 export * from "./task-comments.js";
 export * from "./harness.js";
 export * from "./slack.js";
+export * from "./claude-accounts.js";
 export * from "./events.js";
 export * from "./mcp-apps.js";
 export * from "./domain.js";

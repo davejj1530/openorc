@@ -11,6 +11,8 @@ function nextTab(session: PanelSession, index: number, key: string): WorkTab | u
   return undefined;
 }
 
+}
+
 export function PanelTabs({ session, onSelect, onClose }: { session: PanelSession; onSelect: (id: string) => void; onClose: (id: string) => void }) {
   const strip = useRef<HTMLDivElement>(null);
   useEffect(() => {

@@ -68,8 +68,8 @@ const runCommand: CommandProbe = (binary, args, env) =>
 
 /** What agents and tools this machine has, derived from the environment that launches them. */
 export class SystemService {
-  private cache: { at: number; revision: number; info: SystemInfo } | null = null;
-  private readonly inFlight = new Map<number, Promise<SystemInfo>>();
+  private readonly cache = new Map<string, { at: number; info: SystemInfo }>();
+  private readonly inFlight = new Map<string, Promise<SystemInfo>>();
 
   constructor(
     private readonly dataDir: string,
@@ -87,11 +87,14 @@ export class SystemService {
 
   /** Reads one explicit snapshot, used by admitted runs that must not drift across awaits. */
   infoFor(snapshot: EnvSnapshot, env: Readonly<NodeJS.ProcessEnv> = captureProcessEnvironment(snapshot)): Promise<SystemInfo> {
-    if (this.cache?.revision === snapshot.revision && Date.now() - this.cache.at < 60_000) return Promise.resolve(this.cache.info);
-    const pending = this.inFlight.get(snapshot.revision);
+    const key = `${snapshot.revision}:${snapshot.scope ?? ""}`;
+    for (const [storedKey, value] of this.cache) if (Date.now() - value.at >= 60_000) this.cache.delete(storedKey);
+    const cached = this.cache.get(key);
+    if (cached) return Promise.resolve(cached.info);
+    const pending = this.inFlight.get(key);
     if (pending) return pending;
-    const next = this.probeAll(snapshot, env).finally(() => this.inFlight.delete(snapshot.revision));
-    this.inFlight.set(snapshot.revision, next);
+    const next = this.probeAll(snapshot, env).finally(() => this.inFlight.delete(key));
+    this.inFlight.set(key, next);
     return next;
   }
 
@@ -99,7 +102,7 @@ export class SystemService {
     const harnesses = await Promise.all(harnessIds.map((id) => this.probeHarness(id, snapshot, env)));
     const ghPath = await resolveBinary("gh", snapshot.path);
     const info = this.systemInfo(harnesses, { installed: ghPath !== null, path: ghPath });
-    this.cache = { at: Date.now(), revision: snapshot.revision, info };
+    this.cache.set(`${snapshot.revision}:${snapshot.scope ?? ""}`, { at: Date.now(), info });
     return info;
   }
 
@@ -122,7 +125,7 @@ export class SystemService {
 
   /** A failed login-shell refresh is not proof that either installed harness disappeared. */
   private failedRefreshInfo(snapshot: EnvSnapshot): SystemInfo {
-    const previous = this.cache?.revision === snapshot.revision ? this.cache.info : null;
+    const previous = this.cache.get(`${snapshot.revision}:${snapshot.scope ?? ""}`)?.info;
     const harnesses = harnessIds.map((id): HarnessInfo => {
       const known = previous?.harnesses.find((row) => row.id === id);
       return {

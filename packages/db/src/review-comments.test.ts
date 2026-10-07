@@ -1,3 +1,4 @@
+import { insertLegacyThread } from "./fixtures/legacy-thread.js";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -30,7 +31,7 @@ function ledgerBeforeConversationComments() {
 it("moves a task's comments to the conversation it runs in and keeps everything they recorded", () => {
   const { file, db, upgrade } = ledgerBeforeConversationComments();
   const project = projects.insert(db, { name: "Review", rootPath: "/tmp/review-migration", gitRemote: null, defaultBranch: "main", settings: {} });
-  const conversation = threads.insert(db, { projectId: project.id, title: "Works on it", agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
+  const conversation = insertLegacyThread(db, { projectId: project.id, title: "Works on it", agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
   const task = (title: string) =>
     tasks.insert(db, { projectId: project.id, title, spec: null, priority: "none", labels: [], workspaceMode: "current", baseRef: "main", parentTaskId: null, threadId: null, origin: "user" });
   const running = tasks.update(db, task("Running").id, { executionThreadId: conversation.id });

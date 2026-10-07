@@ -1,5 +1,6 @@
 import {
   audit,
+  claudeAccounts,
   plans,
   settings,
   checkpoints,
@@ -208,8 +209,8 @@ export class ThreadService {
   }
 
   async start(input: StartThreadInput, internal?: { assertCanAdmit(): void; onAdmitted(thread: Thread): void }): Promise<{ thread: Thread; run: Run }> {
-    input = normalizeModelSettings(input);
-    await this.runs.validateFastMode(input.agent, input.model, input.fastMode);
+    input = { ...normalizeModelSettings(input), claudeAccountId: input.claudeAccountId ?? claudeAccounts.defaultId(this.db) };
+    await this.runs.validateFastMode(input.agent, input.model, input.fastMode, undefined, undefined, input.claudeAccountId);
     internal?.assertCanAdmit();
     if (input.workingDirectory && input.projectId !== WORKSPACE_ID) throw new Error("Only Workspace conversations can choose a working folder.");
     const home = executionProject(this.db, { projectId: input.projectId });
@@ -230,6 +231,7 @@ export class ThreadService {
             projectId: project.id,
             title,
             agent: input.agent,
+            claudeAccountId: input.claudeAccountId,
             model: input.model ?? null,
             effort: input.effort ?? null,
             fastMode: input.fastMode ?? false,
@@ -400,7 +402,7 @@ export class ThreadService {
     // A fresh start, or a provider that cannot read the old session, gets a brief instead of the session.
     const switching = own.length > 0 && !own.some((r) => r.agent === input.agent);
     const handoff = own.length > 0 && (switching || input.fresh) ? this.agentTools.handoffBrief(thread, own) : undefined;
-    await this.runs.validateFastMode(input.agent, input.model, input.fastMode);
+    await this.runs.validateFastMode(input.agent, input.model, input.fastMode, undefined, undefined, thread.claudeAccountId);
     const previous = this.runs.liveRunForThread(id);
     if (previous) {
       if (this.runs.threadActivity(id) !== "idle") throw new Error("Wait for the current turn to finish before changing its session settings.");
@@ -464,8 +466,8 @@ export class ThreadService {
 
   /** A fork's first run continues its parent's session as a new one; the parent keeps its own history. */
   private resumeSourceFor(thread: Thread, agent: AgentKind): { resumeFrom: { sessionId: string; fork: boolean } } | null {
-    if (!thread.forkedFromId || runRepo.lastSession(this.db, { threadId: thread.id }, agent)) return null;
-    const parentSession = runRepo.lastSession(this.db, { threadId: thread.forkedFromId }, agent);
+    if (!thread.forkedFromId || runRepo.lastSession(this.db, { threadId: thread.id }, agent, null, thread.claudeAccountId ?? undefined)) return null;
+    const parentSession = runRepo.lastSession(this.db, { threadId: thread.forkedFromId }, agent, null, thread.claudeAccountId ?? undefined);
     return parentSession ? { resumeFrom: { sessionId: parentSession, fork: true } } : null;
   }
 
@@ -485,7 +487,7 @@ export class ThreadService {
     if (!exchange.prompt || thread.title !== titleFromPrompt(exchange.prompt)) return;
     let title: string | null = null;
     try {
-      title = await this.titler({ request: exchange.prompt, reply: exchange.reply }, thread.agent);
+      title = await this.titler({ request: exchange.prompt, reply: exchange.reply }, thread.agent, thread.claudeAccountId ?? "claude-cli");
     } catch (e) {
       this.log.warn(`could not name thread ${thread.id}: ${e instanceof Error ? e.message : String(e)}`);
     }
@@ -605,6 +607,7 @@ export class ThreadService {
       projectId: parent.projectId,
       title: `${parent.title} (fork)`,
       agent: parent.agent,
+      claudeAccountId: parent.claudeAccountId,
       model: parent.model,
       effort: parent.effort,
       fastMode: parent.fastMode,

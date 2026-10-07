@@ -578,7 +578,7 @@ describe("threads", () => {
     try {
       await core.threads.onTurnCompleted(thread, { prompt, reply: "Done" });
       expect(threads.get(core.db, thread.id)?.title).toBe("Independent title settings");
-      expect(title).toHaveBeenCalledWith({ request: prompt, reply: "Done" }, "codex");
+      expect(title).toHaveBeenCalledWith({ request: prompt, reply: "Done" }, "codex", "claude-cli");
       expect(memory).not.toHaveBeenCalled();
     } finally {
       title.mockRestore();

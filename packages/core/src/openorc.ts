@@ -1,3 +1,6 @@
+import { ClaudeAccountService } from "./services/claude-accounts.js";
+import { claudeRunAccount } from "./services/claude-run-account.js";
+import { createClaudeAccountHandlers } from "./handlers/claude-accounts.js";
 import { invalidParamsMessage, resultSummary } from "./handlers/diagnostics.js";
 import { captureLaunchEnvironment, recoverAgentProcesses } from "@openorc/agents";
 import {
@@ -19,7 +22,7 @@ import {
 import { startMcpServer, type OpenOrcMcpServer } from "@openorc/mcp";
 import type { TextEmbedder } from "@openorc/memory";
 import type { BrowserHost } from "@openorc/protocol";
-import { DEFAULT_TEAM_LIMITS, harnessInfo, harnessInstalled, harnessLoggedIn, rpcParams, type HarnessId, type RpcMethod, type RpcRequest } from "@openorc/protocol";
+import { harnessInfo, harnessInstalled, harnessLoggedIn, rpcParams, type HarnessId, type RpcMethod, type RpcRequest } from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
@@ -157,6 +160,7 @@ export class OpenOrc {
   readonly system: SystemService;
   readonly agentUpdates: AgentUpdateService;
   /** The environment agents launch with. Runs capture `current()` at admission; Rescan calls `refresh()`. */
+  readonly claudeAccounts: ClaudeAccountService;
   readonly environment: ShellEnvironment;
   readonly providerUsage: ProviderUsageService;
   readonly memory: MemoryService;
@@ -203,11 +207,22 @@ export class OpenOrc {
     this.settings = new AppSettingsService(db);
     this.environment = new ShellEnvironment({ probe: options.shellProbe ?? (options.ephemeral ? inheritedProbe() : undefined) });
     this.system = new SystemService(options.dataDir, this.environment);
+    this.claudeAccounts = new ClaudeAccountService(
+      db,
+      options.dataDir,
+      () => this.environment.current(),
+      (id) => {
+        if (id) this.providerUsage?.forgetClaudeAccount(id);
+        invalidate(["claude-accounts", "system", "models", "provider-usage"]);
+      },
+      (id) => Boolean(this.agentUpdates?.get().updating || this.memory?.hasPendingWork || this.textGeneration?.hasPendingWork || this.runs?.hasClaudeSessions(id)),
+      (id) => this.runs.retireIdleClaudeSessions(id),
+    );
     this.agentUpdates = new AgentUpdateService({
       info: (refresh) => this.system.info(refresh),
       environment: () => this.environment.current(),
       reserve: async () => {
-        if (this.memory.hasPendingWork || this.textGeneration.hasPendingWork || teamRuntime.openIds(this.db).length || this.schedules.hasPendingWork) {
+        if (this.claudeAccounts.hasPendingWork || this.memory.hasPendingWork || this.textGeneration.hasPendingWork || teamRuntime.openIds(this.db).length || this.schedules.hasPendingWork) {
           throw new Error("Finish agent work, teams, and background processing before updating. Your conversations will be kept.");
         }
         return this.runs.reserveAgentUpdate();
@@ -224,12 +239,13 @@ export class OpenOrc {
     this.projects = new ProjectService(db);
     this.workspaces = new WorkspaceService(db, { dataDir: options.dataDir }, this.log, this.workspaceWriters);
     const backgroundProviders: ProviderInfo = {
-      models: (agent) => this.runs.models(agent),
-      loggedIn: () => this.system.info().then((info) => Object.fromEntries(info.harnesses.map((row) => [row.id, harnessLoggedIn(row)])) as Record<HarnessId, boolean>),
-      launch: (agent) => {
+      models: (agent, accountId) => this.runs.models(agent, undefined, undefined, accountId),
+      loggedIn: (accountId) => this.claudeSystemInfo(accountId).then((info) => Object.fromEntries(info.harnesses.map((row) => [row.id, harnessLoggedIn(row)])) as Record<HarnessId, boolean>),
+      launch: (agent, accountId) => {
         if (this.agentUpdates.get().updating) return null;
         try {
-          return captureLaunchEnvironment(agent, this.environment.current());
+          const snapshot = this.environment.current();
+          return captureLaunchEnvironment(agent, agent === "claude" ? this.claudeAccounts.environment(snapshot, accountId) : snapshot);
         } catch {
           return null;
         }
@@ -239,70 +255,14 @@ export class OpenOrc {
     this.textGeneration = new TextGenerationService(db, backgroundProviders, invalidate);
     this.orclings = new OrclingService({ db, dataDir: options.dataDir, memory: this.memory, runs: () => this.runs, threads: () => this.threads, invalidate });
     this.memory.extractionOwner = (run, thread) => this.orclings.memoryOwner(run, thread);
-    this.runs = new RunService(
-      db,
-      this.ledger,
-      this.frames,
-      () => this.mcpServer(),
-      invalidate,
-      this.log,
-      {
-        browserAvailable: Boolean(options.browser),
-        processRegistry: path.join(options.dataDir, "agent-processes"),
-        captureTeamTree: (runId, cwd, lease) => this.teamWorkspaces.captureRunCheckpoint(runId, cwd, lease),
-        assertStart: (input) => this.teams.assertLaunch(input),
-        assertSend: (runId, teamAttemptId) => this.teams.assertSend(runId, teamAttemptId),
-        idleTimeoutMs: () => {
-          const minutes = this.settings.get().idleProcessMinutes;
-          return minutes ? minutes * 60_000 : null;
-        },
-        claudeUserMcpServers: () => this.settings.get().claudeUserMcpServers,
-        orclings: this.orclings.runHooks,
-        taskImages: (spec) => new AttachmentService(options.dataDir).forTask(spec),
-        inlineToolImages: (output) => this.toolImages.inline(output),
-        brief: (project) => this.memory.brief(project),
-        threadContext: (thread) => this.pullRequests.brief(thread),
-        untrustedCheckout: (thread) => inUnvettedCopy(this.db, thread),
-        memoryEnabled: () => this.memory.enabled(),
-        environment: () => this.environment.current(),
-        claudeVersion: (snapshot, env) => (snapshot ? this.system.infoFor(snapshot, env) : this.system.info()).then((info) => harnessInfo(info, "claude").version),
-        onSteerable: (runId) => this.teams.providerReady(runId),
-        onProviderEvent: (event) => this.providerUsage.observe(event),
-        onEvent: (event) => {
-          this.slack?.observe(event);
-          this.comments?.observe(event);
-        },
-        onApprovalRequested: (event) => this.teamNotifications.approval(event),
-        onRunFinished: (run, scope, project) => {
-          this.memory.onRunFinished(run, { task: scope.task, thread: scope.thread ?? this.threads.scopeThreadFor(scope) }, project);
-          if (scope.task && !this.teams.binding(run.id)) void this.threads.onTaskRunFinished(run, scope.task);
-        },
-        onTurnSettled: (run, scope, project, outcome) => {
-          this.comments?.settled(run, outcome);
-          if (scope.comment) return;
-          this.teams.onTurnSettled(run, scope, project, outcome);
-          this.slack?.settled(run.id, outcome);
-        },
-        onThreadTurn: (thread, exchange) => {
-          if (!orchestration.getInstance(db, thread.id)) void this.threads.onTurnCompleted(thread, exchange);
-        },
-        onThreadIdle: (thread) => {
-          if (!orchestration.getInstance(db, thread.id)) this.threads.onIdle(thread);
-        },
-        notify: (event) => {
-          if (!event.threadId || !orchestration.getInstance(db, event.threadId)) notify(event);
-        },
-      },
-      undefined,
-      this.workspaceWriters,
-    );
+    this.runs = new RunService(db, this.ledger, this.frames, () => this.mcpServer(), invalidate, this.log, this.runHooks(notify), undefined, this.workspaceWriters);
     this.threads = new ThreadService(
       db,
       this.runs,
       this.workspaces,
       invalidate,
       this.log,
-      (exchange, agent) => this.textGeneration.title(exchange, agent),
+      (exchange, agent, accountId) => this.textGeneration.title(exchange, agent, accountId),
       this.workspaceWriters,
       (id) => this.teams.modeChanged(id),
     );
@@ -310,13 +270,13 @@ export class OpenOrc {
     this.orchestration = new OrchestrationService(
       db,
       {
-        models: (agent) => this.runs.models(agent),
+        models: (agent, id) => this.runs.models(agent, undefined, undefined, id ?? undefined),
         // An explicit readiness check should observe a login change immediately.
-        status: (agent, refresh) =>
-          this.system.info(refresh).then((info) => {
-            const row = harnessInfo(info, agent);
-            return { installed: harnessInstalled(row), loggedIn: harnessLoggedIn(row) };
-          }),
+        status: async (agent, refresh, id) => {
+          const info = agent === "claude" ? await this.claudeSystemInfo(id, refresh) : await this.system.info(refresh);
+          const row = harnessInfo(info, agent);
+          return { installed: harnessInstalled(row), loggedIn: harnessLoggedIn(row) };
+        },
       },
       invalidate,
       { dataDir: options.dataDir },
@@ -349,21 +309,7 @@ export class OpenOrc {
         assertStopped: (executionId) => this.teamWorkspaces.assertStopped(executionId),
         recoveries: (executionId) => this.teamWorkspaces.pendingRecoveries(executionId),
       },
-      validate: async (executionSettings, projectId) => {
-        const input = {
-          projectId,
-          draft: {
-            name: "Execution check",
-            limits: DEFAULT_TEAM_LIMITS,
-            members: [{ key: "member", name: "Member", managerKey: null, responsibility: "Validate the captured execution settings.", settings: executionSettings }],
-          },
-        };
-        // The existing minute-long readiness cache also preserves revision-scoped model catalogs.
-        // A stale failure gets one fresh check so installing or signing in unblocks the next turn.
-        let result = await this.orchestration.preflight(input, { refresh: false });
-        if (!result.ready) result = await this.orchestration.preflight(input);
-        if (!result.ready) throw new Error(result.issues.map((issue) => issue.message).join("\n"));
-      },
+      validate: (settings, projectId, accountId) => this.orchestration.validateExecution(settings, projectId, accountId),
       tasks: {
         hasPendingWork: (record, actor) => this.teamTasks.hasPendingWork(record, actor),
         instructions: (record, actor) => this.teamTasks.instructions(record, actor),
@@ -449,7 +395,9 @@ export class OpenOrc {
       () => this.settings.get().defaultWorkspaceMode,
       invalidate,
     );
-    this.providerUsage = new ProviderUsageService(db, this.system, { apiKey: () => this.memory.credentialStatus() }, () => this.environment.current());
+    this.providerUsage = new ProviderUsageService(db, this.system, { apiKey: () => this.memory.credentialStatus() }, (id) =>
+      id ? this.claudeAccounts.environment(this.environment.current(), id) : this.environment.current(),
+    );
     this.lifecycle = new LifecycleService(db, this.threads, invalidate, this.log);
     this.schedules = new ScheduleService(db, this.threads, invalidate, notify, this.log, {
       maintenance: () => this.agentUpdates.get().updating,
@@ -470,6 +418,61 @@ export class OpenOrc {
     });
     this.slack = new SlackService(this, options.slackSecrets, new AttachmentService(options.dataDir));
     this.handlers = this.buildHandlers(invalidate);
+  }
+
+  /** What the run module asks of the rest of the app: briefs, permissions, the environment, and what to do as turns end. */
+  private runHooks(notify: (n: Omit<Notification, "type">) => void): RunHooks {
+    const { options, db } = this;
+    return {
+      browserAvailable: Boolean(options.browser),
+      processRegistry: path.join(options.dataDir, "agent-processes"),
+      captureTeamTree: (runId, cwd, lease) => this.teamWorkspaces.captureRunCheckpoint(runId, cwd, lease),
+      assertStart: (input) => this.teams.assertLaunch(input),
+      assertSend: (runId, teamAttemptId) => this.teams.assertSend(runId, teamAttemptId),
+      idleTimeoutMs: () => {
+        const minutes = this.settings.get().idleProcessMinutes;
+        return minutes ? minutes * 60_000 : null;
+      },
+      claudeUserMcpServers: () => this.settings.get().claudeUserMcpServers,
+      orclings: this.orclings.runHooks,
+      taskImages: (spec) => new AttachmentService(options.dataDir).forTask(spec),
+      inlineToolImages: (output) => this.toolImages.inline(output),
+      brief: (project) => this.memory.brief(project),
+      threadContext: (thread) => this.pullRequests.brief(thread),
+      untrustedCheckout: (thread) => inUnvettedCopy(db, thread),
+      memoryEnabled: () => this.memory.enabled(),
+      environment: () => this.environment.current(),
+      claudeEnvironment: (snapshot, id) => this.claudeAccounts.environment(snapshot, id),
+      claudeAccountFor: (input) => claudeRunAccount(this.db, input),
+      claudeVersion: (snapshot, env) => (snapshot ? this.system.infoFor(snapshot, env) : this.system.info()).then((info) => harnessInfo(info, "claude").version),
+      editorSaves: (root, since) => this.files.savedSince(root, since),
+      onSteerable: (runId) => this.teams.providerReady(runId),
+      onProviderEvent: (event) => this.providerUsage.observe(event),
+      onEvent: (event) => {
+        this.slack?.observe(event);
+        this.comments?.observe(event);
+      },
+      onApprovalRequested: (event) => this.teamNotifications.approval(event),
+      onRunFinished: (run, scope, project) => {
+        this.memory.onRunFinished(run, { task: scope.task, thread: scope.thread ?? this.threads.scopeThreadFor(scope) }, project);
+        if (scope.task && !this.teams.binding(run.id)) void this.threads.onTaskRunFinished(run, scope.task);
+      },
+      onTurnSettled: (run, scope, project, outcome) => {
+        this.comments?.settled(run, outcome);
+        if (scope.comment) return;
+        this.teams.onTurnSettled(run, scope, project, outcome);
+        this.slack?.settled(run.id, outcome);
+      },
+      onThreadTurn: (thread, exchange) => {
+        if (!orchestration.getInstance(db, thread.id)) void this.threads.onTurnCompleted(thread, exchange);
+      },
+      onThreadIdle: (thread) => {
+        if (!orchestration.getInstance(db, thread.id)) this.threads.onIdle(thread);
+      },
+      notify: (event) => {
+        if (!event.threadId || !orchestration.getInstance(db, event.threadId)) notify(event);
+      },
+    };
   }
 
   private teamActionAvailability(id: string) {
@@ -702,6 +705,7 @@ export class OpenOrc {
 
   async close(): Promise<void> {
     this.threads.stopAccepting();
+    await this.claudeAccounts.close();
     await this.agentUpdates.close();
     await this.comments.close();
     await this.slack.close();
@@ -729,10 +733,22 @@ export class OpenOrc {
     this.db.close();
   }
 
+  private async claudeSystemInfo(id?: string | null, refresh = false) {
+    if (refresh) await this.environment.refresh();
+    return this.system.infoFor(this.claudeAccounts.inspectionEnvironment(this.environment.current(), id ?? undefined));
+  }
+
   private buildHandlers(invalidate: (keys: string[]) => void): Handlers {
     return composeHandlers(
       createSlackHandlers({ slack: this.slack, invalidate }),
-      createSystemHandlers({ system: this.system, agentUpdates: this.agentUpdates, providerUsage: this.providerUsage, invalidate }),
+      createClaudeAccountHandlers(this.claudeAccounts),
+      createSystemHandlers({
+        system: this.system,
+        accountInfo: (refresh, id) => (id ? this.claudeSystemInfo(id, refresh) : this.system.info(refresh)),
+        agentUpdates: this.agentUpdates,
+        providerUsage: this.providerUsage,
+        invalidate,
+      }),
       createProjectsHandlers({ db: this.db, projectService: this.projects, invalidate, transport: this.options.transport }),
       createPullRequestHandlers({ pullRequests: this.pullRequests }),
       createReviewerAppHandlers({ reviewerApp: this.reviewerApp }),
@@ -761,8 +777,8 @@ export class OpenOrc {
       createReviewThreadHandlers({ review: this.review, db: this.db, invalidate }),
       createReviewCommentsHandlers({ review: this.review, invalidate }),
       createReviewWorkspaceHandlers({ review: this.review, db: this.db, taskCheckout: this.taskCheckout, invalidate }),
-      createFilesHandlers({ db: this.db, files: this.files }),
-      createInstructionsHandlers({ db: this.db }),
+      createFilesHandlers({ db: this.db, files: this.files, claudeEnvironment: (id) => this.claudeAccounts.environment(this.environment.current(), id).env }),
+      createInstructionsHandlers({ db: this.db, files: this.files, claudeEnvironment: (id) => this.claudeAccounts.environment(this.environment.current(), id).env }),
       createSettingsHandlers({ settings: this.settings, textGeneration: this.textGeneration, invalidate }),
       createSchedulesHandlers({ schedules: this.schedules }),
       createCatalogHandlers({ runService: this.runs, invalidate }),

@@ -209,6 +209,10 @@ export class ScheduleService {
     if (thread) schedules.update(this.db, current.id, { lastRunAt: Date.now(), nextRunAt: Date.now() + firing.snapshot.everyMinutes * 60_000, lastThreadId: thread.id });
     else if (firing.trigger === "timer") schedules.update(this.db, current.id, { nextRunAt: Date.now() + firing.snapshot.everyMinutes * 60_000 });
   }
+  private firingAccount(snapshot: { claudeAccountId?: string }): string {
+    return snapshot.claudeAccountId ?? "claude-cli";
+  }
+
   private async execute(firing: ScheduleFiringRecord): Promise<ScheduleRunResult> {
     let admitted = false;
     let startupFailed = false;
@@ -233,6 +237,7 @@ export class ScheduleService {
       const when = new Date(firing.scheduledFor ?? firing.createdAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
       const common = {
         projectId: snapshot.projectId,
+        claudeAccountId: this.firingAccount(snapshot),
         mode: snapshot.mode,
         permissionMode: snapshot.permissionMode,
         workspaceMode: snapshot.workspaceMode,

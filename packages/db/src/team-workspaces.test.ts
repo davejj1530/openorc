@@ -1,3 +1,4 @@
+import { insertLegacyThread } from "./fixtures/legacy-thread.js";
 import { insertLegacyRun } from "./fixtures/legacy-run.js";
 import { LEGACY_TEAM_PROMPT, legacyTeamRuntime } from "./fixtures/legacy-team-journal.js";
 import { randomUUID } from "node:crypto";
@@ -9,7 +10,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { TeamActorRecord, TeamDraft, TeamExecutionRecord, TeamPublicationRecord, TeamTreeCapture, TeamWorkspaceRecord } from "@openorc/protocol";
 import { Db } from "./database.js";
 import { orchestration } from "./orchestration.js";
-import { projects, runs, tasks, threads } from "./repos.js";
+import { projects, runs, tasks } from "./repos.js";
 import { migrations } from "./schema.js";
 import { teamRuntime } from "./team-runtime.js";
 import { teamWorkspaces } from "./team-workspaces.js";
@@ -64,7 +65,7 @@ describe("team workspace migration and retention", () => {
     const oldDb = new Db(raw);
     opened.add(oldDb);
     const project = projects.insert(oldDb, { name: "Migration fixture", rootPath: path.join(folder, "repository"), gitRemote: null, defaultBranch: "main", settings: {} });
-    const thread = threads.insert(oldDb, { projectId: project.id, title: "Existing team", ...settings, mode: "act", permissionMode: "trusted" });
+    const thread = insertLegacyThread(oldDb, { projectId: project.id, title: "Existing team", ...settings, mode: "act", permissionMode: "trusted" });
     const draft: TeamDraft = {
       name: "Retained team",
       limits: { maxConcurrentAgents: 2, maxAssignments: 12, maxExecutionMinutes: 60, maxAttemptsPerAssignment: 2 },
@@ -147,7 +148,7 @@ describe("team workspace migration and retention", () => {
     expect(teamRuntime.prompt(migrated, record.id, "retained-attempt")).toBe(LEGACY_TEAM_PROMPT);
     expect(orchestration.get(migrated, team.team.id)).toEqual(team);
     expect(orchestration.getInstance(migrated, thread.id)).toEqual(instance);
-    expect(runs.get(migrated, run.id)).toEqual({ ...run, workingDirectory: null, commentTurnId: null });
+    expect(runs.get(migrated, run.id)).toEqual({ ...run, claudeAccountId: null, workingDirectory: null, commentTurnId: null });
     expect(teamRuntime.binding(migrated, run.id)?.executionId).toBe(record.id);
     expect(teamWorkspaces.list(migrated)).toEqual([]);
     expect(teamWorkspaces.publications(migrated)).toEqual([]);

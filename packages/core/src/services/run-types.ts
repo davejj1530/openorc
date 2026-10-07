@@ -23,6 +23,7 @@ export interface SendOptions {
 
 /** What a process was spawned with, and therefore what a further turn on it must also want. */
 export interface ContinueSettings {
+  claudeAccountId?: string | null;
   agent: string;
   model?: string | null;
   effort?: string | null;
@@ -64,6 +65,7 @@ export function capturedTurnOutcome(turn: CompletedTurn, failure: string | null,
 }
 
 export interface StartRunInput {
+  claudeAccountId?: string | null;
   scope: RunScope;
   project: Project;
   agent: AgentKind;
@@ -206,6 +208,8 @@ export type ThreadPermissionState = TeamPermissionState;
 export type Notification = Extract<CorePush, { type: "notify" }>;
 
 export interface RunHooks {
+  claudeEnvironment?(snapshot: EnvSnapshot, accountId?: string): EnvSnapshot;
+  claudeAccountFor?(input: StartRunInput): string;
   processRegistry?: string;
   browserAvailable?: boolean;
   /** Domain events, including host-generated approvals. */

@@ -3,7 +3,7 @@ import { ExecutableAgent, LeadOverrides, TeamContextSeed, TeamTreeCapture, Threa
 import { z } from "zod";
 import type { Db } from "./database.js";
 
-export type TeamForkThread = Pick<Thread, "title" | "agent" | "model" | "effort" | "fastMode" | "mode" | "permissionMode">;
+export type TeamForkThread = Pick<Thread, "claudeAccountId" | "title" | "agent" | "model" | "effort" | "fastMode" | "mode" | "permissionMode">;
 export interface CreateTeamForkInput {
   id: string;
   sourceThreadId: string;
@@ -62,7 +62,7 @@ interface ForkRow {
   created_at: number;
   updated_at: number;
 }
-const ThreadInput = Thread.pick({ title: true, agent: true, model: true, effort: true, fastMode: true, mode: true, permissionMode: true }).extend({ agent: ExecutableAgent });
+const ThreadInput = Thread.pick({ claudeAccountId: true, title: true, agent: true, model: true, effort: true, fastMode: true, mode: true, permissionMode: true }).extend({ agent: ExecutableAgent });
 const CapturedInput = z.object({
   projectRoot: z.string().min(1),
   snapshot: TeamTreeCapture,

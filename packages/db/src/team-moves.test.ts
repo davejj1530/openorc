@@ -1,3 +1,4 @@
+import { insertLegacyThread } from "./fixtures/legacy-thread.js";
 import { randomUUID } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -36,7 +37,7 @@ function fixture(db = Db.memory()) {
     draft: { name: "Move team", limits: DEFAULT_TEAM_LIMITS, members: [{ key: "lead", name: "Lead", managerKey: null, responsibility: "Work", settings }] },
   });
   const sourcePath = `${project.rootPath}-isolated`;
-  let thread = threads.insert(db, { projectId: project.id, title: "Move this team", ...settings, mode: "act", permissionMode: "review", workspaceMode: "worktree" });
+  let thread = insertLegacyThread(db, { projectId: project.id, title: "Move this team", ...settings, mode: "act", permissionMode: "review", workspaceMode: "worktree" });
   const publicationBranch = `openorc/team-${thread.id}`;
   thread = threads.update(db, thread.id, { worktreePath: sourcePath, baseSha: sha("1"), branch: publicationBranch });
   const instance = orchestration.createInstance(db, { threadId: thread.id, teamRevisionId: team.revision.id });

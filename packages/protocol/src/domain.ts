@@ -92,6 +92,7 @@ export const PrState = z.enum(["open", "merged", "closed"]);
 export type PrState = z.infer<typeof PrState>;
 
 export const Thread = z.object({
+  claudeAccountId: z.string().nullable().optional(),
   id: z.string(),
   /** Execution folder for Workspace conversations, independent of their home. */
   workingDirectory: z.string().nullable().optional(),
@@ -272,6 +273,7 @@ export const ImportableSession = z.object({
 export type ImportableSession = z.infer<typeof ImportableSession>;
 
 export const ScheduleLaunchSnapshot = z.object({
+  claudeAccountId: z.string().optional(),
   projectId: z.string(),
   title: z.string(),
   prompt: z.string(),
@@ -346,6 +348,7 @@ export const AppSettings = z.object({
 export type AppSettings = z.infer<typeof AppSettings>;
 
 export const Run = z.object({
+  claudeAccountId: z.string().nullable().optional(),
   id: z.string(),
   /** Canonical execution folder captured when this run was admitted. */
   workingDirectory: z.string().nullable().optional(),

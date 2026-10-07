@@ -1,3 +1,4 @@
+import { useClaudeAccountId } from "../lib/claude-account";
 import { useModelCatalog } from "../lib/use-model-catalog";
 import { useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { effortHint, effortLabel, normalizeModelSettings } from "@openorc/protocol";
@@ -111,7 +112,8 @@ function ModelBrowser({
   close: () => void;
 }) {
   const models = useModelCatalog();
-  const system = useRpc("system.info", {});
+  const claudeAccountId = useClaudeAccountId();
+  const system = useRpc("system.info", claudeAccountId ? { claudeAccountId } : {});
   const list = useMemo(() => pickerCatalog(models.data ?? []), [models.data]);
   const current = catalogModel(list, value);
   const [section, setSection] = useState<PickerSection>(() => initialPickerSection(teams, orclings, value));

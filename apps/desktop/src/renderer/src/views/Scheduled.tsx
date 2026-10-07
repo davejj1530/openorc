@@ -1,3 +1,5 @@
+import { ClaudeAccountPicker } from "../components/ClaudeAccountPicker";
+import { ClaudeAccountScope } from "../lib/claude-account";
 import { ExecutionMode, executionMode, executionModeAvailable, executionModeNote, executionModeSettings, executionModePresentation } from "@openorc/protocol";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { harnessName, type Schedule, type WorkspaceMode } from "@openorc/protocol";
@@ -318,161 +320,164 @@ function ScheduleDialog({
   onClose: () => void;
 }) {
   const {
-    fields: { project, title, prompt, minutes, mode, permission, workspace, worktreeBlocked },
-    target: { selection: target, choice, revision, lead, currentTeam, archived, teamTarget, retainedTeam, pickerTeams, offlineMember, previewReason },
-    resources: { projects, models, info, teams, availability },
+    fields: { claudeAccountId, project, title, prompt, minutes, mode, permission, workspace, worktreeBlocked },
+    target: { usesClaude, selection: target, choice, revision, lead, currentTeam, archived, teamTarget, retainedTeam, pickerTeams, offlineMember, previewReason },
+    resources: { accounts, projects, models, info, teams, availability },
     status: { pending, conflict, projectIssue, targetIssue, error, permissionReady },
-    actions: { setProject, setTitle, setPrompt, setMinutes, setMode, setPermission, setWorkspace, chooseTeam, chooseModel, changeSettings, retryChecks, submit },
+    actions: { setAccount, setProject, setTitle, setPrompt, setMinutes, setMode, setPermission, setWorkspace, chooseTeam, chooseModel, changeSettings, retryChecks, submit },
   } = useScheduleEditor(schedule, latest, projectId, onClose);
   const orclings = useOrclings();
   const picker = <ModelPicker value={choice} onChange={chooseModel} showEffort={false} teams={pickerTeams} disabled={pending} />;
 
   return (
-    <Dialog
-      open
-      onOpenChange={(open) => {
-        if (!open && !pending) onClose();
-      }}
-      title={schedule ? "Edit schedule" : "New schedule"}
-      width={560}
-    >
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          submit();
+    <ClaudeAccountScope id={claudeAccountId}>
+      <Dialog
+        open
+        onOpenChange={(open) => {
+          if (!open && !pending) onClose();
         }}
+        title={schedule ? "Edit schedule" : "New schedule"}
+        width={560}
       >
-        {schedule ? (
-          <p className="text-sm text-ink-3 mb-3">{projects.data?.find((item) => item.id === project)?.name ?? "Saved project"}</p>
-        ) : (
-          <Field label="Project">
-            <Select aria-label="Schedule project" value={project} disabled={pending} onChange={(event) => setProject(event.target.value)}>
-              {!projects.data?.some((item) => item.id === project) ? <option value={project}>{project ? "Unavailable project" : "Choose a project"}</option> : null}
-              {(projects.data ?? []).map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
-                </option>
-              ))}
-            </Select>
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            submit();
+          }}
+        >
+          {schedule ? (
+            <p className="text-sm text-ink-3 mb-3">{projects.data?.find((item) => item.id === project)?.name ?? "Saved project"}</p>
+          ) : (
+            <Field label="Project">
+              <Select aria-label="Schedule project" value={project} disabled={pending} onChange={(event) => setProject(event.target.value)}>
+                {!projects.data?.some((item) => item.id === project) ? <option value={project}>{project ? "Unavailable project" : "Choose a project"}</option> : null}
+                {(projects.data ?? []).map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
+          {usesClaude ? <ClaudeAccountPicker accounts={accounts.data} value={claudeAccountId} onChange={setAccount} disabled={pending} /> : null}
+          <Field label="Name">
+            <Input autoFocus value={title} disabled={pending} onChange={(event) => setTitle(event.target.value)} placeholder="Nightly dependency check" />
           </Field>
-        )}
-        <Field label="Name">
-          <Input autoFocus value={title} disabled={pending} onChange={(event) => setTitle(event.target.value)} placeholder="Nightly dependency check" />
-        </Field>
-        <Field label="Prompt" hint="Sent as the first message of a new thread each time.">
-          <Textarea
-            rows={4}
-            value={prompt}
-            disabled={pending}
-            onChange={(event) => setPrompt(event.target.value)}
-            placeholder="Look for outdated dependencies with known vulnerabilities and propose one task per upgrade worth doing."
-          />
-        </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Runs">
-            <Select value={minutes} disabled={pending} onChange={(event) => setMinutes(Number(event.target.value))}>
-              {!intervals.some((item) => item.minutes === minutes) ? <option value={minutes}>{intervalLabel(minutes)}</option> : null}
-              {intervals.map((item) => (
-                <option key={item.minutes} value={item.minutes}>
-                  {item.label}
-                </option>
-              ))}
-            </Select>
+          <Field label="Prompt" hint="Sent as the first message of a new thread each time.">
+            <Textarea
+              rows={4}
+              value={prompt}
+              disabled={pending}
+              onChange={(event) => setPrompt(event.target.value)}
+              placeholder="Look for outdated dependencies with known vulnerabilities and propose one task per upgrade worth doing."
+            />
           </Field>
-          <div className="min-w-0 mb-3">
-            <p className="text-sm text-ink-3 mb-1.5">Model or team</p>
-            {choice ? (
-              <ComposerModelPicker
-                value={choice}
-                onChange={changeSettings}
-                onSelectModel={chooseModel}
-                teams={pickerTeams}
-                disabled={pending}
-                settingsDisabled={pending}
-                {...(revision ? { team: pickerTeam(revision, orclings) } : {})}
-              />
-            ) : (
-              picker
-            )}
-            {target.kind === "legacy" && target.model === null ? <p className="text-xs text-ink-3 mt-1">{harnessName(target.agent)} provider default is saved.</p> : null}
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Runs">
+              <Select value={minutes} disabled={pending} onChange={(event) => setMinutes(Number(event.target.value))}>
+                {!intervals.some((item) => item.minutes === minutes) ? <option value={minutes}>{intervalLabel(minutes)}</option> : null}
+                {intervals.map((item) => (
+                  <option key={item.minutes} value={item.minutes}>
+                    {item.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <div className="min-w-0 mb-3">
+              <p className="text-sm text-ink-3 mb-1.5">Model or team</p>
+              {choice ? (
+                <ComposerModelPicker
+                  value={choice}
+                  onChange={changeSettings}
+                  onSelectModel={chooseModel}
+                  teams={pickerTeams}
+                  disabled={pending}
+                  settingsDisabled={pending}
+                  {...(revision ? { team: pickerTeam(revision, orclings) } : {})}
+                />
+              ) : (
+                picker
+              )}
+              {target.kind === "legacy" && target.model === null ? <p className="text-xs text-ink-3 mt-1">{harnessName(target.agent)} provider default is saved.</p> : null}
+            </div>
+            <Field label="Mode">
+              <Select
+                value={executionMode(mode, permission)}
+                disabled={pending || !permissionReady}
+                onChange={(event) => {
+                  const next = executionModeSettings(event.target.value as ExecutionMode);
+                  setMode(next.mode);
+                  setPermission(next.permissionMode);
+                }}
+              >
+                {ExecutionMode.options.map((value) => (
+                  <option key={value} value={value} hidden={!executionModeAvailable(choice?.agent, value)}>
+                    {executionModePresentation(choice?.agent, value).label}
+                  </option>
+                ))}
+              </Select>
+              <p className="mt-2 text-xs text-ink-3">{executionModeNote(choice?.agent, executionMode(mode, permission))}</p>
+            </Field>
+            {!teamTarget ? <ScheduleWorkspaceField value={workspace} worktreeBlocked={worktreeBlocked} disabled={pending} onChange={setWorkspace} /> : null}
           </div>
-          <Field label="Mode">
-            <Select
-              value={executionMode(mode, permission)}
-              disabled={pending || !permissionReady}
-              onChange={(event) => {
-                const next = executionModeSettings(event.target.value as ExecutionMode);
-                setMode(next.mode);
-                setPermission(next.permissionMode);
-              }}
-            >
-              {ExecutionMode.options.map((value) => (
-                <option key={value} value={value} hidden={!executionModeAvailable(choice?.agent, value)}>
-                  {executionModePresentation(choice?.agent, value).label}
-                </option>
-              ))}
-            </Select>
-            <p className="mt-2 text-xs text-ink-3">{executionModeNote(choice?.agent, executionMode(mode, permission))}</p>
-          </Field>
-          {!teamTarget ? <ScheduleWorkspaceField value={workspace} worktreeBlocked={worktreeBlocked} disabled={pending} onChange={setWorkspace} /> : null}
-        </div>
-        {target.kind === "team" ? (
-          <div className="text-xs text-ink-3 mb-3 space-y-2" data-schedule-team={target.target.teamRevisionId}>
-            <p>
-              {revision ? `${revision.name} · Version ${revision.number}.` : "The exact saved team version is kept."}{" "}
-              {lead && choice
-                ? `${lead.name}: ${choice.model}${choice.effort ? ` · ${choice.effort}` : ""} · ${choice.fastMode ? "Fast" : "Standard"}.`
-                : "Reload team details to inspect the lead settings."}
-            </p>
-            <p>Each run uses isolated team workspaces. If this schedule’s previous team run still has unfinished work, the next run is skipped.</p>
-            {archived && retainedTeam ? <p>This team is archived. This schedule keeps the saved version it was given.</p> : null}
-            {revision && currentTeam && !archived && currentTeam.revision.id !== revision.id ? (
+          {target.kind === "team" ? (
+            <div className="text-xs text-ink-3 mb-3 space-y-2" data-schedule-team={target.target.teamRevisionId}>
               <p>
-                A newer revision is available.{" "}
-                <Button size="sm" variant="ghost" disabled={pending} onClick={() => chooseTeam(currentTeam.revision)}>
-                  Use revision {currentTeam.revision.number}
-                </Button>
+                {revision ? `${revision.name} · Version ${revision.number}.` : "The exact saved team version is kept."}{" "}
+                {lead && choice
+                  ? `${lead.name}: ${choice.model}${choice.effort ? ` · ${choice.effort}` : ""} · ${choice.fastMode ? "Fast" : "Standard"}.`
+                  : "Reload team details to inspect the lead settings."}
               </p>
-            ) : null}
-            {previewReason ? <p role="status">{previewReason} Runs check availability before starting.</p> : null}
-            {offlineMember ? <p role="status">{offlineMember.name}’s provider or saved model is unavailable. The saved target is kept; readiness is checked when the schedule runs.</p> : null}
-            {teams.error || models.error || info.error || availability.error ? (
-              <p role="status">
-                Some availability details could not refresh.{" "}
-                <Button size="sm" variant="ghost" onClick={retryChecks}>
-                  Retry checks
-                </Button>
-              </p>
-            ) : null}
-          </div>
-        ) : null}
-        {projectIssue || targetIssue ? (
-          <p className="text-sm text-warn mb-3" role="status">
-            {projectIssue ?? targetIssue}
-          </p>
-        ) : null}
-        {conflict && latest ? (
-          <div className="text-sm text-warn mb-3" role="status">
-            This schedule changed elsewhere. Your draft is kept.{" "}
-            <Button size="sm" disabled={pending} onClick={() => onReload(latest)}>
-              Load saved schedule
+              <p>Each run uses isolated team workspaces. If this schedule’s previous team run still has unfinished work, the next run is skipped.</p>
+              {archived && retainedTeam ? <p>This team is archived. This schedule keeps the saved version it was given.</p> : null}
+              {revision && currentTeam && !archived && currentTeam.revision.id !== revision.id ? (
+                <p>
+                  A newer revision is available.{" "}
+                  <Button size="sm" variant="ghost" disabled={pending} onClick={() => chooseTeam(currentTeam.revision)}>
+                    Use revision {currentTeam.revision.number}
+                  </Button>
+                </p>
+              ) : null}
+              {previewReason ? <p role="status">{previewReason} Runs check availability before starting.</p> : null}
+              {offlineMember ? <p role="status">{offlineMember.name}’s provider or saved model is unavailable. The saved target is kept; readiness is checked when the schedule runs.</p> : null}
+              {teams.error || models.error || info.error || availability.error ? (
+                <p role="status">
+                  Some availability details could not refresh.{" "}
+                  <Button size="sm" variant="ghost" onClick={retryChecks}>
+                    Retry checks
+                  </Button>
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+          {projectIssue || targetIssue ? (
+            <p className="text-sm text-warn mb-3" role="status">
+              {projectIssue ?? targetIssue}
+            </p>
+          ) : null}
+          {conflict && latest ? (
+            <div className="text-sm text-warn mb-3" role="status">
+              This schedule changed elsewhere. Your draft is kept.{" "}
+              <Button size="sm" disabled={pending} onClick={() => onReload(latest)}>
+                Load saved schedule
+              </Button>
+            </div>
+          ) : null}
+          {error ? (
+            <p className="text-sm text-bad mb-3 break-words" role="alert">
+              {error} Your draft is kept in this editor.
+            </p>
+          ) : null}
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" disabled={pending} onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={pending || !permissionReady || Boolean(projectIssue) || Boolean(targetIssue) || !title.trim() || !prompt.trim()}>
+              {scheduleSubmitLabel(pending, Boolean(schedule))}
             </Button>
           </div>
-        ) : null}
-        {error ? (
-          <p className="text-sm text-bad mb-3 break-words" role="alert">
-            {error} Your draft is kept in this editor.
-          </p>
-        ) : null}
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" disabled={pending} onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={pending || !permissionReady || Boolean(projectIssue) || Boolean(targetIssue) || !title.trim() || !prompt.trim()}>
-            {scheduleSubmitLabel(pending, Boolean(schedule))}
-          </Button>
-        </div>
-      </form>
-    </Dialog>
+        </form>
+      </Dialog>
+    </ClaudeAccountScope>
   );
 }

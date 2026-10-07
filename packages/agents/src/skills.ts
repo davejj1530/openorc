@@ -273,8 +273,8 @@ async function pluginSkillRoots(configDir: string): Promise<SkillRoot[]> {
  * "<plugin>:<skill>" and so do we, which puts them in their own namespace. The
  * list is sorted by name because readdir order is not.
  */
-async function listClaudeSkills(projectRoot: string, home: string): Promise<AgentSkill[]> {
-  const configDir = claudeConfigDir(home);
+async function listClaudeSkills(projectRoot: string, home: string, env: NodeJS.ProcessEnv): Promise<AgentSkill[]> {
+  const configDir = claudeConfigDir(home, env);
   const roots: SkillRoot[] = [{ dir: path.join(configDir, "skills"), source: "user" }, { dir: path.join(projectRoot, ".claude", "skills"), source: "project" }, ...(await pluginSkillRoots(configDir))];
   const found = new Map<string, AgentSkill>();
   for (const root of roots) {
@@ -477,5 +477,5 @@ export async function listSkills({
     if (!native) return disk;
     return openCodeSkillRows(native, new Map(disk.map((skill) => [skill.path, skill.source])), home);
   }
-  return listClaudeSkills(projectRoot, home);
+  return listClaudeSkills(projectRoot, home, env);
 }

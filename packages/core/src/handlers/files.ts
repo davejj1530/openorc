@@ -7,6 +7,7 @@ import { taskAndProject, threadAndProject } from "./context.js";
 import type { Handlers } from "./types.js";
 type Dependencies = {
   db: Db;
+  claudeEnvironment?: (id?: string) => NodeJS.ProcessEnv;
   files: Pick<FileService, "search" | "read">;
 };
 
@@ -25,13 +26,14 @@ async function fileProject(db: Db, scope: RpcParams<"files.read">["scope"]): Pro
   return { ...project, rootPath: scope.workingDirectory ? await directory(scope.workingDirectory) : project.rootPath };
 }
 
-export function createFilesHandlers({ db, files }: Dependencies): Pick<Handlers, "skills.list" | "files.search" | "files.read"> {
+export function createFilesHandlers({ db, files, claudeEnvironment }: Dependencies): Pick<Handlers, "skills.list" | "files.search" | "files.read"> {
   return {
-    "skills.list": async ({ projectId, workingDirectory, agent }) => {
-      const project = projectId === WORKSPACE_ID ? workspaceHome(db) : projects.get(db, projectId);
-      if (!project) throw new Error(`project ${projectId} not found`);
-      if (workingDirectory && project.id !== WORKSPACE_ID) throw new Error("Only Workspace conversations can choose a working folder.");
-      return listSkills({ projectRoot: workingDirectory ? await directory(workingDirectory) : project.rootPath, agent });
+    "skills.list": async ({ projectId, workingDirectory, agent, claudeAccountId }) =>
+      listSkills({
+        projectRoot: (await conversationFolder(db, { kind: "project", id: projectId, workingDirectory })).root,
+        agent,
+        ...(agent === "claude" && claudeEnvironment ? { env: claudeEnvironment(claudeAccountId) } : {}),
+      });
     },
     "files.search": async ({ projectId, scope, query, limit }) => {
       const project = scope ? await fileProject(db, scope) : projects.get(db, projectId);

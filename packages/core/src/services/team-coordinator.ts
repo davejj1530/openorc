@@ -6,6 +6,7 @@ import {
   type Project,
   type Run,
   type Task,
+  type Thread,
   type TeamActionAvailability,
   type TeamActorRecord,
   type TeamAttemptRecord,
@@ -34,7 +35,7 @@ export interface TeamCoordinatorHooks {
   assertThreadAvailable?(threadId: string, options?: { retainedTask?: boolean }): void;
   /** Must finish preparation before returning and check admission around its asynchronous steps. */
   prepare(task: Task, assertActive: () => void): Promise<Task>;
-  validate(settings: ModelExecutionSettings, projectId: string): Promise<void>;
+  validate(settings: ModelExecutionSettings, projectId: string, claudeAccountId?: string | null): Promise<void>;
   changed(threadId: string, record?: TeamExecutionRecord): void;
   /** Reports a contained failure: one execution could not be read or advanced and is skipped until it changes. */
   warn?(message: string): void;
@@ -409,8 +410,12 @@ export class TeamCoordinator implements TeamCore {
     });
   }
 
-  async validateStart(input: { projectId: string; teamRevisionId: string; leadOverrides?: LeadOverrides; allowArchived?: boolean }): Promise<TeamStartPlan> {
+  async validateStart(input: { projectId: string; teamRevisionId: string; leadOverrides?: LeadOverrides; allowArchived?: boolean; claudeAccountId?: string | null }): Promise<TeamStartPlan> {
     return this.admissionStage.validateStart(input);
+  }
+
+  validateThreadStart(thread: Thread, teamRevisionId: string, leadOverrides: LeadOverrides): Promise<TeamStartPlan> {
+    return this.validateStart({ projectId: thread.projectId, claudeAccountId: thread.claudeAccountId, teamRevisionId, leadOverrides, allowArchived: true });
   }
 
   async validateLeadSettings(threadId: string, overrides: LeadOverrides): Promise<ModelExecutionSettings> {

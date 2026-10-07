@@ -21,11 +21,18 @@ function useScheduleGit(project: string, chosen: WorkspaceMode) {
   return { cannotBranch, workspace: cannotBranch ? ("current" as const) : chosen, teamReason: branchingReason(state, "Teams") };
 }
 
+function useScheduleAccount(initial?: string) {
+  const accounts = useRpc("claude.accounts.list", {});
+  const [selected, setAccount] = useState(initial);
+  return { accounts, setAccount, claudeAccountId: selected ?? accounts.data?.defaultId ?? "claude-cli" };
+}
+
 /** Owns the editable schedule, selected target and the version used for its save. */
 export function useScheduleEditor(schedule: Schedule | null, latest: Schedule | undefined, projectId: string, onClose: () => void) {
   const projects = useRpc("projects.list", {});
-  const models = useRpc("agents.models", {}, { staleTime: 5 * 60_000 });
-  const info = useRpc("system.info", {});
+  const { accounts, setAccount, claudeAccountId } = useScheduleAccount(schedule?.claudeAccountId);
+  const models = useRpc("agents.models", { claudeAccountId }, { staleTime: 5 * 60_000 });
+  const info = useRpc("system.info", { claudeAccountId });
   const availability = useRpc("orchestration.availability", {});
   const create = useRpcMutation("schedules.create");
   const update = useRpcMutation("schedules.update");
@@ -46,6 +53,8 @@ export function useScheduleEditor(schedule: Schedule | null, latest: Schedule | 
   const lead = revision?.members.find((member) => member.managerKey === null);
   const currentTeam = revision ? teams.data?.find((item) => item.team.id === revision.teamId) : undefined;
   const archived = currentTeam ? currentTeam.team.archivedAt !== null : target.kind === "team" && target.archived;
+  const usesClaude = choice?.agent === "claude" || revision?.members.some((member) => member.settings.agent === "claude");
+  const accountReady = !usesClaude || Boolean(accounts.data);
   const teamTarget = target.kind === "team";
   const retainedTeam = teamTarget && schedule?.executionTarget?.kind === "team" && schedule.executionTarget.teamRevisionId === target.target.teamRevisionId;
   const pending = create.isPending || update.isPending;
@@ -97,10 +106,19 @@ export function useScheduleEditor(schedule: Schedule | null, latest: Schedule | 
   else if (availability.data && !availability.data.enabled) previewReason = availability.data.reason ?? "Team execution is disabled in Settings.";
 
   const submit = () => {
-    if (pending || !permissionReady || projectIssue || targetIssue || !title.trim() || !prompt.trim()) return;
+    if (pending || !accountReady || !permissionReady || projectIssue || targetIssue || !title.trim() || !prompt.trim()) return;
     setLocalError(null);
     try {
-      const base = { title: title.trim(), prompt: prompt.trim(), mode, permissionMode: permission, workspaceMode: workspace, everyMinutes: minutes, ...scheduleTargetPayload(target, project) };
+      const base = {
+        claudeAccountId,
+        title: title.trim(),
+        prompt: prompt.trim(),
+        mode,
+        permissionMode: permission,
+        workspaceMode: workspace,
+        everyMinutes: minutes,
+        ...scheduleTargetPayload(target, project),
+      };
       if (schedule) update.mutate({ id: schedule.id, patch: { ...base, expectedVersion: schedule.version } }, { onSuccess: onClose });
       else create.mutate({ projectId: project, ...base }, { onSuccess: onClose });
     } catch (failure) {
@@ -109,10 +127,10 @@ export function useScheduleEditor(schedule: Schedule | null, latest: Schedule | 
   };
 
   return {
-    fields: { project, title, prompt, minutes, mode, permission, workspace, worktreeBlocked: git.cannotBranch },
-    target: { selection: target, choice, revision, lead, currentTeam, archived, teamTarget, retainedTeam, pickerTeams, offlineMember, previewReason },
-    resources: { projects, models, info, teams, availability },
-    status: { pending, conflict, projectIssue, targetIssue, error, permissionReady },
-    actions: { setProject, setTitle, setPrompt, setMinutes, setMode, setPermission, setWorkspace, chooseTeam, chooseModel, changeSettings, retryChecks, submit },
+    fields: { claudeAccountId, project, title, prompt, minutes, mode, permission, workspace, worktreeBlocked: git.cannotBranch },
+    target: { usesClaude, selection: target, choice, revision, lead, currentTeam, archived, teamTarget, retainedTeam, pickerTeams, offlineMember, previewReason },
+    resources: { accounts, projects, models, info, teams, availability },
+    status: { pending, conflict, projectIssue, targetIssue, error, permissionReady: permissionReady && accountReady },
+    actions: { setAccount, setProject, setTitle, setPrompt, setMinutes, setMode, setPermission, setWorkspace, chooseTeam, chooseModel, changeSettings, retryChecks, submit },
   };
 }

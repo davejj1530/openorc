@@ -100,17 +100,18 @@ function AgentConnection({ id, info, update, busy, onUpdate }: { id: HarnessInfo
       </div>
       {update ? <AgentUpdateDetails update={update} setupUrl={harness.setupUrl} /> : null}
       {info && !loggedIn && !harnessFailsToStart(info) ? (
-        <p className="text-ink-2 mt-2">
-          {installed ? (
-            <>
-              Connect in a terminal: <code>{harness.loginCommand}</code>
-            </>
-          ) : (
-            <Button onClick={() => void window.openorc.openExternal(harness.setupUrl)}>Install {harness.name}</Button>
-          )}
-        </p>
+        <p className="text-ink-2 mt-2">{installed ? <AgentLoginInstructions id={id} /> : <Button onClick={() => void window.openorc.openExternal(harness.setupUrl)}>Install {harness.name}</Button>}</p>
       ) : null}
     </div>
+  );
+}
+
+function AgentLoginInstructions({ id }: { id: HarnessInfo["id"] }) {
+  if (id === "claude") return <>Manage your Claude accounts below.</>;
+  return (
+    <>
+      Connect in a terminal: <code>{harnessCatalog[id].loginCommand}</code>
+    </>
   );
 }
 

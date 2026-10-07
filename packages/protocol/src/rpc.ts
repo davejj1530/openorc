@@ -3,6 +3,7 @@ import type { ConversationPlan } from "./execution-mode.js";
 import type { TaskForwardingState } from "./task-forwarding.js";
 import type { TaskCheckoutState } from "./task-checkout.js";
 import { BranchLoss, type ChangePreview, type RemovalImpact } from "./workspace-changes.js";
+import { claudeAccountRpcParams, ClaudeAccountId, type ClaudeAccountRpcResults } from "./claude-accounts.js";
 import { z } from "zod";
 import { FileScope } from "./files.js";
 import type { AgentUpdates } from "./agent-updates.js";
@@ -64,6 +65,7 @@ const hasReviewScope = (scope: { threadId?: string; taskId?: string }) => Boolea
 const REVIEW_SCOPE_REQUIRED = "Review comments need a conversation or a task.";
 
 export const rpcParams = {
+  ...claudeAccountRpcParams,
   ...slackRpcParams,
   ...pullRequestRpcParams,
   ...orclingRpcParams,
@@ -82,12 +84,12 @@ export const rpcParams = {
   "tasks.comments.retry": z.object({ taskId: z.string(), attemptId: z.string() }),
   "tasks.comments.cancel": z.object({ taskId: z.string(), attemptId: z.string() }),
   "tasks.comments.execute": z.object({ taskId: z.string(), attemptId: z.string() }),
-  "system.info": z.object({ refresh: z.boolean().optional() }),
+  "system.info": z.object({ refresh: z.boolean().optional(), claudeAccountId: ClaudeAccountId.optional() }),
   "agents.updates.get": z.object({}),
   "agents.updates.check": z.object({}),
   "agents.updates.install": z.object({ ids: z.array(HarnessId).min(1).max(3) }).strict(),
   "agents.updates.configure": z.object({ automatic: z.boolean().optional(), dismissed: z.string().max(300).optional() }).strict(),
-  "providers.usage": z.object({ provider: z.enum([...HarnessId.options, "anthropic-api"]) }),
+  "providers.usage": z.object({ provider: z.enum([...HarnessId.options, "anthropic-api"]), claudeAccountId: ClaudeAccountId.optional() }),
   "providers.codex.reset": z.object({ attemptId: z.string().uuid(), creditId: z.string().min(1).optional(), confirmationToken: z.string().min(1) }),
   "orchestration.list": z.object({ projectId: z.string().min(1), includeArchived: z.boolean().optional() }),
   "orchestration.get": z.object({ id: z.string().min(1) }),
@@ -189,6 +191,7 @@ export const rpcParams = {
   /** Creates the thread and starts its first turn in one step. */
   "threads.start": z
     .object({
+      claudeAccountId: ClaudeAccountId.optional(),
       projectId: z.string(),
       workingDirectory: z.string().min(1).max(4096).optional(),
       /** Team-only idempotency key for retrying an uncertain launch response. */
@@ -372,6 +375,7 @@ export const rpcParams = {
   "app.settings.set": AppSettings.partial(),
   "schedules.list": z.object({ projectId: z.string().optional() }),
   "schedules.create": z.object({
+    claudeAccountId: ClaudeAccountId.optional(),
     executionTarget: ExecutionTarget.nullable().optional(),
     projectId: z.string(),
     title: z.string().min(1),
@@ -387,6 +391,7 @@ export const rpcParams = {
   "schedules.update": z.object({
     id: z.string(),
     patch: z.object({
+      claudeAccountId: ClaudeAccountId.optional(),
       executionTarget: ExecutionTarget.nullable().optional(),
       expectedVersion: z.number().int().positive().optional(),
       title: z.string().min(1).optional(),
@@ -434,15 +439,15 @@ export const rpcParams = {
   "review.push": z.object({ taskId: z.string() }),
   "review.createPr": z.object({ taskId: z.string(), title: z.string().min(1), body: z.string(), base: BranchName }),
   "git.log": z.object({ taskId: z.string(), limit: z.number().int().positive().max(200).optional() }),
-  "agents.models": z.object({ agent: AgentKind.optional() }),
-  "agents.modelCatalog": z.object({ agent: HarnessId.optional() }),
-  "agents.models.refresh": z.object({ agent: HarnessId.optional() }),
+  "agents.models": z.object({ agent: AgentKind.optional(), claudeAccountId: ClaudeAccountId.optional() }),
+  "agents.modelCatalog": z.object({ agent: HarnessId.optional(), claudeAccountId: ClaudeAccountId.optional() }),
+  "agents.models.refresh": z.object({ agent: HarnessId.optional(), claudeAccountId: ClaudeAccountId.optional() }),
   /**
    * The selected harness's skills where a conversation works, including personal, plugin, and built-in sources.
    * A project's are found from its root. A Workspace conversation, an Orcling's own included, works in its own
    * folder, given as `workingDirectory`; without one, the Workspace's folder.
    */
-  "skills.list": z.object({ projectId: z.string(), workingDirectory: z.string().min(1).max(4096).optional(), agent: HarnessId }),
+  "skills.list": z.object({ claudeAccountId: ClaudeAccountId.optional(), projectId: z.string(), workingDirectory: z.string().min(1).max(4096).optional(), agent: HarnessId }),
   /** Stores an image the user pasted or dropped, returning where it lives. */
   "attachments.save": z.object({ name: z.string(), mime: z.string(), dataBase64: z.string() }),
   /** Stores any other file the user attached. Kept apart from images because only an image is ever served back over the asset protocol. */
@@ -569,7 +574,7 @@ export interface ResolvedExtraction {
   viaApiKey: boolean;
 }
 
-export interface RpcResults extends PullRequestRpcResults, OrclingRpcResults, ProjectRpcResults {
+export interface RpcResults extends PullRequestRpcResults, OrclingRpcResults, ProjectRpcResults, FileRpcResults, ClaudeAccountRpcResults {
   "tasks.comments.list": TaskDiscussion;
   "tasks.comments.post": TaskComment;
   "tasks.comments.retry": CommentAttempt;

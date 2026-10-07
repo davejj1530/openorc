@@ -1,3 +1,4 @@
+import { insertLegacyThread } from "./fixtures/legacy-thread.js";
 import { insertLegacyRun } from "./fixtures/legacy-run.js";
 import { teamJournalWriter } from "./fixtures/legacy-team-journal.js";
 import { randomUUID } from "node:crypto";
@@ -34,7 +35,7 @@ function fixture(db = Db.memory()) {
     expectedRevisionId: null,
     draft: { name: "Restore team", limits: DEFAULT_TEAM_LIMITS, members: [{ key: "lead", name: "Lead", managerKey: null, responsibility: "Work", settings }] },
   });
-  const thread = threads.insert(db, { projectId: project.id, title: "Retain workspace", ...settings, mode: "act", permissionMode: "review", workspaceMode: "worktree" });
+  const thread = insertLegacyThread(db, { projectId: project.id, title: "Retain workspace", ...settings, mode: "act", permissionMode: "review", workspaceMode: "worktree" });
   const sourcePath = "/tmp/team-workspaces/" + randomUUID();
   threads.update(db, thread.id, { worktreePath: sourcePath, baseSha: "1".repeat(40), branch: "openorc/team-" + thread.id });
   const instance = orchestration.createInstance(db, { threadId: thread.id, teamRevisionId: saved.revision.id });

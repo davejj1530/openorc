@@ -1,4 +1,5 @@
 export { taskComments } from "./task-comments.js";
+export { claudeAccounts } from "./claude-accounts.js";
 export { Db } from "./database.js";
 export { LedgerWriter, listEvents, countEvents, completedToolCall, type LedgerOptions, type ListEventsOptions } from "./ledger.js";
 export { ledgerMaintenance, type LedgerSpace } from "./maintenance.js";

@@ -523,10 +523,15 @@ it("does not expose secret RPC parameters even with diagnostic logging enabled",
   const previous = process.env.OPENORC_RPC_LOG;
   process.env.OPENORC_RPC_LOG = "1";
   try {
-    await core.handle({ type: "rpc", id: 91, method: "slack.host.save", params: { botToken: "xoxb-private-fixture", appToken: "xapp-private-fixture", channelId: "CTEST", port: 47831 } });
-    expect(pushed.find((p) => p.type === "rpc.result" && p.id === 91)).toBeDefined();
+    const reply = await core.handle({
+      type: "rpc",
+      id: 91,
+      method: "slack.host.save",
+      params: { botToken: "xoxb-private-fixture", appToken: "xapp-private-fixture", channelId: "CTEST", port: 47831 },
+    });
+    expect(reply.type).toBe("rpc.result");
     expect(JSON.stringify(log.mock.calls)).not.toContain("private-fixture");
-    expect(JSON.stringify(pushed)).not.toContain("private-fixture");
+    expect(JSON.stringify([reply, pushed])).not.toContain("private-fixture");
   } finally {
     if (previous === undefined) delete process.env.OPENORC_RPC_LOG;
     else process.env.OPENORC_RPC_LOG = previous;

@@ -5,8 +5,9 @@ import { afterAll, afterEach, beforeAll, expect, it, vi } from "vitest";
 import { CodexAdapter, RunHandle } from "@openorc/agents";
 import { listEvents, threads } from "@openorc/db";
 import { git, commitAll } from "@openorc/git";
-import type { AgentEvent, CorePush, Project } from "@openorc/protocol";
+import { WORKSPACE_ID, type AgentEvent, type CorePush, type Project } from "@openorc/protocol";
 import { OpenOrc } from "../openorc.js";
+import { executionProject } from "./workspace-home.js";
 
 let root: string;
 let dataDir: string;
@@ -38,9 +39,10 @@ afterAll(async () => {
   await rm(dataDir, { recursive: true, force: true });
 });
 
-/** A live thread run whose provider events the test emits itself. */
-async function session() {
-  const thread = threads.insert(core.db, { projectId: project.id, title: "Diff refresh", agent: "codex", model: "fixture", mode: "act", permissionMode: "trusted" });
+const conversation = { agent: "codex" as const, model: "fixture", mode: "act" as const, permissionMode: "trusted" as const };
+
+/** A live run of `thread`, launched in its folder as a turn would be, whose provider events the test emits itself. */
+async function session(thread = threads.insert(core.db, { projectId: project.id, title: "Diff refresh", ...conversation })) {
   let handle!: RunHandle;
   vi.spyOn(CodexAdapter.prototype, "start").mockImplementation((spec) => {
     let finish!: (code: number) => void;
@@ -56,7 +58,7 @@ async function session() {
     });
     return handle;
   });
-  const run = await core.runs.start({ scope: { thread, task: null }, project, agent: "codex", model: "fixture", mode: "act", permissionMode: "trusted", prompt: "Work", resume: false });
+  const run = await core.runs.start({ scope: { thread, task: null }, project: executionProject(core.db, thread), ...conversation, prompt: "Work", resume: false });
   live.push(run.id);
   const tool = (name: string): AgentEvent => ({ type: "tool.completed", runId: run.id, ts: Date.now(), toolCallId: `${name}-${Math.random()}`, name, output: "", isError: false });
   return { emit: (ev: AgentEvent) => handle.emit("event", ev), tool, runId: run.id, thread };
@@ -78,8 +80,8 @@ it("refreshes working-tree diffs when a tool that can change files finishes, but
 });
 
 it("refreshes every view of the checkout a run works in, and only those", async () => {
-  const sibling = threads.insert(core.db, { projectId: project.id, title: "Same checkout", agent: "codex", model: "fixture", mode: "act", permissionMode: "trusted" });
-  const elsewhere = threads.insert(core.db, { projectId: project.id, title: "Own worktree", agent: "codex", model: "fixture", mode: "act", permissionMode: "trusted" });
+  const sibling = threads.insert(core.db, { projectId: project.id, title: "Same checkout", ...conversation });
+  const elsewhere = threads.insert(core.db, { projectId: project.id, title: "Own worktree", ...conversation });
   threads.update(core.db, elsewhere.id, { worktreePath: path.join(root, "..", "elsewhere") });
   const { emit, tool, thread } = await session();
   pushed.length = 0;
@@ -89,6 +91,25 @@ it("refreshes every view of the checkout a run works in, and only those", async 
   expect(keys).toEqual(expect.arrayContaining([`threaddiff:${thread.id}`, `threaddiff:${sibling.id}`, `projectdiff:${project.id}`]));
   expect(keys).not.toContain("workspace-diff");
   expect(keys).not.toContain(`threaddiff:${elsewhere.id}`);
+});
+
+it("refreshes every Workspace conversation in the folder a Workspace run writes to, and none in another folder", async () => {
+  const [notes, other] = await Promise.all([mkdtemp(path.join(os.tmpdir(), "openorc-diff-refresh-notes-")), mkdtemp(path.join(os.tmpdir(), "openorc-diff-refresh-other-"))]);
+  try {
+    const inFolder = (title: string, folder: string) => threads.update(core.db, threads.insert(core.db, { projectId: WORKSPACE_ID, title, ...conversation }).id, { workingDirectory: folder });
+    const writer = inFolder("Notes", notes);
+    const sibling = inFolder("Same notes", notes);
+    const elsewhere = inFolder("Other notes", other);
+    const { emit, tool } = await session(writer);
+    pushed.length = 0;
+    emit(tool("Write"));
+    await settle();
+    const keys = pushed.flatMap((p) => (p.type === "invalidate" ? p.keys : []));
+    expect(keys).toEqual(expect.arrayContaining([`threaddiff:${writer.id}`, `threaddiff:${sibling.id}`]));
+    expect(keys).not.toContain(`threaddiff:${elsewhere.id}`);
+  } finally {
+    await Promise.all([notes, other].map((folder) => rm(folder, { recursive: true, force: true })));
+  }
 });
 
 it("keeps refreshing diffs while a run works, even with no tool events, and stops once it is idle", async () => {
@@ -132,9 +153,8 @@ it("sends pending frames before a transcript page, so a loading window can drop 
   emit({ type: "message.delta", runId, ts: 1, messageId: "m", role: "assistant", text: "Hel" });
   emit({ type: "message.delta", runId, ts: 2, messageId: "m", role: "assistant", text: "lo" });
   emit({ type: "message.completed", runId, ts: 3, messageId: "m", role: "assistant", text: "Hello" });
-  await core.handle({ type: "rpc", id: 7, method: "events.page", params: { runId, turns: 1 } });
-  const frame = pushed.findIndex((p) => p.type === "frame" && p.frame.events.some((ev) => ev.type === "message.completed"));
-  const result = pushed.findIndex((p) => p.type === "rpc.result" && p.id === 7);
-  expect(frame).toBeGreaterThanOrEqual(0);
-  expect(frame).toBeLessThan(result);
+  const page = await core.handle({ type: "rpc", id: 7, method: "events.page", params: { runId, turns: 1 } });
+  expect(page.type).toBe("rpc.result");
+  // The window gets the page on the same port as the pushes, after every push made before it resolved.
+  expect(pushed.some((p) => p.type === "frame" && p.frame.events.some((ev) => ev.type === "message.completed"))).toBe(true);
 });

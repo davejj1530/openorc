@@ -12,7 +12,6 @@ import { rpcClient } from "./rpc-test-client.js";
 let core: OpenOrc;
 let dir: string;
 let projectId: string;
-let nextId = 1;
 const pushed: CorePush[] = [];
 const handles: RunHandle[] = [];
 const draft: TeamDraft = {

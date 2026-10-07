@@ -5,7 +5,7 @@ const { builtinModules, createRequire } = require("node:module");
 
 // These load outside the compiled bundles. AJV also emits require() calls in
 // generated validation code, which cannot be found as ordinary import syntax.
-const runtimeRoots = ["electron-updater", "node-pty", "sqlite-vec", "fastembed", "onnxruntime-node", "ajv", "ajv-formats"];
+const runtimeRoots = ["electron-updater", "node-pty", "sqlite-vec", "fastembed", "onnxruntime-node", "ajv", "ajv-formats", "prettier"];
 const noticeName = "{package.json,*[Ll][Ii][Cc][Ee][Nn][SsCc][Ee]*,*[Nn][Oo][Tt][Ii][Cc][Ee]*,*[Cc][Oo][Pp][Yy][Ii][Nn][Gg]*,*[Cc][Oo][Pp][Yy][Rr][Ii][Gg][Hh][Tt]*,[Rr][Ee][Aa][Dd][Mm][Ee]*}";
 
 function packageDirectory(from, name) {

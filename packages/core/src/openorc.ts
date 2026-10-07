@@ -72,6 +72,7 @@ import { createOrclingHost } from "./mcp-host/orcling.js";
 import { AgentUpdateService } from "./services/agent-updates.js";
 import { AttachmentService } from "./services/attachments.js";
 import type { ProtectedSecretStore } from "./services/extraction-credentials.js";
+import { FileFormatter, type BundledFormatter } from "./services/file-format.js";
 import { FileService } from "./services/files.js";
 import { ImportService } from "./services/imports.js";
 import { LedgerUpkeep } from "./services/ledger-upkeep.js";
@@ -86,7 +87,7 @@ import { ProviderUsageService } from "./services/provider-usage.js";
 import { PullRequestService } from "./services/pull-requests.js";
 import { ReviewerAppService } from "./services/reviewer-app.js";
 import { ReviewService } from "./services/review.js";
-import { RunService, type Notification } from "./services/runs.js";
+import { RunService, type Notification, type RunHooks } from "./services/runs.js";
 import { ScheduleService } from "./services/schedules.js";
 import { AppSettingsService } from "./services/settings.js";
 import { ShellEnvironment, inheritedProbe, type ShellProbe } from "./services/shell-environment.js";
@@ -122,6 +123,8 @@ export interface OpenOrcOptions {
   githubSecrets?: ProtectedSecretStore;
   /** Where memory's embedding model runs. Defaults to the core's own thread, where loading it and each batch block everything else. */
   embedder?: TextEmbedder;
+  /** The bundled Prettier, run off the core's thread. Without it, files format only with the project's own formatter. */
+  formatter?: BundledFormatter;
   dataDir: string;
   transport: Transport;
   /** In-memory database, for tests. */
@@ -404,7 +407,7 @@ export class OpenOrc {
       teams: this.teamConversations,
       teamQuiescenceReason: (id) => this.teamOperations.reason(id),
     });
-    this.files = new FileService();
+    this.files = new FileService({ writers: this.workspaceWriters, invalidate, formatter: new FileFormatter({ bundled: options.formatter ?? null, environment: () => this.environment.current() }) });
     this.imports = new ImportService(db, this.ledger, invalidate, this.log);
     this.reviewerApp = new ReviewerAppService(db, { secrets: options.githubSecrets, invalidate });
     this.pullRequests = new PullRequestService(db, {
@@ -775,7 +778,7 @@ export class OpenOrc {
       createSettingsHandlers({ settings: this.settings, textGeneration: this.textGeneration, invalidate }),
       createSchedulesHandlers({ schedules: this.schedules }),
       createCatalogHandlers({ runService: this.runs, invalidate }),
-      createMemoryHandlers({ memory: this.memory, db: this.db }),
+      createMemoryHandlers({ memory: this.memory, db: this.db, files: this.files }),
       createOrclingHandlers({ orclings: this.orclings }),
       createInboxHandlers({ runService: this.runs, db: this.db, teams: this.teams }),
       createBenchHandlers({ frames: this.frames, bench: this.bench, db: this.db, ledger: this.ledger, transport: this.options.transport, benchmarks: Boolean(this.options.benchmarks) }),

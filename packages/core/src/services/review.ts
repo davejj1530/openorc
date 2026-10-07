@@ -6,6 +6,7 @@ import { audit, comments, orchestration, projects, snapshots, tasks, teamDeleted
 import { changedFiles, commitAll, createPr, git, GitHubPulls, hasGh, headCommit, log, patchAgainst, patchSinceTree, pullRequestTemplate, push, teamTransfer, unpushedCommits } from "@openorc/git";
 import type { Commit, Project, PushState, ReviewComment, ReviewDiff, Snapshot, Task, TeamActionAvailability, TeamReviewComment, Thread } from "@openorc/protocol";
 import { assertRepository, projectGit } from "./project-git.js";
+import { executionFolder } from "./conversation-folder.js";
 import { workspaceWriters, type WorkspaceWriters } from "./workspace-writers.js";
 import { teamPublicationBranch, teamWorkspaceLocation } from "./team-workspace-location.js";
 import type { TeamTaskExport } from "./team-task-export.js";
@@ -185,7 +186,7 @@ export class ReviewService {
   private async threadCwd(thread: Thread, project: Project): Promise<string> {
     if (project.id === WORKSPACE_ID) throw new Error("Git review is available in project conversations. Workspace uses ordinary folders.");
     if (!thread.worktreePath) await assertRepository(project);
-    return thread.worktreePath ?? project.rootPath;
+    return executionFolder({ thread, task: null }, project);
   }
 
   async threadDiff(thread: Thread, project: Project, comparison: "base" | "head" = "base"): Promise<ReviewDiff> {

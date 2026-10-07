@@ -3,15 +3,17 @@ import { Maximize2, Minimize2, PanelRightClose, Plus } from "./icons";
 import { ResizeHandle } from "./ResizeHandle";
 import { IconButton, Tooltip } from "./ui";
 import { cn } from "../lib/cn";
+import { requestFilesFocus, useFilesHost } from "../lib/files-tool";
 import { useLayout } from "../lib/layout";
 import { usePanelSessions } from "../lib/panel-tabs";
 import { toolPage, usePanelWorkspace } from "../lib/panel-workspace";
 import { useTrafficLights, useWindowsControls } from "../lib/window";
-import { pageLabel, type PanelContext } from "./panel-tools";
+import { pageLabel, panelFileScope, type PanelContext } from "./panel-tools";
 import { PanelContent } from "./PanelContent";
 import { PanelNavigation } from "./PanelNavigation";
 import { PanelNewTab } from "./PanelNewTab";
 import { PanelTabs } from "./PanelTabs";
+import { useFileTabClosing } from "./UnsavedFileDialog";
 
 export { tabsFor, type PanelContext } from "./panel-tools";
 const BrowserPanel = lazy(() => import("../panels/BrowserPanel").then((m) => ({ default: m.BrowserPanel })));
@@ -68,7 +70,15 @@ function PanelBody({ context, workspace, open }: { context: PanelContext; worksp
       <PanelNavigation key={`${tab.id}:${tab.index}`} {...navigation} address={page.kind === "newtab" ? "" : pageLabel(page)} onNavigate={onNavigate} />
       <div className="flex-1 min-h-0">
         {page.kind === "newtab" ? (
-          <PanelNewTab context={context} recentUrls={recentUrls} onTool={(tool) => navigate(toolPage(tool))} onNavigate={onNavigate} />
+          <PanelNewTab
+            context={context}
+            recentUrls={recentUrls}
+            onTool={(tool) => {
+              if (tool === "file") requestFilesFocus();
+              navigate(toolPage(tool));
+            }}
+            onNavigate={onNavigate}
+          />
         ) : (
           <PanelContent context={context} page={page} onNavigate={navigate} />
         )}
@@ -83,6 +93,7 @@ export function Panel({ context }: { context: PanelContext }) {
   const sidebarOpen = useLayout((s) => s.sidebarOpen);
   const mounted = useMountedThroughClose(open);
   const workspace = usePanelWorkspace(context);
+  useFilesHost(panelFileScope(context));
   const windowsControls = useWindowsControls();
   const trafficLights = useTrafficLights();
   const { scope, session, tab } = workspace;
@@ -94,6 +105,7 @@ export function Panel({ context }: { context: PanelContext }) {
       if (active) document.getElementById(`panel-tab-${active}`)?.focus();
     });
   };
+  const closing = useFileTabClosing(session, { close: closeTab, show: (id) => usePanelSessions.getState().select(scope, id) });
   return (
     <>
       {open && !expanded ? <ResizeHandle edge="panel" /> : null}
@@ -105,7 +117,7 @@ export function Panel({ context }: { context: PanelContext }) {
         aria-hidden={!open}
         inert={!open}
         onKeyDown={(event) => {
-          if (expanded && event.key === "Escape") useLayout.getState().setPanelExpanded(false);
+          if (expanded && event.key === "Escape" && !event.defaultPrevented) useLayout.getState().setPanelExpanded(false);
         }}
       >
         <div className="panel-pane h-full flex flex-col">
@@ -117,7 +129,7 @@ export function Panel({ context }: { context: PanelContext }) {
               windowsControls ? "pr-controls" : "pr-2",
             )}
           >
-            <PanelTabs session={session} onSelect={(id) => usePanelSessions.getState().select(scope, id)} onClose={closeTab} />
+            <PanelTabs session={session} onSelect={(id) => usePanelSessions.getState().select(scope, id)} onClose={closing.requestClose} />
             <Tooltip label="New tab">
               <IconButton aria-label="New tab" className="no-drag shrink-0" onClick={() => usePanelSessions.getState().add(scope)}>
                 <Plus size={15} />
@@ -149,6 +161,7 @@ export function Panel({ context }: { context: PanelContext }) {
           </div>
         </div>
       </aside>
+      {closing.dialog}
     </>
   );
 }

@@ -13,7 +13,6 @@ let root: string;
 let dataDir: string;
 let core: OpenOrc;
 const pushed: CorePush[] = [];
-let nextId = 1;
 
 const call = rpcClient(() => core);
 

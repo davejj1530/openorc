@@ -7,7 +7,8 @@
   "description": "The domain: projects, tasks, workspaces, runs, review. Runs in the Electron utility process behind an RPC router.",
   "exports": {
     ".": "./src/index.ts",
-    "./embedder-host": "./src/embedder-host.ts"
+    "./embedder-host": "./src/embedder-host.ts",
+    "./formatter-host": "./src/formatter-host.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -24,6 +25,7 @@
     "@slack/web-api": "^8.1.1",
     "image-size": "^2.0.4",
     "marked": "^18.0.13",
+    "prettier": "3.9.8",
     "zod": "^4.1.0"
   },
   "devDependencies": {

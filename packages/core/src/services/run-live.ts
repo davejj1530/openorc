@@ -2,8 +2,10 @@ import { realpathSync } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { projects, tasks, threads, type Db } from "@openorc/db";
-import { WORKSPACE_ID, type AgentEvent, type Project } from "@openorc/protocol";
+import type { AgentEvent, Project } from "@openorc/protocol";
 import { overlaps } from "./workspace-writers.js";
+import { executionFolder } from "./conversation-folder.js";
+import { executionProject } from "./workspace-home.js";
 import type { Logger } from "../transport.js";
 import { occupied, working, type LiveRun, type RunHooks } from "./run-types.js";
 
@@ -129,7 +131,7 @@ export class RunLive {
   }
 
   watchDiffs(entry: LiveRun, project: Project): void {
-    if (entry.scope.comment || project.id === WORKSPACE_ID) return;
+    if (entry.scope.comment) return;
     const ticker = setInterval(() => {
       if (working(entry)) this.refreshDiffs(entry, project);
     }, WORKING_DIFF_REFRESH_MS);
@@ -167,14 +169,17 @@ export class RunLive {
     const lease = entry.workspaceLease.paths[0];
     if (!lease) return [];
     const cwd = canonicalDirectory(lease);
-    const root = projects.get(this.deps.db, project.id)?.rootPath ?? project.rootPath;
+    // Each conversation's folder as its runs launch: a thread through executionProject, a task with the raw project row.
+    const checkout = projects.get(this.deps.db, project.id) ?? project;
     const here = (dir: string) => canonicalDirectory(dir) === cwd;
-    const threadKeys = threads.list(this.deps.db, { projectId: project.id, filter: "active" }).flatMap((thread) => (here(thread.worktreePath ?? root) ? [`threaddiff:${thread.id}`] : []));
+    const threadKeys = threads
+      .list(this.deps.db, { projectId: project.id, filter: "active" })
+      .flatMap((thread) => (here(executionFolder({ thread, task: null }, executionProject(this.deps.db, thread))) ? [`threaddiff:${thread.id}`] : []));
     const taskKeys = tasks
       .list(this.deps.db, { projectId: project.id, statuses: ["backlog", "in_progress", "review"] })
-      .flatMap((task) => (here(task.worktreePath ?? root) ? [`diff:${task.id}`] : []));
+      .flatMap((task) => (here(executionFolder({ task, thread: null }, checkout)) ? [`diff:${task.id}`] : []));
     const own = [...(entry.scope.thread ? [`threaddiff:${entry.scope.thread.id}`] : []), ...(entry.scope.task ? [`diff:${entry.scope.task.id}`] : [])];
-    return [...new Set([...own, ...threadKeys, ...taskKeys, ...(here(root) ? [`projectdiff:${project.id}`] : [])])];
+    return [...new Set([...own, ...threadKeys, ...taskKeys, ...(here(checkout.rootPath) ? [`projectdiff:${project.id}`] : [])])];
   }
 
   disarmIdle(runId: string): void {

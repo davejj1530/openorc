@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { FileScope } from "@openorc/protocol";
 import { useRouter } from "./router";
 
 interface UiState {
@@ -14,6 +15,8 @@ interface UiState {
   teamMoveThreadId: string | null;
   /** The conversation whose move to or from a worktree is being confirmed. */
   moveThreadId: string | null;
+  /** The folder New file is asking a path for. */
+  newFile: FileScope | null;
   openNewTask: (projectId?: string, threadId?: string) => void;
   setImportProject: (open: boolean) => void;
   setImportSessions: (open: boolean, projectId?: string) => void;
@@ -22,6 +25,7 @@ interface UiState {
   setDeleteThread: (id: string | null) => void;
   setTeamMoveThread: (id: string | null) => void;
   setMoveThread: (id: string | null) => void;
+  setNewFile: (scope: FileScope | null) => void;
 }
 
 /** App-wide overlays. A store rather than App state so shortcuts, the palette, and autorun can open them. */
@@ -34,9 +38,11 @@ export const useUi = create<UiState>((set, get) => ({
   deleteThreadId: null,
   teamMoveThreadId: null,
   moveThreadId: null,
+  newFile: null,
   setDeleteThread: (deleteThreadId) => set({ deleteThreadId }),
   setTeamMoveThread: (teamMoveThreadId) => set({ teamMoveThreadId }),
   setMoveThread: (moveThreadId) => set({ moveThreadId }),
+  setNewFile: (newFile) => set({ newFile }),
   openNewTask: (projectId, threadId) => useRouter.getState().navigate({ view: "newtask", ...(projectId ? { projectId } : {}), ...(threadId ? { threadId } : {}) }),
   setImportProject: (importProject) => set({ importProject }),
   setImportSessions: (open, projectId) => set({ importSessions: { open, ...(projectId ? { projectId } : {}) } }),

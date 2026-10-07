@@ -67,7 +67,6 @@ afterAll(async () => {
   await rm(root, { recursive: true, force: true });
 });
 beforeEach(async () => {
-  pushes.length = 0;
   sessions.clear();
   const spawn = (spec: RunSpec) => {
     let resolve!: (value: number) => void;

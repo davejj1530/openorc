@@ -28,6 +28,11 @@ function contains(parent: string, child: string): boolean {
   return relative === "" || (!relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative));
 }
 
+/** Whether a lease reserves the tree `target` lives in, so a writer can prove it holds the folder before touching a file. */
+export function leaseCovers(lease: Pick<WorkspaceLease, "paths">, target: string): boolean {
+  return lease.paths.some((root) => contains(root, target));
+}
+
 /** Resolve missing worktrees through their nearest existing physical ancestor. */
 async function canonical(input: string): Promise<string> {
   if (!input.trim()) throw new Error("A workspace reservation needs a path.");
@@ -102,12 +107,7 @@ export class WorkspaceWriters {
     if (!inputs.length) throw new Error("A workspace reservation needs at least one path.");
     const resolved = [...new Set(await Promise.all(inputs.map(canonical)))].sort();
     // No awaits after identity resolution: checking and claiming all paths is atomic.
-    if (inherited) {
-      const held = this.leases.get(inherited);
-      if (!held || held.released || !this.reservations.has(held.reservation.id)) throw new Error("The workspace reservation has already been released or belongs to another host.");
-      if (resolved.some((target) => !held.reservation.paths.some((root) => contains(root, target)))) throw new Error("The inherited workspace reservation does not cover this operation's paths.");
-      return this.hold(held.reservation, resolved);
-    }
+    if (inherited) return this.inherit(inherited, resolved);
     const waitedFrom = Date.now();
     let yielded = false;
     let announced = false;
@@ -123,8 +123,9 @@ export class WorkspaceWriters {
         announced = true;
         this.report?.(`${owner} waits for ${conflict.owner} to release ${resolved.join(", ")}`);
       }
-      // A process waiting between turns gives the directory up; its session resumes when it is next needed.
-      if (!yielded && this.yielding) {
+      // A process waiting between turns gives the directory up; its session resumes when it is next needed. Such
+      // processes hold shared reservations, so asking them to leave cannot free a path an exclusive operation holds.
+      if (!yielded && this.yielding && conflict.shared) {
         yielded = true;
         if (await this.yielding(resolved)) continue;
       }
@@ -149,6 +150,13 @@ export class WorkspaceWriters {
     } finally {
       lease.release();
     }
+  }
+
+  private inherit(inherited: WorkspaceLease, paths: readonly string[]): WorkspaceLease {
+    const held = this.leases.get(inherited);
+    if (!held || held.released || !this.reservations.has(held.reservation.id)) throw new Error("The workspace reservation has already been released or belongs to another host.");
+    if (paths.some((target) => !held.reservation.paths.some((root) => contains(root, target)))) throw new Error("The inherited workspace reservation does not cover this operation's paths.");
+    return this.hold(held.reservation, paths);
   }
 
   private hold(reservation: Reservation, paths: readonly string[]): WorkspaceLease {

@@ -93,6 +93,9 @@ export class RunTurns {
     const { role = "user", attachments, recordPrompt = true } = options;
     const runId = entry.run.id;
     const previous = { busy: entry.busy, prompt: entry.prompt, reply: entry.reply, turns: entry.turns, questionsInterrupted: entry.questionsInterrupted };
+    // Only a message to a resting process starts a turn. One to a busy process steers the running turn, and one
+    // during background work joins work the agent has in hand, so neither captures the folder.
+    const startsTurn = !working(entry);
     this.deps.disarmIdle(runId);
     entry.busy = true;
     if (!previous.busy) entry.questionsInterrupted = false;

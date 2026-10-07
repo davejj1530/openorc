@@ -324,7 +324,7 @@ export function TeamConversation({
                     hasStarted={data.executions.length > 0}
                     location={teamConversationLocation(thread, project)}
                     changes={composerChanges}
-                    projectId={project.id}
+                    fileSearch={{ kind: "thread", id: thread.id }}
                     commands={skillCommands}
                     busy={message.pending || leadSaving || policySaving || compactRequest.working}
                     disabledReason={disabledReason}

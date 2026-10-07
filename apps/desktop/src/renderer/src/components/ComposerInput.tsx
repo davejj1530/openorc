@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import type { FileScope } from "@openorc/protocol";
 import { AtSign, Slash, Zap } from "./icons";
 import type { SlashCommand } from "./Composer";
 import { ComposerSuggestions } from "./ComposerSuggestions";
@@ -15,12 +16,15 @@ interface ComposerInputProps {
   disabled: boolean;
   placeholder: string;
   autoFocus?: boolean;
-  projectId?: string;
+  fileSearch?: FileScope;
   mentions?: MentionEntry[];
   commands?: SlashCommand[];
   suggestionAnchor: RefObject<HTMLDivElement | null>;
   suggestionSide: "top" | "bottom";
 }
+
+/** Stands in while there is no scope; the search is disabled then, so it is never sent. */
+const NO_SEARCH: FileScope = { kind: "project", id: "" };
 
 /** The word being typed at the caret, with the character that started it. */
 function tokenAtCaret(text: string, caret: number): { start: number; token: string } | null {
@@ -51,7 +55,7 @@ function suggestionLabel(members: boolean, files: boolean): string {
 
 /** Owns text interaction: suggestions, selection, focus and the highlight mirror. */
 export function ComposerInput(props: ComposerInputProps) {
-  const { value, onChange, onSubmit, onFiles, disabled, placeholder, autoFocus, projectId, mentions, commands } = props;
+  const { value, onChange, onSubmit, onFiles, disabled, placeholder, autoFocus, fileSearch, mentions, commands } = props;
   const [caret, setCaret] = useState(0);
   const [cursor, setCursor] = useState(0);
   const [suggestionsActive, setSuggestionsActive] = useState(true);
@@ -63,10 +67,10 @@ export function ComposerInput(props: ComposerInputProps) {
   const token = useMemo(() => tokenAtCaret(value, caret), [value, caret]);
   const memberQuery = useMemo(() => (mentions?.length ? mentionQueryAt(value, caret) : null), [mentions, value, caret]);
   const memberMatches = useMemo(() => (memberQuery ? filterMentions(mentions ?? [], memberQuery.query) : []), [memberQuery, mentions]);
-  const mentionQuery = token?.token.startsWith("@") && projectId && !memberMatches.length ? token.token.slice(1) : null;
+  const mentionQuery = token?.token.startsWith("@") && fileSearch && !memberMatches.length ? token.token.slice(1) : null;
   const commandPrefix = token?.token[0];
   const commandQuery = commandQueryAt(token, commands);
-  const files = useRpc("files.search", { projectId: projectId ?? "", query: mentionQuery ?? "", limit: 8 }, { enabled: mentionQuery !== null, staleTime: 10_000 });
+  const files = useRpc("files.search", { scope: fileSearch ?? NO_SEARCH, query: mentionQuery ?? "", limit: 8 }, { enabled: mentionQuery !== null, staleTime: 10_000 });
   // Skills insert into the prompt; actions clear it, so only offer actions at the start.
   const commandMatches = useMemo(() => matchingCommands(commands, commandQuery, commandPrefix, token?.start), [commandPrefix, commandQuery, commands, token?.start]);
   const caretFrame = useRef<number | null>(null);

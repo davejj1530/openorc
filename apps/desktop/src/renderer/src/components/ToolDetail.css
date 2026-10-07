@@ -224,6 +224,23 @@
   background: color-mix(in oklab, var(--warn) 32%, transparent);
   color: var(--ink);
 }
+/* In results the user works through, the whole line opens its file there: its number's link covers the row. */
+.tool-view-matches[data-rows] li {
+  position: relative;
+  border-radius: 4px;
+}
+.tool-view-matches[data-rows] li:hover,
+.tool-view-matches[data-rows] li:has(a:focus-visible) {
+  background: var(--surface-2);
+}
+.tool-view-matches[data-rows] .tool-view-line a::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+.tool-view-matches[data-rows] .tool-view-line a:focus-visible {
+  outline: none;
+}
 
 .tool-view-files {
   display: grid;

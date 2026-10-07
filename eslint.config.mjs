@@ -3,6 +3,14 @@ import reactHooks from "eslint-plugin-react-hooks";
 
 const typescriptFiles = ["**/*.{ts,tsx,mts,cts}"];
 const applicationTypeScript = ["packages/*/src/**/*.{ts,tsx}", "apps/desktop/src/**/*.{ts,tsx}", "apps/website/src/**/*.ts"];
+// The editor engine stays behind one folder, so swapping or upgrading it touches nothing else.
+const codeEditorFolder = "apps/desktop/src/renderer/src/components/code-editor";
+const codeEditorFence = {
+  patterns: [
+    { regex: "^(codemirror|@codemirror/|@lezer/)", message: `CodeMirror is imported only in ${codeEditorFolder}/. Use CodeEditor from there.` },
+    { regex: "(^|/)code-editor/.", message: `Import CodeEditor from ${codeEditorFolder}, not its files.` },
+  ],
+};
 
 export default [
   {
@@ -25,6 +33,11 @@ export default [
     files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
     rules: { "no-nested-ternary": "error", "no-control-regex": "error" },
     linterOptions: { reportUnusedDisableDirectives: "error" },
+  },
+  {
+    files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
+    ignores: [`${codeEditorFolder}/**`],
+    rules: { "no-restricted-imports": ["error", codeEditorFence] },
   },
   {
     files: typescriptFiles,

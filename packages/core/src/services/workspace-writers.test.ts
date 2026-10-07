@@ -122,6 +122,31 @@ describe("physical workspace reservations", () => {
     holder.release();
   });
 
+  it("asks idle agents to yield only when their shared reservation is what holds the path", async () => {
+    const root = path.join(directory, "checkout");
+    await mkdir(root);
+    const asked: (readonly string[])[] = [];
+    writers.onConflict(async (paths) => {
+      asked.push(paths);
+      return false;
+    });
+    const commit = await writers.acquire(root, "Commit changes");
+    const save = writers.acquire(root, "Save a file", undefined, { shared: true, waitForExclusive: () => {} });
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    commit.release();
+    const saved = await save;
+    expect(saved.owner).toBe("Save a file");
+    expect(asked).toEqual([]);
+    saved.release();
+
+    const agent = await writers.acquire(root, "Agent session", undefined, { shared: true });
+    const restore = writers.acquire(root, "Restore checkout", undefined, { waitForShared: () => {} });
+    await new Promise((resolve) => setTimeout(resolve, 450));
+    agent.release();
+    (await restore).release();
+    expect(asked).toEqual([[root]]);
+  });
+
   it("rejects dangling symlinks instead of guessing a physical workspace", async () => {
     await symlink(path.join(directory, "absent"), path.join(directory, "dangling"));
     await expect(writers.acquire(path.join(directory, "dangling", "worktree"), "setup")).rejects.toThrow(/cannot be resolved/);

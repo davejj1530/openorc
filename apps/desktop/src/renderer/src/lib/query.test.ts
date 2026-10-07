@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { RpcMethod } from "@openorc/protocol";
+import { fileReads, type RpcMethod } from "@openorc/protocol";
 import { QueryObserver } from "@tanstack/react-query";
 import { invalidatesFor, invalidateTags, queryClient, tagsFor } from "./query";
 
@@ -82,7 +82,7 @@ const contract: Array<[RpcMethod, RpcMethod[]]> = [
   ["reviewerApp.remove", ["reviewerApp.get"]],
 ];
 
-const params = { id: "t1", taskId: "t1", threadId: "t1", projectId: "p1" };
+const params = { id: "t1", taskId: "t1", threadId: "t1", projectId: "p1", scope: { kind: "thread" as const, id: "t1" }, path: "README.md", query: "" };
 
 describe("query cache tags", () => {
   it("every write refreshes the reads it affects", () => {
@@ -130,7 +130,7 @@ describe("query cache tags", () => {
       "git.threadPushState",
       "git.projectLog",
       "git.projectPushState",
-      "files.search",
+      ...fileReads,
       "app.settings.get",
       "schedules.list",
       "pulls.list",
@@ -140,6 +140,11 @@ describe("query cache tags", () => {
       "pulls.review.get",
     ];
     for (const read of reads) expect(tagsFor(read, params).length, `${read} has no tag`).toBeGreaterThan(0);
+  });
+
+  it("refreshes an open file when an agent changes its conversation's folder, and on the workspace refresh", () => {
+    expect(tagsFor("files.read", { scope: { kind: "thread", id: "t1" }, path: "src/app.ts" }).sort()).toEqual(["threaddiff:t1", "workspace-diff"]);
+    expect(tagsFor("files.read", { scope: { kind: "task", id: "k1" }, path: "src/app.ts" }).sort()).toEqual(["diff:k1", "workspace-diff"]);
   });
 
   it("refreshes the checkout branch on the workspace refresh used by focus and terminal commands", async () => {

@@ -34,6 +34,8 @@ interface LayoutState {
   consumeWorkspaceCommit: (requestId: number) => void;
   selectedFile: FileSelection | null;
   openFile: (file: FileSelection) => void;
+  /** The Files tool rather than a file a link chose: on this thread's panel when given, else on the panel on screen. */
+  openFiles: (threadId?: string) => void;
   /** The navigation scope for tasks, memory, and new threads. Null selects all projects. */
   projectId: string | null;
   /** The visible thread whose controls last opened the shared panel. */
@@ -177,6 +179,7 @@ export const useLayout = create<LayoutState>((set, get) => {
     },
     openFile: (selectedFile) =>
       commit({ selectedFile, panelOpen: true, panelTab: "file", panelRequest: { tab: "file" }, ...(selectedFile.scope.kind === "thread" ? { panelThreadId: selectedFile.scope.id } : {}) }),
+    openFiles: (threadId) => commit({ selectedFile: null, panelOpen: true, panelTab: "file", panelRequest: { tab: "file" }, ...(threadId ? { panelThreadId: threadId } : {}) }),
     setPanelWidth: (px) => commit({ panelWidth: clamp(px, limits.panel) }),
     setProject: (projectId) => commit({ projectId }),
     openThreadPanel: (id, tab) => commit({ panelThreadId: id, panelOpen: true, panelTab: tab, panelRequest: { tab } }),

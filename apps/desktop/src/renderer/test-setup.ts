@@ -23,3 +23,12 @@ if (typeof window !== "undefined" && typeof window.matchMedia !== "function") {
     return list;
   };
 }
+
+/*
+ * CodeMirror measures text through Range rectangles on animation frames. jsdom has no layout and no such methods, so
+ * any test that renders the editor long enough for a frame to pass would throw from the measure. Empty rectangles are
+ * what a page without layout would report.
+ */
+if (typeof Range !== "undefined" && !("getClientRects" in Range.prototype)) {
+  Object.assign(Range.prototype, { getClientRects: () => [], getBoundingClientRect: () => new DOMRect() });
+}

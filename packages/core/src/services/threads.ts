@@ -43,6 +43,7 @@ import { inUnvettedCopy } from "./review-copies.js";
 import type { RunService } from "./runs.js";
 import type { WorkspaceService } from "./workspace.js";
 import { directory, executionProject } from "./workspace-home.js";
+import { executionFolder } from "./conversation-folder.js";
 import { workspaceWriters, type WorkspaceWriters } from "./workspace-writers.js";
 import { checkpointRefs, unpinProjectRefs } from "./checkpoint-refs.js";
 import { ThreadMoves, fileChanges } from "./thread-moves.js";
@@ -361,8 +362,7 @@ export class ThreadService {
     if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*\.md$/.test(filename) || filename.length > 120) throw new Error("Choose a Markdown filename without directories.");
     const plan = plans.list(this.db, id).find((p) => p.id === planId);
     if (!plan || plan.state !== "ready") throw new Error("Only completed plan revisions can be exported.");
-    const project = executionProject(this.db, thread);
-    const file = path.join(thread.worktreePath ?? project.rootPath, filename);
+    const file = path.join(executionFolder({ thread, task: null }, executionProject(this.db, thread)), filename);
     await writeFile(file, plan.text + "\n", { flag: "wx" });
     audit.record(this.db, { actor: "user", action: "plan.export", resourceType: "thread", resourceId: id, metadata: { planId, file } });
     return { path: file };
@@ -658,7 +658,7 @@ export class ThreadService {
     if (thread.workspaceMode === to) return thread;
     await this.closeIdleRun(id, "moving the thread");
     const project = executionProject(this.db, thread);
-    const from = thread.worktreePath ?? project.rootPath;
+    const from = executionFolder({ thread, task: null }, project);
     const destination = to === "worktree" ? { ...thread, workspaceMode: to, worktreePath: null, branch: null, baseSha: null } : { ...thread, workspaceMode: to, worktreePath: null };
     return this.writers.withLease([from, this.workspaces.threadPath(destination, project)], `moving thread ${id}`, async (lease) => {
       const moves = new ThreadMoves(this.db, this.workspaces);
@@ -823,7 +823,7 @@ export class ThreadService {
     const checkpoint = checkpoints.get(this.db, checkpointId);
     if (!checkpoint || checkpoint.threadId !== id) throw new Error("checkpoint not found on this thread");
     const project = executionProject(this.db, thread);
-    const cwd = thread.worktreePath ?? project.rootPath;
+    const cwd = executionFolder({ thread, task: null }, project);
     if (checkpoint.root && checkpoint.root !== (await realpath(cwd))) {
       const checkout = await realpath(project.rootPath).catch(() => project.rootPath);
       const place = (folder: string) => (folder === checkout || folder === project.rootPath ? "the project checkout" : `a worktree at ${folder}`);

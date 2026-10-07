@@ -1,7 +1,8 @@
-import { createHash } from "node:crypto";
-import { mkdir, readFile, realpath, writeFile } from "node:fs/promises";
+import { mkdir, readFile, realpath } from "node:fs/promises";
 import path from "node:path";
-import type { InstructionFile } from "@openorc/protocol";
+import { FileVersion, FolderPath, type InstructionFile } from "@openorc/protocol";
+import { versionOf } from "./file-write.js";
+import type { FileService } from "./files.js";
 
 type Location = Pick<InstructionFile, "scope" | "path">;
 
@@ -21,15 +22,17 @@ export async function readInstructionFiles(locations: Location[]): Promise<Instr
 }
 
 /**
- * Refuses a file that changed after `version` was read, so an agent's edit is never overwritten unseen. Writing
- * through links keeps a CLAUDE.md that points at AGENTS.md pointing there.
+ * Refuses a file that changed after `version` was read, so an agent's edit is never overwritten unseen. Writes
+ * through links, so a CLAUDE.md that points at AGENTS.md keeps pointing there.
  */
-export async function saveInstructionFile(location: Location, content: string, version: string | null): Promise<InstructionFile> {
-  const current = await readInstructionFile(location);
-  if (current.version !== version) throw new Error(`${path.basename(location.path)} changed after you started editing it.`);
-  await mkdir(path.dirname(location.path), { recursive: true });
-  await writeFile(location.path, content);
-  return { ...location, content, version: versionOf(Buffer.from(content)) };
+export async function saveInstructionFile(files: Pick<FileService, "save">, location: Location, content: string, version: string | null): Promise<InstructionFile> {
+  const target = await realpath(location.path).catch(() => location.path);
+  await mkdir(path.dirname(target), { recursive: true });
+  const root = await realpath(path.dirname(target));
+  const expected = version === null ? { kind: "absent" as const } : { kind: "version" as const, version: FileVersion.parse(version) };
+  const outcome = await files.save(root, FolderPath.parse(path.basename(target)), content, expected);
+  if (outcome.kind === "conflict") throw new Error(`${path.basename(location.path)} changed after you started editing it.`);
+  return { ...location, content, version: outcome.version };
 }
 
 async function readInstructionFile(location: Location): Promise<InstructionFile> {
@@ -48,5 +51,3 @@ async function readInstructionFile(location: Location): Promise<InstructionFile>
     throw new Error(`${name} is not UTF-8 text.`);
   }
 }
-
-const versionOf = (bytes: Buffer) => createHash("sha256").update(bytes).digest("hex");

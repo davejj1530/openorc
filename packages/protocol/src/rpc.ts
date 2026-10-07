@@ -5,12 +5,12 @@ import type { TaskCheckoutState } from "./task-checkout.js";
 import { BranchLoss, type ChangePreview, type RemovalImpact } from "./workspace-changes.js";
 import { claudeAccountRpcParams, ClaudeAccountId, type ClaudeAccountRpcResults } from "./claude-accounts.js";
 import { z } from "zod";
-import { FileScope } from "./files.js";
 import type { AgentUpdates } from "./agent-updates.js";
 import { slackRpcParams, type SlackStatus } from "./slack.js";
 import { BranchName, pullRequestRpcParams, type PullRequestRpcResults } from "./pull-requests.js";
 import { orclingRpcParams, type OrclingRpcResults } from "./orclings.js";
 import { projectRpcParams, type ProjectRpcResults } from "./projects.js";
+import { fileRpcParams, type FileRpcResults } from "./files.js";
 import { HarnessId, type HarnessInfo } from "./harness.js";
 import { AgentEvent, AgentKind, ApprovalDecision, Frame } from "./events.js";
 import type { McpAppOpenResult } from "./mcp-apps.js";
@@ -70,6 +70,7 @@ export const rpcParams = {
   ...pullRequestRpcParams,
   ...orclingRpcParams,
   ...projectRpcParams,
+  ...fileRpcParams,
   "tasks.comments.list": z.object({ taskId: z.string() }),
   "tasks.comments.post": z
     .object({
@@ -363,10 +364,6 @@ export const rpcParams = {
   /** Which branch Push would publish from the thread's workspace and which commits origin lacks. Local refs only; never fetches. */
   "git.threadPushState": z.object({ threadId: z.string() }),
   "review.threadPrTemplate": z.object({ threadId: z.string() }),
-  /** Tracked files whose path matches, for @ mentions in the composer. */
-  "files.search": z.object({ projectId: z.string(), scope: FileScope.optional(), query: z.string(), limit: z.number().int().positive().max(50).optional() }),
-  /** Read a cited text file in the conversation's workspace. */
-  "files.read": z.object({ scope: FileScope, path: z.string().min(1) }),
   /** The instruction files the thread's agent reads, AGENTS.md first and its personal file last. */
   "instructions.list": z.object({ threadId: z.string() }),
   /** Saves one of them. `version` is the one the edit started from, null for a new file; a file changed since then is refused. */
@@ -663,8 +660,6 @@ export interface RpcResults extends PullRequestRpcResults, OrclingRpcResults, Pr
   "git.threadPushState": PushState;
   /** The repository's pull request template, read from the thread's workspace; null when it has none. */
   "review.threadPrTemplate": { body: string | null };
-  "files.search": string[];
-  "files.read": { path: string; content: string };
   "instructions.list": InstructionFile[];
   "instructions.save": InstructionFile;
   "app.settings.get": AppSettings;

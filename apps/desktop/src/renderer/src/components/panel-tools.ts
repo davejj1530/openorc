@@ -1,6 +1,7 @@
 import { WORKSPACE_ID, isDetachedCopy, type Project, type Task, type ThreadSummary } from "@openorc/protocol";
 import type { FileSelection, PanelTab } from "../lib/layout";
-import type { PanelPage } from "../lib/panel-tabs";
+import { pageType, type PanelPage } from "../lib/panel-tabs";
+import { fileIcon } from "./FileGlyph";
 import { BookText, Brain, FileDiff, FileText, Folder, GitCommitHorizontal, Globe, History, ListTodo, Orcling, SlidersHorizontal, Terminal } from "./icons";
 
 export type PanelContext =
@@ -41,7 +42,7 @@ export function panelDirectory(context: PanelContext): string {
 export function panelFileScope(context: PanelContext): FileSelection["scope"] {
   if (context.kind === "thread") return { kind: "thread", id: context.thread.id };
   if (context.kind === "task") return { kind: "task", id: context.task.id };
-  if (context.kind === "newthread") return { kind: "project", id: context.project.id, workingDirectory: context.workingDirectory };
+  if (context.kind === "newthread" && context.project.id === WORKSPACE_ID) return { kind: "project", id: context.project.id, workingDirectory: context.workingDirectory };
   return { kind: "project", id: context.project.id };
 }
 
@@ -71,4 +72,10 @@ export function pageLabel(page: PanelPage): string {
   if (page.kind === "browser") return page.title || (page.url ? pageHost(page.url) : "Preview");
   if (page.kind === "file" && page.selection) return page.selection.path.split(/[\\/]/).pop() ?? page.selection.path;
   return panelTools[page.kind === "tool" ? page.tool : page.kind].label;
+}
+
+/** A tab's mark: a file page shows what kind of file it holds, any other page its tool. */
+export function pageIcon(page: PanelPage): typeof Globe {
+  if (page.kind === "file" && page.selection) return fileIcon(page.selection.path);
+  return panelTools[pageType(page)].icon;
 }

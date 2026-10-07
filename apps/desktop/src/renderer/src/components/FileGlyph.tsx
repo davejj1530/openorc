@@ -29,13 +29,21 @@ const languages: Record<string, ProjectStackIconId> = {
   astro: "astro",
 };
 
+const extensionOf = (path: string) => /\.([a-z0-9]+)$/i.exec(path)?.[1]?.toLowerCase() ?? "";
+
+/** What kind of file a path names, in outline: an image, prose, or code. */
+export function fileIcon(path: string): typeof FileCode2 {
+  const extension = extensionOf(path);
+  if (/^(png|jpe?g|gif|webp|svg|avif|ico)$/.test(extension)) return Image;
+  if (/^(md|mdx|txt|rst)$/.test(extension)) return FileText;
+  return FileCode2;
+}
+
 /** A file's mark: its language's logo where we ship one, otherwise what kind of file it is. */
 export function FileGlyph({ path, size = 12, className }: { path: string; size?: number; className?: string }) {
   if (/[\\/]$/.test(path)) return <Folder size={size} className={className} />;
-  const extension = /\.([a-z0-9]+)$/i.exec(path)?.[1]?.toLowerCase() ?? "";
-  const language = languages[extension];
+  const language = languages[extensionOf(path)];
   if (language) return <ProjectStackIcon id={language} size={size} />;
-  if (/^(png|jpe?g|gif|webp|svg|avif|ico)$/.test(extension)) return <Image size={size} className={className} />;
-  if (/^(md|mdx|txt|rst)$/.test(extension)) return <FileText size={size} className={className} />;
-  return <FileCode2 size={size} className={className} />;
+  const Icon = fileIcon(path);
+  return <Icon size={size} className={className} />;
 }

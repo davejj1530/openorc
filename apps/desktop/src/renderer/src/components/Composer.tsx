@@ -9,6 +9,7 @@ import {
   type AgentKind,
   type PermissionPreset,
   type RunMode,
+  type FileScope,
 } from "@openorc/protocol";
 import { ArrowUp, ChevronDown, Clock, FileText, GitBranch, Laptop, Plus, Square, X } from "./icons";
 import { Menu } from "@base-ui/react/menu";
@@ -122,8 +123,8 @@ export interface ComposerProps {
   compactDisabledReason?: string;
   compacting?: boolean;
   generatingImage?: boolean;
-  /** For @ file mentions. */
-  projectId?: string;
+  /** Where @ file mentions search. */
+  fileSearch?: FileScope;
   /** Team members `@` can address; they take the popover before file matches. */
   mentions?: MentionEntry[];
   commands?: SlashCommand[];
@@ -266,7 +267,7 @@ export function Composer(props: ComposerProps) {
           disabled={Boolean(props.busy || submitting)}
           placeholder={props.placeholder}
           autoFocus={props.autoFocus}
-          projectId={props.projectId}
+          fileSearch={props.fileSearch}
           mentions={props.mentions}
           commands={props.commands}
           suggestionAnchor={shell}

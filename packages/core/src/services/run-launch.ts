@@ -187,7 +187,6 @@ export class RunLaunch {
     const mcp = await this.deps.mcp();
     phase("mcp");
     const internalMcp = this.internalMcp(input, runId, mcp);
-    const spec = this.runSpec(prepared, lease, internalMcp);
     await this.lockTaskWorkspace(attempt);
     // Captured before the spec is built, so the prompt the provider receives can carry the outside-changes note.
     const outside = await this.captureTurnStart(input, lease);
@@ -392,7 +391,7 @@ export class RunLaunch {
     assertAdmission();
     phase("checks");
     await this.closePrevious(input);
-    const cwd = this.workingDirectory(input);
+    const cwd = executionFolder(input.scope, input.project);
     const runId = randomUUID();
     const model = input.model ?? (await this.deps.models(agent, environment, launch).catch(() => [] as ModelOption[])).find((item) => item.isDefault)?.id;
     input = { ...input, effort: normalizeModelEffort(agent, model, input.effort) };
@@ -410,13 +409,6 @@ export class RunLaunch {
     const entry = this.deps.live.get(previous.id)!;
     if (working(entry)) throw new Error("Wait for the current turn to finish before changing its session settings.");
     await this.deps.closeAndWait(previous.id);
-  }
-
-  private workingDirectory(input: StartRunInput): string {
-    const { task, thread } = input.scope;
-    if (task?.workspaceMode === "current") return input.project.rootPath;
-    if (task) return task.worktreePath ?? input.project.rootPath;
-    return thread?.worktreePath ?? input.project.rootPath;
   }
 
   private resumeTarget(input: StartRunInput, model: string | undefined): { resumeSessionId: string | null | undefined; forkSession: boolean } {

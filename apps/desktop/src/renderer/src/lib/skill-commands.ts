@@ -1,3 +1,4 @@
+import { useClaudeAccountId } from "./claude-account";
 import { useMemo } from "react";
 import { WORKSPACE_ID, type AgentKind } from "@openorc/protocol";
 import type { SlashCommand } from "../components/Composer";
@@ -18,12 +19,14 @@ import { useRpc } from "./query";
  * `folder` says which; elsewhere it is ignored. The list is read again every
  * minute, so a skill installed while a conversation is open shows up in it.
  */
-export function useSkillCommands(projectId: string | null | undefined, selectedAgent: AgentKind | null | undefined, folder?: string | null): SlashCommand[] {
+export function useSkillCommands(projectId: string | null | undefined, selectedAgent: AgentKind | null | undefined, folder?: string | null, selectedAccountId?: string): SlashCommand[] {
+  const scopedAccountId = useClaudeAccountId();
+  const claudeAccountId = selectedAccountId ?? scopedAccountId;
   const agent = selectedAgent === "acp" ? "opencode" : selectedAgent;
   const workingDirectory = projectId === WORKSPACE_ID ? folder : null;
   const skills = useRpc(
     "skills.list",
-    { projectId: projectId ?? "", ...(workingDirectory ? { workingDirectory } : {}), agent: agent ?? "claude" },
+    { ...(agent === "claude" && claudeAccountId ? { claudeAccountId } : {}), projectId: projectId ?? "", ...(workingDirectory ? { workingDirectory } : {}), agent: agent ?? "claude" },
     { enabled: Boolean(projectId && agent && agent !== "opencode"), staleTime: 60_000, refetchInterval: 60_000 },
   );
   const found = skills.data;

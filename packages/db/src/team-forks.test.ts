@@ -1,3 +1,4 @@
+import { insertLegacyThread } from "./fixtures/legacy-thread.js";
 import { randomUUID } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -30,7 +31,7 @@ function fixture(db = Db.memory()) {
     expectedRevisionId: null,
     draft: { name: "Team", limits: DEFAULT_TEAM_LIMITS, members: [{ key: "lead", name: "Lead", managerKey: null, responsibility: "Work", settings }] },
   });
-  const source = threads.insert(db, { projectId: project.id, title: "Source", ...settings, mode: "act", permissionMode: "review" });
+  const source = insertLegacyThread(db, { projectId: project.id, title: "Source", ...settings, mode: "act", permissionMode: "review" });
   const instance = orchestration.createInstance(db, { threadId: source.id, teamRevisionId: team.revision.id });
   const input: CreateTeamForkInput = {
     id: randomUUID(),

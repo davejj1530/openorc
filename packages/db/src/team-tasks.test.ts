@@ -1,3 +1,4 @@
+import { insertLegacyThread } from "./fixtures/legacy-thread.js";
 import { insertLegacyRun } from "./fixtures/legacy-run.js";
 import { LEGACY_TEAM_PROMPT, legacyTeamRuntime, teamJournalWriter } from "./fixtures/legacy-team-journal.js";
 import { randomUUID } from "node:crypto";
@@ -51,7 +52,7 @@ const draft: TeamDraft = {
 function fixture(db = Db.memory()) {
   opened.add(db);
   const project = projects.insert(db, { name: "Task fixture", rootPath: `/tmp/task-${randomUUID()}`, defaultBranch: "main", gitRemote: null, settings: {} });
-  const thread = threads.insert(db, { projectId: project.id, title: "Team tasks", ...settings, mode: "act", permissionMode: "trusted" });
+  const thread = insertLegacyThread(db, { projectId: project.id, title: "Team tasks", ...settings, mode: "act", permissionMode: "trusted" });
   const saved = orchestration.save(db, { projectId: project.id, expectedRevisionId: null, draft });
   const instance = orchestration.createInstance(db, { threadId: thread.id, teamRevisionId: saved.revision.id });
   const addTask = (title: string, parentTaskId: string | null = null) =>
@@ -506,7 +507,7 @@ describe("durable team task input and admission", () => {
     opened.add(reopened);
     expect(teamRuntime.get(reopened, old.id)).toEqual(old);
     expect(teamRuntime.binding(reopened, run.id)?.executionId).toBe(old.id);
-    expect(runs.get(reopened, run.id)).toEqual({ ...run, workingDirectory: null, commentTurnId: null });
+    expect(runs.get(reopened, run.id)).toEqual({ ...run, claudeAccountId: null, workingDirectory: null, commentTurnId: null });
     // A team task keeps its team conversation as the conversation it runs in.
     expect(tasks.get(reopened, f.task.id)).toEqual({ ...f.task, executionThreadId: f.thread.id });
     expect(comments.listForTask(reopened, f.task.id)).toEqual([selected]);

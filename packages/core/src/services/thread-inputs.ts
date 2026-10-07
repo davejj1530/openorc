@@ -1,6 +1,7 @@
 import type { AgentKind, PermissionPreset, RunMode, TaskPriority, WorkspaceMode } from "@openorc/protocol";
 
 export interface StartThreadInput {
+  claudeAccountId?: string;
   projectId: string;
   workingDirectory?: string;
   agent: AgentKind;
@@ -21,7 +22,7 @@ export interface StartThreadInput {
 }
 
 /** Names a thread from its first exchange; null when no model is available. */
-export type ThreadTitler = (exchange: { request: string; reply: string | null }, agent: AgentKind) => Promise<string | null>;
+export type ThreadTitler = (exchange: { request: string; reply: string | null }, agent: AgentKind, claudeAccountId?: string) => Promise<string | null>;
 
 export interface SpawnTaskInput {
   title: string;

@@ -161,7 +161,7 @@ export class TeamForkService {
           sourceRunId: context.sourceRunId,
           teamRevisionId: instance.teamRevisionId,
           leadOverrides: instance.leadOverrides,
-          thread: { title: source.title, agent: source.agent, model: source.model, effort: source.effort, fastMode: source.fastMode, mode: source.mode, permissionMode: source.permissionMode },
+          thread: source,
         });
         this.changed(source.id);
       }
@@ -188,6 +188,7 @@ export class TeamForkService {
             id: accepted.destinationThreadId,
             projectId: accepted.projectId,
             ...accepted.thread,
+            claudeAccountId: accepted.thread.claudeAccountId ?? "claude-cli",
             title: `${accepted.thread.title} (fork)`,
             workspaceMode: "worktree",
           });

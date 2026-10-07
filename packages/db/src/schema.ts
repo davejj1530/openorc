@@ -1,3 +1,4 @@
+import { claudeAccountMigration } from "./claude-account-schema.js";
 import { taskCommentsMigration } from "./task-comments-schema.js";
 import type { DatabaseSync } from "node:sqlite";
 import { teamTaskMigration } from "./team-task-schema.js";
@@ -769,4 +770,5 @@ export const migrations: Migration[] = [
   /** The thread that started this one with thread_start. A parent counts its working children by it. */
   `ALTER TABLE threads ADD COLUMN parent_thread_id TEXT REFERENCES threads(id) ON DELETE SET NULL;
   CREATE INDEX threads_parent ON threads(parent_thread_id) WHERE parent_thread_id IS NOT NULL;`,
+  claudeAccountMigration,
 ];

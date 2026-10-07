@@ -5,13 +5,18 @@ import { threadAndProject } from "./context.js";
 import type { Handlers } from "./types.js";
 type Dependencies = {
   db: Db;
+  claudeEnvironment?: (id?: string) => NodeJS.ProcessEnv;
 };
 
-export function createInstructionsHandlers({ db }: Dependencies): Pick<Handlers, "instructions.list" | "instructions.save"> {
+export function createInstructionsHandlers({ db, claudeEnvironment }: Dependencies): Pick<Handlers, "instructions.list" | "instructions.save"> {
   /** The files the thread's current agent reads, in the folder it works in. */
   const locations = (threadId: string) => {
     const { thread, project } = threadAndProject(db, threadId);
-    return instructionFiles({ agent: thread.agent, folder: thread.worktreePath ?? project.rootPath });
+    return instructionFiles({
+      agent: thread.agent,
+      folder: thread.worktreePath ?? project.rootPath,
+      ...(thread.agent === "claude" && claudeEnvironment ? { env: claudeEnvironment(thread.claudeAccountId ?? "claude-cli") } : {}),
+    });
   };
   return {
     "instructions.list": ({ threadId }) => readInstructionFiles(locations(threadId)),

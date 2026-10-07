@@ -12,6 +12,7 @@ export interface AllowanceWindow {
 }
 
 export interface ProviderUsage {
+  claudeAccountId?: string;
   provider: HarnessId | "anthropic-api";
   status: "available" | "unavailable" | "disconnected" | "error";
   source: string;

@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import {
   audit,
+  claudeAccounts,
   orchestration,
   plans,
   projects,
@@ -45,6 +46,21 @@ import { relayTeamThreadMessage, type TeamThreadMessage } from "./team-thread-me
 import type { TeamWorkspaceService } from "./team-workspaces.js";
 
 const fingerprint = (input: unknown) => createHash("sha256").update(JSON.stringify(input)).digest("hex");
+
+function teamStartFingerprint(input: RpcParams<"threads.start">, baseRef: string | undefined): string {
+  return fingerprint({
+    projectId: input.projectId,
+    target: input.executionTarget,
+    claudeAccountId: input.claudeAccountId,
+    mode: input.mode,
+    permissionMode: input.permissionMode,
+    workspaceMode: input.workspaceMode ?? null,
+    prompt: input.prompt,
+    attachments: input.attachments ?? [],
+    title: input.title ?? null,
+    ...(baseRef ? { baseRef } : {}),
+  });
+}
 
 /** Internal callers can commit their launch receipt with the new conversation. */
 export interface TeamStartAdmission {
@@ -103,17 +119,7 @@ export class TeamConversationService {
       ? {
           scope: "project" as const,
           requestKey: input.requestKey,
-          payloadHash: fingerprint({
-            projectId: input.projectId,
-            target: input.executionTarget,
-            mode: input.mode,
-            permissionMode: input.permissionMode,
-            workspaceMode: input.workspaceMode ?? null,
-            prompt: input.prompt,
-            attachments: input.attachments ?? [],
-            title: input.title ?? null,
-            ...(baseRef ? { baseRef } : {}),
-          }),
+          payloadHash: teamStartFingerprint(input, baseRef),
         }
       : undefined;
     const replay = () => {
@@ -131,10 +137,12 @@ export class TeamConversationService {
     const existing = replay();
     if (existing) return existing;
     internal?.assertCanAdmit();
+    const claudeAccountId = input.claudeAccountId ?? claudeAccounts.defaultId(this.db);
     this.requireEnabled();
     await this.requireBranching(input.projectId);
     const plan = await this.coordinator.validateStart({
       projectId: input.projectId,
+      claudeAccountId,
       teamRevisionId: input.executionTarget.teamRevisionId,
       leadOverrides: input.executionTarget.initialLeadOverrides,
       allowArchived: internal?.allowArchived,
@@ -152,6 +160,7 @@ export class TeamConversationService {
         projectId: input.projectId,
         title: input.title?.trim() || titleFromPrompt(input.prompt),
         ...plan.settings,
+        claudeAccountId,
         mode: input.mode,
         permissionMode: input.permissionMode,
         workspaceMode,
@@ -417,6 +426,7 @@ export class TeamConversationService {
       this.requireEnabled();
       const plan = await this.coordinator.validateStart({
         projectId: runtime.revision.projectId,
+        claudeAccountId: threads.get(this.db, input.threadId)?.claudeAccountId,
         teamRevisionId: runtime.revision.id,
         leadOverrides: runtime.instance.leadOverrides,
         allowArchived: true,

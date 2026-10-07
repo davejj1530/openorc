@@ -1,3 +1,4 @@
+import { insertLegacyThread } from "./fixtures/legacy-thread.js";
 import { insertLegacyRun } from "./fixtures/legacy-run.js";
 import { teamJournalWriter } from "./fixtures/legacy-team-journal.js";
 import { randomUUID } from "node:crypto";
@@ -60,7 +61,7 @@ function fixture(db = Db.memory(), taskCount = 0) {
     },
   });
   const workspace = "/tmp/team-workspaces/" + randomUUID();
-  let thread = threads.insert(db, { projectId: project.id, title: "Delete this team", ...settings, mode: "act", permissionMode: "review", workspaceMode: "worktree" });
+  let thread = insertLegacyThread(db, { projectId: project.id, title: "Delete this team", ...settings, mode: "act", permissionMode: "review", workspaceMode: "worktree" });
   thread = threads.update(db, thread.id, { worktreePath: workspace, baseSha: sha("1"), branch: "openorc/team-" + thread.id });
   const instance = orchestration.createInstance(db, { threadId: thread.id, teamRevisionId: saved.revision.id });
   const run = insertLegacyRun(db, { id: randomUUID(), threadId: thread.id, taskId: null, ...settings, mode: "act", permissionMode: "review" });
@@ -752,7 +753,7 @@ describe("durable team deletion receipts", () => {
     expect(db.version).toBe(migrations.length);
     expect(teamContexts.get(db, before.id)).toEqual(before);
     expect(teamRuntime.get(db, f.execution.id)).toEqual(f.execution);
-    expect(threads.get(db, f.thread.id)).toEqual({ ...f.thread, workingDirectory: null, baseBranch: null });
+    expect(threads.get(db, f.thread.id)).toEqual({ ...f.thread, claudeAccountId: "claude-cli", workingDirectory: null, baseBranch: null });
     expect(ids(threads.list(db, { filter: "all" })).sort()).toEqual([f.thread.id, bare.thread.id].sort());
     const { record: hidden, checkpoint } = hide({ ...f, db });
     const taskless = teamDeletions.create(db, bare.input);

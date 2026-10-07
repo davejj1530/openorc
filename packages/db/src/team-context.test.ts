@@ -1,3 +1,4 @@
+import { insertLegacyThread } from "./fixtures/legacy-thread.js";
 import { insertLegacyRun } from "./fixtures/legacy-run.js";
 import { LEGACY_TEAM_PROMPT, legacyTeamRuntime, readLegacyJournals, teamJournalWriter } from "./fixtures/legacy-team-journal.js";
 import { randomUUID } from "node:crypto";
@@ -18,7 +19,7 @@ import {
 } from "@openorc/protocol";
 import { Db } from "./database.js";
 import { orchestration } from "./orchestration.js";
-import { projects, runs, tasks, threads } from "./repos.js";
+import { projects, runs, tasks } from "./repos.js";
 import { migrations } from "./schema.js";
 import { teamContexts, type CreateTeamContextInput } from "./team-context.js";
 import { teamRuntime } from "./team-runtime.js";
@@ -59,7 +60,7 @@ function actor(id: string, taskId: string | null): TeamActorRecord {
 function fixture(db = Db.memory()) {
   opened.add(db);
   const project = projects.insert(db, { name: "Context fixture", rootPath: `/tmp/context-${randomUUID()}`, defaultBranch: "main", gitRemote: null, settings: {} });
-  const thread = threads.insert(db, { projectId: project.id, title: "Team context", ...settings, mode: "act", permissionMode: "trusted" });
+  const thread = insertLegacyThread(db, { projectId: project.id, title: "Team context", ...settings, mode: "act", permissionMode: "trusted" });
   const draft: TeamDraft = {
     name: "Context team",
     limits: { maxConcurrentAgents: 2, maxAssignments: 12, maxExecutionMinutes: 60, maxAttemptsPerAssignment: 3 },
@@ -479,7 +480,7 @@ describe("durable team context", () => {
     expect(teamRuntime.get(reopened, record.id)).toEqual(recovered);
     expect(orchestration.get(reopened, team.team.id)).toEqual(team);
     expect(orchestration.getInstance(reopened, thread.id)).toEqual(instance);
-    expect(runs.get(reopened, run.id)).toEqual({ ...run, workingDirectory: null, commentTurnId: null });
+    expect(runs.get(reopened, run.id)).toEqual({ ...run, claudeAccountId: null, workingDirectory: null, commentTurnId: null });
     expect(teamRuntime.binding(reopened, run.id)?.executionId).toBe(record.id);
     expect(teamWorkspaces.list(reopened).sort((a, b) => a.actorId.localeCompare(b.actorId))).toEqual(workspaces.sort((a, b) => a.actorId.localeCompare(b.actorId)));
     expect(teamWorkspaces.publications(reopened)).toEqual([publication]);

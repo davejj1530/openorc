@@ -1,9 +1,11 @@
+import { insertLegacyRun } from "./fixtures/legacy-run.js";
+import { insertLegacyThread } from "./fixtures/legacy-thread.js";
 import { DatabaseSync } from "node:sqlite";
 import { expect, it } from "vitest";
 import { Db } from "./database.js";
 import { migrations } from "./schema.js";
 import { taskExecutionMigration } from "./task-execution-schema.js";
-import { audit, projects, runs, tasks, threads } from "./repos.js";
+import { audit, projects, tasks, threads } from "./repos.js";
 import { threadQueue } from "./thread-queue.js";
 
 it("migrates actual task ownership without treating a viewed diff as execution", () => {
@@ -15,7 +17,7 @@ it("migrates actual task ownership without treating a viewed diff as execution",
       else migration(raw);
     }
     const project = projects.insert(db, { name: "Fixture", rootPath: "/fixture", gitRemote: null, defaultBranch: "main", settings: {} });
-    const creator = threads.insert(db, { projectId: project.id, title: "Creator", agent: "codex", model: "fixture", mode: "act", permissionMode: "trusted" });
+    const creator = insertLegacyThread(db, { projectId: project.id, title: "Creator", agent: "codex", model: "fixture", mode: "act", permissionMode: "trusted" });
     const make = (title: string) =>
       tasks.insert(db, { projectId: project.id, threadId: creator.id, title, spec: "Work", priority: "none", labels: [], workspaceMode: "current", baseRef: "main", parentTaskId: null });
     const backlog = make("Viewed only");
@@ -26,7 +28,7 @@ it("migrates actual task ownership without treating a viewed diff as execution",
     audit.record(db, { actor: "agent", action: "task.start", resourceType: "task", resourceId: reset.id, metadata: { threadId: creator.id } });
     const legacy = make("Legacy worktree");
     tasks.update(db, legacy.id, { workspaceMode: "worktree", worktreePath: "/retained/worktree", baseSha: "base", branch: "feature" });
-    runs.insert(db, { id: "legacy", taskId: legacy.id, threadId: null, agent: "claude", model: "legacy-model", mode: "act", permissionMode: "review" });
+    insertLegacyRun(db, { id: "legacy", taskId: legacy.id, threadId: null, agent: "claude", model: "legacy-model", mode: "act", permissionMode: "review" });
 
     taskExecutionMigration(raw);
     expect(tasks.get(db, backlog.id)).toMatchObject({ threadId: creator.id, executionThreadId: null, baseSha: "diff-base-only" });

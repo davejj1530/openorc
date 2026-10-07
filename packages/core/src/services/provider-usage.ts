@@ -1,7 +1,8 @@
 import { CodexResetService, type ResetInput } from "./provider-resets.js";
 import { captureLaunchEnvironment, readClaudeUsage, readCodexUsage, consumeCodexReset } from "@openorc/agents";
-import { settings, type Db } from "@openorc/db";
+import { settings, runs, claudeAccounts, type Db } from "@openorc/db";
 import {
+  DEFAULT_CLAUDE_ACCOUNT,
   harnessCatalog,
   harnessFailsToStart,
   harnessInfo,
@@ -190,12 +191,12 @@ interface HarnessUsageReader {
   /** Fills in the report for an installed harness; `row` is its current probe result. */
   read(result: ProviderUsage, at: number, row: HarnessInfo, snapshot: EnvSnapshot | undefined): Promise<ProviderUsage>;
   /** Drops anything remembered from the account once the harness is gone. */
-  forget?(): void;
+  forget?(accountId?: string): void;
 }
 
 export class ProviderUsageService {
   /** Windows Claude reported during runs in this app; the fallback when the account cannot be asked directly. */
-  private readonly claude: Map<string, AllowanceWindow>;
+  private readonly claude = new Map<string, Map<string, AllowanceWindow>>();
   private readonly inFlight = new Map<string, Promise<ProviderUsage>>();
   private readonly codex: typeof readCodexUsage;
   private readonly resets: CodexResetService;
@@ -205,12 +206,12 @@ export class ProviderUsageService {
     codex: { source: "Codex app-server · account usage", read: (result, _at, _row, snapshot) => this.readCodex(result, snapshot) },
     claude: {
       source: "Claude Code · account usage",
-      forget: () => this.forgetClaude(),
+      forget: (accountId) => this.forgetClaudeAccount(accountId),
       read: (result, at, row, snapshot) => {
         if (harnessLoggedIn(row)) return this.readClaude(result, at, snapshot);
-        this.forgetClaude();
+        this.forgetClaudeAccount(result.claudeAccountId);
         result.status = "disconnected";
-        result.message = `Run ${harnessCatalog.claude.loginCommand} in a terminal, then refresh connections.`;
+        result.message = "Sign in to this Claude account in Settings → Connections, then refresh.";
         return Promise.resolve(result);
       },
     },
@@ -228,14 +229,13 @@ export class ProviderUsageService {
     private readonly db: Db,
     private readonly system: Pick<SystemService, "info" | "infoFor">,
     readers: ProviderUsageReaders = {},
-    private readonly environment?: () => EnvSnapshot,
+    private readonly environment?: (claudeAccountId?: string) => EnvSnapshot,
     private readonly now = Date.now,
   ) {
     this.apiKey = readers.apiKey ?? (async () => ({ hasApiKey: false }));
     this.codex = readers.codex ?? readCodexUsage;
     this.resets = new CodexResetService(db, readers.consumeReset, this.now);
     this.claudeAccount = readers.claude ?? readClaudeUsage;
-    this.claude = new Map(restoreWindows(settings.get(db, CLAUDE_REPORTS_KEY)).map((w) => [w.id, w]));
   }
 
   /** Claude Code's stream carries the account's rate limits; no other harness reports them this way. */
@@ -243,15 +243,19 @@ export class ProviderUsageService {
     if (event.type !== "raw" || event.agent !== "claude") return;
     const windows = normalizeClaude(event.payload, event.ts);
     if (!windows.length) return;
-    for (const w of windows) this.claude.set(w.id, w);
-    settings.set(this.db, CLAUDE_REPORTS_KEY, JSON.stringify([...this.claude.values()]));
+    const id = runs.get(this.db, event.runId)?.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT;
+    const saved = this.windows(id);
+    for (const w of windows) saved.set(w.id, w);
+    settings.set(this.db, this.windowsKey(id), JSON.stringify([...saved.values()]));
   }
 
-  read(provider: ProviderUsage["provider"]): Promise<ProviderUsage> {
-    const pending = this.inFlight.get(provider);
+  read(provider: ProviderUsage["provider"], claudeAccountId?: string): Promise<ProviderUsage> {
+    const id = provider === "claude" ? (claudeAccountId ?? claudeAccounts.defaultId(this.db)) : undefined;
+    const key = id ? `${provider}:${id}` : provider;
+    const pending = this.inFlight.get(key);
     if (pending) return pending;
-    const next = this.fetch(provider).finally(() => this.inFlight.delete(provider));
-    this.inFlight.set(provider, next);
+    const next = this.fetch(provider, id).finally(() => this.inFlight.delete(key));
+    this.inFlight.set(key, next);
     return next;
   }
 
@@ -265,9 +269,22 @@ export class ProviderUsageService {
     return { ...result, usage: await this.fetch("codex") };
   }
 
-  private forgetClaude(): void {
-    this.claude.clear();
-    settings.remove(this.db, CLAUDE_REPORTS_KEY);
+  private windowsKey(id: string): string {
+    return id === DEFAULT_CLAUDE_ACCOUNT ? CLAUDE_REPORTS_KEY : `providerUsage.claude.${id}.windows`;
+  }
+
+  private windows(id = DEFAULT_CLAUDE_ACCOUNT): Map<string, AllowanceWindow> {
+    let saved = this.claude.get(id);
+    if (!saved) {
+      saved = new Map(restoreWindows(settings.get(this.db, this.windowsKey(id))).map((window) => [window.id, window]));
+      this.claude.set(id, saved);
+    }
+    return saved;
+  }
+
+  forgetClaudeAccount(id = DEFAULT_CLAUDE_ACCOUNT): void {
+    this.claude.delete(id);
+    settings.remove(this.db, this.windowsKey(id));
   }
 
   /** Asks the installed CLI for the plan windows of the login it holds; OpenOrc never touches that credential. */
@@ -288,7 +305,7 @@ export class ProviderUsageService {
       result.message = "This Claude Code login bills through an API key or a cloud provider, so plan allowances do not apply. Check that provider's billing dashboard.";
       return result;
     }
-    result.windows = [...this.claude.values()];
+    result.windows = [...this.windows(result.claudeAccountId).values()];
     result.refreshedAt = result.windows.length ? Math.max(...result.windows.map((w) => w.observedAt)) : null;
     result.status = observedUsageStatus(result.windows.length > 0, live.status === "error");
     result.context = "Account reported by Claude runs in this app";
@@ -349,15 +366,16 @@ export class ProviderUsageService {
     };
   }
 
-  private async fetch(provider: ProviderUsage["provider"]): Promise<ProviderUsage> {
+  private async fetch(provider: ProviderUsage["provider"], claudeAccountId?: string): Promise<ProviderUsage> {
     // Capture before the first await. Provider checks and the usage process
     // must agree even if a Rescan publishes the next revision midway.
-    const snapshot = this.environment?.();
+    const snapshot = this.environment?.(claudeAccountId);
     const at = this.now();
     if (provider === "anthropic-api") return this.readApi(at);
     const reader = this.harnesses[provider];
     const result: ProviderUsage = {
       provider,
+      ...(claudeAccountId ? { claudeAccountId } : {}),
       status: "unavailable",
       source: reader.source,
       context: "CLI account",
@@ -377,13 +395,15 @@ export class ProviderUsageService {
             },
           }
         : {}),
-      localRuns: (this.db.stmt("SELECT COUNT(*) AS count FROM runs WHERE agent = ?").get(provider) as { count: number }).count,
+      localRuns: (
+        this.db.stmt("SELECT COUNT(*) AS count FROM runs WHERE agent = ? AND (? IS NULL OR claude_account_id = ?)").get(provider, claudeAccountId ?? null, claudeAccountId ?? null) as { count: number }
+      ).count,
     };
     try {
       const info = snapshot ? await this.system.infoFor(snapshot) : await this.system.info();
       const row = harnessInfo(info, provider);
       if (!harnessInstalled(row)) {
-        reader.forget?.();
+        reader.forget?.(claudeAccountId);
         result.status = "disconnected";
         result.message = `Install ${harnessCatalog[provider].name}, then refresh connections.`;
         return result;

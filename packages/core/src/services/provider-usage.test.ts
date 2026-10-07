@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Db, settings } from "@openorc/db";
+import { claudeAccounts, Db, projects, runs, settings, threads } from "@openorc/db";
 import type { HarnessId, HarnessInfo, SystemInfo, MemorySettings } from "@openorc/protocol";
 import type { ClaudeUsageOptions, ClaudeUsageResult } from "@openorc/agents";
 import { normalizeClaude, normalizeClaudeAccount, normalizeCodex, ProviderUsageService, type ProviderUsageReaders } from "./provider-usage.js";
@@ -283,4 +283,25 @@ describe("usage refresh", () => {
     expect(r.localRuns).toBeNull();
     expect(JSON.stringify(r)).not.toContain("private-api-key");
   });
+});
+
+it("keeps live reads, streamed fallback and run counts separate for three accounts", async () => {
+  const { db, service, claude } = setup();
+  const project = projects.insert(db, { name: "Fixture", rootPath: "/tmp/usage-accounts", gitRemote: null, defaultBranch: "main", settings: {} });
+  const ids = ["Work", "Personal", "Client"].map((name) => claudeAccounts.add(db, name).id);
+  const input = { agent: "claude" as const, model: null, mode: "plan" as const, permissionMode: "review" as const };
+  for (const [index, id] of ids.entries()) {
+    const thread = threads.insert(db, { ...input, projectId: project.id, title: id, claudeAccountId: id });
+    const run = runs.insert(db, { ...input, id, threadId: thread.id, taskId: null, claudeAccountId: id });
+    service.observe({ type: "raw", agent: "claude", runId: run.id, ts: at, payload: rateLimitEvent((index + 1) / 10, (index + 1) / 5) });
+  }
+  claude.mockRejectedValue(new Error("fixture unavailable"));
+  const reports = await Promise.all([...ids.map((id) => service.read("claude", id)), service.read("claude", ids[0])]);
+  expect(claude).toHaveBeenCalledTimes(3);
+  expect(reports.map((report) => report.windows[0]?.usedPercent)).toEqual([10, 20, 30, 10]);
+  expect(reports.slice(0, 3).map((report) => [report.claudeAccountId, report.localRuns])).toEqual(ids.map((id) => [id, 1]));
+  const restarted = setup(undefined, db);
+  restarted.claude.mockRejectedValue(new Error("fixture unavailable"));
+  expect((await restarted.service.read("claude", ids[1])).windows[0]?.usedPercent).toBe(20);
+  expect((await restarted.service.read("claude", "claude-cli")).windows).toEqual([]);
 });

@@ -1,3 +1,4 @@
+import { insertLegacyThread } from "./fixtures/legacy-thread.js";
 import { insertLegacyRun } from "./fixtures/legacy-run.js";
 import { teamJournalWriter } from "./fixtures/legacy-team-journal.js";
 import { randomUUID } from "node:crypto";
@@ -32,7 +33,7 @@ function fixture(db = Db.memory()) {
     draft: { name: "Fork team", limits: DEFAULT_TEAM_LIMITS, members: [{ key: "lead", name: "Lead", managerKey: null, responsibility: "Work", settings }] },
   });
   const add = () => {
-    const thread = threads.insert(db, { projectId: project.id, title: "Fork", ...settings, mode: "act", permissionMode: "trusted" });
+    const thread = insertLegacyThread(db, { projectId: project.id, title: "Fork", ...settings, mode: "act", permissionMode: "trusted" });
     return { thread, instance: orchestration.createInstance(db, { threadId: thread.id, teamRevisionId: saved.revision.id }) };
   };
   const source = add(),

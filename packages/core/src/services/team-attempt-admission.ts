@@ -96,7 +96,7 @@ export class TeamAttemptAdmission {
     if (input.mode !== thread.mode || (actor.taskId !== null && thread.mode !== "act")) throw new TeamModeDeferred();
   }
 
-  async validateStart(input: { projectId: string; teamRevisionId: string; leadOverrides?: LeadOverrides; allowArchived?: boolean }): Promise<TeamStartPlan> {
+  async validateStart(input: { projectId: string; teamRevisionId: string; leadOverrides?: LeadOverrides; allowArchived?: boolean; claudeAccountId?: string | null }): Promise<TeamStartPlan> {
     this.services.assertAccepting();
     const revision = orchestration.getRevision(this.services.db, input.teamRevisionId);
     if (!revision || revision.projectId !== input.projectId || !projects.get(this.services.db, input.projectId)) throw new Error("Team revision not found in this project.");
@@ -106,7 +106,9 @@ export class TeamAttemptAdmission {
     const leadOverrides: LeadOverrides = lead.orclingId ? {} : LeadOverrides.parse(input.leadOverrides ?? {});
     const settings = normalizeModelSettings({ ...lead.settings, ...leadOverrides });
     if (leadOverrides.effort !== undefined) leadOverrides.effort = settings.effort;
-    await Promise.all(revision.members.map((member) => this.services.hooks.validate(member.key === lead.key ? settings : normalizeModelSettings(member.settings), input.projectId)));
+    await Promise.all(
+      revision.members.map((member) => this.services.hooks.validate(member.key === lead.key ? settings : normalizeModelSettings(member.settings), input.projectId, input.claudeAccountId)),
+    );
     this.services.assertAccepting();
     return { revision, settings, leadOverrides, ...(input.allowArchived ? { allowArchived: true } : {}) };
   }
@@ -120,7 +122,7 @@ export class TeamAttemptAdmission {
     const lead = revision.members.find((member) => member.managerKey === null)!;
     if (lead.orclingId) throw new Error("An Orcling leads this team on its own model and effort. Edit the Orcling to change them.");
     const settings = normalizeModelSettings({ ...lead.settings, ...LeadOverrides.parse(overrides) });
-    await this.services.hooks.validate(settings, thread.projectId);
+    await this.services.hooks.validate(settings, thread.projectId, thread.claudeAccountId);
     this.services.assertAccepting();
     return settings;
   }
@@ -139,6 +141,7 @@ export class TeamAttemptAdmission {
     if (instance && input.initialLeadOverrides !== undefined) throw new Error("Initial lead overrides only apply when selecting a team for the first time.");
     const plan = await this.validateStart({
       projectId: thread.projectId,
+      claudeAccountId: thread.claudeAccountId,
       teamRevisionId: revisionId,
       leadOverrides: instance?.leadOverrides ?? input.initialLeadOverrides,
       allowArchived: Boolean(instance),

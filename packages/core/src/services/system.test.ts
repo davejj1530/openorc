@@ -60,3 +60,18 @@ describe("SystemService harness registry", () => {
     expect(env.current()).toBe(admitted);
   });
 });
+
+it("keeps readiness and concurrent probes separate for three accounts", async () => {
+  const base = snapshot();
+  const command = vi.fn<CommandProbe>(async (_binary, args, env) => ({
+    status: "ok",
+    output: args[0] === "--version" ? "fixture" : JSON.stringify({ loggedIn: env.CLAUDE_CONFIG_DIR !== "signed-out" }),
+  }));
+  const service = new SystemService("/data", environment(base), command);
+  const accounts = ["work", "personal", "signed-out"].map((id) => ({ ...base, scope: id, env: { ...base.env, CLAUDE_CONFIG_DIR: id } }));
+  const reports = await Promise.all(accounts.map((entry) => service.infoFor(entry)));
+  expect(reports.map((report) => report.harnesses.find((row) => row.id === "claude")?.state)).toEqual(["ready", "ready", "sign_in"]);
+  expect(command).toHaveBeenCalledTimes(6);
+  await Promise.all(accounts.map((entry) => service.infoFor(entry)));
+  expect(command).toHaveBeenCalledTimes(6);
+});

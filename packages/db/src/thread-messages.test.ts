@@ -1,3 +1,4 @@
+import { insertLegacyThread } from "./fixtures/legacy-thread.js";
 import { DatabaseSync } from "node:sqlite";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -5,7 +6,7 @@ import { join } from "node:path";
 import { expect, it } from "vitest";
 import { Db } from "./database.js";
 import { migrations } from "./schema.js";
-import { projects, threads } from "./repos.js";
+import { projects } from "./repos.js";
 
 it("migrates existing conversation messages and retains attachment references after reopening", () => {
   const dir = mkdtempSync(join(tmpdir(), "thread-images-db-"));
@@ -17,7 +18,7 @@ it("migrates existing conversation messages and retains attachment references af
   let db = new Db(raw);
   try {
     const project = projects.insert(db, { name: "Images", rootPath: dir, gitRemote: null, defaultBranch: "main", settings: {} });
-    const thread = threads.insert(db, { projectId: project.id, title: "Slack", agent: "codex", model: null, mode: "act", permissionMode: "review" });
+    const thread = insertLegacyThread(db, { projectId: project.id, title: "Slack", agent: "codex", model: null, mode: "act", permissionMode: "review" });
     // Reproduce the database immediately before the additive attachments migration.
 
     db.stmt("INSERT INTO thread_messages (id, thread_id, role, text, created_at) VALUES (?, ?, ?, ?, ?)").run("old", thread.id, "user", "Reference", 1);

@@ -33,10 +33,10 @@ export interface MemoryServiceOptions {
 
 /** What the run layer knows about the user's agents; resolved lazily so construction order is free. */
 export interface ProviderInfo {
-  models(agent: AgentKind): Promise<ModelOption[]>;
-  loggedIn(): Promise<Record<HarnessId, boolean>>;
+  models(agent: AgentKind, claudeAccountId?: string): Promise<ModelOption[]>;
+  loggedIn(claudeAccountId?: string): Promise<Record<HarnessId, boolean>>;
   /** The binary and complete environment from one atomic shell snapshot. */
-  launch(agent: HarnessId): AgentLaunchEnvironment | null;
+  launch(agent: HarnessId, claudeAccountId?: string): AgentLaunchEnvironment | null;
 }
 
 const DEFAULT_CLAUDE_MODEL = "claude-haiku-4-5-20251001";
@@ -147,24 +147,24 @@ export class MemoryService {
   }
 
   /** Cheapest sensible model per provider: Haiku for Claude, a small Codex model if the account lists one. */
-  private async defaultModel(provider: HarnessId): Promise<ModelOption | null> {
-    const list = await this.providers.models(provider).catch(() => [] as ModelOption[]);
+  private async defaultModel(provider: HarnessId, claudeAccountId?: string): Promise<ModelOption | null> {
+    const list = await this.providers.models(provider, claudeAccountId).catch(() => [] as ModelOption[]);
     if (provider === "claude")
       return list.find((m) => m.id === DEFAULT_CLAUDE_MODEL) ?? { id: DEFAULT_CLAUDE_MODEL, label: "Claude Haiku 4.5", agent: "claude", isDefault: false, efforts: [], defaultEffort: null };
     return list.find((m) => /spark|mini|nano/i.test(m.id)) ?? list.find((m) => m.isDefault) ?? list[0] ?? null;
   }
 
-  private loggedIn(): Promise<Partial<Record<HarnessId, boolean>>> {
-    return this.providers.loggedIn().catch((): Partial<Record<HarnessId, boolean>> => ({}));
+  private loggedIn(claudeAccountId?: string): Promise<Partial<Record<HarnessId, boolean>>> {
+    return this.providers.loggedIn(claudeAccountId).catch((): Partial<Record<HarnessId, boolean>> => ({}));
   }
 
   /** The model a provider distils with: the user's choice for that provider, else its cheapest sensible default. */
-  private async modelFor(provider: HarnessId, viaApiKey: boolean): Promise<ExtractionResolution> {
+  private async modelFor(provider: HarnessId, viaApiKey: boolean, claudeAccountId?: string): Promise<ExtractionResolution> {
     const chosen = this.chosenModel(provider);
-    const list = await this.providers.models(provider).catch(() => [] as ModelOption[]);
+    const list = await this.providers.models(provider, claudeAccountId).catch(() => [] as ModelOption[]);
     const option =
       (chosen ? (list.find((m) => m.id === chosen) ?? { id: chosen, label: chosen, agent: provider, isDefault: false, efforts: [], defaultEffort: null }) : null) ??
-      (await this.defaultModel(provider));
+      (await this.defaultModel(provider, claudeAccountId));
     if (!option) return { resolved: null, reason: "No model is available for distillation." };
     return { resolved: { provider, model: option.id, label: option.label, viaApiKey }, reason: null };
   }
@@ -174,7 +174,7 @@ export class MemoryService {
    * Automatic keeps a run with the provider that ran it, so its content only reaches another
    * provider when the user chose that provider for every run.
    */
-  private async resolveExtraction(credential: ExtractionCredential, agent: AgentKind): Promise<ExtractionResolution> {
+  private async resolveExtraction(credential: ExtractionCredential, agent: AgentKind, claudeAccountId?: string): Promise<ExtractionResolution> {
     const choice = this.providerChoice();
     if (!this.enabled() || choice === "off") return { resolved: null, reason: null };
     if (choice === "apikey")
@@ -184,8 +184,8 @@ export class MemoryService {
     const name = isHarnessId(provider) ? harnessCatalog[provider].name : provider;
     if (!isHarnessId(provider) || !harnessCatalog[provider].distillation)
       return { resolved: null, reason: choice === "auto" ? `${name} runs are not summarized automatically. Choose a provider to include them.` : `${name} cannot distil memory yet.` };
-    if (!(await this.loggedIn())[provider]) return { resolved: null, reason: `${name} is not logged in.` };
-    return this.modelFor(provider, false);
+    if (!(await this.loggedIn(claudeAccountId))[provider]) return { resolved: null, reason: `${name} is not logged in.` };
+    return this.modelFor(provider, false, claudeAccountId);
   }
 
   /** What Automatic uses for each signed-in agent that can summarize its own runs. */
@@ -256,13 +256,13 @@ export class MemoryService {
   }
 
   /** The extractor for a run of `agent`. Null when none is available or distillation is off. */
-  extractor(agent: AgentKind): Promise<Extractor | null> {
+  extractor(agent: AgentKind, claudeAccountId?: string): Promise<Extractor | null> {
     return this.configure(async () => {
       if (!this.extractionEnabled()) return null;
       const credential = await this.credentials.read();
-      const { resolved } = await this.resolveExtraction(credential, agent);
+      const { resolved } = await this.resolveExtraction(credential, agent, claudeAccountId);
       if (!resolved) return null;
-      const launch = this.providers.launch(resolved.provider);
+      const launch = this.providers.launch(resolved.provider, resolved.viaApiKey ? undefined : claudeAccountId);
       if (!launch) return null;
       return new Extractor({
         provider: resolved.provider,
@@ -276,6 +276,10 @@ export class MemoryService {
 
   extractionEnabled(): boolean {
     return this.enabled() && this.providerChoice() !== "off";
+  }
+
+  private extractorForRun(run: Run): Promise<Extractor | null> {
+    return this.extractor(run.agent, run.claudeAccountId ?? "claude-cli");
   }
 
   /** The system-prompt brief for a run, or "" when the project has no memory yet. */
@@ -332,7 +336,7 @@ export class MemoryService {
         extractionJobs.finish(this.db, run.id, { state: "skipped" });
         return;
       }
-      const extractor = await this.extractor(run.agent);
+      const extractor = await this.extractorForRun(run);
       if (!extractor || !permitted()) {
         extractionJobs.finish(this.db, run.id, { state: "skipped", error: "no distillation provider available" });
         return;

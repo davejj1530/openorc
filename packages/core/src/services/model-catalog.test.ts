@@ -1,3 +1,4 @@
+import { RunCatalog } from "./run-catalog.js";
 import { describe, expect, it, vi } from "vitest";
 import type { ModelOption } from "@openorc/protocol";
 import { ModelCatalogCache, type DiscoveredModels } from "./model-catalog.js";
@@ -15,6 +16,18 @@ const model: ModelOption = {
 const result = (id = model.id): DiscoveredModels => ({ models: [{ ...model, id }] });
 
 describe("catalog cache", () => {
+  it("never shares catalogs or last-good fallback between three accounts", async () => {
+    const cache = new ModelCatalogCache();
+    const scopes = ["work:1", "personal:1", "client:1"];
+    const catalogs = await Promise.all(scopes.map((scope) => cache.read("claude", 1, async () => result(scope), false, scope)));
+    expect(catalogs.map((entry) => entry.models[0]?.id)).toEqual(scopes);
+    const fail = async () => {
+      throw new Error("offline");
+    };
+    expect((await cache.read("claude", 1, fail, true, "work:1")).models[0]?.id).toBe("work:1");
+    expect((await cache.read("claude", 1, fail, false, "work:2")).models).toEqual([]);
+    expect((await cache.read("claude", 1, fail, false, "personal:1")).models[0]?.id).toBe("personal:1");
+  });
   it("coalesces concurrent reads, expires after five minutes and forces refresh", async () => {
     let now = 1000;
     const cache = new ModelCatalogCache(() => now);
@@ -158,4 +171,26 @@ describe("Claude account Fast access", () => {
       expect(withClaudeAccountFastMode(discovered, code)).toBe(discovered);
     }
   });
+});
+
+it("keeps other provider models available when the selected Claude account is disabled", async () => {
+  const catalog = new RunCatalog(
+    {
+      environment: () => ({ revision: 1, shell: "/bin/sh", path: "/fixture", env: {}, binaries: { codex: "/fixture/codex", claude: "/fixture/claude", opencode: "/fixture/opencode" } }),
+      claudeVersion: async () => null,
+      claudeEnvironment: () => {
+        throw new Error("Account disabled");
+      },
+    },
+    { listModels: async () => [] },
+    { listModels: async () => [] },
+    () => {},
+  );
+  const result = await catalog.modelCatalog();
+  expect(result.providers.map((provider) => [provider.agent, provider.status])).toEqual([
+    ["codex", "ready"],
+    ["claude", "error"],
+    ["opencode", "ready"],
+  ]);
+  expect(result.providers.find((provider) => provider.agent === "claude")?.message).toBe("Account disabled");
 });

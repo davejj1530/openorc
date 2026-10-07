@@ -490,9 +490,7 @@ export class TeamTaskService {
     const selection = input.kind === "review" && !previous ? this.controls.review.composeSelectedComments(input.taskId, input.commentIds ?? []) : null;
     const snapshot = previous?.input ?? TeamTaskInputSnapshot.parse({ title: initial.task.title, spec: initial.task.spec ?? "", attachments: await this.controls.images(initial.task.spec ?? "") });
     let active = teamRuntime.activeForThread(this.db, initial.thread.id);
-    const plan = !active
-      ? await this.authority.validateStart({ projectId: initial.task.projectId, teamRevisionId: initial.revision.id, leadOverrides: initial.instance.leadOverrides, allowArchived: true })
-      : null;
+    const plan = !active ? await this.authority.validateThreadStart(initial.thread, initial.revision.id, initial.instance.leadOverrides) : null;
     const admission = this.db.transaction(() => {
       const concurrent = replay();
       if (concurrent) return concurrent;

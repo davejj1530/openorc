@@ -246,7 +246,7 @@ export class TeamAttemptLaunch {
     const { executionId, original, attempt, actor, reservedMode, assertActive, assertMode } = admission;
     assertActive();
     assertMode();
-    await this.services.hooks.validate(attempt.settings, original.projectId);
+    await this.services.hooks.validate(attempt.settings, original.projectId, threads.get(this.services.db, original.threadId)?.claudeAccountId);
     assertActive();
     assertMode();
     const task = await this.prepareTask(admission);

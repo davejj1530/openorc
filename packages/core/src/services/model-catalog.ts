@@ -16,17 +16,18 @@ interface Cached {
 
 /** One cache per harness. A failed refresh preserves only data from that same environment. */
 export class ModelCatalogCache {
-  private readonly caches = new Map<HarnessId, Cached>();
+  private readonly caches = new Map<string, Cached>();
   constructor(
     private readonly now = Date.now,
     private readonly ttl = 5 * 60_000,
   ) {}
 
-  read(agent: HarnessId, revision: number, discover: () => Promise<DiscoveredModels>, refresh = false): Promise<CatalogEntry> {
-    let cache = this.caches.get(agent);
+  read(agent: HarnessId, revision: number, discover: () => Promise<DiscoveredModels>, refresh = false, scope = ""): Promise<CatalogEntry> {
+    const key = `${agent}:${scope}`;
+    let cache = this.caches.get(key);
     if (!cache || cache.revision !== revision) {
       cache = { revision };
-      this.caches.set(agent, cache);
+      this.caches.set(key, cache);
     }
     if (cache.pending) return cache.pending;
     if (!refresh && cache.entry && this.now() - (cache.checkedAt ?? 0) < this.ttl) return Promise.resolve(cache.entry);

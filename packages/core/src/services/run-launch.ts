@@ -90,6 +90,7 @@ export class RunLaunch {
         taskId: null,
         threadId: thread.id,
         agent: thread.agent,
+        claudeAccountId: thread.claudeAccountId,
         model: thread.model,
         effort: thread.effort,
         fastMode: thread.fastMode,
@@ -160,6 +161,7 @@ export class RunLaunch {
         taskId: input.scope.task?.id ?? null,
         threadId: input.scope.thread?.id ?? null,
         agent: input.agent,
+        claudeAccountId: input.claudeAccountId,
         model: model ?? null,
         effort: input.effort ?? null,
         fastMode: input.fastMode ?? false,
@@ -409,7 +411,9 @@ export class RunLaunch {
   private resumeTarget(input: StartRunInput, model: string | undefined): { resumeSessionId: string | null | undefined; forkSession: boolean } {
     const { scope, agent } = input;
     const own =
-      !scope.comment && input.resume ? (runs.lastSession(this.deps.db, scope.task ? { taskId: scope.task.id } : { threadId: scope.thread.id }, agent, input.orclingId) ?? undefined) : undefined;
+      !scope.comment && input.resume
+        ? (runs.lastSession(this.deps.db, scope.task ? { taskId: scope.task.id } : { threadId: scope.thread.id }, agent, input.orclingId, input.claudeAccountId ?? undefined) ?? undefined)
+        : undefined;
     const commentRun = scope.comment?.resumeRunId ? runs.get(this.deps.db, scope.comment.resumeRunId) : null;
     if (scope.comment && input.resume) this.assertCommentResume(scope.comment.task, commentRun, agent, model, input);
     const resumeSessionId = own ?? (scope.comment && input.resume ? commentRun?.externalSessionId : input.resumeFrom?.sessionId);
@@ -422,6 +426,7 @@ export class RunLaunch {
       !commentRun?.externalSessionId ||
       parent?.taskId !== task.id ||
       commentRun.agent !== agent ||
+      (agent === "claude" && commentRun.claudeAccountId !== input.claudeAccountId) ||
       commentRun.model !== model ||
       commentRun.effort !== (input.effort ?? null) ||
       commentRun.mode !== "plan" ||

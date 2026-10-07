@@ -1,5 +1,5 @@
 import { claudeModelsFrom, withClaudeAccountFastMode, withClaudeLegacyModels } from "./claude-model-catalog.js";
-import { ModelCatalogCache, type DiscoveredModels } from "./model-catalog.js";
+import { ModelCatalogCache, type DiscoveredModels, type CatalogEntry } from "./model-catalog.js";
 import { captureLaunchEnvironment, listClaudeModels, type AcpAdapter, type AgentLaunchEnvironment, type CodexAdapter } from "@openorc/agents";
 import { ULTRACODE_EFFORT } from "@openorc/protocol";
 import { harnessCatalog, harnessIds, type HarnessId, type ModelCatalog, type ModelOption } from "@openorc/protocol";
@@ -96,7 +96,7 @@ export class RunCatalog {
   private readonly modelCache = new ModelCatalogCache();
 
   constructor(
-    private readonly hooks: Pick<RunHooks, "environment" | "claudeVersion">,
+    private readonly hooks: Pick<RunHooks, "environment" | "claudeVersion" | "claudeEnvironment">,
     private readonly codex: Pick<CodexAdapter, "listModels">,
     private readonly opencode: Pick<AcpAdapter, "listModels">,
     private readonly assertAvailable: () => void,
@@ -106,11 +106,20 @@ export class RunCatalog {
     return this.pendingCatalogs;
   }
 
-  async modelCatalog(agent?: HarnessId, refresh = false, environment: EnvSnapshot = this.hooks.environment(), admitted?: AgentLaunchEnvironment): Promise<ModelCatalog> {
+  async modelCatalog(agent?: HarnessId, refresh = false, environment: EnvSnapshot = this.hooks.environment(), admitted?: AgentLaunchEnvironment, claudeAccountId?: string): Promise<ModelCatalog> {
     this.assertAvailable();
     this.pendingCatalogs++;
     try {
-      const entries = await Promise.all((agent ? [agent] : harnessIds).map((id) => this.modelCache.read(id, environment.revision, () => this.modelLists[id](environment, admitted), refresh)));
+      const entries = await Promise.all(
+        (agent ? [agent] : harnessIds).map((id): Promise<CatalogEntry> => {
+          try {
+            const snapshot = id === "claude" && !admitted ? (this.hooks.claudeEnvironment?.(environment, claudeAccountId) ?? environment) : environment;
+            return this.modelCache.read(id, snapshot.revision, () => this.modelLists[id](snapshot, admitted), refresh, admitted?.scope ?? snapshot.scope);
+          } catch (error) {
+            return Promise.resolve({ models: [], provider: { agent: id, status: "error", refreshedAt: null, message: error instanceof Error ? error.message : "This account is unavailable." } });
+          }
+        }),
+      );
       return { models: entries.flatMap((entry) => entry.models), providers: entries.map((entry) => entry.provider) };
     } finally {
       this.pendingCatalogs--;

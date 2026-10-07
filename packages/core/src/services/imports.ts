@@ -72,6 +72,7 @@ export class ImportService {
         projectId,
         title: read.title,
         agent: read.agent,
+        claudeAccountId: "claude-cli",
         model: null,
         mode: "act",
         permissionMode: "trusted",

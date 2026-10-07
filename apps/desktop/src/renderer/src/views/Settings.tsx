@@ -3,6 +3,7 @@ import { Menu } from "@base-ui/react/menu";
 import { useEffect, useRef, useState } from "react";
 import { distillationHarnessIds, harnessCatalog, type AppSettings, type ExtractionProviderChoice, type RpcResults } from "@openorc/protocol";
 import { idleTimeoutLabel, memoryModelAgent, learningStatus } from "./settings-presentation";
+import { ClaudeAccountSettings } from "./settings-claude-accounts";
 import { AgentConnections } from "./settings-agent-updates";
 import { useRouter, type Route, type SettingsSection } from "../lib/router";
 import { useLayout } from "../lib/layout";
@@ -113,6 +114,7 @@ function SectionSettings({ id, active, info }: { id: SettingsSection; active: bo
         <>
           {info.isError && <LoadError retry={() => void info.refetch()} />}
           <AgentConnections info={info.data} />
+          <ClaudeAccountSettings active={active} />
           <GitHubSettings info={info.data} />
         </>
       );

@@ -105,7 +105,7 @@ describe("distillation provider resolution", () => {
     const memory = new MemoryService(db, { dataDir: "/tmp" }, providers, () => {}, silent);
 
     await expect(memory.extractor("codex")).resolves.not.toBeNull();
-    expect(launch).toHaveBeenCalledWith("codex");
-    expect(launch).not.toHaveBeenCalledWith("claude");
+    expect(launch).toHaveBeenCalledWith("codex", undefined);
+    expect(launch).not.toHaveBeenCalledWith("claude", undefined);
   });
 });

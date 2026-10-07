@@ -12,11 +12,13 @@ let models: RpcResults["agents.models"];
 let system: RpcResults["system.info"];
 let branches: Record<string, string | null | undefined>;
 let branchError: boolean;
+let accounts: RpcResults["claude.accounts.list"] | undefined;
 
 vi.mock("../lib/query", () => ({
   useRpc: (method: string, params: { id?: string }) => {
     const data: Record<string, unknown> = {
       "projects.list": projects,
+      "claude.accounts.list": accounts,
       "projects.git": "ready",
       "projects.checkoutBranch": branches[params.id ?? ""],
       "workspace.get": undefined,
@@ -63,6 +65,10 @@ beforeEach(() => {
   projects = [makeProject("p1"), makeProject("p2")];
   branches = { p1: "prod", p2: "release" };
   branchError = false;
+  accounts = {
+    defaultId: "work",
+    accounts: ["personal", "work", "client"].map((id, createdAt) => ({ id, name: id, kind: "managed", enabled: true, createdAt, status: "ready", email: null, organization: null, message: null })),
+  };
   teams = [];
   models = [{ id: "codex-model", label: "Codex", agent: "codex", isDefault: true, efforts: ["medium"], defaultEffort: "medium" }];
   system = {
@@ -226,4 +232,21 @@ it("offers starters only for an empty draft", () => {
   fireEvent.change(screen.getByRole("textbox", { name: "Message" }), { target: { value: "" } });
   expect(screen.getByRole("button", { name: "Explore this project" })).toBeTruthy();
   expect(start).not.toHaveBeenCalled();
+});
+
+it("keeps a chosen third Claude account in the draft and sends it when starting", async () => {
+  models = [{ id: "claude-fixture", label: "Claude", agent: "claude", isDefault: true, efforts: [], defaultEffort: null }];
+  system.harnesses = system.harnesses.map((row) => ({ ...row, state: "ready" }));
+  writeNewThreadDraft({ ...readNewThreadDraft("p1"), prompt: "Use the client account", target: { kind: "model", choice: { agent: "claude", model: "claude-fixture", effort: null } } });
+  const view = render(<NewThread projectId="p1" />);
+  const picker = screen.getByRole<HTMLSelectElement>("combobox", { name: "Claude account" });
+  expect(picker.value).toBe("work");
+  expect(picker.options).toHaveLength(3);
+  fireEvent.change(picker, { target: { value: "client" } });
+  expect(readNewThreadDraft("p1").claudeAccountId).toBe("client");
+  accounts!.defaultId = "personal";
+  view.rerender(<NewThread projectId="p1" />);
+  expect(picker.value).toBe("client");
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ agent: "claude", claudeAccountId: "client", prompt: "Use the client account" })));
 });

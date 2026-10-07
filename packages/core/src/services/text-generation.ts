@@ -61,10 +61,10 @@ export class TextGenerationService {
   }
 
   /** The model that names a conversation through `provider`: the chosen one, else a small default. Never the conversation's flagship. */
-  private async resolve(provider: Provider, chosen: string | null): Promise<Pick<TextGenerationSettings, "resolved" | "reason">> {
-    const login = await this.providers.loggedIn().catch(() => ({}) as Partial<Record<Provider, boolean>>);
-    if (!login[provider] || !this.providers.launch(provider)) return { resolved: null, reason: `${harnessCatalog[provider].name} is unavailable. Check its connection in Settings.` };
-    const models = await this.providers.models(provider).catch(() => []);
+  private async resolve(provider: Provider, chosen: string | null, claudeAccountId?: string): Promise<Pick<TextGenerationSettings, "resolved" | "reason">> {
+    const login = await this.providers.loggedIn(claudeAccountId).catch(() => ({}) as Partial<Record<Provider, boolean>>);
+    if (!login[provider] || !this.providers.launch(provider, claudeAccountId)) return { resolved: null, reason: `${harnessCatalog[provider].name} is unavailable. Check its connection in Settings.` };
+    const models = await this.providers.models(provider, claudeAccountId).catch(() => []);
     const model = chosen ? { id: chosen, label: models.find((model) => model.id === chosen)?.label ?? chosen } : defaultModel(provider, models);
     if (!model) return { resolved: null, reason: `${harnessCatalog[provider].name} has no small model. Choose a model explicitly.` };
     return { resolved: { provider, model: model.id, label: model.label }, reason: null };
@@ -85,23 +85,23 @@ export class TextGenerationService {
   }
 
   /** Names a conversation. Automatic uses the conversation's own agent, so its text never reaches another provider. */
-  async title(exchange: { request: string; reply: string | null }, agent: AgentKind): Promise<string | null> {
+  async title(exchange: { request: string; reply: string | null }, agent: AgentKind, claudeAccountId?: string): Promise<string | null> {
     this.pendingTitles++;
     try {
-      return await this.generateTitle(exchange, agent);
+      return await this.generateTitle(exchange, agent, claudeAccountId);
     } finally {
       this.pendingTitles--;
     }
   }
 
-  private async generateTitle(exchange: { request: string; reply: string | null }, agent: AgentKind): Promise<string | null> {
+  private async generateTitle(exchange: { request: string; reply: string | null }, agent: AgentKind, claudeAccountId?: string): Promise<string | null> {
     const prefs = this.preferences();
     if (prefs.provider === "off") return null;
     const provider = prefs.provider === "auto" ? agent : prefs.provider;
     if (!isHarnessId(provider)) return null;
-    const { resolved } = await this.resolve(provider, prefs.provider === "auto" ? null : (prefs.models[provider] ?? null));
+    const { resolved } = await this.resolve(provider, prefs.provider === "auto" ? null : (prefs.models[provider] ?? null), claudeAccountId);
     if (!resolved) return null;
-    const launch = this.providers.launch(resolved.provider);
+    const launch = this.providers.launch(resolved.provider, claudeAccountId);
     if (!launch) return null;
     return new TextGenerator({ provider: resolved.provider, model: resolved.model, binary: launch.binary, env: launch.env, effort: "low", timeoutMs: 30_000 }).title(exchange);
   }

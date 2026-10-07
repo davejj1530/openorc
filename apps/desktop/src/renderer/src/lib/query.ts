@@ -14,6 +14,7 @@ export const queryClient = new QueryClient({
 
 /** Reads whose tags never depend on their parameters. */
 const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
+  "claude.accounts.list": ["claude-accounts"],
   "workspace.get": ["workspace"],
   "slack.status": ["slack"],
   "system.info": ["system"],
@@ -154,6 +155,11 @@ const workspaceMutations = new Set<RpcMethod>(["threads.moveWorkspace", "threads
 
 /** Mutations whose effects never depend on their parameters. */
 const fixedInvalidations: Partial<Record<RpcMethod, readonly string[]>> = {
+  "claude.accounts.list": ["claude-accounts", "system", "models", "provider-usage"],
+  "claude.accounts.add": ["claude-accounts"],
+  "claude.accounts.update": ["claude-accounts", "system", "models", "provider-usage"],
+  "claude.accounts.login": ["claude-accounts"],
+  "claude.accounts.cancelLogin": ["claude-accounts"],
   "providers.codex.reset": ["provider-usage"],
   "agents.models.refresh": ["models"],
   "workspace.configure": ["workspace", "projects"],

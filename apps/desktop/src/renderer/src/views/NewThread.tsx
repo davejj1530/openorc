@@ -1,3 +1,5 @@
+import { ClaudeAccountPicker } from "../components/ClaudeAccountPicker";
+import { ClaudeAccountScope } from "../lib/claude-account";
 import { useEffect, useRef, useState } from "react";
 import { WORKSPACE_ID, harnessIds, harnessInfo, harnessLoggedIn, type HarnessId, type Project, type TeamDetail } from "@openorc/protocol";
 import { ChevronRight, FolderGit2 } from "../components/icons";
@@ -82,13 +84,15 @@ function NewThreadProject({
 }) {
   const isWorkspace = projectId === WORKSPACE_ID;
   const git = useProjectGit(projectId);
-  const info = useRpc("system.info", {});
-  const models = useRpc("agents.models", {}, { staleTime: 5 * 60_000 });
+  const [draft, setDraft] = useState(() => readNewThreadDraft(projectId));
+  const accounts = useRpc("claude.accounts.list", {});
+  const claudeAccountId = draft.claudeAccountId ?? accounts.data?.defaultId ?? "claude-cli";
+  const info = useRpc("system.info", { claudeAccountId });
+  const models = useRpc("agents.models", { claudeAccountId }, { staleTime: 5 * 60_000 });
   const settings = useRpc("app.settings.get", {});
   const teams = useRpc("orchestration.list", { projectId, includeArchived: true }, { enabled: Boolean(projectId) });
   const availability = useRpc("orchestration.availability", {});
   const activity = useArrivalActivity();
-  const [draft, setDraft] = useState(() => readNewThreadDraft(projectId));
   const [storageError, setStorageError] = useState<string | null>(null);
   const { permission, select: setPermission, error: permissionError, ready: permissionReady } = usePermissionSelection();
   const start = useRpcMutation("threads.start");
@@ -112,7 +116,7 @@ function NewThreadProject({
   const revision = target.kind === "team" ? target.revision : null;
   // The landing composer has no thread, so no thread action applies to it. The
   // skills do: they belong to the project, or the Workspace folder, chosen on this screen.
-  const skillCommands = useSkillCommands(projectId, choice?.agent, draft.workingDirectory);
+  const skillCommands = useSkillCommands(projectId, choice?.agent, draft.workingDirectory, claudeAccountId);
   const workspaceMode = newThreadWorkspaceMode({ canBranch: !isWorkspace && !git.cannotBranch, chosen: draft.workspace, preferred: settings.data?.defaultWorkspaceMode });
 
   useEffect(() => {
@@ -126,7 +130,7 @@ function NewThreadProject({
     selectedTeam,
     targetIssue,
     projectIssue,
-    disabledReason,
+    disabledReason: targetDisabledReason,
     teamOptions,
     teamStatus,
   } = evaluateNewThreadAvailability({
@@ -142,6 +146,8 @@ function NewThreadProject({
     models: { data: models.data, failed: models.isError },
     system: { data: info.data, failed: info.isError },
   });
+  const usesClaude = choice?.agent === "claude" || revision?.members.some((member) => member.settings.agent === "claude");
+  const disabledReason = usesClaude && !accounts.data ? (accounts.error?.message ?? "Loading Claude accounts…") : targetDisabledReason;
   const location = useNewThreadLocation(projectId, selected, workspaceMode, draft.workingDirectory);
   const chooseTeam = (detail: TeamDetail) =>
     changeDraft({
@@ -166,6 +172,7 @@ function NewThreadProject({
     else chooseModel(model);
   };
   const retry = () => {
+    void accounts.refetch();
     void teams.refetch();
     void availability.refetch();
     void models.refetch();
@@ -183,7 +190,7 @@ function NewThreadProject({
     if (disabledReason) throw new Error(disabledReason);
     if (!choice || !selected || target.kind === "unavailable") throw new Error("Choose a project and execution target first.");
     const threadId = await startNewThread({
-      draft,
+      draft: { ...draft, claudeAccountId },
       project: selected,
       isWorkspace,
       workspaceMode,
@@ -202,7 +209,7 @@ function NewThreadProject({
     : null;
 
   return (
-    <>
+    <ClaudeAccountScope id={claudeAccountId}>
       <main className="workspace-main well flex flex-1 flex-col min-w-0 min-h-0">
         <TopBar showProject={false} panel={Boolean(panelContext)}>
           <h1 className="px-1 text-base font-medium">New thread</h1>
@@ -231,6 +238,9 @@ function NewThreadProject({
                     onFolder={(workingDirectory) => changeDraft({ workingDirectory })}
                     onMode={(workspace) => changeDraft({ workspace })}
                   />
+                  {choice?.agent === "claude" || revision?.members.some((member) => member.settings.agent === "claude") ? (
+                    <ClaudeAccountPicker accounts={accounts.data} value={claudeAccountId} onChange={(claudeAccountId) => changeDraft({ claudeAccountId })} disabled={start.isPending} />
+                  ) : null}
                   <Composer
                     draftKey={`newthread.${projectId}.attachments`}
                     autoFocus
@@ -336,7 +346,7 @@ function NewThreadProject({
         </div>
       </main>
       {panelContext ? <Panel context={panelContext} /> : null}
-    </>
+    </ClaudeAccountScope>
   );
 }
 

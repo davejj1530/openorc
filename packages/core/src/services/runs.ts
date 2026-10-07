@@ -151,6 +151,16 @@ export class RunService {
   private readonly opencode: AcpAdapter;
   private readonly adapters: RunAdapterRegistry;
   private readonly catalog: RunCatalog;
+  private readonly startingAccounts = new Map<string, number>();
+
+  hasClaudeSessions(id: string): boolean {
+    return (this.startingAccounts.get(id) ?? 0) > 0 || [...this.live.values()].some((entry) => entry.run.agent === "claude" && (entry.run.claudeAccountId ?? "claude-cli") === id);
+  }
+  async retireIdleClaudeSessions(id: string): Promise<void> {
+    const idle = [...this.live.values()].filter((entry) => entry.run.agent === "claude" && entry.run.claudeAccountId === id && !working(entry) && !entry.exiting && !entry.closingRequested);
+    await Promise.all(idle.map((entry) => this.closeAndWait(entry.run.id)));
+  }
+
   private readonly briefs: RunBriefs;
   private readonly liveView: RunLive;
   private readonly events: RunEvents;
@@ -244,7 +254,7 @@ export class RunService {
       keysFor: (scope) => this.keysFor(scope),
       start: (input) => this.start(input),
       emit: (event) => this.emit(event),
-      validateFastMode: (agent, model, fastMode) => this.validateFastMode(agent, model, fastMode),
+      validateFastMode: (agent, model, fastMode, id) => this.validateFastMode(agent, model, fastMode, undefined, undefined, id),
       log: this.log,
     });
     this.progress = new RunProgress(this.db, this.ledger, this.live, () => this.pending());
@@ -439,16 +449,27 @@ export class RunService {
   }
 
   /** Keep the original array interface for execution and automation callers. */
-  async models(agent?: AgentKind, environment = this.hooks.environment(), admitted?: AgentLaunchEnvironment): Promise<ModelOption[]> {
+  async models(agent?: AgentKind, environment = this.hooks.environment(), admitted?: AgentLaunchEnvironment, claudeAccountId?: string): Promise<ModelOption[]> {
     if (agent && !isHarnessId(agent)) return [];
-    return (await this.modelCatalog(agent, false, environment, admitted)).models;
+    return (await this.modelCatalog(agent, false, environment, admitted, claudeAccountId)).models;
   }
 
-  modelCatalog(agent?: HarnessId, refresh = false, environment = this.hooks.environment(), admitted?: AgentLaunchEnvironment): Promise<ModelCatalog> {
-    return this.catalog.modelCatalog(agent, refresh, environment, admitted);
+  modelCatalog(agent?: HarnessId, refresh = false, environment = this.hooks.environment(), admitted?: AgentLaunchEnvironment, claudeAccountId?: string): Promise<ModelCatalog> {
+    return this.catalog.modelCatalog(agent, refresh, environment, admitted, claudeAccountId);
   }
 
-  async validateFastMode(agent: AgentKind, model: string | undefined, fastMode: boolean | undefined, environment = this.hooks.environment(), launch?: AgentLaunchEnvironment): Promise<void> {
+  async validateFastMode(
+    agent: AgentKind,
+    model: string | undefined,
+    fastMode: boolean | undefined,
+    environment = this.hooks.environment(),
+    launch?: AgentLaunchEnvironment,
+    claudeAccountId?: string | null,
+  ): Promise<void> {
+    if (agent === "claude" && claudeAccountId) {
+      environment = this.hooks.claudeEnvironment?.(environment, claudeAccountId) ?? environment;
+      launch ??= captureLaunchEnvironment("claude", environment);
+    }
     if (!fastMode) return;
     const options = await this.models(agent, environment, launch);
     const selected = model ? options.find((m) => m.id === model) : options.find((m) => m.isDefault);
@@ -484,21 +505,42 @@ export class RunService {
     if (!input.teamAttemptId && (input.promptRole ?? "user") === "user" && input.scope.thread) this.agentHops.delete(input.scope.thread.id);
     if (this.closing) throw new Error("OpenOrc is closing.");
     this.hooks.assertStart?.(input);
-    if (!isHarnessId(input.agent)) throw new Error(`Provider ${input.agent} has no executable adapter.`);
     input.assertCanStart?.();
-    const environment = this.hooks.environment();
-    const launch = captureLaunchEnvironment(input.agent, environment);
+    const captured = this.captureAccount(input);
+    input = captured.input;
     const key = this.startKey(input);
     if (this.starting.has(key)) throw new Error("This conversation is already starting. Wait for it to connect before sending again.");
     this.starting.add(key);
-    const operation = this.launcher.startSession(input, environment, launch);
+    const releaseAccount = this.trackAccountStart(input);
+    const operation = this.launcher.startSession(input, captured.environment, captured.launch);
     this.startOperations.add(operation);
     try {
       return await operation;
     } finally {
+      releaseAccount();
       this.starting.delete(key);
       this.startOperations.delete(operation);
     }
+  }
+
+  private captureAccount(input: StartRunInput) {
+    const agent = input.agent;
+    if (!isHarnessId(agent)) throw new Error(`Provider ${agent} has no executable adapter.`);
+    const snapshot = this.hooks.environment();
+    if (agent === "claude") input = { ...input, claudeAccountId: this.hooks.claudeAccountFor?.(input) ?? input.scope.thread?.claudeAccountId ?? input.claudeAccountId };
+    const environment = agent === "claude" ? (this.hooks.claudeEnvironment?.(snapshot, input.claudeAccountId ?? undefined) ?? snapshot) : snapshot;
+    return { input, environment, launch: captureLaunchEnvironment(agent, environment) };
+  }
+
+  private trackAccountStart(input: StartRunInput): () => void {
+    const id = input.agent === "claude" ? input.claudeAccountId : null;
+    if (!id) return () => {};
+    this.startingAccounts.set(id, (this.startingAccounts.get(id) ?? 0) + 1);
+    return () => {
+      const remaining = (this.startingAccounts.get(id) ?? 1) - 1;
+      if (remaining) this.startingAccounts.set(id, remaining);
+      else this.startingAccounts.delete(id);
+    };
   }
 
   private startKey(input: StartRunInput): string {

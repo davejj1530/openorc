@@ -6,6 +6,7 @@ import { harnessCatalog, type HarnessId } from "@openorc/protocol";
  * binary from the PATH and credentials/configuration it was resolved under.
  */
 export interface AgentLaunchEnvironment {
+  readonly scope?: string;
   readonly revision: number;
   readonly binary: string;
   readonly env: Readonly<NodeJS.ProcessEnv>;
@@ -13,6 +14,7 @@ export interface AgentLaunchEnvironment {
 }
 
 export interface ResolvedHarnessEnvironment {
+  readonly scope?: string;
   readonly revision: number;
   readonly path: string;
   readonly binaries: Readonly<Record<HarnessId, string | null>>;
@@ -27,7 +29,7 @@ export interface ResolvedHarnessEnvironment {
 export function captureLaunchEnvironment(agent: HarnessId, snapshot: ResolvedHarnessEnvironment): AgentLaunchEnvironment {
   const binary = snapshot.binaries[agent];
   if (!binary) throw new Error(`${harnessCatalog[agent].name} was not found. Rescan after installing it.`);
-  return Object.freeze({ revision: snapshot.revision, binary, env: snapshot.env });
+  return Object.freeze({ revision: snapshot.revision, binary, env: snapshot.env, ...(snapshot.scope ? { scope: snapshot.scope } : {}) });
 }
 
 /** Complete immutable environment for a provider-independent probe. */

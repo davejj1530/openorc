@@ -32,6 +32,8 @@ function harnessBinaries(resolve: (id: HarnessId) => string | null): HarnessBina
  * cannot reach into it.
  */
 export interface EnvSnapshot {
+  readonly claudeAccountId?: string;
+  readonly scope?: string;
   readonly revision: number;
   /** The login shell that answered, or the inherited one before any probe. */
   readonly shell: string;

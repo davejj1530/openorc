@@ -5,15 +5,14 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { projects, threads } from "@openorc/db";
 import * as gitTools from "@openorc/git";
 import { commitAll, git } from "@openorc/git";
-import type { CorePush, Project, RpcMethod, RpcParams, RpcResults } from "@openorc/protocol";
+import type { Project } from "@openorc/protocol";
 import { OpenOrc } from "../openorc.js";
+import { rpcClient } from "../rpc-test-client.js";
 
 let folder: string;
 let root: string;
 let core: OpenOrc;
 let project: Project;
-let pushed: CorePush[];
-let rpcId = 0;
 
 beforeEach(async () => {
   folder = await mkdtemp(path.join(os.tmpdir(), "openorc-push-state-"));
@@ -24,8 +23,7 @@ beforeEach(async () => {
   await git(root, ["config", "user.name", "Fixture"]);
   await writeFile(path.join(root, "README.md"), "Original\n");
   await commitAll(root, "Initial commit");
-  pushed = [];
-  core = await OpenOrc.create({ dataDir: path.join(folder, "data"), ephemeral: true, transport: { push: (message) => pushed.push(message) } });
+  core = await OpenOrc.create({ dataDir: path.join(folder, "data"), ephemeral: true, transport: { push: () => {} } });
   project = projects.insert(core.db, { name: "Site", rootPath: root, defaultBranch: "main", gitRemote: null, settings: {} });
 });
 
@@ -35,14 +33,7 @@ afterEach(async () => {
   if (folder) await rm(folder, { recursive: true, force: true });
 });
 
-async function call<M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> {
-  const id = ++rpcId;
-  await core.handle({ type: "rpc", id, method, params });
-  const response = pushed.find((message) => (message.type === "rpc.result" || message.type === "rpc.error") && message.id === id);
-  if (!response || (response.type !== "rpc.result" && response.type !== "rpc.error")) throw new Error("Missing RPC response");
-  if (response.type === "rpc.error") throw new Error(response.message);
-  return response.result as RpcResults[M];
-}
+const call = rpcClient(() => core);
 
 async function addOrigin(): Promise<void> {
   await git(folder, ["init", "-q", "--bare", "-b", "main", "remote.git"]);

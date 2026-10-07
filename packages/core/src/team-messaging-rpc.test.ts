@@ -5,17 +5,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CodexAdapter, RunHandle } from "@openorc/agents";
 import { projects, settings, teamRuntime, threads } from "@openorc/db";
 import { commitAll, git } from "@openorc/git";
-import { DEFAULT_TEAM_LIMITS, type CorePush, type Project, type RpcMethod, type RpcParams, type RpcResults, type RunSpec } from "@openorc/protocol";
+import { DEFAULT_TEAM_LIMITS, type Project, type RunSpec } from "@openorc/protocol";
 import { OpenOrc } from "./openorc.js";
 import { MAX_AGENT_HOPS } from "./services/thread-agent-tools.js";
+import { rpcClient } from "./rpc-test-client.js";
 
 let core: OpenOrc;
 let folder: string;
 let project: Project;
-let pushed: CorePush[];
 let turns: Map<string, { spec: RunSpec; handle: RunHandle }>;
 let sends: { runId: string; text: string }[];
-let rpcId = 0;
 const member = (key: string, managerKey: string | null) => ({
   key,
   name: key,
@@ -36,7 +35,6 @@ async function repository(name: string) {
 }
 beforeEach(async () => {
   folder = await mkdtemp(path.join(os.tmpdir(), "openorc-team-messaging-"));
-  pushed = [];
   turns = new Map();
   sends = [];
   vi.spyOn(CodexAdapter.prototype, "start").mockImplementation((spec) => {
@@ -61,7 +59,7 @@ beforeEach(async () => {
     turns.set(spec.runId, { spec, handle });
     return handle;
   });
-  core = await OpenOrc.create({ dataDir: path.join(folder, "data"), ephemeral: true, transport: { push: (message) => pushed.push(message) } });
+  core = await OpenOrc.create({ dataDir: path.join(folder, "data"), ephemeral: true, transport: { push: () => {} } });
   settings.set(core.db, "extraction.provider", "off");
   project = projects.insert(core.db, { name: "Fixture", rootPath: await repository("repository"), defaultBranch: "main", gitRemote: null, settings: {} });
   vi.spyOn(core.orchestration, "preflight").mockResolvedValue({ ready: true, issues: [] });
@@ -76,14 +74,7 @@ afterEach(async () => {
   if (folder) await rm(folder, { recursive: true, force: true });
 });
 
-async function call<M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> {
-  const id = ++rpcId;
-  await core.handle({ type: "rpc", id, method, params });
-  const response = pushed.find((message) => (message.type === "rpc.result" || message.type === "rpc.error") && message.id === id);
-  if (!response || (response.type !== "rpc.result" && response.type !== "rpc.error")) throw new Error("Missing RPC response");
-  if (response.type === "rpc.error") throw new Error(response.message);
-  return response.result as RpcResults[M];
-}
+const call = rpcClient(() => core);
 async function mcpCall(runId: string, name: string, args: Record<string, unknown>) {
   const url = (await core.mcpServer()).urlForRun(runId);
   const response = await fetch(url, {

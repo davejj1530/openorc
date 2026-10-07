@@ -5,19 +5,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CodexAdapter, RunHandle } from "@openorc/agents";
 import { runs, settings, tasks, threads } from "@openorc/db";
 import { commitAll, git } from "@openorc/git";
-import type { CorePush, Project, RpcMethod, RpcParams, RpcResults, RunSpec } from "@openorc/protocol";
+import type { Project, RunSpec } from "@openorc/protocol";
 import { OpenOrc } from "../openorc.js";
+import { rpcClient } from "../rpc-test-client.js";
 
 let root: string, data: string, core: OpenOrc, project: Project;
-let pushed: CorePush[], specs: RunSpec[], handles: RunHandle[];
-let nextId = 0;
-async function call<M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> {
-  const id = ++nextId;
-  await core.handle({ type: "rpc", id, method, params });
-  const reply = pushed.find((item) => (item.type === "rpc.result" || item.type === "rpc.error") && item.id === id);
-  if (reply?.type !== "rpc.result") throw new Error(reply?.type === "rpc.error" ? reply.message : "Missing reply");
-  return reply.result as RpcResults[M];
-}
+let specs: RunSpec[], handles: RunHandle[];
+const call = rpcClient(() => core);
 async function mcp(runId: string, name: string, args: unknown) {
   const response = await fetch((await core.mcpServer()).urlForRun(runId), {
     method: "POST",
@@ -46,10 +40,9 @@ beforeEach(async () => {
   await commitAll(root, "base");
   await writeFile(path.join(root, "tracked.txt"), "user dirty\n");
   await writeFile(path.join(root, "new.txt"), "user new\n");
-  pushed = [];
   specs = [];
   handles = [];
-  core = await OpenOrc.create({ dataDir: data, ephemeral: true, transport: { push: (event) => pushed.push(event) } });
+  core = await OpenOrc.create({ dataDir: data, ephemeral: true, transport: { push: () => {} } });
   settings.set(core.db, "extraction.provider", "off");
   project = await core.projects.import(root);
   vi.spyOn(CodexAdapter.prototype, "start").mockImplementation((spec) => {

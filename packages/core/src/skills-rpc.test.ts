@@ -3,22 +3,14 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { projects, threads } from "@openorc/db";
-import { WORKSPACE_ID, defaultOrclingLook, type AgentSkill, type CorePush, type RpcMethod, type RpcParams, type RpcResults } from "@openorc/protocol";
+import { WORKSPACE_ID, defaultOrclingLook, type AgentSkill } from "@openorc/protocol";
 import { OpenOrc } from "./openorc.js";
+import { rpcClient } from "./rpc-test-client.js";
 
 let root: string;
 let core: OpenOrc;
-const pushed: CorePush[] = [];
-let nextId = 1;
 
-async function call<M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> {
-  const id = nextId++;
-  await core.handle({ type: "rpc", id, method, params });
-  const reply = pushed.find((m) => (m.type === "rpc.result" || m.type === "rpc.error") && m.id === id);
-  if (!reply) throw new Error("no reply");
-  if (reply.type === "rpc.error") throw new Error(reply.message);
-  return (reply as { result: RpcResults[M] }).result;
-}
+const call = rpcClient(() => core);
 
 /** A Claude skill, as far as the listing reads it: a folder with a SKILL.md header. */
 async function skill(skills: string, name: string) {
@@ -33,7 +25,7 @@ beforeEach(async () => {
   // Personal skills resolve here, never in the real home.
   vi.stubEnv("CLAUDE_CONFIG_DIR", path.join(root, "claude"));
   await skill(path.join(root, "claude", "skills"), "humanizer");
-  core = await OpenOrc.create({ dataDir: path.join(root, "data"), ephemeral: true, transport: { push: (message) => pushed.push(message) } });
+  core = await OpenOrc.create({ dataDir: path.join(root, "data"), ephemeral: true, transport: { push: () => {} } });
 });
 
 afterEach(async () => {

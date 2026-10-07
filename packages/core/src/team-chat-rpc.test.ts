@@ -5,16 +5,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AcpAdapter, ClaudeAdapter, CodexAdapter, RunHandle } from "@openorc/agents";
 import { orchestration, projects, settings, tasks, teamRuntime, threads, teamRoom } from "@openorc/db";
 import { commitAll, git } from "@openorc/git";
-import { DEFAULT_TEAM_LIMITS, type CorePush, type Project, type RpcMethod, type RpcParams, type RpcResults, type RunSpec, type HarnessId } from "@openorc/protocol";
+import { DEFAULT_TEAM_LIMITS, type Project, type RunSpec, type HarnessId } from "@openorc/protocol";
 import { OpenOrc } from "./openorc.js";
+import { rpcClient } from "./rpc-test-client.js";
 
 let core: OpenOrc;
 let folder: string;
 let root: string;
 let project: Project;
-let pushed: CorePush[];
 let turns: Map<string, { spec: RunSpec; handle: RunHandle }>;
-let rpcId = 0;
 let acceptLive = false;
 let liveInputs: { runId: string; text: string; attachments: string[] }[];
 const member = (key: string, name: string, managerKey: string | null, agent: HarnessId = "codex") => ({
@@ -34,7 +33,6 @@ beforeEach(async () => {
   await git(root, ["config", "user.name", "Fixture"]);
   await writeFile(path.join(root, "README.md"), "# Chat fixture\n");
   await commitAll(root, "Fixture baseline");
-  pushed = [];
   turns = new Map();
   acceptLive = false;
   liveInputs = [];
@@ -69,7 +67,7 @@ beforeEach(async () => {
   vi.spyOn(CodexAdapter.prototype, "start").mockImplementation(start);
   vi.spyOn(ClaudeAdapter.prototype, "start").mockImplementation(start);
   vi.spyOn(AcpAdapter.prototype, "start").mockImplementation(start);
-  core = await OpenOrc.create({ dataDir: path.join(folder, "data"), ephemeral: true, transport: { push: (message) => pushed.push(message) } });
+  core = await OpenOrc.create({ dataDir: path.join(folder, "data"), ephemeral: true, transport: { push: () => {} } });
   // Scripted adapters still pass through real launch admission; the fixture needs no installed CLIs.
   const environment = core.environment.current();
   vi.spyOn(core.environment, "current").mockReturnValue({ ...environment, binaries: { codex: "/fixture/codex", claude: "/fixture/claude", opencode: "/fixture/opencode" } });
@@ -95,14 +93,7 @@ afterEach(async () => {
   if (folder) await rm(folder, { recursive: true, force: true });
 });
 
-async function call<M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> {
-  const id = ++rpcId;
-  await core.handle({ type: "rpc", id, method, params });
-  const response = pushed.find((message) => (message.type === "rpc.result" || message.type === "rpc.error") && message.id === id);
-  if (!response || (response.type !== "rpc.result" && response.type !== "rpc.error")) throw new Error("Missing RPC response");
-  if (response.type === "rpc.error") throw new Error(response.message);
-  return response.result as RpcResults[M];
-}
+const call = rpcClient(() => core);
 async function liveRun(executionId: string, actorId: string) {
   // Several scripted members start at once; under a loaded machine that takes longer than a single run.
   await vi.waitFor(() => expect(core.teams.status(executionId).attempts.findLast((attempt) => attempt.actorId === actorId && attempt.state === "running")?.runId).toBeTruthy(), { timeout: 30000 });

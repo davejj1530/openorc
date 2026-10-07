@@ -5,21 +5,13 @@ import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import { ClaudeAdapter, CodexAdapter, RunHandle } from "@openorc/agents";
 import { threads } from "@openorc/db";
 import { git, commitAll } from "@openorc/git";
-import type { CorePush, RpcMethod, RpcParams, RpcResults } from "@openorc/protocol";
 import { OpenOrc } from "../openorc";
+import { rpcClient } from "../rpc-test-client.js";
 
 let dir: string;
 let core: OpenOrc;
 let projectId: string;
-let id = 0;
-const messages: CorePush[] = [];
-async function call<M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> {
-  const requestId = ++id;
-  await core.handle({ type: "rpc", id: requestId, method, params });
-  const response = messages.find((message) => (message.type === "rpc.result" || message.type === "rpc.error") && message.id === requestId);
-  if (!response || response.type === "rpc.error") throw new Error(response?.message ?? "Missing result");
-  return (response as { result: RpcResults[M] }).result;
-}
+const call = rpcClient(() => core);
 beforeAll(async () => {
   dir = await mkdtemp(path.join(tmpdir(), "task-image-launch-"));
   await git(dir, ["init", "-b", "main"]);
@@ -27,7 +19,7 @@ beforeAll(async () => {
   await git(dir, ["config", "user.name", "Test"]);
   await writeFile(path.join(dir, "README.md"), "Task image fixture");
   await commitAll(dir, "Initial");
-  core = await OpenOrc.create({ dataDir: path.join(dir, "data"), ephemeral: true, transport: { push: (message) => messages.push(message) } });
+  core = await OpenOrc.create({ dataDir: path.join(dir, "data"), ephemeral: true, transport: { push: () => {} } });
   projectId = (await call("projects.import", { rootPath: dir })).id;
 });
 afterAll(async () => {

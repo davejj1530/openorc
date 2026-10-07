@@ -5,16 +5,15 @@ import path from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { commitAll, git, pinObject, treeHash } from "@openorc/git";
 import { checkpoints, tasks, threads } from "@openorc/db";
-import type { CorePush, Project, RpcMethod, RpcParams, RpcResults } from "@openorc/protocol";
+import type { Project } from "@openorc/protocol";
 import { OpenOrc } from "../openorc.js";
 import { checkpointRefs } from "./checkpoint-refs.js";
+import { rpcClient } from "../rpc-test-client.js";
 
 let root: string;
 let dataDir: string;
 let core: OpenOrc;
 let project: Project;
-const pushed: CorePush[] = [];
-let rpcId = 0;
 
 beforeAll(async () => {
   root = await realpath(await mkdtemp(path.join(os.tmpdir(), "openorc-moves-repo-")));
@@ -26,7 +25,7 @@ beforeAll(async () => {
   await writeFile(path.join(root, "tracked.txt"), "original\n");
   await writeFile(path.join(root, "gone.txt"), "deleted by the conversation\n");
   await commitAll(root, "init");
-  core = await OpenOrc.create({ dataDir, ephemeral: true, transport: { push: (message) => pushed.push(message) } });
+  core = await OpenOrc.create({ dataDir, ephemeral: true, transport: { push: () => {} } });
   project = await core.projects.import(root);
 });
 
@@ -41,14 +40,7 @@ beforeEach(async () => {
   await git(root, ["clean", "-qfd"]);
 });
 
-async function call<M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> {
-  const id = ++rpcId;
-  await core.handle({ type: "rpc", id, method, params });
-  const response = pushed.find((message) => (message.type === "rpc.result" || message.type === "rpc.error") && message.id === id);
-  if (!response || (response.type !== "rpc.result" && response.type !== "rpc.error")) throw new Error("Missing RPC response");
-  if (response.type === "rpc.error") throw new Error(response.message);
-  return response.result as RpcResults[M];
-}
+const call = rpcClient(() => core);
 
 const insert = (title: string) => threads.insert(core.db, { projectId: project.id, title, agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
 const text = (dir: string, file: string) => readFile(path.join(dir, file), "utf8");

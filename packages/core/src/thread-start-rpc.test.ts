@@ -5,22 +5,20 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { CodexAdapter, RunHandle } from "@openorc/agents";
 import { projects, settings, threads } from "@openorc/db";
 import { commitAll, git } from "@openorc/git";
-import type { CorePush, ModelOption, Project, RpcMethod, RpcParams, RpcResults, RunSpec } from "@openorc/protocol";
+import type { ModelOption, Project, RpcParams, RunSpec } from "@openorc/protocol";
 import { OpenOrc } from "./openorc.js";
 import { MAX_WORKING_CHILDREN, pickModel } from "./services/thread-agent-tools.js";
+import { rpcClient } from "./rpc-test-client.js";
 
 let core: OpenOrc;
 let folder: string;
 let project: Project;
-let pushed: CorePush[];
 let turns: Map<string, { spec: RunSpec; handle: RunHandle }>;
-let rpcId = 0;
 
 const model = (id: string, label: string): ModelOption => ({ id, label, agent: "codex", isDefault: false, efforts: ["high"], defaultEffort: "high", fastMode: { supported: false } });
 
 beforeEach(async () => {
   folder = await mkdtemp(path.join(os.tmpdir(), "openorc-thread-start-"));
-  pushed = [];
   turns = new Map();
   vi.spyOn(CodexAdapter.prototype, "start").mockImplementation((spec) => {
     let close!: (code: number) => void;
@@ -42,7 +40,7 @@ beforeEach(async () => {
     turns.set(spec.runId, { spec, handle });
     return handle;
   });
-  core = await OpenOrc.create({ dataDir: path.join(folder, "data"), ephemeral: true, transport: { push: (message) => pushed.push(message) } });
+  core = await OpenOrc.create({ dataDir: path.join(folder, "data"), ephemeral: true, transport: { push: () => {} } });
   settings.set(core.db, "extraction.provider", "off");
   const root = path.join(folder, "repository");
   await mkdir(root);
@@ -62,14 +60,7 @@ afterEach(async () => {
   if (folder) await rm(folder, { recursive: true, force: true });
 });
 
-async function call<M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> {
-  const id = ++rpcId;
-  await core.handle({ type: "rpc", id, method, params });
-  const response = pushed.find((message) => (message.type === "rpc.result" || message.type === "rpc.error") && message.id === id);
-  if (!response || (response.type !== "rpc.result" && response.type !== "rpc.error")) throw new Error("Missing RPC response");
-  if (response.type === "rpc.error") throw new Error(response.message);
-  return response.result as RpcResults[M];
-}
+const call = rpcClient(() => core);
 
 type Started = { thread: { id: string; title: string }; agent: string; model: string | null; message: string };
 

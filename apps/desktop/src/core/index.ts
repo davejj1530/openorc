@@ -1,5 +1,6 @@
 import { ProtectedSecretsClient } from "./protected-secrets";
 import { BrowserClient } from "./browser-client";
+import { windowPorts } from "./reply";
 import { join } from "node:path";
 import { Worker } from "node:worker_threads";
 import type { MessagePortMain } from "electron";
@@ -15,16 +16,16 @@ import { RpcRequest, type CorePush } from "@openorc/protocol";
 const dataDir = process.env["OPENORC_DATA_DIR"];
 if (!dataDir) throw new Error("OPENORC_DATA_DIR is not set");
 
-let ports: MessagePortMain[] = [];
 /** The latest startup or ready push, for a window that connects after it was sent. */
-let lastStatus: CorePush | null = null;
+let lastStatus: Broadcast | null = null;
 let pendingRequests = 0;
 let closing = false;
 
+const windows = windowPorts(answer);
 const transport: Transport = {
   push(message) {
     if (message.type === "startup" || message.type === "ready") lastStatus = message;
-    for (const p of ports) p.postMessage(message);
+    windows.broadcast(message);
   },
 };
 
@@ -53,26 +54,21 @@ void corePromise.then((core) => {
 });
 
 function attach(port: MessagePortMain): void {
-  ports.push(port);
-  port.on("message", (e) => {
-    const parsed = RpcRequest.safeParse(e.data);
-    if (!parsed.success) {
-      console.warn(`[core] dropped malformed message: ${parsed.error.message}`);
-      return;
-    }
-    if (closing) {
-      port.postMessage({ type: "rpc.error", id: parsed.data.id, message: "OpenOrc is restarting to update. Please wait." });
-      return;
-    }
-    pendingRequests++;
-    void corePromise.then((core) => core.handle(parsed.data)).finally(() => pendingRequests--);
-  });
-  port.on("close", () => {
-    ports = ports.filter((p) => p !== port);
-  });
+  windows.attach(port);
   port.start();
   // A renderer that connects after startup still needs to know we are up, or what we are waiting for.
   if (lastStatus) port.postMessage(lastStatus);
+}
+
+/** Counted from the moment a request arrives, with no await before, so an update never fences one mid-flight. */
+async function answer(request: RpcRequest): Promise<RpcReply> {
+  if (closing) return { type: "rpc.error", id: request.id, message: "OpenOrc is restarting to update. Please wait." };
+  pendingRequests++;
+  try {
+    return await (await corePromise).handle(request);
+  } finally {
+    pendingRequests--;
+  }
 }
 
 process.parentPort.on("message", (e) => {

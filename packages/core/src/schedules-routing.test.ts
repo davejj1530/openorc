@@ -5,15 +5,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ClaudeAdapter, CodexAdapter, RunHandle } from "@openorc/agents";
 import { orchestration, projects, runs, scheduleFirings, settings, teamRuntime, threads } from "@openorc/db";
 import { commitAll, git } from "@openorc/git";
-import { DEFAULT_TEAM_LIMITS, type CorePush, type Project, type RpcMethod, type RpcParams, type RpcResults, type RunSpec } from "@openorc/protocol";
+import { DEFAULT_TEAM_LIMITS, type CorePush, type Project, type RunSpec } from "@openorc/protocol";
 import { OpenOrc } from "./openorc.js";
+import { rpcClient } from "./rpc-test-client.js";
 
 let core: OpenOrc;
 let folder: string;
 let project: Project;
 let pushed: CorePush[];
 let turns: Map<string, { spec: RunSpec; handle: RunHandle }>;
-let rpcId = 0;
 beforeEach(async () => {
   folder = await mkdtemp(path.join(os.tmpdir(), "openorc-schedule-routing-"));
   const root = path.join(folder, "repository");
@@ -61,14 +61,7 @@ afterEach(async () => {
   vi.restoreAllMocks();
   if (folder) await rm(folder, { recursive: true, force: true });
 });
-async function call<M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> {
-  const id = ++rpcId;
-  await core.handle({ type: "rpc", id, method, params });
-  const response = pushed.find((message) => (message.type === "rpc.result" || message.type === "rpc.error") && message.id === id);
-  if (!response || (response.type !== "rpc.result" && response.type !== "rpc.error")) throw new Error("Missing RPC response");
-  if (response.type === "rpc.error") throw new Error(response.message);
-  return response.result as RpcResults[M];
-}
+const call = rpcClient(() => core);
 async function schedule(agent: "codex" | "claude" = "codex") {
   const saved = await call("orchestration.save", {
     projectId: project.id,

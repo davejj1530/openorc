@@ -4,12 +4,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { projects, tasks } from "@openorc/db";
 import { emptyTree, git } from "@openorc/git";
-import type { CorePush, RpcMethod, RpcParams, RpcResults, RunSpec } from "@openorc/protocol";
+import type { RunSpec } from "@openorc/protocol";
 import { CodexAdapter, RunHandle } from "@openorc/agents";
 import { OpenOrc } from "../openorc.js";
 import { projectGit } from "./project-git.js";
 import { threadTurnChanges } from "./thread-turn-changes.js";
 import { directory } from "./workspace-home.js";
+import { rpcClient } from "../rpc-test-client.js";
 
 const dirs: string[] = [];
 afterEach(async () => {
@@ -48,25 +49,16 @@ async function harness(root: string, duringTurn: () => Promise<void> = async () 
     return handle;
   });
   const logs: string[] = [];
-  const pushed: CorePush[] = [];
   const core = await OpenOrc.create({
     dataDir: join(root, "data"),
     ephemeral: true,
     transport: {
       push(message) {
-        pushed.push(message);
         if (message.type === "log" && message.level !== "info") logs.push(message.message);
       },
     },
   });
-  let requestId = 0;
-  const call = async <M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> => {
-    const id = ++requestId;
-    await core.handle({ type: "rpc", id, method, params });
-    const reply = pushed.find((message) => (message.type === "rpc.result" || message.type === "rpc.error") && message.id === id);
-    if (reply?.type !== "rpc.result") throw new Error(reply?.type === "rpc.error" ? reply.message : "Missing RPC reply");
-    return reply.result as RpcResults[M];
-  };
+  const call = rpcClient(() => core);
   vi.spyOn(core.memory, "onRunFinished").mockImplementation(() => {});
   vi.spyOn(core.textGeneration, "title").mockResolvedValue(null);
   const input = { agent: "codex" as const, model: "fixture", effort: undefined, mode: "act" as const, permissionMode: "review" as const, attachments: undefined, title: undefined };

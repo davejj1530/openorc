@@ -39,8 +39,8 @@ export class ProjectService {
   }
 
   /** Any folder can be a project. A folder inside a repository brings the whole repository, as it always has. */
-  async import(rootPath: string): Promise<Project> {
-    const folder = await directory(rootPath);
+  async import(rootPath: string, options: { create?: boolean } = {}): Promise<Project> {
+    const folder = await directory(rootPath, options);
     const info = (await isGitRepo(folder)) ? await repoInfo(folder) : null;
     const root = info?.root ?? folder;
     const existing = projects.getByRoot(this.db, root);

@@ -1,7 +1,7 @@
 import { writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
-import { protocol, app, BrowserWindow, dialog, ipcMain, MessageChannelMain, session, shell, utilityProcess, type UtilityProcess } from "electron";
+import { protocol, app, BrowserWindow, dialog, ipcMain, MessageChannelMain, session, shell, utilityProcess, type OpenDialogOptions, type UtilityProcess } from "electron";
 import { appOrigin, isExternalWebUrl, permitted } from "./app-origin";
 import electronUpdater from "electron-updater";
 import { AppUpdates } from "./app-updates";
@@ -252,9 +252,8 @@ app.whenReady().then(async () => {
     const forced = qaDirectory();
     if (forced) return forced;
     const win = BrowserWindow.fromWebContents(event.sender);
-    const result = win
-      ? await dialog.showOpenDialog(win, { properties: ["openDirectory"], title: "Choose a repository" })
-      : await dialog.showOpenDialog({ properties: ["openDirectory"], title: "Choose a repository" });
+    const options: OpenDialogOptions = { properties: ["openDirectory", "createDirectory"], title: "Choose a repository" };
+    const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options);
     return result.canceled ? null : (result.filePaths[0] ?? null);
   });
 

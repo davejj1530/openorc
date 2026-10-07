@@ -1,7 +1,7 @@
 import { Db } from "@openorc/db";
 import { WORKSPACE_ID } from "@openorc/protocol";
 import { ProjectService } from "../services/projects.js";
-import { configureWorkspace, workspaceHome } from "../services/workspace-home.js";
+import { configureWorkspace, folderMissing, workspaceHome } from "../services/workspace-home.js";
 import { type Transport } from "../transport.js";
 import type { Handlers } from "./types.js";
 type Dependencies = {
@@ -18,7 +18,16 @@ export function createProjectsHandlers({
   transport,
 }: Dependencies): Pick<
   Handlers,
-  "workspace.get" | "workspace.configure" | "projects.list" | "projects.get" | "projects.git" | "projects.checkoutBranch" | "projects.import" | "projects.remove" | "projects.updateSettings"
+  | "workspace.get"
+  | "workspace.configure"
+  | "projects.list"
+  | "projects.get"
+  | "projects.git"
+  | "projects.checkoutBranch"
+  | "projects.import"
+  | "projects.folderMissing"
+  | "projects.remove"
+  | "projects.updateSettings"
 > {
   return {
     "workspace.get": () => workspaceHome(db),
@@ -36,11 +45,12 @@ export function createProjectsHandlers({
       if (changed) invalidate(["projects", `project:${id}`]);
       return state;
     },
-    "projects.import": async ({ rootPath }) => {
-      const p = await projectService.import(rootPath);
+    "projects.import": async ({ rootPath, create }) => {
+      const p = await projectService.import(rootPath, { create });
       invalidate(["projects"]);
       return p;
     },
+    "projects.folderMissing": ({ rootPath }) => folderMissing(rootPath),
     "projects.updateSettings": ({ id, settings }) => {
       const p = projectService.updateSettings(id, settings);
       invalidate(["projects", `project:${id}`]);

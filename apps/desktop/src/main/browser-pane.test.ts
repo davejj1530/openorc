@@ -531,6 +531,36 @@ describe("opening thread links", () => {
     expect(first.webContents.sent).toHaveLength(0);
   });
 
+  it("opens links in the selected browser tab and releases its association on close", () => {
+    const ipc = install();
+    const window = new fake.FakeWindow();
+    const owner = "thread:tabs";
+    const tab = `${owner}:tab:second`;
+    ipc.call("browser:context", window, owner);
+    const first = loaded(ipc, window, owner, "https://first.example/");
+    ipc.call("browser:show", window, { id: tab, context: owner, bounds: panelRect, url: "https://second.example/" });
+    const second = newestView();
+    second.webContents.finish();
+    openBrowserLink(window as unknown as Electron.BrowserWindow, "https://selected.example/");
+    expect(second.webContents.loaded.at(-1)).toBe("https://selected.example/");
+    expect(first.webContents.loaded).toEqual(["https://first.example/"]);
+    expect(window.webContents.sent.at(-1)?.payload).toBe(tab);
+    ipc.call("browser:close", window, tab);
+    openBrowserLink(window as unknown as Electron.BrowserWindow, "https://remaining.example/");
+    expect(first.webContents.loaded.at(-1)).toBe("https://remaining.example/");
+  });
+
+  it("does not associate a tab from another conversation with the current browser context", () => {
+    const ipc = install();
+    const window = new fake.FakeWindow();
+    ipc.call("browser:context", window, "thread:one");
+    ipc.call("browser:show", window, { id: "thread:two:tab:page", context: "thread:one", bounds: panelRect, url: "https://second.example/" });
+    const foreign = newestView();
+    openBrowserLink(window as unknown as Electron.BrowserWindow, "https://first.example/");
+    expect(foreign.webContents.loaded).toEqual(["https://second.example/"]);
+    expect(window.webContents.sent.at(-1)?.payload).toBe("thread:one");
+  });
+
   it("retries a failed link when reopening instead of replacing it with the previous default", () => {
     const ipc = install();
     const window = new fake.FakeWindow();

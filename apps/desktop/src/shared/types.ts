@@ -114,8 +114,8 @@ export interface BrowserPaneApi {
   /** Register the panel's current conversation, including when Preview is hidden. */
   setContext(id: string | null): void;
   onReveal(cb: (id: string) => void): () => void;
-  /** Create or reveal the view for `id`, painted at `bounds`, loading `url` when given. */
-  show(input: { id: string; bounds: PaneRect; url?: string }): Promise<BrowserPaneState>;
+  /** Reveal a tab at `bounds`. Its conversation `context` makes this the agent's selected page. */
+  show(input: { id: string; bounds: PaneRect; url?: string; context?: string }): Promise<BrowserPaneState>;
   /** Move the view without reloading it. Called on every panel resize and scroll. */
   setBounds(id: string, bounds: PaneRect): void;
   /** Detach from the screen, keeping the page alive. */

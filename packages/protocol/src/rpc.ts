@@ -4,6 +4,7 @@ import type { TaskForwardingState } from "./task-forwarding.js";
 import type { TaskCheckoutState } from "./task-checkout.js";
 import { BranchLoss, type ChangePreview, type RemovalImpact } from "./workspace-changes.js";
 import { z } from "zod";
+import { FileScope } from "./files.js";
 import type { AgentUpdates } from "./agent-updates.js";
 import { slackRpcParams, type SlackStatus } from "./slack.js";
 import { BranchName, pullRequestRpcParams, type PullRequestRpcResults } from "./pull-requests.js";
@@ -360,9 +361,9 @@ export const rpcParams = {
   "git.threadPushState": z.object({ threadId: z.string() }),
   "review.threadPrTemplate": z.object({ threadId: z.string() }),
   /** Tracked files whose path matches, for @ mentions in the composer. */
-  "files.search": z.object({ projectId: z.string(), query: z.string(), limit: z.number().int().positive().max(50).optional() }),
+  "files.search": z.object({ projectId: z.string(), scope: FileScope.optional(), query: z.string(), limit: z.number().int().positive().max(50).optional() }),
   /** Read a cited text file in the conversation's workspace. */
-  "files.read": z.object({ scope: z.object({ kind: z.enum(["thread", "task"]), id: z.string() }), path: z.string().min(1) }),
+  "files.read": z.object({ scope: FileScope, path: z.string().min(1) }),
   /** The instruction files the thread's agent reads, AGENTS.md first and its personal file last. */
   "instructions.list": z.object({ threadId: z.string() }),
   /** Saves one of them. `version` is the one the edit started from, null for a new file; a file changed since then is refused. */

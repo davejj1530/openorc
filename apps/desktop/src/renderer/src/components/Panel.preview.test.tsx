@@ -2,6 +2,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { Project, RpcMethod, RpcResults, ThreadSummary } from "@openorc/protocol";
+import { usePanelSessions } from "../lib/panel-tabs";
 import { useLayout } from "../lib/layout";
 import { queryClient } from "../lib/query";
 import { core } from "../lib/rpc";
@@ -24,6 +25,7 @@ const thread = { id: "thread", projectId: project.id, workspaceMode: "current", 
 const listeners = new Set<(id: string) => void>();
 
 beforeEach(() => {
+  usePanelSessions.setState({ sessions: {} });
   queryClient.clear();
   queryClient.setDefaultOptions({ queries: { retry: false, staleTime: Infinity } });
   vi.stubGlobal("openorc", {
@@ -39,7 +41,7 @@ beforeEach(() => {
     if (method === "projects.git") return "none" as RpcResults[M];
     return [] as unknown as RpcResults[M];
   });
-  useLayout.setState({ panelOpen: false, panelTab: "changes", panelThreadId: thread.id, panelTools: {}, selectedChanges: null, selectedFile: null, panelExpanded: false });
+  useLayout.setState({ panelOpen: false, panelTab: "changes", panelThreadId: thread.id, panelRequest: null, selectedChanges: null, selectedFile: null, panelExpanded: false });
 });
 
 afterEach(() => {
@@ -62,5 +64,5 @@ it.each(["changes", "browser"] as const)("reveals the linked page when the close
   });
   expect((await screen.findByRole("tab", { name: "Preview" })).getAttribute("aria-selected")).toBe("true");
   expect(await screen.findByRole("region", { name: "Web preview" })).toBeTruthy();
-  expect(useLayout.getState().panelTools["thread:thread"]).toContain("browser");
+  expect(usePanelSessions.getState().sessions["thread:thread"]?.tabs).toHaveLength(1);
 });

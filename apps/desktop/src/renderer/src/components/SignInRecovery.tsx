@@ -10,7 +10,7 @@ export function SignInRecovery({ provider, lead, className }: { provider: Activi
   return (
     <p className={cn("my-2 text-sm text-ink-2", className)}>
       {lead ? `${lead} ` : null}
-      {fileScope ? (
+      {fileScope && fileScope.kind !== "project" ? (
         <button type="button" className="text-accent-ink hover:underline" onClick={() => runInTerminal(fileScope, command)}>
           Sign in
         </button>

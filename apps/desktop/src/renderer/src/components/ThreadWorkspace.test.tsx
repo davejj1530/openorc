@@ -171,7 +171,7 @@ describe.each([{ ids: ["a", "b"] }, { ids: ["a", "b", "c"] }])("header focus bou
     const { container } = setup();
     for (const id of ids.slice(1)) {
       const pane = container.querySelector<HTMLElement>(`[data-thread-pane="${id}"]`)!;
-      const toggle = within(pane).getByRole("button", { name: "Changes" });
+      const toggle = within(pane).getByRole("button", { name: "Show panel" });
       fireEvent.pointerDown(toggle);
       fireEvent.focus(toggle);
       fireEvent.click(toggle);

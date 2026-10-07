@@ -20,7 +20,6 @@ export function runInTerminal(scope: { kind: "thread" | "task"; id: string }, co
   const id = `${scope.kind}:${scope.id}`;
   useRequests.setState((s) => ({ commands: { ...s.commands, [id]: command } }));
   const layout = useLayout.getState();
-  layout.rememberPanelTool(id, "terminal");
   if (scope.kind === "thread") layout.openThreadPanel(scope.id, "terminal");
   else layout.setPanel(true, "terminal");
 }

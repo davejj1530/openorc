@@ -45,10 +45,12 @@ export function ThreadMedia({
   // Callers pass the scope as a fresh literal; keying on its fields keeps every image and link below from re-rendering.
   const scopeKind = fileScope?.kind;
   const scopeId = fileScope?.id;
-  const context = useMemo(
-    () => ({ basePath, openImage, fileScope: scopeKind && scopeId !== undefined ? { kind: scopeKind, id: scopeId } : undefined, mentionNames }),
-    [basePath, openImage, scopeKind, scopeId, mentionNames],
-  );
+  const scopeDirectory = fileScope?.kind === "project" ? fileScope.workingDirectory : undefined;
+  const context = useMemo(() => {
+    let scope: FileSelection["scope"] | undefined;
+    if (scopeKind && scopeId !== undefined) scope = scopeKind === "project" ? { kind: scopeKind, id: scopeId, workingDirectory: scopeDirectory } : { kind: scopeKind, id: scopeId };
+    return { basePath, openImage, fileScope: scope, mentionNames };
+  }, [basePath, openImage, scopeKind, scopeId, scopeDirectory, mentionNames]);
   return (
     <MediaContext.Provider value={context}>
       {children}

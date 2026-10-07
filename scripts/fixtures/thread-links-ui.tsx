@@ -20,7 +20,7 @@ const project: Project = {
 };
 const thread = { id: "links", projectId: project.id, workspaceMode: "current", createdAt: 0 } as ThreadSummary;
 core.call = (async (method) => (method === "projects.git" ? "none" : [])) as typeof core.call;
-useLayout.setState({ panelOpen: false, panelTab: "browser", panelThreadId: thread.id, panelTools: {}, panelExpanded: false });
+useLayout.setState({ panelOpen: false, panelTab: "browser", panelThreadId: thread.id, panelRequest: null, panelExpanded: false });
 useLayout.getState().setPanelWidth(420);
 
 function Fixture() {

@@ -1,0 +1,204 @@
+.panel-browser-header {
+  min-width: 0;
+}
+.panel-browser-tabs {
+  display: flex;
+  gap: 4px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 3px 0;
+}
+.panel-browser-tab {
+  display: flex;
+  align-items: center;
+  flex: 0 1 172px;
+  min-width: 110px;
+  max-width: 190px;
+  height: 29px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: var(--ink-3);
+}
+.panel-browser-tab:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.panel-browser-tab[data-active="true"] {
+  background: var(--surface-2);
+  border-color: var(--line);
+  color: var(--ink);
+}
+.panel-browser-tab > [role="tab"] {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 7px 0 9px;
+  border-radius: 6px;
+  font-size: 12px;
+  text-align: left;
+}
+.panel-browser-tab > [role="tab"] svg {
+  flex-shrink: 0;
+  color: var(--ink-3);
+}
+.panel-browser-tab > [role="tab"] span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.panel-tab-close {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-right: 3px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  color: var(--ink-3);
+}
+.panel-tab-close:hover {
+  background: var(--surface-3);
+  color: var(--ink);
+}
+.panel-navigation {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 48px;
+  flex-shrink: 0;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--line);
+}
+.panel-navigation-actions {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  flex-shrink: 0;
+}
+.panel-address {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  background: var(--surface-2);
+  border: 1px solid transparent;
+  border-radius: 8px;
+}
+.panel-address:focus-within {
+  border-color: var(--line-strong, var(--ink-3));
+}
+.panel-address input {
+  width: 100%;
+  min-width: 0;
+  padding: 0 10px;
+  background: transparent;
+  border: 0;
+  border-radius: inherit;
+  font-size: 12px;
+  text-align: center;
+  color: var(--ink-2);
+  text-overflow: ellipsis;
+  outline: none;
+}
+.panel-address input:focus {
+  text-align: left;
+  color: var(--ink);
+}
+.panel-address input::placeholder {
+  color: var(--ink-3);
+}
+.panel-new-tab {
+  height: 100%;
+  overflow-y: auto;
+  padding: 30px 24px;
+}
+.panel-new-tab section + section {
+  margin-top: 38px;
+}
+.panel-new-tab h2 {
+  margin-bottom: 16px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+.panel-tool-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+.panel-tool-shortcut {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 13px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-2) 65%, var(--paper));
+  text-align: left;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.panel-tool-shortcut svg {
+  flex-shrink: 0;
+  color: var(--ink-3);
+}
+.panel-tool-shortcut:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.panel-recent-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+  gap: 12px;
+}
+.panel-recent-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 13px;
+  min-width: 0;
+  padding: 10px 4px;
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.panel-recent-page > span:first-child {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 11px;
+  background: var(--surface-2);
+  color: var(--ink-3);
+}
+.panel-recent-page > span:last-child {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.panel-recent-page:hover {
+  background: var(--surface-2);
+}
+@container review-panel (max-width: 420px) {
+  .panel-new-tab {
+    padding: 24px 16px;
+  }
+  .panel-tool-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .panel-navigation {
+    gap: 4px;
+    padding: 0 8px;
+  }
+}
+@container work-row (max-width: 788px) {
+  .panel-browser-header[data-traffic-clearance="true"] {
+    padding-left: var(--spacing-traffic);
+  }
+}

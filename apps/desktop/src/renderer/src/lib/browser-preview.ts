@@ -2,13 +2,13 @@ import { useEffect } from "react";
 import { create } from "zustand";
 
 /** Listen only while this conversation owns the shared sidebar. */
-export function useBrowserPreview(surface: string | null, reveal: () => void): void {
+export function useBrowserPreview(surface: string | null, reveal: (id: string) => void): void {
   useEffect(() => {
     const browser = window.openorc.browser;
     // A hot-reloaded renderer can precede the new preload during development.
     if (!browser?.onReveal) return;
     const off = browser.onReveal((id) => {
-      if (id === surface) reveal();
+      if (surface && (id === surface || id.startsWith(`${surface}:tab:`))) reveal(id);
     });
     browser.setContext(surface);
     return () => {

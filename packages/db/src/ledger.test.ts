@@ -7,6 +7,7 @@ import type { AgentEvent } from "@openorc/protocol";
 import { Db } from "./database.js";
 import { LedgerWriter, listEvents } from "./ledger.js";
 import { checkpoints } from "./checkpoints.js";
+import { insertLegacyCheckpoint } from "./fixtures/legacy-checkpoint.js";
 import { audit, projects, runs, tasks, threads } from "./repos.js";
 import { schedules } from "./schedules.js";
 import { messages } from "./search.js";
@@ -51,6 +52,35 @@ describe("migrations", () => {
       db = Db.open(file);
       expect(threads.get(db, "old-thread")?.fastMode).toBe(true);
       expect(runs.get(db, "old-run")?.fastMode).toBe(false);
+    } finally {
+      db.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("reads checkpoints saved before the outside column as inside a turn, and only ever stores who made an outside one", () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "openorc-outside-migration-"));
+    const file = path.join(dir, "old.sqlite");
+    const raw = new DatabaseSync(file);
+    const beforeOutside = migrations.length - 1;
+    for (const migration of migrations.slice(0, beforeOutside)) {
+      if (typeof migration === "string") raw.exec(migration);
+      else migration(raw);
+    }
+    raw.exec(`PRAGMA user_version = ${beforeOutside}`);
+    const old = new Db(raw);
+    const project = projects.insert(old, { name: "Existing", rootPath: dir, gitRemote: null, defaultBranch: null, settings: {} });
+    const thread = threads.insert(old, { projectId: project.id, title: "Existing conversation", agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
+    const stat = { files: 0, insertions: 0, deletions: 0, untracked: 0 };
+    const legacy = insertLegacyCheckpoint(old, { threadId: thread.id, runId: null, turn: 0, treeSha: "a".repeat(40), diffStat: stat });
+    old.close();
+    const db = Db.open(file);
+    try {
+      expect(checkpoints.listForThread(db, thread.id)).toEqual([legacy]);
+      const outside = checkpoints.insert(db, { threadId: thread.id, runId: null, turn: 0, treeSha: "b".repeat(40), diffStat: stat, root: dir, outside: "user" });
+      expect(checkpoints.get(db, outside.id)).toMatchObject({ outside: "user" });
+      expect(checkpoints.insert(db, { threadId: thread.id, runId: null, turn: 0, treeSha: "c".repeat(40), diffStat: stat }).outside).toBeNull();
+      expect(() => db.stmt("UPDATE thread_checkpoints SET outside = 'agent' WHERE id = ?").run(outside.id)).toThrow(/CHECK/);
     } finally {
       db.close();
       rmSync(dir, { recursive: true, force: true });

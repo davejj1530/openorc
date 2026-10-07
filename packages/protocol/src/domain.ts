@@ -249,6 +249,12 @@ export const ThreadCheckpoint = z.object({
   note: z.string().nullable(),
   /** The folder the files were read from, so a restore never writes them into another location. Null before this was recorded. */
   root: z.string().nullable(),
+  /**
+   * Set on the checkpoint a turn saves as it starts, because the files changed since the conversation's last
+   * checkpoint. It splits those changes off the agent's turn, so the turn's card and Undo cover only the agent.
+   * `user`: no agent could have made them. `unknown`: an agent may have, too. Null on every other checkpoint.
+   */
+  outside: z.enum(["user", "unknown"]).nullable(),
   createdAt: z.number(),
 });
 export type ThreadCheckpoint = z.infer<typeof ThreadCheckpoint>;

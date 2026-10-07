@@ -8,7 +8,7 @@ import { Composer, type SlashCommand, ComposerChoice } from "./Composer";
 import { Transcript } from "./Transcript";
 import { MessageQueue } from "./MessageQueue";
 import { BackgroundCommands } from "./BackgroundCommands";
-import { ThreadChangeCard } from "./ThreadChangeCard";
+import { useTurnFooter } from "./TurnFooter";
 import { isImageGeneration } from "../lib/image-activity";
 import { useComposerChanges } from "../lib/composer-changes";
 import { useProjectGit } from "../lib/project-git";
@@ -144,7 +144,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
 
   const activeRun: Run | undefined = runs[runs.length - 1];
   const basePath = (scope.kind === "task" ? scope.task.worktreePath : (scope.thread.workingDirectory ?? scope.thread.worktreePath)) ?? project.rootPath;
-  const { merged, liveTranscript, turnCards, hasOlder, loadOlder } = useConversationTranscript({ runs, threadId: thread?.id ?? null, basePath });
+  const { merged, liveTranscript, footers, hasOlder, loadOlder } = useConversationTranscript({ runs, threadId: thread?.id ?? null, basePath });
 
   const settings = useConversationSettings({ thread, activeRun });
   const { choice, mode, permission, permissionReady, permissionError } = settings;
@@ -180,19 +180,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   const steerReason = conversationSteerReason({ canSteer, compacting: compact.isPending, settingsPending, sameAgent, agent: activeRun?.agent });
   const sendDisabledReason = conversationSendDisabledReason({ permissionReady, historyLoading: runsQuery.isLoading, historyFailed: Boolean(runsQuery.error), hasModel: Boolean(choice) });
   const busy = start.isPending || send.isPending || queue.isPending;
-  const changeCard = useCallback(
-    (blocks: Block[]) => {
-      for (const block of blocks) {
-        const card = turnCards.get(block.id);
-        if (card && threadId)
-          return (
-            <ThreadChangeCard key={card.checkpointId} threadId={threadId} checkpointId={card.checkpointId} previousCheckpointId={card.previousCheckpointId} paths={card.paths} working={working} />
-          );
-      }
-      return null;
-    },
-    [turnCards, threadId, working],
-  );
+  const turnFooter = useTurnFooter({ footers, threadId, working });
   const switching = Boolean(thread && choice && runs.length > 0 && !runs.some((r) => r.agent === choice.agent));
 
   const startRun = async (body: string, attachments: string[], fresh = false) => {

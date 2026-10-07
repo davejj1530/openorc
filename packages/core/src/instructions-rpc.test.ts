@@ -3,24 +3,15 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { projects, threads } from "@openorc/db";
-import type { CorePush, RpcMethod, RpcParams, RpcResults } from "@openorc/protocol";
 import { OpenOrc } from "./openorc.js";
+import { rpcClient } from "./rpc-test-client.js";
 
 let folder: string;
 let personal: string;
 let core: OpenOrc;
 let threadId: string;
-const pushed: CorePush[] = [];
-let nextId = 1;
 
-async function call<M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> {
-  const id = nextId++;
-  await core.handle({ type: "rpc", id, method, params });
-  const reply = pushed.find((m) => (m.type === "rpc.result" || m.type === "rpc.error") && m.id === id);
-  if (!reply) throw new Error("no reply");
-  if (reply.type === "rpc.error") throw new Error(reply.message);
-  return (reply as { result: RpcResults[M] }).result;
-}
+const call = rpcClient(() => core);
 
 beforeEach(async () => {
   folder = await mkdtemp(path.join(os.tmpdir(), "openorc-instructions-"));
@@ -28,7 +19,7 @@ beforeEach(async () => {
   // Personal files resolve under these folders, never the real home.
   vi.stubEnv("CLAUDE_CONFIG_DIR", personal);
   vi.stubEnv("CODEX_HOME", personal);
-  core = await OpenOrc.create({ dataDir: folder, ephemeral: true, transport: { push: (message) => pushed.push(message) } });
+  core = await OpenOrc.create({ dataDir: folder, ephemeral: true, transport: { push: () => {} } });
   const project = projects.insert(core.db, { name: "Instructions fixture", rootPath: folder, gitRemote: null, defaultBranch: null, settings: {} });
   threadId = threads.insert(core.db, { projectId: project.id, title: "Instructions", agent: "claude", model: null, mode: "act", permissionMode: "trusted" }).id;
 });
@@ -85,4 +76,20 @@ describe("instruction files through RPC", () => {
     await call("instructions.save", { threadId, path: path.join(folder, "AGENTS.md"), content: "Shared rules, updated\n", version: files[0]!.version });
     expect(await readFile(path.join(folder, "CLAUDE.md"), "utf8")).toBe("Shared rules, updated\n");
   });
+});
+
+it("waits for an exclusive operation on the folder before saving, and leaves no temp file", async () => {
+  const target = path.join(folder, "AGENTS.md");
+  const restore = await core.workspaceWriters.acquire(folder, "restoring");
+  let settled = false;
+  const pending = call("instructions.save", { threadId, path: target, content: "After the restore.\n", version: null }).finally(() => {
+    settled = true;
+  });
+  await new Promise((resolve) => setTimeout(resolve, 400));
+  expect(settled).toBe(false);
+  await expect(readFile(target, "utf8")).rejects.toThrow();
+  restore.release();
+  await expect(pending).resolves.toMatchObject({ content: "After the restore.\n" });
+  expect(await readFile(target, "utf8")).toBe("After the restore.\n");
+  expect((await readdir(folder)).filter((name) => name.startsWith(".openorc-"))).toEqual([]);
 });

@@ -5,22 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AcpAdapter, ClaudeAdapter, CodexAdapter, RunHandle } from "@openorc/agents";
 import { checkpoints, memories, orchestration, projects, runs, settings, tasks, teamContexts, teamTasks, teamWorkspaces, threads } from "@openorc/db";
 import { commitAll, git, teamTransfer } from "@openorc/git";
-import {
-  DEFAULT_TEAM_LIMITS,
-  TeamExecutionRecord,
-  type CorePush,
-  type Project,
-  type RpcMethod,
-  type RpcParams,
-  type RpcResults,
-  type RunSpec,
-  type TeamDraft,
-  type Thread,
-  type HarnessId,
-} from "@openorc/protocol";
+import { DEFAULT_TEAM_LIMITS, TeamExecutionRecord, type Project, type RunSpec, type TeamDraft, type Thread, type HarnessId } from "@openorc/protocol";
 import { OpenOrc } from "./openorc.js";
 import { ShellEnvironment } from "./services/shell-environment.js";
 import { SystemService, type CommandProbe } from "./services/system.js";
+import { rpcClient } from "./rpc-test-client.js";
 
 interface ScriptedTurn {
   spec: RunSpec;
@@ -31,10 +20,8 @@ let core: OpenOrc;
 let directory: string;
 let root: string;
 let project: Project;
-let pushed: CorePush[];
 let scripted: Map<string, ScriptedTurn>;
 let executions: string[];
-let rpcId = 0;
 let liveSteering = false;
 const liveDelivery = vi.fn<(text: string, attachments?: string[]) => Promise<"accepted" | "unavailable">>();
 
@@ -76,7 +63,6 @@ beforeEach(async () => {
   await writeFile(path.join(root, "README.md"), "# Routing fixture\n");
   await commitAll(root, "Fixture baseline");
   scripted = new Map();
-  pushed = [];
   executions = [];
   liveSteering = false;
   liveDelivery.mockReset().mockResolvedValue("accepted");
@@ -110,7 +96,7 @@ beforeEach(async () => {
   vi.spyOn(CodexAdapter.prototype, "start").mockImplementation(start);
   vi.spyOn(ClaudeAdapter.prototype, "start").mockImplementation(start);
   vi.spyOn(AcpAdapter.prototype, "start").mockImplementation(start);
-  core = await OpenOrc.create({ dataDir: path.join(directory, "data"), ephemeral: true, transport: { push: (message) => pushed.push(message) } });
+  core = await OpenOrc.create({ dataDir: path.join(directory, "data"), ephemeral: true, transport: { push: () => {} } });
   const environment = core.environment.current();
   vi.spyOn(core.environment, "current").mockReturnValue({ ...environment, binaries: { codex: "/fixture/codex", claude: "/fixture/claude", opencode: "/fixture/opencode" } });
   // Agents get memory tools only while memory is on; runs are not summarized.
@@ -213,14 +199,7 @@ async function mcpCall(runId: string, name: string, args: Record<string, unknown
   return JSON.parse(payload.result.content[0].text);
 }
 
-async function call<M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> {
-  const id = ++rpcId;
-  await core.handle({ type: "rpc", id, method, params });
-  const response = pushed.find((message) => (message.type === "rpc.result" || message.type === "rpc.error") && message.id === id);
-  if (!response || (response.type !== "rpc.result" && response.type !== "rpc.error")) throw new Error("No RPC response");
-  if (response.type === "rpc.error") throw new Error(response.message);
-  return response.result as RpcResults[M];
-}
+const call = rpcClient(() => core);
 
 function emitFinish(turn: ScriptedTurn) {
   const { runId, agent, model } = turn.spec;

@@ -5,20 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ClaudeAdapter, CodexAdapter, RunHandle } from "@openorc/agents";
 import { comments, projects, settings, snapshots, taskForwardings, tasks, teamTaskCompletions, teamTasks, teamWorkspaces } from "@openorc/db";
 import { commitAll, git } from "@openorc/git";
-import {
-  DEFAULT_TEAM_LIMITS,
-  teamReviewComment,
-  type CorePush,
-  type Project,
-  type RpcMethod,
-  type RpcParams,
-  type RpcResults,
-  type RunSpec,
-  type TeamDraft,
-  type TeamTaskActionResult,
-} from "@openorc/protocol";
+import { DEFAULT_TEAM_LIMITS, teamReviewComment, type Project, type RunSpec, type TeamDraft, type TeamTaskActionResult } from "@openorc/protocol";
 import { OpenOrc } from "./openorc.js";
 import { TaskForwardingService } from "./services/task-forwarding.js";
+import { rpcClient } from "./rpc-test-client.js";
 
 interface Turn {
   spec: RunSpec;
@@ -28,9 +18,7 @@ interface Turn {
 let core: OpenOrc;
 let directory: string;
 let project: Project;
-let pushed: CorePush[];
 let turns: Map<string, Turn>;
-let rpcId = 0;
 
 beforeEach(async () => {
   directory = await mkdtemp(path.join(os.tmpdir(), "openorc-task-activation-"));
@@ -42,7 +30,6 @@ beforeEach(async () => {
   await writeFile(path.join(root, "README.md"), "# Task activation fixture\n");
   await commitAll(root, "Fixture baseline");
   turns = new Map();
-  pushed = [];
   const start = (spec: RunSpec) => {
     let resolve!: (code: number) => void;
     const done = new Promise<number>((next) => {
@@ -70,7 +57,7 @@ beforeEach(async () => {
   };
   vi.spyOn(CodexAdapter.prototype, "start").mockImplementation(start);
   vi.spyOn(ClaudeAdapter.prototype, "start").mockImplementation(start);
-  core = await OpenOrc.create({ dataDir: path.join(directory, "data"), ephemeral: true, transport: { push: (message) => pushed.push(message) } });
+  core = await OpenOrc.create({ dataDir: path.join(directory, "data"), ephemeral: true, transport: { push: () => {} } });
   settings.set(core.db, "extraction.provider", "off");
   project = projects.insert(core.db, { name: "Fixture", rootPath: root, gitRemote: null, defaultBranch: "main", settings: {} });
   vi.spyOn(core.orchestration, "preflight").mockResolvedValue({ ready: true, issues: [] });
@@ -85,14 +72,7 @@ afterEach(async () => {
   if (directory) await rm(directory, { recursive: true, force: true });
 });
 
-async function call<M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> {
-  const id = ++rpcId;
-  await core.handle({ type: "rpc", id, method, params });
-  const response = pushed.find((message) => (message.type === "rpc.result" || message.type === "rpc.error") && message.id === id);
-  if (!response || (response.type !== "rpc.result" && response.type !== "rpc.error")) throw new Error("Missing RPC response");
-  if (response.type === "rpc.error") throw new Error(response.message);
-  return response.result as RpcResults[M];
-}
+const call = rpcClient(() => core);
 async function tool(turn: Turn, name: string, args: Record<string, unknown>) {
   const response = await fetch((await core.mcpServer()).urlForRun(turn.spec.runId), {
     method: "POST",

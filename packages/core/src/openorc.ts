@@ -112,7 +112,7 @@ import { ToolImageStore } from "./services/tool-images.js";
 import { ensureWorkspaceHome } from "./services/workspace-home.js";
 import { WorkspaceWriters } from "./services/workspace-writers.js";
 import { WorkspaceService } from "./services/workspace.js";
-import { transportLogger, type Logger, type Transport } from "./transport.js";
+import { transportLogger, type Logger, type RpcReply, type Transport } from "./transport.js";
 
 export interface OpenOrcOptions {
   browser?: BrowserHost;
@@ -567,24 +567,17 @@ export class OpenOrc {
     return this.mcp;
   }
 
-  /** Dispatch one renderer request. Never throws; errors go back as rpc.error. */
-  async handle(request: RpcRequest): Promise<void> {
+  /**
+   * Dispatch one renderer request and resolve to its reply. Never rejects: failures resolve to rpc.error. The caller
+   * posts the reply on the port the request came from, because every window counts request ids from 1.
+   */
+  async handle(request: RpcRequest): Promise<RpcReply> {
     const { id, method } = request;
     const privateParams = method.startsWith("slack.") || method === "memory.settings.set";
     const schema = (rpcParams as Record<string, (typeof rpcParams)[RpcMethod]>)[method];
-    if (!schema) {
-      this.options.transport.push({ type: "rpc.error", id, message: `unknown method ${method}` });
-      return;
-    }
+    if (!schema) return { type: "rpc.error", id, message: `unknown method ${method}` };
     const parsed = schema.safeParse(request.params ?? {});
-    if (!parsed.success) {
-      this.options.transport.push({
-        type: "rpc.error",
-        id,
-        message: invalidParamsMessage(method, parsed.error.message),
-      });
-      return;
-    }
+    if (!parsed.success) return { type: "rpc.error", id, message: invalidParamsMessage(method, parsed.error.message) };
     try {
       this.guardTeamRequest(method as RpcMethod, parsed.data);
       const handler = this.handlers[method as RpcMethod] as (p: unknown) => Promise<unknown> | unknown;
@@ -593,12 +586,12 @@ export class OpenOrc {
       if (process.env["OPENORC_RPC_LOG"] === "1") {
         console.log(`[rpc] ${method} ${privateParams ? "[private]" : JSON.stringify(parsed.data).slice(0, 120)} -> ${resultSummary(result)} in ${Date.now() - started} ms`);
       }
-      this.options.transport.push({ type: "rpc.result", id, result: result ?? null });
+      return { type: "rpc.result", id, result: result ?? null };
     } catch (e) {
       const detail = e instanceof Error ? e.message : String(e);
       const message = method.startsWith("slack.") ? redact(detail).text : detail;
       this.log.error(`${method}: ${message}`);
-      this.options.transport.push({ type: "rpc.error", id, message });
+      return { type: "rpc.error", id, message };
     }
   }
 

@@ -1,8 +1,14 @@
 import type { CorePush } from "@openorc/protocol";
 
-/** How the core reaches the renderer. The Electron shell implements it over MessagePorts. */
+/** The answer to one request. It goes back only to the window that sent it, on that window's own port. */
+export type RpcReply = Extract<CorePush, { type: "rpc.result" | "rpc.error" }>;
+
+/** What every window hears: frames, invalidations, notices, logs and startup state. Never a reply. */
+export type Broadcast = Exclude<CorePush, RpcReply>;
+
+/** How the core reaches the renderers. The Electron shell implements it over MessagePorts. */
 export interface Transport {
-  push(message: CorePush): void;
+  push(message: Broadcast): void;
 }
 
 export interface Logger {

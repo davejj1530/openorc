@@ -5,8 +5,9 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { CodexAdapter, RunHandle } from "@openorc/agents";
 import { projects, settings, threads } from "@openorc/db";
 import { git } from "@openorc/git";
-import { DEFAULT_TEAM_LIMITS, type CorePush, type RpcMethod, type RpcParams, type RpcResults, type TeamDraft } from "@openorc/protocol";
+import { DEFAULT_TEAM_LIMITS, type CorePush, type TeamDraft } from "@openorc/protocol";
 import { OpenOrc } from "./openorc.js";
+import { rpcClient } from "./rpc-test-client.js";
 
 let core: OpenOrc;
 let dir: string;
@@ -21,14 +22,7 @@ const draft: TeamDraft = {
   members: [{ key: "lead", name: "Lead", responsibility: "Coordinate the requested work.", managerKey: null, settings: { agent: "codex", model: "fixture-model", effort: "high", fastMode: false } }],
 };
 
-async function call<M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> {
-  const id = nextId++;
-  await core.handle({ type: "rpc", id, method, params });
-  const reply = pushed.find((message) => (message.type === "rpc.result" || message.type === "rpc.error") && message.id === id);
-  if (!reply || (reply.type !== "rpc.result" && reply.type !== "rpc.error")) throw new Error("No RPC response");
-  if (reply.type === "rpc.error") throw new Error(reply.message);
-  return reply.result as RpcResults[M];
-}
+const call = rpcClient(() => core);
 
 beforeAll(async () => {
   dir = await mkdtemp(path.join(os.tmpdir(), "openorc-orchestration-rpc-"));

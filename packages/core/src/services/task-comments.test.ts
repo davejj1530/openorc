@@ -5,25 +5,15 @@ import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from "vite
 import { CodexAdapter, ClaudeAdapter, RunHandle } from "@openorc/agents";
 import { taskComments, runs, threads, tasks, settings } from "@openorc/db";
 import { git, commitAll } from "@openorc/git";
-import type { CorePush, RpcMethod, RpcParams, RpcResults, RunSpec, CommentRecipient, AgentEvent } from "@openorc/protocol";
+import type { RunSpec, CommentRecipient, AgentEvent } from "@openorc/protocol";
 import { OpenOrc } from "../openorc.js";
 import { inheritedProbe } from "./shell-environment.js";
+import { rpcClient } from "../rpc-test-client.js";
 
-let root: string,
-  dataDir: string,
-  core: OpenOrc,
-  taskId: string,
-  nextId = 0;
-const pushes: CorePush[] = [];
+let root: string, dataDir: string, core: OpenOrc, taskId: string;
 const sessions = new Map<string, { spec: RunSpec; handle: RunHandle }>();
 const recipient: CommentRecipient = { agent: "codex", model: "test-model", effort: "high" };
-async function call<M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> {
-  const id = ++nextId;
-  await core.handle({ type: "rpc", id, method, params });
-  const r = pushes.find((p) => (p.type === "rpc.result" || p.type === "rpc.error") && p.id === id);
-  if (!r || r.type === "rpc.error") throw new Error(r?.message ?? "No result");
-  return (r as { result: RpcResults[M] }).result;
-}
+const call = rpcClient(() => core);
 async function post(body: string, recipients = [recipient], key = crypto.randomUUID(), replyTo?: string) {
   return call("tasks.comments.post", { taskId, body, recipients, requestKey: key, source: "comment", replyTo });
 }
@@ -59,7 +49,7 @@ function announceSession(runId: string, sessionId = crypto.randomUUID()) {
   return sessionId;
 }
 async function openCore() {
-  core = await OpenOrc.create({ dataDir, shellProbe: inheritedProbe(), transport: { push: (p) => pushes.push(p) } });
+  core = await OpenOrc.create({ dataDir, shellProbe: inheritedProbe(), transport: { push: () => {} } });
   settings.set(core.db, "extraction.provider", "off");
   vi.spyOn(core.runs, "models").mockImplementation(async (agent) =>
     agent === "codex" || agent === "claude" ? [{ agent, id: "test-model", label: "Test", isDefault: true, efforts: ["high", "low"], defaultEffort: "high" }] : [],

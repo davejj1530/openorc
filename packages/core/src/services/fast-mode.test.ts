@@ -5,22 +5,15 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import { ClaudeAdapter, CodexAdapter, RunHandle, type AgentLaunchEnvironment } from "@openorc/agents";
 import { threads, runs } from "@openorc/db";
 import { commitAll, git } from "@openorc/git";
-import type { CorePush, Project, RpcMethod, RpcParams, RpcResults, RunSpec, SystemInfo } from "@openorc/protocol";
+import type { Project, RunSpec, SystemInfo } from "@openorc/protocol";
 import { OpenOrc } from "../openorc.js";
+import { rpcClient } from "../rpc-test-client.js";
 
 let root: string;
 let dataDir: string;
 let core: OpenOrc;
 let project: Project;
-const pushed: CorePush[] = [];
-let requestId = 0;
-async function call<M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> {
-  const id = ++requestId;
-  await core.handle({ type: "rpc", id, method, params });
-  const reply = pushed.find((m) => (m.type === "rpc.result" || m.type === "rpc.error") && m.id === id);
-  if (!reply || reply.type !== "rpc.result") throw new Error(reply?.type === "rpc.error" ? reply.message : "Missing RPC reply");
-  return reply.result as RpcResults[M];
-}
+const call = rpcClient(() => core);
 const models = [
   {
     id: "fixture-fast",
@@ -52,7 +45,7 @@ beforeAll(async () => {
   await git(root, ["config", "user.name", "Test"]);
   await writeFile(path.join(root, "README.md"), "# fixture\n");
   await commitAll(root, "init");
-  core = await OpenOrc.create({ dataDir, ephemeral: true, transport: { push: (m) => pushed.push(m) } });
+  core = await OpenOrc.create({ dataDir, ephemeral: true, transport: { push: () => {} } });
   project = await core.projects.import(root);
   const discovery = vi.spyOn(CodexAdapter.prototype, "listModels").mockResolvedValue(models);
   await core.runs.models("codex");

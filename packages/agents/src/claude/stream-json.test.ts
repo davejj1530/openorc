@@ -302,6 +302,23 @@ describe("ClaudeStreamParser", () => {
       line({ type: "result", subtype: "success", num_turns: 1, duration_ms: 1, fast_mode_state: "off", fast_mode_disabled_reason: "sdk_opt_in_required" }),
     ].flatMap((l) => p.parseLine(l, 1000));
     expect(events.filter((e) => e.type === "message.completed")).toEqual([]);
+    expect(events.find((e) => e.type === "turn.completed")).not.toHaveProperty("fastMode");
+  });
+
+  it("ends each Fast turn with whether Fast served it, which only the result line knows", () => {
+    const p = new ClaudeStreamParser("run-fast", { fastMode: true });
+    const served = (l: unknown) => {
+      const turn = p.parseLine(line(l), 1000).find((e) => e.type === "turn.completed");
+      return turn?.type === "turn.completed" ? turn.fastMode : "no turn";
+    };
+    // Claude Code says on at init even for an account whose first request will be refused.
+    expect(served({ type: "system", subtype: "init", session_id: "s", model: "m", fast_mode_state: "on" })).toBe("no turn");
+    expect(served({ type: "result", subtype: "success", num_turns: 1, duration_ms: 1, fast_mode_state: "off", fast_mode_disabled_reason: "extra_usage_disabled" })).toEqual({
+      state: "off",
+      code: "extra_usage_disabled",
+    });
+    expect(served({ type: "result", subtype: "success", num_turns: 1, duration_ms: 1, fast_mode_state: "on" })).toEqual({ state: "on" });
+    expect(served({ type: "result", subtype: "success", num_turns: 1, duration_ms: 1 })).toBeUndefined();
   });
 });
 

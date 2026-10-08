@@ -54,12 +54,17 @@ export function withClaudeLegacyModels(discovered: DiscoveredModels, legacy: Mod
 }
 
 /**
- * Claude Code checks Fast access for the account, not per model: when it
- * cannot serve Fast, no model offers it. Its allowed-models check ran against
- * the CLI's default model rather than each row, so that one is left to the run.
+ * Why a Claude account cannot use Fast on any model, or null when Claude Code's
+ * code does not say so. Its allowed-models check runs against a single model
+ * rather than each row, so that one is left to the run.
  */
+export function claudeAccountFastBlock(code: string | undefined): string | null {
+  return code === "model_not_allowed" ? null : claudeFastModeReason(code);
+}
+
+/** Claude Code checks Fast access for the account, not per model: when it cannot serve Fast, no model offers it. */
 export function withClaudeAccountFastMode(discovered: DiscoveredModels, code: string | undefined): DiscoveredModels {
-  const reason = code === "model_not_allowed" ? null : claudeFastModeReason(code);
+  const reason = claudeAccountFastBlock(code);
   if (!reason) return discovered;
   return { ...discovered, models: discovered.models.map((m) => (m.fastMode?.supported ? { ...m, fastMode: { supported: false, reason } } : m)) };
 }

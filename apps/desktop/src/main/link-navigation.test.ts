@@ -8,7 +8,7 @@ const fake = vi.hoisted(() => ({
   incognito: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock("electron", () => ({ clipboard: { writeText: fake.copy }, shell: { openExternal: fake.external } }));
-vi.mock("./chrome-incognito", () => ({ chromeExecutable: fake.chrome, openChromeIncognito: fake.incognito }));
+vi.mock("@openorc/agents/chrome-incognito", () => ({ chromeExecutable: fake.chrome, openChromeIncognito: fake.incognito }));
 vi.mock("./browser-pane", () => ({
   openBrowserLink: fake.open,
   hasBrowserContext: fake.hasContext,

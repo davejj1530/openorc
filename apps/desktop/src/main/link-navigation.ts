@@ -1,6 +1,6 @@
 import { clipboard, dialog, shell, type BrowserWindow, type MenuItemConstructorOptions, type WebContents } from "electron";
 import { hasBrowserContext, isAllowedPaneUrl, openBrowserLink } from "./browser-pane";
-import { chromeExecutable, openChromeIncognito } from "./chrome-incognito";
+import { chromeExecutable, openChromeIncognito } from "@openorc/agents/chrome-incognito";
 
 const isWebLink = (url: string): boolean => url !== "about:blank" && isAllowedPaneUrl(url);
 

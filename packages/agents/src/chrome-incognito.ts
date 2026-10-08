@@ -9,10 +9,12 @@ export function chromeExecutable(): string | null {
   return candidates.find((candidate) => existsSync(candidate)) ?? null;
 }
 
+export const chromeIncognitoFlags = ["--incognito", "--new-window"];
+
 export function openChromeIncognito(executable: string, url: string): Promise<void> {
   return new Promise((resolve, reject) => {
     // Separate argv keeps query strings and shell metacharacters literal.
-    const child = spawn(executable, ["--incognito", "--new-window", url], { detached: true, stdio: "ignore", shell: false });
+    const child = spawn(executable, [...chromeIncognitoFlags, url], { detached: true, stdio: "ignore", shell: false });
     child.once("error", reject);
     child.once("spawn", () => {
       child.unref();

@@ -6,7 +6,8 @@
   "type": "module",
   "description": "Adapters that spawn vendor CLIs and map their native streams onto the shared event model.",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./chrome-incognito": "./src/chrome-incognito.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

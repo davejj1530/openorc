@@ -11,6 +11,8 @@ let db: Db;
 let service: ClaudeAccountService;
 let snapshot: EnvSnapshot;
 const busy = vi.fn(() => false);
+const fake = vi.hoisted(() => ({ chrome: null as string | null }));
+vi.mock("@openorc/agents/chrome-incognito", async (original) => ({ ...(await original<typeof import("@openorc/agents/chrome-incognito")>()), chromeExecutable: () => fake.chrome }));
 const changed = vi.fn();
 
 beforeEach(async () => {
@@ -23,7 +25,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const dir = process.env.CLAUDE_CONFIG_DIR;
 if (process.argv.includes('login')) {
-  fs.writeFileSync(path.join(dir, 'launch.json'), JSON.stringify({ dir, home: process.env.HOME, apiKey: process.env.ANTHROPIC_API_KEY, args: process.argv.slice(2) }));
+  fs.writeFileSync(path.join(dir, 'launch.json'), JSON.stringify({ dir, home: process.env.HOME, apiKey: process.env.ANTHROPIC_API_KEY, browser: process.env.BROWSER, args: process.argv.slice(2) }));
+  if (process.env.BROWSER) require('node:child_process').execFileSync(process.env.BROWSER, ['http://localhost:1/callback?code=a&state=$(nope)']);
   if (process.env.FIXTURE_HOLD) setInterval(() => {}, 1000);
   else setTimeout(() => { fs.writeFileSync(path.join(dir, 'connected'), 'fixture'); }, 100);
 } else {
@@ -49,6 +52,7 @@ if (process.argv.includes('login')) {
       CLAUDE_CODE_DISABLE_FAST_MODE: "1",
     }),
   };
+  fake.chrome = null;
   busy.mockReset().mockReturnValue(false);
   changed.mockReset();
   service = new ClaudeAccountService(db, root, () => snapshot, changed, busy);
@@ -91,6 +95,30 @@ it("signs in through the selected CLI directory and reports only public account 
   expect(result.accounts.find((entry) => entry.id === account.id)).toMatchObject({ status: "ready", email: `${account.id}@example.test`, organization: "Fixture" });
   expect(JSON.stringify(result)).not.toContain("fixture-only");
   expect(JSON.stringify(db.stmt("SELECT * FROM claude_accounts").all())).not.toContain("fixture-only");
+});
+
+it("signs added accounts in from Chrome Incognito and keeps the existing login on the default browser", async () => {
+  const log = path.join(root, "chrome.log");
+  fake.chrome = path.join(root, "fixture-chrome");
+  await writeFile(fake.chrome, `#!${process.execPath}\nrequire('node:fs').appendFileSync(${JSON.stringify(log)}, JSON.stringify(process.argv.slice(2)) + '\\n');\n`, { mode: 0o700 });
+  const signIn = async (id: string) => {
+    await service.login(id);
+    await vi.waitFor(() => expect(service.hasPendingWork).toBe(false), { timeout: 5000 });
+    return JSON.parse(await readFile(path.join(service.environment(snapshot, id).env.CLAUDE_CONFIG_DIR!, "launch.json"), "utf8"));
+  };
+  const opened = async () =>
+    (await readFile(log, "utf8").catch(() => ""))
+      .trim()
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line));
+
+  await signIn(service.add("Work").id);
+  expect(await opened()).toEqual([["--incognito", "--new-window", "http://localhost:1/callback?code=a&state=$(nope)"]]);
+  expect((await signIn("claude-cli")).browser).toBeUndefined();
+  fake.chrome = null;
+  expect((await signIn(service.add("Personal").id)).browser).toBeUndefined();
+  expect(await opened()).toHaveLength(1);
 });
 
 it("persists arbitrary account names and defaults, rejects disabled accounts without a fallback", async () => {

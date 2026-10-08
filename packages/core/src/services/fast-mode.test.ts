@@ -119,6 +119,51 @@ describe("Fast mode eligibility", () => {
     ]);
   });
 
+  it("takes Fast off the picker for a Claude account a turn found cannot use it, without refusing Fast turns", async () => {
+    vi.spyOn(core.system, "infoFor").mockResolvedValue(info("2.1.219"));
+    await core.environment.refresh();
+    const handles: RunHandle[] = [];
+    vi.spyOn(ClaudeAdapter.prototype, "start").mockImplementation((spec, launch) => {
+      const handle = session(spec, launch);
+      handles.push(handle);
+      return handle;
+    });
+    const { thread, run } = await core.threads.start({
+      projectId: project.id,
+      agent: "claude",
+      model: "claude-opus-5",
+      effort: "high",
+      fastMode: true,
+      mode: "act",
+      permissionMode: "trusted",
+      prompt: "First",
+      attachments: undefined,
+      title: "Refused Fast fixture",
+    });
+    if (!run) throw new Error("A model launch must return its run.");
+    const shown = async () => (await call("agents.models", { agent: "claude" })).find((m) => m.id === "claude-opus-5")?.fastMode;
+    const turn = (fastMode: { state: "on" | "off" | "cooldown"; code?: string }) =>
+      handles[0]!.emit("event", { type: "turn.completed", runId: run.id, ts: Date.now(), turnId: "turn", status: "success", durationMs: 0, fastMode });
+    expect(await shown()).toEqual({ supported: true });
+    // A rate limit cooldown and a code that does not block the account change nothing.
+    turn({ state: "cooldown" });
+    turn({ state: "off", code: "model_not_allowed" });
+    expect(await shown()).toEqual({ supported: true });
+    turn({ state: "off", code: "extra_usage_disabled" });
+    await vi.waitFor(async () => expect(await shown()).toEqual({ supported: false, reason: expect.stringContaining("usage credits") }));
+    // Saved Fast choices still launch: Claude Code answers them at standard speed.
+    expect((await core.runs.models("claude")).find((m) => m.id === "claude-opus-5")?.fastMode).toEqual({ supported: true });
+    await expect(core.runs.validateFastMode("claude", "claude-opus-5", true)).resolves.toBeUndefined();
+    turn({ state: "on" });
+    await vi.waitFor(async () => expect(await shown()).toEqual({ supported: true }));
+    turn({ state: "off", code: "extra_usage_disabled" });
+    await vi.waitFor(async () => expect((await shown())?.supported).toBe(false));
+    await call("agents.models.refresh", { agent: "claude" });
+    expect(await shown()).toEqual({ supported: true });
+    core.runs.close(run.id);
+    await vi.waitFor(() => expect(core.runs.liveRunForThread(thread.id)).toBeNull());
+  });
+
   it.each(["CLAUDE_CODE_USE_FOUNDRY"])("respects %s", async (key) => {
     vi.spyOn(core.system, "infoFor").mockResolvedValue(info("2.1.219"));
     vi.stubEnv(key, "1");

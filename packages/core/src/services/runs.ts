@@ -454,13 +454,14 @@ export class RunService {
   }
 
   /** Keep the original array interface for execution and automation callers. */
-  async models(agent?: AgentKind, environment = this.hooks.environment(), admitted?: AgentLaunchEnvironment, claudeAccountId?: string): Promise<ModelOption[]> {
+  async models(agent?: AgentKind, environment = this.hooks.environment(), admitted?: AgentLaunchEnvironment, claudeAccountId?: string, shown = false): Promise<ModelOption[]> {
     if (agent && !isHarnessId(agent)) return [];
-    return (await this.modelCatalog(agent, false, environment, admitted, claudeAccountId)).models;
+    return (await this.modelCatalog(agent, false, environment, admitted, claudeAccountId, shown)).models;
   }
 
-  modelCatalog(agent?: HarnessId, refresh = false, environment = this.hooks.environment(), admitted?: AgentLaunchEnvironment, claudeAccountId?: string): Promise<ModelCatalog> {
-    return this.catalog.modelCatalog(agent, refresh, environment, admitted, claudeAccountId);
+  /** `shown` is the catalog people pick from; see RunCatalog.modelCatalog. */
+  modelCatalog(agent?: HarnessId, refresh = false, environment = this.hooks.environment(), admitted?: AgentLaunchEnvironment, claudeAccountId?: string, shown = false): Promise<ModelCatalog> {
+    return this.catalog.modelCatalog(agent, refresh, environment, admitted, claudeAccountId, shown);
   }
 
   async validateFastMode(
@@ -721,6 +722,9 @@ export class RunService {
     ev = { ...ev, eventId: ev.eventId ?? randomUUID() };
     const planRun = this.live.get(ev.runId)?.run ?? runs.get(this.db, ev.runId);
     if (planRun && plans.capture(this.db, planRun, ev)) this.invalidate([`plans:${planRun.threadId}`]);
+    if (ev.type === "turn.completed" && ev.fastMode && planRun?.agent === "claude" && this.catalog.noteClaudeFastMode(planRun.claudeAccountId ?? "claude-cli", ev.fastMode)) {
+      this.invalidate(["models"]);
+    }
     this.ledger.push(ev);
     // The renderer draws normalized events only; the ledger hands native payloads to the provider log.
     if (ev.type !== "raw") this.frames.push(ev);

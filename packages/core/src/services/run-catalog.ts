@@ -1,4 +1,4 @@
-import { claudeModelsFrom, withClaudeAccountFastMode, withClaudeLegacyModels } from "./claude-model-catalog.js";
+import { claudeAccountFastBlock, claudeModelsFrom, withClaudeAccountFastMode, withClaudeLegacyModels } from "./claude-model-catalog.js";
 import { ModelCatalogCache, type DiscoveredModels, type CatalogEntry } from "./model-catalog.js";
 import { captureLaunchEnvironment, listClaudeModels, type AcpAdapter, type AgentLaunchEnvironment, type CodexAdapter } from "@openorc/agents";
 import { ULTRACODE_EFFORT } from "@openorc/protocol";
@@ -94,6 +94,12 @@ function claudeModelList(list: StaticClaudeModel[], installed: string | null, en
 export class RunCatalog {
   private pendingCatalogs = 0;
   private readonly modelCache = new ModelCatalogCache();
+  /**
+   * Fast blocks a Claude turn reported, by account. Claude Code's initialize answer says Fast is on until a request
+   * is refused, and the next session has forgotten the refusal, so the app keeps it until Fast serves a turn again or
+   * models are refreshed.
+   */
+  private readonly claudeFastBlocks = new Map<string, string>();
 
   constructor(
     private readonly hooks: Pick<RunHooks, "environment" | "claudeVersion" | "claudeEnvironment">,
@@ -106,7 +112,26 @@ export class RunCatalog {
     return this.pendingCatalogs;
   }
 
-  async modelCatalog(agent?: HarnessId, refresh = false, environment: EnvSnapshot = this.hooks.environment(), admitted?: AgentLaunchEnvironment, claudeAccountId?: string): Promise<ModelCatalog> {
+  /** A Claude turn that asked for Fast ended. True when what people are shown changed. */
+  noteClaudeFastMode(claudeAccountId: string, served: { state: "on" | "off" | "cooldown"; code?: string | undefined }): boolean {
+    const before = this.claudeFastBlocks.get(claudeAccountId);
+    if (served.state === "on") this.claudeFastBlocks.delete(claudeAccountId);
+    else if (served.state === "off" && served.code && claudeAccountFastBlock(served.code)) this.claudeFastBlocks.set(claudeAccountId, served.code);
+    return this.claudeFastBlocks.get(claudeAccountId) !== before;
+  }
+
+  /**
+   * `shown` is the catalog people pick from: it also takes Fast off a Claude account a turn found cannot use it.
+   * Launches still ask for Fast there, and Claude Code answers at standard speed, so saved choices keep working.
+   */
+  async modelCatalog(
+    agent?: HarnessId,
+    refresh = false,
+    environment: EnvSnapshot = this.hooks.environment(),
+    admitted?: AgentLaunchEnvironment,
+    claudeAccountId?: string,
+    shown = false,
+  ): Promise<ModelCatalog> {
     this.assertAvailable();
     this.pendingCatalogs++;
     try {
@@ -114,7 +139,11 @@ export class RunCatalog {
         (agent ? [agent] : harnessIds).map((id): Promise<CatalogEntry> => {
           try {
             const snapshot = id === "claude" && !admitted ? (this.hooks.claudeEnvironment?.(environment, claudeAccountId) ?? environment) : environment;
-            return this.modelCache.read(id, snapshot.revision, () => this.modelLists[id](snapshot, admitted), refresh, admitted?.scope ?? snapshot.scope);
+            const account = id === "claude" ? snapshot.claudeAccountId : undefined;
+            if (refresh && account) this.claudeFastBlocks.delete(account);
+            const read = this.modelCache.read(id, snapshot.revision, () => this.modelLists[id](snapshot, admitted), refresh, admitted?.scope ?? snapshot.scope);
+            const block = shown && account ? this.claudeFastBlocks.get(account) : undefined;
+            return block ? read.then((entry) => ({ ...entry, models: withClaudeAccountFastMode(entry, block).models })) : read;
           } catch (error) {
             return Promise.resolve({ models: [], provider: { agent: id, status: "error", refreshedAt: null, message: error instanceof Error ? error.message : "This account is unavailable." } });
           }

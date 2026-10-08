@@ -328,6 +328,7 @@ export class ClaudeStreamParser {
       ...(typeof msg["result"] === "string" ? { resultText: msg["result"] } : {}),
       ...(usage ? { usage } : {}),
       durationMs: num(msg["duration_ms"]) ?? 0,
+      ...fastModeServed(msg, this.fastMode),
     });
     this.turns += modelTurns;
     this.reportFastMode(msg, now, out);
@@ -575,6 +576,14 @@ export function usageNotice(info: Record<string, unknown> | undefined, resetPhra
 function str(v: unknown): string | null {
   return typeof v === "string" ? v : null;
 }
+/** For a turn that asked for Fast, whether it was served. Only a result line knows: init lines say on before any request has been refused. */
+function fastModeServed(msg: Record<string, unknown>, asked: boolean): Pick<Extract<AgentEvent, { type: "turn.completed" }>, "fastMode"> {
+  const state = str(msg["fast_mode_state"]);
+  const code = str(msg["fast_mode_disabled_reason"]);
+  if (!asked || (state !== "on" && state !== "off" && state !== "cooldown")) return {};
+  return { fastMode: { state, ...(code ? { code } : {}) } };
+}
+
 /** The window of the session's model from a result's per-model usage map; the first entry when the init line named none. */
 function readContextWindow(modelUsage: unknown, model: string | null): number | undefined {
   if (!modelUsage || typeof modelUsage !== "object") return undefined;

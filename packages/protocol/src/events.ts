@@ -208,6 +208,8 @@ export const AgentEvent = z.discriminatedUnion("type", [
     resultText: z.string().optional(),
     usage: Usage.optional(),
     durationMs: z.number().nonnegative(),
+    /** For a turn that asked for Fast, whether the provider served it, with its code for why not. */
+    fastMode: z.object({ state: z.enum(["on", "off", "cooldown"]), code: z.string().optional() }).optional(),
   }),
   /**
    * What the agent has running in the background, outliving the turn that started it. `running` counts work that

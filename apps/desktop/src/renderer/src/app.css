@@ -9,6 +9,7 @@
 @import "./appearance.css";
 @import "./workspace-design.css";
 @import "./panel-browser.css";
+@import "./file-explorer.css";
 @import "./settings-design.css";
 @source "../../../node_modules/streamdown/dist/*.js";
 @source "../../../node_modules/@streamdown/mermaid/dist/*.js";

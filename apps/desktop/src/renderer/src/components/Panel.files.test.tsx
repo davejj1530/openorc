@@ -100,6 +100,7 @@ beforeEach(() => {
   useDrafts.setState({ keys: new Set(), ready: true, loaded: new Map(), failed: false });
   vi.stubGlobal("openorc", { browser: { setContext: vi.fn(), onReveal: () => () => {}, close: vi.fn(), navigate: vi.fn() } });
   vi.spyOn(core, "call").mockImplementation(async <M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> => {
+    if (method === "files.list") return disk.list((params as RpcParams<"files.list">).path) as RpcResults[M];
     if (method === "files.read") return disk.read((params as RpcParams<"files.read">).path) as RpcResults[M];
     if (method === "files.write") return disk.write(params as RpcParams<"files.write">) as RpcResults[M];
     if (method === "projects.git") return "none" as RpcResults[M];

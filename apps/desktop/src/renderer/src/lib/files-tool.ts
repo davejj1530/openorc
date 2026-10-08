@@ -4,8 +4,8 @@ import type { FileScope, FindQuery } from "@openorc/protocol";
 import { useLayout } from "./layout";
 import { useRouter } from "./router";
 
-/** What the Files tool searches: file names (Cmd+P) or what files contain (Cmd+Shift+F). */
-export type FilesMode = "names" | "contents";
+/** Browse the tree, find file names (Cmd+P), or search their contents (Cmd+Shift+F). */
+export type FilesMode = "tree" | "names" | "contents";
 
 /** One conversation's Files tool for this session: its mode and what was typed in each. */
 interface FilesTool {
@@ -24,7 +24,7 @@ interface FilesToolState {
   tools: Record<string, FilesTool>;
 }
 
-const EMPTY: FilesTool = { mode: "names", names: "", contents: { text: "", regex: false, caseSensitive: false } };
+const EMPTY: FilesTool = { mode: "tree", names: "", contents: { text: "", regex: false, caseSensitive: false } };
 
 export const useFilesTool = create<FilesToolState>(() => ({ host: null, focus: null, tools: {} }));
 
@@ -49,14 +49,14 @@ export function requestFilesFocus(): void {
 }
 
 /** A Files tool's search box takes a focus request, its text selected for typing over. */
-export function useFilesFocus(input: RefObject<HTMLInputElement | null>): void {
+export function useFilesFocus(input: RefObject<HTMLInputElement | null>, enabled = true): void {
   const focus = useFilesTool((state) => state.focus);
   useEffect(() => {
-    if (!focus) return;
+    if (!focus || !enabled) return;
     input.current?.focus();
     input.current?.select();
     useFilesTool.setState({ focus: null });
-  }, [focus, input]);
+  }, [focus, input, enabled]);
 }
 
 /** Panel names the conversation its Files tool works in, for as long as it is mounted. */

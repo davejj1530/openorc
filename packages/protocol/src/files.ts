@@ -28,6 +28,19 @@ const isFolderPath = (value: string) => !value.includes("\0") && !/^[/\\]/.test(
 export const FolderPath = z.string().min(1).max(4096).refine(isFolderPath, "Use a path inside the conversation's folder, such as src/index.ts.").brand<"FolderPath">();
 export type FolderPath = z.infer<typeof FolderPath>;
 
+export interface FileEntry {
+  name: string;
+  path: FolderPath;
+  kind: "directory" | "file";
+  /** Hidden by default in Explorer: Git-ignored files, dependencies, and repository/OS metadata. */
+  ignored: boolean;
+}
+
+export interface FileDirectory {
+  root: string;
+  entries: FileEntry[];
+}
+
 /** Git's own files, under a `.git` segment in any case. They open read-only and are never written. */
 export const inGitFolder = (path: string): boolean => /(^|\/)\.git(\/|$)/i.test(path);
 
@@ -88,6 +101,8 @@ export type FindResult = { kind: "matches"; groups: FindGroup[]; truncated: bool
 const MAX_TEXT = 2 * 1024 * 1024;
 
 export const fileRpcParams = {
+  /** Immediate children, including empty and ignored folders. An empty path names the workspace root. */
+  "files.list": z.object({ scope: FileScope, path: z.union([z.literal(""), FolderPath]) }).strict(),
   /** File names in a conversation's folder or a project's checkout, best first, for @ mentions. */
   "files.search": z.object({ scope: FileScope, query: z.string().max(500), limit: z.number().int().positive().max(50).optional() }).strict(),
   /** A text file in the conversation's folder, with its version. `path` may be relative to the folder or absolute inside it. */
@@ -106,6 +121,7 @@ export const fileRpcParams = {
 export type FileMethod = keyof typeof fileRpcParams;
 
 export interface FileRpcResults {
+  "files.list": FileDirectory;
   "files.search": string[];
   "files.read": FileRead;
   "files.write": FileWriteResult;
@@ -114,7 +130,7 @@ export interface FileRpcResults {
 }
 
 /** Cached reads, which need refresh tags, and actions, called on demand and never cached. Every files.* method is in exactly one. */
-export const fileReads = ["files.read", "files.search", "files.find"] as const satisfies readonly FileMethod[];
+export const fileReads = ["files.read", "files.search", "files.find", "files.list"] as const satisfies readonly FileMethod[];
 export const fileActions = ["files.write", "files.format"] as const satisfies readonly FileMethod[];
 export type FileReadMethod = (typeof fileReads)[number];
 export type FileActionMethod = (typeof fileActions)[number];

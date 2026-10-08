@@ -7,8 +7,10 @@ import { useUi } from "../lib/ui";
 import { FileText, Plus, Search } from "../components/icons";
 import { IconButton, Input, Segmented, Tooltip } from "../components/ui";
 import { FindInFiles } from "./FindInFiles";
+import { FileExplorer } from "./FileExplorer";
 
 const modes: { value: FilesMode; label: string }[] = [
+  { value: "tree", label: "Explorer" },
   { value: "names", label: "File names" },
   { value: "contents", label: "Contents" },
 ];
@@ -75,8 +77,8 @@ function FileNames({ scope, query, onQuery }: { scope: FileScope; query: string;
   );
 }
 
-/** The Files tool: finds files by name or by what they contain, and starts new ones. */
-export function FilesPanel({ scope }: { scope: FileScope }) {
+/** The Files tool opens on the tree; quick open and content search keep their own queries. */
+export function FilesPanel({ scope, directory }: { scope: FileScope; directory: string }) {
   const [tool, update] = useFilesToolState(scope);
   return (
     <section aria-label="Files" className="h-full flex flex-col min-h-0">
@@ -92,17 +94,17 @@ export function FilesPanel({ scope }: { scope: FileScope }) {
           options={modes}
         />
         <span className="flex-1" />
-        <Tooltip label="New file">
-          <IconButton size="sm" aria-label="New file" onClick={() => useUi.getState().setNewFile(scope)}>
-            <Plus size={14} />
-          </IconButton>
-        </Tooltip>
+        {tool.mode !== "tree" ? (
+          <Tooltip label="New file">
+            <IconButton size="sm" aria-label="New file" onClick={() => useUi.getState().setNewFile(scope)}>
+              <Plus size={14} />
+            </IconButton>
+          </Tooltip>
+        ) : null}
       </div>
-      {tool.mode === "names" ? (
-        <FileNames scope={scope} query={tool.names} onQuery={(names) => update({ names })} />
-      ) : (
-        <FindInFiles scope={scope} query={tool.contents} onQuery={(contents) => update({ contents })} />
-      )}
+      {tool.mode === "tree" ? <FileExplorer scope={scope} directory={directory} /> : null}
+      {tool.mode === "names" ? <FileNames scope={scope} query={tool.names} onQuery={(names) => update({ names })} /> : null}
+      {tool.mode === "contents" ? <FindInFiles scope={scope} query={tool.contents} onQuery={(contents) => update({ contents })} /> : null}
     </section>
   );
 }

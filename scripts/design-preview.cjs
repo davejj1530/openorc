@@ -3,6 +3,7 @@ const path = require("node:path");
 const desktop = path.resolve(__dirname, "../apps/desktop");
 const root = path.resolve(__dirname, "..");
 const port = Number(process.env.OPENORC_PREVIEW_PORT ?? 5177);
+const fixture = process.env.OPENORC_PREVIEW_VIEW === "files" ? "file-explorer-ui.tsx" : "website-product-ui.tsx";
 
 async function main() {
   const { createServer } = await import(require.resolve("vite", { paths: [desktop] }));
@@ -14,7 +15,7 @@ async function main() {
     configFile: false,
     root: desktop,
     define: { __OPENORC_QA__: "false" },
-    optimizeDeps: { entries: [path.join(__dirname, "fixtures/website-product-ui.tsx")] },
+    optimizeDeps: { entries: [path.join(__dirname, "fixtures", fixture)] },
     plugins: [
       react(),
       tailwind(),
@@ -32,7 +33,7 @@ async function main() {
                 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
                 <title>OpenOrc · Design study</title><link rel="stylesheet" href="/src/renderer/src/app.css"></head>
                 <body><div id="root" style="height:100vh"></div>
-                <script type="module" src="/@fs/${path.join(__dirname, "fixtures/website-product-ui.tsx")}"></script></body></html>`,
+                <script type="module" src="/@fs/${path.join(__dirname, "fixtures", fixture)}"></script></body></html>`,
               );
               response.setHeader("Content-Type", "text/html");
               response.end(html);

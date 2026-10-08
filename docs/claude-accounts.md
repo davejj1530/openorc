@@ -6,7 +6,7 @@ OpenOrc supports any number of named Claude Code accounts. Add them in **Setting
 
 1. Enter a name such as Personal, Work, or a client name.
 2. Select **Add account and sign in**.
-3. Complete Claude's sign-in in your browser. The account row shows the signed-in email and organization when Claude reports them.
+3. Complete Claude's sign-in in the Chrome Incognito window that opens, so your browser's own Claude login stays as it is. Without Chrome, or on Windows, sign-in opens in your default browser. The account row shows the signed-in email and organization when Claude reports them.
 
 Use **Make default** for new conversations. An explicitly selected account stays with a saved draft. Existing conversations, forks, child threads, and schedules retain their saved account when the default changes. Claude members of a team use the conversation's selected Claude account.
 

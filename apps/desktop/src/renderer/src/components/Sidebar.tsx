@@ -4,7 +4,7 @@ import { useLayout } from "../lib/layout";
 import { newThread, useRouter } from "../lib/router";
 import { usePendingApprovals } from "../lib/transcript";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
-import { useTrafficLights } from "../lib/window";
+import { useTrafficLights, useWindow } from "../lib/window";
 import { useUi } from "../lib/ui";
 import { useRpc } from "../lib/query";
 import { useProjectIconChanges } from "../lib/project-icons";
@@ -12,6 +12,7 @@ import { OrclingsRailContext, useOrclingsRail } from "../lib/orclings-rail";
 import { useOrclings } from "../lib/orclings";
 import { cn } from "../lib/cn";
 import { ResizeHandle } from "./ResizeHandle";
+import { OpenOrcMark } from "./OpenOrcMark";
 import { SidebarNav } from "./SidebarNav";
 import { SidebarOrclings } from "./SidebarOrclings";
 import { SidebarSettings } from "./SidebarSettings";
@@ -75,9 +76,17 @@ export function Sidebar() {
 }
 
 function SidebarHeader() {
+  const fullscreen = useWindow((state) => state.fullscreen);
   return (
     <header className="sidebar-header drag-region h-topbar">
-      <span className="flex-1" />
+      {fullscreen ? (
+        <div className="sidebar-brand" role="img" aria-label="OpenOrc">
+          <OpenOrcMark size={20} className="shrink-0" />
+          <span className="sidebar-wordmark">OpenOrc</span>
+        </div>
+      ) : (
+        <span className="flex-1" />
+      )}
       <InboxButton />
       <SidebarToggle open />
       <Tooltip label="Search">

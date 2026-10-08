@@ -35,7 +35,10 @@ async function main() {
   window.addEventListener("resize", sizeCapture);
   const { core } = await import("../../apps/desktop/src/renderer/src/lib/rpc");
   const { queryClient } = await import("../../apps/desktop/src/renderer/src/lib/query");
-  const { useLayout } = await import("../../apps/desktop/src/renderer/src/lib/layout");
+  const { useLayout, limits } = await import("../../apps/desktop/src/renderer/src/lib/layout");
+  const { useWindow } = await import("../../apps/desktop/src/renderer/src/lib/window");
+  const fullscreen = query.get("fullscreen") === "1";
+  useWindow.setState({ fullscreen });
   const { useTheme, parsePreset } = await import("../../apps/desktop/src/renderer/src/lib/theme");
   const { emptyRun, seedRun } = await import("../../apps/desktop/src/renderer/src/lib/transcript");
   const mode = query.get("view") ?? "workspace";
@@ -318,7 +321,7 @@ async function main() {
     collapsed: ["project:openorc-workspace", "project:atlas"],
     hiddenScreens: ["pulls", "orchestration", "memory"],
   });
-  useLayout.getState().setSidebarWidth(267);
+  useLayout.getState().setSidebarWidth(query.get("sidebar") === "narrow" ? limits.sidebar.min : limits.sidebar.default);
   useLayout.getState().setPanelWidth(640);
   // Detail captures render the same production components at readable widths.
   // They are panel crops, so no window chrome is invented around them.
@@ -361,11 +364,13 @@ async function main() {
       {/* Browser captures omit Electron's native chrome. Reproduce only the
           buttons in the space already reserved by the production header:
           main/index.ts trafficLightPosition (14, 13), 14px buttons, 9px gaps. */}
-      <div aria-hidden="true" style={{ position: "fixed", left: 14, top: 13, display: "flex", gap: 9, pointerEvents: "none", zIndex: 100 }}>
-        {["#ff5f57", "#febc2e", "#28c840"].map((background) => (
-          <span key={background} style={{ width: 14, height: 14, borderRadius: "50%", background }} />
-        ))}
-      </div>
+      {!fullscreen ? (
+        <div aria-hidden="true" style={{ position: "fixed", left: 14, top: 13, display: "flex", gap: 9, pointerEvents: "none", zIndex: 100 }}>
+          {["#ff5f57", "#febc2e", "#28c840"].map((background) => (
+            <span key={background} style={{ width: 14, height: 14, borderRadius: "50%", background }} />
+          ))}
+        </div>
+      ) : null}
     </QueryClientProvider>,
   );
 }

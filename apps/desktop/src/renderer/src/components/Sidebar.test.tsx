@@ -4,6 +4,8 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import { defaultOrclingLook, WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
 
+vi.hoisted(() => Object.assign(window, { openorc: { platform: "darwin" } }));
+
 const fixture: {
   projects: { id: string; name: string; rootPath: string }[];
   threads: Pick<ThreadSummary, "id" | "title" | "projectId" | "agent" | "activity" | "unread" | "session" | "pinnedAt" | "snoozedUntil" | "lastActivityAt">[];
@@ -38,7 +40,6 @@ vi.mock("../lib/rpc", () => ({
   },
 }));
 vi.mock("../lib/transcript", () => ({ usePendingApprovals: () => 0, useRun: () => undefined }));
-vi.mock("../lib/window", () => ({ useTrafficLights: () => false, useWindowsControls: () => false }));
 vi.mock("../lib/browser-preview", () => ({ CoversPreview: () => null }));
 vi.mock("./ui", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./ui")>()),
@@ -48,6 +49,7 @@ vi.mock("./ui", async (importOriginal) => ({
 import { useLayout } from "../lib/layout";
 import { useRouter } from "../lib/router";
 import { useUi } from "../lib/ui";
+import { useWindow } from "../lib/window";
 import { Sidebar } from "./Sidebar";
 
 afterEach(cleanup);
@@ -55,6 +57,7 @@ beforeEach(() => {
   fixture.projects = [];
   fixture.threads = [];
   localStorage.clear();
+  useWindow.setState({ fullscreen: false });
   useLayout.setState({ collapsed: [], projectId: null, sidebarOpen: true, sidebarFilter: "active", pinnedOnly: false });
   useRouter.setState({ route: { view: "newthread" }, history: [], future: [], threadIds: [] });
 });
@@ -72,6 +75,16 @@ const open = (threadId: string) => {
   useRouter.setState({ route: { view: "thread", threadId } });
   mountSidebar();
 };
+
+it("shows the OpenOrc wordmark only while fullscreen and keeps the header controls available", () => {
+  mountSidebar();
+  expect(screen.queryByRole("img", { name: "OpenOrc" })).toBeNull();
+  act(() => useWindow.setState({ fullscreen: true }));
+  expect(screen.getByRole("img", { name: "OpenOrc" }).textContent).toBe("OpenOrc");
+  for (const name of ["Inbox", "Toggle sidebar", "Search"]) expect(screen.getByRole("button", { name })).toBeTruthy();
+  act(() => useWindow.setState({ fullscreen: false }));
+  expect(screen.queryByRole("img", { name: "OpenOrc" })).toBeNull();
+});
 
 it("unfolds the project that lists the opened thread", () => {
   open("notes");

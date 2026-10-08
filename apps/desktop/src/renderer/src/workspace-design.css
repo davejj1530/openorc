@@ -71,6 +71,19 @@
 .workspace-navigation[data-traffic-lights="true"] .sidebar-header {
   padding-left: var(--spacing-traffic);
 }
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1;
+  min-width: 0;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.sidebar-brand .sidebar-wordmark {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .sidebar-destinations {
   padding: 8px 12px 12px;
   width: var(--width-sidebar);

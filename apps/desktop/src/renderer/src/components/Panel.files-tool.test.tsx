@@ -8,6 +8,7 @@ import { fakeFileDisk } from "../fixtures/file-disk";
 import { useAppShortcuts } from "../lib/app-shortcuts";
 import { useDrafts } from "../lib/file-drafts";
 import { useFilesTool } from "../lib/files-tool";
+import { useFileExplorer } from "../lib/file-explorer";
 import { useLayout } from "../lib/layout";
 import { usePanelSessions } from "../lib/panel-tabs";
 import { queryClient } from "../lib/query";
@@ -58,6 +59,7 @@ beforeEach(() => {
   useDrafts.setState({ keys: new Set(), ready: true, loaded: new Map(), failed: false });
   vi.stubGlobal("openorc", { browser: { setContext: vi.fn(), onReveal: () => () => {}, close: vi.fn(), navigate: vi.fn() } });
   vi.spyOn(core, "call").mockImplementation(async <M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> => {
+    if (method === "files.list") return disk.list((params as RpcParams<"files.list">).path) as RpcResults[M];
     if (method === "files.search") {
       const search = params as RpcParams<"files.search">;
       searches.push(search);
@@ -73,6 +75,7 @@ beforeEach(() => {
   });
   usePanelSessions.setState({ sessions: {} });
   useFilesTool.setState({ host: null, focus: null, tools: {} });
+  useFileExplorer.setState({ visible: true, showIgnored: false, width: 240, folders: {} });
   useRouter.setState({ route: { view: "thread", threadId: thread.id }, threadIds: [thread.id] });
   useLayout.setState({ panelOpen: false, panelTab: "newtab", panelRequest: null, panelThreadId: thread.id, selectedFile: null, selectedChanges: null, panelExpanded: false, previewUrls: {} });
 });
@@ -327,7 +330,7 @@ it("leaves focus where it was when the panel shows the Files tool without being 
   usePanelSessions.getState().open(`thread:${thread.id}`, { kind: "file", selection: null });
   useLayout.setState({ panelOpen: true });
   render(<Window />);
-  const box = await search();
+  const box = await screen.findByRole("textbox", { name: "Filter files" });
   await new Promise((resolve) => setTimeout(resolve, 50));
   expect(document.activeElement).not.toBe(box);
 });
@@ -336,7 +339,7 @@ it("focuses the search box when the Files tool is opened from the new tab's tool
   useLayout.setState({ panelOpen: true });
   render(<Window />);
   fireEvent.click(await screen.findByRole("button", { name: "Files" }));
-  const box = await search();
+  const box = await screen.findByRole("textbox", { name: "Filter files" });
   await waitFor(() => expect(document.activeElement).toBe(box));
 });
 
@@ -373,4 +376,96 @@ it("searches a git project's checkout from a new thread's panel, and a Workspace
   );
   press("p");
   await waitFor(() => expect(searches.at(-1)?.scope).toEqual({ kind: "project", id: WORKSPACE_ID, workingDirectory: "/notes" }));
+});
+
+it("starts with a folder tree and keeps it beside file tabs without browser controls or losing edits", async () => {
+  useLayout.setState({ panelOpen: true });
+  render(<Window />);
+  fireEvent.click(screen.getByRole("button", { name: "Files" }));
+  const src = await screen.findByRole("treeitem", { name: "src" });
+  expect(src.getAttribute("aria-expanded")).toBe("false");
+  expect(screen.queryByRole("textbox", { name: "Preview address" })).toBeNull();
+  fireEvent.click(src);
+  fireEvent.click(await screen.findByRole("treeitem", { name: "cart.ts" }));
+  const first = await editor();
+  fireEvent.change(first, { target: { value: "export const total = 42;\n" } });
+  expect(screen.getByRole("navigation", { name: "File path" }).textContent).toBe("reposrccart.ts");
+  expect(screen.queryByRole("button", { name: "Reload" })).toBeNull();
+  fireEvent.click(await screen.findByRole("treeitem", { name: "checkout.ts" }));
+  await waitFor(() => expect(screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Editor" }).value).toBe("export {};\n"));
+  expect(screen.getByRole("treeitem", { name: "src" }).getAttribute("aria-expanded")).toBe("true");
+  fireEvent.click(screen.getByRole("tab", { name: "cart.ts, unsaved changes" }));
+  await waitFor(() => expect(screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Editor" }).value).toBe("export const total = 42;\n"));
+  fireEvent.click(screen.getByRole("button", { name: "File actions" }));
+  expect(await screen.findByRole("menuitem", { name: "Refresh" })).toBeTruthy();
+  expect(screen.getByRole("menuitem", { name: "Copy path" })).toBeTruthy();
+});
+
+it("navigates and collapses directories with the keyboard, then opens the selected file", async () => {
+  useLayout.setState({ panelOpen: true });
+  render(<Window />);
+  fireEvent.click(screen.getByRole("button", { name: "Files" }));
+  const src = await screen.findByRole("treeitem", { name: "src" });
+  act(() => src.focus());
+  fireEvent.keyDown(src, { key: "ArrowRight" });
+  const cart = await screen.findByRole("treeitem", { name: "cart.ts" });
+  fireEvent.keyDown(src, { key: "ArrowRight" });
+  expect(document.activeElement).toBe(cart);
+  fireEvent.keyDown(cart, { key: "ArrowLeft" });
+  expect(document.activeElement).toBe(src);
+  fireEvent.keyDown(src, { key: "ArrowLeft" });
+  expect(screen.queryByRole("treeitem", { name: "cart.ts" })).toBeNull();
+  fireEvent.keyDown(src, { key: "ArrowRight" });
+  await screen.findByRole("treeitem", { name: "cart.ts" });
+  fireEvent.keyDown(src, { key: "End" });
+  expect(document.activeElement).toBe(screen.getByRole("treeitem", { name: "checkout.ts" }));
+  fireEvent.keyDown(document.activeElement!, { key: "Enter" });
+  expect((await editor()).value).toBe("export {};\n");
+});
+
+it("remembers the tree width and visibility, refreshes directory entries, and filters files", async () => {
+  render(<Window />);
+  act(() => useLayout.getState().openFile({ path: "src/cart.ts", scope }));
+  await editor();
+  const separator = screen.getByRole("separator", { name: "Resize file explorer" });
+  fireEvent.keyDown(separator, { key: "ArrowLeft" });
+  expect(separator.getAttribute("aria-valuenow")).toBe("256");
+  fireEvent.click(screen.getByRole("button", { name: "Hide file explorer" }));
+  expect(screen.queryByRole("tree")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Show file explorer" }));
+  expect(screen.getByRole("separator", { name: "Resize file explorer" }).getAttribute("aria-valuenow")).toBe("256");
+  disk.set("notes.md", "# Notes\n");
+  fireEvent.click(screen.getByRole("button", { name: "Refresh files" }));
+  expect(await screen.findByRole("treeitem", { name: "notes.md" })).toBeTruthy();
+  const filter = screen.getByRole("textbox", { name: "Filter files" });
+  fireEvent.change(filter, { target: { value: "checkout" } });
+  expect(await screen.findByRole("button", { name: "checkout.ts src/checkout.ts" })).toBeTruthy();
+  fireEvent.keyDown(filter, { key: "Escape" });
+  expect(await screen.findByRole("treeitem", { name: "cart.ts" })).toBeTruthy();
+});
+
+it("hides ignored entries until requested, remembers the choice, and keeps a directly opened file visible", async () => {
+  for (const path of [".git/HEAD", "node_modules/library/index.js", ".DS_Store", "output/result.txt", ".github/workflows/ci.yml"]) disk.set(path, "fixture\n");
+  for (const path of [".git", "node_modules", ".DS_Store", "output"]) disk.ignored.add(path);
+  render(<Window />);
+  act(() => useLayout.getState().openFile({ path: "src/cart.ts", scope }));
+  await editor();
+  expect(await screen.findByRole("treeitem", { name: ".github" })).toBeTruthy();
+  for (const name of disk.ignored) expect(screen.queryByRole("treeitem", { name })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Explorer options" }));
+  const toggle = await screen.findByRole("menuitemcheckbox", { name: "Show ignored files" });
+  expect(toggle.getAttribute("aria-checked")).toBe("false");
+  fireEvent.click(toggle);
+  expect(toggle.getAttribute("aria-checked")).toBe("true");
+  fireEvent.keyDown(toggle, { key: "Escape" });
+  for (const name of disk.ignored) expect(await screen.findByRole("treeitem", { name })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Hide file explorer" }));
+  fireEvent.click(screen.getByRole("button", { name: "Show file explorer" }));
+  expect(await screen.findByRole("treeitem", { name: "node_modules" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Explorer options" }));
+  fireEvent.click(await screen.findByRole("menuitemcheckbox", { name: "Show ignored files" }));
+  fireEvent.keyDown(screen.getByRole("menuitemcheckbox"), { key: "Escape" });
+  act(() => useLayout.getState().openFile({ path: "output/result.txt", scope }));
+  expect(await screen.findByRole("treeitem", { name: "result.txt" })).toBeTruthy();
+  expect(screen.queryByRole("treeitem", { name: "node_modules" })).toBeNull();
 });

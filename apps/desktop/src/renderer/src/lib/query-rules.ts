@@ -14,6 +14,7 @@ function reviewCommentTags({ threadId, taskId }: { threadId?: string | undefined
 }
 
 const fileReadRules: { [M in FileReadMethod]: Rule<M> } = {
+  "files.list": ({ scope }) => ["files", "workspace-diff", ...folderTags(scope)],
   "files.read": ({ scope }) => ["workspace-diff", ...folderTags(scope)],
   "files.search": () => ["files"],
   // Saves, commits, terminal commands and window focus rerun a find; an agent's edits wait until the results show again.

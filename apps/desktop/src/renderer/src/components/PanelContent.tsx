@@ -24,8 +24,8 @@ function commitSource(context: PanelContext): CommitSource | null {
 }
 
 function FileContent({ context, page }: ContentProps & { page: Extract<PanelPage, { kind: "file" }> }) {
-  if (page.selection) return <FilePanel selection={page.selection} />;
-  return <FilesPanel scope={panelFileScope(context)} />;
+  if (page.selection) return <FilePanel selection={page.selection} directory={panelDirectory(context)} />;
+  return <FilesPanel scope={panelFileScope(context)} directory={panelDirectory(context)} />;
 }
 
 function ChangesContent({ context, page }: ContentProps & { page: Extract<PanelPage, { kind: "changes" }> }) {

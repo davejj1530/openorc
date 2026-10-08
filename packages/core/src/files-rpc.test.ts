@@ -58,6 +58,71 @@ it("searches a worktree thread's own folder, after searching the checkout of the
   expect(await call("files.search", { scope: { kind: "thread", id: apart.id }, query: "only" })).toEqual(["only-in-worktree.ts"]);
 });
 
+it("lists immediate folders and files, including empty, ignored and hidden entries, folders first", async () => {
+  await mkdir(path.join(checkout, "src"));
+  await mkdir(path.join(checkout, "empty"));
+  await mkdir(path.join(checkout, "node_modules"));
+  await writeFile(path.join(checkout, "src", "index.ts"), "export {};\n");
+  await writeFile(path.join(checkout, ".gitignore"), "node_modules/\n");
+  const scope = { kind: "thread", id: thread.id } as const;
+  const listing = await call("files.list", { scope, path: "" });
+  expect(listing.root).toBe(checkout);
+  expect(listing.entries.map((entry) => [entry.name, entry.kind])).toEqual([
+    [".git", "directory"],
+    ["empty", "directory"],
+    ["node_modules", "directory"],
+    ["src", "directory"],
+    [".gitignore", "file"],
+    ["README.md", "file"],
+  ]);
+  expect(listing.entries.filter((entry) => entry.ignored).map((entry) => entry.name)).toEqual([".git", "node_modules"]);
+  expect(await call("files.list", { scope, path: FolderPath.parse("src") })).toEqual({ root: checkout, entries: [{ name: "index.ts", path: "src/index.ts", kind: "file", ignored: false }] });
+  expect((await call("files.list", { scope, path: FolderPath.parse("empty") })).entries).toEqual([]);
+});
+
+it("lists the worktree and the task's execution folder rather than the checkout", async () => {
+  const { thread: apart, worktree } = await worktreeThread();
+  const task = tasks.insert(core.db, { projectId: project.id, title: "Run apart", spec: null, priority: "none", labels: [], workspaceMode: "worktree", baseRef: null, parentTaskId: null });
+  tasks.update(core.db, task.id, { executionThreadId: apart.id });
+  for (const scope of [
+    { kind: "thread", id: apart.id },
+    { kind: "task", id: task.id },
+  ] as const) {
+    const listing = await call("files.list", { scope, path: "" });
+    expect(listing.root).toBe(worktree);
+    expect(listing.entries.some((entry) => entry.name === "only-in-worktree.ts")).toBe(true);
+  }
+});
+
+it("does not list folders through a symlink outside the workspace, but allows internal directory links", async () => {
+  const outside = path.join(root, "private");
+  await mkdir(outside);
+  await writeFile(path.join(outside, "secret.txt"), "secret");
+  await mkdir(path.join(checkout, "src"));
+  await writeFile(path.join(checkout, "src", "index.ts"), "export {};\n");
+  await symlink(outside, path.join(checkout, "external"));
+  await symlink(path.join(checkout, "src"), path.join(checkout, "alias"));
+  const scope = { kind: "thread", id: thread.id } as const;
+  expect((await call("files.list", { scope, path: "" })).entries.some((entry) => entry.name === "external")).toBe(false);
+  await expect(call("files.list", { scope, path: FolderPath.parse("external") })).rejects.toThrow("outside");
+  expect((await call("files.list", { scope, path: FolderPath.parse("alias") })).entries).toEqual([{ name: "index.ts", path: "alias/index.ts", kind: "file", ignored: false }]);
+});
+
+it("marks Git ignore rules and metadata without hiding tracked files or useful dot folders", async () => {
+  for (const directory of [".github", "output", "src"]) await mkdir(path.join(checkout, directory));
+  await writeFile(path.join(checkout, ".gitignore"), "output/\n*.log\nREADME.md\n");
+  await writeFile(path.join(checkout, ".DS_Store"), "metadata");
+  await writeFile(path.join(checkout, "src", ".gitignore"), "!keep.log\n");
+  await writeFile(path.join(checkout, "src", "debug.log"), "ignored");
+  await writeFile(path.join(checkout, "src", "keep.log"), "included");
+  const scope = { kind: "thread", id: thread.id } as const;
+  const rootEntries = (await call("files.list", { scope, path: "" })).entries;
+  expect(rootEntries.filter((entry) => entry.ignored).map((entry) => entry.name)).toEqual([".git", "output", ".DS_Store"]);
+  expect(rootEntries.filter((entry) => !entry.ignored).map((entry) => entry.name)).toEqual([".github", "src", ".gitignore", "README.md"]);
+  const sourceEntries = (await call("files.list", { scope, path: FolderPath.parse("src") })).entries;
+  expect(sourceEntries.filter((entry) => entry.ignored).map((entry) => entry.name)).toEqual(["debug.log"]);
+});
+
 it("searches the folder a Workspace conversation chose", async () => {
   const chosen = path.join(root, "notes");
   await mkdir(chosen);
@@ -65,6 +130,12 @@ it("searches the folder a Workspace conversation chose", async () => {
   const notes = threads.insert(core.db, { projectId: WORKSPACE_ID, title: "Notes", ...conversation });
   threads.update(core.db, notes.id, { workingDirectory: chosen });
   expect(await call("files.search", { scope: { kind: "thread", id: notes.id }, query: "" })).toEqual(["ideas.md"]);
+  await mkdir(path.join(chosen, "node_modules"));
+  const listing = await call("files.list", { scope: { kind: "thread", id: notes.id }, path: "" });
+  expect(listing.entries.map((entry) => [entry.name, entry.ignored])).toEqual([
+    ["node_modules", true],
+    ["ideas.md", false],
+  ]);
 });
 
 const read = (file: string) => call("files.read", { scope: { kind: "thread", id: thread.id }, path: file });

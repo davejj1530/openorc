@@ -3,6 +3,7 @@ import { audit, Db } from "@openorc/db";
 import type { FileScope } from "@openorc/protocol";
 import { conversationFolder } from "../services/conversation-folder.js";
 import { FileService } from "../services/files.js";
+import { listDirectory } from "../services/file-directory.js";
 import type { Handlers } from "./types.js";
 type Dependencies = {
   db: Db;
@@ -13,7 +14,11 @@ type Dependencies = {
 /** One conversation, or one new conversation's folder, whose finds supersede each other. */
 const conversationKey = (scope: FileScope) => (scope.kind === "project" ? `project:${scope.id}:${scope.workingDirectory ?? ""}` : `${scope.kind}:${scope.id}`);
 
-export function createFilesHandlers({ db, files, claudeEnvironment }: Dependencies): Pick<Handlers, "skills.list" | "files.search" | "files.read" | "files.write" | "files.find" | "files.format"> {
+export function createFilesHandlers({
+  db,
+  files,
+  claudeEnvironment,
+}: Dependencies): Pick<Handlers, "skills.list" | "files.list" | "files.search" | "files.read" | "files.write" | "files.find" | "files.format"> {
   return {
     "skills.list": async ({ projectId, workingDirectory, agent, claudeAccountId }) =>
       listSkills({
@@ -21,6 +26,7 @@ export function createFilesHandlers({ db, files, claudeEnvironment }: Dependenci
         agent,
         ...(agent === "claude" && claudeEnvironment ? { env: claudeEnvironment(claudeAccountId) } : {}),
       }),
+    "files.list": async ({ scope, path }) => listDirectory((await conversationFolder(db, scope)).root, path),
     "files.search": async ({ scope, query, limit }) => files.search(await conversationFolder(db, scope), query, limit),
     "files.read": async ({ scope, path }) => files.read(await conversationFolder(db, scope), path),
     "files.write": async ({ scope, path, text, expected }) => {

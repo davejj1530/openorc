@@ -1,17 +1,16 @@
-import { Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { CodeEditor, type LineRange } from "../components/code-editor";
-import { Button, Segmented, Tooltip } from "../components/ui";
+import { Button } from "../components/ui";
 import { ThreadMedia, ThreadRichText } from "../components/ThreadImages";
 import { hasUnsavedEdits } from "../lib/file-buffer";
 import { flushDrafts, useDrafts } from "../lib/file-drafts";
 import type { FileSelection } from "../lib/layout";
 import { useFileBuffer, type FileBuffer } from "../lib/use-file-buffer";
+import { useFileExplorer } from "../lib/file-explorer";
+import { FileExplorer } from "./FileExplorer";
+import { ExplorerResizeHandle } from "./ExplorerResizeHandle";
+import { FileToolbar, type FileView } from "./FileToolbar";
 
-type View = "preview" | "source";
-const views: { value: View; label: string }[] = [
-  { value: "preview", label: "Preview" },
-  { value: "source", label: "Source" },
-];
 const isMarkdown = (path: string) => /\.(md|markdown)$/i.test(path);
 const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
 
@@ -24,42 +23,68 @@ function revealOf(selection: FileSelection): LineRange | null {
 }
 
 /** A file in the conversation's folder, edited in place. Markdown also renders, and a cited line opens the source there. */
-export function FilePanel({ selection }: { selection: FileSelection }) {
+export function FilePanel({ selection, directory }: { selection: FileSelection; directory: string }) {
   const buffer = useFileBuffer(selection);
   const markdown = isMarkdown(selection.path);
-  const [chosen, choose] = useState<{ selection: FileSelection; view: View } | null>(null);
-  let view: View = selection.line ? "source" : "preview";
+  const [chosen, choose] = useState<{ selection: FileSelection; view: FileView } | null>(null);
+  let view: FileView = selection.line ? "source" : "preview";
   if (chosen?.selection === selection) view = chosen.view;
+  const frame = useRef<HTMLElement>(null);
+  const [compact, setCompact] = useState(false);
+  const [overlayFor, setOverlayFor] = useState<string | null>(null);
+  const visible = useFileExplorer((state) => state.visible);
+  const width = useFileExplorer((state) => state.width);
+  const treeVisible = compact ? overlayFor === selection.path : visible;
+  const explorerStyle: CSSProperties & { "--file-explorer-width": string } = { "--file-explorer-width": `${width}px` };
+  const onTree = (show: boolean) => (compact ? setOverlayFor(show ? selection.path : null) : useFileExplorer.getState().setVisible(show));
+  const root = "file" in buffer.view ? buffer.view.file.root : directory;
+  useEffect(() => {
+    if (!frame.current || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry && entry.contentRect.width > 0) setCompact(entry.contentRect.width < 580);
+    });
+    observer.observe(frame.current);
+    return () => observer.disconnect();
+  }, []);
   useEffect(() => () => void flushDrafts(), []);
   return (
-    <section aria-label="File" className="h-full min-h-0 flex flex-col">
-      <header className="shrink-0 flex items-center gap-2 px-3 py-2 border-b border-line">
-        <div className="min-w-0 flex-1" title={selection.path}>
-          <div className="truncate text-base font-medium">
-            {fileName(selection.path)}
-            {selection.line ? `:${selection.line}${selection.endLine ? `–${selection.endLine}` : ""}` : ""}
-          </div>
-          <div className="truncate text-xs text-ink-3">{selection.path}</div>
-        </div>
-        {buffer.readOnly ? (
-          <Tooltip label={buffer.readOnly}>
-            <span tabIndex={0} className="text-sm text-ink-3">
-              Read-only
-            </span>
-          </Tooltip>
-        ) : null}
-        {markdown ? <Segmented size="sm" label="File view" value={view} onChange={(next) => choose({ selection, view: next })} options={views} /> : null}
-        <Button size="sm" variant="ghost" disabled={buffer.read.refreshing} onClick={buffer.read.refresh}>
-          Refresh
-        </Button>
-        {hasUnsavedEdits(buffer.view) || buffer.saving ? (
-          <Button size="sm" disabled={buffer.saving || buffer.view.kind === "conflict"} onClick={buffer.save}>
-            {buffer.saving ? "Saving…" : "Save"}
-          </Button>
-        ) : null}
-      </header>
-      <FileNotices buffer={buffer} name={fileName(selection.path)} />
-      <FileBody buffer={buffer} selection={selection} preview={markdown && view === "preview"} />
+    <section
+      ref={frame}
+      aria-label="File"
+      className="file-workspace"
+      data-compact={compact || undefined}
+      data-explorer={(treeVisible && !compact) || undefined}
+      style={explorerStyle}
+      onKeyDown={(event) => {
+        if (event.key !== "Escape" || !compact || !treeVisible || event.defaultPrevented) return;
+        event.preventDefault();
+        event.stopPropagation();
+        onTree(false);
+        requestAnimationFrame(() => frame.current?.querySelector<HTMLButtonElement>('[aria-label="Show file explorer"]')?.focus());
+      }}
+    >
+      <FileToolbar
+        selection={selection}
+        buffer={buffer}
+        directory={root}
+        view={view}
+        markdown={markdown}
+        onView={(next) => choose({ selection, view: next })}
+        treeVisible={treeVisible}
+        onTree={onTree}
+      />
+      <div className="file-editor">
+        <FileNotices buffer={buffer} name={fileName(selection.path)} />
+        <FileBody buffer={buffer} selection={selection} preview={markdown && view === "preview"} />
+      </div>
+      {treeVisible ? (
+        <>
+          {compact ? <button className="file-explorer-backdrop" aria-label="Dismiss file explorer" onClick={() => onTree(false)} /> : <ExplorerResizeHandle />}
+          <aside className="file-explorer-sidebar">
+            <FileExplorer scope={selection.scope} directory={root} selected={selection.path} />
+          </aside>
+        </>
+      ) : null}
     </section>
   );
 }

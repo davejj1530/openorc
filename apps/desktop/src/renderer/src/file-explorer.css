@@ -1,0 +1,247 @@
+.app-shell .panel-content[data-file-workspace] {
+  border-color: transparent;
+  border-radius: 8px;
+}
+.file-workspace,
+.file-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+.file-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  position: relative;
+  overflow: hidden;
+}
+.file-workspace[data-explorer] {
+  grid-template-columns: minmax(0, 1fr) min(45%, var(--file-explorer-width));
+}
+.app-shell .panel-browser-tab[data-file][data-active="true"] {
+  background: var(--paper);
+  color: var(--ink);
+  font-weight: 500;
+}
+.file-toolbar {
+  grid-area: 1 / 1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  min-height: 40px;
+  padding: 4px 10px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--line);
+}
+.file-breadcrumbs {
+  flex: 1 1 120px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+.file-breadcrumbs ol,
+.file-breadcrumbs li,
+.file-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.file-breadcrumbs ol {
+  width: max-content;
+}
+.file-breadcrumbs li {
+  white-space: nowrap;
+}
+.file-breadcrumbs button {
+  border-radius: 4px;
+  padding: 3px 2px;
+}
+.file-breadcrumbs button:hover {
+  color: var(--ink);
+  background: var(--surface-2);
+}
+.file-breadcrumbs [aria-current] {
+  color: var(--ink-2);
+}
+.file-toolbar-actions {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.file-editor {
+  grid-area: 2 / 1;
+  overflow: hidden;
+}
+.file-explorer-sidebar {
+  grid-area: 1 / 2 / 3 / 3;
+  display: grid;
+  grid-template-rows: subgrid;
+  min-width: 0;
+  min-height: 0;
+  border-left: 1px solid var(--line);
+}
+.file-explorer {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  background: color-mix(in srgb, var(--surface) 60%, var(--paper));
+}
+.file-explorer-sidebar > .file-explorer {
+  grid-row: 1 / 3;
+  grid-template-rows: subgrid;
+}
+.file-explorer-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 40px;
+  padding: 4px 8px 4px 12px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--line);
+}
+.file-explorer-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.file-explorer-filter {
+  position: relative;
+  padding: 8px;
+  flex-shrink: 0;
+}
+.file-explorer-filter > svg {
+  position: absolute;
+  left: 16px;
+  top: 16px;
+  color: var(--ink-3);
+  pointer-events: none;
+}
+.file-explorer-filter input {
+  height: 28px;
+  padding-left: 26px;
+  font-size: 12px;
+  background: transparent;
+}
+.file-explorer-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 5px 12px;
+}
+.file-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding-right: 8px;
+  border-radius: 4px;
+  color: var(--ink-2);
+  font-size: 12px;
+  cursor: default;
+  user-select: none;
+}
+.file-tree-row svg {
+  flex-shrink: 0;
+  color: var(--ink-3);
+}
+.file-tree-folder {
+  opacity: 0.65;
+}
+.file-tree-root {
+  padding-left: 8px;
+  font-weight: 500;
+}
+.file-tree-row:hover {
+  background: var(--surface-2);
+}
+.file-explorer [role="treeitem"] {
+  outline: none;
+}
+.file-explorer [role="treeitem"][aria-selected="true"] > .file-tree-row {
+  background: var(--navigation-soft);
+  color: var(--navigation-ink);
+}
+.file-explorer [role="treeitem"]:focus-visible > .file-tree-row {
+  outline: 1px solid var(--ink-3);
+  outline-offset: -1px;
+}
+.file-tree-group {
+  position: relative;
+}
+.file-tree-guide {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+  pointer-events: none;
+}
+.file-tree-notice {
+  padding: 6px 12px 6px 24px;
+  font-size: 12px;
+  color: var(--ink-3);
+  overflow-wrap: anywhere;
+}
+.file-tree-result {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  text-align: left;
+  border-radius: 4px;
+  font-size: 12px;
+}
+.file-tree-result > svg {
+  flex-shrink: 0;
+}
+.file-tree-result:hover {
+  background: var(--surface-2);
+}
+.file-explorer-resize {
+  grid-area: 1 / 2 / 3 / 3;
+  position: relative;
+  width: 5px;
+  margin-left: -2px;
+  cursor: col-resize;
+  touch-action: none;
+  z-index: 3;
+}
+.file-explorer-resize::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 2px;
+  width: 1px;
+  background: transparent;
+}
+.file-explorer-resize:hover::after,
+.file-explorer-resize:focus-visible::after {
+  background: var(--ink-3);
+}
+.file-workspace[data-compact] .file-explorer-sidebar {
+  grid-area: 2 / 1;
+  grid-template-rows: auto minmax(0, 1fr);
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: min(85%, var(--file-explorer-width));
+  z-index: 2;
+}
+.file-explorer-backdrop {
+  grid-area: 2 / 1;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: transparent;
+  cursor: default;
+}

@@ -27,7 +27,7 @@ function PanelTab({ tab, page, active, unsaved, onSelect, onClose, onKeyDown }: 
   const label = pageLabel(page);
   const Icon = pageIcon(page);
   return (
-    <div role="presentation" className="panel-browser-tab" data-active={active}>
+    <div role="presentation" className="panel-browser-tab" data-active={active} data-file={(page.kind === "file" && !!page.selection) || undefined}>
       <button
         role="tab"
         id={`panel-tab-${tab.id}`}

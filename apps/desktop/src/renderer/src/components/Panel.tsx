@@ -65,6 +65,7 @@ function PanelBody({ context, workspace, open }: { context: PanelContext; worksp
       />
     ) : null;
   const recentUrls = [...new Set(Object.values(previewUrls).filter((url) => /^https?:\/\//i.test(url)))].reverse().slice(0, 4);
+  if (page.kind === "file") return <PanelContent context={context} page={page} onNavigate={navigate} />;
   return (
     <div className="h-full flex flex-col min-h-0">
       <PanelNavigation key={`${tab.id}:${tab.index}`} {...navigation} address={page.kind === "newtab" ? "" : pageLabel(page)} onNavigate={onNavigate} />
@@ -152,7 +153,13 @@ export function Panel({ context }: { context: PanelContext }) {
               </IconButton>
             </Tooltip>
           </header>
-          <div id="panel-tab-content" role="tabpanel" aria-labelledby={`panel-tab-${tab.id}`} className="panel-content flex-1 min-h-0">
+          <div
+            id="panel-tab-content"
+            role="tabpanel"
+            aria-labelledby={`panel-tab-${tab.id}`}
+            data-file-workspace={workspace.page.kind === "file" || undefined}
+            className="panel-content flex-1 min-h-0"
+          >
             {mounted ? (
               <Suspense fallback={null}>
                 <PanelBody context={context} workspace={workspace} open={open} />

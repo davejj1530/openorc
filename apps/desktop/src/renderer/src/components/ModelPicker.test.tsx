@@ -99,6 +99,35 @@ describe("ModelPicker", () => {
     expect(screen.getByText("Extra high + workflows")).toBeTruthy();
     expect(slider.closest(".composer-effort-slider")?.getAttribute("data-ultracode")).toBe("true");
   });
+  it("keeps every effort label in the trigger so its width, and the popup anchored to it, hold still", async () => {
+    const opus: ModelOption = { id: "claude-opus-5", agent: "claude", label: "Opus", efforts: ["low", "medium", "high", "xhigh", "max", "ultracode"], defaultEffort: "medium", isDefault: true };
+    mocks.call.mockImplementation(async (method) => (method === "agents.modelCatalog" ? { models: [opus], providers: [] } : info));
+    function Fixture() {
+      const [choice, setChoice] = useState<ModelChoice>({ agent: "claude", model: opus.id, effort: "low" });
+      return <ComposerModelPicker value={choice} onChange={setChoice} />;
+    }
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <Fixture />
+      </QueryClientProvider>,
+    );
+    const trigger = await screen.findByRole("button", { name: "Model and effort" });
+    const labels = () => [...trigger.querySelectorAll(".composer-model-effort > span")];
+    const shown = () =>
+      labels()
+        .filter((label) => !label.hasAttribute("aria-hidden"))
+        .map((label) => label.textContent);
+    await waitFor(() => expect(labels()).toHaveLength(6));
+    expect(shown()).toEqual(["Low"]);
+    fireEvent.click(trigger);
+    fireEvent.change(await screen.findByRole("slider", { name: "Reasoning effort" }), { target: { value: "3" } });
+    expect(shown()).toEqual(["Extra high"]);
+    expect(
+      labels()
+        .map((label) => label.textContent)
+        .sort(),
+    ).toEqual(["Extra high", "High", "Low", "Max", "Medium", "Ultracode"]);
+  });
   it("keeps model selection and effort in one composer panel", async () => {
     const catalog = [models[0]!, { ...models[0]!, id: "gpt-plus", label: "GPT Plus", defaultEffort: "high", isDefault: false }];
     mocks.call.mockImplementation(async (method) => (method === "agents.modelCatalog" ? { models: catalog, providers: [] } : info));

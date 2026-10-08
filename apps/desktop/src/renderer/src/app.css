@@ -2020,10 +2020,18 @@ diffs-container {
   white-space: nowrap;
 }
 .composer-model-effort {
+  display: inline-grid;
   flex-shrink: 0;
   color: var(--ink-3);
   font-size: var(--text-sm);
   white-space: nowrap;
+}
+/* Every label shares one cell, so the cell is as wide as the longest; only the current one shows. */
+.composer-model-effort > span {
+  grid-area: 1 / 1;
+}
+.composer-model-effort > [aria-hidden] {
+  visibility: hidden;
 }
 .composer-model-trigger > svg {
   flex-shrink: 0;

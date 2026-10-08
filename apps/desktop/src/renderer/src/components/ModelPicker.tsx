@@ -414,6 +414,25 @@ export function ModelPicker({
   );
 }
 
+/**
+ * The effort label holds the width of the model's longest one. The popup tracks the
+ * trigger's size, so a label that grew and shrank with each step slid the popup sideways
+ * while the effort slider was dragged.
+ */
+function TriggerEffort({ label, efforts }: { label: string; efforts: string[] }) {
+  const others = [...new Set(efforts.map(effortLabel))].filter((other) => other !== label);
+  return (
+    <span className="composer-model-effort">
+      <span>{label}</span>
+      {others.map((other) => (
+        <span key={other} aria-hidden="true">
+          {other}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 function ComposerTriggerIcon({ orcling, team, value }: { orcling: Orcling | null; team: boolean; value: ModelChoice | null }) {
   if (orcling) return <OrclingAvatar orcling={orcling} size={14} />;
   return <>{pickerTriggerIcon(team, value, 14, 14)}</>;
@@ -481,7 +500,7 @@ export function ComposerModelPicker({
         <ComposerTriggerIcon orcling={chosenOrcling(orclings)} team={Boolean(team)} value={value} />
         {fast ? <Zap size={13} aria-label={fastBlocked ? "Fast mode can't run" : "Fast mode requested"} className="composer-fast-indicator shrink-0" data-blocked={fastBlocked || undefined} /> : null}
         <span className="composer-model-name">{chosenOrcling(orclings)?.name ?? team?.name ?? current?.label ?? value?.model ?? "Choose model"}</span>
-        {value ? <span className="composer-model-effort">{label}</span> : null}
+        {value ? <TriggerEffort label={label} efforts={efforts} /> : null}
         <ChevronDown size={14} />
       </Popover.Trigger>
       <Popover.Portal>

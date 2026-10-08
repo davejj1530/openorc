@@ -228,19 +228,23 @@ function NewThreadProject({
             ) : (
               <>
                 <div className="relative">
-                  <NewThreadContext
-                    projectId={projectId}
-                    projects={projects}
-                    mode={workspaceMode}
-                    blocked={branchingReason(git.state, "Worktrees")}
-                    disabled={start.isPending}
-                    onProject={onProject}
-                    onFolder={(workingDirectory) => changeDraft({ workingDirectory })}
-                    onMode={(workspace) => changeDraft({ workspace })}
-                  />
-                  {choice?.agent === "claude" || revision?.members.some((member) => member.settings.agent === "claude") ? (
-                    <ClaudeAccountPicker accounts={accounts.data} value={claudeAccountId} onChange={(claudeAccountId) => changeDraft({ claudeAccountId })} disabled={start.isPending} />
-                  ) : null}
+                  <div className="flex flex-wrap justify-between items-end">
+                    <NewThreadContext
+                      projectId={projectId}
+                      projects={projects}
+                      mode={workspaceMode}
+                      blocked={branchingReason(git.state, "Worktrees")}
+                      disabled={start.isPending}
+                      onProject={onProject}
+                      onFolder={(workingDirectory) => changeDraft({ workingDirectory })}
+                      onMode={(workspace) => changeDraft({ workspace })}
+                    />
+
+                    {choice?.agent === "claude" || revision?.members.some((member) => member.settings.agent === "claude") ? (
+                      <ClaudeAccountPicker accounts={accounts.data} value={claudeAccountId} onChange={(claudeAccountId) => changeDraft({ claudeAccountId })} disabled={start.isPending} />
+                    ) : null}
+                  </div>
+
                   <Composer
                     draftKey={`newthread.${projectId}.attachments`}
                     autoFocus
@@ -309,6 +313,7 @@ function NewThreadProject({
                     ) : null}
                   </p>
                 ) : null}
+
                 {revision && selectedTeam && selectedTeam.revision.id !== revision.id ? (
                   <p className="text-xs text-ink-3 mt-2">
                     Version {revision.number} is selected.{" "}

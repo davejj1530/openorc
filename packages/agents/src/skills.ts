@@ -12,7 +12,8 @@ import path from "node:path";
 import type { AgentSkill } from "@openorc/protocol";
 import type { HarnessId } from "@openorc/protocol";
 import { parse } from "jsonc-parser";
-import { claudeConfigDir } from "./claude/config-dir.js";
+import { SHARED_CLAUDE_CONFIG_DIR, claudeConfigDir } from "./claude/config-dir.js";
+import { installedClaudePlugins, type InstalledClaudePlugin } from "./claude/plugins.js";
 import { listCodexSkills } from "./codex/skills.js";
 import { listNativeOpenCodeSkills, openCodeSkillRows } from "./opencode/skills.js";
 
@@ -235,35 +236,9 @@ async function readSkillDir(root: SkillRoot): Promise<AgentSkill[]> {
   return out;
 }
 
-/**
- * Where installed plugins keep their skills, from the manifest Claude Code
- * writes rather than by walking the plugin cache: the cache holds every
- * version ever fetched, and only the installed one is a skill the CLI would
- * resolve. The manifest key carries the plugin's name, which the CLI prefixes
- * onto every skill the plugin ships, so it travels with the directory.
- */
-async function pluginSkillRoots(configDir: string): Promise<SkillRoot[]> {
-  let manifest: unknown;
-  try {
-    manifest = JSON.parse(await readFile(path.join(configDir, "plugins", "installed_plugins.json"), "utf8"));
-  } catch {
-    return [];
-  }
-  const plugins = (manifest as { plugins?: unknown } | null)?.plugins;
-  if (typeof plugins !== "object" || plugins === null) return [];
-  const roots: SkillRoot[] = [];
-  for (const [key, installs] of Object.entries(plugins as Record<string, unknown>)) {
-    if (!Array.isArray(installs)) continue;
-    // "figma@claude-plugins-official" is figma from that marketplace; only the name reaches the prompt.
-    const plugin = key.split("@")[0] ?? "";
-    // With no name there is no handle to offer, and a wrong "/name" costs more than a missing one.
-    if (!plugin) continue;
-    for (const install of installs as unknown[]) {
-      const installPath = install && typeof install === "object" ? (install as { installPath?: unknown }).installPath : null;
-      if (typeof installPath === "string" && installPath) roots.push({ dir: path.join(installPath, "skills"), source: "plugin", plugin });
-    }
-  }
-  return roots.sort((a, b) => a.dir.localeCompare(b.dir)).slice(0, MAX_ENTRIES);
+/** Where plugins keep their skills, under the name the CLI prefixes onto each one. */
+function pluginSkillRoots(plugins: InstalledClaudePlugin[]): SkillRoot[] {
+  return plugins.map((plugin): SkillRoot => ({ dir: path.join(plugin.dir, "skills"), source: "plugin", plugin: plugin.name })).slice(0, MAX_ENTRIES);
 }
 
 /**
@@ -275,7 +250,10 @@ async function pluginSkillRoots(configDir: string): Promise<SkillRoot[]> {
  */
 async function listClaudeSkills(projectRoot: string, home: string, env: NodeJS.ProcessEnv): Promise<AgentSkill[]> {
   const configDir = claudeConfigDir(home, env);
-  const roots: SkillRoot[] = [{ dir: path.join(configDir, "skills"), source: "user" }, { dir: path.join(projectRoot, ".claude", "skills"), source: "project" }, ...(await pluginSkillRoots(configDir))];
+  // An added account also runs the plugins the CLI login turns on; its personal skills are already linked into the account.
+  const shared = env[SHARED_CLAUDE_CONFIG_DIR];
+  const plugins = [...installedClaudePlugins(configDir), ...(shared ? installedClaudePlugins(shared).filter((plugin) => plugin.enabled) : [])];
+  const roots: SkillRoot[] = [{ dir: path.join(configDir, "skills"), source: "user" }, { dir: path.join(projectRoot, ".claude", "skills"), source: "project" }, ...pluginSkillRoots(plugins)];
   const found = new Map<string, AgentSkill>();
   for (const root of roots) {
     for (const skill of await readSkillDir(root)) {

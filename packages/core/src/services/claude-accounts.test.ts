@@ -1,7 +1,8 @@
-import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, readdir, readFile, readlink, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { SHARED_CLAUDE_CONFIG_DIR } from "@openorc/agents";
 import { claudeAccounts, Db } from "@openorc/db";
 import { ClaudeAccountService } from "./claude-accounts.js";
 import type { EnvSnapshot } from "./shell-environment.js";
@@ -78,6 +79,61 @@ it("isolates three managed accounts while preserving the existing CLI environmen
   expect(service.environment(snapshot, "claude-cli").env).toEqual(snapshot.env);
   expect(snapshot.env.ANTHROPIC_API_KEY).toBe("fixture-only");
   expect(() => service.environment(snapshot, "../../other")).toThrow(/no longer available/);
+});
+
+it("links the CLI login's personal skills into a signed-in added account and drops them once uninstalled", async () => {
+  const original = path.join(root, "original", "skills");
+  for (const name of ["humanizer", "research", "synced/bucket/morning", ".hidden"]) await mkdir(path.join(original, name), { recursive: true });
+  const account = service.add("Work");
+  expect(service.environment(snapshot, account.id).env[SHARED_CLAUDE_CONFIG_DIR]).toBe(path.join(root, "original"));
+  // Not signed in yet: the folder keeps the private mode sign-in creates it with.
+  const directory = path.join(root, "claude-accounts", account.id);
+  await expect(stat(directory)).rejects.toThrow();
+  await mkdir(path.join(directory, "skills", "synced", "own-bucket"), { recursive: true });
+  await mkdir(path.join(directory, "skills", "research"));
+  service.environment(snapshot, account.id);
+  const skills = path.join(directory, "skills");
+  expect((await readdir(skills)).sort()).toEqual(["humanizer", "research", "synced"]);
+  expect(await readlink(path.join(skills, "humanizer"))).toBe(path.join(original, "humanizer"));
+  expect((await lstat(path.join(skills, "research"))).isSymbolicLink()).toBe(false);
+  await rm(path.join(original, "humanizer"), { recursive: true });
+  service.environment(snapshot, account.id);
+  expect((await readdir(skills)).sort()).toEqual(["research", "synced"]);
+  expect(service.environment(snapshot, "claude-cli").env[SHARED_CLAUDE_CONFIG_DIR]).toBeUndefined();
+});
+
+it("keeps an added account's memory with the CLI login's and moves in what the account saved alone", async () => {
+  const account = service.add("Work");
+  const original = path.join(root, "original");
+  expect(service.environment(snapshot, account.id).env.CLAUDE_CODE_REMOTE_MEMORY_DIR).toBe(original);
+  expect(service.environment(snapshot, "claude-cli").env.CLAUDE_CODE_REMOTE_MEMORY_DIR).toBeUndefined();
+  const own = (project: string) => path.join(root, "claude-accounts", account.id, "projects", project, "memory");
+  const shared = (project: string) => path.join(original, "projects", project, "memory");
+  await mkdir(own("-repo"), { recursive: true });
+  await mkdir(shared("-repo"), { recursive: true });
+  await mkdir(own("-empty"), { recursive: true });
+  await mkdir(own("-solo"), { recursive: true });
+  await writeFile(path.join(shared("-repo"), "MEMORY.md"), "- [Tabs](tabs.md) — tabs\n- [Lint](lint.md) — lint");
+  await writeFile(path.join(shared("-repo"), "tabs.md"), "use tabs");
+  await writeFile(path.join(shared("-repo"), "lint.md"), "run lint");
+  await writeFile(path.join(own("-repo"), "MEMORY.md"), "- [Tabs](tabs.md) — tabs\n- [Ports](ports.md) — ports\n- [Lint](lint.md) — lint\n");
+  await writeFile(path.join(own("-repo"), "ports.md"), "port 80");
+  await writeFile(path.join(own("-repo"), "lint.md"), "run lint");
+  await writeFile(path.join(own("-repo"), "tabs.md"), "use spaces");
+  await writeFile(path.join(own("-solo"), "MEMORY.md"), "- [Solo](solo.md) — solo\n");
+  await writeFile(path.join(own("-solo"), "solo.md"), "solo");
+
+  service.environment(snapshot, account.id);
+  service.environment(snapshot, account.id);
+
+  expect(await readFile(path.join(shared("-repo"), "MEMORY.md"), "utf8")).toBe("- [Tabs](tabs.md) — tabs\n- [Lint](lint.md) — lint\n- [Ports](ports.md) — ports\n");
+  expect(await readFile(path.join(shared("-repo"), "ports.md"), "utf8")).toBe("port 80");
+  expect(await readFile(path.join(shared("-repo"), "tabs.md"), "utf8")).toBe("use tabs");
+  expect(await readdir(own("-repo"))).toEqual(["tabs.md"]);
+  expect((await readdir(shared("-solo"))).sort()).toEqual(["MEMORY.md", "solo.md"]);
+  await expect(stat(own("-solo"))).rejects.toThrow();
+  await expect(stat(own("-empty"))).rejects.toThrow();
+  await expect(stat(shared("-empty"))).rejects.toThrow();
 });
 
 it("signs in through the selected CLI directory and reports only public account metadata", async () => {

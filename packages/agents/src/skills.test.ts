@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { SHARED_CLAUDE_CONFIG_DIR } from "./claude/config-dir.js";
 import { MAX_ENTRIES, MAX_SKILL_BYTES, listSkills } from "./skills.js";
 
 const temps: string[] = [];
@@ -106,6 +107,23 @@ describe("listSkills", () => {
       "wrapped",
     ]);
     expect(found.find((skill) => skill.name === "shared")?.source).toBe("user");
+  });
+
+  it("gives an added account its own skills and the plugins the CLI login turns on", async () => {
+    const account = await temp("openorc-skills-account-");
+    await skill(path.join(account, "skills"), "own", "---\nname: own\ndescription: Installed in the account.\n---\n");
+    const shared = await temp("openorc-skills-shared-");
+    await mkdir(path.join(shared, "plugins"));
+    await writeFile(
+      path.join(shared, "plugins", "installed_plugins.json"),
+      JSON.stringify({
+        version: 2,
+        plugins: { "demo@market": [{ scope: "user", installPath: path.join(home, "plugins", "demo") }], plain: [{ scope: "user", installPath: path.join(home, "plugins", "plain") }] },
+      }),
+    );
+    await writeFile(path.join(shared, "settings.json"), JSON.stringify({ enabledPlugins: { "demo@market": true, plain: false } }));
+    const found = await listSkills({ projectRoot, home, agent: "claude", env: { CLAUDE_CONFIG_DIR: account, [SHARED_CLAUDE_CONFIG_DIR]: shared } });
+    expect(found.map((s) => s.name)).toEqual(["demo:only-plugin", "demo:paired", "demo:shared", "own", "shared"]);
   });
 
   it("discovers OpenCode's compatible, native, nested, and flat skills with its source precedence", async () => {

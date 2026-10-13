@@ -1,12 +1,13 @@
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import { spawn, type ChildProcess } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { fileBoundaryUrl, type AgentEvent } from "@openorc/protocol";
 import { ClaudeAdapter, ultracodeFallbackNotice } from "./adapter.js";
+import { SHARED_CLAUDE_CONFIG_DIR } from "./config-dir.js";
 
 vi.mock("node:child_process", () => ({ spawn: vi.fn() }));
 vi.mock("node:fs", async (importOriginal) => {
@@ -747,6 +748,41 @@ describe("unvetted checkouts", () => {
         handle.close();
         await handle.wait();
       }
+    }
+  });
+});
+
+describe("added Claude accounts", () => {
+  it("load the plugins the CLI login turns on, and the marker stays out of Claude's environment", async () => {
+    const shared = mkdtempSync(path.join(tmpdir(), "openorc-claude-shared-"));
+    try {
+      mkdirSync(path.join(shared, "plugins"));
+      const installed = (name: string) => [{ scope: "user", installPath: path.join(shared, "plugins", "cache", name) }];
+      writeFileSync(
+        path.join(shared, "plugins", "installed_plugins.json"),
+        JSON.stringify({ version: 2, plugins: { "on@market": installed("on"), "off@market": installed("off"), "unlisted@market": installed("unlisted") } }),
+      );
+      writeFileSync(path.join(shared, "settings.json"), JSON.stringify({ apiKeyHelper: "not-read", enabledPlugins: { "on@market": true, "off@market": false } }));
+      mockProcess();
+      const handle = new ClaudeAdapter().start(
+        { runId: "added-account", agent: "claude", cwd: process.cwd(), prompt: "Fixture only", permissionMode: "autonomous" },
+        { ...launch, env: { ...process.env, [SHARED_CLAUDE_CONFIG_DIR]: shared } },
+      );
+      try {
+        const [, args, options] = vi.mocked(spawn).mock.lastCall!;
+        expect((args as string[]).filter((_, index, all) => all[index - 1] === "--plugin-dir")).toEqual([path.join(shared, "plugins", "cache", "on")]);
+        expect((options as { env: NodeJS.ProcessEnv }).env[SHARED_CLAUDE_CONFIG_DIR]).toBeUndefined();
+      } finally {
+        handle.close();
+        await handle.wait();
+      }
+      mockProcess();
+      const own = new ClaudeAdapter().start({ runId: "cli-login", agent: "claude", cwd: process.cwd(), prompt: "Fixture only", permissionMode: "autonomous" }, launch);
+      expect(vi.mocked(spawn).mock.lastCall![1]).not.toContain("--plugin-dir");
+      own.close();
+      await own.wait();
+    } finally {
+      rmSync(shared, { recursive: true, force: true });
     }
   });
 });

@@ -630,6 +630,7 @@ describe("app actions follow the conversation's mode", () => {
   const expected: Record<string, string[]> = {
     // Plan, Review, Accept edits, Autonomous
     snapshot: ["allowed", "allowed", "allowed", "allowed"],
+    visualize: ["allowed", "allowed", "allowed", "allowed"],
     click: ["blocked", "asked 1", "asked 1", "allowed"],
     password: ["blocked", "asked 2", "asked 2", "asked 1"],
     memory_record: ["blocked", "asked 1", "allowed", "allowed"],
@@ -656,6 +657,7 @@ describe("app actions follow the conversation's mode", () => {
       const url = (await core.mcpServer()).urlForRun(run.id);
       const results = {
         snapshot: await outcome(run.id, url, "browser", { action: "snapshot" }),
+        visualize: await outcome(run.id, url, "visualize", { title: "A queue", description: "First in, first out.", html: "<p>1 → 2 → 3</p>" }),
         click: await outcome(run.id, url, "browser", { action: "click", ref: "button" }),
         password: await outcome(run.id, url, "browser", { action: "fill", ref: "pw", text: "hunter2" }),
         memory_record: await outcome(run.id, url, "memory_record", { type: "lesson", title: `Recorded in ${mode} ${permissionMode}`, body: "A finding." }),

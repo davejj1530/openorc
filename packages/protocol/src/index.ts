@@ -4,6 +4,7 @@ export * from "./slack.js";
 export * from "./claude-accounts.js";
 export * from "./events.js";
 export * from "./mcp-apps.js";
+export * from "./visualization.js";
 export * from "./domain.js";
 export * from "./review-comments.js";
 export * from "./diff-lines.js";

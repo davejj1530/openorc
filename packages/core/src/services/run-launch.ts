@@ -4,6 +4,7 @@ import { worktree } from "@openorc/git";
 import { internalToolNames, type OpenOrcMcpServer } from "@openorc/mcp";
 import {
   browserInstructions,
+  visualizationInstructions,
   harnessName,
   isHarnessId,
   normalizeModelEffort,
@@ -297,6 +298,7 @@ export class RunLaunch {
     return [
       this.deps.hooks.orclings?.brief(input) ?? "",
       !input.scope.comment && this.deps.hooks.browserAvailable ? browserInstructions : "",
+      !input.scope.comment ? visualizationInstructions : "",
       this.scopeBrief(input),
       taskImages.length ? `Task images in document order (open them from these paths):\n${taskImages.map((file, index) => `${index + 1}. ${file}`).join("\n")}` : "",
       input.handoff ?? "",

@@ -821,6 +821,8 @@ describe("coordinator run seams", () => {
     const spec = vi.mocked(adapters[agent].start).mock.calls[0]![0];
     expect(spec.systemPromptAppendix).toContain("use OpenOrc's browser tool first");
     expect(spec.internalMcp?.toolNames).toContain("browser");
+    expect(spec.systemPromptAppendix).toContain("Use OpenOrc's visualize tool");
+    expect(spec.internalMcp?.toolNames).toContain("visualize");
   });
 
   it("fences a stop while MCP startup is awaiting without leaving a starting row", async () => {

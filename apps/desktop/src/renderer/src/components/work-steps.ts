@@ -1,6 +1,7 @@
 import type { Block } from "../lib/transcript";
 import { isImageGeneration, isImageView } from "../lib/image-activity";
 import { toolShowsCard } from "../lib/task-progress";
+import { visualizationFromTool } from "../lib/visualization";
 import { callParts, type WorkChip } from "./work-chips";
 
 /**
@@ -53,13 +54,18 @@ export interface PlanItem {
 
 /** Tool attempts share one summary, including failures; their original status stays in the expanded details. */
 export function foldable(block: Block, taskCards: boolean): boolean {
-  // Collaboration milestones are individually meaningful in the work timeline.
-  if (block.kind === "tool" && /(?:spawn_agent|thread_send|send_message|team_say|team_complete)$/.test(block.name)) return false;
-  if (block.kind === "activity" && /finished|completed/i.test(block.label)) return false;
-  if (block.kind === "thinking") return !block.status || block.status === "success" || block.status === "running";
-  if (block.kind === "tool") return (!block.status || ["running", "success", "error"].includes(block.status)) && !(taskCards && toolShowsCard(block));
-  if (block.kind === "activity") return ["running", "success"].includes(block.status) && !isImageGeneration(block) && !isImageView(block);
-  return false;
+  switch (block.kind) {
+    case "thinking":
+      return !block.status || block.status === "success" || block.status === "running";
+    case "tool":
+      // Collaboration milestones and visual explanations remain individually visible.
+      if (visualizationFromTool(block) || /(?:spawn_agent|thread_send|send_message|team_say|team_complete)$/.test(block.name)) return false;
+      return (!block.status || ["running", "success", "error"].includes(block.status)) && !(taskCards && toolShowsCard(block));
+    case "activity":
+      return ["running", "success"].includes(block.status) && !/finished|completed/i.test(block.label) && !isImageGeneration(block) && !isImageView(block);
+    default:
+      return false;
+  }
 }
 
 /** Still happening: a call without its result, reasoning or a reply still streaming, an activity still running. */

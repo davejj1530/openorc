@@ -10,10 +10,11 @@ OpenOrc checks installed agents 30 seconds after startup and every six hours whi
 
 - npm global installations of Codex, Claude Code, and OpenCode, where the active npm global folder owns the executable.
 - Homebrew casks for Codex and Claude Code, using the Homebrew installation that owns the cask and the cask's release information.
+- Codex's standalone installer, using `codex update`. OpenOrc recognizes the launcher in `~/.local/bin` when it points to the active package in `~/.codex/packages/standalone`. It also honors `CODEX_HOME` and `CODEX_INSTALL_DIR` when set.
 - Claude Code's standard native installer, using `claude update`. The version check follows `autoUpdatesChannel` (`latest` or `stable`) in your Claude settings file. Managed policies can hold an update back; OpenOrc checks the installed version afterwards.
 - OpenCode's standard `~/.opencode/bin/opencode` installation, using `opencode upgrade --method curl`.
 
-Windows, custom launchers, Homebrew formulas and taps, and other package managers get instructions for updating by hand. OpenOrc never replaces them with an npm installation. Prerelease or unrecognized version strings are reported as failed checks rather than offered as upgrades.
+Windows, custom launchers, Homebrew formulas and taps, and other package managers get instructions for updating by hand. Custom Codex updater settings that change the package manager, pin a release, or select a restricted installer mode also stay manual. OpenOrc never replaces them with an npm installation. Prerelease or unrecognized version strings are reported as failed checks rather than offered as upgrades.
 
 ## While an update runs
 

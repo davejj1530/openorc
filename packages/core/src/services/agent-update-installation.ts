@@ -129,11 +129,17 @@ export async function detectAgentInstallation(id: HarnessId, binary: string, sna
     }
   }
 
-  const home = snapshot.env["HOME"] ?? os.homedir();
+  return detectNativeInstallation(id, binary, snapshot.env, manual);
+}
+
+async function detectNativeInstallation(id: HarnessId, binary: string, env: NodeJS.ProcessEnv, manual: AgentInstallation): Promise<AgentInstallation> {
+  if (id === "codex") return detectStandaloneCodex(binary, env, manual);
+  const home = env["HOME"] ?? os.homedir();
+  const target = manual.identity;
   if (id === "claude" && target.startsWith(path.join(home, ".local/share/claude/versions") + path.sep) && binary === path.join(home, ".local/bin/claude")) {
     let channel = "latest";
     try {
-      const config = JSON.parse(await readFile(path.join(snapshot.env["CLAUDE_CONFIG_DIR"] ?? path.join(home, ".claude"), "settings.json"), "utf8"));
+      const config = JSON.parse(await readFile(path.join(env["CLAUDE_CONFIG_DIR"] ?? path.join(home, ".claude"), "settings.json"), "utf8"));
       if (config.autoUpdatesChannel === "stable") channel = "stable";
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") return { ...manual, message: "Claude’s release channel could not be read. Use claude update in a terminal." };
@@ -142,6 +148,23 @@ export async function detectAgentInstallation(id: HarnessId, binary: string, sna
   }
   if (id === "opencode" && target === path.join(home, ".opencode/bin/opencode")) {
     return { ...manual, method: "Native", command: { binary, args: ["upgrade", "--method", "curl"] }, message: null };
+  }
+  return manual;
+}
+
+async function detectStandaloneCodex(binary: string, env: NodeJS.ProcessEnv, manual: AgentInstallation): Promise<AgentInstallation> {
+  const home = env["HOME"] ?? os.homedir();
+  if (binary !== path.join(env["CODEX_INSTALL_DIR"] || path.join(home, ".local/bin"), "codex")) return manual;
+  const managed = ["NPM", "BUN", "PNPM", "VITE_PLUS"].some((manager) => env[`CODEX_MANAGED_BY_${manager}`] !== undefined);
+  const installerMode = ["DAEMON_ONLY", "DEFER_SELECTION", "IF_LATEST", "IF_CURRENT"].some((mode) => env[`CODEX_INSTALL_${mode}`] === "1");
+  const release = env["CODEX_RELEASE"];
+  if (managed || installerMode || (release && release !== "latest")) return manual;
+  const codexHome = await realpath(env["CODEX_HOME"] || path.join(home, ".codex")).catch(() => null);
+  if (!codexHome) return manual;
+  const standalone = path.join(codexHome, "packages/standalone");
+  const current = path.join(standalone, "current/bin/codex");
+  if (manual.identity.startsWith(path.join(standalone, "releases") + path.sep) && manual.identity === (await realpath(current).catch(() => null))) {
+    return { ...manual, method: "Native", command: { binary, args: ["update"] }, message: null };
   }
   return manual;
 }

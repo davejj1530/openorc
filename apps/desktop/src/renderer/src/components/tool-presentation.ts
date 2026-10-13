@@ -1,20 +1,27 @@
 import { Check, FileText, Globe, Hammer, Search, WorkCommand, WorkDelegate, WorkEdit, WorkMessage, WorkRead, WorkSearch } from "./icons";
+import { isVisualizationTool } from "@openorc/protocol";
 
 export type ToolIcon = typeof WorkCommand;
 
 /** The hue a step's icon takes from what kind of work it is. */
 export type Tone = "read" | "edit" | "run" | "search" | "web" | "task" | "memory" | "plan" | "think" | "context" | "neutral";
 
-function editedObject(paths: string[]): string {
-  if (paths.length === 1) return paths[0]!;
-  if (paths.length) return `${paths.length} files`;
-  return "";
+function editedObject(input: unknown, filePath: string, patch: string): string {
+  if (Array.isArray(input)) {
+    const paths = input.flatMap((entry) => (entry && typeof entry.path === "string" ? [entry.path] : []));
+    if (paths.length === 1) return paths[0]!;
+    return paths.length ? `${paths.length} files` : "";
+  }
+  if (filePath) return filePath;
+  const files = patch ? patch.split("\n").filter((line) => /^\*\*\* (Add|Update|Delete) File: /.test(line)).length : 0;
+  return files ? `${files} file${files === 1 ? "" : "s"}` : "";
 }
 
 /** Verb and object for a tool call, from the names Claude Code and Codex use. */
 export function toolCallPresentation(name: string, input: unknown): { icon: ToolIcon; verb: string; object: string; tone: Tone; summary?: string } {
   const i = (input ?? {}) as Record<string, unknown>;
   const str = (k: string) => (typeof i[k] === "string" ? (i[k] as string) : "");
+  if (isVisualizationTool(name)) return { icon: FileText, verb: "Visualized", object: str("title"), tone: "read" };
   const mcp = mcpCall(name);
   const n = mcp?.tool ?? name;
   const command = str("cmd") || str("command") || (Array.isArray(i["command"]) ? (i["command"] as string[]).join(" ") : "");
@@ -22,13 +29,7 @@ export function toolCallPresentation(name: string, input: unknown): { icon: Tool
     return { icon: WorkCommand, verb: "Ran", object: command.replace(/^\/bin\/zsh -lc /, "").replace(/^'(.*)'$/, "$1"), tone: "run" };
   if (/^(read|read_file|view|cat|notebookread)$/i.test(n)) return { icon: WorkRead, verb: "Read", object: str("file_path") || str("path"), tone: "read" };
   if (/^(edit|multiedit|write|apply_patch|write_file|str_replace|create_file|notebookedit)$/i.test(n)) {
-    if (Array.isArray(input)) {
-      const paths = input.flatMap((entry) => (entry && typeof entry.path === "string" ? [entry.path] : []));
-      return { icon: WorkEdit, verb: "Edited", object: editedObject(paths), tone: "edit" };
-    }
-    const patch = str("patch") || str("input");
-    const files = patch ? patch.split("\n").filter((l) => /^\*\*\* (Add|Update|Delete) File: /.test(l)).length : 0;
-    return { icon: WorkEdit, verb: "Edited", object: str("file_path") || str("path") || (files ? `${files} file${files === 1 ? "" : "s"}` : ""), tone: "edit" };
+    return { icon: WorkEdit, verb: "Edited", object: editedObject(input, str("file_path") || str("path"), str("patch") || str("input")), tone: "edit" };
   }
   if (/^(grep|glob|search|rg|find|ls)$/i.test(n)) return { icon: WorkSearch, verb: "Searched", object: str("pattern") || str("query") || str("path"), tone: "search" };
   if (/^(webfetch|fetch)$/i.test(n)) return { icon: Globe, verb: "Fetched", object: str("url"), tone: "web" };

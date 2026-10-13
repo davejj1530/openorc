@@ -137,6 +137,24 @@ function resultText(result: Awaited<ReturnType<Client["callTool"]>>): string {
   return first.text;
 }
 
+void test("visualize accepts a self-contained explanation without host actions or echoing its source", async (t) => {
+  const { connect, calls } = await fixture(t, false);
+  const client = await connect("visualization-run");
+  const tool = (await client.listTools()).tools.find((tool) => tool.name === "visualize");
+  assert.ok(tool);
+  assert.equal(tool.annotations?.readOnlyHint, true);
+  assert.ok(internalToolNames.includes("visualize"));
+  const input = { title: "A queue", description: "Items leave in the order they arrive.", html: '<svg aria-label="First in, first out"></svg>' };
+  const result = await client.callTool({ name: "visualize", arguments: input });
+  assert.ok(!result.isError);
+  assert.deepEqual(JSON.parse(resultText(result)), { title: input.title, description: input.description, message: "Visualization added to the conversation." });
+  assert.ok(!resultText(result).includes("<svg"));
+  assert.deepEqual(calls, []);
+  for (const patch of [{ html: " " }, { html: "x".repeat(256_001) }, { description: "" }, { title: "x".repeat(121) }]) {
+    assert.equal((await client.callTool({ name: "visualize", arguments: { ...input, ...patch } })).isError, true);
+  }
+});
+
 /** An MCP initialize request with full control of the headers, as a web page or a stray process would send it. */
 function post(target: string, headers: Record<string, string> = {}): Promise<number> {
   const url = new URL(target);

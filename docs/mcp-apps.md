@@ -2,6 +2,8 @@
 
 OpenOrc can show the interactive views that some MCP servers provide with their tool results, called MCP Apps. A compatible tool declares `_meta.ui.resourceUri` (or the older `ui/resourceUri` key). The provider reads that `ui://` resource, and OpenOrc passes the original tool arguments and result to the view through the official `AppBridge` SDK.
 
+Agents can also create [visual explanations](visualizations.md) with OpenOrc's built-in `visualize` tool. Those views work across providers and reopen from saved history without a live session.
+
 ## Provider support
 
 - **Codex:** supported. OpenOrc uses the existing Codex connection for tool discovery, resource reads, and tool calls made by the app. Last verified against the `codex-cli` 0.154.0 app-server protocol.

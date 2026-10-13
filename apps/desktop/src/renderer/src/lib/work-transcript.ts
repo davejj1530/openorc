@@ -1,5 +1,6 @@
 import type { Block } from "./transcript";
 import { toolShowsCard } from "./task-progress";
+import { visualizationFromTool } from "./visualization";
 
 /** Persisted turn identity wins; user messages and terminal events also cover older transcripts. */
 export function workTurns(blocks: Block[]): { id: string; blocks: Block[] }[] {
@@ -53,6 +54,7 @@ export function workParts(blocks: Block[], live: boolean, taskCards = true, ambi
       // Failed attempts stay with their work history; turn outcomes and provider
       // errors carry the overall failure state without promoting earlier retries.
       (b.kind === "tool" && taskCards && toolShowsCard(b)) ||
+      visualizationFromTool(b) !== null ||
       (b.kind === "activity" && b.activityKind === "image_generation") ||
       (b.kind === "status" && b.tone === "bad" && !/^(turn|session) /.test(b.text))
     )

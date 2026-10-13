@@ -7,6 +7,7 @@ import { UserInput, type UserInputResult } from "./questions.js";
 export { UserInput, validateUserAnswers, type UserInputResult } from "./questions.js";
 import { AgentKind, TaskStatus, CommentIntent, parseFileBoundary, type ApprovalDecision, type BrowserCommand, type BrowserResult } from "@openorc/protocol";
 import { registerBrowserTool } from "./browser.js";
+import { registerVisualizationTool } from "./visualization.js";
 import { registerPullReviewTools, type PullReviewTools } from "./pull-review.js";
 export type { PullReviewComment, PullReviewTools } from "./pull-review.js";
 import { orclingToolNames, registerOrclingTools, type OrclingTools } from "./orcling-tools.js";
@@ -261,6 +262,7 @@ async function answerFileBoundary(req: http.IncomingMessage, res: http.ServerRes
 /** App actions eligible for internal approval; the approval bridge itself is excluded. */
 export const internalToolNames = [
   "browser",
+  "visualize",
   "ask_user",
   "plan_write",
   "memory_search",
@@ -372,6 +374,7 @@ function buildServer(host: McpHost, runId: string): McpServer {
     return mcp;
   }
 
+  registerVisualizationTool(mcp);
   registerOptionalTools(mcp, host, runId);
 
   if (host.plan?.available(runId))

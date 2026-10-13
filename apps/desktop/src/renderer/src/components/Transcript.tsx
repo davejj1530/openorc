@@ -11,6 +11,7 @@ import { AgentPresence } from "./AgentPresence";
 import { useTurnAuthor } from "../lib/turn-authors";
 import { toolCallPresentation, type Tone } from "./tool-presentation";
 import { foldable } from "./work-steps";
+import { visualizationFromTool } from "../lib/visualization";
 import { WorkNow, WorkSteps } from "./WorkSteps";
 import { turnReceipt } from "./work-receipt";
 export { AgentPresence } from "./AgentPresence";
@@ -22,6 +23,7 @@ import { UsageRecovery } from "./UsageRecovery";
 import { SignInRecovery } from "./SignInRecovery";
 import { TranscriptErrorCard } from "./TranscriptErrorCard";
 const McpAppResult = lazy(() => import("./McpAppResult"));
+const VisualizationResult = lazy(() => import("./VisualizationResult"));
 import { Button, IconButton, TextButton } from "./ui";
 import { ImageGenerationRow, ImageViewRow, ThreadImage, ThreadMedia, ThreadRichText } from "./ThreadImages";
 import { isImageGeneration, isImageView } from "../lib/image-activity";
@@ -658,10 +660,16 @@ function ToolRow({ block, defaultOpen = false }: { block: Extract<Block, { kind:
   // An output left out of the page starts loading when the pointer reaches the row, so it is there by the click.
   const [near, setNear] = useState(false);
   const output = useToolOutput(block, open || near);
+  const visualization = visualizationFromTool(block);
   const { icon: Icon, verb, object, tone } = toolCallPresentation(block.name, block.input);
   const label = block.done ? verb : liveVerb(verb);
   return (
     <div>
+      {visualization ? (
+        <Suspense fallback={<p className="text-sm text-ink-2">{visualization.description}</p>}>
+          <VisualizationResult visualization={visualization} />
+        </Suspense>
+      ) : null}
       <button
         aria-expanded={open}
         data-state={block.done ? (block.status ?? (block.isError ? "error" : "success")) : "running"}
@@ -671,14 +679,13 @@ function ToolRow({ block, defaultOpen = false }: { block: Extract<Block, { kind:
         className={cn("group flex items-center gap-2 min-h-6 w-full text-left text-sm", block.isError ? "text-bad" : "text-ink-3 hover:text-ink-2")}
       >
         <Icon size={16} className="tool-icon shrink-0" data-tone={block.isError ? "error" : tone} />
-        <span className="shrink-0">{label}</span>
-        {object ? <span className="font-mono truncate text-ink-2 group-hover:text-ink">{object}</span> : null}
-        {block.done && (block.isError || (block.status && block.status !== "success")) ? <span className="text-xs">{stateLabel(block.status ?? "error")}</span> : null}
-        {!block.done ? <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse shrink-0" /> : null}
+        <span className="shrink-0">{visualization ? "View source" : label}</span>
+        {!visualization && object ? <span className="font-mono truncate text-ink-2 group-hover:text-ink">{object}</span> : null}
+        <ToolStatus block={block} />
         <ChevronRight size={12} className={cn("ml-auto shrink-0 opacity-0 group-hover:opacity-100 transition-transform", open && "rotate-90 opacity-100")} />
       </button>
       {block.progress ? <div className="ml-5 text-xs text-ink-3 whitespace-pre-wrap">{block.progress}</div> : null}
-      {block.mcp && block.done && block.runId ? (
+      {!visualization && block.mcp && block.done && block.runId ? (
         <Suspense fallback={null}>
           <McpAppResult runId={block.runId} toolCallId={block.id} />
         </Suspense>
@@ -690,6 +697,12 @@ function ToolRow({ block, defaultOpen = false }: { block: Extract<Block, { kind:
       ) : null}
     </div>
   );
+}
+
+function ToolStatus({ block }: { block: Extract<Block, { kind: "tool" }> }) {
+  if (!block.done) return <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse shrink-0" />;
+  if (block.isError || (block.status && block.status !== "success")) return <span className="text-xs">{stateLabel(block.status ?? "error")}</span>;
+  return null;
 }
 
 /** A loaded page leaves large outputs out; a row about to open reads its output from the ledger. */

@@ -9,7 +9,8 @@ import { stopProcess, waitForProcessGroup } from "../process-lifetime.js";
 import readline from "node:readline";
 import { ULTRACODE_EFFORT, type AgentEvent, type FileBoundary, type RunSpec } from "@openorc/protocol";
 import { ClaudeStreamParser } from "./stream-json.js";
-import { claudeConfigDir } from "./config-dir.js";
+import { SHARED_CLAUDE_CONFIG_DIR, claudeConfigDir } from "./config-dir.js";
+import { installedClaudePlugins } from "./plugins.js";
 import { RunHandle, type RunControls } from "../run-handle.js";
 import { withAttachedFiles } from "../attachments.js";
 import type { AgentLaunchEnvironment } from "../launch-environment.js";
@@ -141,6 +142,11 @@ function isolationArgs(spec: RunSpec, restricted: boolean, strictMcp: boolean): 
   return [...(untrusted ? ["--setting-sources", "user"] : []), ...(restricted || strictMcp || untrusted ? ["--strict-mcp-config"] : [])];
 }
 
+/** An added account runs the plugins the CLI login turns on, loaded for this process rather than installed into its folder. */
+function sharedPluginArgs(shared: string | undefined): string[] {
+  return shared ? installedClaudePlugins(shared).flatMap((plugin) => (plugin.enabled ? ["--plugin-dir", plugin.dir] : [])) : [];
+}
+
 /** Prepare the exact CLI launch and private MCP file before a process owns them. */
 function prepareClaudeLaunch(spec: RunSpec, launch: AgentLaunchEnvironment, options: ClaudeAdapterOptions) {
   if (process.platform === "win32" && (spec.mode === "plan" || spec.permissionMode === "trusted"))
@@ -149,6 +155,8 @@ function prepareClaudeLaunch(spec: RunSpec, launch: AgentLaunchEnvironment, opti
   const env: NodeJS.ProcessEnv = { ...launch.env, ...options.env };
   // Claude Code refuses to nest inside itself; the app is not a Claude session.
   delete env["CLAUDECODE"];
+  const shared = env[SHARED_CLAUDE_CONFIG_DIR];
+  delete env[SHARED_CLAUDE_CONFIG_DIR];
   // Claude keeps plan files in its own plans directory, as in its desktop app. The
   // CLI ignores a plansDirectory outside the project, so the boundary follows it instead.
   const plans = spec.mode === "plan" ? claudePlansDirectory(env) : null;
@@ -180,6 +188,7 @@ function prepareClaudeLaunch(spec: RunSpec, launch: AgentLaunchEnvironment, opti
     // Native subagents have independent policies; use OpenOrc's inherited-policy delegation instead.
     if (restricted) args.push("--tools", "Read,Grep,Glob,Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch,AskUserQuestion,ExitPlanMode");
     args.push(...isolationArgs(spec, restricted, Boolean(connection) && (spec.strictMcp ?? options.strictMcp) === true));
+    args.push(...sharedPluginArgs(shared));
     if (spec.model) args.push("--model", spec.model);
     if (spec.effort) args.push("--effort", spec.effort);
     if (spec.maxTurns) args.push("--max-turns", String(spec.maxTurns));

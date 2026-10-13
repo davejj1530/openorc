@@ -1,9 +1,9 @@
 import { execFile, spawn, type ChildProcess } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, readlinkSync, renameSync, rmdirSync, symlinkSync, unlinkSync, writeFileSync, type Dirent } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import { captureLaunchEnvironment, launchCommand, stopProcess } from "@openorc/agents";
+import { SHARED_CLAUDE_CONFIG_DIR, captureLaunchEnvironment, claudeConfigDir, launchCommand, stopProcess } from "@openorc/agents";
 import { chromeExecutable, chromeIncognitoFlags } from "@openorc/agents/chrome-incognito";
 import { claudeAccounts, type Db } from "@openorc/db";
 import { DEFAULT_CLAUDE_ACCOUNT, type ClaudeAccount, type ClaudeAccountConnection, type ClaudeAccounts } from "@openorc/protocol";
@@ -14,6 +14,101 @@ const authStatus = z.object({ loggedIn: z.boolean(), email: z.string().nullable(
 const inheritedAuth = /^(ANTHROPIC_|CLAUDE_CODE_(OAUTH_TOKEN|OAUTH_TOKEN_FILE_DESCRIPTOR|API_KEY_FILE_DESCRIPTOR|USE_BEDROCK|USE_VERTEX|USE_FOUNDRY)|CLAUDE_CONFIG_DIR$)/;
 type Connection = Pick<ClaudeAccountConnection, "status" | "email" | "organization" | "message">;
 const disconnected: Connection = { status: "signed_out", email: null, organization: null, message: null };
+
+/**
+ * An added account uses the personal skills installed for the existing CLI login: each is linked into the
+ * account's own skills folder, where both Claude Code and the composer's / list find it. A link goes once its
+ * skill is uninstalled. The account's own skills and the claude.ai skills Claude Code syncs into `synced` stay.
+ * This runs whenever the account's environment is built, so a newly installed skill is linked by the next refresh.
+ */
+function linkSharedSkills(shared: string, account: string): void {
+  // Before sign-in the folder does not exist, and creating it here would skip the private mode sign-in gives it.
+  if (!existsSync(account)) return;
+  const from = path.join(shared, "skills");
+  const to = path.join(account, "skills");
+  const linkable = (entry: Dirent) => (entry.isDirectory() || entry.isSymbolicLink()) && entry.name !== "synced" && !entry.name.startsWith(".");
+  let installed: Set<string>;
+  let present: Dirent[];
+  try {
+    installed = new Set(
+      existsSync(from)
+        ? readdirSync(from, { withFileTypes: true })
+            .filter(linkable)
+            .map((entry) => entry.name)
+        : [],
+    );
+    mkdirSync(to, { recursive: true });
+    present = readdirSync(to, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of present) {
+    const link = path.join(to, entry.name);
+    try {
+      if (entry.isSymbolicLink() && !installed.has(entry.name) && path.dirname(readlinkSync(link)) === from) unlinkSync(link);
+    } catch {
+      // A link that cannot be removed is a skill Claude reports missing, not a reason to stop the run.
+    }
+  }
+  const existing = new Set(present.map((entry) => entry.name));
+  for (const name of installed) {
+    if (existing.has(name)) continue;
+    try {
+      symlinkSync(path.join(from, name), path.join(to, name), process.platform === "win32" ? "junction" : "dir");
+    } catch {
+      // That one skill stays out of this account; the rest still link.
+    }
+  }
+}
+
+/**
+ * Memories an added account saved in its own folder, before it shared the CLI login's, move to the CLI login's folder
+ * for the same project, where its runs now look. Index lines are added once; a file whose name already holds a
+ * different memory stays where it is, and so does the account's folder around it.
+ */
+function moveAccountMemory(shared: string, account: string): void {
+  const projects = path.join(account, "projects");
+  let names: string[];
+  try {
+    names = readdirSync(projects);
+  } catch {
+    return;
+  }
+  for (const project of names) {
+    const from = path.join(projects, project, "memory");
+    const to = path.join(shared, "projects", project, "memory");
+    let files: string[];
+    try {
+      files = readdirSync(from);
+      if (files.length > 0) mkdirSync(to, { recursive: true });
+    } catch {
+      continue;
+    }
+    for (const file of files) {
+      const source = path.join(from, file);
+      const target = path.join(to, file);
+      try {
+        if (!existsSync(target)) renameSync(source, target);
+        else if (file === "MEMORY.md") {
+          const present = readFileSync(target, "utf8");
+          const known = new Set(present.split("\n").map((line) => line.trim()));
+          const missing = readFileSync(source, "utf8")
+            .split("\n")
+            .filter((line) => line.trim() && !known.has(line.trim()));
+          if (missing.length > 0) appendFileSync(target, `${present === "" || present.endsWith("\n") ? "" : "\n"}${missing.join("\n")}\n`);
+          unlinkSync(source);
+        } else if (readFileSync(source).equals(readFileSync(target))) unlinkSync(source);
+      } catch {
+        // Left with the account, as a memory whose name the CLI login's folder already uses is.
+      }
+    }
+    try {
+      rmdirSync(from);
+    } catch {
+      // Still holds a memory that could not move.
+    }
+  }
+}
 
 export class ClaudeAccountService {
   private readonly logins = new Map<string, { process: ChildProcess; done: Promise<void> }>();
@@ -51,8 +146,16 @@ export class ClaudeAccountService {
     if (this.signingIn(id)) throw new Error(`Finish signing in to “${account.name}” before starting a conversation.`);
     const env = { ...snapshot.env };
     if (account.kind === "managed") {
+      const shared = claudeConfigDir(os.homedir(), env);
       for (const key of Object.keys(env)) if (inheritedAuth.test(key)) delete env[key];
       env["CLAUDE_CONFIG_DIR"] = this.directory(account);
+      env[SHARED_CLAUDE_CONFIG_DIR] = shared;
+      // Claude Code keeps auto-memory under this folder instead of the account's, naming each project's memory folder
+      // the way it does for the CLI login, so every account reads and saves the same memories. autoMemoryDirectory
+      // would need OpenOrc to repeat that naming, and Claude asks permission to use memory through a folder link.
+      env["CLAUDE_CODE_REMOTE_MEMORY_DIR"] = shared;
+      linkSharedSkills(shared, env["CLAUDE_CONFIG_DIR"]);
+      moveAccountMemory(shared, env["CLAUDE_CONFIG_DIR"]);
     }
     return { ...snapshot, env: Object.freeze(env), claudeAccountId: id, scope: `${id}:${this.generations.get(id) ?? 0}` };
   }

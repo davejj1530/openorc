@@ -16,6 +16,6 @@ export { listSkills } from "./skills.js";
 export { instructionFiles } from "./instructions.js";
 export { readCodexUsage, consumeCodexReset, type CodexUsageOptions, type CodexAccountReport } from "./codex/usage.js";
 export { readClaudeUsage, type ClaudeUsageResult, type ClaudeUsageOptions } from "./claude/usage.js";
-export { claudeConfigDir } from "./claude/config-dir.js";
+export { SHARED_CLAUDE_CONFIG_DIR, claudeConfigDir } from "./claude/config-dir.js";
 export { StdioJsonRpc, stripAnsi } from "./jsonrpc.js";
 export { listClaudeSessions, listCodexSessions, readClaudeSession, readCodexSession, claudeProjectDir, codexSessionsDir, type SessionFile, type ImportedSession, type SessionCache } from "./import.js";

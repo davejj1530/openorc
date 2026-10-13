@@ -22,6 +22,10 @@ An existing thread keeps its account. Start a new thread to use another account.
 
 ## Credential ownership
 
-Claude Code handles browser authentication, credential storage, and token refresh. OpenOrc stores account names and identifiers, not OAuth tokens. Managed accounts use separate `CLAUDE_CONFIG_DIR` directories inside OpenOrc's data directory, following [Claude Code's multiple-account support](https://code.claude.com/docs/en/authentication#log-in-with-multiple-accounts). Each has separate Claude settings, plugins, and session history. Project files and project instructions remain shared.
+Claude Code handles browser authentication, credential storage, and token refresh. OpenOrc stores account names and identifiers, not OAuth tokens. Managed accounts use separate `CLAUDE_CONFIG_DIR` directories inside OpenOrc's data directory, following [Claude Code's multiple-account support](https://code.claude.com/docs/en/authentication#log-in-with-multiple-accounts). Each has separate Claude settings and session history. Project files and project instructions remain shared.
+
+Claude's memory is shared as well. Every added account reads and saves memories in the **Existing CLI login**'s memory folders, so what Claude learns about a project on one account is there on the others. Memories an account saved on its own before this move into the CLI login's folder for the same project. A memory file whose name the CLI login already uses for a different memory stays in the account's folder, unused.
+
+Added accounts use the skills and plugins installed for the **Existing CLI login**, so `/` offers the same skills whichever account a thread runs on. OpenOrc links each personal skill into the account's own `skills` folder and removes the link once the skill is uninstalled. Plugins turned on for the CLI login are loaded into each run with `--plugin-dir`, with nothing installed in the account. Skills an account installs itself, and the claude.ai skills Claude Code syncs for it, stay with that account.
 
 The existing CLI entry keeps the inherited environment. Managed entries remove inherited Anthropic API keys, OAuth token overrides, and cloud-provider selectors from their launch environment so those values cannot override the chosen Claude login. Adding an account does not change the login used by your ordinary terminal.

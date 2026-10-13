@@ -45,6 +45,8 @@ export class ClaudeStreamParser {
   /** Tools announced from a streamed content block, before their input finished; the assistant line then updates them. */
   private readonly toolsStarted = new Set<string>();
   private lastToolId: string | null = null;
+  /** Where each task this process started shows: on a row of its own, or elsewhere (a tool row, or the call that started the subagent running it). */
+  private readonly taskPlaces = new Map<string, "own" | "elsewhere">();
   /** The model the session runs on, from the init line; picks its entry out of a result's per-model usage. */
   private model: string | null = null;
   /** Where the session's login comes from, from the init line. */
@@ -444,27 +446,44 @@ export class ClaudeStreamParser {
       return;
     }
     if (subtype === "task_started" || subtype === "task_notification") {
+      // Housekeeping tasks stay out of the transcript, as Claude Code asks of hosts.
+      if (msg["skip_transcript"] === true || msg["ambient"] === true) return;
       const toolCallId = str(msg["tool_use_id"]);
+      const taskId = str(msg["task_id"]);
+      // A notification has no description; its summary becomes the row's label.
       const description = str(msg["description"]) ?? str(msg["summary"]) ?? "Background task";
       const finished = subtype === "task_notification";
       const failed = finished && str(msg["status"]) !== "completed";
       if (toolCallId && this.toolNames.has(toolCallId)) {
         // The task belongs to a tool call the transcript already shows; report on that row.
+        if (taskId) this.taskPlaces.set(taskId, "elsewhere");
         if (!finished) out.push({ type: "tool.updated", runId: this.runId, ts: now, toolCallId, progress: description });
         return;
       }
+      if (!this.trackStandaloneTask(msg, taskId, toolCallId)) return;
       out.push({
         type: "activity.updated",
         runId: this.runId,
         ts: now,
-        activityId: `task-${str(msg["task_id"]) ?? toolCallId ?? now}`,
+        activityId: `task-${taskId ?? toolCallId ?? now}`,
         label: description,
         status: backgroundStatus(finished, failed),
-        ...(finished && str(msg["summary"]) ? { text: str(msg["summary"])! } : {}),
-        detail: { taskType: str(msg["task_type"]) },
       });
       return;
     }
+  }
+
+  private trackStandaloneTask(msg: Record<string, unknown>, taskId: string | null, toolCallId: string | null): boolean {
+    const place = taskId ? this.taskPlaces.get(taskId) : undefined;
+    // An unseen shell call belongs to a subagent. Its parent call stands for that work, including later resumptions.
+    if (place === "elsewhere" || (toolCallId && str(msg["task_type"]) === "local_bash")) {
+      if (taskId) this.taskPlaces.set(taskId, "elsewhere");
+      return false;
+    }
+    // A resumed process reports the last one's unfinished tasks without a run id; their rows already closed.
+    if (msg["subtype"] === "task_notification" && !place && msg["run_id"] === undefined) return false;
+    if (taskId) this.taskPlaces.set(taskId, "own");
+    return true;
   }
 
   /**

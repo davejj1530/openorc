@@ -84,7 +84,73 @@ describe("ClaudeStreamParser", () => {
       ["activity.updated", "error"],
     ]);
     expect(tasks[0]).toMatchObject({ activityId: "task-bg2", label: "Indexing" });
+    expect(tasks[0]).not.toHaveProperty("detail");
+    expect(tasks[1]).not.toHaveProperty("text");
     expect(tasks[2]).toMatchObject({ label: "Rate limit reached" });
+  });
+
+  it("leaves what a workflow's agents run to the call that started them", () => {
+    const p = new ClaudeStreamParser("run-workflow");
+    const types = (lines: unknown[]) => lines.flatMap((l) => p.parseLine(line(l), 1000)).filter((e) => e.type !== "raw");
+    types([
+      {
+        type: "assistant",
+        message: {
+          id: "m1",
+          role: "assistant",
+          content: [
+            { type: "tool_use", id: "wf", name: "Workflow", input: {} },
+            { type: "tool_use", id: "ag", name: "Agent", input: {} },
+          ],
+        },
+      },
+    ]);
+    // Claude Code 2.1.296 reports each command as a task, but a workflow agent's own tool calls never reach the stream.
+    const events = types([
+      { type: "system", subtype: "task_started", task_id: "wf1", tool_use_id: "wf", description: "Collapsible sidebar", task_type: "local_workflow" },
+      { type: "system", subtype: "task_started", task_id: "a1", tool_use_id: "ag", description: "Study the sidebar", task_type: "local_agent", is_backgrounded: true },
+      {
+        type: "system",
+        subtype: "task_started",
+        task_id: "b1",
+        tool_use_id: "toolu_sub1",
+        description: "Measure logo alignment",
+        owned_by_subagent: true,
+        is_backgrounded: false,
+        task_type: "local_bash",
+      },
+      { type: "system", subtype: "task_notification", task_id: "b1", tool_use_id: "toolu_sub1", status: "completed", output_file: "", summary: "Measure logo alignment" },
+      { type: "system", subtype: "task_started", task_id: "b2", tool_use_id: "toolu_sub2", description: "Run phone audit", is_backgrounded: true, task_type: "local_bash" },
+      {
+        type: "system",
+        subtype: "task_notification",
+        task_id: "b2",
+        tool_use_id: "toolu_sub2",
+        status: "completed",
+        output_file: "",
+        summary: 'Background command "Run phone audit" completed (exit code 0)',
+      },
+      // A workflow agent's SendMessage resumes the background agent from a call the stream never showed.
+      { type: "system", subtype: "task_started", task_id: "a1", tool_use_id: "toolu_send", description: "(resumed)", task_type: "local_agent", is_backgrounded: true },
+      { type: "system", subtype: "task_notification", task_id: "a1", tool_use_id: "toolu_send", status: "completed", output_file: "", summary: "I replied to the workspace agent." },
+    ]);
+    expect(events).toEqual([
+      expect.objectContaining({ type: "tool.updated", toolCallId: "wf", progress: "Collapsible sidebar" }),
+      expect.objectContaining({ type: "tool.updated", toolCallId: "ag", progress: "Study the sidebar" }),
+    ]);
+  });
+
+  it("keeps housekeeping and an earlier process's orphaned tasks out of the transcript", () => {
+    const p = new ClaudeStreamParser("run-resumed");
+    const types = (lines: unknown[]) => lines.flatMap((l) => p.parseLine(line(l), 1000)).filter((e) => e.type !== "raw");
+    const orphaned = "Orphaned by a previous Claude Code process exit and reported in an aggregate summary.";
+    const events = types([
+      { type: "system", subtype: "task_notification", task_id: "old1", tool_use_id: "toolu_old", status: "stopped", output_file: "", summary: orphaned },
+      { type: "system", subtype: "task_notification", task_id: "dream1", run_id: "r1", status: "stopped", output_file: "", summary: "", skip_transcript: true, ambient: true },
+      { type: "system", subtype: "task_notification", task_id: "bg3", run_id: "r2", tool_use_id: "toolu_prev", status: "completed", output_file: "", summary: "Background command completed" },
+    ]);
+    // A task this process registered in an earlier turn still reports back.
+    expect(events).toEqual([expect.objectContaining({ type: "activity.updated", activityId: "task-bg3", status: "success" })]);
   });
 
   it("tells the user about a usage threshold without calling the turn a failure", () => {

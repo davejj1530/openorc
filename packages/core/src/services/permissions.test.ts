@@ -43,6 +43,8 @@ beforeAll(async () => {
   core = await OpenOrc.create({
     dataDir,
     ephemeral: true,
+    // Permission checks keep memory records, but do not need to download an embedding model.
+    embedder: { ready: async () => false, embed: async () => null, embedQuery: async () => null },
     transport: {
       push(message) {
         pushes.push(message);

@@ -408,10 +408,6 @@
 .browser-group-toggle > span:first-child {
   flex: 1;
 }
-.browser-group-toggle > svg {
-  color: var(--ink-3);
-  flex-shrink: 0;
-}
 .project-group-icon {
   margin-inline: 5px;
   color: var(--ink-3);

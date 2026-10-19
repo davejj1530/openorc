@@ -92,26 +92,38 @@
   font-size: 12px;
   line-height: 1.6;
 }
+/* Each account is a compact card set apart by its fill alone: no border, no shadow, no rules.
+   Every row of the grid takes the tallest card's height, so all cards share one size. */
+.usage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-auto-rows: 1fr;
+  gap: 12px;
+}
 .usage-account {
-  padding: 22px 0;
-  border-top: var(--hairline) solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  padding: 14px 16px 10px;
+  border-radius: var(--radius-xl);
+  background: var(--surface-2);
   scroll-margin-top: 16px;
 }
 .usage-account:focus-visible {
   outline: 2px solid var(--ring);
-  outline-offset: 6px;
+  outline-offset: 2px;
 }
 .usage-account-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: 12px;
 }
 .usage-account-identity {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
 }
 .usage-account-identity > div {
@@ -120,190 +132,165 @@
 .usage-account-identity img {
   flex-shrink: 0;
 }
+.usage-account-identity :is(h2, p),
+.usage-window-label h3,
+.usage-credit h3 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .usage-account-identity h2 {
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
 }
 .usage-account-identity p {
   color: var(--ink-3);
-  font-size: 12px;
-  margin-top: 2px;
+  font-size: 11px;
 }
 .usage-account-status {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 4px;
   flex-shrink: 0;
+  margin-right: -6px;
   font-size: 11px;
   color: var(--ink-3);
 }
 .usage-account-status [data-warning] {
   color: var(--warn);
 }
-.usage-windows {
-  display: grid;
+/* Front and back share one area: Details lies over the limits instead of adding height. */
+.usage-account-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
 }
-.usage-window {
+.usage-account-front {
   display: grid;
-  grid-template-columns: minmax(160px, 1fr) minmax(90px, 1.25fr) 90px;
+  align-content: start;
+  gap: 12px;
+}
+/* Details scroll inside the card; the fade over the bottom padding shows there is more. */
+.usage-account-details {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding-bottom: 16px;
+  overflow-y: auto;
+  scrollbar-width: none;
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
+  color: var(--ink-2);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.usage-account-details[hidden] {
+  display: none;
+}
+/* A limit is one row: its ring, the name over its reset time, and the amount. Credits share the
+   columns so their labels line up with the limits'. */
+.usage-window,
+.usage-credit {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 6px 24px;
-  padding-block: 12px;
+  column-gap: 10px;
 }
-.usage-window + .usage-window {
-  border-top: var(--hairline) solid var(--line);
+.usage-credit > h3 {
+  grid-column: 2;
+}
+.usage-ring {
+  display: block;
+  width: 28px;
+  height: 28px;
+}
+.usage-ring svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+.usage-ring circle {
+  fill: none;
+  stroke-width: 3;
+}
+.usage-ring-track {
+  stroke: color-mix(in srgb, var(--ink) 10%, transparent);
+}
+.usage-ring-fill {
+  stroke: var(--navigation-ink);
+  stroke-linecap: round;
+}
+.usage-window[data-warning] .usage-ring-fill {
+  stroke: var(--warn);
+}
+.usage-window-label {
+  min-width: 0;
 }
 .usage-window-label h3,
 .usage-credit h3 {
-  font-size: 13px;
-  font-weight: 500;
-}
-.usage-window-label p,
-.usage-credit p {
-  margin-top: 3px;
-  color: var(--ink-3);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-}
-.usage-window-meter {
-  display: grid;
-  gap: 6px;
-}
-.usage-meter {
-  height: 5px;
-  overflow: hidden;
-  border-radius: 3px;
-  background: var(--surface-3);
-}
-.usage-meter > span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--navigation-ink);
-}
-.usage-window[data-warning] .usage-meter > span {
-  background: var(--warn);
-}
-.usage-window-value {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-  white-space: nowrap;
-}
-.usage-window-value strong {
-  font-size: 24px;
-  line-height: 1;
-  font-weight: 500;
-  letter-spacing: -0.8px;
-  font-variant-numeric: tabular-nums;
-}
-.usage-window-value small {
-  font-size: 14px;
-  margin-left: 2px;
-  letter-spacing: 0;
+  font-size: 12px;
+  font-weight: 400;
   color: var(--ink-2);
 }
-.usage-window-value > span {
+.usage-window-label p {
+  overflow: hidden;
   color: var(--ink-3);
   font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.usage-window-warning {
+.usage-window[data-warning] .usage-window-label p,
+.usage-reset-note[data-warning] {
   color: var(--warn);
-  font-size: 11px;
 }
-.usage-window-observed {
-  grid-column: 1 / -1;
-  color: var(--ink-3);
+.usage-window-value,
+.usage-credit strong {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.usage-reset-note {
+  color: var(--ink-2);
   font-size: 11px;
 }
 .usage-empty {
-  padding-block: 10px;
   color: var(--ink-3);
   font-size: 12px;
 }
-.usage-credit {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  padding-block: 12px;
-  border-top: var(--hairline) solid var(--line);
+.usage-report {
+  display: grid;
+  gap: 4px;
 }
-.usage-credit strong {
-  font-size: 14px;
-  font-weight: 500;
+.usage-report > div {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 12px;
 }
-.usage-message {
-  color: var(--ink-2);
-  font-size: 12px;
-  margin-top: 10px;
+.usage-report dt {
+  color: var(--ink-3);
 }
 .usage-account-footer {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
-  margin-top: 10px;
-  color: var(--ink-3);
+  gap: 12px;
+  margin-right: -6px;
   font-size: 11px;
 }
-.usage-account-footer > button {
-  margin-left: auto;
-  flex-shrink: 0;
-}
-.usage-report-details {
-  min-width: 0;
-  flex: 1;
-}
-.usage-report-details > summary {
-  min-height: 28px;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  width: fit-content;
-  list-style: none;
-}
-.usage-report-details > summary::before {
-  content: "";
-  width: 5px;
-  height: 5px;
-  border-right: 1px solid currentColor;
-  border-bottom: 1px solid currentColor;
-  transform: rotate(-45deg);
-  margin-right: 3px;
-}
-.usage-report-details[open] > summary::before {
-  transform: rotate(45deg);
-}
-.usage-report-details > summary::-webkit-details-marker {
-  display: none;
-}
-.usage-report-details > summary:hover {
-  color: var(--ink);
-}
-.usage-report-details > summary:focus-visible,
 .settings-agent-location > summary:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
   border-radius: 3px;
 }
-.usage-report-details dl {
-  display: grid;
-  gap: 6px;
-  margin-block: 8px;
-}
-.usage-report-details dl > div {
-  display: grid;
-  grid-template-columns: 80px minmax(0, 1fr);
-  gap: 16px;
-}
-.usage-report-details dd {
-  color: var(--ink-2);
-}
 .usage-footnote {
   max-width: 650px;
-  border-top: var(--hairline) solid var(--line);
-  padding-top: 16px;
+  margin-top: 20px;
   color: var(--ink-3);
   font-size: 11px;
   line-height: 1.6;
@@ -317,60 +304,18 @@
     max-width: 600px;
   }
 }
-@container (max-width: 540px) {
-  .usage-window {
-    grid-template-columns: minmax(0, 1fr) 80px;
-    gap: 8px 18px;
-  }
-  .usage-window-value {
-    grid-column: 2;
-    grid-row: 1 / 3;
-  }
-  .usage-window-meter {
-    grid-row: 2;
-    grid-column: 1;
-  }
-  .usage-account-heading {
-    flex-wrap: wrap;
-    gap: 10px;
-  }
-  .usage-account-status {
-    margin-left: auto;
-  }
-  .usage-account-footer {
-    gap: 8px;
-  }
-  .usage-report-details dl > div {
-    grid-template-columns: 1fr;
-    gap: 1px;
-  }
-}
 @media (prefers-reduced-motion: reduce) {
   .settings-section-menu {
     transition: none;
   }
 }
 @media (forced-colors: active) {
-  .usage-meter {
-    border: 1px solid CanvasText;
+  .usage-ring-track {
+    stroke: CanvasText;
   }
-  .usage-meter > span {
-    background: Highlight;
-    forced-color-adjust: none;
+  .usage-ring-fill {
+    stroke: Highlight;
   }
-}
-.usage-reset-details {
-  margin-top: 8px;
-  color: var(--ink-3);
-  font-size: 11px;
-}
-.usage-reset-details > summary {
-  width: fit-content;
-  padding-block: 4px;
-}
-.usage-reset-details > summary:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
 }
 
 .settings-shell .settings-feedback:empty {

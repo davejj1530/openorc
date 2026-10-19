@@ -69,7 +69,7 @@ export function Settings({ route }: { route: SettingsRoute }) {
 function revealSetting(route: SettingsRoute) {
   if (route.setting === "team-execution") document.getElementById("team-execution-setting")?.scrollIntoView?.({ block: "center" });
   if (route.section !== "usage" || !route.provider) return;
-  const target = document.getElementById(`provider-usage-${route.provider}`);
+  const target = document.querySelector<HTMLElement>(`[data-usage-provider="${route.provider}"]`);
   target?.scrollIntoView?.({ block: "start" });
   target?.focus({ preventScroll: true });
 }

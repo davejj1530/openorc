@@ -200,7 +200,7 @@ Responsive rules follow the available space:
 - At work-row widths of (788px) or less, an open work panel overlays the work area. It can still expand independently.
 - In conversation composers at widths of (440px) or less, action controls move to a second row and wrap. The new-thread variant keeps metadata and actions inline while space permits; at composer widths of (300px) or less, metadata takes a full row and actions follow.
 - At viewport widths of (520px) or less, reading gutters shrink to (12px). Expanded new-thread activity uses one column when its available width is (480px) or less.
-- Settings retains its horizontal category toolbar and maximum (960px) content width. Preference rows stack below an (800px) container; usage rows reflow below (540px).
+- Settings retains its horizontal category toolbar and maximum (960px) content width. Preference rows stack below an (800px) container; usage cards fill as many (260px) minimum columns as fit.
 
 ## Elevation & Depth
 
@@ -248,7 +248,7 @@ Tasks, Pull requests, Schedules, Orchestration, and Memory share one page header
 
 Tasks filter Active/Done/Archived with a status selector with counts. The grouped list has 46px rows, keyboard navigation, and status menus. Saving a task to backlog and starting its work are separate actions. Drafts survive navigation. Pull requests group by project when every project is shown. Schedules split Active and Paused. Orchestration shows saved teams as tabs, with team execution status beside the team's version. Memory filters by type and source; turning memory on or off lives in Settings, and the page says when it is off.
 
-Settings uses flat preference groups and a 40px row of text categories below the window toolbar. Categories keep their natural width and scroll horizontally in narrow windows; arrow keys, Home, and End select and reveal each section. Palette changes update the app live. Usage is an account ledger: each allowance shows its reported remaining or used amount, a thin meter, and reset timing. Missing, stale, and failed reports remain explicit; provider details and local activity stay separate.
+Settings uses flat preference groups and a 40px row of text categories below the window toolbar. Categories keep their natural width and scroll horizontally in narrow windows; arrow keys, Home, and End select and reveal each section. Palette changes update the app live. Usage is a grid of same-size account cards, set apart by a raised fill with no border or shadow. Each allowance is one row: a thin ring of the reported remaining or used amount, the limit over its reset timing, and the amount. Details turns a card's own space over to the report, provider notes, and reset options, so opening it never resizes the grid; actionable resets and unresolved attempts still show on the front. Missing, stale, and failed reports remain explicit, and a healthy report carries no status label.
 
 **The Save Feedback Rule.** Announce actual saves and errors in normal document flow; leave the idle state empty.
 

@@ -1,4 +1,4 @@
-import { usageReportStatus, creditBalanceLabel } from "./settings-presentation";
+import { creditBalanceLabel, usageCardState, type UsageCardState } from "./settings-presentation";
 import { ResetControls } from "./settings-resets";
 import { harnessCatalog, harnessIds, type AllowanceWindow, type ProviderUsage } from "@openorc/protocol";
 import { Button, IconButton, TextButton, Tooltip } from "../components/ui";
@@ -67,33 +67,10 @@ function ProviderReport({ provider, claudeAccountId, name, active, now }: { prov
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, [q.refetch]);
-  const stale = d?.windows.some((w) => allowanceState(w, now).stale) ?? false;
-  const exhausted = d?.windows.some((w) => w.exhausted) ?? false;
-  const state = usageReportStatus({ error: q.isError, fetching: q.isFetching, report: d, stale, exhausted });
-  const failed = q.isError || d?.status === "error";
-  // A healthy report needs no label; screen readers still hear it.
-  const healthy = !failed && !q.isFetching && d?.status === "available" && !stale && !exhausted;
+  const state = usageCardState({ report: d, error: q.isError, fetching: q.isFetching, now });
   return (
     <section data-usage-provider={provider} tabIndex={-1} className="usage-account" aria-label={`${name} usage`} aria-busy={q.isFetching}>
-      <header className="usage-account-heading">
-        <div className="usage-account-identity">
-          <HarnessLogo id={provider === "anthropic-api" ? "claude" : provider} size={20} />
-          <div>
-            <h2>{name}</h2>
-            <p title={d?.context}>{d?.context ?? "Checking account…"}</p>
-          </div>
-        </div>
-        <div className="usage-account-status">
-          <span role="status" className={cn(healthy && "sr-only")} data-warning={failed || exhausted || stale || undefined}>
-            {state}
-          </span>
-          <Tooltip label={`Refresh ${name} usage`}>
-            <IconButton size="sm" disabled={q.isFetching} aria-label={`Refresh ${name} usage`} onClick={() => void q.refetch()}>
-              <RefreshCw size={14} />
-            </IconButton>
-          </Tooltip>
-        </div>
-      </header>
+      <UsageCardHeading provider={provider} name={name} context={d?.context} state={state} fetching={q.isFetching} onRefresh={() => void q.refetch()} />
       <div className="usage-account-body">
         <div className={cn("usage-account-front", details && "invisible")}>
           {q.isError && (
@@ -102,35 +79,81 @@ function ProviderReport({ provider, claudeAccountId, name, active, now }: { prov
             </p>
           )}
           {!d && !q.isError && <p className="usage-empty">Loading…</p>}
-          {d && <ProviderAllowances report={d} now={now} outdated={failed || d.status === "disconnected"} />}
+          {d && <ProviderAllowances report={d} now={now} outdated={state.outdated} />}
         </div>
         {d && (
           <div id={detailsId} className="usage-account-details" hidden={!details}>
-            <UsageReportDetails report={d} stale={q.isFetching || failed || d.status === "disconnected"} />
+            <UsageReportDetails report={d} stale={q.isFetching || state.outdated} />
           </div>
         )}
       </div>
       {d && (
-        <footer className="usage-account-footer">
-          <TextButton tone="muted" aria-expanded={details} aria-controls={detailsId} onClick={() => setDetails(!details)}>
-            {details ? "Hide details" : "Details"}
-          </TextButton>
-          {d.accountUrl && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                returning.current = true;
-                window.openorc.openExternal(d.accountUrl);
-              }}
-            >
-              Open {d.provider === "anthropic-api" ? "Console" : "usage"}
-              <ExternalLink size={12} aria-hidden="true" />
-            </Button>
-          )}
-        </footer>
+        <UsageCardFooter
+          report={d}
+          details={details}
+          detailsId={detailsId}
+          onToggle={() => setDetails(!details)}
+          onOpenUsage={() => {
+            returning.current = true;
+            window.openorc.openExternal(d.accountUrl);
+          }}
+        />
       )}
     </section>
+  );
+}
+
+function UsageCardHeading({
+  provider,
+  name,
+  context,
+  state,
+  fetching,
+  onRefresh,
+}: {
+  provider: ProviderUsage["provider"];
+  name: string;
+  context: string | undefined;
+  state: UsageCardState;
+  fetching: boolean;
+  onRefresh: () => void;
+}) {
+  return (
+    <header className="usage-account-heading">
+      <div className="usage-account-identity">
+        <HarnessLogo id={provider === "anthropic-api" ? "claude" : provider} size={20} />
+        <div>
+          <h2>{name}</h2>
+          <p title={context}>{context ?? "Checking account…"}</p>
+        </div>
+      </div>
+      <div className="usage-account-status">
+        <span role="status" className={cn(state.healthy && "sr-only")} data-warning={state.warning || undefined}>
+          {state.label}
+        </span>
+        <Tooltip label={`Refresh ${name} usage`}>
+          <IconButton size="sm" disabled={fetching} aria-label={`Refresh ${name} usage`} onClick={onRefresh}>
+            <RefreshCw size={14} />
+          </IconButton>
+        </Tooltip>
+      </div>
+    </header>
+  );
+}
+
+function UsageCardFooter({ report: d, details, detailsId, onToggle, onOpenUsage }: { report: ProviderUsage; details: boolean; detailsId: string; onToggle: () => void; onOpenUsage: () => void }) {
+  return (
+    <footer className="usage-account-footer">
+      <TextButton tone="muted" aria-expanded={details} aria-controls={detailsId} onClick={onToggle}>
+        {details ? "Hide details" : "Details"}
+      </TextButton>
+      {d.accountUrl && (
+        <Button variant="ghost" size="sm" onClick={onOpenUsage}>
+          Open {d.provider === "anthropic-api" ? "Console" : "usage"}
+          <ExternalLink size={12} aria-hidden="true" />
+        </Button>
+      )}
+    </footer>
   );
 }
 

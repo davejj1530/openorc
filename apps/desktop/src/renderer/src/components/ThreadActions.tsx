@@ -121,7 +121,7 @@ function ThreadMenuContent({ thread, parts: M }: { thread: ThreadSummary; parts:
       <M.Item className={menuItem} onClick={() => window.openorc.openWindow(`thread:${thread.id}`)}>
         <AppWindow size={13} /> Open in new window
       </M.Item>
-      <M.Separator className="my-1 h-px bg-line" />
+      <M.Separator className="my-1 border-t border-line" />
       {lifecycleReason ? (
         <div className="max-w-64 px-2 py-1 text-xs text-ink-3" role="status">
           {lifecycleReason}
@@ -165,7 +165,7 @@ function ThreadMenuContent({ thread, parts: M }: { thread: ThreadSummary; parts:
               ))}
               {thread.snoozedUntil ? (
                 <>
-                  <M.Separator className="my-1 h-px bg-line" />
+                  <M.Separator className="my-1 border-t border-line" />
                   <M.Item className={menuItem} disabled={lifecycleBlocked} closeOnClick={!team} onClick={() => patch({ snoozedUntil: null })}>
                     Wake now
                   </M.Item>
@@ -178,7 +178,7 @@ function ThreadMenuContent({ thread, parts: M }: { thread: ThreadSummary; parts:
       <M.Item className={menuItem} disabled={team && mutating} onClick={() => patch({ seen: thread.unread })}>
         <MailOpen size={13} /> {thread.unread ? "Mark as read" : "Mark as unread"}
       </M.Item>
-      <M.Separator className="my-1 h-px bg-line" />
+      <M.Separator className="my-1 border-t border-line" />
       <ThreadForkActions thread={thread} parts={M} teamFork={teamFork} recoveryKey={runtime.data?.actions?.forkRecovery?.requestKey} />
       {team && moveReason ? (
         <div role="status" className="max-w-64 px-2 py-1 text-xs text-ink-3 break-words">
@@ -196,7 +196,7 @@ function ThreadMenuContent({ thread, parts: M }: { thread: ThreadSummary; parts:
           {threadMoveLabel({ cancelling: pendingMove?.phase === "cancel", pending: Boolean(pendingMove), mode: thread.workspaceMode })}
         </M.Item>
       ) : null}
-      <M.Separator className="my-1 h-px bg-line" />
+      <M.Separator className="my-1 border-t border-line" />
       <M.Item className={menuItem} disabled={lifecycleBlocked} title={lifecycleReason ?? undefined} closeOnClick={!team} onClick={() => patch({ archived: !archived })}>
         {archived ? <ArchiveRestore size={13} /> : <Archive size={13} />} {archived ? "Unarchive" : "Archive"}
       </M.Item>

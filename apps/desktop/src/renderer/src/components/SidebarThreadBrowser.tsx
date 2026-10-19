@@ -201,7 +201,7 @@ function ThreadFilter() {
               <Check size={13} className={pinned ? "text-accent-ink" : "text-transparent"} />
               Pinned threads
             </Menu.Item>
-            <Menu.Separator className="my-1 h-px bg-line" />
+            <Menu.Separator className="my-1 border-t border-line" />
             <Menu.Item className={menuItem} onClick={() => useUi.getState().setImportSessions(true, projectId ?? undefined)}>
               Import terminal sessions…
             </Menu.Item>

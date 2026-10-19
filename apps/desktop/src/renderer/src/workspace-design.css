@@ -53,7 +53,7 @@
   content: "";
   position: absolute;
   inset: 0 0 0 auto;
-  width: 1px;
+  width: var(--hairline);
   background: var(--line);
   pointer-events: none;
 }
@@ -261,7 +261,7 @@
 .project-picker-popup {
   width: 300px;
   max-width: calc(100vw - 24px);
-  border: 1px solid var(--line);
+  border: var(--hairline) solid var(--line);
   border-radius: 12px;
   background: var(--surface);
   color: var(--ink);
@@ -323,7 +323,7 @@
   width: 100%;
   margin-top: 8px;
   padding: 12px 9px 7px;
-  border-top: 1px solid var(--line);
+  border-top: var(--hairline) solid var(--line);
   color: var(--ink-2);
   text-align: left;
   font-size: 12px;
@@ -561,7 +561,7 @@
 .document-type-mark {
   width: 7px;
   height: 9px;
-  border: 1px solid var(--content-ink);
+  border: var(--hairline) solid var(--content-ink);
   border-radius: 1px;
 }
 .app-shell [data-transcript] > .max-w-chat {
@@ -624,7 +624,7 @@
   overflow-wrap: anywhere;
   background: var(--bubble);
   box-shadow: none;
-  border: 1px solid var(--line);
+  border: var(--hairline) solid var(--line);
   border-radius: 12px;
   padding: 10px 12px;
   color: var(--bubble-ink);
@@ -762,7 +762,7 @@
 .app-shell .panel-content {
   --bg: var(--paper);
   margin: 0 12px 12px;
-  border: 1px solid var(--panel-page-edge);
+  border: var(--hairline) solid var(--panel-page-edge);
   border-radius: var(--panel-page-radius);
   overflow: hidden;
   background: var(--paper);
@@ -991,7 +991,7 @@
   min-height: 26px;
   height: auto;
   padding: 3px 10px;
-  border: 1px solid var(--line);
+  border: var(--hairline) solid var(--line);
   border-radius: 14px;
   background: var(--composer-input);
   color: var(--ink-3);

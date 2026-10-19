@@ -98,7 +98,7 @@ function MoreScreens({ screens, route, projectId, rail }: { screens: Screen[]; r
                   {label}
                 </Menu.Item>
               ))}
-              {screens.length ? <Menu.Separator className="my-1 h-px bg-line" /> : null}
+              {screens.length ? <Menu.Separator className="my-1 border-t border-line" /> : null}
               <Menu.Item className={menuItem} onClick={() => setEditing(true)}>
                 Edit sidebar…
               </Menu.Item>

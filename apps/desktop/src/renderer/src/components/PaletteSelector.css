@@ -11,7 +11,7 @@
   grid-template-columns: 1fr auto;
   gap: 8px;
   padding: 10px;
-  border: 1px solid var(--line);
+  border: var(--hairline) solid var(--line);
   border-radius: 8px;
   color: var(--ink-2);
   text-align: left;
@@ -43,7 +43,7 @@
   grid-column: 1 / -1;
   height: 24px;
   overflow: hidden;
-  border: 1px solid var(--line-strong);
+  border: var(--hairline) solid var(--line-strong);
   border-radius: 4px;
 }
 .palette-swatches i {

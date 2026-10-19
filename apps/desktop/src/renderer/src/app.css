@@ -25,6 +25,8 @@
  * carries selection and primary actions only; everything else is neutral.
  */
 :root {
+  /* Every structural line's width; one physical pixel on high-density screens, below. */
+  --hairline: 1px;
   --bg: #ffffff;
   --surface: #ffffff;
   --surface-2: #f7f7f7;
@@ -122,7 +124,7 @@
      ground around it, so the line is the whole boundary; dark's plane sits a small step below
      its ground and takes the same line. Inset, so the edge never grows the plane's box. This
      is not --material-raise; the three-per-group raise budget is untouched. */
-  --material-well: inset 0 0 0 1px var(--line);
+  --material-well: inset 0 0 0 var(--hairline) var(--line);
   /* Content planes (settings groups, provider, memory and orchestration cards). Light's plane
      is the page's white, told apart by its hairline and contact; dark's plane is the raised
      step, lit along its top edge by --material-seat. */
@@ -140,7 +142,7 @@
      and cast lift it. No sheen: in light the sheen is an occluded lip, which reads as a
      press. Dark keeps the lit top edge. */
   --current-row-fill: var(--bg);
-  --current-row-material: 0 0 0 1px var(--line), var(--material-contact), 0 3px 6px -2px var(--material-lo-soft);
+  --current-row-material: 0 0 0 var(--hairline) var(--line), var(--material-contact), 0 3px 6px -2px var(--material-lo-soft);
   --current-chip-material: var(--current-row-material);
   /* The user's own message is a raised plane in the palette's --bubble tone. Light lifts it
      with a soft cast under the contact, plus a faint lit top edge that only shows on a dark
@@ -149,6 +151,11 @@
   --bubble-ink: var(--ink);
   --bubble-material: inset 0 1px 0 color-mix(in srgb, var(--bg) 16%, transparent), var(--material-contact), 0 6px 14px -6px var(--material-lo-cast);
   color-scheme: light;
+}
+@media (min-resolution: 2dppx) {
+  :root {
+    --hairline: 0.5px;
+  }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -469,6 +476,8 @@
   --width-panel-min: 340px;
   --width-details: 72px;
   --height-topbar: max(40px, calc(32px / var(--window-zoom, 1)));
+  /* border, border-t, divide-y and the rest draw hairlines. */
+  --default-border-width: var(--hairline);
   --container-chat: 760px;
   --container-document: 800px;
   --document-gutter: 48px;
@@ -906,7 +915,7 @@ body[data-resizing] .sidebar-shell {
 /* Every title rail sits on its view's canvas, with one line separating it from the content. */
 .app-topbar {
   padding-top: calc(var(--spacing-well) / 2);
-  border-bottom: 1px solid var(--line);
+  border-bottom: var(--hairline) solid var(--line);
 }
 /* The band under a column header: a route's filter row, search row or toolbar. One 44px height
    for all of them, clearing --control-lg with room. min-height rather than height so a
@@ -918,7 +927,7 @@ body[data-resizing] .sidebar-shell {
   gap: 12px;
   min-height: 44px;
   padding: 0 24px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: var(--hairline) solid var(--line);
   flex-shrink: 0;
 }
 
@@ -1051,7 +1060,7 @@ body[data-resizing] .sidebar-shell {
   background-color: var(--surface-2);
 }
 .task-list [data-status-group] [data-row]:last-child .task-list-row {
-  border-bottom: 1px solid var(--line);
+  border-bottom: var(--hairline) solid var(--line);
 }
 .schedule-delete:is(:hover, :focus-visible) {
   color: var(--bad);
@@ -1217,7 +1226,7 @@ body[data-resizing] iframe {
 /* What a turn changed: one card under the reply, the way the agent apps show their edits. */
 .change-card {
   margin-block: 20px;
-  border: 1px solid var(--line);
+  border: var(--hairline) solid var(--line);
   border-radius: 12px;
   overflow: hidden;
 }
@@ -1265,7 +1274,7 @@ body[data-resizing] iframe {
   font-size: var(--text-sm);
 }
 .change-files {
-  border-top: 1px solid var(--line);
+  border-top: var(--hairline) solid var(--line);
   padding: 4px 16px;
 }
 .change-files li {
@@ -1276,7 +1285,7 @@ body[data-resizing] iframe {
   font-size: var(--text-sm);
 }
 .change-files li + li {
-  border-top: 1px solid var(--line);
+  border-top: var(--hairline) solid var(--line);
 }
 .change-files li > :first-child {
   overflow-wrap: anywhere;
@@ -1293,7 +1302,7 @@ body[data-resizing] iframe {
   gap: 8px;
   width: 100%;
   padding: 10px 16px;
-  border-top: 1px solid var(--line);
+  border-top: var(--hairline) solid var(--line);
   font-size: var(--text-sm);
   color: var(--ink-2);
 }
@@ -1383,10 +1392,10 @@ diffs-container {
    border on the header alone would rule a folded row and leave an open one's code butting
    straight onto the next fold, so the two rules are stated where each is actually true. */
 .diff-file + .diff-file {
-  border-top: 1px solid var(--line);
+  border-top: var(--hairline) solid var(--line);
 }
 .diff-file-header[aria-expanded="true"] {
-  border-bottom: 1px solid var(--line);
+  border-bottom: var(--hairline) solid var(--line);
 }
 
 /* Content gets the width; window furniture yields before the editor does. */
@@ -1465,7 +1474,7 @@ diffs-container {
   gap: 8px;
   padding: 4px 0;
   margin-bottom: 12px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: var(--hairline) solid var(--line);
 }
 .document-description {
   width: 100%;
@@ -1485,7 +1494,7 @@ diffs-container {
 .task-execution-settings {
   padding-top: 24px;
   margin-top: 32px;
-  border-top: 1px solid var(--line);
+  border-top: var(--hairline) solid var(--line);
 }
 .document-footer {
   display: flex;
@@ -1494,7 +1503,7 @@ diffs-container {
   flex-wrap: wrap;
   gap: 12px;
   padding: 12px 24px;
-  border-top: 1px solid var(--line);
+  border-top: var(--hairline) solid var(--line);
   flex-shrink: 0;
 }
 .document-footer > button {
@@ -1521,7 +1530,7 @@ diffs-container {
   padding: 0 24px;
   height: 40px;
   flex-shrink: 0;
-  border-bottom: 1px solid var(--line);
+  border-bottom: var(--hairline) solid var(--line);
 }
 .workspace-tabs button {
   height: 100%;
@@ -1547,7 +1556,7 @@ diffs-container {
 .task-activity {
   margin-top: 32px;
   padding-top: 24px;
-  border-top: 1px solid var(--line);
+  border-top: var(--hairline) solid var(--line);
 }
 /* The workspace sits behind a single, generously padded writing surface. */
 .composer {
@@ -1847,7 +1856,7 @@ diffs-container {
 .skill-token {
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--accent) 18%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 24%, transparent);
+  box-shadow: 0 0 0 var(--hairline) color-mix(in srgb, var(--accent) 24%, transparent);
   color: inherit;
 }
 .composer-suggestions .skill-token {
@@ -1914,7 +1923,7 @@ diffs-container {
   max-height: var(--available-height);
   overflow-y: auto;
   padding: 16px;
-  border: 1px solid var(--line);
+  border: var(--hairline) solid var(--line);
   border-radius: var(--radius-lg);
   background: var(--surface);
   box-shadow: var(--shadow-panel);
@@ -1943,7 +1952,7 @@ diffs-container {
   justify-items: start;
   gap: 8px;
   padding-top: 12px;
-  border-top: 1px solid var(--line);
+  border-top: var(--hairline) solid var(--line);
 }
 .composer-permission {
   display: inline-flex;
@@ -2067,7 +2076,7 @@ diffs-container {
 .message-queue {
   min-width: 0;
   container-type: inline-size;
-  border: 1px solid var(--line);
+  border: var(--hairline) solid var(--line);
   border-radius: var(--radius-lg);
   font-size: var(--text-sm);
   line-height: var(--text-sm--line-height);
@@ -2105,7 +2114,7 @@ diffs-container {
   align-items: start;
   gap: 8px;
   padding: 10px 0;
-  border-top: 1px solid var(--line);
+  border-top: var(--hairline) solid var(--line);
 }
 .message-queue-position {
   padding-top: 2px;
@@ -2185,7 +2194,7 @@ diffs-container {
   height: 88px;
   border-radius: var(--radius-lg);
   object-fit: cover;
-  border: 1px solid var(--line-strong);
+  border: var(--hairline) solid var(--line-strong);
 }
 /* A file that is not an image has no picture to stand for it, so it states itself: the
    glyph, the name it arrived with, and its weight. It takes the thumbnail's height and
@@ -2198,7 +2207,7 @@ diffs-container {
   width: 168px;
   height: 88px;
   padding: 0 12px;
-  border: 1px solid var(--line-strong);
+  border: var(--hairline) solid var(--line-strong);
   border-radius: var(--radius-lg);
   background: var(--surface-2);
 }
@@ -2237,7 +2246,7 @@ diffs-container {
   width: min(420px, calc(100vw - 24px));
   height: min(312px, calc(100vh - 24px));
   overflow: hidden;
-  border: 1px solid var(--line-strong);
+  border: var(--hairline) solid var(--line-strong);
   border-radius: var(--radius-lg);
   background: var(--surface-2);
   color: var(--ink);
@@ -2261,7 +2270,7 @@ diffs-container {
   gap: 6px;
   min-height: 0;
   padding: 10px 6px;
-  border-right: 1px solid var(--line);
+  border-right: var(--hairline) solid var(--line);
 }
 .model-picker-rail-button {
   display: grid;
@@ -2432,7 +2441,7 @@ diffs-container {
 .model-picker-footer {
   min-width: 0;
   padding: 10px 12px 12px;
-  border-top: 1px solid var(--line);
+  border-top: var(--hairline) solid var(--line);
 }
 .model-picker-effort-heading {
   display: flex;
@@ -2462,7 +2471,7 @@ diffs-container {
   margin-top: 8px;
 }
 .model-picker-popup .composer-effort-slider:has(input:focus-visible) .composer-effort-thumb {
-  border: 1px solid var(--line);
+  border: var(--hairline) solid var(--line);
 }
 .model-picker-popup .composer-effort-slider[data-fast]:has(input:focus-visible) .fast-mode-rocket {
   background: color-mix(in srgb, var(--ink) 4%, transparent);
@@ -2481,7 +2490,7 @@ diffs-container {
   --effort-rocket-accent: #a879dc;
   width: min(288px, calc(100vw - 24px));
   padding: 16px;
-  border: 1px solid var(--line-strong);
+  border: var(--hairline) solid var(--line-strong);
   border-radius: var(--radius-lg);
   background: var(--surface-2);
   color: var(--ink);
@@ -2630,7 +2639,7 @@ diffs-container {
   transform: translateX(-50%);
   border-radius: var(--radius-pill);
   background: #ffffff;
-  border: 1px solid var(--line);
+  border: var(--hairline) solid var(--line);
   box-shadow: var(--material-contact);
   transition: left 160ms cubic-bezier(0.16, 1, 0.3, 1);
   pointer-events: none;
@@ -2824,7 +2833,7 @@ diffs-container {
   gap: 32px;
   padding-block: 22px;
   margin: 0;
-  border-top: 1px solid var(--line);
+  border-top: var(--hairline) solid var(--line);
 }
 .settings-section-intro h2 {
   color: var(--ink);
@@ -2864,7 +2873,7 @@ diffs-container {
   min-width: 0;
   margin-bottom: 24px;
   padding: 12px 16px;
-  border: 1px solid var(--line);
+  border: var(--hairline) solid var(--line);
   border-radius: var(--radius-lg);
   background: var(--plane-fill);
   box-shadow: var(--material-seat);
@@ -2880,7 +2889,7 @@ diffs-container {
   display: flex;
   gap: 4px;
   overflow-x: auto;
-  border-bottom: 1px solid var(--line);
+  border-bottom: var(--hairline) solid var(--line);
 }
 .skills-harness {
   display: inline-flex;
@@ -2961,7 +2970,7 @@ diffs-container {
   list-style: none;
 }
 .skills-list > li + li {
-  border-top: 1px solid var(--line);
+  border-top: var(--hairline) solid var(--line);
 }
 .skills-item-summary {
   display: grid;
@@ -3026,7 +3035,7 @@ diffs-container {
 }
 .skills-empty {
   padding: 24px;
-  border: 1px solid var(--line);
+  border: var(--hairline) solid var(--line);
   border-radius: var(--radius-lg);
   background: var(--plane-fill);
 }
@@ -3038,7 +3047,7 @@ diffs-container {
   gap: 12px 24px;
   min-height: 52px;
   padding-block: 12px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: var(--hairline) solid var(--line);
 }
 .settings-field > span:not(.settings-switch) {
   flex: 1;
@@ -3069,7 +3078,7 @@ diffs-container {
   width: 100%;
   height: 100%;
   margin: 0;
-  border: 1px solid var(--line);
+  border: var(--hairline) solid var(--line);
   border-radius: var(--radius-pill);
   background: var(--track-fill);
   box-shadow: var(--material-recess);
@@ -3131,7 +3140,7 @@ diffs-container {
   position: sticky;
   bottom: 0;
   min-height: 36px;
-  border-top: 1px solid var(--line);
+  border-top: var(--hairline) solid var(--line);
   color: var(--ink-2);
   font-size: var(--text-sm);
   padding-block: 8px;
@@ -3150,7 +3159,7 @@ diffs-container {
 }
 .settings-agent {
   padding-block: 16px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: var(--hairline) solid var(--line);
 }
 @container (max-width: 720px) {
   .settings-content {
@@ -3315,7 +3324,7 @@ body:has(.sidebar-shell[data-open="false"]) .thread-pane:first-child > .well {
 .thread-drop-preview span,
 .thread-drop-error {
   padding: 12px 16px;
-  border: 1px solid var(--line-strong);
+  border: var(--hairline) solid var(--line-strong);
   border-radius: var(--radius-md);
   background: var(--surface);
   color: var(--ink);
@@ -3344,7 +3353,7 @@ body:has(.sidebar-shell[data-open="false"]) .thread-pane:first-child > .well {
     right: 0;
     bottom: 0;
     z-index: 20;
-    border-left: 1px solid var(--line);
+    border-left: var(--hairline) solid var(--line);
     box-shadow: var(--shadow-far);
   }
   .resize-handle[data-edge="panel"] {
@@ -3361,7 +3370,7 @@ body:has(.sidebar-shell[data-open="false"]) .thread-pane:first-child > .well {
 /* Task-owned discussion shares the document's reading column. */
 .task-comments {
   margin-block: 32px;
-  border-top: 1px solid var(--color-line);
+  border-top: var(--hairline) solid var(--color-line);
   padding-top: 24px;
   min-width: 0;
 }
@@ -3387,7 +3396,7 @@ body:has(.sidebar-shell[data-open="false"]) .thread-pane:first-child > .well {
 }
 .task-comment {
   padding-block: 20px;
-  border-bottom: 1px solid var(--color-line);
+  border-bottom: var(--hairline) solid var(--color-line);
   scroll-margin-top: 20px;
 }
 .task-comment-meta {
@@ -3436,13 +3445,13 @@ body:has(.sidebar-shell[data-open="false"]) .thread-pane:first-child > .well {
   content: "";
   position: absolute;
   left: 0;
-  border-left: 1px solid var(--color-line-strong);
+  border-left: var(--hairline) solid var(--color-line-strong);
 }
 .task-comment-response::before {
   top: 0;
   width: 20px;
   height: var(--reply-turn);
-  border-bottom: 1px solid var(--color-line-strong);
+  border-bottom: var(--hairline) solid var(--color-line-strong);
   border-bottom-left-radius: var(--reply-curve);
 }
 .task-comment-response:not(:last-child)::after {
@@ -3473,7 +3482,7 @@ body:has(.sidebar-shell[data-open="false"]) .thread-pane:first-child > .well {
   position: relative;
   margin-top: 24px;
   background: var(--composer-surface);
-  border: 1px solid var(--color-line);
+  border: var(--hairline) solid var(--color-line);
   border-radius: 10px;
 }
 .task-comment-composer textarea {
@@ -3512,7 +3521,7 @@ body:has(.sidebar-shell[data-open="false"]) .thread-pane:first-child > .well {
 .task-comment-mentions {
   max-height: 260px;
   overflow: auto;
-  border-block: 1px solid var(--color-line);
+  border-block: var(--hairline) solid var(--color-line);
   padding: 4px;
 }
 .task-comment-mentions button[role="option"] {

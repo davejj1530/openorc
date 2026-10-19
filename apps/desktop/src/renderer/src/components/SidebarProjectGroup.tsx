@@ -3,7 +3,7 @@ import { useLayout } from "../lib/layout";
 import { WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
 import { newThread } from "../lib/router";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
-import { ChevronDown, ChevronRight, Globe, Plus } from "./icons";
+import { Globe, Plus } from "./icons";
 import { ProjectIconPicker } from "./ProjectIconPicker";
 import { ProjectMenu } from "./ProjectMenu";
 import { IconButton, Tooltip } from "./ui";
@@ -33,7 +33,6 @@ export function SidebarProjectGroup({ id, name, rootPath, threads, children }: {
             {waiting ? "Needs you" : "Running"}
           </span>
         ) : null}
-        {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
       </button>
       <Tooltip label={`New thread in ${name}`}>
         <IconButton

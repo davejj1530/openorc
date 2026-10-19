@@ -1,33 +1,71 @@
+/* The row reaches 1px over the page so the active tab can cover the page's top edge. Its top
+   padding leaves exactly the tabs' height, so the strip holds a whole tab and every control
+   centers on the tab labels. The tab masks below are drawn for this height. */
 .panel-browser-header {
+  --panel-tab-height: 36px;
   min-width: 0;
+  height: calc(var(--height-topbar) + 1px);
+  margin-bottom: -1px;
+  padding-top: calc(var(--height-topbar) + 1px - var(--panel-tab-height));
 }
+/* The active tab is the top of its page, shaped like a Chrome tab: rounded shoulders, then feet
+   that curve out into the page's top edge. The strip paints above the page so the tab covers
+   that edge, and its padding keeps the first tab's foot on a straight run past the page's corner. */
 .panel-browser-tabs {
+  position: relative;
+  z-index: 1;
   display: flex;
-  gap: 4px;
+  align-self: stretch;
+  align-items: flex-end;
+  gap: 2px;
   min-width: 0;
+  padding-inline: calc(var(--panel-page-radius) + 14px) 8px;
   overflow-x: auto;
   scrollbar-width: none;
-  padding: 3px 0;
 }
 .panel-browser-tab {
+  position: relative;
+  isolation: isolate;
   display: flex;
   align-items: center;
   flex: 0 1 172px;
   min-width: 110px;
   max-width: 190px;
-  height: 29px;
-  border: 1px solid transparent;
-  border-radius: 7px;
+  height: var(--panel-tab-height);
   color: var(--ink-3);
 }
-.panel-browser-tab:hover {
-  background: var(--surface-2);
+.panel-browser-tab:hover,
+.panel-browser-tab[data-active="true"] {
   color: var(--ink);
 }
-.panel-browser-tab[data-active="true"] {
-  background: var(--surface-2);
-  border-color: var(--line);
-  color: var(--ink);
+/* One outline in two layers, the page's ground and then its edge, so every palette themes it.
+   The 17px caps hold the curves; the middle stretches and tucks 1px under each cap, so a tab
+   on a fractional pixel shows no seam. */
+.panel-browser-tab[data-active="true"]::before,
+.panel-browser-tab[data-active="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 0 -8px;
+  z-index: -1;
+  pointer-events: none;
+}
+.panel-browser-tab[data-active="true"]::before {
+  background: var(--paper);
+  mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17 36'%3E%3Cpath d='M0 35.5A8.5 8.5 0 0 0 8.5 27V8.5A8 8 0 0 1 16.5.5H17V36H0Z'/%3E%3C/svg%3E") left / 17px 36px
+      no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17 36'%3E%3Cpath d='M17 35.5A8.5 8.5 0 0 1 8.5 27V8.5A8 8 0 0 0 .5.5H0V36H17Z'/%3E%3C/svg%3E") right / 17px 36px
+      no-repeat,
+    linear-gradient(#000 0 0) center / calc(100% - 32px) 100% no-repeat;
+}
+.panel-browser-tab[data-active="true"]::after {
+  background: var(--panel-page-edge);
+  mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17 36'%3E%3Cpath d='M0 35.5A8.5 8.5 0 0 0 8.5 27V8.5A8 8 0 0 1 16.5.5H17' fill='none' stroke='%23000'/%3E%3C/svg%3E")
+      left / 17px 36px no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17 36'%3E%3Cpath d='M17 35.5A8.5 8.5 0 0 1 8.5 27V8.5A8 8 0 0 0 .5.5H0' fill='none' stroke='%23000'/%3E%3C/svg%3E")
+      right / 17px 36px no-repeat,
+    linear-gradient(#000 0 1px, transparent 0) center / calc(100% - 32px) 100% no-repeat;
 }
 .panel-browser-tab > [role="tab"] {
   display: flex;

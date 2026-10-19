@@ -8,7 +8,7 @@ import { useLayout } from "../lib/layout";
 import { usePanelSessions } from "../lib/panel-tabs";
 import { toolPage, usePanelWorkspace } from "../lib/panel-workspace";
 import { useTrafficLights, useWindowsControls } from "../lib/window";
-import { pageLabel, panelFileScope, type PanelContext } from "./panel-tools";
+import { panelFileScope, type PanelContext } from "./panel-tools";
 import { PanelContent } from "./PanelContent";
 import { PanelNavigation } from "./PanelNavigation";
 import { PanelNewTab } from "./PanelNewTab";
@@ -64,25 +64,22 @@ function PanelBody({ context, workspace, open }: { context: PanelContext; worksp
         }}
       />
     ) : null;
+  // Only the browser and the new tab, where an address can be typed, carry browser controls.
+  if (page.kind !== "newtab") return <PanelContent context={context} page={page} onNavigate={navigate} />;
   const recentUrls = [...new Set(Object.values(previewUrls).filter((url) => /^https?:\/\//i.test(url)))].reverse().slice(0, 4);
-  if (page.kind === "file") return <PanelContent context={context} page={page} onNavigate={navigate} />;
   return (
     <div className="h-full flex flex-col min-h-0">
-      <PanelNavigation key={`${tab.id}:${tab.index}`} {...navigation} address={page.kind === "newtab" ? "" : pageLabel(page)} onNavigate={onNavigate} />
+      <PanelNavigation key={`${tab.id}:${tab.index}`} {...navigation} address="" onNavigate={onNavigate} />
       <div className="flex-1 min-h-0">
-        {page.kind === "newtab" ? (
-          <PanelNewTab
-            context={context}
-            recentUrls={recentUrls}
-            onTool={(tool) => {
-              if (tool === "file") requestFilesFocus();
-              navigate(toolPage(tool));
-            }}
-            onNavigate={onNavigate}
-          />
-        ) : (
-          <PanelContent context={context} page={page} onNavigate={navigate} />
-        )}
+        <PanelNewTab
+          context={context}
+          recentUrls={recentUrls}
+          onTool={(tool) => {
+            if (tool === "file") requestFilesFocus();
+            navigate(toolPage(tool));
+          }}
+          onNavigate={onNavigate}
+        />
       </div>
     </div>
   );

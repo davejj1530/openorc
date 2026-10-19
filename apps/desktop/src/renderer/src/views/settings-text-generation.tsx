@@ -36,7 +36,7 @@ export function TextGenerationSettings() {
               <span id={modelLabelId} className="font-medium">
                 Model
               </span>
-              <span id={modelHintId} className="block text-sm text-ink-2 mt-1">
+              <span id={modelHintId} className="settings-hint">
                 The default uses a small model. Choosing a larger model may cost more or use more of your allowance.
               </span>
             </span>

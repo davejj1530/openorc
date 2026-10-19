@@ -1,10 +1,4 @@
 /* Preference sheets share the workspace's quiet typography and independent accents. */
-.settings-shell .settings-field:first-child {
-  padding-top: 0;
-}
-.settings-shell .settings-field:last-child {
-  padding-bottom: 0;
-}
 .settings-shell .settings-field > span:not(.settings-switch) {
   min-width: 160px;
 }
@@ -13,50 +7,28 @@
   position: static;
   min-height: 0;
 }
-.settings-shell .appearance-modes {
-  margin: 0;
-}
 .settings-shell .accent-combinations {
   margin-top: 0;
 }
 .settings-shell .accent-editor {
   margin-top: 16px;
 }
-.settings-shell .appearance-advanced {
-  margin-top: 12px;
+/* Memory's switch, the skills scope and empty states are cards like every other group. */
+.settings-shell :is(.memory-control, .skills-scope, .skills-empty) {
+  border: 0;
+  border-radius: var(--radius-xl);
+  background: var(--settings-card-fill);
+  box-shadow: none;
 }
 .settings-shell .memory-control {
-  padding: 20px 0;
-  border: 0;
-  border-top: var(--hairline) solid var(--line);
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
+  margin-bottom: 28px;
+  padding: 14px 16px;
 }
 .settings-shell .skills-scope {
-  padding: 0 0 20px;
-  border: 0;
-  border-bottom: var(--hairline) solid var(--line);
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
+  margin-bottom: 20px;
 }
 .settings-shell .skills-list {
-  margin-top: 12px;
-  border-block: var(--hairline) solid var(--line);
-}
-.settings-shell .skills-item-summary {
-  padding-inline: 8px;
-}
-.settings-shell .skills-empty {
-  border: 0;
-  border-block: var(--hairline) solid var(--line);
-  border-radius: 0;
-  padding: 24px 0;
-  background: transparent;
-}
-.settings-shell .settings-agent:first-of-type {
-  padding-top: 12px;
+  margin-top: 10px;
 }
 .settings-agent-location {
   color: var(--ink-3);
@@ -107,7 +79,7 @@
   min-width: 0;
   padding: 14px 16px 10px;
   border-radius: var(--radius-xl);
-  background: var(--surface-2);
+  background: var(--settings-card-fill);
   scroll-margin-top: 16px;
 }
 .usage-account:focus-visible {
@@ -295,15 +267,6 @@
   font-size: 11px;
   line-height: 1.6;
 }
-@container (max-width: 800px) {
-  .settings-shell .settings-section:has(> .settings-section-intro) {
-    grid-template-columns: 1fr;
-    gap: 16px;
-  }
-  .settings-shell .settings-section-intro p {
-    max-width: 600px;
-  }
-}
 @media (prefers-reduced-motion: reduce) {
   .settings-section-menu {
     transition: none;
@@ -327,4 +290,272 @@
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 12px;
+}
+
+/* Inside a card the raised roles step up from the card's own fill, so secondary buttons, hovers
+   and selected fills stay visible on it in every palette. */
+.settings-shell :is(.settings-group, .settings-card, .settings-disclosure, .usage-account, .memory-control, .skills-scope) {
+  --surface-2: color-mix(in srgb, var(--ink) 7%, transparent);
+  --surface-3: color-mix(in srgb, var(--ink) 11%, transparent);
+}
+/* Parallel things (agents, accounts) are equal cards: every row of the grid takes the tallest
+   card's height, and each card's actions sit on its foot. */
+.settings-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-auto-rows: 1fr;
+  gap: 12px;
+}
+.settings-cards + :is(.settings-group, .settings-note) {
+  margin-top: 12px;
+}
+.settings-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 14px 16px;
+  border-radius: var(--radius-xl);
+  background: var(--settings-card-fill);
+}
+.settings-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 28px;
+}
+.settings-card-head h3 {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* In the components layer so a tone utility on the line (text-bad for an error) still wins. */
+@layer components {
+  .settings-card-meta {
+    color: var(--ink-3);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+}
+.settings-card-label {
+  display: grid;
+  gap: 6px;
+  color: var(--ink-2);
+  font-size: 12px;
+}
+.settings-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin-top: auto;
+  padding-top: 8px;
+}
+.settings-card-actions:empty {
+  display: none;
+}
+/* A name that edits in place: it reads as the card's title, hover outlines it, and focus takes the
+   app's text-field fill. */
+.settings-label-input {
+  flex: 1;
+  height: 28px;
+  margin-left: -8px;
+  padding-inline: 8px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+}
+.settings-label-input:hover {
+  border-color: var(--line);
+}
+.settings-label-input:focus {
+  border-color: var(--line-strong);
+}
+.settings-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  color: var(--ink-3);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.settings-status::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+.settings-status[data-ok] {
+  color: var(--ok);
+}
+.settings-hint {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink-3);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.settings-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+  padding-inline: 2px;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+.settings-note {
+  max-width: 640px;
+  margin-top: 10px;
+  padding-inline: 2px;
+  color: var(--ink-3);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* Segmented choices (appearance modes, fonts, skill harnesses) sit on the page in a tinted track
+   with the current one raised, as Bencho's Day/Week control does: a paper pill in light, a
+   lighter tint in dark. */
+.settings-shell {
+  --settings-track-current: var(--paper);
+}
+:root[data-theme="dark"] .settings-shell {
+  --settings-track-current: color-mix(in srgb, var(--ink) 14%, transparent);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .settings-shell {
+    --settings-track-current: color-mix(in srgb, var(--ink) 14%, transparent);
+  }
+}
+.settings-shell :is(.appearance-modes, .skills-harnesses) {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  gap: 2px;
+  padding: 3px;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  box-shadow: none;
+}
+.settings-shell :is(.appearance-modes, .skills-harnesses) button {
+  min-height: var(--control-md);
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--ink-2);
+}
+.settings-shell :is(.appearance-modes, .skills-harnesses) button[aria-pressed="true"] {
+  background: var(--settings-track-current);
+  color: var(--ink);
+  box-shadow: var(--material-contact);
+}
+.settings-shell .appearance-modes {
+  margin-block: 12px;
+}
+.settings-shell .skills-harness-count {
+  background: transparent;
+}
+.settings-shell .skills-section-heading h2 {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+}
+/* A disclosure that is its own card, for long guides such as Slack setup. */
+.settings-disclosure {
+  margin-bottom: 28px;
+  padding: 0 16px;
+  border-radius: var(--radius-xl);
+  background: var(--settings-card-fill);
+}
+.settings-disclosure > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 48px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+  list-style: none;
+  cursor: default;
+}
+.settings-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+.settings-disclosure > summary::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  margin-right: 4px;
+  border-right: var(--hairline) solid currentColor;
+  border-bottom: var(--hairline) solid currentColor;
+  transform: rotate(45deg);
+}
+.settings-disclosure[open] > summary::after {
+  transform: rotate(-135deg);
+}
+.settings-disclosure > summary:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+.settings-disclosure[open] {
+  padding-bottom: 16px;
+}
+/* Appearance choices are fill-only tiles; the current one carries an ink ring. */
+.settings-shell :is(.palette-choice, .accent-combinations button) {
+  border: 0;
+  background: var(--settings-card-fill);
+}
+.settings-shell :is(.palette-choice, .accent-combinations button):hover {
+  background: color-mix(in srgb, var(--ink) 9%, var(--settings-card-fill));
+}
+.settings-shell :is(.palette-choice, .accent-combinations button)[aria-pressed="true"] {
+  background: var(--settings-card-fill);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--navigation-ink);
+}
+.settings-shell .palette-choice {
+  border-radius: var(--radius-lg);
+}
+.settings-shell .accent-editor {
+  padding: 16px;
+  border-radius: var(--radius-xl);
+  background: var(--settings-card-fill);
+}
+.settings-shell .accent-example {
+  border: 0;
+  background: var(--paper);
+}
+
+/* Content in a card that is not a row still clears the card's edges. */
+.settings-group > :not(.settings-field):first-child {
+  margin-top: 12px;
+}
+.settings-group > :not(.settings-field):last-child {
+  margin-bottom: 12px;
+}
+/* A focused switch draws its own ring, so its row keeps the card's fill. */
+.settings-field:has(input[type="checkbox"]:focus-visible) {
+  background-color: transparent;
+}
+.settings-card > button {
+  align-self: flex-start;
+}
+.settings-card-tag {
+  flex-shrink: 0;
+  color: var(--ink-3);
+  font-size: 11px;
 }

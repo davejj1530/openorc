@@ -29,7 +29,7 @@ export function AppearanceSettings() {
   const report: Report = (saved) => setStatus(saved ? "Appearance saved" : "Applied for this session. Storage is unavailable; select again to retry saving.");
   return (
     <>
-      <Section title="Color appearance" description="Use a light or dark workspace, or follow your device.">
+      <Section flush title="Color appearance" description="Use a light or dark workspace, or follow your device.">
         <div className="appearance-modes" role="group" aria-label="Color appearance">
           {modes.map(({ id, name, icon: Icon }) => (
             <button key={id} type="button" aria-pressed={choice === id} onClick={() => report(set(id))}>
@@ -46,7 +46,7 @@ export function AppearanceSettings() {
       <FontSettings report={report} />
       <CodeFontSettings report={report} />
       <WindowAppearanceSettings report={report} />
-      <details className="appearance-advanced">
+      <details className="settings-disclosure">
         <summary>Fine-tune individual colors</summary>
         <ColorEditor report={report} />
       </details>
@@ -60,7 +60,7 @@ export function AppearanceSettings() {
 function FontSettings({ report }: { report: Report }) {
   const { font, setFont } = useAppFont();
   return (
-    <Section title="Font" description="The typeface across the app. Code stays monospaced.">
+    <Section flush title="Font" description="The typeface across the app. Code stays monospaced.">
       <div className="appearance-modes font-choices" role="group" aria-label="Font">
         {appFonts.map(({ id, name }) => (
           <button key={id} type="button" data-font={id} aria-pressed={font === id} onClick={() => report(setFont(id))}>
@@ -131,7 +131,8 @@ function ColorEditor({ report }: { report: Report }) {
     [theme, resolved],
   );
   return (
-    <Section title="Colors" description="Change any color in the palette you picked. Light and dark keep their own values.">
+    <>
+      <p className="settings-note">Change any color in the palette you picked. Light and dark keep their own values.</p>
       <div className="color-editor-head">
         <p>{changed === 0 ? `Showing the ${resolved} colors of ${theme.name}.` : `${changed} of ${editableTokens.length} ${resolved} colors changed from ${theme.name}.`}</p>
         <Button size="sm" disabled={changed === 0} onClick={() => report(resetColors())}>
@@ -156,6 +157,6 @@ function ColorEditor({ report }: { report: Report }) {
           </div>
         </div>
       ))}
-    </Section>
+    </>
   );
 }

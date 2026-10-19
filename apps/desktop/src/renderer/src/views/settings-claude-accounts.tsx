@@ -1,8 +1,8 @@
 import { useState } from "react";
 import type { ClaudeAccountConnection } from "@openorc/protocol";
-import { Badge, Button, Input, TextButton } from "../components/ui";
+import { Button, Input, TextButton } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/query";
-import { Section } from "./settings-shared";
+import { Section, Status } from "./settings-shared";
 
 export function ClaudeAccountSettings({ active }: { active: boolean }) {
   const accounts = useRpc(
@@ -16,41 +16,49 @@ export function ClaudeAccountSettings({ active }: { active: boolean }) {
   const [name, setName] = useState("");
   const error = accounts.error ?? refresh.error ?? add.error ?? login.error;
   return (
-    <Section title="Claude accounts" description="Add as many accounts as you need. Each account keeps its own Claude login, settings, plugins, and usage. Choose an account when starting a thread.">
-      <div className="flex items-center justify-between gap-3 mb-3">
-        <p className="text-sm text-ink-2">Changing the default affects new threads. Existing threads keep their account.</p>
+    <Section
+      title="Claude accounts"
+      description="Add as many accounts as you need. Each account keeps its own Claude login, settings, plugins, and usage. Choose an account when starting a thread."
+      flush
+    >
+      <div className="settings-toolbar">
+        <p>Changing the default affects new threads. Existing threads keep their account.</p>
         <Button size="sm" disabled={refresh.isPending} onClick={() => refresh.mutate({ refresh: true })}>
           Refresh accounts
         </Button>
       </div>
-      {accounts.data?.accounts.map((account) => (
-        <AccountRow key={account.id} account={account} isDefault={accounts.data.defaultId === account.id} />
-      ))}
-      <form
-        className="flex flex-wrap items-end gap-2 mt-4"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (!name.trim() || add.isPending) return;
-          add.mutate(
-            { name: name.trim() },
-            {
-              onSuccess: (account) => {
-                setName("");
-                login.mutate({ id: account.id });
+      <div className="settings-cards">
+        {accounts.data?.accounts.map((account) => (
+          <AccountCard key={account.id} account={account} isDefault={accounts.data.defaultId === account.id} />
+        ))}
+        <form
+          className="settings-card"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!name.trim() || add.isPending) return;
+            add.mutate(
+              { name: name.trim() },
+              {
+                onSuccess: (account) => {
+                  setName("");
+                  login.mutate({ id: account.id });
+                },
               },
-            },
-          );
-        }}
-      >
-        <label className="text-sm flex flex-col gap-1 flex-1 min-w-40">
-          Account name
-          <Input value={name} onChange={(event) => setName(event.target.value)} maxLength={80} placeholder="Work, Personal, Client…" required />
-        </label>
-        <Button type="submit" disabled={!name.trim() || add.isPending || login.isPending}>
-          Add account and sign in
-        </Button>
-      </form>
-      {accounts.isPending ? <p className="text-sm text-ink-2 mt-2">Checking accounts…</p> : null}
+            );
+          }}
+        >
+          <label className="settings-card-label">
+            Account name
+            <Input value={name} onChange={(event) => setName(event.target.value)} maxLength={80} placeholder="Work, Personal, Client…" required />
+          </label>
+          <div className="settings-card-actions">
+            <Button size="sm" type="submit" disabled={!name.trim() || add.isPending || login.isPending}>
+              Add account and sign in
+            </Button>
+          </div>
+        </form>
+      </div>
+      {accounts.isPending ? <p className="settings-note">Checking accounts…</p> : null}
       {error ? (
         <p role="alert" className="text-sm text-bad mt-2">
           {error.message}
@@ -60,35 +68,38 @@ export function ClaudeAccountSettings({ active }: { active: boolean }) {
   );
 }
 
-function AccountRow({ account, isDefault }: { account: ClaudeAccountConnection; isDefault: boolean }) {
+function AccountCard({ account, isDefault }: { account: ClaudeAccountConnection; isDefault: boolean }) {
   const update = useRpcMutation("claude.accounts.update");
   const [name, setName] = useState(account.name);
   return (
-    <div className="py-3 border-b border-line">
-      <div className="flex flex-wrap items-center gap-2">
-        <Input aria-label={`Name for ${account.name}`} value={name} onChange={(event) => setName(event.target.value)} maxLength={80} className="max-w-56" />
+    <div className="settings-card">
+      <div className="settings-card-head">
+        <Input aria-label={`Name for ${account.name}`} value={name} onChange={(event) => setName(event.target.value)} maxLength={80} className="settings-label-input" />
+        {isDefault ? <span className="settings-card-tag">Default</span> : null}
+        <Status ok={account.status === "ready"}>{connectionLabels[account.status]}</Status>
+      </div>
+      <p className="settings-card-meta">
+        {[account.email, account.organization].filter(Boolean).join(" · ") ||
+          (account.kind === "cli" ? "Uses your existing Claude Code login and configuration." : "Separate Claude Code login and configuration.")}
+      </p>
+      {account.message ? (
+        <p className="settings-card-meta" role="status">
+          {account.message}
+        </p>
+      ) : null}
+      {update.error ? (
+        <p className="settings-card-meta text-bad" role="alert">
+          {update.error.message}
+        </p>
+      ) : null}
+      <div className="settings-card-actions">
         {name.trim() !== account.name ? (
           <Button size="sm" disabled={!name.trim() || update.isPending} onClick={() => update.mutate({ id: account.id, name: name.trim() })}>
             Save name
           </Button>
         ) : null}
-        <Badge tone={account.status === "ready" ? "ok" : "muted"}>{connectionLabels[account.status]}</Badge>
         <AccountActions account={account} isDefault={isDefault} />
       </div>
-      <p className="text-sm text-ink-2 mt-1">
-        {[account.email, account.organization].filter(Boolean).join(" · ") ||
-          (account.kind === "cli" ? "Uses your existing Claude Code login and configuration." : "Separate Claude Code login and configuration.")}
-      </p>
-      {account.message ? (
-        <p className="text-sm text-ink-2 mt-1" role="status">
-          {account.message}
-        </p>
-      ) : null}
-      {update.error ? (
-        <p className="text-sm text-bad mt-1" role="alert">
-          {update.error.message}
-        </p>
-      ) : null}
     </div>
   );
 }
@@ -105,7 +116,6 @@ function AccountActions({ account, isDefault }: { account: ClaudeAccountConnecti
   const update = useRpcMutation("claude.accounts.update");
   return (
     <>
-      {isDefault ? <Badge>Default</Badge> : null}
       {!isDefault && account.enabled ? (
         <Button size="sm" disabled={update.isPending} onClick={() => update.mutate({ id: account.id, makeDefault: true })}>
           Make default
@@ -113,12 +123,12 @@ function AccountActions({ account, isDefault }: { account: ClaudeAccountConnecti
       ) : null}
       <AccountLogin account={account} />
       {!isDefault ? (
-        <TextButton disabled={update.isPending || account.status === "signing_in"} onClick={() => update.mutate({ id: account.id, enabled: !account.enabled })}>
+        <TextButton tone="muted" disabled={update.isPending || account.status === "signing_in"} onClick={() => update.mutate({ id: account.id, enabled: !account.enabled })}>
           {account.enabled ? "Disable" : "Enable"}
         </TextButton>
       ) : null}
       {update.error ? (
-        <p className="text-sm text-bad w-full" role="alert">
+        <p className="settings-card-meta w-full text-bad" role="alert">
           {update.error.message}
         </p>
       ) : null}
@@ -143,7 +153,7 @@ function AccountLogin({ account }: { account: ClaudeAccountConnection }) {
         </Button>
       )}
       {error ? (
-        <p className="text-sm text-bad w-full" role="alert">
+        <p className="settings-card-meta w-full text-bad" role="alert">
           {error.message}
         </p>
       ) : null}

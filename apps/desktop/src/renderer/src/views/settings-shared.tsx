@@ -52,10 +52,10 @@ export function SaveStatus({ status, retry }: { status: string; retry: () => voi
   );
 }
 
-/** Preferences align their introduction with the controls. Visual editors can span the page. */
+/** A titled section. Its rows sit in one card; `flush` sections lay out their own cards. */
 export function Section({ id, title, children, description, flush }: { id?: string; title: string; children: ReactNode; description?: string; flush?: boolean }) {
   return (
-    <section id={id} className="settings-section" data-wide={flush || undefined}>
+    <section id={id} className="settings-section">
       <header className="settings-section-intro">
         <h2>{title}</h2>
         {description && <p>{description}</p>}
@@ -70,10 +70,19 @@ export function Field({ label, children, hint }: { label: string; children: Reac
     <label className="settings-field">
       <span>
         <span className="font-medium">{label}</span>
-        {hint && <span className="block text-sm text-ink-2 mt-1">{hint}</span>}
+        {hint && <span className="settings-hint">{hint}</span>}
       </span>
       {children}
     </label>
+  );
+}
+
+/** A state in a word, with a dot that turns the success ink only when the state is good. */
+export function Status({ ok, children }: { ok?: boolean; children: ReactNode }) {
+  return (
+    <span className="settings-status" data-ok={ok || undefined}>
+      {children}
+    </span>
   );
 }
 

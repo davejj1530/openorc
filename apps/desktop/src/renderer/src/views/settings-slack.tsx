@@ -11,9 +11,9 @@ import {
   executionModePresentation,
   type SlackClientConfig,
 } from "@openorc/protocol";
-import { Badge, Button, Input, Select } from "../components/ui";
+import { Button, Input, Select } from "../components/ui";
 import { useRpc } from "../lib/query";
-import { Field, LoadError, Section } from "./settings-shared";
+import { Field, LoadError, Section, Status } from "./settings-shared";
 import { DirectSlackSettings } from "./settings-slack-direct";
 import { useSlackRelaySettings } from "./settings-slack-relay";
 
@@ -55,7 +55,7 @@ function RelaySlackSettings({ active }: { active: boolean }) {
       <Section title="This computer" description="Get a device key from the person hosting the relay. It connects only your Slack user to this computer.">
         <div className="flex items-center justify-between gap-3 mb-3">
           <span>{client?.userId ? `Slack user ${client.userId}` : "Desktop connection"}</span>
-          <Badge tone={client?.connected && !client.error ? "ok" : "muted"}>{relayClientStatus(client)}</Badge>
+          <Status ok={client?.connected && !client.error}>{relayClientStatus(client)}</Status>
         </div>
         <Field label="Relay address" hint="On another machine, use the local address of your SSH tunnel.">
           <Input value={config.relayUrl} disabled={disabled || client?.enabled || client?.busy} onChange={(e) => updateConfig({ relayUrl: e.target.value })} />
@@ -138,7 +138,7 @@ function RelaySlackSettings({ active }: { active: boolean }) {
         <Section title="Slack connection" description="Set this up once on the host computer. Keep OpenOrc open and the computer awake. Teammates use device keys instead of these tokens.">
           <div className="flex justify-between gap-3 mb-3">
             <span>{host?.workspace ?? "Slack workspace"}</span>
-            <Badge tone={host?.connected ? "ok" : "muted"}>{relayHostStatus(host)}</Badge>
+            <Status ok={host?.connected}>{relayHostStatus(host)}</Status>
           </div>
           <Field label="Bot token" hint={host?.configured ? "Saved securely. Leave blank to keep it." : "From OAuth & Permissions in your Slack app."}>
             <Input type="password" autoComplete="off" spellCheck={false} placeholder="xoxb-…" value={botToken} disabled={disabled || host?.enabled} onChange={(e) => setBotToken(e.target.value)} />

@@ -1,16 +1,16 @@
 import { useState, type ReactNode } from "react";
 import type { ReviewerAppStatus, SystemInfo } from "@openorc/protocol";
-import { Badge, Button, TextButton } from "../components/ui";
+import { Button, TextButton } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/query";
 import { installationLabel } from "./settings-presentation";
-import { Section, Toggle } from "./settings-shared";
+import { Section, Status, Toggle } from "./settings-shared";
 
 function SettingRow({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
   return (
     <div className="settings-field">
       <span>
         <span className="font-medium">{label}</span>
-        {hint ? <span className="block text-sm text-ink-2 mt-1">{hint}</span> : null}
+        {hint ? <span className="settings-hint">{hint}</span> : null}
       </span>
       <span className="flex shrink-0 flex-wrap items-center justify-end gap-2">{children}</span>
     </div>
@@ -109,7 +109,7 @@ export function GitHubSettings({ info }: { info: SystemInfo | undefined }) {
   return (
     <Section title="GitHub" description="Pull requests use the GitHub CLI installed on this device.">
       <SettingRow label="GitHub CLI" hint={info && !info.gh.installed ? "Install it to create pull requests. Push still works; OpenOrc opens the compare page instead." : null}>
-        <Badge tone={info?.gh.installed ? "ok" : "muted"}>{installationLabel(Boolean(info), info?.gh.installed ?? false)}</Badge>
+        <Status ok={info?.gh.installed}>{installationLabel(Boolean(info), info?.gh.installed ?? false)}</Status>
         <Button onClick={() => window.openorc.openExternal("https://cli.github.com")}>GitHub CLI setup</Button>
       </SettingRow>
       <ReviewerAppSetting />

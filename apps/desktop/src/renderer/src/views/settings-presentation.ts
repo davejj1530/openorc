@@ -1,6 +1,6 @@
-import { harnessCatalog, harnessFailsToStart, isHarnessId, type ExtractionProviderChoice, type HarnessInfo, type RpcResults, type SlackStatus } from "@openorc/protocol";
+import { harnessCatalog, harnessFailsToStart, isHarnessId, type ExtractionProviderChoice, type HarnessInfo, type ProviderUsage, type RpcResults, type SlackStatus } from "@openorc/protocol";
 import { extractionSummary } from "../lib/memory-extraction";
-import { formatUsageTime } from "../lib/provider-usage";
+import { allowanceState, formatUsageTime } from "../lib/provider-usage";
 
 export function installationLabel(loaded: boolean, installed: boolean): string {
   if (!loaded) return "Checking…";
@@ -118,3 +118,19 @@ export function resetTimeLabel(resetsAt: number | null, expired: boolean): strin
   if (expired) return `Reported reset ${formatUsageTime(resetsAt)} has passed. Refresh for a new report.`;
   return `Resets ${formatUsageTime(resetsAt)}`;
 }
+
+/** What a usage card shows about its report, decided once from the query and the clock. */
+export function usageCardState({ report, error, fetching, now }: { report: ProviderUsage | undefined; error: boolean; fetching: boolean; now: number }) {
+  const stale = report?.windows.some((w) => allowanceState(w, now).stale) ?? false;
+  const exhausted = report?.windows.some((w) => w.exhausted) ?? false;
+  const failed = error || report?.status === "error";
+  return {
+    label: usageReportStatus({ error, fetching, report, stale, exhausted }),
+    /** A healthy report needs no label; screen readers still hear it. */
+    healthy: !failed && !fetching && report?.status === "available" && !stale && !exhausted,
+    warning: failed || exhausted || stale,
+    /** The values on screen may no longer match the account. */
+    outdated: failed || report?.status === "disconnected",
+  };
+}
+export type UsageCardState = ReturnType<typeof usageCardState>;

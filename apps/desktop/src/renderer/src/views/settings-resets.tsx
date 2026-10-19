@@ -1,14 +1,13 @@
-import type { ProviderUsage } from "@openorc/protocol";
+import type { ProviderUsage, ResetInventory } from "@openorc/protocol";
 import { Button } from "../components/ui";
-import { CodexResetDialog, useCodexReset } from "../components/CodexReset";
+import { CodexResetDialog, useCodexReset, type CodexReset } from "../components/CodexReset";
 import { formatUsageTime } from "../lib/provider-usage";
 
 export function ResetControls({ report, stale }: { report: ProviderUsage; stale: boolean }) {
   const reset = useCodexReset(report);
   const inventory = report.resets ?? (report.provider === "codex" ? { availableCount: null, credits: null, redemption: "external" as const } : null);
   if (!inventory) return null;
-  const { redeem, retryInput } = reset;
-  const busy = redeem.isPending;
+  const { redeem } = reset;
   return (
     <div className="space-y-2">
       {report.provider === "codex" && (
@@ -26,19 +25,7 @@ export function ResetControls({ report, stale }: { report: ProviderUsage; stale:
       {report.provider === "codex" && inventory.redemption === "external" && !inventory.message && (
         <p className="text-sm text-ink-2">Open your provider usage page to check for resets, or update Codex and refresh.</p>
       )}
-      {report.provider === "codex" &&
-        (retryInput ? (
-          <Button disabled={busy || stale} onClick={() => void reset.submit(retryInput)}>
-            {busy ? "Checking reset…" : "Retry reset attempt"}
-          </Button>
-        ) : (
-          inventory.redemption === "available" &&
-          inventory.availableCount !== 0 && (
-            <Button disabled={busy || stale || !inventory.availableCount || !inventory.confirmationToken} onClick={reset.ask}>
-              Use reset
-            </Button>
-          )
-        ))}
+      {report.provider === "codex" && <ResetAction inventory={inventory} reset={reset} stale={stale} />}
       {redeem.data && (
         <p role="status" className="text-sm text-ink-2">
           {redeem.data.message}
@@ -56,5 +43,23 @@ export function ResetControls({ report, stale }: { report: ProviderUsage; stale:
       )}
       <CodexResetDialog reset={reset} />
     </div>
+  );
+}
+
+/** Codex's one reset action: retry an attempt whose outcome is unknown, or use an available reset. */
+function ResetAction({ inventory, reset, stale }: { inventory: ResetInventory; reset: CodexReset; stale: boolean }) {
+  const busy = reset.redeem.isPending;
+  const retry = reset.retryInput;
+  if (retry)
+    return (
+      <Button disabled={busy || stale} onClick={() => void reset.submit(retry)}>
+        {busy ? "Checking reset…" : "Retry reset attempt"}
+      </Button>
+    );
+  if (inventory.redemption !== "available" || inventory.availableCount === 0) return null;
+  return (
+    <Button disabled={busy || stale || !inventory.availableCount || !inventory.confirmationToken} onClick={reset.ask}>
+      Use reset
+    </Button>
   );
 }

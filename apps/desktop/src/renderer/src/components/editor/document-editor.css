@@ -134,14 +134,14 @@
   height: 14px;
 }
 .task-rich-editor blockquote {
-  border-left: 1px solid var(--line-strong);
+  border-left: var(--hairline) solid var(--line-strong);
   margin: 16px 0;
   padding: 1px 0 1px 18px;
   color: var(--ink-2);
 }
 .task-rich-editor pre {
   background: var(--surface-2);
-  border: 1px solid var(--line);
+  border: var(--hairline) solid var(--line);
   border-radius: var(--radius-lg);
   padding: 16px;
   margin: 16px 0;
@@ -172,7 +172,7 @@
 }
 .task-rich-editor hr {
   border: 0;
-  border-top: 1px solid var(--line);
+  border-top: var(--hairline) solid var(--line);
   margin: 24px 0;
 }
 .task-rich-editor table {
@@ -183,7 +183,7 @@
 }
 .task-rich-editor th,
 .task-rich-editor td {
-  border: 1px solid var(--line);
+  border: var(--hairline) solid var(--line);
   padding: 6px 10px;
   position: relative;
   vertical-align: top;
@@ -229,7 +229,7 @@
 .task-link-editor,
 .task-insert-menu {
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: var(--hairline) solid var(--line);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-panel);
   color: var(--ink);
@@ -290,7 +290,7 @@
 }
 .task-insert-footer {
   padding: 8px 8px 4px;
-  border-top: 1px solid var(--line);
+  border-top: var(--hairline) solid var(--line);
   font-size: var(--text-xs);
   color: var(--ink-3);
 }
@@ -328,7 +328,7 @@
   height: auto;
   border-radius: var(--radius-md);
   /* A hairline keeps light screenshots from dissolving into a light page. */
-  box-shadow: 0 0 0 1px var(--line);
+  box-shadow: 0 0 0 var(--hairline) var(--line);
 }
 .task-image.is-selected img,
 .task-image.is-selected .task-image-card,
@@ -344,7 +344,7 @@
   padding: 8px 12px;
   border-radius: var(--radius-md);
   background: var(--surface-2);
-  box-shadow: 0 0 0 1px var(--line);
+  box-shadow: 0 0 0 var(--hairline) var(--line);
   color: var(--ink-2);
   font-size: var(--text-base);
 }
@@ -383,7 +383,7 @@
   display: flex;
   gap: 2px;
   padding: 2px;
-  border: 1px solid var(--line);
+  border: var(--hairline) solid var(--line);
   border-radius: var(--radius-md);
   background: var(--surface);
   box-shadow: var(--shadow-panel);

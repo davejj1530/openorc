@@ -28,7 +28,7 @@
 .settings-shell .memory-control {
   padding: 20px 0;
   border: 0;
-  border-top: 1px solid var(--line);
+  border-top: var(--hairline) solid var(--line);
   border-radius: 0;
   background: transparent;
   box-shadow: none;
@@ -36,21 +36,21 @@
 .settings-shell .skills-scope {
   padding: 0 0 20px;
   border: 0;
-  border-bottom: 1px solid var(--line);
+  border-bottom: var(--hairline) solid var(--line);
   border-radius: 0;
   background: transparent;
   box-shadow: none;
 }
 .settings-shell .skills-list {
   margin-top: 12px;
-  border-block: 1px solid var(--line);
+  border-block: var(--hairline) solid var(--line);
 }
 .settings-shell .skills-item-summary {
   padding-inline: 8px;
 }
 .settings-shell .skills-empty {
   border: 0;
-  border-block: 1px solid var(--line);
+  border-block: var(--hairline) solid var(--line);
   border-radius: 0;
   padding: 24px 0;
   background: transparent;
@@ -78,7 +78,7 @@
   font-size: 12px;
 }
 .settings-data-note + .settings-data-note {
-  border-top: 1px solid var(--line);
+  border-top: var(--hairline) solid var(--line);
   margin-top: 16px;
   padding-top: 16px;
 }
@@ -94,7 +94,7 @@
 }
 .usage-account {
   padding: 22px 0;
-  border-top: 1px solid var(--line);
+  border-top: var(--hairline) solid var(--line);
   scroll-margin-top: 16px;
 }
 .usage-account:focus-visible {
@@ -151,7 +151,7 @@
   padding-block: 12px;
 }
 .usage-window + .usage-window {
-  border-top: 1px solid var(--line);
+  border-top: var(--hairline) solid var(--line);
 }
 .usage-window-label h3,
 .usage-credit h3 {
@@ -227,7 +227,7 @@
   justify-content: space-between;
   gap: 16px;
   padding-block: 12px;
-  border-top: 1px solid var(--line);
+  border-top: var(--hairline) solid var(--line);
 }
 .usage-credit strong {
   font-size: 14px;
@@ -302,7 +302,7 @@
 }
 .usage-footnote {
   max-width: 650px;
-  border-top: 1px solid var(--line);
+  border-top: var(--hairline) solid var(--line);
   padding-top: 16px;
   color: var(--ink-3);
   font-size: 11px;

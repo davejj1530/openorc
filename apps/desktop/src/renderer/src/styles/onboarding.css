@@ -67,7 +67,7 @@
 
 .onboarding-progress-item:not(:last-child)::after {
   content: "";
-  height: 1px;
+  height: var(--hairline);
   flex: 1;
   margin-left: var(--spacing-sm);
   background: var(--line);
@@ -88,7 +88,7 @@
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  border: 1px solid var(--line-strong);
+  border: var(--hairline) solid var(--line-strong);
   border-radius: var(--radius-pill);
   font-variant-numeric: tabular-nums;
 }
@@ -228,7 +228,7 @@
 .harness-list {
   overflow: hidden;
   border-radius: var(--radius-lg);
-  border: 1px solid var(--line);
+  border: var(--hairline) solid var(--line);
   background: var(--plane-fill);
 }
 
@@ -242,7 +242,7 @@
   gap: var(--spacing-md);
   min-height: 72px;
   padding: var(--spacing-md) var(--spacing-lg);
-  border-bottom: 1px solid var(--line);
+  border-bottom: var(--hairline) solid var(--line);
 }
 
 .harness-row:last-child {
@@ -379,7 +379,7 @@
   height: var(--control-badge);
   display: grid;
   place-items: center;
-  border: 1px solid var(--line-strong);
+  border: var(--hairline) solid var(--line-strong);
   border-radius: var(--radius-pill);
   background: var(--surface);
   color: transparent;
@@ -435,7 +435,7 @@
   margin-top: var(--spacing-md);
   overflow: hidden;
   border-radius: var(--radius-lg);
-  border: 1px solid var(--line);
+  border: var(--hairline) solid var(--line);
   background: var(--plane-fill);
 }
 
@@ -467,7 +467,7 @@
   gap: var(--spacing-md);
   min-height: 64px;
   padding: var(--spacing-md) var(--spacing-lg);
-  border-bottom: 1px solid var(--line);
+  border-bottom: var(--hairline) solid var(--line);
 }
 
 .onboarding-project-row:last-child {
@@ -534,7 +534,7 @@
 }
 
 .onboarding-preview {
-  border-bottom: 1px solid var(--line);
+  border-bottom: var(--hairline) solid var(--line);
   background: var(--bg);
 }
 
@@ -649,7 +649,7 @@
   align-self: center;
   margin-top: 0;
   padding: var(--spacing-lg) 0 var(--spacing-xl);
-  border-top: 1px solid var(--line);
+  border-top: var(--hairline) solid var(--line);
 }
 .onboarding-footer .onboarding-action-note {
   max-width: 38ch;

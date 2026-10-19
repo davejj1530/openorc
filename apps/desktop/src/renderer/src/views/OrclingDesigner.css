@@ -44,7 +44,7 @@
   place-items: center;
   aspect-ratio: 1;
   border-radius: var(--radius-xl);
-  box-shadow: inset 0 0 0 1px transparent;
+  box-shadow: inset 0 0 0 var(--hairline) transparent;
   transition:
     background-color 120ms var(--ease-out),
     box-shadow 120ms var(--ease-out);
@@ -70,7 +70,7 @@
   gap: 12px 24px;
   padding: 12px 16px;
   border-radius: var(--radius-pill);
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 var(--hairline) var(--line);
 }
 
 .orcling-designer-swatches {
@@ -83,7 +83,7 @@
   width: 32px;
   height: 32px;
   border-radius: var(--radius-pill);
-  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.08);
+  box-shadow: inset 0 0 0 var(--hairline) rgb(0 0 0 / 0.08);
   transition: box-shadow 120ms var(--ease-out);
 }
 
@@ -106,7 +106,7 @@
   align-items: center;
   gap: 16px;
   padding: 24px;
-  border-left: 1px solid var(--line);
+  border-left: var(--hairline) solid var(--line);
   overflow-y: auto;
 }
 
@@ -174,6 +174,6 @@
   .orcling-designer-card {
     order: -1;
     border-left: 0;
-    border-bottom: 1px solid var(--line);
+    border-bottom: var(--hairline) solid var(--line);
   }
 }

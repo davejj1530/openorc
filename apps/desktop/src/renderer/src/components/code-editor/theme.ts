@@ -36,7 +36,7 @@ const highlight = HighlightStyle.define([
   { tag: t.strikethrough, textDecoration: "line-through" },
 ]);
 
-const control = { height: "26px", padding: "0 8px", border: "1px solid transparent", borderRadius: "6px", fontSize: "var(--text-sm)", verticalAlign: "middle" };
+const control = { height: "26px", padding: "0 8px", border: "var(--hairline) solid transparent", borderRadius: "6px", fontSize: "var(--text-sm)", verticalAlign: "middle" };
 
 /** Every surface color is an app token, so the editor follows the palette, appearance and custom colors live. */
 const theme = EditorView.theme({
@@ -59,7 +59,7 @@ const theme = EditorView.theme({
   ".cm-searchMatch.cm-searchMatch-selected": { backgroundColor: "color-mix(in srgb, var(--warn) 48%, transparent)" },
   ".cm-selectionMatch": { backgroundColor: "color-mix(in srgb, var(--ok) 16%, transparent)" },
   ".cm-panels": { backgroundColor: "var(--surface)", color: "var(--ink)" },
-  ".cm-panels-top": { borderBottom: "1px solid var(--line)" },
+  ".cm-panels-top": { borderBottom: "var(--hairline) solid var(--line)" },
   // One row of find controls whose field takes the slack, and replace on a row of its own when the file is editable.
   // A flex row ignores CodeMirror's <br>, so a full-width item after the find controls breaks the row instead.
   ".cm-panel.cm-search": { display: "flex", flexWrap: "wrap", alignItems: "center", columnGap: "6px", padding: "4px 40px 4px 12px", fontFamily: "var(--font-sans)", fontSize: "var(--text-sm)" },

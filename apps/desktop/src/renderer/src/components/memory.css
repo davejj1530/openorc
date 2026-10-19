@@ -1,6 +1,6 @@
 .memory-control {
   padding-block: 20px;
-  border-block: 1px solid var(--line);
+  border-block: var(--hairline) solid var(--line);
 }
 .memory-control-row {
   display: flex;
@@ -21,7 +21,7 @@
 }
 .memory-entry {
   padding-block: 20px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: var(--hairline) solid var(--line);
   min-width: 0;
   overflow-wrap: anywhere;
 }

@@ -170,7 +170,7 @@ function Actions({
                 </Menu.Item>
               </>
             ) : null}
-            <Menu.Separator className="my-1 h-px bg-line" />
+            <Menu.Separator className="my-1 border-t border-line" />
             <Menu.Item className={item} onClick={onRetract}>
               <X size={13} /> Retract
             </Menu.Item>

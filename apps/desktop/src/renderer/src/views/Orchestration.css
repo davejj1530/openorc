@@ -41,7 +41,7 @@
 }
 .orchestration-footer {
   padding: 12px 0;
-  border-top: 1px solid var(--line);
+  border-top: var(--hairline) solid var(--line);
 }
 .orchestration-footer-content {
   display: flex;
@@ -61,7 +61,7 @@
 .orchestration-card {
   padding: 16px;
   background: var(--plane-fill);
-  border: 1px solid var(--line);
+  border: var(--hairline) solid var(--line);
   border-radius: var(--radius-lg);
   box-shadow: var(--material-seat);
 }
@@ -78,7 +78,7 @@
   min-height: var(--control-lg);
   margin-bottom: 12px;
   padding-bottom: 12px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: var(--hairline) solid var(--line);
 }
 .orchestration-avatar-copy {
   display: grid;
@@ -115,7 +115,7 @@
   padding: 0;
   color: var(--ink-3);
   background: transparent;
-  border: 1px solid transparent;
+  border: var(--hairline) solid transparent;
   border-radius: var(--radius-pill);
   transition:
     background-color 120ms var(--ease-out),
@@ -140,7 +140,7 @@
 .orchestration-tree {
   padding: 12px;
   background: var(--surface-2);
-  border: 1px solid var(--line);
+  border: var(--hairline) solid var(--line);
   border-radius: var(--radius-lg);
   box-shadow: var(--material-recess);
 }
@@ -158,7 +158,7 @@
   margin: 16px 0;
   padding: 12px;
   background: var(--surface-2);
-  border: 1px solid var(--line);
+  border: var(--hairline) solid var(--line);
   border-radius: var(--radius-lg);
   box-shadow: var(--material-recess);
   font-size: var(--text-base);
@@ -176,7 +176,7 @@
   margin-top: 12px;
   padding: 16px;
   background: var(--surface-2);
-  border: 1px solid var(--line);
+  border: var(--hairline) solid var(--line);
   border-radius: var(--radius-lg);
   box-shadow: var(--material-recess);
 }

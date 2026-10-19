@@ -65,7 +65,17 @@
       left / 17px 36px no-repeat,
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17 36'%3E%3Cpath d='M17 35.5A8.5 8.5 0 0 1 8.5 27V8.5A8 8 0 0 0 .5.5H0' fill='none' stroke='%23000'/%3E%3C/svg%3E")
       right / 17px 36px no-repeat,
-    linear-gradient(#000 0 1px, transparent 0) center / calc(100% - 32px) 100% no-repeat;
+    linear-gradient(#000 0 var(--hairline), transparent 0) center / calc(100% - 32px) 100% no-repeat;
+}
+/* On high-density screens the edge is a hairline, drawn a quarter pixel in so it stays on whole
+   device pixels and meets the page's hairline top edge. The fill above already starts there. */
+@media (min-resolution: 2dppx) {
+  .panel-browser-tab[data-active="true"]::after {
+    mask-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17 36'%3E%3Cpath d='M0 35.25A8.25 8.25 0 0 0 8.25 27V8.25A8 8 0 0 1 16.25.25H17' fill='none' stroke='%23000' stroke-width='.5'/%3E%3C/svg%3E"),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17 36'%3E%3Cpath d='M17 35.25A8.25 8.25 0 0 1 8.75 27V8.25A8 8 0 0 0 .75.25H0' fill='none' stroke='%23000' stroke-width='.5'/%3E%3C/svg%3E"),
+      linear-gradient(#000 0 var(--hairline), transparent 0);
+  }
 }
 .panel-browser-tab > [role="tab"] {
   display: flex;
@@ -127,7 +137,7 @@
   height: 48px;
   flex-shrink: 0;
   padding: 0 12px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: var(--hairline) solid var(--line);
 }
 .panel-navigation-actions {
   display: flex;
@@ -141,7 +151,7 @@
   min-width: 0;
   height: 30px;
   background: var(--surface-2);
-  border: 1px solid transparent;
+  border: var(--hairline) solid transparent;
   border-radius: 8px;
 }
 .panel-address:focus-within {

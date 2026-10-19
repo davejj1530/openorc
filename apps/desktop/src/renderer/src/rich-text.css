@@ -88,14 +88,14 @@
 .prose-chat blockquote {
   margin: 16px 0;
   padding: 3px 0 3px 16px;
-  border-left: 1px solid var(--line-strong);
+  border-left: var(--hairline) solid var(--line-strong);
   color: var(--ink-2);
   font-style: normal;
 }
 .prose-chat hr {
   margin: 24px 0;
   border: 0;
-  border-top: 1px solid var(--line);
+  border-top: var(--hairline) solid var(--line);
 }
 .prose-chat pre {
   font-size: var(--text-sm);
@@ -115,14 +115,14 @@
   margin: 16px 0;
   padding: 0;
   gap: 0;
-  border: 1px solid var(--line);
+  border: var(--hairline) solid var(--line);
   border-radius: var(--radius-lg);
   background: var(--surface-2);
   overflow: hidden;
 }
 [data-streamdown="code-block"] > div:first-child {
   padding: 4px 12px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: var(--hairline) solid var(--line);
 }
 [data-streamdown="code-block-header"] {
   height: var(--control-md);
@@ -176,7 +176,7 @@
 }
 [data-streamdown="table"] :is(th, td) {
   border: 0;
-  border-top: 1px solid var(--line);
+  border-top: var(--hairline) solid var(--line);
   padding: 10px 14px;
   min-width: 100px;
   vertical-align: top;

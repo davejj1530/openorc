@@ -1170,9 +1170,7 @@ body[data-resizing] .sidebar-shell {
   transition: transform 150ms ease-out;
 }
 .work-content {
-  padding-top: 8px;
   margin-top: 4px;
-  border-top: 1px solid var(--line);
 }
 .work-content[hidden],
 .work-step-detail[hidden] {

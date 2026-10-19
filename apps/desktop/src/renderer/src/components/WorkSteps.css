@@ -37,16 +37,6 @@
   height: 28px;
   color: var(--ink-3);
 }
-.work-done {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 14px;
-  height: 14px;
-  border-radius: var(--radius-pill);
-  background: color-mix(in oklab, var(--ok) 18%, transparent);
-  color: var(--ok);
-}
 .work-pulse {
   position: relative;
   width: 8px;

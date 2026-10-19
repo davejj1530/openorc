@@ -79,13 +79,13 @@ it("reuses the same attempt after a lost response and resumes an attempt supplie
 
 it("keeps a terminal outcome visible if post-redemption usage refresh fails", async () => {
   mocks.call.mockResolvedValue({ outcome: "reset", message: "Reset used; refresh usage", usage: { ...report, status: "error", resets: undefined } });
-  const view = mount(<ResetControls report={report} stale={false} disclosure />);
+  const view = mount(<ResetControls report={report} stale={false} />);
   fireEvent.click(screen.getByRole("button", { name: "Use reset" }));
   fireEvent.click(screen.getByRole("button", { name: "Confirm reset" }));
   await screen.findByRole("status");
   view.rerender(
     <QueryClientProvider client={view.client}>
-      <ResetControls report={{ ...report, status: "error", resets: undefined }} stale disclosure />
+      <ResetControls report={{ ...report, status: "error", resets: undefined }} stale />
     </QueryClientProvider>,
   );
   expect(screen.getByRole("status").textContent).toContain("Reset used");

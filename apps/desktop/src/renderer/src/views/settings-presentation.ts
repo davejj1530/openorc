@@ -108,8 +108,9 @@ export function usageReportStatus({
   return "Usage reported";
 }
 export function creditBalanceLabel(credit: { unlimited: boolean; balance: string | null }): string {
-  if (credit.unlimited) return "Unlimited (provider reported)";
-  if (credit.balance !== null) return `${parseInt(credit.balance).toFixed(2)} credits remaining`;
+  if (credit.unlimited) return "Unlimited";
+  const balance = credit.balance === null ? NaN : Number(credit.balance);
+  if (Number.isFinite(balance)) return `${balance.toLocaleString(undefined, { maximumFractionDigits: 2 })} credits`;
   return "Balance unavailable";
 }
 export function resetTimeLabel(resetsAt: number | null, expired: boolean): string {

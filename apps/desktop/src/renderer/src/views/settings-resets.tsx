@@ -1,17 +1,16 @@
-import type { ReactNode } from "react";
-import type { ProviderUsage, ResetInventory } from "@openorc/protocol";
+import type { ProviderUsage } from "@openorc/protocol";
 import { Button } from "../components/ui";
 import { CodexResetDialog, useCodexReset } from "../components/CodexReset";
 import { formatUsageTime } from "../lib/provider-usage";
 
-export function ResetControls({ report, stale, disclosure = false }: { report: ProviderUsage; stale: boolean; disclosure?: boolean }) {
+export function ResetControls({ report, stale }: { report: ProviderUsage; stale: boolean }) {
   const reset = useCodexReset(report);
   const inventory = report.resets ?? (report.provider === "codex" ? { availableCount: null, credits: null, redemption: "external" as const } : null);
   if (!inventory) return null;
   const { redeem, retryInput } = reset;
   const busy = redeem.isPending;
-  const content = (
-    <div className="mt-4 space-y-2">
+  return (
+    <div className="space-y-2">
       {report.provider === "codex" && (
         <p className="font-medium">
           {inventory.availableCount === null ? "Reset availability unknown" : `${inventory.availableCount} ${inventory.availableCount === 1 ? "reset" : "resets"} available`}
@@ -33,7 +32,8 @@ export function ResetControls({ report, stale, disclosure = false }: { report: P
             {busy ? "Checking reset…" : "Retry reset attempt"}
           </Button>
         ) : (
-          inventory.redemption === "available" && (
+          inventory.redemption === "available" &&
+          inventory.availableCount !== 0 && (
             <Button disabled={busy || stale || !inventory.availableCount || !inventory.confirmationToken} onClick={reset.ask}>
               Use reset
             </Button>
@@ -56,21 +56,5 @@ export function ResetControls({ report, stale, disclosure = false }: { report: P
       )}
       <CodexResetDialog reset={reset} />
     </div>
-  );
-  return (
-    <ResetPresentation disclosure={disclosure} inventory={inventory} reset={reset}>
-      {content}
-    </ResetPresentation>
-  );
-}
-
-/** Keep the reset hook mounted when its inventory changes, preserving the attempt's outcome. */
-function ResetPresentation({ disclosure, inventory, reset, children }: { disclosure: boolean; inventory: ResetInventory; reset: ReturnType<typeof useCodexReset>; children: ReactNode }) {
-  if (!disclosure || inventory.redemption === "available" || reset.retryInput || reset.redeem.data || reset.redeem.isError) return children;
-  return (
-    <details className="usage-reset-details">
-      <summary>Reset options</summary>
-      {children}
-    </details>
   );
 }

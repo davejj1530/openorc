@@ -121,13 +121,7 @@ function LiveWords({ headline }: { headline: LiveHeadline }) {
 function RailDot({ live = false }: { live?: boolean }) {
   return (
     <span className="work-rail-dot" aria-hidden="true">
-      {live ? (
-        <span className="work-pulse" />
-      ) : (
-        <span className="work-done">
-          <Check size={10} />
-        </span>
-      )}
+      {live ? <span className="work-pulse" /> : <Check size={14} className="text-ok" />}
     </span>
   );
 }

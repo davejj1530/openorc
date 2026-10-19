@@ -787,11 +787,6 @@
 .app-shell .panel-content .diff-file-header {
   height: 34px;
 }
-.app-shell .appearance-modes button[aria-pressed="true"] {
-  background: var(--navigation-soft);
-  color: var(--navigation-ink);
-  box-shadow: none;
-}
 .app-shell .document-title {
   font-family: var(--document-font);
   font-size: 30px;

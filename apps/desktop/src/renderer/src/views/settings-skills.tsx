@@ -91,12 +91,12 @@ function SkillGroup({ group, agent }: { group: (typeof sources)[number] & { item
   return (
     <section className="settings-section skills-section">
       <div className="skills-section-heading">
-        <h2 className="text-lg font-semibold">{group.title}</h2>
+        <h2>{group.title}</h2>
         <span className="text-sm text-ink-3 tabular-nums" aria-label={`${group.items.length} skills`}>
           {group.items.length}
         </span>
       </div>
-      <p className="text-ink-2 mt-1">{group.description}</p>
+      <p className="settings-hint">{group.description}</p>
       <ul className="settings-group skills-list">
         {group.items.map((skill) => {
           const description = readableDescription(skill.description);

@@ -4,8 +4,8 @@ import { cn } from "../lib/cn";
 import { useRpc, useRpcMutation } from "../lib/query";
 import { useRouter } from "../lib/router";
 import { Download, X } from "../components/icons";
-import { Badge, Button, IconButton, TextButton } from "../components/ui";
-import { Section, Toggle } from "./settings-shared";
+import { Button, IconButton, TextButton } from "../components/ui";
+import { Section, Status, Toggle } from "./settings-shared";
 import { HarnessLogo } from "../components/HarnessLogo";
 
 /** The shared core state survives navigation and keeps every window in agreement. */
@@ -20,8 +20,8 @@ export function AgentConnections({ info }: { info?: SystemInfo }) {
   const error = install.error ?? check.error ?? configure.error ?? updates.error;
   const checked = state?.agents.map((row) => row.checkedAt ?? 0).reduce((a, b) => Math.max(a, b), 0);
   return (
-    <Section title="Coding agents" description="Agents use your CLI login. OpenOrc does not read their credential files.">
-      <div className="agent-update-toolbar">
+    <Section title="Coding agents" description="Agents use your CLI login. OpenOrc does not read their credential files." flush>
+      <div className="settings-toolbar">
         <p className="text-sm text-ink-2" role="status">
           {agentUpdateStatus({ updating: Boolean(state?.updating), checking: Boolean(state?.checking || check.isPending), checked })}
         </p>
@@ -48,24 +48,28 @@ export function AgentConnections({ info }: { info?: SystemInfo }) {
           {error.message} {updates.isError ? <TextButton onClick={() => void updates.refetch()}>Try again</TextButton> : null}
         </p>
       ) : null}
-      {harnessIds.map((id) => (
-        <AgentConnection
-          key={id}
-          id={id}
-          info={info?.harnesses.find((row) => row.id === id)}
-          update={state?.agents.find((row) => row.id === id)}
-          busy={busy}
-          onUpdate={() => install.mutate({ ids: [id] })}
+      <div className="settings-cards">
+        {harnessIds.map((id) => (
+          <AgentConnection
+            key={id}
+            id={id}
+            info={info?.harnesses.find((row) => row.id === id)}
+            update={state?.agents.find((row) => row.id === id)}
+            busy={busy}
+            onUpdate={() => install.mutate({ ids: [id] })}
+          />
+        ))}
+      </div>
+      <div className="settings-group">
+        <Toggle
+          label="Check for agent updates automatically"
+          hint="Every six hours while OpenOrc is open. Checks contact npm or Homebrew for public version information."
+          checked={state?.automatic ?? true}
+          disabled={!state || configure.isPending}
+          onChange={(automatic) => configure.mutate({ automatic })}
         />
-      ))}
-      <p className="text-sm text-ink-2 mt-4">Updates start only when agent work has finished. Idle sessions reconnect on your next message; your conversations stay here.</p>
-      <Toggle
-        label="Check for agent updates automatically"
-        hint="Every six hours while OpenOrc is open. Checks contact npm or Homebrew for public version information."
-        checked={state?.automatic ?? true}
-        disabled={!state || configure.isPending}
-        onChange={(automatic) => configure.mutate({ automatic })}
-      />
+      </div>
+      <p className="settings-note">Updates start only when agent work has finished. Idle sessions reconnect on your next message; your conversations stay here.</p>
     </Section>
   );
 }
@@ -75,33 +79,38 @@ function AgentConnection({ id, info, update, busy, onUpdate }: { id: HarnessInfo
   const installed = info ? harnessInstalled(info) : false;
   const loggedIn = info ? harnessLoggedIn(info) : false;
   return (
-    <div className="settings-agent">
-      <div className="agent-update-row">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <HarnessLogo id={id} size={18} />
-            <h3 className="font-semibold">{harness.name}</h3>
-            <Badge tone={loggedIn ? "ok" : "muted"}>{agentConnectionStatus({ info, installed, loggedIn })}</Badge>
-          </div>
-          {installed ? (
-            <p className="text-sm text-ink-2 mt-1">
-              {update?.installedVersion ?? info?.version ?? "Version unknown"}
-              {update?.method ? ` · ${update.method}` : ""}
-            </p>
-          ) : null}
-          {info?.path ? (
-            <details className="settings-agent-location">
-              <summary>Installation location</summary>
-              <code>{info.path.replace(/^\/Users\/[^/]+/, "~")}</code>
-            </details>
-          ) : null}
-        </div>
-        {update ? <AgentUpdateAction update={update} name={harness.shortName} busy={busy} onUpdate={onUpdate} /> : null}
+    <div className="settings-card">
+      <div className="settings-card-head">
+        <HarnessLogo id={id} size={20} />
+        <h3>{harness.name}</h3>
+        <Status ok={loggedIn}>{agentConnectionStatus({ info, installed, loggedIn })}</Status>
       </div>
-      {update ? <AgentUpdateDetails update={update} setupUrl={harness.setupUrl} /> : null}
-      {info && !loggedIn && !harnessFailsToStart(info) ? (
-        <p className="text-ink-2 mt-2">{installed ? <AgentLoginInstructions id={id} /> : <Button onClick={() => void window.openorc.openExternal(harness.setupUrl)}>Install {harness.name}</Button>}</p>
+      {installed ? (
+        <p className="settings-card-meta">
+          {update?.installedVersion ?? info?.version ?? "Version unknown"}
+          {update?.method ? ` · ${update.method}` : ""}
+        </p>
       ) : null}
+      {update ? <AgentUpdateDetails update={update} setupUrl={harness.setupUrl} /> : null}
+      {info && !loggedIn && !harnessFailsToStart(info) && installed ? (
+        <p className="settings-card-meta">
+          <AgentLoginInstructions id={id} />
+        </p>
+      ) : null}
+      {info?.path ? (
+        <details className="settings-agent-location">
+          <summary>Installation location</summary>
+          <code>{info.path.replace(/^\/Users\/[^/]+/, "~")}</code>
+        </details>
+      ) : null}
+      <div className="settings-card-actions">
+        {update ? <AgentUpdateAction update={update} name={harness.shortName} busy={busy} onUpdate={onUpdate} /> : null}
+        {info && !loggedIn && !installed && !harnessFailsToStart(info) ? (
+          <Button size="sm" onClick={() => void window.openorc.openExternal(harness.setupUrl)}>
+            Install {harness.name}
+          </Button>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -142,15 +151,15 @@ function AgentUpdateDetails({ update, setupUrl }: { update: AgentUpdate; setupUr
   const action = actionLabels[status];
   return (
     <>
-      {status === "available" && <p className="text-sm mt-2">Version {update.latestVersion} available</p>}
-      {status === "current" && <p className="text-sm text-ink-2 mt-2">Up to date</p>}
+      {status === "available" && <p className="settings-card-meta text-ink">Version {update.latestVersion} available</p>}
+      {status === "current" && <p className="settings-card-meta">Up to date</p>}
       {update.message ? (
-        <p className={cn("text-sm mt-2", alert && "text-bad", !alert && "text-ink-2")} role={alert ? "alert" : undefined}>
+        <p className={cn("settings-card-meta", alert && "text-bad")} role={alert ? "alert" : undefined}>
           {update.message}
         </p>
       ) : null}
       {action && !update.canUpdate ? (
-        <TextButton className="text-sm mt-2" onClick={() => void window.openorc.openExternal(setupUrl)}>
+        <TextButton className="settings-card-meta" onClick={() => void window.openorc.openExternal(setupUrl)}>
           {action} instructions
         </TextButton>
       ) : null}

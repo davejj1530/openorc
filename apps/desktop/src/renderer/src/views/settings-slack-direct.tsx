@@ -11,11 +11,11 @@ import {
   executionModePresentation,
   type SlackDirectConfig,
 } from "@openorc/protocol";
-import { Badge, Button, Input, Select } from "../components/ui";
+import { Button, Input, Select } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/query";
 import { core } from "../lib/rpc";
 import { slackPersonalCreateUrl, slackPersonalManifest } from "../lib/slack-setup";
-import { Field, LoadError, Section } from "./settings-shared";
+import { Field, LoadError, Section, Status } from "./settings-shared";
 
 export function DirectSlackSettings({ active }: { active: boolean }) {
   const status = useRpc("slack.status", {}, { enabled: active, refetchInterval: active ? 2000 : false });
@@ -50,11 +50,11 @@ export function DirectSlackSettings({ active }: { active: boolean }) {
   }
   return (
     <>
-      <p className="text-ink-2 mb-4">Connect your own Slack bot to this computer. Each teammate creates a separate bot. Keep OpenOrc open and your computer awake to receive requests.</p>
+      <p className="settings-note mb-3">Connect your own Slack bot to this computer. Each teammate creates a separate bot. Keep OpenOrc open and your computer awake to receive requests.</p>
       {status.isError && <LoadError retry={() => void status.refetch()} />}
-      <details open={!direct?.configured} className="mb-6">
-        <summary className="text-lg font-semibold py-2">Set up your Slack app</summary>
-        <ol className="list-decimal pl-5 space-y-5 mt-3 text-md">
+      <details open={!direct?.configured} className="settings-disclosure">
+        <summary>Set up your Slack app</summary>
+        <ol className="list-decimal pl-5 space-y-5 text-md">
           <li>
             <p className="font-medium">Create a personal app</p>
             <p className="text-ink-2 mt-1">
@@ -108,7 +108,7 @@ export function DirectSlackSettings({ active }: { active: boolean }) {
       <Section title="Personal connection" description="Tokens stay encrypted on this computer. Leave a saved token blank to keep it.">
         <div className="flex items-center justify-between gap-3 mb-3">
           <span>{direct?.workspace ? `${direct.ownerName ?? config.userId} · ${direct.workspace}` : "This computer"}</span>
-          <Badge tone={direct?.connected && !direct.error ? "ok" : "muted"}>{directSlackStatus(direct)}</Badge>
+          <Status ok={direct?.connected && !direct.error}>{directSlackStatus(direct)}</Status>
         </div>
         <Field label="Bot token" hint="OAuth & Permissions → Bot User OAuth Token.">
           <Input

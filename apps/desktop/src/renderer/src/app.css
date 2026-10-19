@@ -131,9 +131,6 @@
   --plane-fill: var(--bg);
   /* Raised thread cards: the contact plus a soft cast, the lift the user's bubble has. */
   --material-card: var(--material-contact), 0 4px 12px -6px var(--material-lo-cast);
-  /* A recessed track inside a plane: the switch, the usage meter, a path well. Light's grey
-     step sits under the white plane; dark's canvas sits under the raised one. */
-  --track-fill: var(--surface-2);
   /* The selected segment of a --surface-2 track, such as the appearance modes. It sits one
      step lighter than the track. */
   --track-2-current: var(--surface);
@@ -237,7 +234,6 @@
     /* Most of a step above the canvas, so a hover row inside a plane still lifts at --surface-2. */
     --plane-fill: color-mix(in srgb, var(--surface-2) 60%, var(--surface));
     --material-card: var(--material-sheen), var(--material-contact), 0 4px 12px -6px var(--material-lo-cast);
-    --track-fill: var(--surface);
     --bubble-material: var(--material-sheen);
     color-scheme: dark;
   }
@@ -321,7 +317,6 @@
   /* Most of a step above the canvas, so a hover row inside a plane still lifts at --surface-2. */
   --plane-fill: color-mix(in srgb, var(--surface-2) 60%, var(--surface));
   --material-card: var(--material-sheen), var(--material-contact), 0 4px 12px -6px var(--material-lo-cast);
-  --track-fill: var(--surface);
   --bubble-material: var(--material-sheen);
   color-scheme: dark;
 }
@@ -2772,6 +2767,7 @@ diffs-container {
 .settings-shell {
   --settings-content-width: 960px;
   --settings-control-width: 240px;
+  --settings-card-fill: var(--surface-2);
   container-type: inline-size;
   flex: 1;
   min-height: 0;
@@ -2823,26 +2819,24 @@ diffs-container {
   color: var(--ink-3);
   font-size: 13px;
 }
+/* Sections stack: a quiet title and its context above the content. A group is a card set apart
+   by its fill alone, with no border or shadow; hairlines divide the rows inside it. */
 .settings-section {
-  margin-bottom: 24px;
+  margin-bottom: 28px;
 }
-.settings-section:has(> .settings-section-intro) {
-  display: grid;
-  grid-template-columns: 190px minmax(0, 1fr);
-  align-items: start;
-  gap: 32px;
-  padding-block: 22px;
-  margin: 0;
-  border-top: var(--hairline) solid var(--line);
+.settings-section-intro {
+  margin-bottom: 10px;
+  padding-inline: 2px;
 }
 .settings-section-intro h2 {
   color: var(--ink);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.5;
 }
 .settings-section-intro p {
-  margin-top: 6px;
+  max-width: 640px;
+  margin-top: 2px;
   color: var(--ink-3);
   font-size: 12px;
   line-height: 1.6;
@@ -2850,15 +2844,11 @@ diffs-container {
 .settings-section-body {
   min-width: 0;
 }
-.settings-section[data-wide] {
-  grid-template-columns: 1fr;
-  gap: 16px;
-}
-.settings-section[data-wide] .settings-section-intro p {
-  margin-top: 3px;
-}
 .settings-group {
-  padding: 0;
+  display: flow-root;
+  padding: 0 16px;
+  border-radius: var(--radius-xl);
+  background: var(--settings-card-fill);
 }
 .settings-group > :last-child {
   border-bottom: 0;
@@ -2889,25 +2879,18 @@ diffs-container {
   display: flex;
   gap: 4px;
   overflow-x: auto;
-  border-bottom: var(--hairline) solid var(--line);
 }
 .skills-harness {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   flex: 0 0 auto;
-  min-height: 40px;
-  padding: 0 12px;
-  border-bottom: 2px solid transparent;
   color: var(--ink-2);
   font-size: var(--text-sm);
 }
 .skills-harness:hover,
 .skills-harness[aria-pressed="true"] {
   color: var(--ink);
-}
-.skills-harness[aria-pressed="true"] {
-  border-bottom-color: var(--ink);
 }
 .skills-harness:focus-visible {
   outline: 2px solid var(--line-strong);
@@ -3062,10 +3045,9 @@ diffs-container {
 .settings-field .settings-switch {
   flex: 0 0 auto;
 }
-/* A recessed track holding a raised knob: the same construction as the appearance modes and
-   the task destination, and the reference module's own geometry. Checked fills with --ink
-   rather than --accent, which is what retires accent-color here and keeps one hot element
-   per view. Focus moves border-color only: no material, no halo. */
+/* A track tinted from the ink, so it reads on any ground, holding a paper knob. Checked fills
+   with --ink rather than --accent, which is what retires accent-color here and keeps one hot
+   element per view. */
 .settings-switch {
   position: relative;
   display: inline-block;
@@ -3078,31 +3060,22 @@ diffs-container {
   width: 100%;
   height: 100%;
   margin: 0;
-  border: var(--hairline) solid var(--line);
+  border: 0;
   border-radius: var(--radius-pill);
-  background: var(--track-fill);
-  box-shadow: var(--material-recess);
-  transition:
-    background-color 120ms var(--ease-out),
-    border-color 120ms var(--ease-out);
+  background: color-mix(in srgb, var(--ink) 14%, transparent);
+  transition: background-color 120ms var(--ease-out);
 }
 .settings-switch input:checked {
   background: var(--ink);
-  border-color: var(--ink);
-  box-shadow: none;
 }
 .settings-switch input:focus-visible {
-  border-color: var(--line-strong);
-  background: var(--track-fill);
-}
-.settings-switch input:checked:focus-visible {
-  background: var(--ink);
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }
 .settings-switch input:disabled {
   pointer-events: none;
   opacity: 1;
-  border-color: var(--line);
-  background: var(--surface-2);
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
 }
 .settings-switch-knob {
   position: absolute;
@@ -3111,7 +3084,7 @@ diffs-container {
   width: 16px;
   height: 16px;
   border-radius: var(--radius-pill);
-  background: var(--plane-fill);
+  background: var(--paper);
   box-shadow: var(--material-seat);
   transition: left 120ms var(--ease-out);
   pointer-events: none;
@@ -3153,13 +3126,9 @@ diffs-container {
   white-space: normal;
   padding: 8px 12px;
   border-radius: var(--radius-md);
-  background: var(--track-fill);
+  background: var(--surface);
   box-shadow: var(--material-recess);
   color: var(--ink-2);
-}
-.settings-agent {
-  padding-block: 16px;
-  border-bottom: var(--hairline) solid var(--line);
 }
 @container (max-width: 720px) {
   .settings-content {
@@ -3559,17 +3528,6 @@ body:has(.sidebar-shell[data-open="false"]) .thread-pane:first-child > .well {
 .task-comment-recipients,
 .task-comment-mentions button[role="option"] span:last-child {
   color: var(--ink-2);
-}
-.agent-update-toolbar,
-.agent-update-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-.agent-update-toolbar {
-  margin-bottom: 12px;
 }
 .workspace-update-notices {
   position: fixed;

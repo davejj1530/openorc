@@ -264,13 +264,7 @@
   color: var(--accent-fg);
   font-weight: 500;
 }
-.appearance-advanced > summary {
-  width: fit-content;
-  color: var(--ink-2);
-  padding: 8px 0;
-}
-.accent-combinations button:focus-visible,
-.appearance-advanced > summary:focus-visible {
+.accent-combinations button:focus-visible {
   outline: 2px solid var(--accent-ink);
   outline-offset: 2px;
 }

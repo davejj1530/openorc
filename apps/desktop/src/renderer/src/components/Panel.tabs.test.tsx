@@ -48,18 +48,16 @@ function mount() {
   );
 }
 
-it("opens with a launcher, uses its tab for a tool, and keeps clicking the active tab open", async () => {
+it("opens with a launcher, uses its tab for a tool without browser controls, and keeps clicking the active tab open", async () => {
   mount();
   expect(screen.getAllByRole("tab")).toHaveLength(1);
   expect(screen.getByRole("tab", { name: "New tab" })).toBeTruthy();
-  expect(screen.getByRole("button", { name: "Changes" })).toBeTruthy();
+  expect(within(screen.getByRole("tabpanel")).getByRole("button", { name: "Back" })).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Memory" }));
   expect(await screen.findByText("Project memory")).toBeTruthy();
+  expect(within(screen.getByRole("tabpanel")).queryByRole("button", { name: "Back" })).toBeNull();
   fireEvent.click(screen.getByRole("tab", { name: "Memory" }));
   expect(useLayout.getState().panelOpen).toBe(true);
-  fireEvent.click(within(screen.getByRole("tabpanel")).getByRole("button", { name: "Back" }));
-  expect(screen.getByRole("heading", { name: "Tools" })).toBeTruthy();
-  fireEvent.click(within(screen.getByRole("tabpanel")).getByRole("button", { name: "Forward" }));
   expect(screen.getByText("Project memory")).toBeTruthy();
 });
 

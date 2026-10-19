@@ -1,5 +1,7 @@
+.app-shell .panel-pane:has(> .panel-content[data-file-workspace]) {
+  --panel-page-edge: transparent;
+}
 .app-shell .panel-content[data-file-workspace] {
-  border-color: transparent;
   border-radius: 8px;
 }
 .file-workspace,
@@ -21,8 +23,6 @@
   grid-template-columns: minmax(0, 1fr) min(45%, var(--file-explorer-width));
 }
 .app-shell .panel-browser-tab[data-file][data-active="true"] {
-  background: var(--paper);
-  color: var(--ink);
   font-weight: 500;
 }
 .file-toolbar {

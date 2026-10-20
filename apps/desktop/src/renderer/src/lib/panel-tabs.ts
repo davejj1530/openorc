@@ -35,9 +35,17 @@ function replacePage(tab: WorkTab, page: PanelPage): WorkTab {
   return { ...tab, entries: [replace(tab.entries[0], 0), ...tab.entries.slice(1).map((entry, index) => replace(entry, index + 1))] };
 }
 
+/** Moves one tab to the front of the track, keeping the others in order. */
+function toFront(session: PanelSession, id: string): PanelSession {
+  const tab = session.tabs.find((entry) => entry.id === id);
+  return tab ? { ...session, tabs: [tab, ...session.tabs.filter((entry) => entry.id !== id)] } : session;
+}
+
 function samePage(left: PanelPage, right: PanelPage): boolean {
   if (left.kind === "file" && right.kind === "file") return left.selection?.path === right.selection?.path;
   return pageType(left) === pageType(right);
+}
+
 }
 
 interface PanelSessions {
@@ -85,9 +93,13 @@ export const usePanelSessions = create<PanelSessions>()(
             const existing = id ? session.tabs.find((tab) => tab.id === id) : session.tabs.find((tab) => samePage(currentPage(tab), page));
             const blank = currentPage(activeTab(session)).kind === "newtab" ? activeTab(session) : null;
             const target = existing ?? (id ? null : blank);
-            if (target) return { ...updateTab(session, target.id, (tab) => (samePage(currentPage(tab), page) ? replacePage(tab, page) : navigateTab(tab, page))), activeId: target.id };
+            if (target) {
+              const next = { ...updateTab(session, target.id, (tab) => (samePage(currentPage(tab), page) ? replacePage(tab, page) : navigateTab(tab, page))), activeId: target.id };
+              return target === blank && page.kind === "changes" ? toFront(next, target.id) : next;
+            }
             const tab = navigateTab(newTab(id ?? `${scope}:tab:${crypto.randomUUID()}`), page);
-            return { tabs: [...session.tabs, tab], activeId: tab.id };
+            // Changes is the panel's first tab: it opens at the front of the track, and closes like any other.
+            return { tabs: page.kind === "changes" ? [tab, ...session.tabs] : [...session.tabs, tab], activeId: tab.id };
           }),
         move: (scope, delta) => change(scope, (session) => updateTab(session, session.activeId, (tab) => ({ ...tab, index: Math.max(0, Math.min(tab.entries.length - 1, tab.index + delta)) }))),
         reportBrowser: (scope, id, url, title) =>

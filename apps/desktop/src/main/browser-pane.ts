@@ -39,6 +39,15 @@ const orZero = (value: number): number => (Number.isFinite(value) ? value : 0);
  * drag. Values arrive over IPC, so a non-finite number reads as zero instead
  * of reaching Chromium.
  */
+/** The panel draws the page as an r14 viewport (--radius-viewport); the view rounds its own corners to match. */
+const VIEWPORT_RADIUS = 14;
+
+/** Moves the view onto the panel's rectangle, its corners scaled with the page zoom like its bounds. */
+function place(pane: Pane, rect: PaneRect, zoom: number): void {
+  pane.view.setBounds(toViewBounds(rect, zoom));
+  pane.view.setBorderRadius(Math.round(VIEWPORT_RADIUS * (Number.isFinite(zoom) && zoom > 0 ? zoom : 1)));
+}
+
 export function toViewBounds(rect: PaneRect, zoom: number): Electron.Rectangle {
   const scale = Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
   const x = orZero(rect.x) * scale;
@@ -481,7 +490,7 @@ export function installBrowserPane(ipcMain: Electron.IpcMain, options: { getWind
     pane.desired = true;
     pane.revealRequested = false;
     pane.shown = ++reveals;
-    pane.view.setBounds(toViewBounds(rect, event.sender.getZoomFactor()));
+    place(pane, rect, event.sender.getZoomFactor());
 
     // A pane that was only hidden keeps the page the user browsed to. The
     // panel re-asserts the surface's default URL on every reveal, so honouring
@@ -508,7 +517,7 @@ export function installBrowserPane(ipcMain: Electron.IpcMain, options: { getWind
     const pane = senders(event, id);
     const rect = toRect(bounds);
     if (!pane || !rect) return;
-    pane.view.setBounds(toViewBounds(rect, event.sender.getZoomFactor()));
+    place(pane, rect, event.sender.getZoomFactor());
   });
 
   ipcMain.on("browser:hide", (event, id: unknown) => {

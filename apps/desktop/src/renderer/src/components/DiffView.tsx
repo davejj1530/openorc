@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import { PatchDiff, Virtualizer, WorkerPoolContextProvider, type FileDiffOptions, type SelectedLineRange, type SelectionSide } from "@pierre/diffs/react";
 import DiffWorker from "@pierre/diffs/worker/worker.js?worker";
 import { commentAnchor, isOutdated, patchFiles, reviewCommentLines, reviewCommentSent, type CommentAnchor, type DiffLine, type DiffSide, type PatchFile, type ReviewComment } from "@openorc/protocol";
@@ -28,6 +28,44 @@ export interface ReviewCommentState {
 interface Annotation {
   comment: ReviewComment | null;
 }
+
+/** A run of added or removed lines reads as one r6 block: its first and last rows round their outer corners. */
+function roundedRuns(type: "change-addition" | "change-deletion"): string {
+  const row = `[data-line-type="${type}"]`;
+  const first = `${row}:not(${row} + *)`;
+  const last = `${row}:not(:has(+ ${row}))`;
+  return `
+  [data-column-number]${first} { border-top-left-radius: 6px; }
+  [data-column-number]${last} { border-bottom-left-radius: 6px; }
+  [data-line]${first} { border-top-right-radius: 6px; }
+  [data-line]${last} { border-bottom-right-radius: 6px; }`;
+}
+
+/**
+ * Lines read in the diff's own tones rather than the highlighter's: context muted, added lines
+ * and their marks in --ok on --ok-soft, removed ones in --bad on --bad-soft, each run rounded,
+ * with 2px between a removed run and the added run that replaces it. Rows are 22px; app.css
+ * sets the type.
+ */
+const PLAIN_LINES = `
+  [data-line] span { color: inherit; }
+  [data-line] { color: var(--ink-3); }
+  :is([data-line], [data-column-number], [data-gutter-buffer])[data-line-type="change-addition"] { color: var(--ok); background-color: var(--ok-soft); }
+  :is([data-line], [data-column-number], [data-gutter-buffer])[data-line-type="change-deletion"] { color: var(--bad); background-color: var(--bad-soft); }
+  ${roundedRuns("change-addition")}
+  ${roundedRuns("change-deletion")}
+  :is([data-line], [data-column-number])[data-line-type="change-deletion"] + [data-line-type="change-addition"] { margin-top: 2px; }
+`;
+
+/** Lines marked with + and -, in the tones above, without word-level emphasis. */
+const plainLines = { diffIndicators: "classic", lineDiffType: "none", unsafeCSS: PLAIN_LINES } as const;
+
+/** The worker pool's highlighter: both GitHub themes, plain lines, and the languages a project usually holds. */
+const highlighter = {
+  theme: { light: "github-light", dark: "github-dark" },
+  lineDiffType: plainLines.lineDiffType,
+  langs: ["ts", "tsx", "js", "jsx", "json", "css", "html", "md", "yaml", "sh", "py", "rs", "go"],
+} satisfies ComponentProps<typeof WorkerPoolContextProvider>["highlighterOptions"];
 
 /** The width at which a diff reads side by side rather than unified. */
 const SPLIT_MIN = 880;
@@ -179,11 +217,8 @@ export function DiffView({ patch, comments = [], commentRanges = false, draft = 
   const theme = dark ? "github-dark" : "github-light";
 
   return (
-    <WorkerPoolContextProvider
-      poolOptions={{ workerFactory, poolSize: 2 }}
-      highlighterOptions={{ theme: { light: "github-light", dark: "github-dark" }, langs: ["ts", "tsx", "js", "jsx", "json", "css", "html", "md", "yaml", "sh", "py", "rs", "go"] }}
-    >
-      <div ref={box} className="h-full min-w-0">
+    <WorkerPoolContextProvider poolOptions={{ workerFactory, poolSize: 2 }} highlighterOptions={highlighter}>
+      <div ref={box} className="diff-view h-full min-w-0">
         <Virtualizer className="diffscroll h-full overflow-auto" config={{ overscrollSize: 800 }}>
           {files.map((f) => {
             const open = expanded.has(f.path);
@@ -230,22 +265,22 @@ function FileHeader({ file, open, onToggle, commentCount }: { file: DiffFile; op
       onClick={(event) => onToggle(event.currentTarget)}
       aria-expanded={open}
       title={`${statusLabel[file.status]} · ${file.path}`}
-      className="diff-file-header group flex w-full items-center gap-2 px-2 text-left"
+      className="diff-file-header group flex w-full items-center gap-2 text-left"
     >
-      <ChevronRight size={12} className={cn("shrink-0 text-ink-4 transition-transform group-hover:text-ink-3", open && "rotate-90")} />
-      <span className={cn("w-3 shrink-0 text-center font-mono text-xs font-medium", statusTone[file.status])} aria-hidden="true">
+      <ChevronRight size={14} className={cn("shrink-0 text-ink-4 transition-transform group-hover:text-ink-3", open && "rotate-90")} />
+      <span className={cn("w-3 shrink-0 text-center font-mono text-xs", statusTone[file.status])} aria-hidden="true">
         {statusLetter[file.status]}
       </span>
       <span className="min-w-0 truncate font-mono text-sm">
         {directory ? <span className="text-ink-4">{directory}</span> : null}
-        <span className="text-ink-2 group-hover:text-ink">{name}</span>
+        <span className="text-ink">{name}</span>
       </span>
       {commentCount > 0 ? (
         <span className="shrink-0 text-xs text-ink-4">
           {commentCount} comment{commentCount === 1 ? "" : "s"}
         </span>
       ) : null}
-      <span className="ml-auto shrink-0 font-mono text-xs tabular">
+      <span className="ml-auto shrink-0 font-mono text-sm tabular">
         {file.insertions > 0 ? <span className="text-ok">+{file.insertions}</span> : null}
         {file.insertions > 0 && file.deletions > 0 ? " " : null}
         {file.deletions > 0 ? <span className="text-bad">-{file.deletions}</span> : null}
@@ -338,7 +373,7 @@ function FileBlock({
   const options = useMemo((): FileDiffOptions<Annotation, undefined> => {
     const base: FileDiffOptions<Annotation, undefined> = {
       diffStyle,
-      diffIndicators: "bars",
+      ...plainLines,
       theme: { light: "github-light", dark: "github-dark" },
       themeType: theme === "github-dark" ? "dark" : "light",
       // The fold above carries the filename, the letter and the counts.
@@ -403,9 +438,9 @@ function FileBlock({
 function CommentAnnotation({ comment, state, onRemove, outdated = false }: { comment: ReviewComment; state?: ReviewCommentState; onRemove: () => void; outdated?: boolean }) {
   const range = rangeLabel(comment);
   return (
-    <div className={cn("my-1 mx-3 rounded-md border bg-surface px-3 py-2 text-sm font-sans", outdated && "border-dashed border-line-strong", !outdated && "border-line")}>
+    <div className={cn("my-1.5 mx-3 rounded-xl px-3.5 py-2.5 text-base font-sans", outdated ? "bg-surface-3" : "bg-surface-2")}>
       <div className="flex items-center gap-2 text-xs text-ink-3 mb-1">
-        <span className="font-medium text-ink-2">{state?.author ?? "You"}</span>
+        <span className="text-ink-2">{state?.author ?? "You"}</span>
         {range ? <span className="text-ink-2">{range}</span> : null}
         <span>{state?.label ?? (reviewCommentSent(comment) ? "sent to the agent" : "not sent yet")}</span>
         {outdated ? <span>· {changedLabel(comment)}</span> : null}
@@ -436,7 +471,7 @@ function DraftComposer({
   onCancel: () => void;
 }) {
   return (
-    <div className="my-1 mx-3 rounded-md border border-line-strong bg-surface p-2 font-sans">
+    <div className="my-1.5 mx-3 rounded-xl bg-surface-2 p-2.5 font-sans">
       {label ? <p className="text-xs text-ink-3 mb-1.5">{label}</p> : null}
       {changedText !== null ? <div className="font-mono text-xs text-ink-3 whitespace-pre overflow-x-auto mb-1.5">{changedText}</div> : null}
       <Textarea
@@ -454,7 +489,7 @@ function DraftComposer({
         <Button size="sm" variant="ghost" onClick={onCancel}>
           Cancel
         </Button>
-        <Button size="sm" disabled={!body.trim()} onClick={() => onSubmit(body.trim())}>
+        <Button size="sm" variant="primary" disabled={!body.trim()} onClick={() => onSubmit(body.trim())}>
           Add comment
         </Button>
       </div>

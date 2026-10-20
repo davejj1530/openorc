@@ -3,6 +3,7 @@ import type { ThreadSummary } from "@openorc/protocol";
 import { History } from "../components/icons";
 import { Button, Dialog, Empty, TextButton } from "../components/ui";
 import { FileRows } from "./FileRows";
+import { PanelBar, PanelBarMeta, PanelNotice } from "../components/PanelBar";
 import { cn } from "../lib/cn";
 import { useRpc, useRpcMutation } from "../lib/query";
 import { relativeTime } from "../lib/time";
@@ -138,7 +139,7 @@ export function CheckpointsPanel({ thread }: { thread: ThreadSummary }) {
       );
     else if (preview.data?.files.length)
       previewContent = (
-        <div className="mb-3 rounded-md border border-line">
+        <div className="mb-3 rounded-lg bg-surface-2 py-1">
           <FileRows files={preview.data.files} />
         </div>
       );
@@ -149,7 +150,8 @@ export function CheckpointsPanel({ thread }: { thread: ThreadSummary }) {
   else if (pending) submitLabel = "Retry restore";
   return (
     <div className="h-full overflow-y-auto">
-      {status ? <div className="px-3 py-2 border-b border-line">{status}</div> : null}
+      <PanelBar title="Checkpoints" meta={items.length > 0 ? <PanelBarMeta>{items.length}</PanelBarMeta> : null} />
+      {status ? <div className="px-5 pb-2.5">{status}</div> : null}
       <PendingTeamRestore
         id={thread.id}
         pending={pending}
@@ -163,45 +165,42 @@ export function CheckpointsPanel({ thread }: { thread: ThreadSummary }) {
           refresh();
         }}
       />
-      {notice ? (
-        <p role="status" className="px-3 py-2 text-sm text-ink-3">
-          {notice}
-        </p>
-      ) : null}
+      {notice ? <PanelNotice>{notice}</PanelNotice> : null}
       {listStatus}
-      {items.map((c, i) => {
-        const stat = c.diffStat;
-        return (
-          <div key={c.id} className="flex items-center gap-3 px-3 py-2 border-b border-line text-base">
-            <History size={14} className={cn("shrink-0", i === 0 ? "text-ink-2" : "text-ink-4")} />
-            <div className="flex-1 min-w-0">
-              <div className="truncate">
-                {c.note ?? `Turn ${c.turn}`}
-                {i === 0 ? " (latest)" : ""}
+      <div className="panel-rows pb-2.5">
+        {items.map((c, i) => {
+          const stat = c.diffStat;
+          return (
+            <div key={c.id} className="flex items-center gap-3 mx-2.5 px-2.5 py-2.5 text-base">
+              <History size={14} className={cn("shrink-0", i === 0 ? "text-ink-2" : "text-ink-4")} />
+              <div className="flex-1 min-w-0">
+                <div className="truncate">
+                  {c.note ?? `Turn ${c.turn}`}
+                  {i === 0 ? " (latest)" : ""}
+                </div>
+                <div className="flex items-center gap-2 text-sm text-ink-3">
+                  <span className="font-mono tabular">
+                    {stat.files + stat.untracked} file{stat.files + stat.untracked === 1 ? "" : "s"} <span className="text-ok">+{stat.insertions}</span>{" "}
+                    <span className="text-bad">-{stat.deletions}</span>
+                  </span>
+                  <span className="ml-auto tabular text-ink-4">{relativeTime(c.createdAt)}</span>
+                </div>
               </div>
-              <div className="flex items-center gap-2 text-sm text-ink-3">
-                <span className="font-mono text-xs tabular">
-                  {stat.files + stat.untracked} file{stat.files + stat.untracked === 1 ? "" : "s"} <span className="text-ok">+{stat.insertions}</span>{" "}
-                  <span className="text-bad">-{stat.deletions}</span>
-                </span>
-                <span className="ml-auto tabular text-ink-4">{relativeTime(c.createdAt)}</span>
-              </div>
+              <Button
+                disabled={Boolean(blockedReason) || busy || Boolean(pending && pending.checkpointId !== c.id)}
+                title={pending && pending.checkpointId !== c.id ? "Confirm the saved restore request before choosing another checkpoint." : (blockedReason ?? undefined)}
+                onClick={() => select(c.id)}
+              >
+                {pending?.checkpointId === c.id ? "Retry restore" : "Restore"}
+              </Button>
             </div>
-            <Button
-              size="sm"
-              disabled={Boolean(blockedReason) || busy || Boolean(pending && pending.checkpointId !== c.id)}
-              title={pending && pending.checkpointId !== c.id ? "Confirm the saved restore request before choosing another checkpoint." : (blockedReason ?? undefined)}
-              onClick={() => select(c.id)}
-            >
-              {pending?.checkpointId === c.id ? "Retry restore" : "Restore"}
-            </Button>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
       {error && !confirm ? (
-        <p role="alert" className="px-3 py-2 text-sm text-bad break-words">
+        <PanelNotice role="alert" tone="bad">
           {error}
-        </p>
+        </PanelNotice>
       ) : null}
       <Dialog
         open={Boolean(confirm)}
@@ -258,7 +257,7 @@ function PendingTeamRestore({
 }) {
   if (!pending) return null;
   return (
-    <div className="px-3 py-2 border-b border-line space-y-2" data-team-restore-request={pending.requestKey}>
+    <div className="px-5 pb-2.5 space-y-2" data-team-restore-request={pending.requestKey}>
       <p className="text-sm text-ink-3">A saved restore request is awaiting confirmation. It keeps the same checkpoint and workspace change.</p>
       <Button size="sm" disabled={busy} onClick={() => select(pending.checkpointId)}>
         Retry restore

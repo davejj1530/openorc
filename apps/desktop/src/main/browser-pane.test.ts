@@ -96,6 +96,10 @@ const fake = vi.hoisted(() => {
     setBounds(bounds: { x: number; y: number; width: number; height: number }): void {
       this.bounds = bounds;
     }
+    radius = 0;
+    setBorderRadius(radius: number): void {
+      this.radius = radius;
+    }
     setVisible(visible: boolean): void {
       this.visible = visible;
     }

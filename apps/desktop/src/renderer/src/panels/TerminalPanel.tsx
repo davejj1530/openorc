@@ -3,6 +3,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { Terminal as Xterm } from "@xterm/xterm";
 import { RotateCcw, Square, Terminal } from "../components/icons";
 import { Button, Empty, IconButton, TextButton } from "../components/ui";
+import { PanelBar, PanelBarMeta, PanelNotice } from "../components/PanelBar";
 import { typeAtPrompt } from "../lib/terminal-requests";
 import { useTheme } from "../lib/theme";
 import { terminalTheme } from "./terminal-theme";
@@ -45,13 +46,35 @@ function openXterm(element: HTMLElement): { term: Xterm; fit: FitAddon } {
     // The ring in main is the replay after a re-attach; this is only what the
     // reader can scroll back through in the view they are looking at.
     scrollback: 5000,
-    theme: terminalTheme(getComputedStyle(document.documentElement), isDark()),
+    // Read where the terminal sits: the panel card restates --bg as its own surface.
+    theme: terminalTheme(getComputedStyle(element), isDark()),
   });
   const fit = new FitAddon();
   term.loadAddon(fit);
   term.open(element);
   fit.fit();
   return { term, fit };
+}
+
+/** The tool's bar: where the shell runs, then End and Restart. */
+function TerminalBar({ cwd, running, onStop, onRestart }: { cwd: string; running: boolean; onStop: () => void; onRestart: () => void }) {
+  return (
+    <PanelBar
+      title="Terminal"
+      meta={
+        <PanelBarMeta className="font-mono" title={cwd}>
+          {shortPath(cwd)}
+        </PanelBarMeta>
+      }
+    >
+      <IconButton onClick={onStop} aria-label="End shell" disabled={!running} title="End this shell and forget its output">
+        <Square size={14} />
+      </IconButton>
+      <IconButton onClick={onRestart} aria-label="Restart shell" title="Start a new shell here">
+        <RotateCcw size={14} />
+      </IconButton>
+    </PanelBar>
+  );
 }
 
 /** The panel is 440px wide by default; the tail of a worktree path is the part that says which workspace this is. */
@@ -149,7 +172,7 @@ export function TerminalPanel({ id, cwd }: { id: string; cwd: string }) {
   // media query as well because it tracks the choice rather than the result.
   useEffect(() => {
     const term = termRef.current;
-    if (term) term.options.theme = terminalTheme(getComputedStyle(document.documentElement), isDark());
+    if (term) term.options.theme = terminalTheme(getComputedStyle(term.element ?? document.documentElement), isDark());
   }, [resolved, preset, custom]);
 
   const restart = (): void => {
@@ -164,29 +187,18 @@ export function TerminalPanel({ id, cwd }: { id: string; cwd: string }) {
 
   return (
     <div className="h-full flex flex-col min-h-0">
-      <div className="h-10 shrink-0 flex items-center gap-2 px-3 border-b border-line text-base">
-        <span className="font-medium">Terminal</span>
-        <span className="min-w-0 flex-1 truncate font-mono text-sm text-ink-3" title={cwd}>
-          {shortPath(cwd)}
-        </span>
-        <IconButton onClick={stop} aria-label="End shell" size="sm" disabled={status.kind !== "running"} title="End this shell and forget its output">
-          <Square size={12} />
-        </IconButton>
-        <IconButton onClick={restart} aria-label="Restart shell" size="sm" title="Start a new shell here">
-          <RotateCcw size={12} />
-        </IconButton>
-      </div>
+      <TerminalBar cwd={cwd} running={status.kind === "running"} onStop={stop} onRestart={restart} />
       {status.kind === "exited" ? (
-        <div role="status" className="shrink-0 px-3 py-1.5 text-sm text-ink-3 border-b border-line">
+        <PanelNotice>
           The shell ended{status.code === null ? "" : ` with code ${status.code}`}.{" "}
           <TextButton type="button" underline onClick={restart}>
             Start a new one
           </TextButton>
-        </div>
+        </PanelNotice>
       ) : null}
       <div className="relative flex-1 min-h-0">
         {/* The host stays mounted through every state: xterm measures it to lay out, and it still holds the output of a shell that has ended. */}
-        <div ref={hostRef} className="absolute inset-0 pl-2 pt-1.5" />
+        <div ref={hostRef} className="absolute inset-0 pl-5 pr-2.5 pb-2.5" />
         {status.kind === "error" ? (
           <div className="absolute inset-0 bg-bg">
             <Empty

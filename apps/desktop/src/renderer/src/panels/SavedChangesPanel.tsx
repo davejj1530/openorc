@@ -1,5 +1,6 @@
 import { lazy, Suspense, type ReactNode } from "react";
 import { Button } from "../components/ui";
+import { PanelBar, PanelBarMeta } from "../components/PanelBar";
 import { useRpc } from "../lib/query";
 import { useLayout, type ChangeSelection } from "../lib/layout";
 
@@ -21,7 +22,7 @@ export function SavedChangesPanel({ selection }: { selection: ChangeSelection })
   let diffContent: ReactNode;
   if (diff.isError) {
     diffContent = (
-      <div role="alert" className="p-3 text-sm">
+      <div role="alert" className="px-5 py-2.5 text-sm">
         Could not load this saved diff.{" "}
         <Button size="sm" variant="ghost" onClick={() => void diff.refetch()}>
           Retry
@@ -30,7 +31,7 @@ export function SavedChangesPanel({ selection }: { selection: ChangeSelection })
     );
   } else if (!diff.data) {
     diffContent = (
-      <p role="status" className="p-3 text-sm text-ink-3">
+      <p role="status" className="px-5 py-2.5 text-sm text-ink-3">
         Loading saved changes…
       </p>
     );
@@ -45,13 +46,12 @@ export function SavedChangesPanel({ selection }: { selection: ChangeSelection })
   }
   return (
     <section className="h-full flex flex-col min-h-0" aria-label="Selected code changes">
-      <header className="flex items-center gap-3 px-3 py-2 border-b border-line shrink-0">
-        <strong className="text-base font-medium">Saved changes{diff.data ? ` · ${diff.data.files.length} ${diff.data.files.length === 1 ? "file" : "files"}` : ""}</strong>
-        <Button size="sm" variant="ghost" className="ml-auto" onClick={clear}>
+      <PanelBar title="Saved changes" meta={diff.data ? <PanelBarMeta>{`${diff.data.files.length} ${diff.data.files.length === 1 ? "file" : "files"}`}</PanelBarMeta> : null}>
+        <Button variant="ghost" onClick={clear}>
           All changes
         </Button>
-      </header>
-      <p className="px-3 py-2 text-sm text-ink-3 border-b border-line">
+      </PanelBar>
+      <p className="panel-notice">
         {team
           ? "Only files selected from this turn’s card. Shared checkpoint; concurrent edits may be included."
           : "Only files selected from this turn’s card, as they were saved when the turn ended."}

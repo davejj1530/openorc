@@ -28,7 +28,7 @@ function DiffItems({ items, height, label, lineNumbers = true }: { items: CodeVi
     viewer.current?.scrollTo({ type: "position", position: 0, behavior: "instant" });
   }, [items]);
   return (
-    <section aria-label={label} className="my-2 min-w-0 overflow-hidden rounded-lg border border-line" style={{ height, maxHeight: "55vh" }}>
+    <section aria-label={label} className="inline-diff my-2 min-w-0 overflow-hidden rounded-2xl" style={{ height, maxHeight: "55vh" }}>
       <WorkerPoolContextProvider
         poolOptions={{ workerFactory, poolSize: 2 }}
         highlighterOptions={{ theme: { light: "github-light", dark: "github-dark" }, langs: ["ts", "tsx", "js", "jsx", "json", "css", "html", "md", "yaml", "sh", "py", "rs", "go"] }}
@@ -68,7 +68,7 @@ export function InlineDiff({ patch }: { patch: string }) {
     return (
       <div className="my-2 text-xs text-ink-3">
         <p role="status">Diff preview unavailable. The patch may be incomplete.</p>
-        <pre className="mt-2 max-h-72 overflow-auto whitespace-pre font-mono rounded-lg border border-line p-3">{patch}</pre>
+        <pre className="mt-2 max-h-72 overflow-auto whitespace-pre font-mono rounded-lg bg-surface-2 p-3">{patch}</pre>
       </div>
     );
   return <DiffItems key={patch} items={preview.items} height={preview.height} label="Inline diff" />;
@@ -89,7 +89,7 @@ export function EditDiff({ path, before, after }: { path: string; before: string
       return null;
     }
   }, [path, before, after]);
-  if (!fileDiff) return <pre className="my-2 max-h-72 overflow-auto whitespace-pre-wrap font-mono text-xs rounded-lg border border-line p-3">{after}</pre>;
+  if (!fileDiff) return <pre className="my-2 max-h-72 overflow-auto whitespace-pre-wrap font-mono text-xs rounded-lg bg-surface-2 p-3">{after}</pre>;
   const items: CodeViewItem<undefined>[] = [{ id: `edit:${fileDiff.name}`, type: "diff", fileDiff }];
   return <DiffItems key={`${path}\n${before}\n${after}`} items={items} height={diffHeight([fileDiff])} label="Edit" lineNumbers={false} />;
 }

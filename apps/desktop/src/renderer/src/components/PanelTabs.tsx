@@ -1,6 +1,7 @@
 import { useEffect, useRef, type KeyboardEvent } from "react";
 import type { FileSelection } from "../lib/layout";
 import { currentPage, type PanelPage, type PanelSession, type WorkTab } from "../lib/panel-tabs";
+import { useSlidingKnob } from "../lib/use-sliding-knob";
 import { useUnsavedFile } from "../lib/use-file-buffer";
 import { pageIcon, pageLabel } from "./panel-tools";
 import { X } from "./icons";
@@ -22,12 +23,15 @@ interface TabProps {
   onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void;
 }
 
-/** One tab. Unsaved edits show as a dot where the close button sits, and the close button returns on hover. */
+/**
+ * One tab at its natural width. Its mark (the tool's glyph, or a dot while a file has unsaved
+ * edits) turns into the close control under the pointer or keyboard focus.
+ */
 function PanelTab({ tab, page, active, unsaved, onSelect, onClose, onKeyDown }: TabProps & { unsaved: boolean }) {
   const label = pageLabel(page);
   const Icon = pageIcon(page);
   return (
-    <div role="presentation" className="panel-browser-tab" data-active={active} data-file={(page.kind === "file" && !!page.selection) || undefined}>
+    <div role="presentation" className="panel-tab" data-active={active}>
       <button
         role="tab"
         id={`panel-tab-${tab.id}`}
@@ -45,11 +49,12 @@ function PanelTab({ tab, page, active, unsaved, onSelect, onClose, onKeyDown }: 
         }}
         onKeyDown={onKeyDown}
       >
-        <Icon size={14} />
-        <span>{label}</span>
+        <span className="panel-tab-mark" aria-hidden="true">
+          {unsaved ? <span className="panel-tab-dot" /> : <Icon size={14} />}
+        </span>
+        <span className="panel-tab-label">{label}</span>
       </button>
-      <button className="panel-tab-close" data-unsaved={unsaved || undefined} aria-label={`Close ${label}`} title={`Close ${label}`} onClick={() => onClose(tab.id)}>
-        <span className="panel-tab-dot" aria-hidden="true" />
+      <button className="panel-tab-close" aria-label={`Close ${label}`} title={`Close ${label}`} onClick={() => onClose(tab.id)}>
         <X size={12} />
       </button>
     </div>
@@ -60,13 +65,19 @@ function FileTab({ selection, ...props }: TabProps & { selection: FileSelection 
   return <PanelTab {...props} unsaved={useUnsavedFile(selection)} />;
 }
 
+/**
+ * The panel's tabs on a fill track with a sliding knob under the open one. The track scrolls
+ * sideways when the tabs outgrow it; the knob scrolls with it and the open tab is kept in view.
+ */
 export function PanelTabs({ session, onSelect, onClose }: { session: PanelSession; onSelect: (id: string) => void; onClose: (id: string) => void }) {
   const strip = useRef<HTMLDivElement>(null);
+  const knob = useSlidingKnob(strip, '.panel-tab[data-active="true"]', `${session.activeId}:${session.tabs.length}`);
   useEffect(() => {
     strip.current?.querySelector('[aria-selected="true"]')?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
   }, [session.activeId]);
   return (
-    <div ref={strip} role="tablist" aria-label="Panel tabs" className="panel-browser-tabs no-drag">
+    <div ref={strip} role="tablist" aria-label="Panel tabs" className="panel-tabs no-drag" data-placed={knob.placed || undefined}>
+      <span aria-hidden="true" className="panel-tabs-knob" data-placed={knob.placed || undefined} hidden={!knob.style} style={knob.style} />
       {session.tabs.map((tab, index) => {
         const page = currentPage(tab);
         const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {

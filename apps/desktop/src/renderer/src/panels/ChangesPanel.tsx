@@ -1,7 +1,10 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { isDetachedCopy, type Project, type Task, type ThreadSummary } from "@openorc/protocol";
-import { GitCommitHorizontal, RefreshCw } from "../components/icons";
-import { Button, Dialog, Empty, Field, IconButton, Textarea, TextButton } from "../components/ui";
+import { RefreshCw } from "../components/icons";
+import { CommitSheet } from "../components/CommitSheet";
+import { DiffStat, PanelBar, PanelBarMeta, PanelNotice } from "../components/PanelBar";
+import { Button, Empty, IconButton, Segmented, TextButton, Tooltip } from "../components/ui";
+import { cn } from "../lib/cn";
 import { ConversationReview } from "./ConversationReview";
 import { FileRows } from "./FileRows";
 import { PullRequestLink } from "./ThreadPullRequest";
@@ -72,15 +75,6 @@ export function ChangesPanel({ thread, project, task }: { thread?: ThreadSummary
       refresh();
     }
   };
-  const actionNotice = (reason: string | null) =>
-    reason ? (
-      <p role="status" className="text-sm text-ink-3 mb-3">
-        {reason}{" "}
-        <TextButton type="button" disabled={busy || runtime.isFetching} underline onClick={refresh}>
-          Refresh team status
-        </TextButton>
-      </p>
-    ) : null;
   let workspaceContent: ReactNode = null;
   if (diff.error) workspaceContent = <Empty title="Could not read the workspace">{diff.error.message}</Empty>;
   else if (!diff.isLoading && files.length === 0) {
@@ -96,7 +90,7 @@ export function ChangesPanel({ thread, project, task }: { thread?: ThreadSummary
         {thread && !team ? (
           <ConversationReview patch={patch} threadId={thread.id} taskId={task?.id} />
         ) : (
-          <div className="flex-1 min-h-0 border-t border-line">
+          <div className="flex-1 min-h-0">
             <Suspense fallback={null}>
               <DiffView patch={patch} />
             </Suspense>
@@ -105,84 +99,102 @@ export function ChangesPanel({ thread, project, task }: { thread?: ThreadSummary
       </>
     );
   }
+  const refreshTeam = (
+    <TextButton type="button" disabled={busy || runtime.isFetching} underline onClick={refresh}>
+      Refresh team status
+    </TextButton>
+  );
 
   return (
     <div className="h-full flex flex-col min-h-0">
-      <div className="h-10 shrink-0 flex items-center gap-2 px-3 border-b border-line text-base">
-        <span className="font-medium">Changes</span>
-        <span className="text-ink-3 tabular">{files.length}</span>
-        {stat.add + stat.del > 0 ? (
-          <span className="font-mono text-sm tabular">
-            <span className="text-ok">+{stat.add}</span> <span className="text-bad">-{stat.del}</span>
-          </span>
-        ) : null}
-        <span className="flex-1" />
-        {commits ? (
-          <Button size="sm" variant="primary" disabled={!canCommit} title={actions.commit.reason ?? undefined} onClick={() => setCommitOpen(true)}>
-            <GitCommitHorizontal size={12} /> Commit
-          </Button>
-        ) : null}
-        {thread ? <PullRequestLink thread={thread} /> : null}
-        <IconButton onClick={refresh} aria-label="Refresh" size="sm">
-          <RefreshCw size={12} className={diff.isFetching ? "animate-spin" : ""} />
-        </IconButton>
-      </div>
-      {thread?.worktreePath ? (
-        <div className="flex items-center gap-2 px-3 py-2 border-b border-line text-sm">
-          <span className="text-ink-2">{comparison === "head" ? "Uncommitted changes" : "All branch changes"}</span>
-          <TextButton className="ml-auto" underline onClick={() => useLayout.getState().openWorkspaceChanges(target, "review", comparison === "head" ? "base" : "head")}>
-            {comparison === "head" ? "Show branch changes" : "Show uncommitted"}
-          </TextButton>
-        </div>
-      ) : null}
-      {commitReason ? (
-        <p role="status" className="px-3 py-2 text-sm text-ink-3 border-b border-line">
-          {commitReason}{" "}
-          <TextButton type="button" disabled={busy || runtime.isFetching} underline onClick={refresh}>
-            Refresh team status
-          </TextButton>
-        </p>
-      ) : null}
-      {notice ? (
-        <div role="status" className="px-3 py-1.5 text-sm text-ink-3 border-b border-line break-words">
-          {notice}
-        </div>
-      ) : null}
-      <div className="flex-1 min-h-0 flex flex-col">{workspaceContent}</div>
-      <Dialog
-        open={commitOpen}
-        onOpenChange={(open) => {
-          if (!busy) setCommitOpen(open);
-        }}
-        title="Commit changes"
+      <PanelBar
+        title={
+          thread?.worktreePath ? (
+            <Segmented size="sm" label="Compare" value={comparison} options={comparisons} onChange={(next) => useLayout.getState().openWorkspaceChanges(target, "review", next)} />
+          ) : (
+            "Uncommitted"
+          )
+        }
+        meta={
+          <>
+            <PanelBarMeta>{fileCount(files.length)}</PanelBarMeta>
+            <DiffStat add={stat.add} del={stat.del} />
+          </>
+        }
       >
-        <Field label="Message">
-          <Textarea rows={3} value={message} onChange={(e) => setMessage(e.target.value)} disabled={busy} autoFocus placeholder="What changed and why" />
-        </Field>
-        {actionNotice(actions.commit.reason)}
-        {uncommitted.isError ? (
-          <p role="alert" className="text-sm text-bad mb-3">
-            Could not refresh uncommitted changes.{" "}
-            <TextButton underline onClick={refresh}>
-              Retry
-            </TextButton>
-          </p>
+        {thread ? <PullRequestLink thread={thread} /> : null}
+        <Tooltip label="Refresh">
+          <IconButton onClick={refresh} aria-label="Refresh" className="text-ink-4">
+            <RefreshCw size={15} className={cn(diff.isFetching && "animate-spin")} />
+          </IconButton>
+        </Tooltip>
+        {commits ? (
+          <CommitSheet
+            open={commitOpen}
+            onOpenChange={(open) => {
+              if (!busy) setCommitOpen(open);
+            }}
+            trigger={
+              <Button variant="primary" disabled={!canCommit} title={actions.commit.reason ?? undefined}>
+                Commit
+              </Button>
+            }
+            title="Commit changes"
+            summary={<CommitSummary files={uncommitted.data?.files.length ?? 0} stat={countStat(uncommitted.data?.patch ?? "")} />}
+            message={message}
+            onMessageChange={setMessage}
+            busy={busy}
+            commitDisabled={!canCommit || !message.trim()}
+            committing={commit.isPending}
+            onCommit={() => void commitChanges()}
+            placeholder="What changed and why"
+          >
+            {actions.commit.reason ? (
+              <p role="status" className="text-sm text-ink-3 mb-3">
+                {actions.commit.reason} {refreshTeam}
+              </p>
+            ) : null}
+            {uncommitted.isError ? (
+              <p role="alert" className="text-sm text-bad mb-3">
+                Could not refresh uncommitted changes.{" "}
+                <TextButton underline onClick={refresh}>
+                  Retry
+                </TextButton>
+              </p>
+            ) : null}
+            {commit.error ? (
+              <div role="alert" className="text-sm text-bad mb-3 break-words">
+                {commit.error.message}
+              </div>
+            ) : null}
+          </CommitSheet>
         ) : null}
-        {commit.error ? (
-          <div role="alert" className="text-sm text-bad mb-3 break-words">
-            {commit.error.message}
-          </div>
-        ) : null}
-        <div className="flex justify-end gap-2">
-          <Button disabled={busy} onClick={() => setCommitOpen(false)}>
-            Cancel
-          </Button>
-          <Button variant="primary" disabled={!canCommit || !message.trim()} onClick={() => void commitChanges()}>
-            {commit.isPending ? "Committing…" : "Commit"}
-          </Button>
-        </div>
-      </Dialog>
+      </PanelBar>
+      {commitReason ? (
+        <PanelNotice>
+          {commitReason} {refreshTeam}
+        </PanelNotice>
+      ) : null}
+      {notice ? <PanelNotice>{notice}</PanelNotice> : null}
+      <div className="flex-1 min-h-0 flex flex-col">{workspaceContent}</div>
     </div>
+  );
+}
+
+const comparisons = [
+  { value: "head", label: "Uncommitted" },
+  { value: "base", label: "Branch" },
+] as const;
+
+const fileCount = (count: number) => `${count} ${count === 1 ? "file" : "files"}`;
+
+/** What a commit takes: its files and line counts, under the sheet's title. */
+export function CommitSummary({ files, stat }: { files: number; stat: { add: number; del: number } }) {
+  return (
+    <span className="inline-flex items-center gap-2">
+      {fileCount(files)}
+      <DiffStat add={stat.add} del={stat.del} />
+    </span>
   );
 }
 

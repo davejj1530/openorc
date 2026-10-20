@@ -80,3 +80,37 @@ it("restores the agent's native preview tab and updates only that page's title",
   expect(currentPage(activeTab(session()))).toEqual({ kind: "browser", url: "https://example.com", title: "Example" });
   expect(JSON.parse(localStorage.getItem("openorc.panel-sessions") ?? "{}").state.sessions[scope].tabs).toHaveLength(2);
 });
+
+it("opens Changes at the front of the track, and it closes like any tab", () => {
+  actions().open(scope, terminal);
+  actions().open(scope, { kind: "tool", tool: "memory" });
+  actions().open(scope, changes);
+  expect(session().tabs.map((tab) => currentPage(tab))).toEqual([changes, terminal, { kind: "tool", tool: "memory" }]);
+  expect(currentPage(activeTab(session()))).toEqual(changes);
+  actions().close(scope, session().activeId);
+  expect(session().tabs.map((tab) => currentPage(tab))).toEqual([terminal, { kind: "tool", tool: "memory" }]);
+});
+
+it("moves a blank tab that opens Changes to the front", () => {
+  actions().open(scope, terminal);
+  actions().add(scope);
+  actions().open(scope, changes);
+  expect(session().tabs).toHaveLength(2);
+  expect(currentPage(session().tabs[0])).toEqual(changes);
+  expect(session().activeId).toBe(session().tabs[0].id);
+});
+
+it("restores a saved session in its saved order and leaves Changes alone on an agent reveal", () => {
+  const saved = {
+    tabs: [
+      { id: "b", entries: [terminal], index: 0 },
+      { id: "a", entries: [changes], index: 0 },
+    ],
+    activeId: "b",
+  } as const;
+  usePanelSessions.setState({ sessions: { [scope]: structuredClone(saved) as never } });
+  expect(session().tabs.map((tab) => tab.id)).toEqual(["b", "a"]);
+  actions().open(scope, { kind: "browser", url: "", title: "" }, scope);
+  expect(session().tabs.map((tab) => tab.id)).toEqual(["b", "a", scope]);
+  expect(currentPage(session().tabs[1]!)).toEqual(changes);
+});

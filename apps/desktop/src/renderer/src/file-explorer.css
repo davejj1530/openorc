@@ -1,9 +1,3 @@
-.app-shell .panel-pane:has(> .panel-content[data-file-workspace]) {
-  --panel-page-edge: transparent;
-}
-.app-shell .panel-content[data-file-workspace] {
-  border-radius: 8px;
-}
 .file-workspace,
 .file-editor {
   display: flex;
@@ -22,27 +16,23 @@
 .file-workspace[data-explorer] {
   grid-template-columns: minmax(0, 1fr) min(45%, var(--file-explorer-width));
 }
-.app-shell .panel-browser-tab[data-file][data-active="true"] {
-  font-weight: 500;
-}
 .file-toolbar {
   grid-area: 1 / 1;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 4px 12px;
-  min-height: 40px;
-  padding: 4px 10px;
+  min-height: 44px;
+  padding: 4px 10px 4px 20px;
   flex-shrink: 0;
-  border-bottom: var(--hairline) solid var(--line);
 }
 .file-breadcrumbs {
   flex: 1 1 120px;
   min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
-  color: var(--ink-3);
-  font-size: 12px;
+  color: var(--ink-4);
+  font-size: var(--text-sm);
 }
 .file-breadcrumbs ol,
 .file-breadcrumbs li,
@@ -58,15 +48,15 @@
   white-space: nowrap;
 }
 .file-breadcrumbs button {
-  border-radius: 4px;
-  padding: 3px 2px;
+  border-radius: var(--radius-sm);
+  padding: 3px 4px;
 }
 .file-breadcrumbs button:hover {
   color: var(--ink);
   background: var(--surface-2);
 }
 .file-breadcrumbs [aria-current] {
-  color: var(--ink-2);
+  color: var(--ink);
 }
 .file-toolbar-actions {
   margin-left: auto;
@@ -82,7 +72,7 @@
   grid-template-rows: subgrid;
   min-width: 0;
   min-height: 0;
-  border-left: var(--hairline) solid var(--line);
+  border-left: var(--hairline) solid color-mix(in srgb, var(--line) 60%, transparent);
 }
 .file-explorer {
   display: grid;
@@ -91,7 +81,16 @@
   min-width: 0;
   min-height: 0;
   height: 100%;
-  background: color-mix(in srgb, var(--surface) 60%, var(--paper));
+}
+/* Beside an open file the explorer sits one fill step down, with a faint seam. Its current row
+   and filter step back up to the card's surface, like a tile card inside a plane. */
+.file-explorer-sidebar > .file-explorer {
+  --current-row-fill: var(--surface);
+  --control-fill: var(--surface);
+  background: var(--surface-2);
+}
+.file-explorer-sidebar .file-explorer-filter input {
+  background: var(--surface);
 }
 .file-explorer-sidebar > .file-explorer {
   grid-row: 1 / 3;
@@ -101,10 +100,9 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  min-height: 40px;
-  padding: 4px 8px 4px 12px;
+  min-height: 44px;
+  padding: 4px 8px 4px 16px;
   flex-shrink: 0;
-  border-bottom: var(--hairline) solid var(--line);
 }
 .file-explorer-body {
   display: flex;
@@ -125,10 +123,10 @@
   pointer-events: none;
 }
 .file-explorer-filter input {
-  height: 28px;
-  padding-left: 26px;
-  font-size: 12px;
-  background: transparent;
+  height: 30px;
+  padding-left: 28px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
 }
 .file-explorer-scroll {
   flex: 1;
@@ -140,11 +138,11 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  height: 26px;
+  height: 28px;
   padding-right: 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-md);
   color: var(--ink-2);
-  font-size: 12px;
+  font-size: var(--text-sm);
   cursor: default;
   user-select: none;
 }
@@ -157,21 +155,23 @@
 }
 .file-tree-root {
   padding-left: 8px;
-  font-weight: 500;
 }
 .file-tree-row:hover {
   background: var(--surface-2);
+}
+.file-explorer-sidebar .file-tree-row:hover {
+  background: var(--surface-3);
 }
 .file-explorer [role="treeitem"] {
   outline: none;
 }
 .file-explorer [role="treeitem"][aria-selected="true"] > .file-tree-row {
-  background: var(--navigation-soft);
+  background: var(--current-row-fill);
   color: var(--navigation-ink);
 }
 .file-explorer [role="treeitem"]:focus-visible > .file-tree-row {
-  outline: 1px solid var(--ink-3);
-  outline-offset: -1px;
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
 }
 .file-tree-group {
   position: relative;
@@ -185,7 +185,7 @@
 }
 .file-tree-notice {
   padding: 6px 12px 6px 24px;
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--ink-3);
   overflow-wrap: anywhere;
 }
@@ -196,8 +196,8 @@
   width: 100%;
   padding: 6px 8px;
   text-align: left;
-  border-radius: 4px;
-  font-size: 12px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
 }
 .file-tree-result > svg {
   flex-shrink: 0;
@@ -225,7 +225,7 @@
 }
 .file-explorer-resize:hover::after,
 .file-explorer-resize:focus-visible::after {
-  background: var(--ink-3);
+  background: var(--line-strong);
 }
 .file-workspace[data-compact] .file-explorer-sidebar {
   grid-area: 2 / 1;

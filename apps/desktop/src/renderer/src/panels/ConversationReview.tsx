@@ -3,6 +3,7 @@ import { reviewCommentSent } from "@openorc/protocol";
 import type { CommentDraft } from "../components/DiffView";
 import { Send } from "../components/icons";
 import { Button } from "../components/ui";
+import { PanelNotice } from "../components/PanelBar";
 import { useRpc, useRpcMutation } from "../lib/query";
 import { ReviewCommentList } from "./ReviewCommentList";
 
@@ -47,34 +48,30 @@ export function ConversationReview({ patch, threadId, taskId }: { patch: string;
 
   return (
     <>
-      <div className="flex-1 min-h-0 border-t border-line">
+      <div className="flex-1 min-h-0">
         <Suspense fallback={null}>
           <DiffView patch={patch} comments={all} commentRanges draft={draft} onRequestComment={setDraft} onSubmitDraft={submitDraft} onCancelDraft={() => setDraft(null)} onRemoveComment={remove} />
         </Suspense>
       </div>
       {all.length > 0 ? (
-        <div className="shrink-0 border-t border-line">
+        <div className="shrink-0">
           <div className="max-h-48 overflow-y-auto">
             <ReviewCommentList comments={all} onRemove={remove} />
           </div>
           {unsent.length > 0 ? (
-            <div className="flex justify-end px-3 pb-2">
-              <Button size="sm" variant="primary" disabled={sendComments.isPending} onClick={sendUnsent}>
-                <Send size={12} /> {sendComments.isPending ? REVIEW_TEXT.sending : REVIEW_TEXT.send(unsent.length)}
+            <div className="flex justify-end px-2.5 pb-2.5">
+              <Button disabled={sendComments.isPending} onClick={sendUnsent}>
+                <Send size={14} /> {sendComments.isPending ? REVIEW_TEXT.sending : REVIEW_TEXT.send(unsent.length)}
               </Button>
             </div>
           ) : null}
         </div>
       ) : null}
-      {notice ? (
-        <p role="status" className="shrink-0 px-3 py-1.5 text-sm text-ink-3 border-t border-line break-words">
-          {notice}
-        </p>
-      ) : null}
+      {notice ? <PanelNotice className="pt-2">{notice}</PanelNotice> : null}
       {error ? (
-        <p role="alert" className="shrink-0 px-3 py-2 text-sm text-bad border-t border-line break-words">
+        <PanelNotice role="alert" tone="bad" className="pt-2">
           {error.message}
-        </p>
+        </PanelNotice>
       ) : null}
     </>
   );

@@ -2,6 +2,7 @@ import { Globe } from "./icons";
 import { pageHost, panelTools, tabsFor, type PanelContext } from "./panel-tools";
 import type { PanelTab } from "../lib/layout";
 
+/** A blank tab's page: every tool this context offers, in launcher order, then the pages visited lately. */
 export function PanelNewTab({ context, onTool, onNavigate, recentUrls }: { context: PanelContext; onTool: (tool: PanelTab) => void; onNavigate: (url: string) => void; recentUrls: string[] }) {
   return (
     <div className="panel-new-tab">
@@ -12,7 +13,7 @@ export function PanelNewTab({ context, onTool, onNavigate, recentUrls }: { conte
             const { icon: Icon, label } = panelTools[tool];
             return (
               <button key={tool} className="panel-tool-shortcut" onClick={() => onTool(tool)}>
-                <Icon size={17} />
+                <Icon size={15} />
                 <span>{label}</span>
               </button>
             );
@@ -22,12 +23,10 @@ export function PanelNewTab({ context, onTool, onNavigate, recentUrls }: { conte
       {recentUrls.length > 0 ? (
         <section aria-labelledby="panel-recent-heading">
           <h2 id="panel-recent-heading">Recent pages</h2>
-          <div className="panel-recent-grid">
+          <div className="panel-tool-grid">
             {recentUrls.map((url) => (
               <button key={url} className="panel-recent-page" title={url} onClick={() => onNavigate(url)}>
-                <span>
-                  <Globe size={22} />
-                </span>
+                <Globe size={15} />
                 <span>{pageHost(url)}</span>
               </button>
             ))}

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Project, Task } from "@openorc/protocol";
-import { Download, GitCommitHorizontal, GitPullRequest, Upload } from "../components/icons";
+import { Download, GitPullRequest, Upload } from "../components/icons";
+import { CommitSheet } from "../components/CommitSheet";
 import { Button, Dialog, Field, Input, Textarea } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/query";
 import { taskBaseLabel, taskCompareUrl } from "../lib/task-review-availability";
@@ -33,7 +34,7 @@ export function ReviewPublication({
   return (
     <>
       <Button
-        size="sm"
+        variant="ghost"
         disabled={Boolean(blockedReason) || !hasChanges || exportPatch.isPending}
         title={blockedReason ?? "Write a lossless patch of these changes to a file"}
         onClick={() =>
@@ -49,55 +50,53 @@ export function ReviewPublication({
           )
         }
       >
-        <Download size={12} /> {exportPatch.isPending ? "Exporting…" : "Export patch"}
-      </Button>
-      <Button size="sm" disabled={Boolean(blockedReason) || !hasChanges || commit.isPending} title={blockedReason ?? undefined} onClick={() => setCommitOpen(true)}>
-        <GitCommitHorizontal size={12} /> Commit
+        <Download size={14} /> {exportPatch.isPending ? "Exporting…" : "Export patch"}
       </Button>
       <Button
-        size="sm"
         disabled={Boolean(blockedReason) || !task.branch || push.isPending}
         title={blockedReason ?? undefined}
         onClick={() => push.mutate({ taskId: task.id }, { onSuccess: (r) => setNotice(`Pushed ${r.branch} to ${r.remote}`), onError: (e) => setNotice(e.message) })}
       >
-        <Upload size={12} /> {push.isPending ? "Pushing…" : "Push"}
+        <Upload size={14} /> {push.isPending ? "Pushing…" : "Push"}
       </Button>
       {info.data?.gh.installed ? (
-        <Button size="sm" disabled={Boolean(blockedReason) || !task.branch} onClick={() => setPrOpen(true)} title={blockedReason ?? "Open a pull request"}>
-          <GitPullRequest size={12} /> PR
+        <Button disabled={Boolean(blockedReason) || !task.branch} onClick={() => setPrOpen(true)} title={blockedReason ?? "Open a pull request"}>
+          <GitPullRequest size={14} /> PR
         </Button>
       ) : null}
       {!info.data?.gh.installed && ghUrl ? (
-        <Button size="sm" disabled={Boolean(blockedReason)} onClick={() => window.openorc.openExternal(ghUrl)} title={blockedReason ?? "Compare on GitHub"}>
-          <GitPullRequest size={12} /> PR
+        <Button disabled={Boolean(blockedReason)} onClick={() => window.openorc.openExternal(ghUrl)} title={blockedReason ?? "Compare on GitHub"}>
+          <GitPullRequest size={14} /> PR
         </Button>
       ) : null}
-      <Dialog open={commitOpen} onOpenChange={setCommitOpen} title="Commit all changes">
-        <Field label="Message">
-          <Textarea rows={3} value={message} onChange={(e) => setMessage(e.target.value)} autoFocus />
-        </Field>
-        {commit.error ? <div className="text-sm text-bad mb-3">{commit.error.message}</div> : null}
-        <div className="flex justify-end gap-2">
-          <Button onClick={() => setCommitOpen(false)}>Cancel</Button>
-          <Button
-            variant="primary"
-            disabled={Boolean(blockedReason) || !message.trim() || commit.isPending}
-            onClick={() =>
-              commit.mutate(
-                { taskId: task.id, message: message.trim() },
-                {
-                  onSuccess: (r) => {
-                    setCommitOpen(false);
-                    setNotice(`Committed ${r.sha.slice(0, 7)}`);
-                  },
-                },
-              )
-            }
-          >
+      <CommitSheet
+        open={commitOpen}
+        onOpenChange={setCommitOpen}
+        trigger={
+          <Button variant="primary" disabled={Boolean(blockedReason) || !hasChanges || commit.isPending} title={blockedReason ?? undefined}>
             Commit
           </Button>
-        </div>
-      </Dialog>
+        }
+        title="Commit all changes"
+        message={message}
+        onMessageChange={setMessage}
+        busy={false}
+        commitDisabled={Boolean(blockedReason) || !message.trim() || commit.isPending}
+        committing={commit.isPending}
+        onCommit={() =>
+          commit.mutate(
+            { taskId: task.id, message: message.trim() },
+            {
+              onSuccess: (r) => {
+                setCommitOpen(false);
+                setNotice(`Committed ${r.sha.slice(0, 7)}`);
+              },
+            },
+          )
+        }
+      >
+        {commit.error ? <div className="text-sm text-bad mb-3">{commit.error.message}</div> : null}
+      </CommitSheet>
 
       <TaskPullRequestDialog
         open={prOpen}

@@ -1,270 +1,288 @@
-/* The row reaches 1px over the page so the active tab can cover the page's top edge. Its top
-   padding leaves exactly the tabs' height, so the strip holds a whole tab and every control
-   centers on the tab labels. The tab masks below are drawn for this height. */
-.panel-browser-header {
-  --panel-tab-height: 36px;
-  min-width: 0;
-  height: calc(var(--height-topbar) + 1px);
-  margin-bottom: -1px;
-  padding-top: calc(var(--height-topbar) + 1px - var(--panel-tab-height));
-}
-/* The active tab is the top of its page, shaped like a Chrome tab: rounded shoulders, then feet
-   that curve out into the page's top edge. The strip paints above the page so the tab covers
-   that edge, and its padding keeps the first tab's foot on a straight run past the page's corner. */
-.panel-browser-tabs {
-  position: relative;
-  z-index: 1;
+/* The panel is one r20 card on the window's tile, holding its header and the open tab's page.
+   It carries data-plane, so controls inside it take the plane's fill step. */
+.panel-card {
   display: flex;
-  align-self: stretch;
-  align-items: flex-end;
-  gap: 2px;
-  min-width: 0;
-  padding-inline: calc(var(--panel-page-radius) + 14px) 8px;
-  overflow-x: auto;
-  scrollbar-width: none;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  margin: 8px 8px 8px 0;
+  border-radius: var(--radius-3xl);
+  background: var(--surface);
+  overflow: hidden;
 }
-.panel-browser-tab {
+.panel-shell[data-expanded="true"] .panel-card {
+  margin-left: 8px;
+}
+/* A header that reaches the native window controls sits on the 44px chrome line: the card
+   drops its top margin and meets the window's top edge square. */
+.panel-card[data-chrome] {
+  margin-top: 0;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+.panel-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 52px;
+  min-width: 0;
+  flex-shrink: 0;
+}
+.panel-header-chrome {
+  height: var(--height-topbar);
+}
+
+/* The tabs: a fill track at its natural width with a surface knob under the open tab, like the
+   segmented control. Tabs keep their full names; the track scrolls sideways when they outgrow
+   the header, and the knob, an absolute child of the track, scrolls with it. */
+.panel-tabs {
   position: relative;
   isolation: isolate;
   display: flex;
   align-items: center;
-  flex: 0 1 172px;
-  min-width: 110px;
-  max-width: 190px;
-  height: var(--panel-tab-height);
-  color: var(--ink-3);
+  flex: 0 1 auto;
+  width: fit-content;
+  min-width: 0;
+  padding: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  overflow-x: auto;
+  scrollbar-width: none;
 }
-.panel-browser-tab:hover,
-.panel-browser-tab[data-active="true"] {
-  color: var(--ink);
+.panel-tabs::-webkit-scrollbar {
+  display: none;
 }
-/* One outline in two layers, the page's ground and then its edge, so every palette themes it.
-   The 17px caps hold the curves; the middle stretches and tucks 1px under each cap, so a tab
-   on a fractional pixel shows no seam. */
-.panel-browser-tab[data-active="true"]::before,
-.panel-browser-tab[data-active="true"]::after {
-  content: "";
+.panel-tabs-knob {
   position: absolute;
-  inset: 0 -8px;
+  top: 0;
+  left: 0;
   z-index: -1;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
   pointer-events: none;
 }
-.panel-browser-tab[data-active="true"]::before {
-  background: var(--paper);
-  mask:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17 36'%3E%3Cpath d='M0 35.5A8.5 8.5 0 0 0 8.5 27V8.5A8 8 0 0 1 16.5.5H17V36H0Z'/%3E%3C/svg%3E") left / 17px 36px
-      no-repeat,
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17 36'%3E%3Cpath d='M17 35.5A8.5 8.5 0 0 1 8.5 27V8.5A8 8 0 0 0 .5.5H0V36H17Z'/%3E%3C/svg%3E") right / 17px 36px
-      no-repeat,
-    linear-gradient(#000 0 0) center / calc(100% - 32px) 100% no-repeat;
+.panel-tabs-knob[data-placed] {
+  transition:
+    transform var(--duration-swap) var(--ease-out),
+    width var(--duration-swap) var(--ease-out);
 }
-.panel-browser-tab[data-active="true"]::after {
-  background: var(--panel-page-edge);
-  mask:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17 36'%3E%3Cpath d='M0 35.5A8.5 8.5 0 0 0 8.5 27V8.5A8 8 0 0 1 16.5.5H17' fill='none' stroke='%23000'/%3E%3C/svg%3E")
-      left / 17px 36px no-repeat,
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17 36'%3E%3Cpath d='M17 35.5A8.5 8.5 0 0 1 8.5 27V8.5A8 8 0 0 0 .5.5H0' fill='none' stroke='%23000'/%3E%3C/svg%3E")
-      right / 17px 36px no-repeat,
-    linear-gradient(#000 0 var(--hairline), transparent 0) center / calc(100% - 32px) 100% no-repeat;
+.panel-tab {
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+  height: 30px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  color: var(--ink-3);
+  transition:
+    color var(--duration-arrive) var(--ease-out),
+    width var(--duration-swap) var(--ease-out),
+    opacity var(--duration-arrive) var(--ease-out);
 }
-/* On high-density screens the edge is a hairline, drawn a quarter pixel in so it stays on whole
-   device pixels and meets the page's hairline top edge. The fill above already starts there. */
-@media (min-resolution: 2dppx) {
-  .panel-browser-tab[data-active="true"]::after {
-    mask-image:
-      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17 36'%3E%3Cpath d='M0 35.25A8.25 8.25 0 0 0 8.25 27V8.25A8 8 0 0 1 16.25.25H17' fill='none' stroke='%23000' stroke-width='.5'/%3E%3C/svg%3E"),
-      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17 36'%3E%3Cpath d='M17 35.25A8.25 8.25 0 0 1 8.75 27V8.25A8 8 0 0 0 .75.25H0' fill='none' stroke='%23000' stroke-width='.5'/%3E%3C/svg%3E"),
-      linear-gradient(#000 0 var(--hairline), transparent 0);
+/* A tab added after the track settled widens from nothing while the knob slides to it. The track
+   remounts per conversation, so restored tabs never animate. */
+@starting-style {
+  .panel-tabs[data-placed] .panel-tab {
+    width: 0;
+    opacity: 0;
   }
 }
-.panel-browser-tab > [role="tab"] {
+.panel-tab:hover,
+.panel-tab[data-active="true"] {
+  color: var(--ink);
+}
+.panel-tab[data-active="true"] {
+  color: var(--navigation-ink);
+}
+.panel-tab > [role="tab"] {
   display: flex;
   align-items: center;
-  gap: 7px;
-  flex: 1;
-  min-width: 0;
+  gap: 6px;
   height: 100%;
-  padding: 0 7px 0 9px;
-  border-radius: 6px;
-  font-size: 12px;
-  text-align: left;
-}
-.panel-browser-tab > [role="tab"] svg {
-  flex-shrink: 0;
-  color: var(--ink-3);
-}
-.panel-browser-tab > [role="tab"] span {
-  overflow: hidden;
-  text-overflow: ellipsis;
+  padding: 0 14px 0 12px;
+  border-radius: inherit;
+  font-size: var(--text-base);
+  line-height: 16px;
+  letter-spacing: var(--text-base--letter-spacing);
   white-space: nowrap;
 }
-.panel-tab-close {
+.panel-tab > [role="tab"]:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+.panel-tab-mark {
   display: grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
-  margin-right: 3px;
+  width: 14px;
+  height: 14px;
   flex-shrink: 0;
-  border-radius: 4px;
+}
+.panel-tab-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+/* The close control sits over the tab's mark and takes its place under the pointer or focus. */
+.panel-tab-close {
+  position: absolute;
+  top: 50%;
+  left: 9px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-top: -10px;
+  border-radius: var(--radius-pill);
   color: var(--ink-3);
+  opacity: 0;
+  transition: opacity var(--duration-quick) var(--ease-out);
+}
+.panel-tab:is(:hover, :focus-within) .panel-tab-close {
+  opacity: 1;
+}
+.panel-tab:is(:hover, :focus-within) .panel-tab-mark {
+  visibility: hidden;
 }
 .panel-tab-close:hover {
   background: var(--surface-3);
   color: var(--ink);
 }
-.panel-tab-dot {
-  display: none;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--ink-2);
+.panel-tab-close:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
 }
-/* Unsaved edits take the close button's place until the pointer or focus reaches it. */
-.panel-tab-close[data-unsaved] .panel-tab-dot {
-  display: block;
-}
-.panel-tab-close[data-unsaved] svg,
-.panel-tab-close[data-unsaved]:is(:hover, :focus-visible) .panel-tab-dot {
-  display: none;
-}
-.panel-tab-close[data-unsaved]:is(:hover, :focus-visible) svg {
-  display: block;
-}
+
+/* The browser bar: the page's own Back and Forward, an address pill holding Reload, then Tools. */
 .panel-navigation {
   display: flex;
   align-items: center;
-  gap: 8px;
-  height: 48px;
+  gap: 4px;
+  height: 44px;
   flex-shrink: 0;
-  padding: 0 12px;
-  border-bottom: var(--hairline) solid var(--line);
-}
-.panel-navigation-actions {
-  display: flex;
-  align-items: center;
-  gap: 1px;
-  flex-shrink: 0;
+  padding: 0 10px;
 }
 .panel-address {
   display: flex;
+  align-items: center;
+  gap: 8px;
   flex: 1;
   min-width: 0;
-  height: 30px;
+  height: 32px;
+  margin: 0 4px;
+  padding: 0 4px 0 0;
+  border-radius: var(--radius-pill);
   background: var(--surface-2);
-  border: var(--hairline) solid transparent;
-  border-radius: 8px;
+  transition: background-color var(--duration-quick) var(--ease-out);
 }
 .panel-address:focus-within {
-  border-color: var(--line-strong, var(--ink-3));
+  background: var(--surface-3);
 }
 .panel-address input {
+  flex: 1;
   width: 100%;
   min-width: 0;
-  padding: 0 10px;
+  height: 100%;
+  padding: 0 0 0 14px;
   background: transparent;
   border: 0;
   border-radius: inherit;
-  font-size: 12px;
-  text-align: center;
-  color: var(--ink-2);
+  font-size: var(--text-sm);
+  color: var(--ink-3);
   text-overflow: ellipsis;
   outline: none;
 }
 .panel-address input:focus {
-  text-align: left;
   color: var(--ink);
 }
 .panel-address input::placeholder {
+  color: var(--ink-4);
+}
+.panel-address:focus-within input::placeholder {
   color: var(--ink-3);
 }
+/* The page itself: an r14 viewport inset in the card. The native view rounds its own corners to match. */
+.panel-viewport {
+  margin: 0 10px 10px;
+  border-radius: var(--radius-viewport);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+/* The New tab page: the tools as rows in their launcher order, then recent pages by host. */
 .panel-new-tab {
   height: 100%;
   overflow-y: auto;
-  padding: 30px 24px;
+  padding: 10px 10px 20px;
 }
 .panel-new-tab section + section {
-  margin-top: 38px;
+  margin-top: 20px;
 }
 .panel-new-tab h2 {
-  margin-bottom: 16px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--ink-2);
+  padding: 0 10px 6px;
+  font-size: var(--text-base);
+  line-height: 16px;
+  letter-spacing: var(--text-base--letter-spacing);
+  color: var(--ink);
 }
 .panel-tool-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 7px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 2px 8px;
 }
-.panel-tool-shortcut {
+.panel-tool-shortcut,
+.panel-recent-page {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 10px;
   min-width: 0;
-  min-height: 44px;
-  padding: 10px 13px;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--surface-2) 65%, var(--paper));
+  height: 36px;
+  padding: 0 10px;
+  border-radius: var(--radius-md);
   text-align: left;
-  font-size: 13px;
-  color: var(--ink-2);
+  font-size: var(--text-base);
+  line-height: 16px;
+  letter-spacing: var(--text-base--letter-spacing);
+  color: var(--ink);
+  transition: background-color var(--duration-quick) var(--ease-out);
 }
-.panel-tool-shortcut svg {
+.panel-tool-shortcut svg,
+.panel-recent-page svg {
   flex-shrink: 0;
   color: var(--ink-3);
 }
-.panel-tool-shortcut:hover {
+.panel-tool-shortcut:hover,
+.panel-recent-page:hover {
   background: var(--surface-2);
-  color: var(--ink);
 }
-.panel-recent-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
-  gap: 12px;
+.panel-tool-shortcut:active,
+.panel-recent-page:active {
+  background: var(--surface-3);
 }
-.panel-recent-page {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 13px;
+.panel-recent-page > span {
   min-width: 0;
-  padding: 10px 4px;
-  border-radius: 8px;
-  font-size: 12px;
-  color: var(--ink-2);
-}
-.panel-recent-page > span:first-child {
-  display: grid;
-  place-items: center;
-  width: 42px;
-  height: 42px;
-  border-radius: 11px;
-  background: var(--surface-2);
-  color: var(--ink-3);
-}
-.panel-recent-page > span:last-child {
-  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.panel-recent-page:hover {
-  background: var(--surface-2);
-}
 @container review-panel (max-width: 420px) {
-  .panel-new-tab {
-    padding: 24px 16px;
-  }
-  .panel-tool-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
   .panel-navigation {
-    gap: 4px;
-    padding: 0 8px;
+    padding: 0 6px;
   }
+}
+/* A narrow window floats the panel over the work row. It only reaches the traffic lights when it
+   covers nearly all of it, so the header steps past them by just the overlap. Registered as a
+   length so 100cqw resolves against the work row, not the panel's own container. */
+@property --panel-traffic-overlap {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
 }
 @container work-row (max-width: 788px) {
-  .panel-browser-header[data-traffic-clearance="true"] {
-    padding-left: var(--spacing-traffic);
+  .panel-shell {
+    --panel-traffic-overlap: max(0px, calc(var(--spacing-traffic) - (100cqw - var(--panel-pane) - var(--spacing-well))));
+  }
+  .panel-header[data-traffic-clearance="true"] {
+    padding-left: max(10px, var(--panel-traffic-overlap));
   }
 }

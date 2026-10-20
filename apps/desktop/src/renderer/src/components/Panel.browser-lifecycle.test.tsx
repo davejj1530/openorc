@@ -6,6 +6,7 @@ import type { BrowserPaneState } from "../../../shared/types";
 import { CoversPreview } from "../lib/browser-preview";
 import { usePanelSessions } from "../lib/panel-tabs";
 import { useLayout } from "../lib/layout";
+import { PANE_MS } from "../lib/motion";
 import { queryClient } from "../lib/query";
 import { core } from "../lib/rpc";
 import { Panel } from "./Panel";
@@ -98,7 +99,7 @@ it("hides the native preview when the panel closes, before the close animation e
   expect(useLayout.getState().panelOpen).toBe(false);
   expect(document.querySelector(".panel-shell")?.getAttribute("aria-hidden")).toBe("true");
   expect([...visible]).toEqual([]);
-  await act(async () => vi.advanceTimersByTime(250));
+  await act(async () => vi.advanceTimersByTime(PANE_MS + 30));
   expect([...visible]).toEqual([]);
 });
 
@@ -111,7 +112,7 @@ it("does not reveal the native preview when a covering layer closes during the p
   act(() => useLayout.getState().setPanel(false));
   layer.unmount();
   expect([...visible]).toEqual([]);
-  await act(async () => vi.advanceTimersByTime(250));
+  await act(async () => vi.advanceTimersByTime(PANE_MS + 30));
   expect([...visible]).toEqual([]);
 });
 
@@ -123,7 +124,7 @@ it("keeps a late load response from revealing a closed preview", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Hide panel" }));
   expect([...visible]).toEqual([]);
   await act(async () => loading.resolve(page));
-  await act(async () => vi.advanceTimersByTime(250));
+  await act(async () => vi.advanceTimersByTime(PANE_MS + 30));
   expect([...visible]).toEqual([]);
 });
 
@@ -137,7 +138,7 @@ it("keeps the old page hidden when switching to a new thread while the panel clo
     </QueryClientProvider>,
   );
   expect([...visible]).toEqual([]);
-  await act(async () => vi.advanceTimersByTime(250));
+  await act(async () => vi.advanceTimersByTime(PANE_MS + 30));
   expect([...visible]).toEqual([]);
   await act(async () => useLayout.getState().setPanel(true, "browser"));
   expect([...visible]).toEqual(["newthread:project"]);

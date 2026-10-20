@@ -1,8 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from "react";
-import { Maximize2, Minimize2, PanelRightClose, Plus } from "./icons";
 import { ResizeHandle } from "./ResizeHandle";
-import { IconButton, Tooltip } from "./ui";
-import { cn } from "../lib/cn";
+import { PANE_MS } from "../lib/motion";
 import { requestFilesFocus, useFilesHost } from "../lib/files-tool";
 import { useLayout } from "../lib/layout";
 import { usePanelSessions } from "../lib/panel-tabs";
@@ -12,7 +10,7 @@ import { panelFileScope, type PanelContext } from "./panel-tools";
 import { PanelContent } from "./PanelContent";
 import { PanelNavigation } from "./PanelNavigation";
 import { PanelNewTab } from "./PanelNewTab";
-import { PanelTabs } from "./PanelTabs";
+import { PanelHeader } from "./PanelHeader";
 import { useFileTabClosing } from "./UnsavedFileDialog";
 
 export { tabsFor, type PanelContext } from "./panel-tools";
@@ -25,7 +23,7 @@ function useMountedThroughClose(open: boolean): boolean {
       setMounted(true);
       return;
     }
-    const timer = setTimeout(() => setMounted(false), 220);
+    const timer = setTimeout(() => setMounted(false), PANE_MS);
     return () => clearTimeout(timer);
   }, [open]);
   return open || mounted;
@@ -104,6 +102,9 @@ export function Panel({ context }: { context: PanelContext }) {
     });
   };
   const closing = useFileTabClosing(session, { close: closeTab, show: (id) => usePanelSessions.getState().select(scope, id) });
+  const trafficClearance = !sidebarOpen && trafficLights;
+  // The header shares the window's chrome line when it reaches the native controls: expanded past a hidden sidebar, or beside Windows and Linux controls.
+  const chrome = (expanded && trafficClearance) || windowsControls;
   return (
     <>
       {open && !expanded ? <ResizeHandle edge="panel" /> : null}
@@ -119,49 +120,21 @@ export function Panel({ context }: { context: PanelContext }) {
         }}
       >
         <div className="panel-pane h-full flex flex-col">
-          <header
-            data-traffic-clearance={(!sidebarOpen && trafficLights) || undefined}
-            className={cn(
-              "panel-browser-header drag-region h-topbar shrink-0 flex items-center gap-1",
-              expanded && !sidebarOpen && trafficLights ? "pl-traffic" : "pl-3",
-              windowsControls ? "pr-controls" : "pr-2",
-            )}
-          >
-            <PanelTabs session={session} onSelect={(id) => usePanelSessions.getState().select(scope, id)} onClose={closing.requestClose} />
-            <Tooltip label="New tab">
-              <IconButton aria-label="New tab" className="no-drag shrink-0" onClick={() => usePanelSessions.getState().add(scope)}>
-                <Plus size={15} />
-              </IconButton>
-            </Tooltip>
-            <span className="flex-1" />
-            <Tooltip label={expanded ? "Collapse panel" : "Expand panel"}>
-              <IconButton
-                aria-label={expanded ? "Collapse panel" : "Expand panel"}
-                aria-pressed={expanded}
-                className="no-drag shrink-0"
-                onClick={() => useLayout.getState().setPanelExpanded(!expanded)}
-              >
-                {expanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
-              </IconButton>
-            </Tooltip>
-            <Tooltip label="Hide panel">
-              <IconButton aria-label="Hide panel" className="no-drag shrink-0" onClick={() => useLayout.getState().setPanel(false)}>
-                <PanelRightClose size={15} />
-              </IconButton>
-            </Tooltip>
-          </header>
-          <div
-            id="panel-tab-content"
-            role="tabpanel"
-            aria-labelledby={`panel-tab-${tab.id}`}
-            data-file-workspace={workspace.page.kind === "file" || undefined}
-            className="panel-content flex-1 min-h-0"
-          >
-            {mounted ? (
-              <Suspense fallback={null}>
-                <PanelBody context={context} workspace={workspace} open={open} />
-              </Suspense>
-            ) : null}
+          <div className="panel-card" data-plane data-chrome={chrome || undefined}>
+            <PanelHeader scope={scope} session={session} expanded={expanded} chrome={chrome} trafficClearance={trafficClearance} windowsControls={windowsControls} onClose={closing.requestClose} />
+            <div
+              id="panel-tab-content"
+              role="tabpanel"
+              aria-labelledby={`panel-tab-${tab.id}`}
+              data-file-workspace={workspace.page.kind === "file" || undefined}
+              className="panel-content flex-1 min-h-0"
+            >
+              {mounted ? (
+                <Suspense fallback={null}>
+                  <PanelBody context={context} workspace={workspace} open={open} />
+                </Suspense>
+              ) : null}
+            </div>
           </div>
         </div>
       </aside>

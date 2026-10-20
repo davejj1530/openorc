@@ -8,6 +8,8 @@ import { cn } from "../lib/cn";
 import { useRpcMutation } from "../lib/query";
 import { relativeTime } from "../lib/time";
 import { CoversPreview } from "../lib/browser-preview";
+import { floatingGround } from "../lib/use-anchor-ground";
+import { menuItem, menuItemDanger, menuPopup, menuSeparator } from "./menu";
 import "./memory.css";
 
 export const memorySourceLabel: Record<MemorySource, string> = { agent: "Saved by an agent", extraction: "Learned after a run", user: "Saved by you", tool: "Saved by a tool" };
@@ -50,7 +52,7 @@ export function MemoryCard({ memory }: { memory: Memory }) {
       </div>
       {editing ? (
         <div className="grid gap-2">
-          <Input aria-label="Memory title" value={title} onChange={(e) => setTitle(e.target.value)} className="h-7 font-medium" />
+          <Input aria-label="Memory title" value={title} onChange={(e) => setTitle(e.target.value)} className="h-7" />
           <Textarea aria-label="Memory details" rows={3} value={body} onChange={(e) => setBody(e.target.value)} />
           <div className="flex gap-2">
             <Button
@@ -76,7 +78,7 @@ export function MemoryCard({ memory }: { memory: Memory }) {
         </div>
       ) : (
         <>
-          <h3 className={cn("memory-entry-title text-md font-medium", dim ? "text-ink-2" : "text-ink")}>{memory.title}</h3>
+          <h3 className={cn("memory-entry-title text-md", dim ? "text-ink-2" : "text-ink")}>{memory.title}</h3>
           <p className={cn("memory-entry-body text-base mt-1 whitespace-pre-wrap", dim ? "text-ink-3" : "text-ink-2")}>{memory.body}</p>
         </>
       )}
@@ -142,40 +144,43 @@ function Actions({
   onDelete: () => void;
   onPromote: (file: "CLAUDE.md" | "AGENTS.md") => void;
 }) {
-  const item = "flex items-center gap-2 h-7 px-2 rounded-md text-base text-ink-2 data-[highlighted]:bg-surface-2 outline-none";
   // An Orcling's memory is about the person, not a project's instruction files.
   const promotable = !memory.orclingId;
   return (
     <Menu.Root>
-      <Menu.Trigger aria-label={`Actions for ${memory.title}`} disabled={disabled} className="text-ink-3 hover:text-ink rounded-md p-1">
+      <Menu.Trigger
+        aria-label={`Actions for ${memory.title}`}
+        disabled={disabled}
+        className="grid size-7 shrink-0 place-items-center rounded-full text-ink-3 hover:bg-surface-2 hover:text-ink aria-expanded:bg-surface-2 aria-expanded:text-ink"
+      >
         <MoreHorizontal size={14} />
       </Menu.Trigger>
       <Menu.Portal>
         <CoversPreview />
         <Menu.Positioner sideOffset={4} align="end" collisionPadding={8}>
-          <Menu.Popup className="menu-popup min-w-44 rounded-lg border border-line bg-surface p-1 shadow-panel outline-none">
-            <Menu.Item className={item} onClick={onEdit}>
-              <Pencil size={13} /> Edit
+          <Menu.Popup ref={floatingGround} className={menuPopup}>
+            <Menu.Item className={menuItem} onClick={onEdit}>
+              <Pencil size={15} /> Edit
             </Menu.Item>
-            <Menu.Item className={item} onClick={onHelpful}>
-              <ThumbsUp size={13} /> Mark helpful
+            <Menu.Item className={menuItem} onClick={onHelpful}>
+              <ThumbsUp size={15} /> Mark helpful
             </Menu.Item>
             {promotable ? (
               <>
-                <Menu.Item className={item} onClick={() => onPromote("CLAUDE.md")}>
-                  <Upload size={13} /> Add to CLAUDE.md
+                <Menu.Item className={menuItem} onClick={() => onPromote("CLAUDE.md")}>
+                  <Upload size={15} /> Add to CLAUDE.md
                 </Menu.Item>
-                <Menu.Item className={item} onClick={() => onPromote("AGENTS.md")}>
-                  <Upload size={13} /> Add to AGENTS.md
+                <Menu.Item className={menuItem} onClick={() => onPromote("AGENTS.md")}>
+                  <Upload size={15} /> Add to AGENTS.md
                 </Menu.Item>
               </>
             ) : null}
-            <Menu.Separator className="my-1 border-t border-line" />
-            <Menu.Item className={item} onClick={onRetract}>
-              <X size={13} /> Retract
+            <Menu.Separator className={menuSeparator} />
+            <Menu.Item className={menuItem} onClick={onRetract}>
+              <X size={15} /> Retract
             </Menu.Item>
-            <Menu.Item className={cn(item, "text-bad")} onClick={onDelete}>
-              <Trash2 size={13} /> Delete
+            <Menu.Item className={menuItemDanger} onClick={onDelete}>
+              <Trash2 size={15} /> Delete
             </Menu.Item>
           </Menu.Popup>
         </Menu.Positioner>

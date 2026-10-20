@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { TEAM_LIMIT_BOUNDS, type TeamDetail } from "@openorc/protocol";
-import { Archive, ArchiveRestore, Check } from "../components/icons";
+import { Archive, ArchiveRestore, Check, ChevronDown, Plus } from "../components/icons";
 import { PageFilters } from "../components/PageFilters";
 import { TopBar } from "../components/TopBar";
 import { Badge, Button, Empty, Input, Segmented, Switch, TextButton } from "../components/ui";
@@ -145,17 +145,17 @@ export function Orchestration({ projectId, teamId }: { projectId?: string; teamI
         }}
         actions={
           <Button
-            size="sm"
+            size="lg"
             disabled={!selected}
             onClick={() => {
               if (selected) navigate({ view: "orchestration", projectId: selected.id, teamId: "new" });
             }}
           >
-            New team
+            <Plus size={14} className="text-ink-3" /> New team
           </Button>
         }
       >
-        Orchestration
+        Teams
       </TopBar>
       {projects.error && selected ? (
         <div role="alert" className="px-6 py-3 text-sm text-ink-3">
@@ -241,7 +241,7 @@ function TeamLoadError({ error, title = "Teams couldn’t load", onRetry, retryi
   const outdatedCore = /unknown method.*orchestration\./i.test(error.message);
   return (
     <div className="orchestration-load-error" role="alert">
-      <h2 className="text-base font-medium">{title}</h2>
+      <h2 className="text-base">{title}</h2>
       <p className="mt-1 text-sm text-ink-3">
         {outdatedCore ? "Restart OpenOrc to load the updated team editor, then try again." : "Try again to load your saved teams. Drafts kept on this device are preserved."}
       </p>
@@ -260,7 +260,7 @@ function TeamEditorHeader({ detail, archived }: { detail: TeamDetail | null; arc
   return (
     <div className="flex items-start justify-between gap-3 mb-6">
       <div className="min-w-0">
-        <h2 className="text-xl font-semibold">{detail ? "Edit team" : "Create a team"}</h2>
+        <h2 className="text-title-sm">{detail ? "Edit team" : "Create a team"}</h2>
         <p className="mt-1 text-sm text-ink-3">Choose a lead, then define who reports to whom.</p>
       </div>
       <div className="flex flex-wrap items-center justify-end gap-2">
@@ -326,13 +326,16 @@ function TeamEditor({ projectId, detail, onSaved }: { projectId: string; detail:
         ) : null}
         {archived ? <div className="orchestration-notice text-ink-3">This team is archived. Unarchive it to edit its configuration.</div> : null}
         <fieldset disabled={busy || archived} className="min-w-0 border-0 p-0 m-0">
-          <label className="orchestration-card grid gap-1.5 text-sm text-ink-3 mb-6">
+          <label data-plane className="orchestration-card grid gap-1.5 text-sm text-ink-3 mb-6">
             Team name
             <Input aria-label="Team name" autoComplete="off" maxLength={120} placeholder="e.g. Delivery team" value={draft.name} onChange={(event) => patch({ name: event.target.value })} />
           </label>
           <TeamMembers draft={draft} teamId={detail?.team.id ?? null} onChange={patch} />
-          <details className="orchestration-card mt-6">
-            <summary className="text-base font-medium py-2">Execution limits</summary>
+          <details data-plane className="orchestration-card orchestration-limits motion-disclosure mt-6">
+            <summary>
+              Execution limits
+              <ChevronDown size={14} aria-hidden="true" />
+            </summary>
             <p className="text-sm text-ink-3 mb-3">These limits apply each time this saved team runs.</p>
             <div className="orchestration-fields">
               {(
@@ -360,7 +363,7 @@ function TeamEditor({ projectId, detail, onSaved }: { projectId: string; detail:
         </fieldset>
         {attempted && problems.length > 0 ? (
           <div ref={validationRef} tabIndex={-1} role="alert" data-tone="bad" className="orchestration-notice text-bad">
-            <p className="font-medium mb-1">Check the team configuration</p>
+            <p className="mb-1">Check the team configuration</p>
             <ul className="list-disc pl-4">
               {problems.map((problem) => (
                 <li key={problem}>{problem}</li>
@@ -370,7 +373,7 @@ function TeamEditor({ projectId, detail, onSaved }: { projectId: string; detail:
         ) : null}
         <div className="mt-6 flex items-center gap-3 flex-wrap">
           <Button
-            size="sm"
+            size="lg"
             disabled={!parsed.success || preflight.isPending || busy}
             onClick={() => {
               checkReadiness();
@@ -415,7 +418,7 @@ function TeamEditor({ projectId, detail, onSaved }: { projectId: string; detail:
           </div>
           {detail ? (
             <Button
-              variant="ghost"
+              size="lg"
               disabled={busy || (!archived && dirty) || conflict}
               title={dirty && !archived ? "Save or discard edits before archiving" : undefined}
               onClick={() => void toggleArchive()}
@@ -424,7 +427,7 @@ function TeamEditor({ projectId, detail, onSaved }: { projectId: string; detail:
               {archived ? "Unarchive" : "Archive"}
             </Button>
           ) : null}
-          <Button type="submit" disabled={busy || archived || conflict || (Boolean(detail) && !dirty)}>
+          <Button type="submit" variant="primary" size="lg" disabled={busy || archived || conflict || (Boolean(detail) && !dirty)}>
             {save.isPending ? "Saving…" : "Save team"}
           </Button>
         </div>

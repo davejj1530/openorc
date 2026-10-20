@@ -10,7 +10,7 @@ import {
   type PullRequestReview,
   type ThreadSummary,
 } from "@openorc/protocol";
-import { LoaderCircle, Sparkles } from "./icons";
+import { LoaderCircle, Wand } from "./icons";
 import { defaultChoice, ModelPicker, type ModelChoice } from "./ModelPicker";
 import { Button, Segmented, TextButton } from "./ui";
 import { draftAuthor, readPullReviewer, writePullReviewer, type PullReviewer } from "../lib/pull-requests";
@@ -97,7 +97,7 @@ export function PullRequestReviewer({ projectId, pull, review }: { projectId: st
             disabled={start.isPending}
           />
           <Button size="sm" disabled={!settings || start.isPending || reviewing} onClick={begin}>
-            <Sparkles size={12} /> {startLabel(start.isPending, again)}
+            <Wand size={12} /> {startLabel(start.isPending, again)}
           </Button>
         </>
       ) : null}

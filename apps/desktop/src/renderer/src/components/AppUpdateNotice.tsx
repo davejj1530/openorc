@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { UpdateDismissal, UpdateSnapshot, UpdateState } from "../../../shared/app-updates";
 import { CoversPreview } from "../lib/browser-preview";
 import { Download } from "./icons";
-import { TextButton } from "./ui";
+import { Button } from "./ui";
 
 function useAppUpdate() {
   const [snapshot, setSnapshot] = useState<UpdateSnapshot | null>(null);
@@ -92,16 +92,16 @@ export function AppUpdateNoticeContent({ snapshot }: { snapshot: UpdateSnapshot 
   return (
     <aside className="agent-update-notice" aria-label="OpenOrc update">
       <CoversPreview />
-      <Download size={18} className="shrink-0 text-ink-2 mt-0.5" />
+      <Download size={16} className="shrink-0 text-ink-3" />
       <div className="min-w-0 flex-1">
         <div role="status" aria-live="polite">
-          <p className="font-medium break-words">{text.title}</p>
-          <p className="text-sm text-ink-2 mt-1">{text.detail}</p>
+          <p className="break-words">{text.title}</p>
+          <p className="agent-update-notice-detail">{text.detail}</p>
         </div>
         {percent !== null ? (
           <div className="mt-3">
             <progress className="app-update-progress" aria-label="Update download progress" value={percent} max={100} />
-            <p className="text-sm text-ink-2 tabular-nums mt-1">{percent}% downloaded</p>
+            <p className="agent-update-notice-detail tabular-nums mt-1.5">{percent}% downloaded</p>
           </div>
         ) : null}
         {problem ? (
@@ -110,19 +110,19 @@ export function AppUpdateNoticeContent({ snapshot }: { snapshot: UpdateSnapshot 
           </p>
         ) : null}
         {dismissal?.kind === "later" ? (
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-3">
-            <TextButton disabled={pending} className="text-sm" onClick={() => void run(state.phase === "ready" ? "install" : "download")}>
+          <div className="flex flex-wrap items-center gap-2 mt-3">
+            <Button size="sm" disabled={pending} onClick={() => void run(state.phase === "ready" ? "install" : "download")}>
               {actionLabel(state)}
-            </TextButton>
-            <TextButton disabled={pending} className="text-sm text-ink-2" onClick={() => void run(dismissal)}>
+            </Button>
+            <Button size="sm" variant="ghost" disabled={pending} onClick={() => void run(dismissal)}>
               Later
-            </TextButton>
+            </Button>
           </div>
         ) : null}
         {dismissal?.kind === "hide" ? (
-          <TextButton className="text-sm text-ink-2 mt-3" onClick={() => void run(dismissal)}>
+          <Button size="sm" className="mt-3" onClick={() => void run(dismissal)}>
             Hide
-          </TextButton>
+          </Button>
         ) : null}
       </div>
     </aside>

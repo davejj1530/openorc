@@ -47,14 +47,14 @@ function MoveDialog({ threadId }: { threadId: string }) {
     );
   else if (files.length)
     previewContents = (
-      <div className="mb-3 rounded-md border border-line">
+      <div className="mb-3 overflow-hidden rounded-xl bg-surface-2">
         <FileRows files={files} />
       </div>
     );
   else if (!blocked) previewContents = <p className="text-sm text-ink-3 mb-3">No uncommitted changes. Only the conversation moves.</p>;
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : close())} title={to === "current" ? "Move this conversation to the checkout?" : "Move this conversation to a worktree?"} width={520}>
-      <div className="px-4 py-3">
+      <div>
         {thread.data ? <p className="text-sm text-ink-3 mb-3 break-words">{thread.data.title}</p> : null}
         <p className="text-base text-ink-2 mb-3">
           {to === "current"
@@ -73,11 +73,11 @@ function MoveDialog({ threadId }: { threadId: string }) {
           </p>
         ) : null}
         <p className="text-sm text-ink-3 mb-3">Moving does not start an agent. If a file changes while it moves, nothing is taken from where it was.</p>
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" disabled={move.isPending} onClick={close}>
+        <div className="mt-5 flex justify-end gap-2">
+          <Button disabled={move.isPending} onClick={close}>
             Cancel
           </Button>
-          <Button disabled={move.isPending || preview.isPending || Boolean(blocked) || !to} onClick={() => void submit()}>
+          <Button variant="primary" disabled={move.isPending || preview.isPending || Boolean(blocked) || !to} onClick={() => void submit()}>
             {move.isPending ? "Moving…" : "Move"}
           </Button>
         </div>

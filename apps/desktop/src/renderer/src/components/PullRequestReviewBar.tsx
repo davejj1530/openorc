@@ -26,7 +26,7 @@ function DraftCommentRow({ comment, reviewKey, author }: { comment: PullRequestD
         <span className="flex-1" />
         {body === null ? (
           <Tooltip label="Edit comment">
-            <IconButton aria-label="Edit comment" size="sm" className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100" onClick={() => setBody(comment.body)}>
+            <IconButton aria-label="Edit comment" size="xs" className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100" onClick={() => setBody(comment.body)}>
               <Pencil size={11} />
             </IconButton>
           </Tooltip>
@@ -34,7 +34,7 @@ function DraftCommentRow({ comment, reviewKey, author }: { comment: PullRequestD
         <Tooltip label="Remove comment">
           <IconButton
             aria-label="Remove comment"
-            size="sm"
+            size="xs"
             className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
             disabled={remove.isPending}
             onClick={() => remove.mutate({ ...reviewKey, id: comment.id })}
@@ -213,7 +213,7 @@ function SubmitReviewDialog({
 /** The model's summary, kept beside one the user wrote rather than replacing it. */
 function ModelSummary({ text, disabled, onAdd }: { text: string; disabled: boolean; onAdd: () => void }) {
   return (
-    <div className="mb-3 rounded-md border border-line px-3 py-2">
+    <div className="mb-3 rounded-lg bg-surface-2 px-3 py-2.5">
       <div className="mb-1 flex items-center justify-between gap-3">
         <span className="text-sm text-ink-3">Model's summary</span>
         <TextButton disabled={disabled} onClick={onAdd}>
@@ -266,7 +266,7 @@ export function PullRequestReviewBar({ projectId, pull, review }: { projectId: s
   const drafted = comments.length > 0 || Boolean(review?.summary.trim());
   const earlier = review !== null && comments.length > 0 && review.commitId !== pull.headSha;
   return (
-    <div className="shrink-0 border-t border-line">
+    <div className="shrink-0">
       {listOpen && comments.length > 0 ? (
         <ul className="max-h-60 overflow-y-auto border-b border-line py-1" aria-label="Draft comments">
           {comments.map((comment) => (
@@ -274,7 +274,7 @@ export function PullRequestReviewBar({ projectId, pull, review }: { projectId: s
           ))}
         </ul>
       ) : null}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-6 py-2">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3.5 pr-4 pl-6">
         {comments.length > 0 ? (
           <TextButton className="inline-flex items-center gap-1 text-sm text-ink-2" aria-expanded={listOpen} onClick={() => setListOpen(!listOpen)}>
             {listOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
@@ -295,21 +295,23 @@ export function PullRequestReviewBar({ projectId, pull, review }: { projectId: s
           </span>
         ) : null}
         <span className="flex-1" />
-        {drafted ? (
-          <Button size="sm" variant="ghost" onClick={() => setDialog("discard")}>
-            Discard draft
+        <span className="flex items-center gap-2">
+          {drafted ? (
+            <Button size="xl" onClick={() => setDialog("discard")}>
+              Discard draft
+            </Button>
+          ) : null}
+          <Button
+            size="xl"
+            variant="primary"
+            onClick={() => {
+              setPosted(null);
+              setDialog("submit");
+            }}
+          >
+            Submit review
           </Button>
-        ) : null}
-        <Button
-          size="sm"
-          variant="primary"
-          onClick={() => {
-            setPosted(null);
-            setDialog("submit");
-          }}
-        >
-          Submit review
-        </Button>
+        </span>
       </div>
       <SubmitReviewDialog open={dialog === "submit"} onClose={() => setDialog(null)} reviewKey={reviewKey} pull={pull} review={review} onPosted={(url) => setPosted({ url })} />
       <DiscardDialog open={dialog === "discard"} onClose={() => setDialog(null)} reviewKey={reviewKey} count={comments.length} />

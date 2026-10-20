@@ -1,58 +1,19 @@
 import { ClaudeAccountPicker } from "../components/ClaudeAccountPicker";
 import { ClaudeAccountScope } from "../lib/claude-account";
 import { ExecutionMode, executionMode, executionModeAvailable, executionModeNote, executionModeSettings, executionModePresentation } from "@openorc/protocol";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { harnessName, type Schedule, type WorkspaceMode } from "@openorc/protocol";
-import { ArrowUpRight, CalendarClock, Pause, Play, Plus, RefreshCw, Trash2, Zap } from "../components/icons";
+import { Plus } from "../components/icons";
 import { ComposerModelPicker, ModelPicker } from "../components/ModelPicker";
 import { PageFilters, PageSearch } from "../components/PageFilters";
 import { TopBar } from "../components/TopBar";
-import { Button, Dialog, Empty, Field, IconButton, Input, Segmented, Select, Textarea, Tooltip } from "../components/ui";
-import { cn } from "../lib/cn";
+import { Button, Dialog, Empty, Field, Input, Segmented, Select, Textarea } from "../components/ui";
 import { useLayout } from "../lib/layout";
 import { useOrclings } from "../lib/orclings";
-import { useRpc, useRpcMutation } from "../lib/query";
-import { openThread, useRouter } from "../lib/router";
-import { relativeTime, untilTime } from "../lib/time";
+import { useRpc } from "../lib/query";
 import { useScheduleEditor } from "../lib/use-schedule-editor";
-import { beginScheduleTrigger, finishScheduleTrigger, readScheduleTrigger } from "../lib/schedule-draft";
 import { pickerTeam } from "../lib/team-settings";
-
-const intervals: { label: string; minutes: number }[] = [
-  { label: "Every 30 minutes", minutes: 30 },
-  { label: "Every hour", minutes: 60 },
-  { label: "Every 6 hours", minutes: 360 },
-  { label: "Every day", minutes: 1440 },
-  { label: "Every week", minutes: 10_080 },
-];
-const intervalLabel = (m: number) => intervals.find((i) => i.minutes === m)?.label ?? `Every ${m} minutes`;
-
-function scheduleTargetLabel(schedule: Schedule): string {
-  const target = schedule.executionTarget;
-  if (target?.kind === "team") {
-    if (schedule.team) return `${schedule.team.revision.name} · Version ${schedule.team.revision.number}`;
-    return "Saved team · pinned version";
-  }
-  if (target?.kind === "model") return target.settings.model;
-  return schedule.model ?? `${harnessName(schedule.agent)} default model`;
-}
-
-function scheduleFireLabel(fire: Schedule["lastFire"]): string | null {
-  switch (fire?.state) {
-    case "pending":
-      return "Run request pending";
-    case "started":
-      return "Thread started";
-    case "skipped":
-      return "Run skipped";
-    case "cancelled":
-      return "Run cancelled";
-    case "failed":
-      return "Run failed";
-    default:
-      return null;
-  }
-}
+import { intervalLabel, intervals, ScheduleRow } from "./schedule-row";
 
 function scheduleSubmitLabel(pending: boolean, existing: boolean): string {
   if (pending) return "Saving…";
@@ -79,7 +40,7 @@ function scheduleListBody(input: {
   row: (schedule: Schedule) => ReactNode;
 }): ReactNode {
   if (input.loading) return <p className="px-2 py-3 text-sm text-ink-3">Loading schedules…</p>;
-  if (input.shown.length > 0 || input.failed) return <div className="flex-1 min-h-0 overflow-y-auto pb-4">{input.shown.map(input.row)}</div>;
+  if (input.shown.length > 0 || input.failed) return <div className="schedule-list flex-1 min-h-0 overflow-y-auto pb-4">{input.shown.map(input.row)}</div>;
   if (input.query) return <Empty title="No matching schedules">Try a different name.</Empty>;
   if (input.total > 0) return <Empty title={input.shelf === "active" ? "No active schedules" : "No paused schedules"} />;
   return (
@@ -110,8 +71,8 @@ export function Scheduled() {
     <>
       <TopBar
         actions={
-          <Button size="sm" onClick={() => setEditing("new")} disabled={!canCreate}>
-            New schedule
+          <Button size="lg" onClick={() => setEditing("new")} disabled={!canCreate}>
+            <Plus size={14} className="text-ink-3" /> New schedule
           </Button>
         }
       >
@@ -159,136 +120,6 @@ export function Scheduled() {
         />
       ) : null}
     </>
-  );
-}
-
-function ScheduleRow({ schedule: s, projectName, onEdit }: { schedule: Schedule; projectName?: string; onEdit: () => void }) {
-  const update = useRpcMutation("schedules.update");
-  const remove = useRpcMutation("schedules.delete");
-  const trigger = useRpcMutation("schedules.trigger");
-  const [recovery] = useState(() => {
-    try {
-      return { key: readScheduleTrigger(s.id), error: null };
-    } catch (error) {
-      return { key: null, error: error instanceof Error ? error.message : String(error) };
-    }
-  });
-  const [pendingKey, setPendingKey] = useState(recovery.key);
-  const [localError, setLocalError] = useState<string | null>(recovery.error);
-  const mounted = useRef(true);
-  const requesting = useRef(false);
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
-  const fire = s.lastFire;
-  const threadId = fire?.threadId ?? s.lastThreadId;
-  const targetLabel = scheduleTargetLabel(s);
-  const firingLabel = scheduleFireLabel(fire);
-  const error = localError ?? update.error?.message ?? remove.error?.message;
-  const busy = trigger.isPending || update.isPending || remove.isPending;
-  const runNow = async () => {
-    if (requesting.current) return;
-    requesting.current = true;
-    setLocalError(null);
-    try {
-      const requestKey = beginScheduleTrigger(s.id);
-      setPendingKey(requestKey);
-      const result = await trigger.mutateAsync({ id: s.id, requestKey });
-      if (!finishScheduleTrigger(s.id, requestKey)) {
-        setLocalError("The run request was confirmed, but its local recovery record could not be cleared. Retry confirms the same request.");
-        return;
-      }
-      setPendingKey(null);
-      if (result.status === "failed") setLocalError(result.reason);
-      if (result.status === "started" && mounted.current && useRouter.getState().route.view === "scheduled") openThread(result.thread.id);
-    } catch (failure) {
-      setLocalError(failure instanceof Error ? failure.message : String(failure));
-    } finally {
-      requesting.current = false;
-    }
-  };
-  return (
-    <div data-schedule={s.id} className="schedule-row px-2 py-3 border-t border-line last:border-b">
-      <div className="flex items-center flex-wrap gap-3">
-        <CalendarClock size={16} className="text-ink-3 shrink-0" />
-        <button onClick={onEdit} className="flex-1 min-w-40 text-left">
-          <div className={cn("text-base break-words", !s.enabled && "text-ink-2")}>{s.title}</div>
-          <div className="text-sm text-ink-3 break-words tabular">
-            {intervalLabel(s.everyMinutes)}
-            {projectName ? ` · ${projectName}` : ""}
-            {s.lastRunAt ? ` · last ${relativeTime(s.lastRunAt)}` : " · never run"}
-            {s.enabled ? ` · next ${untilTime(s.nextRunAt)}` : ""}
-          </div>
-          <div className="text-xs text-ink-3 break-words">
-            {targetLabel}
-            {s.team?.archived ? " · archived team, saved version kept" : ""}
-          </div>
-        </button>
-        <div className="schedule-actions ml-auto flex items-center gap-1.5">
-          {threadId ? (
-            <Tooltip label="Open thread">
-              <IconButton aria-label="Open thread" size="sm" onClick={() => openThread(threadId)}>
-                <ArrowUpRight size={14} />
-              </IconButton>
-            </Tooltip>
-          ) : null}
-          <Tooltip label={s.enabled ? "Pause schedule" : "Resume schedule"}>
-            <IconButton
-              size="sm"
-              aria-label={s.enabled ? "Pause schedule" : "Resume schedule"}
-              disabled={busy}
-              onClick={() => {
-                setLocalError(null);
-                update.mutate({ id: s.id, patch: { enabled: !s.enabled, expectedVersion: s.version } });
-              }}
-            >
-              {s.enabled ? <Pause size={14} /> : <Play size={14} />}
-            </IconButton>
-          </Tooltip>
-          <Tooltip label={pendingKey ? "Retry run request" : "Run now"}>
-            <IconButton
-              size="sm"
-              disabled={busy}
-              onClick={() => void runNow()}
-              aria-label={pendingKey ? "Retry run request" : "Run now"}
-              title={pendingKey ? "Confirm the saved run request without starting duplicate work" : "Run now"}
-            >
-              {pendingKey ? <RefreshCw size={14} /> : <Zap size={14} />}
-            </IconButton>
-          </Tooltip>
-          <Tooltip label="Delete schedule">
-            <IconButton
-              size="sm"
-              className="schedule-delete"
-              disabled={busy || Boolean(pendingKey)}
-              onClick={() => {
-                setLocalError(null);
-                remove.mutate({ id: s.id });
-              }}
-              aria-label="Delete schedule"
-              title={pendingKey ? "Confirm the pending run request before deleting this schedule" : "Delete schedule"}
-            >
-              <Trash2 size={14} />
-            </IconButton>
-          </Tooltip>
-        </div>
-      </div>
-      {firingLabel ? (
-        <p className={cn("mt-2 text-xs break-words", fire?.state === "failed" ? "text-bad" : "text-ink-3")} role="status" data-schedule-firing={fire?.state}>
-          {firingLabel}
-          {fire?.reason ? ` · ${fire.reason}` : ""}
-        </p>
-      ) : null}
-      {pendingKey ? <p className="mt-2 text-xs text-ink-3">A saved run request is awaiting confirmation. Retry checks that request, including its original settings.</p> : null}
-      {error ? (
-        <p className="mt-2 text-sm text-bad break-words" role="alert">
-          {error}
-        </p>
-      ) : null}
-    </div>
   );
 }
 
@@ -372,7 +203,7 @@ function ScheduleDialog({
               placeholder="Look for outdated dependencies with known vulnerabilities and propose one task per upgrade worth doing."
             />
           </Field>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 items-start gap-3">
             <Field label="Runs">
               <Select value={minutes} disabled={pending} onChange={(event) => setMinutes(Number(event.target.value))}>
                 {!intervals.some((item) => item.minutes === minutes) ? <option value={minutes}>{intervalLabel(minutes)}</option> : null}
@@ -469,10 +300,10 @@ function ScheduleDialog({
             </p>
           ) : null}
           <div className="flex justify-end gap-2">
-            <Button variant="ghost" disabled={pending} onClick={onClose}>
+            <Button disabled={pending} onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={pending || !permissionReady || Boolean(projectIssue) || Boolean(targetIssue) || !title.trim() || !prompt.trim()}>
+            <Button type="submit" variant="primary" disabled={pending || !permissionReady || Boolean(projectIssue) || Boolean(targetIssue) || !title.trim() || !prompt.trim()}>
               {scheduleSubmitLabel(pending, Boolean(schedule))}
             </Button>
           </div>

@@ -11,7 +11,7 @@ export function StartupNotice() {
   }, []);
   if (!message) return null;
   return (
-    <p role="status" className="fixed bottom-6 left-1/2 -translate-x-1/2 rounded-lg border border-line bg-surface px-4 py-2 text-sm text-ink-2 shadow-panel">
+    <p role="status" className="fixed bottom-6 left-1/2 -translate-x-1/2 rounded-xl bg-float-fill px-4 py-2.5 text-base text-ink-2">
       {message}
     </p>
   );

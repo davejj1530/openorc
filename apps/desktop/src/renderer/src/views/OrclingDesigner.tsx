@@ -12,7 +12,7 @@ import { OrclingSilhouette, OrclingStill } from "../components/OrclingAvatar";
 import { OrclingPreview } from "../components/OrclingPreview";
 import { ORCLING_ACCESSORIES, ORCLING_BODY_COLORS, ORCLING_EYE_COLORS, ORCLING_EYES, ORCLING_GLASSES, ORCLING_SHAPES, ORCLING_TEXTURES } from "../components/orcling-art";
 import { TopBar } from "../components/TopBar";
-import { Button, Dialog, IconButton, Segmented, TextButton } from "../components/ui";
+import { Button, Dialog, IconButton, Segmented } from "../components/ui";
 import "./OrclingDesigner.css";
 
 const TABS: readonly { part: OrclingLookPart; label: string; options: readonly { name: string }[] }[] = [
@@ -85,7 +85,7 @@ function DesignerForm({ existing, initialModel }: { existing: Orcling | undefine
       </TopBar>
       <div className="orcling-designer-layout">
         <LookOptions look={look} onChange={setLook} />
-        <section className="orcling-designer-card" aria-label="Orcling">
+        <section data-plane className="orcling-designer-card" aria-label="Orcling">
           <input className="orcling-designer-name" value={name} maxLength={40} placeholder="Name" aria-label="Name" onChange={(event) => setName(event.target.value)} />
           {problem ? (
             <p role="alert" className="orcling-designer-error text-center">
@@ -112,10 +112,12 @@ function DesignerForm({ existing, initialModel }: { existing: Orcling | undefine
             </div>
           </div>
           <SaveError error={create.error ?? update.error} />
-          <Button variant="primary" size="lg" className="orcling-designer-save" disabled={create.isPending || update.isPending || !name.trim() || Boolean(problem) || !model} onClick={save}>
-            {existing ? "Save" : "Create Orcling"}
-          </Button>
-          {existing ? <DeleteOrcling orcling={existing} /> : null}
+          <div className="orcling-designer-actions">
+            {existing ? <DeleteOrcling orcling={existing} /> : null}
+            <Button variant="primary" size="xl" disabled={create.isPending || update.isPending || !name.trim() || Boolean(problem) || !model} onClick={save}>
+              {existing ? "Save" : "Create Orcling"}
+            </Button>
+          </div>
         </section>
       </div>
     </div>
@@ -128,7 +130,7 @@ function LookOptions({ look, onChange }: { look: OrclingLook; onChange: (look: O
   const current = TABS.find((entry) => entry.part === tab)!;
   return (
     <section className="orcling-designer-options" aria-label="Look">
-      <div className="sub-header">
+      <div className="orcling-designer-parts">
         <Segmented label="Part to change" value={tab} options={TABS.map((entry) => ({ value: entry.part, label: entry.label }))} onChange={setTab} />
       </div>
       <div className="orcling-designer-look">
@@ -171,9 +173,9 @@ function DeleteOrcling({ orcling }: { orcling: Orcling }) {
   const remove = useRpcMutation("orclings.delete");
   return (
     <>
-      <TextButton tone="danger" className="orcling-designer-delete" onClick={() => setOpen(true)}>
+      <Button variant="danger" size="xl" onClick={() => setOpen(true)}>
         Delete {orcling.name}
-      </TextButton>
+      </Button>
       <Dialog open={open} onOpenChange={setOpen} title={`Delete ${orcling.name}?`}>
         <p className="text-base text-ink-2">Its conversation, instructions and memories go with it. Threads it worked in keep their history.</p>
         {remove.error ? (
@@ -181,7 +183,7 @@ function DeleteOrcling({ orcling }: { orcling: Orcling }) {
             {remove.error.message}
           </p>
         ) : null}
-        <div className="flex justify-end gap-2 mt-4">
+        <div className="mt-5 flex justify-end gap-2">
           <Button onClick={() => setOpen(false)}>Cancel</Button>
           <Button variant="danger" disabled={remove.isPending} onClick={() => remove.mutate({ id: orcling.id }, { onSuccess: () => useRouter.getState().navigate({ view: "newthread" }) })}>
             Delete

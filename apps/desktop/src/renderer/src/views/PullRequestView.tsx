@@ -1,14 +1,14 @@
 import { lazy, Suspense, useMemo, useState } from "react";
 import type { PullRequestDetail, PullRequestReview } from "@openorc/protocol";
 import type { CommentDraft } from "../components/DiffView";
-import { ChevronRight, ExternalLink, GitPullRequest, RefreshCw } from "../components/icons";
+import { ChevronRight, ExternalLink, RefreshCw } from "../components/icons";
 import { PullRequestReviewBar } from "../components/PullRequestReviewBar";
 import { PullRequestReviewer } from "../components/PullRequestReviewer";
 import { RichText } from "../components/RichText";
 import { TopBar } from "../components/TopBar";
-import { Badge, Button, Empty, IconButton, Segmented, Tooltip } from "../components/ui";
+import { Badge, Button, Empty, IconButton, Segmented, StatusDot, Tooltip } from "../components/ui";
 import { cn } from "../lib/cn";
-import { diffComment, draftAuthor, pullRequestTone, pullRequestToneClass, pullRequestToneLabel, reviewDecisionLabel } from "../lib/pull-requests";
+import { diffComment, draftAuthor, pullRequestDot, pullRequestTone, pullRequestToneLabel, reviewDecisionLabel } from "../lib/pull-requests";
 import { invalidateTags, useRpc, useRpcMutation } from "../lib/query";
 import { useRouter } from "../lib/router";
 import { relativeTime } from "../lib/time";
@@ -27,13 +27,13 @@ function PullRequestHeading({ pull }: { pull: PullRequestDetail }) {
   const tone = pullRequestTone(pull);
   const decision = pull.reviewDecision ? reviewDecisionLabel[pull.reviewDecision] : null;
   return (
-    <div className="shrink-0 px-6 pt-4 pb-3">
-      <h1 className="text-lg font-medium text-ink break-words">
-        {pull.title} <span className="font-normal text-ink-3">#{pull.number}</span>
+    <div className="shrink-0 px-6 pt-5 pb-3">
+      <h1 className="text-title-sm text-ink break-words">
+        {pull.title} <span className="text-ink-4">#{pull.number}</span>
       </h1>
-      <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-3">
-        <span className={cn("inline-flex items-center gap-1 font-medium", pullRequestToneClass[tone])}>
-          <GitPullRequest size={13} aria-hidden="true" /> {pullRequestToneLabel[tone]}
+      <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-3">
+        <span className="inline-flex items-center gap-2 text-ink-2">
+          <StatusDot tone={pullRequestDot[tone]} /> {pullRequestToneLabel[tone]}
         </span>
         <span className="min-w-0">
           {pull.author} · <span className="font-mono text-ink-2">{pull.headRefName}</span> → <span className="font-mono text-ink-2">{pull.baseRefName}</span>
@@ -84,8 +84,7 @@ function PullRequestChanges({ projectId, pull, review }: { projectId: string; pu
   if (!patch.trim()) return <Empty title="No changes">This pull request changes no files.</Empty>;
   return (
     <>
-      {/* The plane's edge is an inset hairline painted beneath its content, so the diff's opaque ground stops a pixel short of it. */}
-      <div className="flex-1 min-h-0 mx-px">
+      <div className="flex-1 min-h-0 px-4">
         <Suspense fallback={null}>
           <DiffView
             patch={patch}
@@ -101,7 +100,7 @@ function PullRequestChanges({ projectId, pull, review }: { projectId: string; pu
         </Suspense>
       </div>
       {error ? (
-        <p role="alert" className="shrink-0 border-t border-line px-6 py-2 text-sm text-bad break-words">
+        <p role="alert" className="shrink-0 px-6 py-2 text-sm text-bad break-words">
           {error.message}
         </p>
       ) : null}
@@ -178,7 +177,7 @@ export function PullRequestView({ projectId, number }: { projectId: string; numb
         }
       >
         <span className="inline-flex min-w-0 items-center gap-1 text-ink">
-          <button type="button" className="no-drag h-7 rounded-md px-1 text-ink-2 hover:bg-surface-2 hover:text-ink" onClick={() => navigate({ view: "pulls" })}>
+          <button type="button" className="no-drag h-7 rounded-full px-2 text-ink-3 hover:bg-surface-2 hover:text-ink" onClick={() => navigate({ view: "pulls" })}>
             Pull requests
           </button>
           <ChevronRight size={12} className="shrink-0 text-ink-4" aria-hidden="true" />

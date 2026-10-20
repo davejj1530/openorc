@@ -14,7 +14,7 @@ function DiscussionEditor({ draft, onChange }: { draft: TeamDraft; onChange: (di
   const follows = (key: string) => !discussion.mentionOnly.includes(key);
   return (
     <section aria-labelledby="team-discussion-heading" className="mt-7">
-      <h2 id="team-discussion-heading" className="text-base font-medium">
+      <h2 id="team-discussion-heading" className="text-base">
         Discussion
       </h2>
       <p className="text-sm text-ink-3 mt-1 mb-3">
@@ -94,11 +94,11 @@ function MemberEditor({
   // An Orcling in the seat brings its own name and face; they change only where the Orcling is edited.
   const seated = orclingById(useOrclings(), member.orclingId);
   return (
-    <div className="orchestration-card orchestration-member">
+    <div data-plane className="orchestration-card orchestration-member">
       <div className="flex items-center gap-3 mb-3 min-w-0">
         <MemberAvatar avatar={avatar} orcling={seated} fallbackIndex={index} size="lg" />
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-sm font-medium truncate">{member.name || `Member ${index + 1}`}</span>
+          <span className="text-sm truncate">{member.name || `Member ${index + 1}`}</span>
           {lead ? (
             <Badge>Lead</Badge>
           ) : (
@@ -317,7 +317,7 @@ export function TeamMembers({ draft, teamId, onChange }: { draft: TeamDraft; tea
     <>
       {draft.members.length > 0 ? (
         <section aria-labelledby="team-hierarchy-heading" className="mb-7">
-          <h2 id="team-hierarchy-heading" className="text-base font-medium">
+          <h2 id="team-hierarchy-heading" className="text-base">
             Hierarchy
           </h2>
           <p className="text-sm text-ink-3 mt-1 mb-3">One lead and up to {MAX_TEAM_DEPTH} levels. Responsibilities guide how the lead delegates.</p>
@@ -326,7 +326,7 @@ export function TeamMembers({ draft, teamId, onChange }: { draft: TeamDraft; tea
       ) : null}
       <section aria-labelledby="team-members-heading">
         <div className="flex items-center justify-between gap-2 mb-1">
-          <h2 id="team-members-heading" className="text-base font-medium">
+          <h2 id="team-members-heading" className="text-base">
             Members{" "}
             <span className="font-normal text-ink-3">
               {draft.members.length} / {MAX_TEAM_MEMBERS}
@@ -338,7 +338,7 @@ export function TeamMembers({ draft, teamId, onChange }: { draft: TeamDraft; tea
             </Button>
           ) : (
             <Tooltip label="Add member">
-              <IconButton aria-label="Add member" size="sm" disabled={draft.members.length >= MAX_TEAM_MEMBERS} onClick={addMember}>
+              <IconButton aria-label="Add member" size="xs" disabled={draft.members.length >= MAX_TEAM_MEMBERS} onClick={addMember}>
                 <Plus size={14} />
               </IconButton>
             </Tooltip>

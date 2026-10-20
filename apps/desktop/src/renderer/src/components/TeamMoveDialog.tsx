@@ -129,8 +129,8 @@ function MoveDialog({ threadId }: { threadId: string }) {
             ) : null}
           </>
         )}
-        <div className="flex flex-wrap justify-end gap-2">
-          <Button variant="ghost" disabled={busy} onClick={close}>
+        <div className="mt-5 flex flex-wrap justify-end gap-2">
+          <Button disabled={busy} onClick={close}>
             {pending || notice ? "Close" : "Cancel"}
           </Button>
           {!notice && recovery && !cancelling ? (
@@ -139,7 +139,7 @@ function MoveDialog({ threadId }: { threadId: string }) {
             </Button>
           ) : null}
           {!notice ? (
-            <Button disabled={busy || Boolean(blockedReason) || !to} onClick={() => void submit(cancelling ? "cancel" : "move")}>
+            <Button variant="primary" disabled={busy || Boolean(blockedReason) || !to} onClick={() => void submit(cancelling ? "cancel" : "move")}>
               {teamMoveButton({ cancelPending: cancel.isPending, movePending: move.isPending, cancelling, pending: Boolean(pending) })}
             </Button>
           ) : null}

@@ -469,7 +469,6 @@ export const Globe = icon(
 );
 export const Lightbulb = icon("Lightbulb", <path d="M9 17c0-3-3.5-3.5-3.5-7.5a6.5 6.5 0 0 1 13 0c0 4-3.5 4.5-3.5 7.5Z M9 20.5h6 M12 17v-6m-2-1 2 1 2-1" />);
 export const Hammer = icon("Hammer", <path d="m3 19 9-9 3 3-9 9Z M9 6l4-4 8 8-4 4-3-3 1-1-3-3-1 1Z" />);
-export const Sparkles = icon("Sparkles", <path d="m10 3 2.5 6.5L19 12l-6.5 2.5L10 21l-2.5-6.5L1 12l6.5-2.5Z M19 2v4 M17 4h4 M21 17v4 M19 19h4" />);
 export const Wand = icon("Wand", <path d="M4 20 14 10 M17.5 3.5v6 M14.5 6.5h6" />);
 export const Settings = icon(
   "Settings",

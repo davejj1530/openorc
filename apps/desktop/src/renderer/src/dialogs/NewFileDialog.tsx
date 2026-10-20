@@ -94,7 +94,7 @@ function NewFileForm({ scope }: { scope: FileScope }) {
           </Button>
         </div>
       ) : null}
-      <div className="flex justify-end gap-2">
+      <div className="mt-5 flex justify-end gap-2">
         <Button onClick={() => useUi.getState().setNewFile(null)}>Cancel</Button>
         <Button type="submit" variant="primary" disabled={!typed.trim() || attempt.kind === "creating"}>
           Create

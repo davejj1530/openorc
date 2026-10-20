@@ -21,6 +21,13 @@
   flex-direction: column;
 }
 
+.orcling-designer-parts {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 24px;
+}
+
 .orcling-designer-look {
   flex: 1;
   min-height: 0;
@@ -39,38 +46,44 @@
   align-content: start;
 }
 
+/* Tiles rest on the fill step and step up on hover; the chosen one is a plane with an ink ring. */
 .orcling-designer-tile {
   display: grid;
   place-items: center;
   aspect-ratio: 1;
-  border-radius: var(--radius-xl);
-  box-shadow: inset 0 0 0 var(--hairline) transparent;
+  border-radius: var(--radius-3xl);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 2px transparent;
   transition:
-    background-color 120ms var(--ease-out),
-    box-shadow 120ms var(--ease-out);
+    background-color var(--duration-leave) var(--ease-out),
+    box-shadow var(--duration-arrive) var(--ease-out);
 }
 
 .orcling-designer-tile:hover {
-  background: var(--surface-2);
+  background: var(--surface-3);
 }
 
 .orcling-designer-tile[aria-checked="true"] {
+  background: var(--surface);
   box-shadow: inset 0 0 0 2px var(--ink);
 }
 
 .orcling-designer-tile:focus-visible {
-  outline: none;
-  box-shadow: inset 0 0 0 2px var(--line-strong);
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }
 
+/* The colors pill hugs its swatches rather than running the width of the grid. */
 .orcling-designer-colors {
+  align-self: flex-start;
+  max-width: 100%;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 12px 24px;
-  padding: 12px 16px;
+  padding: 10px 12px;
   border-radius: var(--radius-pill);
-  box-shadow: inset 0 0 0 var(--hairline) var(--line);
+  background: var(--surface-2);
 }
 
 .orcling-designer-swatches {
@@ -83,21 +96,23 @@
   width: 32px;
   height: 32px;
   border-radius: var(--radius-pill);
-  box-shadow: inset 0 0 0 var(--hairline) rgb(0 0 0 / 0.08);
-  transition: box-shadow 120ms var(--ease-out);
+  /* Keeps the palest colors apart from the pill under them. */
+  box-shadow: inset 0 0 0 var(--hairline) var(--line);
+  transition: outline-offset var(--duration-arrive) var(--ease-out);
 }
 
+/* An outline keeps the gap around the chosen color see-through, whatever the pill's fill. */
 .orcling-designer-swatch-selected {
-  box-shadow:
-    0 0 0 2px var(--surface),
-    0 0 0 4px var(--ink);
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
 }
 
 .orcling-designer-swatch:focus-visible {
-  outline: 2px solid var(--line-strong);
-  outline-offset: 3px;
+  outline: 2px solid var(--ring);
+  outline-offset: 4px;
 }
 
+/* The identity card: a plane beside the options, with its actions along the foot. */
 .orcling-designer-card {
   min-width: 0;
   min-height: 0;
@@ -105,8 +120,10 @@
   flex-direction: column;
   align-items: center;
   gap: 16px;
-  padding: 24px;
-  border-left: var(--hairline) solid var(--line);
+  margin: 0 12px 12px 0;
+  padding: 24px 20px 20px;
+  border-radius: var(--radius-3xl);
+  background: var(--plane-fill);
   overflow-y: auto;
 }
 
@@ -116,7 +133,7 @@
   text-align: center;
   font-size: var(--text-title);
   line-height: var(--text-title--line-height);
-  font-weight: 600;
+  letter-spacing: var(--text-title--letter-spacing);
   color: var(--ink);
   outline: none;
 }
@@ -153,13 +170,14 @@
   font-size: var(--text-sm);
 }
 
-.orcling-designer-save {
+.orcling-designer-actions {
   width: 100%;
-  border-radius: var(--radius-pill);
+  display: flex;
+  gap: 8px;
 }
 
-.orcling-designer-delete {
-  font-size: var(--text-sm);
+.orcling-designer-actions > :last-child {
+  flex: 1;
 }
 
 @container (max-width: 720px) {
@@ -173,7 +191,6 @@
   }
   .orcling-designer-card {
     order: -1;
-    border-left: 0;
-    border-bottom: var(--hairline) solid var(--line);
+    margin: 0 12px;
   }
 }

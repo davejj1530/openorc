@@ -110,9 +110,6 @@ function Progress({ step }: { step: OnboardingStep }) {
           data-complete={index < current || undefined}
           key={item.id}
         >
-          <span className="onboarding-progress-dot" aria-hidden="true">
-            {index < current ? <Check size={12} /> : index + 1}
-          </span>
           <span>{item.label}</span>
           {index < current ? <span className="sr-only"> completed</span> : null}
         </li>
@@ -363,7 +360,7 @@ function OnboardingFlow({ mode = "first_run", initialStep, persisted, onPersist,
           <footer className="onboarding-actions onboarding-footer">
             <p className="onboarding-action-note">Your saved preferences will stay in place.</p>
             <div className="onboarding-action-buttons">
-              <Button variant="primary" disabled={!canReturn} onClick={completeRecovery}>
+              <Button variant="primary" size="xl" disabled={!canReturn} onClick={completeRecovery}>
                 Return to OpenOrc
               </Button>
             </div>
@@ -473,7 +470,7 @@ function OnboardingFlow({ mode = "first_run", initialStep, persisted, onPersist,
                     {selectedProject ? " and your first project is connected." : "."}
                   </p>
                   <div className="onboarding-action-buttons">
-                    <Button variant="primary" onClick={complete}>
+                    <Button variant="primary" size="xl" onClick={complete}>
                       Start your first thread <ArrowRight size={14} />
                     </Button>
                   </div>
@@ -487,11 +484,11 @@ function OnboardingFlow({ mode = "first_run", initialStep, persisted, onPersist,
             <p className="onboarding-action-note">{setupActionNote({ step, selectedCount: selectedReady.length, readyCount: ready.length, defaultHarness, preview, selectedProject })}</p>
             <div className="onboarding-action-buttons">
               {step !== "scan" ? (
-                <Button onClick={retreat} disabled={importing}>
+                <Button size="xl" onClick={retreat} disabled={importing}>
                   <ArrowLeft size={14} /> Back
                 </Button>
               ) : null}
-              <Button variant="primary" disabled={!canContinue} onClick={advance}>
+              <Button variant="primary" size="xl" disabled={!canContinue} onClick={advance}>
                 {step === "project" ? "Finish setup" : "Continue"} <ArrowRight size={14} />
               </Button>
             </div>

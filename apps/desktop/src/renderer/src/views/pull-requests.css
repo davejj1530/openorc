@@ -1,0 +1,33 @@
+/* Pull request rows: rounded two-line rows on the tile with no rules between them. A dot and a
+   word carry the state; hover is the fill step. */
+.pull-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pull-row {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 56px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: var(--radius-lg);
+  text-align: left;
+  transition: background-color var(--duration-leave) var(--ease-out);
+}
+.pull-row:hover {
+  background: var(--surface-2);
+}
+
+/* As tall as the title's line, so the dot sits on it. */
+.pull-row-mark {
+  width: 16px;
+  height: 20px;
+  flex-shrink: 0;
+  align-self: flex-start;
+  display: grid;
+  place-items: center;
+}

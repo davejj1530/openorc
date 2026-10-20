@@ -1,18 +1,19 @@
 import { useId, useState, type ReactNode } from "react";
 import { useQueries } from "@tanstack/react-query";
 import { WORKSPACE_ID, type Project, type PullRequestFilter, type PullRequestSummary } from "@openorc/protocol";
-import { Folder, GitPullRequest, RefreshCw } from "../components/icons";
+import { RefreshCw } from "../components/icons";
 import { ListGroupHeading } from "../components/ListGroupHeading";
 import { PageFilters, PageSearch } from "../components/PageFilters";
 import { TopBar } from "../components/TopBar";
-import { Badge, Button, Empty, IconButton, metaSlot, Segmented, Tooltip } from "../components/ui";
+import { Badge, Button, Empty, IconButton, metaSlot, Segmented, StatusDot, Tooltip } from "../components/ui";
 import { cn } from "../lib/cn";
 import { useLayout } from "../lib/layout";
-import { matchesPullRequest, onGitHub, pullRequestFilters, pullRequestTone, pullRequestToneClass, pullRequestToneLabel, reviewDecisionLabel } from "../lib/pull-requests";
+import { matchesPullRequest, onGitHub, pullRequestFilters, pullRequestDot, pullRequestTone, pullRequestToneLabel, reviewDecisionLabel } from "../lib/pull-requests";
 import { tagsFor, useRpc } from "../lib/query";
 import { core } from "../lib/rpc";
 import { openPullRequest } from "../lib/router";
 import { relativeTime } from "../lib/time";
+import "./pull-requests.css";
 
 const emptyTitle: Record<PullRequestFilter, string> = {
   open: "No open pull requests",
@@ -24,24 +25,18 @@ const emptyTitle: Record<PullRequestFilter, string> = {
 function PullRequestRow({ pull, projectId }: { pull: PullRequestSummary; projectId: string }) {
   const tone = pullRequestTone(pull);
   const decision = pull.reviewDecision ? reviewDecisionLabel[pull.reviewDecision] : null;
-  // A merged or closed pull request says so in words as well as in the icon's color.
-  const ended = pull.state === "open" ? "" : `${pullRequestToneLabel[tone]} · `;
   return (
-    <div className="border-t border-line last:border-b">
-      <button
-        type="button"
-        onClick={() => openPullRequest(projectId, pull.number)}
-        className="flex w-full min-w-0 items-center gap-3 px-2 py-2 text-left hover:bg-surface-2"
-        aria-label={`${pull.title}, #${pull.number}, ${pullRequestToneLabel[tone]}`}
-      >
-        <GitPullRequest size={15} className={cn("mt-0.5 shrink-0 self-start", pullRequestToneClass[tone])} aria-hidden="true" />
+    <div>
+      <button type="button" onClick={() => openPullRequest(projectId, pull.number)} className="pull-row" aria-label={`${pull.title}, #${pull.number}, ${pullRequestToneLabel[tone]}`}>
+        <span className="pull-row-mark" aria-hidden="true">
+          <StatusDot tone={pullRequestDot[tone]} />
+        </span>
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="truncate text-base text-ink" title={pull.title}>
             {pull.title}
           </span>
-          <span className="truncate text-sm text-ink-3">
-            #{pull.number} · {ended}
-            {pull.author} · {pull.headRefName} → {pull.baseRefName}
+          <span className="truncate text-sm text-ink-4">
+            #{pull.number} · {pullRequestToneLabel[tone]} · {pull.author} · {pull.headRefName} → {pull.baseRefName}
           </span>
         </span>
         {pull.isDraft ? <Badge className="shrink-0">Draft</Badge> : null}
@@ -72,29 +67,21 @@ function ProjectSection({ entry, query, named }: { entry: ProjectPulls; query: s
   let body: ReactNode = pulls.map((pull) => <PullRequestRow key={pull.number} pull={pull} projectId={entry.project.id} />);
   if (entry.error) {
     body = (
-      <p className="border-y border-line px-2 py-2 text-sm text-ink-3">
+      <p className="px-3 py-2 text-sm text-ink-3">
         {entry.error.message}{" "}
         <button type="button" className="underline hover:text-ink" onClick={entry.retry}>
           Retry
         </button>
       </p>
     );
-  } else if (entry.loading) body = <p className="border-y border-line px-2 py-2 text-sm text-ink-3">Loading…</p>;
+  } else if (entry.loading) body = <p className="px-3 py-2 text-sm text-ink-3">Loading…</p>;
   else if (pulls.length === 0) body = null;
   if (named && !body) return null;
   const count = entry.pulls ? { value: pulls.length, label: `${pulls.length} ${pulls.length === 1 ? "pull request" : "pull requests"}` } : null;
   return (
     <section aria-label={`${entry.project.name} pull requests`} className="list-group">
       {named ? (
-        <ListGroupHeading
-          id={`${id}-heading`}
-          controls={`${id}-pulls`}
-          collapsed={collapsed}
-          onToggle={() => setCollapsed((current) => !current)}
-          icon={<Folder size={13} className="text-ink-3" />}
-          label={entry.project.name}
-          count={count}
-        />
+        <ListGroupHeading id={`${id}-heading`} controls={`${id}-pulls`} collapsed={collapsed} onToggle={() => setCollapsed((current) => !current)} label={entry.project.name} count={count} />
       ) : null}
       <div id={`${id}-pulls`} hidden={collapsed}>
         {body}

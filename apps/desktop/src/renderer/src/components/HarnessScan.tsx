@@ -1,9 +1,8 @@
 import { harnessCatalog, type HarnessId, type HarnessInfo } from "@openorc/protocol";
 import { harnessLogos } from "./HarnessLogo";
-import { AlertCircle, Check, ChevronDown, ExternalLink, Loader2, RefreshCw } from "./icons";
-import { Badge, Button, TextButton } from "./ui";
+import { Check, ChevronDown, ExternalLink, Loader2, RefreshCw } from "./icons";
+import { Button, StatusDot, TextButton } from "./ui";
 import { cn } from "../lib/cn";
-import type { ReactNode } from "react";
 
 export type HarnessRowState = HarnessInfo["state"] | "checking";
 
@@ -48,22 +47,20 @@ const stateGuidance: Record<HarnessRowState, string> = {
   check_failed: "The check didn’t finish. Retry to confirm this agent’s status.",
 };
 
-function tone(state: HarnessRowState): "muted" | "ok" | "warn" | "bad" {
-  if (state === "ready") return "ok";
-  if (state === "sign_in") return "warn";
-  if (state === "check_failed") return "bad";
-  return "muted";
-}
+const dotTone: Record<Exclude<HarnessRowState, "checking">, "ok" | "attention" | "bad" | "muted"> = {
+  ready: "ok",
+  sign_in: "attention",
+  check_failed: "bad",
+  not_found: "muted",
+};
 
-function StatusBadge({ state }: { state: HarnessRowState }) {
-  let icon: ReactNode = null;
-  if (state === "checking") icon = <Loader2 className="onboarding-spin" size={11} />;
-  else if (state === "check_failed") icon = <AlertCircle size={11} />;
+/** The state as a dot and a word; a check still running spins in the dot's place. */
+function HarnessState({ state }: { state: HarnessRowState }) {
   return (
-    <Badge tone={tone(state)}>
-      {icon}
+    <span className="harness-state">
+      {state === "checking" ? <Loader2 className="onboarding-spin" size={11} aria-hidden="true" /> : <StatusDot tone={dotTone[state]} />}
       {stateLabels[state]}
-    </Badge>
+    </span>
   );
 }
 
@@ -182,7 +179,7 @@ export function HarnessScan({ rows, onRefresh, onRetry, onConnect, onSetup, refr
               <div className="harness-content">
                 <div className="harness-identity">
                   <h3>{harnessCatalog[row.id].name}</h3>
-                  <StatusBadge state={row.state} />
+                  <HarnessState state={row.state} />
                 </div>
                 <p className="harness-guidance">{stateGuidance[row.state]}</p>
               </div>

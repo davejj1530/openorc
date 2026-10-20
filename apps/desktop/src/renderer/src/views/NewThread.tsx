@@ -2,13 +2,14 @@ import { ClaudeAccountPicker } from "../components/ClaudeAccountPicker";
 import { ClaudeAccountScope } from "../lib/claude-account";
 import { useEffect, useRef, useState } from "react";
 import { WORKSPACE_ID, harnessIds, harnessInfo, harnessLoggedIn, type HarnessId, type Project, type TeamDetail } from "@openorc/protocol";
-import { ChevronRight, FolderGit2 } from "../components/icons";
+import { FolderGit2 } from "../components/icons";
 import { Composer } from "../components/Composer";
 import { Panel } from "../components/Panel";
 import { useComposerChanges } from "../lib/composer-changes";
 import { NewThreadStarters } from "../components/NewThreadStarters";
-import { NewThreadContext } from "../components/NewThreadContext";
-import { ArrivalPanel, useArrivalActivity } from "../components/NewThreadActivity";
+import { NewThreadProjectChoice } from "../components/NewThreadContext";
+import { NewThreadOptions } from "../components/NewThreadOptions";
+import { NewThreadRecent, useArrivalActivity } from "../components/NewThreadActivity";
 import { ComposerModelPicker, defaultChoice, ModelPicker, type ModelChoice, type OrclingPickerChoices, type TeamPickerChoices } from "../components/ModelPicker";
 import { useOrclings } from "../lib/orclings";
 import { pickerTeam } from "../lib/team-settings";
@@ -212,12 +213,12 @@ function NewThreadProject({
     <ClaudeAccountScope id={claudeAccountId}>
       <main className="workspace-main well flex flex-1 flex-col min-w-0 min-h-0">
         <TopBar showProject={false} panel={Boolean(panelContext)}>
-          <h1 className="px-1 text-base font-medium">New thread</h1>
+          {null}
         </TopBar>
-        <div className="new-thread-body flex-1 min-h-0 flex flex-col overflow-y-auto">
-          <div ref={composer} className="new-thread-composer">
+        <div className="new-thread-body flex-1 min-h-0 overflow-y-auto">
+          <div ref={composer} className="new-thread-column">
             {projects?.length === 0 ? (
-              <div className="rounded-xl border border-line bg-surface p-4 text-base text-ink-2">
+              <div className="new-thread-empty">
                 Import a project to start.
                 <div className="mt-3">
                   <Button variant="primary" size="sm" onClick={() => useUi.getState().setImportProject(true)}>
@@ -227,33 +228,18 @@ function NewThreadProject({
               </div>
             ) : (
               <>
+                <h1 className="new-thread-question">{selected && !isWorkspace ? `What should we work on in ${selected.name}?` : "What should we work on?"}</h1>
                 <div className="relative">
-                  <div className="flex flex-wrap justify-between items-end">
-                    <NewThreadContext
-                      projectId={projectId}
-                      projects={projects}
-                      mode={workspaceMode}
-                      blocked={branchingReason(git.state, "Worktrees")}
-                      disabled={start.isPending}
-                      onProject={onProject}
-                      onFolder={(workingDirectory) => changeDraft({ workingDirectory })}
-                      onMode={(workspace) => changeDraft({ workspace })}
-                    />
-
-                    {choice?.agent === "claude" || revision?.members.some((member) => member.settings.agent === "claude") ? (
-                      <ClaudeAccountPicker accounts={accounts.data} value={claudeAccountId} onChange={(claudeAccountId) => changeDraft({ claudeAccountId })} disabled={start.isPending} />
-                    ) : null}
-                  </div>
-
                   <Composer
                     draftKey={`newthread.${projectId}.attachments`}
                     autoFocus
                     value={draft.prompt}
                     onChange={(prompt) => changeDraft({ prompt })}
                     onSubmit={submit}
-                    placeholder={revision ? "Message the team… (@name to address a member)" : "Ask OpenOrc to build, fix bugs, explore"}
+                    placeholder={revision ? "Message the team" : "Ask OpenOrc to build, fix bugs, explore"}
                     size="lg"
                     presentation="new-thread"
+                    projectControl={<NewThreadProjectChoice projectId={projectId} projects={projects} disabled={start.isPending} onProject={onProject} />}
                     {...(revision ? { mentions: teamMentionEntries(revision) } : {})}
                     model={choice}
                     onModel={changeSettings}
@@ -278,7 +264,6 @@ function NewThreadProject({
                     onPermission={setPermission}
                     settingsDisabled={start.isPending}
                     location={location}
-                    changes={composerChanges}
                     fileSearch={isWorkspace || !projectId ? undefined : { kind: "project", id: projectId }}
                     commands={skillCommands}
                     busy={start.isPending}
@@ -286,6 +271,21 @@ function NewThreadProject({
                     error={start.error?.message ?? permissionError ?? storageError}
                   />
                 </div>
+                <NewThreadOptions
+                  projectId={projectId}
+                  mode={workspaceMode}
+                  location={location}
+                  blocked={branchingReason(git.state, "Worktrees")}
+                  disabled={start.isPending}
+                  onFolder={(workingDirectory) => changeDraft({ workingDirectory })}
+                  onMode={(workspace) => changeDraft({ workspace })}
+                  changes={composerChanges}
+                  account={
+                    usesClaude ? (
+                      <ClaudeAccountPicker compact accounts={accounts.data} value={claudeAccountId} onChange={(claudeAccountId) => changeDraft({ claudeAccountId })} disabled={start.isPending} />
+                    ) : null
+                  }
+                />
                 {targetIssue || projectIssue ? (
                   <p role="status" className="text-xs text-warn mt-2 break-words">
                     {targetIssue ?? projectIssue}{" "}
@@ -333,21 +333,8 @@ function NewThreadProject({
                 }}
               />
             ) : null}
+            {activity.any ? <NewThreadRecent activity={activity} /> : null}
           </div>
-          {activity.any ? (
-            <details className="new-thread-activity">
-              <summary>
-                <ChevronRight size={13} aria-hidden="true" />
-                <span>Recent activity</span>
-                {activity.waiting.length > 0 ? (
-                  <span className="ml-auto text-warn">
-                    {activity.waiting.length} {activity.waiting.length === 1 ? "needs" : "need"} you
-                  </span>
-                ) : null}
-              </summary>
-              <ArrivalPanel activity={activity} />
-            </details>
-          ) : null}
         </div>
       </main>
       {panelContext ? <Panel context={panelContext} /> : null}
@@ -374,7 +361,7 @@ function teamPickerChoices(input: {
   if (teams.isError || availability.isError) action = { label: "Retry team checks", onSelect: input.retry };
   else if (availability.data && !availability.data.enabled) action = { label: "Open Settings", onSelect: () => useRouter.getState().navigate({ view: "settings" }) };
   else if (teams.data && !teams.data.some((team) => team.team.archivedAt === null))
-    action = { label: "Create a team in Orchestration", onSelect: () => useRouter.getState().navigate({ view: "orchestration", projectId: input.projectId }) };
+    action = { label: "Create a team", onSelect: () => useRouter.getState().navigate({ view: "orchestration", projectId: input.projectId }) };
   return {
     options: input.options,
     ...selected,

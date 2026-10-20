@@ -315,123 +315,6 @@
 .app-shell .page-column [data-task-open] > span:first-of-type {
   font-size: 14px;
 }
-.app-shell .new-thread-body {
-  container: new-thread / inline-size;
-  justify-content: flex-start;
-  padding: 32px var(--reading-gutter) 32px;
-}
-.new-thread-composer {
-  flex-shrink: 0;
-  width: 100%;
-  max-width: 640px;
-  margin: 0 auto;
-}
-.new-thread-context {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 2px;
-  min-width: 0;
-  min-height: 28px;
-  margin-bottom: 6px;
-}
-.new-thread-context > button {
-  height: 28px;
-  max-width: 100%;
-  padding-inline: 6px;
-  color: var(--ink-2);
-  font-size: 12px;
-}
-.new-thread-context .new-thread-project {
-  max-width: min(320px, 100%);
-}
-/* A single prompt surface, with model/mode first in both reading and tab order. */
-.app-shell .composer-new-thread .composer-shell {
-  padding: 6px;
-  border-radius: 12px;
-  background: var(--composer-input);
-}
-.app-shell .composer-new-thread .composer-input {
-  min-height: 88px;
-}
-.app-shell .composer-new-thread .composer-foot {
-  flex-wrap: nowrap;
-  align-items: flex-end;
-  gap: 6px;
-  padding: 2px 0 0;
-}
-.app-shell .composer-new-thread .composer-meta {
-  flex: 1;
-  gap: 2px;
-}
-.app-shell .composer-new-thread .composer-model-trigger,
-.app-shell .composer-new-thread .composer-picker {
-  padding-inline: 6px;
-}
-.app-shell .composer-new-thread .composer-model-trigger {
-  order: 0;
-  margin-right: 0;
-  max-width: min(260px, 100%);
-}
-.app-shell .composer-new-thread .composer-picker {
-  max-width: 100%;
-  font-size: 12px;
-}
-.app-shell .composer-new-thread .composer-actions {
-  flex: 0 0 auto;
-  flex-wrap: nowrap;
-  min-width: 0;
-  gap: 4px;
-}
-.app-shell .composer-new-thread .composer-send {
-  margin-left: 0;
-}
-@container composer (max-width: 300px) {
-  .app-shell .composer-new-thread .composer-foot {
-    flex-wrap: wrap;
-  }
-  .app-shell .composer-new-thread .composer-meta {
-    flex-basis: 100%;
-  }
-}
-.new-thread-activity {
-  flex-shrink: 0;
-  width: 100%;
-  max-width: 640px;
-  margin: 24px auto 0;
-}
-.new-thread-activity > summary {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 28px;
-  padding: 0 8px;
-  border-radius: 6px;
-  list-style: none;
-  font-size: 12px;
-  color: var(--ink-3);
-}
-.new-thread-activity > summary::-webkit-details-marker {
-  display: none;
-}
-.new-thread-activity > summary:hover {
-  color: var(--ink);
-  background: var(--surface-2);
-}
-.new-thread-activity[open] > summary > svg {
-  transform: rotate(90deg);
-}
-.new-thread-activity > div {
-  margin-top: 16px;
-  padding-inline: 8px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px;
-}
-@container new-thread (max-width: 480px) {
-  .new-thread-activity > div {
-    grid-template-columns: 1fr;
-  }
-}
 @container (max-width: 480px) {
   .thread-header-project {
     display: none;
@@ -443,9 +326,6 @@
   }
   .page-column {
     padding: 16px 24px 0;
-  }
-  .app-shell .new-thread-body {
-    padding-top: 24px;
   }
 }
 @media (max-width: 520px) {
@@ -491,8 +371,9 @@ html[data-transparent-shell="true"] .app-shell .panel-shell[data-expanded="true"
   outline-offset: 2px;
 }
 
-/* Text entry uses a change of surface and the caret, without a focus ring. */
-.app-shell :is(input:not([type="checkbox"]):not([type="range"]):not([type="color"]), textarea:not(.composer-input)):focus {
+/* Text entry uses a change of surface and the caret, without a focus ring. Fields from ui.tsx
+   already rest on a fill and deepen it to --surface-3 themselves. */
+.app-shell :is(input:not([type="checkbox"]):not([type="range"]):not([type="color"]), textarea:not(.composer-input)):where(:not(.native-field)):focus {
   outline: none;
   box-shadow: none;
   background-color: var(--surface-2);

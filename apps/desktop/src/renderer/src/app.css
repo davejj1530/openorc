@@ -18,6 +18,7 @@
 @import "./styles/motion.css";
 @import "./styles/conversation.css";
 @import "./styles/composer.css";
+@import "./styles/new-thread.css";
 @import "./components/MessageQueue.css";
 @source "../../../node_modules/streamdown/dist/*.js";
 @source "../../../node_modules/@streamdown/mermaid/dist/*.js";
@@ -98,6 +99,13 @@
   :root {
     --hairline: 0.5px;
   }
+}
+/* Planes (the panel, sheets, menus, popovers, dialogs, the composer) restate the contextual fills
+   one step off their own fill. A tile card inside a plane steps them back to the plane. Mark new
+   planes with data-plane and tile cards with data-plane="tile" rather than growing these lists. */
+:where([data-plane], .panel-content, .menu-popup, .floating-popover, .project-picker-popup, .composer-context-popup, .model-picker-popup, .composer-effort-popup, .composer-shell, [role="dialog"]) {
+  --current-row-fill: var(--surface-2);
+  --control-fill: var(--surface-2);
 }
 }
 
@@ -1718,30 +1726,6 @@ body:has(.sidebar-shell[data-open="false"]) .thread-pane:first-child > .well {
 .task-comment-executor {
   margin-top: 20px;
 }
-.task-comment-composer {
-  --composer-surface: var(--bg);
-  position: relative;
-  margin-top: 24px;
-  background: var(--composer-surface);
-  border: var(--hairline) solid var(--color-line);
-  border-radius: 10px;
-}
-.task-comment-composer textarea {
-  display: block;
-  resize: none;
-  field-sizing: content;
-  width: 100%;
-  min-height: 84px;
-  max-height: 320px;
-  padding: 12px;
-  background: transparent;
-  font-size: 14px;
-  line-height: 1.6;
-  outline: none;
-}
-.task-comment-composer:focus-within {
-  border-color: var(--color-line-strong);
-}
 .task-comment-compose-footer {
   display: flex;
   align-items: center;
@@ -1786,15 +1770,6 @@ body:has(.sidebar-shell[data-open="false"]) .thread-pane:first-child > .well {
 .task-comment-mentions p {
   padding: 8px;
   font-size: 12px;
-}
-
-[data-theme="dark"] .task-comment-composer {
-  --composer-surface: color-mix(in srgb, var(--surface) 88%, #ffffff);
-}
-
-.task-comment-composer textarea::placeholder {
-  color: var(--ink-2);
-  opacity: 1;
 }
 .task-comment-compose-footer > span,
 .task-comment-recipients,

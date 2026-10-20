@@ -36,7 +36,7 @@ vi.mock("../lib/query", () => ({
 vi.mock("../lib/permission-default", () => ({ usePermissionSelection: () => ({ permission: "review", ready: true, select: vi.fn(), error: null }) }));
 vi.mock("../lib/skill-commands", () => ({ useSkillCommands: () => [] }));
 vi.mock("../lib/composer-changes", () => ({ useComposerChanges: () => null }));
-vi.mock("../components/NewThreadActivity", () => ({ useArrivalActivity: () => ({ any: false }), ArrivalPanel: () => null }));
+vi.mock("../components/NewThreadActivity", () => ({ useArrivalActivity: () => ({ any: false }), NewThreadRecent: () => null }));
 vi.mock("../components/NewThreadMascot", () => ({ NewThreadMascot: () => null }));
 vi.mock("../components/Panel", () => ({ Panel: () => null }));
 vi.mock("../components/TopBar", () => ({ TopBar: ({ children }: { children: React.ReactNode }) => <header>{children}</header> }));

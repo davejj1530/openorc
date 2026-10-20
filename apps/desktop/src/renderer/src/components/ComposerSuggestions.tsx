@@ -2,6 +2,7 @@ import { useEffect, useRef, type ReactNode, type RefObject } from "react";
 import { Popover } from "@base-ui/react/popover";
 import { CoversPreview } from "../lib/browser-preview";
 import { cn } from "../lib/cn";
+import { floatingGround } from "../lib/use-anchor-ground";
 
 /** Keep suggestions outside scrolling columns, without moving focus out of the textarea. */
 export function ComposerSuggestions({
@@ -44,10 +45,13 @@ export function ComposerSuggestions({
           style={{ width: members ? undefined : "var(--anchor-width)", maxWidth: "var(--available-width)" }}
         >
           <Popover.Popup
-            ref={popup}
+            ref={(element) => {
+              popup.current = element;
+              floatingGround(element);
+            }}
             initialFocus={false}
             finalFocus={false}
-            className={cn("composer-suggestions rounded-lg border border-line bg-surface p-1 overflow-y-auto", members && "min-w-56 max-w-full")}
+            className={cn("composer-suggestions floating-popover", members && "min-w-56 max-w-full")}
             style={{ maxHeight: "min(320px, var(--available-height))" }}
           >
             {children}

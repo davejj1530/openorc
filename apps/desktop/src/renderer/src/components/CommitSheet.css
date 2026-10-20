@@ -1,0 +1,91 @@
+/* The commit sheet (components/CommitSheet.tsx): an r22 card that opens clipped to its Commit
+   pill and grows to full size over 420ms, its parts arriving one after another. Like every
+   floating layer it has no shadow; --float-fill steps it away from the ground beneath. */
+.commit-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(280px, calc(100vw - 24px));
+  min-width: var(--anchor-width);
+  max-height: var(--available-height);
+  overflow-y: auto;
+  padding: 18px 16px 16px;
+  border-radius: var(--radius-4xl);
+  background: var(--float-fill);
+  color: var(--ink);
+  outline: none;
+  clip-path: inset(0 round var(--radius-4xl));
+  transition:
+    opacity var(--duration-leave) var(--ease-out),
+    clip-path var(--duration-resize) var(--ease-out);
+}
+.commit-sheet[data-starting-style] {
+  clip-path: inset(0 0 calc(100% - var(--anchor-height)) calc(100% - var(--anchor-width)) round var(--radius-pill));
+}
+.commit-sheet[data-ending-style] {
+  opacity: 0;
+}
+/* Flipped above its pill, it drops in like a menu instead. */
+.commit-sheet[data-side="top"] {
+  transform-origin: var(--transform-origin);
+  transition:
+    opacity var(--duration-leave) var(--ease-out),
+    transform var(--duration-arrive) var(--ease-out);
+}
+.commit-sheet[data-side="top"]:is([data-starting-style], [data-ending-style]) {
+  clip-path: inset(0 round var(--radius-4xl));
+  opacity: 0;
+  transform: translateY(6px) scale(0.96);
+}
+.commit-sheet-part {
+  transition:
+    opacity var(--duration-arrive) var(--ease-out) var(--part-delay, 0ms),
+    filter var(--duration-arrive) var(--ease-out) var(--part-delay, 0ms),
+    translate var(--duration-arrive) var(--ease-out) var(--part-delay, 0ms);
+}
+.commit-sheet-part:nth-child(1) {
+  --part-delay: 120ms;
+}
+.commit-sheet-part:nth-child(2) {
+  --part-delay: 170ms;
+}
+.commit-sheet-part:nth-child(3) {
+  --part-delay: 220ms;
+}
+.commit-sheet[data-starting-style] .commit-sheet-part {
+  opacity: 0;
+  filter: blur(var(--arrive-blur));
+  translate: 0 var(--arrive-rise);
+}
+.commit-sheet[data-ending-style] .commit-sheet-part {
+  --part-delay: 0ms;
+}
+.commit-sheet-head {
+  display: grid;
+  gap: 2px;
+}
+.commit-sheet-title {
+  font-size: var(--text-md);
+  line-height: 20px;
+  letter-spacing: var(--text-md--letter-spacing);
+  color: var(--ink);
+}
+.commit-sheet-summary {
+  font-size: var(--text-sm);
+  line-height: 16px;
+  color: var(--ink-4);
+}
+/* One line to start, like the drawn field; a longer message grows it up to five lines. */
+.commit-sheet-message {
+  min-height: 40px;
+  max-height: 124px;
+  field-sizing: content;
+}
+.commit-sheet-actions {
+  display: flex;
+  gap: 8px;
+}
+/* The pill steps aside while the sheet that grew out of it is open, so no corner of it shows past the sheet's. */
+.commit-sheet-pill[data-popup-open] {
+  opacity: 0;
+}

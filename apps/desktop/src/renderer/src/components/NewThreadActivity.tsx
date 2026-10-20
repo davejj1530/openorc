@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { ThreadSummary } from "@openorc/protocol";
-import { arrivalGroups, type ArrivalActivity } from "./arrival-groups";
+import { arrivalGroups, arrivalRows, type ArrivalActivity, type ArrivalRow } from "./arrival-groups";
 import { agentQuiet, formatQuiet, QUIET_TICK_MS } from "./agent-quiet";
-import { MessageSquare } from "./icons";
+import { LoaderCircle } from "./icons";
+import { StatusDot } from "./ui";
 import { StatusIcon, statusLabel } from "./status";
 import { cn } from "../lib/cn";
 import { useLayout } from "../lib/layout";
 import { useRpc } from "../lib/query";
+import { relativeTime } from "../lib/time";
 import { openThread, useRouter } from "../lib/router";
 
 /**
@@ -40,82 +42,51 @@ function useQuietClock(running: ThreadSummary[]): number {
   return now;
 }
 
-/** A live dot in the app's existing vocabulary: warn wants you, accent is working. */
-function Dot({ tone }: { tone: "warn" | "accent" }) {
-  return <span className={cn("w-1.5 h-1.5 rounded-full", tone === "warn" ? "bg-warn" : "bg-accent animate-pulse")} />;
+function rowMeta(row: ArrivalRow, now: number): ReactNode {
+  if (row.kind === "tasks") return "Tasks";
+  if (row.kind === "waiting") return "Needs you";
+  if (row.kind === "running") {
+    const quiet = agentQuiet(row.thread, now);
+    return quiet ? <span className={cn("tabular", quiet.strong && "text-warn")}>No output for {formatQuiet(quiet.ms)}</span> : "Working";
+  }
+  return relativeTime(row.thread.lastActivityAt, now);
 }
 
-function Row({ icon, title, meta, onClick }: { icon: ReactNode; title: ReactNode; meta?: ReactNode; onClick: () => void }) {
-  return (
-    <button onClick={onClick} className="w-full flex items-center gap-2.5 h-7 -mx-2 px-2 rounded-md text-left text-base text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink">
-      <span className="w-3.5 shrink-0 grid place-items-center">{icon}</span>
-      <span className="flex-1 min-w-0 truncate">{title}</span>
-      {meta ? <span className="shrink-0 text-sm whitespace-nowrap">{meta}</span> : null}
-    </button>
-  );
+function RowLead({ row }: { row: ArrivalRow }) {
+  if (row.kind === "waiting") return <StatusDot tone="attention" />;
+  if (row.kind === "running") return <LoaderCircle size={14} className="animate-spin" />;
+  if (row.kind === "tasks") return <StatusIcon status={row.status} />;
+  return null;
 }
 
-function Group({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <section className="min-w-0">
-      <h2 className="mb-1 text-sm font-medium text-ink-3">{label}</h2>
-      {children}
-    </section>
-  );
-}
-
-/** Every row opens the thing it names; nothing here is a statistic for its own sake. */
-export function ArrivalPanel({ activity }: { activity: ArrivalActivity }) {
+/** "Pick up where you left off": one flat list, threads that wait on you first. Every row opens the thing it names. */
+export function NewThreadRecent({ activity }: { activity: ArrivalActivity }) {
   const navigate = useRouter((s) => s.navigate);
   const now = useQuietClock(activity.running);
   return (
-    <div className="mt-8 grid gap-5 min-w-0">
-      {activity.waiting.length > 0 ? (
-        <Group label="Needs you">
-          {activity.waiting.map((t) => (
-            <Row key={t.id} icon={<Dot tone="warn" />} title={t.title} onClick={() => openThread(t.id)} />
-          ))}
-        </Group>
-      ) : null}
-      {activity.running.length > 0 ? (
-        <Group label="Working">
-          {activity.running.map((t) => {
-            const quiet = agentQuiet(t, now);
-            return (
-              <Row
-                key={t.id}
-                icon={<Dot tone="accent" />}
-                title={t.title}
-                meta={quiet ? <span className={cn("tabular", quiet.strong ? "text-warn" : "text-ink-4")}>no output for {formatQuiet(quiet.ms)}</span> : null}
-                onClick={() => openThread(t.id)}
-              />
-            );
-          })}
-        </Group>
-      ) : null}
-      {activity.tasks.length > 0 ? (
-        <Group label="Tasks">
-          {activity.tasks.map((group) => (
-            <Row
-              key={group.status}
-              icon={<StatusIcon status={group.status} />}
-              title={
+    <section className="new-thread-recent" aria-labelledby="new-thread-recent-label">
+      <h2 id="new-thread-recent-label" className="new-thread-recent-label">
+        Pick up where you left off
+      </h2>
+      <div className="motion-stagger">
+        {arrivalRows(activity).map((row) => (
+          <button key={row.key} type="button" className="new-thread-recent-row motion-arrive" onClick={() => (row.kind === "tasks" ? navigate({ view: "tasks" }) : openThread(row.thread.id))}>
+            <span className="new-thread-recent-lead">
+              <RowLead row={row} />
+            </span>
+            <span className="new-thread-recent-title">
+              {row.kind === "tasks" ? (
                 <>
-                  <span className="tabular">{group.count}</span> {statusLabel[group.status].toLowerCase()}
+                  <span className="tabular">{row.count}</span> {statusLabel[row.status].toLowerCase()}
                 </>
-              }
-              onClick={() => navigate({ view: "tasks" })}
-            />
-          ))}
-        </Group>
-      ) : null}
-      {activity.recent.length > 0 ? (
-        <Group label="Recent">
-          {activity.recent.map((t) => (
-            <Row key={t.id} icon={<MessageSquare size={13} className="text-ink-4" />} title={t.title} onClick={() => openThread(t.id)} />
-          ))}
-        </Group>
-      ) : null}
-    </div>
+              ) : (
+                row.thread.title
+              )}
+            </span>
+            <span className="new-thread-recent-meta">{rowMeta(row, now)}</span>
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }

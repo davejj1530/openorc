@@ -1,333 +1,63 @@
-/* The composer: its surface, foot, pickers, attachments, model picker and effort. */
+/* The composer: one carved surface with the prompt and a bar of attach, chips, the context ring
+   and send; the footer with the folder, branch and Commit chip; its popups (mode, context, model,
+   effort, suggestions); attachments and the drop zone. The New thread composer is in
+   new-thread.css. */
 
 .app-shell .composer-padding {
-  padding: 8px var(--reading-gutter) 12px;
+  padding: 12px var(--composer-gutter) 14px;
 }
 .app-shell .composer-padding > .max-w-chat {
-  max-width: calc(var(--container-chat) - 2 * var(--reading-gutter));
-}
-:root .app-shell .composer {
-  --composer-surface: var(--surface-2);
-  --composer-edge: var(--line);
-  --composer-track: var(--composer-input);
-  --composer-sheen: transparent;
-}
-.app-shell .composer-shell {
-  border-radius: 11px;
-  background: var(--composer-surface);
-  box-shadow: none;
-  display: flex;
-  flex-direction: column;
-  padding: 4px;
-}
-.app-shell .composer-input-shell {
-  width: 100%;
-  margin: 0;
-  border-radius: 8px;
-  box-shadow: none;
-  background: var(--composer-input);
-}
-.app-shell .composer-input-shell:focus-within {
-  background: var(--composer-input);
-}
-.app-shell .composer-input,
-.app-shell .composer-input-mirror {
-  padding: 9px 8px;
-  border-radius: inherit;
-  font-size: 13px;
-  line-height: 1.6;
-}
-.app-shell .composer-input {
-  min-height: 48px;
-  caret-color: var(--accent-ink);
-}
-.app-shell .composer-foot {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px;
-  padding: 3px 2px 0;
-  background: transparent;
-  border: 0;
-}
-.app-shell .composer-meta {
-  flex: 0 1 auto;
-  max-width: 100%;
-  padding: 0;
-  gap: 4px;
-  min-height: 28px;
-}
-.app-shell .composer-actions {
-  flex: 1;
-  width: auto;
-  gap: 3px;
-  flex-wrap: nowrap;
-  min-width: 130px;
-}
-.app-shell .composer-model-trigger {
-  order: -1;
-  margin-right: auto;
-  max-width: 260px;
-  font-size: 12px;
-}
-.app-shell .composer-send {
-  width: 26px;
-  height: 26px;
-  min-width: 26px;
-}
-@container composer (max-width: 440px) {
-  .app-shell .composer-actions {
-    flex-basis: 100%;
-    flex-wrap: wrap;
-    min-width: 0;
-  }
-}
-.app-shell .composer-rail {
-  margin-top: 7px;
-  padding: 0 8px;
-  font-size: 11px;
+  max-width: calc(var(--container-chat) - 2 * var(--composer-gutter));
 }
 
-@container (max-width: 480px) {
-  .app-shell .composer-actions {
-    flex-basis: 140px;
-  }
-}
-
-/* The workspace sits behind a single, generously padded writing surface. */
 .composer {
   container: composer / inline-size;
-  --composer-surface: var(--surface-2);
-  --composer-edge: color-mix(in srgb, var(--line) 65%, transparent);
-  --composer-sheen: transparent;
-  --composer-track: var(--bg);
-  --composer-context-track: var(--surface-3);
-  --composer-context-hover: var(--surface);
-}
-[data-theme="dark"] .composer {
-  /* Give the input a visible well without dropping it to the conversation ground. */
-  --composer-track: color-mix(in srgb, var(--surface-2) 50%, var(--surface));
-  --composer-context-track: var(--composer-track);
-  --composer-context-hover: var(--surface-3);
-  /* The shell's --material-lift lights its top edge in dark. */
-  --composer-sheen: var(--material-hi);
-}
-/* The working folder leads; branch, diff totals, and commit share its quiet footer. */
-.composer-rail {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-width: 0;
-  min-height: var(--control-badge);
-  padding: 4px 12px 0;
+  flex-direction: column;
+}
+.composer-alert {
+  margin-bottom: 8px;
+  color: var(--bad);
   font-size: var(--text-sm);
-  color: var(--ink-3);
-  white-space: nowrap;
+  line-height: var(--text-sm--line-height);
+  overflow-wrap: break-word;
 }
-.composer-rail svg {
-  flex-shrink: 0;
-  color: var(--ink-3);
-}
-.composer-directory {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  flex: 1;
-  min-width: 0;
-}
-.composer-git {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 0 1 auto;
-  min-width: 0;
-  margin-left: auto;
-}
-.composer-changes {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-.composer-directory span,
-.composer-branch,
-.composer-branch span {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  min-width: 0;
-}
-.composer-branch {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  flex: 0 1 auto;
-  max-width: min(180px, 24cqi);
-}
-.composer-changes-summary,
-.composer-changes-commit {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: var(--control-badge);
-  padding-inline: 8px;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--ink-3);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-.composer-changes-summary {
-  gap: 8px;
-  font-variant-numeric: tabular-nums;
-}
-.composer-changes-commit {
-  gap: 4px;
-}
-.composer-changes-summary:hover,
-.composer-changes-commit:hover:not(:disabled) {
-  background: var(--surface-3);
-  color: var(--ink);
-}
-.composer-changes-commit-wrap {
-  display: inline-flex;
-  flex-shrink: 0;
-}
-.composer-changes-commit:disabled {
-  color: var(--ink-4);
-}
-/* The foot shares the shell's fill. Its context control uses a separate lower track so the
-   white writing area in light mode does not turn that recessed control into a raised pill. */
-.composer-foot {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px;
-  min-width: 0;
-  padding: 4px 8px;
-  font-size: var(--text-base);
-  color: var(--ink-2);
-}
-.composer-lead {
-  display: flex;
-  align-items: center;
-}
-/* Keep the destination and mode reachable. Action groups reflow before controls clip. */
-.composer-meta {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex: 1 0 auto;
-  flex-wrap: wrap;
-  min-width: 0;
-  max-width: calc(100% - var(--control-lg) - 4px);
-  min-height: var(--control-lg);
-  padding-inline: 4px;
-  white-space: nowrap;
-}
-.composer-meta svg {
-  flex-shrink: 0;
-  color: var(--ink-3);
-}
-.composer-location {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-width: 0;
-}
-.composer-location span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-/* The only distribution mechanism now: the flex-1 spacer and .composer-send-controls are gone. */
-/* Shrinkable, with the model name as the thing that gives. flex-shrink 0 here let the foot
-   overflow its column at narrow widths, and because the scroller's overflow-y forces
-   overflow-x to auto, that overflow became a 10px horizontal scrollbar eating the height
-   the composer needed to sit on the floor. */
-.composer-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 4px;
-  flex-wrap: wrap;
-  min-width: 0;
-  margin-left: auto;
-}
-.composer-actions > *:not(.composer-model-trigger) {
-  flex-shrink: 0;
-}
-/* The caller's destination toggle now reads the protected Plan/Act grammar rather than its
-   own filled tile: selection in ink and weight on a transparent ground. */
-.composer-destination [role="radiogroup"] {
-  display: inline-flex;
-  align-items: center;
-  background: transparent;
-  margin: 0;
-  gap: 2px;
-}
-.composer-destination [role="radio"] {
-  height: var(--control-sm);
-  padding: 0 8px;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--ink-3);
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-normal);
-}
-.composer-destination [role="radio"]:hover {
-  color: var(--ink);
-}
-.composer-destination [role="radio"]:focus-visible {
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-.composer-destination [aria-checked="true"] {
-  background: transparent;
-  color: var(--ink);
-  font-weight: var(--font-weight-medium);
-}
-.composer-destination [role="radio"] svg {
-  width: 14px;
-  height: 14px;
-}
+
+/* One surface on the writing-area role (the plane in OpenOrc), no border or shadow. Depth comes
+   from the step to the ground around it. */
 .composer-shell {
-  border-radius: var(--radius-xl);
-  background: var(--composer-surface);
-  border-color: var(--composer-edge);
-  box-shadow: var(--material-lift);
-  transition:
-    border-color 120ms ease-out,
-    background-color 120ms ease-out,
-    box-shadow 120ms ease-out;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 12px 12px 16px;
+  border-radius: var(--radius-3xl);
+  background: var(--composer-input);
 }
-.composer:has(.composer-shell:focus-within) {
-  --composer-edge: var(--line-strong);
+
+/* The prompt. The textarea and its highlight mirror agree on geometry to the character, or the
+   skill highlight drifts off the word it belongs to. */
+.composer-prompt {
+  position: relative;
+  display: grid;
+  min-width: 0;
 }
-.composer:has(.composer-shell[data-dragging]) {
-  --composer-edge: var(--ink-3);
-}
-/* The writing surface moved out to a wrapper so a highlight can be painted under the
-   text. The well is the wrapper's now (fill, recess, radius, the 8px inset it always
-   had) and the textarea keeps only its own box. Everything inside must agree on geometry
-   to the character, or the highlight drifts off the word it belongs to. */
 .composer-input-shell {
   position: relative;
   isolation: isolate;
-  width: calc(100% - 16px);
-  margin: 8px 8px 0;
-  border-radius: var(--radius-md);
-  background: var(--composer-track);
-  box-shadow: var(--material-recess);
+  grid-area: 1 / 1;
+  min-width: 0;
 }
 .composer-input,
 .composer-input-mirror {
   box-sizing: border-box;
   width: 100%;
-  padding: 12px;
+  margin: 0;
+  padding: 0;
   font: inherit;
-  font-size: var(--text-prose);
-  line-height: 1.65;
-  letter-spacing: inherit;
+  font-size: var(--text-md);
+  line-height: 20px;
+  letter-spacing: var(--text-md--letter-spacing);
   white-space: pre-wrap;
   overflow-wrap: break-word;
   tab-size: 4;
@@ -337,12 +67,17 @@
   display: block;
   position: relative;
   z-index: 1;
-  min-height: 56px;
+  min-height: 20px;
   max-height: var(--composer-max-height);
   overflow-y: auto;
-  border-radius: var(--radius-md);
   background: transparent;
   caret-color: var(--ink);
+}
+.composer-large .composer-input {
+  min-height: 40px;
+}
+.composer-input::placeholder {
+  color: var(--ink-4);
 }
 /* Decorative only: it never takes the pointer, and it is hidden from the accessibility
    tree because the textarea beside it already carries the same text. */
@@ -355,24 +90,212 @@
   pointer-events: none;
   user-select: none;
 }
-.composer-large .composer-input {
-  min-height: 68px;
+/* The text just sent lifts away as the prompt clears. */
+.composer-sent-ghost {
+  grid-area: 1 / 1;
+  z-index: 2;
+  max-height: 60px;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: var(--text-md);
+  line-height: 20px;
+  letter-spacing: var(--text-md--letter-spacing);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  pointer-events: none;
+  animation: composer-sent-lift var(--duration-arrive) var(--ease-out) forwards;
 }
-/* Send now sits beside the send button while a turn runs. Quiet on purpose: the round
-   blue send is the one primary action in the composer under The One Blue Rule, and this
-   is the same send with different timing, not a louder one. */
+@keyframes composer-sent-lift {
+  to {
+    opacity: 0;
+    filter: blur(var(--arrive-blur));
+    transform: translateY(-8px);
+  }
+}
+
+/* The bar: attach and the chips lead, the context ring and send close it. */
+.composer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.composer-tools {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin-left: -4px;
+}
+.composer-end {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.composer-activity {
+  color: var(--ink-4);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+  white-space: nowrap;
+}
+
+/* Bare round icon controls: attach and the in-turn Stop. */
+.composer-icon-button {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: var(--control-sm);
+  height: var(--control-sm);
+  border-radius: var(--radius-pill);
+  color: var(--ink-4);
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out);
+}
+.composer-icon-button:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.composer-icon-button:disabled {
+  color: var(--ink-4);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* Chips: the model, the mode, a destination. A pill on the control fill; hover steps the fill. */
+.composer-chip,
+.composer-model-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 260px;
+  height: var(--control-sm);
+  padding: 0 10px 0 8px;
+  border-radius: var(--radius-pill);
+  background-color: var(--control-fill);
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+  white-space: nowrap;
+  transition: background-color var(--duration-quick) var(--ease-out);
+}
+.composer-chip:hover:not(:disabled),
+.composer-chip[data-popup-open],
+.composer-model-trigger:hover:not(:disabled),
+.composer-model-trigger[data-popup-open] {
+  background-image: linear-gradient(var(--surface-2), var(--surface-2));
+}
+.composer-chip:disabled,
+.composer-model-trigger:disabled {
+  color: var(--ink-4);
+  pointer-events: none;
+}
+.composer-chip > svg {
+  flex-shrink: 0;
+  width: 13px;
+  height: 13px;
+  color: var(--ink-4);
+}
+.composer-chip-label,
+.composer-model-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.composer-chip > .composer-chip-chevron {
+  width: 12px;
+  height: 12px;
+  margin-right: -2px;
+}
+.composer-model-trigger > svg {
+  flex-shrink: 0;
+  color: var(--ink);
+}
+.composer-model-effort {
+  display: inline-grid;
+  flex-shrink: 0;
+  color: var(--ink-4);
+  white-space: nowrap;
+}
+/* Every label shares one cell, so the cell is as wide as the longest; only the current one shows. */
+.composer-model-effort > span {
+  grid-area: 1 / 1;
+}
+.composer-model-effort > [aria-hidden] {
+  visibility: hidden;
+}
+
+/* A choice read as part of a sentence (where the thread works). */
+.composer-text-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+  height: var(--control-sm);
+  margin-left: -8px;
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  color: var(--ink-4);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+  white-space: nowrap;
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out);
+}
+.composer-text-choice:hover:not(:disabled),
+.composer-text-choice[data-popup-open] {
+  background: var(--surface-2);
+  color: var(--ink-2);
+}
+.composer-text-choice:disabled {
+  pointer-events: none;
+}
+.composer-text-choice > svg {
+  flex-shrink: 0;
+}
+
+/* The caller's destination: a static label or its own choice. */
+.composer-location,
+.composer-destination {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+.composer-location svg {
+  flex-shrink: 0;
+  color: var(--ink-4);
+}
+.composer-location span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Send now sits beside send while a turn runs: the same send with different timing, so quiet. */
 .composer-send-now {
   flex-shrink: 0;
   height: var(--control-sm);
-  padding: 0 8px;
-  border-radius: var(--radius-sm);
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
   color: var(--ink-2);
   font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
   white-space: nowrap;
   transition:
-    background-color 120ms var(--ease-out),
-    color 120ms var(--ease-out);
+    background-color var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out);
 }
 .composer-send-now:hover:not(:disabled) {
   background-color: var(--surface-2);
@@ -385,89 +308,80 @@
   pointer-events: none;
 }
 
-/* A "/name" the provider will resolve, marked in the popover and again in the message.
-   A wash rather than a fill: it sits under live text, so it has to read as emphasis on
-   the word and never as a control the caret could land outside of. */
-.skill-token {
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--accent) 18%, transparent);
-  box-shadow: 0 0 0 var(--hairline) color-mix(in srgb, var(--accent) 24%, transparent);
-  color: inherit;
-}
-.composer-suggestions .skill-token {
-  color: var(--accent-ink);
-  background: none;
-  box-shadow: none;
-  font-weight: var(--font-weight-medium);
-}
-.composer-suggestions-more {
-  padding: 4px 8px 2px;
-  color: var(--ink-4);
-  font-size: var(--text-xs);
-}
-.composer-input::placeholder {
-  color: var(--ink-3);
-}
-/* Round, so attach, stop and send read as one family of circular controls, which is the
-   reference module's own toolbar. The hover is the composer's existing ink wash rather than
-   --surface-3: --surface-3 is -9.76 in light inside a --bg shell and a RAISE in dark, deeper
-   than the writing track it sits beside. The wash is -3.46 light, +3.19 dark, and flips sign
-   for free because --ink does. */
-.composer-icon-button {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: var(--control-lg);
-  height: var(--control-lg);
-  border-radius: var(--radius-pill);
-  color: var(--ink-2);
-}
-.composer-icon-button:hover {
-  background: color-mix(in srgb, var(--ink) 4%, transparent);
-  color: var(--ink);
-}
-.composer-icon-button:disabled {
-  color: var(--ink-4);
-  pointer-events: none;
-}
-/* The same value-in-a-track grammar as the usage meter, so the two surfaces state it
-   identically. This is the second and LAST recess inside the shell: both say "my fill sits
-   below my container" and neither claims rank, which is the licensed repeat. A third would
-   be the pegboard. */
+/* The context ring: bare, muted, warn above 60% and bad above 85%. */
 .composer-context {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   flex-shrink: 0;
   height: var(--control-sm);
-  padding: 0 8px 0 4px;
+  margin-right: -4px;
+  padding: 0 6px;
   border-radius: var(--radius-pill);
-  background: var(--composer-context-track);
-  box-shadow: var(--material-recess);
   color: var(--ink-3);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
   font-variant-numeric: tabular-nums;
+  transition: background-color var(--duration-quick) var(--ease-out);
+}
+.composer-context > span {
+  color: var(--ink-4);
+}
+.composer-context[data-tone] > span {
+  color: inherit;
+}
+.composer-context-track {
+  stroke: var(--surface-3);
 }
 .composer-context:hover,
-.composer-context:focus-visible,
 .composer-context[data-popup-open] {
-  background: var(--composer-context-hover);
+  background: var(--surface-2);
 }
 .composer-context-popup {
-  width: min(320px, calc(100vw - 24px));
+  width: min(300px, calc(100vw - 24px));
   max-height: var(--available-height);
   overflow-y: auto;
-  padding: 16px;
-  border: var(--hairline) solid var(--line);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-  box-shadow: var(--shadow-panel);
+  padding: 18px;
+  border-radius: var(--radius-3xl);
+  background: var(--float-fill);
+  color: var(--ink-4);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+}
+.composer-context-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.composer-context-title {
+  color: var(--ink);
+  font-size: var(--text-base);
+  line-height: 16px;
+  letter-spacing: var(--text-base--letter-spacing);
+}
+.composer-context-cells {
+  display: flex;
+  gap: 3px;
+  height: 18px;
+  margin-top: 14px;
+}
+.composer-context-cells > span {
+  flex: 1;
+  border-radius: 2px;
+  background: var(--surface-3);
+}
+.composer-context-cells > span[data-filled] {
+  background: var(--ink);
+}
+.composer-context-note {
+  margin-top: 14px;
+  color: var(--ink-3);
 }
 .composer-context-stats {
   display: grid;
   gap: 4px;
-  margin-block: 12px;
-  font-size: var(--text-sm);
+  margin-block: 12px 14px;
 }
 .composer-context-stats > div {
   display: flex;
@@ -475,7 +389,7 @@
   gap: 12px;
 }
 .composer-context-stats dt {
-  color: var(--ink-2);
+  color: var(--ink-3);
 }
 .composer-context-stats dd {
   color: var(--ink);
@@ -485,124 +399,183 @@
 .composer-context-compact {
   display: grid;
   justify-items: start;
-  gap: 8px;
-  padding-top: 12px;
-  border-top: var(--hairline) solid var(--line);
+  gap: 10px;
 }
-/* Every picker in the foot is the same object: transparent at rest, an ink wash on hover and
-   while open, the value in --ink and a small chevron. The protected rule is that a selected
-   mode is never a filled tile, and a transparent trigger honours it. */
-.composer-picker-value {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.composer-context-compact > .composer-context-note {
+  margin: 0;
 }
 
-.composer-picker,
-.composer-model-trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  height: var(--control-lg);
-  min-width: 0;
-  max-width: 300px;
-  padding: 0 8px;
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--ink);
-  font-size: var(--text-base);
-}
-.composer-picker > svg {
-  flex-shrink: 0;
-  color: var(--ink-3);
-}
-.composer-picker:hover,
-.composer-picker:focus-visible,
-.composer-picker[data-popup-open] {
-  background: color-mix(in srgb, var(--ink) 4%, transparent);
-}
-.composer-model-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.composer-model-effort {
-  display: inline-grid;
-  flex-shrink: 0;
-  color: var(--ink-3);
-  font-size: var(--text-sm);
-  white-space: nowrap;
-}
-/* Every label shares one cell, so the cell is as wide as the longest; only the current one shows. */
-.composer-model-effort > span {
-  grid-area: 1 / 1;
-}
-.composer-model-effort > [aria-hidden] {
-  visibility: hidden;
-}
-.composer-model-trigger > svg {
-  flex-shrink: 0;
-  margin-left: 2px;
-  color: var(--ink-3);
-}
-.composer-model-trigger:hover,
-.composer-model-trigger:focus-visible,
-.composer-model-trigger[data-popup-open] {
-  background: color-mix(in srgb, var(--ink) 4%, transparent);
-}
+/* Send: the screen's ink pill. Send, Queue and Stop are stacked layers that swap in place. */
 .composer-send {
   display: grid;
   place-items: center;
   flex-shrink: 0;
   width: var(--control-send);
   height: var(--control-send);
-  margin-left: 4px;
   border-radius: var(--radius-pill);
-  background: var(--accent);
+  background-color: var(--accent);
   color: var(--accent-fg);
   transition:
-    opacity 120ms ease-out,
-    background-color 120ms ease-out;
+    background-color var(--duration-leave) var(--ease-out),
+    color var(--duration-leave) var(--ease-out);
 }
-.composer-send:hover {
-  opacity: 0.85;
+.composer-send:hover:not(:disabled) {
+  background-image: linear-gradient(color-mix(in srgb, var(--accent-fg) 12%, transparent), color-mix(in srgb, var(--accent-fg) 12%, transparent));
 }
 .composer-send:disabled {
-  background: var(--surface-3);
+  background-color: var(--surface-3);
   color: var(--ink-3);
 }
-
-.composer-send-queued {
-  background: var(--surface-3);
+.composer-send[data-state="queue"] {
+  background-color: var(--surface-3);
   color: var(--ink);
 }
+.composer-send-layer {
+  grid-area: 1 / 1;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  transform: scale(0.5);
+  transition:
+    opacity var(--duration-leave) var(--ease-out),
+    transform var(--duration-confirm) var(--ease-overshoot);
+}
+.composer-send[data-state="send"] > [data-layer="send"],
+.composer-send[data-state="queue"] > [data-layer="queue"],
+.composer-send[data-state="stop"] > [data-layer="stop"] {
+  opacity: 1;
+  transform: none;
+}
+.composer-stop-glyph {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: currentColor;
+}
+
+/* The footer under the surface: the working folder, the branch and the Commit chip. */
+.composer-rail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: var(--control-sm);
+  margin-top: 10px;
+  padding: 0 4px 0 8px;
+  color: var(--ink-4);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+  white-space: nowrap;
+}
+.composer-rail svg {
+  flex-shrink: 0;
+}
+.composer-directory {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.composer-directory span,
+.composer-branch {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.composer-git {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin-left: auto;
+}
+.composer-branch-chip {
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: min(180px, 24cqi);
+  height: var(--control-sm);
+  padding: 0 8px 0 10px;
+}
+.composer-branch {
+  color: var(--ink-3);
+}
+/* The Commit chip sits on the ground beside the composer and takes the composer's own fill, so it
+   reads in palettes whose surface matches the ground. */
+.composer-changes {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  height: var(--control-sm);
+  border-radius: var(--radius-pill);
+  background-color: var(--composer-input);
+}
+.composer-changes-commit-wrap {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.composer-changes-commit,
+.composer-changes-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--control-sm);
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+  transition: background-color var(--duration-quick) var(--ease-out);
+}
+.composer-changes-commit {
+  padding: 0 6px 0 12px;
+  color: var(--ink);
+}
+.composer-changes-summary {
+  padding: 0 12px 0 6px;
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.composer-changes-commit:hover:not(:disabled),
+.composer-changes-summary:hover {
+  background-color: var(--surface-2);
+}
+.composer-changes-commit:disabled {
+  color: var(--ink-4);
+}
+
+/* Attachments: borderless thumbnails, and a fill card for files that have no picture. */
 .composer-attachments {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  padding: 16px 16px 12px;
+  gap: 8px;
 }
 .composer-thumbnail {
-  width: 88px;
-  height: 88px;
+  width: 72px;
+  height: 72px;
   border-radius: var(--radius-lg);
   object-fit: cover;
-  border: var(--hairline) solid var(--line-strong);
+  background: var(--surface-2);
 }
-/* A file that is not an image has no picture to stand for it, so it states itself: the
-   glyph, the name it arrived with, and its weight. It takes the thumbnail's height and
-   radius so a mixed row reads as one strip of attachments and not two. */
+.composer-uploading {
+  animation: composer-uploading 1.2s ease-in-out infinite alternate;
+}
+@keyframes composer-uploading {
+  to {
+    opacity: 0.5;
+  }
+}
 .composer-file {
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 4px;
-  width: 168px;
-  height: 88px;
+  width: 160px;
+  height: 72px;
   padding: 0 12px;
-  border: var(--hairline) solid var(--line-strong);
   border-radius: var(--radius-lg);
   background: var(--surface-2);
 }
@@ -612,11 +585,10 @@
   white-space: nowrap;
   color: var(--ink-2);
   font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
 }
 .composer-file-size {
   color: var(--ink-4);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
 }
 .composer-remove-image {
   position: absolute;
@@ -624,36 +596,177 @@
   right: 4px;
   display: grid;
   place-items: center;
-  width: var(--control-sm);
-  height: var(--control-sm);
+  width: 22px;
+  height: 22px;
   border-radius: var(--radius-pill);
-  background: var(--ink);
-  color: var(--surface);
+  background: var(--accent);
+  color: var(--accent-fg);
 }
 .composer-remove-image:hover {
-  opacity: 0.85;
+  background-image: linear-gradient(color-mix(in srgb, var(--accent-fg) 12%, transparent), color-mix(in srgb, var(--accent-fg) 12%, transparent));
 }
+
+/* Files over the composer: the surface darkens a step, the arrow inverts, and the words say
+   what letting go does. */
+.composer-drop-zone {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border-radius: inherit;
+  background: linear-gradient(var(--surface-2), var(--surface-2)), var(--composer-input);
+  color: var(--ink);
+  font-size: var(--text-base);
+  line-height: 16px;
+  pointer-events: none;
+  animation: composer-drop-arrive var(--duration-arrive) var(--ease-out);
+}
+.composer-drop-well {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+@keyframes composer-drop-arrive {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Suggestions: an r20 list with 40px rows; commands and paths in a mono column. */
+.composer-suggestions.floating-popover {
+  padding: 6px;
+  border-radius: var(--radius-3xl);
+}
+.composer-suggestions [role="listbox"] {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.composer-suggestion {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: var(--radius-lg);
+  color: var(--ink-3);
+  font-size: var(--text-base);
+  line-height: 16px;
+  letter-spacing: var(--text-base--letter-spacing);
+  text-align: left;
+  transition: background-color var(--duration-quick) var(--ease-out);
+}
+.composer-suggestion[aria-selected="true"] {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+/* Commands and paths share one mono column as wide as the longest (half the list at most), so
+   every hint starts at the same edge. Team members keep their flex rows. */
+.composer-suggestions [role="listbox"]:not([data-team-mention-list]) {
+  display: grid;
+  grid-template-columns: fit-content(50%) minmax(0, 1fr);
+  column-gap: 12px;
+}
+.composer-suggestions [role="listbox"]:not([data-team-mention-list]) > .composer-suggestion {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+}
+.composer-suggestion-label {
+  flex-shrink: 0;
+  min-width: 72px;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+}
+/* The column caps the width instead. */
+.composer-suggestion-label[data-mono] {
+  max-width: none;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  letter-spacing: 0;
+}
+.composer-suggestion-label:only-child {
+  grid-column: 1 / -1;
+  max-width: 100%;
+}
+.composer-suggestion-hint {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.composer-suggestions-more {
+  padding: 6px 10px 4px;
+  color: var(--ink-4);
+  font-size: var(--text-sm);
+}
+/* A "/name" the provider will resolve, marked in the message. A neutral wash rather than a
+   fill: it sits under live text, so it reads as emphasis on the word, never as a control. */
+.skill-token {
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: inherit;
+}
+.composer-suggestions .skill-token {
+  background: none;
+}
+
+/* Composer popups open out of the control that was touched, clear of the composer surface: they
+   settle from a small drop toward it and leave quicker than they arrive. */
+.composer-float {
+  transform-origin: var(--transform-origin);
+  transition:
+    opacity var(--duration-leave) var(--ease-out),
+    transform var(--duration-arrive) var(--ease-out);
+}
+.composer-float:is([data-starting-style], [data-ending-style]) {
+  opacity: 0;
+  transform: translateY(6px) scale(0.96);
+}
+.composer-float[data-side="bottom"]:is([data-starting-style], [data-ending-style]) {
+  transform: translateY(-6px) scale(0.96);
+}
+.composer-float[data-ending-style] {
+  transition-duration: var(--duration-leave);
+}
+
+/* The current choice in a composer menu is filled, as the current model is in the model list. */
+.composer-choice-item[data-current] {
+  background: var(--current-row-fill);
+}
+
+/* The model picker: a rail of providers as pills, a search pill, 40px rows and the effort bar. */
 .model-picker-popup {
   --effort-galaxy-base: #906acb;
   --effort-galaxy-light: #c6a3f2;
   --effort-galaxy-deep: #684397;
   --effort-rocket-accent: #a879dc;
   width: min(420px, calc(100vw - 24px));
-  height: min(312px, calc(100vh - 24px));
+  height: min(340px, calc(100vh - 24px));
   overflow: hidden;
-  border: var(--hairline) solid var(--line-strong);
-  border-radius: var(--radius-lg);
-  background: var(--surface-2);
+  border-radius: var(--radius-3xl);
+  background: var(--float-fill);
   color: var(--ink);
-  box-shadow: var(--shadow-panel);
   outline: none;
 }
 .model-picker-popup[data-no-effort] {
-  height: min(288px, calc(100vh - 24px));
+  height: min(296px, calc(100vh - 24px));
 }
 .model-picker-layout {
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr);
+  grid-template-columns: 52px minmax(0, 1fr);
   width: 100%;
   height: 100%;
   min-height: 0;
@@ -662,28 +775,27 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   min-height: 0;
-  padding: 10px 6px;
-  border-right: var(--hairline) solid var(--line);
+  padding: 10px 0 10px 10px;
 }
 .model-picker-rail-button {
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  width: var(--control-send);
-  height: var(--control-send);
-  border-radius: var(--radius-md);
+  width: var(--control-lg);
+  height: var(--control-lg);
+  border-radius: var(--radius-pill);
   color: var(--ink-3);
+  transition: background-color var(--duration-quick) var(--ease-out);
 }
-.model-picker-rail-button:hover,
-.model-picker-rail-button[aria-pressed="true"] {
-  background: var(--surface-3);
+.model-picker-rail-button:hover {
+  background: var(--surface-2);
   color: var(--ink);
 }
-.model-picker-rail-button:focus-visible:not([aria-pressed="true"]) {
-  background: color-mix(in srgb, var(--ink) 4%, transparent);
-  color: var(--ink-2);
+.model-picker-rail-button[aria-pressed="true"] {
+  background: var(--current-row-fill);
+  color: var(--ink);
 }
 .model-picker-rail-button:disabled {
   opacity: 0.4;
@@ -705,12 +817,15 @@
   align-items: center;
   gap: 8px;
   min-width: 0;
-  height: var(--control-send);
-  margin: 10px 12px 8px;
-  padding: 0 8px;
-  border-radius: var(--radius-md);
+  height: var(--control-lg);
+  margin: 10px 10px 6px;
+  padding: 0 4px 0 12px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--ink-4);
+}
+.model-picker-search:focus-within {
   background: var(--surface-3);
-  color: var(--ink-3);
 }
 .model-picker-search input {
   flex: 1;
@@ -724,56 +839,71 @@
 .model-picker-search input::placeholder {
   color: var(--ink-4);
 }
+.model-picker-search:focus-within input::placeholder {
+  color: var(--ink-3);
+}
 .model-picker-search button {
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  width: var(--control-md);
-  height: var(--control-md);
-  border-radius: var(--radius-sm);
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-pill);
+  color: var(--ink-3);
 }
 .model-picker-search button:hover,
 .model-picker-search button:focus-visible {
+  background: var(--surface-3);
   color: var(--ink-2);
 }
 .model-picker-search button:disabled {
   opacity: 0.4;
 }
 .model-picker-results {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 0 8px 8px;
+  padding: 0 10px 10px;
   scrollbar-color: var(--line-strong) transparent;
   scrollbar-width: thin;
 }
+.model-picker-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
 .model-picker-group + .model-picker-group {
-  margin-top: 8px;
+  margin-top: 6px;
 }
 .model-picker-group-label {
-  padding: 8px 10px 3px;
-  color: var(--ink-3);
-  font-size: var(--text-xs);
+  padding: 8px 10px 4px;
+  color: var(--ink-4);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
 }
 .model-picker-row {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
-  min-height: 38px;
-  padding: 0 10px;
+  min-height: 40px;
+  padding: 0 12px 0 10px;
   border-radius: var(--radius-md);
   color: var(--ink-2);
   text-align: left;
+  transition: background-color var(--duration-quick) var(--ease-out);
 }
-.model-picker-row:hover,
-.model-picker-row[aria-pressed="true"] {
-  background: var(--surface-3);
+.model-picker-row:hover {
+  background: var(--surface-2);
   color: var(--ink);
 }
-.model-picker-row:focus-visible:not([aria-pressed="true"]) {
-  background: color-mix(in srgb, var(--ink) 4%, transparent);
-  color: var(--ink-2);
+.model-picker-row[aria-pressed="true"] {
+  background: var(--current-row-fill);
+  color: var(--ink);
 }
 .model-picker-row:disabled {
   opacity: 0.45;
@@ -785,6 +915,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: var(--text-base);
+  line-height: 16px;
 }
 .model-picker-row-meta {
   flex: 0 1 auto;
@@ -792,8 +923,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--ink-3);
-  font-size: var(--text-xs);
+  color: var(--ink-4);
+  font-size: var(--text-sm);
 }
 .model-picker-check {
   flex: 0 0 auto;
@@ -811,6 +942,7 @@
 }
 .model-picker-text-action {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 6px;
   min-height: var(--control-lg);
@@ -822,27 +954,22 @@
   text-align: left;
 }
 .model-picker-text-action:hover {
-  background: var(--surface-3);
+  background: var(--surface-2);
   color: var(--ink);
 }
-.model-picker-text-action:focus-visible,
-.model-picker-reset:focus-visible {
-  background: color-mix(in srgb, var(--ink) 4%, transparent);
-  color: var(--ink-2);
-}
 .model-picker-manage {
-  margin-top: 8px;
+  margin-top: 6px;
 }
 .model-picker-footer {
   min-width: 0;
-  padding: 10px 12px 12px;
-  border-top: var(--hairline) solid var(--line);
+  padding: 4px 14px 14px;
 }
 .model-picker-effort-heading {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: var(--ink-3);
+  height: var(--control-sm);
+  color: var(--ink-4);
   font-size: var(--text-sm);
 }
 .model-picker-effort-value {
@@ -852,32 +979,37 @@
 .model-picker-reset {
   display: grid;
   place-items: center;
-  width: var(--control-sm);
-  height: var(--control-sm);
-  border-radius: var(--radius-sm);
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-pill);
+  color: var(--ink-3);
 }
 .model-picker-reset:hover {
-  background: var(--surface-3);
+  background: var(--surface-2);
+  color: var(--ink);
 }
 .model-picker-reset:disabled {
   opacity: 0.35;
 }
 .model-picker-footer .composer-effort-slider {
-  margin-top: 8px;
+  margin-top: 6px;
 }
 .model-picker-popup .composer-effort-slider:has(input:focus-visible) .composer-effort-thumb {
-  border: var(--hairline) solid var(--line);
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }
 .model-picker-popup .composer-effort-slider[data-fast]:has(input:focus-visible) .fast-mode-rocket {
-  background: color-mix(in srgb, var(--ink) 4%, transparent);
+  background: var(--surface-2);
 }
 .model-picker-effort-empty,
 .model-picker-effort-hint {
   margin: 8px 0 0;
   color: var(--ink-3);
-  font-size: var(--text-xs);
-  line-height: var(--text-xs--line-height);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
 }
+
+/* The effort popup a running team uses in place of the model browser. */
 .composer-effort-popup {
   --effort-galaxy-base: #906acb;
   --effort-galaxy-light: #c6a3f2;
@@ -885,11 +1017,9 @@
   --effort-rocket-accent: #a879dc;
   width: min(288px, calc(100vw - 24px));
   padding: 16px;
-  border: var(--hairline) solid var(--line-strong);
-  border-radius: var(--radius-lg);
-  background: var(--surface-2);
+  border-radius: var(--radius-3xl);
+  background: var(--float-fill);
   color: var(--ink);
-  box-shadow: var(--shadow-panel);
 }
 .composer-effort-heading {
   display: grid;
@@ -898,9 +1028,8 @@
 }
 .composer-effort-title {
   text-align: center;
-  color: var(--accent-ink);
+  color: var(--ink);
   font-size: var(--text-lg);
-  font-weight: var(--font-weight-medium);
 }
 .composer-effort-model {
   display: flex;
@@ -913,17 +1042,19 @@
 .composer-effort-slider {
   position: relative;
   margin-top: 16px;
-  height: var(--control-md);
+  height: var(--control-sm);
   border-radius: var(--radius-pill);
   background: var(--surface-3);
 }
+/* The fill and the knob read as one shape: the fill runs half a track past the knob's center, so its
+   round end wraps the knob. */
 .composer-effort-fill {
   position: absolute;
   inset: 0 auto 0 0;
-  width: var(--effort-center);
-  border-radius: var(--radius-pill) 0 0 var(--radius-pill);
+  width: calc(var(--effort-center) + var(--control-sm) / 2);
+  border-radius: var(--radius-pill);
   background: var(--accent);
-  transition: width 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition: width var(--duration-leave) var(--ease-out);
   pointer-events: none;
 }
 .composer-effort-slider[data-max] .composer-effort-fill {
@@ -994,7 +1125,7 @@
 }
 .composer-effort-ticks {
   position: absolute;
-  inset: 0 calc(var(--control-md) / 2);
+  inset: 0 calc(var(--control-sm) / 2);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1008,36 +1139,35 @@
   background: var(--ink);
   opacity: 0.3;
 }
-/* A short bar before the ultracode stop separates the mode from the levels. */
-.composer-effort-ticks i[data-detached]::before {
-  content: "";
-  position: absolute;
-  top: -6px;
-  left: -14px;
-  width: 1px;
-  height: 16px;
-  background: var(--ink);
+/* Ultracode is a mode on top of the levels: its stop takes the mode's lavender instead of a divider. */
+.composer-effort-ticks i[data-detached] {
+  width: 6px;
+  height: 6px;
+  background: var(--effort-galaxy-base, #906acb);
+  opacity: 1;
 }
 .composer-effort-hint {
   margin: 8px 0 0;
   color: var(--ink-3);
-  font-size: var(--text-xs);
-  line-height: var(--text-xs--line-height);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
   text-align: center;
 }
+/* The knob takes the accent's own ink, so it reads inside the fill's end on any accent, white ones included. */
 .composer-effort-thumb {
   position: absolute;
-  top: 0;
+  top: 3px;
   left: var(--effort-center);
-  width: var(--control-md);
-  height: var(--control-md);
+  width: calc(var(--control-sm) - 6px);
+  height: calc(var(--control-sm) - 6px);
   transform: translateX(-50%);
   border-radius: var(--radius-pill);
-  background: #ffffff;
-  border: var(--hairline) solid var(--line);
-  box-shadow: var(--material-contact);
-  transition: left 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  background: var(--accent-fg);
+  transition: left var(--duration-leave) var(--ease-out);
   pointer-events: none;
+}
+.composer-effort-slider[data-max] .composer-effort-thumb {
+  background: #ffffff;
 }
 .composer-effort-slider[data-dragging] .composer-effort-thumb,
 .composer-effort-slider[data-dragging] .composer-effort-fill {
@@ -1047,7 +1177,7 @@
   position: relative;
   display: block;
   width: 100%;
-  height: var(--control-md);
+  height: var(--control-sm);
   margin: 0;
   padding: 0;
   opacity: 0;
@@ -1058,44 +1188,19 @@
   cursor: grabbing;
 }
 .composer-effort-slider:has(input:focus-visible) .composer-effort-thumb {
-  border: 3px solid var(--accent-ink);
-}
-@container composer (max-width: 560px) {
-  .composer-commit-suffix {
-    display: none;
-  }
-  .composer-foot {
-    display: grid;
-    grid-template-columns: var(--control-md) minmax(0, 1fr);
-  }
-  .composer-meta {
-    max-width: none;
-    overflow: visible;
-    height: auto;
-    flex-wrap: wrap;
-    gap: 4px 8px;
-  }
-  .composer-actions {
-    grid-column: 1 / -1;
-    width: 100%;
-    flex-wrap: wrap;
-  }
-}
-@container composer (max-width: 480px) {
-  .composer-model-trigger {
-    max-width: 250px;
-  }
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }
 
-/* Fast uses the readable accent; the effort thumb stays white. */
+/* Fast uses the readable accent; the effort knob stays white. */
 .composer-fast-toggle[aria-pressed="true"] {
   color: var(--accent-ink);
 }
 .composer-fast-description {
   margin: 8px 0 0;
   color: var(--ink-3);
-  font-size: var(--text-xs);
-  line-height: var(--text-xs--line-height);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
   text-align: center;
 }
 
@@ -1111,4 +1216,12 @@
 .model-picker-fast[aria-pressed="true"][data-blocked],
 .composer-effort-popup .composer-fast-toggle[aria-pressed="true"][data-blocked] {
   color: var(--warn);
+}
+
+/* Narrow: chips truncate first, then the folder; at 440px the end group keeps its row. */
+@container composer (max-width: 440px) {
+  .composer-chip,
+  .composer-model-trigger {
+    max-width: 160px;
+  }
 }

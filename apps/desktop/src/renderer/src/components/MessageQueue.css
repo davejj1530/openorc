@@ -1,108 +1,155 @@
-/* The queue of messages waiting to send. */
+/* The queue of messages waiting to send: a pile above the composer that fans out on click. */
 
-/* Queue content stays inside the reading column, including unbroken logs and paths. */
 .message-queue {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   min-width: 0;
+  padding: 0 14px;
   container-type: inline-size;
-  border: var(--hairline) solid var(--line);
-  border-radius: var(--radius-lg);
-  font-size: var(--text-sm);
-  line-height: var(--text-sm--line-height);
+  font-size: var(--text-base);
+  line-height: 16px;
+  letter-spacing: var(--text-base--letter-spacing);
 }
-.message-queue-header {
+
+/* The pile: the front card, with up to two cards stacked behind and above it. */
+.message-queue-pile {
+  display: grid;
+}
+.message-queue-pile[data-behind="1"] {
+  padding-top: 5px;
+}
+.message-queue-pile[data-behind="2"] {
+  padding-top: 10px;
+}
+.message-queue-behind,
+.message-queue-front {
+  grid-area: 1 / 1;
+  height: 36px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  transition:
+    opacity var(--duration-arrive) var(--ease-out),
+    transform var(--duration-resize) var(--ease-out);
+}
+.message-queue-behind[data-depth="1"] {
+  opacity: 0.75;
+  transform: translateY(-5px) scale(0.97);
+}
+.message-queue-behind[data-depth="2"] {
+  opacity: 0.5;
+  transform: translateY(-10px) scale(0.94);
+}
+@starting-style {
+  .message-queue-behind {
+    opacity: 0;
+    transform: none;
+  }
+}
+.message-queue-front {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 0 12px 0 14px;
+  color: var(--ink);
+  text-align: left;
+}
+.message-queue-front:hover {
+  background-image: linear-gradient(var(--surface-2), var(--surface-2));
+}
+.message-queue-count {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.message-queue-hint {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-4);
+  font-size: var(--text-sm);
+}
+.message-queue-chevron {
+  flex-shrink: 0;
+  color: var(--ink-4);
+  transform: rotate(180deg);
+  transition: transform var(--duration-swap) var(--ease-out);
+}
+.message-queue-front[aria-expanded="true"] .message-queue-chevron {
+  transform: none;
+}
+
+/* The fanned-out messages, oldest first, each a card with its own actions. */
+.message-queue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: min(240px, 28vh);
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+}
+.message-queue-card {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
-  color: var(--ink-3);
-}
-.message-queue-title {
-  color: var(--ink-2);
-  font-weight: 500;
-}
-.message-queue-count {
-  margin-left: 4px;
-  color: var(--ink-3);
-  font-variant-numeric: tabular-nums;
-}
-.message-queue-hint {
-  margin-left: auto;
-}
-.message-queue-list {
-  margin: 0;
-  padding: 0 12px;
-  list-style: none;
-  max-height: min(240px, 28vh);
-  overflow: auto;
-  overscroll-behavior: contain;
-}
-.message-queue-row {
-  display: grid;
-  grid-template-columns: 14px minmax(0, 1fr) auto;
-  align-items: start;
-  gap: 8px;
-  padding: 10px 0;
-  border-top: var(--hairline) solid var(--line);
-}
-.message-queue-position {
-  padding-top: 2px;
-  color: var(--ink-3);
-  font-variant-numeric: tabular-nums;
+  min-width: 0;
+  min-height: 44px;
+  padding: 6px 6px 6px 14px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
 }
 .message-queue-message {
+  flex: 1;
   min-width: 0;
-  color: var(--ink-2);
+  color: var(--ink);
 }
 .message-queue-message summary {
   display: flex;
-  align-items: start;
-  gap: 8px;
+  flex-direction: column;
+  gap: 4px;
   min-width: 0;
-  padding: 2px 0;
   list-style: none;
   border-radius: var(--radius-sm);
+  cursor: default;
 }
 .message-queue-message summary::-webkit-details-marker {
   display: none;
 }
 .message-queue-preview {
   min-width: 0;
-  flex: 1;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
   overflow: hidden;
-  overflow-wrap: anywhere;
-  white-space: pre-wrap;
-}
-.message-queue-chevron {
-  flex-shrink: 0;
-  margin-top: 3px;
-  color: var(--ink-3);
-}
-.message-queue-message[open] .message-queue-chevron {
-  transform: rotate(180deg);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .message-queue-message[open] .message-queue-preview {
-  display: block;
-  -webkit-line-clamp: unset;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.message-queue-error {
+  color: var(--bad);
+  font-size: var(--text-sm);
 }
 .message-queue-attachments {
-  display: block;
-  margin-top: 4px;
-  color: var(--ink-3);
+  color: var(--ink-4);
+  font-size: var(--text-sm);
 }
 .message-queue-actions {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
 }
 @container (max-width: 420px) {
-  .message-queue-row {
-    grid-template-columns: 14px minmax(0, 1fr);
+  .message-queue-card {
+    flex-wrap: wrap;
   }
   .message-queue-actions {
-    grid-column: 2;
-    justify-content: flex-end;
+    margin-left: auto;
   }
 }

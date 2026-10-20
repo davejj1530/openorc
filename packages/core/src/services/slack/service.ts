@@ -1,7 +1,7 @@
 import { SocketModeClient } from "@slack/socket-mode";
 import { WebClient, LogLevel } from "@slack/web-api";
 import { settings, redactJson } from "@openorc/db";
-import type { AgentEvent, RpcParams, SlackClientConfig, SlackDirectConfig, SlackStatus } from "@openorc/protocol";
+import { citationName, replaceFileCitations, type AgentEvent, type RpcParams, type SlackClientConfig, type SlackDirectConfig, type SlackStatus } from "@openorc/protocol";
 import { z } from "zod";
 import type { OpenOrc } from "../../openorc.js";
 import { ContextMessage, SlackJob, SlackRelay, RelayRequestError, newDevice, relayRequest, relayUrl, type Device, type SlackResult, type RelayJournal } from "./relay.js";
@@ -268,7 +268,8 @@ export class SlackService {
           } while (cursor);
           return messages;
         },
-        progress: async (job, text, ts) => {
+        progress: async (job, reply, ts) => {
+          const text = slackReply(reply);
           const content = {
             channel: job.channelId,
             text: replyFallback(job.userId, text),
@@ -323,7 +324,8 @@ export class SlackService {
         updateApproval: async (job, ts, text) => {
           await web.chat.update({ channel: job.channelId, ts, text: `<@${job.userId}> ${text}`, blocks: [] });
         },
-        post: async (job, text) => {
+        post: async (job, reply) => {
+          const text = slackReply(reply);
           await web.chat.postMessage({
             channel: job.channelId,
             thread_ts: job.threadTs,
@@ -576,6 +578,11 @@ const escapeSlack = (text: string) => text.replaceAll("&", "&amp;").replaceAll("
 // chat.update limits top-level text to 4,000 characters, independently of the
 // 12,000-character Markdown body. Bound the escaped notification/accessibility
 // preview without truncating the formatted answer or splitting escape entities.
+/** Codex cites files with a directive Slack can't show; the file's name reads better there than a local path. */
+function slackReply(text: string): string {
+  return replaceFileCitations(text, (citation) => `\`${citationName(citation)}\``);
+}
+
 function replyFallback(userId: string, text: string): string {
   const prefix = `<@${userId}> `;
   const suffix = "… (Full response in the message.)";

@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { Dialog as BaseDialog } from "@base-ui/react/dialog";
 import { defaultRehypePlugins, defaultUrlTransform, type Components, type StreamdownProps, type UrlTransform } from "streamdown";
+import { citationName, replaceFileCitations, type FileCitation } from "@openorc/protocol";
 import { ChevronRight, Image, FolderOpen, Loader2, X, ZoomIn, ZoomOut } from "./icons";
 import { cn } from "../lib/cn";
 import { imageSource, isImagePath, localPath } from "../../../shared/image-paths";
@@ -222,7 +223,20 @@ export function ThreadRichText(props: StreamdownProps) {
     if (mentionNames?.size) plugins.push([rehypeMentionNames, { names: [...mentionNames] }]);
     return plugins;
   }, [basePath, mentionNames]);
-  return <RichText {...props} components={threadMarkdownComponents} rehypePlugins={rehypePlugins} urlTransform={threadUrlTransform} />;
+  const text = typeof props.children === "string" ? replaceFileCitations(props.children, citationLink) : props.children;
+  return (
+    <RichText {...props} components={threadMarkdownComponents} rehypePlugins={rehypePlugins} urlTransform={threadUrlTransform}>
+      {text}
+    </RichText>
+  );
+}
+
+/** Codex's citation directive as the Markdown link the transcript already opens in the file panel. */
+function citationLink(citation: FileCitation): string {
+  const name = citationName(citation);
+  if (/[<>\n]/.test(citation.path)) return `\`${name}\``;
+  const location = citation.line ? `#L${citation.line}${citation.endLine ? `-L${citation.endLine}` : ""}` : "";
+  return `[${name.replace(/[[\]\\]/g, "\\$&")}](<${citation.path}${location}>)`;
 }
 
 type MarkdownNode = { tagName?: string; properties?: Record<string, unknown>; children?: MarkdownNode[] };

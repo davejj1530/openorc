@@ -592,6 +592,18 @@ it("delivers assistant text to Slack before completion without exposing reasonin
   expect(JSON.stringify(slackMessages())).not.toContain("RAW-TOOL-INPUT");
 });
 
+it("names a file Codex cites instead of posting its citation directive", async () => {
+  const started = providers();
+  const { core, send } = await connected();
+  send("CITE", "Revise the flyer");
+  await vi.waitFor(() => expect(started).toHaveLength(1), { timeout: 3000 });
+  complete(started[0]!.handle, 'Updated it.\n\n:codex-file-citation{path="/Users/david/flyers (1)/output/01_toby_revised.pdf" purpose="output"}');
+  await vi.waitFor(async () => expect((await core.slack.status()).client.busy).toBe(false), { timeout: 3000 });
+  const posted = JSON.stringify(slackMessages());
+  expect(posted).toContain("`01_toby_revised.pdf`");
+  expect(posted).not.toContain("codex-file-citation");
+});
+
 it("handles startup exceptions once and leaves an actionable reply if the default also fails", async () => {
   providers();
   const { core, send } = await connected();

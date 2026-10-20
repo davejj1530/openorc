@@ -77,6 +77,9 @@ export class RunEvents {
       case "usage.updated":
         entry.usage = { ...entry.usage, ...ev.usage };
         return;
+      case "context.updated":
+        this.onContextUpdated(entry, ev);
+        return;
       case "message.completed":
         if (ev.role === "assistant") entry.reply = ev.text;
         return;
@@ -117,6 +120,17 @@ export class RunEvents {
     });
     // The requested model wins; the adapter's report is a fallback for runs that did not name one.
     runs.update(this.deps.db, entry.run.id, { state: "running", externalSessionId: ev.externalSessionId, model: entry.run.model ?? ev.model });
+    this.deps.invalidate(this.deps.keysFor(entry.scope));
+  }
+
+  /**
+   * Compaction changed how full the conversation is without a turn. The fill lives on the run's usage; a process that
+   * has answered nothing yet has spent nothing of its own, so its usage starts at zero. The thread shows the fill, so it
+   * is told now rather than at the next turn.
+   */
+  private onContextUpdated(entry: LiveRun, ev: Extract<AgentEvent, { type: "context.updated" }>): void {
+    const { contextTokens, contextWindow } = ev;
+    entry.usage = { inputTokens: 0, outputTokens: 0, ...entry.usage, contextTokens, ...(contextWindow !== undefined ? { contextWindow } : {}) };
     this.deps.invalidate(this.deps.keysFor(entry.scope));
   }
 

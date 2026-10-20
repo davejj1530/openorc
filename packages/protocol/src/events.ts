@@ -30,6 +30,13 @@ export interface ApprovalResolution {
 export const RunStatus = z.enum(["success", "error", "cancelled", "max_turns", "budget_exceeded"]);
 export type RunStatus = z.infer<typeof RunStatus>;
 
+/** How full the conversation is: tokens the model reads on its next request, and its window when the agent reports one. */
+export const ContextFill = z.object({
+  contextTokens: z.number().int().nonnegative(),
+  contextWindow: z.number().int().positive().optional(),
+});
+export type ContextFill = z.infer<typeof ContextFill>;
+
 export const Usage = z.object({
   inputTokens: z.number().int().nonnegative(),
   outputTokens: z.number().int().nonnegative(),
@@ -37,9 +44,8 @@ export const Usage = z.object({
   cacheWriteTokens: z.number().int().nonnegative().optional(),
   /** What the provider session has cost so far, as the provider reports it: a running total that a resumed session continues, not one turn's share. */
   costUsd: z.number().nonnegative().optional(),
-  /** How full the conversation is: tokens the model read on the latest turn, and its window when the agent reports one. */
-  contextTokens: z.number().int().nonnegative().optional(),
-  contextWindow: z.number().int().positive().optional(),
+  /** A model request also says how full the conversation is afterwards. */
+  ...ContextFill.partial().shape,
 });
 export type Usage = z.infer<typeof Usage>;
 
@@ -192,6 +198,12 @@ export const AgentEvent = z.discriminatedUnion("type", [
     type: z.literal("usage.updated"),
     ...base,
     usage: Usage,
+  }),
+  /** The conversation changed size without a turn, as when compaction folded it into a summary. No tokens were spent on a turn, so there is no usage to report. */
+  z.object({
+    type: z.literal("context.updated"),
+    ...base,
+    ...ContextFill.shape,
   }),
   /** A prompt was taken up. Both providers keep their process open between turns, and queued input can start a turn on its own. */
   z.object({

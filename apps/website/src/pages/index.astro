@@ -1,6 +1,7 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import Icon from "../components/Icon.astro";
+import LiquidWord from "../components/LiquidWord.astro";
 import DownloadButton from "../components/DownloadButton.astro";
 import SiteHeader from "../components/SiteHeader.astro";
 import SiteFooter from "../components/SiteFooter.astro";
@@ -32,7 +33,7 @@ const releaseDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "num
   <SiteHeader />
   <main id="main" class="home-page">
     <section class="hero container" aria-labelledby="hero-title">
-      <h1 id="hero-title" class="hero-title" data-arrive>Your coding agents, <span class="quiet">working together.</span></h1>
+      <h1 id="hero-title" class="hero-title" data-arrive><LiquidWord>Your coding agents,</LiquidWord> <span class="quiet">working together.</span></h1>
       <ProductPreview>
         <div slot="actions" class="hero-actions">
           <DownloadButton />

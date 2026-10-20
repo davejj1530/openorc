@@ -1,0 +1,178 @@
+---
+/**
+ * Words cast in liquid metal, as on Immaculate's site: the metal fills the letters and runs along their edges. The text
+ * stays in the page for reading and selection and turns clear once the metal draws. Without WebGL, or when the words
+ * wrap, they stay plain text.
+ */
+---
+
+<span class="liquid-word" data-liquid-word>
+  <slot />
+  <span class="liquid-word-box" aria-hidden="true">
+    <svg class="liquid-word-tones">
+      <filter id="metal-on-dark" color-interpolation-filters="sRGB">
+        <feComponentTransfer>
+          <feFuncR type="linear" slope="0.62" intercept="0.38" />
+          <feFuncG type="linear" slope="0.62" intercept="0.38" />
+          <feFuncB type="linear" slope="0.62" intercept="0.38" />
+        </feComponentTransfer>
+      </filter>
+      <filter id="metal-on-light" color-interpolation-filters="sRGB">
+        <feComponentTransfer>
+          <feFuncR type="linear" slope="0.72" />
+          <feFuncG type="linear" slope="0.72" />
+          <feFuncB type="linear" slope="0.72" />
+        </feComponentTransfer>
+      </filter>
+    </svg>
+  </span>
+</span>
+
+<style>
+  .liquid-word {
+    position: relative;
+    display: inline-block;
+    transition: color 300ms var(--ease-out);
+  }
+  .liquid-word[data-cast] {
+    color: transparent;
+  }
+  .liquid-word-box {
+    position: absolute;
+    inset: -8px -12px;
+    pointer-events: none;
+  }
+  .liquid-word-tones {
+    position: absolute;
+    width: 0;
+    height: 0;
+  }
+  /* The metal's dark bands are pure black and its highlights pure white: these bring the whites down to silver on the
+     white page and lift the blacks to graphite on the dark one, so no letter vanishes into either. */
+  .liquid-word-box :global(.liquid-word-metal) {
+    position: absolute;
+    inset: 0;
+    filter: url(#metal-on-light);
+  }
+  :global(:root[data-theme="dark"]) .liquid-word-box :global(.liquid-word-metal) {
+    filter: url(#metal-on-dark);
+  }
+</style>
+
+<script>
+  import { ShaderFitOptions, ShaderMount, getShaderColorFromString, liquidMetalFragmentShader, toProcessedLiquidMetal } from "@paper-design/shaders";
+
+  /** How many image pixels the letters are drawn with per CSS pixel. */
+  const density = 3;
+
+  /**
+   * Draws the letters, black on clear, where the page set them inside the box: each letter at its own measured position,
+   * so kerning and tracking match the type around it.
+   */
+  function drawLetters(word: HTMLElement, box: HTMLElement) {
+    const text = [...word.childNodes].find((node): node is Text => node instanceof Text && node.data.trim() !== "");
+    if (!text) return;
+    const style = getComputedStyle(word);
+    const frame = box.getBoundingClientRect();
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.ceil(frame.width * density);
+    canvas.height = Math.ceil(frame.height * density);
+    const context = canvas.getContext("2d");
+    if (!context) return;
+    context.scale(density, density);
+    context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+    context.textBaseline = "alphabetic";
+    const metrics = context.measureText(text.data);
+    const line = word.getBoundingClientRect();
+    // CSS centers the font's ascent and descent in the line box.
+    const baseline = line.top - frame.top + (line.height - metrics.fontBoundingBoxAscent - metrics.fontBoundingBoxDescent) / 2 + metrics.fontBoundingBoxAscent;
+    const range = document.createRange();
+    for (let at = 0; at < text.length; at++) {
+      range.setStart(text, at);
+      range.setEnd(text, at + 1);
+      context.fillText(text.data[at], range.getBoundingClientRect().left - frame.left, baseline);
+    }
+    return canvas.toDataURL();
+  }
+
+  /** Words that wrapped keep their plain text: the letters are drawn on one baseline. */
+  function onOneLine(word: HTMLElement) {
+    const style = getComputedStyle(word);
+    return word.getBoundingClientRect().height < (parseFloat(style.lineHeight) || parseFloat(style.fontSize)) * 1.5;
+  }
+
+  function loadImage(blob: Blob) {
+    return new Promise<HTMLImageElement>((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = reject;
+      image.src = URL.createObjectURL(blob);
+    });
+  }
+
+  async function cast(word: HTMLElement, box: HTMLElement, still: boolean) {
+    word.removeAttribute("data-cast");
+    box.querySelector(".liquid-word-metal")?.remove();
+    const letters = onOneLine(word) ? drawLetters(word, box) : undefined;
+    if (!letters) return null;
+    const image = await loadImage((await toProcessedLiquidMetal(letters)).pngBlob);
+    const surface = document.createElement("span");
+    surface.className = "liquid-word-metal";
+    box.append(surface);
+    const mount = new ShaderMount(
+      surface,
+      liquidMetalFragmentShader,
+      {
+        u_colorBack: getShaderColorFromString("#00000000"),
+        u_colorTint: getShaderColorFromString("#ffffff"),
+        u_image: image,
+        u_isImage: true,
+        u_shape: 0,
+        u_repetition: 2,
+        u_softness: 0.1,
+        u_shiftRed: 0.3,
+        u_shiftBlue: 0.3,
+        u_distortion: 0.07,
+        u_contour: 0.4,
+        u_angle: 70,
+        u_fit: ShaderFitOptions.contain,
+        u_scale: 1,
+        u_rotation: 0,
+        u_offsetX: 0,
+        u_offsetY: 0,
+        u_originX: 0.5,
+        u_originY: 0.5,
+        u_worldWidth: 0,
+        u_worldHeight: 0,
+      },
+      undefined,
+      still ? 0 : 1,
+      0,
+      8,
+      undefined,
+      ["u_image"],
+    );
+    word.setAttribute("data-cast", "");
+    return mount;
+  }
+
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (document.createElement("canvas").getContext("webgl2")) {
+    for (const word of document.querySelectorAll<HTMLElement>("[data-liquid-word]")) {
+      const box = word.querySelector<HTMLElement>(".liquid-word-box");
+      if (!box) continue;
+      let mount: ShaderMount | null = null;
+      let generation = 0;
+      // A resize can land while the last letters are still processing; only the newest cast keeps its metal.
+      const recast = async () => {
+        const current = ++generation;
+        mount?.dispose();
+        mount = null;
+        const next = await cast(word, box, still);
+        if (current === generation) mount = next;
+        else next?.dispose();
+      };
+      void document.fonts.ready.then(() => new ResizeObserver(() => void recast()).observe(word));
+    }
+  }
+</script>

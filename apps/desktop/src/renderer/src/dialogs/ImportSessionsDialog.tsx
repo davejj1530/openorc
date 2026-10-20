@@ -57,14 +57,14 @@ export function ImportSessionsDialog({ open, projectId: given, onOpenChange }: {
       {emptyState ?? (
         <>
           <p className="text-sm text-ink-3 mb-2">Sessions you ran from a terminal in this repository. Each becomes a thread that continues where the terminal left off.</p>
-          <div className="max-h-80 overflow-y-auto rounded-md border border-line divide-y divide-line">
+          <div className="-mx-3 max-h-80 overflow-y-auto">
             {sessions.map((s) => {
               const done = Boolean(s.threadId);
               return (
-                <label key={s.path} className={cn("flex items-center gap-3 px-3 h-10 text-base", done ? "text-ink-4" : "hover:bg-surface-2")}>
+                <label key={s.path} className={cn("flex h-10 items-center gap-3 rounded-md px-3 text-base", done ? "text-ink-4" : "hover:bg-surface-2")}>
                   <input type="checkbox" disabled={done} checked={done || picked.has(s.path)} onChange={() => toggle(s)} />
                   <span className="flex-1 min-w-0 truncate">{s.title}</span>
-                  <span className="text-xs text-ink-3">{agentLabel[s.agent] ?? s.agent}</span>
+                  <span className="text-xs text-ink-4">{agentLabel[s.agent] ?? s.agent}</span>
                   <span className="text-xs text-ink-4 tabular">{s.messages} msgs</span>
                   <span className="text-xs text-ink-4 tabular w-16 text-right">{done ? "imported" : relativeTime(s.startedAt)}</span>
                 </label>
@@ -72,10 +72,10 @@ export function ImportSessionsDialog({ open, projectId: given, onOpenChange }: {
             })}
           </div>
           {doImport.error ? <div className="text-sm text-bad mt-2">{doImport.error.message}</div> : null}
-          <div className="flex items-center gap-2 mt-4">
-            <button onClick={() => setPicked(new Set(fresh.map((s) => s.path)))} className="text-sm text-ink-3 hover:text-ink">
+          <div className="mt-5 flex items-center gap-2">
+            <Button variant="ghost" onClick={() => setPicked(new Set(fresh.map((s) => s.path)))}>
               Select all
-            </button>
+            </Button>
             <span className="flex-1" />
             <Button onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button

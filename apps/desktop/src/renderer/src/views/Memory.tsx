@@ -50,14 +50,14 @@ function MemoryBrowser({ projectId }: { projectId: string }) {
           ))}
         </Select>
         {filtered && (
-          <Button variant="ghost" onClick={clear}>
+          <Button variant="ghost" size="lg" onClick={clear}>
             Clear filters
           </Button>
         )}
       </PageFilters>
       <div className="memory-list flex-1 min-h-0 overflow-y-auto pb-4">
         {off ? (
-          <p className="memory-off-notice" role="status">
+          <p className="mb-3 rounded-xl bg-surface px-4 py-3.5 text-base text-ink-2" role="status">
             OpenOrc memory is off. Agents won’t save or recall these memories.{" "}
             <TextButton underline onClick={() => navigate({ view: "settings", section: "memory" })}>
               Turn on in Settings

@@ -1,0 +1,93 @@
+/* Schedules: one r16 plane card per schedule on the tile, a filled well for its glyph, the name and
+   when it runs in place, its tools on hover and a switch that turns it on and off. */
+.schedule-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.schedule-card {
+  container-type: inline-size;
+  padding: 14px;
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+}
+
+.schedule-card-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  border-radius: var(--radius-md);
+}
+
+.schedule-card-well {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+.schedule-card-name {
+  font-size: var(--text-base);
+  line-height: 16px;
+  letter-spacing: var(--text-base--letter-spacing);
+  color: var(--ink);
+}
+
+.schedule-when {
+  display: flex;
+  gap: 0.3em;
+  min-width: 0;
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+  color: var(--ink-4);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* The line leaving overlays the one arriving, so the details that follow sit right after the
+   words on show instead of after the longer of the two. */
+.schedule-when > .motion-swap {
+  position: relative;
+}
+.schedule-when > .motion-swap > [aria-hidden="true"] {
+  position: absolute;
+  inset: 0 auto auto 0;
+}
+
+.schedule-card-note {
+  margin: 8px 0 0 48px;
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+  color: var(--ink-3);
+  overflow-wrap: anywhere;
+}
+
+/* Tools rest out of sight and arrive with hover or keyboard focus. A pending run request keeps
+   them out, since Retry is how it gets confirmed. */
+.schedule-tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  transition: opacity var(--duration-leave) var(--ease-out);
+}
+.schedule-card:not(:hover, :focus-within) .schedule-tools:not(.schedule-tools-shown) {
+  opacity: 0;
+}
+@media (hover: none) {
+  .schedule-card .schedule-tools {
+    opacity: 1;
+  }
+}
+
+.schedule-delete:is(:hover, :focus-visible) {
+  color: var(--bad);
+}

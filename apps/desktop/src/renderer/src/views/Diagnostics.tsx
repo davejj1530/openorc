@@ -42,7 +42,7 @@ export function Diagnostics() {
       <div className="flex-1 min-h-0 flex">
         <aside className="w-72 shrink-0 border-r border-line p-4 grid gap-4 content-start overflow-y-auto">
           <section className="grid gap-2">
-            <h2 className="text-xs font-medium text-ink-3 uppercase tracking-wide">Bridge bench</h2>
+            <h2 className="text-xs text-ink-3 uppercase tracking-wide">Bridge bench</h2>
             <label className="text-sm text-ink-3">
               runs <Input type="number" value={runs} onChange={(e) => setRuns(Number(e.target.value))} />
             </label>
@@ -67,7 +67,7 @@ export function Diagnostics() {
             ) : null}
           </section>
           <section className="grid gap-2">
-            <h2 className="text-xs font-medium text-ink-3 uppercase tracking-wide">Diff viewer</h2>
+            <h2 className="text-xs text-ink-3 uppercase tracking-wide">Diff viewer</h2>
             <label className="text-sm text-ink-3">
               changed lines <Input type="number" value={diffLines} onChange={(e) => setDiffLines(Number(e.target.value))} />
             </label>
@@ -77,7 +77,7 @@ export function Diagnostics() {
             {firstPaint !== null && showDiff ? <div className="text-xs font-mono text-ink-3">first paint {firstPaint} ms</div> : null}
           </section>
           <section className="grid gap-1">
-            <h2 className="text-xs font-medium text-ink-3 uppercase tracking-wide">Processes</h2>
+            <h2 className="text-xs text-ink-3 uppercase tracking-wide">Processes</h2>
             {metrics?.processes.map((p) => (
               <div key={p.pid} className="text-xs font-mono text-ink-3">
                 {p.type}

@@ -60,7 +60,7 @@ export function ImportProjectDialog({ open, onOpenChange }: { open: boolean; onO
           </div>
         </Field>
         {importProject.error ? <div className="text-sm text-bad mb-3">{importProject.error.message}</div> : null}
-        <div className="flex justify-end gap-2">
+        <div className="mt-5 flex justify-end gap-2">
           <Button onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button type="submit" variant="primary" disabled={!rootPath || importProject.isPending}>
             {create ? "Create and import" : "Import"}

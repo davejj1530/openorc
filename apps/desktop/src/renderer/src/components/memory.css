@@ -1,6 +1,10 @@
+/* In Settings memory's switch sits in a tile card like every other group. */
 .memory-control {
-  padding-block: 20px;
-  border-block: var(--hairline) solid var(--line);
+  margin-bottom: 32px;
+  padding: 18px 20px;
+  border: 0;
+  border-radius: var(--radius-2xl);
+  background: var(--settings-card-fill, var(--surface-2));
 }
 .memory-control-row {
   display: flex;
@@ -12,6 +16,24 @@
    their text lines up with the filter row above. */
 .memory-list .memory-entry {
   padding-inline: 8px;
+}
+/* In the panel, entries and run history line up with the bar's title. */
+.memory-panel-list .memory-entry,
+.memory-run {
+  padding-inline: 20px;
+}
+.memory-panel-list .memory-entry:first-child {
+  padding-top: 4px;
+}
+.memory-run {
+  padding-block: 14px;
+  border-bottom: var(--hairline) solid var(--line);
+}
+.memory-panel-heading {
+  padding: 16px 20px 2px;
+  font-size: var(--text-base);
+  line-height: 16px;
+  color: var(--ink);
 }
 .memory-off-notice {
   margin-bottom: 8px;
@@ -27,6 +49,9 @@
 }
 .memory-entry:first-child {
   padding-top: 12px;
+}
+.memory-entry:last-child {
+  border-bottom: 0;
 }
 .memory-entry-meta {
   display: flex;

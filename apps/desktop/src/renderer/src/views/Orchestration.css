@@ -1,14 +1,6 @@
 .orchestration {
   container-type: inline-size;
 }
-/* Saved teams are the filter row's tabs. Many of them scroll sideways instead of pushing
-   Show archived off the row. */
-.page-filters [role="radiogroup"].orchestration-team-tabs {
-  flex-shrink: 1;
-  min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
 .orchestration-archive-filter {
   display: flex;
   align-items: center;
@@ -40,8 +32,7 @@
   max-width: 800px;
 }
 .orchestration-footer {
-  padding: 12px 0;
-  border-top: var(--hairline) solid var(--line);
+  padding: 12px 0 16px;
 }
 .orchestration-footer-content {
   display: flex;
@@ -54,16 +45,41 @@
   max-width: 800px;
   padding: 24px 0;
 }
-/* The same content plane as the memory card and the settings group: --plane-fill plus
-   --material-seat, one construction across the app. NOT --material-lift, which aliases to
-   --material-raise in dark and which no content surface may read, and which at fifteen
-   members would be the pegboard. */
+/* A plane on the tile: --plane-fill, no edge. Cards carry data-plane, so their fields and
+   hovers take the plane's fill step. */
 .orchestration-card {
-  padding: 16px;
+  padding: 20px;
   background: var(--plane-fill);
-  border: var(--hairline) solid var(--line);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--material-seat);
+  border-radius: var(--radius-3xl);
+}
+/* Execution limits fold into their card; the chevron turns as it opens. */
+.orchestration-limits > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--ink);
+  font-size: var(--text-base);
+  line-height: var(--text-base--line-height);
+  list-style: none;
+}
+.orchestration-limits > summary::-webkit-details-marker {
+  display: none;
+}
+.orchestration-limits > summary > svg {
+  color: var(--ink-3);
+  transition: transform var(--duration-arrive) var(--ease-out);
+}
+.orchestration-limits[open] > summary {
+  margin-bottom: 4px;
+}
+.orchestration-limits[open] > summary > svg {
+  transform: rotate(180deg);
+}
+.orchestration-limits > summary:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }
 /* 12px clears the contact's 1px reach. Do not restore the border-bottom: with the card it
    would give every member two bottom edges, a border and a cast. */
@@ -115,19 +131,17 @@
   padding: 0;
   color: var(--ink-3);
   background: transparent;
-  border: var(--hairline) solid transparent;
   border-radius: var(--radius-pill);
   transition:
-    background-color 120ms var(--ease-out),
-    border-color 120ms var(--ease-out);
+    background-color var(--duration-leave) var(--ease-out),
+    color var(--duration-leave) var(--ease-out);
 }
 .orchestration-avatar-option:hover {
   background: var(--surface-2);
 }
 .orchestration-avatar-option[data-selected] {
-  background: var(--surface-2);
-  border-color: var(--line-strong);
-  box-shadow: var(--material-recess);
+  background: var(--surface-3);
+  color: var(--ink);
 }
 .orchestration-avatar-option:disabled {
   pointer-events: none;
@@ -138,11 +152,9 @@
   gap: 12px 16px;
 }
 .orchestration-tree {
-  padding: 12px;
+  padding: 12px 16px;
   background: var(--surface-2);
-  border: var(--hairline) solid var(--line);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--material-recess);
+  border-radius: var(--radius-xl);
 }
 .orchestration-tree li {
   display: flex;
@@ -156,11 +168,9 @@
    measures 4.48 and --bad 4.51, under the 4.5 floor; on the soft grounds they hold. */
 .orchestration-notice {
   margin: 16px 0;
-  padding: 12px;
+  padding: 12px 16px;
   background: var(--surface-2);
-  border: var(--hairline) solid var(--line);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--material-recess);
+  border-radius: var(--radius-xl);
   font-size: var(--text-base);
   line-height: var(--text-base--line-height);
 }
@@ -176,9 +186,7 @@
   margin-top: 12px;
   padding: 16px;
   background: var(--surface-2);
-  border: var(--hairline) solid var(--line);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--material-recess);
+  border-radius: var(--radius-xl);
 }
 @container (max-width: 440px) {
   .orchestration-fields {

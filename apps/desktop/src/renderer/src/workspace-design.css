@@ -73,9 +73,8 @@
   color: var(--ink);
   font-size: 21px;
   line-height: 1.25;
-  font-weight: 600;
   letter-spacing: -0.6px;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   text-align: left;
 }
 .thread-project-picker > span {

@@ -40,68 +40,47 @@
 
 .onboarding-brand {
   color: var(--ink-2);
-  font-weight: var(--font-weight-medium);
 }
 
+/* A progress track: one segment per step under its name. Steps done and the current one fill
+   with ink; the rest rest on the strong fill. */
 .onboarding-progress {
   width: min(100%, 776px);
   flex: 0 0 auto;
   align-self: center;
   display: flex;
-  align-items: center;
-  gap: var(--spacing-lg);
+  gap: var(--spacing-sm);
   padding: var(--spacing-xl) var(--spacing-document-x);
   list-style: none;
 }
 
 .onboarding-progress-item {
   flex: 1;
+  min-width: 0;
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: var(--spacing-sm);
   color: var(--ink-3);
   font-size: var(--text-sm);
   line-height: var(--text-sm--line-height);
   white-space: nowrap;
+  transition: color var(--duration-arrive) var(--ease-out);
 }
 
-.onboarding-progress-item:not(:last-child)::after {
+.onboarding-progress-item::after {
   content: "";
-  height: var(--hairline);
-  flex: 1;
-  margin-left: var(--spacing-sm);
-  background: var(--line);
+  height: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  transition: background-color var(--duration-resize) var(--ease-out);
 }
 
-.onboarding-progress-item:last-child {
-  flex: 0 0 auto;
+.onboarding-progress-item:is([data-current="true"], [data-complete="true"])::after {
+  background: var(--ink);
 }
 
 .onboarding-progress-item[data-current="true"] {
   color: var(--ink);
-  font-weight: var(--font-weight-medium);
-}
-
-.onboarding-progress-dot {
-  width: 24px;
-  height: 24px;
-  flex: 0 0 auto;
-  display: grid;
-  place-items: center;
-  border: var(--hairline) solid var(--line-strong);
-  border-radius: var(--radius-pill);
-  font-variant-numeric: tabular-nums;
-}
-
-.onboarding-progress-item[data-current="true"] .onboarding-progress-dot {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: var(--bg);
-}
-
-.onboarding-progress-item[data-complete="true"] .onboarding-progress-dot {
-  border-color: transparent;
-  color: var(--ink-2);
 }
 
 .onboarding-preview-trigger {
@@ -121,9 +100,8 @@
   flex: 1;
   margin: 0 var(--spacing-well) var(--spacing-well);
   overflow: hidden;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-3xl);
   /* Its fill is the work plane's, painted beside .well::before in app.css. */
-  box-shadow: var(--material-well);
 }
 
 .harness-scan {
@@ -177,8 +155,7 @@
   color: var(--ink);
   font-size: var(--text-title);
   line-height: var(--text-title--line-height);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: -0.025em;
+  letter-spacing: var(--text-title--letter-spacing);
 }
 
 .onboarding-heading p {
@@ -191,7 +168,6 @@
 
 .onboarding-heading strong {
   color: var(--ink-2);
-  font-weight: var(--font-weight-medium);
 }
 
 .harness-scan-heading {
@@ -207,7 +183,6 @@
   color: var(--ink);
   font-size: var(--text-base);
   line-height: var(--text-base--line-height);
-  font-weight: var(--font-weight-medium);
 }
 
 .harness-scan-heading p,
@@ -225,11 +200,18 @@
   flex-shrink: 0;
 }
 
+/* Agents and projects are cards: a plane with no edge, rows parted by hairlines. */
 .harness-list {
   overflow: hidden;
-  border-radius: var(--radius-lg);
-  border: var(--hairline) solid var(--line);
+  border-radius: var(--radius-3xl);
   background: var(--plane-fill);
+}
+
+/* Settings sets the list on its sheet as a tile card; onboarding sets it on the tile as a plane,
+   so its pills and the chosen row take the plane's fill step. */
+.onboarding-root .harness-list {
+  --control-fill: var(--surface-2);
+  --current-row-fill: var(--surface-2);
 }
 
 .harness-row {
@@ -278,15 +260,17 @@
 
 .harness-identity h3 {
   color: var(--ink);
-  font-size: var(--text-lg);
-  line-height: var(--text-lg--line-height);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--text-md);
+  line-height: var(--text-md--line-height);
 }
 
-.harness-identity .badge {
+.harness-state {
   display: inline-flex;
   align-items: center;
-  gap: var(--spacing-xs);
+  gap: 6px;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
 }
 
 .harness-details {
@@ -334,7 +318,6 @@
 
 .harness-meta strong {
   color: var(--ink-3);
-  font-weight: var(--font-weight-medium);
 }
 
 .harness-meta code {
@@ -366,23 +349,24 @@
 
 .harness-choice:hover {
   color: var(--ink);
-  background: var(--surface-3);
+  background: var(--surface-2);
 }
 
 .harness-choice[aria-checked="true"] {
   color: var(--ink);
-  font-weight: var(--font-weight-medium);
 }
 
 .harness-choice-mark {
-  width: var(--control-badge);
-  height: var(--control-badge);
+  width: 20px;
+  height: 20px;
   display: grid;
   place-items: center;
-  border: var(--hairline) solid var(--line-strong);
   border-radius: var(--radius-pill);
-  background: var(--surface);
+  background: var(--surface-3);
   color: transparent;
+  transition:
+    background-color var(--duration-arrive) var(--ease-out),
+    color var(--duration-arrive) var(--ease-out);
 }
 
 .harness-choice[data-selection-mode="multiple"] .harness-choice-mark {
@@ -391,9 +375,8 @@
 
 .harness-choice[aria-checked="true"] .harness-choice-mark,
 .onboarding-project-row[data-selected="true"] .harness-choice-mark {
-  border-color: var(--ink-2);
-  background: var(--ink-2);
-  color: var(--bg);
+  background: var(--ink);
+  color: var(--surface);
 }
 
 .harness-refresh-note {
@@ -434,8 +417,7 @@
 .onboarding-project-list {
   margin-top: var(--spacing-md);
   overflow: hidden;
-  border-radius: var(--radius-lg);
-  border: var(--hairline) solid var(--line);
+  border-radius: var(--radius-3xl);
   background: var(--plane-fill);
 }
 
@@ -480,7 +462,6 @@
   color: var(--ink);
   font-size: var(--text-base);
   line-height: var(--text-base--line-height);
-  font-weight: var(--font-weight-medium);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -516,8 +497,7 @@
 .onboarding-finish h1 {
   font-size: var(--text-title);
   line-height: var(--text-title--line-height);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: -0.025em;
+  letter-spacing: var(--text-title--letter-spacing);
 }
 
 .onboarding-finish p {
@@ -552,7 +532,6 @@
   color: var(--ink-3);
   font-size: var(--text-sm);
   line-height: var(--text-sm--line-height);
-  font-weight: var(--font-weight-medium);
 }
 
 .onboarding-preview-field {
@@ -649,7 +628,6 @@
   align-self: center;
   margin-top: 0;
   padding: var(--spacing-lg) 0 var(--spacing-xl);
-  border-top: var(--hairline) solid var(--line);
 }
 .onboarding-footer .onboarding-action-note {
   max-width: 38ch;
@@ -657,9 +635,6 @@
 }
 .onboarding-footer .onboarding-action-buttons {
   flex-shrink: 0;
-}
-.onboarding-footer button {
-  min-height: var(--control-send);
 }
 .onboarding-project-empty {
   padding: var(--spacing-xl) 0 var(--spacing-sm);
@@ -703,9 +678,6 @@
   .onboarding-progress-item {
     gap: var(--spacing-xs);
   }
-  .onboarding-progress-item:not(:last-child)::after {
-    margin-left: var(--spacing-xs);
-  }
   .onboarding-footer {
     width: calc(100% - 32px);
     padding-bottom: var(--spacing-lg);
@@ -716,6 +688,7 @@
   .onboarding-heading h1 {
     font-size: var(--text-title-sm);
     line-height: var(--text-title-sm--line-height);
+    letter-spacing: var(--text-title-sm--letter-spacing);
   }
   .onboarding-heading-with-mascot {
     grid-template-columns: minmax(0, 1fr) 80px;

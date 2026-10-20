@@ -834,16 +834,6 @@ body[data-resizing] .sidebar-shell {
   color: var(--ink-2);
 }
 
-.schedule-delete:is(:hover, :focus-visible) {
-  color: var(--bad);
-}
-.schedule-row {
-  container-type: inline-size;
-}
-.schedule-actions {
-  width: 100%;
-  justify-content: flex-end;
-}
 /* CONTENT. Depth is a fill step, never a shadow. The surfaces a thread grows for a task, a turn's
    file changes, a question or an MCP app are planes, in the transcript and the panel alike.
    Unlayered on purpose, so the fill beats the components' own bg utilities. The loading

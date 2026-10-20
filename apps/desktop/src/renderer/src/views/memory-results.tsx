@@ -91,7 +91,7 @@ export function MemoryResults(props: MemoryFilters & { disabled: boolean; clear:
     <>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-2 px-2">
         {!status && (
-          <p className="text-sm text-ink-3" role="status" aria-live="polite">
+          <p className="text-sm text-ink-4" role="status" aria-live="polite">
             {memoryCount(page, items.length, hasNext, searching)}
             {searching && " · Searches active memories"}
           </p>

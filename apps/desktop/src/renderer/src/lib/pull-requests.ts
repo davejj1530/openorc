@@ -34,7 +34,8 @@ export function pullRequestTone(pull: Pick<PullRequestSummary, "state" | "isDraf
 }
 
 export const pullRequestToneLabel: Record<PullRequestTone, string> = { open: "Open", draft: "Draft", merged: "Merged", closed: "Closed" };
-export const pullRequestToneClass: Record<PullRequestTone, string> = { open: "text-ok", draft: "text-ink-3", merged: "text-accent-ink", closed: "text-bad" };
+/** The state's dot beside its word: open is the ok tone, merged full ink, closed the bad tone, a draft faint. */
+export const pullRequestDot: Record<PullRequestTone, "ok" | "muted" | "live" | "bad"> = { open: "ok", draft: "muted", merged: "live", closed: "bad" };
 
 export const reviewDecisionLabel: Record<PullRequestReviewDecision, { label: string; tone: "ok" | "warn" | "muted" }> = {
   approved: { label: "Approved", tone: "ok" },

@@ -35,12 +35,12 @@ export const team = {
       id: "lead",
       member: "lead",
       reply:
-        "One contract for everyone: the server emits `thread.updated` with `{ id, updatedAt }` on the existing socket. **@Server** sends it, **@Client** drops polling for it, **@Reviewer** checks both sides.",
+        "One contract for everyone: the server emits `thread.updated` with `{ id, updatedAt }` on the existing socket. @Server sends it, @Client drops polling for it, @Reviewer checks both sides.",
     },
     {
       id: "server",
       member: "server",
-      reply: "Emitting `thread.updated` after each write. I added `version` so late events can be ignored. **@Client**, order by `version`, not by arrival.",
+      reply: "Emitting `thread.updated` after each write. I added `version` so late events can be ignored. @Client, order by `version`, not by arrival.",
     },
     {
       id: "client",
@@ -51,7 +51,7 @@ export const team = {
       id: "review",
       member: "reviewer",
       reply:
-        "Reading both sides: the server sends `updatedAt` in seconds, the client compares it to `Date.now()` in milliseconds. Every event looks older than what is on screen, so none are shown. **@Server**, send milliseconds.",
+        "Reading both sides: the server sends `updatedAt` in seconds, the client compares it to `Date.now()` in milliseconds. Every event looks older than what is on screen, so none are shown. @Server, send milliseconds.",
     },
     {
       id: "fix",

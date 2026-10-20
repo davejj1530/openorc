@@ -1,13 +1,14 @@
 ---
 /**
- * The app sidebar as the desktop app lays it out (Sidebar.tsx): the Inbox, sidebar toggle and search in the header;
- * New thread, Tasks, Pull requests and More; the Threads and Orclings tabs, the filter, then projects and their
- * threads. A thread's status sits before its title, and a working thread says what its agent is doing under it.
- * Settings and history sit at the foot. Stills pass no journey.
+ * The app sidebar as the desktop app lays it out (Sidebar.tsx): Inbox, search and the sidebar toggle by the window
+ * controls; New thread, Tasks, Schedules and More; the Threads and Orclings track with its search and filter; then
+ * projects with their threads. A working thread has a spinner before its title and says what its agent is doing
+ * under it, and its project counts the threads running. Add project, the week's usage and Settings sit at the foot.
+ * Stills pass no journey.
  */
-import ProductIcon from "./ProductIcon.astro";
+import ProductIcon, { type IconName } from "./ProductIcon.astro";
 import { otherThreads, project, type SidebarRow } from "../../data/hero/workspace";
-import { timed, type Journey } from "../../data/hero/timeline";
+import { flagged, timed, type Journey } from "../../data/hero/timeline";
 
 interface Props {
   /** The scene's journey; stills pass none. */
@@ -20,69 +21,77 @@ interface Props {
   inboxPending?: string;
 }
 const { journey, nav, rows, inboxPending } = Astro.props;
-const navigation = [
+const navigation: { icon: IconName; label: string; count?: number }[] = [
   { icon: "compose", label: "New thread" },
-  { icon: "tasks", label: "Tasks" },
-  { icon: "pullRequest", label: "Pull requests" },
-  { icon: "more", label: "More" },
-] as const;
+  { icon: "tasks", label: "Tasks", count: 3 },
+  { icon: "scheduled", label: "Schedules", count: 2 },
+];
 const studio = [...rows, ...otherThreads.filter((thread) => !rows.some((row) => row.title === thread.title))];
 const show = (windows: string) => (journey ? timed(journey, windows) : {});
-/** A row or project is busy for a scene's windows, or always in a still. */
-const busyAttributes = (busy: string | true | undefined) => (busy === true ? { "data-busy": "" } : busy ? { "data-flag": `busy:${busy}` } : {});
-// The project says Running while any of its threads works.
-const busyRows = studio.map((row) => row.busy).filter((busy) => busy !== undefined);
-const running = busyRows.includes(true) ? true : busyRows.join(" ") || undefined;
+/** A row is busy, or waits on the user, for a scene's windows; a still's busy row always works. */
+const stateAttributes = ({ busy, waiting }: SidebarRow) => {
+  if (busy === true) return { "data-busy": "" };
+  const flags = Object.fromEntries(Object.entries({ busy, waiting }).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+  return journey && Object.keys(flags).length ? flagged(journey, flags) : {};
+};
+// The project says when one of its threads needs you, or counts those running; scenes run at most two at once.
+const running = Math.min(2, studio.filter((row) => row.busy).length);
+const needs = studio.some((row) => row.waiting);
 const inbox = 2;
 const [pendingFrom, pendingTo] = inboxPending?.split("~") ?? [];
+const usage = 64;
 ---
 
 <aside class="hs-sidebar">
-  <div class="hs-sidebar-inner">
-    <div class="hs-sidebar-head">
-      <span class="hs-icon-button hs-inbox">
-        <ProductIcon name="inbox" />
-        <span class="hs-nav-badge">
-          {inboxPending ? <span {...show(`<${pendingFrom} >${pendingTo}`)}>{inbox}</span> : inbox}
-          {inboxPending ? <span {...show(inboxPending)}>{inbox + 1}</span> : null}
+  <div class="hs-sidebar-head">
+    <span class="hs-round hs-inbox">
+      <ProductIcon name="inbox" />
+      <span class="hs-inbox-count">
+        {inboxPending ? <span {...show(`<${pendingFrom} >${pendingTo}`)}>{inbox}</span> : inbox}
+        {inboxPending ? <span {...show(inboxPending)}>{inbox + 1}</span> : null}
+      </span>
+    </span>
+    <span class="hs-round"><ProductIcon name="search" /></span>
+    <span class="hs-round"><ProductIcon name="panelLeft" /></span>
+  </div>
+  <nav class="hs-nav">
+    {navigation.map((item) => (
+      <span class="hs-nav-row" data-nav={item.label} data-current={item.label === nav ? "" : undefined}>
+        <ProductIcon name={item.icon} />
+        <span class="hs-nav-label">{item.label}</span>
+        {item.count ? <span class="hs-nav-count">{item.count}</span> : null}
+      </span>
+    ))}
+    <span class="hs-nav-row">
+      <ProductIcon name="more" />
+      <span class="hs-nav-label">More</span>
+      <ProductIcon name="chevronDown" class="hs-nav-chevron" />
+    </span>
+  </nav>
+  <div class="hs-list-head">
+    <span class="hs-track"><span data-selected>Threads</span><span>Orclings</span></span>
+    <span class="hs-round hs-list-search"><ProductIcon name="search" /></span>
+    <span class="hs-list-tool"><ProductIcon name="funnel" /></span>
+  </div>
+  <div class="hs-projects">
+    <div class="hs-project">
+      <span class="hs-project-head"><ProductIcon name="globe" /><span class="hs-project-name">Workspace</span><span class="hs-project-meta">No threads</span></span>
+    </div>
+    <div class="hs-project">
+      <span class="hs-project-head">
+        <ProductIcon name="folderOpen" />
+        <span class="hs-project-name">{project.name}</span>
+        <span class="hs-project-meta">
+          <span data-running="0">{studio.length} threads</span>
+          {Array.from({ length: running }, (_, i) => <span data-running={i + 1}>{i + 1} running</span>)}
+          {needs ? <span data-needs>Needs you</span> : null}
         </span>
       </span>
-      <span class="hs-icon-button"><ProductIcon name="panelLeft" /></span>
-      <span class="hs-icon-button"><ProductIcon name="search" /></span>
-    </div>
-    <div class="hs-nav">
-      {navigation.map((item) => (
-        <span class="hs-nav-row" data-nav={item.label} data-current={item.label === nav ? "" : undefined}>
-          <span class="hs-nav-icon"><ProductIcon name={item.icon} /></span>
-          {item.label}
-        </span>
-      ))}
-    </div>
-    <div class="hs-browser-tabs">
-      <span data-selected>Threads</span>
-      <span>Orclings</span>
-    </div>
-    <div class="hs-filter">
-      <ProductIcon name="search" />
-      <span>Filter threads…</span>
-      <span class="hs-icon-button hs-small"><ProductIcon name="filter" /></span>
-    </div>
-    <div class="hs-threads">
-      <div class="hs-group">
-        <span class="hs-group-head"><span class="hs-group-icon"><ProductIcon name="globe" /></span><span class="hs-group-name">Workspace</span><ProductIcon name="chevronRight" class="hs-group-chevron" /><span class="hs-icon-button hs-small"><ProductIcon name="plus" /></span></span>
-      </div>
-      <div class="hs-group">
-        <span class="hs-group-head" {...busyAttributes(running)}>
-          <span class="hs-group-icon"><ProductIcon name="folder" /></span>
-          <span class="hs-group-name">{project.name}</span>
-          <span class="hs-group-activity">Running</span>
-          <ProductIcon name="chevronDown" class="hs-group-chevron" />
-          <span class="hs-icon-button hs-small"><ProductIcon name="plus" /></span>
-        </span>
+      <div class="hs-project-threads">
         {studio.map((row) => (
-          <span class:list={["hs-row", { "hs-block": row.show }]} data-row={row.id} data-current={row.current ? "" : undefined} data-grow={row.show ? "" : undefined} {...busyAttributes(row.busy)} {...(row.show ? show(row.show) : {})}>
-            <span class="hs-row-heading">
-              <span class="hs-status"><ProductIcon name="loader" /></span>
+          <span class="hs-row" data-row={row.id} data-current={row.current ? "" : undefined} data-grow={row.show ? "" : undefined} {...stateAttributes(row)} {...(row.show ? show(row.show) : {})}>
+            <span class="hs-row-head">
+              <span class="hs-row-status"><ProductIcon name="loader" />{row.waiting ? <ProductIcon name="circleHelp" class="hs-row-waiting" /> : null}</span>
               <span class="hs-row-title">{row.title}</span>
             </span>
             <span class="hs-row-headline">
@@ -91,23 +100,26 @@ const [pendingFrom, pendingTo] = inboxPending?.split("~") ?? [];
           </span>
         ))}
       </div>
-      <div class="hs-group">
-        <span class="hs-group-head"><span class="hs-group-icon"><ProductIcon name="folder" /></span><span class="hs-group-name">website</span><ProductIcon name="chevronDown" class="hs-group-chevron" /><span class="hs-icon-button hs-small"><ProductIcon name="plus" /></span></span>
-        <span class="hs-row">
-          <span class="hs-row-heading"><span class="hs-status"></span><span class="hs-row-title">Tell the product story</span></span>
-        </span>
-      </div>
-      <div class="hs-group">
-        <span class="hs-group-head"><span class="hs-group-icon"><ProductIcon name="folder" /></span><span class="hs-group-name">atlas-api</span><ProductIcon name="chevronRight" class="hs-group-chevron" /><span class="hs-icon-button hs-small"><ProductIcon name="plus" /></span></span>
+    </div>
+    <div class="hs-project">
+      <span class="hs-project-head"><ProductIcon name="folderOpen" /><span class="hs-project-name">website</span><span class="hs-project-meta">1 thread</span></span>
+      <div class="hs-project-threads">
+        <span class="hs-row"><span class="hs-row-head"><span class="hs-row-status"></span><span class="hs-row-title">Tell the product story</span></span></span>
       </div>
     </div>
-    <div class="hs-sidebar-foot">
-      <span class="hs-add-project"><ProductIcon name="plus" />Add project</span>
-      <div class="hs-foot-controls">
-        <span class="hs-settings"><ProductIcon name="settings" />Settings</span>
-        <span class="hs-icon-button"><ProductIcon name="arrowLeft" /></span>
-        <span class="hs-icon-button" data-disabled><ProductIcon name="arrowRight" /></span>
-      </div>
+    <div class="hs-project">
+      <span class="hs-project-head"><ProductIcon name="folder" /><span class="hs-project-name">atlas-api</span><span class="hs-project-meta">1 thread</span></span>
+    </div>
+  </div>
+  <div class="hs-sidebar-foot">
+    <span class="hs-add-project"><ProductIcon name="plus" />Add project</span>
+    <div class="hs-account">
+      <span class="hs-usage">
+        <svg class="hs-ring" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" /><circle cx="8" cy="8" r="6" pathLength="100" stroke-dasharray={`${usage} 100`} transform="rotate(-90 8 8)" /></svg>
+        <span class="hs-usage-value">{usage}%</span>
+        <span class="hs-usage-label">left this week</span>
+      </span>
+      <span class="hs-round"><ProductIcon name="settings" /></span>
     </div>
   </div>
 </aside>

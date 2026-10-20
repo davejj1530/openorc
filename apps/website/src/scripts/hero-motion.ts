@@ -150,12 +150,17 @@ function renderGrows(grows: Grow[], t: number) {
   moving.forEach((item, i) => place(item, t, naturals[i]));
 }
 
-/** Where a notice sits, or will appear: before it opens, that is where its next visible sibling starts. */
+/**
+ * Where a notice sits, or will appear: before it opens, that is where the next visible sibling of its outermost
+ * closed block starts, or the end of the column that block sits in.
+ */
 function destination(to: HTMLElement) {
   if (to.offsetParent) return to.getBoundingClientRect();
-  let next = to.nextElementSibling as HTMLElement | null;
+  let block = to;
+  while (block.parentElement && !block.parentElement.offsetParent) block = block.parentElement;
+  let next = block.nextElementSibling as HTMLElement | null;
   while (next && !next.offsetParent) next = next.nextElementSibling as HTMLElement | null;
-  const column = to.parentElement!;
+  const column = block.parentElement!;
   const style = getComputedStyle(column);
   const box = column.getBoundingClientRect();
   const inset = (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0);
@@ -183,7 +188,7 @@ function renderFlights(root: HTMLElement, flights: Flight[], t: number) {
     style.top = `${(lerp(a.top - 4 * unit, b.top, p) - origin.top - 56 * unit * Math.sin(Math.PI * clamp(p))).toFixed(2)}px`;
     style.width = `${lerp(Number(f.el.dataset.width), b.width, q).toFixed(2)}px`;
     style.height = `${lerp(34 * unit, natural, q).toFixed(2)}px`;
-    style.borderRadius = `${lerp(17, 14, q) * unit}px`;
+    style.borderRadius = `${lerp(17, 16, q) * unit}px`;
     style.opacity = (1 - q).toFixed(3);
     f.label.style.opacity = (1 - clamp(q * 2)).toFixed(3);
   });

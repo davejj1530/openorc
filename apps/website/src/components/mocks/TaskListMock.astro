@@ -1,77 +1,67 @@
 ---
-/** The Tasks view, still: active tasks grouped by status, as views/TaskList.tsx lays them out, with its keyboard hints. */
+/** The Tasks page, still: active tasks grouped by status under quiet headings, as views/TaskList.tsx lays them out. */
 import ProductIcon from "../hero/ProductIcon.astro";
+import StatusMark from "../hero/StatusMark.astro";
 import "../../styles/hero-scene.css";
 
 type Priority = "low" | "medium" | "high";
+type Status = "in_progress" | "review" | "backlog";
 interface Task {
   title: string;
   priority: Priority;
   label?: string;
-  current?: boolean;
+  /** The row under the pointer, on the hover fill. */
+  hover?: boolean;
 }
-const groups: { status: "backlog" | "in_progress" | "review"; label: string; icon: "circleDashed" | "loader" | "circleReview"; tasks: Task[] }[] = [
-  {
-    status: "backlog",
-    label: "Backlog",
-    icon: "circleDashed",
-    tasks: [
-      { title: "Render transcript rows by block", priority: "medium", label: "Performance", current: true },
-      { title: "Defer font and icon loading", priority: "medium", label: "Performance" },
-      { title: "Write useful empty states", priority: "medium" },
-    ],
-  },
-  { status: "in_progress", label: "In progress", icon: "loader", tasks: [{ title: "Cache dashboard queries", priority: "high", label: "Performance" }] },
+const groups: { status: Status; label: string; tasks: Task[] }[] = [
+  { status: "in_progress", label: "In progress", tasks: [{ title: "Cache dashboard queries", priority: "high", label: "Performance" }] },
   {
     status: "review",
-    label: "Review",
-    icon: "circleReview",
+    label: "Ready for review",
     tasks: [
       { title: "Create the welcome flow", priority: "high", label: "Onboarding" },
       { title: "Polish the project picker", priority: "medium", label: "Onboarding" },
     ],
   },
+  {
+    status: "backlog",
+    label: "Backlog",
+    tasks: [
+      { title: "Render transcript rows by block", priority: "medium", label: "Performance", hover: true },
+      { title: "Defer font and icon loading", priority: "medium", label: "Performance" },
+      { title: "Write useful empty states", priority: "low" },
+    ],
+  },
 ];
-const priorityIcon: Record<Priority, "signalLow" | "signalMedium" | "signalHigh"> = { low: "signalLow", medium: "signalMedium", high: "signalHigh" };
+const priorityIcon = { low: "signalLow", medium: "signalMedium", high: "signalHigh" } as const;
 ---
 
 <div class="hs-mock hs-mock-tasks">
-  <header class="hs-header hs-header-flat">
-    <span class="hs-header-lead">
-      <span class="hs-title hs-title-page">Tasks</span>
-      <span class="hs-chip"><span>All projects</span><ProductIcon name="chevronDown" /></span>
-    </span>
+  <header class="hs-header">
+    <span class="hs-page-title">Tasks</span>
+    <span class="hs-header-chip">All projects<ProductIcon name="chevronDown" /></span>
     <span class="hs-header-actions">
-      <span class="hs-button">New task</span>
+      <span class="hs-round"><ProductIcon name="search" /></span>
+      <span class="hs-round"><ProductIcon name="funnel" /></span>
+      <span class="hs-button hs-button-lg hs-button-plane"><ProductIcon name="plus" />New task</span>
     </span>
   </header>
-  <div class="hs-tasks-sub">
-    <span class="hs-tasks-shelf">
-      <span data-selected>Active</span><span>Done</span><span>Archived</span>
-    </span>
-    <span class="hs-tasks-select">All statuses<ProductIcon name="chevronDown" /></span>
-    <span class="hs-tasks-filter"><ProductIcon name="search" />Filter tasks…</span>
+  <div class="hs-task-list">
+    {groups.map((group) => (
+      <section class="hs-task-group">
+        <div class="hs-task-group-head"><span>{group.label}</span><span class="hs-task-group-count">{group.tasks.length}</span></div>
+        {group.tasks.map((task) => (
+          <div class="hs-task-row" data-status={group.status} data-hover={task.hover ? "" : undefined}>
+            <span class="hs-task-row-status"><StatusMark status={group.status} /></span>
+            <span class="hs-task-row-title">{task.title}</span>
+            {task.label ? <span class="hs-label-chip">{task.label}</span> : null}
+            <span class="hs-task-row-meta">studio</span>
+            <span class="hs-task-row-meta hs-task-row-time">just now</span>
+            <span class="hs-task-row-slot"><ProductIcon name={priorityIcon[task.priority]} /></span>
+            <span class="hs-task-row-slot">{group.status === "backlog" ? <ProductIcon name="messageSquare" /> : null}</span>
+          </div>
+        ))}
+      </section>
+    ))}
   </div>
-  {groups.map((group) => (
-    <section class="hs-task-group">
-      <div class="hs-task-group-head">
-        <ProductIcon name="chevronDown" class="hs-task-group-chevron" />
-        <ProductIcon name={group.icon} class:list={["hs-status-glyph", `hs-status-${group.status}`]} />
-        <span>{group.label}</span>
-        <span class="hs-task-group-count">{group.tasks.length}</span>
-      </div>
-      {group.tasks.map((task) => (
-        <div class="hs-task-row" data-current={task.current ? "" : undefined}>
-          <span class="hs-icon-button hs-small"><ProductIcon name={group.icon} class:list={["hs-status-glyph", `hs-status-${group.status}`]} /></span>
-          <ProductIcon name={priorityIcon[task.priority]} class="hs-priority" />
-          <span class="hs-task-row-title">{task.title}</span>
-          {task.label ? <span class="hs-label-chip">{task.label}</span> : null}
-          <span class="hs-task-row-project">studio</span>
-          <span class="hs-task-row-time">just now</span>
-          {group.status === "backlog" ? <span class="hs-icon-button hs-small"><ProductIcon name="messageSquare" /></span> : <span class="hs-task-row-spacer" />}
-        </div>
-      ))}
-    </section>
-  ))}
-  <footer class="hs-tasks-keys"><kbd>j</kbd><kbd>k</kbd>move<kbd>↵</kbd>open</footer>
 </div>

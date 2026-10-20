@@ -83,7 +83,6 @@ export const workflow = {
     reply:
       "Dashboard queries are cached per project. Selection changes reuse the cache, thread events invalidate it, and the first paint comes from the last known state. The dashboard now makes **two requests on open** instead of one per render.",
     phases: { read: "Reading the dashboard hooks", edit: "Caching the queries per project" },
-    receipt: "Worked · 3 files changed",
     change: {
       files: [
         { path: "src/dashboard/useProjects.ts", added: 18, removed: 6 },

@@ -49,3 +49,30 @@ export function timed(journey: Journey, windows: string) {
     "data-end-hidden": visibleAt(windows, wide, moment("end", wide)) ? undefined : "",
   };
 }
+
+/**
+ * Attributes for an element whose `data-<name>` states hold during windows, as `name: windows` pairs. The player
+ * toggles them; the server sets the ones that hold at the last moment, which the page shows when nothing plays.
+ */
+export function flagged(journey: Journey, flags: Record<string, string>) {
+  const { wide } = journey.timelines;
+  const end = moment("end", wide);
+  const attributes: Record<string, string | undefined> = {
+    "data-flag": Object.entries(flags)
+      .map(([name, windows]) => `${name}:${windows}`)
+      .join(";"),
+  };
+  for (const [name, windows] of Object.entries(flags)) attributes[`data-${name}`] = visibleAt(windows, wide, end) ? "" : undefined;
+  return attributes;
+}
+
+/** Elapsed work as the app writes it: "42s", then "1m 5s". */
+export function duration(seconds: number): string {
+  return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+}
+
+/** Whole seconds from one moment to another (the end by default) on the wide timeline, which pages without a player show. */
+export function elapsed(journey: Journey, from: string, to = "end"): number {
+  const { wide } = journey.timelines;
+  return Math.max(0, Math.floor(moment(to, wide) - moment(from, wide)));
+}

@@ -5,13 +5,13 @@
  * reason. A follow-up mention asks that model to build, and the work continues
  * in a linked thread. Content and timing: data/hero/discussion.ts.
  */
-import ProductIcon from "./ProductIcon.astro";
 import Prose from "./Prose.astro";
+import ProductIcon from "./ProductIcon.astro";
 import SceneFrame from "./SceneFrame.astro";
 import TaskPane from "./TaskPane.astro";
+import TaskProperties from "./TaskProperties.astro";
 import { discussion, discussionJourney } from "../../data/hero/discussion";
-import { project } from "../../data/hero/workspace";
-import { timed } from "../../data/hero/timeline";
+import { flagged, timed } from "../../data/hero/timeline";
 
 interface Props {
   label: string;
@@ -25,21 +25,11 @@ const at = (windows: string) => timed(discussionJourney, windows);
   <div class="hs-panes">
     <TaskPane id="task" journey={discussionJourney} title={discussion.title} start="replyDone" branch={discussion.thread.branch}>
       <div class="hs-doc-title">{discussion.title}</div>
-      <div class="hs-props">
-        <span class="hs-prop hs-prop-select" {...at("<replyDone")}><ProductIcon name="circleDashed" class="hs-status-glyph hs-status-circleDashed" />Backlog<ProductIcon name="chevronDown" class="hs-prop-chevron" /></span>
-        <span class="hs-prop hs-prop-select" {...at(">replyDone")}><ProductIcon name="loader" class="hs-status-glyph hs-status-in_progress" />In progress<ProductIcon name="chevronDown" class="hs-prop-chevron" /></span>
-        <span class="hs-prop hs-prop-select"><ProductIcon name="signalHigh" />High<ProductIcon name="chevronDown" class="hs-prop-chevron" /></span>
-        <span class="hs-prop">{project.name}</span>
-      </div>
-      <div class="hs-editor-controls">
-        <span class="hs-icon-button"><ProductIcon name="plus" /></span>
-        <span class="hs-icon-button"><ProductIcon name="image" /></span>
-        <span class="hs-editor-mode">Markdown</span>
-      </div>
+      <TaskProperties journey={discussionJourney} start="replyDone" priority="High" />
       <div class="hs-spec">
-        <div class="hs-spec-heading">Goal</div>
+        <h3>Goal</h3>
         <p>{discussion.spec.goal}</p>
-        <div class="hs-spec-heading">Acceptance criteria</div>
+        <h3>Acceptance criteria</h3>
         {discussion.spec.criteria.map((item) => (
           <div class="hs-check" data-done={item.done ? "" : undefined}>
             <i>{item.done ? <ProductIcon name="check" /> : null}</i>
@@ -50,12 +40,12 @@ const at = (windows: string) => timed(discussionJourney, windows);
       <div class="hs-labels"><span>Labels</span><span>{discussion.label}</span></div>
 
       <section class="hs-comments">
-        <div class="hs-comments-head">{copy.heading}</div>
+        <h3>{copy.heading}</h3>
         <p class="hs-comments-help">{copy.help}</p>
         <div class="hs-comment">
           <div class="hs-comment-meta"><strong>You</strong><time>{discussion.question.time}</time></div>
           <div class="hs-comment-body">{discussion.question.body}</div>
-          <div class="hs-comment-actions"><span>Reply</span></div>
+          <span class="hs-comment-reply">Reply</span>
           <div class="hs-replies">
             <article class="hs-response">
               <div class="hs-comment-meta"><strong>{replies.codex.author}</strong><span>{replies.codex.meta}</span><time>just now</time></div>
@@ -63,7 +53,7 @@ const at = (windows: string) => timed(discussionJourney, windows);
               <p class="hs-comment-status" {...at("<codexEnd")}>Replying…</p>
               <div class="hs-comment-actions"><span>Reply</span><span {...at("<codexEnd")}>Cancel response</span></div>
             </article>
-            <article class="hs-response hs-block" data-grow {...at(">claudeStart")}>
+            <article class="hs-response" data-grow {...at(">claudeStart")}>
               <div class="hs-comment-meta"><strong>{replies.claude.author}</strong><span>{replies.claude.meta}</span><time>just now</time></div>
               <div class="hs-comment-body" data-grow {...at(">claudeText")}><Prose text={replies.claude.body} stream="claudeText~claudeEnd" /></div>
               <p class="hs-comment-status" {...at("<claudeEnd")}>Replying…</p>
@@ -71,12 +61,12 @@ const at = (windows: string) => timed(discussionJourney, windows);
             </article>
           </div>
         </div>
-        <div class="hs-comment hs-block" data-grow {...at(">post")}>
+        <div class="hs-comment" data-grow {...at(">post")}>
           <div class="hs-comment-meta"><strong>You</strong><time>just now</time></div>
           <div class="hs-comment-body">{discussion.mentions[request.to]} {request.text}</div>
-          <div class="hs-comment-actions"><span>Reply</span></div>
+          <span class="hs-comment-reply">Reply</span>
           <div class="hs-replies" data-grow {...at(">replyStart")}>
-            <article class="hs-response hs-block">
+            <article class="hs-response">
               <div class="hs-comment-meta"><strong>{result.author}</strong><span>{result.meta}</span><time>just now</time></div>
               <div class="hs-comment-body" data-grow {...at(">replyText")}><Prose text={result.body} stream="replyText~replyEnd" /></div>
               <p class="hs-comment-status" {...at("<replyEnd")}>Replying…</p>
@@ -87,8 +77,8 @@ const at = (windows: string) => timed(discussionJourney, windows);
           </div>
         </div>
 
-        <div class="hs-tc" data-flag="focused:focus~post;typed:mentionAt~post">
-          <div class="hs-tc-input">
+        <div class="hs-comment-composer" {...flagged(discussionJourney, { typed: "mentionAt~post" })}>
+          <div class="hs-comment-input">
             <span class="hs-placeholder">{copy.placeholder}</span>
             <span {...at("mentionAt~pick")}>@</span>
             <span {...at("pick~post")}>{discussion.mentions[request.to]} </span>
@@ -97,12 +87,11 @@ const at = (windows: string) => timed(discussionJourney, windows);
           </div>
           <div class="hs-mentions" data-grow {...at("mentionAt~pick")}>
             {discussion.options.map((option, i) => (
-              <div class="hs-option" data-selected={i === 0 ? "" : undefined} data-flag={`selected:${i === 0 ? "<mentionNext" : ">mentionNext"}`}><span>{option.name}</span><span>{option.harness}</span></div>
+              <div class="hs-option" {...flagged(discussionJourney, { selected: i === 0 ? "<mentionNext" : ">mentionNext" })}><span>{option.name}</span><span>{option.harness}</span></div>
             ))}
           </div>
-          <div class="hs-tc-foot">
-            <span>{copy.hint}</span>
-            <span class="hs-tc-submit">Comment</span>
+          <div class="hs-comment-composer-foot">
+            <span class="hs-button hs-button-sm hs-comment-submit">Comment</span>
           </div>
         </div>
       </section>

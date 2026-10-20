@@ -1,0 +1,38 @@
+---
+/**
+ * What a turn's work came to, as the app's TurnReceipt draws it: how long it thought, how many steps it took, and
+ * the last check it ran, then the chevron that opens the steps. Items whose words change take one span per window.
+ */
+import ProductIcon from "./ProductIcon.astro";
+import { timed, type Journey } from "../../data/hero/timeline";
+
+type Words = string | { text: string; show: string }[];
+interface Props extends Record<string, unknown> {
+  /** The block opens and closes with the scene (scripts/hero-motion.ts). */
+  grow?: boolean;
+  journey?: Journey;
+  thought?: Words;
+  steps?: Words;
+  check?: string;
+}
+const { journey, thought, steps, check, grow, ...rest } = Astro.props;
+const at = (windows: string) => (journey ? timed(journey, windows) : {});
+const items = [
+  { icon: "lightbulb", words: thought },
+  { icon: "circleCheck", words: steps },
+  { icon: "terminal", words: check },
+] as const;
+const windows = (words: Words) => (typeof words === "string" ? undefined : words.map((word) => word.show).join(" "));
+---
+
+<div class="hs-receipt" data-grow={grow ? "" : undefined} {...rest}>
+  {items.map(({ icon, words }) =>
+    words ? (
+      <span class="hs-receipt-item" {...(windows(words) ? at(windows(words)!) : {})}>
+        <ProductIcon name={icon} />
+        {typeof words === "string" ? words : words.map((word) => <span {...at(word.show)}>{word.text}</span>)}
+      </span>
+    ) : null,
+  )}
+  <ProductIcon name="chevronDown" class="hs-receipt-chevron" />
+</div>

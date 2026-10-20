@@ -1,9 +1,11 @@
 ---
 /**
- * The task view: breadcrumb header, tab strip, the scrolling document in the slot, and the footer bar.
- * The task waits in the backlog until its work starts, then runs in its own worktree on `branch`.
+ * The task view (TaskView.tsx, TaskDocument.tsx): the breadcrumb header with the task's status mark, the tab track,
+ * the scrolling document in the slot, and the footer. The task waits in the backlog until its work starts, then
+ * runs in its own worktree on `branch`.
  */
 import ProductIcon from "./ProductIcon.astro";
+import StatusMark from "./StatusMark.astro";
 import { project } from "../../data/hero/workspace";
 import { timed, type Journey } from "../../data/hero/timeline";
 
@@ -11,7 +13,7 @@ interface Props {
   id: string;
   journey: Journey;
   title: string;
-  /** Moment the task's work starts. Before it the status glyph is Backlog, after it In progress. */
+  /** Moment the task's work starts. Before it the status is Backlog, after it In progress. */
   start: string;
   /** The worktree branch the footer names once work starts, as views/TaskDocument.tsx does. */
   branch: string;
@@ -23,24 +25,16 @@ const tabs = ["Overview", "Activity", "Changes", "Commits", "Memory"];
 ---
 
 <section class="hs-pane" data-pane={id}>
-  <header class="hs-header">
-    <span class="hs-header-lead">
-      <span class="hs-window-nav">
-        <span class="hs-icon-button"><ProductIcon name="panelLeft" /></span>
-        <span class="hs-icon-button"><ProductIcon name="search" /></span>
-        <span class="hs-icon-button"><ProductIcon name="arrowLeft" /></span>
-        <span class="hs-icon-button" data-disabled><ProductIcon name="arrowRight" /></span>
-      </span>
-      <span class="hs-crumb">Tasks</span>
-      <span class="hs-crumb-sep">/</span>
-      <ProductIcon name="circleDashed" class="hs-status-glyph hs-status-circleDashed" {...waiting} />
-      <ProductIcon name="loader" class="hs-status-glyph hs-status-in_progress" {...started} />
-      <span class="hs-title">{title}</span>
-      <span class="hs-chip"><span>{project.name}</span><ProductIcon name="chevronDown" /></span>
-    </span>
+  <header class="hs-header hs-task-header">
+    <span class="hs-crumb">Tasks</span>
+    <span class="hs-crumb-sep">/</span>
+    <StatusMark status="backlog" {...waiting} />
+    <StatusMark status="in_progress" {...started} />
+    <span class="hs-title">{title}</span>
+    <span class="hs-header-chip">{project.name}<ProductIcon name="chevronDown" /></span>
   </header>
-  <nav class="hs-tabs">
-    {tabs.map((tab, i) => <span class="hs-tab" data-current={i === 0 ? "" : undefined}>{tab}</span>)}
+  <nav class="hs-task-tabs">
+    <span class="hs-track">{tabs.map((tab, i) => <span data-selected={i === 0 ? "" : undefined}>{tab}</span>)}</span>
   </nav>
   <div class="hs-transcript">
     <article class="hs-doc">
@@ -49,7 +43,7 @@ const tabs = ["Overview", "Activity", "Changes", "Commits", "Memory"];
   </div>
   <footer class="hs-doc-footer">
     <span><ProductIcon name="check" />Saved</span>
-    <span class="hs-doc-branch"><ProductIcon name="branch" /><span {...waiting}>Isolated worktree on start</span><span {...started}>{branch}</span></span>
-    <span class="hs-open-thread">Open thread<ProductIcon name="arrowUpRight" /></span>
+    <span class="hs-doc-branch"><ProductIcon name="branch" /><span {...waiting}>{project.branch}</span><span {...started}>{branch}</span></span>
+    <span class="hs-button hs-open-thread">Open thread<ProductIcon name="arrowUpRight" /></span>
   </footer>
 </section>

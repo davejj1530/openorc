@@ -1,0 +1,11 @@
+---
+/** Line counts as the app's Counts draws them: additions and removals, each only when there are any. */
+interface Props {
+  added?: number;
+  removed?: number;
+  class?: string;
+}
+const { added, removed, class: className } = Astro.props;
+---
+
+<span class:list={["hs-counts", className]}>{added ? <span class="hs-added">+{added}</span> : null}{removed ? <span class="hs-removed">−{removed}</span> : null}</span>

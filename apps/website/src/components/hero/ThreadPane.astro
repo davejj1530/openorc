@@ -1,60 +1,43 @@
 ---
 /**
- * One conversation pane as the app draws it (ThreadView.tsx): a quiet header, the transcript ending in the OpenOrc
- * cube, and the composer. The `presence` slot sits beside the cube, as a team's working clock does.
+ * One conversation pane as the app draws it (ThreadView.tsx): the title and its faint facts in the header with the
+ * round pane buttons, the transcript ending in the OpenOrc cube, and the composer. The `presence` slot sits beside
+ * the cube, as a team's working clock does.
  */
 import Composer from "./Composer.astro";
 import PresenceMark from "./PresenceMark.astro";
 import ProductIcon from "./ProductIcon.astro";
 import { project } from "../../data/hero/workspace";
-import type { Journey } from "../../data/hero/timeline";
+import { flagged } from "../../data/hero/timeline";
+import type { ComponentProps } from "astro/types";
 
-interface Props {
+type ComposerProps = ComponentProps<typeof Composer>;
+
+interface Props extends Omit<ComposerProps, "layout"> {
   id: string;
-  /** The scene's journey; stills pass none. */
-  journey?: Journey;
   title: string;
   /** Windows during which the thread's agent is working; stills pass none. */
   busy?: string;
-  model: { label: string; effort: string; harness?: string; icon?: "orchestration" };
-  permission: string;
-  placeholder: string;
-  /** The checkout's branch, or the thread's own branch when it runs in a worktree. The composer names it. */
-  branch?: string;
-  /** Window during which uncommitted changes show under the composer, with their counts; `true` for the whole scene. */
-  changes?: string | boolean;
-  changeStat?: { added: number; removed: number };
-  /** The prompt this pane's composer types, if any. */
-  prompt?: { text: string; typo: { at: number; key: string }; window: string; typed: string };
-  /** How full the context window is; team conversations show none. */
-  context?: number | null;
 }
-const { id, journey, title, busy, model, permission, placeholder, branch = project.branch, changes, changeStat, prompt, context } = Astro.props;
+const { id, title, busy, ...composer } = Astro.props;
+const { journey } = composer;
 ---
 
-<section class="hs-pane" data-pane={id} data-flag={busy ? `busy:${busy}` : undefined}>
+<section class="hs-pane" data-pane={id} {...(busy && journey ? flagged(journey, { busy }) : {})}>
   <header class="hs-header">
-    <span class="hs-header-lead">
-      <span class="hs-window-nav">
-        <span class="hs-icon-button"><ProductIcon name="panelLeft" /></span>
-        <span class="hs-icon-button"><ProductIcon name="inbox" /></span>
-        <span class="hs-icon-button"><ProductIcon name="search" /></span>
-        <span class="hs-icon-button"><ProductIcon name="arrowLeft" /></span>
-        <span class="hs-icon-button" data-disabled><ProductIcon name="arrowRight" /></span>
-      </span>
-      <span class="hs-title">{title}</span>
-      <span class="hs-header-project">{project.name}</span>
+    <span class="hs-title">{title}</span>
+    <span class="hs-facts">
+      <span>{project.name}</span>
+      <span class="hs-fact-working"><i></i>working</span>
     </span>
     <span class="hs-header-actions">
       <slot name="status" />
-      <span class="hs-badge">working</span>
-      <span class="hs-icon-button hs-close-pane"><ProductIcon name="close" /></span>
-      <span class="hs-icon-button hs-header-extra"><ProductIcon name="more" /></span>
-      <span class="hs-icon-button hs-header-extra"><ProductIcon name="tasks" /></span>
-      <span class="hs-icon-button"><ProductIcon name="panelRight" /></span>
+      <span class="hs-round hs-close-pane"><ProductIcon name="close" /></span>
+      <span class="hs-round"><ProductIcon name="more" /></span>
+      <span class="hs-round"><ProductIcon name="tasks" /></span>
+      <span class="hs-round"><ProductIcon name="panelRight" /></span>
     </span>
   </header>
-  <slot name="bar" />
   <div class="hs-transcript">
     <div class="hs-column">
       <slot />
@@ -63,6 +46,6 @@ const { id, journey, title, busy, model, permission, placeholder, branch = proje
   </div>
   <div class="hs-composer-area">
     <slot name="hint" />
-    <Composer journey={journey} placeholder={placeholder} model={model} permission={permission} branch={branch} changes={changes} changeStat={changeStat} prompt={prompt} context={context} />
+    <Composer {...composer} />
   </div>
 </section>

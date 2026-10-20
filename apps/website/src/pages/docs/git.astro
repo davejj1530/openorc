@@ -5,21 +5,9 @@ import LinkCards from "../../components/docs/LinkCards.astro";
 import DocsVisual from "../../components/docs/DocsVisual.astro";
 import WorktreeMock from "../../components/mocks/WorktreeMock.astro";
 import { docHref } from "../../data/docs";
-
-const sections = [
-  { id: "where", title: "Checkout or worktree" },
-  { id: "choose", title: "Choose for each thread" },
-  { id: "worktrees", title: "How a worktree is made" },
-  { id: "move", title: "Move a thread" },
-  { id: "merge", title: "Bring the work back" },
-  { id: "delete", title: "Delete a thread" },
-  { id: "repository", title: "What OpenOrc adds to your repository" },
-  { id: "no-git", title: "Projects without Git" },
-  { id: "next-steps", title: "Next steps" },
-];
 ---
 
-<DocsLayout slug="git" sections={sections}>
+<DocsLayout slug="git">
   <DocsVisual
     label="OpenOrc with the thread Simplify the design tokens open. It works in its own worktree, and the row under the composer names its branch, openorc/design-tokens-2c91f0, with 12 lines added, 4 removed, and Commit changes. In the sidebar, another thread in the project is still working."
   >

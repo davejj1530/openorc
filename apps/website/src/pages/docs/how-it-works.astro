@@ -6,21 +6,10 @@ import Diagram from "../../components/docs/Diagram.astro";
 import { systemDiagram, turnDiagram } from "../../data/docs/diagrams";
 import { docHref } from "../../data/docs";
 
-const sections = [
-  { id: "parts", title: "The parts" },
-  { id: "processes", title: "Every process" },
-  { id: "interface", title: "How the interface talks to the core" },
-  { id: "agents", title: "How OpenOrc runs each agent" },
-  { id: "message", title: "The path a message takes" },
-  { id: "runs", title: "Runs, turns, and sessions" },
-  { id: "lifecycle", title: "Startup, shutdown, and recovery" },
-  { id: "next-steps", title: "Next steps" },
-];
-
 const envelope = `{ "type": "rpc", "id": 42, "method": "runs.start", "params": { … } }`;
 ---
 
-<DocsLayout slug="how-it-works" sections={sections}>
+<DocsLayout slug="how-it-works">
   <section aria-labelledby="parts">
     <h2 id="parts">The parts</h2>
     <p>

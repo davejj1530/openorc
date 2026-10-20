@@ -2,17 +2,9 @@
 import DocsLayout from "../../layouts/DocsLayout.astro";
 import LinkCards from "../../components/docs/LinkCards.astro";
 import { docHref } from "../../data/docs";
-
-const sections = [
-  { id: "where", title: "Where agents work" },
-  { id: "conversations", title: "Conversations" },
-  { id: "planning", title: "Planning and context" },
-  { id: "companions", title: "Orclings and teams" },
-  { id: "next-steps", title: "Next steps" },
-];
 ---
 
-<DocsLayout slug="concepts" sections={sections}>
+<DocsLayout slug="concepts">
   <section aria-labelledby="where">
     <h2 id="where">Where agents work</h2>
     <dl class="docs-terms">

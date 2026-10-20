@@ -5,20 +5,9 @@ import LinkCards from "../../components/docs/LinkCards.astro";
 import DocsVisual from "../../components/docs/DocsVisual.astro";
 import ChangesPanelMock from "../../components/mocks/ChangesPanelMock.astro";
 import { docHref } from "../../data/docs";
-
-const sections = [
-  { id: "changes-panel", title: "The Changes panel" },
-  { id: "turn", title: "Review one turn" },
-  { id: "comments", title: "Comment on lines" },
-  { id: "commit", title: "Commit" },
-  { id: "push", title: "Push and open a pull request" },
-  { id: "tasks", title: "Changes in a task" },
-  { id: "requirements", title: "What each action needs" },
-  { id: "next-steps", title: "Next steps" },
-];
 ---
 
-<DocsLayout slug="review" sections={sections}>
+<DocsLayout slug="review">
   <DocsVisual
     label="The Changes panel for one modified file, src/Welcome.tsx, with eight lines added and two removed shown as a unified diff, under the Commit button."
   >

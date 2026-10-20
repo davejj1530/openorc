@@ -5,20 +5,9 @@ import LinkCards from "../../components/docs/LinkCards.astro";
 import Diagram from "../../components/docs/Diagram.astro";
 import { memoryDiagram } from "../../data/docs/diagrams";
 import { docHref } from "../../data/docs";
-
-const sections = [
-  { id: "what", title: "What a memory is" },
-  { id: "turn-on", title: "Turn memory on" },
-  { id: "made", title: "How memories are made" },
-  { id: "review", title: "Review and edit memories" },
-  { id: "later-runs", title: "How later runs use memory" },
-  { id: "models", title: "Choose who summarizes runs" },
-  { id: "privacy", title: "What leaves your computer" },
-  { id: "next-steps", title: "Next steps" },
-];
 ---
 
-<DocsLayout slug="memory" sections={sections}>
+<DocsLayout slug="memory">
   <section aria-labelledby="what">
     <h2 id="what">What a memory is</h2>
     <p>

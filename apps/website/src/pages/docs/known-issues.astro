@@ -3,23 +3,9 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 import Callout from "../../components/docs/Callout.astro";
 import LinkCards from "../../components/docs/LinkCards.astro";
 import { docHref } from "../../data/docs";
-
-const sections = [
-  { id: "windows", title: "More than one window" },
-  { id: "restarts", title: "Crashes and restarts" },
-  { id: "threads", title: "Threads" },
-  { id: "git", title: "Tasks and Git" },
-  { id: "storage", title: "Storage" },
-  { id: "memory", title: "Memory" },
-  { id: "slack", title: "Slack" },
-  { id: "teams", title: "Agent teams (Beta)" },
-  { id: "windows-os", title: "Windows" },
-  { id: "linux", title: "Linux" },
-  { id: "next-steps", title: "Next steps" },
-];
 ---
 
-<DocsLayout slug="known-issues" sections={sections}>
+<DocsLayout slug="known-issues">
   <p>Each entry says what you will notice and how to work around it. For problems with a fix, see <a href={docHref("troubleshooting")}>Troubleshooting</a>.</p>
 
   <section aria-labelledby="windows">

@@ -3,18 +3,9 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 import Callout from "../../components/docs/Callout.astro";
 import LinkCards from "../../components/docs/LinkCards.astro";
 import { docHref } from "../../data/docs";
-
-const sections = [
-  { id: "how-it-works", title: "How discussions work" },
-  { id: "ask", title: "Ask a model" },
-  { id: "replies", title: "How replies arrive" },
-  { id: "several", title: "Ask several models" },
-  { id: "work", title: "From discussion to work" },
-  { id: "next-steps", title: "Next steps" },
-];
 ---
 
-<DocsLayout slug="discussions" sections={sections}>
+<DocsLayout slug="discussions">
   <section aria-labelledby="how-it-works">
     <h2 id="how-it-works">How discussions work</h2>
     <p>Every task has <strong>Comments</strong> on its Overview, under the spec. A comment without a mention is a note to yourself. Mention a model with <kbd>@</kbd> and it reads the task and the discussion so far, then replies under your comment.</p>

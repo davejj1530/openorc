@@ -13,16 +13,8 @@ import LogoSprite from "../components/hero/LogoSprite.astro";
 import AppPreview from "../components/mocks/AppPreview.astro";
 import LiquidWord from "../components/LiquidWord.astro";
 import { getPublishedReleases, releaseAnchor } from "../data/changelog";
+import { questions } from "../data/faq";
 import "../styles/home.css";
-
-const faqs = [
-  ["What is OpenOrc?", "A desktop workspace for coding agents. Conversations, tasks, project context, and code review stay together across your projects."],
-  ["Can I use my existing agents?", "Yes. OpenOrc works with the Codex, Claude Code, and OpenCode tools you already have installed, through their own sign-in and configuration. Provider subscriptions and API usage stay separate."],
-  ["Where does my work live?", "Projects, conversation history, tasks, and project memory are stored on your computer. Each agent’s requests go to that agent’s provider, under its data policies. So do conversation titles, and run summaries once you turn memory on, unless you choose another provider in settings."],
-  ["Does saving a task start work?", "No. A task waits in the backlog until you start it. Discuss it first, then begin when the approach is settled."],
-  ["Can I review changes before they ship?", "Yes. The Changes panel sits beside the conversation. Read the diff, ask for another pass in the thread, then commit, push, or open a pull request when your Git setup supports it."],
-  ["Does scheduled or Slack work run while OpenOrc is closed?", "No. Agents run on your computer. Keep OpenOrc open and your computer awake for scheduled work and Slack replies."],
-];
 
 /** The stage: neutral grays drifting slowly under a fine grain. */
 const stage = {
@@ -104,8 +96,8 @@ const releaseDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "num
     <section class="faq-section container" id="questions" aria-labelledby="faq-title" data-reveal>
       <h2 id="faq-title">Good to know.</h2>
       <div class="faq-list">
-        {faqs.map(([question, answer]) => (
-          <details>
+        {questions.map(({ id, question, answer }) => (
+          <details id={id}>
             <summary>{question}<Icon name="plus" size={16} /></summary>
             <p>{answer}</p>
           </details>
@@ -124,3 +116,13 @@ const releaseDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "num
   </main>
   <SiteFooter />
 </Layout>
+
+<script>
+  // A question linked by its id, from the search or anywhere else, opens as the page lands on it.
+  const openLinkedQuestion = () => {
+    const target = document.getElementById(decodeURIComponent(location.hash.slice(1)));
+    if (target instanceof HTMLDetailsElement) target.open = true;
+  };
+  openLinkedQuestion();
+  addEventListener("hashchange", openLinkedQuestion);
+</script>

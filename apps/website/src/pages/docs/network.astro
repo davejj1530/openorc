@@ -3,20 +3,9 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 import Callout from "../../components/docs/Callout.astro";
 import LinkCards from "../../components/docs/LinkCards.astro";
 import { docHref } from "../../data/docs";
-
-const sections = [
-  { id: "summary", title: "Every connection" },
-  { id: "agents", title: "Agents" },
-  { id: "background", title: "Background requests" },
-  { id: "downloads", title: "Downloads and update checks" },
-  { id: "git", title: "Git and GitHub" },
-  { id: "local", title: "Local servers" },
-  { id: "never", title: "What OpenOrc does not send" },
-  { id: "next-steps", title: "Next steps" },
-];
 ---
 
-<DocsLayout slug="network" sections={sections}>
+<DocsLayout slug="network">
   <section aria-labelledby="summary">
     <h2 id="summary">Every connection</h2>
     <p>OpenOrc has no server of its own. Every connection goes straight from your computer to one of the services below. This table lists each one, when it happens, and how to stop it.</p>

@@ -3,22 +3,9 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 import Callout from "../../components/docs/Callout.astro";
 import LinkCards from "../../components/docs/LinkCards.astro";
 import { docHref } from "../../data/docs";
-
-const sections = [
-  { id: "data-folder", title: "The data folder" },
-  { id: "outside", title: "Outside the data folder" },
-  { id: "database", title: "The database" },
-  { id: "ledger", title: "Agent events" },
-  { id: "redaction", title: "Redaction" },
-  { id: "secrets", title: "Settings and secrets" },
-  { id: "window", title: "Window storage" },
-  { id: "retention", title: "How long things stay" },
-  { id: "deleting", title: "What deleting removes" },
-  { id: "next-steps", title: "Next steps" },
-];
 ---
 
-<DocsLayout slug="storage" sections={sections}>
+<DocsLayout slug="storage">
   <p>
     OpenOrc keeps your work on your computer, almost all of it in one data folder. It has no server of its own, and <a href={docHref("network")}>Network connections</a> lists everything that leaves your computer.
   </p>

@@ -4,6 +4,7 @@ import DownloadButton from "./DownloadButton.astro";
 import BrandMark from "./BrandMark.astro";
 import ThemeToggle from "./ThemeToggle.astro";
 import SoundToggle from "./SoundToggle.astro";
+import SearchDialog from "./SearchDialog.astro";
 import { getPublishedReleases } from "../data/changelog";
 const docs = Astro.url.pathname.startsWith("/docs");
 const changelog = Astro.url.pathname.startsWith("/changelog");
@@ -13,22 +14,35 @@ const home = Astro.url.pathname === "/" ? "" : "/";
 
 <header class="site-header">
   <nav class="container nav" aria-label="Main navigation">
-    <a class="wordmark" href="/" aria-label="OpenOrc home">
-      <BrandMark />
-      OpenOrc
-    </a>
-    <div class="nav-links">
-      <a class="nav-secondary" href={`${home}#workflow`}>
-        Workflow
+    <div class="nav-start">
+      <a class="wordmark" href="/" aria-label="OpenOrc home">
+        <BrandMark />
+        OpenOrc
       </a>
-      <a class="nav-secondary" href={`${home}#your-tools`}>
-        Your setup
-      </a>
-      <a href="/docs/" aria-current={docs ? "page" : undefined}>
-        Docs
-      </a>
-      {hasPublishedReleases && <a href="/changelog/" aria-current={changelog ? "page" : undefined}>Changelog</a>}
+      <div class="nav-links">
+        <a class="nav-secondary" href={`${home}#workflow`}>
+          Workflow
+        </a>
+        <a class="nav-secondary" href={`${home}#your-tools`}>
+          Your setup
+        </a>
+        <a href="/docs/" aria-current={docs ? "page" : undefined}>
+          Docs
+        </a>
+        {
+          hasPublishedReleases && (
+            <a class="nav-changelog" href="/changelog/" aria-current={changelog ? "page" : undefined}>
+              Changelog
+            </a>
+          )
+        }
+      </div>
     </div>
+    <button class="search-pill" type="button" aria-label="Search" aria-haspopup="dialog" aria-expanded="false" aria-controls="site-search" data-search-pill>
+      <Icon name="search" size={18} />
+      <span class="search-label">Search</span>
+      <kbd class="search-key" data-search-key>⌘K</kbd>
+    </button>
     <div class="nav-actions">
       <SoundToggle />
       <ThemeToggle />
@@ -39,6 +53,7 @@ const home = Astro.url.pathname === "/" ? "" : "/";
     </div>
   </nav>
 </header>
+<SearchDialog />
 
 <script>
   const header = document.querySelector<HTMLElement>(".site-header");

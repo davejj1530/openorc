@@ -3,18 +3,9 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 import Callout from "../../components/docs/Callout.astro";
 import LinkCards from "../../components/docs/LinkCards.astro";
 import { docHref } from "../../data/docs";
-
-const sections = [
-  { id: "choose-a-mode", title: "Choose a mode" },
-  { id: "what-each-mode-allows", title: "What each mode allows" },
-  { id: "plan", title: "Plan, then implement" },
-  { id: "approvals", title: "Answer an approval" },
-  { id: "openorc-tools", title: "OpenOrc's tools" },
-  { id: "next-steps", title: "Next steps" },
-];
 ---
 
-<DocsLayout slug="permissions" sections={sections}>
+<DocsLayout slug="permissions">
   <p>Every thread has a mode. It decides what the agent does on its own and what it asks you first. Plan keeps the agent to reading and planning. The other three modes are for acting, and each one asks you less often than the one before.</p>
 
   <section aria-labelledby="choose-a-mode">

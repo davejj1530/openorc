@@ -3,18 +3,9 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 import Callout from "../../components/docs/Callout.astro";
 import LinkCards from "../../components/docs/LinkCards.astro";
 import { docHref } from "../../data/docs";
-
-const sections = [
-  { id: "install", title: "Install OpenOrc" },
-  { id: "agent", title: "Set up an agent" },
-  { id: "setup", title: "Finish setup" },
-  { id: "first-thread", title: "Start your first thread" },
-  { id: "review", title: "Review and commit" },
-  { id: "next-steps", title: "Next steps" },
-];
 ---
 
-<DocsLayout slug="quickstart" sections={sections}>
+<DocsLayout slug="quickstart">
   <section aria-labelledby="install">
     <h2 id="install">Install OpenOrc</h2>
     <p>Get the installer from the <a href="/download/">download page</a>, which highlights the one for your computer when it can tell. OpenOrc is free and open source, and you don't need an OpenOrc account.</p>

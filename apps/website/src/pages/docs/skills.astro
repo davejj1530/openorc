@@ -3,17 +3,9 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 import Callout from "../../components/docs/Callout.astro";
 import LinkCards from "../../components/docs/LinkCards.astro";
 import { docHref } from "../../data/docs";
-
-const sections = [
-  { id: "what", title: "What a skill is" },
-  { id: "browse", title: "Browse skills" },
-  { id: "sources", title: "Where skills come from" },
-  { id: "use", title: "Use a skill in a conversation" },
-  { id: "next-steps", title: "Next steps" },
-];
 ---
 
-<DocsLayout slug="skills" sections={sections}>
+<DocsLayout slug="skills">
   <section aria-labelledby="what">
     <h2 id="what">What a skill is</h2>
     <p>

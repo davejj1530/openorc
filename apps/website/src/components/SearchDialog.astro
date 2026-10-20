@@ -1,0 +1,50 @@
+---
+/**
+ * The open search: a field over the dimmed page and the results panel under it. It sits outside the header, whose
+ * backdrop filter would otherwise hold it, and scripts/search.ts grows it out of the header's pill.
+ */
+import Icon from "./Icon.astro";
+import { searchSuggestions } from "../data/search-index";
+import "../styles/search.css";
+---
+
+<div class="search" id="site-search" role="dialog" aria-modal="true" aria-label="Search" data-search data-suggestions={JSON.stringify(searchSuggestions)} hidden>
+  <div class="search-scrim" data-search-scrim data-sound="click"></div>
+  <div class="search-column" data-search-column>
+    <div class="search-slot" data-search-slot>
+      <div class="search-field">
+        <span class="search-field-fill" data-search-field-fill></span>
+        <Icon name="search" size={18} />
+        <span class="search-label" aria-hidden="true">Search</span>
+        <kbd class="search-key" aria-hidden="true" data-search-key>⌘K</kbd>
+        <input
+          class="search-input"
+          type="text"
+          role="combobox"
+          aria-label="Search docs, questions and releases"
+          aria-expanded="true"
+          aria-controls="search-results"
+          aria-autocomplete="list"
+          placeholder="Search docs, questions and releases"
+          autocomplete="off"
+          spellcheck="false"
+          enterkeyhint="go"
+          data-search-input
+        />
+        <button class="search-clear" type="button" aria-label="Clear" data-search-clear>
+          <Icon name="close" size={20} />
+        </button>
+      </div>
+    </div>
+    <div class="search-panel" data-search-panel>
+      <span class="search-panel-fill"></span>
+      <div class="search-content" data-search-content>
+        <div class="search-results" id="search-results" role="listbox" aria-label="Results" data-search-results></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  import "../scripts/search";
+</script>

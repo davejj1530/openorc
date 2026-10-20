@@ -210,7 +210,10 @@ h3 {
   transform: none;
 }
 
-/* Header: the mark, pill links with a fill on the current page, then sound, theme, GitHub and the one ink pill. */
+/*
+ * Header: three zones. The mark and pill links with a fill on the current page; the search at the center; then sound,
+ * theme, GitHub and the one ink pill.
+ */
 .site-header {
   --header-height: 64px;
   position: sticky;
@@ -231,6 +234,12 @@ h3 {
   min-height: var(--header-height);
   gap: 4px 24px;
 }
+.nav-start {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: inherit;
+}
 .wordmark {
   display: inline-flex;
   align-items: center;
@@ -248,6 +257,7 @@ h3 {
   gap: 2px;
   color: var(--muted);
   font-size: var(--type-control);
+  white-space: nowrap;
 }
 .nav-links a {
   display: inline-flex;
@@ -269,9 +279,10 @@ h3 {
 }
 .nav-actions {
   display: flex;
+  flex: 1;
   align-items: center;
+  justify-content: flex-end;
   gap: 4px;
-  margin-left: auto;
 }
 .icon-button {
   display: grid;
@@ -463,6 +474,11 @@ h3 {
     width: calc(100% - 2 * var(--gutter));
   }
 }
+@media (max-width: 860px) {
+  .nav-links .nav-secondary {
+    display: none;
+  }
+}
 @media (max-width: 700px) {
   :root {
     --gutter: 16px;
@@ -478,15 +494,24 @@ h3 {
   .nav {
     gap: 4px 8px;
   }
-  .nav-links .nav-secondary,
   .nav-actions .button-small {
     display: none;
+  }
+  /* On phones the search circle joins the actions, as on Immaculate's site. */
+  .nav-actions {
+    flex: none;
   }
   .footer-grid {
     grid-template-columns: 1fr;
   }
   .footer-links {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+/* On phones the search reaches every release, so the Changelog link makes room for it. */
+@media (max-width: 480px) {
+  .nav-links .nav-changelog {
+    display: none;
   }
 }
 @media (prefers-reduced-motion: reduce) {

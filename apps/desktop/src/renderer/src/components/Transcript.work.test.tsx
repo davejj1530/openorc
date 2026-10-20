@@ -124,7 +124,7 @@ it("carries the live step on one line, open or folded", () => {
 it("preserves an inspected command when it fails and a retry arrives", () => {
   const command: Block = { ...tool, name: "shell", input: { command: "pnpm test" } };
   const { rerender } = render(<WorkTranscript runId="run" blocks={[command]} live />);
-  fireEvent.click(screen.getByRole("button", { name: "Running" }));
+  // A phase that is its one call opens straight to it.
   fireEvent.click(screen.getByRole("button", { name: /Running command pnpm test/ }));
   const failed: Block = { ...command, done: true, isError: true, status: "error", output: "7 tests failed" };
   rerender(<WorkTranscript runId="run" blocks={[failed, { ...command, id: "retry" }]} live />);
@@ -184,7 +184,7 @@ it.each([["individual", WorkTranscript]] as const)("keeps failed attempts in %s 
   applyFrame({ runId, seq: 1, events: events.slice(0, 3) });
   const { rerender, unmount } = render(<Component runId={runId} blocks={getRun(runId)!.blocks} live />);
   expect(screen.queryByRole("button", { name: /pnpm test.*Failed/ })).toBeNull();
-  expect(screen.getByRole("button", { name: "Running pnpm test" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Running the tests" })).toBeTruthy();
 
   applyFrame({ runId, seq: 2, events: events.slice(3) });
   rerender(<Component runId={runId} blocks={getRun(runId)!.blocks} />);
@@ -202,8 +202,9 @@ it.each([["individual", WorkTranscript]] as const)("keeps failed attempts in %s 
   expect(screen.queryByRole("button", { name: /.*Failed/ })).toBeNull();
   fireEvent.click(receipt());
   expect(screen.queryByRole("button", { name: /.*Failed/ })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Ran 2 commands" }));
-  fireEvent.click(screen.getByRole("button", { name: "Ran 2" }));
+  fireEvent.click(screen.getByRole("button", { name: "Read a file, ran the tests" }));
+  fireEvent.click(screen.getByRole("button", { name: "Read" }));
+  fireEvent.click(screen.getByRole("button", { name: "Ran" }));
   fireEvent.click(screen.getByRole("button", { name: /cat scripts\/build-mascot-review.cjs.*Failed/ }));
   fireEvent.click(screen.getByRole("button", { name: /pnpm test.*Failed/ }));
   expect(screen.getByText("No such file or directory")).toBeTruthy();

@@ -1,4 +1,5 @@
 import { shellSteps, unwrapShell } from "../lib/shell";
+import { commandParts, folderOf } from "./command-chips";
 import { commandOf } from "../lib/tool-view";
 import type { Block } from "../lib/transcript";
 import { patchStat } from "./diff-stat";
@@ -16,6 +17,14 @@ export interface WorkChip {
   path?: string;
   added?: number;
   removed?: number;
+  /** Faint words that fill the middle of the row: a file's folder, a search's scope, or its query when the agent's words are the label. */
+  detail?: string;
+  /** Faint words at the row's end: the lines a read printed, how many matches a search found. */
+  note?: string;
+  /** What the live line says while the call runs, when that is not the section's verb before the label. */
+  live?: string;
+  /** Each thing a call with plain words ran, once done, for a phase named after it: ["Ran the tests"]. */
+  done?: string[];
   blocks: Block[];
 }
 
@@ -26,7 +35,6 @@ export interface CallPart {
 }
 
 type ToolBlock = Extract<Block, { kind: "tool" }>;
-type CommandAction = { type?: unknown; command?: unknown; name?: unknown; path?: unknown; query?: unknown };
 
 const text = (value: unknown) => (typeof value === "string" ? value : "");
 
@@ -106,7 +114,7 @@ function editStats(block: ToolBlock): Map<string, { added?: number; removed?: nu
 }
 
 function fileChip(path: string, stat?: { added?: number; removed?: number }, kind: "file" | "edit" = "file"): Omit<WorkChip, "blocks"> {
-  return { key: path, label: basename(path), title: path, kind, path, ...stat };
+  return { key: path, label: basename(path), title: path, kind, path, detail: folderOf(path), ...stat };
 }
 
 /** The calls a chip opens. An edit opens only its own file's part of each patch, so the diff is the one its numbers count. */
@@ -117,18 +125,6 @@ export function chipCalls(chip: WorkChip): Block[] {
     const own = (block.input as { path?: unknown }[]).filter((entry) => entry?.path === chip.path);
     return own.length ? { ...block, input: own } : block;
   });
-}
-
-/** Codex reads each command for what it does: a `sed` that prints a file is a read, an `rg` is a search. */
-function actionPart(action: CommandAction): CallPart {
-  const command = text(action.command);
-  if (action.type === "read") {
-    const path = text(action.path) || text(action.name);
-    return { section: "Read", chip: { ...fileChip(path), label: text(action.name) || basename(path) } };
-  }
-  if (action.type === "search") return { section: "Searched", chip: { key: text(action.query) || command, label: text(action.query) || command, title: command, kind: "query" } };
-  if (action.type === "listFiles") return { section: "Listed", chip: { key: text(action.path) || command, label: text(action.path) || command, title: command, kind: "folder" } };
-  return { section: "Ran", chip: { key: command, label: commandLabel(command), title: command, kind: "command" } };
 }
 
 const sectionFor: Record<string, { section: string; kind: ChipKind }> = {
@@ -171,16 +167,16 @@ function presentedParts(block: ToolBlock): CallPart[] {
   return [{ section: known?.section ?? verb, chip: { key: label, label, title: object, kind: known?.kind ?? "tool" } }];
 }
 
-/** Which sections a call belongs to and what it adds to each. Every call lands in at least one section. */
+/**
+ * Which sections a call belongs to and what it adds to each. Every call lands in at least one section. A shell call
+ * reads as what its command did, so a `sed -n` lands under Read even when the agent described it.
+ */
 export function callParts(block: Block): CallPart[] {
   if (block.kind === "activity") return [{ section: block.label, chip: null }];
   if (block.kind !== "tool") return [{ section: block.kind, chip: null }];
   const intent = toolIntent(block);
-  if (intent) {
-    const agent = !/^bash$/i.test(block.name);
-    return [{ section: agent ? "Delegated" : "Ran", chip: { key: `intent:${block.id}`, label: intent, title: agent ? intent : commandText(block) || intent, kind: agent ? "agent" : "intent" } }];
-  }
-  const actions = (block.input as { commandActions?: unknown } | null)?.commandActions;
-  const parsed = Array.isArray(actions) ? actions.filter((action): action is CommandAction => typeof action === "object" && action !== null) : [];
-  return parsed.length ? parsed.map(actionPart) : presentedParts(block);
+  if (intent && !/^bash$/i.test(block.name)) return [{ section: "Delegated", chip: { key: `intent:${block.id}`, label: intent, title: intent, kind: "agent" } }];
+  const command = commandText(block);
+  const { verb, summary } = toolCallPresentation(block.name, block.input);
+  return command && verb === "Ran" && !summary ? commandParts(block, command, intent) : presentedParts(block);
 }

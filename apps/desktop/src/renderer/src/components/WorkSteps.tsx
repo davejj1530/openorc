@@ -1,4 +1,4 @@
-import { memo, useEffect, useId, useMemo, useState, type ReactNode } from "react";
+import { Fragment, memo, useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import type { Block } from "../lib/transcript";
 import { cn } from "../lib/cn";
 import { workDuration } from "../lib/work-transcript";
@@ -6,7 +6,7 @@ import { Brain, Check, ChevronRight, Folder, Globe, Hammer, Loader2, Search, Ter
 import { FileGlyph } from "./FileGlyph";
 import { ThreadLink } from "./ThreadImages";
 import { chipCalls, type WorkChip } from "./work-chips";
-import { isLive, liveHeadline, liveSectionLabel, workEntries, type LiveHeadline, type PlanItem, type WorkEntry, type WorkPhase, type WorkSection } from "./work-steps";
+import { chipTitle, isLive, liveHeadline, liveSectionLabel, workEntries, type LiveHeadline, type PlanItem, type WorkEntry, type WorkPhase, type WorkSection } from "./work-steps";
 import "./WorkSteps.css";
 
 /** How raw blocks render: the transcript's own rows, so the work list never needs to know them. `open` starts calls open. */
@@ -169,7 +169,7 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? o
 /** A folded phase's hint of what is inside: "6 files · 2 commands". */
 function phaseMeta(phase: WorkPhase): string {
   const count = (labels: string[]) => phase.sections.filter((section) => labels.includes(section.label)).reduce((sum, section) => sum + section.chips.length, 0);
-  const files = count(["Read", "Edited", "Listed"]);
+  const files = count(["Read", "Edited"]);
   const searches = count(["Searched", "Searched the web", "Searched memory"]);
   const commands = count(["Ran"]);
   return [files ? plural(files, "file") : "", searches ? plural(searches, "search", "searches") : "", commands ? plural(commands, "command") : ""].filter(Boolean).slice(0, 2).join(" · ");
@@ -239,6 +239,7 @@ function PhaseBody({ phase, live, renderBlocks }: { phase: WorkPhase; live: bool
   // already shows the command and its last line, so it stays closed rather than repeat them.
   const section = phase.sections.length === 1 ? phase.sections[0]! : null;
   const only = section?.chips.length === 1 ? section.chips[0]! : null;
+  if (only && chipTitle(only) === phase.title && !phase.extras.length) return <div className="work-group-calls">{renderBlocks(only.blocks, section?.label !== "Ran")}</div>;
   return (
     <>
       {phase.detail ? <p className="work-phase-detail">{phase.detail}</p> : null}
@@ -261,12 +262,12 @@ function PhaseBody({ phase, live, renderBlocks }: { phase: WorkPhase; live: bool
 }
 
 /**
- * One kind of work in a phase: a small label ("Read 6"), then what it touched as chips. The label opens the calls
- * themselves. An activity with nothing to chip is its own row already.
+ * One kind of work in a phase: its verb ("Read") in a quiet column, then what it touched as aligned rows. The verb
+ * opens the calls themselves. An activity with nothing to list is its own row already.
  */
 function GroupView({ section, live, renderBlocks }: { section: WorkSection; live: boolean; renderBlocks: RenderBlocks }) {
   const activities = section.blocks.filter((block) => block.kind === "activity");
-  if (!section.chips.length && activities.length) return <div className="work-group">{renderBlocks(activities)}</div>;
+  if (!section.chips.length && activities.length) return <div className="work-group-blocks">{renderBlocks(activities)}</div>;
   return <ChipGroup section={section} live={live} renderBlocks={renderBlocks} />;
 }
 
@@ -279,7 +280,11 @@ function ChipGroup({ section, live, renderBlocks }: { section: WorkSection; live
   const [visited, setVisited] = useState(false);
   const callsId = useId();
   const running = live && section.blocks.some(isLive);
-  const shown = all ? section.chips : section.chips.slice(0, CHIP_LIMIT);
+  const first = section.chips.slice(0, CHIP_LIMIT);
+  // The call under way stays in view, in place of the last row that fits.
+  const current = running ? section.chips.findLast((chip) => chip.blocks.some(isLive)) : undefined;
+  const fitting = current && !first.includes(current) ? [...first.slice(0, -1), current] : first;
+  const shown = all ? section.chips : fitting;
   return (
     <div className="work-group">
       <button
@@ -293,22 +298,21 @@ function ChipGroup({ section, live, renderBlocks }: { section: WorkSection; live
         }}
       >
         <span>{running ? liveSectionLabel(section.label) : section.label}</span>
-        {section.chips.length > 1 ? <span className="work-count">{section.chips.length}</span> : null}
         <ChevronRight size={10} className={cn("work-chevron", calls && "rotate-90")} />
       </button>
-      {shown.length ? (
-        <div className="work-chips">
-          {shown.map((chip) => (
-            <ChipView key={chip.key} chip={chip} live={live && chip.blocks.some(isLive)} picked={chip.key === picked} onPick={() => setPicked((key) => (key === chip.key ? null : chip.key))} />
-          ))}
-          {section.chips.length > shown.length ? (
-            <button type="button" className="work-more" onClick={() => setAll(true)}>
-              +{section.chips.length - shown.length} more
-            </button>
-          ) : null}
-        </div>
-      ) : null}
-      {pick ? <div className="work-group-calls">{renderBlocks(chipCalls(pick), true)}</div> : null}
+      <div className="work-chips">
+        {shown.map((chip) => (
+          <Fragment key={chip.key}>
+            <ChipView chip={chip} live={live && chip.blocks.some(isLive)} picked={chip.key === picked} onPick={() => setPicked((key) => (key === chip.key ? null : chip.key))} />
+            {chip === pick ? <div className="work-group-calls">{renderBlocks(chipCalls(pick), true)}</div> : null}
+          </Fragment>
+        ))}
+        {section.chips.length > shown.length ? (
+          <button type="button" className="work-more" onClick={() => setAll(true)}>
+            {section.chips.length - shown.length} more
+          </button>
+        ) : null}
+      </div>
       <div id={callsId} hidden={!calls} className="work-group-calls">
         {visited ? renderBlocks(section.blocks) : null}
       </div>
@@ -320,16 +324,25 @@ const kindIcons = { folder: Folder, query: Search, command: Terminal, intent: Te
 
 /** A file shows its language's mark; anything else shows what kind of thing it is. */
 function ChipIcon({ chip }: { chip: WorkChip }) {
-  if (chip.kind === "file" || chip.kind === "edit") return <FileGlyph path={chip.label} className="work-chip-icon" />;
+  if (chip.kind === "file" || chip.kind === "edit") return <FileGlyph path={chip.label} size={14} className="work-chip-icon" />;
   const Icon = kindIcons[chip.kind];
-  return <Icon size={12} className="work-chip-icon" />;
+  return <Icon size={14} className="work-chip-icon" />;
 }
 
+/**
+ * A row: the mark, the name, a faint detail that fills the middle (a file's folder, a search's scope), and at the
+ * end a faint note (the lines read, the matches found) or an edit's line counts.
+ */
 function ChipView({ chip, live, picked, onPick }: { chip: WorkChip; live: boolean; picked: boolean; onPick: () => void }) {
   const content = (
     <>
       <ChipIcon chip={chip} />
       <span className="work-chip-label">{chip.label}</span>
+      {/* A file's title carries its whole path, so its folder stays out of the row's name. */}
+      <span className="work-chip-detail" aria-hidden={chip.path ? true : undefined}>
+        {chip.detail}
+      </span>
+      {chip.note ? <span className="work-chip-note">{chip.note}</span> : null}
       {chip.added ? <span className="work-stat-added">+{chip.added}</span> : null}
       {chip.removed ? <span className="work-stat-removed">−{chip.removed}</span> : null}
     </>

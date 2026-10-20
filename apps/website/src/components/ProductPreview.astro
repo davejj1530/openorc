@@ -3,6 +3,8 @@ import LogoSprite from "./hero/LogoSprite.astro";
 import DiscussionScene from "./hero/DiscussionScene.astro";
 import HandoffScene from "./hero/HandoffScene.astro";
 import TeamScene from "./hero/TeamScene.astro";
+import WorktreeMock from "./mocks/WorktreeMock.astro";
+import ChangesPanelMock from "./mocks/ChangesPanelMock.astro";
 
 const demos = [
   {
@@ -44,7 +46,7 @@ const demos = [
       ))}
     </div>
   </div>
-  <div class="stage demo-stage" data-arrive style="--arrive-index: 2">
+  <div class="stage demo-stage hero-demo" data-arrive style="--arrive-index: 2">
     {demos.map(({ id, alt, Scene }, i) => (
       <article id={`demo-${id}`} class="demo-panel" data-panel hidden={i !== 0}>
         <div class="demo-window">
@@ -52,6 +54,15 @@ const demos = [
         </div>
       </article>
     ))}
+  </div>
+  {/* Phones get no demo: two stills on a tile, as Plan, Review, Ship shows them. */}
+  <div class="stage feature-visual hero-still" data-arrive style="--arrive-index: 2">
+    <div class="hero-still-thread mock-window" role="img" aria-label="An OpenOrc thread where Codex reports that every color, radius, and spacing step now comes from one tokens.css file.">
+      <WorktreeMock />
+    </div>
+    <div class="hero-still-changes mock-window" role="img" aria-label="OpenOrc's Changes panel showing a sample code diff under its Commit button.">
+      <ChangesPanelMock />
+    </div>
   </div>
 </section>
 

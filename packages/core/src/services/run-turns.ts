@@ -66,7 +66,14 @@ export class RunTurns {
   private async shouldRestart(entry: LiveRun, thread: Thread | null): Promise<boolean> {
     if (!thread || entry.team || entry.busy) return false;
     if (this.mustRestart(entry, thread)) return true;
-    return !(await this.applyThreadSettings(entry, thread));
+    // Background work the agent left running ends with its process, so a message during it keeps the process and any
+    // settings it can't take wait for the next turn with nothing running.
+    return !(await this.applyThreadSettings(entry, thread)) && !working(entry);
+  }
+
+  /** Whether the next message can go to this process as it is, without a new one for its mode, permissions or agent. */
+  reusable(entry: LiveRun, thread: Thread): boolean {
+    return !entry.team && !this.mustRestart(entry, thread);
   }
 
   private async restartTurn(entry: LiveRun, thread: Thread, text: string, options: SendOptions): Promise<void> {

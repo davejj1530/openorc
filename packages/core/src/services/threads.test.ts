@@ -107,6 +107,68 @@ describe("commands left running in the background", () => {
   });
 });
 
+describe("work left running after the turn", () => {
+  it("starts the next turn from the queue on the same session, and holds a message that needs a new process until the work ends", async () => {
+    const thread = threads.insert(core.db, { projectId: project.id, title: "Long review", agent: "claude", model: null, mode: "act", permissionMode: "trusted" });
+    const send = vi.fn(async () => {});
+    const handles: RunHandle[] = [];
+    const adapter = vi.spyOn(ClaudeAdapter.prototype, "start").mockImplementation((spec) => {
+      let finish!: (code: number) => void;
+      const done = new Promise<number>((resolve) => {
+        finish = resolve;
+      });
+      const handle: RunHandle = new RunHandle(spec.runId, {
+        send,
+        interrupt() {},
+        close() {
+          handle.emit("exit", 0);
+          finish(0);
+        },
+        done,
+      });
+      handles.push(handle);
+      return handle;
+    });
+    try {
+      const run = await core.runs.start({
+        scope: { task: null, thread },
+        project,
+        agent: "claude",
+        model: "fixture",
+        mode: "act",
+        permissionMode: "trusted",
+        prompt: "Review everything",
+        resume: false,
+      });
+      const [handle] = handles as [RunHandle];
+      const turnEnds = (turnId: string) => handle.emit("event", { type: "turn.completed", runId: run.id, ts: Date.now(), turnId, status: "success", durationMs: 0 });
+      handle.emit("event", { type: "session.started", runId: run.id, ts: Date.now(), agent: "claude", externalSessionId: "review", model: "fixture" });
+      // The turn hands work to background agents and ends while they run.
+      handle.emit("event", { type: "background.updated", runId: run.id, ts: Date.now(), running: 1 });
+      core.threads.queue(thread.id, "Also check the sidebar");
+      turnEnds("first");
+      await vi.waitFor(() => expect(send).toHaveBeenCalledWith("Also check the sidebar", []));
+      expect(core.threads.get(thread.id)).toMatchObject({ queued: [], activity: "running" });
+
+      turnEnds("second");
+      // Between turns, with the work still running, the session takes a message as its next turn.
+      await vi.waitFor(() => expect(core.runs.canDeliver(run.id)).toBe(true));
+      // Plan mode needs a new process, which would end the background work, so the message waits for it.
+      threads.update(core.db, thread.id, { mode: "plan" });
+      core.threads.queue(thread.id, "Plan the rest");
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(core.threads.get(thread.id)?.queued).toMatchObject([{ text: "Plan the rest" }]);
+      expect(handles).toHaveLength(1);
+
+      handle.emit("event", { type: "background.updated", runId: run.id, ts: Date.now(), running: 0 });
+      await vi.waitFor(() => expect(handles).toHaveLength(2));
+      await vi.waitFor(() => expect(core.threads.get(thread.id)?.queued).toEqual([]));
+    } finally {
+      adapter.mockRestore();
+    }
+  });
+});
+
 describe("compaction and delivery recovery", () => {
   async function idleSession(controls: { send: (text: string, attachments?: string[]) => Promise<void>; compact: () => Promise<void> }) {
     const thread = planThread();
@@ -1141,7 +1203,7 @@ describe("thread lifecycle", () => {
     const r = runRepo.insert(core.db, { id: "steer-rejected-run", taskId: null, threadId: t.id, agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
     vi.spyOn(core.runs, "threadActivity").mockReturnValue("running");
     vi.spyOn(core.runs, "liveRunForThread").mockImplementation((id) => (id === t.id ? r : null));
-    vi.spyOn(core.runs, "canSteer").mockReturnValue(true);
+    vi.spyOn(core.runs, "canDeliver").mockReturnValue(true);
     let reject!: (error: Error) => void;
     vi.spyOn(core.runs, "send").mockImplementation(
       () =>
@@ -1164,7 +1226,7 @@ describe("thread lifecycle", () => {
     const r = runRepo.insert(core.db, { id: "queue-identity-run", taskId: null, threadId: t.id, agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
     vi.spyOn(core.runs, "threadActivity").mockReturnValue("running");
     vi.spyOn(core.runs, "liveRunForThread").mockImplementation((id) => (id === t.id ? r : null));
-    vi.spyOn(core.runs, "canSteer").mockReturnValue(true);
+    vi.spyOn(core.runs, "canDeliver").mockReturnValue(true);
     const send = vi.spyOn(core.runs, "send").mockResolvedValue();
     const first = core.threads.queueFollowUp({ threadId: t.id, text: "First", requestKey: "first" });
     const second = core.threads.queueFollowUp({ threadId: t.id, text: "Second", requestKey: "second" });

@@ -177,17 +177,19 @@ export function AgentUpdateNotice() {
   const available = data.agents.filter((row) => row.status === "available");
   return (
     <aside className="agent-update-notice" aria-label="Agent updates" role="status">
-      <Download size={18} className="shrink-0 text-ink-2 mt-0.5" />
+      <Download size={16} className="shrink-0 text-ink-3" />
       <div className="min-w-0 flex-1">
-        <p className="font-medium">{available.length === 1 ? `${harnessCatalog[available[0]!.id].name} update available` : `${available.length} agent updates available`}</p>
-        <p className="text-sm text-ink-2 mt-1">{available.length === 1 ? `Version ${available[0]!.latestVersion} is ready to review.` : "New versions of your coding agents are ready to review."}</p>
-        <TextButton className="mt-3 text-sm" onClick={() => useRouter.getState().navigate({ view: "settings", section: "connections" })}>
+        <p>{available.length === 1 ? `${harnessCatalog[available[0]!.id].name} update available` : `${available.length} agent updates available`}</p>
+        <p className="agent-update-notice-detail">
+          {available.length === 1 ? `Version ${available[0]!.latestVersion} is ready to review.` : "New versions of your coding agents are ready to review."}
+        </p>
+        <Button size="sm" className="mt-3" onClick={() => useRouter.getState().navigate({ view: "settings", section: "connections" })}>
           Review updates
-        </TextButton>
+        </Button>
         {dismiss.error ? <p className="text-sm text-bad mt-1">Could not dismiss. Try again.</p> : null}
       </div>
-      <IconButton aria-label="Dismiss agent updates" disabled={dismiss.isPending} onClick={() => dismiss.mutate({ dismissed: signature })}>
-        <X size={16} />
+      <IconButton aria-label="Dismiss agent updates" size="xs" className="-mt-1 -mr-1" disabled={dismiss.isPending} onClick={() => dismiss.mutate({ dismissed: signature })}>
+        <X size={14} />
       </IconButton>
     </aside>
   );

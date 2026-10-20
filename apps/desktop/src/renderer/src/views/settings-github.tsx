@@ -9,7 +9,7 @@ function SettingRow({ label, hint, children }: { label: string; hint?: ReactNode
   return (
     <div className="settings-field">
       <span>
-        <span className="font-medium">{label}</span>
+        <span>{label}</span>
         {hint ? <span className="settings-hint">{hint}</span> : null}
       </span>
       <span className="flex shrink-0 flex-wrap items-center justify-end gap-2">{children}</span>

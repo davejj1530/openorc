@@ -34,9 +34,7 @@ function SkillsScope({ projects, projectId, error, onProject }: { projects: Proj
   return (
     <div className="skills-scope">
       <div>
-        <label htmlFor="skills-project" className="font-medium">
-          Project
-        </label>
+        <label htmlFor="skills-project">Project</label>
         <p className="text-sm text-ink-2 mt-1">Project skills vary by project. Each agent also has its own personal and plugin skills.</p>
       </div>
       <Select id="skills-project" value={projectId} disabled={!projects?.length} onChange={(event) => onProject(event.target.value)}>
@@ -127,7 +125,7 @@ function SkillGroup({ group, agent }: { group: (typeof sources)[number] & { item
 function SkillsEmpty({ term, clear }: { term: string; clear: () => void }) {
   return (
     <div className="skills-empty">
-      <p className="font-medium">{term ? "No matching skills" : "No skills found"}</p>
+      <p>{term ? "No matching skills" : "No skills found"}</p>
       <p className="text-sm text-ink-2 mt-1">{term ? "Try another name or description." : "A skill is a Markdown file in a project or personal skill folder. Plugins can add their own."}</p>
       {term && (
         <Button variant="ghost" className="mt-3" onClick={clear}>

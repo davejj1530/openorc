@@ -58,8 +58,8 @@ export function CodexResetDialog({ reset }: { reset: CodexReset }) {
       <div className="space-y-3">
         <p>{reset.confirmation?.context}</p>
         <p className="text-ink-2">{credit?.description ?? "Use one available reset for eligible Codex usage limits. The provider will choose the reset when details are unavailable."}</p>
-        {credit?.expiresAt != null && <p className="text-sm text-ink-2">Expires {formatUsageTime(credit.expiresAt)}</p>}
-        <p className="text-sm text-ink-2">This consumes one reset and may change your next reset time. Your conversation will not restart automatically.</p>
+        {credit?.expiresAt != null && <p className="text-sm text-ink-3">Expires {formatUsageTime(credit.expiresAt)}</p>}
+        <p className="text-sm text-ink-3">This consumes one reset and may change your next reset time. Your conversation will not restart automatically.</p>
         <div className="flex justify-end gap-2">
           <Button onClick={reset.dismiss}>Cancel</Button>
           <Button

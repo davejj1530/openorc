@@ -11,7 +11,7 @@ import { cn } from "../lib/cn";
 import { CoversPreview } from "../lib/browser-preview";
 import { settingsSection, settingsSections } from "../lib/settings-sections";
 import { Check, ChevronDown, RefreshCw } from "../components/icons";
-import { menuItem, menuPopup } from "../components/ThreadActions";
+import { menuItem, menuPopup } from "../components/menu";
 import { TopBar } from "../components/TopBar";
 import { MemoryControl } from "../components/MemoryControl";
 import { Button, Input, Select } from "../components/ui";
@@ -24,6 +24,7 @@ import { SlackSettings } from "./settings-slack";
 import { ProviderUsageOverview } from "./settings-usage";
 import { TextGenerationSettings } from "./settings-text-generation";
 import { UpdateSettingsSection } from "./settings-updates";
+import { floatingGround } from "../lib/use-anchor-ground";
 
 type SettingsRoute = Extract<Route, { view: "settings" }>;
 
@@ -38,30 +39,34 @@ export function Settings({ route }: { route: SettingsRoute }) {
     return () => cancelAnimationFrame(frame);
   }, [route]);
   const info = useRpc("system.info", { refresh: true });
+  const sidebarOpen = useLayout((s) => s.sidebarOpen);
   return (
-    <>
-      <TopBar showProject={false}>
-        <SettingsTitle current={current} />
+    <div className="settings-sheet" data-plane data-sidebar={sidebarOpen ? "open" : "closed"}>
+      <TopBar showProject={false} className="settings-sheet-bar">
+        {null}
       </TopBar>
       <div className="settings-shell">
         <div ref={content} className="settings-content">
-          {settingsSections.map(({ id, label, description }) => (
+          <header className="settings-page-head">
+            <div className="min-w-0">
+              <SettingsTitle current={current} />
+              <p>{current.description}</p>
+            </div>
+            {current.id === "connections" && (
+              <Button size="lg" disabled={info.isFetching} onClick={() => void info.refetch()}>
+                <RefreshCw size={13} />
+                {info.isFetching ? "Checking…" : "Refresh connections"}
+              </Button>
+            )}
+          </header>
+          {settingsSections.map(({ id, label }) => (
             <section key={id} id={`settings-${id}`} aria-label={label} hidden={id !== current.id}>
-              <header className="settings-heading">
-                <p>{description}</p>
-                {id === "connections" && (
-                  <Button disabled={info.isFetching} onClick={() => void info.refetch()}>
-                    <RefreshCw size={13} />
-                    {info.isFetching ? "Checking…" : "Refresh connections"}
-                  </Button>
-                )}
-              </header>
               <SectionSettings id={id} active={id === current.id} info={info} />
             </section>
           ))}
         </div>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -84,12 +89,12 @@ export function SettingsTitle({ current }: { current: { id: SettingsSection; lab
       <Menu.Root>
         <Menu.Trigger className="settings-section-menu no-drag">
           <span className="truncate">{current.label}</span>
-          <ChevronDown size={12} className="shrink-0" />
+          <ChevronDown size={16} className="shrink-0" />
         </Menu.Trigger>
         <Menu.Portal>
           <CoversPreview />
           <Menu.Positioner sideOffset={6} align="start" className="z-40" collisionPadding={8}>
-            <Menu.Popup className={menuPopup}>
+            <Menu.Popup ref={floatingGround} className={menuPopup}>
               {settingsSections.map(({ id, label }) => (
                 <Menu.Item key={id} className={menuItem} onClick={() => navigate({ view: "settings", section: id })}>
                   <Check size={13} className={cn("text-transparent", id === current.id && "text-ink")} />
@@ -190,7 +195,7 @@ function GeneralSettings() {
           onChange={(claudeUserMcpServers) => void s.commit({ claudeUserMcpServers })}
         />
       </Section>
-      <Section id="team-execution-setting" title="Orchestration">
+      <Section id="team-execution-setting" title="Teams">
         <Toggle
           label="Team execution (Beta)"
           hint="Let a lead coordinate managers and workers. Turning this off keeps existing activity and Stop available."
@@ -228,9 +233,7 @@ export function MemorySettings() {
   return (
     <>
       {s.query.isError && <LoadError retry={() => void s.query.refetch()} />}
-      <div className="mb-6">
-        <MemoryControl />
-      </div>
+      <MemoryControl />
       <Section
         title="Learn from completed runs"
         description="An optional background model extracts useful lessons after each run. When this is off, agents can still save memories if OpenOrc memory is on."

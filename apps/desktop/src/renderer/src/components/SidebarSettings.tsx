@@ -1,4 +1,4 @@
-import { ArrowLeft } from "./icons";
+import { ChevronLeft } from "./icons";
 import { NavItem } from "./SidebarNav";
 import { useRouter, type Route } from "../lib/router";
 import { settingsSection, settingsSections } from "../lib/settings-sections";
@@ -8,11 +8,11 @@ export function SidebarSettings({ route }: { route: Extract<Route, { view: "sett
   const opener = useRouter((s) => s.history.findLast((entry) => entry.view !== "settings"));
   const current = settingsSection(route).id;
   return (
-    <div className="sidebar-destinations settings-destinations">
-      <NavItem route={opener ?? { view: "newthread" }} icon={<ArrowLeft size={15} />} label="Back to app" active={false} />
-      <nav className="nav-track grid grid-cols-1 min-w-0 gap-px" aria-label="Settings">
+    <div className="settings-destinations">
+      <NavItem route={opener ?? { view: "newthread" }} icon={<ChevronLeft size={16} />} label="Back to app" active={false} />
+      <nav className="grid grid-cols-1 gap-0.5 min-w-0" aria-label="Settings">
         {settingsSections.map(({ id, label, Icon }) => (
-          <NavItem key={id} route={{ view: "settings", section: id }} icon={<Icon size={15} />} label={label} active={id === current} />
+          <NavItem key={id} route={{ view: "settings", section: id }} icon={<Icon size={16} />} label={label} active={id === current} />
         ))}
       </nav>
     </div>

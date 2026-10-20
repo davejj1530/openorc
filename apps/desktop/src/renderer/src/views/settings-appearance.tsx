@@ -4,7 +4,7 @@ import { Button } from "../components/ui";
 import { cn } from "../lib/cn";
 import { toHex } from "../lib/color";
 import { themePresets, useTheme, type ThemeChoice } from "../lib/theme";
-import { colorGroups, editableTokens, overridesFor } from "../lib/theme-custom";
+import { colorGroups, editableTokens, overridesFor, translucentTokens } from "../lib/theme-custom";
 import { Field, Section, Toggle } from "./settings-shared";
 import { useWindowAppearance } from "../lib/window-appearance";
 import { PaletteSelector } from "../components/PaletteSelector";
@@ -126,7 +126,10 @@ function ColorEditor({ report }: { report: Report }) {
     () =>
       colorGroups.map((group) => ({
         name: group.name,
-        tokens: group.tokens.map(({ token, label }) => ({ token, label, base: toHex(theme.colors[resolved][token]) ?? "#000000" })),
+        tokens: group.tokens.map(({ token, label }) => {
+          const alpha = translucentTokens.has(token);
+          return { token, label, alpha, base: toHex(theme.colors[resolved][token], alpha) ?? "#000000" };
+        }),
       })),
     [theme, resolved],
   );
@@ -144,11 +147,12 @@ function ColorEditor({ report }: { report: Report }) {
           <h3>{group.name}</h3>
           {group.name === "Mascot" && <MascotStill className="block w-20 h-20" />}
           <div className="color-rows">
-            {group.tokens.map(({ token, label, base }) => (
+            {group.tokens.map(({ token, label, alpha, base }) => (
               <ColorRow
                 key={token}
                 label={label}
-                value={toHex(colors[token]) ?? base}
+                alpha={alpha}
+                value={toHex(colors[token], alpha) ?? base}
                 changed={token in overrides}
                 onChange={(hex) => report(setColor(token, hex))}
                 onReset={() => report(resetColor(token))}

@@ -109,6 +109,9 @@
   --current-row-fill: var(--surface-2);
   --control-fill: var(--surface-2);
 }
+:where([data-plane="tile"], .settings-group, .settings-card, .settings-disclosure, .usage-account, .memory-control, .skills-scope, .harness-list) {
+  --current-row-fill: var(--surface);
+  --control-fill: var(--surface);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -594,16 +597,17 @@ html[data-transparent-shell="true"] .sidebar-shell {
   z-index: -1;
   border-radius: var(--radius-lg);
 }
-/* The plane's paint: the palette's --surface-gradient over --surface. The gradient is fixed to
-   the window rather than to each box, so anything that has to blend into the plane, such as a
-   sticky header or footer, paints this same fill and meets it without a seam. */
+/* The window ground: the palette's --surface-gradient over --bg, shared by the sidebar, the
+   conversation and page toolbars. The gradient is fixed to the window rather than to each box,
+   so anything that has to blend into the ground, such as a sticky header or footer, paints this
+   same fill and meets it without a seam. */
 .well::before,
 .well-fill,
 .onboarding-surface,
 .settings-feedback {
   background:
     var(--surface-gradient) fixed,
-    var(--surface);
+    var(--bg);
 }
 /* Two adjacent wells share one gutter rather than stacking two. */
 .well + .well {
@@ -836,10 +840,10 @@ body[data-resizing] .sidebar-shell {
 .schedule-row {
   container-type: inline-size;
 }
-  .schedule-actions {
-    width: 100%;
-    justify-content: flex-end;
-  }
+.schedule-actions {
+  width: 100%;
+  justify-content: flex-end;
+}
 /* CONTENT. Depth is a fill step, never a shadow. The surfaces a thread grows for a task, a turn's
    file changes, a question or an MCP app are planes, in the transcript and the panel alike.
    Unlayered on purpose, so the fill beats the components' own bg utilities. The loading
@@ -880,15 +884,11 @@ body[data-resizing] iframe {
   height: 40px;
   padding: 0 10px;
   border-radius: var(--radius-lg);
-  background:
-    linear-gradient(var(--surface-2), var(--surface-2)),
-    var(--bg);
+  background: linear-gradient(var(--surface-2), var(--surface-2)), var(--bg);
   transition: background-color var(--duration-quick) var(--ease-out);
 }
 .diff-file-header:is(:hover, :focus-visible) {
-  background:
-    linear-gradient(var(--surface-3), var(--surface-3)),
-    var(--bg);
+  background: linear-gradient(var(--surface-3), var(--surface-3)), var(--bg);
 }
 .diff-file + .diff-file {
   margin-top: 8px;
@@ -1027,11 +1027,6 @@ span.property-chip {
 .document-description::placeholder {
   color: var(--ink-4);
 }
-.task-execution-settings {
-  padding-top: 24px;
-  margin-top: 32px;
-  border-top: var(--hairline) solid var(--line);
-}
 .document-footer {
   display: flex;
   align-items: center;
@@ -1132,91 +1127,132 @@ span.property-chip {
     display: none;
   }
 }
-/* One preference sheet per section. The sidebar lists the sections. */
+/* Settings is a surface sheet (r20) beside the settings sidebar. Its toolbar is the window chrome
+   inside the sheet; the open section heads a left-aligned 860px column. Cards inside it are tile
+   cards (--bg) on the sheet. */
+.settings-sheet {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  /* The well gutter. --spacing-well is an inline theme value, so it has no runtime variable. */
+  margin: 8px 8px 8px 0;
+  border-radius: var(--radius-3xl);
+  background: var(--surface);
+}
+.settings-sheet[data-sidebar="closed"] {
+  margin-left: 8px;
+}
+.app-shell .well:has(> .settings-sheet)::before {
+  top: 0;
+}
+/* The toolbar reaches up into the sheet's top gutter, so its controls share the window chrome's
+   centerline with the traffic lights and every other view's header. With the sidebar hidden it
+   reaches into the left gutter too, so the window corner keeps its place beside the lights. */
+.app-shell .settings-sheet .settings-sheet-bar {
+  position: relative;
+  top: -8px;
+  background: transparent;
+}
+.app-shell .settings-sheet[data-sidebar="closed"] .settings-sheet-bar {
+  margin-left: -8px;
+}
 .settings-shell {
-  --settings-content-width: 960px;
+  --settings-content-width: 860px;
   --settings-control-width: 240px;
-  --settings-card-fill: var(--surface-2);
+  --settings-card-fill: var(--bg);
   container-type: inline-size;
   flex: 1;
   min-height: 0;
   min-width: 0;
   overflow: hidden;
+  /* The sheet leaves its toolbar unclipped, so the scroller rounds its own bottom corners. */
+  border-radius: 0 0 var(--radius-3xl) var(--radius-3xl);
+}
+.settings-page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px 24px;
+  max-width: var(--settings-content-width);
+  margin-bottom: 32px;
+}
+.settings-page-head p {
+  margin-top: 6px;
+  color: var(--ink-4);
+  font-size: var(--text-md);
+  line-height: 20px;
+  letter-spacing: var(--text-md--letter-spacing);
 }
 .settings-window-title {
   display: flex;
   min-width: 0;
-  padding-inline: 4px;
-  font-size: 13px;
-  font-weight: 500;
+  color: var(--ink);
+  font-size: var(--text-title);
+  line-height: var(--text-title--line-height);
+  letter-spacing: var(--text-title--letter-spacing);
 }
 /* With the sidebar hidden, the title opens the section list. */
 .settings-section-menu {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   min-width: 0;
-  height: 28px;
-  margin-inline: -4px;
-  padding: 0 6px 0 4px;
-  border-radius: 6px;
+  margin-inline: -10px;
+  padding: 0 10px;
+  border-radius: var(--radius-md);
   color: var(--ink);
-  transition: background-color 120ms var(--ease-out);
+  transition: background-color var(--duration-leave) var(--ease-out);
 }
 .settings-section-menu > svg {
-  color: var(--ink-3);
+  color: var(--ink-4);
 }
 .settings-section-menu:hover,
 .settings-section-menu[data-popup-open] {
   background: var(--surface-2);
 }
 .settings-content {
-  --settings-inset: 36px;
+  --settings-inset: 72px;
   height: 100%;
   min-width: 0;
   overflow-y: auto;
   scrollbar-gutter: stable;
-  padding: 20px var(--settings-inset) 32px;
+  padding: 20px var(--settings-inset) 48px;
 }
 .settings-content > section {
   max-width: var(--settings-content-width);
-  margin-inline: auto;
   overflow-wrap: anywhere;
-}
-.settings-heading {
-  margin-bottom: 16px;
-  color: var(--ink-3);
-  font-size: 13px;
 }
 /* Sections stack: a quiet title and its context above the content. A group is a card set apart
    by its fill alone, with no border or shadow; hairlines divide the rows inside it. */
 .settings-section {
-  margin-bottom: 28px;
+  margin-bottom: 32px;
 }
 .settings-section-intro {
   margin-bottom: 10px;
-  padding-inline: 2px;
 }
 .settings-section-intro h2 {
   color: var(--ink);
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1.5;
+  font-size: var(--text-md);
+  line-height: 20px;
+  letter-spacing: var(--text-md--letter-spacing);
 }
 .settings-section-intro p {
   max-width: 640px;
   margin-top: 2px;
-  color: var(--ink-3);
-  font-size: 12px;
-  line-height: 1.6;
+  color: var(--ink-4);
+  font-size: var(--text-sm);
+  line-height: 18px;
 }
 .settings-section-body {
   min-width: 0;
 }
 .settings-group {
   display: flow-root;
-  padding: 0 16px;
-  border-radius: var(--radius-xl);
+  padding: 0 20px;
+  border-radius: var(--radius-2xl);
   background: var(--settings-card-fill);
 }
 .settings-group > :last-child {
@@ -1235,7 +1271,6 @@ span.property-chip {
   border: var(--hairline) solid var(--line);
   border-radius: var(--radius-lg);
   background: var(--plane-fill);
-  box-shadow: var(--material-seat);
 }
 .skills-scope > div {
   flex: 1;
@@ -1268,7 +1303,7 @@ span.property-chip {
 .skills-harness-count {
   min-width: 20px;
   padding: 1px 5px;
-  border-radius: 5px;
+  border-radius: var(--radius-pill);
   background: var(--surface-2);
   color: var(--ink-3);
   font-variant-numeric: tabular-nums;
@@ -1330,7 +1365,7 @@ span.property-chip {
   align-items: start;
   gap: 16px;
   min-width: 0;
-  padding: 12px 16px;
+  padding: 12px 20px;
   list-style: none;
 }
 .skills-item-summary::-webkit-details-marker {
@@ -1350,7 +1385,6 @@ span.property-chip {
   color: var(--ink);
   font-family: var(--font-mono);
   font-size: var(--text-base);
-  font-weight: var(--font-weight-medium);
   line-height: var(--text-base--line-height);
 }
 .skills-preview {
@@ -1377,7 +1411,7 @@ span.property-chip {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: 8px;
-  padding: 0 46px 14px 222px;
+  padding: 0 50px 14px 226px;
   font-size: var(--text-sm);
 }
 .skills-item-detail code {
@@ -1418,10 +1452,12 @@ span.property-chip {
   position: sticky;
   bottom: 0;
   min-height: 36px;
-  border-top: var(--hairline) solid var(--line);
-  color: var(--ink-2);
+  color: var(--ink-3);
   font-size: var(--text-sm);
   padding-block: 8px;
+}
+.settings-sheet .settings-feedback {
+  background: var(--surface);
 }
 /* A path is field-shaped, so it takes the field's well at the field's radius. Turns the Data
    tab from two floating text nodes into a card with wells in it. */
@@ -1431,13 +1467,12 @@ span.property-chip {
   white-space: normal;
   padding: 8px 12px;
   border-radius: var(--radius-md);
-  background: var(--surface);
-  box-shadow: var(--material-recess);
+  background: var(--surface-2);
   color: var(--ink-2);
 }
 @container (max-width: 720px) {
   .settings-content {
-    --settings-inset: 24px;
+    --settings-inset: 28px;
   }
   .skills-scope {
     flex-wrap: wrap;
@@ -1477,7 +1512,7 @@ span.property-chip {
     grid-row: 1;
   }
   .skills-item-detail {
-    padding-left: 16px;
+    padding-left: 20px;
   }
 }
 
@@ -1612,4 +1647,3 @@ body:has(.sidebar-shell[data-open="false"]) .thread-pane:first-child > .well {
     max-width: 88px;
   }
 }
-

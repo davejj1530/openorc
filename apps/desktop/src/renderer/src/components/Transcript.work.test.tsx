@@ -5,7 +5,7 @@ import type { AgentEvent, ProviderUsage } from "@openorc/protocol";
 import { applyFrame, getRun, hydrate, resetTranscripts, type Block } from "../lib/transcript";
 import { core } from "../lib/rpc";
 import { TeamWorkTranscript } from "./TeamWorkTranscript";
-import { WorkTranscript, groupBlocks, groupSummary, AgentPresence } from "./Transcript";
+import { Transcript, WorkTranscript, groupBlocks, groupSummary, AgentPresence } from "./Transcript";
 vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onFrame: vi.fn(), onInvalidate: vi.fn(), onReady: vi.fn() } }));
 vi.mock("./ThreadImages", () => ({
   ThreadRichText: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -23,6 +23,14 @@ vi.mock("./AgentOrb", () => ({ AgentOrb: ({ state }: { state: string }) => <div 
 vi.mock("./TaskCard", () => ({ TaskCard: ({ taskId }: { taskId: string }) => <div>Task {taskId}</div> }));
 vi.mock("./QuestionCard", () => ({ QuestionCard: () => <div>Question for you</div> }));
 afterEach(cleanup);
+// The transcript follows its tail through a ResizeObserver, which jsdom lacks.
+Object.assign(globalThis, {
+  ResizeObserver: class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  },
+});
 /** The turn's receipt row, which opens and folds its work. */
 const receipt = () => document.querySelector<HTMLButtonElement>(".turn-receipt")!;
 const tool: Block = { id: "read", kind: "tool", name: "read_file", input: { path: "src/source.ts" }, output: "source contents", done: false, at: 1000 };
@@ -334,4 +342,60 @@ it("offers an available Codex reset where the limit surfaced and uses it only af
   await screen.findByText("Reset used. Send a message to continue.");
   expect(vi.mocked(core.call).mock.calls.find(([method]) => method === "providers.codex.reset")![1]).toMatchObject({ creditId: "credit", confirmationToken: "snapshot" });
   expect(screen.queryByRole("button", { name: "Use reset" })).toBeNull();
+});
+
+it("shows a manual compaction between turns as finished work, not a turn under way", () => {
+  // The events core recorded on 2026-10-20 for a Claude thread's /compact, between two turns of one warm session.
+  resetTranscripts();
+  const runId = "7c17e6fe-855f-4133-816e-a3ec9a25b00e";
+  const frame = (seq: number, events: AgentEvent[]) => applyFrame({ runId, seq, events });
+  const heads = () => [...document.querySelectorAll(".turn-head")].map((head) => head.getAttribute("data-state"));
+  frame(1, [
+    { type: "session.started", runId, ts: 1792467848859, agent: "claude", externalSessionId: "dd1b0fd3-115e-4d6d-8274-0001c648144c", model: "claude-opus-5-5" },
+    { type: "message.completed", runId, ts: 1792474970926, messageId: "user-10cec7e1-811d-4cea-a4e4-e2c9361e3470", role: "user", text: "Looking great, one more thing." },
+    { type: "turn.started", runId, ts: 1792474971082, turnId: "e2ae868b-0373-4c9c-b720-28b0b1d832bf" },
+    { type: "message.completed", runId, ts: 1792476111112, messageId: "msg_011CgCyqNGB1TcsfJ7vF4fkQ", role: "assistant", text: "Both are built, uncommitted." },
+    { type: "turn.completed", runId, ts: 1792476111125, turnId: "766599d6-01ab-40ef-9b09-d267f07f42a1", status: "success", resultText: "Both are built, uncommitted.", durationMs: 1140194 },
+    { type: "activity.updated", runId, ts: 1792476274142, activityId: "compaction-1", label: "Compacting context", status: "running", detail: { mode: "manual" } },
+  ]);
+  // Core reports the thread busy while it compacts: the head and the live row say so.
+  const { rerender } = render(<Transcript run={getRun(runId)!} working />);
+  expect(heads()).toEqual(["done", "working"]);
+  expect(document.querySelector(".tool-row-live")).toBeTruthy();
+  expect(document.body.textContent).toContain("Compacting context");
+  frame(2, [
+    {
+      type: "activity.updated",
+      runId,
+      ts: 1792476346983,
+      activityId: "compaction-1",
+      label: "Compacting context",
+      status: "success",
+      text: "851,927 tokens folded into 22,712.",
+      detail: { mode: "manual" },
+    },
+    {
+      type: "message.completed",
+      runId,
+      ts: 1792476346986,
+      messageId: "compact-2ca37c99-4cf9-466a-9fc6-96ced4eb09bb",
+      role: "system",
+      text: "Context compacted. The agent continues from a summary of the conversation so far.",
+    },
+  ]);
+  // The compaction ended and core reports the thread idle; the session stays open for the next message.
+  rerender(<Transcript run={getRun(runId)!} working={false} />);
+  expect(getRun(runId)!.live).toBe(true);
+  expect(heads()).toEqual(["done", "done"]);
+  expect(document.querySelector(".tool-row-live")).toBeNull();
+  expect(document.querySelector(".work-now")).toBeNull();
+  expect(receipt().textContent).toMatch(/1 step/);
+  expect(document.body.textContent).toContain("Context compacted.");
+  frame(3, [
+    { type: "message.completed", runId, ts: 1792476572518, messageId: "user-f12095cd-e7e7-4b56-a774-b87e6c84964e", role: "user", text: "Thanks, now update the website." },
+    { type: "turn.started", runId, ts: 1792476572650, turnId: "a1288048-7abe-43a4-8741-11e5680ce322" },
+  ]);
+  // The next prompt opens a turn before core's busy flag reaches the view.
+  rerender(<Transcript run={getRun(runId)!} working={false} />);
+  expect(heads()).toEqual(["done", "done", "working"]);
 });

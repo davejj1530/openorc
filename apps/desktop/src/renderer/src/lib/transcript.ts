@@ -59,6 +59,8 @@ export interface RunTranscript {
   blocks: Block[];
   blockIndex: Map<string, number>;
   live: boolean;
+  /** A turn is under way: the agent took a prompt and no result has ended it. Never true once the session ended. */
+  turnOpen: boolean;
   hydrated: boolean;
   /** The first turn loaded from the ledger. 0 once the whole run is here, which a run seen from its start always is. */
   fromTurn: number;
@@ -89,7 +91,7 @@ const hydrating = new Map<string, Frame[]>();
 const loads = new Map<string, Promise<void>>();
 
 export function emptyRun(runId: string): RunTranscript {
-  return { runId, blocks: [], blockIndex: new Map(), live: false, hydrated: false, fromTurn: 0, eventCount: 0, turnsCompleted: 0, turnOf: new Map(), pendingApprovals: 0, stderr: [] };
+  return { runId, blocks: [], blockIndex: new Map(), live: false, turnOpen: false, hydrated: false, fromTurn: 0, eventCount: 0, turnsCompleted: 0, turnOf: new Map(), pendingApprovals: 0, stderr: [] };
 }
 
 /** Tells subscribers about everything changed since the last time. */
@@ -177,6 +179,7 @@ async function loadPage(runId: string, request: LoadRequest): Promise<void> {
     for (const ev of page.events) applyEvent(run, ev);
     // A page that starts after the session did has no session.started to say whether it is still open.
     if (page.fromTurn > 0) run.live = page.live;
+    if (!run.live) run.turnOpen = false;
     // The listing already reflects every buffered event up to the last one it holds, including streaming fragments
     // the ledger has since dropped because their completion replaced them. Only what came after is new.
     const buffered = (hydrating.get(runId) ?? []).flatMap((frame) => frame.events);
@@ -353,6 +356,12 @@ function closeActive(run: RunTranscript, ts: number, status: ActivityStatus): vo
   run.pendingApprovals = 0;
 }
 
+/** The process is gone, and any turn with it. */
+function endSession(run: RunTranscript): void {
+  run.live = false;
+  run.turnOpen = false;
+}
+
 function completionOutcome(status: Extract<AgentEvent, { type: "turn.completed" | "session.completed" }>["status"]): "success" | "cancelled" | "error" {
   if (status === "success") return "success";
   if (status === "cancelled") return "cancelled";
@@ -483,7 +492,11 @@ function applyEvent(run: RunTranscript, ev: AgentEvent): void {
       if (existing) upsert(run, { ...existing, decision: ev.decision, ...(ev.answers ? { answers: ev.answers } : {}) });
       return;
     }
+    case "turn.started":
+      run.turnOpen = true;
+      return;
     case "turn.completed":
+      run.turnOpen = false;
       closeActive(run, ev.ts, completionOutcome(ev.status));
       upsert(run, {
         id: `turn-${ev.turnId}`,
@@ -498,7 +511,7 @@ function applyEvent(run: RunTranscript, ev: AgentEvent): void {
       return;
     case "session.completed":
       closeActive(run, ev.ts, sessionCloseStatus(ev.status));
-      run.live = false;
+      endSession(run);
       run.pendingApprovals = 0;
       upsert(run, {
         id: "status-end",
@@ -512,7 +525,7 @@ function applyEvent(run: RunTranscript, ev: AgentEvent): void {
     case "error":
       if (ev.fatal) {
         closeActive(run, ev.ts, "error");
-        run.live = false;
+        endSession(run);
         upsert(run, { id: `err-${ev.ts}-${run.blocks.length}`, kind: "status", boundary: "session", outcome: "error", tone: "bad", text: ev.message });
       } else {
         run.stderr.push(ev.message);

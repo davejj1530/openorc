@@ -39,7 +39,20 @@ function execution(actors: TeamActorView[]): TeamExecutionView {
   };
 }
 function run(blocks: Block[]): RunTranscript {
-  return { runId: "run", blocks, blockIndex: new Map(), live: true, hydrated: true, fromTurn: 0, eventCount: blocks.length, turnsCompleted: 0, turnOf: new Map(), pendingApprovals: 1, stderr: [] };
+  return {
+    runId: "run",
+    blocks,
+    blockIndex: new Map(),
+    live: true,
+    turnOpen: true,
+    hydrated: true,
+    fromTurn: 0,
+    eventCount: blocks.length,
+    turnsCompleted: 0,
+    turnOf: new Map(),
+    pendingApprovals: 1,
+    stderr: [],
+  };
 }
 const question: Block = { id: "question", kind: "approval", approvalKind: "user_input", approvalId: "question", input: { questions: [{ question: "Which option?" }] } };
 it("collects questions and permissions from collapsed nested assignments and deduplicates warm runs", () => {

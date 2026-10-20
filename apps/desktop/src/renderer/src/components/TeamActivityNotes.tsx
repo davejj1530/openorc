@@ -3,9 +3,9 @@ import { TeamTaskStart, TeamTaskAdmissions } from "./TeamTaskStart";
 import { Button } from "./ui";
 
 export function TeamActorExplanation({ actor, hasReasoning }: { actor: Pick<TeamActorView, "modeHold" | "runIds" | "state">; hasReasoning: boolean }) {
-  if (actor.modeHold === "plan") return <p className="text-sm text-ink-3">Switch to Act to continue this assignment.</p>;
+  if (actor.modeHold === "plan") return <p className="text-xs text-ink-4">Switch to Act to continue this assignment.</p>;
   if (!actor.runIds.length)
-    return <p className="text-sm text-ink-3">{actor.state === "queued" ? "Waiting for its manager, dependencies or an available provider slot." : "Activity appears when the agent starts."}</p>;
+    return <p className="text-xs text-ink-4">{actor.state === "queued" ? "Waiting for its manager, dependencies or an available provider slot." : "Activity appears when the agent starts."}</p>;
   if (!hasReasoning) return <p className="team-reasoning-note">No readable reasoning has been provided. Actions and responses appear above.</p>;
   return null;
 }

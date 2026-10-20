@@ -2,7 +2,7 @@ import { memo, useEffect, useId, useMemo, useState, type ReactNode } from "react
 import type { Block } from "../lib/transcript";
 import { cn } from "../lib/cn";
 import { workDuration } from "../lib/work-transcript";
-import { Brain, Check, ChevronRight, CircleDashed, Folder, Globe, Hammer, ListChecks, Search, Terminal, WorkDelegate, WorkLive } from "./icons";
+import { Brain, Check, ChevronRight, Folder, Globe, Hammer, Loader2, Search, Terminal, WorkDelegate } from "./icons";
 import { FileGlyph } from "./FileGlyph";
 import { ThreadLink } from "./ThreadImages";
 import { chipCalls, type WorkChip } from "./work-chips";
@@ -15,9 +15,9 @@ type RenderBlocks = (blocks: Block[], open?: boolean) => ReactNode;
 const CHIP_LIMIT = 6;
 
 /**
- * A turn's work on a rail: a dot and a title per phase, what each phase touched as chips under it, and the one
- * thing happening now carried by a single live line. `turn` is every block of the turn, so a reply streaming below
- * the work keeps the line quiet.
+ * A turn's work as one card of steps. With a plan, its head reads "Step k of n" over a progress track; without one,
+ * the phases are the steps. Each step is a row with a ring, a loader or an ink check, and opens to what it touched
+ * as chips. `turn` is every block of the turn, so a reply streaming below the work keeps the live row quiet.
  */
 export function WorkSteps({
   blocks,
@@ -37,19 +37,53 @@ export function WorkSteps({
   const entries = useMemo(() => workEntries(blocks, taskCards, pinned), [blocks, taskCards, pinned]);
   const headline = live ? liveHeadline(entries, turn) : null;
   return (
-    <ol className="work-rail">
-      {entries.map((entry) => (
-        <EntryView key={entryId(entry)} entry={entry} headline={headline} live={live} renderBlocks={renderBlocks} />
-      ))}
-      {headline && !headline.entryId ? (
-        <li className="work-rail-item" data-state="running">
-          <RailDot live />
-          <div className="work-phase-title" role="status">
-            <LiveWords headline={headline} />
-          </div>
-        </li>
-      ) : null}
-    </ol>
+    <div className="steps-card" data-plane>
+      <StepsHead entries={entries} />
+      <ol className="work-rail">
+        {entries.map((entry) => (
+          <EntryView key={entryId(entry)} entry={entry} headline={headline} live={live} renderBlocks={renderBlocks} />
+        ))}
+        {headline && !headline.entryId ? (
+          <li className="work-rail-item" data-state="running">
+            <StepMark state="running" />
+            <div className="work-phase-title" role="status">
+              <LiveWords headline={headline} />
+            </div>
+          </li>
+        ) : null}
+      </ol>
+    </div>
+  );
+}
+
+/** Where a plan stands: the step it is on, and how far along the track it is. */
+function planProgress(items: PlanItem[]): { count: string; progress: number } {
+  const done = items.filter((item) => item.status === "completed").length;
+  const current = items.findIndex((item) => item.status !== "completed");
+  const working = items.some((item) => item.status === "in_progress") ? 0.5 : 0;
+  if (current < 0) return { count: "Done", progress: 1 };
+  return { count: `Step ${current + 1} of ${items.length}`, progress: (done + working) / items.length };
+}
+
+/** The card's head: the plan's step and track, or how many steps the work took. */
+function StepsHead({ entries }: { entries: WorkEntry[] }) {
+  const plan = entries.findLast((entry): entry is Extract<WorkEntry, { kind: "plan" }> => entry.kind === "plan");
+  if (!plan) return null;
+  const { count, progress } = planProgress(plan.items);
+  return (
+    <div className="steps-head">
+      <div className="steps-title">
+        <span className="steps-name">Plan</span>
+        <span className="steps-count motion-swap">
+          <span key={count} className="motion-arrive">
+            {count}
+          </span>
+        </span>
+      </div>
+      <div className="steps-track" role="progressbar" aria-label="Plan progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)}>
+        <span style={{ inlineSize: `${progress * 100}%` }} />
+      </div>
+    </div>
   );
 }
 
@@ -59,10 +93,8 @@ export function WorkNow({ blocks, turn, taskCards = true }: { blocks: Block[]; t
   const headline = liveHeadline(entries, turn);
   return headline ? (
     <div className="work-now" role="status">
-      <span className="work-now-dot" aria-hidden="true">
-        <span className="work-pulse" />
-      </span>
-      <LiveWords headline={headline} />
+      <Loader2 size={16} className="tool-row-live" />
+      <LiveWords headline={headline} elapsed />
     </div>
   ) : null;
 }
@@ -79,7 +111,6 @@ function EntryView({ entry, headline, live, renderBlocks }: { entry: WorkEntry; 
   if (entry.kind === "plan") return <PlanView items={entry.items} live={live} />;
   return (
     <li className="work-rail-item">
-      <span className="work-rail-dot" aria-hidden="true" />
       <div className="work-rail-blocks">{renderBlocks(entry.blocks)}</div>
     </li>
   );
@@ -106,22 +137,29 @@ function Elapsed({ since }: { since: number | undefined }) {
   );
 }
 
-/** The accent, a slow light passing through the words, and how long it has been going. */
-function LiveWords({ headline }: { headline: LiveHeadline }) {
+function LiveWords({ headline, elapsed = false }: { headline: LiveHeadline; elapsed?: boolean }) {
   return (
     <>
-      <span className="work-line-text work-shimmer" title={headline.label}>
         {headline.label}
       </span>
-      <Elapsed since={headline.since} />
+      {elapsed ? <Elapsed since={headline.since} /> : null}
     </>
   );
 }
 
-function RailDot({ live = false }: { live?: boolean }) {
+type StepState = "pending" | "running" | "done";
+
+/** A step's mark: an empty ring, a loader while it runs, an ink check once done. The check lands with one overshoot. */
+function StepMark({ state }: { state: StepState }) {
   return (
-    <span className="work-rail-dot" aria-hidden="true">
-      {live ? <span className="work-pulse" /> : <Check size={14} className="text-ok" />}
+    <span className="step-mark" data-state={state} aria-hidden="true">
+      {state === "running" ? <Loader2 size={16} className="tool-row-live" /> : null}
+      {state === "done" ? (
+        <span className="step-check">
+          <Check size={11} strokeWidth={2.25} />
+        </span>
+      ) : null}
+      {state === "pending" ? <span className="step-ring" /> : null}
     </span>
   );
 }
@@ -161,7 +199,7 @@ const PhaseView = memo(function PhaseView({ phase, headline, renderBlocks }: Pha
   const expandable = phase.sections.length > 0 || phase.extras.length > 0 || phase.thoughts.length > 0 || Boolean(phase.detail || phase.narration);
   return (
     <li className="work-rail-item" data-state={live ? "running" : "done"}>
-      <RailDot live={live} />
+      <StepMark state={live ? "running" : "done"} />
       <button
         type="button"
         className="work-phase-title"
@@ -197,9 +235,10 @@ function PhaseWords({ phase, headline, open }: { phase: WorkPhase; headline: Liv
 }
 
 function PhaseBody({ phase, live, renderBlocks }: { phase: WorkPhase; live: boolean; renderBlocks: RenderBlocks }) {
-  // A phase named after its one call ("Run the desktop tests") opens straight to that call.
-  const only = phase.sections.length === 1 && phase.sections[0]!.chips.length === 1 ? phase.sections[0]!.chips[0]! : null;
-  if (only?.label === phase.title && !phase.extras.length) return <div className="work-group-calls">{renderBlocks(only.blocks, true)}</div>;
+  // A phase named after its one call ("Run the desktop tests") opens straight to that call. A command's card
+  // already shows the command and its last line, so it stays closed rather than repeat them.
+  const section = phase.sections.length === 1 ? phase.sections[0]! : null;
+  const only = section?.chips.length === 1 ? section.chips[0]! : null;
   return (
     <>
       {phase.detail ? <p className="work-phase-detail">{phase.detail}</p> : null}
@@ -309,30 +348,20 @@ function ChipView({ chip, live, picked, onPick }: { chip: WorkChip; live: boolea
   );
 }
 
-const planIcon: Record<PlanItem["status"], (live: boolean) => ReactNode> = {
-  completed: () => <Check size={14} className="text-ok" />,
-  in_progress: (live) => <WorkLive size={14} className={cn("text-accent-ink", live && "work-live")} />,
-  pending: () => <CircleDashed size={14} className="text-ink-4" />,
+const planStates: Record<PlanItem["status"], (live: boolean) => StepState> = {
+  completed: () => "done",
+  in_progress: (live) => (live ? "running" : "pending"),
+  pending: () => "pending",
 };
 
-/** The agent's plan as a checklist that updates in place, with the step it is on in the accent. */
+/** The agent's plan as steps that check off in place, the one it is on in ink. */
 function PlanView({ items, live }: { items: PlanItem[]; live: boolean }) {
-  const done = items.filter((item) => item.status === "completed").length;
   return (
-    <li className="work-rail-item">
-      <span className="work-rail-dot" aria-hidden="true">
-        <ListChecks size={14} />
-      </span>
-      <div className="work-phase-title">
-        <span className="work-line-text">Plan</span>
-        <span className="work-plan-count">
-          {done} of {items.length}
-        </span>
-      </div>
+    <li className="work-rail-item work-plan">
       <ol className="work-plan-items">
         {items.map((item, index) => (
           <li key={index} className="work-plan-item" data-status={item.status}>
-            <span className="work-plan-icon">{planIcon[item.status](live)}</span>
+            <StepMark state={planStates[item.status](live)} />
             <span className="min-w-0">{item.text}</span>
           </li>
         ))}

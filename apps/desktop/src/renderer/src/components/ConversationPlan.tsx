@@ -41,7 +41,7 @@ export function ConversationPlan({ thread }: { thread: ThreadSummary }) {
   return (
     <section className="h-full min-w-0 flex min-h-0 flex-col" aria-label="Conversation plan">
       <header className="flex items-center gap-2 border-b border-line px-4 py-3">
-        <span className="text-sm font-medium text-ink">{team ? "Team plan" : "Conversation plan"}</span>
+        <span className="text-sm text-ink">{team ? "Team plan" : "Conversation plan"}</span>
         <span className="flex-1" />
         {plan ? (
           <Select aria-label="Plan revision" value={plan.id} onChange={(e) => setSelectedId(e.target.value)}>

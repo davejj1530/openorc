@@ -66,7 +66,7 @@ export function TeamRecoveryActions({
       {kind === "delete" && canKeepFiles ? (
         <>
           <p className="text-ink-3">If cleanup already started, you can remove the {subject} and keep every remaining folder and Git reference. Removed files cannot be restored by this action.</p>
-          <Button size="sm" variant="danger" className="h-auto min-h-6 whitespace-normal text-left" disabled={busy} onClick={() => void resolve(true)}>
+          <Button size="sm" variant="danger" className="h-auto min-h-7 py-1.5 whitespace-normal text-left" disabled={busy} onClick={() => void resolve(true)}>
             Finish deletion, keep remaining files
           </Button>
         </>

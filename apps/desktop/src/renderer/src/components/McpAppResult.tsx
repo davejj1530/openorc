@@ -33,14 +33,14 @@ export default function McpAppResult({ runId, toolCallId }: { runId: string; too
   }, [runId, toolCallId, attempt, closed]);
   if (closed)
     return (
-      <button className="ml-5 text-xs text-ink-3 hover:text-ink" onClick={() => setClosed(false)}>
+      <button className="text-xs text-ink-3 hover:text-ink" onClick={() => setClosed(false)}>
         Open interactive app
       </button>
     );
   if (!result || result.status === "none") return null;
   if (result.status === "unavailable")
     return (
-      <div className="ml-5 py-2 text-xs text-ink-3" role="status">
+      <div className="py-2 text-xs text-ink-3" role="status">
         {result.message}{" "}
         <button className="underline" onClick={() => setAttempt((n) => n + 1)}>
           Reload app
@@ -145,7 +145,7 @@ function AppView({ app, close }: { app: McpAppReady; close: () => void }) {
     };
   }, [app]);
   return (
-    <section aria-label={`${app.title} interactive app`} className="mcp-app-card ml-5 my-2 overflow-hidden rounded-lg border border-line">
+    <section aria-label={`${app.title} interactive app`} className="mcp-app-card my-2 overflow-hidden rounded-2xl">
       <div className="flex items-center justify-between gap-2 px-3 py-2 text-xs text-ink-3">
         <span>{app.title}</span>
         <button onClick={close} className="hover:text-ink">

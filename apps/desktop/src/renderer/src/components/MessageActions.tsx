@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Check, Copy } from "./icons";
+import { Check, Copy, GitFork } from "./icons";
 import { IconButton } from "./ui";
 import { cn } from "../lib/cn";
 import { relativeTime } from "../lib/time";
@@ -8,10 +8,7 @@ import { relativeTime } from "../lib/time";
 export function MessageTime({ at, className }: { at: number | undefined; className?: string }) {
   if (at === undefined) return null;
   return (
-    <div
-      className={cn("h-5 flex items-center text-xs text-ink-4 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity", className)}
-      title={new Date(at).toLocaleString()}
-    >
+    <div className={cn("message-time", className)} title={new Date(at).toLocaleString()}>
       {relativeTime(at)}
     </div>
   );
@@ -23,6 +20,7 @@ function copyMessageLabel(state: "idle" | "copied" | "error"): string {
   return "Copy message";
 }
 
+/** Copy widens just enough to say so: a fill and "Copied" in place, then it gives them back. */
 export function CopyMessage({ text }: { text: string }) {
   const [state, setState] = useState<"idle" | "copied" | "error">("idle");
   useEffect(() => {
@@ -32,14 +30,12 @@ export function CopyMessage({ text }: { text: string }) {
   }, [state]);
   const label = copyMessageLabel(state);
   return (
-    <IconButton
-      size="sm"
+    <button
+      type="button"
       aria-label={label}
       title={label}
-      className={cn(
-        "transition-opacity opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
-        state !== "idle" && "opacity-100",
-      )}
+      data-state={state}
+      className="copy-action message-action"
       onClick={() => {
         void navigator.clipboard.writeText(text).then(
           () => setState("copied"),
@@ -47,7 +43,29 @@ export function CopyMessage({ text }: { text: string }) {
         );
       }}
     >
-      {state === "copied" ? <Check size={13} /> : <Copy size={13} />}
-    </IconButton>
+      <span className="copy-action-glyph motion-swap" aria-hidden="true">
+        <Copy size={16} aria-hidden={state === "copied" ? "true" : undefined} />
+        <Check size={16} aria-hidden={state === "copied" ? undefined : "true"} />
+      </span>
+      {state === "idle" ? null : <span className="copy-action-word motion-arrive">{state === "copied" ? "Copied" : "Failed"}</span>}
+    </button>
+  );
+}
+
+/**
+ * The end of a turn: copy the reply and, on the latest turn, fork the conversation from it. The latest turn shows
+ * the row at rest; older turns show it on hover. The time stays a hover detail.
+ */
+export function TurnActions({ text, at, onFork, resting }: { text: string | undefined; at: number | undefined; onFork?: (() => void) | undefined; resting: boolean }) {
+  return (
+    <div className="group turn-actions" data-resting={resting || undefined}>
+      {text ? <CopyMessage text={text} /> : null}
+      {onFork ? (
+        <IconButton size="md" onClick={() => onFork()} title="Continue this conversation in a new thread" aria-label="Fork thread" className="message-action">
+          <GitFork size={16} />
+        </IconButton>
+      ) : null}
+      <MessageTime at={at} />
+    </div>
   );
 }

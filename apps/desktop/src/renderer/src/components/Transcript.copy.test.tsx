@@ -58,7 +58,9 @@ it("offers a fork only at the latest message, since a fork carries the whole con
     />,
   );
   const fork = screen.getByRole("button", { name: "Fork thread" });
-  expect(fork.closest(".journal-message")?.textContent).toContain("Again");
+  expect(fork.closest(".turn-actions")).toBeTruthy();
+  expect(fork.closest("[data-turn]")?.textContent).toContain("Again");
+  expect(fork.closest("[data-turn]")?.textContent).toContain("Done again");
   fireEvent.click(fork);
   expect(onFork).toHaveBeenCalledWith();
 });

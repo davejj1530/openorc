@@ -10,30 +10,37 @@
 .prose-chat :where(p:last-child) {
   margin-bottom: 0;
 }
+/* Headings take size, not weight: the interface has one weight, and bold is kept for the
+   author's own emphasis below. */
 .prose-chat :where(h1, h2, h3, h4, h5, h6) {
   color: var(--ink);
-  font-weight: 600;
-  line-height: 1.35;
-  letter-spacing: -0.018em;
+  letter-spacing: -0.01em;
   text-wrap: pretty;
   margin: 28px 0 10px;
 }
 .prose-chat h1 {
   font-size: var(--text-title-sm);
+  line-height: var(--text-title-sm--line-height);
+  letter-spacing: var(--text-title-sm--letter-spacing);
 }
 .prose-chat h2 {
   font-size: var(--text-xl);
+  line-height: var(--text-xl--line-height);
 }
 .prose-chat h3 {
   font-size: var(--text-lg);
+  line-height: var(--text-lg--line-height);
 }
 .prose-chat :where(h4, h5, h6) {
   font-size: var(--text-prose);
+  line-height: var(--text-lg--line-height);
 }
 .prose-chat > div > :first-child {
   margin-top: 0;
 }
-.prose-chat strong {
+/* Author emphasis, the one place bold survives. Streamdown renders **text** as a span. */
+.prose-chat :is(strong, b),
+[data-streamdown="strong"] {
   font-weight: 600;
   color: var(--ink);
 }
@@ -115,14 +122,13 @@
   margin: 16px 0;
   padding: 0;
   gap: 0;
-  border: var(--hairline) solid var(--line);
-  border-radius: var(--radius-lg);
+  border: 0;
+  border-radius: var(--radius-xl);
   background: var(--surface-2);
   overflow: hidden;
 }
 [data-streamdown="code-block"] > div:first-child {
   padding: 4px 12px;
-  border-bottom: var(--hairline) solid var(--line);
 }
 [data-streamdown="code-block-header"] {
   height: var(--control-md);
@@ -135,8 +141,8 @@
 [data-streamdown="code-block-body"] {
   border: 0;
   border-radius: 0;
-  padding: 16px;
-  background: var(--surface-2);
+  padding: 4px 16px 16px;
+  background: transparent;
 }
 [data-streamdown="code-block-body"] pre {
   background: transparent !important;
@@ -172,7 +178,7 @@
   border-collapse: collapse;
   font-size: var(--text-base);
   line-height: 1.6;
-  background: var(--surface);
+  background: transparent;
 }
 [data-streamdown="table"] :is(th, td) {
   border: 0;
@@ -182,12 +188,13 @@
   vertical-align: top;
 }
 [data-streamdown="table"] th {
-  font-weight: 600;
-  color: var(--ink-2);
-  background: var(--surface-2);
+  color: var(--ink-3);
+}
+[data-streamdown="table"] thead :is(th, td) {
+  border-top: 0;
 }
 [data-streamdown="table"] tbody tr:hover {
-  background: color-mix(in srgb, var(--surface-2) 55%, var(--surface));
+  background: var(--surface-2);
 }
 [data-streamdown="table-fullscreen"],
 [data-streamdown="mermaid-fullscreen"] {
@@ -208,7 +215,7 @@
   padding: 16px;
   margin: 16px 0;
   background: var(--surface-2);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-xl);
 }
 .prose-chat .katex {
   font-size: 1.1em;
@@ -223,4 +230,16 @@
   [data-streamdown="table"] :is(th, td) {
     padding: 8px 10px;
   }
+}
+/* Streaming replies: each new word fades in from a slight blur as it arrives (Streamdown's animate plugin stamps
+   the spans; its own stylesheet is not loaded). Only words arriving live animate, and reduced motion zeroes the
+   duration, so the text is there at once. */
+@keyframes sd-fadeIn {
+  from {
+    opacity: 0;
+    filter: blur(2px);
+  }
+}
+[data-sd-animate] {
+  animation: var(--sd-animation, sd-fadeIn) var(--sd-duration, 160ms) var(--ease-out) var(--sd-delay, 0ms) both;
 }

@@ -1,7 +1,55 @@
-/* A turn's work on a rail. Each phase is a dot and a title; the live phase is open and carries the accent, with a
-   slow light passing through its words. Class names stay under work-rail, work-phase, work-group and work-chip:
+/* A turn's work as one card of steps. Each step is a mark and a title; the live one is open and in ink.
+   Class names stay under steps, work-rail, work-phase, work-group and work-chip:
    app.css already owns .work-row and .work-section for the window layout, and .work-row draws a window drag
    region. */
+/* The steps card: an r20 plane. With a plan, a head with "Step k of n" over a 2px track. */
+.steps-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  padding: 16px 18px 14px;
+  border-radius: var(--radius-3xl);
+  background: var(--surface);
+}
+.steps-head {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.steps-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.steps-name {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-base);
+  line-height: 16px;
+  color: var(--ink);
+}
+.steps-count {
+  justify-items: end;
+  font-size: var(--text-xs);
+  line-height: 16px;
+  color: var(--ink-4);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.steps-track {
+  display: flex;
+  height: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.steps-track > span {
+  border-radius: inherit;
+  background: var(--ink);
+  transition: inline-size var(--duration-resize) var(--ease-out);
+}
 .work-rail {
   display: grid;
   min-width: 0;
@@ -17,50 +65,38 @@
   column-gap: 10px;
   min-width: 0;
 }
-/* The spine, from below this item's dot to the next one. */
-.work-rail-item:not(:last-child)::after {
-  content: "";
-  position: absolute;
-  left: 7.5px;
-  top: 22px;
-  bottom: -6px;
-  width: var(--hairline);
-  background: var(--line);
-  pointer-events: none;
 }
-.work-rail-dot {
+.work-rail-item.work-plan {
+  display: block;
+}
+
+/* A step's mark: ring, loader or ink check, all 16px. */
+.step-mark {
   grid-column: 1;
   grid-row: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 28px;
-  color: var(--ink-3);
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 30px;
 }
-.work-pulse {
-  position: relative;
-  width: 8px;
-  height: 8px;
+.step-ring {
+  width: 14px;
+  height: 14px;
   border-radius: var(--radius-pill);
-  background: var(--accent-ink);
+  box-shadow: inset 0 0 0 1.5px var(--surface-3);
 }
-.work-pulse::after {
-  content: "";
-  position: absolute;
-  inset: -4px;
-  border-radius: inherit;
-  border: 1.5px solid var(--accent-ink);
-  opacity: 0;
-  animation: work-pulse 1.8s ease-out infinite;
+.step-check {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-pill);
+  background: var(--ink);
+  color: var(--surface);
 }
-@keyframes work-pulse {
   from {
-    transform: scale(0.5);
-    opacity: 0.8;
-  }
-  to {
-    transform: scale(1.5);
     opacity: 0;
+    scale: 0.5;
   }
 }
 
@@ -72,10 +108,15 @@
   gap: 8px;
   width: 100%;
   min-width: 0;
-  min-height: 28px;
+  min-height: 30px;
   text-align: left;
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
+  line-height: 16px;
   color: var(--ink-2);
+  transition: color var(--duration-arrive) var(--ease-out);
+}
+.work-rail-item[data-state="running"] > .work-phase-title {
+  color: var(--ink);
 }
 button.work-phase-title:enabled:hover {
   color: var(--ink);
@@ -83,7 +124,7 @@ button.work-phase-title:enabled:hover {
 button.work-phase-title:focus-visible,
 .work-group-label:focus-visible,
 .work-more:focus-visible {
-  outline: 2px solid var(--accent-ink);
+  outline: 2px solid var(--ring);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
 }
@@ -96,13 +137,7 @@ button.work-phase-title:focus-visible,
 .work-phase-meta {
   flex-shrink: 0;
   font-size: var(--text-xs);
-  color: var(--ink-3);
-  font-variant-numeric: tabular-nums;
-}
-.work-plan-count {
-  flex-shrink: 0;
-  font-size: var(--text-xs);
-  color: var(--ink-3);
+  color: var(--ink-4);
   font-variant-numeric: tabular-nums;
 }
 /* A narrow column keeps the title whole rather than a clipped hint. */
@@ -115,7 +150,7 @@ button.work-phase-title:focus-visible,
   margin-left: auto;
   flex-shrink: 0;
   font-size: var(--text-xs);
-  color: var(--ink-3);
+  color: var(--ink-4);
   font-variant-numeric: tabular-nums;
 }
 .work-phase-title > .work-chevron {
@@ -143,7 +178,8 @@ button.work-phase-title[aria-expanded="true"] > .work-chevron {
   display: none;
 }
 .work-phase-detail {
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
+  line-height: 20px;
   color: var(--ink-3);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -155,29 +191,21 @@ button.work-phase-title[aria-expanded="true"] > .work-chevron {
 .work-group > .transcript-block:first-child {
   margin-top: 0;
 }
-/* The work's header already names who is talking, so narration here drops its own author line, and it reads as
-   a note under its phase rather than as a reply. */
-.work-rail .journal-author {
-  display: none;
-}
-/* Without that line there is no corner for the time and copy to float in, so they take their own row under the note. */
-.work-rail .journal-message {
-  padding-bottom: 0;
-}
-.work-rail .journal-reply-actions {
-  position: static;
-  justify-content: flex-end;
-  margin-top: 0;
-}
+/* Narration under a step reads as a muted note rather than a reply. */
+.work-rail .journal-response .prose-chat,
 .work-phase-narration .text-prose {
-  font-size: var(--text-sm);
-  line-height: 1.55;
+  font-size: var(--text-base);
+  line-height: 20px;
   color: var(--ink-3);
 }
 .work-rail-blocks {
-  grid-column: 2;
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 4px;
   min-width: 0;
-  padding: 4px 0 8px;
+}
+.work-rail-blocks > .transcript-block {
+  margin-top: 0;
 }
 
 /* Codex's reasoning titles inside a phase: the steps it took, quieter than what it touched. */
@@ -264,8 +292,8 @@ button.work-chip[aria-pressed="true"] {
   color: var(--ink);
 }
 button.work-chip:focus-visible {
-  outline: 2px solid var(--accent-ink);
   outline-offset: 1px;
+  outline: 2px solid var(--ring);
 }
 .work-chip-label {
   min-width: 0;
@@ -276,13 +304,13 @@ button.work-chip:focus-visible {
 .work-chip:is([data-kind="file"], [data-kind="edit"], [data-kind="folder"], [data-kind="query"], [data-kind="command"]) .work-chip-label {
   font-family: var(--font-mono);
 }
+}
 .work-chip-icon {
   flex-shrink: 0;
   color: var(--ink-3);
 }
 .work-chip[data-live] {
-  color: var(--accent-ink);
-  box-shadow: inset 0 0 0 var(--hairline) color-mix(in oklab, var(--accent-ink) 35%, transparent);
+  color: var(--ink);
 }
 .work-stat-added,
 .work-stat-removed {
@@ -297,85 +325,65 @@ button.work-chip:focus-visible {
 }
 .work-more {
   font-size: var(--text-xs);
-  color: var(--accent-ink);
+}
+.work-more:hover {
+  color: var(--ink);
 }
 .work-group-calls {
   min-width: 0;
   padding-left: 2px;
 }
 
+/* The plan's steps, each a 30px row; the one it is on in ink. */
 .work-plan-items {
-  grid-column: 2;
   display: grid;
-  padding: 0 0 8px;
-  font-size: var(--text-sm);
-  color: var(--ink-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 .work-plan-item {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 2px 0;
-}
-.work-plan-icon {
-  display: inline-flex;
-  align-self: center;
+  align-items: center;
+  gap: 10px;
+  min-height: 30px;
+  font-size: var(--text-base);
+  line-height: 16px;
+  color: var(--ink-2);
+  transition: color var(--duration-arrive) var(--ease-out);
 }
 .work-plan-item[data-status="in_progress"] {
-  color: var(--ink-2);
+  color: var(--ink);
+}
+.work-plan-item > .step-mark {
+  flex-shrink: 0;
 }
 
-/* The folded work's line: the same pulse and words, under the header. */
+/* The folded work's line: a loader and what is happening now, under the receipt. */
 .work-now {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 28px;
-  margin-top: 4px;
-  font-size: var(--text-sm);
-}
-.work-now-dot {
-  display: flex;
-  justify-content: center;
-  width: 16px;
-  flex-shrink: 0;
+  min-height: 30px;
+  font-size: var(--text-base);
+  line-height: 16px;
+  color: var(--ink);
 }
 
-.work-shimmer {
-  --work-shimmer-rest: color-mix(in oklab, var(--accent-ink) 70%, transparent);
-  color: var(--accent-ink);
-  background: linear-gradient(100deg, var(--work-shimmer-rest) 40%, var(--accent-ink) 50%, var(--work-shimmer-rest) 60%) 0 0 / 300% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: work-shimmer 2.4s linear infinite;
 }
-@keyframes work-shimmer {
-  from {
-    background-position: 100% 0;
-  }
-  to {
-    background-position: 0% 0;
+    opacity: 0;
+    filter: blur(var(--arrive-blur));
+    translate: 0 var(--arrive-rise);
   }
 }
-/* What arrives while a phase runs fades in, so the work reads as it happens. */
 .work-rail-item[data-state="running"] .work-chip {
-  animation: work-chip-in 280ms ease-out both;
 }
 @keyframes work-chip-in {
   from {
-    opacity: 0;
-    transform: translateY(3px) scale(0.97);
-  }
 }
-@media (prefers-reduced-motion: reduce) {
-  .work-shimmer {
-    animation: none;
-    background: none;
-    -webkit-text-fill-color: currentColor;
-  }
-  .work-pulse::after,
-  .work-rail-item[data-state="running"] .work-chip {
-    animation: none;
-  }
+/* A command nested in the card steps down a fill, since the card is already the plane. */
+.steps-card .command-card {
+  background: var(--surface-2);
+}
+.steps-card .inline-diff {
+  background: var(--surface-2);
 }

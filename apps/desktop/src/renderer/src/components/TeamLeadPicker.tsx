@@ -14,8 +14,8 @@ export function TeamLeadPicker({ revision, value, onChange, saving }: { revision
       team={team}
       settingsDisabled={saving}
       modelSelector={
-        <span className="text-sm text-ink-2">
-          {team?.leadName} · {value.model}
+        <span className="text-base text-ink">
+          {team?.leadName} <span className="text-ink-4">{value.model}</span>
         </span>
       }
     />

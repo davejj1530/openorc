@@ -74,3 +74,22 @@ function mcpNames({ server, tool }: McpCall): { label: string; source: string } 
   const source = spaced(base).replace(/^./, (c) => c.toUpperCase());
   return { label: `${source}: ${spaced(action)}`, source };
 }
+
+/** What a call is doing while it runs: "Running command" for "Ran". */
+export function liveVerb(verb: string): string {
+  const live: Record<string, string> = {
+    Ran: "Running command",
+    Read: "Reading files",
+    Edited: "Editing files",
+    Searched: "Searching",
+    Fetched: "Fetching",
+    Delegated: "Delegating",
+    "Sent message": "Sending message",
+  };
+  return live[verb] ?? verb;
+}
+
+/** How a call or activity ended, in a word. */
+export function stateLabel(status: string): string {
+  return ({ success: "Completed", error: "Failed", cancelled: "Interrupted", disconnected: "Disconnected", running: "Running" } as Record<string, string>)[status] ?? status;
+}

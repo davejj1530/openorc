@@ -1,7 +1,11 @@
-import { useState, type ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
+import { harnessShortName, isHarnessId } from "@openorc/protocol";
 import { core } from "../lib/rpc";
+import { useRunVoice } from "../lib/turn-authors";
 import { Button, Input } from "./ui";
 import { cn } from "../lib/cn";
+import { Check } from "./icons";
+import { HarnessLogo } from "./HarnessLogo";
 
 interface Question {
   /** Answer key: Codex uses an id, Claude the question text. */
@@ -33,23 +37,78 @@ function readQuestions(input: unknown): Question[] {
   });
 }
 
-function answeredQuestion(q: Question, answers: Record<string, string[]> | undefined, decided: string): ReactNode {
-  if (decided === "deny") return null;
-  const answer = answers?.[q.key];
-  let content: ReactNode = <p className="text-ink-3">Answer unavailable</p>;
-  if (answer?.length) {
-    if (q.secret) content = <p>Answer hidden</p>;
-    else
-      content = answer.map((value, index) => (
-        <p key={index} className="whitespace-pre-wrap break-words">
-          {value}
-        </p>
-      ));
-  }
+/** What was answered outside the options: a custom answer, or a question that had none. Secret answers stay hidden. */
+function answeredText(q: Question, answer: string[]): ReactNode {
+  const extra = q.options ? answer.filter((value) => !q.options!.some((o) => o.label === value)) : answer;
+  if (!extra.length) return null;
   return (
-    <div className="space-y-1 text-base text-ink-2" aria-label="Your answer">
-      {content}
+    <div className="question-answer" aria-label="Your answer">
+      {q.secret ? (
+        <p>Answer hidden</p>
+      ) : (
+        extra.map((value, index) => (
+          <p key={index} className="whitespace-pre-wrap break-words">
+            {value}
+          </p>
+        ))
+      )}
     </div>
+  );
+}
+
+/**
+ * One option as a 44px fill row. Picking it marks it with a check; once the answer is sent the chosen rows take the
+ * ink pill and the rest step back, one after another. A conversation loaded already answered shows that at once.
+ */
+function OptionRow({ q, option, index, name, picked, decided, onToggle }: OptionProps) {
+  let state: string | undefined;
+  if (decided) state = picked ? "chosen" : "dropped";
+  return (
+    <label className="question-option" data-picked={picked || undefined} data-state={state} style={{ "--option-index": index } as CSSProperties}>
+      <input type={q.multi ? "checkbox" : "radio"} name={name} className="sr-only" checked={picked} disabled={Boolean(decided)} onChange={onToggle} />
+      <span className="question-option-label">
+        {option.label}
+        {option.description ? <span className="question-option-description">{option.description}</span> : null}
+      </span>
+      <Check size={16} className="question-option-check" />
+    </label>
+  );
+}
+
+type OptionProps = { q: Question; option: { label: string; description: string }; index: number; name: string; picked: boolean; decided: string | undefined; onToggle: () => void };
+
+/** A free answer in the card: beside the options as "something else", or the whole answer when there are none. */
+function OtherAnswer({
+  q,
+  name,
+  picked,
+  value,
+  onPick,
+  onChange,
+  onSubmit,
+}: {
+  q: Question;
+  name: string;
+  picked: boolean;
+  value: string;
+  onPick: () => void;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <label className="question-other">
+      {q.options ? <input type={q.multi ? "checkbox" : "radio"} name={name} className="sr-only" checked={picked} onChange={onPick} /> : null}
+      <Input
+        variant="sheet"
+        type={q.secret ? "password" : "text"}
+        aria-label={q.options ? `Custom answer: ${q.question}` : q.question}
+        placeholder={q.options ? "Something else" : "Your answer"}
+        value={value}
+        onFocus={() => q.options && !picked && onPick()}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && onSubmit()}
+      />
+    </label>
   );
 }
 
@@ -68,6 +127,7 @@ export function QuestionCard({
   answers?: Record<string, string[]> | undefined;
 }) {
   const questions = readQuestions(input);
+  const voice = useRunVoice(runId);
   const [picked, setPicked] = useState<Record<string, string[]>>({});
   const [other, setOther] = useState<Record<string, string>>({});
 
@@ -88,74 +148,94 @@ export function QuestionCard({
     });
 
   const submit = () => {
+    if (!complete) return;
     const answers: Record<string, string[]> = {};
     for (const q of questions) answers[q.key] = answerFor(q);
     void core.call("approvals.resolve", { runId, approvalId, decision: "allow", answers });
   };
+  const chosen = (q: Question): string[] => {
+    if (!decided) return picked[q.key] ?? [];
+    return decided === "deny" ? [] : (answers?.[q.key] ?? []);
+  };
 
   return (
-    <div data-blocking={decided ? undefined : "true"} className={cn("question-card my-3 rounded-lg border border-line p-4", decided && "text-ink-2")}>
-      {questions.map((q) => (
-        <fieldset key={q.key} className="mb-4 min-w-0">
-          <legend className="mb-3 text-md font-medium text-ink break-words">{q.question || q.header}</legend>
-          {decided ? (
-            answeredQuestion(q, answers, decided)
-          ) : (
-            <div className="grid gap-1.5">
-              {q.options?.map((o) => (
-                <label
-                  key={o.label}
-                  className={cn(
-                    "flex min-h-10 items-start gap-3 rounded-md px-3 py-2.5 text-base transition-colors hover:bg-surface-2 focus-within:outline focus-within:outline-2 focus-within:outline-accent",
-                    (picked[q.key] ?? []).includes(o.label) && "bg-surface-2",
-                  )}
-                >
-                  <input
-                    type={q.multi ? "checkbox" : "radio"}
-                    name={`${approvalId}-${q.key}`}
-                    className="mt-1 shrink-0 accent-current"
-                    checked={(picked[q.key] ?? []).includes(o.label)}
-                    onChange={() => toggle(q, o.label)}
-                  />
-                  <span className="min-w-0 break-words">
-                    <span className="font-medium text-ink">{o.label}</span>
-                    {o.description ? <span className="mt-0.5 block text-ink-2">{o.description}</span> : null}
-                  </span>
-                </label>
-              ))}
-              {q.allowOther ? (
-                <label className="mt-2 flex items-center gap-3 px-3 text-base">
-                  {q.options ? (
-                    <input type={q.multi ? "checkbox" : "radio"} name={`${approvalId}-${q.key}`} checked={(picked[q.key] ?? []).includes("__other")} onChange={() => toggle(q, "__other")} />
-                  ) : null}
-                  <Input
-                    type={q.secret ? "password" : "text"}
-                    aria-label={q.options ? `Custom answer: ${q.question}` : q.question}
-                    placeholder={q.options ? "Write a different answer…" : "Your answer"}
-                    value={other[q.key] ?? ""}
-                    onFocus={() => q.options && !(picked[q.key] ?? []).includes("__other") && toggle(q, "__other")}
-                    onChange={(e) => setOther((s) => ({ ...s, [q.key]: e.target.value }))}
-                    onKeyDown={(e) => e.key === "Enter" && complete && submit()}
-                    className="h-9"
-                  />
-                </label>
-              ) : null}
-            </div>
-          )}
+    <div data-blocking={decided ? undefined : "true"} data-plane className="question-card">
+      {questions.map((q, i) => (
+        <fieldset key={q.key} className="question-set">
+          <legend className="question-ask">
+            {i === 0 && voice && isHarnessId(voice.agent) ? <HarnessLogo id={voice.agent} size={14} /> : null}
+            <span>{q.question || q.header}</span>
+          </legend>
+          <div className="question-options">
+            {q.options?.map((o, index) => (
+              <OptionRow key={o.label} q={q} option={o} index={index} name={`${approvalId}-${q.key}`} picked={chosen(q).includes(o.label)} decided={decided} onToggle={() => toggle(q, o.label)} />
+            ))}
+            {!decided && q.allowOther ? (
+              <OtherAnswer
+                q={q}
+                name={`${approvalId}-${q.key}`}
+                picked={(picked[q.key] ?? []).includes("__other")}
+                value={other[q.key] ?? ""}
+                onPick={() => toggle(q, "__other")}
+                onChange={(value) => setOther((s) => ({ ...s, [q.key]: value }))}
+                onSubmit={submit}
+              />
+            ) : null}
+            {decided && decided !== "deny" ? answeredText(q, answers?.[q.key] ?? []) : null}
+          </div>
         </fieldset>
       ))}
-      {decided ? (
-        <div className="text-sm text-ink-3">{decided === "deny" ? "declined" : "answered"}</div>
-      ) : (
-        <div className="flex items-center gap-2 border-t border-line pt-3">
-          <Button size="md" variant="primary" disabled={!complete} onClick={submit}>
-            Answer
-          </Button>
-          <Button size="md" variant="ghost" onClick={() => void core.call("approvals.resolve", { runId, approvalId, decision: "deny" })}>
-            Decline
-          </Button>
-        </div>
-      )}
+      <QuestionFoot
+        decided={decided}
+        hint={askHint(questions)}
+        agent={voice ? harnessShortName(voice.agent) : null}
+        complete={complete}
+        onSubmit={submit}
+        onDecline={() => void core.call("approvals.resolve", { runId, approvalId, decision: "deny" })}
+      />
+    </div>
+  );
+}
+
+/** What the card asks of the reader, in a few words. */
+function askHint(questions: Question[]): string {
+  if (!questions.some((q) => q.options)) return "Type your answer";
+  const pick = questions.some((q) => q.multi) ? "Pick any" : "Pick one";
+  return questions.some((q) => q.options && q.allowOther) ? `${pick}, or type your own` : pick;
+}
+
+/** The foot swaps in place: a hint and the answers' controls while it waits, then where the answer went. */
+function QuestionFoot({
+  decided,
+  hint,
+  agent,
+  complete,
+  onSubmit,
+  onDecline,
+}: {
+  decided: string | undefined;
+  hint: string;
+  agent: string | null;
+  complete: boolean;
+  onSubmit: () => void;
+  onDecline: () => void;
+}) {
+  const [asked] = useState(!decided);
+  if (decided)
+    return (
+      <p className={cn("question-foot", asked && "motion-arrive")} role="status">
+        {decided === "deny" ? "Declined" : `Sent to ${agent ?? "the agent"}`}
+      </p>
+    );
+  return (
+    <div className="question-foot">
+      <span className="min-w-0 flex-1">{hint}</span>
+      <Button size="md" variant="ghost" onClick={onDecline}>
+        Decline
+      </Button>
+      <Button size="md" variant="primary" disabled={!complete} onClick={onSubmit}>
+        Answer
+      </Button>
     </div>
   );
 }

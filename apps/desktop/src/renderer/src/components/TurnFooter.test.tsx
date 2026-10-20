@@ -137,10 +137,10 @@ it("says the reader changed the files, between the last turn and the next prompt
   expect(answer).toBeGreaterThanOrEqual(0);
   expect(line).toBeGreaterThan(answer!);
   expect(nextAsk).toBeGreaterThan(line!);
-  expect(screen.queryByText("one.ts")).toBeNull();
+  expect(screen.queryByText(/one\.ts$/)).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Show 2 files" }));
-  expect(screen.getByText("one.ts")).toBeTruthy();
-  expect(screen.getByText("two.ts")).toBeTruthy();
+  expect(screen.getByText(/one\.ts$/)).toBeTruthy();
+  expect(screen.getByText(/two\.ts$/)).toBeTruthy();
 });
 
 it("stays neutral when an agent may have changed the files, before the prompt a new process recorded first", async () => {

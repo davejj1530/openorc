@@ -3,19 +3,9 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 import Callout from "../../components/docs/Callout.astro";
 import LinkCards from "../../components/docs/LinkCards.astro";
 import { docHref } from "../../data/docs";
-
-const sections = [
-  { id: "agent", title: "An agent is missing or signed out" },
-  { id: "stuck", title: "A thread seems stuck" },
-  { id: "approvals", title: "Approvals don't appear" },
-  { id: "slack", title: "Slack doesn't reply" },
-  { id: "git", title: "Worktree and Git errors" },
-  { id: "updates", title: "Updates won't install" },
-  { id: "next-steps", title: "Next steps" },
-];
 ---
 
-<DocsLayout slug="troubleshooting" sections={sections}>
+<DocsLayout slug="troubleshooting">
   <section aria-labelledby="agent">
     <h2 id="agent">An agent is missing or signed out</h2>
     <p>

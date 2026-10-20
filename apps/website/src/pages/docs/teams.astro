@@ -3,22 +3,9 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 import Callout from "../../components/docs/Callout.astro";
 import LinkCards from "../../components/docs/LinkCards.astro";
 import { docHref } from "../../data/docs";
-
-const sections = [
-  { id: "what-a-team-is", title: "What a team is" },
-  { id: "turn-on", title: "Turn on team execution" },
-  { id: "create", title: "Create a team" },
-  { id: "start", title: "Start a team conversation" },
-  { id: "talk", title: "Talk to the team" },
-  { id: "members", title: "How members work together" },
-  { id: "changes", title: "Review and combine changes" },
-  { id: "needs-you", title: "When the team needs you" },
-  { id: "limits", title: "Limits" },
-  { id: "next-steps", title: "Next steps" },
-];
 ---
 
-<DocsLayout slug="teams" sections={sections}>
+<DocsLayout slug="teams">
   <p>You talk to a team the way you talk to a single agent. The lead answers, other members join in when you address them, and the lead can hand pieces of the work to the members who report to it.</p>
 
   <section aria-labelledby="what-a-team-is">

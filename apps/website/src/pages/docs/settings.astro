@@ -3,22 +3,9 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 import Callout from "../../components/docs/Callout.astro";
 import LinkCards from "../../components/docs/LinkCards.astro";
 import { docHref } from "../../data/docs";
-
-const sections = [
-  { id: "usage", title: "Usage" },
-  { id: "connections", title: "Connections" },
-  { id: "slack", title: "Slack" },
-  { id: "skills", title: "Skills" },
-  { id: "appearance", title: "Appearance" },
-  { id: "general", title: "General" },
-  { id: "memory", title: "Memory & models" },
-  { id: "data", title: "Data" },
-  { id: "saved", title: "Where settings are saved" },
-  { id: "next-steps", title: "Next steps" },
-];
 ---
 
-<DocsLayout slug="settings" sections={sections}>
+<DocsLayout slug="settings">
   <p>
     Open <strong>Settings</strong> at the bottom of the sidebar, or choose <strong>Settings</strong> in the command palette (<kbd>⌘K</kbd>). The sections are listed down the side. With a section name focused, the left and right arrow keys move
     between them.

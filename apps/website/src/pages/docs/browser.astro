@@ -3,18 +3,9 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 import Callout from "../../components/docs/Callout.astro";
 import LinkCards from "../../components/docs/LinkCards.astro";
 import { docHref } from "../../data/docs";
-
-const sections = [
-  { id: "open", title: "Open the Preview" },
-  { id: "agents", title: "How agents use it" },
-  { id: "approval", title: "What needs approval" },
-  { id: "sign-ins", title: "Sign-ins" },
-  { id: "limits", title: "Limits" },
-  { id: "next-steps", title: "Next steps" },
-];
 ---
 
-<DocsLayout slug="browser" sections={sections}>
+<DocsLayout slug="browser">
   <section aria-labelledby="open">
     <h2 id="open">Open the Preview</h2>
     <p>

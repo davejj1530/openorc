@@ -4,18 +4,6 @@ import Callout from "../../components/docs/Callout.astro";
 import LinkCards from "../../components/docs/LinkCards.astro";
 import { docHref } from "../../data/docs";
 
-const sections = [
-  { id: "scope", title: "What this covers" },
-  { id: "servers", title: "Local servers" },
-  { id: "window", title: "The app window and the Preview" },
-  { id: "agents", title: "What agents can do through OpenOrc" },
-  { id: "package", title: "The installed app" },
-  { id: "secrets", title: "Secrets and your data" },
-  { id: "limits", title: "What OpenOrc cannot protect against" },
-  { id: "report", title: "Reporting a vulnerability" },
-  { id: "next-steps", title: "Next steps" },
-];
-
 const fuses = `RunAsNode                              off
 EnableNodeOptionsEnvironmentVariable   off
 EnableNodeCliInspectArguments          off
@@ -26,7 +14,7 @@ OnlyLoadAppFromAsar                    on`;
 const address = "http://127.0.0.1:<port>/mcp/<random UUID without dashes>";
 ---
 
-<DocsLayout slug="security" sections={sections}>
+<DocsLayout slug="security">
   <section aria-labelledby="scope">
     <h2 id="scope">What this covers</h2>
     <p>OpenOrc runs coding agents with your account's access to your computer. This page covers who else could try to use that access, and what stops them:</p>

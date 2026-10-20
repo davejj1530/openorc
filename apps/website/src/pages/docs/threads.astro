@@ -3,21 +3,9 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 import Callout from "../../components/docs/Callout.astro";
 import LinkCards from "../../components/docs/LinkCards.astro";
 import { docHref } from "../../data/docs";
-
-const sections = [
-  { id: "start", title: "Start a thread" },
-  { id: "composer", title: "Write a message" },
-  { id: "while-working", title: "Send while the agent works" },
-  { id: "stop", title: "Stop a turn" },
-  { id: "fork", title: "Fork a thread" },
-  { id: "side-by-side", title: "Open threads side by side" },
-  { id: "sidebar", title: "The sidebar" },
-  { id: "import", title: "Import terminal sessions" },
-  { id: "next-steps", title: "Next steps" },
-];
 ---
 
-<DocsLayout slug="threads" sections={sections}>
+<DocsLayout slug="threads">
   <section aria-labelledby="start">
     <h2 id="start">Start a thread</h2>
     <p>Start a thread for each piece of work you hand to an agent. Every thread keeps its own agent, model, mode, and folder, so several can work at once.</p>

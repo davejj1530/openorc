@@ -4,15 +4,6 @@ import Callout from "../../components/docs/Callout.astro";
 import LinkCards from "../../components/docs/LinkCards.astro";
 import { docHref } from "../../data/docs";
 
-const sections = [
-  { id: "files", title: "Instruction files" },
-  { id: "loading", title: "How each agent loads them" },
-  { id: "edit", title: "Edit them in OpenOrc" },
-  { id: "brief", title: "The brief OpenOrc adds" },
-  { id: "delivery", title: "How the brief reaches the agent" },
-  { id: "next-steps", title: "Next steps" },
-];
-
 const brief = `You are in the thread "<title>" for project <project>, working directly in the project folder at <path> on <default branch>.
 
 Tasks are records of work within this conversation. task_create saves a document without launching an agent. When asked to start a task, call task_start and implement it here in the current thread and workspace. Do not forward work to a separate task agent. Use task_update to record progress and completion. Only open a new thread when the user requests a separate conversation.
@@ -30,7 +21,7 @@ Other threads of this project are reachable with thread_list, thread_read, and t
 The openorc MCP server also offers memory_search, task_context, and memory_record for this project's history.`;
 ---
 
-<DocsLayout slug="instructions" sections={sections}>
+<DocsLayout slug="instructions">
   <section aria-labelledby="files">
     <h2 id="files">Instruction files</h2>
     <p>

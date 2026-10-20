@@ -4,19 +4,10 @@ import Callout from "../../components/docs/Callout.astro";
 import LinkCards from "../../components/docs/LinkCards.astro";
 import { docHref } from "../../data/docs";
 
-const sections = [
-  { id: "how-it-works", title: "How it works" },
-  { id: "ask", title: "Ask in plain words" },
-  { id: "helper-threads", title: "Helper threads" },
-  { id: "messages", title: "Messages between threads" },
-  { id: "limits", title: "How exchanges end" },
-  { id: "next-steps", title: "Next steps" },
-];
-
 const notice = `Message from the thread "API work" (id …):`;
 ---
 
-<DocsLayout slug="messaging" sections={sections}>
+<DocsLayout slug="messaging">
   <p>Agents in different threads of a project can talk to each other. One agent can ask another what it knows, tell it something its work depends on, or start a helper thread to take on part of the job. You ask for this in the conversation, and the agents do it with OpenOrc's thread tools.</p>
 
   <section aria-labelledby="how-it-works">

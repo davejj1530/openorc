@@ -5,18 +5,17 @@ import SiteFooter from "../components/SiteFooter.astro";
 import Icon from "../components/Icon.astro";
 import DocsNav from "../components/docs/DocsNav.astro";
 import LogoSprite from "../components/hero/LogoSprite.astro";
-import { docPage, docsReviewed, type DocSection } from "../data/docs";
+import { docPage, docsReviewed } from "../data/docs";
 import "../styles/docs.css";
 
 interface Props {
   slug: string;
-  /** The page's h2 sections, for the outline beside it. */
-  sections?: DocSection[];
 }
 
-const { slug, sections = [] } = Astro.props;
+const { slug } = Astro.props;
 const page = docPage(slug);
 if (!page) throw new Error(`Unknown docs page: ${slug}`);
+const { sections } = page;
 const home = slug === "";
 ---
 

@@ -3,20 +3,9 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 import Callout from "../../components/docs/Callout.astro";
 import LinkCards from "../../components/docs/LinkCards.astro";
 import { docHref } from "../../data/docs";
-
-const sections = [
-  { id: "how", title: "How it works" },
-  { id: "connect", title: "Connect your bot" },
-  { id: "mention", title: "Mention your bot" },
-  { id: "in-slack", title: "What you see in Slack" },
-  { id: "approvals", title: "Approve from Slack" },
-  { id: "desktop", title: "Find the conversation in OpenOrc" },
-  { id: "limits", title: "Limits" },
-  { id: "next-steps", title: "Next steps" },
-];
 ---
 
-<DocsLayout slug="slack" sections={sections}>
+<DocsLayout slug="slack">
   <section aria-labelledby="how">
     <h2 id="how">How it works</h2>
     <p>

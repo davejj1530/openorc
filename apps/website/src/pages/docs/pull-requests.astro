@@ -3,20 +3,9 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 import Callout from "../../components/docs/Callout.astro";
 import LinkCards from "../../components/docs/LinkCards.astro";
 import { docHref } from "../../data/docs";
-
-const sections = [
-  { id: "open", title: "Open pull requests" },
-  { id: "browse", title: "Browse and filter" },
-  { id: "read", title: "Read a pull request" },
-  { id: "draft", title: "Draft a review" },
-  { id: "model", title: "Let a model review" },
-  { id: "submit", title: "Submit the review" },
-  { id: "requirements", title: "What it needs" },
-  { id: "next-steps", title: "Next steps" },
-];
 ---
 
-<DocsLayout slug="pull-requests" sections={sections}>
+<DocsLayout slug="pull-requests">
   <section aria-labelledby="open">
     <h2 id="open">Open pull requests</h2>
     <p><strong>Pull requests</strong> lists your projects' pull requests on GitHub and lets you review them without leaving OpenOrc. It reads everything through your own GitHub CLI, <code>gh</code>. Your review stays a draft in OpenOrc, and nothing reaches GitHub until you submit it.</p>

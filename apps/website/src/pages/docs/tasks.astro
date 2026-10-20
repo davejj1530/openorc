@@ -5,20 +5,9 @@ import LinkCards from "../../components/docs/LinkCards.astro";
 import DocsVisual from "../../components/docs/DocsVisual.astro";
 import TaskListMock from "../../components/mocks/TaskListMock.astro";
 import { docHref } from "../../data/docs";
-
-const sections = [
-  { id: "how-tasks-work", title: "How tasks work" },
-  { id: "create", title: "Create a task" },
-  { id: "spec", title: "Write the spec" },
-  { id: "status", title: "Status and priority" },
-  { id: "tabs", title: "The task's tabs" },
-  { id: "start", title: "Start a task" },
-  { id: "list", title: "The Tasks list" },
-  { id: "next-steps", title: "Next steps" },
-];
 ---
 
-<DocsLayout slug="tasks" sections={sections}>
+<DocsLayout slug="tasks">
   <DocsVisual
     label="The Tasks view with six tasks grouped under In progress, Ready for review and Backlog. Each row shows its status, a title, the project, when the task last changed and a priority icon, and most rows also show a label."
   >

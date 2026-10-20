@@ -3,21 +3,9 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 import Callout from "../../components/docs/Callout.astro";
 import LinkCards from "../../components/docs/LinkCards.astro";
 import { docHref } from "../../data/docs";
-
-const sections = [
-  { id: "supported", title: "Supported agents" },
-  { id: "differences", title: "How they differ" },
-  { id: "finding", title: "How OpenOrc finds them" },
-  { id: "choose", title: "Choose the agent and model" },
-  { id: "effort", title: "Effort and Fast mode" },
-  { id: "switch", title: "Switch agents in a thread" },
-  { id: "usage", title: "Usage and allowances" },
-  { id: "updates", title: "Update the agents" },
-  { id: "next-steps", title: "Next steps" },
-];
 ---
 
-<DocsLayout slug="agents" sections={sections}>
+<DocsLayout slug="agents">
   <section aria-labelledby="supported">
     <h2 id="supported">Supported agents</h2>
     <p>OpenOrc works with three coding agents. Each is a command-line tool that you install and sign in to yourself. OpenOrc starts it for your threads with that sign-in, and the agent sends your requests to its own provider.</p>

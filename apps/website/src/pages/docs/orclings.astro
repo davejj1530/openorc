@@ -3,19 +3,9 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 import Callout from "../../components/docs/Callout.astro";
 import LinkCards from "../../components/docs/LinkCards.astro";
 import { docHref } from "../../data/docs";
-
-const sections = [
-  { id: "create", title: "Create an Orcling" },
-  { id: "own-conversation", title: "Its own conversation" },
-  { id: "what-it-sees", title: "What it sees" },
-  { id: "instructions-and-memory", title: "Instructions and memory" },
-  { id: "project-work", title: "Bring it into project work" },
-  { id: "edit-or-delete", title: "Edit or delete an Orcling" },
-  { id: "next-steps", title: "Next steps" },
-];
 ---
 
-<DocsLayout slug="orclings" sections={sections}>
+<DocsLayout slug="orclings">
   <p>You give each Orcling a name, a look, a model and a permission, and its memory goes with it wherever it works. Talk to one when you want to think something through away from project work, or to check on all your projects at once. When there's code to change, it starts the work in a project.</p>
 
   <section aria-labelledby="create">

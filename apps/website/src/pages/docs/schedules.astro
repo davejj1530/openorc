@@ -3,18 +3,9 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 import Callout from "../../components/docs/Callout.astro";
 import LinkCards from "../../components/docs/LinkCards.astro";
 import { docHref } from "../../data/docs";
-
-const sections = [
-  { id: "how-it-works", title: "How schedules work" },
-  { id: "create", title: "Create a schedule" },
-  { id: "results", title: "Where results go" },
-  { id: "manage", title: "Pause, run now and delete" },
-  { id: "timing", title: "When a schedule runs" },
-  { id: "next-steps", title: "Next steps" },
-];
 ---
 
-<DocsLayout slug="schedules" sections={sections}>
+<DocsLayout slug="schedules">
   <section aria-labelledby="how-it-works">
     <h2 id="how-it-works">How schedules work</h2>
     <p>A schedule sends the same prompt to an agent on a timer. Each run starts a new thread in the schedule's project, with the model, mode and location you saved. Use one for work that repeats, such as a nightly dependency check or a weekly look for flaky tests.</p>

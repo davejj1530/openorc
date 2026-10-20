@@ -2,20 +2,9 @@
 import DocsLayout from "../../layouts/DocsLayout.astro";
 import Callout from "../../components/docs/Callout.astro";
 import LinkCards from "../../components/docs/LinkCards.astro";
-
-const sections = [
-  { id: "navigation", title: "Navigation" },
-  { id: "threads", title: "Threads" },
-  { id: "composer", title: "Composer" },
-  { id: "tasks", title: "Tasks list and task pages" },
-  { id: "review", title: "Review and editing" },
-  { id: "layout", title: "Resizing and menus" },
-  { id: "app-menu", title: "App menu" },
-  { id: "next-steps", title: "Next steps" },
-];
 ---
 
-<DocsLayout slug="shortcuts" sections={sections}>
+<DocsLayout slug="shortcuts">
   <p>
     This page uses the Mac keys. On Windows and Linux, press <kbd>Ctrl</kbd> wherever it shows <kbd>⌘</kbd>. <kbd>⇧</kbd> is Shift and <kbd>↵</kbd> is Return or Enter. OpenOrc has no setting to change these keys.
   </p>

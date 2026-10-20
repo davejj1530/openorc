@@ -3,19 +3,9 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 import Callout from "../../components/docs/Callout.astro";
 import LinkCards from "../../components/docs/LinkCards.astro";
 import { docHref } from "../../data/docs";
-
-const sections = [
-  { id: "while-it-works", title: "While the agent works" },
-  { id: "open-a-step", title: "Open a step" },
-  { id: "when-it-finishes", title: "When a turn finishes" },
-  { id: "changes", title: "Review or undo a turn" },
-  { id: "questions-and-approvals", title: "Questions and approvals" },
-  { id: "inbox", title: "The Inbox" },
-  { id: "next-steps", title: "Next steps" },
-];
 ---
 
-<DocsLayout slug="work" sections={sections}>
+<DocsLayout slug="work">
   <p>Each turn's work sits between your message and the agent's reply. While the agent works, you see the step it's on. When it finishes, the work folds into one line that says what the turn came to, and a card lists the files it changed.</p>
 
   <section aria-labelledby="while-it-works">

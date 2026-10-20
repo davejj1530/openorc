@@ -1,0 +1,300 @@
+/*
+ * The header's search, after Immaculate's site search: a pill at the header's center that grows into a 48px field
+ * over the dimmed page, with a radius 28 panel of results 10px under it. scripts/search-morph.ts moves the field, the
+ * panel and its contents between the two; what is here is where they rest.
+ */
+
+/* The pill on the chip fill. Hover brings its text up; a press sinks and springs back. */
+.search-pill {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  width: 200px;
+  height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--tint);
+  color: var(--faint);
+  font-size: var(--type-control);
+  transition:
+    color var(--duration-leave) ease,
+    transform var(--duration-release) var(--ease-overshoot);
+}
+.search-pill:hover {
+  color: var(--text);
+}
+.search-pill:active {
+  transform: scale(0.97);
+  transition-duration: var(--duration-leave), var(--duration-press);
+}
+/* While the search is out, the field stands where the pill was. */
+:root[data-search-shown] {
+  overflow: hidden;
+}
+:root[data-search-shown] .search-pill {
+  opacity: 0;
+}
+.search-label {
+  flex: 1;
+  text-align: left;
+}
+.search-key {
+  font: inherit;
+  font-size: 0.8125rem;
+}
+
+/*
+ * The morph's shape (scripts/search-morph.ts animates these on the column): the field's box and inset relative to its
+ * slot, and the panel's top and height. Their initial values are the open search at rest.
+ */
+@property --search-x {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+@property --search-y {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+@property --search-width {
+  syntax: "<length-percentage>";
+  inherits: true;
+  initial-value: 100%;
+}
+@property --search-height {
+  syntax: "<length-percentage>";
+  inherits: true;
+  initial-value: 100%;
+}
+@property --search-inset {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 14px;
+}
+@property --search-panel-y {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+@property --search-panel-height {
+  syntax: "<length-percentage>";
+  inherits: true;
+  initial-value: 100%;
+}
+
+.search {
+  --search-float: 0 0 0 var(--hairline) var(--rule), 0 16px 40px -16px rgb(0 0 0 / 0.24);
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+}
+:root[data-theme="dark"] .search {
+  --search-float: 0 0 0 var(--hairline) var(--rule), 0 16px 40px -16px #000;
+}
+.search-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgb(0 0 0 / 0.18);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+:root[data-theme="dark"] .search-scrim {
+  background: rgb(0 0 0 / 0.55);
+}
+.search-column {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 664px;
+  margin-inline: auto;
+  padding: 12px 16px 0;
+  pointer-events: none;
+}
+.search-slot {
+  position: relative;
+  z-index: 1;
+  height: 48px;
+}
+
+/* The field is the pill grown: it starts on the chip fill, and the surface fades in over it as it opens. */
+.search-field {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--search-width);
+  height: var(--search-height);
+  translate: var(--search-x) var(--search-y);
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 var(--search-inset);
+  border-radius: 999px;
+  background: var(--tint);
+  color: var(--faint);
+  font-size: var(--type-control);
+  pointer-events: auto;
+}
+.search-field-fill {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--surface);
+  box-shadow: var(--search-float);
+}
+/* Open, the field takes a query; running back into the pill, it shows the pill's face again. */
+.search[data-state="open"] .search-field :is(.search-label, .search-key),
+.search[data-state="closing"] .search-field :is(.search-input, .search-clear) {
+  display: none;
+}
+.search-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--type-body);
+  outline: none;
+}
+.search-input::placeholder {
+  color: var(--faint);
+  opacity: 1;
+}
+.search-clear {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-right: -6px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--faint);
+  transition:
+    color var(--duration-leave) ease,
+    opacity var(--duration-leave) ease,
+    filter var(--duration-leave) ease,
+    visibility var(--duration-leave),
+    transform var(--duration-release) var(--ease-overshoot);
+}
+.search-clear:hover {
+  color: var(--text);
+}
+.search-clear:active {
+  transform: scale(0.94);
+  transition-duration: var(--duration-leave), var(--duration-leave), var(--duration-leave), var(--duration-leave), var(--duration-press);
+}
+.search-clear:not([data-shown]) {
+  visibility: hidden;
+  opacity: 0;
+  filter: blur(2px);
+  transform: scale(0.8);
+}
+
+/* The panel: a surface that keeps the field's width and grows down from under it. */
+.search-panel {
+  position: relative;
+}
+.search-panel-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--search-width);
+  height: var(--search-panel-height);
+  translate: var(--search-x) var(--search-panel-y);
+  border-radius: 28px;
+  background: var(--surface);
+  box-shadow: var(--search-float);
+}
+/* The results scroll inside the panel, which stops a little above the window's bottom edge. The 16px fades at the
+   edges fall on the padding at either end, so they only show over rows with more to scroll. */
+.search-content {
+  position: relative;
+  max-height: calc(100dvh - 96px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  clip-path: inset(var(--search-panel-y) calc(100% - var(--search-x) - var(--search-width)) calc(100% - var(--search-panel-y) - var(--search-panel-height)) var(--search-x) round 28px);
+  -webkit-mask-image: linear-gradient(transparent, #000 16px, #000 calc(100% - 16px), transparent);
+  mask-image: linear-gradient(transparent, #000 16px, #000 calc(100% - 16px), transparent);
+  scrollbar-width: none;
+  pointer-events: auto;
+}
+.search-content::-webkit-scrollbar {
+  display: none;
+}
+.search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 16px;
+  translate: var(--search-x) 0;
+}
+.search-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.search-group-label {
+  padding: 0 6px;
+  color: var(--faint);
+  font-size: 0.8125rem;
+  line-height: 18px;
+}
+.search-option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  scroll-margin-block: 16px;
+  transition:
+    background-color var(--duration-quick) ease,
+    scale var(--duration-release) var(--ease-overshoot);
+}
+.search-option:active {
+  scale: 0.98;
+  transition-duration: var(--duration-quick), var(--duration-press);
+}
+.search-option[aria-selected="true"] {
+  background: var(--tint);
+}
+.search-option-name {
+  color: var(--text);
+  font-size: var(--type-control);
+  line-height: 20px;
+}
+.search-option-about {
+  overflow: hidden;
+  color: var(--faint);
+  font-size: 0.8125rem;
+  line-height: 18px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.search-empty {
+  padding: 24px 6px;
+  color: var(--faint);
+  font-size: var(--type-control);
+  text-align: center;
+}
+
+/* Where the header is narrow, the pill is a 36px circle holding the magnifier. */
+@media (max-width: 1023px) {
+  .search-pill {
+    width: 36px;
+    padding: 0 9px;
+  }
+  .search-pill :is(.search-label, .search-key),
+  .search[data-state="closing"] .search-field :is(.search-label, .search-key) {
+    display: none;
+  }
+}

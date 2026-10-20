@@ -3,18 +3,9 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 import Callout from "../../components/docs/Callout.astro";
 import LinkCards from "../../components/docs/LinkCards.astro";
 import { docHref } from "../../data/docs";
-
-const sections = [
-  { id: "open", title: "Open a terminal" },
-  { id: "shell", title: "Shell and folder" },
-  { id: "lifetime", title: "How long a shell runs" },
-  { id: "processes", title: "Processes agents start" },
-  { id: "finishing", title: "When the turn ends" },
-  { id: "next-steps", title: "Next steps" },
-];
 ---
 
-<DocsLayout slug="terminal" sections={sections}>
+<DocsLayout slug="terminal">
   <section aria-labelledby="open">
     <h2 id="open">Open a terminal</h2>
     <p>Every conversation has a terminal of its own in the side panel. Use it to run commands yourself in the folder the agent works in, such as your tests or a dev server.</p>

@@ -1,0 +1,31 @@
+---
+/** One kind of work in a step, as the app's WorkSteps groups it: the verb in a quiet column, then a row per file it touched. */
+import Counts from "./Counts.astro";
+import FileGlyph from "./FileGlyph.astro";
+
+interface Props {
+  label: string;
+  files: { path: string; added?: number; removed?: number }[];
+  /** The file being worked on now, which reads in ink. */
+  live?: string;
+}
+const { label, files, live } = Astro.props;
+const split = (path: string) => [path.slice(0, path.lastIndexOf("/")), path.slice(path.lastIndexOf("/") + 1)];
+---
+
+<div class="hs-group">
+  <span class="hs-group-label">{label}</span>
+  <div class="hs-chips">
+    {files.map((file) => {
+      const [folder, name] = split(file.path);
+      return (
+        <span class="hs-chip" data-live={file.path === live ? "" : undefined}>
+          <FileGlyph path={file.path} />
+          <span class="hs-chip-label">{name}</span>
+          <span class="hs-chip-detail">{folder}</span>
+          <Counts added={file.added} removed={file.removed} />
+        </span>
+      );
+    })}
+  </div>
+</div>

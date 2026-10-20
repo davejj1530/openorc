@@ -1,0 +1,30 @@
+---
+/** A turn's edits closed to one line, as the app's ChangeCard draws it: "Changed N files", the totals, Review and its chevron. */
+import Counts from "./Counts.astro";
+import ProductIcon from "./ProductIcon.astro";
+
+interface Props extends Record<string, unknown> {
+  /** The block opens and closes with the scene (scripts/hero-motion.ts). */
+  grow?: boolean;
+  files: number;
+  added: number;
+  removed: number;
+  /** A thread's own turn can be undone; a team's shared checkpoint cannot. */
+  undo?: boolean;
+  note?: string;
+}
+const { files, added, removed, undo, note, grow, ...rest } = Astro.props;
+---
+
+<section class="hs-change" data-grow={grow ? "" : undefined} {...rest}>
+  <div class="hs-change-head">
+    <span class="hs-change-title">Changed {files} {files === 1 ? "file" : "files"}</span>
+    <Counts added={added} removed={removed} />
+    <span class="hs-change-actions">
+      {undo ? <span class="hs-text-button">Undo</span> : null}
+      <span class="hs-button hs-button-sm">Review</span>
+      <span class="hs-change-chevron"><ProductIcon name="chevronDown" /></span>
+    </span>
+  </div>
+  {note ? <p class="hs-change-note">{note}</p> : null}
+</section>

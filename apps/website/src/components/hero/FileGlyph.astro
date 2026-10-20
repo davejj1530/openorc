@@ -1,0 +1,32 @@
+---
+/**
+ * A file's mark as the app's FileGlyph picks it: TypeScript and React files show their language's mark, anything
+ * else the outline code file. The marks are drawn here at chip size rather than copied from the app's icon set.
+ */
+interface Props {
+  path: string;
+}
+const { path } = Astro.props;
+const extension = /\.([a-z0-9]+)$/i.exec(path)?.[1]?.toLowerCase() ?? "";
+const kind = /^(ts|mts|cts)$/.test(extension) ? "typescript" : /^(tsx|jsx)$/.test(extension) ? "react" : "code";
+---
+
+{kind === "typescript" ? (
+  <svg class="hs-file-glyph" viewBox="0 0 16 16" aria-hidden="true">
+    <rect x="1" y="1" width="14" height="14" rx="1" fill="#007acc" />
+    <path d="M4.4 8.6h4.4M6.6 8.6V13M12.9 9.1c-.4-.5-.9-.7-1.5-.7-.8 0-1.3.4-1.3 1 0 1.5 2.9.9 2.9 2.5 0 .7-.6 1.2-1.5 1.2-.7 0-1.3-.3-1.7-.8" fill="none" stroke="#fff" stroke-width="1.15" stroke-linecap="round" />
+  </svg>
+) : kind === "react" ? (
+  <svg class="hs-file-glyph" viewBox="0 0 16 16" aria-hidden="true">
+    <g fill="none" stroke="#61dafb" stroke-width="0.9">
+      <ellipse cx="8" cy="8" rx="7" ry="2.6" />
+      <ellipse cx="8" cy="8" rx="7" ry="2.6" transform="rotate(60 8 8)" />
+      <ellipse cx="8" cy="8" rx="7" ry="2.6" transform="rotate(120 8 8)" />
+    </g>
+    <circle cx="8" cy="8" r="1.4" fill="#61dafb" />
+  </svg>
+) : (
+  <svg class="hs-file-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M14 3.5H6a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-9Z M14 3.5v6h6" /><path d="m9 12-3 3 3 3 M15 12l3 3-3 3" />
+  </svg>
+)}

@@ -1,0 +1,43 @@
+---
+/**
+ * One step of a turn's work, as the app's WorkSteps draws it: a loader while it runs and an ink check once done, its
+ * title (in ink while it runs), a faint hint of what it touched once folded, and its body in the slot while it is open.
+ */
+import ProductIcon from "./ProductIcon.astro";
+import { timed, type Journey } from "../../data/hero/timeline";
+
+interface Props extends Record<string, unknown> {
+  /** The block opens and closes with the scene (scripts/hero-motion.ts). */
+  grow?: boolean;
+  journey?: Journey;
+  /** The step's title, or titles that follow the scene's windows. */
+  title: string | { text: string; show: string }[];
+  /** Window while the step runs; it is done after it. Omit for a step done when the scene opens. */
+  live?: string;
+  /** Window from which the step is done. */
+  done?: string;
+  /** What the folded step touched ("4 files"), and when it shows. */
+  meta?: { text: string; show?: string };
+  /** Window while the step is open; its body is the slot. */
+  open?: string;
+}
+const { journey, title, live, done, meta, open, grow, ...rest } = Astro.props;
+const at = (windows: string) => (journey ? timed(journey, windows) : {});
+---
+
+<li class="hs-step" data-grow={grow ? "" : undefined} {...rest}>
+  <span class="hs-step-mark">
+    {live ? <span class="hs-live" {...at(live)}><ProductIcon name="loader" /></span> : null}
+    {live && !done ? null : <span class="hs-done" {...(done ? at(done) : {})}><ProductIcon name="check" /></span>}
+  </span>
+  <span class="hs-step-title">
+    {typeof title === "string" ? <span class="hs-step-text">{title}</span> : title.map((item) => <span class="hs-step-text" {...at(item.show)}>{item.text}</span>)}
+    {meta ? <span class="hs-step-meta" {...(meta.show ? at(meta.show) : {})}>{meta.text}</span> : null}
+    {open ? <ProductIcon name="chevronRight" class="hs-step-chevron" /> : null}
+  </span>
+  {open ? (
+    <div class="hs-step-body" data-grow {...at(open)}>
+      <slot />
+    </div>
+  ) : null}
+</li>

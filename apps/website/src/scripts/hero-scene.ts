@@ -1,4 +1,4 @@
-import { journeys, moment, visibleAt, type Journey, type Layout, type SceneId, type Timeline } from "../data/hero";
+import { duration, journeys, moment, visibleAt, type Journey, type Layout, type SceneId, type Timeline } from "../data/hero";
 import { createMotion, watchWidth } from "./hero-motion";
 
 /** How long the scene fades out and back in when the journey starts over, in seconds. */
@@ -135,7 +135,7 @@ function bindScene(root: HTMLElement, journey: Journey, skip: string) {
       return { el, attribute: `data-${name}`, windows, visible: el.hasAttribute(`data-${name}`) };
     }),
   );
-  const clocks = [...root.querySelectorAll<HTMLElement>("[data-clock]")].map((el) => ({ el, from: el.dataset.clock!, template: el.dataset.clockText ?? "Working · {s}s", shown: -1 }));
+  const clocks = [...root.querySelectorAll<HTMLElement>("[data-clock]")].map((el) => ({ el, from: el.dataset.clock!, template: el.dataset.clockText ?? "{t}", shown: -1 }));
   const durations = [...root.querySelectorAll<HTMLElement>("[data-duration]")];
   let typing: Typing[] = [];
   let streams: Stream[] = [];
@@ -153,7 +153,7 @@ function bindScene(root: HTMLElement, journey: Journey, skip: string) {
   const write = (sceneSeconds: number, timeline: Timeline) => {
     for (const clock of clocks) {
       const seconds = Math.max(0, Math.floor(sceneSeconds - moment(clock.from, timeline)));
-      if (seconds !== clock.shown) clock.el.textContent = clock.template.replace("{s}", String((clock.shown = seconds)));
+      if (seconds !== clock.shown) clock.el.textContent = clock.template.replace("{t}", duration((clock.shown = seconds)));
     }
     for (const item of typing) {
       const text = item.keys.findLast((key) => key.at <= sceneSeconds)?.text ?? "";
@@ -180,7 +180,7 @@ function bindScene(root: HTMLElement, journey: Journey, skip: string) {
       });
       for (const el of durations) {
         const [from, to] = el.dataset.duration!.split("~");
-        el.textContent = `Worked for ${Math.floor(moment(to, timeline) - moment(from, timeline))}s`;
+        el.textContent = duration(Math.floor(moment(to, timeline) - moment(from, timeline)));
       }
     },
     render(sceneSeconds: number, timeline: Timeline, layout: Layout) {

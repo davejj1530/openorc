@@ -1,0 +1,19 @@
+---
+/** A task's status as the app's status mark draws it: an empty ring in the backlog, a quarter arc in progress, a dot in review. */
+interface Props extends Record<string, unknown> {
+  status: "backlog" | "in_progress" | "review";
+  class?: string;
+}
+const { status, class: className, ...rest } = Astro.props;
+---
+
+<svg class:list={["hs-status-mark", className]} data-status={status} viewBox="0 0 16 16" fill="none" aria-hidden="true" {...rest}>
+  {status === "backlog" ? <circle cx="8" cy="8" r="5.25" stroke-width="1.5" stroke="currentColor" /> : null}
+  {status === "in_progress" ? (
+    <>
+      <circle class="hs-status-track" cx="8" cy="8" r="6" stroke-width="2" />
+      <circle cx="8" cy="8" r="6" stroke-width="2" stroke-linecap="round" stroke-dasharray="15 37.7" transform="rotate(-90 8 8)" stroke="currentColor" />
+    </>
+  ) : null}
+  {status === "review" ? <circle cx="8" cy="8" r="4" fill="currentColor" /> : null}
+</svg>

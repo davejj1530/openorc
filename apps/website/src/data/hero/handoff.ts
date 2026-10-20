@@ -19,7 +19,8 @@ export const threads = {
     title: "Billing page",
     earlier: {
       request: "Plan a billing page in Settings.",
-      worked: "Worked for 41s",
+      took: "41s",
+      receipt: { thought: "Thought 9s", steps: "2 steps" },
       reply: "Billing fits under **Settings → Billing**, next to Members. It needs the current plan, the card on file, and past invoices.",
     },
     prompt: "Build the billing page: current plan, card, and invoices.",
@@ -40,7 +41,6 @@ export const threads = {
       ask: "Asking Plans migration for the plan's new shape",
       build: "Building the page against user.subscription",
     },
-    receipt: "Worked · 1 file changed",
     headline: [
       { text: "Reading the settings pages", show: "<aSending" },
       { text: "Asking Plans migration", show: "aSending~aDone" },
@@ -64,8 +64,12 @@ export const threads = {
       answer: "Answering Billing page",
       resume: "Updating the billing queries",
     },
-    edited: ["src/db/subscriptions.ts", "src/db/plans.ts"],
-    editing: "src/db/migrations/0042_subscriptions.ts",
+    /** The migration's edits so far, the last one under way when the scene opens. */
+    edits: [
+      { path: "src/db/subscriptions.ts", added: 24 },
+      { path: "src/db/plans.ts", added: 6, removed: 17 },
+      { path: "src/db/migrations/0042_subscriptions.ts", added: 11 },
+    ],
     change: { added: 41, removed: 17 },
     headline: [
       { text: "Moving plans into subscriptions", show: "<bWork" },
@@ -76,7 +80,7 @@ export const threads = {
 };
 
 /** Moments when each thread's agent is working. */
-export const busy = { a: "aSend~aDone bSent~aFinish", b: "<end" };
+export const busy = { a: "aSend~aDone bSent~aFinish", b: ">bStart" };
 
 const wide: Timeline = {
   typeStart: 0.9,
@@ -109,36 +113,10 @@ const wide: Timeline = {
   end: 22.7,
 };
 
-/** One thread at a time: the sidebar opens to move between them, as the app does at this width. */
-const narrow: Timeline = {
-  ...wide,
-  sidebarOpen: 9.6,
-  viewB: 10.2,
-  sidebarClose: 10.5,
-  bWork: 11.1,
-  bDetails: 11.3,
-  bThought: 12,
-  bSending: 12.4,
-  bSent: 13.1,
-  bLand: 13.4,
-  bAnswerStart: 13.4,
-  bAnswerEnd: 15.5,
-  bDone: 15.9,
-  sidebarReopen: 16.4,
-  viewA: 17,
-  sidebarReclose: 17.3,
-  aWork: 14,
-  aEdited: 18.2,
-  aResultStart: 18.5,
-  aResultEnd: 21.3,
-  aFinish: 21.7,
-  end: 27.6,
-};
-
 export const handoff: Journey = {
-  timelines: { wide, narrow },
+  timelines: { wide, narrow: wide },
   states: {
-    view: { rest: "a", narrow: { b: "viewB~viewA" } },
-    sidebar: { rest: "closed", narrow: { open: "sidebarOpen~sidebarClose sidebarReopen~sidebarReclose" } },
+    view: { rest: "a" },
+    sidebar: { rest: "closed" },
   },
 };

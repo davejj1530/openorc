@@ -1,0 +1,37 @@
+---
+/**
+ * One head per turn, as the app's TurnHead draws it: the harness mark, the agent's name, then its model and a status
+ * that swaps in place. A played turn says it is working with its clock, then Writing while the reply streams, then
+ * how long it took; a finished one says how long it took.
+ */
+import { duration, elapsed, timed, type Journey } from "../../data/hero/timeline";
+
+interface Props extends Record<string, unknown> {
+  /** The block opens and closes with the scene (scripts/hero-motion.ts). */
+  grow?: boolean;
+  journey?: Journey;
+  harness: string;
+  agent: string;
+  model: string;
+  /** How long a finished turn took. */
+  took?: string;
+  /** A played turn: working from `from`, writing its reply from `writing`, done at `to`. */
+  clock?: { from: string; writing?: string; to?: string };
+}
+const { journey, harness, agent, model, took, clock, grow, ...rest } = Astro.props;
+const at = (windows: string) => (journey ? timed(journey, windows) : {});
+const working = clock ? (clock.writing ?? clock.to) : undefined;
+// Without a player the page shows the journey's last moment, so the words start there.
+const since = (from: string, to?: string) => (journey ? duration(elapsed(journey, from, to)) : "0s");
+---
+
+<div class="hs-head" data-grow={grow ? "" : undefined} {...rest}>
+  <svg class="hs-logo" data-provider={harness} aria-hidden="true"><use href={`#hs-logo-${harness}`} /></svg>
+  <span class="hs-head-name">{agent}</span>
+  <span class="hs-head-status">
+    {`${model} · `}{took}
+    {clock ? <span {...(working ? at(`<${working}`) : {})} data-clock={clock.from} data-clock-text="working {t}">working {clock && since(clock.from)}</span> : null}
+    {clock?.writing ? <span {...at(clock.to ? `${clock.writing}~${clock.to}` : `>${clock.writing}`)}>Writing</span> : null}
+    {clock?.to ? <span {...at(`>${clock.to}`)} data-duration={`${clock.from}~${clock.to}`}>{since(clock.from, clock.to)}</span> : null}
+  </span>
+</div>

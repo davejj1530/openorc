@@ -4,10 +4,13 @@
  * app, the composer names the thread's branch with its uncommitted changes; the sidebar is the scenes' own.
  */
 import "../../styles/hero-scene.css";
+import ChangeLine from "../hero/ChangeLine.astro";
 import ProductIcon from "../hero/ProductIcon.astro";
 import Prose from "../hero/Prose.astro";
+import Receipt from "../hero/Receipt.astro";
 import SceneSidebar from "../hero/SceneSidebar.astro";
 import ThreadPane from "../hero/ThreadPane.astro";
+import TurnHead from "../hero/TurnHead.astro";
 import { branches, models } from "../../data/hero/workspace";
 
 const rows = [
@@ -16,6 +19,7 @@ const rows = [
   { title: "Make the first five minutes count", providers: [{ harness: "codex", label: "Codex" }] },
   { title: "A faster command menu", providers: [{ harness: "claude", label: "Claude" }], busy: true as const, headline: "Caching the search index" },
 ];
+const change = { added: 12, removed: 4 };
 ---
 
 <div class="hs-mock hs-mock-worktree">
@@ -29,10 +33,15 @@ const rows = [
     placeholder="Message Codex…"
     branch={branches.tokens}
     changes
-    changeStat={{ added: 12, removed: 4 }}
+    changeStat={change}
   >
-    <div class="hs-user"><div class="hs-bubble">Move every color, radius, and spacing value into one tokens file.</div></div>
-    <div class="hs-work"><span class="hs-work-toggle">Worked · 3 files changed<ProductIcon name="chevronRight" /></span></div>
-    <div class="hs-reply"><div class="hs-author">Assistant</div><Prose text="Every color, radius, and spacing step now comes from one `tokens.css`. The old per-component values are gone, and nothing outside this worktree has changed." /></div>
+    <div class="hs-turn">
+      <div class="hs-user"><div class="hs-bubble">Move every color, radius, and spacing value into one tokens file.</div></div>
+      <TurnHead harness="codex" agent="Codex" model={models.codex.label} took="2m 4s" />
+      <Receipt thought="Thought 8s" steps="3 steps" />
+      <div class="hs-reply"><Prose text="Every color, radius, and spacing step now comes from one `tokens.css`. The old per-component values are gone, and nothing outside this worktree has changed." /></div>
+      <ChangeLine files={3} added={change.added} removed={change.removed} undo />
+      <div class="hs-turn-actions"><ProductIcon name="copy" /></div>
+    </div>
   </ThreadPane>
 </div>

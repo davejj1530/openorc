@@ -68,7 +68,6 @@ export const discussion = {
     heading: "Comments",
     help: "Mention a model to discuss this task. Clear work requests continue in a linked thread.",
     placeholder: "Leave a note, or type @ to ask a model…",
-    hint: "Type @ to choose a model and effort",
   },
 };
 
@@ -97,7 +96,6 @@ export const discussionJourney: Journey = {
   timelines: { wide, narrow: wide },
   states: {
     view: { rest: "task" },
-    // Narrow screens hide the sidebar, so it opens to show the new thread.
-    sidebar: { rest: "closed", narrow: { open: ">replyDone" } },
+    sidebar: { rest: "closed" },
   },
 };

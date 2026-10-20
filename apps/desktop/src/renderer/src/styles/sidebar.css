@@ -1,0 +1,403 @@
+/* The sidebar: its column, destinations, thread browser, project groups, footer and Orclings. */
+
+.app-shell .workspace-navigation {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: var(--width-sidebar);
+  overflow: hidden;
+  background: var(--bg);
+}
+.app-shell .workspace-navigation::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: var(--hairline);
+  background: var(--line);
+  pointer-events: none;
+}
+.app-shell .workspace-navigation[data-open="false"] {
+  width: 0;
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  padding: 0 12px 0 18px;
+  width: var(--width-sidebar);
+}
+.workspace-navigation[data-traffic-lights="true"] .sidebar-header {
+  padding-left: var(--spacing-traffic);
+}
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1;
+  min-width: 0;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.sidebar-brand .sidebar-wordmark {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sidebar-destinations {
+  padding: 8px 12px 12px;
+  width: var(--width-sidebar);
+}
+.sidebar-destinations .nav-track {
+  margin: 0;
+  padding: 0;
+  gap: 2px;
+}
+.sidebar-destinations .nav-row,
+.sidebar-new-thread {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 34px;
+  padding: 0 8px;
+  border-radius: 7px;
+  font-size: 13px;
+  color: var(--ink);
+  text-align: left;
+}
+.sidebar-new-thread > svg {
+  color: var(--ink-3);
+}
+.sidebar-destinations .nav-row[aria-current="page"] {
+  color: var(--navigation-ink);
+}
+.sidebar-browser-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 12px 8px;
+  width: var(--width-sidebar);
+  flex-shrink: 0;
+}
+.sidebar-browser-tabs > button {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 7px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+.sidebar-browser-tabs > button:hover {
+  background: var(--surface-3);
+}
+.sidebar-browser-tabs > button[aria-current="page"] {
+  color: var(--navigation-ink);
+  background: var(--navigation-soft);
+}
+.sidebar-browser-slot {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  width: var(--width-sidebar);
+}
+.sidebar-browser-slot[hidden] {
+  display: none;
+}
+/* Settings takes the column over; the app's navigation waits underneath it. */
+.sidebar-workspace {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+.sidebar-workspace[hidden] {
+  display: none;
+}
+.settings-destinations {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.settings-destinations > .nav-row {
+  margin-bottom: 12px;
+}
+.sidebar-footer {
+  flex-shrink: 0;
+  padding: 8px 12px 12px;
+  width: var(--width-sidebar);
+}
+.sidebar-add-project,
+.sidebar-settings {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+.sidebar-add-project {
+  width: 100%;
+  margin-bottom: 12px;
+}
+.sidebar-add-project:hover,
+.sidebar-settings:hover {
+  background: var(--surface-3);
+  color: var(--ink);
+}
+.sidebar-footer-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+}
+.sidebar-settings {
+  flex: 1;
+}
+.app-shell .workspace-window-nav[data-sidebar-open="true"] {
+  display: none;
+}
+
+.browser-close {
+  display: none;
+}
+.conversation-browser {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  width: var(--width-sidebar);
+}
+.browser-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 12px 8px;
+}
+.browser-search {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 6px;
+  color: var(--ink-3);
+}
+.browser-search:focus-within {
+  background: var(--surface-2);
+}
+.browser-search input {
+  width: 100%;
+  min-width: 0;
+  background: transparent;
+  font-size: 12px;
+  padding: 5px 0;
+}
+.browser-threads {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 10px 16px;
+}
+.sidebar-project + .sidebar-project {
+  margin-top: 12px;
+}
+.browser-group-title {
+  padding: 0 0 4px;
+  color: var(--ink-2);
+  font-size: 12px;
+}
+.browser-group-title > div {
+  padding-inline: 4px;
+}
+.browser-group-toggle {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 28px;
+  padding: 0 2px;
+  border-radius: 4px;
+  text-align: left;
+}
+.browser-group-toggle:hover {
+  color: var(--ink);
+}
+.browser-group-toggle > span:first-child {
+  flex: 1;
+}
+.project-group-icon {
+  margin-inline: 5px;
+  color: var(--ink-3);
+  flex-shrink: 0;
+}
+.project-group-activity {
+  flex-shrink: 0;
+  color: var(--ink-3);
+  font-size: 10px;
+}
+.project-group-activity[data-waiting="true"] {
+  color: var(--warn);
+}
+/* The status slot sits under the project icon and the title under the project name, so the list needs no indent. */
+.app-shell .thread-preview {
+  position: relative;
+  border-radius: 7px;
+  padding: 7px 10px 7px 9px;
+  margin: 1px 0;
+  gap: 0;
+  min-height: 32px;
+  color: var(--ink);
+  border: 0;
+  text-align: left;
+}
+.thread-preview-heading {
+  gap: 11px;
+  align-items: center;
+}
+.thread-preview-status {
+  display: flex;
+  flex-shrink: 0;
+  width: 14px;
+  justify-content: center;
+}
+.app-shell .sidebar-shell .thread-preview[data-open]:not(:focus-visible) {
+  background: var(--navigation-soft);
+  box-shadow: none;
+}
+.thread-preview-title {
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 18px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.thread-preview[data-open] .thread-preview-title {
+  color: var(--navigation-ink);
+}
+/* Keep branch/provider details in the accessible label and hover title without a second row. */
+.thread-preview-meta {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.browser-empty {
+  padding: 6px 14px 10px 34px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-3);
+}
+.browser-load-more {
+  padding: 8px 14px 8px 34px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+.browser-load-more:hover {
+  color: var(--navigation-ink);
+}
+.browser-hint {
+  padding: 8px 18px;
+  color: var(--ink-3);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.app-shell .resize-handle[data-edge="sidebar"] {
+  width: 0;
+  flex: 0 0 0;
+  margin: var(--height-topbar) 0 0;
+  align-self: stretch;
+  z-index: 10;
+}
+.app-shell .resize-handle[data-edge="sidebar"]::after {
+  inset: 0 -7px 0 0;
+}
+.app-shell .resize-handle[data-edge="sidebar"] .resize-grip {
+  /* Center the full pill over the 1px seam border; the hit area stays on the work side. */
+  left: -0.5px;
+  width: 4px;
+}
+
+@media (max-width: 900px) {
+  .app-shell .workspace-window-nav[data-sidebar-open="true"] {
+    display: flex;
+  }
+  .app-shell .resize-handle[data-edge="sidebar"] {
+    display: none;
+  }
+  .app-shell .workspace-navigation {
+    position: absolute;
+    inset: 0 auto 0 0;
+    z-index: 30;
+    max-width: calc(100vw - 40px);
+    height: 100%;
+    box-shadow: 12px 0 30px -16px var(--material-lo-cast);
+  }
+  .app-shell .workspace-navigation[data-open="false"] {
+    visibility: hidden;
+  }
+}
+
+/* The app paints native transparency once; the sidebar column must respect it. */
+html[data-transparent-shell="true"] .app-shell .workspace-navigation {
+  background: transparent;
+}
+html[data-transparent-shell="true"] .app-shell .conversation-browser {
+  background: transparent;
+}
+
+.browser-search input::placeholder {
+  color: var(--ink-3);
+  opacity: 1;
+}
+
+/* Contacts share the single navigation browser. */
+.orcling-browser .browser-heading h2 {
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.6px;
+}
+.orcling-contact {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 8px;
+  margin: 2px 0;
+  border-radius: 6px;
+  text-align: left;
+}
+.orcling-contact:hover {
+  background: var(--surface-2);
+}
+.orcling-contact[aria-current="page"] {
+  background: var(--navigation-soft);
+  box-shadow: none;
+}
+.orcling-contact > span {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+.orcling-contact strong {
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--ink);
+}
+.orcling-contact small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--ink-3);
+}

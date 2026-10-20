@@ -1,0 +1,107 @@
+/* Floating layers: menus, tooltips and popovers. */
+
+.project-picker-popup {
+  width: 300px;
+  max-width: calc(100vw - 24px);
+  border: var(--hairline) solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+  padding: 8px;
+}
+.project-picker-label {
+  padding: 6px 9px 10px;
+  color: var(--ink-3);
+  font-size: 11px;
+  font-weight: 550;
+}
+.project-picker-options {
+  max-height: min(360px, 60vh);
+  overflow-y: auto;
+}
+.project-option {
+  border-radius: 6px;
+  margin: 2px 0;
+  padding: 2px 0;
+}
+.project-option[data-selected="true"] {
+  background: var(--navigation-soft);
+  color: var(--navigation-ink);
+}
+.project-option:hover {
+  background: var(--surface-2);
+}
+.project-option-name {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 8px 0 3px;
+  text-align: left;
+  font-size: 13px;
+  border-radius: 4px;
+}
+.project-option-name > span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.project-option-icon {
+  display: inline-flex;
+  width: 24px;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--ink-3);
+}
+.project-picker-add {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 8px;
+  padding: 12px 9px 7px;
+  border-top: var(--hairline) solid var(--line);
+  color: var(--ink-2);
+  text-align: left;
+  font-size: 12px;
+}
+.project-picker-add:hover {
+  color: var(--navigation-ink);
+}
+.project-picker-feedback {
+  padding: 8px 9px;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+/* Menus never grow past the space Base UI measures between their anchor and the window edge; they scroll instead. */
+.menu-popup {
+  max-height: var(--available-height);
+  overflow-y: auto;
+}
+
+/* Two members of the floating layer that are not free-floating planes. The mention flyout
+   lives inside the already-raised composer shell, and a tooltip is a label, not a plane. */
+.composer-suggestions,
+.tooltip-popup {
+  box-shadow: var(--material-contact);
+}
+
+/* Menus communicate opening with a short native pop; workspace content never flies in. */
+.menu-popup {
+  transform-origin: var(--transform-origin);
+  transition:
+    opacity 100ms ease-out,
+    transform 100ms ease-out;
+}
+
+.menu-popup[data-starting-style],
+.menu-popup[data-ending-style] {
+  opacity: 0;
+  transform: translateY(2px);
+}

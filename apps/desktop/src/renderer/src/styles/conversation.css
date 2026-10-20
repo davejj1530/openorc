@@ -1,0 +1,340 @@
+/* The conversation: its column, journal entries, work toggles, change cards, turn blocks and update notices. */
+
+.app-shell [data-transcript] > .max-w-chat {
+  max-width: var(--container-chat);
+  padding: 4px var(--reading-gutter) 20px;
+}
+.journal-message {
+  position: relative;
+  padding: 4px 0 10px;
+}
+.journal-author {
+  padding-right: 96px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 7px;
+  color: var(--ink-3);
+  font-size: 11px;
+  font-weight: 550;
+}
+.journal-author-mark {
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink-4);
+}
+.journal-response .journal-author-mark {
+  background: var(--content-ink);
+}
+/* Named team authors already identify each reply. Keep one author line. */
+.team-turn .journal-response > .journal-author,
+.team-chat-entry:not(.team-chat-entry-user) .journal-response > .journal-author {
+  display: none;
+}
+.team-turn .journal-reply-actions,
+.team-chat-entry:not(.team-chat-entry-user) .journal-reply-actions {
+  position: static;
+  justify-content: flex-end;
+  margin-top: 2px;
+}
+.team-turn .journal-message {
+  padding-bottom: 0;
+}
+.team-turn-author + [data-team-run] > .work-turn:first-child > .transcript-block:first-child {
+  margin-top: 6px;
+}
+.journal-prompt > .journal-message-body {
+  width: fit-content;
+  max-width: min(88%, 72ch);
+  min-width: 0;
+  margin-inline-start: auto;
+  grid-template-columns: minmax(0, 1fr);
+}
+.app-shell .journal-prompt .message-bubble {
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+  justify-self: end;
+  overflow-wrap: anywhere;
+  background: var(--bubble);
+  box-shadow: none;
+  border: var(--hairline) solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: var(--bubble-ink);
+  font-size: 14px;
+  line-height: 1.55;
+}
+.journal-prompt > .journal-author {
+  display: none;
+}
+.journal-message-actions {
+  /* Keep the hover controls in their own row below the prompt, including at narrow widths. */
+  justify-content: flex-end;
+}
+.journal-reply-actions {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: auto;
+  margin: 0;
+  padding: 0;
+}
+
+/* Routine work is quiet; color identifies live work, delegation and attention. */
+.tool-icon {
+  color: currentColor;
+}
+.agent-orb .tool-icon[data-tone="think"] {
+  color: var(--tone-think);
+}
+.tool-icon[data-tone="task"] {
+  color: var(--accent-ink);
+}
+.tool-icon[data-tone="agent"] {
+  color: var(--ok);
+}
+.tool-icon[data-tone="error"] {
+  color: var(--bad);
+}
+.work-turn {
+  min-width: 0;
+}
+.work-section {
+  margin-top: 16px;
+  margin-bottom: 16px;
+}
+.work-toggle,
+.work-step-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  max-width: 100%;
+  text-align: left;
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+}
+.work-toggle:hover,
+.work-step-toggle:hover {
+  color: var(--ink);
+}
+.work-toggle:focus-visible,
+.work-step-toggle:focus-visible {
+  background: var(--surface-2);
+  color: var(--ink);
+  border-radius: 5px;
+}
+.work-chevron {
+  flex-shrink: 0;
+  transition: transform 150ms ease-out;
+}
+.work-content {
+  margin-top: 4px;
+}
+.work-content[hidden],
+.work-step-detail[hidden] {
+  display: none;
+}
+.work-step-toggle {
+  width: 100%;
+}
+.work-step-toggle > span {
+  min-width: 0;
+}
+.work-step-detail {
+  margin-left: 24px;
+  padding: 4px 0 8px;
+  min-width: 0;
+}
+.work-live {
+  color: var(--accent-ink);
+  flex-shrink: 0;
+  animation: work-spin 1.6s linear infinite;
+}
+@keyframes work-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .work-live {
+    animation: none;
+  }
+  .work-chevron {
+    transition: none;
+  }
+}
+
+/* Blocks below the fold skip layout until scrolled to; the transcript stays a plain list. */
+/* What a turn changed: one card under the reply, the way the agent apps show their edits. */
+.change-card {
+  margin-block: 20px;
+  border: var(--hairline) solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.change-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+}
+.change-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--ink-2);
+  flex: none;
+}
+.change-title {
+  display: grid;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.change-title strong {
+  font-weight: 500;
+}
+.change-counts {
+  display: inline-flex;
+  gap: 8px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-sm);
+}
+.change-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+.change-note {
+  padding: 0 16px 12px;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+.change-files {
+  border-top: var(--hairline) solid var(--line);
+  padding: 4px 16px;
+}
+.change-files li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding-block: 8px;
+  font-size: var(--text-sm);
+}
+.change-files li + li {
+  border-top: var(--hairline) solid var(--line);
+}
+.change-files li > :first-child {
+  overflow-wrap: anywhere;
+  min-width: 0;
+  color: var(--ink-2);
+}
+.change-files li > :first-child strong {
+  color: var(--ink);
+  font-weight: 500;
+}
+.change-more {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 16px;
+  border-top: var(--hairline) solid var(--line);
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+}
+.change-error {
+  padding: 8px 16px 12px;
+  font-size: var(--text-sm);
+}
+@container (max-width: 600px) {
+  .change-heading {
+    flex-wrap: wrap;
+  }
+}
+
+.transcript-block {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 48px;
+  animation: transcript-block-in 220ms ease-out both;
+}
+@keyframes transcript-block-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* A stable slot for the flat agent presence mark in idle and working states. */
+.agent-orb {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+}
+
+/* Reasoning streams in view while it runs: the last few lines, fading in from the top. Click the row to read it all. */
+.thinking-tail {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  max-height: 88px;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, transparent, black 32px);
+}
+
+.workspace-update-notices {
+  position: fixed;
+  pointer-events: none;
+  z-index: 40;
+  top: 40px;
+  right: 4px;
+  width: min(422px, calc(100vw - 8px));
+  max-height: calc(100dvh - 44px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+.agent-update-notice {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  border-radius: var(--radius-xl);
+  background: var(--surface-2);
+  color: var(--ink);
+  box-shadow: 0 8px 30px rgb(0 0 0 / 18%);
+}
+.app-update-progress {
+  display: block;
+  width: 100%;
+  height: 4px;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--line);
+  appearance: none;
+}
+.app-update-progress::-webkit-progress-bar {
+  background: var(--line);
+}
+.app-update-progress::-webkit-progress-value {
+  background: var(--ink-2);
+}

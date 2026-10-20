@@ -1,0 +1,32 @@
+---
+/** Turns the interface sounds on and off and remembers the choice. Turning them on says so with a sound. */
+---
+
+<button class="icon-button" type="button" aria-label="Interface sounds" aria-pressed="true" data-sound-toggle data-sound="none">
+  <span class="icon-swap">
+    <svg data-icon="on" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3l4.5-4v13L7 14.5H4z" /><path d="M15.5 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11" /></svg>
+    <svg data-icon="off" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3l4.5-4v13L7 14.5H4z" /><path d="m16 10 4 4M20 10l-4 4" /></svg>
+  </span>
+</button>
+
+<script>
+  import { isSoundOn, onSoundChange, play, setSoundOn } from "../scripts/speaker";
+
+  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-sound-toggle]")) {
+    const on = button.querySelector<SVGElement>('[data-icon="on"]');
+    const off = button.querySelector<SVGElement>('[data-icon="off"]');
+    const show = () => {
+      const sound = isSoundOn();
+      button.setAttribute("aria-pressed", String(sound));
+      on?.toggleAttribute("data-off", !sound);
+      off?.toggleAttribute("data-off", sound);
+    };
+    show();
+    onSoundChange(show);
+    button.addEventListener("click", () => {
+      const next = !isSoundOn();
+      setSoundOn(next);
+      if (next) play("on");
+    });
+  }
+</script>

@@ -64,7 +64,18 @@
   grid-template-columns: 16px minmax(0, 1fr);
   column-gap: 10px;
   min-width: 0;
+  transition:
+    opacity var(--duration-arrive) var(--ease-out),
+    filter var(--duration-arrive) var(--ease-out),
+    translate var(--duration-arrive) var(--ease-out);
 }
+/* A step that starts while the turn runs comes in; steps already there when the card mounts stay put. */
+@starting-style {
+  [data-arrivals] .work-rail-item {
+    opacity: 0;
+    filter: blur(var(--arrive-blur));
+    translate: 0 var(--arrive-rise);
+  }
 }
 .work-rail-item.work-plan {
   display: block;
@@ -93,8 +104,13 @@
   border-radius: var(--radius-pill);
   background: var(--ink);
   color: var(--surface);
+  transition:
+    opacity var(--duration-confirm) var(--ease-out),
+    scale var(--duration-confirm) var(--ease-overshoot);
 }
-  from {
+/* A step checked while the turn runs lands with one overshoot; checks already there don't replay. */
+@starting-style {
+  [data-arrivals] .step-check {
     opacity: 0;
     scale: 0.5;
   }
@@ -177,7 +193,6 @@ button.work-phase-title[aria-expanded="true"] > .work-chevron {
   min-width: 0;
   padding: 2px 0 12px;
 }
-.work-phase-body[hidden],
 .work-phase-body > :not(.work-group) {
   grid-column: 1 / -1;
 }
@@ -416,16 +431,27 @@ button.work-chip:focus-visible {
   color: var(--ink);
 }
 
+/* What a step touches while the turn runs fades in, so the work reads as it happens. */
+.work-chip {
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    opacity var(--duration-arrive) var(--ease-out),
+    filter var(--duration-arrive) var(--ease-out),
+    translate var(--duration-arrive) var(--ease-out);
 }
+@starting-style {
+  [data-arrivals] .work-chip {
     opacity: 0;
     filter: blur(var(--arrive-blur));
     translate: 0 var(--arrive-rise);
   }
 }
-.work-rail-item[data-state="running"] .work-chip {
+/* A note inside a step is not a reply: no copy and time row, and no space kept for one. */
+.work-phase-narration .journal-reply-actions {
+  display: none;
 }
-@keyframes work-chip-in {
-  from {
+.work-phase-narration .prose-chat :where(p):last-child {
+  margin-bottom: 0;
 }
 /* A command nested in the card steps down a fill, since the card is already the plane. */
 .steps-card .command-card {

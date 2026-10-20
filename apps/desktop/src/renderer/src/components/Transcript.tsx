@@ -1,4 +1,5 @@
 import { lazy, memo, Suspense, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type ComponentProps, type RefObject } from "react";
+import { useVisited } from "../lib/use-visited";
 import { harnessCatalog, type ActivityRecovery } from "@openorc/protocol";
 import { WorkMessage, WorkAgent, ChevronDown, ChevronRight, FileText, GitFork, Lightbulb, Loader2 } from "./icons";
 import { workTurns } from "../lib/work-transcript";
@@ -389,11 +390,8 @@ function useSteadyTurns(blocks: Block[]): { id: string; blocks: Block[] }[] {
 function useWorkOpen(showActivity: boolean, live: boolean) {
   const [choice, setChoice] = useState<{ mode: boolean; open: boolean | null }>({ mode: showActivity, open: null });
   if (choice.mode !== showActivity) setChoice({ mode: showActivity, open: null });
-  const [visited, setVisited] = useState(false);
-  useEffect(() => {
-    if (open) setVisited(true);
-  }, [open]);
   const open = (choice.mode === showActivity ? choice.open : null) ?? (showActivity && live);
+  const visited = useVisited(open);
   return { open, visited, choose: (next: boolean) => setChoice({ mode: showActivity, open: next }) };
 }
 
@@ -422,7 +420,7 @@ const WorkTurn = memo(function WorkTurn({ id, blocks, live = false, ambient = fa
           <div
             id={contentId}
             hidden={!open}
-            className="work-content"
+            className="work-content motion-collapse"
             onClickCapture={(event) => {
               if ((event.target as HTMLElement).closest("button, summary")) choose(true);
             }}

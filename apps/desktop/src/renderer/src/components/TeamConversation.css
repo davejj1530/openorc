@@ -6,13 +6,32 @@
   justify-content: flex-end;
   padding: 4px 24px;
 }
+/* The team trigger: a 30px pill with the team mark, its status and a faint chevron. On narrow
+   headers it folds to a 30px circle around the mark. */
 .team-toolbar-trigger {
   max-width: 200px;
-  gap: 5px;
+  gap: 6px;
+  padding: 0 10px 0 9px;
+  font-size: var(--text-sm);
+  color: var(--ink-2);
 }
 .team-toolbar-status {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.team-toolbar-chevron {
+  flex-shrink: 0;
+  color: var(--ink-4);
+}
+@container (max-width: 600px) {
+  .team-toolbar-trigger {
+    width: var(--control-md);
+    padding: 0;
+  }
+  .team-toolbar-status,
+  .team-toolbar-chevron {
+    display: none;
+  }
 }
 .team-tools-menu {
   width: 280px;
@@ -20,15 +39,24 @@
 }
 .team-tools-summary {
   display: grid;
-  gap: 4px;
-  padding: 8px;
-  color: var(--ink-3);
+  gap: 2px;
+  padding: 0 10px 8px;
+  color: var(--ink-4);
   font-size: var(--text-sm);
+  line-height: 16px;
   overflow-wrap: anywhere;
 }
-.team-tools-summary strong {
+.team-tools-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+}
+.team-tools-head > :first-child {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-base);
   color: var(--ink);
-  font-weight: 600;
 }
 .team-tools-description {
   padding: 6px 8px 8px;
@@ -36,14 +64,24 @@
   line-height: 1.5;
   color: var(--ink-3);
 }
+/* A refresh or compaction failure reads as one quiet pill above the timeline. */
 .team-refresh-error {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 8px 24px;
+  width: fit-content;
+  max-width: calc(100% - 48px);
+  min-height: var(--control-md);
+  margin: 8px auto 0;
+  padding: 0 4px 0 12px;
+  border-radius: var(--radius-pill);
+  background: var(--bad-soft);
   color: var(--bad);
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
+}
+.team-refresh-error:not(:has(button)) {
+  padding-right: 12px;
 }
 .team-execution {
   min-width: 0;
@@ -55,18 +93,24 @@
 .team-turn-continued {
   margin-top: 4px;
 }
+/* A team turn's head, in the turn-head language: picture, name in ink, model and time faint. */
 .team-turn-author {
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
   gap: 4px 8px;
-  font-size: var(--text-sm);
-  color: var(--ink-3);
+  min-height: 16px;
+  font-size: var(--text-xs);
+  line-height: 16px;
+  color: var(--ink-4);
   overflow-wrap: anywhere;
 }
-.team-turn-author strong {
+.team-turn > .team-turn-author {
+  margin-bottom: 12px;
+}
+.team-author-name {
+  flex-shrink: 0;
   font-size: var(--text-base);
-  font-weight: 600;
   color: var(--ink);
 }
 .team-author-model {
@@ -142,8 +186,8 @@
 .team-context-notice {
   margin: 12px 0;
   padding: 8px 0;
-  color: var(--ink-3);
-  font-size: var(--text-sm);
+  color: var(--ink-4);
+  font-size: var(--text-xs);
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
@@ -154,8 +198,7 @@
   gap: 4px 12px;
 }
 .team-context-notice strong {
-  color: var(--ink-2);
-  font-weight: 500;
+  color: var(--ink-3);
 }
 .team-member-list {
   margin: 18px 0;
@@ -179,7 +222,6 @@
   margin: 0 0 8px;
   color: var(--ink-2);
   font-size: var(--text-sm);
-  font-weight: 500;
 }
 .team-member-toggle {
   display: flex;
@@ -267,8 +309,8 @@
 }
 .team-member-responsibility,
 .team-reasoning-note {
-  color: var(--ink-3);
-  font-size: var(--text-sm);
+  color: var(--ink-4);
+  font-size: var(--text-xs);
   line-height: 1.5;
   margin: 4px 0 12px;
   overflow-wrap: anywhere;
@@ -280,7 +322,6 @@
   color: var(--ink-2);
 }
 .team-member-result strong {
-  font-weight: 500;
   color: var(--ink);
 }
 .team-member-result p {
@@ -289,13 +330,11 @@
 }
 .team-recovery {
   margin: 12px 0;
-  padding: 12px;
+  padding: 12px 14px;
   background: var(--surface-2);
-  border: var(--hairline) solid var(--line);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl);
   color: var(--ink-2);
   font-size: var(--text-base);
-  box-shadow: var(--material-recess);
 }
 .team-recovery p {
   white-space: pre-wrap;
@@ -311,8 +350,8 @@
 }
 .team-composer-hint {
   padding: 0 2px;
-  font-size: var(--text-sm);
-  color: var(--ink-3);
+  font-size: var(--text-xs);
+  color: var(--ink-4);
   line-height: 1.5;
 }
 .team-chat-entry {
@@ -327,23 +366,13 @@
   flex-wrap: wrap;
   gap: 4px 12px;
   margin-top: 4px;
-  font-size: var(--text-sm);
-  color: var(--ink-3);
+  font-size: var(--text-xs);
+  color: var(--ink-4);
 }
 .team-chat-entry-user .team-chat-delivery {
   justify-content: flex-end;
 }
 @container (max-width: 600px) {
-  .team-toolbar-status {
-    display: none;
-  }
-  .team-toolbar-trigger {
-    width: 28px;
-    padding: 0;
-  }
-  .team-toolbar-trigger > svg:last-child {
-    display: none;
-  }
   .team-member-content {
     padding-left: 12px;
   }
@@ -358,9 +387,9 @@
 .team-seen-by {
   margin-top: 4px;
   text-align: right;
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   line-height: 1.5;
-  color: var(--ink-3);
+  color: var(--ink-4);
   overflow-wrap: anywhere;
 }
 .team-work-transcript {
@@ -407,7 +436,6 @@
   max-width: 100%;
 }
 .team-activity-strip strong {
-  font-weight: 500;
   flex-shrink: 0;
 }
 .team-activity-strip span {
@@ -433,7 +461,6 @@
 }
 .team-attention-heading strong {
   color: var(--ink);
-  font-weight: 500;
 }
 .team-attention-heading > button {
   margin-left: auto;

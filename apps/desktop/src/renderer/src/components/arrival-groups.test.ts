@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ThreadSummary } from "@openorc/protocol";
-import { arrivalGroups } from "./arrival-groups";
+import { arrivalGroups, arrivalRows } from "./arrival-groups";
 
 const thread = (id: string, activity: ThreadSummary["activity"], lastActivityAt: number) => ({ id, title: id, activity, lastActivityAt }) as unknown as ThreadSummary;
 
@@ -27,5 +27,12 @@ describe("arrivalGroups", () => {
       { status: "backlog", count: 2 },
       { status: "review", count: 1 },
     ]);
+  });
+});
+
+describe("arrivalRows", () => {
+  it("lists waiting threads first, then running, open tasks and recent threads", () => {
+    const groups = arrivalGroups([thread("idle", "idle", 9), thread("busy", "running", 5), thread("asks", "waiting", 1)], [{ projectId: "p", status: "review" }], null);
+    expect(arrivalRows(groups).map((row) => row.key)).toEqual(["asks", "busy", "tasks:review", "idle"]);
   });
 });

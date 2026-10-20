@@ -602,9 +602,9 @@ html[data-transparent-shell="true"] .sidebar-shell {
 /* While the sidebar is open, its shell spans the gutter beside it (see .sidebar-shell), so the
    first plane seats flush against the sidebar and the list scrollbar rides the seam. With the
    sidebar closed the gutter returns — a plane never touches the window edge. The margin
-   transition rides the same 220ms as the shell's width so the seam moves as one. */
+   transition rides the same duration as the shell's width so the seam moves as one. */
 .work-row > .well:first-child {
-  transition: margin-left 220ms var(--ease-out);
+  transition: margin-left var(--duration-arrive) var(--ease-out);
 }
 body:has(.sidebar-shell[data-open="true"]) .work-row > .well:first-child {
   margin-left: 0;
@@ -853,13 +853,10 @@ body[data-resizing] .sidebar-shell {
 .mcp-app-card {
   background: var(--plane-fill);
 }
-
-/* The user's own plane: the palette's --bubble tone, seated in light and lit along its top
-   edge in dark. */
+/* The user's own plane, in the palette's --bubble tone. */
 .message-bubble {
   background: var(--bubble-fill);
   color: var(--bubble-ink);
-  box-shadow: var(--bubble-material);
 }
 
 /* Deliberately excluded: [data-streamdown="table-wrapper"]. rich-text.css paints --surface

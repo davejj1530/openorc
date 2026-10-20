@@ -8,10 +8,10 @@ export default function VisualizationResult({ visualization }: { visualization: 
   const [attempt, setAttempt] = useState(0);
   const descriptionId = useId();
   return (
-    <section aria-label={visualization.title} aria-describedby={descriptionId} className="my-3 min-w-0">
+    <section aria-label={visualization.title} aria-describedby={descriptionId} className="min-w-0">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-ink">{visualization.title}</h3>
-        <div className="flex shrink-0 gap-3 text-xs text-ink-3">
+        <h3 className="text-md text-ink">{visualization.title}</h3>
+        <div className="flex shrink-0 gap-3 text-xs text-ink-4">
           {visible ? <TextButton onClick={() => setAttempt((n) => n + 1)}>Reset</TextButton> : null}
           <TextButton aria-expanded={visible} onClick={() => setVisible((value) => !value)}>
             {visible ? "Hide visualization" : "Show visualization"}

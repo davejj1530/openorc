@@ -58,6 +58,6 @@ it("masks secret answers and does not show answers for declined questions", () =
   expect(screen.getByText("Answer hidden")).toBeTruthy();
   expect(screen.queryByText("private-value")).toBeNull();
   rerender(<TranscriptContents runId="run" blocks={[{ ...block, decision: "deny" }]} />);
-  expect(screen.getByText("declined")).toBeTruthy();
+  expect(screen.getByText("Declined")).toBeTruthy();
   expect(screen.queryByLabelText("Your answer")).toBeNull();
 });

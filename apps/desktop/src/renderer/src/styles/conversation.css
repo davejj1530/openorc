@@ -1,49 +1,134 @@
-/* The conversation: its column, journal entries, work toggles, change cards, turn blocks and update notices. */
+/* The conversation: its reading column, turns with their head, receipt and actions, prompts, replies, thinking,
+   tool rows, command and permission cards, change cards, turn blocks and update notices. Cards on the tile are
+   planes (--surface) with no border; depth inside them is the fill step. */
 
+.app-shell [data-transcript] {
+  container: transcript / inline-size;
+}
 .app-shell [data-transcript] > .max-w-chat {
   max-width: var(--container-chat);
-  padding: 4px var(--reading-gutter) 20px;
+  padding: 12px var(--reading-gutter) 24px;
 }
-.journal-message {
-  position: relative;
-  padding: 4px 0 10px;
+/* A narrow thread pane reads with the small gutter, whatever the window's width. */
+@container transcript (max-width: 520px) {
+  .app-shell [data-transcript] > .max-w-chat {
+    padding-inline: 12px;
+  }
 }
-.journal-author {
-  padding-right: 96px;
+
+/* A turn: the prompt, 28px, then the agent's head, receipt, work, reply, change card and actions 14px apart. The
+   next turn follows 24px later. */
+.work-turn {
   display: flex;
-  align-items: center;
-  gap: 7px;
-  margin-bottom: 7px;
-  color: var(--ink-3);
-  font-size: 11px;
-  font-weight: 550;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
 }
-.journal-author-mark {
-  display: block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--ink-4);
+.work-turn > .transcript-block {
+  margin-top: 0;
 }
-.journal-response .journal-author-mark {
-  background: var(--content-ink);
+.work-turn > .transcript-block:has(> .journal-prompt):not(:last-child) {
+  margin-bottom: 14px;
 }
-/* Named team authors already identify each reply. Keep one author line. */
-.team-turn .journal-response > .journal-author,
-.team-chat-entry:not(.team-chat-entry-user) .journal-response > .journal-author {
+.work-turn + .work-turn {
+  margin-top: 24px;
+}
+/* A prompt whose answer came as a turn of its own still sits 28px above it. */
+.work-turn:has(> .transcript-block:last-child > .journal-prompt) + .work-turn {
+  margin-top: 28px;
+}
+.work-section {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.work-content[hidden],
+.work-step-detail[hidden] {
   display: none;
 }
-.team-turn .journal-reply-actions,
-.team-chat-entry:not(.team-chat-entry-user) .journal-reply-actions {
-  position: static;
-  justify-content: flex-end;
-  margin-top: 2px;
+
+/* The head: the agent's mark and name, then its model and a status that swaps in place. */
+.turn-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 16px;
+  font-size: var(--text-base);
+  line-height: 16px;
+  color: var(--ink);
 }
-.team-turn .journal-message {
-  padding-bottom: 0;
+.turn-head-mark {
+  flex-shrink: 0;
 }
-.team-turn-author + [data-team-run] > .work-turn:first-child > .transcript-block:first-child {
-  margin-top: 6px;
+.turn-head-name {
+  flex-shrink: 0;
+}
+.turn-head-status {
+  display: grid;
+  min-width: 0;
+}
+.turn-head-words {
+  grid-area: 1 / 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-xs);
+  line-height: 16px;
+  color: var(--ink-4);
+  font-variant-numeric: tabular-nums;
+}
+.turn-head-words[data-tone="bad"] {
+  color: var(--bad);
+}
+.turn-outcome {
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+}
+
+/* The receipt: thought time, steps and the last check as faint icon items. It opens the work. */
+.turn-receipt {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-self: flex-start;
+  align-items: center;
+  gap: 4px 16px;
+  max-width: 100%;
+  min-height: 16px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  line-height: 16px;
+  color: var(--ink-4);
+  text-align: left;
+}
+.turn-receipt:hover {
+  color: var(--ink-2);
+}
+.turn-receipt:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.turn-receipt-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.turn-receipt-item[data-tone="bad"] {
+  color: var(--bad);
+}
+.turn-receipt-chevron,
+.thinking-chevron {
+  flex-shrink: 0;
+  transition: rotate var(--duration-arrive) var(--ease-out);
+}
+
+/* The prompt: the user's own plane at the right, its copy, fork and time under it on hover, in the gap. */
+.journal-message {
+  position: relative;
+  min-width: 0;
 }
 .journal-prompt > .journal-message-body {
   width: fit-content;
@@ -58,223 +143,842 @@
   min-width: 0;
   justify-self: end;
   overflow-wrap: anywhere;
-  background: var(--bubble);
-  box-shadow: none;
-  border: var(--hairline) solid var(--line);
-  border-radius: 12px;
-  padding: 10px 12px;
-  color: var(--bubble-ink);
-  font-size: 14px;
-  line-height: 1.55;
-}
-.journal-prompt > .journal-author {
-  display: none;
+  border-radius: var(--radius-2xl);
+  padding: 12px 16px;
+  font-size: var(--text-md);
+  line-height: var(--text-md--line-height);
+  letter-spacing: var(--text-md--letter-spacing);
 }
 .journal-message-actions {
-  /* Keep the hover controls in their own row below the prompt, including at narrow widths. */
-  justify-content: flex-end;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  z-index: 1;
 }
 .journal-reply-actions {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: auto;
-  margin: 0;
-  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: 6px 0 0 -7px;
 }
 
-/* Routine work is quiet; color identifies live work, delegation and attention. */
+/* A reply reads at 14/22 in ink; lists step back to muted with ink leads and a faint dot. Scoped to the
+   transcript so documents keep their own reading size. */
+.app-shell .journal-response .prose-chat {
+  font-size: var(--text-md);
+  line-height: var(--text-md--line-height);
+  letter-spacing: var(--text-md--letter-spacing);
+  color: var(--ink);
+}
+.journal-response .prose-chat :where(p) {
+  margin-bottom: 14px;
+}
+.journal-response .prose-chat :where(h1, h2, h3, h4, h5, h6) {
+  margin: 20px 0 14px;
+}
+.app-shell .journal-response .prose-chat h3 {
+  font-size: var(--text-lg);
+  line-height: var(--text-lg--line-height);
+}
+.journal-response .prose-chat :where(ul, ol) {
+  margin: 0 0 14px;
+  color: var(--ink-2);
+}
+.journal-response .prose-chat :where(ul:not(:has(> li > input[type="checkbox"]))) {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-left: 0;
+  list-style: none;
+}
+.journal-response .prose-chat ul:not(:has(> li > input[type="checkbox"])) > li {
+  position: relative;
+  margin: 0;
+  padding: 0 0 0 16px;
+}
+.journal-response .prose-chat ul:not(:has(> li > input[type="checkbox"])) > li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 9px;
+  width: 4px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--ink-4);
+}
+.journal-response .prose-chat li::marker {
+  color: var(--ink-4);
+}
+.journal-response .prose-chat :where(li > :is(ul, ol)) {
+  margin: 8px 0 0;
+}
+.journal-response .prose-chat :where(li > p) {
+  margin: 0;
+}
+
+/* Waiting on the first words: a small ink pulse leads the line. */
+.reply-pending {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 22px;
+  font-size: var(--text-base);
+  color: var(--ink-3);
+}
+.reply-pulse {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--ink);
+  animation: reply-pulse 1.4s var(--ease-out) infinite alternate;
+}
+@keyframes reply-pulse {
+  from {
+    opacity: 0.35;
+    scale: 0.75;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+/* The end of a turn: copy and fork as faint icons, at rest on the latest turn, on hover elsewhere. */
+.turn-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 30px;
+  margin: -4px 0 0 -7px;
+}
+.message-action,
+.message-time {
+  opacity: 0;
+  transition: opacity var(--duration-leave) var(--ease-out);
+}
+.group:is(:hover, :focus-within) :is(.message-action, .message-time),
+.work-turn:is(:hover, :focus-within) > .turn-actions :is(.message-action, .message-time),
+.turn-actions[data-resting] .message-action,
+.message-action:focus-visible,
+.copy-action:not([data-state="idle"]) {
+  opacity: 1;
+}
+@media (hover: none) {
+  .message-action {
+    opacity: 1;
+  }
+}
+.message-time {
+  display: flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 6px;
+  font-size: var(--text-xs);
+  color: var(--ink-4);
+  white-space: nowrap;
+}
+/* Copy confirms in place: it takes a fill and a word, then gives them back. */
+.copy-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  min-width: 30px;
+  padding: 0 7px;
+  border-radius: var(--radius-pill);
+  color: var(--ink-4);
+  transition:
+    opacity var(--duration-leave) var(--ease-out),
+    background-color var(--duration-arrive) var(--ease-out),
+    color var(--duration-arrive) var(--ease-out);
+}
+.copy-action:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.copy-action:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.copy-action:not([data-state="idle"]) {
+  background: var(--control-fill);
+  color: var(--ink);
+}
+.copy-action[data-state="error"] {
+  color: var(--bad);
+}
+.copy-action-glyph {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.copy-action-glyph > :last-child {
+  transition:
+    opacity var(--duration-leave) var(--ease-out),
+    scale var(--duration-confirm) var(--ease-overshoot);
+}
+.copy-action-glyph > [aria-hidden="true"]:last-child {
+  scale: 0.5;
+}
+.copy-action-word {
+  font-size: var(--text-xs);
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+/* Thinking: how long it reasoned, a 32px head; the reasoning grows open under a thin rule, line after line. */
+.thinking-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  max-width: 100%;
+  font-size: var(--text-base);
+  line-height: 16px;
+  color: var(--ink-4);
+  text-align: left;
+}
+.thinking-head:enabled:hover {
+  color: var(--ink-2);
+}
+.thinking-head:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+.thinking-body {
+  display: grid;
+  grid-template-rows: 1fr;
+  padding: 0 0 4px 7px;
+  transition: grid-template-rows var(--duration-resize) var(--ease-out);
+}
+@starting-style {
+  .thinking-body {
+    grid-template-rows: 0fr;
+  }
+}
+.thinking-lines {
+  --stagger-from: 80ms;
+  display: grid;
+  gap: 8px;
+  min-height: 0;
+  overflow: hidden;
+  padding-left: 12px;
+  border-left: 1.5px solid var(--line);
+}
+.thinking-lines > p {
+  font-size: var(--text-base);
+  line-height: 22px;
+  color: var(--ink-4);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Tool rows: 13px faint lines that open their call. The object steps up to muted, then ink on hover. */
+.tool-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  min-height: 30px;
+  font-size: var(--text-base);
+  line-height: 16px;
+  color: var(--ink-4);
+  text-align: left;
+}
+.tool-row:enabled:hover {
+  color: var(--ink-2);
+}
+.tool-row:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+.tool-row[data-state="error"] {
+  color: var(--bad);
+}
+.tool-row-object {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+.tool-row:hover .tool-row-object {
+  color: var(--ink);
+}
+.tool-row-chevron {
+  flex-shrink: 0;
+  margin-left: auto;
+  opacity: 0;
+  transition:
+    opacity var(--duration-leave) var(--ease-out),
+    rotate var(--duration-arrive) var(--ease-out);
+}
+.tool-row:is(:hover, :focus-visible, [aria-expanded="true"]) .tool-row-chevron {
+  opacity: 1;
+}
+.tool-row-live {
+  flex-shrink: 0;
+  color: var(--ink-4);
+  animation: work-spin 1.2s linear infinite;
+}
+.tool-row-progress,
+.tool-row-text {
+  margin-left: 24px;
+  font-size: var(--text-xs);
+  line-height: 18px;
+  color: var(--ink-4);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.tool-row-text {
+  font-size: var(--text-base);
+  line-height: 20px;
+  color: var(--ink-3);
+}
+.tool-row-detail {
+  min-width: 0;
+  margin-left: 24px;
+}
+.tool-row-raw {
+  max-height: 18rem;
+  overflow: auto;
+  padding: 8px 12px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 18px;
+  color: var(--ink-3);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .tool-icon {
   color: currentColor;
 }
 .agent-orb .tool-icon[data-tone="think"] {
   color: var(--tone-think);
 }
-.tool-icon[data-tone="task"] {
-  color: var(--accent-ink);
-}
-.tool-icon[data-tone="agent"] {
-  color: var(--ok);
-}
 .tool-icon[data-tone="error"] {
   color: var(--bad);
-}
-.work-turn {
-  min-width: 0;
-}
-.work-section {
-  margin-top: 16px;
-  margin-bottom: 16px;
-}
-.work-toggle,
-.work-step-toggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 32px;
-  max-width: 100%;
-  text-align: left;
-  font-size: var(--text-sm);
-  color: var(--ink-3);
-}
-.work-toggle:hover,
-.work-step-toggle:hover {
-  color: var(--ink);
-}
-.work-toggle:focus-visible,
-.work-step-toggle:focus-visible {
-  background: var(--surface-2);
-  color: var(--ink);
-  border-radius: 5px;
-}
-.work-chevron {
-  flex-shrink: 0;
-  transition: transform 150ms ease-out;
-}
-.work-content {
-  margin-top: 4px;
-}
-.work-content[hidden],
-.work-step-detail[hidden] {
-  display: none;
-}
-.work-step-toggle {
-  width: 100%;
-}
-.work-step-toggle > span {
-  min-width: 0;
-}
-.work-step-detail {
-  margin-left: 24px;
-  padding: 4px 0 8px;
-  min-width: 0;
-}
-.work-live {
-  color: var(--accent-ink);
-  flex-shrink: 0;
-  animation: work-spin 1.6s linear infinite;
 }
 @keyframes work-spin {
   to {
     transform: rotate(360deg);
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .work-live {
-    animation: none;
-  }
-  .work-chevron {
-    transition: none;
-  }
+/* A folded run of steps, outside the steps card: one row like any tool row. */
+.work-step-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 30px;
+  text-align: left;
+  font-size: var(--text-base);
+  line-height: 16px;
+  color: var(--ink-4);
+}
+.work-step-toggle > span {
+  min-width: 0;
+}
+.work-step-toggle:hover {
+  color: var(--ink-2);
+}
+.work-step-toggle:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+.work-chevron {
+  flex-shrink: 0;
+  transition: rotate var(--duration-arrive) var(--ease-out);
+}
+.work-step-detail {
+  margin-left: 24px;
+  padding: 2px 0 8px;
+  min-width: 0;
 }
 
-/* Blocks below the fold skip layout until scrolled to; the transcript stays a plain list. */
-/* What a turn changed: one card under the reply, the way the agent apps show their edits. */
+/* A command: an r16 card with the command, a status that trades places with its result, and its last line. */
+.command-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px 14px;
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+}
+.command-card-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  min-height: 16px;
+  text-align: left;
+}
+.command-card-row:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 4px;
+  border-radius: var(--radius-sm);
+}
+.command-card-icon {
+  flex-shrink: 0;
+  color: var(--ink-4);
+}
+.command-card-command {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 16px;
+  color: var(--ink);
+}
+.command-card-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+  line-height: 16px;
+  color: var(--ink-4);
+}
+.command-card-status[data-tone="ok"] {
+  color: var(--ok);
+}
+.command-card-status[data-tone="bad"] {
+  color: var(--bad);
+}
+.command-card-settled {
+  animation: command-settle var(--duration-confirm) var(--ease-overshoot) both;
+}
+@keyframes command-settle {
+  from {
+    opacity: 0;
+    scale: 0.8;
+  }
+}
+.command-card-output {
+  min-width: 0;
+  padding-left: 24px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 18px;
+  color: var(--ink-4);
+}
+.command-card .tool-view {
+  padding: 0 0 0 24px;
+}
+
+/* A permission request: an r18 card with a well, the request in words, and Deny, Allow for this run and Allow. */
+.approval-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px 12px 12px 14px;
+  border-radius: var(--radius-2xl);
+  background: var(--surface);
+}
+.approval-card-request {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+.approval-card-well {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--ink-3);
+}
+.approval-card-words {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.approval-card-title {
+  font-size: var(--text-md);
+  line-height: 20px;
+  letter-spacing: var(--text-md--letter-spacing);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.approval-card-detail {
+  max-height: 10rem;
+  margin: 0;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 16px;
+  color: var(--ink-4);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.approval-card-raw {
+  align-self: flex-start;
+  font-size: var(--text-xs);
+  line-height: 16px;
+}
+.approval-card-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+/* A narrow column stacks the request over full-width answers. */
+@container transcript (max-width: 560px) {
+  .approval-card {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 16px;
+  }
+  .approval-card-actions {
+    flex-direction: column;
+  }
+}
+/* Answered: one 44px line remembers a refusal. An allowed call shows as its tool row instead. */
+.approval-answer-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  height: 44px;
+  padding: 0 18px 0 16px;
+  border-radius: 22px;
+  background: var(--surface);
+  font-size: var(--text-base);
+  line-height: 16px;
+  color: var(--ink);
+  text-align: left;
+}
+.approval-answer-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-4);
+}
+.approval-answer-detail {
+  margin: 8px 16px 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 18px;
+  color: var(--ink-3);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* A question: an r20 card, 44px fill options, an in-card answer of your own, and a foot that swaps in place.
+   Sent, the chosen options take the ink pill with an overshoot check and the rest step back one after another. */
+.question-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  border-radius: var(--radius-3xl);
+  background: var(--surface);
+}
+.question-set {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.question-ask {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 0;
+  font-size: var(--text-md);
+  line-height: 20px;
+  letter-spacing: var(--text-md--letter-spacing);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.question-ask > img {
+  flex-shrink: 0;
+}
+.question-options {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.question-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 12px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  font-size: var(--text-base);
+  line-height: 16px;
+  color: var(--ink);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-arrive) var(--ease-out),
+    color var(--duration-arrive) var(--ease-out),
+    opacity var(--duration-arrive) var(--ease-out) calc(var(--option-index, 0) * var(--stagger));
+}
+.question-option:hover,
+.question-option[data-picked] {
+  background: var(--surface-3);
+}
+.question-option:has(input:focus-visible) {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.question-option-label {
+  display: grid;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.question-option-description {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+.question-option-check {
+  flex-shrink: 0;
+  opacity: 0;
+  scale: 0.5;
+  transition:
+    opacity var(--duration-leave) var(--ease-out),
+    scale var(--duration-confirm) var(--ease-overshoot);
+}
+.question-option[data-picked] .question-option-check {
+  opacity: 1;
+  scale: 1;
+}
+.question-option[data-state] {
+  cursor: default;
+}
+.question-option[data-state="chosen"] {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+.question-option[data-state="chosen"] .question-option-description {
+  color: inherit;
+}
+.question-option[data-state="dropped"] {
+  background: var(--surface-2);
+  opacity: 0.4;
+}
+.question-answer {
+  display: grid;
+  gap: 4px;
+  padding: 14px 12px;
+  border-radius: var(--radius-lg);
+  background: var(--accent);
+  font-size: var(--text-base);
+  line-height: 16px;
+  color: var(--accent-fg);
+}
+.question-other {
+  display: block;
+}
+.question-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 16px;
+  font-size: var(--text-xs);
+  line-height: 16px;
+  color: var(--ink-4);
+}
+
+/* An edit's diff in the thread: an r18 card on the tile, a fill inside a card. */
+.inline-diff {
+  background: var(--surface);
+}
+
+/* OpenOrc talking in the thread, and attachments the prompt carried: quiet fill rows. */
+.system-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-xl);
+  background: var(--surface-2);
+  font-size: var(--text-base);
+  line-height: 20px;
+}
+.system-notice-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--ink-4);
+}
+.system-notice-details {
+  margin-top: 4px;
+  font-family: var(--font-sans);
+  color: var(--ink-3);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.attached-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 14rem;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  font-size: var(--text-base);
+  color: var(--ink-2);
+}
+.attached-file:hover {
+  background: var(--surface-3);
+  color: var(--ink);
+}
+
+/* What a turn changed: an r18 card closed to one 48px line, its files opening in place under a hairline. */
 .change-card {
-  margin-block: 20px;
-  border: var(--hairline) solid var(--line);
-  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-radius: var(--radius-2xl);
   overflow: hidden;
 }
 .change-heading {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-}
-.change-icon {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: var(--surface-2);
-  color: var(--ink-2);
-  flex: none;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 10px 0 16px;
 }
 .change-title {
-  display: grid;
-  gap: 2px;
-  flex: 1;
   min-width: 0;
-}
-.change-title strong {
-  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-base);
+  line-height: 16px;
+  color: var(--ink);
 }
 .change-counts {
   display: inline-flex;
   gap: 8px;
   white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 16px;
+  color: var(--ink-4);
   font-variant-numeric: tabular-nums;
-  font-size: var(--text-sm);
+}
+.change-totals {
+  flex: 1;
+}
+.change-totals .change-added {
+  color: var(--ok);
+}
+.change-totals .change-removed {
+  color: var(--bad);
 }
 .change-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   flex: none;
+}
+.change-chevron {
+  transition: rotate var(--duration-arrive) var(--ease-out);
 }
 .change-note {
   padding: 0 16px 12px;
+  font-size: var(--text-xs);
   color: var(--ink-3);
-  font-size: var(--text-sm);
+}
+.change-error {
+  padding: 0 16px 12px;
+  font-size: var(--text-xs);
+}
+.change-files-wrap[hidden] {
+  display: none;
 }
 .change-files {
-  border-top: var(--hairline) solid var(--line);
-  padding: 4px 16px;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0 8px 6px;
+  list-style: none;
+  --stagger-from: 100ms;
+}
+/* The rule under the head stops short of the card's edges, in line with the file names. */
+.change-files::before {
+  content: "";
+  flex-shrink: 0;
+  height: var(--hairline);
+  margin: 0 8px 4px;
+  background: var(--line);
 }
 .change-files li {
   display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  padding-block: 8px;
-  font-size: var(--text-sm);
-}
-.change-files li + li {
-  border-top: var(--hairline) solid var(--line);
-}
-.change-files li > :first-child {
-  overflow-wrap: anywhere;
-  min-width: 0;
-  color: var(--ink-2);
-}
-.change-files li > :first-child strong {
-  color: var(--ink);
-  font-weight: 500;
-}
-.change-more {
-  display: flex;
   align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 10px 16px;
-  border-top: var(--hairline) solid var(--line);
-  font-size: var(--text-sm);
+  gap: 10px;
+  min-height: 36px;
+  padding: 0 8px;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 16px;
+}
+.change-file {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: left;
   color: var(--ink-2);
 }
-.change-error {
-  padding: 8px 16px 12px;
-  font-size: var(--text-sm);
+.change-file:hover {
+  color: var(--ink);
+  text-decoration: underline;
 }
-@container (max-width: 600px) {
+@container transcript (max-width: 420px) {
   .change-heading {
     flex-wrap: wrap;
+    padding-block: 8px;
   }
 }
 
+/* Blocks below the fold skip layout until scrolled to. Only blocks that arrive while a turn runs, after the
 .transcript-block {
   content-visibility: auto;
   contain-intrinsic-size: auto 48px;
-  animation: transcript-block-in 220ms ease-out both;
 }
 @keyframes transcript-block-in {
   from {
     opacity: 0;
-    transform: translateY(2px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
+    filter: blur(var(--arrive-blur));
+    translate: 0 var(--arrive-rise);
   }
 }
 
@@ -286,15 +990,14 @@
   width: 36px;
   height: 36px;
 }
-
-/* Reasoning streams in view while it runs: the last few lines, fading in from the top. Click the row to read it all. */
-.thinking-tail {
+.agent-presence {
   display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  max-height: 88px;
-  overflow: hidden;
-  mask-image: linear-gradient(to bottom, transparent, black 32px);
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  margin-left: -10px;
+  font-size: var(--text-xs);
+  color: var(--ink-4);
 }
 
 .workspace-update-notices {
@@ -311,30 +1014,42 @@
   gap: 12px;
   padding: 16px;
 }
+/* Update notices are toasts: an r16 card on the floating fill, a 16px glyph, the title in ink and
+   the detail faint, with small pills for what to do. */
 .agent-update-notice {
+  --control-fill: var(--surface-2);
   pointer-events: auto;
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  padding: 16px;
+  gap: 10px;
+  padding: 14px;
   border-radius: var(--radius-xl);
-  background: var(--surface-2);
+  background: var(--float-fill);
   color: var(--ink);
-  box-shadow: 0 8px 30px rgb(0 0 0 / 18%);
+  font-size: var(--text-base);
+  line-height: 16px;
+}
+.agent-update-notice .agent-update-notice-detail {
+  margin-top: 2px;
+  color: var(--ink-4);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
 }
 .app-update-progress {
   display: block;
   width: 100%;
-  height: 4px;
+  height: 3px;
   overflow: hidden;
   border: 0;
-  border-radius: var(--radius-sm);
-  background: var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
   appearance: none;
 }
 .app-update-progress::-webkit-progress-bar {
-  background: var(--line);
+  background: var(--surface-3);
 }
 .app-update-progress::-webkit-progress-value {
-  background: var(--ink-2);
+  border-radius: var(--radius-pill);
+  background: var(--ink);
+  transition: inline-size var(--duration-resize) var(--ease-out);
 }

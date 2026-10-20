@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ChangeCard } from "./ChangeCard";
 import { Button, Tooltip } from "./ui";
-import { RotateCcw } from "./icons";
+import { cn } from "../lib/cn";
 import { useRpc, useRpcMutation } from "../lib/query";
 import { useLayout } from "../lib/layout";
 
@@ -69,9 +69,15 @@ export function UndoTurnButton({
   const reason = undoDisabledReason(checkpointId, working);
   return (
     <Tooltip label={reason ?? (confirming ? confirmHint : hint)}>
-      <Button size="sm" variant="ghost" disabled={Boolean(reason) || restore.isPending} onClick={() => void undo()} aria-label={confirming ? "Confirm undo" : label}>
+      <Button
+        size="sm"
+        variant="ghost"
+        className={cn(!confirming && "text-ink-4")}
+        disabled={Boolean(reason) || restore.isPending}
+        onClick={() => void undo()}
+        aria-label={confirming ? "Confirm undo" : label}
+      >
         {undoButtonLabel(restore.isPending, confirming)}
-        <RotateCcw size={14} />
       </Button>
     </Tooltip>
   );

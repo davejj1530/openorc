@@ -8,7 +8,7 @@ const textStyle = "px-3 py-2 whitespace-pre-wrap break-words text-ink-3 max-h-72
 export const ToolResult = memo(function ToolResult({ output }: { output: unknown }) {
   const result = useMemo(() => toolResult(output), [output]);
   return (
-    <div className="min-w-0 border-t border-line">
+    <div className="min-w-0 rounded-lg bg-surface-2">
       {result.media.length ? (
         <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,12rem),1fr))] items-start gap-3 p-3">
           {result.media.map((item, index) =>

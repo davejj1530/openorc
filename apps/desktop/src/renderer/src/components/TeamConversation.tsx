@@ -26,7 +26,7 @@ import { AgentPresence, Transcript, TranscriptContents } from "./Transcript";
 import { ThreadMedia, useThreadMentionNames } from "./ThreadImages";
 import { MemberAvatar } from "./MemberAvatar";
 import { orclingById, useOrclings } from "../lib/orclings";
-import { AlertCircle, ChevronDown, Folder, GitFork } from "./icons";
+import { AlertCircle, ChevronDown, Folder, GitFork, Loader2 } from "./icons";
 import { Button, TextButton, Tooltip } from "./ui";
 import { emptyRun, getRun, hydrate, useRun, useRunMap, useRuns, type Block, type RunTranscript } from "../lib/transcript";
 import { useRpc, useRpcMutation } from "../lib/query";
@@ -628,7 +628,7 @@ function TeamAuthor({
   return (
     <header className="team-turn-author">
       {memberKey ? <TeamMemberPicture memberKey={memberKey} size="sm" /> : null}
-      <strong>{name}</strong>
+      <span className="team-author-name">{name}</span>
       {model ? (
         <span className="team-author-model" title={model}>
           {model}
@@ -636,7 +636,7 @@ function TeamAuthor({
       ) : null}
       {at !== undefined ? <time dateTime={new Date(at).toISOString()}>{clockTime(at)}</time> : null}
       {note ? <span>{note}</span> : null}
-      {live ? <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" role="status" aria-label="Working" /> : null}
+      {live ? <Loader2 size={14} className="tool-row-live" role="status" aria-label="Working" /> : null}
     </header>
   );
 }
@@ -1417,7 +1417,7 @@ export function TeamTaskConversation({ task, project, data }: { task: Task; proj
           }
           return (
             <section key={`${assignment.executionId}:${assignment.actorId}`} className="mt-5 border-t border-line pt-4" data-team-task-assignment={`${assignment.executionId}:${assignment.actorId}`}>
-              <h2 className="text-base font-medium mb-3">
+              <h2 className="text-base mb-3">
                 {member?.name ?? "Agent"}
                 {index > 0 ? " · Follow-up" : ""} <span className="text-ink-3 font-normal">· {actor?.modeHold === "plan" ? "Waiting for Act" : stateLabel[assignment.state]}</span>
               </h2>

@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { Dialog as BaseDialog } from "@base-ui/react/dialog";
 import { defaultRehypePlugins, defaultUrlTransform, type Components, type StreamdownProps, type UrlTransform } from "streamdown";
-import { ChevronRight, Image, FolderOpen, X, ZoomIn, ZoomOut } from "./icons";
+import { ChevronRight, Image, FolderOpen, Loader2, X, ZoomIn, ZoomOut } from "./icons";
+import { cn } from "../lib/cn";
 import { imageSource, isImagePath, localPath } from "../../../shared/image-paths";
 import { fileReference } from "../../../shared/file-reference";
 import { useLayout, type FileSelection } from "../lib/layout";
@@ -63,11 +64,7 @@ export function ThreadMedia({
         <BaseDialog.Portal>
           <CoversPreview />
           <BaseDialog.Backdrop className="fixed inset-0 z-50 bg-black/60" />
-          <BaseDialog.Popup
-            aria-label="Image viewer"
-            finalFocus={opener}
-            className="fixed inset-6 z-50 flex flex-col overflow-hidden rounded-xl border border-line bg-surface text-ink shadow-modal outline-none"
-          >
+          <BaseDialog.Popup aria-label="Image viewer" finalFocus={opener} className="fixed inset-6 z-50 flex flex-col overflow-hidden rounded-3xl bg-surface text-ink outline-none">
             {selected ? <ImageViewer key={selected.src} image={selected} /> : null}
           </BaseDialog.Popup>
         </BaseDialog.Portal>
@@ -86,7 +83,7 @@ function ImageViewer({ image }: { image: ImageSelection }) {
       <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-2 border-b border-line px-4 py-2">
         <Image size={16} className="shrink-0 text-ink-3" />
         <div className="min-w-24 flex-1">
-          <BaseDialog.Title className="truncate text-base font-medium">{image.label}</BaseDialog.Title>
+          <BaseDialog.Title className="truncate text-base">{image.label}</BaseDialog.Title>
           <BaseDialog.Description className="whitespace-nowrap text-xs text-ink-3">{size ? `${size.width} × ${size.height}` : "Image preview"}</BaseDialog.Description>
         </div>
         <div className="flex items-center gap-1">
@@ -153,7 +150,7 @@ export function ThreadImage({ src = "", alt = "Image", compact = false }: { src?
       type="button"
       aria-label={`View image: ${label}`}
       onClick={() => openImage({ src: source, label, path })}
-      className="my-2 block max-w-full overflow-hidden rounded-lg border border-line bg-surface-2 text-left hover:border-line-strong focus-visible:outline-2 focus-visible:outline-accent"
+      className="my-2 block max-w-full overflow-hidden rounded-xl bg-surface-2 text-left hover:bg-surface-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
     >
       {failed ? (
         <span className="flex items-center gap-2 px-4 py-6 text-sm text-ink-3">
@@ -285,22 +282,16 @@ export function ImageViewRow({ block }: { block: Extract<Block, { kind: "activit
   const label = imageViewingLabel(block.status);
   return (
     <section aria-label="Image viewing">
-      <button
-        type="button"
-        data-state={block.status}
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-        className={`group flex min-h-6 w-full min-w-0 items-center gap-2 text-left text-sm ${block.status === "error" ? "text-bad" : "text-ink-3 hover:text-ink-2"}`}
-      >
+      <button type="button" data-state={block.status} aria-expanded={open} onClick={() => setOpen((value) => !value)} className={cn("tool-row group", block.status === "error" && "text-bad")}>
         <Image size={16} className="shrink-0" />
         <span className="shrink-0">{label}</span>
         {filename ? (
-          <span className="truncate font-mono" title={path}>
+          <span className="tool-row-object" title={path}>
             {filename}
           </span>
         ) : null}
-        {block.status === "running" ? <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent motion-safe:animate-pulse" /> : null}
-        <ChevronRight size={12} className={`ml-auto shrink-0 transition-transform ${open ? "rotate-90" : ""}`} />
+        {block.status === "running" ? <Loader2 size={14} className="tool-row-live" /> : null}
+        <ChevronRight size={12} className={cn("tool-row-chevron", open && "rotate-90")} />
       </button>
       {open ? (
         <div className="ml-6 min-w-0">
@@ -319,14 +310,14 @@ export function ImageGenerationRow({ block }: { block: Extract<Block, { kind: "a
   const running = block.status === "running";
   const label = imageGenerationLabel(block.status);
   return (
-    <section className="my-2" aria-label="Image generation">
-      <div data-state={block.status} role="status" className="flex items-center gap-2 text-sm text-ink-3">
+    <section aria-label="Image generation">
+      <div data-state={block.status} role="status" className="flex min-h-7.5 items-center gap-2 text-base text-ink-4">
         <Image size={14} />
         <span>{label}</span>
-        {running ? <span className="h-1.5 w-1.5 rounded-full bg-accent motion-safe:animate-pulse" /> : null}
+        {running ? <Loader2 size={14} className="tool-row-live" /> : null}
       </div>
       {running ? (
-        <div className="mt-2 grid h-40 w-64 max-w-full place-content-center gap-2 rounded-lg border border-line bg-surface-2 text-center text-xs text-ink-3">
+        <div className="mt-2 grid h-40 w-64 max-w-full place-content-center gap-2 rounded-xl bg-surface-2 text-center text-xs text-ink-3">
           <Image size={28} className="mx-auto motion-safe:animate-pulse" />
           Creating your image…
         </div>

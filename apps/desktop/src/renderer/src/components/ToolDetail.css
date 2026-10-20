@@ -13,10 +13,9 @@
   display: grid;
   gap: 2px;
   min-width: 0;
-  padding: 8px 10px;
-  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  border-radius: var(--radius-lg);
   background: var(--surface-2);
-  box-shadow: var(--material-recess);
 }
 .tool-view-step {
   display: grid;
@@ -89,9 +88,10 @@
   gap: 4px;
   flex-shrink: 0;
   justify-self: start;
+  min-height: 22px;
   padding: 0 8px;
-  border: var(--hairline) solid var(--line);
   border-radius: var(--radius-pill);
+  background: var(--surface-2);
   color: var(--ink-3);
 }
 .tool-view-more {
@@ -103,7 +103,7 @@
   color: var(--ink-2);
 }
 .tool-view-more:focus-visible {
-  outline: 2px solid var(--accent-ink);
+  outline: 2px solid var(--ring);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
 }
@@ -111,10 +111,9 @@
   max-height: 18rem;
   margin: 0;
   overflow: auto;
-  padding: 8px 10px;
-  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  border-radius: var(--radius-lg);
   background: var(--surface-2);
-  box-shadow: var(--material-recess);
   font-family: var(--font-mono);
   color: var(--ink-2);
   white-space: pre-wrap;
@@ -284,12 +283,18 @@
   font-variant-numeric: tabular-nums;
 }
 .tool-view-tally > span[data-tone="ok"] {
-  background: color-mix(in oklab, var(--ok) 14%, transparent);
+  background: var(--ok-soft);
   color: var(--ok);
 }
 .tool-view-tally > span[data-tone="bad"] {
-  background: color-mix(in oklab, var(--bad) 14%, transparent);
+  background: var(--bad-soft);
   color: var(--bad);
+}
+/* In the transcript the matches sit on the detail's own fill; the guide rule beside them goes. */
+[data-transcript] .tool-view-matches ol {
+  margin-left: 0;
+  padding-left: 0;
+  border-left: 0;
 }
 
 /* One grid for every field, so the values line up whatever the longest name. */

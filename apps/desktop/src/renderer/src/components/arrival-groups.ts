@@ -35,3 +35,15 @@ export function arrivalGroups(threads: ThreadSummary[], tasks: { projectId: stri
     any: waiting.length + running.length + counts.length + recent.length > 0,
   };
 }
+
+export type ArrivalRow = { key: string; kind: "waiting" | "running" | "recent"; thread: ThreadSummary } | { key: string; kind: "tasks"; status: TaskStatus; count: number };
+
+/** The groups as one list for "Pick up where you left off": threads that wait on you first, then running ones, open tasks, and recent threads. */
+export function arrivalRows(activity: ArrivalActivity): ArrivalRow[] {
+  return [
+    ...activity.waiting.map((thread) => ({ key: thread.id, kind: "waiting" as const, thread })),
+    ...activity.running.map((thread) => ({ key: thread.id, kind: "running" as const, thread })),
+    ...activity.tasks.map((group) => ({ key: `tasks:${group.status}`, kind: "tasks" as const, status: group.status, count: group.count })),
+    ...activity.recent.map((thread) => ({ key: thread.id, kind: "recent" as const, thread })),
+  ];
+}

@@ -15,21 +15,20 @@ export function StartedThreadCard({ threadId }: { threadId: string }) {
   const projects = useRpc("projects.list", {});
   const orcling = orclingById(useOrclings(), thread.data?.orclingId);
   const started = thread.data;
-  if (!started)
-    return thread.isLoading ? <div className="surface-card my-2 h-14 rounded-xl border border-line bg-surface" /> : <div className="my-2 text-sm text-ink-3">This thread is no longer available.</div>;
+  if (!started) return thread.isLoading ? <div className="surface-card h-14 rounded-2xl" /> : <div className="text-sm text-ink-3">This thread is no longer available.</div>;
   const project = projects.data?.find((candidate) => candidate.id === started.projectId)?.name;
   return (
-    <div className="surface-card my-2 rounded-xl border border-line bg-surface px-4 py-3 min-w-0">
+    <div className="surface-card rounded-2xl px-4 py-3 min-w-0">
       <div className="flex items-center gap-2 min-w-0">
         {orcling ? <OrclingAvatar orcling={orcling} size={16} /> : null}
-        <button type="button" onClick={() => openThread(started.id)} className="flex-1 min-w-0 text-left text-base font-medium text-ink truncate" title={started.title}>
+        <button type="button" onClick={() => openThread(started.id)} className="flex-1 min-w-0 text-left text-base text-ink truncate" title={started.title}>
           {started.title}
         </button>
         <TextButton onClick={() => openThread(started.id)} tone="faint" title="Open thread" aria-label={`Open ${started.title}`}>
           <ArrowUpRight size={14} />
         </TextButton>
       </div>
-      <div className="mt-1 flex items-center gap-2 text-xs text-ink-3 min-w-0">
+      <div className="mt-1 flex items-center gap-2 text-xs text-ink-4 min-w-0">
         <span role="status" className={cn("shrink-0", started.activity === "waiting" && "text-warn")}>
           {activityLabel[started.activity]}
         </span>

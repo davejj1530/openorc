@@ -23,6 +23,8 @@ vi.mock("./AgentOrb", () => ({ AgentOrb: ({ state }: { state: string }) => <div 
 vi.mock("./TaskCard", () => ({ TaskCard: ({ taskId }: { taskId: string }) => <div>Task {taskId}</div> }));
 vi.mock("./QuestionCard", () => ({ QuestionCard: () => <div>Question for you</div> }));
 afterEach(cleanup);
+/** The turn's receipt row, which opens and folds its work. */
+const receipt = () => document.querySelector<HTMLButtonElement>(".turn-receipt")!;
 const tool: Block = { id: "read", kind: "tool", name: "read_file", input: { path: "src/source.ts" }, output: "source contents", done: false, at: 1000 };
 const thought: Block = { id: "think", kind: "thinking", text: "Available reasoning summary", startedAt: 1100, endedAt: 1200 };
 const reply: Block = { id: "reply", kind: "message", role: "assistant", text: "The final answer.", streaming: false };
@@ -31,7 +33,8 @@ const end: Block = { id: "end", kind: "status", boundary: "turn", durationMs: 22
 it("shows a lone startup status once without a duplicate disclosure", () => {
   const startup: Block = { id: "startup", kind: "activity", label: "Starting OpenCode", status: "success", text: "" };
   render(<WorkTranscript runId="run" blocks={[startup, { ...end, durationMs: 0, outcome: "error" }]} />);
-  fireEvent.click(screen.getByRole("button", { name: "Failed for 0s" }));
+  expect(document.querySelector(".turn-head")!.textContent).toContain("Failed after 0s");
+  fireEvent.click(receipt());
   const row = screen.getByRole("button", { name: "Starting OpenCode" });
   expect(row.getAttribute("aria-expanded")).toBeNull();
   expect(row.hasAttribute("disabled")).toBe(true);
@@ -40,15 +43,15 @@ it("shows a lone startup status once without a duplicate disclosure", () => {
 it("opens a lone activity directly to its content", () => {
   const activity: Block = { id: "plan", kind: "activity", label: "Planning", status: "success", text: "The actual plan" };
   render(<WorkTranscript runId="run" blocks={[activity, end]} />);
-  fireEvent.click(screen.getByRole("button", { name: "Worked for 3m 42s" }));
+  fireEvent.click(receipt());
   fireEvent.click(screen.getByRole("button", { name: "Planning" }));
   expect(screen.getByText("The actual plan")).toBeTruthy();
   expect(screen.getAllByText("Planning")).toHaveLength(1);
 });
 it("opens a lone reasoning row directly to its summary", () => {
   render(<WorkTranscript runId="run" blocks={[thought, end]} />);
-  fireEvent.click(screen.getByRole("button", { name: "Worked for 3m 42s" }));
-  fireEvent.click(screen.getByRole("button", { name: "Thought for 1s" }));
+  fireEvent.click(receipt());
+  fireEvent.click(screen.getByRole("button", { name: "Thought for 1 second" }));
   expect(screen.getByText("Available reasoning summary")).toBeTruthy();
 });
 
@@ -69,7 +72,7 @@ it("names MCP tool calls by server and tool in each provider's naming", () => {
     end,
   ];
   render(<WorkTranscript runId="run" blocks={blocks} />);
-  fireEvent.click(screen.getByRole("button", { name: "Worked for 3m 42s" }));
+  fireEvent.click(receipt());
   fireEvent.click(screen.getByRole("button", { name: "Used Codegraph, used Mobbin" }));
   for (const [chip, call] of [
     ["explore", /^Codegraph: explore who calls describe/],
@@ -86,9 +89,11 @@ it("names MCP tool calls by server and tool in each provider's naming", () => {
 it("reads a described command as its description, with the command one click deeper", () => {
   const run: Block = { ...tool, id: "bash", name: "Bash", input: { command: "pnpm --filter desktop test", description: "Run the desktop tests" }, output: "48 passed", done: true };
   render(<WorkTranscript runId="run" blocks={[run, reply, end]} />);
-  fireEvent.click(screen.getByRole("button", { name: "Worked for 3m 42s · tests passed" }));
+  expect(receipt().getAttribute("aria-label")).toContain("tests passed");
+  fireEvent.click(receipt());
   fireEvent.click(screen.getByRole("button", { name: "Run the desktop tests" }));
-  expect(screen.getByRole("button", { name: /^Ran pnpm --filter desktop test/ }).getAttribute("aria-expanded")).toBe("true");
+  // The command's card already reads the command and its last line, so it stays closed instead of repeating them.
+  expect(screen.getByRole("button", { name: /^Ran pnpm --filter desktop test/ }).getAttribute("aria-expanded")).toBe("false");
   expect(screen.getByText("48 passed")).toBeTruthy();
 });
 it("opens an edited file's chip to its diff, not the file", async () => {
@@ -98,7 +103,7 @@ it("opens an edited file's chip to its diff, not the file", async () => {
   ];
   const patch: Block = { ...tool, id: "patch", name: "apply_patch", input, output: "Success", done: true };
   render(<WorkTranscript runId="run" blocks={[patch, reply, end]} />);
-  fireEvent.click(screen.getByRole("button", { name: /^Worked for 3m 42s/ }));
+  fireEvent.click(receipt());
   fireEvent.click(screen.getByRole("button", { name: "Edited 2 files" }));
   const chip = screen.getByTitle("src/a.ts");
   expect(chip.tagName).toBe("BUTTON");
@@ -112,8 +117,8 @@ it("carries the live step on one line, open or folded", () => {
   const reasoning: Block = { id: "think-r", kind: "thinking", text: "**Running the desktop tests**\n\nThey cover the row.", startedAt: Date.now() - 4000, endedAt: Date.now() - 3000 };
   const running: Block = { ...tool, id: "cmd", name: "shell", input: { command: "pnpm test" }, at: Date.now() };
   render(<WorkTranscript runId="run" blocks={[reasoning, running]} live />);
-  expect(screen.getByRole("button", { name: /^Running the desktop tests/ }).querySelector(".work-shimmer")).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: /^Working/ }));
+  expect(screen.getByRole("button", { name: /^Running the desktop tests/ }).getAttribute("aria-expanded")).toBe("true");
+  fireEvent.click(receipt());
   expect(screen.getByRole("status").textContent).toMatch(/^Running the desktop tests/);
 });
 it("preserves an inspected command when it fails and a retry arrives", () => {
@@ -128,7 +133,7 @@ it("preserves an inspected command when it fails and a retry arrives", () => {
 });
 it("defaults completed work closed, preserves the final answer and reveals nested detail with keyboard-accessible controls", () => {
   render(<WorkTranscript runId="run" blocks={[{ ...tool, done: true }, thought, reply, end]} />);
-  const work = screen.getByRole("button", { name: "Worked for 3m 42s" });
+  const work = receipt();
   expect(work.getAttribute("aria-expanded")).toBe("false");
   expect(screen.getByText("The final answer.")).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Read a file" })).toBeNull();
@@ -149,7 +154,7 @@ it("keeps pending input visible and failed tools inside collapsed work", () => {
   render(<WorkTranscript runId="run" blocks={[{ ...tool, done: true }, ...attention, reply, end]} />);
   expect(screen.getByText("Question for you")).toBeTruthy();
   expect(screen.queryByRole("button", { name: /failed-test.*Failed/ })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Worked for 3m 42s" }));
+  fireEvent.click(receipt());
   expect(screen.queryByRole("button", { name: /failed-test.*Failed/ })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Read a file, ran a command" }));
   fireEvent.click(screen.getByRole("button", { name: "Ran" }));
@@ -183,7 +188,9 @@ it.each([["individual", WorkTranscript]] as const)("keeps failed attempts in %s 
 
   applyFrame({ runId, seq: 2, events: events.slice(3) });
   rerender(<Component runId={runId} blocks={getRun(runId)!.blocks} />);
-  expect(screen.getByRole("button", { name: "Worked for 6m 21s · tests passed" }).getAttribute("aria-expanded")).toBe("false");
+  expect(receipt().getAttribute("aria-label")).toContain("tests passed");
+  expect(receipt().getAttribute("aria-expanded")).toBe("false");
+  expect(document.querySelector(".turn-head")!.textContent).toContain("6m 21s");
   expect(screen.queryByRole("button", { name: /.*Failed/ })).toBeNull();
   expect(screen.getByText("Verified all 37 tests.")).toBeTruthy();
 
@@ -193,7 +200,7 @@ it.each([["individual", WorkTranscript]] as const)("keeps failed attempts in %s 
   await hydrate(runId);
   render(<Component runId={runId} blocks={getRun(runId)!.blocks} />);
   expect(screen.queryByRole("button", { name: /.*Failed/ })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Worked for 6m 21s · tests passed" }));
+  fireEvent.click(receipt());
   expect(screen.queryByRole("button", { name: /.*Failed/ })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Ran 2 commands" }));
   fireEvent.click(screen.getByRole("button", { name: "Ran 2" }));
@@ -204,9 +211,9 @@ it.each([["individual", WorkTranscript]] as const)("keeps failed attempts in %s 
   expect(screen.getByText("Verified all 37 tests.").closest(".work-section")).toBeNull();
 });
 it("preserves the orb presence independently of the work header", () => {
-  const { rerender } = render(<AgentPresence working since={1000} showElapsed={false} />);
+  const { rerender } = render(<AgentPresence working />);
   expect(screen.getByTestId("orb31").dataset.state).toBe("thinking");
-  rerender(<AgentPresence working={false} since={1000} showElapsed={false} />);
+  rerender(<AgentPresence working={false} />);
   expect(screen.getByTestId("orb31").dataset.state).toBe("idle");
 });
 
@@ -222,7 +229,7 @@ it.each([false])("keeps a genuine turn failure visible with showActivity=%s", (s
       ]}
     />,
   );
-  expect(screen.getByText("Failed for 3m 42s")).toBeTruthy();
+  expect(screen.getByText("Failed after 3m 42s")).toBeTruthy();
   expect(screen.getByText("Provider lost connection")).toBeTruthy();
 });
 
@@ -233,7 +240,7 @@ it("keeps a streaming reply outside activity while retaining intermediate work a
   rerender(<TeamWorkTranscript runId="run" blocks={[thought, streaming]} live showActivity />);
   expect(screen.getAllByText("The final answer.")).toHaveLength(1);
   expect(screen.getByText("The final answer.").closest(".work-section")).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: /^Working/ }));
+  fireEvent.click(receipt());
   expect(screen.getByText("The final answer.").closest("[hidden]")).toBeNull();
 
   // A subsequent tool reveals that the previous text was intermediate commentary.
@@ -249,7 +256,7 @@ it("keeps a streaming reply outside activity while retaining intermediate work a
 
 it.each(["error", "cancelled"] as const)("quiet mode retains a %s turn status without an activity control", (outcome) => {
   render(<WorkTranscript runId="run" blocks={[{ ...end, outcome }]} author="Sol 2" showActivity={false} />);
-  expect(screen.getByRole("status").textContent).toBe(`Sol 2 · ${outcome === "error" ? "Failed" : "Stopped"} for 3m 42s`);
+  expect(document.querySelector(".turn-head")!.textContent).toBe(`Sol 2${outcome === "error" ? "Failed" : "Stopped"} after 3m 42s`);
   expect(screen.queryByRole("button")).toBeNull();
 });
 
@@ -283,7 +290,7 @@ it("signs a signed-out Claude back in from the thread's Terminal, under the fold
   shell.dispose();
   expect(typed).toEqual(["claude auth login"]);
 
-  fireEvent.click(screen.getByRole("button", { name: "Failed for 3m 42s" }));
+  fireEvent.click(receipt());
   expect(screen.getByRole("button", { name: "Sign in" }).parentElement!.textContent).toBe("Sign in");
 });
 

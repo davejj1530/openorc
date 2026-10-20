@@ -180,11 +180,6 @@
   font-size: 14px;
   line-height: 1.6;
 }
-.app-shell .prose-chat :is(h1, h2, h3) {
-  color: var(--ink);
-  font-weight: 550;
-  letter-spacing: -0.4px;
-}
 .app-shell .prose-chat :where(h1, h2, h3, h4, h5, h6) {
   margin-block: 20px 8px;
 }

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { cn } from "../lib/cn";
 import { useCanvasAnimation } from "./canvas-animation";
 import { MascotStill } from "./MascotStill";
 import type { MascotReaction } from "./mascot-runtime";
@@ -13,7 +14,7 @@ interface RiveMascotProps {
   placement?: "composer" | "hero";
 }
 
-export function RiveMascot({ reaction, reactionKey, className = "", placement }: RiveMascotProps) {
+export function RiveMascot({ reaction, reactionKey, className, placement }: RiveMascotProps) {
   const frame = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const { ready, animation } = useCanvasAnimation({ frame, canvas, loadRuntime: loadMascotRuntime });
@@ -24,7 +25,7 @@ export function RiveMascot({ reaction, reactionKey, className = "", placement }:
   }, [animation, reaction, reactionKey, ready]);
 
   return (
-    <div ref={frame} className={`rive-mascot ${className}`} aria-hidden="true" data-ready={ready} data-placement={placement}>
+    <div ref={frame} className={cn("rive-mascot", className)} aria-hidden="true" data-ready={ready} data-placement={placement}>
       <MascotStill className="rive-mascot-static" />
       <canvas ref={canvas} className="rive-mascot-canvas" />
     </div>

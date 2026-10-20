@@ -605,9 +605,77 @@ button.browser-empty:hover,
 /* Footer: Add project as a quiet row, Settings as a round button. */
 .sidebar-footer {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 6px;
   padding: 6px 10px 10px;
+}
+/* The open thread's weekly usage, then Settings at the row's end. */
+.sidebar-account-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.sidebar-account-row > :last-child {
+  margin-left: auto;
+}
+.account-usage-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: var(--control-row);
+  padding: 0 14px 0 10px;
+  border-radius: var(--radius-pill);
+  background: var(--control-fill);
+  white-space: nowrap;
+  transition: background-color var(--duration-quick) var(--ease-out);
+}
+.account-usage-chip:hover,
+.account-usage-chip[data-popup-open] {
+  background-image: linear-gradient(var(--surface-2), var(--surface-2));
+}
+.account-usage-chip:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.account-usage-ring {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke-width: 2;
+}
+.account-usage-track {
+  stroke: var(--surface-3);
+}
+.account-usage-fill {
+  stroke: var(--ink);
+  stroke-linecap: round;
+  transition: stroke-dasharray var(--duration-resize) var(--ease-out);
+}
+.account-usage-value {
+  font-size: var(--text-base);
+  line-height: 16px;
+  color: var(--ink);
+}
+.account-usage-chip[data-low] .account-usage-value {
+  color: var(--attention);
+}
+.account-usage-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--text-xs);
+  line-height: 16px;
+  color: var(--ink-4);
+}
+/* The usage card from Settings, as the popover itself. */
+.account-usage-popup {
+  width: min(360px, calc(100vw - 24px));
+  padding: 0;
+}
+.account-usage-popup .usage-account {
+  background: none;
 }
 .sidebar-add-project {
   display: flex;

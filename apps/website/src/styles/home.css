@@ -41,6 +41,11 @@
   margin-bottom: 20px;
 }
 
+/* Phones see stills instead of the demo (below). */
+.home-page .hero-still {
+  display: none;
+}
+
 /* Agents */
 .home-page .agents-section {
   padding-top: clamp(64px, 7vw, 104px);
@@ -769,6 +774,38 @@
   }
   .home-page .hero {
     padding-top: 40px;
+  }
+  /* Phones get no demos: the hero shows stills instead, and the workflow section keeps only its words. */
+  .home-page .demo-tabs,
+  .home-page .hero-demo,
+  .home-page [data-workflow-demo] {
+    display: none;
+  }
+  .home-page .workflow-section .section-heading {
+    margin-bottom: 0;
+  }
+  .home-page .hero-still {
+    display: block;
+    container-type: inline-size;
+    min-height: 440px;
+  }
+  .home-page .hero-still-thread {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 900px;
+    transform: translateX(calc(-1 * min(246px, max(0px, 900px - 100cqi))));
+  }
+  .home-page .hero-still-thread .hs-mock-worktree {
+    --hs-canvas: 1000;
+    height: calc(660 * var(--u));
+  }
+  .home-page .hero-still-changes {
+    position: absolute;
+    z-index: 1;
+    top: 290px;
+    left: 12px;
+    width: 620px;
   }
   .home-page .agent-logos {
     gap: 16px 28px;

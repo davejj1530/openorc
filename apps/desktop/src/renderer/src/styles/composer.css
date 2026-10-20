@@ -121,14 +121,55 @@
   gap: 8px;
   min-width: 0;
 }
+/* One row that never wraps: when the composer is too narrow for every chip, the row scrolls sideways and fades at
+   the edge that has more. The padding keeps focus rings inside the scroller; the margins put the chips back. */
 .composer-tools {
   display: flex;
   flex: 1 1 auto;
-  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   min-width: 0;
-  margin-left: -4px;
+  margin: -4px 0 -4px -8px;
+  padding: 4px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+/* Chips keep their width here, so a tight composer scrolls the row instead of squeezing every label. */
+.composer-bar .composer-tools > * {
+  flex-shrink: 0;
+}
+@property --tools-fade-start {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --tools-fade-end {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@supports (animation-timeline: scroll()) {
+  .composer-tools {
+    mask-image: linear-gradient(to right, transparent, #000 var(--tools-fade-start), #000 calc(100% - var(--tools-fade-end)), transparent);
+    animation: composer-tools-fade linear both;
+    animation-timeline: scroll(self inline);
+  }
+}
+@keyframes composer-tools-fade {
+  0% {
+    --tools-fade-start: 0px;
+    --tools-fade-end: 24px;
+  }
+  8%,
+  92% {
+    --tools-fade-start: 24px;
+    --tools-fade-end: 24px;
+  }
+  100% {
+    --tools-fade-start: 24px;
+    --tools-fade-end: 0px;
+  }
 }
 .composer-end {
   display: flex;

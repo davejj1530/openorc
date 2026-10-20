@@ -134,7 +134,7 @@ function RelaySlackSettings({ active }: { active: boolean }) {
         </div>
       </Section>
       <details className="mt-6">
-        <summary className="text-lg font-semibold py-2">Host the Slack connection</summary>
+        <summary className="text-lg py-2">Host the Slack connection</summary>
         <Section title="Slack connection" description="Set this up once on the host computer. Keep OpenOrc open and the computer awake. Teammates use device keys instead of these tokens.">
           <div className="flex justify-between gap-3 mb-3">
             <span>{host?.workspace ?? "Slack workspace"}</span>
@@ -167,7 +167,7 @@ function RelaySlackSettings({ active }: { active: boolean }) {
           {status.data?.devices.map((device) => (
             <div className="settings-field" key={device.id}>
               <div>
-                <span className="font-medium">{device.label}</span>
+                <span>{device.label}</span>
                 <span className="block text-sm text-ink-2">
                   {device.userId} · {device.online ? "Online" : "Offline"}
                 </span>

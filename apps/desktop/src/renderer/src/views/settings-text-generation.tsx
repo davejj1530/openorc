@@ -33,9 +33,7 @@ export function TextGenerationSettings() {
         {explicitProvider && (
           <div className="settings-field" role="group" aria-labelledby={modelLabelId} aria-describedby={modelHintId}>
             <span>
-              <span id={modelLabelId} className="font-medium">
-                Model
-              </span>
+              <span id={modelLabelId}>Model</span>
               <span id={modelHintId} className="settings-hint">
                 The default uses a small model. Choosing a larger model may cost more or use more of your allowance.
               </span>
@@ -59,7 +57,7 @@ export function TextGenerationSettings() {
             </div>
           </div>
         )}
-        <p className="text-ink-2 mt-3" role="status">
+        <p className="text-sm text-ink-3 mt-3" role="status">
           {textGenerationStatus({ loading: s.query.isLoading, status: s.status, value: v })}
         </p>
       </Section>

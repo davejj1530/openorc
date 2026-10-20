@@ -14,8 +14,8 @@ import {
 import { Button, Input, Select } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/query";
 import { core } from "../lib/rpc";
-import { slackPersonalCreateUrl, slackPersonalManifest } from "../lib/slack-setup";
 import { Field, LoadError, Section, Status } from "./settings-shared";
+import { SlackSetupGuide } from "./settings-slack-guide";
 
 export function DirectSlackSettings({ active }: { active: boolean }) {
   const status = useRpc("slack.status", {}, { enabled: active, refetchInterval: active ? 2000 : false });
@@ -52,59 +52,7 @@ export function DirectSlackSettings({ active }: { active: boolean }) {
     <>
       <p className="settings-note mb-3">Connect your own Slack bot to this computer. Each teammate creates a separate bot. Keep OpenOrc open and your computer awake to receive requests.</p>
       {status.isError && <LoadError retry={() => void status.refetch()} />}
-      <details open={!direct?.configured} className="settings-disclosure">
-        <summary>Set up your Slack app</summary>
-        <ol className="list-decimal pl-5 space-y-5 text-md">
-          <li>
-            <p className="font-medium">Create a personal app</p>
-            <p className="text-ink-2 mt-1">
-              Choose a distinct name, such as OpenOrc Personal. Open the setup link, choose your workspace, review the prefilled settings, and create the app. Your workspace may require admin
-              approval.
-            </p>
-            <div className="flex flex-wrap items-end gap-2 mt-3">
-              <label className="flex-1 min-w-0">
-                App name
-                <Input aria-label="App name" maxLength={35} value={appName} onChange={(e) => setAppName(e.target.value)} />
-              </label>
-              <Button onClick={() => window.openorc.openExternal(slackPersonalCreateUrl(appName))}>Create Slack app</Button>
-              <Button
-                onClick={() =>
-                  void act(
-                    () => navigator.clipboard.writeText(JSON.stringify(slackPersonalManifest(appName), null, 2)),
-                    "Manifest copied. In Slack, choose Create New App → From a manifest, then paste it as JSON.",
-                  )
-                }
-              >
-                Copy manifest
-              </Button>
-            </div>
-            <p className="text-sm text-ink-2 mt-2">
-              The template enables Socket Mode, approval buttons, channel/thread events, and image attachments. If the link does not prefill the form, use Copy manifest.
-            </p>
-            <p className="text-sm text-ink-2 mt-2">
-              Already connected? To receive images, add the files:read bot scope under OAuth &amp; Permissions in your Slack app, then reinstall it to your workspace.
-            </p>
-          </li>
-          <li>
-            <p className="font-medium">Install the app and copy its bot token</p>
-            <p className="text-ink-2 mt-1">In Slack’s app settings, open OAuth &amp; Permissions → Install to Workspace. Approve access, then copy the Bot User OAuth Token beginning with xoxb-.</p>
-          </li>
-          <li>
-            <p className="font-medium">Generate an app token</p>
-            <p className="text-ink-2 mt-1">
-              Open Basic Information → App-Level Tokens → Generate Token and Scopes. Name it OpenOrc desktop, add connections:write, then copy the token beginning with xapp-. Use tokens from the same
-              app.
-            </p>
-          </li>
-          <li>
-            <p className="font-medium">Copy your Slack member ID</p>
-            <p className="text-ink-2 mt-1">In Slack, open your own profile → More → Copy member ID. Only requests and approvals from this member will control your computer.</p>
-          </li>
-        </ol>
-        <Button className="mt-4" variant="ghost" onClick={() => window.openorc.openExternal("https://api.slack.com/apps")}>
-          Open Slack app settings
-        </Button>
-      </details>
+      <SlackSetupGuide open={!direct?.configured} appName={appName} onAppName={setAppName} act={act} />
       <Section title="Personal connection" description="Tokens stay encrypted on this computer. Leave a saved token blank to keep it.">
         <div className="flex items-center justify-between gap-3 mb-3">
           <span>{direct?.workspace ? `${direct.ownerName ?? config.userId} · ${direct.workspace}` : "This computer"}</span>

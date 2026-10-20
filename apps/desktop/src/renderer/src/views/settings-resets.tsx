@@ -11,9 +11,7 @@ export function ResetControls({ report, stale }: { report: ProviderUsage; stale:
   return (
     <div className="space-y-2">
       {report.provider === "codex" && (
-        <p className="font-medium">
-          {inventory.availableCount === null ? "Reset availability unknown" : `${inventory.availableCount} ${inventory.availableCount === 1 ? "reset" : "resets"} available`}
-        </p>
+        <p>{inventory.availableCount === null ? "Reset availability unknown" : `${inventory.availableCount} ${inventory.availableCount === 1 ? "reset" : "resets"} available`}</p>
       )}
       {inventory.credits?.map((c) => (
         <p key={c.id} className="text-sm text-ink-2">

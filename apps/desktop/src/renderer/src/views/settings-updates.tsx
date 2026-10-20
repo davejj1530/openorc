@@ -23,7 +23,7 @@ export function UpdateSettingsSection() {
         disabled={!settings.data || save.isPending}
         onChange={(on) => save.mutate(on)}
       />
-      {settings.data?.unavailable && <p className="text-ink-2 mt-3">{settings.data.unavailable}</p>}
+      {settings.data?.unavailable && <p className="text-sm text-ink-3 mt-3">{settings.data.unavailable}</p>}
       {save.isError && (
         <p role="alert" className="text-bad mt-3">
           Could not save. Your previous setting is still active.

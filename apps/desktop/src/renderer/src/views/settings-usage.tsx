@@ -3,7 +3,7 @@ import { ResetControls } from "./settings-resets";
 import { harnessCatalog, harnessIds, type AllowanceWindow, type ProviderUsage } from "@openorc/protocol";
 import { Button, IconButton, TextButton, Tooltip } from "../components/ui";
 import { HarnessLogo } from "../components/HarnessLogo";
-import { ExternalLink, RefreshCw } from "../components/icons";
+import { ChevronDown, ExternalLink, RefreshCw } from "../components/icons";
 import { allowanceState, formatUsageTime, usageResetLabel } from "../lib/provider-usage";
 import { useEffect, useId, useRef, useState } from "react";
 import { useRpc } from "../lib/query";
@@ -121,7 +121,7 @@ function UsageCardHeading({
   return (
     <header className="usage-account-heading">
       <div className="usage-account-identity">
-        <HarnessLogo id={provider === "anthropic-api" ? "claude" : provider} size={20} />
+        <HarnessLogo id={provider === "anthropic-api" ? "claude" : provider} size={16} />
         <div>
           <h2>{name}</h2>
           <p title={context}>{context ?? "Checking account…"}</p>
@@ -132,7 +132,7 @@ function UsageCardHeading({
           {state.label}
         </span>
         <Tooltip label={`Refresh ${name} usage`}>
-          <IconButton size="sm" disabled={fetching} aria-label={`Refresh ${name} usage`} onClick={onRefresh}>
+          <IconButton size="xs" disabled={fetching} aria-label={`Refresh ${name} usage`} onClick={onRefresh}>
             <RefreshCw size={14} />
           </IconButton>
         </Tooltip>
@@ -144,8 +144,9 @@ function UsageCardHeading({
 function UsageCardFooter({ report: d, details, detailsId, onToggle, onOpenUsage }: { report: ProviderUsage; details: boolean; detailsId: string; onToggle: () => void; onOpenUsage: () => void }) {
   return (
     <footer className="usage-account-footer">
-      <TextButton tone="muted" aria-expanded={details} aria-controls={detailsId} onClick={onToggle}>
+      <TextButton tone="muted" className="usage-details-toggle" aria-expanded={details} aria-controls={detailsId} onClick={onToggle}>
         {details ? "Hide details" : "Details"}
+        <ChevronDown size={12} aria-hidden="true" />
       </TextButton>
       {d.accountUrl && (
         <Button variant="ghost" size="sm" onClick={onOpenUsage}>
@@ -163,9 +164,13 @@ function ProviderAllowances({ report: d, now, outdated }: { report: ProviderUsag
   return (
     <>
       {d.windows.length === 0 && <p className="usage-empty">{d.status === "disconnected" ? "Connect this provider to see its account allowances." : "No limits reported."}</p>}
-      {d.windows.map((w) => (
-        <UsageWindow key={w.id} value={w} now={now} outdated={outdated} />
-      ))}
+      {d.windows.length > 0 && (
+        <div className="usage-windows">
+          {d.windows.map((w) => (
+            <UsageWindow key={w.id} value={w} now={now} outdated={outdated} />
+          ))}
+        </div>
+      )}
       {d.credits.map((c, index) => (
         <div key={`${c.label}:${index}`} className="usage-credit">
           <h3>{c.label}</h3>
@@ -225,41 +230,42 @@ function UsageReportDetails({ report: d, stale }: { report: ProviderUsage; stale
   );
 }
 
-/** One row: a ring for the reported amount, the limit over its reset time, and the amount itself. */
+/** One limit: a 48px ring for the share left, the share as a stat, then the limit and its reset time. */
 function UsageWindow({ value: w, now, outdated }: { value: AllowanceWindow; now: number; outdated: boolean }) {
   const stale = outdated || allowanceState(w, now).stale;
-  const amount = w.remainingPercent ?? w.usedPercent;
-  const metric = w.remainingPercent !== null ? "remaining" : "used";
-  const percent = amount === null ? null : amount.toLocaleString(undefined, { maximumFractionDigits: 1 });
-  const filled = amount === null ? 0 : Math.max(0, Math.min(100, amount));
+  const left = w.remainingPercent ?? (w.usedPercent === null ? null : 100 - w.usedPercent);
+  const percent = left === null ? null : left.toLocaleString(undefined, { maximumFractionDigits: 1 });
+  const filled = left === null ? 0 : Math.max(0, Math.min(100, left));
   const ring = (
-    <svg viewBox="0 0 32 32" aria-hidden="true">
-      <circle className="usage-ring-track" cx="16" cy="16" r="13" />
-      {filled > 0 && <circle className="usage-ring-fill" cx="16" cy="16" r="13" pathLength="100" strokeDasharray={`${filled} 100`} />}
+    <svg viewBox="0 0 48 48" aria-hidden="true">
+      <circle className="usage-ring-track" cx="24" cy="24" r="21" />
+      {filled > 0 && <circle className="usage-ring-fill" cx="24" cy="24" r="21" pathLength="100" strokeDasharray={`${filled} 100`} />}
     </svg>
   );
   return (
     <div className="usage-window" data-warning={w.exhausted || stale || undefined}>
-      {amount === null ? (
+      {left === null ? (
         <span className="usage-ring">{ring}</span>
       ) : (
         <span
           className="usage-ring"
           role="progressbar"
-          aria-label={`${w.label}: reported allowance ${metric}`}
+          aria-label={`${w.label}: reported allowance remaining`}
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={filled}
-          aria-valuetext={`${percent}% ${metric}${stale ? ", out of date" : ""}`}
+          aria-valuetext={`${percent}% remaining${stale ? ", out of date" : ""}`}
         >
           {ring}
         </span>
       )}
       <div className="usage-window-label">
+        <span className="usage-window-value" data-empty={percent === null || undefined}>
+          {percent === null ? "Not reported" : `${percent}% left`}
+        </span>
         <h3>{w.label}</h3>
         <p title={w.resetsAt === null ? undefined : formatUsageTime(w.resetsAt)}>{stale ? `Out of date · reported ${formatUsageTime(w.observedAt)}` : usageResetLabel(w.resetsAt, now)}</p>
       </div>
-      <span className="usage-window-value">{percent === null ? "Not reported" : `${percent}% ${metric === "remaining" ? "left" : "used"}`}</span>
     </div>
   );
 }

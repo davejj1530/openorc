@@ -69,7 +69,7 @@ export function Field({ label, children, hint }: { label: string; children: Reac
   return (
     <label className="settings-field">
       <span>
-        <span className="font-medium">{label}</span>
+        <span>{label}</span>
         {hint && <span className="settings-hint">{hint}</span>}
       </span>
       {children}

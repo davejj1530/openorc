@@ -1,12 +1,9 @@
 /*
- * The homepage, after Cursor's: warm paper, calm left-aligned type, and the
- * product standing on landscape paintings. Feature rows are cards on the
- * page's surface color; the one strong color is the black Download pill.
+ * The homepage in the app's own language: a white page, gray tiles the product stands on, white planes inside them,
+ * two-tone headings, and one ink pill. The app is shown frameless, since each tile is its ground.
  */
 .home-page {
-  --setup-shadow: 0 0 0 1px rgb(0 0 0 / 0.07), 0 14px 32px -20px rgb(36 40 30 / 0.45);
-  --card-radius: 10px;
-  --section-gap: clamp(96px, 10vw, 152px);
+  --section-gap: clamp(96px, 10vw, 144px);
   overflow: clip;
 }
 .home-page h2 {
@@ -15,23 +12,24 @@
 
 /* Hero */
 .home-page .hero {
-  padding-top: clamp(56px, 7vw, 104px);
+  padding-top: clamp(48px, 6vw, 88px);
 }
-.home-page .hero h1 {
-  max-width: 19ch;
+.home-page .hero-title {
   font-size: var(--type-hero);
-  line-height: 1.15;
-  letter-spacing: -0.02em;
+  line-height: 1.04;
+  letter-spacing: -0.035em;
+}
+.home-page .hero-title .quiet {
+  display: block;
 }
 .home-page .hero-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px 24px;
-  margin-top: 28px;
+  gap: 10px;
 }
 .home-page .product-showcase {
-  margin-top: 28px;
+  margin-top: 36px;
   scroll-margin-top: 90px;
 }
 .home-page .demo-bar {
@@ -42,65 +40,30 @@
   gap: 16px 24px;
   margin-bottom: 20px;
 }
-.home-page .demo-bar .hero-actions {
-  margin-top: 0;
-}
-.home-page .demo-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-.home-page .demo-tabs button {
-  min-height: 40px;
-  padding: 6px 16px;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--muted);
-  font-size: var(--type-control);
-  white-space: nowrap;
-  transition:
-    background 160ms ease,
-    color 160ms ease;
-}
-.home-page .demo-tabs button:hover {
-  color: var(--text);
-}
-.home-page .demo-tabs button[aria-selected="true"] {
-  background: var(--surface);
-  color: var(--text);
-}
-/* The window keeps the scenes' 1360 × 850 shape, so their text renders at the size it was laid out for. */
-.home-page .demo-art .art-panel-stage {
-  padding: clamp(14px, 4.5%, 64px) clamp(14px, 5%, 72px);
-}
-.home-page .demo-window {
-  aspect-ratio: 8 / 5;
-}
 
 /* Agents */
 .home-page .agents-section {
   padding-top: clamp(64px, 7vw, 104px);
 }
 .home-page .agents-caption {
+  color: var(--faint);
   font-size: var(--type-control);
 }
 .home-page .agent-logos {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 20px clamp(32px, 5vw, 72px);
-  margin: 20px 0 0;
+  gap: 20px clamp(32px, 5vw, 64px);
+  margin: 18px 0 0;
   padding: 0;
   list-style: none;
-  color: var(--text-2);
+  color: var(--muted);
 }
 .home-page .agent-logos li {
   display: inline-flex;
   align-items: center;
   gap: 10px;
   font-size: 1.125rem;
-  font-weight: 450;
   letter-spacing: -0.015em;
 }
 .home-page .agent-logos svg {
@@ -110,86 +73,79 @@
 .home-page .agents-statement {
   max-width: 40ch;
   margin-top: clamp(56px, 6vw, 88px);
-  color: var(--muted);
-  font-size: clamp(1.375rem, 2vw, 1.875rem);
-  line-height: 1.3;
-  letter-spacing: -0.02em;
+  color: var(--faint);
+  font-size: clamp(1.5rem, 2.1vw, 2rem);
+  line-height: 1.25;
+  letter-spacing: -0.025em;
 }
 .home-page .agents-statement strong {
   color: var(--text);
   font-weight: inherit;
 }
 
-/* Feature rows: the copy on the left, its painting on the right. */
+/* Feature rows: the copy on the page, the product on its tile beside it. */
 .home-page .features {
   display: grid;
-  gap: 16px;
+  gap: clamp(64px, 7vw, 112px);
   margin-top: var(--section-gap);
 }
 .home-page .feature {
   display: grid;
   grid-template-columns: minmax(0, 0.8fr) minmax(0, 2fr);
   gap: clamp(32px, 4vw, 64px);
-  padding: clamp(20px, 2.4vw, 32px);
-  border-radius: var(--card-radius);
-  background: var(--surface);
   scroll-margin-top: 90px;
 }
 .home-page .feature-copy {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  padding-top: 6px;
+  padding-top: 8px;
 }
 .home-page .feature-copy h2 {
+  max-width: 20ch;
   font-size: var(--type-heading);
 }
+.home-page .feature-copy h2 .quiet {
+  display: block;
+}
 .home-page .feature-copy > p {
-  max-width: 44ch;
+  max-width: 42ch;
   margin-top: 14px;
 }
-.home-page .feature-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 44px;
+.home-page .feature-copy .text-link {
   margin-top: 10px;
-  color: var(--accent);
-  font-size: var(--type-control);
-  font-weight: 450;
 }
-.home-page .feature-link:hover {
-  text-decoration: underline;
-  text-underline-offset: 0.25em;
+.home-page .feature-visual {
+  min-height: 560px;
 }
 
-/* Two stills on one painting: the task list behind, the diff in front. */
-.home-page .review-art .art-panel-stage {
-  aspect-ratio: 16 / 11;
-  padding: 0;
-}
+/* Two stills on one tile: the task list as the app draws it, and the Changes panel's plane in front. */
 .home-page .review-tasks {
   position: absolute;
-  top: 8%;
-  left: 6%;
-  width: 64%;
+  top: 0;
+  left: 0;
+  width: 74%;
 }
 .home-page .review-changes {
   position: absolute;
   z-index: 1;
-  top: 30%;
-  right: 6%;
-  width: 60%;
+  top: 132px;
+  right: -4%;
+  width: 66%;
 }
-/* A compact desktop window, with the sidebar visible even when the painting crops it. */
-.home-page .worktree-art .hs-mock-worktree {
+/* The worktree thread, cropped by its tile at the right and bottom. */
+.home-page .worktree-visual .mock-window {
+  position: absolute;
+  inset: 0 -1px auto 0;
+}
+.home-page .worktree-visual .hs-mock-worktree {
   --hs-canvas: 1000;
   height: calc(660 * var(--u));
 }
-.home-page .slack-art .art-panel-stage {
+.home-page .slack-visual {
   display: grid;
   place-items: center;
-  padding: clamp(16px, 6%, 64px);
+  padding: clamp(16px, 5%, 56px);
 }
 .home-page .slack-points {
   display: grid;
@@ -199,7 +155,6 @@
 .home-page .slack-points dt {
   color: var(--text);
   font-size: var(--type-body);
-  font-weight: 450;
 }
 .home-page .slack-points dd {
   margin: 4px 0 0;
@@ -209,6 +164,7 @@
 }
 .home-page .slack-note {
   margin-top: 28px;
+  color: var(--faint);
   font-size: var(--type-control);
 }
 
@@ -218,7 +174,7 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: end;
   gap: 24px 64px;
-  margin-bottom: 40px;
+  margin-bottom: 36px;
 }
 .home-page .section-heading h2 {
   max-width: 20ch;
@@ -234,7 +190,7 @@
   padding-top: var(--section-gap);
 }
 
-/* Your setup: four cards, each with a small still of the part of the app it describes. */
+/* Your setup: four equal tiles, each holding a plane with a small still of the part of the app it describes. */
 .home-page .setup-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -243,12 +199,13 @@
 .home-page .setup-card {
   display: flex;
   flex-direction: column;
-  padding: 20px 20px 24px;
-  border-radius: var(--card-radius);
+  padding: 16px 16px 28px;
+  border-radius: var(--radius-tile);
   background: var(--surface);
 }
-.home-page .setup-card h3 {
-  font-weight: 450;
+.home-page .setup-card h3,
+.home-page .setup-card p {
+  padding-inline: 12px;
 }
 .home-page .setup-card p {
   margin-top: 8px;
@@ -258,18 +215,21 @@
 .home-page .setup-visual {
   display: grid;
   place-items: center;
-  height: 188px;
+  height: 200px;
   margin-bottom: 24px;
+  padding: 16px;
+  border-radius: var(--radius-card);
+  background: var(--paper);
 }
+/* A menu as the app draws one on a plane: the tile's fill, r16, with r10 rows. */
 .home-page .setup-window {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   width: 100%;
   max-width: 280px;
   padding: 6px;
-  border-radius: 10px;
-  background: var(--paper);
-  box-shadow: var(--setup-shadow);
+  border-radius: 16px;
+  background: var(--surface);
   color: var(--text);
   font-size: 0.8125rem;
 }
@@ -277,19 +237,19 @@
   display: flex;
   align-items: center;
   gap: 9px;
-  min-height: 32px;
-  padding-inline: 9px;
-  border-radius: 6px;
+  min-height: 34px;
+  padding-inline: 10px;
+  border-radius: var(--radius-row);
   white-space: nowrap;
 }
 .home-page .setup-row[data-current] {
-  background: var(--tint);
+  background: var(--paper);
 }
 .home-page .setup-row[data-done] {
-  color: var(--muted);
+  color: var(--faint);
 }
-.home-page .setup-row[data-own] {
-  color: var(--accent);
+.home-page .setup-row svg {
+  color: var(--muted);
 }
 .home-page .setup-grow {
   flex: 1;
@@ -298,11 +258,11 @@
   text-overflow: ellipsis;
 }
 .home-page .setup-window code {
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-family: "JetBrains Mono Variable", ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 0.75rem;
 }
 .home-page .setup-quiet {
-  color: var(--muted);
+  color: var(--faint);
   font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
 }
@@ -310,29 +270,33 @@
   display: grid;
   flex: none;
   place-items: center;
-  width: 14px;
-  height: 14px;
-  border-radius: 4px;
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
   background: var(--ink-button);
   color: var(--on-ink);
 }
+.home-page .setup-row .setup-check svg {
+  color: inherit;
+}
 .home-page .setup-row[data-done] .setup-check {
-  background: var(--rule-strong);
+  background: var(--tint-strong);
+  color: var(--faint);
 }
 .home-page .setup-tag {
   flex: none;
-  padding: 1px 8px;
+  padding: 2px 8px;
   border-radius: 999px;
   background: var(--tint);
   color: var(--muted);
-  font-size: 0.6875rem;
-  font-weight: 450;
+  font-size: 0.75rem;
 }
 .home-page .setup-ref-dot {
   display: grid;
   flex: none;
   place-items: center;
   width: 14px;
+  color: var(--muted);
 }
 .home-page .setup-ref-dot::before {
   content: "";
@@ -342,7 +306,7 @@
   background: currentColor;
 }
 
-/* The latest releases */
+/* The latest releases, as equal tiles. */
 .home-page .releases-head {
   display: flex;
   flex-wrap: wrap;
@@ -367,16 +331,21 @@
   flex-direction: column;
   gap: 14px;
   height: 100%;
-  min-height: 176px;
-  padding: 20px;
-  border-radius: var(--card-radius);
+  min-height: 184px;
+  padding: 24px;
+  border-radius: var(--radius-tile);
   background: var(--surface);
-  color: var(--muted);
+  color: var(--faint);
   font-size: var(--type-control);
-  transition: background 160ms ease;
+  transition:
+    background-color var(--duration-leave) ease,
+    transform var(--duration-quick) var(--ease-out);
 }
 .home-page .release-card:hover {
-  background: var(--card-hover);
+  background: color-mix(in srgb, var(--surface), var(--text) 4%);
+}
+.home-page .release-card:active {
+  transform: scale(0.99);
 }
 .home-page .release-meta {
   display: flex;
@@ -385,10 +354,9 @@
 }
 .home-page .release-tag {
   padding: 2px 10px;
-  border: 1px solid var(--rule-strong);
   border-radius: 999px;
+  background: var(--paper);
   color: var(--text);
-  font-weight: 450;
   font-variant-numeric: tabular-nums;
 }
 .home-page .release-summary {
@@ -400,7 +368,7 @@
   margin-top: auto;
 }
 
-/* Questions */
+/* Questions: rows parted by hairlines, each answer opening in place. */
 .home-page .faq-section {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
@@ -410,18 +378,27 @@
 .home-page .faq-section h2 {
   font-size: var(--type-display);
 }
-.home-page .faq-list {
-  border-top: 1px solid var(--rule);
-}
 .home-page .faq-list details {
-  border-bottom: 1px solid var(--rule);
+  border-bottom: var(--hairline) solid var(--rule);
+  interpolate-size: allow-keywords;
+}
+.home-page .faq-list details::details-content {
+  block-size: 0;
+  overflow: hidden;
+  transition:
+    block-size var(--duration-resize) var(--ease-out),
+    content-visibility var(--duration-resize) allow-discrete;
+}
+.home-page .faq-list details[open]::details-content {
+  block-size: auto;
 }
 .home-page .faq-list summary {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  padding: 20px 0;
+  min-height: 60px;
+  padding-block: 12px;
   color: var(--text);
   list-style: none;
   cursor: pointer;
@@ -430,20 +407,29 @@
   display: none;
 }
 .home-page .faq-list summary svg {
+  box-sizing: content-box;
+  padding: 6px;
+  border-radius: 999px;
   color: var(--muted);
-  transition: transform 200ms ease;
+  transition:
+    transform var(--duration-arrive) var(--ease-out),
+    background-color var(--duration-leave) ease;
+}
+.home-page .faq-list summary:hover svg {
+  background: var(--tint);
+  color: var(--text);
 }
 .home-page .faq-list details[open] summary svg {
   transform: rotate(45deg);
 }
 .home-page .faq-list details p {
   max-width: 60ch;
-  padding: 0 32px 22px 0;
+  padding: 0 40px 22px 0;
 }
 
 /* Closing */
 .home-page .closing {
-  padding-block: var(--section-gap) clamp(48px, 5vw, 72px);
+  padding-top: var(--section-gap);
 }
 .home-page .closing h2 {
   font-size: var(--type-display);
@@ -453,33 +439,31 @@
   margin-top: 16px;
   font-size: var(--type-lead);
 }
-.home-page .closing-art {
-  aspect-ratio: 3 / 1;
-  margin-top: clamp(48px, 6vw, 80px);
+.home-page .closing .hero-actions {
+  margin-top: 28px;
 }
 
 /* The Slack thread, in Slack's light theme, or its dark one in dark mode. */
 .home-page .slack-card {
   --slack-bg: #ffffff;
-  --slack-text: var(--slack-text);
-  --slack-muted: var(--slack-muted);
-  --slack-faint: var(--slack-faint);
-  --slack-line: var(--slack-line);
-  --slack-rule: var(--slack-rule);
-  --slack-border: var(--slack-border);
-  --slack-soft: var(--slack-soft);
-  --slack-chip: var(--slack-chip);
-  --slack-mention-bg: var(--slack-mention-bg);
-  --slack-mention: var(--slack-mention);
+  --slack-text: #1d1c1d;
+  --slack-muted: #616061;
+  --slack-faint: #868686;
+  --slack-line: #e8e8e8;
+  --slack-rule: #dddddd;
+  --slack-border: #bbbabb;
+  --slack-soft: #f8f8f8;
+  --slack-chip: #e8e8e8;
+  --slack-mention-bg: #e8f5fa;
+  --slack-mention: #1264a3;
   position: relative;
   display: flex;
   flex-direction: column;
   width: min(100%, 470px);
   height: 600px;
   overflow: hidden;
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   background: var(--slack-bg);
-  box-shadow: var(--window-shadow);
   color: var(--slack-text);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   text-align: left;
@@ -546,13 +530,10 @@
   font-weight: 700;
   letter-spacing: 0.025em;
 }
+/* The bot's avatar is the app icon: the cube on a charcoal tile. */
 .home-page .slack-avatar-app {
-  background: var(--slack-soft);
-}
-.home-page .slack-avatar-app img {
-  width: 30px;
-  height: 30px;
-  object-fit: contain;
+  background: #171717;
+  color: #ffffff;
 }
 .home-page .slack-message-body {
   min-width: 0;
@@ -745,19 +726,16 @@
 @media (max-width: 1100px) {
   /* The page adapts to the phone; the product remains a desktop window.
      The camera follows the journey through the same sidebar and split panes. */
-  .home-page .demo-art {
+  .home-page .demo-stage {
     container-type: inline-size;
-  }
-  .home-page .demo-art .art-panel-stage {
-    padding: 24px;
   }
   .home-page .demo-window {
     --crop-offset: 220px;
     width: 1000px;
     height: 560px;
     aspect-ratio: auto;
-    transform: translateX(calc(-1 * min(var(--crop-offset), max(0px, 1048px - 100cqi))));
-    transition: transform 700ms cubic-bezier(0.16, 1, 0.3, 1);
+    transform: translateX(calc(-1 * min(var(--crop-offset), max(0px, 1000px - 100cqi))));
+    transition: transform 700ms var(--ease-out);
   }
   .home-page .demo-window .hero-scene {
     --u: calc(100cqi / 1120);
@@ -774,7 +752,7 @@
   }
   .home-page .feature {
     grid-template-columns: minmax(0, 1fr);
-    gap: 28px;
+    gap: 24px;
   }
   .home-page .feature-copy > p {
     max-width: 60ch;
@@ -790,15 +768,7 @@
     --section-gap: 80px;
   }
   .home-page .hero {
-    padding-top: 48px;
-  }
-  .home-page .demo-tabs {
-    flex-wrap: nowrap;
-    width: calc(100% + 40px);
-    margin-inline: -20px;
-    padding-inline: 20px;
-    overflow-x: auto;
-    scrollbar-width: none;
+    padding-top: 40px;
   }
   .home-page .agent-logos {
     gap: 16px 28px;
@@ -806,37 +776,31 @@
   .home-page .agent-logos li {
     font-size: 1rem;
   }
-  .home-page .feature {
-    padding: 16px 16px 20px;
+  .home-page .features {
+    gap: 64px;
   }
-  /* Preserve the desktop stills' overlapping composition inside a tighter crop. */
-  .home-page .review-art .art-panel-stage {
-    height: 480px;
-    aspect-ratio: auto;
-    padding: 0;
+  /* Keep the desktop stills' overlapping composition inside a tighter crop. */
+  .home-page .feature-visual {
+    min-height: 480px;
   }
   .home-page .review-tasks {
-    top: 24px;
-    left: 24px;
     width: 620px;
   }
   .home-page .review-changes {
-    top: 168px;
-    left: 64px;
+    top: 150px;
+    left: 48px;
     right: auto;
     width: 620px;
   }
-  .home-page .worktree-art {
+  .home-page .worktree-visual {
     container-type: inline-size;
   }
-  .home-page .worktree-art .art-panel-stage {
-    padding: 24px;
-  }
-  .home-page .worktree-art .mock-window {
+  .home-page .worktree-visual .mock-window {
+    right: auto;
     width: 900px;
-    transform: translateX(calc(-1 * min(170px, max(0px, 948px - 100cqi))));
+    transform: translateX(calc(-1 * min(246px, max(0px, 900px - 100cqi))));
   }
-  .home-page .slack-art .art-panel-stage {
+  .home-page .slack-visual {
     padding: 12px;
   }
   .home-page .slack-card {
@@ -855,9 +819,6 @@
   .home-page .faq-section {
     grid-template-columns: minmax(0, 1fr);
   }
-  .home-page .closing-art {
-    aspect-ratio: 3 / 2;
-  }
 }
 
 @media (max-width: 360px) {
@@ -872,16 +833,6 @@
   }
 }
 
-@media (forced-colors: active) {
-  .home-page .demo-tabs button[aria-selected="true"] {
-    outline: 2px solid Highlight;
-    outline-offset: -3px;
-  }
-}
-
 :root[data-theme="dark"] .home-page .setup-row img:is([src="/openai.svg"], [src="/opencode.svg"]) {
   filter: invert(1);
-}
-:root[data-theme="dark"] .home-page {
-  --setup-shadow: 0 0 0 1px rgb(255 255 255 / 0.07), 0 14px 32px -20px rgb(0 0 0 / 0.8);
 }

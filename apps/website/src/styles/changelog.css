@@ -5,15 +5,15 @@
 .changelog-intro {
   padding-bottom: 48px;
 }
-/* Set like the homepage's hero; the second phrase in the muted ink. */
+/* Set like the homepage's hero; the second phrase in the faint gray. */
 .changelog-intro h1 {
   max-width: 19ch;
   font-size: var(--type-hero);
-  line-height: 1.15;
-  letter-spacing: -0.025em;
+  line-height: 1.04;
+  letter-spacing: -0.035em;
 }
 .changelog-intro h1 span {
-  color: var(--muted);
+  color: var(--faint);
 }
 .changelog-intro > p {
   max-width: 62ch;
@@ -24,11 +24,10 @@
 .changelog-list {
   margin: 0;
   padding: 0;
-  border-top: 1px solid var(--rule);
   list-style: none;
 }
-.changelog-entry {
-  border-bottom: 1px solid var(--rule);
+.changelog-entry + .changelog-entry {
+  border-top: var(--hairline) solid var(--rule);
 }
 .changelog-release {
   display: flex;
@@ -53,7 +52,7 @@
   line-height: 1.35;
 }
 .changelog-channel {
-  color: var(--muted);
+  color: var(--faint);
   font-size: var(--type-control);
 }
 .changelog-highlights {
@@ -81,7 +80,7 @@
   font-size: var(--type-control);
 }
 .changelog-release-meta time {
-  color: var(--muted);
+  color: var(--faint);
   white-space: nowrap;
 }
 .changelog-release-link {
@@ -89,16 +88,17 @@
   align-items: center;
   gap: 8px;
   min-height: 44px;
-  color: var(--accent);
+  color: var(--text);
 }
 .changelog-release-link:hover {
-  color: var(--text);
   text-decoration: underline;
+  text-decoration-color: var(--rule-strong);
   text-underline-offset: 0.25em;
 }
 .changelog-empty {
-  border-top: 1px solid var(--rule);
-  padding-top: 24px;
+  padding: 28px;
+  border-radius: var(--radius-tile);
+  background: var(--surface);
 }
 .changelog-empty h2 {
   max-width: none;

@@ -30,7 +30,7 @@ const refs = [
 ---
 
 <div class="setup-grid">
-  <article class="setup-card">
+  <article class="setup-card" data-reveal style="--reveal-index: 0">
     <div class="setup-visual" aria-hidden="true">
       <div class="setup-window">
         {agents.map((agent) => (
@@ -45,7 +45,7 @@ const refs = [
     <h3>Keep your provider setup</h3>
     <p>Choose Codex, Claude Code, or OpenCode for each conversation, with the sign-in and configuration you already have.</p>
   </article>
-  <article class="setup-card">
+  <article class="setup-card" data-reveal style="--reveal-index: 1">
     <div class="setup-visual" aria-hidden="true">
       <div class="setup-window">
         {sessions.map((session) => (
@@ -60,7 +60,7 @@ const refs = [
     <h3>Bring conversations forward</h3>
     <p>Import Claude Code and Codex sessions and continue them with their history intact.</p>
   </article>
-  <article class="setup-card">
+  <article class="setup-card" data-reveal style="--reveal-index: 2">
     <div class="setup-visual" aria-hidden="true">
       <div class="setup-window">
         {memories.map((memory) => (
@@ -74,7 +74,7 @@ const refs = [
     <h3>Carry the useful context</h3>
     <p>Keep decisions and lessons in optional shared project memory, so the next task starts with what you already learned.</p>
   </article>
-  <article class="setup-card">
+  <article class="setup-card" data-reveal style="--reveal-index: 3">
     <div class="setup-visual" aria-hidden="true">
       <div class="setup-window">
         {refs.map((ref) => (

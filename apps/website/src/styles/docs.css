@@ -1,14 +1,11 @@
 /*
- * The docs, after Cursor's: a quiet grouped sidebar, one readable column, and an
- * outline beside it on wide screens. Pages explain a feature first and point to
- * the internals in Reference.
+ * The docs: a quiet grouped sidebar whose open page takes the fill row, one readable column, and an outline beside
+ * it on wide screens. Tables, notes and cards are fill-only tiles, as in the app's Settings.
  */
 .docs {
-  --warning-bg: #fbf4e0;
-  --warning-rule: #ecdcb0;
-  --warning-ink: #5c4710;
-  --card-shadow: rgb(36 40 30 / 0.35);
-  --docs-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --warning-bg: #b26a0014;
+  --warning-ink: #7a4a00;
+  --docs-mono: "JetBrains Mono Variable", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --docs-body: 0.9375rem;
   display: grid;
   grid-template-columns: 220px minmax(0, 768px) 200px;
@@ -19,10 +16,8 @@
 }
 
 :root[data-theme="dark"] .docs {
-  --warning-bg: #2a2414;
-  --warning-rule: #4a3f1f;
-  --warning-ink: #e8cf8a;
-  --card-shadow: rgb(0 0 0 / 0.6);
+  --warning-bg: #f0b35a1a;
+  --warning-ink: #f0c98a;
 }
 
 /* Sidebar */
@@ -45,7 +40,7 @@
 .docs-nav-group-title {
   margin: 0 0 4px;
   padding-left: 12px;
-  color: var(--muted);
+  color: var(--faint);
   font-size: 0.75rem;
   font-weight: 450;
 }
@@ -58,23 +53,20 @@
 .docs-nav-groups a {
   display: flex;
   align-items: center;
-  min-height: 30px;
+  min-height: 32px;
   padding: 4px 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-row);
   color: var(--muted);
   font-size: var(--type-control);
   line-height: 1.4;
+  transition:
+    background-color var(--duration-leave) ease,
+    color var(--duration-leave) ease;
 }
-.docs-nav-groups a:hover {
-  background: var(--surface);
-  color: var(--text);
-}
+.docs-nav-groups a:hover,
 .docs-nav-groups a[aria-current="page"] {
-  color: var(--accent);
-  font-weight: 700;
-}
-.docs-nav-groups a[aria-current="page"]:hover {
-  background: none;
+  background: var(--tint);
+  color: var(--text);
 }
 .docs-menu {
   display: none;
@@ -104,8 +96,8 @@
 .docs-header h1 {
   max-width: 22ch;
   font-size: 2.125rem;
-  line-height: 1.2;
-  letter-spacing: -0.025em;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
 }
 .docs-lead {
   max-width: 62ch;
@@ -116,8 +108,8 @@
 .docs-reviewed {
   margin-top: 64px;
   padding-top: 20px;
-  border-top: 1px solid var(--rule);
-  color: var(--muted);
+  border-top: var(--hairline) solid var(--rule);
+  color: var(--faint);
   font-size: 0.8125rem;
 }
 
@@ -144,7 +136,7 @@
   margin: 24px 0 8px;
   color: var(--text);
   font-size: var(--docs-body);
-  font-weight: 700;
+  font-weight: 450;
 }
 .docs-article p {
   max-width: 72ch;
@@ -197,10 +189,9 @@
   text-decoration-color: currentColor;
 }
 .docs-article code {
-  padding: 0.1em 0.35em;
-  border: 1px solid var(--rule);
-  border-radius: 5px;
-  background: var(--surface);
+  padding: 0.1em 0.4em;
+  border-radius: 6px;
+  background: var(--tint);
   color: var(--text);
   font-family: var(--docs-mono);
   font-size: 0.84em;
@@ -209,10 +200,9 @@
 .docs-article pre {
   max-width: 100%;
   margin: 18px 0 22px;
-  padding: 14px 18px;
+  padding: 16px 20px;
   overflow-x: auto;
-  border: 1px solid var(--rule);
-  border-radius: 8px;
+  border-radius: 16px;
   background: var(--surface);
   color: var(--text);
   font-family: var(--docs-mono);
@@ -230,12 +220,10 @@
 }
 kbd {
   display: inline-block;
-  min-width: 1.6em;
-  padding: 0 0.4em;
-  border: 1px solid var(--rule);
-  border-bottom-width: 2px;
-  border-radius: 5px;
-  background: var(--paper);
+  min-width: 1.8em;
+  padding: 0 0.5em;
+  border-radius: 999px;
+  background: var(--tint);
   color: var(--text);
   font-family: inherit;
   font-size: 0.8125rem;
@@ -246,9 +234,10 @@ kbd {
 /* Structures */
 .docs-table {
   margin: 18px 0 26px;
+  padding: 4px 4px 4px;
   overflow-x: auto;
-  border: 1px solid var(--rule);
-  border-radius: 8px;
+  border-radius: 18px;
+  background: var(--surface);
 }
 .docs-table table {
   width: 100%;
@@ -262,22 +251,23 @@ kbd {
 }
 .docs-table th,
 .docs-table td {
-  padding: 11px 16px;
+  padding: 11px 14px;
   text-align: left;
   vertical-align: top;
 }
 .docs-table th {
-  background: var(--surface);
-  color: var(--text);
+  color: var(--faint);
   font-weight: 450;
   white-space: nowrap;
 }
 .docs-table td {
-  border-top: 1px solid var(--rule);
+  border-top: var(--hairline) solid var(--rule);
   color: var(--text-2);
 }
-.docs-table td:first-child {
+.docs-table td:first-child,
+.docs-table td:first-child strong {
   color: var(--text);
+  font-weight: 450;
 }
 .docs-table td:not(:last-child) code {
   white-space: nowrap;
@@ -291,10 +281,10 @@ kbd {
   grid-template-columns: 10rem minmax(0, 1fr);
   gap: 24px;
   padding-block: 13px;
-  border-top: 1px solid var(--rule);
+  border-top: var(--hairline) solid var(--rule);
 }
 .docs-terms > div:last-child {
-  border-bottom: 1px solid var(--rule);
+  border-bottom: var(--hairline) solid var(--rule);
 }
 .docs-terms dt {
   color: var(--text);
@@ -334,9 +324,8 @@ kbd {
   place-items: center;
   width: 26px;
   height: 26px;
-  border: 1px solid var(--rule);
   border-radius: 50%;
-  background: var(--paper);
+  background: var(--tint);
   color: var(--text);
   font-size: 0.8125rem;
 }
@@ -345,7 +334,7 @@ kbd {
 }
 .docs-source {
   margin-top: 14px;
-  color: var(--muted);
+  color: var(--faint);
   font-size: 0.8125rem;
 }
 
@@ -353,22 +342,19 @@ kbd {
 .docs-callout {
   max-width: 72ch;
   margin: 22px 0;
-  padding: 13px 16px;
-  border: 1px solid var(--rule);
-  border-radius: 8px;
+  padding: 14px 18px;
+  border-radius: 18px;
   background: var(--surface);
   color: var(--text-2);
   font-size: 0.875rem;
   line-height: 1.6;
 }
 .docs-callout[data-tone="warning"] {
-  border-color: var(--warning-rule);
   background: var(--warning-bg);
 }
 .docs-callout-title {
   margin-bottom: 4px;
   color: var(--text);
-  font-weight: 700;
 }
 .docs-article .docs-callout p {
   font-size: 0.875rem;
@@ -395,21 +381,22 @@ kbd {
   display: grid;
   align-content: start;
   gap: 6px;
-  padding: 15px 18px 17px;
-  border: 1px solid var(--rule);
-  border-radius: 8px;
+  padding: 18px 20px 20px;
+  border-radius: var(--radius-card);
+  background: var(--surface);
   transition:
-    border-color 160ms ease,
-    box-shadow 160ms ease;
+    background-color var(--duration-leave) ease,
+    transform var(--duration-quick) var(--ease-out);
 }
 .docs-card:hover {
-  border-color: var(--accent);
-  box-shadow: 0 6px 18px -12px var(--card-shadow);
+  background: color-mix(in srgb, var(--surface), var(--text) 4%);
+}
+.docs-card:active {
+  transform: scale(0.99);
 }
 .docs-card-title {
   color: var(--text);
   font-size: var(--docs-body);
-  font-weight: 700;
 }
 .docs-card-text {
   color: var(--muted);
@@ -417,12 +404,15 @@ kbd {
   line-height: 1.55;
 }
 
-/* Product stills on a painting */
+/* Product stills on a tile: a plane or a list floats inside it, a whole window fills it. */
 .docs-visual {
   margin: 26px 0 32px;
 }
-.docs-visual .art-panel-stage {
-  padding: clamp(14px, 5%, 40px);
+.docs-stage {
+  padding: clamp(14px, 5%, 32px);
+}
+.docs-stage:has(.hs-mock-worktree) {
+  padding: 0;
 }
 /* The worktree still is drawn narrower here, as on the homepage, so its text stays readable in the column. */
 .docs-visual .hs-mock-worktree {
@@ -431,24 +421,21 @@ kbd {
 }
 .docs-visual figcaption {
   margin-top: 12px;
-  color: var(--muted);
+  color: var(--faint);
   font-size: 0.8125rem;
 }
 
 /* Documentation previews also show the desktop product through a crop. */
 @media (max-width: 700px) {
-  .docs-visual .art-panel {
+  .docs-stage {
     container-type: inline-size;
-  }
-  .docs-visual .art-panel-stage {
-    padding: 24px;
   }
   .docs-visual .mock-window {
     width: 640px;
   }
   .docs-visual .mock-window:has(.hs-mock-worktree) {
     width: 900px;
-    transform: translateX(calc(-1 * min(170px, max(0px, 948px - 100cqi))));
+    transform: translateX(calc(-1 * min(246px, max(0px, 900px - 100cqi))));
   }
 }
 
@@ -466,19 +453,17 @@ kbd {
 .docs-diagram .diagram-narrow {
   display: none;
 }
+/* Nodes are fill-only, like every surface; the emphasized one is a step deeper. */
 .diagram-edges {
   fill: none;
-  stroke: var(--muted);
+  stroke: var(--faint);
   stroke-width: 1.25;
 }
 .diagram-node-shape {
-  fill: var(--bg);
-  stroke: var(--faint);
-  stroke-width: 1;
+  fill: var(--surface);
 }
 .diagram-emphasis .diagram-node-shape {
-  fill: var(--surface);
-  stroke: var(--text);
+  fill: color-mix(in srgb, var(--surface), var(--text) 8%);
 }
 .diagram-group {
   fill: none;
@@ -547,7 +532,7 @@ kbd {
   .docs-menu {
     display: block;
     margin-bottom: 28px;
-    border-block: 1px solid var(--rule);
+    border-block: var(--hairline) solid var(--rule);
   }
   .docs-menu summary {
     display: flex;
@@ -564,7 +549,7 @@ kbd {
   }
   .docs-menu summary svg {
     transform: rotate(90deg);
-    transition: transform 0.2s;
+    transition: transform var(--duration-arrive) var(--ease-out);
   }
   .docs-menu[open] summary svg {
     transform: rotate(-90deg);

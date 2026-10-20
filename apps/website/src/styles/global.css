@@ -12,10 +12,14 @@
   font-weight: 700;
   font-display: swap;
 }
+/*
+ * The desktop app's design language (apps/desktop/DESIGN.md): depth is a step in fill, from the page to a tile to a
+ * plane, with no borders on surfaces and no shadows. One weight, three grays, and one ink pill.
+ */
 :root {
   color-scheme: light;
-  --type-hero: clamp(1.75rem, 2.6vw, 2.375rem);
-  --type-display: clamp(2rem, 3vw, 2.5rem);
+  --type-hero: clamp(2.25rem, 3.4vw, 3.25rem);
+  --type-display: clamp(1.875rem, 2.6vw, 2.5rem);
   --type-heading: 1.625rem;
   --type-title: 1.0625rem;
   --type-body: 1rem;
@@ -23,25 +27,37 @@
   --type-control: 0.875rem;
   --section-space: 7.5rem;
 
-  /* Warm paper, ink, and OpenOrc's teal kept for links and focus. Dark mode below swaps every one. */
-  --bg: #f7f7f4;
-  --surface: #efeee9;
-  --text: #1f1e1b;
-  --text-2: #4a4944;
-  --muted: #6b6a64;
-  --faint: #a3a29b;
-  --rule: #e1e0d9;
-  --rule-strong: #d6d4cc;
-  --tint: #f2f1ec;
-  --card-hover: #e8e7e1;
+  --bg: #ffffff;
+  --surface: #f4f4f4;
   --paper: #ffffff;
-  --accent: #0b7268;
-  --ink-button: #1f1e1b;
-  --ink-button-hover: #000000;
+  --tint: #1717170d;
+  --tint-strong: #17171717;
+  --rule: #17171717;
+  --rule-strong: #1717172e;
+  --text: #171717;
+  --text-2: #3d3d3d;
+  --muted: #555555;
+  --faint: #666666;
+  --ok: #1e7359;
+  --bad: #9b5050;
+  --ink-button: #171717;
+  --ink-button-hover: #333333;
   --on-ink: #ffffff;
-  --selection: #cfe9e4;
-  --scrollbar: #c8c6bf;
-  /* Immaculate Gothic ships two upright faces: Text 450 and Bold 700. */
+  --selection: #17171724;
+  --scrollbar: #1717172e;
+  --hairline: 1px;
+
+  --radius-tile: 28px;
+  --radius-card: 20px;
+  --radius-row: 10px;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-overshoot: cubic-bezier(0.24, 1.34, 0.38, 1);
+  --duration-quick: 120ms;
+  --duration-leave: 160ms;
+  --duration-arrive: 220ms;
+  --duration-swap: 320ms;
+  --duration-resize: 420ms;
+
   font-family:
     "Immaculate Gothic",
     -apple-system,
@@ -49,35 +65,42 @@
     sans-serif;
   font-weight: 450;
   font-kerning: normal;
-  letter-spacing: 0.005em;
+  letter-spacing: -0.005em;
   color: var(--text);
   background: var(--bg);
   font-synthesis: none;
   scroll-behavior: smooth;
   scroll-padding-top: 100px;
-  caret-color: var(--accent);
+  caret-color: var(--text);
   scrollbar-color: var(--scrollbar) var(--bg);
+  -webkit-font-smoothing: antialiased;
 }
-/* Dark mode: warm near-black, as on Cursor's site, with the Download pill turned light. */
+/* Dark: the tile stays a step above the page and planes are carved back down to it, as in the app. */
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #151410;
-  --surface: #1d1c18;
-  --text: #ecebe6;
-  --text-2: #c9c8c1;
-  --muted: #a3a29a;
-  --faint: #6f6e67;
-  --rule: #2c2b26;
-  --rule-strong: #3a3934;
-  --tint: #24231f;
-  --card-hover: #25241f;
-  --paper: #1f1e1a;
-  --accent: #5cc4b5;
-  --ink-button: #ecebe6;
-  --ink-button-hover: #ffffff;
-  --on-ink: #151410;
-  --selection: #1f4a44;
-  --scrollbar: #3a3934;
+  --bg: #0a0a0a;
+  --surface: #171717;
+  --paper: #0a0a0a;
+  --tint: #ffffff12;
+  --tint-strong: #ffffff1f;
+  --rule: #ffffff1c;
+  --rule-strong: #ffffff2e;
+  --text: #ffffff;
+  --text-2: #dedede;
+  --muted: #b8b8b8;
+  --faint: #8e8e8e;
+  --ok: #7cc4a2;
+  --bad: #e2a3a3;
+  --ink-button: #ffffff;
+  --ink-button-hover: #e6e6e6;
+  --on-ink: #000000;
+  --selection: #ffffff2e;
+  --scrollbar: #ffffff2e;
+}
+@media (min-resolution: 2dppx) {
+  :root {
+    --hairline: 0.5px;
+  }
 }
 * {
   box-sizing: border-box;
@@ -96,6 +119,7 @@ a {
 }
 button {
   font: inherit;
+  color: inherit;
 }
 strong,
 b {
@@ -122,14 +146,13 @@ svg {
   color: var(--text);
 }
 :focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 5px;
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
 }
 p {
   margin: 0;
   color: var(--muted);
-
-  line-height: 1.65;
+  line-height: 1.6;
   font-size: var(--type-body);
   overflow-wrap: anywhere;
 }
@@ -142,20 +165,24 @@ h3 {
   overflow-wrap: anywhere;
 }
 h1 {
-  line-height: 1.1;
-  letter-spacing: -0.02em;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
   font-size: var(--type-display);
 }
 h2 {
-  line-height: 1.15;
-  letter-spacing: -0.0125em;
+  line-height: 1.12;
+  letter-spacing: -0.025em;
   max-width: 22ch;
   font-size: var(--type-heading);
 }
 h3 {
   line-height: 1.35;
-  letter-spacing: -0.005em;
+  letter-spacing: -0.01em;
   font-size: var(--type-title);
+}
+/* Two-tone headings: what it is in ink, the rest in the faint gray. */
+.quiet {
+  color: var(--faint);
 }
 .container {
   width: min(var(--content-width, 1376px), calc(100% - 64px));
@@ -170,46 +197,41 @@ h3 {
   z-index: 100;
   top: 12px;
   left: 16px;
-  padding: 14px;
-  background: var(--text);
-  color: var(--bg);
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: var(--ink-button);
+  color: var(--on-ink);
   transform: translateY(-180%);
 }
 .skip-link:focus {
   transform: none;
 }
+
+/* Header: the mark, pill links with a fill on the current page, then sound, theme, GitHub and the one ink pill. */
 .site-header {
-  --header-height: 56px;
+  --header-height: 64px;
   position: sticky;
   top: 0;
   z-index: 50;
   min-height: var(--header-height);
-  background: color-mix(in srgb, var(--bg) 86%, transparent);
-  -webkit-backdrop-filter: saturate(1.4) blur(14px);
-  backdrop-filter: saturate(1.4) blur(14px);
-  border-bottom: 1px solid var(--rule);
-  transition:
-    background-color 160ms ease,
-    border-color 160ms ease;
+  background: color-mix(in srgb, var(--bg) 84%, transparent);
+  -webkit-backdrop-filter: saturate(1.4) blur(16px);
+  backdrop-filter: saturate(1.4) blur(16px);
+  transition: background-color var(--duration-leave) ease;
 }
 .site-header[data-at-top] {
-  background: transparent;
-  border-bottom-color: transparent;
+  background: var(--bg);
 }
 .nav {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  min-height: calc(var(--header-height) - 1px);
-  flex-wrap: wrap;
-  gap: 4px 32px;
-  padding-block: 3px;
+  min-height: var(--header-height);
+  gap: 4px 24px;
 }
 .wordmark {
   display: inline-flex;
   align-items: center;
   gap: 9px;
-
   font-size: 1.0625rem;
   font-weight: 450;
   letter-spacing: -0.02em;
@@ -219,32 +241,36 @@ h3 {
 }
 .nav-links {
   display: flex;
-  gap: 32px;
   align-items: center;
-  flex-wrap: wrap;
+  gap: 2px;
   color: var(--muted);
-
   font-size: var(--type-control);
+}
+.nav-links a {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  transition:
+    background-color var(--duration-leave) ease,
+    color var(--duration-leave) ease;
+}
+.nav-links a:hover {
+  background: var(--tint);
+  color: var(--text);
+}
+.nav-links a[aria-current="page"] {
+  background: var(--tint);
+  color: var(--text);
 }
 .nav-actions {
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 4px;
+  margin-left: auto;
 }
-.nav-github {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 44px;
-  color: var(--muted);
-  font-size: var(--type-control);
-  transition: color 160ms ease;
-}
-.nav-github:hover {
-  color: var(--text);
-}
-.theme-toggle {
+.icon-button {
   display: grid;
   place-items: center;
   width: 36px;
@@ -253,96 +279,133 @@ h3 {
   border-radius: 999px;
   background: none;
   color: var(--muted);
-  transition: color 160ms ease;
+  transition:
+    background-color var(--duration-leave) ease,
+    color var(--duration-leave) ease,
+    transform var(--duration-quick) var(--ease-out);
 }
-.theme-toggle:hover {
+.icon-button:hover {
+  background: var(--tint);
   color: var(--text);
 }
-/* The button shows where it goes: a moon in light mode, a sun in dark. */
-.theme-toggle-sun,
-:root[data-theme="dark"] .theme-toggle-moon {
-  display: none;
+.icon-button:active {
+  transform: scale(0.94);
 }
-:root[data-theme="dark"] .theme-toggle-sun {
-  display: block;
+/* Toggles hold both icons in one cell; the one going waits for the one coming, so the button never empties. */
+.icon-swap {
+  display: grid;
 }
-.nav-links a:hover,
-.nav-links a[aria-current="page"],
-.text-link:hover,
-.footer a:hover {
-  color: var(--text);
+.icon-swap > svg {
+  grid-area: 1 / 1;
+  transition:
+    opacity var(--duration-leave) ease,
+    filter var(--duration-leave) ease,
+    transform var(--duration-arrive) var(--ease-out);
 }
+.icon-swap > svg[data-off] {
+  opacity: 0;
+  filter: blur(2px);
+  transform: scale(0.8);
+}
+.nav-actions .button-small {
+  margin-left: 8px;
+}
+
+/* Buttons are pills. Primary is the ink pill; secondary rests on the fill. Both press in a little. */
 .button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  border-radius: 999px;
-  padding: 10px 18px;
-  line-height: 1.5;
-  transition:
-    background 0.2s,
-    color 0.2s,
-    transform 0.2s;
-  white-space: normal;
-  text-align: center;
+  gap: 8px;
   max-width: 100%;
-
-  font-weight: 450;
   min-height: 40px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
   font-size: var(--type-control);
+  font-weight: 450;
+  line-height: 1.3;
+  text-align: center;
+  white-space: nowrap;
+  transition:
+    background-color var(--duration-leave) ease,
+    color var(--duration-leave) ease,
+    transform var(--duration-quick) var(--ease-out);
 }
-.button:disabled {
-  cursor: default;
-  opacity: 1;
+.button:active {
+  transform: scale(0.97);
 }
-/* Black pills, as on the desktop app's Send and Cursor's site: the one strong color on the page. */
+.button-primary,
+.button-small {
+  background: var(--ink-button);
+  color: var(--on-ink);
+}
+.button-primary:hover,
+.button-small:hover {
+  background: var(--ink-button-hover);
+}
 .button-small {
   min-height: 32px;
-  padding: 5px 14px;
-  background: var(--ink-button);
-  color: var(--on-ink);
+  padding: 0 14px;
 }
-.button-small:not(:disabled):hover {
-  background: var(--ink-button-hover);
+.button-secondary {
+  background: var(--tint);
+  color: var(--text);
 }
-.button-primary {
-  background: var(--ink-button);
-  color: var(--on-ink);
+.button-secondary:hover {
+  background: var(--tint-strong);
 }
-.button-primary:not(:disabled):hover {
-  background: var(--ink-button-hover);
+.button-secondary svg {
+  color: var(--muted);
 }
 .text-link {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  color: var(--muted);
-  line-height: 1.5;
-
-  min-height: 44px;
-  font-size: var(--type-control);
-}
-.slack-setup {
-  display: flex;
-  justify-content: space-between;
-  align-items: start;
-  gap: 40px;
-  margin-top: 40px;
-  padding-top: 24px;
-  border-top: 1px solid var(--rule);
-}
-.slack-setup p {
-  max-width: 60ch;
-  font-size: var(--type-control);
-}
-.slack-setup strong {
+  gap: 6px;
+  min-height: 40px;
   color: var(--text);
-  font-weight: 450;
+  font-size: var(--type-control);
 }
-/* A quiet footer: the mark and credit, then short link columns, as on Cursor's site. */
+.text-link svg {
+  color: var(--faint);
+  transition: transform var(--duration-arrive) var(--ease-out);
+}
+.text-link:hover svg {
+  transform: translateX(2px);
+}
+
+/* Arrivals: blocks marked data-reveal clear a 4px blur and rise 4px as they reach the screen, a row at a time. */
+:root[data-reveal-ready] [data-reveal] {
+  opacity: 0;
+  filter: blur(4px);
+  transform: translateY(4px);
+  transition:
+    opacity var(--duration-arrive) var(--ease-out),
+    filter var(--duration-arrive) var(--ease-out),
+    transform var(--duration-arrive) var(--ease-out);
+  transition-delay: calc(min(var(--reveal-index, 0), 8) * 40ms);
+}
+:root[data-reveal-ready] [data-reveal][data-shown] {
+  opacity: 1;
+  filter: none;
+  transform: none;
+}
+/* What the page opens on arrives the same way, once, without waiting for a script. */
+[data-arrive] {
+  animation: arrive var(--duration-arrive) var(--ease-out) backwards;
+  animation-delay: calc(var(--arrive-index, 0) * 40ms);
+}
+@keyframes arrive {
+  from {
+    opacity: 0;
+    filter: blur(4px);
+    transform: translateY(4px);
+  }
+}
+
+/* A quiet footer: the mark and credit, then short link columns. */
 .footer {
-  border-top: 1px solid var(--rule);
+  margin-top: var(--section-space);
   color: var(--muted);
   font-size: var(--type-control);
 }
@@ -350,7 +413,8 @@ h3 {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 40px;
-  padding-block: 48px 64px;
+  padding-block: 40px 64px;
+  border-top: var(--hairline) solid var(--rule);
 }
 .footer .wordmark {
   color: var(--text);
@@ -370,78 +434,55 @@ h3 {
 .footer-links > div {
   display: grid;
   align-content: start;
-  gap: 4px;
+  gap: 2px;
 }
 .footer-links h2 {
   margin-bottom: 6px;
-  color: var(--text);
+  color: var(--faint);
   font-size: var(--type-control);
-  font-weight: 700;
   letter-spacing: 0;
 }
 .footer-links a {
-  min-height: 32px;
   display: inline-flex;
   align-items: center;
+  min-height: 30px;
+  transition: color var(--duration-leave) ease;
+}
+.footer a:hover {
+  color: var(--text);
+}
+
+@media (max-width: 1100px) {
+  .container {
+    width: calc(100% - 64px);
+  }
 }
 @media (max-width: 700px) {
+  :root {
+    --type-heading: 1.625rem;
+    --type-title: 1.125rem;
+    --type-lead: 1rem;
+    --section-space: 4.5rem;
+    --radius-tile: 22px;
+  }
+  .container {
+    width: calc(100% - 32px);
+  }
+  .site-header {
+    --header-height: 56px;
+  }
+  .nav {
+    gap: 4px 8px;
+  }
+  .nav-links .nav-secondary,
+  .nav-actions .button-small {
+    display: none;
+  }
   .footer-grid {
     grid-template-columns: 1fr;
   }
   .footer-links {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (max-width: 1100px) {
-  .container {
-    width: calc(100% - 64px);
-  }
-  .nav-links {
-    gap: 23px;
-  }
-}
-@media (max-width: 700px) {
-  :root {
-    --type-display: 2rem;
-    --type-heading: 1.625rem;
-    --type-title: 1.125rem;
-    --type-lead: 1rem;
-    --section-space: 4rem;
-  }
-  .container {
-    width: calc(100% - 40px);
-  }
-  .site-header {
-    --header-height: 52px;
-  }
-  .nav {
-    gap: 4px 14px;
-  }
-  .nav-links {
-    gap: 16px;
-  }
-  .nav-links .nav-secondary,
-  .nav-actions > .button-small {
-    display: none;
-  }
-  .nav-actions {
-    gap: 0;
-  }
-  .nav-github {
-    width: 44px;
-  }
-  .nav-github span {
-    display: none;
-  }
-  .button-small {
-    min-height: 36px;
-    padding: 6px 9px;
-    gap: 8px;
-  }
-  .slack-setup {
-    flex-direction: column;
-    gap: 12px;
-    margin-top: 32px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -456,19 +497,69 @@ h3 {
   }
 }
 
-.nav-links a {
-  padding-block: 12px;
+/* A tile the product stands on. It paints the app's own ground, so the app's planes read as the cards on it. */
+.stage {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: var(--radius-tile);
+  background: var(--surface);
+}
+.mock-window,
+.demo-window {
+  position: relative;
+  overflow: hidden;
+  container-type: inline-size;
+}
+.demo-window {
+  aspect-ratio: 1360 / 850;
+}
+
+/* Switchers: a fill track at natural width, with a raised knob that slides to the choice (scripts/segmented.ts). */
+.segmented {
+  position: relative;
+  isolation: isolate;
   display: inline-flex;
-  align-items: center;
-  min-height: 44px;
+  max-width: 100%;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--tint);
 }
-.nav-links a[aria-current="page"] {
-  text-decoration: underline;
-  text-underline-offset: 0.35em;
-  text-decoration-thickness: 1px;
+.segmented button {
+  position: relative;
+  z-index: 1;
+  height: 34px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  font-size: var(--type-control);
+  white-space: nowrap;
+  transition: color var(--duration-leave) ease;
 }
-.text-link:hover,
-.footer a:hover {
-  text-decoration: underline;
-  text-underline-offset: 0.25em;
+.segmented button:hover,
+.segmented button[aria-selected="true"] {
+  color: var(--text);
+}
+.segmented-knob {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 0;
+  width: var(--knob-width, 0);
+  border-radius: 999px;
+  background: var(--paper);
+  transform: translateX(var(--knob-x, 0));
+}
+.segmented[data-ready] .segmented-knob {
+  transition:
+    transform var(--duration-swap) var(--ease-out),
+    width var(--duration-swap) var(--ease-out);
+}
+@media (forced-colors: active) {
+  .segmented button[aria-selected="true"] {
+    outline: 2px solid Highlight;
+    outline-offset: -3px;
+  }
 }

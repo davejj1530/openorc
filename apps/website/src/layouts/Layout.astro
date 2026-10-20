@@ -31,7 +31,7 @@ const {
     <link rel="preload" href={textFont} as="font" type="font/woff2" crossorigin />
     <meta name="description" content={description} />
     {noindex && <meta name="robots" content="noindex" />}
-    <meta name="theme-color" content="#f7f7f4" />
+    <meta name="theme-color" content="#ffffff" />
     <script is:inline>
       // Before the first paint: the saved theme, or the system's until one is chosen.
       (() => {
@@ -41,7 +41,7 @@ const {
         } catch {}
         const theme = saved === "dark" || saved === "light" ? saved : matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
         document.documentElement.dataset.theme = theme;
-        document.querySelector('meta[name="theme-color"]').setAttribute("content", theme === "dark" ? "#151410" : "#f7f7f4");
+        document.querySelector('meta[name="theme-color"]').setAttribute("content", theme === "dark" ? "#0a0a0a" : "#ffffff");
       })();
     </script>
     <meta property="og:title" content={title} />
@@ -56,5 +56,8 @@ const {
       Skip to content
     </a>
     <slot />
+    <script>
+      import "../scripts/reveal";
+    </script>
   </body>
 </html>

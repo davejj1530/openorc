@@ -35,7 +35,7 @@ const release = selectDownloadRelease(await getPublishedReleases());
                 <div class="download-file">
                   {installer ? (
                     <>
-                      <a class="button button-primary" href={installer.url} data-installer-link aria-label={`Download OpenOrc for ${target.title}, ${target.chip}${installer.unsigned ? ", unsigned beta" : ""}`}>
+                      <a class="button button-secondary" href={installer.url} data-installer-link aria-label={`Download OpenOrc for ${target.title}, ${target.chip}${installer.unsigned ? ", unsigned beta" : ""}`}>
                         Download {target.format}<Icon name="download" size={17} />
                       </a>
                       <span>{Math.round(installer.size / 1_000_000)} MB{installer.unsigned && " · Unsigned beta"}</span>

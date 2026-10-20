@@ -4,7 +4,7 @@
 }
 .privacy-intro {
   padding-bottom: 40px;
-  border-bottom: 1px solid var(--rule);
+  border-bottom: var(--hairline) solid var(--rule);
 }
 .privacy-date {
   margin-top: 20px;

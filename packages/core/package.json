@@ -8,7 +8,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./embedder-host": "./src/embedder-host.ts",
-    "./formatter-host": "./src/formatter-host.ts"
+    "./formatter-host": "./src/formatter-host.ts",
+    "./file-url": "./src/services/file-url.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

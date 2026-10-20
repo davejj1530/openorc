@@ -23,7 +23,7 @@ import { startMcpServer, type OpenOrcMcpServer } from "@openorc/mcp";
 import type { TextEmbedder } from "@openorc/memory";
 import type { BrowserHost } from "@openorc/protocol";
 import { harnessInfo, harnessInstalled, harnessLoggedIn, rpcParams, type HarnessId, type RpcMethod, type RpcRequest } from "@openorc/protocol";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { BenchGenerator } from "./bench.js";
@@ -126,6 +126,11 @@ export interface OpenOrcOptions {
   /** The bundled Prettier, run off the core's thread. Without it, files format only with the project's own formatter. */
   formatter?: BundledFormatter;
   dataDir: string;
+  /**
+   * Signs the file panel's viewer URLs; the app verifies them with the same key before serving a file. A core
+   * without one signs with a key nobody holds, so its viewer URLs load nowhere. Tests pass none.
+   */
+  fileKey?: string;
   transport: Transport;
   /** In-memory database, for tests. */
   ephemeral?: boolean;
@@ -407,7 +412,12 @@ export class OpenOrc {
       teams: this.teamConversations,
       teamQuiescenceReason: (id) => this.teamOperations.reason(id),
     });
-    this.files = new FileService({ writers: this.workspaceWriters, invalidate, formatter: new FileFormatter({ bundled: options.formatter ?? null, environment: () => this.environment.current() }) });
+    this.files = new FileService({
+      writers: this.workspaceWriters,
+      invalidate,
+      formatter: new FileFormatter({ bundled: options.formatter ?? null, environment: () => this.environment.current() }),
+      fileKey: options.fileKey ?? randomBytes(32).toString("hex"),
+    });
     this.imports = new ImportService(db, this.ledger, invalidate, this.log);
     this.reviewerApp = new ReviewerAppService(db, { secrets: options.githubSecrets, invalidate });
     this.pullRequests = new PullRequestService(db, {

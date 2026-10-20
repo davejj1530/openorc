@@ -33,7 +33,7 @@ export function isImageAttachment(file: Pick<File, "type" | "name">): boolean {
   return /^image\/(png|jpeg|gif|webp)$/.test(file.type) || /\.(png|jpe?g|gif|webp)$/i.test(file.name);
 }
 
-const UNITS = ["B", "KB", "MB"];
+const UNITS = ["B", "KB", "MB", "GB"];
 /** A size a person can read at a glance; the composer chip has room for three characters and a unit. */
 export function formatBytes(bytes: number): string {
   let value = bytes;

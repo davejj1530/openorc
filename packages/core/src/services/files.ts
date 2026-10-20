@@ -1,10 +1,23 @@
 import { glob, open, realpath, type FileHandle } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { git } from "@openorc/git";
-import { FolderPath, inGitFolder, type FileExpectation, type FileRead, type FileWriteResult, type FindQuery, type FindResult, type FormatResult } from "@openorc/protocol";
+import {
+  fileMedia,
+  FolderPath,
+  inGitFolder,
+  OTHER_MEDIA,
+  type FileExpectation,
+  type FileMediaEntry,
+  type FileRead,
+  type FileWriteResult,
+  type FindQuery,
+  type FindResult,
+  type FormatResult,
+} from "@openorc/protocol";
 import type { ConversationFolder } from "./conversation-folder.js";
 import { findInFolder } from "./file-find.js";
 import type { FileFormatter } from "./file-format.js";
+import { signFileUrl } from "./file-url.js";
 import { MAX_FILE_BYTES, versionOf, writeVersioned, type WriteOutcome } from "./file-write.js";
 import { projectGit } from "./project-git.js";
 import type { WorkspaceWriters } from "./workspace-writers.js";
@@ -43,6 +56,8 @@ interface FileServiceDependencies {
   /** Refresh keys for every window: `workspace-diff` after a save, `files` after a create. */
   invalidate: (keys: string[]) => void;
   formatter: Pick<FileFormatter, "format">;
+  /** Signs the viewer URL a binary read carries. Main verifies it with the same key before serving a byte. */
+  fileKey: string;
 }
 
 /** Ranks a path for a query: a basename that starts with it beats one that contains it beats a directory match. */
@@ -70,6 +85,13 @@ function folderPath(root: string, absolute: string): FolderPath {
   if (!local) throw new Error("This path is a folder, not a file.");
   if (local === ".." || local.startsWith(`..${sep}`) || isAbsolute(local)) throw new Error("This file is outside the conversation's workspace.");
   return FolderPath.parse(local.split(sep).join("/"));
+}
+
+/** Whether the first 8000 bytes hold a NUL, as git tells binary from text, so a large binary is known without reading it all. */
+async function nulInHead(file: FileHandle): Promise<boolean> {
+  const head = Buffer.alloc(8000);
+  const { bytesRead } = await file.read(head, 0, head.length, 0);
+  return head.subarray(0, bytesRead).includes(0);
 }
 
 /** Reads one byte past the limit, so a file another process grew after the size check is still caught. */
@@ -117,9 +139,21 @@ export class FileService {
     try {
       const stat = await file.stat();
       if (!stat.isFile()) return unreadable("This path is a folder, not a file.");
+      const binary = (media: FileMediaEntry): FileRead => ({
+        kind: "binary",
+        root: folder.root,
+        path: local,
+        absolutePath: target,
+        size: stat.size,
+        ...media,
+        url: signFileUrl(this.deps.fileKey, target, `${stat.mtimeMs}-${stat.size}`),
+      });
+      const known = fileMedia(target);
+      if (known) return binary(known);
+      if (await nulInHead(file)) return binary(OTHER_MEDIA);
       const bytes = stat.size > MAX_FILE_BYTES ? null : await boundedBytes(file);
       if (!bytes) return unreadable("This file is too large to open (2 MB maximum).");
-      if (bytes.includes(0)) return unreadable("This is a binary file and cannot be shown as code.");
+      if (bytes.includes(0)) return binary(OTHER_MEDIA);
       const text = utf8(bytes);
       if (text === null) return unreadable("This file is not UTF-8 text and cannot be shown.");
       return {

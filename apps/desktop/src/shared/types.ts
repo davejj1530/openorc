@@ -167,6 +167,8 @@ export interface OpenOrcApi {
   filePath(file: File): string;
   openExternal(url: string): void;
   revealFile(path: string): void;
+  /** Opens a file of the conversation's folder in its default app, named by the viewer URL files.read gave. Resolves why it could not, or "" when it did. */
+  openFile(url: import("@openorc/protocol").SignedFileUrl): Promise<string>;
   /** A second window on a route spec such as "thread:<id>". */
   openWindow(route: string): void;
   isFullscreen(): Promise<boolean>;

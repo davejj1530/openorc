@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
@@ -15,7 +16,9 @@ import { installProtectedSecrets } from "./protected-secrets";
 import { configureAppIdentity } from "./app-identity";
 import { qaDirectory } from "./qa-directory";
 import { removeInjectedVariables } from "./launch-environment";
+import { FILE_SCHEME } from "@openorc/core/file-url";
 import { imageAssetResponse } from "./image-assets";
+import { installFileViewer } from "./file-viewer";
 import { installImageContextMenu } from "./image-context-menu";
 import { installLinkNavigation } from "./link-navigation";
 import { installWindowAppearance } from "./window-appearance";
@@ -69,8 +72,15 @@ app.on("second-instance", () => {
 });
 
 // Attachments and local image artifacts use an image-only private scheme,
-// so the sandboxed renderer can display them without file:// access.
-protocol.registerSchemesAsPrivileged([{ scheme: "openorc-asset", privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
+// so the sandboxed renderer can display them without file:// access. Files
+// opened in the file panel stream over their own scheme, which never counts
+// as the app's origin: a URL there names a file only with the core's signature.
+protocol.registerSchemesAsPrivileged([
+  { scheme: "openorc-asset", privileges: { standard: true, secure: true, supportFetchAPI: true } },
+  { scheme: FILE_SCHEME, privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true } },
+]);
+// Signs the file panel's viewer URLs. The core gets it once, at fork; main verifies every URL with it.
+const fileKey = randomBytes(32).toString("hex");
 const mcpAppSandbox = new McpAppSandbox();
 
 /**
@@ -84,7 +94,7 @@ function startCore(): UtilityProcess {
   const child = utilityProcess.fork(join(here, "core.mjs"), [], {
     serviceName: "openorc-core",
     stdio: "pipe",
-    env: { ...process.env, OPENORC_DATA_DIR: app.getPath("userData") },
+    env: { ...process.env, OPENORC_DATA_DIR: app.getPath("userData"), OPENORC_FILE_KEY: fileKey },
   });
   // A UtilityProcess hands the listener the raw payload; only MessagePorts wrap it in an event.
   listenForShellEnv(child);
@@ -126,6 +136,8 @@ function createWindow(route?: string): BrowserWindow {
       preload: join(here, "../preload/index.js"),
       sandbox: true,
       contextIsolation: true,
+      // The file panel shows PDFs in Chromium's viewer, which is a plugin.
+      plugins: true,
       // A covered QA window must keep measuring the continuous workload.
       backgroundThrottling: !benchmarking,
       ...(route ? { additionalArguments: [`--openorc-route=${route}`] } : {}),
@@ -202,6 +214,7 @@ app.whenReady().then(async () => {
   // Development runs inside Electron.app, whose bundle still has Electron's icon.
   app.dock?.setIcon(appIcon);
   protocol.handle("openorc-asset", (request) => imageAssetResponse(request, app.getPath("userData")));
+  installFileViewer(fileKey, isAppOrigin);
   core = startCore();
   installProjectIcons(isAppOrigin, app.getPath("userData"));
   const disabledUpdates = updateUnavailableReason() ?? configureReleaseFeed(electronUpdater.autoUpdater, join(process.resourcesPath, "app-update.yml"));

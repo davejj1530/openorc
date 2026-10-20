@@ -30,7 +30,7 @@ interface SaveState {
   saving: ReadonlySet<FileKey>;
   /** The last failed save's message per file, until the next edit. */
   errors: ReadonlyMap<FileKey, string>;
-  /** A quiet word on the last save or format per file, such as why it wasn't formatted, until the next edit. */
+  /** A quiet word on the last save, format or open per file, such as why it wasn't formatted, until the next edit. */
   notes: ReadonlyMap<FileKey, string>;
 }
 
@@ -56,6 +56,11 @@ function setMessage(kind: "errors" | "notes", key: FileKey, message: string | nu
 }
 
 const errorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
+/** Leaves a quiet word on a file the panel shows without editing, such as why its default app did not open it. */
+export function noteFile(file: { root: string; path: string }, note: string | null): void {
+  setMessage("notes", fileKey(file), note);
+}
 
 /**
  * Applies a save's answer to every read of the file and to its draft in one task, so no render sees one without the
@@ -161,7 +166,7 @@ export interface FileBuffer {
   saving: boolean;
   /** The last save's error, until the next edit. */
   error: string | null;
-  /** A quiet word on the last save or format, such as why it wasn't formatted, until the next edit. */
+  /** A quiet word on the last save, format or open, such as why it wasn't formatted, until the next edit. */
   note: string | null;
   /** The read itself: failure, and a refresh for edits made outside OpenOrc. */
   read: { error: Error | null; refreshing: boolean; refresh: () => void };
@@ -194,7 +199,7 @@ export function useFileBuffer(selection: FileSelection): FileBuffer {
     key,
     view,
     text: bufferText(view),
-    readOnly: "file" in view ? view.file.readOnly : null,
+    readOnly: isEditable(view) && "file" in view ? view.file.readOnly : null,
     saving,
     error,
     note,

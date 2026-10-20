@@ -7,6 +7,7 @@ import { flushDrafts, useDrafts } from "../lib/file-drafts";
 import type { FileSelection } from "../lib/layout";
 import { useFileBuffer, type FileBuffer } from "../lib/use-file-buffer";
 import { useFileExplorer } from "../lib/file-explorer";
+import { BinaryView } from "./BinaryView";
 import { FileExplorer } from "./FileExplorer";
 import { ExplorerResizeHandle } from "./ExplorerResizeHandle";
 import { FileToolbar, type FileView } from "./FileToolbar";
@@ -155,6 +156,7 @@ function FileBody({ buffer, selection, preview }: { buffer: FileBuffer; selectio
   if (view.kind === "loading" || buffer.key === null) return status("Loading file…");
   if (view.kind === "missing") return status("File not found. It may have moved or been deleted.");
   if (view.kind === "unreadable") return status(view.reason);
+  if (view.kind === "binary") return <BinaryView key={view.file.url} file={view.file} />;
   const text = buffer.text ?? "";
   if (preview && view.kind !== "deleted") return <MarkdownPreview content={text} path={view.file.absolutePath} scope={selection.scope} />;
   return <SourceEditor buffer={buffer} sessionKey={buffer.key} selection={selection} text={text} path={view.kind === "deleted" ? view.path : view.file.path} />;

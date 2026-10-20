@@ -4,6 +4,7 @@ import type { LineRange } from "./types";
 /** What an editor keeps for its buffer while unmounted. Type-only engine imports keep this module out of the editor's chunk. */
 export interface EditorSession {
   state: EditorState;
+  /** Where the editor last scrolled to, or the reveal it was last asked for if that came after. */
   scroll: StateEffect<unknown> | null;
   /** The text last reported to the caller or taken from it. */
   reported: string;

@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef } from "react";
 import { isolateHistory } from "@codemirror/commands";
-import { Annotation } from "@codemirror/state";
+import { Annotation, type StateEffect } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { bindCaller, createState, loadLanguage, setReadOnly } from "./extensions";
 import { replacement } from "./replacement";
@@ -32,22 +32,26 @@ function mount(parent: HTMLElement, key: string, props: () => CodeEditorProps): 
   });
   bindCaller(view, props);
   if (session.scroll) view.dispatch({ effects: session.scroll });
+  // Read on scroll, not on unmount: an editor removed before it drew would report the top and lose its pending scroll.
+  view.scrollDOM.addEventListener("scroll", () => (session.scroll = view.scrollSnapshot()), { passive: true });
   loadLanguage(view, initial.path, () => alive);
   const unmount = () => {
     alive = false;
     session.state = view.state;
-    session.scroll = view.scrollSnapshot();
     if (isKept(key, session)) keepSession(key, session);
     view.destroy();
   };
   return { mounted: { view, session }, unmount };
 }
 
-function revealLines(view: EditorView, { start, end }: LineRange): void {
+/** Selects the lines and returns the scroll that centers them. */
+function revealLines(view: EditorView, { start, end }: LineRange): StateEffect<unknown> {
   const doc = view.state.doc;
   const first = doc.line(Math.min(Math.max(1, start), doc.lines));
   const last = doc.line(Math.min(Math.max(first.number, end), doc.lines));
-  view.dispatch({ selection: { anchor: first.from, head: last.to }, effects: EditorView.scrollIntoView(first.from, { y: "center" }) });
+  const scroll = EditorView.scrollIntoView(first.from, { y: "center" });
+  view.dispatch({ selection: { anchor: first.from, head: last.to }, effects: scroll });
+  return scroll;
 }
 
 /**
@@ -90,7 +94,7 @@ export function CodeEditor(props: CodeEditorProps) {
     const mounted = editor.current;
     if (!mounted || !reveal || reveal === mounted.session.revealed) return;
     mounted.session.revealed = reveal;
-    revealLines(mounted.view, reveal);
+    mounted.session.scroll = revealLines(mounted.view, reveal);
   }, [sessionKey, reveal]);
 
   useLayoutEffect(() => {

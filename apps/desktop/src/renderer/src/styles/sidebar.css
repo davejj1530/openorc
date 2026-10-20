@@ -1,4 +1,6 @@
-/* The sidebar: its column, destinations, thread browser, project groups, footer and Orclings. */
+/* The sidebar: its column, window corner, screens, list head, project groups, footer and Orclings.
+   It sits on the tile and paints nothing of its own: no fill, no seam. Rows are 34px with a 10px
+   corner; the current row takes --current-row-fill and keeps --navigation-ink. */
 
 .app-shell .workspace-navigation {
   position: relative;
@@ -6,27 +8,25 @@
   flex-direction: column;
   width: var(--width-sidebar);
   overflow: hidden;
-  background: var(--bg);
-}
-.app-shell .workspace-navigation::after {
-  content: "";
-  position: absolute;
-  inset: 0 0 0 auto;
-  width: var(--hairline);
-  background: var(--line);
-  pointer-events: none;
+  background: none;
 }
 .app-shell .workspace-navigation[data-open="false"] {
   width: 0;
 }
+/* The column slides; its parts keep the full width so nothing reflows while it moves. */
+.sidebar-header,
+.sidebar-workspace,
+.settings-destinations,
+.sidebar-footer {
+  width: var(--width-sidebar);
+  flex-shrink: 0;
+}
 
+/* The window's corner: traffic lights, then Inbox, Search and the sidebar toggle at the right. */
 .sidebar-header {
   display: flex;
   align-items: center;
-  gap: 2px;
-  flex-shrink: 0;
-  padding: 0 12px 0 18px;
-  width: var(--width-sidebar);
+  padding: 0 10px 0 16px;
 }
 .workspace-navigation[data-traffic-lights="true"] .sidebar-header {
   padding-left: var(--spacing-traffic);
@@ -44,122 +44,320 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.sidebar-destinations {
-  padding: 8px 12px 12px;
-  width: var(--width-sidebar);
-}
-.sidebar-destinations .nav-track {
-  margin: 0;
-  padding: 0;
-  gap: 2px;
-}
-.sidebar-destinations .nav-row,
-.sidebar-new-thread {
+.window-corner {
   display: flex;
   align-items: center;
-  gap: 10px;
-  width: 100%;
-  height: 34px;
-  padding: 0 8px;
-  border-radius: 7px;
-  font-size: 13px;
-  color: var(--ink);
-  text-align: left;
-}
-.sidebar-new-thread > svg {
-  color: var(--ink-3);
-}
-.sidebar-destinations .nav-row[aria-current="page"] {
-  color: var(--navigation-ink);
-}
-.sidebar-browser-tabs {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 0 12px 8px;
-  width: var(--width-sidebar);
   flex-shrink: 0;
 }
-.sidebar-browser-tabs > button {
-  height: 28px;
-  padding: 0 12px;
-  border-radius: 7px;
-  font-size: 12px;
-  color: var(--ink-3);
+/* The count hangs on the icon's top-right corner, over count-badge's own positioning. */
+.window-corner .window-corner-badge {
+  position: absolute;
+  top: 2px;
+  right: 0;
 }
-.sidebar-browser-tabs > button:hover {
-  background: var(--surface-3);
-}
-.sidebar-browser-tabs > button[aria-current="page"] {
-  color: var(--navigation-ink);
-  background: var(--navigation-soft);
-}
-.sidebar-browser-slot {
-  flex: 1;
-  display: flex;
-  min-height: 0;
-  width: var(--width-sidebar);
-}
-.sidebar-browser-slot[hidden] {
+.app-shell .workspace-window-nav[data-sidebar-open="true"] {
   display: none;
 }
-/* Settings takes the column over; the app's navigation waits underneath it. */
+
 .sidebar-workspace {
   display: flex;
   flex: 1;
   flex-direction: column;
   min-height: 0;
 }
+/* Settings takes the column over; the app's navigation waits underneath it. */
 .sidebar-workspace[hidden] {
   display: none;
 }
+
+/* Screens. One knob carries the current row's fill and slides between rows. */
+.sidebar-nav,
+.settings-destinations {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  padding: 0 10px;
+  margin-top: 6px;
+}
+.sidebar-nav-knob {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  border-radius: var(--radius-md);
+  background: var(--current-row-fill);
+  pointer-events: none;
+}
+.sidebar-nav-knob[data-placed] {
+  transition:
+    transform var(--duration-swap) var(--ease-out),
+    width var(--duration-swap) var(--ease-out),
+    height var(--duration-swap) var(--ease-out);
+}
+.sidebar-nav-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: var(--control-row);
+  padding: 0 10px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
+  line-height: 16px;
+  color: var(--ink-3);
+  text-align: left;
+  transition:
+    background-color var(--duration-leave) var(--ease-out),
+    color var(--duration-leave) var(--ease-out);
+}
+button.sidebar-nav-row:hover {
+  background-color: var(--surface-2);
+  color: var(--ink);
+}
+/* The current row already sits on the knob; a hover fill over it would wash it out. */
+.sidebar-nav button.sidebar-nav-row[aria-current="page"]:hover {
+  background-color: transparent;
+}
+.sidebar-nav-icon {
+  display: flex;
+  flex-shrink: 0;
+  color: var(--ink-3);
+}
+.sidebar-nav-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sidebar-nav-count {
+  flex-shrink: 0;
+  font-size: var(--text-sm);
+  line-height: 16px;
+  color: var(--ink-4);
+}
+.sidebar-new-thread {
+  color: var(--ink);
+}
+.sidebar-nav-row[aria-current="page"],
+.sidebar-nav-row[aria-current="page"] .sidebar-nav-icon {
+  color: var(--navigation-ink);
+}
+/* Settings' own list keeps the row shape without the sliding knob. */
 .settings-destinations {
   flex: 1;
   min-height: 0;
+  align-content: start;
   overflow-y: auto;
 }
-.settings-destinations > .nav-row {
-  margin-bottom: 12px;
+.settings-destinations .sidebar-nav-row[aria-current="page"]:not(:focus-visible) {
+  background-color: var(--current-row-fill);
 }
-.sidebar-footer {
-  flex-shrink: 0;
-  padding: 8px 12px 12px;
-  width: var(--width-sidebar);
-}
-.sidebar-add-project,
-.sidebar-settings {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  height: 32px;
-  padding: 0 8px;
-  border-radius: 6px;
-  font-size: 12px;
-  color: var(--ink-3);
-}
-.sidebar-add-project {
-  width: 100%;
-  margin-bottom: 12px;
-}
-.sidebar-add-project:hover,
-.sidebar-settings:hover {
-  background: var(--surface-3);
-  color: var(--ink);
-}
-.sidebar-footer-controls {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 2px;
-}
-.sidebar-settings {
-  flex: 1;
-}
-.app-shell .workspace-window-nav[data-sidebar-open="true"] {
-  display: none;
+.settings-destinations > .sidebar-nav-row {
+  margin-bottom: 18px;
 }
 
-.browser-close {
+/* More unfolds in place: its rows grow from nothing to 34px. */
+.sidebar-more-chevron {
+  flex-shrink: 0;
+  color: var(--ink-4);
+  transition: rotate var(--duration-arrive) var(--ease-out);
+}
+.sidebar-more-toggle[aria-expanded="true"] {
+  color: var(--ink);
+}
+.sidebar-more-toggle[aria-expanded="true"] .sidebar-more-chevron {
+  rotate: 180deg;
+}
+.sidebar-more {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--duration-resize) var(--ease-out);
+}
+.sidebar-more[data-open] {
+  grid-template-rows: 1fr;
+}
+.sidebar-more-rows {
+  display: grid;
+  min-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity var(--duration-quick) var(--ease-out);
+}
+.sidebar-more[data-open] .sidebar-more-rows {
+  opacity: 1;
+  transition-duration: var(--duration-arrive);
+}
+.sidebar-edit-entry,
+.sidebar-edit-entry .sidebar-nav-icon {
+  color: var(--ink-4);
+}
+
+/* The Edit sidebar dialog: each screen with its switch. */
+.sidebar-edit {
+  display: grid;
+  gap: 2px;
+}
+.sidebar-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 40px;
+  padding: 0 10px;
+  border-radius: var(--radius-lg);
+  color: var(--ink);
+  transition: background-color var(--duration-quick) var(--ease-out);
+}
+.sidebar-edit-row:hover {
+  background-color: var(--control-fill);
+}
+
+/* The list head: Threads and Orclings at their own width, a round search button, then the list's
+   tool. While searching, the capsule grows over the tabs and the tool steps aside for Close. */
+.sidebar-list-head {
+  display: grid;
+  align-items: center;
+  height: var(--control-row);
+  margin: 22px 10px 0;
+  flex-shrink: 0;
+}
+.sidebar-list-head > * {
+  grid-area: 1 / 1;
+}
+/* The tabs leave room for search and the tool; on a narrow sidebar the track scrolls instead. */
+.sidebar-list-head .sidebar-list-tabs {
+  justify-self: start;
+  max-width: calc(100% - var(--control-row) - 34px);
+  transition:
+    opacity var(--duration-leave) var(--ease-out),
+    filter var(--duration-leave) var(--ease-out),
+    translate var(--duration-arrive) var(--ease-out);
+}
+/* 14px of side padding at the default width, easing to 7px as the sidebar nears its minimum. */
+.sidebar-list-tab {
+  height: 28px;
+  padding: 0 clamp(7px, calc((var(--width-sidebar) - 224px) / 7 + 7px), 14px);
+  font-size: var(--text-base);
+  line-height: 16px;
+}
+.sidebar-list-tab[aria-current="page"] {
+  color: var(--navigation-ink);
+}
+.sidebar-list-head[data-searching] .sidebar-list-tabs {
+  opacity: 0;
+  filter: blur(var(--arrive-blur));
+  translate: -8px 0;
+}
+.sidebar-search {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  width: var(--control-row);
+  height: var(--control-row);
+  margin-right: 30px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  overflow: hidden;
+  transition:
+    width var(--duration-resize) var(--ease-out),
+    margin-right var(--duration-resize) var(--ease-out);
+}
+.sidebar-list-head[data-searching] .sidebar-search {
+  width: 100%;
+  margin-right: 0;
+}
+.sidebar-search-glass {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: var(--control-row);
+  height: var(--control-row);
+  border-radius: var(--radius-pill);
+  color: var(--ink-3);
+}
+.sidebar-search-glass:hover {
+  background-color: var(--surface-3);
+  color: var(--ink);
+}
+.sidebar-list-head[data-searching] .sidebar-search-glass {
+  pointer-events: none;
+}
+.sidebar-search-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  margin-right: 26px;
+  padding: 0;
+  background: transparent;
+  font-size: var(--text-base);
+  line-height: 16px;
+  color: var(--ink);
+  outline: none;
+  opacity: 0;
+  filter: blur(var(--arrive-blur));
+  pointer-events: none;
+  transition:
+    opacity var(--duration-leave) var(--ease-out),
+    filter var(--duration-leave) var(--ease-out);
+}
+.sidebar-search-input::placeholder {
+  color: var(--ink-4);
+  opacity: 1;
+}
+.sidebar-list-head[data-searching] .sidebar-search-input {
+  opacity: 1;
+  filter: none;
+  pointer-events: auto;
+  transition-duration: var(--duration-arrive);
+  transition-delay: 140ms;
+}
+.sidebar-search-close {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  margin-right: 4px;
+  border-radius: var(--radius-pill);
+  color: var(--ink-3);
+  opacity: 0;
+  scale: 0.8;
+  pointer-events: none;
+  transition:
+    opacity var(--duration-leave) var(--ease-out),
+    scale var(--duration-arrive) var(--ease-out);
+}
+.sidebar-search-close:hover {
+  background-color: var(--surface-3);
+  color: var(--ink);
+}
+.sidebar-list-head[data-searching] .sidebar-search-close {
+  opacity: 1;
+  scale: 1;
+  pointer-events: auto;
+  transition-delay: 200ms;
+}
+.sidebar-list-tool {
+  justify-self: end;
+  display: flex;
+  margin-right: 3px;
+  transition: translate var(--duration-resize) var(--ease-out);
+}
+.sidebar-list-head[data-searching] .sidebar-list-tool {
+  translate: -26px 0;
+}
+.sidebar-list-head[data-searching] .sidebar-list-tool button:hover {
+  background-color: var(--surface-3);
+}
+
+/* Lists */
+.sidebar-browser-slot {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+.sidebar-browser-slot[hidden] {
   display: none;
 }
 .conversation-browser {
@@ -168,112 +366,155 @@
   flex: 1;
   min-width: 0;
   min-height: 0;
-  width: var(--width-sidebar);
-}
-.browser-controls {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 0 12px 8px;
-}
-.browser-search {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  height: 28px;
-  padding: 0 8px;
-  border-radius: 6px;
-  color: var(--ink-3);
-}
-.browser-search:focus-within {
-  background: var(--surface-2);
-}
-.browser-search input {
-  width: 100%;
-  min-width: 0;
-  background: transparent;
-  font-size: 12px;
-  padding: 5px 0;
 }
 .browser-threads {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 0 10px 16px;
+  padding: 14px 10px 16px;
 }
 .sidebar-project + .sidebar-project {
-  margin-top: 12px;
+  margin-top: 6px;
 }
-.browser-group-title {
-  padding: 0 0 4px;
-  color: var(--ink-2);
-  font-size: 12px;
+
+/* Project headings: 34px, a 16px icon, the name in ink, and a faint meta that swaps for New thread
+   on hover and keyboard focus. */
+.app-shell .browser-group-title > * {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: var(--control-row);
+  padding: 0 5px 0 6px;
+  border-radius: var(--radius-md);
+  color: var(--ink-4);
 }
-.browser-group-title > div {
-  padding-inline: 4px;
+.project-group-icon,
+.app-shell .browser-group-title .project-icon-trigger {
+  flex-shrink: 0;
+  color: var(--ink-4);
+}
+.project-group-icon {
+  margin-inline: 4px;
 }
 .browser-group-toggle {
   display: flex;
   flex: 1;
   align-items: center;
-  gap: 6px;
+  align-self: stretch;
   min-width: 0;
-  min-height: 28px;
-  padding: 0 2px;
-  border-radius: 4px;
+  font-size: var(--text-base);
+  line-height: 16px;
+  color: var(--ink);
   text-align: left;
 }
-.browser-group-toggle:hover {
-  color: var(--ink);
-}
-.browser-group-toggle > span:first-child {
-  flex: 1;
-}
-.project-group-icon {
-  margin-inline: 5px;
-  color: var(--ink-3);
+.project-group-end {
+  display: grid;
   flex-shrink: 0;
+  align-items: center;
+  justify-items: end;
+}
+.project-group-end > * {
+  grid-area: 1 / 1;
+  transition: opacity var(--duration-leave) var(--ease-out);
 }
 .project-group-activity {
-  flex-shrink: 0;
-  color: var(--ink-3);
-  font-size: 10px;
+  padding-right: 5px;
+  font-size: var(--text-sm);
+  line-height: 16px;
+  color: var(--ink-4);
+  white-space: nowrap;
+  /* It shares a cell with the New thread button and paints above it while faded out. */
+  pointer-events: none;
 }
-.project-group-activity[data-waiting="true"] {
+.project-group-activity[data-tone="attention"] {
   color: var(--warn);
 }
-/* The status slot sits under the project icon and the title under the project name, so the list needs no indent. */
+.project-group-end[data-meta] .project-group-new {
+  opacity: 0;
+}
+.browser-group-title:is(:hover, :has(:focus-visible)) .project-group-activity {
+  opacity: 0;
+}
+.browser-group-title:is(:hover, :has(:focus-visible)) .project-group-new {
+  opacity: 1;
+}
+@media (hover: none) {
+  .project-group-activity {
+    opacity: 0;
+  }
+  .project-group-end[data-meta] .project-group-new {
+    opacity: 1;
+  }
+}
+.sidebar-project-threads,
+.sidebar-thread-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+}
+.sidebar-project-threads {
+  margin-top: 2px;
+}
+/* A fold the user opens grows to its height while its rows arrive one after another. */
+.sidebar-project-threads[data-animate] {
+  overflow: clip;
+  transition: height var(--duration-resize) var(--ease-out);
+}
+.sidebar-project-threads[data-animate] > * {
+  transition: opacity var(--duration-arrive) var(--ease-out) var(--motion-delay, 0ms);
+}
+@starting-style {
+  .sidebar-project-threads[data-animate] {
+    height: 0;
+  }
+  .sidebar-project-threads[data-animate] > * {
+    opacity: 0;
+  }
+}
+
+/* Thread rows: muted titles behind a 16px status lead. The open row sits on the current-row fill
+   with --navigation-ink. A second line appears only while there is something to say. */
 .app-shell .thread-preview {
   position: relative;
-  border-radius: 7px;
-  padding: 7px 10px 7px 9px;
-  margin: 1px 0;
-  gap: 0;
-  min-height: 32px;
-  color: var(--ink);
-  border: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+  min-width: 0;
+  min-height: var(--control-row);
+  padding: 9px 10px;
+  border-radius: var(--radius-md);
+  color: var(--ink-3);
   text-align: left;
+  transition:
+    background-color var(--duration-leave) var(--ease-out),
+    color var(--duration-leave) var(--ease-out);
+}
+.app-shell .thread-preview:hover {
+  background-color: var(--surface-2);
+  color: var(--ink);
+}
+.app-shell .sidebar-shell .thread-preview[data-open]:not(:focus-visible) {
+  background-color: var(--current-row-fill);
 }
 .thread-preview-heading {
-  gap: 11px;
+  display: flex;
   align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 .thread-preview-status {
   display: flex;
   flex-shrink: 0;
-  width: 14px;
+  width: 16px;
   justify-content: center;
 }
-.app-shell .sidebar-shell .thread-preview[data-open]:not(:focus-visible) {
-  background: var(--navigation-soft);
-  box-shadow: none;
-}
 .thread-preview-title {
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 18px;
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-base);
+  line-height: 16px;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -281,7 +522,13 @@
 .thread-preview[data-open] .thread-preview-title {
   color: var(--navigation-ink);
 }
-/* Keep branch/provider details in the accessible label and hover title without a second row. */
+.thread-status-spinner {
+  color: var(--ink-4);
+}
+.thread-preview[data-open] .thread-status-spinner {
+  color: var(--ink-3);
+}
+/* Branch and provider details stay in the accessible label and hover title, not on screen. */
 .thread-preview-meta {
   position: absolute;
   width: 1px;
@@ -292,26 +539,104 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
-.browser-empty {
-  padding: 6px 14px 10px 34px;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--ink-3);
+.sidebar-section-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 28px;
+  padding: 0 10px 0 30px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  color: var(--ink-4);
 }
+.sidebar-section-toggle:hover {
+  color: var(--ink);
+}
+/* Empty, loading and load-more rows are faint rows lined up with the titles. */
+.browser-empty,
 .browser-load-more {
-  padding: 8px 14px 8px 34px;
-  font-size: 12px;
-  color: var(--ink-3);
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: var(--control-row);
+  padding: 0 10px 0 34px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
+  line-height: 16px;
+  color: var(--ink-4);
+  text-align: left;
 }
+button.browser-empty:hover,
 .browser-load-more:hover {
-  color: var(--navigation-ink);
+  color: var(--ink);
 }
 .browser-hint {
-  padding: 8px 18px;
-  color: var(--ink-3);
-  font-size: 11px;
-  line-height: 1.5;
+  padding: 8px 20px;
+  color: var(--ink-4);
+  font-size: var(--text-sm);
+  line-height: 16px;
 }
+
+/* Orclings: contacts with a face, a name and the last thing said. */
+.orcling-contact {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px 6px 6px;
+  border-radius: var(--radius-md);
+  text-align: left;
+  font-size: var(--text-base);
+  line-height: 16px;
+  transition: background-color var(--duration-leave) var(--ease-out);
+}
+.orcling-contact:hover {
+  background-color: var(--surface-2);
+}
+.app-shell .sidebar-shell .orcling-contact[aria-current="page"]:not(:focus-visible) {
+  background-color: var(--current-row-fill);
+  color: var(--navigation-ink);
+}
+.orcling-contact + .orcling-contact {
+  margin-top: 2px;
+}
+
+/* Footer: Add project as a quiet row, Settings as a round button. */
+.sidebar-footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px 10px;
+}
+.sidebar-add-project {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  height: var(--control-row);
+  padding: 0 10px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
+  line-height: 16px;
+  color: var(--ink-4);
+  transition:
+    background-color var(--duration-leave) var(--ease-out),
+    color var(--duration-leave) var(--ease-out);
+}
+.sidebar-add-project > span {
+  color: var(--ink-3);
+}
+.sidebar-add-project:hover {
+  background-color: var(--surface-2);
+  color: var(--ink);
+}
+.sidebar-add-project:hover > span {
+  color: var(--ink);
+}
+
+/* The resize grip rides the seam between the sidebar and the work column. */
 .app-shell .resize-handle[data-edge="sidebar"] {
   width: 0;
   flex: 0 0 0;
@@ -323,11 +648,12 @@
   inset: 0 -7px 0 0;
 }
 .app-shell .resize-handle[data-edge="sidebar"] .resize-grip {
-  /* Center the full pill over the 1px seam border; the hit area stays on the work side. */
   left: -0.5px;
   width: 4px;
 }
 
+/* At 900px and narrower the sidebar floats over the work column: an opaque tile with the one
+   soft shadow the app keeps, since tile over tile has no fill step to lean on. */
 @media (max-width: 900px) {
   .app-shell .workspace-window-nav[data-sidebar-open="true"] {
     display: flex;
@@ -335,69 +661,40 @@
   .app-shell .resize-handle[data-edge="sidebar"] {
     display: none;
   }
-  .app-shell .workspace-navigation {
+  .app-shell .workspace-navigation,
+  html[data-transparent-shell="true"] .app-shell .workspace-navigation {
     position: absolute;
     inset: 0 auto 0 0;
     z-index: 30;
     max-width: calc(100vw - 40px);
     height: 100%;
-    box-shadow: 12px 0 30px -16px var(--material-lo-cast);
+    background:
+      var(--surface-gradient) fixed,
+      var(--bg);
+    box-shadow: var(--shadow-overlay);
   }
   .app-shell .workspace-navigation[data-open="false"] {
     visibility: hidden;
   }
+  /* Native drag regions ignore stacking and resolve in document order, so the work row's header,
+     which comes after the sidebar, would turn the floating sidebar's corner into window drag.
+     While the sidebar floats open the work row gives up its regions; the sidebar header drags. */
+  .app-shell:has(> .workspace-navigation[data-open="true"]) .work-row::before,
+  .app-shell:has(> .workspace-navigation[data-open="true"]) .work-row * {
+    -webkit-app-region: initial;
+  }
 }
 
-/* The app paints native transparency once; the sidebar column must respect it. */
-html[data-transparent-shell="true"] .app-shell .workspace-navigation {
-  background: transparent;
-}
-html[data-transparent-shell="true"] .app-shell .conversation-browser {
-  background: transparent;
-}
-
-.browser-search input::placeholder {
-  color: var(--ink-3);
-  opacity: 1;
-}
-
-/* Contacts share the single navigation browser. */
-.orcling-browser .browser-heading h2 {
-  font-size: 21px;
-  font-weight: 600;
-  letter-spacing: -0.6px;
-}
-.orcling-contact {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 8px;
-  margin: 2px 0;
-  border-radius: 6px;
-  text-align: left;
-}
-.orcling-contact:hover {
-  background: var(--surface-2);
-}
-.orcling-contact[aria-current="page"] {
-  background: var(--navigation-soft);
-  box-shadow: none;
-}
-.orcling-contact > span {
-  display: grid;
-  min-width: 0;
-  gap: 4px;
-}
-.orcling-contact strong {
-  font-size: 13px;
-  font-weight: 550;
-  color: var(--ink);
-}
-.orcling-contact small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 11px;
-  color: var(--ink-3);
+@media (forced-colors: active) {
+  .sidebar-nav-knob {
+    display: none;
+  }
+  .sidebar-nav-row[aria-current="page"],
+  .sidebar-list-tab[aria-current="page"],
+  .orcling-contact[aria-current="page"] {
+    outline: 1px solid Highlight;
+  }
+  .sidebar-search {
+    outline: 1px solid ButtonBorder;
+  }
 }

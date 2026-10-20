@@ -93,15 +93,6 @@
 .thread-rail-title {
   flex: 0 1 auto;
   min-width: 0;
-.thread-header-project {
-  min-width: 0;
-  max-width: 120px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  font-weight: 400;
-  color: var(--ink-3);
   /* The rename box's padding hangs outside the text on the left and half of it on the right, so
      the facts sit close to the title. */
   margin: 0 -4px 0 -8px;
@@ -129,6 +120,43 @@
   background: var(--surface-2);
   outline: none;
 }
+.thread-header-facts {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--text-sm);
+  line-height: 16px;
+  color: var(--ink-4);
+  white-space: nowrap;
+}
+.thread-header-facts > * {
+  flex-shrink: 0;
+}
+.thread-header-facts > .thread-header-project {
+  flex-shrink: 1;
+}
+.thread-header-project {
+  min-width: 0;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+  color: var(--ink-4);
+}
+.thread-header-fact {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--ink-4);
+}
+.thread-header-fact-link {
+  border-radius: var(--radius-sm);
+}
+.thread-header-fact-link:hover {
   color: var(--ink);
 }
 .thread-rail-tools {
@@ -411,9 +439,6 @@
 }
 @container (max-width: 480px) {
   .thread-header-project {
-    display: none;
-  }
-  .thread-header .window-history-control {
     display: none;
   }
 }

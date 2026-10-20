@@ -1,131 +1,115 @@
-import { useState, type ReactNode } from "react";
-import { Menu } from "@base-ui/react/menu";
-import { Brain, CalendarClock, GitPullRequest, ListTodo, MoreHorizontal, Workflow } from "./icons";
-import { cn } from "../lib/cn";
-import { CoversPreview } from "../lib/browser-preview";
+import { useId, useRef, useState, type ReactNode } from "react";
+import { ChevronDown, MoreHorizontal, PenSquare, SlidersHorizontal } from "./icons";
 import { useLayout, type SidebarScreen } from "../lib/layout";
-import { useRouter, type Route } from "../lib/router";
-import { menuItem, menuPopup } from "./ThreadActions";
-import { Dialog, Switch, Tooltip } from "./ui";
+import { useRpc } from "../lib/query";
+import { newThread, useRouter, type Route } from "../lib/router";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
+import { activeScheduleCount, openTaskCount } from "../lib/task-stage-counts";
+import { useSlidingKnob } from "../lib/use-sliding-knob";
+import { SidebarEdit } from "./SidebarEdit";
+import { SCREENS, type Screen } from "./sidebar-screens";
 
-const navRow = "nav-row no-drag w-full flex items-center gap-3 h-9 px-2 rounded-md text-md font-normal text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink";
-
-export function NavItem({ route, icon, label, active, rail = false }: { route: Route; icon: ReactNode; label: string; active: boolean; rail?: boolean }) {
+/** A sidebar row: a 16px muted glyph, the label, and an optional faint count. */
+export function NavItem({ route, icon, label, active, count }: { route: Route; icon: ReactNode; label: string; active: boolean; count?: number }) {
   const navigate = useRouter((s) => s.navigate);
-  const button = (
+  return (
     <button
+      type="button"
       onClick={() => {
         navigate(route);
         dismissCompactNavigation();
       }}
-      aria-label={rail ? label : undefined}
       aria-current={active ? "page" : undefined}
-      className={cn(rail ? "workspace-rail-button" : navRow, active && "text-ink")}
+      className="nav-row sidebar-nav-row no-drag"
     >
-      <span className={cn("text-ink-3", active && "text-ink")}>{icon}</span>
-      {rail ? null : <span className="flex-1 text-left truncate">{label}</span>}
+      <span className="sidebar-nav-icon">{icon}</span>
+      <span className="sidebar-nav-label">{label}</span>
+      {count ? <span className="sidebar-nav-count tabular">{count}</span> : null}
     </button>
   );
-  return rail ? <Tooltip label={label}>{button}</Tooltip> : button;
 }
 
-interface Screen {
-  id: SidebarScreen;
-  label: string;
-  Icon: typeof ListTodo;
-  route: (projectId: string | null) => Route;
-  /** The views that belong to the screen, so it reads as current on any of them. */
-  views: Route["view"][];
+/** The counts a screen row carries: open tasks, and schedules that are switched on. */
+function useScreenCounts(): Partial<Record<SidebarScreen, number>> {
+  const tasks = useRpc("tasks.list", {});
+  const schedules = useRpc("schedules.list", {});
+  return { tasks: openTaskCount(tasks.data ?? []), scheduled: activeScheduleCount(schedules.data ?? []) };
 }
 
-/** The screens in the order the sidebar lists them. */
-const SCREENS: Screen[] = [
-  { id: "tasks", label: "Tasks", Icon: ListTodo, route: () => ({ view: "tasks" }), views: ["tasks", "task", "newtask"] },
-  { id: "pulls", label: "Pull requests", Icon: GitPullRequest, route: () => ({ view: "pulls" }), views: ["pulls", "pull"] },
-  { id: "scheduled", label: "Schedules", Icon: CalendarClock, route: () => ({ view: "scheduled" }), views: ["scheduled"] },
-  { id: "orchestration", label: "Orchestration", Icon: Workflow, route: (projectId) => ({ view: "orchestration", ...(projectId ? { projectId } : {}) }), views: ["orchestration"] },
-  { id: "memory", label: "Memory", Icon: Brain, route: () => ({ view: "memory" }), views: ["memory"] },
-];
-
-/** The app's screens above the projects: the ones the user lists, then More for the rest. */
-export function SidebarNav({ route, projectId, rail = false }: { route: Route; projectId: string | null; rail?: boolean }) {
+/**
+ * The app's screens above the projects: New thread, the screens the user lists, then More, which
+ * unfolds in place to the rest and to Edit sidebar, a dialog of switches. The current row's fill is
+ * one knob that slides.
+ */
+export function SidebarNav({ route, projectId }: { route: Route; projectId: string | null }) {
   const hidden = useLayout((s) => s.hiddenScreens);
-  const Container = rail ? "div" : "nav";
+  const counts = useScreenCounts();
+  const [editing, setEditing] = useState(false);
+  const track = useRef<HTMLElement>(null);
+  const knob = useSlidingKnob(track, '[aria-current="page"]', `${route.view}:${hidden.join()}`);
+  const row = ({ id, label, Icon, route: to, views }: Screen) => (
+    <NavItem key={id} route={to(projectId)} icon={<Icon size={16} />} label={label} active={views.includes(route.view)} count={counts[id]} />
+  );
   return (
-    <Container className={rail ? "flex flex-col gap-1" : "nav-track grid grid-cols-1 min-w-0 gap-px"}>
-      {SCREENS.filter((screen) => !hidden.includes(screen.id)).map(({ id, label, Icon, route: to, views }) => (
-        <NavItem key={id} route={to(projectId)} icon={<Icon size={rail ? 19 : 15} />} label={label} active={views.includes(route.view)} rail={rail} />
-      ))}
-      <MoreScreens screens={SCREENS.filter((screen) => hidden.includes(screen.id))} route={route} projectId={projectId} rail={rail} />
-    </Container>
+    <nav ref={track} className="sidebar-nav" aria-label="Screens">
+      <span aria-hidden="true" className="sidebar-nav-knob" data-placed={knob.placed || undefined} hidden={!knob.style} style={knob.style} />
+      <button
+        type="button"
+        className="nav-row sidebar-nav-row sidebar-new-thread no-drag"
+        onClick={() => {
+          newThread(projectId ?? undefined);
+          dismissCompactNavigation();
+        }}
+      >
+        <span className="sidebar-nav-icon">
+          <PenSquare size={16} />
+        </span>
+        <span className="sidebar-nav-label">New thread</span>
+      </button>
+      {SCREENS.filter((screen) => !hidden.includes(screen.id)).map(row)}
+      <MoreScreens screens={SCREENS.filter((screen) => hidden.includes(screen.id))} route={route} onEdit={() => setEditing(true)}>
+        {SCREENS.filter((screen) => hidden.includes(screen.id)).map(row)}
+      </MoreScreens>
+      <SidebarEdit open={editing} onOpenChange={setEditing} />
+    </nav>
   );
 }
 
-/** The screens the user hid, and the way to choose which ones the sidebar lists. It reads as current while one of its screens is open. */
-function MoreScreens({ screens, route, projectId, rail }: { screens: Screen[]; route: Route; projectId: string | null; rail: boolean }) {
-  const navigate = useRouter((s) => s.navigate);
-  const [editing, setEditing] = useState(false);
-  const current = screens.some((screen) => screen.views.includes(route.view));
+/**
+ * The screens the user hid, unfolding in place under More, and the way to the Edit sidebar dialog.
+ * More reads as current while one of its screens is open and it is folded.
+ */
+function MoreScreens({ screens, route, onEdit, children }: { screens: Screen[]; route: Route; onEdit: () => void; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const contentId = useId();
+  const current = !open && screens.some((screen) => screen.views.includes(route.view));
   return (
     <>
-      <Menu.Root>
-        <Menu.Trigger
-          aria-label={rail ? "More" : undefined}
-          title={rail ? "More" : undefined}
-          aria-current={current ? "page" : undefined}
-          className={cn(rail ? "workspace-rail-button" : navRow, current && "text-ink")}
-        >
-          <span className={cn("text-ink-3", current && "text-ink")}>
-            <MoreHorizontal size={rail ? 19 : 15} />
-          </span>
-          {rail ? null : <span className="flex-1 text-left truncate">More</span>}
-        </Menu.Trigger>
-        <Menu.Portal>
-          <CoversPreview />
-          <Menu.Positioner side="right" align="start" sideOffset={8} className="z-40" collisionPadding={8}>
-            <Menu.Popup className={menuPopup}>
-              {screens.map(({ id, label, Icon, route: to }) => (
-                <Menu.Item
-                  key={id}
-                  className={menuItem}
-                  onClick={() => {
-                    navigate(to(projectId));
-                    dismissCompactNavigation();
-                  }}
-                >
-                  <Icon size={14} className="text-ink-3" />
-                  {label}
-                </Menu.Item>
-              ))}
-              {screens.length ? <Menu.Separator className="my-1 border-t border-line" /> : null}
-              <Menu.Item className={menuItem} onClick={() => setEditing(true)}>
-                Edit sidebar…
-              </Menu.Item>
-            </Menu.Popup>
-          </Menu.Positioner>
-        </Menu.Portal>
-      </Menu.Root>
-      <EditSidebar open={editing} onOpenChange={setEditing} />
-    </>
-  );
-}
-
-/** Which screens the sidebar lists; each one switched off waits under More. */
-function EditSidebar({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
-  const hidden = useLayout((s) => s.hiddenScreens);
-  const setScreenShown = useLayout((s) => s.setScreenShown);
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange} title="Edit sidebar" width={360}>
-      <div className="grid gap-px">
-        {SCREENS.map(({ id, label, Icon }) => (
-          <label key={id} className="flex items-center gap-3 h-9 px-2 rounded-md hover:bg-surface-2">
-            <Icon size={15} className="text-ink-3" />
-            <span className="flex-1 text-base text-ink">{label}</span>
-            <Switch checked={!hidden.includes(id)} onChange={(event) => setScreenShown(id, event.target.checked)} />
-          </label>
-        ))}
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={contentId}
+        aria-current={current ? "page" : undefined}
+        onClick={() => setOpen(!open)}
+        className="nav-row sidebar-nav-row sidebar-more-toggle no-drag"
+      >
+        <span className="sidebar-nav-icon">
+          <MoreHorizontal size={16} />
+        </span>
+        <span className="sidebar-nav-label">More</span>
+        <ChevronDown size={14} className="sidebar-more-chevron" />
+      </button>
+      <div id={contentId} className="sidebar-more" data-open={open || undefined} inert={!open} aria-hidden={!open}>
+        <div className="sidebar-more-rows">
+          {children}
+          <button type="button" className="nav-row sidebar-nav-row sidebar-edit-entry no-drag" onClick={onEdit}>
+            <span className="sidebar-nav-icon">
+              <SlidersHorizontal size={16} />
+            </span>
+            <span className="sidebar-nav-label">Edit sidebar</span>
+          </button>
+        </div>
       </div>
-    </Dialog>
+    </>
   );
 }

@@ -70,3 +70,18 @@ export function visibleSidebarThreadIds(
     )
     .map((thread) => thread.id);
 }
+
+export type ProjectMeta = { text: string; tone: "attention" | "faint" };
+
+/**
+ * What a project heading says beside its name, most urgent first: a thread waiting on you, then how many are
+ * running, then how many threads it lists. `more` marks a list with further pages. Nothing while it loads.
+ */
+export function projectMeta(threads: readonly Pick<ThreadSummary, "activity">[], { loaded, more = false }: { loaded: boolean; more?: boolean }): ProjectMeta | null {
+  if (threads.some((thread) => thread.activity === "waiting")) return { text: "Needs you", tone: "attention" };
+  const running = threads.filter((thread) => thread.activity === "running").length;
+  if (running) return { text: `${running} running`, tone: "faint" };
+  if (!loaded) return null;
+  if (!threads.length) return { text: "No threads", tone: "faint" };
+  return { text: `${threads.length}${more ? "+" : ""} ${threads.length === 1 && !more ? "thread" : "threads"}`, tone: "faint" };
+}

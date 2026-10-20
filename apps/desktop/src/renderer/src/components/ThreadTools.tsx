@@ -17,12 +17,12 @@ export function ThreadTools({ threadId }: { threadId: string }) {
             else layout.openThreadPanel(threadId, "tasks");
           }}
         >
-          <ListTodo size={15} />
+          <ListTodo size={16} />
         </IconButton>
       </Tooltip>
       <Tooltip label={toggleLabel}>
         <IconButton aria-label={toggleLabel} aria-pressed={activeTab !== null} onClick={() => useLayout.getState().toggleThreadPanel(threadId)}>
-          <PanelRight size={15} />
+          <PanelRight size={16} />
         </IconButton>
       </Tooltip>
     </div>

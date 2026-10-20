@@ -1,22 +1,11 @@
 import { ClaudeAccountScope } from "../lib/claude-account";
-import { ThreadClaudeAccount } from "../components/ClaudeAccountPicker";
 import { useEffect, useRef, useState } from "react";
-import { AlarmClock, ArrowLeft, GitFork, GitPullRequest, MoreHorizontal, X } from "../components/icons";
-import { Menu } from "@base-ui/react/menu";
-import { ThreadTitle } from "../components/ThreadTitle";
-import { ThreadTools } from "../components/ThreadTools";
 import { Conversation } from "../components/Conversation";
-import { menuItem, menuPopup, ThreadMenuItems } from "../components/ThreadActions";
-import { TopBar } from "../components/TopBar";
-import { ThreadOrcling } from "../components/OrclingAvatar";
-import { Badge, IconButton, TextButton, Tooltip } from "../components/ui";
+import { ThreadHeader, ThreadHeaderPlaceholder } from "../components/ThreadHeader";
 import { useLayout } from "../lib/layout";
 import { useRpc, useRpcMutation } from "../lib/query";
 import { useConversationPlans } from "../lib/conversation-plans";
-import { openThread, useRouter } from "../lib/router";
-import { CoversPreview } from "../lib/browser-preview";
-
-const prTone = { open: "muted", merged: "ok", closed: "bad" } as const;
+import { useRouter } from "../lib/router";
 
 /**
  * A stable, thread-scoped conversation. The workspace owns the shared panel.
@@ -24,10 +13,8 @@ const prTone = { open: "muted", merged: "ok", closed: "bad" } as const;
 export function ThreadView({ threadId, first, last, focused, onClose }: { threadId: string; first: boolean; last: boolean; focused: boolean; onClose?: () => void }) {
   const thread = useRpc("threads.get", { id: threadId });
   const project = useRpc("projects.get", { id: thread.data?.projectId ?? "" }, { enabled: Boolean(thread.data) });
-  const back = useRouter((s) => s.back);
   const update = useRpcMutation("threads.update");
   const setProject = useLayout((s) => s.setProject);
-  const panelOpen = useLayout((s) => s.panelOpen);
   const [renaming, setRenaming] = useState(false);
   const [teamToolbar, setTeamToolbar] = useState<HTMLSpanElement | null>(null);
   const activate = () => {
@@ -60,24 +47,7 @@ export function ThreadView({ threadId, first, last, focused, onClose }: { thread
   if (!t || !p) {
     return (
       <main className="workspace-main well flex-1 min-w-0 flex flex-col">
-        <TopBar
-          windowDragSurface
-          showProject={false}
-          inSplit={!first}
-          rightmost={last && !panelOpen}
-          actions={
-            onClose ? (
-              <IconButton onClick={onClose} aria-label="Close pane">
-                <X size={15} />
-              </IconButton>
-            ) : undefined
-          }
-        >
-          <TextButton onClick={back} tone="muted" className="mr-1" title="Back">
-            <ArrowLeft size={16} />
-          </TextButton>
-          <span className="text-ink-3 font-normal">{thread.isLoading || project.isLoading ? "Loading…" : "Thread not found"}</span>
-        </TopBar>
+        <ThreadHeaderPlaceholder loading={thread.isLoading || project.isLoading} first={first} last={last} onClose={onClose} />
       </main>
     );
   }
@@ -86,64 +56,17 @@ export function ThreadView({ threadId, first, last, focused, onClose }: { thread
     <ClaudeAccountScope id={t.claudeAccountId ?? "claude-cli"}>
       <RevealEmittedPlan key={threadId} threadId={threadId} focused={focused} team={Boolean(t.teamInstanceId)} />
       <main className="workspace-main well flex-1 min-w-0 flex flex-col">
-        <TopBar
-          windowDragSurface
-          showProject={false}
-          inSplit={!first}
-          rightmost={last && !panelOpen}
-          actions={
-            <>
-              {t.agent === "claude" ? <ThreadClaudeAccount /> : null}
-              {t.teamInstanceId ? <span ref={setTeamToolbar} className="thread-team-toolbar" /> : null}
-              {!t.teamInstanceId && t.activity !== "idle" ? <Badge tone={t.activity === "waiting" ? "warn" : "accent"}>{t.activity === "waiting" ? "needs you" : "working"}</Badge> : null}
-              {t.prUrl ? (
-                <Tooltip label={t.prUrl}>
-                  <TextButton onClick={() => window.openorc.openExternal(t.prUrl as string)} className="inline-flex" aria-label="Open the pull request">
-                    <Badge tone={prTone[t.prState ?? "open"]}>
-                      <GitPullRequest size={11} className="mr-1" /> {t.prState ?? "PR"}
-                    </Badge>
-                  </TextButton>
-                </Tooltip>
-              ) : null}
-              {t.snoozedUntil && t.snoozedUntil > Date.now() ? (
-                <Badge>
-                  <AlarmClock size={11} className="mr-1" /> until {new Date(t.snoozedUntil).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" })}
-                </Badge>
-              ) : null}
-              {onClose ? (
-                <Tooltip label="Close pane">
-                  <IconButton onClick={onClose} aria-label="Close pane">
-                    <X size={15} />
-                  </IconButton>
-                </Tooltip>
-              ) : null}
-              <Menu.Root>
-                <Menu.Trigger render={<IconButton aria-label="Thread actions" />}>
-                  <MoreHorizontal size={15} />
-                </Menu.Trigger>
-                <Menu.Portal>
-                  <CoversPreview />
-                  <Menu.Positioner sideOffset={6} align="end" className="z-40" collisionPadding={8}>
-                    <Menu.Popup className={menuPopup} finalFocus={renaming ? false : undefined}>
-                      <Menu.Item className={menuItem} onClick={() => setRenaming(true)}>
-                        Rename
-                      </Menu.Item>
-                      <ThreadMenuItems thread={t} parts={Menu} />
-                    </Menu.Popup>
-                  </Menu.Positioner>
-                </Menu.Portal>
-              </Menu.Root>
-              <ThreadTools threadId={threadId} />
-            </>
-          }
-        >
-          <ForkParent parent={t.forkedFromId} />
-          <ThreadOrcling threadId={t.id} orclingId={t.orclingId} />
-          <ThreadTitle title={t.title} editing={renaming} onEditingChange={setRenaming} onSave={(title) => update.mutate({ id: t.id, patch: { title } })} />
-          <span className="thread-header-project" title={p.rootPath}>
-            {p.name}
-          </span>
-        </TopBar>
+        <ThreadHeader
+          thread={t}
+          project={p}
+          renaming={renaming}
+          onRenamingChange={setRenaming}
+          onRename={(title) => update.mutate({ id: t.id, patch: { title } })}
+          onTeamToolbar={setTeamToolbar}
+          first={first}
+          last={last}
+          onClose={onClose}
+        />
         {/* Header controls own their thread explicitly; only conversation interaction activates a pane. */}
         <div className="thread-pane-content flex-1 min-h-0" onPointerDownCapture={activate} onFocusCapture={activate}>
           <Conversation key={t.id} scope={{ kind: "thread", thread: t }} project={p} toolbarTarget={teamToolbar} />
@@ -171,18 +94,4 @@ function RevealEmittedPlan({ threadId, focused, team }: { threadId: string; focu
     useLayout.getState().openThreadPanel(threadId, "plan");
   }, [isSuccess, planId, focused, threadId]);
   return null;
-}
-
-export { menuItem };
-
-/** A fork links back to the thread it continues. */
-function ForkParent({ parent }: { parent: string | null }) {
-  if (!parent) return null;
-  return (
-    <Tooltip label="Forked from another thread">
-      <TextButton onClick={() => openThread(parent)} tone="muted" aria-label="Open the parent thread">
-        <GitFork size={13} />
-      </TextButton>
-    </Tooltip>
-  );
 }

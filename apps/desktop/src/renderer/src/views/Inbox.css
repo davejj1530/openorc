@@ -1,0 +1,27 @@
+/* The Inbox page in the list language: 52px rows with a 12px corner and a fill hover, a muted
+   glyph lead, the title in ink and the reason and time faint. */
+/* The page column's width, with the rows' own 10px padding hanging into its 28px gutter. */
+.inbox-list {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 6px 18px 14px;
+}
+.inbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 10px;
+  border-radius: var(--radius-lg);
+  font-size: var(--text-base);
+  line-height: 16px;
+  text-align: left;
+  transition: background-color var(--duration-leave) var(--ease-out);
+}
+.inbox-row:hover {
+  background-color: var(--surface-2);
+}

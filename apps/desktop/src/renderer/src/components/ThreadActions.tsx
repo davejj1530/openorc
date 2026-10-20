@@ -3,10 +3,9 @@ import { WORKSPACE_ID } from "@openorc/protocol";
 import { useRef, useState } from "react";
 import { Menu } from "@base-ui/react/menu";
 import type { ThreadSummary } from "@openorc/protocol";
-import { AlarmClock, AppWindow, Archive, ArchiveRestore, Columns2, GitBranch, GitFork, Laptop, MailOpen, Pencil, Pin, PinOff, Trash2 } from "./icons";
+import { AlarmClock, AppWindow, Archive, ArchiveRestore, ChevronRight, Columns2, GitBranch, GitFork, Laptop, MailOpen, Pencil, Pin, PinOff, Trash2 } from "./icons";
 import { orclingHome, useOrclings } from "../lib/orclings";
 import { Button, Dialog } from "./ui";
-import { cn } from "../lib/cn";
 import { useRpc, useRpcMutation } from "../lib/query";
 import { hasOpenTeamExecution } from "../lib/team-activity";
 import { MAX_THREAD_PANES, openThread, useRouter } from "../lib/router";
@@ -20,12 +19,11 @@ import { useTeamDeleteRequest } from "../lib/use-team-delete-request";
 import { beginTeamDeleteRequest, finishTeamDeleteRequest } from "../lib/team-delete-request";
 import { CoversPreview } from "../lib/browser-preview";
 import { TeamRecoveryActions } from "./TeamRecoveryActions";
+import { menuItem, menuItemDanger, menuPopup, menuSeparator } from "./menu";
+import { floatingGround } from "../lib/use-anchor-ground";
 
 /** The parts a dropdown and a context menu share, so one item list serves both. */
 export type MenuParts = Pick<typeof Menu, "Item" | "Separator" | "SubmenuRoot" | "SubmenuTrigger" | "Portal" | "Positioner" | "Popup">;
-
-export const menuItem = "flex items-center gap-2 h-7 px-2 rounded-md text-base text-ink-2 data-[highlighted]:bg-surface-2 data-[highlighted]:text-ink data-[disabled]:opacity-50 outline-none";
-export const menuPopup = "menu-popup min-w-48 rounded-lg border border-line bg-surface p-1 shadow-panel outline-none";
 
 /** When a snoozed thread comes back, from now. */
 export function snoozePresets(now = new Date()): { label: string; until: number }[] {
@@ -121,7 +119,7 @@ function ThreadMenuContent({ thread, parts: M }: { thread: ThreadSummary; parts:
       <M.Item className={menuItem} onClick={() => window.openorc.openWindow(`thread:${thread.id}`)}>
         <AppWindow size={13} /> Open in new window
       </M.Item>
-      <M.Separator className="my-1 border-t border-line" />
+      <M.Separator className={menuSeparator} />
       {lifecycleReason ? (
         <div className="max-w-64 px-2 py-1 text-xs text-ink-3" role="status">
           {lifecycleReason}
@@ -152,12 +150,12 @@ function ThreadMenuContent({ thread, parts: M }: { thread: ThreadSummary; parts:
       <M.SubmenuRoot>
         <M.SubmenuTrigger className={menuItem} disabled={lifecycleBlocked} title={lifecycleReason ?? undefined}>
           <AlarmClock size={13} /> {thread.snoozedUntil ? "Snoozed" : "Snooze"}
-          <span className="ml-auto text-ink-4">›</span>
+          <ChevronRight size={14} className="ml-auto" />
         </M.SubmenuTrigger>
         <M.Portal>
           <CoversPreview />
-          <M.Positioner sideOffset={4} alignOffset={-4} collisionPadding={8}>
-            <M.Popup className={menuPopup}>
+          <M.Positioner sideOffset={4} alignOffset={-6} collisionPadding={8}>
+            <M.Popup ref={floatingGround} className={menuPopup}>
               {snoozePresets().map((p) => (
                 <M.Item key={p.label} className={menuItem} disabled={lifecycleBlocked} closeOnClick={!team} onClick={() => patch({ snoozedUntil: p.until })}>
                   {p.label}
@@ -165,7 +163,7 @@ function ThreadMenuContent({ thread, parts: M }: { thread: ThreadSummary; parts:
               ))}
               {thread.snoozedUntil ? (
                 <>
-                  <M.Separator className="my-1 border-t border-line" />
+                  <M.Separator className={menuSeparator} />
                   <M.Item className={menuItem} disabled={lifecycleBlocked} closeOnClick={!team} onClick={() => patch({ snoozedUntil: null })}>
                     Wake now
                   </M.Item>
@@ -178,7 +176,7 @@ function ThreadMenuContent({ thread, parts: M }: { thread: ThreadSummary; parts:
       <M.Item className={menuItem} disabled={team && mutating} onClick={() => patch({ seen: thread.unread })}>
         <MailOpen size={13} /> {thread.unread ? "Mark as read" : "Mark as unread"}
       </M.Item>
-      <M.Separator className="my-1 border-t border-line" />
+      <M.Separator className={menuSeparator} />
       <ThreadForkActions thread={thread} parts={M} teamFork={teamFork} recoveryKey={runtime.data?.actions?.forkRecovery?.requestKey} />
       {team && moveReason ? (
         <div role="status" className="max-w-64 px-2 py-1 text-xs text-ink-3 break-words">
@@ -196,7 +194,7 @@ function ThreadMenuContent({ thread, parts: M }: { thread: ThreadSummary; parts:
           {threadMoveLabel({ cancelling: pendingMove?.phase === "cancel", pending: Boolean(pendingMove), mode: thread.workspaceMode })}
         </M.Item>
       ) : null}
-      <M.Separator className="my-1 border-t border-line" />
+      <M.Separator className={menuSeparator} />
       <M.Item className={menuItem} disabled={lifecycleBlocked} title={lifecycleReason ?? undefined} closeOnClick={!team} onClick={() => patch({ archived: !archived })}>
         {archived ? <ArchiveRestore size={13} /> : <Archive size={13} />} {archived ? "Unarchive" : "Archive"}
       </M.Item>
@@ -205,12 +203,7 @@ function ThreadMenuContent({ thread, parts: M }: { thread: ThreadSummary; parts:
           {deleteReason}
         </div>
       ) : null}
-      <M.Item
-        className={cn(menuItem, "text-bad data-[highlighted]:text-bad")}
-        disabled={team && (Boolean(deleteReason) || mutating)}
-        title={deleteReason ?? undefined}
-        onClick={() => useUi.getState().setDeleteThread(thread.id)}
-      >
+      <M.Item className={menuItemDanger} disabled={team && (Boolean(deleteReason) || mutating)} title={deleteReason ?? undefined} onClick={() => useUi.getState().setDeleteThread(thread.id)}>
         <Trash2 size={13} /> {pendingDelete ? "Retry delete" : "Delete thread"}
       </M.Item>
     </>

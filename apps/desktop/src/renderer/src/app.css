@@ -560,15 +560,11 @@ html[data-transparent-shell="true"] .app-shell {
 }
 /* Over the tinted blur an opaque row fill is a solid block, and while the thread list scrolls
    under the pointer each hovered row's fading fill trails behind it. The sidebar's fills are
-   ink tints here instead, so they blend with whatever shows through. The nav badge's ring
-   knocks out the row fill, which is now see-through, so it drops away at rest. */
+   ink tints here instead, so they blend with whatever shows through. */
 html[data-transparent-shell="true"] .sidebar-shell {
   --surface-2: color-mix(in srgb, var(--ink) 7%, transparent);
   --surface-3: color-mix(in srgb, var(--ink) 11%, transparent);
   --current-row-fill: color-mix(in srgb, var(--ink) 9%, transparent);
-}
-html[data-transparent-shell="true"] .sidebar-shell .nav-row:not(:hover, :focus-visible, [aria-current="page"]) {
-  --nav-row-fill: transparent;
 }
 .well {
   position: relative;
@@ -672,7 +668,7 @@ body[data-resizing] .panel-shell {
   z-index: 1;
   width: calc(var(--width-sidebar) + var(--spacing-well));
   overflow: hidden;
-  transition: width 220ms var(--ease-out);
+  transition: width var(--duration-arrive) var(--ease-out);
 }
 .sidebar-shell[data-open="false"] {
   width: 0;
@@ -695,7 +691,6 @@ body[data-resizing] .sidebar-shell {
 .sidebar-wordmark {
   color: var(--ink);
   font-size: 17px;
-  font-weight: 650;
   letter-spacing: -0.03em;
   line-height: 1;
 }
@@ -813,7 +808,6 @@ body[data-resizing] .sidebar-shell {
   background: var(--surface-2);
   color: var(--ink-3);
   font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
   max-width: 40%;
   min-width: 0;
   transition:
@@ -826,77 +820,6 @@ body[data-resizing] .sidebar-shell {
   color: var(--ink-2);
 }
 
-/* The current sidebar row is raised in both modes: a hairline and a small cast in light, the
-   lit edge in dark. Only the row's own background and shadow change, so rank in the sidebar
-   still rides on height, weight and ink, never on a new fill step, border or accent. The
-   header's Inbox control is raised the same way on its screen, in the main column's header
-   too while the sidebar is hidden. :not(:focus-visible) is load-bearing and silent if dropped:
-   this rule outranks the keyboard focus fill in controls.css, so without the guard focus
-   becomes invisible with no error and no failing test. Guarded, focus keeps --surface-3. */
-.sidebar-shell [aria-current="page"]:not(:focus-visible),
-.app-topbar .nav-row[aria-current="page"]:not(:focus-visible) {
-  background-color: var(--current-row-fill);
-}
-.sidebar-shell [aria-current="page"],
-.app-topbar .nav-row[aria-current="page"] {
-  box-shadow: var(--current-row-material);
-}
-
-/* GEOMETRY ONLY. The nav track paints nothing in either mode; only its padding matters.
-   The selection cue is the item's own shadow, which reads on any ground, so nothing sits
-   behind the nav group and nav-versus-thread rank stays on height, weight and ink. */
-.nav-track {
-  background: none;
-  box-shadow: none;
-}
-/* 4px margin plus 4px padding puts a row's left edge 8px from the column. */
-.nav-track {
-  margin: 0 4px;
-  padding: 4px;
-}
-
-/* A nav count hangs off its icon's top-right corner, as on the header's Inbox control. It is
-   sized to the 15px nav icon and sits high enough to keep the icon readable and clear of the
-   label. It knocks itself out of its control's own fill, which these follow in the order the
-   control resolves them: the ground at rest, hover, the current page, then focus. In the main
-   column's header the ground is the plane rather than the column. */
-.nav-row {
-  --nav-row-fill: var(--bg);
-}
-.app-topbar .nav-row {
-  --nav-row-fill: var(--surface);
-}
-.nav-row:hover {
-  --nav-row-fill: var(--surface-2);
-}
-.nav-row[aria-current="page"]:not(:focus-visible) {
-  --nav-row-fill: var(--current-row-fill);
-}
-.nav-row:focus-visible {
-  --nav-row-fill: var(--surface-3);
-}
-.nav-badge {
-  position: absolute;
-  top: -7px;
-  right: -4px;
-  display: grid;
-  place-items: center;
-  min-width: 15px;
-  height: 15px;
-  padding: 0 3px;
-  border-radius: var(--radius-pill);
-  background: var(--ink);
-  color: var(--bg);
-  font-size: var(--text-xs);
-  font-weight: var(--font-weight-semibold);
-  line-height: 1;
-  box-shadow: 0 0 0 2px var(--nav-row-fill);
-}
-/* With no label beside it, the header's Inbox control centres its count on the icon's corner,
-   so the glyph stays recognisable. */
-.inbox-control .nav-badge {
-  right: -8px;
-}
 
 /* The task list's keyboard cursor. Without this it is indistinguishable from a hovered row,
    because both resolve to surface-2. Sheen only: a list must not grow raised items. */

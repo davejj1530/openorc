@@ -25,7 +25,7 @@ afterEach(cleanup);
 it("shows each Orcling's last message under its name, marking the person's own", () => {
   lastMessages.set("Opi-thread", { id: "a", role: "assistant", text: "**Done.** Shipped `beta.9` to [releases](https://example.com).", createdAt: 2 });
   lastMessages.set("Rini-thread", { id: "u", role: "user", text: "Can you check the release?", createdAt: 1 });
-  render(<SidebarOrclings route={{ view: "thread", threadId: "Opi-thread" }} />);
+  render(<SidebarOrclings route={{ view: "thread", threadId: "Opi-thread" }} search="" />);
 
   const opi = screen.getByRole("button", { name: /Opi/ });
   expect(opi.getAttribute("aria-current")).toBe("page");

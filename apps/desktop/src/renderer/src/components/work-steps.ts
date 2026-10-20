@@ -2,6 +2,7 @@ import type { Block } from "../lib/transcript";
 import { isImageGeneration, isImageView } from "../lib/image-activity";
 import { toolShowsCard } from "../lib/task-progress";
 import { visualizationFromTool } from "../lib/visualization";
+import { joinLabels } from "../lib/run-labels";
 import { callParts, type WorkChip } from "./work-chips";
 
 /**
@@ -142,16 +143,29 @@ export function planItems(block: Block): PlanItem[] {
   });
 }
 
-/** "Read 3 files", "Ran 2 commands": a phase's name when the agent gave it none, from what it did. */
+/** What a row says as a phase's title: a plain label in the past ("Ran the tests"), anything else as it reads. */
+export function chipTitle(chip: WorkChip): string {
+  return chip.done ? joinLabels(chip.done) : chip.label;
+}
+
+/** The Ran part of a summary: what ran, when every row has plain words for it and there are three things or fewer. */
+function ranWords(chips: WorkChip[]): string | null {
+  const steps = [...new Set(chips.flatMap((chip) => chip.done ?? []))];
+  return chips.length && chips.every((chip) => chip.done) && steps.length <= 3 ? joinLabels(steps) : null;
+}
+
+/** "Read 3 files, searched twice": a phase's name when the agent gave it none, from what it did. */
 function summaryTitle(phase: WorkPhase): string {
   const intents = phase.sections.flatMap((section) => section.chips.filter((chip) => chip.kind === "intent" || chip.kind === "agent"));
-  if (intents.length === 1 && phase.sections.length === 1) return intents[0]!.label;
-  const count = (label: string) => phase.sections.find((section) => section.label === label)?.chips.length ?? 0;
+  if (intents.length === 1 && phase.sections.length === 1) return chipTitle(intents[0]!);
+  const chips = (label: string) => phase.sections.find((section) => section.label === label)?.chips ?? [];
+  const ran = ranWords(chips("Ran"));
   const parts: [number, string, (n: number) => string][] = [
-    [count("Edited"), "Edited a file", (n) => `Edited ${n} files`],
-    [count("Read"), "Read a file", (n) => `Read ${n} files`],
-    [count("Searched"), "Searched once", (n) => `Searched ${n} times`],
-    [count("Ran"), "Ran a command", (n) => `Ran ${n} commands`],
+    [chips("Edited").length, "Edited a file", (n) => `Edited ${n} files`],
+    [chips("Read").length, "Read a file", (n) => `Read ${n} files`],
+    [chips("Searched").length, "Searched once", (n) => (n === 2 ? "Searched twice" : `Searched ${n} times`)],
+    [chips("Listed").length, "Listed a folder", (n) => `Listed ${n} folders`],
+    [chips("Ran").length, ran ?? "Ran a command", (n) => ran ?? `Ran ${n} commands`],
   ];
   const words = parts.filter(([n]) => n > 0).map(([n, one, many]) => (n === 1 ? one : many(n)));
   const [head = "Worked", ...rest] = (words.length ? words : phase.sections.map((section) => section.label)).slice(0, 2);
@@ -348,6 +362,7 @@ function phaseHeadline(phase: WorkPhase, block: Block | undefined): LiveHeadline
   const call = block && phase.blocks.includes(block) ? block : phase.blocks.findLast((candidate) => candidate.kind === "tool" || candidate.kind === "activity");
   const section = phase.sections.find((candidate) => call && candidate.blocks.includes(call));
   const chip = section?.chips.find((candidate) => call && candidate.blocks.includes(call));
+  if (chip?.live) return { label: chip.live, since: call?.at, entryId: phase.id };
   if (chip?.kind === "intent" || chip?.kind === "agent") return { label: chip.label, since: call?.at, entryId: phase.id };
   const verb = section ? liveSectionLabel(section.label) : "Working";
   return { label: chip ? `${verb} ${chip.label}` : verb, since: call?.at, entryId: phase.id };

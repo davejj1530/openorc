@@ -299,16 +299,26 @@ function simpleCommand(tokens: ShellToken[]): Omit<CommandLine, "next"> {
   return { words, output };
 }
 
-/** What a step runs first, what that output flows into, and where it goes instead of the terminal. */
-export function commandLine(text: string): CommandLine {
-  const segments: ShellToken[][] = [[]];
+/** One command of a step's pipeline, and the operator that led to it: `|`, `||` or `|&`, or null for the first. */
+export interface PipedCommand extends Omit<CommandLine, "next"> {
+  via: string | null;
+}
+
+/** A step's commands in the order its pipes and `||` join them. There is always at least one, maybe without words. */
+export function pipeline(text: string): PipedCommand[] {
+  const segments: { via: string | null; tokens: ShellToken[] }[] = [{ via: null, tokens: [] }];
   for (const token of shellTokens(text)) {
     if (token.operator && CONTROL.test(token.value)) break;
-    if (token.operator && PIPES.test(token.value)) segments.push([]);
-    else segments[segments.length - 1]!.push(token);
+    if (token.operator && PIPES.test(token.value)) segments.push({ via: token.value, tokens: [] });
+    else segments[segments.length - 1]!.tokens.push(token);
   }
-  const [first = [], ...rest] = segments;
-  return { ...simpleCommand(first), next: rest.map((segment) => simpleCommand(segment).words[0] ?? "") };
+  return segments.map(({ via, tokens }) => ({ ...simpleCommand(tokens), via }));
+}
+
+/** What a step runs first, what that output flows into, and where it goes instead of the terminal. */
+export function commandLine(text: string): CommandLine {
+  const [first, ...rest] = pipeline(text);
+  return { words: first!.words, output: first!.output, next: rest.map((command) => command.words[0] ?? "") };
 }
 
 /** The script inside a `zsh -lc '…'` wrapper, unquoted, as Codex sends it; any other command as it is. */

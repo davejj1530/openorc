@@ -166,14 +166,21 @@ button.work-phase-title:focus-visible > .work-chevron,
 button.work-phase-title[aria-expanded="true"] > .work-chevron {
   opacity: 1;
 }
+/* A phase opens to its kinds of work: the verbs share one quiet column, what they touched lines up beside it.
+   Anything else in the body spans both columns. */
 .work-phase-body {
   grid-column: 2;
   display: grid;
-  gap: 10px;
+  grid-template-columns: fit-content(112px) minmax(0, 1fr);
+  column-gap: 12px;
+  row-gap: 10px;
   min-width: 0;
   padding: 2px 0 12px;
 }
 .work-phase-body[hidden],
+.work-phase-body > :not(.work-group) {
+  grid-column: 1 / -1;
+}
 .work-group-calls[hidden] {
   display: none;
 }
@@ -188,7 +195,7 @@ button.work-phase-title[aria-expanded="true"] > .work-chevron {
 .work-phase-extras > .transcript-block:first-child,
 .work-group-calls > .transcript-block:first-child,
 .work-rail-blocks > .transcript-block:first-child,
-.work-group > .transcript-block:first-child {
+.work-group-blocks > .transcript-block:first-child {
   margin-top: 0;
 }
 /* Narration under a step reads as a muted note rather than a reply. */
@@ -232,78 +239,107 @@ button.work-phase-title[aria-expanded="true"] > .work-chevron {
 }
 
 .work-group {
-  display: grid;
-  gap: 6px;
-  min-width: 0;
+  display: contents;
 }
+/* The verb column is at least as wide as "Searching", so rows start at one edge from phase to phase. */
 .work-group-label {
+  grid-column: 1;
+  align-self: start;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   justify-self: start;
+  min-width: 72px;
+  min-height: 28px;
   font-size: var(--text-xs);
-  color: var(--ink-3);
+  line-height: 16px;
+  color: var(--ink-4);
+  text-align: left;
 }
 .work-group-label:hover {
   color: var(--ink-2);
 }
 .work-group-label > .work-chevron {
+  flex-shrink: 0;
   opacity: 0;
 }
 .work-group-label:hover > .work-chevron,
+.work-group-label:focus-visible > .work-chevron,
 .work-group-label[aria-expanded="true"] > .work-chevron {
   opacity: 1;
 }
-.work-count {
-  color: var(--ink-4);
-  font-variant-numeric: tabular-nums;
-}
 .work-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  grid-column: 2;
+  display: grid;
+  gap: 1px;
   min-width: 0;
 }
+/* A row reaches 8px past the column on both sides, so its hover fill frames the mark and the counts. */
 .work-chip {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
-  max-width: 100%;
-  height: 24px;
+  height: 28px;
+  margin: 0 -8px;
   padding: 0 8px;
   border-radius: var(--radius-md);
-  background: var(--surface-2);
   color: var(--ink-2);
-  font-size: var(--text-xs);
+  font-size: var(--text-base);
+  line-height: 16px;
+  text-align: left;
 }
 .work-chip > a {
-  display: inline-flex;
+  display: flex;
+  flex: 1;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
+  height: 100%;
   color: inherit;
   text-decoration: none;
 }
 .work-chip:has(> a):hover,
 button.work-chip:hover,
 button.work-chip[aria-pressed="true"] {
-  background: var(--surface-3);
+  background: var(--surface-2);
   color: var(--ink);
 }
 button.work-chip:focus-visible {
-  outline-offset: 1px;
   outline: 2px solid var(--ring);
+  outline-offset: -2px;
 }
 .work-chip-label {
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.work-chip:is([data-kind="file"], [data-kind="edit"], [data-kind="folder"], [data-kind="query"], [data-kind="command"]) .work-chip-label {
-  font-family: var(--font-mono);
+/* Files read as names in ink; commands and search patterns stay code, a size down. */
+.work-chip:is([data-kind="file"], [data-kind="edit"], [data-kind="folder"]) .work-chip-label {
+  color: var(--ink);
 }
+/* A command shown as written stays code, a size down; everything else reads as words. */
+.work-chip[data-kind="command"] .work-chip-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+.work-chip-detail {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-xs);
+  color: var(--ink-4);
+}
+.work-chip-note {
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+  color: var(--ink-4);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 .work-chip-icon {
   flex-shrink: 0;
@@ -315,6 +351,8 @@ button.work-chip:focus-visible {
 .work-stat-added,
 .work-stat-removed {
   flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
 }
 .work-stat-added {
@@ -324,14 +362,23 @@ button.work-chip:focus-visible {
   color: var(--bad);
 }
 .work-more {
+  justify-self: start;
+  height: 28px;
+  padding-left: 22px;
   font-size: var(--text-xs);
+  color: var(--ink-4);
 }
 .work-more:hover {
   color: var(--ink);
 }
 .work-group-calls {
   min-width: 0;
-  padding-left: 2px;
+}
+.work-group > .work-group-calls {
+  grid-column: 2;
+}
+.work-chips > .work-group-calls {
+  padding: 4px 0 6px;
 }
 
 /* The plan's steps, each a 30px row; the one it is on in ink. */

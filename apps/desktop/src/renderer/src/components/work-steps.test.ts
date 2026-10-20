@@ -63,11 +63,11 @@ it("heads Codex work with its reasoning titles and groups what each phase touche
   expect(outline(workEntries(blocks))).toEqual([
     "# Inspecting the status row",
     "  Listed: [src]",
-    "  Searched: [ThreadStatus] [agentQuiet]",
+    "  Searched: [“ThreadStatus”] [“agentQuiet”]",
     "  Read: [status.tsx]",
     "# Updating the row",
     "  Edited: [ThreadStatusIndicator.tsx +2 -1]",
-    "  Ran: [pnpm test]",
+    "  Ran: [Run the tests]",
   ]);
   const [first] = workEntries(blocks);
   expect(first?.kind === "phase" && first.phase.detail).toBe("Find where the row renders.");
@@ -76,7 +76,7 @@ it("heads Codex work with its reasoning titles and groups what each phase touche
 it("keeps Codex's reasoning titles from splitting the work into a phase per call", () => {
   // Titles with no call between them fold into the next title, as the steps that led there.
   const folded = workEntries([thinking("r1", "**Reading the comp**\n\n**Checking the guide**"), thinking("r2", "**Capturing references**"), tool("c1", "shell", { command: "ls" })]);
-  expect(outline(folded)).toEqual(["# Capturing references", "  Ran: [ls]"]);
+  expect(outline(folded)).toEqual(["# Capturing references", "  Listed: [this folder]"]);
   expect(folded[0]?.kind === "phase" && folded[0].phase.thoughts.map((thought) => thought.title)).toEqual(["Reading the comp", "Checking the guide"]);
   // Inside a narrated phase, titles are its steps rather than phases of their own.
   const narrated = workEntries([
@@ -108,17 +108,27 @@ it("opens Claude's phases at its narration and names earlier calls after what th
     "  Read: [a.ts] [b.ts]",
     "  Searched: [agentQuiet]",
     "# Checking where threads are marked running",
-    "  Ran: [Find where threads are marked running] [Run the desktop tests]",
+    "  Searched: [Find where threads are marked running]",
     "  Read: [c.ts]",
     "  Edited: [d.ts +1 -1]",
+    "  Ran: [Run the desktop tests]",
     "  Used Figma: [get design context]",
   ]);
 });
 
-it("names a phase with one described command after it, and shows a raw command by its first line", () => {
+it("names a phase with one described command after it, a known command plainly, and anything else by its first line", () => {
   expect(outline(workEntries([tool("t1", "Bash", { command: "pnpm test", description: "Run the desktop tests" })]))).toEqual(["~ Run the desktop tests", "  Ran: [Run the desktop tests]"]);
-  const raw = [tool("c1", "shell", { command: `/bin/zsh -lc "python3 - <<'PY'\nprint(1)\nPY"` }), tool("c2", "shell", { command: "git status --short" })];
-  expect(outline(workEntries(raw))).toEqual(["~ Ran 2 commands", "  Ran: [python3 -] [git status --short]"]);
+  const known = [tool("c1", "shell", { command: `/bin/zsh -lc "python3 - <<'PY'\nprint(1)\nPY"` }), tool("c2", "shell", { command: "git status --short" })];
+  expect(outline(workEntries(known))).toEqual(["~ Ran a Python script and checked git status", "  Ran: [Run a Python script] [Check git status]"]);
+  expect(outline(workEntries([tool("c3", "shell", { command: "cd /tmp && opencode serve --help" })]))).toEqual(["~ Ran a command", "  Ran: [opencode serve --help]"]);
+});
+
+it("names a summary's runs by what they were, and counts them only past three", () => {
+  const looked = [tool("c1", "Bash", { command: "sed -n 1,20p a.ts" }), tool("c2", "Bash", { command: "rg -n foo src" }), tool("c3", "Bash", { command: "pnpm test" })];
+  expect(outline(workEntries(looked))[0]).toBe("~ Read a file, searched once");
+  expect(outline(workEntries([tool("c1", "Bash", { command: "pnpm test" }), tool("c2", "Bash", { command: "pnpm typecheck" })]))[0]).toBe("~ Ran the tests and the typecheck");
+  const many = ["pnpm test", "pnpm typecheck", "pnpm lint", "git status"].map((command, index) => tool(`m${index}`, "Bash", { command }));
+  expect(outline(workEntries(many))[0]).toBe("~ Ran 4 commands");
 });
 
 it("drops waiting and startup signals, keeps reasoning with the call it led to, and keeps milestones in their phase", () => {
@@ -165,7 +175,8 @@ it("names the one thing happening now, wherever it sits", () => {
   const head = (blocks: Block[], turn = blocks) => liveHeadline(workEntries(blocks), turn);
   expect(head([thinking("r1", "**Running the tests**"), tool("c1", "shell", { command: "pnpm test" }, false)])).toMatchObject({ label: "Running the tests", entryId: "phase-r1", since: 500 });
   expect(head([narration("n1", "I'll study the opening."), thinking("r1", "**Scrolling to the logos**", true)])).toMatchObject({ label: "Scrolling to the logos", entryId: "phase-n1" });
-  expect(head([tool("c1", "shell", { command: "pnpm test" }, false)])).toMatchObject({ label: "Running pnpm test", entryId: "phase-c1" });
+  expect(head([tool("c1", "shell", { command: "pnpm test" }, false)])).toMatchObject({ label: "Running the tests", entryId: "phase-c1" });
+  expect(head([tool("c1", "shell", { command: "sed -n 1,40p src/a.ts" }, false)])).toMatchObject({ label: "Reading a.ts" });
   expect(head([tool("c1", "Bash", { command: "pnpm test", description: "Run the tests" }, false)])).toMatchObject({ label: "Run the tests" });
   expect(head([narration("n1", "Checking the ledger."), tool("c1", "Bash", { command: "sqlite3", description: "Read the ledger" }, false)])).toMatchObject({
     label: "Checking the ledger",

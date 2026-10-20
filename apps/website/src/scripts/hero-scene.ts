@@ -1,8 +1,8 @@
-import { duration, journeys, moment, visibleAt, type Journey, type Layout, type SceneId, type Timeline } from "../data/hero";
+import { duration, journeys, moment, stateAt, visibleAt, type Journey, type Layout, type SceneId, type Timeline } from "../data/hero";
 import { createMotion, watchWidth } from "./hero-motion";
 
-/** How long the scene fades out and back in when the journey starts over, in seconds. */
-const JOURNEY_FADE_SECONDS = 0.45;
+/** How long a replay fades the scene out before its first moment comes back, in seconds. */
+const REWIND_SECONDS = 0.45;
 const MAX_FRAME_ELAPSED_MS = 100;
 const RENDER_INTERVAL_SECONDS = 1 / 30;
 
@@ -19,9 +19,15 @@ interface Stream {
 }
 
 /**
- * Plays a scene's journey against the markup its SceneFrame renders. The scene
- * state is a function of time, so pausing only stops the clock, reduced motion
- * shows the last moment, and the journey loops by fading back to its first moment.
+ * Where a scene is: resting on a moment with the clock stopped, fading out before it starts over, or playing once
+ * through to its last moment, where it rests again.
+ */
+type Phase = { name: "rest" } | { name: "rewind"; seconds: number } | { name: "play" };
+
+/**
+ * Plays a scene's journey against the markup its SceneFrame renders. The scene state is a function of time, so a
+ * scene rests on its last moment until asked to play, plays once, and pauses its clock while it is off screen.
+ * Reduced motion keeps it on its last moment.
  */
 export function initHeroScene(root: HTMLElement) {
   const journey = journeys[root.dataset.scene as SceneId];
@@ -33,44 +39,49 @@ export function initHeroScene(root: HTMLElement) {
 
   let layout: Layout = narrow.matches ? "narrow" : "wide";
   let timeline: Timeline = journey.timelines[layout];
+  let phase: Phase = { name: "rest" };
   let elapsedSeconds = 0;
   let previousFrameMs: number | null = null;
   let lastRenderedSeconds = -1;
   let frameRequest = 0;
   let visible = false;
-  let paused = reducedMotion.matches;
 
+  const end = () => moment("end", timeline);
   const prepare = () => {
     timeline = journey.timelines[layout];
     motion?.prepare(timeline);
     scene.prepare(timeline);
   };
-  const render = (sceneSeconds: number) => scene.render(sceneSeconds, timeline, layout);
+  const render = (sceneSeconds: number) => {
+    scene.render(sceneSeconds, timeline, layout);
+    lastRenderedSeconds = sceneSeconds;
+  };
 
   const tick = (now: number) => {
     frameRequest = 0;
-    if (previousFrameMs !== null) elapsedSeconds += Math.min(now - previousFrameMs, MAX_FRAME_ELAPSED_MS) / 1000;
+    const step = previousFrameMs === null ? 0 : Math.min(now - previousFrameMs, MAX_FRAME_ELAPSED_MS) / 1000;
     previousFrameMs = now;
-    const end = moment("end", timeline);
-    if (elapsedSeconds >= end + JOURNEY_FADE_SECONDS) {
+    if (phase.name === "rewind") {
+      phase.seconds += step;
+      if (phase.seconds < REWIND_SECONDS) return schedule();
+      phase = { name: "play" };
       elapsedSeconds = 0;
       lastRenderedSeconds = -1;
       root.removeAttribute("data-fading");
-    } else if (elapsedSeconds >= end) root.setAttribute("data-fading", "");
+    } else elapsedSeconds = Math.min(elapsedSeconds + step, end());
     // The fixtures change in words and short state transitions. Thirty updates
     // per second keep typing fluid without walking every scene node each frame.
-    const renderTime = Math.min(elapsedSeconds, end);
-    if (renderTime - lastRenderedSeconds >= RENDER_INTERVAL_SECONDS || (renderTime === end && lastRenderedSeconds < end)) {
-      render(renderTime);
-      lastRenderedSeconds = renderTime;
+    if (elapsedSeconds - lastRenderedSeconds >= RENDER_INTERVAL_SECONDS || elapsedSeconds === end()) render(elapsedSeconds);
+    if (elapsedSeconds < end()) motion?.render(elapsedSeconds);
+    else {
+      motion?.settle(elapsedSeconds);
+      phase = { name: "rest" };
     }
-    // Springs need every frame; the motion layer writes only what is moving.
-    motion?.render(renderTime);
     schedule();
   };
 
   const schedule = () => {
-    const running = visible && !paused && !document.hidden;
+    const running = phase.name !== "rest" && visible && !document.hidden;
     root.toggleAttribute("data-paused", !running);
     if (running && !frameRequest) frameRequest = requestAnimationFrame(tick);
     if (!running) {
@@ -80,50 +91,67 @@ export function initHeroScene(root: HTMLElement) {
     }
   };
 
-  /** Starts the journey from its first moment, or shows its last one when motion is reduced. */
-  const restart = () => {
-    elapsedSeconds = reducedMotion.matches && paused ? moment("end", timeline) : 0;
-    lastRenderedSeconds = elapsedSeconds;
-    previousFrameMs = null;
+  /** Stops on the last moment. */
+  const rest = () => {
+    phase = { name: "rest" };
+    elapsedSeconds = end();
     root.removeAttribute("data-fading");
     render(elapsedSeconds);
-    motion?.[paused ? "settle" : "render"](elapsedSeconds);
+    motion?.settle(elapsedSeconds);
+    schedule();
+  };
+
+  /** Plays the journey once from its first moment. */
+  const start = () => {
+    if (reducedMotion.matches) return rest();
+    phase = { name: "play" };
+    elapsedSeconds = 0;
+    root.removeAttribute("data-fading");
+    render(0);
+    motion?.render(0);
+    schedule();
+  };
+
+  /** Fades out whatever moment shows, then plays the journey once from its first. */
+  const replay = () => {
+    if (reducedMotion.matches) return rest();
+    phase = { name: "rewind", seconds: 0 };
+    root.setAttribute("data-fading", "");
     schedule();
   };
 
   prepare();
   root.setAttribute("data-engine", "");
-  restart();
+  rest();
 
   // Sizes the motion layer measured follow the frame's width.
   if (motion)
     watchWidth(root, () => {
       motion.prepare(timeline);
-      if (paused) motion.settle(lastRenderedSeconds);
+      if (phase.name === "rest") motion.settle(lastRenderedSeconds);
     });
 
   narrow.addEventListener("change", () => {
     layout = narrow.matches ? "narrow" : "wide";
     prepare();
-    restart();
+    rest();
   });
   reducedMotion.addEventListener("change", () => {
-    paused = reducedMotion.matches;
-    restart();
+    if (reducedMotion.matches) rest();
   });
   document.addEventListener("visibilitychange", schedule);
   new IntersectionObserver(
     ([entry]) => {
-      const entering = entry.isIntersecting && !visible;
       visible = entry.isIntersecting;
-      if (entering) restart();
-      else schedule();
+      schedule();
     },
     { threshold: 0.05 },
   ).observe(root);
 
-  return { restart };
+  return { start, replay };
 }
+
+export type ScenePlayer = ReturnType<typeof initHeroScene>;
 
 /** The markup a journey drives: timed blocks and flags, clocks, typed text and streamed words. */
 function bindScene(root: HTMLElement, journey: Journey, skip: string) {
@@ -166,7 +194,7 @@ function bindScene(root: HTMLElement, journey: Journey, skip: string) {
   };
   const states = (sceneSeconds: number, timeline: Timeline, layout: Layout) => {
     for (const [name, state] of Object.entries(journey.states)) {
-      const value = Object.entries(state[layout] ?? {}).find(([, windows]) => visibleAt(windows, timeline, sceneSeconds))?.[0] ?? state.rest;
+      const value = stateAt(state, layout, timeline, sceneSeconds);
       if (root.dataset[name] !== value) root.dataset[name] = value;
     }
   };

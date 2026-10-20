@@ -29,7 +29,7 @@ const since = (from: string, to?: string) => (journey ? duration(elapsed(journey
   <svg class="hs-logo" data-provider={harness} aria-hidden="true"><use href={`#hs-logo-${harness}`} /></svg>
   <span class="hs-head-name">{agent}</span>
   <span class="hs-head-status">
-    {`${model} · `}{took}
+    {took || clock ? `${model} · ` : model}{took}
     {clock ? <span {...(working ? at(`<${working}`) : {})} data-clock={clock.from} data-clock-text="working {t}">working {clock && since(clock.from)}</span> : null}
     {clock?.writing ? <span {...at(clock.to ? `${clock.writing}~${clock.to}` : `>${clock.writing}`)}>Writing</span> : null}
     {clock?.to ? <span {...at(`>${clock.to}`)} data-duration={`${clock.from}~${clock.to}`}>{since(clock.from, clock.to)}</span> : null}

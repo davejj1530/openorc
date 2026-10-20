@@ -117,10 +117,8 @@
   filter: invert(1);
 }
 
-/* Before the player starts, the page shows the first moment when it will play
-   and the last one when it won't (no script or reduced motion). */
-[data-hero-motion] .hero-scene:not([data-engine]) [data-start-hidden],
-:root:not([data-hero-motion]) .hero-scene:not([data-engine]) [data-end-hidden] {
+/* Scenes rest on their last moment, so until a player starts the page shows that one. */
+.hero-scene:not([data-engine]) [data-end-hidden] {
   display: none;
 }
 
@@ -2044,7 +2042,7 @@
 .hs-panel-add {
   width: calc(36 * var(--u));
   height: calc(36 * var(--u));
-  background: var(--hs-fill);
+  background: var(--hs-control);
 }
 .hs-panel-add .hs-icon,
 .hs-panel-tools .hs-round:first-child .hs-icon,
@@ -2183,6 +2181,188 @@
   height: clamp(440px, 44vw, 620px);
 }
 
+/* The app at rest, still: one 1248 × 780 window with the thread at the app's narrow reading gutters and the Changes
+   panel's card on the tile, its tab track on the window's top line. */
+.hs-mock-app {
+  --hs-canvas: 1248;
+  display: flex;
+  height: calc(780 * var(--u));
+}
+.hs-mock-app .hs-column {
+  padding-inline: calc(12 * var(--u));
+}
+.hs-app-panel {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  width: calc(500 * var(--u));
+}
+.hs-app-panel .hs-panel-header {
+  flex: none;
+  height: calc(44 * var(--u));
+  padding: 0 calc(16 * var(--u)) 0 0;
+}
+.hs-app-panel .hs-panel-header .hs-track > span {
+  height: calc(30 * var(--u));
+}
+.hs-app-panel-card {
+  flex: 1;
+  min-height: 0;
+  margin: 0 calc(8 * var(--u)) calc(8 * var(--u)) 0;
+  overflow: hidden;
+  border-radius: calc(20 * var(--u));
+  background: var(--hs-plane);
+  --hs-control: var(--hs-fill);
+}
+.hs-round[data-on] {
+  background: var(--hs-fill);
+  color: var(--hs-ink);
+}
+/* Threads that talk, still: one thread whose transcript reads from the top, so the message that reached it leads. */
+.hs-mock-message {
+  --hs-canvas: 640;
+  display: flex;
+  height: calc(620 * var(--u));
+}
+.hs-mock-message .hs-transcript {
+  justify-content: flex-start;
+}
+/* A file open in the work panel, still: the code in the editor's GitHub colors, the line being typed on highlighted. */
+.hs-mock-editor {
+  --hs-canvas: 600;
+  --hs-syntax-kw: #d73a49;
+  --hs-syntax-str: #032f62;
+  --hs-syntax-fn: #6f42c1;
+  --hs-syntax-tag: #22863a;
+  height: calc(560 * var(--u));
+  background: var(--hs-bg);
+}
+:root[data-theme="dark"] .hs-mock-editor {
+  --hs-syntax-kw: #f97583;
+  --hs-syntax-str: #9ecbff;
+  --hs-syntax-fn: #b392f0;
+  --hs-syntax-tag: #85e89d;
+}
+.hs-mock-editor .hs-track > span {
+  gap: calc(6 * var(--u));
+}
+.hs-file-toolbar {
+  display: flex;
+  align-items: center;
+  gap: calc(6 * var(--u));
+  height: calc(44 * var(--u));
+  padding: 0 calc(10 * var(--u)) 0 calc(20 * var(--u));
+}
+.hs-crumbs {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: calc(4 * var(--u));
+  min-width: 0;
+  color: var(--hs-faint);
+  font-size: calc(13 * var(--u));
+}
+.hs-crumbs .hs-icon {
+  width: calc(12 * var(--u));
+  height: calc(12 * var(--u));
+}
+.hs-crumbs [data-current] {
+  color: var(--hs-ink);
+}
+.hs-file-toolbar .hs-button {
+  background: var(--hs-fill);
+}
+.hs-code {
+  padding-top: calc(8 * var(--u));
+  color: var(--hs-ink);
+  font-family: var(--hs-mono);
+  font-size: calc(12.5 * var(--u));
+  line-height: calc(22 * var(--u));
+  letter-spacing: 0;
+}
+.hs-code-row {
+  display: flex;
+  height: calc(22 * var(--u));
+}
+.hs-code-row[data-active] {
+  background: var(--hs-fill);
+}
+.hs-code-num {
+  flex: none;
+  width: calc(48 * var(--u));
+  padding-right: calc(14 * var(--u));
+  color: var(--hs-faint);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.hs-code-row[data-active] .hs-code-num {
+  color: var(--hs-muted);
+}
+.hs-code-line {
+  white-space: pre;
+}
+.hs-tok-kw {
+  color: var(--hs-syntax-kw);
+}
+.hs-tok-str {
+  color: var(--hs-syntax-str);
+}
+.hs-tok-fn,
+.hs-tok-attr {
+  color: var(--hs-syntax-fn);
+}
+.hs-tok-tag {
+  color: var(--hs-syntax-tag);
+}
+
+/* A reply with more than one block: paragraphs, a small heading, and bullets that lead with their point. */
+.hs-reply > * + * {
+  margin-top: calc(14 * var(--u));
+}
+.hs-reply > .hs-prose-heading {
+  margin-top: calc(20 * var(--u));
+  color: var(--hs-ink);
+  font-size: calc(16 * var(--u));
+  line-height: calc(24 * var(--u));
+  letter-spacing: -0.01em;
+}
+.hs-prose-list {
+  display: grid;
+  gap: calc(8 * var(--u));
+  margin-bottom: 0;
+  padding: 0;
+  color: var(--hs-muted);
+  list-style: none;
+}
+.hs-prose-list li {
+  position: relative;
+  padding-left: calc(16 * var(--u));
+}
+.hs-prose-list li::before {
+  content: "";
+  position: absolute;
+  top: calc(9 * var(--u));
+  left: 0;
+  width: calc(4 * var(--u));
+  height: calc(4 * var(--u));
+  border-radius: 999px;
+  background: var(--hs-faint);
+}
+.hs-prose-list .hs-strong {
+  color: var(--hs-ink);
+}
+
+/* A still set on a plane instead of the tile: the plane becomes its ground, and what the app draws as planes steps
+   down to the tile's fill, as cards do inside the app's own planes. */
+.hs-on-plane :is(.hero-scene, .hs-mock) {
+  --hs-bg: #ffffff;
+  --hs-plane: #f4f4f4;
+}
+:root[data-theme="dark"] .hs-on-plane :is(.hero-scene, .hs-mock) {
+  --hs-bg: #0a0a0a;
+  --hs-plane: #171717;
+}
+
 /* Scenes with data-motion: scripts/hero-motion.ts opens and closes [data-grow]
    blocks with springs. Elsewhere blocks arrive with the app's rise and blur.
    States that swap in place and streamed words fade in rather than appear. */
@@ -2216,7 +2396,7 @@
   color: var(--hs-faint);
 }
 
-/* The journey fades back to its first moment when it loops. */
+/* A replay fades the scene out before its first moment comes back. */
 .hero-scene[data-fading] :is(.hs-column, .hs-doc, .hs-commit, .hs-typed) {
   opacity: 0;
 }
@@ -2229,13 +2409,13 @@
 
 /* Without a player the page shows the last moment through data-end-hidden, so the states read from hidden blocks
    follow those attributes instead. */
-:root:not([data-hero-motion]) .hero-scene:not([data-engine]) .hs-turn:has(> .hs-steps[data-end-hidden]) .hs-receipt-chevron {
+.hero-scene:not([data-engine]) .hs-turn:has(> .hs-steps[data-end-hidden]) .hs-receipt-chevron {
   rotate: none;
 }
-:root:not([data-hero-motion]) .hero-scene:not([data-engine]) .hs-step:has(> .hs-step-mark > .hs-live[data-end-hidden]) > .hs-step-title {
+.hero-scene:not([data-engine]) .hs-step:has(> .hs-step-mark > .hs-live[data-end-hidden]) > .hs-step-title {
   color: var(--hs-muted);
 }
-:root:not([data-hero-motion]) .hero-scene:not([data-engine]) .hs-step:has(> .hs-step-body[data-end-hidden]) .hs-step-chevron {
+.hero-scene:not([data-engine]) .hs-step:has(> .hs-step-body[data-end-hidden]) .hs-step-chevron {
   display: none;
 }
 

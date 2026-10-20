@@ -1,0 +1,20 @@
+---
+/** Import terminal sessions, still: the app's menu of Claude Code and Codex sessions, one already brought in. */
+import Icon from "../Icon.astro";
+
+const sessions = [
+  { title: "Fix the flaky upload test", detail: "42 msgs" },
+  { title: "Add the pricing table", detail: "18 msgs" },
+  { title: "Tidy the auth middleware", detail: "imported", done: true },
+];
+---
+
+<div class="setup-window">
+  {sessions.map((session) => (
+    <span class="setup-row" data-done={session.done ? "" : undefined}>
+      <span class="setup-check"><Icon name="check" size={10} /></span>
+      <span class="setup-grow">{session.title}</span>
+      <span class="setup-quiet">{session.detail}</span>
+    </span>
+  ))}
+</div>

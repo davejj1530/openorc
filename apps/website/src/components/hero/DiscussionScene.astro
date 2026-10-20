@@ -21,7 +21,7 @@ const { copy, replies, request, result } = discussion;
 const at = (windows: string) => timed(discussionJourney, windows);
 ---
 
-<SceneFrame id="discussion" journey={discussionJourney} label={label} view="task" nav="Tasks" rows={[discussion.thread]} motion>
+<SceneFrame id="discussion" journey={discussionJourney} label={label} nav="Tasks" rows={[discussion.thread]} motion>
   <div class="hs-panes">
     <TaskPane id="task" journey={discussionJourney} title={discussion.title} start="replyDone" branch={discussion.thread.branch}>
       <div class="hs-doc-title">{discussion.title}</div>

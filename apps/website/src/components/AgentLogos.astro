@@ -1,25 +1,53 @@
 ---
 /**
- * The coding agents OpenOrc works with, as one monochrome row. The marks are
- * the provider files the app ships (public/*.svg), recolored to the text color.
+ * The coding agents OpenOrc works with, named in one quiet line with their marks: the provider files the app ships
+ * (public/*.svg). Codex is drawn in the text color, as OpenAI's mark is monochrome; Claude and OpenCode keep theirs.
  */
 import openai from "../../public/openai.svg?raw";
 import claude from "../../public/claude.svg?raw";
 import opencode from "../../public/opencode.svg?raw";
 
-const mono = (svg: string) => (svg.match(/<path[^>]*\/>|<path[^>]*>.*?<\/path>/gs)?.join("") ?? "").replace(/fill="[^"]*"/g, 'fill="currentColor"');
+const paths = (svg: string) => svg.match(/<path[^>]*\/>|<path[^>]*>.*?<\/path>/gs)?.join("") ?? "";
 const agents = [
-  { name: "Codex", viewBox: "0 0 41 41", paths: mono(openai) },
-  { name: "Claude Code", viewBox: "0 0 125 125", paths: mono(claude) },
-  { name: "OpenCode", viewBox: "96 64 320 384", paths: mono(opencode) },
+  { name: "Codex", viewBox: "0 0 41 41", paths: paths(openai).replace(/fill="[^"]*"/g, 'fill="currentColor"'), tone: "ink" },
+  { name: "Claude Code", viewBox: "0 0 125 125", paths: paths(claude) },
+  { name: "OpenCode", viewBox: "96 64 320 384", paths: paths(opencode), tone: "invert" },
 ];
 ---
 
-<ul class="agent-logos" aria-label="Supported coding agents">
-  {agents.map((agent) => (
-    <li>
-      <svg viewBox={agent.viewBox} aria-hidden="true" set:html={agent.paths} />
-      <span>{agent.name}</span>
-    </li>
+<p class="works-with">
+  Works with
+  {agents.map((agent, i) => (
+    <Fragment>
+      {i === agents.length - 1 ? " and " : i > 0 ? ", " : " "}
+      <span class="works-with-agent">
+        <svg viewBox={agent.viewBox} data-tone={agent.tone} aria-hidden="true" set:html={agent.paths} />
+        {agent.name}
+      </span>
+    </Fragment>
   ))}
-</ul>
+</p>
+
+<style>
+  .works-with {
+    color: var(--faint);
+    font-size: 0.8125rem;
+    line-height: 1.4;
+  }
+  .works-with-agent {
+    white-space: nowrap;
+  }
+  .works-with svg {
+    width: 14px;
+    height: 14px;
+    margin-right: 5px;
+    vertical-align: -2px;
+  }
+  .works-with svg[data-tone="ink"] {
+    color: var(--text);
+  }
+  /* OpenCode's mark is dark, so the dark theme inverts it, as the app does. */
+  :global(:root[data-theme="dark"]) .works-with svg[data-tone="invert"] {
+    filter: invert(1);
+  }
+</style>

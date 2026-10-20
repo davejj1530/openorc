@@ -1,0 +1,36 @@
+---
+/**
+ * Threads that talk, still: the Billing page thread after Plans migration's answer reached it, as the Across threads
+ * scene ends. The message opens a new turn that builds the page against the answer.
+ */
+import "../../styles/hero-scene.css";
+import ChangeLine from "../hero/ChangeLine.astro";
+import ProductIcon from "../hero/ProductIcon.astro";
+import Prose from "../hero/Prose.astro";
+import Receipt from "../hero/Receipt.astro";
+import ThreadPane from "../hero/ThreadPane.astro";
+import TurnHead from "../hero/TurnHead.astro";
+import { handoff, threads } from "../../data/hero/handoff";
+import { duration, elapsed } from "../../data/hero/timeline";
+
+const { a } = threads;
+---
+
+<div class="hs-mock hs-mock-message">
+  <ThreadPane id="a" title={a.title} model={{ harness: a.harness, label: a.label, effort: a.effort }} permission={a.permission} placeholder={`Message ${a.agent}…`} changes changeStat={a.change}>
+    <div class="hs-turn">
+      <div class="hs-notice">
+        <ProductIcon name="workMessage" />
+        <span class="hs-notice-body">
+          <span class="hs-notice-head">{a.notice.head}</span>
+          <span class="hs-notice-toggle">Show details</span>
+        </span>
+      </div>
+      <TurnHead harness={a.harness} agent={a.agent} model={a.label} took={duration(elapsed(handoff, "aWork", "aFinish"))} />
+      <Receipt steps="1 step" />
+      <div class="hs-reply"><Prose text={a.result} /></div>
+      <ChangeLine files={1} added={a.change.added} removed={a.change.removed} undo />
+      <div class="hs-turn-actions"><ProductIcon name="copy" /></div>
+    </div>
+  </ThreadPane>
+</div>

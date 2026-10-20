@@ -114,3 +114,19 @@ it("restores a saved session in its saved order and leaves Changes alone on an a
   expect(session().tabs.map((tab) => tab.id)).toEqual(["b", "a", scope]);
   expect(currentPage(session().tabs[1]!)).toEqual(changes);
 });
+
+it("gives each further Terminal tab a numbered shell of its own, while opening Terminal finds the conversation's shell", () => {
+  actions().navigate(scope, terminal);
+  actions().add(scope);
+  actions().navigate(scope, terminal);
+  const second = currentPage(activeTab(session()));
+  expect(second).toMatchObject({ kind: "tool", tool: "terminal", shell: { number: 2 } });
+  actions().add(scope);
+  actions().navigate(scope, terminal);
+  expect(currentPage(activeTab(session()))).toMatchObject({ shell: { number: 3 } });
+  expect(second.kind === "tool" && second.shell?.id).not.toBe(currentPage(activeTab(session())).kind === "tool" && (currentPage(activeTab(session())) as { shell?: { id: string } }).shell?.id);
+  // A request for the Terminal, such as signing in, lands on the conversation's own shell.
+  actions().open(scope, terminal);
+  expect(currentPage(activeTab(session()))).toEqual(terminal);
+  expect(session().tabs).toHaveLength(3);
+});

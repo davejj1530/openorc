@@ -7,7 +7,10 @@ export type PanelPage =
   | { kind: "browser"; url: string; title: string }
   | { kind: "file"; selection: FileSelection | null }
   | { kind: "changes"; selection: ChangeSelection | null }
-  | { kind: "tool"; tool: Exclude<PanelTab, "newtab" | "browser" | "file" | "changes"> };
+  | { kind: "tool"; tool: Exclude<PanelTab, "newtab" | "browser" | "file" | "changes">; shell?: TerminalShell };
+
+/** A Terminal tab's own shell. The conversation's first Terminal has none and keeps the conversation's shell. */
+export type TerminalShell = { id: string; number: number };
 
 export type WorkTab = { id: string; entries: [PanelPage, ...PanelPage[]]; index: number };
 export type PanelSession = { tabs: [WorkTab, ...WorkTab[]]; activeId: string };
@@ -43,9 +46,22 @@ function toFront(session: PanelSession, id: string): PanelSession {
 
 function samePage(left: PanelPage, right: PanelPage): boolean {
   if (left.kind === "file" && right.kind === "file") return left.selection?.path === right.selection?.path;
+  if (left.kind === "tool" && right.kind === "tool" && left.tool === "terminal") return right.tool === "terminal" && left.shell?.id === right.shell?.id;
   return pageType(left) === pageType(right);
 }
 
+const terminalShells = (tab: WorkTab) => tab.entries.flatMap((page) => (page.kind === "tool" && page.tool === "terminal" ? [page.shell ?? null] : []));
+
+/**
+ * A Terminal opened while another tab already holds the conversation's shell gets a shell of its own, numbered after
+ * the others, so each Terminal tab is its own shell.
+ */
+function withOwnShell(session: PanelSession, tabId: string, page: PanelPage): PanelPage {
+  if (page.kind !== "tool" || page.tool !== "terminal" || page.shell) return page;
+  const others = session.tabs.filter((tab) => tab.id !== tabId).flatMap(terminalShells);
+  if (!others.includes(null)) return page;
+  const number = Math.max(1, ...others.map((shell) => shell?.number ?? 1)) + 1;
+  return { ...page, shell: { id: crypto.randomUUID(), number } };
 }
 
 interface PanelSessions {
@@ -87,7 +103,7 @@ export const usePanelSessions = create<PanelSessions>()(
             const tabs: PanelSession["tabs"] = [first, ...rest];
             return { tabs, activeId: session.activeId === id ? (tabs[Math.max(0, index - 1)] ?? first).id : session.activeId };
           }),
-        navigate: (scope, page) => change(scope, (session) => updateTab(session, session.activeId, (tab) => navigateTab(tab, page))),
+        navigate: (scope, page) => change(scope, (session) => updateTab(session, session.activeId, (tab) => navigateTab(tab, withOwnShell(session, tab.id, page)))),
         open: (scope, page, id) =>
           change(scope, (session) => {
             const existing = id ? session.tabs.find((tab) => tab.id === id) : session.tabs.find((tab) => samePage(currentPage(tab), page));

@@ -1,0 +1,163 @@
+---
+/**
+ * The parts of the app, as wide cards in a row that scrolls sideways from the page's left edge off its right one.
+ * Each card is a tile: a soft colored visual holding a still of the part on a plane, then its title and a line.
+ * The Slack card's visual plays its thread once when pressed.
+ */
+import Icon from "./Icon.astro";
+import MeshGradient from "./MeshGradient.astro";
+import SlackDemo from "./SlackDemo.astro";
+import CodeEditorMock from "./mocks/CodeEditorMock.astro";
+import ImportSessionsMock from "./mocks/ImportSessionsMock.astro";
+import TaskListMock from "./mocks/TaskListMock.astro";
+import ThreadMessageMock from "./mocks/ThreadMessageMock.astro";
+import WorktreeMock from "./mocks/WorktreeMock.astro";
+
+interface Card {
+  id: string;
+  title: string;
+  body: string;
+  palette: { light: string[]; dark: string[] };
+  /** A still of the part, or a scene that rests on its last moment. */
+  visual: typeof TaskListMock;
+  /** What the visual shows, for anyone who cannot see it. */
+  label: string;
+  /** The visual is a scene resting on its last moment, and pressing it plays the scene once. */
+  replay?: true;
+}
+
+const cards: Card[] = [
+  {
+    id: "threads",
+    title: "Agents communication across threads.",
+    body: "One agent asks another before it builds, and the answer lands in both threads.",
+    palette: { light: ["#f3effa", "#d9cff0", "#ece6f7", "#cbbde9"], dark: ["#17141d", "#2c2540", "#100e14", "#3a3052"] },
+    visual: ThreadMessageMock,
+    label: "The Billing page thread after a message from the Plans migration thread. Claude built the page against the answer, user.subscription with its plan, card, and invoices, and changed one file.",
+  },
+  {
+    id: "review",
+    title: "Plan, review, ship.",
+    body: "Turn a conversation into tasks, weigh the approach with more than one model, and read the diff where the work happened.",
+    palette: { light: ["#fbf2ea", "#f1d6c2", "#f7e8dc", "#ebc7ab"], dark: ["#1c1612", "#3d2b1f", "#130f0c", "#4a3424"] },
+    visual: TaskListMock,
+    label: "OpenOrc Tasks view with active tasks grouped by In progress, Ready for review, and Backlog.",
+  },
+  {
+    id: "worktrees",
+    title: "Parallel work, without collisions.",
+    body: "Give a thread its own worktree and branch. Agents work side by side without touching each other’s files.",
+    palette: { light: ["#f1f4ec", "#d6e0c8", "#e8eedf", "#c7d5b3"], dark: ["#151812", "#2a3223", "#0f110d", "#343f2b"] },
+    visual: WorktreeMock,
+    label: "A thread working in its own worktree. Under the composer it names its branch, openorc/design-tokens, with 12 lines added and 4 removed, and offers to commit them.",
+  },
+  {
+    id: "editor",
+    title: "Write code yourself.",
+    body: "Open a file beside the conversation, make the change, and save. The agent sees what you changed on its next turn.",
+    palette: { light: ["#eef2f9", "#cfdaf0", "#e6ecf6", "#bccbea"], dark: ["#13161c", "#252e40", "#0d0f13", "#2f3a52"] },
+    visual: CodeEditorMock,
+    label: "Welcome.tsx open in a tab beside Changes, in the studio project. The button label is being edited to Start your first conversation, and Save waits for the change.",
+  },
+  {
+    id: "slack",
+    title: "Pick it up from Slack.",
+    body: "Mention your personal bot in a channel. Your agent works on your computer and replies in the thread.",
+    palette: { light: ["#faf0f2", "#efd2da", "#f6e6ea", "#e7c0cb"], dark: ["#1b1416", "#3a252b", "#120d0f", "#472d35"] },
+    visual: SlackDemo,
+    label: "A sample Slack thread. David asks OpenOrc to simplify the studio welcome screen. OpenOrc posts a progress line naming the model and the tool it is using, which becomes its reply: should Connect a project be the one clear next step? David confirms. A new progress line waits for approval, and a permission request to edit Welcome.tsx offers Allow once and Deny, with buttons that expire after 10 minutes.",
+    replay: true,
+  },
+  {
+    id: "import",
+    title: "Bring conversations forward.",
+    body: "Import Claude Code and Codex sessions and continue them with their history intact.",
+    palette: { light: ["#faf6e8", "#efe2b5", "#f6efd6", "#e8d79e"], dark: ["#1a1811", "#363020", "#11100b", "#433b25"] },
+    visual: ImportSessionsMock,
+    label: "OpenOrc's list of Claude Code and Codex sessions to import, with their message counts, one of them already imported.",
+  },
+];
+---
+
+<section class="showcase" aria-labelledby="showcase-title" data-showcase>
+  <div class="showcase-head container" data-reveal>
+    <h2 id="showcase-title">More than just threads.</h2>
+    <div class="showcase-steps">
+      <button type="button" class="round-button" aria-label="Previous" data-step="-1" disabled><Icon name="chevron" size={16} /></button>
+      <button type="button" class="round-button" aria-label="Next" data-step="1"><Icon name="chevron" size={16} /></button>
+    </div>
+  </div>
+  <div class="showcase-track" data-reveal>
+    <div class="showcase-row" role="region" aria-label="Parts of OpenOrc" tabindex="0" data-showcase-row data-at-start>
+      <ul class="showcase-cards">
+        {cards.map(({ id, title, body, palette, visual: Visual, label, replay }, index) => {
+          const Frame = replay ? "button" : "div";
+          return (
+            <li class="showcase-card" data-card={id}>
+              <Frame class="showcase-visual" aria-label={label} {...(replay ? { type: "button", "data-replay": "" } : { role: "img" })}>
+                <MeshGradient class="showcase-ground" colors={palette} distortion={0.8} swirl={0.25} frame={2000 + index * 2600}>
+                  <div class="showcase-plane hs-on-plane">
+                    <Visual />
+                  </div>
+                </MeshGradient>
+              </Frame>
+              <h3>{title}</h3>
+              <p>{body}</p>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { initHeroScene, type ScenePlayer } from "../scripts/hero-scene";
+  import { play } from "../scripts/speaker";
+
+  const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+
+  for (const showcase of document.querySelectorAll<HTMLElement>("[data-showcase]")) {
+    const row = showcase.querySelector<HTMLElement>("[data-showcase-row]")!;
+    const cards = [...row.querySelectorAll<HTMLElement>(".showcase-card")];
+    const steps = [...showcase.querySelectorAll<HTMLButtonElement>("[data-step]")];
+
+    /** The card the row starts on: the one whose start is nearest the row's scroll position. */
+    const current = () => cards.reduce((best, card, i) => (Math.abs(card.offsetLeft - row.scrollLeft) < Math.abs(cards[best].offsetLeft - row.scrollLeft) ? i : best), 0);
+    const step = (direction: number) => {
+      const target = cards[Math.min(cards.length - 1, Math.max(0, current() + direction))];
+      row.scrollTo({ left: target.offsetLeft, behavior: reducedMotion.matches ? "instant" : "smooth" });
+    };
+    const edges = () => {
+      const atStart = row.scrollLeft <= 1;
+      const atEnd = row.scrollLeft >= row.scrollWidth - row.clientWidth - 1;
+      row.toggleAttribute("data-at-start", atStart);
+      row.toggleAttribute("data-at-end", atEnd);
+      steps.forEach((button) => (button.disabled = Number(button.dataset.step) < 0 ? atStart : atEnd));
+    };
+
+    for (const button of steps) button.addEventListener("click", () => step(Number(button.dataset.step)));
+    row.addEventListener("keydown", (event) => {
+      if (event.target !== row || (event.key !== "ArrowLeft" && event.key !== "ArrowRight")) return;
+      event.preventDefault();
+      const direction = event.key === "ArrowLeft" ? -1 : 1;
+      if (direction < 0 ? row.hasAttribute("data-at-start") : row.hasAttribute("data-at-end")) return;
+      play("tap");
+      step(direction);
+    });
+    row.addEventListener("scroll", edges, { passive: true });
+    new ResizeObserver(edges).observe(row);
+    edges();
+
+    // A replayable visual starts its player the first time it is pressed; until then it rests as the server drew it.
+    for (const visual of row.querySelectorAll<HTMLButtonElement>("[data-replay]")) {
+      let player: ScenePlayer | null = null;
+      visual.addEventListener("click", () => {
+        const scene = visual.querySelector<HTMLElement>("[data-hero-scene]");
+        if (!scene) return;
+        player ??= initHeroScene(scene);
+        player.replay();
+      });
+    }
+  }
+</script>

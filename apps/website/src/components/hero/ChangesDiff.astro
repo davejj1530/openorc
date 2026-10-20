@@ -1,0 +1,62 @@
+---
+/**
+ * The Changes page's content (Panel.tsx, DiffView.tsx): the Uncommitted bar with Commit, and the sample diff under its
+ * file head. Rows follow the app's unified view: line numbers, soft runs of additions and removals, no syntax colors.
+ */
+import Counts from "./Counts.astro";
+import ProductIcon from "./ProductIcon.astro";
+
+type Type = "context" | "add" | "del";
+const lines: [Type, number, string][] = [
+  ["context", 1, "import { ProjectPicker } from './ProjectPicker';"],
+  ["add", 2, "import { Button } from './ui';"],
+  ["context", 3, ""],
+  ["context", 4, "export function Welcome() {"],
+  ["context", 5, "  return ("],
+  ["del", 5, '    <main className="empty">'],
+  ["del", 6, "      <p>No projects yet.</p>"],
+  ["add", 6, '    <main className="welcome">'],
+  ["add", 7, "      <h1>Make yourself at home.</h1>"],
+  ["add", 8, "      <p>Connect a project to start building.</p>"],
+  ["context", 9, "      <ProjectPicker />"],
+  ["add", 10, "      <Button onClick={startConversation}>"],
+  ["add", 11, "        Start a conversation"],
+  ["add", 12, "      </Button>"],
+  ["add", 13, "      <KeyboardHint />"],
+  ["context", 14, "    </main>"],
+  ["context", 15, "  );"],
+  ["context", 16, "}"],
+];
+// A run of changed lines rounds its ends, and a run that follows another kind of change starts a little apart.
+const rows = lines.map(([type, number, code], i) => ({
+  type,
+  number,
+  code,
+  first: type !== "context" && lines[i - 1]?.[0] !== type,
+  last: type !== "context" && lines[i + 1]?.[0] !== type,
+}));
+---
+
+<div class="hs-panel-bar">
+  <span class="hs-panel-title">Uncommitted</span>
+  <span class="hs-panel-meta">1 file</span>
+  <Counts added={8} removed={2} />
+  <span class="hs-round hs-panel-refresh"><ProductIcon name="refresh" /></span>
+  <span class="hs-button hs-button-ink">Commit</span>
+</div>
+<section class="hs-diff-file">
+  <div class="hs-diff-head">
+    <ProductIcon name="chevronDown" />
+    <span class="hs-diff-letter">M</span>
+    <span class="hs-diff-path"><span>src/</span>Welcome.tsx</span>
+    <Counts added={8} removed={2} />
+  </div>
+  <div class="hs-diff">
+    {rows.map((row) => (
+      <div class="hs-diff-row" data-type={row.type} data-first={row.first ? "" : undefined} data-last={row.last ? "" : undefined}>
+        <span class="hs-diff-num">{row.number}</span>
+        <span class="hs-diff-code">{row.code}</span>
+      </div>
+    ))}
+  </div>
+</section>

@@ -18,8 +18,10 @@ interface Props extends Omit<ComposerProps, "layout"> {
   title: string;
   /** Windows during which the thread's agent is working; stills pass none. */
   busy?: string;
+  /** The work panel is open beside the thread, so its toggle shows as on. */
+  panel?: boolean;
 }
-const { id, title, busy, ...composer } = Astro.props;
+const { id, title, busy, panel, ...composer } = Astro.props;
 const { journey } = composer;
 ---
 
@@ -35,7 +37,7 @@ const { journey } = composer;
       <span class="hs-round hs-close-pane"><ProductIcon name="close" /></span>
       <span class="hs-round"><ProductIcon name="more" /></span>
       <span class="hs-round"><ProductIcon name="tasks" /></span>
-      <span class="hs-round"><ProductIcon name="panelRight" /></span>
+      <span class="hs-round" data-on={panel ? "" : undefined}><ProductIcon name="panelRight" /></span>
     </span>
   </header>
   <div class="hs-transcript">

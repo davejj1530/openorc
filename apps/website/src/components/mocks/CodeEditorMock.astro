@@ -1,0 +1,61 @@
+---
+/**
+ * The work panel's file page, still (FilePanel.tsx, FileToolbar.tsx): the file's tab beside Changes, its path with
+ * Save for the unsaved edit, and the code in the app's editor colors (Shiki's GitHub themes) with the caret where the
+ * person is typing.
+ */
+import FileGlyph from "../hero/FileGlyph.astro";
+import ProductIcon from "../hero/ProductIcon.astro";
+import "../../styles/hero-scene.css";
+
+type Token = "kw" | "str" | "fn" | "tag" | "attr" | "text";
+const t = (kind: Token, text: string): [Token, string] => [kind, text];
+const lines: [Token, string][][] = [
+  [t("kw", "import"), t("text", " { ProjectPicker } "), t("kw", "from"), t("str", " './ProjectPicker'"), t("text", ";")],
+  [t("kw", "import"), t("text", " { Button } "), t("kw", "from"), t("str", " './ui'"), t("text", ";")],
+  [],
+  [t("kw", "export function"), t("fn", " Welcome"), t("text", "() {")],
+  [t("kw", "  return"), t("text", " (")],
+  [t("text", "    <"), t("tag", "main"), t("attr", " className"), t("kw", "="), t("str", '"welcome"'), t("text", ">")],
+  [t("text", "      <"), t("tag", "h1"), t("text", ">Make yourself at home.</"), t("tag", "h1"), t("text", ">")],
+  [t("text", "      <"), t("tag", "p"), t("text", ">Connect a project to start building.</"), t("tag", "p"), t("text", ">")],
+  [t("text", "      <"), t("fn", "ProjectPicker"), t("text", " />")],
+  [t("text", "      <"), t("fn", "Button"), t("attr", " onClick"), t("kw", "="), t("text", "{startConversation}>")],
+  [t("text", "        Start your first conversation")],
+  [t("text", "      </"), t("fn", "Button"), t("text", ">")],
+  [t("text", "      <"), t("fn", "KeyboardHint"), t("text", " />")],
+  [t("text", "    </"), t("tag", "main"), t("text", ">")],
+  [t("text", "  );")],
+  [t("text", "}")],
+];
+const active = 11;
+---
+
+<div class="hs-mock hs-mock-editor">
+  <div class="hs-panel-header">
+    <span class="hs-track">
+      <span><ProductIcon name="fileDiff" />Changes</span>
+      <span data-selected><FileGlyph path="Welcome.tsx" />Welcome.tsx</span>
+    </span>
+    <span class="hs-round hs-panel-add"><ProductIcon name="plus" /></span>
+  </div>
+  <div class="hs-file-toolbar">
+    <span class="hs-crumbs">
+      <span>studio</span><ProductIcon name="chevronRight" /><span>src</span><ProductIcon name="chevronRight" /><span data-current>Welcome.tsx</span>
+    </span>
+    <span class="hs-button hs-button-sm">Save</span>
+    <span class="hs-round"><ProductIcon name="folder" /></span>
+    <span class="hs-round"><ProductIcon name="more" /></span>
+  </div>
+  <div class="hs-code">
+    {lines.map((tokens, i) => (
+      <div class="hs-code-row" data-active={i + 1 === active ? "" : undefined}>
+        <span class="hs-code-num">{i + 1}</span>
+        <span class="hs-code-line">
+          {tokens.map(([kind, text]) => (kind === "text" ? text : <span class={`hs-tok-${kind}`}>{text}</span>))}
+          {i + 1 === active ? <i class="hs-caret" /> : null}
+        </span>
+      </div>
+    ))}
+  </div>
+</div>

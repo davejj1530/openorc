@@ -1,0 +1,124 @@
+---
+/**
+ * A frame painted by a mesh gradient (Paper Shaders). It starts drawing as it nears the screen; with a speed it drifts
+ * while in view and holds still under reduced motion. The theme swaps the colors in place. Content in the slot sits
+ * above the canvas. Without WebGL the frame keeps its flat fill.
+ */
+import type { HTMLAttributes } from "astro/types";
+
+interface Props extends HTMLAttributes<"div"> {
+  colors: { light: string[]; dark: string[] };
+  distortion: number;
+  swirl: number;
+  grainMixer?: number;
+  grainOverlay?: number;
+  /** How fast it drifts; 0 keeps it still. */
+  speed?: number;
+  /** Where in its motion it starts, in ms. */
+  frame?: number;
+}
+
+const { colors, distortion, swirl, grainMixer = 0, grainOverlay = 0, speed = 0, frame = 0, class: className, ...rest } = Astro.props;
+const mesh = { colors, distortion, swirl, grainMixer, grainOverlay, speed, frame };
+---
+
+<div class:list={["mesh-gradient", className]} data-mesh-gradient={JSON.stringify(mesh)} {...rest}>
+  <slot />
+</div>
+
+<style is:global>
+  /* Without weight, so the class a frame is given can place and size it. */
+  :where(.mesh-gradient) {
+    position: relative;
+    isolation: isolate;
+    background: var(--surface);
+  }
+  :where(.mesh-gradient) > canvas {
+    opacity: 0;
+    transition: opacity var(--duration-swap) ease;
+  }
+  :where(.mesh-gradient[data-painted]) > canvas {
+    opacity: 1;
+  }
+</style>
+
+<script>
+  import { ShaderFitOptions, ShaderMount, getShaderColorFromString, meshGradientFragmentShader } from "@paper-design/shaders";
+
+  interface Mesh {
+    colors: { light: string[]; dark: string[] };
+    distortion: number;
+    swirl: number;
+    grainMixer: number;
+    grainOverlay: number;
+    speed: number;
+    frame: number;
+  }
+
+  const frames = [...document.querySelectorAll<HTMLElement>("[data-mesh-gradient]")];
+  const painted = new Map<HTMLElement, { mount: ShaderMount; mesh: Mesh }>();
+  const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+  const speedOf = (mesh: Mesh) => (reducedMotion.matches ? 0 : mesh.speed);
+  const theme = () => (document.documentElement.dataset.theme === "dark" ? "dark" : "light");
+  const palette = (mesh: Mesh) => {
+    const colors = mesh.colors[theme()];
+    return { u_colors: colors.map((color) => getShaderColorFromString(color)), u_colorsCount: colors.length };
+  };
+
+  function paint(frame: HTMLElement) {
+    if (painted.has(frame)) return;
+    const mesh = JSON.parse(frame.dataset.meshGradient!) as Mesh;
+    const uniforms = {
+      ...palette(mesh),
+      u_distortion: mesh.distortion,
+      u_swirl: mesh.swirl,
+      u_grainMixer: mesh.grainMixer,
+      u_grainOverlay: mesh.grainOverlay,
+      u_fit: ShaderFitOptions.contain,
+      u_scale: 1,
+      u_rotation: 0,
+      u_offsetX: 0,
+      u_offsetY: 0,
+      u_originX: 0.5,
+      u_originY: 0.5,
+      u_worldWidth: 0,
+      u_worldHeight: 0,
+    };
+    painted.set(frame, { mount: new ShaderMount(frame, meshGradientFragmentShader, uniforms, undefined, speedOf(mesh), mesh.frame), mesh });
+    frame.setAttribute("data-painted", "");
+  }
+
+  /** A frame inside a sideways scroller is clipped out of view until scrolled to, so the scroller decides when it is near. */
+  function nearTarget(frame: HTMLElement) {
+    for (let node = frame.parentElement; node; node = node.parentElement) {
+      if (/auto|scroll/.test(getComputedStyle(node).overflowX)) return node;
+    }
+    return frame;
+  }
+
+  if (frames.length > 0 && document.createElement("canvas").getContext("webgl2")) {
+    const waiting = new Map<Element, HTMLElement[]>();
+    for (const frame of frames) {
+      const target = nearTarget(frame);
+      waiting.set(target, [...(waiting.get(target) ?? []), frame]);
+    }
+    const near = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          near.unobserve(entry.target);
+          waiting.get(entry.target)?.forEach(paint);
+        }
+      },
+      { rootMargin: "50% 0px" },
+    );
+    for (const target of waiting.keys()) near.observe(target);
+
+    new MutationObserver(() => {
+      for (const { mount, mesh } of painted.values()) mount.setUniforms(palette(mesh));
+    }).observe(document.documentElement, { attributeFilter: ["data-theme"] });
+    reducedMotion.addEventListener("change", () => {
+      for (const { mount, mesh } of painted.values()) mount.setSpeed(speedOf(mesh));
+    });
+  }
+</script>

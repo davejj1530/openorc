@@ -36,23 +36,33 @@ export function visibleAt(windows: string, timeline: Timeline, t: number): boole
   });
 }
 
+/** A scene-wide state's value at `t`: the first value whose windows hold, or its resting value. */
+export function stateAt(state: Journey["states"][string], layout: Layout, timeline: Timeline, t: number): string {
+  return Object.entries(state[layout] ?? {}).find(([, windows]) => visibleAt(windows, timeline, t))?.[0] ?? state.rest;
+}
+
 /**
- * Attributes for an element that appears during `windows`. Both layouts share
- * their first and last frames, so the server marks them from the wide timeline:
- * the page opens on the first frame, and on the last one when nothing plays.
+ * Attributes for an element that appears during `windows`. A scene rests on its last moment, which both layouts
+ * share, so the server marks it from the wide timeline.
  */
 export function timed(journey: Journey, windows: string) {
   const { wide } = journey.timelines;
   return {
     "data-show": windows,
-    "data-start-hidden": visibleAt(windows, wide, 0) ? undefined : "",
     "data-end-hidden": visibleAt(windows, wide, moment("end", wide)) ? undefined : "",
   };
 }
 
+/** The scene-wide `data-*` states at the last moment, which the page shows until the scene plays. */
+export function restingStates(journey: Journey) {
+  const { wide } = journey.timelines;
+  const end = moment("end", wide);
+  return Object.fromEntries(Object.entries(journey.states).map(([name, state]) => [`data-${name}`, stateAt(state, "wide", wide, end)]));
+}
+
 /**
  * Attributes for an element whose `data-<name>` states hold during windows, as `name: windows` pairs. The player
- * toggles them; the server sets the ones that hold at the last moment, which the page shows when nothing plays.
+ * toggles them; the server sets the ones that hold at the last moment, where a scene rests.
  */
 export function flagged(journey: Journey, flags: Record<string, string>) {
   const { wide } = journey.timelines;
@@ -71,7 +81,7 @@ export function duration(seconds: number): string {
   return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 }
 
-/** Whole seconds from one moment to another (the end by default) on the wide timeline, which pages without a player show. */
+/** Whole seconds from one moment to another (the end by default) on the wide timeline, which a resting scene shows. */
 export function elapsed(journey: Journey, from: string, to = "end"): number {
   const { wide } = journey.timelines;
   return Math.max(0, Math.floor(moment(to, wide) - moment(from, wide)));

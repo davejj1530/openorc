@@ -30,7 +30,7 @@ const fixed = team.turns.find((turn) => turn.change)!;
 const at = (windows: string) => timed(teamJourney, windows);
 ---
 
-<SceneFrame id="team" journey={teamJourney} label={label} view="team" rows={[{ ...teamThread, busy: team.busy }]} motion>
+<SceneFrame id="team" journey={teamJourney} label={label} rows={[{ ...teamThread, busy: team.busy }]} motion>
   <div class="hs-panes">
     <ThreadPane
       id="team"

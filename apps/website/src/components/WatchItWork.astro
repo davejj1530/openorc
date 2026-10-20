@@ -1,0 +1,88 @@
+---
+/**
+ * The animated scenes, on demand. Each rests on its last moment; picking its tab plays it from the start, and pressing
+ * the stage plays the chosen one again. Nothing plays by itself, and reduced motion keeps every scene at rest.
+ */
+import DiscussionScene from "./hero/DiscussionScene.astro";
+import HandoffScene from "./hero/HandoffScene.astro";
+import TeamScene from "./hero/TeamScene.astro";
+import WorkflowScene from "./hero/WorkflowScene.astro";
+
+const scenes = [
+  {
+    id: "handoff",
+    label: "Across threads",
+    alt: "Sample OpenOrc project with two threads working side by side. Asked to build the billing page, Claude Code notices that the Plans migration thread is changing the plan data and messages it. Codex answers mid-migration with the new shape from its unmerged work and keeps going, and Claude Code builds the page against it.",
+    Scene: HandoffScene,
+  },
+  {
+    id: "discussion",
+    label: "Task discussion",
+    alt: "Sample task about rate-limiting the public API. The user mentions GPT-6-Astra and Opus 5.5. Astra suggests counting requests in memory; Opus points out that the app runs on three instances, so the limit would triple, and suggests Redis. The user asks Opus to build it, and a linked thread appears in the sidebar, already working.",
+    Scene: DiscussionScene,
+  },
+  {
+    id: "team",
+    label: "Agent team · Beta",
+    alt: "Agent teams are in Beta and enabled for new profiles. In this sample team conversation replacing dashboard polling with live updates, the lead sets one event contract, the server member adds a version field and tells the client member directly, and the reviewer, reading both sides, catches that the server sends seconds while the client expects milliseconds. The server fixes it and the lead hands it over for review.",
+    Scene: TeamScene,
+  },
+  {
+    id: "workflow",
+    label: "Plan to commit",
+    alt: "Sample OpenOrc journey. A question about app performance becomes three tasks. Inside the first task the user asks GPT-6-Astra and Opus 5.5 for their views, asks GPT-6-Astra to build it, and a new thread finishes with a change ready for review.",
+    Scene: WorkflowScene,
+  },
+];
+---
+
+<section class="watch container" id="workflow" aria-labelledby="watch-title" data-watch>
+  <div class="watch-head" data-reveal>
+    <h2 id="watch-title">Watch it work.</h2>
+    <div class="segmented" role="tablist" aria-label="Scenes" hidden data-watch-tabs>
+      <span class="segmented-knob" aria-hidden="true"></span>
+      {scenes.map((scene, i) => (
+        <button type="button" role="tab" id={`watch-tab-${scene.id}`} aria-controls={`watch-${scene.id}`} aria-selected={i === 0 ? "true" : "false"} tabindex={i === 0 ? 0 : -1}>
+          {scene.label}
+        </button>
+      ))}
+    </div>
+  </div>
+  <div class="stage demo-stage" data-reveal>
+    {scenes.map(({ id, alt, Scene }, i) => (
+      <article id={`watch-${id}`} class="watch-panel" data-panel hidden={i !== 0}>
+        <button type="button" class="watch-replay" aria-label={alt}>
+          <span class="demo-window">
+            <Scene label={alt} />
+          </span>
+        </button>
+      </article>
+    ))}
+  </div>
+</section>
+
+<script>
+  import { initTabs } from "../scripts/tabs";
+  import { initHeroScene, type ScenePlayer } from "../scripts/hero-scene";
+  import { followKnob } from "../scripts/segmented";
+
+  for (const watch of document.querySelectorAll<HTMLElement>("[data-watch]")) {
+    const tabs = watch.querySelector<HTMLElement>("[data-watch-tabs]");
+    const panels = [...watch.querySelectorAll<HTMLElement>("[data-panel]")];
+    const players = new Map<number, ScenePlayer>();
+    // A scene's player starts the first time the scene is asked to play; until then it rests as the server drew it.
+    const player = (index: number) => {
+      const existing = players.get(index);
+      if (existing) return existing;
+      const created = initHeroScene(panels[index].querySelector<HTMLElement>("[data-hero-scene]")!);
+      players.set(index, created);
+      return created;
+    };
+
+    panels.forEach((panel, index) => panel.querySelector(".watch-replay")?.addEventListener("click", () => player(index).replay()));
+    if (tabs && initTabs(watch, (index) => player(index).start())) {
+      tabs.hidden = false;
+      followKnob(tabs);
+    }
+  }
+</script>

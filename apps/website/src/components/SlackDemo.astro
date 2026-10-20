@@ -1,5 +1,8 @@
 ---
-/** A synthetic Slack thread that ends at OpenOrc's real owner-only approval step. */
+/**
+ * A synthetic Slack thread that ends at OpenOrc's real owner-only approval step. It rests on that last moment; the
+ * showcase plays it when its card is pressed, and that card carries its description.
+ */
 import BrandMark from "./BrandMark.astro";
 import { slack, slackJourney } from "../data/hero/slack";
 import { timed } from "../data/hero/timeline";
@@ -7,7 +10,7 @@ import { timed } from "../data/hero/timeline";
 const at = (windows: string) => timed(slackJourney, windows);
 ---
 
-<div class="slack-card" role="img" aria-label="A sample Slack thread. David asks OpenOrc to simplify the studio welcome screen. OpenOrc posts a progress line naming the model and the tool it is using, which becomes its reply: should Connect a project be the one clear next step? David confirms. A new progress line waits for approval, and a permission request to edit Welcome.tsx offers Allow once and Deny, with buttons that expire after 10 minutes." data-hero-scene data-scene="slack" data-paused>
+<div class="slack-card" data-hero-scene data-scene="slack" data-paused>
   <div class="slack-card-head">
     <strong>Thread</strong>
     <span class="slack-card-channel"><span class="slack-hash">#</span>{slack.channel}</span>
@@ -71,9 +74,3 @@ const at = (windows: string) => timed(slackJourney, windows);
     <div class="slack-composer-foot"><span class="slack-composer-add">+</span><span class="slack-composer-hint">Shift ↵ for new line</span><span class="slack-composer-send"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10h11m-4-4 4 4-4 4" /></svg></span></div>
   </div>
 </div>
-
-<script>
-  import { observeHeroScenes } from "../scripts/observe-hero-scenes";
-
-  observeHeroScenes("[data-scene=\"slack\"]");
-</script>

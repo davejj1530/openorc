@@ -10,4 +10,4 @@ export const journeys = { handoff, discussion: discussionJourney, team: teamJour
 
 export type SceneId = keyof typeof journeys;
 
-export { duration, elapsed, flagged, moment, timed, visibleAt, type Journey, type Layout, type Timeline } from "./timeline";
+export { duration, elapsed, flagged, moment, restingStates, stateAt, timed, visibleAt, type Journey, type Layout, type Timeline } from "./timeline";

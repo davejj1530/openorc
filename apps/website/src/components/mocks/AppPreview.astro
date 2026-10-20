@@ -1,0 +1,63 @@
+---
+/**
+ * The app at rest, still: the sidebar, a finished Codex thread, and the Changes panel open beside it with its tab
+ * track on the window's top line. Laid out at the 1248 × 780 window it was measured at, and scaled as one picture.
+ */
+import "../../styles/hero-scene.css";
+import ChangesDiff from "../hero/ChangesDiff.astro";
+import ProductIcon from "../hero/ProductIcon.astro";
+import Prose from "../hero/Prose.astro";
+import SceneSidebar from "../hero/SceneSidebar.astro";
+import ThreadPane from "../hero/ThreadPane.astro";
+import TurnHead from "../hero/TurnHead.astro";
+import { models } from "../../data/hero/workspace";
+
+const title = "Make the first five minutes count";
+const rows = [
+  { title, providers: [{ harness: "codex", label: "Codex" }], current: true },
+  { title: "Build a thoughtful onboarding", providers: [{ harness: "claude", label: "Claude" }] },
+  { title: "A faster command menu", providers: [{ harness: "claude", label: "Claude" }], busy: true as const },
+  { title: "Simplify the design tokens", providers: [{ harness: "codex", label: "Codex" }] },
+];
+const points = [
+  ["A real welcome.", "A short introduction gives people a place to start."],
+  ["One clear next step.", "Connect a project, then open a conversation."],
+  ["Keyboard support throughout.", "Move between choices without leaving the keyboard."],
+];
+---
+
+<div class="hs-mock hs-mock-app">
+  <span class="hs-lights" aria-hidden="true"><i></i><i></i><i></i></span>
+  <SceneSidebar rows={rows} />
+  <ThreadPane
+    id="welcome"
+    title={title}
+    model={{ harness: "codex", label: models.codex.label, effort: models.codex.effort }}
+    permission={models.codex.permission}
+    placeholder="Message Codex…"
+    changes
+    panel
+  >
+    <div class="hs-turn">
+      <div class="hs-user"><div class="hs-bubble">Let’s make onboarding feel more thoughtful. Help people connect their first project, then give them a clear next step.</div></div>
+      <TurnHead harness="codex" agent="Codex" model={models.codex.label} />
+      <div class="hs-reply">
+        <Prose text="The welcome flow is ready to review. It uses the existing components and keeps the first run focused on one decision at a time." />
+        <p class="hs-prose-heading">A calmer first five minutes</p>
+        <ul class="hs-prose-list">
+          {points.map(([lead, text]) => <li><Prose text={`**${lead}** ${text}`} /></li>)}
+        </ul>
+        <Prose text="The changes are in `src/Welcome.tsx`. You can review them alongside this conversation." />
+      </div>
+      <div class="hs-turn-actions"><ProductIcon name="copy" /></div>
+    </div>
+  </ThreadPane>
+  <aside class="hs-app-panel">
+    <div class="hs-panel-header">
+      <span class="hs-track"><span data-selected><ProductIcon name="fileDiff" />Changes</span></span>
+      <span class="hs-round hs-panel-add"><ProductIcon name="plus" /></span>
+      <span class="hs-panel-tools"><span class="hs-round"><ProductIcon name="expand" /></span></span>
+    </div>
+    <div class="hs-app-panel-card"><ChangesDiff /></div>
+  </aside>
+</div>

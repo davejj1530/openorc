@@ -62,6 +62,19 @@ describe("saved orchestration teams", () => {
     expect(orchestration.getInstance(db, thread.id)).toEqual(instance);
   });
 
+  it("keeps a Claude member's own account with its revision, and none for members on another provider", () => {
+    const { db, project } = fixture();
+    db.stmt("INSERT INTO claude_accounts (id, name, kind, enabled, created_at) VALUES ('work', 'Work', 'managed', 1, 0)").run();
+    const roster = draft();
+    roster.members[1]!.settings = { agent: "claude", model: "claude-opus-5-5", effort: "high", fastMode: false };
+    roster.members[1]!.claudeAccountId = "work";
+    const saved = orchestration.save(db, { projectId: project.id, expectedRevisionId: null, draft: roster });
+    const members = orchestration.getRevision(db, saved.revision.id)!.members;
+    expect(members[1]).toMatchObject({ key: "ui", claudeAccountId: "work" });
+    expect(members[0]).not.toHaveProperty("claudeAccountId");
+    expect(members[2]).not.toHaveProperty("claudeAccountId");
+  });
+
   it("keeps discussion settings with the revision that carries them and reads older revisions without any", () => {
     const { db, project } = fixture();
     const plain = orchestration.save(db, { projectId: project.id, expectedRevisionId: null, draft: draft() });
@@ -365,13 +378,15 @@ describe("orchestration migration", () => {
       expect(orchestration.get(db, saved.team.id)).toEqual(saved);
       expect(orchestration.getInstance(db, thread.id)).toEqual(instance);
       expect(orchestration.listMemberAvatars(db, saved.team.id)).toEqual(avatars);
-      expect(db.stmt("SELECT rowid,* FROM orchestration_team_members ORDER BY rowid").all()).toEqual(originalRows);
+      // Members saved before accounts existed run on the conversation's account.
+      const migratedRows = db.stmt("SELECT rowid,* FROM orchestration_team_members ORDER BY rowid").all() as Record<string, unknown>[];
+      expect(migratedRows.map(({ claude_account_id, ...row }) => (expect(claude_account_id).toBeNull(), row))).toEqual(originalRows);
       expect(() => db!.stmt("UPDATE orchestration_team_members SET model='changed' WHERE revision_id=?").run(saved.revision.id)).toThrow(/immutable/);
       expect(() => db!.stmt("DELETE FROM orchestration_team_members WHERE revision_id=?").run(saved.revision.id)).toThrow(/retained/);
       expect(() =>
         db!
           .stmt(
-            "INSERT INTO orchestration_team_members SELECT revision_id,'extra',99,'Extra',responsibility,member_key,agent,model,effort,fast_mode FROM orchestration_team_members WHERE revision_id=? AND manager_key IS NULL",
+            "INSERT INTO orchestration_team_members SELECT revision_id,'extra',99,'Extra',responsibility,member_key,agent,model,effort,fast_mode,claude_account_id FROM orchestration_team_members WHERE revision_id=? AND manager_key IS NULL",
           )
           .run(saved.revision.id),
       ).toThrow(/immutable/);

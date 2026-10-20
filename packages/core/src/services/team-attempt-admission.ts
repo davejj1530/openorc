@@ -107,7 +107,9 @@ export class TeamAttemptAdmission {
     const settings = normalizeModelSettings({ ...lead.settings, ...leadOverrides });
     if (leadOverrides.effort !== undefined) leadOverrides.effort = settings.effort;
     await Promise.all(
-      revision.members.map((member) => this.services.hooks.validate(member.key === lead.key ? settings : normalizeModelSettings(member.settings), input.projectId, input.claudeAccountId)),
+      revision.members.map((member) =>
+        this.services.hooks.validate(member.key === lead.key ? settings : normalizeModelSettings(member.settings), input.projectId, member.claudeAccountId ?? input.claudeAccountId),
+      ),
     );
     this.services.assertAccepting();
     return { revision, settings, leadOverrides, ...(input.allowArchived ? { allowArchived: true } : {}) };
@@ -122,7 +124,7 @@ export class TeamAttemptAdmission {
     const lead = revision.members.find((member) => member.managerKey === null)!;
     if (lead.orclingId) throw new Error("An Orcling leads this team on its own model and effort. Edit the Orcling to change them.");
     const settings = normalizeModelSettings({ ...lead.settings, ...LeadOverrides.parse(overrides) });
-    await this.services.hooks.validate(settings, thread.projectId, thread.claudeAccountId);
+    await this.services.hooks.validate(settings, thread.projectId, lead.claudeAccountId ?? thread.claudeAccountId);
     this.services.assertAccepting();
     return settings;
   }

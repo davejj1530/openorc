@@ -8,7 +8,7 @@ import { OrclingPanel } from "../panels/OrclingPanel";
 import { TaskDetailsPanel } from "../panels/TaskDetailsPanel";
 import { ThreadTasksPanel } from "../panels/ThreadTasksPanel";
 import { FilesPanel } from "../panels/FilesPanel";
-import { panelDirectory, panelFileScope, panelScope, type PanelContext } from "./panel-tools";
+import { panelDirectory, panelFileScope, panelScope, terminalId, type PanelContext } from "./panel-tools";
 
 const ConversationPlan = lazy(() => import("./ConversationPlan").then((m) => ({ default: m.ConversationPlan })));
 const SavedChangesPanel = lazy(() => import("../panels/SavedChangesPanel").then((m) => ({ default: m.SavedChangesPanel })));
@@ -65,9 +65,8 @@ export function PanelContent({ context, page, onNavigate }: ContentProps) {
   if (page.kind !== "tool") return null;
   switch (page.tool) {
     case "terminal": {
-      const cwd = panelDirectory(context);
-      const id = context.kind === "newthread" ? `${panelScope(context)}:${cwd}` : panelScope(context);
-      return <TerminalPanel key={id} id={id} cwd={cwd} />;
+      const id = terminalId(context, page);
+      return <TerminalPanel key={id} id={id} cwd={panelDirectory(context)} />;
     }
     case "commits": {
       const source = commitSource(context);

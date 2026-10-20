@@ -32,6 +32,12 @@ export function panelScope(context: PanelContext): string {
   return `${context.kind}:${context.project.id}`;
 }
 
+/** The shell a Terminal page shows: the conversation's own, or the one its tab opened for itself. */
+export function terminalId(context: PanelContext, page: Extract<PanelPage, { kind: "tool" }>): string {
+  const base = context.kind === "newthread" ? `${panelScope(context)}:${panelDirectory(context)}` : panelScope(context);
+  return page.shell ? `${base}:shell:${page.shell.id}` : base;
+}
+
 export function panelDirectory(context: PanelContext): string {
   if (context.kind === "newthread") return context.workingDirectory;
   if (context.kind === "thread") return context.thread.workingDirectory ?? context.thread.worktreePath ?? context.project.rootPath;
@@ -70,6 +76,7 @@ export function pageHost(url: string): string {
 
 export function pageLabel(page: PanelPage): string {
   if (page.kind === "browser") return page.title || (page.url ? pageHost(page.url) : "Preview");
+  if (page.kind === "tool" && page.shell) return `${panelTools.terminal.label} ${page.shell.number}`;
   if (page.kind === "file" && page.selection) return page.selection.path.split(/[\\/]/).pop() ?? page.selection.path;
   return panelTools[page.kind === "tool" ? page.tool : page.kind].label;
 }

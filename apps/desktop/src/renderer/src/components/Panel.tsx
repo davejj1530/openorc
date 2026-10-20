@@ -6,7 +6,7 @@ import { useLayout } from "../lib/layout";
 import { usePanelSessions } from "../lib/panel-tabs";
 import { toolPage, usePanelWorkspace } from "../lib/panel-workspace";
 import { useTrafficLights, useWindowsControls } from "../lib/window";
-import { panelFileScope, type PanelContext } from "./panel-tools";
+import { panelFileScope, terminalId, type PanelContext } from "./panel-tools";
 import { PanelContent } from "./PanelContent";
 import { PanelNavigation } from "./PanelNavigation";
 import { PanelNewTab } from "./PanelNewTab";
@@ -95,6 +95,8 @@ export function Panel({ context }: { context: PanelContext }) {
   const { scope, session, tab } = workspace;
   const closeTab = (id: string) => {
     window.openorc.browser?.close?.(id);
+    // A Terminal tab's own shell has no other tab to come back to, so it ends with its tab.
+    for (const page of session.tabs.find((entry) => entry.id === id)?.entries ?? []) if (page.kind === "tool" && page.shell) window.openorc.terminal.kill(terminalId(context, page));
     usePanelSessions.getState().close(scope, id);
     requestAnimationFrame(() => {
       const active = usePanelSessions.getState().sessions[scope]?.activeId;

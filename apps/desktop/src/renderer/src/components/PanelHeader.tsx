@@ -6,15 +6,15 @@ import { usePanelSessions, type PanelSession } from "../lib/panel-tabs";
 import { PanelTabs } from "./PanelTabs";
 
 /**
- * The top of the panel card: the tab track, the plus that adds a New tab page, then expand and
- * hide. It sits 52px tall inside the card, or on the 44px window chrome line when it clears the
- * native window controls (`chrome`), padded past whichever controls it shares the line with.
+ * The panel's row on the window's chrome line, above its card: the tab track, the plus that adds
+ * a New tab page, then expand and hide. It lines up with the thread header beside it and pads past
+ * whichever native window controls it shares the line with. Hide shows only while the panel
+ * covers the thread header and its panel toggle: expanded, or floating over a narrow work row.
  */
 export function PanelHeader({
   scope,
   session,
   expanded,
-  chrome,
   trafficClearance,
   windowsControls,
   onClose,
@@ -22,7 +22,6 @@ export function PanelHeader({
   scope: string;
   session: PanelSession;
   expanded: boolean;
-  chrome: boolean;
   trafficClearance: boolean;
   windowsControls: boolean;
   onClose: (id: string) => void;
@@ -30,7 +29,8 @@ export function PanelHeader({
   return (
     <header
       data-traffic-clearance={trafficClearance || undefined}
-      className={cn("panel-header drag-region", chrome && "panel-header-chrome", expanded && trafficClearance ? "pl-traffic" : "pl-2.5", windowsControls ? "pr-controls" : "pr-2")}
+      // The tabs start at the card's left edge: flush when docked, past its 8px gutter or the traffic lights when expanded.
+      className={cn("panel-header drag-region", expanded && (trafficClearance ? "pl-traffic" : "pl-2"), windowsControls ? "pr-controls" : "pr-2")}
     >
       <PanelTabs key={scope} session={session} onSelect={(id) => usePanelSessions.getState().select(scope, id)} onClose={onClose} />
       <Tooltip label="New tab">
@@ -45,7 +45,7 @@ export function PanelHeader({
         </IconButton>
       </Tooltip>
       <Tooltip label="Hide panel">
-        <IconButton aria-label="Hide panel" className="no-drag" onClick={() => useLayout.getState().setPanel(false)}>
+        <IconButton aria-label="Hide panel" className="panel-hide no-drag" onClick={() => useLayout.getState().setPanel(false)}>
           <PanelRight size={16} />
         </IconButton>
       </Tooltip>

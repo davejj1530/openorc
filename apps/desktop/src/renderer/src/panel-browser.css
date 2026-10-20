@@ -1,11 +1,11 @@
-/* The panel is one r20 card on the window's tile, holding its header and the open tab's page.
+/* The panel is one r20 card on the window's tile under its header row, holding the open tab's page.
    It carries data-plane, so controls inside it take the plane's fill step. */
 .panel-card {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  margin: 8px 8px 8px 0;
+  margin: 0 8px 8px 0;
   border-radius: var(--radius-3xl);
   background: var(--surface);
   overflow: hidden;
@@ -13,23 +13,22 @@
 .panel-shell[data-expanded="true"] .panel-card {
   margin-left: 8px;
 }
-/* A header that reaches the native window controls sits on the 44px chrome line: the card
-   drops its top margin and meets the window's top edge square. */
-.panel-card[data-chrome] {
-  margin-top: 0;
-  border-top-left-radius: 0;
-  border-top-right-radius: 0;
-}
+/* The header shares the window's chrome line with the thread header, on the tile above the card. */
 .panel-header {
   display: flex;
   align-items: center;
   gap: 6px;
-  height: 52px;
+  height: var(--height-topbar);
   min-width: 0;
   flex-shrink: 0;
 }
-.panel-header-chrome {
-  height: var(--height-topbar);
+/* The thread header's panel toggle hides a docked panel; the panel's own Hide is for when it covers that toggle.
+   Its tooltip's wrapper goes with it, so no empty gap stays at the end of the row. */
+.panel-header > :has(> .panel-hide) {
+  display: none;
+}
+.panel-shell[data-expanded="true"] .panel-header > :has(> .panel-hide) {
+  display: inline-flex;
 }
 
 /* The tabs: a fill track at its natural width with a surface knob under the open tab, like the
@@ -283,6 +282,9 @@
     --panel-traffic-overlap: max(0px, calc(var(--spacing-traffic) - (100cqw - var(--panel-pane) - var(--spacing-well))));
   }
   .panel-header[data-traffic-clearance="true"] {
-    padding-left: max(10px, var(--panel-traffic-overlap));
+    padding-left: var(--panel-traffic-overlap);
+  }
+  .panel-header > :has(> .panel-hide) {
+    display: inline-flex;
   }
 }

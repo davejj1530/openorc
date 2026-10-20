@@ -204,7 +204,7 @@ export function Transcript({
       <div ref={parentRef} data-transcript data-arrivals={arrivals || undefined} className={cn("h-full overflow-y-auto", waiting && "invisible")}>
         <div ref={contentRef} className="max-w-chat mx-auto px-6 py-5">
           {hasOlder ? <div ref={olderRef} aria-hidden /> : null}
-          {children ?? <WorkTranscript runId={run.runId} blocks={run.blocks} live={working || run.live} onFork={onFork} trailing={trailing} />}
+          {children ?? <WorkTranscript runId={run.runId} blocks={run.blocks} live={working || run.turnOpen} onFork={onFork} trailing={trailing} />}
           {run.blocks.length > 0 ? <AgentPresence working={working} /> : null}
         </div>
       </div>

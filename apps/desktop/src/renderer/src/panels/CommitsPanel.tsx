@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import type { Commit, Project, PushState, Task, TeamActionAvailability, ThreadSummary } from "@openorc/protocol";
 import { Upload } from "../components/icons";
 import { Badge, Button, Empty } from "../components/ui";
-import { cn } from "../lib/cn";
+import { PanelBar, PanelNotice } from "../components/PanelBar";
 import { useRpc, useRpcMutation } from "../lib/query";
 import { teamGitActions } from "../lib/team-git-actions";
 import { useThreadMutationPending } from "../lib/thread-mutations";
@@ -58,15 +58,15 @@ function SourcePushBar({ source, state, error }: { source: CommitSource; state: 
 
 function CommitList({ commits, unpushed }: { commits: Commit[]; unpushed: ReadonlySet<string> }) {
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto">
+    <div className="panel-rows flex-1 min-h-0 overflow-y-auto pb-2.5">
       {commits.map((c) => (
-        <div key={c.sha} className="grid gap-0.5 px-3 py-2 border-b border-line text-base">
+        <div key={c.sha} className="commit-row grid gap-1 mx-2.5 px-2.5 py-2.5 text-base">
           <div className="flex items-center gap-2">
             <span className="truncate">{c.subject}</span>
             {unpushed.has(c.sha) ? <Badge className="ml-auto">Not pushed</Badge> : null}
           </div>
           <div className="flex items-center gap-2 text-sm text-ink-3">
-            <span className="font-mono text-xs">{shortSha(c.sha)}</span>
+            <span className="font-mono">{shortSha(c.sha)}</span>
             <span>{c.author}</span>
             <span className="ml-auto tabular text-ink-4">{relativeTime(c.at)}</span>
           </div>
@@ -138,25 +138,19 @@ function PushBar({
   };
   return (
     <>
-      <div className="h-10 shrink-0 flex items-center gap-2 px-3 border-b border-line text-base">
-        <span className="font-medium">Commits</span>
-        <span className="flex-1" />
+      <PanelBar title="Commits">
         {pending && !state?.blocked ? (
-          <Button size="sm" disabled={!canPush} title={state?.branch ? `Push ${state.branch} to origin` : undefined} onClick={pushNow}>
-            <Upload size={12} /> {pushLabel(state, pushing)}
+          <Button variant="primary" disabled={!canPush} title={state?.branch ? `Push ${state.branch} to origin` : undefined} onClick={pushNow}>
+            <Upload size={14} /> {pushLabel(state, pushing)}
           </Button>
         ) : null}
         {pullRequest?.((url) => setNotice({ message: `Opened ${url}` }))}
-      </div>
-      {reason ? (
-        <p role="status" className="px-3 py-2 text-sm text-ink-3 border-b border-line">
-          {reason}
-        </p>
-      ) : null}
+      </PanelBar>
+      {reason ? <PanelNotice>{reason}</PanelNotice> : null}
       {shown ? (
-        <div role={shown.error ? "alert" : "status"} className={cn("px-3 py-1.5 text-sm border-b border-line break-words", shown.error ? "text-bad" : "text-ink-3")}>
+        <PanelNotice role={shown.error ? "alert" : "status"} tone={shown.error ? "bad" : "muted"}>
           {shown.message}
-        </div>
+        </PanelNotice>
       ) : null}
     </>
   );

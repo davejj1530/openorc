@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Menu } from "@base-ui/react/menu";
 import { ChevronRight, Copy, Folder, MoreHorizontal, RefreshCw } from "../components/icons";
 import { Button, IconButton, Segmented, Tooltip } from "../components/ui";
-import { menuItem, menuPopup } from "../components/ThreadActions";
+import { menuItem, menuPopup } from "../components/menu";
+import { floatingGround } from "../lib/use-anchor-ground";
 import { hasUnsavedEdits } from "../lib/file-buffer";
 import { relativeFilePath, useFileExplorer } from "../lib/file-explorer";
 import { filesKey } from "../lib/files-tool";
@@ -71,7 +72,7 @@ export function FileToolbar({ selection, buffer, directory, view, markdown, onVi
           </Button>
         ) : null}
         <Tooltip label={treeVisible ? "Hide file explorer" : "Show file explorer"}>
-          <IconButton size="sm" aria-label={treeVisible ? "Hide file explorer" : "Show file explorer"} aria-pressed={treeVisible} onClick={() => onTree(!treeVisible)}>
+          <IconButton size="xs" aria-label={treeVisible ? "Hide file explorer" : "Show file explorer"} aria-pressed={treeVisible} onClick={() => onTree(!treeVisible)}>
             <Folder size={15} />
           </IconButton>
         </Tooltip>
@@ -86,12 +87,12 @@ function FileMenu({ path, buffer }: { path: string; buffer: FileBuffer }) {
   return (
     <>
       <Menu.Root>
-        <Menu.Trigger render={<IconButton size="sm" aria-label="File actions" title="File actions" />}>
+        <Menu.Trigger render={<IconButton size="xs" aria-label="File actions" title="File actions" />}>
           <MoreHorizontal size={15} />
         </Menu.Trigger>
         <Menu.Portal>
           <Menu.Positioner sideOffset={6} align="end" className="z-40" collisionPadding={8}>
-            <Menu.Popup className={menuPopup}>
+            <Menu.Popup ref={floatingGround} className={menuPopup}>
               <Menu.Item className={menuItem} disabled={buffer.read.refreshing} onClick={buffer.read.refresh}>
                 <RefreshCw size={14} />
                 Refresh

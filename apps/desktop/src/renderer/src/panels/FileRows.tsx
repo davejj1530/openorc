@@ -11,16 +11,16 @@ export function FileRows({ files, commented }: { files: FileChange[]; commented?
   const [open, setOpen] = useState(true);
   return (
     <div className="shrink-0 max-h-56 flex flex-col">
-      <button onClick={() => setOpen((v) => !v)} className="h-7 shrink-0 flex items-center gap-1.5 px-2 text-sm text-ink-3 hover:text-ink">
-        <ChevronRight size={12} className={cn("transition-transform", open && "rotate-90")} />
+      <button onClick={() => setOpen((v) => !v)} className="h-8 shrink-0 flex items-center gap-2 mx-2.5 px-2.5 rounded-md text-sm text-ink-3 hover:bg-surface-2 hover:text-ink">
+        <ChevronRight size={14} className={cn("text-ink-4 transition-transform", open && "rotate-90")} />
         {files.length} file{files.length === 1 ? "" : "s"}
       </button>
       {open ? (
-        <div className="overflow-y-auto pb-1">
+        <div className="overflow-y-auto pb-2">
           {files.map((f) => (
-            <div key={f.path} className="flex items-center gap-2 h-6 px-3 text-sm">
-              <span className={cn("w-3 font-mono text-xs font-medium", statusTone[f.status])}>{statusLetter[f.status]}</span>
-              <span className="font-mono truncate text-ink-2" title={f.path}>
+            <div key={f.path} className="flex items-center gap-2 h-7 px-5 text-sm">
+              <span className={cn("w-3 font-mono text-xs", statusTone[f.status])}>{statusLetter[f.status]}</span>
+              <span className="font-mono truncate text-ink" title={f.path}>
                 {f.path}
               </span>
               {commented?.has(f.path) ? <MessageSquare size={11} className="ml-auto text-ink-4 shrink-0" /> : null}

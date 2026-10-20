@@ -25,7 +25,7 @@ export function ReviewCommentList({
       {comments.map((c) => {
         const state = commentState?.(c.id);
         return (
-          <div key={c.id} data-review-comment={c.id} className={cn("px-3 py-1.5 text-sm group", reviewCommentSent(c) && "opacity-60")}>
+          <div key={c.id} data-review-comment={c.id} className={cn("px-5 py-1.5 text-sm group", reviewCommentSent(c) && "opacity-60")}>
             <div className="flex items-center gap-1 font-mono text-xs text-ink-4">
               {selectedIds ? (
                 <input

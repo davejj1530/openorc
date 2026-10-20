@@ -270,7 +270,7 @@ export function BrowserPanel({
         onNavigate={navigate}
         loading={state.loading}
       />
-      <div ref={host} className="relative flex-1 min-h-0">
+      <div ref={host} className="panel-viewport relative flex-1 min-h-0">
         {previewStatus}
         {still !== null ? <img ref={stillImage} src={still} alt="" draggable={false} className="absolute inset-0 size-full object-cover object-top-left" /> : null}
       </div>

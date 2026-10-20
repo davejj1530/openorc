@@ -5,7 +5,7 @@ import { extractionSummary } from "../lib/memory-extraction";
 import "./memory.css";
 
 /** Show the acknowledged policy, never an optimistic Off claim after a failed save. */
-export function MemoryControl({ compact = false }: { compact?: boolean }) {
+export function MemoryControl() {
   const settings = useRpc("memory.settings.get", {});
   const save = useRpcMutation("memory.settings.set");
   const descriptionId = useId();
@@ -40,23 +40,15 @@ export function MemoryControl({ compact = false }: { compact?: boolean }) {
     <section className="memory-control" aria-label="OpenOrc memory status" aria-busy={settings.isLoading || save.isPending}>
       <div className="memory-control-row">
         <div className="min-w-0">
-          <h2 className="text-md font-semibold">{heading}</h2>
-          <p id={descriptionId} className="text-base text-ink-2 mt-1">
+          <h2 className="text-md">{heading}</h2>
+          <p id={descriptionId} className="text-base text-ink-3 mt-1">
             {description}
           </p>
-          {extraction && <p className="text-base text-ink-2 mt-1">{extraction}</p>}
+          {extraction && <p className="text-base text-ink-3 mt-1">{extraction}</p>}
         </div>
-        {!compact && (
-          <Switch
-            aria-label="OpenOrc memory"
-            aria-describedby={descriptionId}
-            checked={enabled === true}
-            disabled={enabled === undefined || save.isPending}
-            onChange={(e) => commit(e.target.checked)}
-          />
-        )}
+        <Switch aria-label="OpenOrc memory" aria-describedby={descriptionId} checked={enabled === true} disabled={enabled === undefined || save.isPending} onChange={(e) => commit(e.target.checked)} />
       </div>
-      {!compact && <p className="text-sm text-ink-3 mt-3">Applies to all projects. Native harness memory is managed separately. Memories already in a conversation remain in its context.</p>}
+      <p className="text-sm text-ink-4 mt-3">Applies to all projects. Native harness memory is managed separately. Memories already in a conversation remain in its context.</p>
       {save.isPending && (
         <p className="text-sm text-ink-2 mt-2" role="status">
           Saving memory preference…

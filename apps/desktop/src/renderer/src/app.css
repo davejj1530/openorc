@@ -639,7 +639,7 @@ body:has(.sidebar-shell[data-open="true"]) .work-row > .well:first-child {
 .panel-shell {
   overflow: hidden;
   width: calc(var(--panel-pane) + var(--spacing-well));
-  transition: width 220ms var(--ease-out); /* PANE_MS in Panel.tsx holds the panel open for exactly this long */
+  transition: width var(--duration-resize) var(--ease-out); /* PANE_MS in lib/motion.ts holds the panel open for exactly this long */
 }
 .panel-shell[data-open="false"] {
   width: 0;
@@ -877,29 +877,47 @@ body[data-resizing] iframe {
   pointer-events: none;
 }
 
-/* Every file in a patch folds to its own row. The header replaces the diff renderer's own,
-   so the path, the change letter and the two counts read in the app's ink ramp rather than
-   the highlighter's, and it stays on the top edge of the scroller while its file passes
-   under it. It paints --bg, the column's own ground, so a fold is a hairline and a row and
-   never a second plane. */
+/* Every file in a patch folds to its own row: a 40px r12 fill head that replaces the diff
+   renderer's own, so the path, the change letter and the two counts read in the app's ink
+   ramp. It stays on the top edge of the scroller while its file passes under it, opaque there:
+   the fill is layered over the column's own ground. */
+.diff-view .diffscroll {
+  padding: 0 10px 10px;
+}
 .diff-file-header {
   position: sticky;
   top: 0;
   z-index: 1;
-  height: var(--control-lg);
-  background-color: var(--bg);
-  transition: background-color 120ms var(--ease-out);
+  height: 40px;
+  padding: 0 10px;
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(var(--surface-2), var(--surface-2)),
+    var(--bg);
+  transition: background-color var(--duration-quick) var(--ease-out);
 }
 .diff-file-header:is(:hover, :focus-visible) {
-  background-color: var(--surface-2);
+  background:
+    linear-gradient(var(--surface-3), var(--surface-3)),
+    var(--bg);
+}
+.diff-file + .diff-file {
+  margin-top: 8px;
+}
+.diff-file-header[aria-expanded="true"] {
+  margin-bottom: 10px;
 }
 /* The highlighter paints its theme's own ground, and github-dark's #24292e is a grey slab on a
    near-black column. A declaration on the host outranks the renderer's :host theme rule, so
-   code sits on the column's ground in both modes and every line tint mixes from it. */
+   code sits on the column's ground in both modes. Rows are 22px of 12px mono; added and removed
+   lines sit on the soft status fills with faint numbers elsewhere. */
 diffs-container {
   --diffs-light-bg: var(--bg);
   --diffs-dark-bg: var(--bg);
   --diffs-font-family: var(--font-mono);
+  --diffs-font-size: var(--text-sm);
+  --diffs-line-height: 22px;
+  --diffs-gap-style: none;
   --diffs-bg-context-override: var(--bg);
   --diffs-bg-context-gutter-override: var(--bg);
   --diffs-fg-number-override: var(--ink-4);
@@ -907,21 +925,12 @@ diffs-container {
   --diffs-fg-number-deletion-override: var(--bad);
   --diffs-addition-color-override: var(--ok);
   --diffs-deletion-color-override: var(--bad);
-  --diffs-bg-addition-override: color-mix(in srgb, var(--bg) 87%, var(--ok));
-  --diffs-bg-addition-number-override: color-mix(in srgb, var(--bg) 83%, var(--ok));
-  --diffs-bg-addition-emphasis-override: color-mix(in srgb, var(--bg) 72%, var(--ok));
-  --diffs-bg-deletion-override: color-mix(in srgb, var(--bg) 87%, var(--bad));
-  --diffs-bg-deletion-number-override: color-mix(in srgb, var(--bg) 83%, var(--bad));
-  --diffs-bg-deletion-emphasis-override: color-mix(in srgb, var(--bg) 72%, var(--bad));
-}
-/* One hairline between neighbours, and one under a fold that is showing its code. A
-   border on the header alone would rule a folded row and leave an open one's code butting
-   straight onto the next fold, so the two rules are stated where each is actually true. */
-.diff-file + .diff-file {
-  border-top: var(--hairline) solid var(--line);
-}
-.diff-file-header[aria-expanded="true"] {
-  border-bottom: var(--hairline) solid var(--line);
+  --diffs-bg-addition-override: var(--ok-soft);
+  --diffs-bg-addition-number-override: var(--ok-soft);
+  --diffs-bg-addition-emphasis-override: color-mix(in srgb, var(--ok-soft) 80%, var(--ok));
+  --diffs-bg-deletion-override: var(--bad-soft);
+  --diffs-bg-deletion-number-override: var(--bad-soft);
+  --diffs-bg-deletion-emphasis-override: color-mix(in srgb, var(--bad-soft) 80%, var(--bad));
 }
 
 /* Content gets the width; window furniture yields before the editor does. */
@@ -1602,8 +1611,6 @@ body:has(.sidebar-shell[data-open="false"]) .thread-pane:first-child > .well {
     right: 0;
     bottom: 0;
     z-index: 20;
-    border-left: var(--hairline) solid var(--line);
-    box-shadow: var(--shadow-far);
   }
   .resize-handle[data-edge="panel"] {
     display: none;

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, ArrowRight, Home, RefreshCw } from "./icons";
+import { ChevronLeft, ChevronRight, Home, RefreshCw } from "./icons";
 import { IconButton, Tooltip } from "./ui";
+import { cn } from "../lib/cn";
 
 export function typedUrl(value: string): string | null {
   const text = value.trim();
@@ -35,23 +36,16 @@ export function PanelNavigation({ address, canGoBack, canGoForward, onBack, onFo
   }, [focusAddress]);
   return (
     <div className="panel-navigation">
-      <div className="panel-navigation-actions">
-        <Tooltip label="Back">
-          <IconButton size="sm" aria-label="Back" disabled={!canGoBack} onClick={onBack}>
-            <ArrowLeft size={14} />
-          </IconButton>
-        </Tooltip>
-        <Tooltip label="Forward">
-          <IconButton size="sm" aria-label="Forward" disabled={!canGoForward} onClick={onForward}>
-            <ArrowRight size={14} />
-          </IconButton>
-        </Tooltip>
-        <Tooltip label="Reload">
-          <IconButton size="sm" aria-label="Reload" disabled={!onReload} onClick={onReload}>
-            <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-          </IconButton>
-        </Tooltip>
-      </div>
+      <Tooltip label="Back">
+        <IconButton aria-label="Back" disabled={!canGoBack} onClick={onBack}>
+          <ChevronLeft size={16} />
+        </IconButton>
+      </Tooltip>
+      <Tooltip label="Forward">
+        <IconButton aria-label="Forward" disabled={!canGoForward} onClick={onForward}>
+          <ChevronRight size={16} />
+        </IconButton>
+      </Tooltip>
       <form
         className="panel-address"
         onSubmit={(event) => {
@@ -86,9 +80,14 @@ export function PanelNavigation({ address, canGoBack, canGoForward, onBack, onFo
             }
           }}
         />
+        <Tooltip label="Reload">
+          <IconButton size="xs" aria-label="Reload" disabled={!onReload} onClick={onReload} className="hover:bg-surface-3">
+            <RefreshCw size={14} className={cn(loading && "animate-spin")} />
+          </IconButton>
+        </Tooltip>
       </form>
       <Tooltip label="Tools">
-        <IconButton size="sm" aria-label="Tools" onClick={onHome}>
+        <IconButton aria-label="Tools" onClick={onHome}>
           <Home size={15} />
         </IconButton>
       </Tooltip>

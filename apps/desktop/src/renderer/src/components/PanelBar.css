@@ -1,0 +1,54 @@
+/* A tool's bar: 48px, the title in ink, meta faint, actions at the end (components/PanelBar.tsx). */
+.panel-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 48px;
+  flex-shrink: 0;
+  min-width: 0;
+  padding: 0 10px 0 20px;
+}
+.panel-bar-title {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex-shrink: 0;
+  font-size: var(--text-base);
+  line-height: 16px;
+  letter-spacing: var(--text-base--letter-spacing);
+  color: var(--ink);
+  white-space: nowrap;
+}
+/* A track in the title's place starts at the bar's inner edge like a row would. */
+.panel-bar-title:has(> .segmented) {
+  margin-left: -10px;
+}
+.panel-bar-meta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+  line-height: 16px;
+  color: var(--ink-4);
+}
+.panel-bar-stat {
+  display: inline-flex;
+  gap: 6px;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: 16px;
+}
+.panel-notice {
+  flex-shrink: 0;
+  padding: 0 20px 10px;
+  font-size: var(--text-sm);
+  line-height: 18px;
+  color: var(--ink-3);
+  overflow-wrap: anywhere;
+}
+/* A tool's list of rows (commits, checkpoints): inset rows split by hairlines. */
+.panel-rows > * + * {
+  border-top: var(--hairline) solid var(--line);
+}

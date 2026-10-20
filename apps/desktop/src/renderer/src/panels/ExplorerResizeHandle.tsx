@@ -19,7 +19,7 @@ export function ExplorerResizeHandle() {
       aria-valuemax={explorerWidth.max}
       tabIndex={0}
       className="file-explorer-resize"
-      title="Drag or use arrow keys to resize. Double-click to reset."
+      aria-description="Drag or use arrow keys to resize. Double-click to reset."
       onPointerDown={(event) => {
         if (event.button !== 0) return;
         event.preventDefault();

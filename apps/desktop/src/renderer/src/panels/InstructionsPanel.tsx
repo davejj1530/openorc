@@ -1,8 +1,11 @@
 import { useState, type KeyboardEvent } from "react";
 import type { InstructionFile } from "@openorc/protocol";
 import { Button, Segmented, Textarea } from "../components/ui";
+import { PanelNotice } from "../components/PanelBar";
+import { SavePill } from "../components/SavePill";
 import { readDraft, removeDraft, writeDraft } from "../lib/drafts";
 import { queryClient, useRpc, useRpcMutation } from "../lib/query";
+import "./instructions.css";
 
 /** Unsaved text, with the version of the file it started from. */
 type Draft = { content: string; version: string | null };
@@ -65,6 +68,7 @@ function InstructionEditor({
   onRefused: () => void;
 }) {
   const save = useRpcMutation("instructions.save");
+  const [savedAt, setSavedAt] = useState<number | null>(null);
   const { draftFor, keep } = useDrafts();
   const name = fileName(file.path);
   const draft = draftFor(file.path);
@@ -85,6 +89,7 @@ function InstructionEditor({
         onSuccess: (saved) => {
           queryClient.setQueryData<InstructionFile[]>(["instructions.list", { threadId }], (current) => current?.map((candidate) => (candidate.path === saved.path ? saved : candidate)));
           keep(path, null);
+          setSavedAt(Date.now());
         },
         // Refused because the file moved on: reading it again shows the newer version.
         onError: onRefused,
@@ -99,18 +104,17 @@ function InstructionEditor({
 
   return (
     <section aria-label="Instructions" className="h-full min-h-0 flex flex-col">
-      <header className="shrink-0 flex items-center gap-2 px-3 py-2 border-b border-line">
+      <header className="instructions-bar">
         <Segmented size="sm" label="Instruction file" value={file.path} onChange={onSelect} options={files.map((candidate) => ({ value: candidate.path, label: fileLabel(candidate) }))} />
         <span className="flex-1" />
-        <Button size="sm" disabled={!dirty || stale || save.isPending} onClick={submit}>
-          {save.isPending ? "Saving…" : "Save"}
-        </Button>
+        <SavePill disabled={!dirty || stale || save.isPending} pending={save.isPending} savedAt={savedAt} onSave={submit} />
       </header>
-      <p className="shrink-0 truncate px-3 pt-2 text-xs text-ink-3" title={file.path}>
-        {file.path}
+      <p className="instructions-head" title={file.path}>
+        <span className="text-ink-4">{file.path.slice(0, file.path.length - name.length)}</span>
+        <span className="text-ink">{name}</span>
       </p>
       {stale ? (
-        <div role="status" className="shrink-0 flex flex-wrap items-center gap-2 px-3 pt-2 text-sm text-ink-2">
+        <div role="status" className="instructions-stale">
           <span className="min-w-0 flex-1">{name} changed after you started editing.</span>
           <Button size="sm" onClick={keepMine}>
             Keep mine
@@ -121,13 +125,13 @@ function InstructionEditor({
         </div>
       ) : null}
       {save.error && !stale && save.variables?.path === file.path ? (
-        <p role="alert" className="shrink-0 px-3 pt-2 text-sm text-bad">
+        <PanelNotice role="alert" tone="bad">
           {save.error.message}
-        </p>
+        </PanelNotice>
       ) : null}
       <Textarea
         aria-label={fileTitle(file)}
-        className="flex-1 min-h-0 rounded-none border-0 bg-transparent px-3 py-3 font-mono text-sm"
+        className="instructions-editor flex-1 min-h-0 rounded-none bg-transparent px-5 py-3 font-mono text-sm focus:bg-transparent"
         value={draft?.content ?? file.content}
         placeholder={file.version === null ? `No ${name} yet` : undefined}
         spellCheck={false}

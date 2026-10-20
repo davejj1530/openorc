@@ -1,5 +1,6 @@
 import { Plus } from "../components/icons";
 import type { Project, Thread } from "@openorc/protocol";
+import { PanelBar, PanelBarMeta } from "../components/PanelBar";
 import { TaskCard } from "../components/TaskCard";
 import { Button, Empty } from "../components/ui";
 import { useRpc } from "../lib/query";
@@ -11,18 +12,15 @@ export function ThreadTasksPanel({ thread, project }: { thread: Thread; project:
   const own = (tasks.data ?? []).filter((x) => x.status !== "archived");
   return (
     <div className="h-full flex flex-col min-h-0">
-      <div className="h-10 shrink-0 flex items-center gap-2 px-3 border-b border-line text-base">
-        <span className="font-medium">Tasks</span>
-        <span className="text-ink-3 tabular">{own.length}</span>
-        <span className="flex-1" />
-        <Button size="sm" onClick={() => useUi.getState().openNewTask(project.id, thread.id)}>
-          <Plus size={12} /> Add
+      <PanelBar title="Tasks" meta={<PanelBarMeta>{own.length}</PanelBarMeta>}>
+        <Button onClick={() => useUi.getState().openNewTask(project.id, thread.id)}>
+          <Plus size={14} /> Add
         </Button>
-      </div>
+      </PanelBar>
       {own.length === 0 && !tasks.isLoading ? (
         <Empty title="No tasks yet">Ask the agent to save one, or add one yourself.</Empty>
       ) : (
-        <div className="flex-1 min-h-0 overflow-y-auto p-3 grid gap-2 content-start">
+        <div className="flex-1 min-h-0 overflow-y-auto px-2.5 pb-2.5 grid gap-0.5 content-start">
           {own.map((x) => (
             <TaskCard key={x.id} taskId={x.id} compact />
           ))}

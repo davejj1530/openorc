@@ -41,8 +41,8 @@ function FileNames({ scope, query, onQuery }: { scope: FileScope; query: string;
   };
   return (
     <>
-      <div className="shrink-0 flex items-center gap-2 px-3 py-2 border-b border-line">
-        <Search size={15} className="text-ink-3 shrink-0" />
+      <div className="shrink-0 flex items-center gap-2 px-2.5 pb-2.5">
+        <Search size={15} className="ml-2.5 text-ink-4 shrink-0" />
         <Input
           ref={input}
           aria-label="Find a file"
@@ -54,7 +54,7 @@ function FileNames({ scope, query, onQuery }: { scope: FileScope; query: string;
           className="flex-1"
         />
       </div>
-      <div ref={list} onKeyDown={onHitKey} className="flex-1 min-h-0 overflow-auto p-2">
+      <div ref={list} onKeyDown={onHitKey} className="flex-1 min-h-0 overflow-auto px-2.5 pb-2.5">
         {files.isLoading ? (
           <p role="status" className="p-3 text-ink-3">
             Loading files…
@@ -67,7 +67,7 @@ function FileNames({ scope, query, onQuery }: { scope: FileScope; query: string;
         ) : null}
         {files.data?.length === 0 ? <p className="p-3 text-ink-3">No files found.</p> : null}
         {files.data?.map((path) => (
-          <button key={path} onClick={() => open(path)} className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-left text-sm hover:bg-surface-2 focus-visible:bg-surface-2">
+          <button key={path} onClick={() => open(path)} className="w-full h-9 flex items-center gap-2.5 px-2.5 rounded-md text-left text-base hover:bg-surface-2 focus-visible:bg-surface-2">
             <FileText size={15} className="shrink-0 text-ink-3" />
             <span className="truncate">{path}</span>
           </button>
@@ -82,7 +82,7 @@ export function FilesPanel({ scope, directory }: { scope: FileScope; directory: 
   const [tool, update] = useFilesToolState(scope);
   return (
     <section aria-label="Files" className="h-full flex flex-col min-h-0">
-      <div className="shrink-0 flex items-center gap-2 px-3 pt-2">
+      <div className="h-12 shrink-0 flex items-center gap-2 pl-2.5 pr-2.5">
         <Segmented
           size="sm"
           label="Find by"
@@ -96,8 +96,8 @@ export function FilesPanel({ scope, directory }: { scope: FileScope; directory: 
         <span className="flex-1" />
         {tool.mode !== "tree" ? (
           <Tooltip label="New file">
-            <IconButton size="sm" aria-label="New file" onClick={() => useUi.getState().setNewFile(scope)}>
-              <Plus size={14} />
+            <IconButton aria-label="New file" onClick={() => useUi.getState().setNewFile(scope)}>
+              <Plus size={15} />
             </IconButton>
           </Tooltip>
         ) : null}

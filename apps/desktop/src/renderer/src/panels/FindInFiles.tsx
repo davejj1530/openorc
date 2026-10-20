@@ -66,8 +66,8 @@ export function FindInFiles({ scope, query, onQuery }: { scope: FileScope; query
   if (stale && result?.kind === "invalid") result = undefined;
   return (
     <>
-      <div className="shrink-0 flex items-center gap-1 px-3 py-2 border-b border-line">
-        <Search size={15} className="mr-1 text-ink-3 shrink-0" />
+      <div className="shrink-0 flex items-center gap-1 px-2.5 pb-2.5">
+        <Search size={15} className="mx-2 text-ink-4 shrink-0" />
         <Input
           ref={input}
           aria-label="Find in files"
@@ -84,7 +84,7 @@ export function FindInFiles({ scope, query, onQuery }: { scope: FileScope; query
           .*
         </Toggle>
       </div>
-      <div className="flex-1 min-h-0 overflow-auto px-3 py-2">
+      <div className="flex-1 min-h-0 overflow-auto px-5 pb-2.5">
         {find.error ? (
           <p role="alert" className="text-sm text-ink-3">
             {find.error.message}

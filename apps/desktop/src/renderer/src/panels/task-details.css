@@ -1,0 +1,16 @@
+/* Task details in the panel: rows divided by hairlines, actions as pills. */
+.task-details-rows > * + * {
+  border-top: var(--hairline) solid var(--line);
+}
+.task-details-row {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-height: var(--control-row);
+  padding-block: 4px;
+}
+.task-details-row > :first-child {
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}

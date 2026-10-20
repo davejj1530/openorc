@@ -2,13 +2,14 @@ import { useState } from "react";
 import { harnessName, type Project, type Task, type TaskPriority, type TaskStatus } from "@openorc/protocol";
 import { Copy, MessageSquare, Play, Trash2 } from "../components/icons";
 import { PriorityIcon, priorityLabel, priorityOrder, statusLabel, statusOrder } from "../components/status";
-import { Badge, Button, Dialog, Field, Input, Select, Textarea, TextButton } from "../components/ui";
+import { Badge, Button, Dialog, Field, IconButton, Input, Select, StatusDot, Textarea, TextButton } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/query";
 import { newThread, openTask, openThread } from "../lib/router";
 import { formatBytes, relativeTime, shortSha } from "../lib/time";
 import { TeamTaskAdmissions, TeamTaskStart } from "../components/TeamTaskStart";
 import { DeleteRetainedOwnerContent } from "../components/TeamRetainedDelete";
 import { useTaskFields } from "./useTaskFields";
+import "./task-details.css";
 
 const TASK_WORKSPACE_REASONS = {
   working: "The team is working on this task. Workspace changes are unavailable; task status can still be changed.",
@@ -69,7 +70,7 @@ function TaskDetails({ task: t, project: p }: { task: Task; project: Project }) 
   const tokens = latestRun?.usage ? latestRun.usage.inputTokens + latestRun.usage.outputTokens : 0;
 
   return (
-    <div className="h-full overflow-y-auto p-4 grid grid-cols-1 gap-4 content-start">
+    <div className="h-full overflow-y-auto p-5 grid grid-cols-1 gap-6 content-start">
       {blockedReason ? (
         <p role="status" className="text-sm text-ink-3">
           {blockedReason}
@@ -87,17 +88,20 @@ function TaskDetails({ task: t, project: p }: { task: Task; project: Project }) 
         <>
           <TeamTaskStart key={t.id} task={ownership.data} />
           <TeamTaskAdmissions task={ownership.data} />
-          <Button size="sm" onClick={() => openTask(t.id, "spec")}>
+          <Button size="lg" className="justify-self-start" onClick={() => openTask(t.id, "spec")}>
             Open Overview
           </Button>
         </>
       ) : null}
       {t.status === "proposed" && !ownership.data ? (
-        <div className="rounded-lg border border-warn bg-warn-soft/40 px-3 py-2 text-sm text-ink-2">
-          {ownership.data ? "Proposed by the team. Send direction through the lead to continue." : "Proposed by the agent. Edit the spec if you like, then start it."}
-          <div className="mt-2">
+        <div className="grid gap-3 rounded-2xl bg-surface-2 px-4 py-3.5 text-base text-ink-2">
+          <p className="flex items-center gap-2">
+            <StatusDot tone="attention" />
+            {ownership.data ? "Proposed by the team. Send direction through the lead to continue." : "Proposed by the agent. Edit the spec if you like, then start it."}
+          </p>
+          <div>
             <Button
-              size="sm"
+              size="lg"
               variant="primary"
               disabled={Boolean(blockedReason) || startTask.isPending}
               title={blockedReason ?? undefined}
@@ -112,27 +116,27 @@ function TaskDetails({ task: t, project: p }: { task: Task; project: Project }) 
                 )
               }
             >
-              <Play size={11} /> Start task
+              <Play size={13} /> Start task
             </Button>
           </div>
-          {startTask.error ? <div className="mt-1 text-xs text-bad">{startTask.error.message}</div> : null}
+          {startTask.error ? <div className="text-sm text-bad">{startTask.error.message}</div> : null}
         </div>
       ) : null}
 
       {!ownership.data ? (
         <div className="grid grid-cols-1 min-w-0 gap-2">
           <Field label="Spec" hint="Attached to every prompt for this task. Say what done looks like.">
-            <Textarea rows={8} value={fields.spec} onChange={(e) => fields.setSpec(e.target.value)} className="font-mono text-sm" />
+            <Textarea variant="sheet" rows={8} value={fields.spec} onChange={(e) => fields.setSpec(e.target.value)} className="font-mono text-sm" />
           </Field>
           <Field label="Labels" hint="Comma separated.">
-            <Input value={fields.labels} onChange={(e) => fields.setLabels(e.target.value)} />
+            <Input variant="sheet" value={fields.labels} onChange={(e) => fields.setLabels(e.target.value)} />
           </Field>
           {fields.dirty ? (
             <div className="flex gap-2">
-              <Button size="sm" variant="primary" disabled={fields.isPending} onClick={fields.save}>
+              <Button variant="primary" disabled={fields.isPending} onClick={fields.save}>
                 Save
               </Button>
-              <Button size="sm" variant="ghost" onClick={fields.discard}>
+              <Button variant="ghost" onClick={fields.discard}>
                 Discard
               </Button>
             </div>
@@ -141,9 +145,9 @@ function TaskDetails({ task: t, project: p }: { task: Task; project: Project }) 
         </div>
       ) : null}
 
-      <div className="grid gap-2 text-base border-t border-line pt-4">
+      <div className="task-details-rows grid text-base">
         <Row label="Status">
-          <Select aria-label="Status" value={t.status} disabled={fields.isPending} onChange={(e) => fields.changeStatus(e.target.value as TaskStatus)} className="h-6 text-sm w-full">
+          <Select aria-label="Status" value={t.status} disabled={fields.isPending} onChange={(e) => fields.changeStatus(e.target.value as TaskStatus)} className="h-7 text-sm w-full">
             {statusOrder.map((s) => (
               <option key={s} value={s}>
                 {statusLabel[s]}
@@ -159,7 +163,7 @@ function TaskDetails({ task: t, project: p }: { task: Task; project: Project }) 
         <Row label="Priority">
           <div className="flex items-center gap-1.5">
             <PriorityIcon priority={t.priority} />
-            <Select value={t.priority} disabled={fields.isPending} onChange={(e) => fields.changePriority(e.target.value as TaskPriority)} className="h-6 text-sm w-full">
+            <Select value={t.priority} disabled={fields.isPending} onChange={(e) => fields.changePriority(e.target.value as TaskPriority)} className="h-7 text-sm w-full">
               {priorityOrder.map((s) => (
                 <option key={s} value={s}>
                   {priorityLabel[s]}
@@ -236,10 +240,9 @@ function TaskDetails({ task: t, project: p }: { task: Task; project: Project }) 
         </Row>
       </div>
 
-      <div className="border-t border-line pt-4 grid gap-1.5">
+      <div className="flex flex-wrap items-center gap-2">
         {t.worktreePath ? (
           <Button
-            size="sm"
             disabled={Boolean(blockedReason) || cleanup.isPending}
             onClick={() => cleanup.mutate({ taskId: t.id })}
             title={blockedReason ?? "Remove the worktree from disk. Uncommitted changes are committed to its branch first; the branch and the history stay."}
@@ -248,15 +251,14 @@ function TaskDetails({ task: t, project: p }: { task: Task; project: Project }) 
           </Button>
         ) : null}
         <Button
-          size="sm"
           variant="danger"
           disabled={ownerDeletion ? !ownerDeletion.allowed : Boolean(blockedReason)}
           title={ownerDeletion ? (ownerDeletion.reason ?? undefined) : (blockedReason ?? undefined)}
           onClick={() => setDeleting(true)}
         >
-          <Trash2 size={12} /> Delete task
+          <Trash2 size={13} /> Delete task
         </Button>
-        {cleanup.error ? <div className="text-xs text-bad">{cleanup.error.message}</div> : null}
+        {cleanup.error ? <div className="basis-full text-sm text-bad">{cleanup.error.message}</div> : null}
       </div>
 
       <Dialog open={deleting} onOpenChange={setDeleting} title={ownerDeletion && ownerDeletion.taskIds.length > 1 ? `Delete ${ownerDeletion.taskIds.length} saved tasks?` : "Delete this task?"}>
@@ -331,8 +333,8 @@ function BranchLossNotice({ impact }: { impact: ReturnType<typeof useRpc<"worksp
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-rail items-center gap-2 min-h-6">
-      <span className="text-sm text-ink-3">{label}</span>
+    <div className="task-details-row">
+      <span>{label}</span>
       <div className="min-w-0">{children}</div>
     </div>
   );
@@ -344,9 +346,9 @@ function Mono({ text }: { text: string }) {
       <span className="font-mono text-xs text-ink-2 truncate" title={text}>
         {text}
       </span>
-      <Button size="sm" variant="ghost" className="h-5 px-1" onClick={() => void navigator.clipboard.writeText(text)} title="Copy">
-        <Copy size={11} />
-      </Button>
+      <IconButton size="xs" aria-label={`Copy ${text}`} onClick={() => void navigator.clipboard.writeText(text)}>
+        <Copy size={12} />
+      </IconButton>
     </div>
   );
 }

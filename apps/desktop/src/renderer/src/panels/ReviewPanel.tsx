@@ -2,6 +2,7 @@ import { lazy, Suspense, useState, type ReactNode } from "react";
 import type { Project, Task } from "@openorc/protocol";
 import { Send } from "../components/icons";
 import { Button, Empty, TextButton } from "../components/ui";
+import { DiffStat, PanelBar, PanelBarMeta, PanelNotice } from "../components/PanelBar";
 import { countStat } from "./ChangesPanel";
 import { FileRows } from "./FileRows";
 import { ReviewCommentList } from "./ReviewCommentList";
@@ -106,7 +107,7 @@ function TaskReview({ task, project }: { task: Task; project: Project }) {
     diffContent = (
       <>
         {files.length > 1 || !/^@@ /m.test(patch) ? <FileRows files={files} commented={commented} /> : null}
-        <div className="flex-1 min-h-0 border-t border-line">
+        <div className="flex-1 min-h-0">
           <Suspense fallback={null}>
             <DiffView
               patch={patch}
@@ -129,38 +130,39 @@ function TaskReview({ task, project }: { task: Task; project: Project }) {
 
   return (
     <div className="h-full flex flex-col min-h-0">
-      <div className="h-10 shrink-0 flex items-center gap-2 px-3 border-b border-line text-base">
-        <span className="font-medium">Changes</span>
-        <span className="text-ink-3 tabular">{files.length}</span>
-        {stat.add + stat.del > 0 ? (
-          <span className="font-mono text-sm tabular">
-            <span className="text-ok">+{stat.add}</span> <span className="text-bad">-{stat.del}</span>
-          </span>
-        ) : null}
-        <span className="flex-1" />
+      <PanelBar
+        title="Changes"
+        meta={
+          <>
+            <PanelBarMeta>
+              {files.length} {files.length === 1 ? "file" : "files"}
+            </PanelBarMeta>
+            <DiffStat add={stat.add} del={stat.del} />
+          </>
+        }
+      >
         <ReviewPublication task={task} project={project} hasChanges={files.length > 0} blockedReason={blockedReason} exportBranch={exportInfo?.branch} onNotice={setNotice} />
-      </div>
-      {!blockedReason && exportNote ? (
-        <p role="status" className="px-3 py-2 text-sm text-ink-3 border-b border-line break-words">
-          {exportNote}
-        </p>
-      ) : null}
+      </PanelBar>
+      {!blockedReason && exportNote ? <PanelNotice>{exportNote}</PanelNotice> : null}
       {blockedReason ? (
-        <p role="status" className="px-3 py-2 text-sm text-ink-3 border-b border-line">
+        <PanelNotice>
           {blockedReason}
           {blockedAction}
-        </p>
+        </PanelNotice>
       ) : null}
-      <div className="h-8 shrink-0 flex items-center gap-2 px-3 border-b border-line text-sm text-ink-3">
-        <button
+      <div className="h-9 shrink-0 flex items-center gap-2 pl-3.5 pr-2.5 pb-1 text-sm text-ink-4">
+        <Button
+          size="sm"
+          variant="ghost"
+          aria-pressed={sinceReviewed}
           onClick={() => setSinceReviewed((v) => !v)}
           disabled={!task.reviewedSnapshotId}
-          className={cn("h-6 px-2 rounded-md hover:text-ink disabled:text-ink-4 disabled:pointer-events-none", sinceReviewed && "bg-surface-2 text-ink")}
+          className={cn(sinceReviewed && "bg-control-fill text-navigation-ink hover:bg-control-fill")}
           title={task.reviewedSnapshotId ? "Only what changed since you last marked this reviewed" : "Mark reviewed first"}
         >
           Since last review
-        </button>
-        {diff.data?.since ? <span className="text-ink-4">from {relativeTime(diff.data.since.createdAt)}</span> : null}
+        </Button>
+        {diff.data?.since ? <span>from {relativeTime(diff.data.since.createdAt)}</span> : null}
         <span className="flex-1" />
         <Button
           size="sm"
@@ -171,10 +173,10 @@ function TaskReview({ task, project }: { task: Task; project: Project }) {
           Mark reviewed
         </Button>
       </div>
-      {notice ? <div className="px-3 py-1.5 text-sm text-ink-3 border-b border-line break-words">{notice}</div> : null}
+      {notice ? <PanelNotice>{notice}</PanelNotice> : null}
       <div className="flex-1 min-h-0 flex flex-col">{diffContent}</div>
       {allComments.length > 0 || Boolean(team && teamReview.pending) ? (
-        <div className="shrink-0 border-t border-line">
+        <div className="shrink-0">
           <div className="max-h-48 overflow-y-auto">
             <ReviewCommentList
               comments={allComments}
@@ -186,17 +188,15 @@ function TaskReview({ task, project }: { task: Task; project: Project }) {
             />
           </div>
           {team ? (
-            <div className="px-3 pb-3 space-y-2">
+            <div className="px-5 pb-3 space-y-2">
               <TeamTaskIdentity task={team} />
               <div className="flex justify-end">
                 <Button
-                  size="sm"
-                  variant="primary"
                   disabled={teamReview.working || (!teamReview.pending && (!team.review.allowed || ownership.isError || selection.length === 0))}
                   title={teamReview.pending ? undefined : (team.review.reason ?? undefined)}
                   onClick={() => void teamReview.submit(selection)}
                 >
-                  <Send size={12} />
+                  <Send size={14} />
                   {submitLabel}
                 </Button>
               </div>
@@ -212,14 +212,14 @@ function TaskReview({ task, project }: { task: Task; project: Project }) {
         </div>
       ) : null}
       {team?.admissions.some((item) => item.kind === "review") ? (
-        <div className="shrink-0 max-h-40 overflow-y-auto border-t border-line px-3 py-2">
+        <div className="shrink-0 max-h-40 overflow-y-auto px-5 py-2">
           <TeamTaskAdmissions task={team} kind="review" />
         </div>
       ) : null}
       {commentError ? (
-        <p role="alert" className="px-3 py-2 text-sm text-bad break-words">
+        <PanelNotice role="alert" tone="bad">
           {commentError.message}
-        </p>
+        </PanelNotice>
       ) : null}
     </div>
   );

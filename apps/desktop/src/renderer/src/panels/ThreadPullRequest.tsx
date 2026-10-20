@@ -19,8 +19,8 @@ export function PullRequestLink({ thread }: { thread: ThreadSummary }) {
   const url = thread.prUrl;
   if (!url) return null;
   return (
-    <Button size="sm" onClick={() => window.openorc.openExternal(url)} title={url}>
-      <GitPullRequest size={12} /> {thread.prState ?? "PR"}
+    <Button onClick={() => window.openorc.openExternal(url)} title={url}>
+      <GitPullRequest size={14} /> {thread.prState ?? "PR"}
     </Button>
   );
 }
@@ -56,15 +56,15 @@ export function ThreadPullRequest({
   if (!info.data?.gh.installed) {
     const ghUrl = compareUrl(project, thread);
     return ghUrl ? (
-      <Button size="sm" disabled={disabled} onClick={() => window.openorc.openExternal(ghUrl)} title={action.reason ?? "Compare on GitHub"}>
-        <GitPullRequest size={12} /> PR
+      <Button disabled={disabled} onClick={() => window.openorc.openExternal(ghUrl)} title={action.reason ?? "Compare on GitHub"}>
+        <GitPullRequest size={14} /> PR
       </Button>
     ) : null;
   }
   return (
     <>
-      <Button size="sm" disabled={disabled} onClick={() => setOpen(true)} title={action.reason ?? "Open a pull request"}>
-        <GitPullRequest size={12} /> PR
+      <Button disabled={disabled} onClick={() => setOpen(true)} title={action.reason ?? "Open a pull request"}>
+        <GitPullRequest size={14} /> PR
       </Button>
       <PullRequestDialog open={open} onOpenChange={setOpen} thread={thread} project={project} head={head} pr={pr} action={action} busy={busy} onOpened={onOpened} />
     </>

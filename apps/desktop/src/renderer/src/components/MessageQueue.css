@@ -1,0 +1,108 @@
+/* The queue of messages waiting to send. */
+
+/* Queue content stays inside the reading column, including unbroken logs and paths. */
+.message-queue {
+  min-width: 0;
+  container-type: inline-size;
+  border: var(--hairline) solid var(--line);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+}
+.message-queue-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  color: var(--ink-3);
+}
+.message-queue-title {
+  color: var(--ink-2);
+  font-weight: 500;
+}
+.message-queue-count {
+  margin-left: 4px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.message-queue-hint {
+  margin-left: auto;
+}
+.message-queue-list {
+  margin: 0;
+  padding: 0 12px;
+  list-style: none;
+  max-height: min(240px, 28vh);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.message-queue-row {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px;
+  padding: 10px 0;
+  border-top: var(--hairline) solid var(--line);
+}
+.message-queue-position {
+  padding-top: 2px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.message-queue-message {
+  min-width: 0;
+  color: var(--ink-2);
+}
+.message-queue-message summary {
+  display: flex;
+  align-items: start;
+  gap: 8px;
+  min-width: 0;
+  padding: 2px 0;
+  list-style: none;
+  border-radius: var(--radius-sm);
+}
+.message-queue-message summary::-webkit-details-marker {
+  display: none;
+}
+.message-queue-preview {
+  min-width: 0;
+  flex: 1;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.message-queue-chevron {
+  flex-shrink: 0;
+  margin-top: 3px;
+  color: var(--ink-3);
+}
+.message-queue-message[open] .message-queue-chevron {
+  transform: rotate(180deg);
+}
+.message-queue-message[open] .message-queue-preview {
+  display: block;
+  -webkit-line-clamp: unset;
+}
+.message-queue-attachments {
+  display: block;
+  margin-top: 4px;
+  color: var(--ink-3);
+}
+.message-queue-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+@container (max-width: 420px) {
+  .message-queue-row {
+    grid-template-columns: 14px minmax(0, 1fr);
+  }
+  .message-queue-actions {
+    grid-column: 2;
+    justify-content: flex-end;
+  }
+}

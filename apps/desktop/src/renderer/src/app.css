@@ -16,10 +16,12 @@
 @import "./styles/floating.css";
 @import "./styles/controls.css";
 @import "./styles/motion.css";
+@import "./styles/destinations.css";
 @import "./styles/conversation.css";
 @import "./styles/composer.css";
 @import "./styles/new-thread.css";
 @import "./components/MessageQueue.css";
+@import "./components/TaskComments.css";
 @source "../../../node_modules/streamdown/dist/*.js";
 @source "../../../node_modules/@streamdown/mermaid/dist/*.js";
 @custom-variant dark (&:where(.dark, .dark *));
@@ -828,19 +830,6 @@ body[data-resizing] .sidebar-shell {
   color: var(--ink-2);
 }
 
-
-/* The task list's keyboard cursor. Without this it is indistinguishable from a hovered row,
-   because both resolve to surface-2. Sheen only: a list must not grow raised items. */
-.task-list [data-current] {
-  box-shadow: var(--material-sheen);
-}
-.task-list-row:hover,
-.task-list-row[data-current] {
-  background-color: var(--surface-2);
-}
-.task-list [data-status-group] [data-row]:last-child .task-list-row {
-  border-bottom: var(--hairline) solid var(--line);
-}
 .schedule-delete:is(:hover, :focus-visible) {
   color: var(--bad);
 }
@@ -969,12 +958,13 @@ diffs-container {
 .document-title::placeholder {
   color: var(--ink-4);
 }
+/* Properties are secondary pills under the title: the mark, then a select without its own fill. */
 .task-properties {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px 12px;
-  margin: 24px 0;
+  gap: 6px;
+  margin: 16px 0 28px;
 }
 .property-chip {
   display: inline-flex;
@@ -1069,9 +1059,7 @@ span.property-chip {
   border-radius: var(--radius-md);
 }
 .task-activity {
-  margin-top: 32px;
-  padding-top: 24px;
-  border-top: var(--hairline) solid var(--line);
+  margin-top: 40px;
 }
 /* Harness marks. The OpenAI and OpenCode marks are dark on light and invert in dark themes. */
 .harness-logo {
@@ -1120,6 +1108,8 @@ span.property-chip {
   .thread-branch {
     display: none;
   }
+  .task-tabs {
+    padding-inline: 16px;
   }
 }
 @container (max-width: 400px) {
@@ -1623,163 +1613,3 @@ body:has(.sidebar-shell[data-open="false"]) .thread-pane:first-child > .well {
   }
 }
 
-/* Task-owned discussion shares the document's reading column. */
-.task-comments {
-  margin-block: 32px;
-  border-top: var(--hairline) solid var(--color-line);
-  padding-top: 24px;
-  min-width: 0;
-}
-.task-comments-heading {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 16px;
-  margin-bottom: 8px;
-  flex-wrap: wrap;
-}
-.task-comments-heading h2 {
-  font-size: 16px;
-  font-weight: 600;
-}
-.task-comments-heading button {
-  font-size: 12px;
-}
-.task-comments-feed {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.task-comment {
-  padding-block: 20px;
-  border-bottom: var(--hairline) solid var(--color-line);
-  scroll-margin-top: 20px;
-}
-.task-comment-meta {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--color-ink-3);
-  margin-bottom: 8px;
-  overflow-wrap: anywhere;
-}
-.task-comment-meta strong {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-ink);
-}
-.task-comment-body {
-  font-size: 14px;
-  line-height: 1.65;
-  overflow-wrap: anywhere;
-  min-width: 0;
-  max-height: 640px;
-  overflow-y: auto;
-}
-.task-comment-body pre {
-  max-width: 100%;
-  overflow-x: auto;
-}
-/* Replies hang off one line that curves into each response's name. Each response draws its own
-   elbow, and every response but the last carries the line on to the next, so the line ends at the
-   final reply without masking the gradient plane. Straight stretches are never painted twice, which
-   would darken translucent borders. --reply-turn is the top padding plus the middle of the name line. */
-.task-comment-replies {
-  margin-top: 4px;
-}
-.task-comment-response {
-  --reply-turn: 31px;
-  --reply-curve: 10px;
-  position: relative;
-  padding: 20px 0 0 28px;
-  scroll-margin-top: 20px;
-}
-.task-comment-response::before,
-.task-comment-response:not(:last-child)::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  border-left: var(--hairline) solid var(--color-line-strong);
-}
-.task-comment-response::before {
-  top: 0;
-  width: 20px;
-  height: var(--reply-turn);
-  border-bottom: var(--hairline) solid var(--color-line-strong);
-  border-bottom-left-radius: var(--reply-curve);
-}
-.task-comment-response:not(:last-child)::after {
-  top: calc(var(--reply-turn) - var(--reply-curve));
-  bottom: 0;
-}
-.task-comment-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 16px;
-  margin-top: 8px;
-  font-size: 12px;
-  color: var(--color-ink-3);
-}
-.task-comment-context {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  max-height: 240px;
-  overflow: auto;
-  margin-top: 8px;
-}
-.task-comment-executor {
-  margin-top: 20px;
-}
-.task-comment-compose-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 12px;
-  flex-wrap: wrap;
-}
-.task-comment-recipients {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-  padding: 8px 12px 0;
-  font-size: 12px;
-  color: var(--color-ink-3);
-  overflow-wrap: anywhere;
-}
-.task-comment-mentions {
-  max-height: 260px;
-  overflow: auto;
-  border-block: var(--hairline) solid var(--color-line);
-  padding: 4px;
-}
-.task-comment-mentions button[role="option"] {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  width: 100%;
-  text-align: left;
-  padding: 8px;
-  font-size: 12px;
-  overflow-wrap: anywhere;
-}
-.task-comment-mentions button[role="option"] span:last-child {
-  color: var(--color-ink-3);
-}
-.task-comment-mentions button[aria-selected="true"],
-.task-comment-mentions button[role="option"]:hover {
-  background: var(--color-surface-2);
-}
-.task-comment-mentions p {
-  padding: 8px;
-  font-size: 12px;
-}
-.task-comment-compose-footer > span,
-.task-comment-recipients,
-.task-comment-mentions button[role="option"] span:last-child {
-  color: var(--ink-2);
-}

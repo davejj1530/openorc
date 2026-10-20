@@ -95,27 +95,28 @@ export function TeamTaskStart({ task, inline = false }: { task: TeamTaskView; in
       <TeamTaskIdentity task={task} />
       <div className="flex flex-wrap items-center gap-2">
         <Button
-          size="sm"
+          size="lg"
+          variant={inline ? "secondary" : "primary"}
           disabled={request.working || (!request.pending && !task.start.allowed)}
           title={request.pending ? undefined : (task.start.reason ?? undefined)}
           onClick={() => void request.submit()}
         >
-          <Play size={12} />
+          <Play size={13} />
           {teamTaskSubmitLabel({ working: request.working, pending: Boolean(request.pending), kind: "start" })}
         </Button>
         {!inline && task.ownerDeletedAt ? (
-          <Button size="sm" variant="ghost" onClick={() => openTask(task.taskId, "chat")}>
+          <Button size="lg" variant="ghost" onClick={() => openTask(task.taskId, "chat")}>
             Open team activity
           </Button>
         ) : null}
         {!inline && !task.ownerDeletedAt ? (
-          <Button size="sm" variant="ghost" onClick={() => openThread(task.threadId)}>
+          <Button size="lg" variant="ghost" onClick={() => openThread(task.threadId)}>
             Open team conversation
           </Button>
         ) : null}
       </div>
       {!task.start.allowed && !request.pending && task.start.reason ? <p className="text-sm text-ink-3">{task.start.reason}</p> : null}
-      {request.pending ? <p className="text-xs text-ink-3">The saved request will be confirmed before another is created.</p> : null}
+      {request.pending ? <p className="text-sm text-ink-3">The saved request will be confirmed before another is created.</p> : null}
       {request.error ? (
         <p role="alert" className="text-sm text-bad break-words">
           {request.error}{" "}

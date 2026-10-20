@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ThreadRichText } from "./ThreadImages";
-import { WorkAgent, WorkDelegate, WorkLive, AlertCircle, ArrowUpRight, Check, ChevronRight, GitBranch, LoaderCircle, Play } from "./icons";
+import { WorkAgent, WorkDelegate, Loader2, AlertCircle, ArrowUpRight, Check, ChevronRight, GitBranch, LoaderCircle, Play } from "./icons";
 import { statusLabel } from "./status";
 import { Button, TextButton } from "./ui";
 import { cn } from "../lib/cn";
@@ -12,9 +12,15 @@ import { taskActivity, taskCardStatusLabel, taskStepLabel } from "../lib/task-pr
 
 function taskActivityIcon({ waiting, failed, working, finished, successful }: { waiting: boolean; failed: boolean; working: boolean; finished: boolean; successful: boolean }) {
   if (waiting || failed) return <AlertCircle size={14} className={cn("shrink-0", failed ? "text-bad" : "text-warn")} />;
-  if (working) return <WorkLive size={16} className="work-live" />;
-  if (finished && successful) return <WorkAgent size={16} className="tool-icon" data-tone="agent" />;
-  return <WorkDelegate size={16} className="tool-icon" data-tone="task" />;
+  if (working) return <Loader2 size={16} className="tool-row-live" />;
+  if (finished && successful) return <WorkAgent size={16} className="shrink-0 text-ink-3" />;
+  return <WorkDelegate size={16} className="shrink-0 text-ink-3" />;
+}
+
+/** In a thread a task is a card; in the panel's list it is a borderless row that takes the fill on hover. */
+function taskCardClass(compact: boolean): string {
+  if (compact) return "min-w-0 rounded-xl px-3 py-2.5 transition-colors hover:bg-surface-2";
+  return "surface-card min-w-0 rounded-2xl px-4 py-3";
 }
 
 function taskStepIcon({ failed, done, working }: { failed: boolean; done: boolean; working: boolean }) {
@@ -58,7 +64,7 @@ export function TaskCard({ taskId, compact = false }: { taskId: string; compact?
   const stateLabel = taskCardStatusLabel({ approvalKind: waiting?.approvalKind, runState: liveRun?.state, taskLabel: t ? statusLabel[t.status] : "" });
   if (!t)
     return task.isLoading ? (
-      <div className={cn("surface-card my-2 h-14 rounded-xl border border-line bg-surface", compact && "my-0 h-12")} />
+      <div className={cn("surface-card h-14 rounded-2xl", compact && "h-12")} />
     ) : (
       <div className="my-2 text-sm text-ink-3">
         {task.error ? "Could not load this task." : "This task is no longer available."}
@@ -74,10 +80,10 @@ export function TaskCard({ taskId, compact = false }: { taskId: string; compact?
   const proposed = t.status === "proposed";
 
   return (
-    <div data-task-activity={taskId} className={cn("surface-card rounded-xl border bg-surface min-w-0", proposed ? "border-warn" : "border-line", compact ? "px-2.5 py-2" : "my-2 px-4 py-3")}>
+    <div data-task-activity={taskId} className={taskCardClass(compact)}>
       <div className="flex items-center gap-2 min-w-0">
         {taskActivityIcon({ waiting: Boolean(waiting), failed, working, finished, successful: liveRun?.state === "success" })}
-        <button onClick={() => openTask(t.id)} className="flex-1 min-w-0 text-left text-base font-medium text-ink truncate hover:text-ink" title={t.title}>
+        <button onClick={() => openTask(t.id)} className="flex-1 min-w-0 text-left text-base text-ink truncate hover:text-ink" title={t.title}>
           {t.title}
         </button>
         {proposed ? (
@@ -103,7 +109,7 @@ export function TaskCard({ taskId, compact = false }: { taskId: string; compact?
           </TextButton>
         )}
       </div>
-      <div className="mt-1 flex items-center gap-2 text-xs text-ink-3 min-w-0">
+      <div className={cn("mt-1 flex items-center gap-2 text-xs text-ink-3 min-w-0", compact && "pl-6")}>
         <span role="status" className={cn("shrink-0", waiting && "text-warn", failed && "text-bad")}>
           {stateLabel}
         </span>

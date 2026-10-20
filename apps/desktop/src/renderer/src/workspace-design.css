@@ -244,72 +244,41 @@
   justify-content: flex-end;
   margin-left: auto;
 }
+/* Page filters are fill pills: the field's own fill, rounded fully, stepping up on hover. */
 .app-shell .page-filter-select {
   flex-shrink: 0;
-  max-width: 144px;
-  border-color: transparent;
-  background-color: transparent;
-  box-shadow: none;
-  font-size: 12px;
+  max-width: 160px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
 }
+.app-shell .page-filter-select:hover:not(:disabled, :focus-visible) {
+  background-color: var(--surface-3);
+}
+/* The page search is a round fill field, the same shape the Tasks header search grows into. */
 .page-search {
   display: flex;
   flex: 1;
   min-width: 0;
+  height: var(--control-lg);
   align-items: center;
   gap: 8px;
+  padding: 0 12px 0 10px;
+  border-radius: var(--radius-pill);
+  background: var(--control-fill);
   color: var(--ink-3);
+}
+.page-search:focus-within {
+  color: var(--ink-2);
 }
 .page-search input {
   width: 100%;
   min-width: 0;
-  padding: 4px 0;
   background: transparent;
-  font-size: 12px;
+  color: var(--ink);
+  font-size: var(--text-sm);
 }
 .page-search input::placeholder {
   color: var(--ink-4);
-}
-.page-filters [role="radiogroup"] {
-  flex-shrink: 0;
-  gap: 4px;
-}
-.page-filters [role="radio"] {
-  min-height: 28px;
-  padding: 0 10px;
-  border-radius: 6px;
-  color: var(--ink-3);
-}
-.page-filters [role="radio"]:hover {
-  background: var(--surface-2);
-  color: var(--ink);
-}
-.page-filters [role="radio"][aria-checked="true"] {
-  background: var(--navigation-soft);
-  color: var(--navigation-ink);
-}
-.app-shell .page-column .list-group {
-  margin-bottom: 16px;
-}
-.app-shell .page-column .list-group-heading {
-  margin-inline: 0;
-  padding-top: 0;
-}
-.app-shell .page-column .list-group-header {
-  padding: 0 8px;
-  height: 38px;
-  background: transparent;
-}
-.app-shell .page-column .task-list-row {
-  margin-inline: 0;
-  padding-inline: 8px;
-}
-.app-shell .page-column [data-task-open] {
-  height: 46px;
-  gap: 10px;
-}
-.app-shell .page-column [data-task-open] > span:first-of-type {
-  font-size: 14px;
 }
 @container (max-width: 480px) {
   .thread-header-project {
@@ -335,7 +304,6 @@
 }
 @media (forced-colors: active) {
   .project-option[data-selected="true"],
-  .page-filters [role="radio"][aria-checked="true"] {
   .thread-preview[data-open] {
     outline: 1px solid Highlight;
   }
@@ -363,8 +331,6 @@ html[data-transparent-shell="true"] .app-shell .panel-shell[data-expanded="true"
 }
 .app-shell .workspace-navigation button:focus-visible,
 .thread-rail-title button:focus-visible,
-.thread-starters button:focus-visible,
-.new-thread-activity > summary:focus-visible,
 .page-filters button:focus-visible,
 .page-filter-select:focus-visible {
   outline: 2px solid var(--ring);

@@ -1,20 +1,22 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { Menu } from "@base-ui/react/menu";
 import type { Task, TaskStatus } from "@openorc/protocol";
-import { Check, Plus } from "../components/icons";
+import { Check, Funnel, Plus } from "../components/icons";
 import { ListGroupHeading } from "../components/ListGroupHeading";
-import { PageFilters, PageSearch } from "../components/PageFilters";
-import { PriorityIcon, StatusIcon, statusLabel, statusOrder } from "../components/status";
+import { HeaderSearch } from "../components/PageFilters";
+import { PriorityIcon, StatusIcon, groupLabel, groupOrder, statusLabel, statusOrder } from "../components/status";
 import { TopBar } from "../components/TopBar";
 import { TaskStart } from "../components/TaskStart";
-import { menuItem, menuPopup } from "../components/ThreadActions";
-import { Badge, Button, Empty, IconButton, Kbd, metaSlot, Segmented, Select } from "../components/ui";
+import { menuItem, menuPopup, menuSeparator } from "../components/menu";
+import { Badge, Button, Empty, IconButton, metaSlot } from "../components/ui";
 import { CoversPreview } from "../lib/browser-preview";
 import { cn } from "../lib/cn";
 import { useLayout } from "../lib/layout";
 import { useRpc, useRpcMutation } from "../lib/query";
 import { openTask } from "../lib/router";
 import { relativeTime } from "../lib/time";
+import { floatingGround } from "../lib/use-anchor-ground";
+import { stageCount } from "../lib/task-stage-counts";
 
 function TaskRowStatus({ task, onMoved }: { task: Task; onMoved: () => void }) {
   const update = useRpcMutation("tasks.update");
@@ -23,7 +25,7 @@ function TaskRowStatus({ task, onMoved }: { task: Task; onMoved: () => void }) {
     <div className="task-row-status relative shrink-0">
       <Menu.Root>
         <Menu.Trigger
-          render={<IconButton aria-label={`Status for ${task.title}`} size="sm" />}
+          render={<IconButton aria-label={`Status for ${task.title}`} size="xs" />}
           aria-describedby={update.error || update.isPending ? feedbackId : undefined}
           aria-busy={update.isPending}
           title={`Change status · ${statusLabel[task.status]}`}
@@ -34,7 +36,7 @@ function TaskRowStatus({ task, onMoved }: { task: Task; onMoved: () => void }) {
         <Menu.Portal>
           <CoversPreview />
           <Menu.Positioner sideOffset={6} align="start" className="z-40" collisionPadding={8}>
-            <Menu.Popup className={menuPopup}>
+            <Menu.Popup ref={floatingGround} className={menuPopup}>
               {statusOrder.map((status) => (
                 <Menu.Item
                   key={status}
@@ -58,7 +60,7 @@ function TaskRowStatus({ task, onMoved }: { task: Task; onMoved: () => void }) {
         </p>
       ) : null}
       {update.error ? (
-        <p id={feedbackId} role="alert" className="absolute left-0 top-full z-20 w-56 rounded-md border border-line bg-surface px-2 py-1 text-xs text-bad shadow-panel break-words">
+        <p id={feedbackId} role="alert" className="absolute left-0 top-full z-20 mt-1 w-56 rounded-md bg-float-fill px-2.5 py-1.5 text-sm text-bad break-words">
           Couldn’t change status: {update.error.message}
         </p>
       ) : null}
@@ -75,7 +77,7 @@ export function TaskRows({ tasks, showProject }: { tasks: Task[]; showProject: b
   const nameOf = (id: string) => projects.data?.find((p) => p.id === id)?.name ?? "";
   const groupId = useId();
   const [collapsed, setCollapsed] = useState<Partial<Record<TaskStatus, boolean>>>({});
-  const groups = useMemo(() => statusOrder.map((status) => ({ status, tasks: tasks.filter((t) => t.status === status) })).filter((g) => g.tasks.length > 0), [tasks]);
+  const groups = useMemo(() => groupOrder.map((status) => ({ status, tasks: tasks.filter((t) => t.status === status) })).filter((g) => g.tasks.length > 0), [tasks]);
   const flat = useMemo(() => groups.flatMap((g) => (collapsed[g.status] ? [] : g.tasks)), [groups, collapsed]);
   const [cursor, setCursor] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
@@ -118,8 +120,7 @@ export function TaskRows({ tasks, showProject }: { tasks: Task[]; showProject: b
               controls={`${groupId}-${status}-tasks`}
               collapsed={Boolean(collapsed[status])}
               onToggle={() => setCollapsed((current) => ({ ...current, [status]: !current[status] }))}
-              icon={<StatusIcon status={status} />}
-              label={statusLabel[status]}
+              label={groupLabel[status]}
               count={{ value: group.length, label: `${group.length} ${group.length === 1 ? "task" : "tasks"}` }}
             />
             <div id={`${groupId}-${status}-tasks`} hidden={Boolean(collapsed[status])}>
@@ -128,25 +129,18 @@ export function TaskRows({ tasks, showProject }: { tasks: Task[]; showProject: b
                 const i = index;
                 return (
                   <div key={t.id} data-row={collapsed[status] ? undefined : i}>
-                    <div data-current={i === cursor || undefined} className="task-list-row mx-3 flex min-w-0 items-center gap-1 border-t border-line px-2">
+                    <div data-current={i === cursor || undefined} data-status={t.status} className="task-list-row">
                       <TaskRowStatus task={t} onMoved={() => listRef.current?.focus({ preventScroll: true })} />
-                      <button
-                        data-task-open
-                        onClick={() => openTask(t.id)}
-                        tabIndex={i === cursor ? 0 : -1}
-                        onFocus={() => setCursor(i)}
-                        aria-label={`${t.title}, ${statusLabel[t.status]}`}
-                        className="flex-1 min-w-0 flex items-center gap-2 h-9 px-1 text-left"
-                      >
-                        <PriorityIcon priority={t.priority} />
-                        <span className="flex-1 min-w-0 truncate text-base" title={t.title}>
+                      <button data-task-open onClick={() => openTask(t.id)} tabIndex={i === cursor ? 0 : -1} onFocus={() => setCursor(i)} aria-label={`${t.title}, ${statusLabel[t.status]}`}>
+                        <span className="task-row-title" title={t.title}>
                           {t.title}
                         </span>
                         {t.labels[0] ? <Badge className="task-row-label max-w-24 truncate">{t.labels[0]}</Badge> : null}
-                        {showProject ? <span className="task-row-project max-w-28 shrink-0 truncate text-right text-sm text-ink-3">{nameOf(t.projectId)}</span> : null}
-                        <span className={cn(metaSlot, "task-row-time w-16 text-sm")}>{relativeTime(t.updatedAt)}</span>
+                        {showProject ? <span className="task-row-meta task-row-project max-w-28 truncate text-right">{nameOf(t.projectId)}</span> : null}
+                        <span className={cn(metaSlot, "task-row-meta task-row-time w-16")}>{relativeTime(t.updatedAt)}</span>
+                        <PriorityIcon priority={t.priority} />
                       </button>
-                      {t.status === "backlog" || t.status === "proposed" ? <TaskStart task={t} /> : null}
+                      {t.status === "backlog" || t.status === "proposed" ? <TaskStart task={t} /> : <span className="size-6 shrink-0" aria-hidden="true" />}
                     </div>
                   </div>
                 );
@@ -154,14 +148,6 @@ export function TaskRows({ tasks, showProject }: { tasks: Task[]; showProject: b
             </div>
           </section>
         ))}
-      </div>
-      <div className="shrink-0 flex items-center gap-3 px-6 h-8 border-t border-line text-xs text-ink-4">
-        <span>
-          <Kbd>j</Kbd> <Kbd>k</Kbd> move
-        </span>
-        <span>
-          <Kbd>↵</Kbd> open
-        </span>
       </div>
     </div>
   );
@@ -212,7 +198,7 @@ function taskListBody(input: {
       {!input.query && !input.stage && input.shelf === "active" ? (
         <div className="mt-4">
           <Button onClick={input.onNewTask}>
-            <Plus size={13} /> New task <Kbd>⌘⇧N</Kbd>
+            <Plus size={13} /> New task
           </Button>
         </div>
       ) : null}
@@ -237,43 +223,87 @@ export function TaskListView({ onNewTask }: { onNewTask: () => void }) {
     <>
       <TopBar
         actions={
-          <Button size="sm" onClick={onNewTask}>
-            New task
-          </Button>
+          <>
+            <HeaderSearch label="Search tasks" placeholder="Search tasks…" value={query} onChange={setQuery} />
+            <TaskFilterMenu
+              tasks={all}
+              shelf={shelf}
+              stage={stage}
+              onShelf={(value) => {
+                setShelf(value);
+                setStage(null);
+              }}
+              onStage={setStage}
+            />
+            <Button size="lg" className="ml-1 pl-2.5" onClick={onNewTask}>
+              <Plus size={14} className="text-ink-3" />
+              New task
+            </Button>
+          </>
         }
       >
         Tasks
       </TopBar>
-      <div className="page-column">
-        <PageFilters
-          tabs={
-            <Segmented
-              label="Task filter"
-              value={shelf}
-              onChange={(value) => {
-                setShelf(value);
-                setStage(null);
-              }}
-              options={shelfOptions}
-            />
-          }
-          end={<PageSearch label="Filter tasks" placeholder="Filter tasks…" value={query} onChange={setQuery} />}
-        >
-          {shelf === "active" ? (
-            <Select aria-label="Task status" className="page-filter-select" value={stage ?? ""} onChange={(event) => setStage((event.target.value as TaskStatus) || null)}>
-              <option value="">All statuses</option>
-              {statusOrder
-                .filter((status) => status !== "done" && status !== "archived")
-                .map((status) => (
-                  <option key={status} value={status}>
-                    {statusLabel[status]} ({all.filter((task) => task.status === status).length})
-                  </option>
-                ))}
-            </Select>
-          ) : null}
-        </PageFilters>
+      <div className="task-page flex-1 min-h-0 flex flex-col">
         {taskListBody({ error: tasks.error, loading: tasks.isLoading, list, query, shelf, stage, showProject: !projectId, retry: () => void tasks.refetch(), onNewTask })}
       </div>
     </>
+  );
+}
+
+/** Open stages in the list's own group order, so the menu reads like the page. */
+const openStages = groupOrder.filter((status) => status !== "done" && status !== "archived");
+
+/** One menu for what the list shows: a shelf, then (on Active) one stage with its count. */
+function TaskFilterMenu({
+  tasks,
+  shelf,
+  stage,
+  onShelf,
+  onStage,
+}: {
+  tasks: Task[];
+  shelf: TaskShelf;
+  stage: TaskStatus | null;
+  onShelf: (shelf: TaskShelf) => void;
+  onStage: (stage: TaskStatus | null) => void;
+}) {
+  const filtered = shelf !== "active" || stage !== null;
+  const name = stage ? statusLabel[stage] : shelfOptions.find((option) => option.value === shelf)!.label;
+  return (
+    <Menu.Root>
+      <Menu.Trigger render={<IconButton aria-label={filtered ? `Filter tasks: ${name}` : "Filter tasks"} className={cn(filtered && "text-navigation-ink")} />}>
+        <Funnel size={15} />
+      </Menu.Trigger>
+      <Menu.Portal>
+        <CoversPreview />
+        <Menu.Positioner sideOffset={6} align="end" className="z-40" collisionPadding={8}>
+          <Menu.Popup ref={floatingGround} className={menuPopup}>
+            <Menu.RadioGroup aria-label="Task shelf" value={shelf} onValueChange={(value: TaskShelf) => onShelf(value)}>
+              {shelfOptions.map((option) => (
+                <Menu.RadioItem key={option.value} value={option.value} className={menuItem} closeOnClick>
+                  <Check size={13} className={cn("text-transparent", shelf === option.value && "text-ink")} />
+                  <span className="flex-1">{option.label}</span>
+                </Menu.RadioItem>
+              ))}
+            </Menu.RadioGroup>
+            {shelf === "active" ? (
+              <>
+                <Menu.Separator className={menuSeparator} />
+                <Menu.RadioGroup aria-label="Task status" value={stage ?? ""} onValueChange={(value: string) => onStage((value as TaskStatus) || null)}>
+                  {[null, ...openStages].map((status) => (
+                    <Menu.RadioItem key={status ?? "all"} value={status ?? ""} className={menuItem} closeOnClick>
+                      <Check size={13} className={cn("text-transparent", stage === status && "text-ink")} />
+                      <span className="flex-1">{status ? statusLabel[status] : "All statuses"}</span>
+                      {status ? <span className="text-sm text-ink-4 tabular">{stageCount(tasks, status)}</span> : null}
+                    </Menu.RadioItem>
+                  ))}
+                </Menu.RadioGroup>
+              </>
+            ) : null}
+          </Menu.Popup>
+        </Menu.Positioner>
+      </Menu.Portal>
+    </Menu.Root>
   );
 }

@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 import type { Task, TaskStatus } from "@openorc/protocol";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { TaskListView } from "./TaskList";
@@ -9,7 +10,7 @@ import { queryClient } from "../lib/query";
 import { useRouter } from "../lib/router";
 
 vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onInvalidate: vi.fn(), onReady: vi.fn() } }));
-vi.mock("../components/TopBar", () => ({ TopBar: () => null }));
+vi.mock("../components/TopBar", () => ({ TopBar: ({ actions }: { actions?: ReactNode }) => <div>{actions}</div> }));
 const task: Task = {
   id: "task",
   projectId: "project",
@@ -74,6 +75,11 @@ async function show() {
   );
   return screen.findByRole("button", { name: "Status for Export rows" });
 }
+async function chooseFilter(name: string) {
+  fireEvent.click(screen.getByRole("button", { name: /^Filter tasks/ }));
+  fireEvent.click(await screen.findByRole("menuitemradio", { name: new RegExp(`^${name}`) }));
+  await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+}
 async function moveStatus(status: TaskStatus) {
   fireEvent.click(await screen.findByRole("button", { name: "Status for Export rows" }));
   fireEvent.click(await screen.findByRole("menuitem", { name: statusLabel[status] }));
@@ -87,7 +93,7 @@ it("moves rows and updates group counts without opening or starting a task", asy
   expect((await screen.findAllByRole("menuitem")).map((item) => item.textContent?.trim())).toEqual(["Proposed", "Backlog", "In progress", "Review", "Done", "Archived"]);
   fireEvent.click(screen.getByRole("menuitem", { name: "Review" }));
   await waitFor(() => expect(document.querySelector('[data-status-group="backlog"]')).toBeNull());
-  expect(within(screen.getByRole("region", { name: /Review/ })).getByLabelText("2 tasks")).toBeTruthy();
+  expect(within(screen.getByRole("region", { name: /Ready for review/ })).getByLabelText("2 tasks")).toBeTruthy();
   expect(core.call).toHaveBeenCalledWith("tasks.update", { id: "task", patch: { status: "review" } });
   expect(useRouter.getState().route).toEqual({ view: "tasks" });
   expect(document.activeElement).toBe(document.querySelector(".task-list"));
@@ -98,13 +104,13 @@ it("moves between Active, Done, and Archived shelves and can restore a task", as
   await show();
   await moveStatus("done");
   await waitFor(() => expect(screen.queryByRole("button", { name: "Status for Export rows" })).toBeNull());
-  fireEvent.click(screen.getByRole("radio", { name: "Done" }));
+  await chooseFilter("Done");
   await moveStatus("archived");
   await waitFor(() => expect(screen.queryByRole("button", { name: "Status for Export rows" })).toBeNull());
-  fireEvent.click(screen.getByRole("radio", { name: "Archived" }));
+  await chooseFilter("Archived");
   await moveStatus("backlog");
   await waitFor(() => expect(screen.queryByRole("button", { name: "Status for Export rows" })).toBeNull());
-  fireEvent.click(screen.getByRole("radio", { name: "Active" }));
+  await chooseFilter("Active");
   await screen.findByRole("button", { name: "Export rows, Backlog" });
 });
 it("disables only the saving row, retains its status on failure and lets the user retry", async () => {
@@ -131,11 +137,25 @@ it("disables only the saving row, retains its status on failure and lets the use
 
 it("filters by stage and clears that filter when changing shelves", async () => {
   await show();
-  fireEvent.change(screen.getByRole("combobox", { name: "Task status" }), { target: { value: "review" } });
+  await chooseFilter("Review");
   expect(screen.queryByRole("button", { name: "Export rows, Backlog" })).toBeNull();
   expect(screen.getByRole("button", { name: "Review copy, Review" })).toBeTruthy();
-  fireEvent.click(screen.getByRole("radio", { name: "Done" }));
-  fireEvent.click(screen.getByRole("radio", { name: "Active" }));
+  expect(screen.getByRole("button", { name: "Filter tasks: Review" })).toBeTruthy();
+  await chooseFilter("Done");
+  await chooseFilter("Active");
   expect(screen.getByRole("button", { name: "Export rows, Backlog" })).toBeTruthy();
-  expect((screen.getByRole("combobox", { name: "Task status" }) as HTMLSelectElement).value).toBe("");
+  expect(screen.getByRole("button", { name: "Filter tasks" })).toBeTruthy();
+});
+
+it("lists each open stage with its count and searches from the header", async () => {
+  await show();
+  fireEvent.click(screen.getByRole("button", { name: "Filter tasks" }));
+  const stages = within(await screen.findByRole("group", { name: "Task status" })).getAllByRole("menuitemradio");
+  expect(stages.map((item) => item.textContent)).toEqual(["All statuses", "In progress0", "Review1", "Proposed0", "Backlog1"]);
+  fireEvent.click(stages[0]!);
+  await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+  fireEvent.click(screen.getByRole("button", { name: "Search tasks" }));
+  fireEvent.change(screen.getByRole("textbox", { name: "Search tasks" }), { target: { value: "copy" } });
+  expect(screen.queryByRole("button", { name: "Export rows, Backlog" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Review copy, Review" })).toBeTruthy();
 });

@@ -27,7 +27,7 @@ export function TaskDelete({ task }: { task: Task }) {
       <Dialog open={confirming} onOpenChange={setConfirming} title="Delete this task?">
         <p className="text-base text-ink-2 mb-3">The task and its discussion disappear from OpenOrc. Its conversation keeps its messages and changes.</p>
         {remove.error ? <div className="text-sm text-bad mb-3">{remove.error.message}</div> : null}
-        <div className="flex justify-end gap-2">
+        <div className="mt-5 flex justify-end gap-2">
           <Button onClick={() => setConfirming(false)}>Cancel</Button>
           <Button variant="danger" disabled={remove.isPending} onClick={confirm}>
             Delete

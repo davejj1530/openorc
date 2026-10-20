@@ -11,7 +11,7 @@ export function TaskStart({ task }: { task: Task }) {
     <div className="relative flex shrink-0 items-center" onKeyDown={(event) => event.stopPropagation()}>
       <Tooltip label={conversation.isPending ? "Opening thread…" : "Open thread"}>
         <IconButton
-          size="sm"
+          size="xs"
           aria-label={`Open thread for ${task.title}`}
           disabled={conversation.isPending}
           onClick={async () => {
@@ -28,7 +28,7 @@ export function TaskStart({ task }: { task: Task }) {
         </IconButton>
       </Tooltip>
       {conversation.error ? (
-        <p role="alert" className="absolute right-0 top-full z-20 w-56 rounded-md border border-line bg-surface px-2 py-1 text-xs text-bad shadow-panel break-words">
+        <p role="alert" className="absolute right-0 top-full z-20 mt-1 w-56 rounded-md bg-float-fill px-2.5 py-1.5 text-sm text-bad break-words">
           {conversation.error.message}
         </p>
       ) : null}

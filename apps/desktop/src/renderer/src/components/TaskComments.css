@@ -1,0 +1,216 @@
+/* Task-owned discussion shares the document's reading column: authors in regular ink, replies
+   hanging off one --line elbow, and a composer that is a plane on the tile. */
+.task-comments {
+  margin-block: 40px;
+  min-width: 0;
+}
+.task-comments-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+.task-comments-heading h2 {
+  font-size: var(--text-lg);
+  line-height: var(--text-lg--line-height);
+  letter-spacing: var(--text-lg--letter-spacing);
+}
+.task-comments-heading button {
+  font-size: var(--text-sm);
+}
+.task-comments-feed {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.task-comment {
+  padding-block: 20px;
+  border-bottom: var(--hairline) solid var(--line);
+  scroll-margin-top: 20px;
+}
+.task-comment-meta {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: var(--text-sm);
+  color: var(--ink-4);
+  margin-bottom: 6px;
+  overflow-wrap: anywhere;
+}
+.task-comment-meta strong {
+  font-size: var(--text-base);
+  color: var(--ink);
+}
+.task-comment-body {
+  font-size: var(--text-md);
+  line-height: var(--text-md--line-height);
+  letter-spacing: var(--text-md--letter-spacing);
+  overflow-wrap: anywhere;
+  min-width: 0;
+  max-height: 640px;
+  overflow-y: auto;
+}
+.task-comment-body pre {
+  max-width: 100%;
+  overflow-x: auto;
+}
+/* Replies hang off one line that curves into each response's name. Each response draws its own
+   elbow, and every response but the last carries the line on to the next, so the line ends at the
+   final reply. Straight stretches are never painted twice, which would darken the translucent
+   line. --reply-turn is the top padding plus the middle of the name line. */
+.task-comment-replies {
+  margin-top: 4px;
+}
+.task-comment-response {
+  --reply-turn: 30px;
+  --reply-curve: 10px;
+  position: relative;
+  padding: 20px 0 0 28px;
+  scroll-margin-top: 20px;
+}
+.task-comment-response::before,
+.task-comment-response:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  border-left: var(--hairline) solid var(--line);
+}
+.task-comment-response::before {
+  top: 0;
+  width: 20px;
+  height: var(--reply-turn);
+  border-bottom: var(--hairline) solid var(--line);
+  border-bottom-left-radius: var(--reply-curve);
+}
+.task-comment-response:not(:last-child)::after {
+  top: calc(var(--reply-turn) - var(--reply-curve));
+  bottom: 0;
+}
+.task-comment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  margin-top: 8px;
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+}
+.task-comment-context {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 240px;
+  overflow: auto;
+  margin-top: 8px;
+}
+.task-comment-executor {
+  margin-top: 20px;
+}
+/* The composer is a plane on the tile: no border, its own fill, r20 like the conversation's. */
+.task-comment-composer {
+  position: relative;
+  margin-top: 24px;
+  border-radius: var(--radius-3xl);
+  background: var(--surface);
+  --current-row-fill: var(--surface-2);
+  --control-fill: var(--surface-2);
+}
+.task-comment-composer textarea {
+  display: block;
+  resize: none;
+  field-sizing: content;
+  width: 100%;
+  min-height: 84px;
+  max-height: 320px;
+  padding: 14px 16px 8px;
+  background: transparent;
+  font-size: var(--text-md);
+  line-height: var(--text-md--line-height);
+  outline: none;
+}
+.task-comment-composer textarea:focus {
+  background: transparent;
+  box-shadow: none;
+}
+.task-comment-composer textarea::placeholder {
+  color: var(--ink-4);
+  opacity: 1;
+}
+.task-comment-compose-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px 10px 16px;
+  flex-wrap: wrap;
+}
+.task-comment-recipients {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 8px 16px 0;
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+.task-comment-mentions {
+  max-height: 260px;
+  overflow: auto;
+  padding: 6px;
+  border-bottom: var(--hairline) solid var(--line);
+}
+.task-comment-mentions button[role="option"] {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 36px;
+  padding: 10px;
+  border-radius: var(--radius-md);
+  text-align: left;
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+.task-comment-mentions button[aria-selected="true"],
+.task-comment-mentions button[role="option"]:hover {
+  background: var(--surface-2);
+}
+.task-comment-mentions p {
+  padding: 8px;
+  font-size: var(--text-sm);
+}
+.task-comment-compose-footer > span,
+.task-comment-recipients,
+.task-comment-mentions button[role="option"] span:last-child {
+  color: var(--ink-3);
+}
+
+/* Execution settings: a quiet section under the discussion. */
+.task-execution-settings {
+  margin-top: 40px;
+}
+/* The disclosure's marker is the interface chevron, not the native triangle. */
+.task-execution-settings > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  list-style: none;
+  transition: color var(--duration-leave) var(--ease-out);
+}
+.task-execution-settings > summary::-webkit-details-marker {
+  display: none;
+}
+.task-execution-settings > summary::after {
+  content: "";
+  width: 12px;
+  height: 12px;
+  background: currentColor;
+  mask: url("./icons-select.svg") center / contain no-repeat;
+  rotate: -90deg;
+  transition: rotate var(--duration-swap) var(--ease-out);
+}
+.task-execution-settings[open] > summary::after {
+  rotate: 0deg;
+}

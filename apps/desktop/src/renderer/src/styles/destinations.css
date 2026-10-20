@@ -1,0 +1,159 @@
+/* Destination pages (Tasks, and the list pages that share its parts): the header tools, group
+   heads and 44px rows. Rows are bare on the tile and take the fill step on hover; the keyboard
+   cursor takes the current-row fill. */
+
+/* Header search: a round control that grows into a field while it is in use. */
+.header-search-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 200px;
+  max-width: 40cqw;
+  height: var(--control-lg);
+  padding: 0 12px 0 10px;
+  border-radius: var(--radius-pill);
+  background: var(--control-fill);
+  color: var(--ink-3);
+  animation: header-search-grow var(--duration-resize) var(--ease-out);
+}
+.header-search-field:focus-within {
+  color: var(--ink-2);
+}
+.header-search-field input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: var(--text-sm);
+}
+.header-search-field input::placeholder {
+  color: var(--ink-4);
+}
+@keyframes header-search-grow {
+  from {
+    width: var(--control-lg);
+  }
+}
+
+/* Group heads: the group's name in ink with a faint count. The chevron that folds it shows on
+   hover, on keyboard focus and while the group is folded. */
+.list-group + .list-group {
+  margin-top: 24px;
+}
+.list-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  font-size: var(--text-base);
+  line-height: 16px;
+  text-align: left;
+}
+.list-group-chevron {
+  flex-shrink: 0;
+  color: var(--ink-4);
+  opacity: 0;
+  transition:
+    opacity var(--duration-leave) var(--ease-out),
+    transform var(--duration-swap) var(--ease-out);
+}
+.list-group-header:is(:hover, :focus-visible) .list-group-chevron,
+.list-group-header[aria-expanded="false"] .list-group-chevron {
+  opacity: 1;
+}
+.list-group-header[aria-expanded="false"] .list-group-chevron {
+  transform: rotate(-90deg);
+}
+.list-group-heading {
+  padding-bottom: 6px;
+}
+
+/* Task rows: 44px, r12, the status mark, the title in ink and faint metadata. */
+.task-list {
+  padding: 10px 14px 24px;
+}
+.task-list-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 44px;
+  padding: 0 8px 0 6px;
+  border-radius: var(--radius-lg);
+  transition: background-color var(--duration-leave) var(--ease-out);
+}
+.task-list-row + .task-list-row,
+[data-row] + [data-row] .task-list-row {
+  margin-top: 2px;
+}
+.task-list-row:hover {
+  background-color: var(--surface-2);
+}
+.task-list:focus-within .task-list-row[data-current] {
+  background-color: var(--current-row-fill);
+}
+.task-list-row [data-task-open] {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  height: 100%;
+  text-align: left;
+}
+.task-row-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: var(--text-base);
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.task-list-row[data-status="backlog"] .task-row-title,
+.task-list-row[data-status="proposed"] .task-row-title {
+  color: var(--ink-2);
+}
+.task-row-meta {
+  flex-shrink: 0;
+  color: var(--ink-4);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+.task-row-status {
+  display: flex;
+}
+/* The status trigger is round and quiet; its mark keeps its own color on hover. */
+.task-row-status button:hover .status-mark,
+.task-row-status button[aria-expanded="true"] .status-mark {
+  opacity: 0.8;
+}
+.status-mark-track {
+  stroke: var(--surface-3);
+}
+.status-mark-empty {
+  color: var(--surface-3);
+}
+@media (forced-colors: active) {
+  .status-mark-track {
+    stroke: CanvasText;
+  }
+  .status-mark-empty {
+    color: CanvasText;
+  }
+}
+
+/* The task page: its tabs sit on the tile under the toolbar as a natural-width track. */
+.task-tabs {
+  display: flex;
+  flex-shrink: 0;
+  padding: 2px 20px 6px;
+}
+.segmented-option[aria-selected="true"] {
+  color: var(--navigation-ink);
+}

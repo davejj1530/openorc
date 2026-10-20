@@ -187,7 +187,7 @@ export function TaskComments({ taskId, description, beforeSend }: { taskId: stri
           </div>
         ) : null}
         <div className="task-comment-compose-footer">
-          <span className="text-sm text-ink-3">{draft.recipients.length ? "Reply to selected agents" : "Type @ to choose a model and effort"}</span>
+          <span className="text-sm text-ink-3">{draft.recipients.length ? "Reply to selected agents" : null}</span>
           <Button type="submit" disabled={sending || !draft.body.trim()} size="sm">
             {sending ? "Sending…" : "Comment"}
           </Button>

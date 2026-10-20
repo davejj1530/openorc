@@ -400,6 +400,7 @@ export const ListTodo = icon(
 );
 export const Funnel = icon("Funnel", <path d="M4 5.5A1 1 0 0 1 5 4.5h14a1 1 0 0 1 .8 1.6L14.5 13v5.4a1 1 0 0 1-.55.9l-2.5 1.25a1 1 0 0 1-1.45-.9V13L4.2 6.1a1 1 0 0 1-.2-.6Z" />);
 export const ListFilter = icon("ListFilter", <path d="M3.5 6h17 M7 12h10 M10 18h4" />);
+export const FilePlain = icon("FilePlain", paper);
 export const FileText = icon(
   "FileText",
   <>

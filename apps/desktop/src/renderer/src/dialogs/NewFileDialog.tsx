@@ -18,7 +18,7 @@ function newFilePath(typed: string): { kind: "path"; path: FolderPath } | { kind
 
 /** What stood at the path when the create-only write refused it. A file can be opened instead; nothing is overwritten. */
 function refusal(current: FileRead): Attempt {
-  if (current.kind === "file") return { kind: "exists", path: current.path };
+  if (current.kind === "file" || current.kind === "binary") return { kind: "exists", path: current.path };
   if (current.kind === "unreadable") return { kind: "refused", message: current.reason };
   return { kind: "typing" };
 }

@@ -1,9 +1,10 @@
-import { mkdtemp, mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, realpath, rm, symlink, truncate, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { FolderPath } from "@openorc/protocol";
 import { FileFormatter } from "./file-format.js";
+import { verifyFileUrl } from "./file-url.js";
 import { FileService } from "./files.js";
 import { WorkspaceWriters } from "./workspace-writers.js";
 
@@ -17,10 +18,66 @@ beforeEach(async () => {
   await mkdir(root);
   writers = new WorkspaceWriters();
   const formatter = new FileFormatter({ bundled: null, environment: () => ({ path: join(dir, "bin"), env: { PATH: "/usr/bin:/bin" } }), timeoutMs: 500 });
-  files = new FileService({ writers, invalidate: () => {}, formatter });
+  files = new FileService({ writers, invalidate: () => {}, formatter, fileKey: "test-key" });
 });
 afterEach(async () => {
   await rm(dir, { recursive: true, force: true });
+});
+
+const folder = () => ({ root, readOnly: null });
+/** An empty file grown to `size` without writing it: it reads as NUL bytes. */
+async function sparse(name: string, size: number): Promise<string> {
+  const file = join(root, name);
+  await writeFile(file, "");
+  await truncate(file, size);
+  return file;
+}
+
+it("shows known media by extension at any size, with a URL only the key names a path from, without reading the bytes", async () => {
+  const image = await sparse("big.PNG", 3 * 1024 * 1024);
+  const read = await files.read(folder(), "big.PNG");
+  expect(read).toEqual({ kind: "binary", root, path: "big.PNG", absolutePath: image, size: 3 * 1024 * 1024, media: "image", mime: "image/png", url: expect.any(String) });
+  if (read.kind !== "binary") throw new Error("not binary");
+  expect(verifyFileUrl("test-key", read.url)).toBe(image);
+  expect(verifyFileUrl("other-key", read.url)).toBeNull();
+  await writeFile(join(root, "deck.pdf"), "%PDF-1.4 text only");
+  expect(await files.read(folder(), "deck.pdf")).toMatchObject({ kind: "binary", media: "pdf", mime: "application/pdf", size: 18 });
+});
+
+it("hands out a new viewer URL once a file's bytes change, so the panel reloads it", async () => {
+  await writeFile(join(root, "chart.png"), "v1");
+  const first = await files.read(folder(), "chart.png");
+  await writeFile(join(root, "chart.png"), "v2, longer");
+  const second = await files.read(folder(), "chart.png");
+  if (first.kind !== "binary" || second.kind !== "binary") throw new Error("not binary");
+  expect(second.url).not.toBe(first.url);
+  expect(verifyFileUrl("test-key", second.url)).toBe(first.absolutePath);
+});
+
+it("takes a NUL byte as binary of no particular kind, whether in the first bytes of a huge file or late in a small one", async () => {
+  await sparse("blob.bin", 3 * 1024 * 1024);
+  expect(await files.read(folder(), "blob.bin")).toMatchObject({ kind: "binary", media: "other", mime: "application/octet-stream", size: 3 * 1024 * 1024 });
+  await writeFile(join(root, "late.dat"), Buffer.concat([Buffer.alloc(10_000, "a"), Buffer.from([0]), Buffer.alloc(10, "b")]));
+  expect(await files.read(folder(), "late.dat")).toMatchObject({ kind: "binary", media: "other", size: 10_011 });
+});
+
+it("still reads text as text, refuses oversized text, and says what a folder or non-UTF-8 file is", async () => {
+  await writeFile(join(root, "notes.txt"), "plain\n");
+  expect(await files.read(folder(), "notes.txt")).toMatchObject({ kind: "file", text: "plain\n" });
+  await writeFile(join(root, "dump.sql"), Buffer.alloc(2 * 1024 * 1024 + 1, "a"));
+  expect(await files.read(folder(), "dump.sql")).toMatchObject({ kind: "unreadable", reason: "This file is too large to open (2 MB maximum)." });
+  await writeFile(join(root, "latin1.txt"), Buffer.from("café", "latin1"));
+  expect(await files.read(folder(), "latin1.txt")).toMatchObject({ kind: "unreadable", reason: "This file is not UTF-8 text and cannot be shown." });
+  await mkdir(join(root, "src"));
+  expect(await files.read(folder(), "src")).toMatchObject({ kind: "unreadable", reason: "This path is a folder, not a file." });
+});
+
+it("refuses media outside the folder before it looks at the extension, through a symlink or by absolute path", async () => {
+  const outside = join(dir, "secret.png");
+  await writeFile(outside, Buffer.from([0x89, 0x50]));
+  await symlink(outside, join(root, "link.png"));
+  await expect(files.read(folder(), "link.png")).rejects.toThrow("outside the conversation's workspace");
+  await expect(files.read(folder(), outside)).rejects.toThrow("outside the conversation's workspace");
 });
 
 it("offers a folder's files without git, skipping hidden entries and dependency or build output", async () => {

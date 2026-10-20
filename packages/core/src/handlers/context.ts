@@ -50,6 +50,7 @@ export async function promoteMemory(deps: { db: Db; files: Pick<FileService, "re
   const path = FolderPath.parse(file);
   const current = await deps.files.read(folder, path);
   if (current.kind === "unreadable") throw new Error(`${file} can't be edited here: ${current.reason}`);
+  if (current.kind === "binary") throw new Error(`${file} can't be edited here: it is not a text file.`);
   const header = "## Project memory (from OpenOrc)";
   const bullet = `- ${memory.title}: ${memory.body}`;
   const content = current.kind === "file" ? current.text : "";

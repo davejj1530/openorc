@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { Menu } from "@base-ui/react/menu";
-import { ChevronRight, Copy, Folder, MoreHorizontal, RefreshCw } from "../components/icons";
+import { ChevronRight, Copy, ExternalLink, Folder, FolderOpen, MoreHorizontal, RefreshCw } from "../components/icons";
 import { Button, IconButton, Segmented, Tooltip } from "../components/ui";
-import { menuItem, menuPopup } from "../components/menu";
+import { menuItem, menuPopup, menuSeparator } from "../components/menu";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { hasUnsavedEdits } from "../lib/file-buffer";
 import { relativeFilePath, useFileExplorer } from "../lib/file-explorer";
 import { filesKey } from "../lib/files-tool";
 import type { FileSelection } from "../lib/layout";
 import type { FileBuffer } from "../lib/use-file-buffer";
+import { openBinaryFile, revealLabel } from "./BinaryView";
 
 export type FileView = "preview" | "source";
 const views: { value: FileView; label: string }[] = [
@@ -84,6 +85,7 @@ export function FileToolbar({ selection, buffer, directory, view, markdown, onVi
 
 function FileMenu({ path, buffer }: { path: string; buffer: FileBuffer }) {
   const [notice, setNotice] = useState("");
+  const binary = buffer.view.kind === "binary" ? buffer.view.file : null;
   return (
     <>
       <Menu.Root>
@@ -93,6 +95,19 @@ function FileMenu({ path, buffer }: { path: string; buffer: FileBuffer }) {
         <Menu.Portal>
           <Menu.Positioner sideOffset={6} align="end" className="z-40" collisionPadding={8}>
             <Menu.Popup ref={floatingGround} className={menuPopup}>
+              {binary ? (
+                <>
+                  <Menu.Item className={menuItem} onClick={() => void openBinaryFile(binary)}>
+                    <ExternalLink size={14} />
+                    Open
+                  </Menu.Item>
+                  <Menu.Item className={menuItem} onClick={() => window.openorc.revealFile(binary.absolutePath)}>
+                    <FolderOpen size={14} />
+                    {revealLabel(window.openorc.platform)}
+                  </Menu.Item>
+                  <Menu.Separator className={menuSeparator} />
+                </>
+              ) : null}
               <Menu.Item className={menuItem} disabled={buffer.read.refreshing} onClick={buffer.read.refresh}>
                 <RefreshCw size={14} />
                 Refresh

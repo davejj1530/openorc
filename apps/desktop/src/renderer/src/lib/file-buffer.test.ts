@@ -1,13 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { FileVersion, FolderPath, type FileRead, type FileSnapshot } from "@openorc/protocol";
-import { afterSave, bufferView, draftAfterEdit, formatRequest, keepMine, saveRequest, type BufferView } from "./file-buffer";
+import { FileVersion, FolderPath, type FileRead, type FileSnapshot, type SignedFileUrl } from "@openorc/protocol";
+import { afterSave, bufferText, bufferView, draftAfterEdit, formatRequest, hasUnsavedEdits, keepMine, saveRequest, type BufferView } from "./file-buffer";
 import type { Draft } from "./file-drafts";
 
 const [v1, v2, v3] = ["1", "2", "3"].map((digit) => FileVersion.parse(digit.repeat(64))) as [FileVersion, FileVersion, FileVersion];
 const path = FolderPath.parse("src/cart.ts");
 const file = (version: FileVersion, text: string): FileSnapshot & { kind: "file" } => ({ kind: "file", root: "/repo", path, absolutePath: "/repo/src/cart.ts", version, text, readOnly: null });
 const missing: FileRead = { kind: "missing", root: "/repo", path };
-const binary: FileRead = { kind: "unreadable", root: "/repo", path, reason: "This is a binary file and cannot be shown as code." };
+const latin1: FileRead = { kind: "unreadable", root: "/repo", path, reason: "This file is not UTF-8 text and cannot be shown." };
+const binary: FileRead = {
+  kind: "binary",
+  root: "/repo",
+  path,
+  absolutePath: "/repo/src/cart.ts",
+  size: 3,
+  media: "other",
+  mime: "application/octet-stream",
+  url: "openorc-file://file/?path=x&sig=y&v=1" as SignedFileUrl,
+};
 const mine: Draft = { text: "mine", base: v1 };
 
 describe("bufferView", () => {
@@ -20,10 +30,17 @@ describe("bufferView", () => {
     ["a draft the disk has caught up with", file(v2, "mine"), mine, "clean"],
     ["a draft on a deleted file", missing, mine, "deleted"],
     ["a deleted file without a draft", missing, null, "missing"],
-    ["a draft on a file that turned binary", binary, mine, "unreadable"],
+    ["a draft on a file that stopped being UTF-8", latin1, mine, "unreadable"],
+    ["a draft on a file that turned binary", binary, mine, "binary"],
   ];
   it.each(cases)("reads %s as the right state", (_, disk, draft, kind) => {
     expect(bufferView(disk, draft).kind).toBe(kind);
+  });
+
+  it("holds the binary file for its viewer and counts no draft on it as unsaved, so closing never asks", () => {
+    const view = bufferView(binary, mine);
+    expect(view).toEqual({ kind: "binary", file: binary });
+    expect([hasUnsavedEdits(view), bufferText(view), saveRequest(view), formatRequest(view)]).toEqual([false, null, null, null]);
   });
 });
 

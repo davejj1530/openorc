@@ -57,7 +57,70 @@ export interface FileSnapshot {
   readOnly: string | null;
 }
 
-export type FileRead = ({ kind: "file" } & FileSnapshot) | { kind: "missing"; root: string; path: FolderPath } | { kind: "unreadable"; root: string; path: FolderPath; reason: string };
+/** How the file panel shows a file it can't edit: a viewer per media, or its name and size with Open for anything else. */
+export type FileMedia = "pdf" | "image" | "video" | "audio" | "other";
+
+export interface FileMediaEntry {
+  media: FileMedia;
+  /** What the viewer URL serves the bytes as. */
+  mime: string;
+}
+
+/** Files the panel shows by extension alone, without reading them. One entry decides both the viewer and the served type. */
+const mediaByExtension: Record<string, FileMediaEntry> = {
+  pdf: { media: "pdf", mime: "application/pdf" },
+  png: { media: "image", mime: "image/png" },
+  jpg: { media: "image", mime: "image/jpeg" },
+  jpeg: { media: "image", mime: "image/jpeg" },
+  gif: { media: "image", mime: "image/gif" },
+  webp: { media: "image", mime: "image/webp" },
+  avif: { media: "image", mime: "image/avif" },
+  bmp: { media: "image", mime: "image/bmp" },
+  ico: { media: "image", mime: "image/x-icon" },
+  svg: { media: "image", mime: "image/svg+xml" },
+  mp4: { media: "video", mime: "video/mp4" },
+  m4v: { media: "video", mime: "video/mp4" },
+  webm: { media: "video", mime: "video/webm" },
+  mov: { media: "video", mime: "video/quicktime" },
+  ogv: { media: "video", mime: "video/ogg" },
+  mp3: { media: "audio", mime: "audio/mpeg" },
+  m4a: { media: "audio", mime: "audio/mp4" },
+  wav: { media: "audio", mime: "audio/wav" },
+  ogg: { media: "audio", mime: "audio/ogg" },
+  oga: { media: "audio", mime: "audio/ogg" },
+  opus: { media: "audio", mime: "audio/ogg" },
+  flac: { media: "audio", mime: "audio/flac" },
+  aac: { media: "audio", mime: "audio/aac" },
+};
+
+/** Any other file whose bytes turn out not to be text. */
+export const OTHER_MEDIA: FileMediaEntry = { media: "other", mime: "application/octet-stream" };
+
+/** The lower-case extension a path ends with, or "" without one. */
+export const fileExtension = (path: string): string => /\.([a-z0-9]+)$/i.exec(path)?.[1]?.toLowerCase() ?? "";
+
+/** The media a path's extension names, or null for a file that is text until its bytes say otherwise. */
+export function fileMedia(path: string): FileMediaEntry | null {
+  return mediaByExtension[fileExtension(path)] ?? null;
+}
+
+/** A viewer URL the core signed after its containment check. Only files.read makes one; the renderer never builds its own. */
+export type SignedFileUrl = string & { readonly __brand: "SignedFileUrl" };
+
+/**
+ * A file the panel shows instead of editing: known media by extension, or anything with a NUL byte. `url` is the only
+ * way the renderer gets the bytes; nothing turns a renderer-supplied path into a file.
+ */
+export interface BinaryFile extends FileMediaEntry {
+  root: string;
+  path: FolderPath;
+  absolutePath: string;
+  size: number;
+  url: SignedFileUrl;
+}
+
+export type FileRead =
+  ({ kind: "file" } & FileSnapshot) | ({ kind: "binary" } & BinaryFile) | { kind: "missing"; root: string; path: FolderPath } | { kind: "unreadable"; root: string; path: FolderPath; reason: string };
 
 /** What a save expects on disk: the version the edit started from, or no file at all, which makes the write create-only. */
 export const FileExpectation = z.discriminatedUnion("kind", [z.object({ kind: z.literal("version"), version: FileVersion }).strict(), z.object({ kind: z.literal("absent") }).strict()]);

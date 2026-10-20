@@ -40,6 +40,9 @@ const api: OpenOrcApi = {
   revealFile(path) {
     ipcRenderer.send("shell:revealFile", path);
   },
+  openFile(url) {
+    return ipcRenderer.invoke("shell:openFile", url) as Promise<string>;
+  },
   openWindow(route) {
     ipcRenderer.send("window:open", route);
   },

@@ -167,12 +167,22 @@ it("answers a file that isn't there with its place in the folder, however the li
   expect(await read("README.md/child")).toEqual({ kind: "missing", root: checkout, path: "README.md/child" });
 });
 
-it("answers a folder, a binary, a non-UTF-8 and an oversized file as unreadable, without their contents", async () => {
+it("answers a folder, a non-UTF-8 and an oversized file as unreadable, and a binary with a viewer URL, never their contents", async () => {
   await mkdir(path.join(checkout, "src"));
   await writeFile(path.join(checkout, "logo.png"), Buffer.from([0x89, 0x50, 0x00, 0x47]));
   await writeFile(path.join(checkout, "latin1.txt"), Buffer.from("café", "latin1"));
   await writeFile(path.join(checkout, "dump.sql"), Buffer.alloc(2 * 1024 * 1024 + 1, "a"));
-  for (const file of ["src", "logo.png", "latin1.txt", "dump.sql"]) expect(await read(file)).toEqual({ kind: "unreadable", root: checkout, path: file, reason: expect.any(String) });
+  for (const file of ["src", "latin1.txt", "dump.sql"]) expect(await read(file)).toEqual({ kind: "unreadable", root: checkout, path: file, reason: expect.any(String) });
+  expect(await read("logo.png")).toEqual({
+    kind: "binary",
+    root: checkout,
+    path: "logo.png",
+    absolutePath: path.join(checkout, "logo.png"),
+    size: 4,
+    media: "image",
+    mime: "image/png",
+    url: expect.stringMatching(/^openorc-file:\/\/file\/\?path=[^&]+&sig=[a-f0-9]{64}&v=[^&]+$/),
+  });
 });
 
 it("names the file a symlink points at, so a file has one path however it was opened", async () => {

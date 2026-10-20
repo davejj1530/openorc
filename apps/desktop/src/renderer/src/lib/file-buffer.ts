@@ -1,4 +1,4 @@
-import type { FileExpectation, FileRead, FileSnapshot, FileWriteResult, FolderPath } from "@openorc/protocol";
+import type { BinaryFile, FileExpectation, FileRead, FileSnapshot, FileWriteResult, FolderPath } from "@openorc/protocol";
 import type { Draft } from "./file-drafts";
 
 /**
@@ -15,13 +15,15 @@ export type BufferView =
   /** Unsaved edits, and the file is gone. Save creates it again. */
   | { kind: "deleted"; path: FolderPath; draft: Draft }
   | { kind: "missing"; path: FolderPath }
-  | { kind: "unreadable"; path: FolderPath; reason: string };
+  | { kind: "unreadable"; path: FolderPath; reason: string }
+  /** Shown in a viewer, never edited. */
+  | { kind: "binary"; file: BinaryFile };
 
 export type EditableView = Extract<BufferView, { kind: "clean" | "dirty" | "conflict" | "deleted" }>;
 
 /**
  * - not read yet, or its draft not loaded yet: loading, since typing then could overwrite a stored draft
- * - unreadable: unreadable, keeping any draft for when the file reads again
+ * - unreadable or binary: as read, keeping any draft for when the file reads as text again
  * - missing: deleted with a draft, missing without
  * - a draft equal to the file is no edit at all: clean, whatever version it began on
  * - a draft begun on this version: dirty; begun on another: conflict
@@ -29,6 +31,7 @@ export type EditableView = Extract<BufferView, { kind: "clean" | "dirty" | "conf
 export function bufferView(disk: FileRead | undefined, draft: Draft | null | undefined): BufferView {
   if (!disk || draft === undefined) return { kind: "loading" };
   if (disk.kind === "unreadable") return { kind: "unreadable", path: disk.path, reason: disk.reason };
+  if (disk.kind === "binary") return { kind: "binary", file: disk };
   if (disk.kind === "missing") return draft ? { kind: "deleted", path: disk.path, draft } : { kind: "missing", path: disk.path };
   if (!draft || draft.text === disk.text) return { kind: "clean", file: disk };
   return draft.base === disk.version ? { kind: "dirty", file: disk, draft } : { kind: "conflict", file: disk, draft };

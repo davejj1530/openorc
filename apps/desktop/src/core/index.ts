@@ -15,6 +15,10 @@ import type { RpcRequest } from "@openorc/protocol";
 
 const dataDir = process.env["OPENORC_DATA_DIR"];
 if (!dataDir) throw new Error("OPENORC_DATA_DIR is not set");
+const fileKey = process.env["OPENORC_FILE_KEY"];
+if (!fileKey) throw new Error("OPENORC_FILE_KEY is not set");
+// Agents and shells inherit this process's environment. The key signs the file panel's viewer URLs and is dropped so theirs never carries it.
+delete process.env["OPENORC_FILE_KEY"];
 
 /** The latest startup or ready push, for a window that connects after it was sent. */
 let lastStatus: Broadcast | null = null;
@@ -34,6 +38,7 @@ const browser = new BrowserClient((message) => process.parentPort.postMessage(me
 const corePromise = OpenOrc.create({
   browser: browser.execute,
   dataDir,
+  fileKey,
   transport,
   slackSecrets: secrets.store("slack.secrets"),
   memorySecrets: secrets.store("memory.secrets"),

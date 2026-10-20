@@ -1,0 +1,205 @@
+/* New thread: one question over a roomy composer on the tile ground, where the thread works
+   under it, the starters and the threads worth picking up again. */
+
+.app-shell .new-thread-body {
+  container: new-thread / inline-size;
+  display: flex;
+  flex-direction: column;
+  padding: 0 48px 72px;
+}
+.new-thread-column {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 100%;
+  max-width: 640px;
+  /* Centred while it fits; once it is taller than the pane it scrolls from its top. */
+  margin: auto;
+  padding-top: 24px;
+}
+.new-thread-question {
+  color: var(--ink);
+  font-size: var(--text-title);
+  line-height: var(--text-title--line-height);
+  letter-spacing: var(--text-title--letter-spacing);
+  overflow-wrap: anywhere;
+}
+.new-thread-empty {
+  padding: 18px 20px;
+  border-radius: var(--radius-3xl);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: var(--text-base);
+}
+
+/* The composer: r24 on the writing-area role, a 15px prompt and one bar with a 34px send. */
+.composer-new-thread .composer-shell {
+  min-height: 156px;
+  gap: 18px;
+  padding: 18px 14px 14px 20px;
+  border-radius: var(--radius-5xl);
+}
+.composer-new-thread .composer-input,
+.composer-new-thread .composer-input-mirror,
+.composer-new-thread .composer-sent-ghost {
+  font-size: 15px;
+  line-height: 24px;
+  letter-spacing: -0.01em;
+}
+.composer-new-thread .composer-input {
+  min-height: 24px;
+}
+.composer-new-thread .composer-bar {
+  margin-top: auto;
+}
+.composer-new-thread .composer-tools {
+  margin-left: -6px;
+}
+.composer-new-thread .composer-icon-button {
+  width: var(--control-md);
+  height: var(--control-md);
+}
+.composer-new-thread :is(.composer-chip, .composer-model-trigger) {
+  height: var(--control-md);
+  padding: 0 10px 0 9px;
+}
+.composer-new-thread .composer-send {
+  width: var(--control-send-hero);
+  height: var(--control-send-hero);
+}
+
+/* Under the composer: where the thread works, the Claude account and uncommitted changes. */
+.new-thread-options {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  padding: 0 6px;
+  color: var(--ink-4);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+}
+.new-thread-location {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.new-thread-sentence,
+.new-thread-folder > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.new-thread-sentence .composer-branch {
+  color: inherit;
+}
+.new-thread-folder {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.new-thread-folder > svg {
+  flex-shrink: 0;
+}
+
+/* Starters prepare a draft (in plan mode); they are fill pills. */
+.thread-starters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 2px;
+}
+.thread-starters button {
+  height: var(--control-sm);
+  padding: 0 12px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+.thread-starters button:hover:not(:disabled) {
+  background: var(--surface-3);
+  color: var(--ink);
+}
+.thread-starters button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* "Pick up where you left off": a flat list of 42px rows with a status lead. */
+.new-thread-recent {
+  display: flex;
+  flex-direction: column;
+  margin-top: 26px;
+}
+.new-thread-recent-label {
+  padding: 0 12px 8px;
+  color: var(--ink-4);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+}
+.new-thread-recent > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.new-thread-recent-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  height: 42px;
+  padding: 0 12px;
+  border-radius: var(--radius-lg);
+  color: var(--ink);
+  text-align: left;
+}
+.new-thread-recent-row:hover {
+  background: var(--surface-2);
+}
+.new-thread-recent-lead {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  color: var(--ink-4);
+}
+.new-thread-recent-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-base);
+  line-height: 16px;
+  letter-spacing: var(--text-base--letter-spacing);
+}
+.new-thread-recent-meta {
+  flex-shrink: 0;
+  color: var(--ink-4);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+  white-space: nowrap;
+}
+
+@container new-thread (max-width: 480px) {
+  .new-thread-options {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+@media (max-width: 900px) {
+  .app-shell .new-thread-body {
+    padding: 0 24px 48px;
+  }
+}
+@media (max-width: 520px) {
+  .app-shell .new-thread-body {
+    padding: 0 12px 32px;
+  }
+}

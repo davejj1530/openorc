@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import type { FileScope } from "@openorc/protocol";
-import { AtSign, Slash, Zap } from "./icons";
 import type { SlashCommand } from "./Composer";
 import { ComposerSuggestions } from "./ComposerSuggestions";
 import { cn } from "../lib/cn";
@@ -156,35 +155,29 @@ export function ComposerInput(props: ComposerInputProps) {
                 may only hold options, and a stray paragraph inside one is read
                 out as if it were selectable. */}
           <div role="listbox" aria-label={suggestionLabel(memberList, mentionQuery !== null)} data-team-mention-list={memberList || undefined}>
-            {shown.map((suggestion, index) => {
-              let SuggestionIcon = Slash;
-              if (memberList || mentionQuery !== null) SuggestionIcon = AtSign;
-              else if (suggestion.insert) SuggestionIcon = Zap;
-              return (
-                <button
-                  key={suggestion.key}
-                  role="option"
-                  aria-selected={index === cursor}
-                  data-team-mention={suggestion.mention}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    suggestion.pick();
-                  }}
-                  onMouseEnter={() => setCursor(index)}
-                  className={cn("w-full flex items-center gap-2 h-7 px-2 rounded-md text-left text-sm", index === cursor ? "bg-surface-2 text-ink" : "text-ink-2")}
-                >
-                  <SuggestionIcon size={12} className="text-ink-4 shrink-0" />
-                  {/* The label is the thing being inserted, so the hint gives way first. A
+            {shown.map((suggestion, index) => (
+              <button
+                key={suggestion.key}
+                role="option"
+                aria-selected={index === cursor}
+                data-team-mention={suggestion.mention}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  suggestion.pick();
+                }}
+                onMouseEnter={() => setCursor(index)}
+                className="composer-suggestion"
+              >
+                {/* The label is the thing being inserted, so the hint gives way first. A
                     skill's description runs to a paragraph and would otherwise squeeze the
                     name it belongs to down to nothing. Half the row is the ceiling, so a
                     long file path still truncates rather than crowding out its own hint. */}
-                  <span className={cn("truncate", suggestion.insert && "skill-token", suggestion.hint ? "shrink-0 max-w-1/2" : "min-w-0", mentionQuery !== null && "font-mono text-xs")}>
-                    {suggestion.label}
-                  </span>
-                  {suggestion.hint ? <span className="ml-auto min-w-0 truncate text-xs text-ink-4">{suggestion.hint}</span> : null}
-                </button>
-              );
-            })}
+                <span className={cn("composer-suggestion-label", suggestion.insert && "skill-token")} data-mono={memberList ? undefined : true}>
+                  {suggestion.label}
+                </span>
+                {suggestion.hint ? <span className="composer-suggestion-hint">{suggestion.hint}</span> : null}
+              </button>
+            ))}
           </div>
           {hidden > 0 ? (
             <p role="status" className="composer-suggestions-more">

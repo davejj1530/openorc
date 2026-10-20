@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ExecutionMode,
   executionMode,
@@ -11,21 +11,22 @@ import {
   type RunMode,
   type FileScope,
 } from "@openorc/protocol";
-import { ArrowUp, ChevronDown, Clock, FileText, GitBranch, Laptop, Plus, Square, X } from "./icons";
-import { Menu } from "@base-ui/react/menu";
-import { Popover } from "@base-ui/react/popover";
+import { FileText, Laptop, Lightbulb, Pencil, Plus, ShieldCheck, Square, Wand, X } from "./icons";
 import { ComposerInput } from "./ComposerInput";
+import { ComposerChoice } from "./ComposerChoice";
+import { ComposerSendButton, type ComposerSendState } from "./ComposerSendButton";
+import { ComposerFooter } from "./ComposerFooter";
+import { ComposerDropZone, useComposerDrop } from "./ComposerDropZone";
+import { ContextUsage } from "./ContextUsage";
 import { ComposerModelPicker, type ModelChoice } from "./ModelPicker";
 import { Button, Tooltip } from "./ui";
 import { cn } from "../lib/cn";
 import { useRpcMutation } from "../lib/query";
 import { useComposerAttachments, removeAcceptedAttachments } from "../lib/composer-attachments";
-import { formatTokens } from "../lib/time";
 import { formatBytes } from "../lib/file-imports";
 import { type MentionEntry } from "../lib/composer-mentions";
 import { useComposerSubmission } from "../lib/composer-submission";
 import { composerActivity, composerSendHint } from "../lib/composer-presentation";
-import { CoversPreview } from "../lib/browser-preview";
 
 export const permissionLabel: Record<PermissionPreset, string> = { review: "Review", trusted: "Workspace access", autonomous: "Autonomous" };
 
@@ -117,7 +118,7 @@ export interface ComposerProps {
   steerReason?: string | null;
   /** Team chat sends live by default; ordinary solo chat keeps Enter-to-queue. */
   liveByDefault?: boolean;
-  /** How full the conversation is; the ring beside the model. */
+  /** How full the conversation is; the ring beside send. */
   context?: { used: number; window: number | null } | null;
   onCompact?: () => void;
   compactDisabledReason?: string;
@@ -130,19 +131,27 @@ export interface ComposerProps {
   commands?: SlashCommand[];
   autoFocus?: boolean;
   size?: "md" | "lg";
-  /** The landing screen keeps destination choices above the prompt and attachment/send actions together. */
+  /** The landing screen draws the roomier composer and shows where the thread works below it, not in a footer. */
   presentation?: "conversation" | "new-thread";
   error?: string | null;
   children?: ReactNode;
 }
 
+/** The sent text, lifting away as the prompt clears. */
+function useSentGhost(text: string | null) {
+  const [ghost, setGhost] = useState<{ text: string; key: number } | null>(null);
+  useEffect(() => {
+    if (text) setGhost((previous) => ({ text, key: (previous?.key ?? 0) + 1 }));
+  }, [text]);
+  return { ghost, clear: () => setGhost(null) };
+}
+
 /**
  * The one composer, for the landing screen and every conversation. Files
  * paste or drop in and ride along with the prompt, images as thumbnails and
- * everything else as a named chip; the model, effort, mode,
- * and permission live under the text; Git context shares the working-folder footer. @
- * mentions a file, / runs a command, and the ring says how full the
- * conversation is.
+ * everything else as a named card; attach, the model and the mode sit in the
+ * bar under the text with the context ring and send at its end; the working
+ * folder and Git context share the footer. @ mentions a file, / runs a command.
  */
 export function Composer(props: ComposerProps) {
   const isNewThread = props.presentation === "new-thread";
@@ -153,13 +162,18 @@ export function Composer(props: ComposerProps) {
   const interrupt = useRpcMutation("runs.interrupt");
   const { submission, submit: submitDraft, acknowledge } = useComposerSubmission(props.draftKey);
   const submitting = submission?.status === "pending";
+  const [sentText, setSentText] = useState<string | null>(null);
+  const sent = useSentGhost(sentText);
   useEffect(() => {
     if (submission?.status !== "accepted") return;
-    if (value.trim() === submission.text) onChange("");
+    if (value.trim() === submission.text) {
+      onChange("");
+      setSentText(submission.text);
+    }
     removeAttachments(submission.attachments);
     acknowledge();
   }, [submission, value, onChange, acknowledge, removeAttachments]);
-  const [dragging, setDragging] = useState(false);
+  const drop = useComposerDrop((dropped) => void addFiles(dropped));
   const attachmentBlock = attachments.length > 0 ? props.attachmentsDisabledReason : null;
   const canSend = Boolean(props.allowEmpty || props.value.trim() || attachments.length > 0) && !props.busy && !submitting && !props.disabledReason && !attachmentBlock && uploading === 0;
 
@@ -168,6 +182,7 @@ export function Composer(props: ComposerProps) {
     files.clearError();
     const sent = attachments.map((attachment) => attachment.path);
     const text = props.value.trim();
+    setSentText(null);
     submitDraft(text, sent, async () => {
       await props.onSubmit(text, sent, now);
       removeAcceptedAttachments(props.draftKey, sent);
@@ -200,39 +215,25 @@ export function Composer(props: ComposerProps) {
     if (props.stopAction) props.stopAction.onStop();
     else if (props.live) interrupt.mutate({ runId: props.live.runId });
   };
+  let sendState: ComposerSendState = queueing && !props.liveByDefault ? "queue" : "send";
+  if (stopInsteadOfSend) sendState = "stop";
 
   return (
     <div className={cn("composer min-w-0", props.size === "lg" && "composer-large", isNewThread && "composer-new-thread")}>
       {interrupt.error || files.error || submission?.error || props.error ? (
-        <div role="alert" className="mb-2 text-sm text-bad break-words">
+        <div role="alert" className="composer-alert">
           {interrupt.error ? `Couldn’t stop the agent. ${interrupt.error.message}` : files.error || submission?.error || props.error}
         </div>
       ) : null}
       {props.changes?.error ? (
-        <p role="status" className="mb-2 text-sm text-bad">
+        <p role="status" className="composer-alert">
           {props.changes.error}{" "}
           <button type="button" className="underline" onClick={props.changes.onRetry}>
             Retry
           </button>
         </p>
       ) : null}
-      <div
-        ref={shell}
-        className="composer-shell relative border"
-        data-dragging={dragging || undefined}
-        onDragOver={(e) => {
-          if (e.dataTransfer.types.includes("Files")) {
-            e.preventDefault();
-            setDragging(true);
-          }
-        }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragging(false);
-          void addFiles(Array.from(e.dataTransfer.files));
-        }}
-      >
+      <div ref={shell} className="composer-shell" data-dragging={drop.dragging || undefined} {...drop.handlers}>
         {attachments.length > 0 || uploading > 0 ? (
           <div className="composer-attachments">
             {attachments.map((attachment) => (
@@ -251,7 +252,7 @@ export function Composer(props: ComposerProps) {
                 </button>
               </div>
             ))}
-            {uploading > 0 ? <div className="composer-thumbnail border border-dashed border-line-strong animate-pulse" /> : null}
+            {uploading > 0 ? <div className="composer-thumbnail composer-uploading" /> : null}
           </div>
         ) : null}
         {/* A textarea cannot colour part of its own value, so the highlight is
@@ -259,50 +260,50 @@ export function Composer(props: ComposerProps) {
             box with transparent ink, and only the skill tokens carry a fill;
             the real characters come from the textarea sitting on top, which
             stays the only thing the caret, selection and IME ever touch. */}
-        <ComposerInput
-          value={props.value}
-          onChange={props.onChange}
-          onSubmit={(duringTurn) => submit(Boolean(props.liveByDefault && queueing) || duringTurn)}
-          onFiles={addFiles}
-          disabled={Boolean(props.busy || submitting)}
-          placeholder={props.placeholder}
-          autoFocus={props.autoFocus}
-          fileSearch={props.fileSearch}
-          mentions={props.mentions}
-          commands={props.commands}
-          suggestionAnchor={shell}
-          suggestionSide={isNewThread ? "bottom" : "top"}
-        />
-        {/* Workspace context and settings share the shell's bottom row. */}
-        <div className="composer-foot">
-          {!isNewThread ? (
-            <div className="composer-lead">
-              <ComposerAttach onAttach={pickFiles} disabledReason={props.attachmentsDisabledReason} />
+        <div className="composer-prompt">
+          <ComposerInput
+            value={props.value}
+            onChange={props.onChange}
+            onSubmit={(duringTurn) => submit(Boolean(props.liveByDefault && queueing) || duringTurn)}
+            onFiles={addFiles}
+            disabled={Boolean(props.busy || submitting)}
+            placeholder={props.placeholder}
+            autoFocus={props.autoFocus}
+            fileSearch={props.fileSearch}
+            mentions={props.mentions}
+            commands={props.commands}
+            suggestionAnchor={shell}
+            suggestionSide={isNewThread ? "bottom" : "top"}
+          />
+          {sent.ghost ? (
+            <div key={sent.ghost.key} className="composer-sent-ghost" aria-hidden="true" onAnimationEnd={sent.clear}>
+              {sent.ghost.text}
             </div>
           ) : null}
-          {/* Metadata truncates first; narrow layouts let the action group use a second row. */}
-          <div className="composer-meta">
+        </div>
+        <div className="composer-bar">
+          {/* Attach, then where and how the agent works. Chips truncate before the end group moves. */}
+          <div className="composer-tools">
+            <ComposerAttach onAttach={pickFiles} disabledReason={props.attachmentsDisabledReason} />
             {props.projectControl}
             {composerDestination(props)}
-            {isNewThread ? composerModelControl(props) : null}
-            {isNewThread ? composerModeControl(props) : null}
-            {!isNewThread ? composerModeControl(props) : null}
+            {composerModelControl(props)}
+            {composerModeControl(props)}
           </div>
-          <div className="composer-actions">
-            {props.context ? (
-              <ContextRing used={props.context.used} window={props.context.window} onCompact={props.onCompact} compacting={props.compacting} disabledReason={props.compactDisabledReason} />
-            ) : null}
+          <div className="composer-end">
             {activityLabel ? (
-              <span role="status" className="text-xs text-ink-3 px-1">
+              <span role="status" className="composer-activity">
                 {activityLabel}
               </span>
             ) : null}
             {props.compacting ? (
-              <span role="status" className="text-xs text-ink-3 px-1">
+              <span role="status" className="composer-activity">
                 Compacting context…
               </span>
             ) : null}
-            {isNewThread ? <ComposerAttach onAttach={pickFiles} disabledReason={props.attachmentsDisabledReason} /> : composerModelControl(props)}
+            {props.context ? (
+              <ContextUsage used={props.context.used} window={props.context.window} onCompact={props.onCompact} compacting={props.compacting} disabledReason={props.compactDisabledReason} />
+            ) : null}
             {canStop && !stopInsteadOfSend ? (
               <Tooltip label="Stop this turn">
                 <button onClick={stop} disabled={stopping} aria-label="Stop" className="composer-icon-button">
@@ -315,7 +316,7 @@ export function Composer(props: ComposerProps) {
                 could never show why it was dim. The reason goes on the queue
                 button instead, which is enabled and therefore hoverable. */}
             {!stopInsteadOfSend && !props.liveByDefault && queueing && props.steerable ? (
-              <Tooltip label="Say it during this turn (⌘↵)">
+              <Tooltip label="Say it during this turn">
                 <button onClick={() => void submit(true)} disabled={!canSend} aria-label="Send now" className="composer-send-now">
                   Send now
                 </button>
@@ -328,90 +329,25 @@ export function Composer(props: ComposerProps) {
                 </Button>
               </Tooltip>
             ) : null}
-            {stopInsteadOfSend ? (
-              <Tooltip label="Stop this turn">
-                <button onClick={stop} disabled={stopping} aria-label="Stop" className="composer-send">
-                  <Square size={16} />
-                </button>
-              </Tooltip>
-            ) : (
-              <Tooltip label={sendHint}>
-                <button
-                  onClick={() => void submit()}
-                  disabled={!canSend}
-                  aria-label={queueing && !props.liveByDefault ? "Queue" : "Send"}
-                  className={cn("composer-send", queueing && !props.liveByDefault && "composer-send-queued")}
-                >
-                  {queueing && !props.liveByDefault ? <Clock size={16} /> : <ArrowUp size={16} />}
-                </button>
-              </Tooltip>
-            )}
+            <ComposerSendButton
+              state={sendState}
+              disabled={stopInsteadOfSend ? stopping : !canSend}
+              hint={stopInsteadOfSend ? "Stop this turn" : sendHint}
+              onClick={stopInsteadOfSend ? stop : () => void submit()}
+            />
           </div>
         </div>
+        {drop.dragging ? <ComposerDropZone count={drop.count} /> : null}
       </div>
-      <ComposerWorkspace location={props.location} changes={props.changes} />
-    </div>
-  );
-}
-
-function ComposerWorkspace({ location, changes }: Pick<ComposerProps, "location" | "changes">) {
-  const changed = changes && changes.files > 0;
-  if (!location.directory && !location.branch && !changed) return null;
-  const fileLabel = changes?.files === 1 ? "file" : "files";
-  return (
-    <div className="composer-rail">
-      {location.directory ? (
-        <span className="composer-directory" title={location.directory}>
-          <Laptop size={14} />
-          <span>{location.directory}</span>
-        </span>
-      ) : null}
-      {location.branch || changed ? (
-        <div className="composer-git">
-          {location.branch ? (
-            <span className="composer-branch" title={location.branch}>
-              <GitBranch size={14} />
-              <span>{location.branch}</span>
-            </span>
-          ) : null}
-          {changed ? (
-            <section className="composer-changes" aria-label="Uncommitted changes">
-              <button
-                type="button"
-                className="composer-changes-summary"
-                onClick={changes.onReview}
-                aria-label={`Review ${changes.files} changed ${fileLabel}, ${changes.insertions} added and ${changes.deletions} removed lines`}
-              >
-                {changes.insertions + changes.deletions > 0 ? (
-                  <>
-                    {changes.insertions > 0 ? <span className="text-ok">+{changes.insertions.toLocaleString()}</span> : null}
-                    {changes.deletions > 0 ? <span className="text-bad">−{changes.deletions.toLocaleString()}</span> : null}
-                  </>
-                ) : (
-                  <span>
-                    {changes.files} {fileLabel}
-                  </span>
-                )}
-              </button>
-              <Tooltip label={changes.commitDisabledReason ?? "Commit changes"}>
-                <span className="composer-changes-commit-wrap">
-                  <button type="button" className="composer-changes-commit" aria-label="Commit changes" disabled={Boolean(changes.commitDisabledReason)} onClick={changes.onCommit}>
-                    Commit<span className="composer-commit-suffix"> changes</span>
-                  </button>
-                </span>
-              </Tooltip>
-            </section>
-          ) : null}
-        </div>
-      ) : null}
+      {isNewThread ? null : <ComposerFooter location={props.location} changes={props.changes} />}
     </div>
   );
 }
 
 function ComposerAttach({ onAttach, disabledReason }: { onAttach: () => void; disabledReason?: string | null }) {
   return (
-    <Tooltip label={disabledReason ?? "Attach a file. Paste or drop works too."}>
-      <button onClick={onAttach} disabled={Boolean(disabledReason)} aria-label="Attach file" className="composer-icon-button">
+    <Tooltip label={disabledReason ?? "Attach files"}>
+      <button onClick={onAttach} disabled={Boolean(disabledReason)} aria-label="Attach file" className="composer-icon-button composer-attach">
         <Plus size={16} />
       </button>
     </Tooltip>
@@ -425,7 +361,7 @@ function composerModelControl(props: ComposerProps): ReactNode {
       {props.modelControl ?? <ComposerModelPicker value={props.model} onChange={props.onModel} />}
       {unavailable ? (
         <Tooltip label={unavailable}>
-          <span className="text-xs text-ink-3" role="status">
+          <span className="composer-activity" role="status">
             Mode unavailable
           </span>
         </Tooltip>
@@ -455,137 +391,9 @@ function composerModeControl(props: ComposerProps): ReactNode {
   );
 }
 
+const modeIcons: Record<ExecutionMode, typeof ShieldCheck> = { plan: Lightbulb, review: ShieldCheck, trusted: Pencil, autonomous: Wand };
+
 /** Every mode keeps its label for the trigger; the menu offers only the ones the agent can run. */
 function modeOptions(agent: AgentKind | undefined) {
-  return ExecutionMode.options.map((value) => ({ value, ...executionModePresentation(agent, value), hidden: !executionModeAvailable(agent, value) }));
-}
-
-/** Usage stays inspectable even while compaction is unavailable. Only the explicit action compacts. */
-function ContextRing({ used, window, onCompact, compacting, disabledReason }: { used: number; window: number | null; onCompact?: () => void; compacting?: boolean; disabledReason?: string }) {
-  const fraction = window ? Math.min(1, used / window) : 0;
-  const r = 6;
-  const c = 2 * Math.PI * r;
-  let tone = "text-ink-3";
-  if (fraction > 0.85) tone = "text-bad";
-  else if (fraction > 0.6) tone = "text-warn";
-  return (
-    <Popover.Root>
-      <Popover.Trigger aria-label="Context usage" className={cn("composer-context", tone)}>
-        <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
-          <circle cx="8" cy="8" r={r} fill="none" stroke="currentColor" strokeOpacity="0.2" strokeWidth="2" />
-          <circle cx="8" cy="8" r={r} fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray={`${c * fraction} ${c}`} strokeLinecap="round" transform="rotate(-90 8 8)" />
-        </svg>
-        <span>{window ? `${Math.round(fraction * 100)}%` : formatTokens(used)}</span>
-      </Popover.Trigger>
-      <Popover.Portal>
-        <CoversPreview />
-        <Popover.Positioner side="top" align="end" sideOffset={8} collisionPadding={12}>
-          <Popover.Popup className="composer-context-popup">
-            <Popover.Title className="text-base font-medium text-ink">Context usage</Popover.Title>
-            <Popover.Description className="mt-1 text-sm text-ink-2">Context is the messages, instructions, and tool results the model can use in this conversation.</Popover.Description>
-            <dl className="composer-context-stats">
-              <div>
-                <dt>Used</dt>
-                <dd>
-                  {used.toLocaleString()} tokens{window ? ` (${Math.round(fraction * 100)}%)` : ""}
-                </dd>
-              </div>
-              {window ? (
-                <>
-                  <div>
-                    <dt>Available</dt>
-                    <dd>{Math.max(0, window - used).toLocaleString()} tokens</dd>
-                  </div>
-                  <div>
-                    <dt>Context window</dt>
-                    <dd>{window.toLocaleString()} tokens</dd>
-                  </div>
-                </>
-              ) : (
-                <div>
-                  <dt>Context window</dt>
-                  <dd>Not reported</dd>
-                </div>
-              )}
-            </dl>
-            <div className="composer-context-compact">
-              <p className="text-sm text-ink-2">Compacting summarizes earlier messages to free up space. Some detail may be lost.</p>
-              <Button size="sm" variant="secondary" disabled={!onCompact || compacting || Boolean(disabledReason)} onClick={onCompact}>
-                {compacting ? "Compacting…" : "Compact context"}
-              </Button>
-              {compacting || !onCompact || disabledReason ? (
-                <p role="status" className="text-xs text-ink-3">
-                  {compacting ? "Compacting context. New messages will be queued." : (disabledReason ?? "Compaction is unavailable for this conversation right now.")}
-                </p>
-              ) : null}
-            </div>
-          </Popover.Popup>
-        </Popover.Positioner>
-      </Popover.Portal>
-    </Popover.Root>
-  );
-}
-
-/**
- * One choice control for the composer foot. Every picker down there is this object:
- * transparent at rest, an ink wash on hover and while open, the current value in --ink and a
- * small chevron. Mode, destination and the model all read it, so a two-up segmented control
- * never has to spend the width of the option you did not pick.
- */
-export function ComposerChoice<T extends string>({
-  value,
-  options,
-  onChange,
-  disabled,
-  disabledReason,
-  describedBy,
-  ariaLabel,
-  className,
-  side = "top",
-  align = "end",
-}: {
-  value: T;
-  /** A hidden option can still be the current value; the menu just doesn't offer it. */
-  options: readonly { value: T; label: string; hint?: string; icon?: ComponentType<{ size?: number }>; hidden?: boolean }[];
-  onChange: (value: T) => void;
-  disabled?: boolean;
-  disabledReason?: string;
-  describedBy?: string;
-  ariaLabel: string;
-  className?: string;
-  side?: "top" | "bottom";
-  align?: "start" | "end";
-}) {
-  const current = options.find((o) => o.value === value) ?? options[0];
-  const Icon = current?.icon;
-  return (
-    <Menu.Root>
-      <Menu.Trigger
-        disabled={disabled}
-        aria-label={`${ariaLabel}: ${current?.label ?? value}`}
-        aria-describedby={describedBy}
-        title={disabled ? disabledReason : current?.hint}
-        className={cn("composer-picker", className)}
-      >
-        {Icon ? <Icon size={14} /> : null}
-        <span className="composer-picker-value">{current?.label ?? value}</span>
-        <ChevronDown size={14} />
-      </Menu.Trigger>
-      <Menu.Portal>
-        <CoversPreview />
-        <Menu.Positioner side={side} align={align} sideOffset={6} collisionPadding={8}>
-          <Menu.Popup className="menu-popup w-64 rounded-lg border border-line bg-surface p-1 shadow-panel outline-none">
-            {options
-              .filter((o) => !o.hidden)
-              .map((o) => (
-                <Menu.Item key={o.value} className="grid gap-0.5 px-2 py-1.5 rounded-md data-[highlighted]:bg-surface-2 outline-none" onClick={() => onChange(o.value)}>
-                  <span className={cn("text-base", value === o.value ? "text-ink font-medium" : "text-ink-2")}>{o.label}</span>
-                  {o.hint ? <span className="text-xs text-ink-3">{o.hint}</span> : null}
-                </Menu.Item>
-              ))}
-          </Menu.Popup>
-        </Menu.Positioner>
-      </Menu.Portal>
-    </Menu.Root>
-  );
+  return ExecutionMode.options.map((value) => ({ value, ...executionModePresentation(agent, value), icon: modeIcons[value], hidden: !executionModeAvailable(agent, value) }));
 }

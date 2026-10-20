@@ -437,3 +437,17 @@ describe("initial execution location", () => {
     expect(screen.getByText("main")).toBeTruthy();
   });
 });
+
+describe("mode pill", () => {
+  it("opens a menu of the levels the agent offers and applies the chosen one without stepping", async () => {
+    const onExecutionMode = vi.fn();
+    mount({ model: { agent: "opencode", model: "m", effort: null }, mode: "act", permission: "autonomous", onExecutionMode });
+    const pill = screen.getByRole("button", { name: "Mode: Autonomous" });
+    fireEvent.click(pill);
+    const items = await screen.findAllByRole("menuitem");
+    expect(items.map((item) => item.textContent)).toEqual(["PlanRead-only, proposes a plan", "AutonomousRuns tools without asking"]);
+    expect(onExecutionMode).not.toHaveBeenCalled();
+    fireEvent.click(items[0]!);
+    expect(onExecutionMode).toHaveBeenCalledExactlyOnceWith({ mode: "plan", permissionMode: "review" });
+  });
+});

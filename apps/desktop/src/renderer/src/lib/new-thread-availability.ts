@@ -79,7 +79,7 @@ export function evaluateNewThreadAvailability(input: NewThreadAvailabilityInput)
     if (teams.failed) teamIssue = "Saved teams could not load. Retry to continue.";
     else if (!teams.data) teamIssue = "Loading the selected team…";
     else if (!selectedTeam) teamIssue = "This team is no longer available in this project. Choose a team or model to continue.";
-    else if (selectedTeam.team.archivedAt !== null) teamIssue = "This team is archived. Restore it in Orchestration or choose another target.";
+    else if (selectedTeam.team.archivedAt !== null) teamIssue = "This team is archived. Restore it in Teams or choose another target.";
     else teamIssue = capabilityIssue(revision, true);
   }
   let targetIssue: string | null = null;

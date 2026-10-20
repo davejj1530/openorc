@@ -1,10 +1,11 @@
 import { conversationWorkspaceMode, conversationLocation, conversationEmptyHint, conversationPlaceholder, conversationEmptyTitle, workspaceDestination } from "../lib/conversation-status-presentation";
 import { WORKSPACE_ID } from "@openorc/protocol";
 import { TaskForwarding } from "./TaskForwarding";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { defaultHarnessId, harnessShortName, type AgentKind, type Project, type Run, type Task, type ThreadSummary, type WorkspaceMode } from "@openorc/protocol";
 import { AlertCircle, GitBranch, Laptop } from "./icons";
-import { Composer, type SlashCommand, ComposerChoice } from "./Composer";
+import { Composer, type SlashCommand } from "./Composer";
+import { ComposerChoice } from "./ComposerChoice";
 import { Transcript } from "./Transcript";
 import { MessageQueue } from "./MessageQueue";
 import { BackgroundCommands } from "./BackgroundCommands";
@@ -149,6 +150,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   const settings = useConversationSettings({ thread, activeRun });
   const { choice, mode, permission, permissionReady, permissionError } = settings;
   const orclings = useOrclingConversation({ thread, runs, choice, onModel: settings.selectModel });
+  const voice = useRunVoices(orclings.voice, runs, thread);
   const draftKey = `conversation.${conversation.id}`;
   const { prompt, setPrompt, clearDraft, error: draftError } = useConversationDraft({ draftKey, threadId: thread?.id ?? null, initialText: thread?.draft ?? "" });
   const start = useRpcMutation("runs.start");
@@ -244,7 +246,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   function renderTranscript() {
     if (merged && merged.blocks.length > 0)
       return (
-        <ConversationVoice.Provider value={orclings.voice}>
+        <ConversationVoice.Provider value={voice}>
           <Transcript
             working={working}
             fileScope={conversation}
@@ -273,6 +275,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
               canSend={canSteer}
               pending={sendQueued.isPending || unqueue.isPending}
               sendReason={steerReason}
+              agentName={harnessShortName(thread.agent ?? defaultHarnessId)}
               onSend={(messageId) => {
                 setSends((count) => count + 1);
                 sendQueued.mutate({ id: thread.id, messageId });
@@ -372,21 +375,34 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   );
 }
 
+/** Each run's agent and model for the turn heads, with the thread's own for messages saved without a run. */
+function useRunVoices(voice: ConversationVoice, runs: readonly Run[], thread: ThreadSummary | null): ConversationVoice {
+  const models = useRpc("agents.models", {}, { staleTime: 5 * 60_000 });
+  return useMemo(() => {
+    const named = (agent: string, model: string | null) => ({ agent, model: model ? (models.data?.find((option) => option.agent === agent && option.id === model)?.label ?? model) : null });
+    return {
+      ...voice,
+      runs: new Map(runs.map((run) => [run.id, named(run.agent, run.model)])),
+      agent: thread ? named(thread.agent, thread.model) : undefined,
+    };
+  }, [voice, runs, thread, models.data]);
+}
+
 /** A lost session or a failed last turn, with a fresh start that hands the conversation over. */
 function SessionRecovery({ session, agent, disabled, onRestart }: { session: NonNullable<ThreadSummary["session"]>; agent: AgentKind; disabled: boolean; onRestart: () => void }) {
   if (session.status !== "lost" && session.status !== "error") return null;
   return (
-    <div data-blocking="true" className="rounded-xl border border-bad/50 bg-bad-soft/40 px-4 py-3 text-sm">
-      <div className="flex items-start gap-2">
-        <AlertCircle size={14} className="text-bad mt-0.5 shrink-0" />
+    <div data-blocking="true" className="rounded-xl bg-bad-soft px-4 py-3 text-base">
+      <div className="flex items-start gap-2.5">
+        <AlertCircle size={16} className="text-bad mt-0.5 shrink-0" />
         <div className="min-w-0 flex-1 grid gap-2">
           <div className="text-ink">{session.status === "lost" ? `${harnessShortName(agent)} no longer has this session.` : "The last turn failed."}</div>
-          {session.message ? <div className="text-ink-3 whitespace-pre-wrap break-words max-h-24 overflow-auto">{session.message}</div> : null}
+          {session.message ? <div className="text-ink-2 whitespace-pre-wrap break-words max-h-24 overflow-auto">{session.message}</div> : null}
           <div className="flex items-center gap-2">
             <Button size="sm" variant="primary" disabled={disabled} onClick={onRestart}>
               {session.status === "lost" ? "Start a fresh session with a handoff" : "Retry with a fresh session"}
             </Button>
-            {session.status === "error" ? <span className="text-xs text-ink-4">Or send a message to resume.</span> : null}
+            {session.status === "error" ? <span className="text-xs text-ink-2">Or send a message to resume.</span> : null}
           </div>
         </div>
       </div>

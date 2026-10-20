@@ -7,9 +7,11 @@ import { Check, ChevronDown, Orcling as OrclingIcon, Plus, Search, Workflow, Rot
 import { OrclingAvatar } from "./OrclingAvatar";
 import { Popover } from "@base-ui/react/popover";
 import { useRpc } from "../lib/query";
+import { cn } from "../lib/cn";
 import { useRouter } from "../lib/router";
 import { HarnessLogo } from "./HarnessLogo";
 import { CoversPreview } from "../lib/browser-preview";
+import { floatingGround } from "../lib/use-anchor-ground";
 import { BrowserEffortFooter, ComposerEffortPanel, fastStatus, orclingLed, type EffortTeam } from "./ModelPickerEffort";
 import { OrclingRows, TeamRows, type OrclingPickerChoices, type TeamPickerChoices } from "./ModelPickerRows";
 import { browserModels, catalogModel, modelChoiceFor, pickerCatalog, pickerSettings, providerGroups, type ModelChoice } from "../lib/model-picker-selection";
@@ -501,13 +503,13 @@ export function ComposerModelPicker({
         {fast ? <Zap size={13} aria-label={fastBlocked ? "Fast mode can't run" : "Fast mode requested"} className="composer-fast-indicator shrink-0" data-blocked={fastBlocked || undefined} /> : null}
         <span className="composer-model-name">{chosenOrcling(orclings)?.name ?? team?.name ?? current?.label ?? value?.model ?? "Choose model"}</span>
         {value ? <TriggerEffort label={label} efforts={efforts} /> : null}
-        <ChevronDown size={14} />
       </Popover.Trigger>
       <Popover.Portal>
         <CoversPreview />
-        <Popover.Positioner side="top" align="end" sideOffset={10} collisionPadding={12} collisionBoundary={popup.boundary}>
+        <Popover.Positioner side="top" align="start" sideOffset={6} collisionPadding={12} collisionBoundary={popup.boundary}>
           <Popover.Popup
-            className={modelSelector ? "composer-effort-popup" : "model-picker-popup"}
+            ref={floatingGround}
+            className={cn(modelSelector ? "composer-effort-popup" : "model-picker-popup", "composer-float")}
             initialFocus={modelSelector ? undefined : false}
             style={popup.maxWidth ? { maxWidth: popup.maxWidth } : undefined}
           >

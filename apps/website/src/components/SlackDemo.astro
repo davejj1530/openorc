@@ -1,7 +1,6 @@
 ---
 /** A synthetic Slack thread that ends at OpenOrc's real owner-only approval step. */
-import { Image } from "astro:assets";
-import mark from "../assets/openorc-mark.png";
+import BrandMark from "./BrandMark.astro";
 import { slack, slackJourney } from "../data/hero/slack";
 import { timed } from "../data/hero/timeline";
 
@@ -24,7 +23,7 @@ const at = (windows: string) => timed(slackJourney, windows);
     </div>
     {/* One progress message per request, edited into the reply when the turn ends. */}
     <div class="slack-message hs-block" {...at(">progress")}>
-      <span class="slack-avatar slack-avatar-app"><Image src={mark} alt="" width={72} height={72} format="webp" loading="lazy" /></span>
+      <span class="slack-avatar slack-avatar-app"><BrandMark size={24} /></span>
       <div class="slack-message-body">
         <div class="slack-meta"><strong>{slack.bot.name}</strong><span class="slack-app">APP</span><time>{slack.times.first}</time></div>
         <p><span class="slack-mention">@{slack.user.name}</span> <span {...at("progress~reply")}>{slack.progress.reading}</span><span {...at(">reply")}>{slack.reply}</span></p>
@@ -38,7 +37,7 @@ const at = (windows: string) => timed(slackJourney, windows);
       </div>
     </div>
     <div class="slack-message hs-block" {...at(">working")}>
-      <span class="slack-avatar slack-avatar-app"><Image src={mark} alt="" width={72} height={72} format="webp" loading="lazy" /></span>
+      <span class="slack-avatar slack-avatar-app"><BrandMark size={24} /></span>
       <div class="slack-message-body">
         <div class="slack-meta"><strong>{slack.bot.name}</strong><span class="slack-app">APP</span><time>{slack.times.second}</time></div>
         <p><span class="slack-mention">@{slack.user.name}</span> <span {...at("working~permission")}>{slack.progress.editing}</span><span {...at(">permission")}>{slack.progress.waiting}</span></p>

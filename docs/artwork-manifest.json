@@ -38,46 +38,6 @@
       "sha256": "bc2f1d693f1cef0baeb5140770f33770f202007496ad33a0f2f44cfff5546617"
     },
     {
-      "group": "openorc-mark",
-      "path": "apps/website/src/assets/openorc-mark.png",
-      "sha256": "bc2f1d693f1cef0baeb5140770f33770f202007496ad33a0f2f44cfff5546617"
-    },
-    {
-      "group": "website-paintings",
-      "path": "apps/website/src/assets/art/closing.webp",
-      "sha256": "3a50984f7a9cb8361740de48834380723c87a227852616d7df7a9377dedadeed"
-    },
-    {
-      "group": "website-paintings",
-      "path": "apps/website/src/assets/art/feature-plan.webp",
-      "sha256": "080ccb532fa856c596524b57728d943b521e3b92e36534ccbe19e0526f131f11"
-    },
-    {
-      "group": "website-paintings",
-      "path": "apps/website/src/assets/art/feature-slack.webp",
-      "sha256": "df849b190653a65ddca78cbdbb96118fd891e33d8a912123efee37a5a50db049"
-    },
-    {
-      "group": "website-paintings",
-      "path": "apps/website/src/assets/art/feature-workflow.webp",
-      "sha256": "f5a85df79bdcc4a5c3a86f70f330b12f2a2acd649c5400dd95d4c3bb8291deb8"
-    },
-    {
-      "group": "website-paintings",
-      "path": "apps/website/src/assets/art/feature-worktree.webp",
-      "sha256": "3665b509a7d443d85c173bc1bd0147f425533acbd41bbc12e620085b2bdbfa22"
-    },
-    {
-      "group": "website-paintings",
-      "path": "apps/website/src/assets/art/hero-mobile.webp",
-      "sha256": "0df0b6388a357e47b132d4b705a72a07261a33baafcc2693a1ae5fe42ef52457"
-    },
-    {
-      "group": "website-paintings",
-      "path": "apps/website/src/assets/art/hero.webp",
-      "sha256": "18a6e43c371e58cfab184cc616c0c04063ce55ba7a6bc1efe22aed84312e7651"
-    },
-    {
       "group": "mascot",
       "path": "assets/mascot/questling.riv",
       "sha256": "c3bfc2ff54203286ece153ffde5789896bbe5a9b86f6fa6915e547c0171a11a4"

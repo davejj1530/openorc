@@ -2,7 +2,7 @@
 export type SiteTheme = "light" | "dark";
 
 const key = "openorc-site-theme";
-const themeColor: Record<SiteTheme, string> = { light: "#f7f7f4", dark: "#151410" };
+const themeColor: Record<SiteTheme, string> = { light: "#ffffff", dark: "#0a0a0a" };
 
 export function siteTheme(): SiteTheme {
   return document.documentElement.dataset.theme === "dark" ? "dark" : "light";

@@ -1,5 +1,4 @@
 ---
-import ArtPanel from "./ArtPanel.astro";
 import LogoSprite from "./hero/LogoSprite.astro";
 import DiscussionScene from "./hero/DiscussionScene.astro";
 import HandoffScene from "./hero/HandoffScene.astro";
@@ -33,10 +32,11 @@ const demos = [
 </script>
 <section class="product-showcase" id="product" data-product-gallery aria-label="OpenOrc product demos">
   <LogoSprite />
-  {/* The page's calls to action share a row with the demo tabs, so the painting follows straight after. */}
-  <div class="demo-bar">
+  {/* The page's calls to action share a row with the demo tabs, so the app follows straight after. */}
+  <div class="demo-bar" data-arrive style="--arrive-index: 1">
     <slot name="actions" />
-    <div class="demo-tabs" role="tablist" aria-label="Explore OpenOrc demos" hidden data-demo-tabs>
+    <div class="segmented demo-tabs" role="tablist" aria-label="Explore OpenOrc demos" hidden data-demo-tabs>
+      <span class="segmented-knob" aria-hidden="true"></span>
       {demos.map((demo, i) => (
         <button type="button" role="tab" id={`demo-tab-${demo.id}`} aria-controls={`demo-${demo.id}`} aria-selected={i === 0 ? "true" : "false"} tabindex={i === 0 ? 0 : -1}>
           {demo.label}
@@ -44,7 +44,7 @@ const demos = [
       ))}
     </div>
   </div>
-  <ArtPanel art="hero" phoneArt="hero-mobile" eager class="demo-art">
+  <div class="stage demo-stage" data-arrive style="--arrive-index: 2">
     {demos.map(({ id, alt, Scene }, i) => (
       <article id={`demo-${id}`} class="demo-panel" data-panel hidden={i !== 0}>
         <div class="demo-window">
@@ -52,12 +52,13 @@ const demos = [
         </div>
       </article>
     ))}
-  </ArtPanel>
+  </div>
 </section>
 
 <script>
   import { initTabs } from "../scripts/tabs";
   import { initHeroScene } from "../scripts/hero-scene";
+  import { followKnob } from "../scripts/segmented";
 
   document.querySelectorAll<HTMLElement>("[data-product-gallery]").forEach((gallery) => {
     const tabs = gallery.querySelector<HTMLElement>("[data-demo-tabs]");
@@ -69,6 +70,9 @@ const demos = [
       const player = players.get(index);
       if (player) player.restart();
       else players.set(index, initHeroScene(scene));
-    })) tabs.hidden = false;
+    })) {
+      tabs.hidden = false;
+      followKnob(tabs);
+    }
   });
 </script>

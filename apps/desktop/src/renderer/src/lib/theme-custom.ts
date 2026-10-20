@@ -16,14 +16,14 @@ export const colorGroups = [
     ],
   },
   {
-    name: "Surfaces",
+    name: "Grounds and fills",
     tokens: [
-      { token: "--bg", label: "Sidebar" },
-      { token: "--surface", label: "Background" },
+      { token: "--bg", label: "Window" },
+      { token: "--surface", label: "Surfaces" },
       { token: "--paper", label: "Work panels" },
       { token: "--composer-input", label: "Writing area" },
-      { token: "--surface-2", label: "Raised" },
-      { token: "--surface-3", label: "Hover" },
+      { token: "--surface-2", label: "Fill" },
+      { token: "--surface-3", label: "Strong fill" },
       { token: "--bubble", label: "Message bubble" },
       { token: "--bubble-ink", label: "Message bubble text" },
     ],
@@ -35,8 +35,8 @@ export const colorGroups = [
       { token: "--ink-2", label: "Secondary text" },
       { token: "--ink-3", label: "Muted text" },
       { token: "--ink-4", label: "Faint text" },
-      { token: "--line", label: "Border" },
-      { token: "--line-strong", label: "Strong border" },
+      { token: "--line", label: "Lines" },
+      { token: "--line-strong", label: "Strong lines" },
     ],
   },
   {
@@ -55,13 +55,18 @@ export const colorGroups = [
 
 export const editableTokens = colorGroups.flatMap((group) => group.tokens.map((entry) => entry.token));
 const editable = new Set<string>(editableTokens);
+/** Fills and lines may be translucent, so they also take `#rrggbbaa`. */
+export const translucentTokens = new Set<string>(["--surface-2", "--surface-3", "--line", "--line-strong"]);
 const presetIds = new Set<string>(themePresets.map((preset) => preset.id));
 
-/** Accepts `#abc`, `abc`, `#AABBCC` and returns the canonical `#aabbcc`, or null. */
-export function normalizeHex(value: string): string | null {
+/** Accepts `#abc`, `abc`, `#AABBCC` and returns the canonical `#aabbcc`, or null. With `alpha`, also
+ * `#abcd` and `#aabbccdd`; an opaque alpha drops back to `#aabbcc`. */
+export function normalizeHex(value: string, alpha = false): string | null {
   const digits = value.trim().replace(/^#/, "").toLowerCase();
-  const expanded = digits.length === 3 ? [...digits].map((digit) => digit + digit).join("") : digits;
-  return /^[0-9a-f]{6}$/.test(expanded) ? `#${expanded}` : null;
+  const expanded = digits.length === 3 || (alpha && digits.length === 4) ? [...digits].map((digit) => digit + digit).join("") : digits;
+  if (/^[0-9a-f]{6}$/.test(expanded)) return `#${expanded}`;
+  if (alpha && /^[0-9a-f]{8}$/.test(expanded)) return expanded.endsWith("ff") ? `#${expanded.slice(0, 6)}` : `#${expanded}`;
+  return null;
 }
 
 export function overridesFor(custom: CustomColors, preset: ThemePreset, mode: Mode): TokenOverrides {
@@ -77,7 +82,7 @@ function replace(custom: CustomColors, preset: ThemePreset, mode: Mode, override
 }
 
 export function withColor(custom: CustomColors, preset: ThemePreset, mode: Mode, token: string, value: string): CustomColors {
-  const hex = normalizeHex(value);
+  const hex = normalizeHex(value, translucentTokens.has(token));
   if (!hex || !editable.has(token)) return custom;
   return replace(custom, preset, mode, { ...overridesFor(custom, preset, mode), [token]: hex });
 }

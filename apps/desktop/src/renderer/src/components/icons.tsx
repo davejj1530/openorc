@@ -96,10 +96,12 @@ export const X = icon("X", <path d="m6 6 12 12 M18 6 6 18" />);
 export const Check = icon("Check", <path d="m5 12 4.5 4.5L19 7" />);
 export const ChevronDown = icon("ChevronDown", <path d="m6 9 6 6 6-6" />);
 export const ChevronRight = icon("ChevronRight", <path d="m9 6 6 6-6 6" />);
+export const ChevronLeft = icon("ChevronLeft", <path d="m15 6-6 6 6 6" />);
 export const ChevronsUpDown = icon("ChevronsUpDown", <path d="m7 8 5-5 5 5 M7 16l5 5 5-5" />);
 export const ArrowRight = icon("ArrowRight", <path d="M4 12h16m-6-6 6 6-6 6" />);
 export const ArrowLeft = icon("ArrowLeft", <path d="M20 12H4m6-6-6 6 6 6" />);
 export const ArrowUp = icon("ArrowUp", <path d="M12 20V4m-6 6 6-6 6 6" />);
+export const ArrowDown = icon("ArrowDown", <path d="M12 4v16m-6-6 6 6 6-6" />);
 export const ArrowUpRight = icon("ArrowUpRight", <path d="M6 18 18 6 M7 6h11v11" />);
 export const ExternalLink = icon(
   "ExternalLink",
@@ -172,6 +174,10 @@ export const Upload = icon("Upload", <path d="M4 15v4a1.5 1.5 0 0 0 1.5 1.5h13A1
 export const Download = icon("Download", <path d="M4 15v4a1.5 1.5 0 0 0 1.5 1.5h13A1.5 1.5 0 0 0 20 19v-4 M12 3.5v12m-5-5 5 5 5-5" />);
 export const Maximize2 = icon("Maximize2", <path d="M14 4h6v6 M20 4l-6 6 M10 20H4v-6 M4 20l6-6" />);
 export const Minimize2 = icon("Minimize2", <path d="M4 14h6v6 M10 14l-6 6 M20 10h-6V4 M14 10l6-6" />);
+/** Four corners opening outward: make a pane fill the window. */
+export const Expand = icon("Expand", <path d="M4 9V6.5A2.5 2.5 0 0 1 6.5 4H9 M15 4h2.5A2.5 2.5 0 0 1 20 6.5V9 M20 15v2.5a2.5 2.5 0 0 1-2.5 2.5H15 M9 20H6.5A2.5 2.5 0 0 1 4 17.5V15" />);
+/** Four corners turned inward: give the window back. */
+export const Shrink = icon("Shrink", <path d="M9 4v2.5A2.5 2.5 0 0 1 6.5 9H4 M15 4v2.5A2.5 2.5 0 0 0 17.5 9H20 M20 15h-2.5a2.5 2.5 0 0 0-2.5 2.5V20 M4 15h2.5A2.5 2.5 0 0 1 9 17.5V20" />);
 export const Send = icon("Send", <path d="m3 4 18 8-18 8 3-8Z M6 12h15" />);
 export const Trash2 = icon(
   "Trash2",
@@ -310,6 +316,13 @@ export const CircleReview = icon(
     <path d="M8.5 10h7 M8.5 14h5" />
   </>,
 );
+export const CircleCheck = icon(
+  "CircleCheck",
+  <>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="m8.5 12.25 2.5 2.5 4.75-5" />
+  </>,
+);
 export const AlertCircle = icon(
   "AlertCircle",
   <>
@@ -385,6 +398,7 @@ export const ListTodo = icon(
     <path d="M14 3.5H6a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-9Z M7 9l1 1 2-2 M13 9h3 M7 14h2 M13 14h3 M7 17h2 M13 17h3" />
   </>,
 );
+export const Funnel = icon("Funnel", <path d="M4 5.5A1 1 0 0 1 5 4.5h14a1 1 0 0 1 .8 1.6L14.5 13v5.4a1 1 0 0 1-.55.9l-2.5 1.25a1 1 0 0 1-1.45-.9V13L4.2 6.1a1 1 0 0 1-.2-.6Z" />);
 export const ListFilter = icon("ListFilter", <path d="M3.5 6h17 M7 12h10 M10 18h4" />);
 export const FileText = icon(
   "FileText",

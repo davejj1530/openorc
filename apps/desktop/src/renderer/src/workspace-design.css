@@ -1,22 +1,10 @@
 /* The shared theme foundation: navigation, conversation, and an inset work panel. */
 .app-shell {
-  --reading-gutter: 16px;
+  --reading-gutter: 32px;
+  --composer-gutter: 24px;
   --container-chat: 800px;
   --spacing-well: 0px;
   --document-font: var(--font-sans);
-  --current-row-fill: var(--navigation-soft);
-  --material-well: none;
-  --material-sheen: none;
-  --material-contact: none;
-  --material-raise: none;
-  --material-lift: none;
-  --material-recess: none;
-  --material-seat: none;
-  --material-card: none;
-  --current-row-material: none;
-  --current-chip-material: none;
-  --material-bubble: none;
-  --bubble-material: none;
 }
 .app-shell .well {
   margin: 0;
@@ -101,15 +89,10 @@
 .thread-project-picker:hover {
   color: var(--navigation-ink);
 }
+/* The thread header: a 13/16 title in a 30px rename box, then a faint run of facts. */
 .thread-rail-title {
   flex: 0 1 auto;
   min-width: 0;
-  margin: 0;
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 20px;
-  letter-spacing: -0.15px;
-}
 .thread-header-project {
   min-width: 0;
   max-width: 120px;
@@ -119,12 +102,20 @@
   font-size: 12px;
   font-weight: 400;
   color: var(--ink-3);
+  /* The rename box's padding hangs outside the text on the left and half of it on the right, so
+     the facts sit close to the title. */
+  margin: 0 -4px 0 -8px;
+  font-size: var(--text-base);
+  line-height: 16px;
+  letter-spacing: var(--text-base--letter-spacing);
 }
 .thread-rail-title :is(button, input) {
   display: block;
   max-width: 100%;
-  padding: 4px 7px;
-  border-radius: 5px;
+  height: var(--control-md);
+  padding: 0 8px;
+  border-radius: var(--radius-md);
+  color: var(--ink);
   text-align: left;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -136,24 +127,19 @@
 .thread-rail-title input {
   width: 100%;
   background: var(--surface-2);
-  color: var(--ink);
   outline: none;
+}
+  color: var(--ink);
 }
 .thread-rail-tools {
   display: flex;
-  gap: 2px;
-}
-.thread-rail-tools button[aria-pressed="true"] {
-  color: var(--navigation-ink);
-  background: var(--navigation-soft);
 }
 .document-eyebrow {
   display: flex;
   align-items: center;
   gap: 8px;
   color: var(--ink-3);
-  font-size: 11px;
-  font-weight: 500;
+  font-size: var(--text-xs);
 }
 .document-type-mark {
   width: 7px;
@@ -201,9 +187,6 @@
 }
 .app-shell .document-title {
   font-family: var(--document-font);
-  font-size: 30px;
-  font-weight: 500;
-  letter-spacing: -0.9px;
 }
 .app-shell .task-document-header {
   padding-top: 24px;
@@ -388,27 +371,6 @@
     flex-basis: 100%;
   }
 }
-.thread-starters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 8px;
-  margin-top: 12px;
-}
-.thread-starters button {
-  min-height: 26px;
-  height: auto;
-  padding: 3px 10px;
-  border: var(--hairline) solid var(--line);
-  border-radius: 14px;
-  background: var(--composer-input);
-  color: var(--ink-3);
-  font-size: 12px;
-  font-weight: 400;
-}
-.thread-starters button:hover {
-  background: var(--surface-2);
-  color: var(--ink);
-}
 .new-thread-activity {
   flex-shrink: 0;
   width: 100%;
@@ -469,16 +431,16 @@
 @media (max-width: 520px) {
   .app-shell {
     --reading-gutter: 12px;
+    --composer-gutter: 12px;
   }
   .page-column {
     padding: 12px 16px 0;
   }
 }
 @media (forced-colors: active) {
-  .sidebar-browser-tabs button[aria-current="page"],
   .project-option[data-selected="true"],
-  .thread-preview[data-open],
   .page-filters [role="radio"][aria-checked="true"] {
+  .thread-preview[data-open] {
     outline: 1px solid Highlight;
   }
 }

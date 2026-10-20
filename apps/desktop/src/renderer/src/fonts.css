@@ -4,8 +4,8 @@
  * choice in its font. Code keeps --font-mono.
  */
 
-/* Immaculate Gothic ships two static faces, Text 450 and Bold 700, upright only. The browser's weight
-   matching sends regular and medium text to Text and semibold to Bold. */
+/* Immaculate Gothic ships two static faces, Text 450 and Bold 700, upright only. The interface uses one
+   weight (400, matched to Text); Bold serves only author emphasis inside replies, documents and comments. */
 @font-face {
   font-family: "Immaculate Gothic";
   src: url("./assets/fonts/ImmaculateGothic-Text.woff2") format("woff2");

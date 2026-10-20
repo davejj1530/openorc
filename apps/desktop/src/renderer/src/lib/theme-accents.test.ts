@@ -5,6 +5,19 @@ import { themePresets } from "./theme-palettes";
 import { overridesFor, parseCustomColors, withAccents, withColor, withoutAccents } from "./theme-custom";
 
 const palette = themePresets.find((theme) => theme.id === "openorc")!;
+/** A translucent `#rrggbbaa` fill as it paints over an opaque ground. */
+function over(fill: string, ground: string): string {
+  if (fill.length !== 9) return fill;
+  const alpha = parseInt(fill.slice(7), 16) / 255;
+  const channel = (color: string, index: number) => parseInt(color.slice(1 + index * 2, 3 + index * 2), 16);
+  return `#${[0, 1, 2]
+    .map((index) =>
+      Math.round(channel(fill, index) * alpha + channel(ground, index) * (1 - alpha))
+        .toString(16)
+        .padStart(2, "0"),
+    )
+    .join("")}`;
+}
 // CSS color conversion runs in the browser; these tests cover role ownership and hex contrast.
 vi.mock("./color", () => ({ toHex: () => "#808080" }));
 
@@ -81,13 +94,28 @@ describe("accent colors", () => {
       expect(background["--navigation-soft"]).not.toBe(original["--navigation-soft"]);
     });
 
-    it(`keeps OpenOrc's default labels and accents readable in ${mode} mode`, () => {
+    it(`keeps OpenOrc's default labels and accents readable on the tile, planes and fills in ${mode} mode`, () => {
       const colors = resolveAccentColors(palette.colors[mode], {});
       expect(contrastRatio(colors["--accent"]!, colors["--accent-fg"]!)).toBeGreaterThanOrEqual(4.5);
-      for (const surface of ["--surface", "--bg", "--surface-2"]) {
-        for (const ink of ["--ink", "--ink-2", "--ink-3", "--ink-4", "--accent-ink"]) {
-          expect(contrastRatio(colors[ink]!, colors[surface]!)).toBeGreaterThanOrEqual(4.5);
+      const tile = colors["--bg"]!;
+      const plane = colors["--surface"]!;
+      const grounds = [tile, plane, over(colors["--surface-2"]!, tile), over(colors["--surface-2"]!, plane)];
+      for (const ground of grounds) {
+        for (const ink of ["--ink", "--ink-2", "--ink-3", "--ink-4", "--accent-ink", "--content-ink"]) {
+          expect(contrastRatio(colors[ink]!, ground), `${ink} on ${ground}`).toBeGreaterThanOrEqual(4.5);
         }
+      }
+      // Strong fill carries muted text at most, never faint.
+      for (const ground of [over(colors["--surface-3"]!, tile), over(colors["--surface-3"]!, plane)]) {
+        expect(contrastRatio(colors["--ink-3"]!, ground)).toBeGreaterThanOrEqual(4.5);
+      }
+    });
+
+    it(`keeps custom content text readable on both the tile and the planes in ${mode} mode`, () => {
+      const base = { ...palette.colors[mode], "--bg": mode === "light" ? "#e4e4e4" : "#2a2a2a" };
+      for (const accent of ["#2768a5", "#87613f", "#5799da", "#deb46c"]) {
+        const colors = resolveAccentColors(base, { "--content-accent": accent });
+        for (const ground of [colors["--bg"]!, colors["--surface"]!]) expect(contrastRatio(colors["--content-ink"]!, ground), `${accent} on ${ground}`).toBeGreaterThanOrEqual(4.5);
       }
     });
 

@@ -1,44 +1,58 @@
-/* The same recess .orchestration-tree and .team-recovery already carry on an identical
-   --surface-2 fill. Without it this track is a groove in light (-2.79) and a raised bar in
-   dark (+5.38): the same object reading opposite ways by mode. */
-.appearance-modes {
+/* Appearance modes, fonts and skill harnesses are pressed-button groups drawn as the segmented
+   track: a fill track at natural width, the current choice on a surface pill. */
+:is(.appearance-modes, .skills-harnesses) {
   display: flex;
-  gap: 4px;
+  gap: 0;
   width: fit-content;
   max-width: 100%;
-  padding: 4px;
-  margin-top: 16px;
-  border-radius: var(--radius-lg);
+  padding: 3px;
+  margin-top: 4px;
+  border-radius: var(--radius-pill);
   background: var(--surface-2);
-  box-shadow: var(--material-recess);
+  overflow-x: auto;
+  scrollbar-width: none;
 }
-.appearance-modes button {
+:is(.appearance-modes, .skills-harnesses) button {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  min-height: var(--control-lg);
-  padding: 0 16px;
-  border-radius: var(--radius-md);
-  color: var(--ink-2);
+  gap: 6px;
+  height: var(--control-sm);
+  padding: 0 14px;
+  border-radius: var(--radius-pill);
+  color: var(--ink-3);
+  font-size: var(--text-sm);
   white-space: nowrap;
+  transition:
+    background-color var(--duration-leave) var(--ease-out),
+    color var(--duration-leave) var(--ease-out);
 }
-
 @container (max-width: 400px) {
   .appearance-modes button {
-    padding-inline: 8px;
+    padding-inline: 10px;
   }
 }
-.appearance-modes button[aria-pressed="true"] {
-  background: var(--track-2-current);
-  color: var(--ink);
-  box-shadow: var(--material-contact);
-}
-.appearance-modes button:hover {
+:is(.appearance-modes, .skills-harnesses) button:hover {
   color: var(--ink);
 }
-.appearance-modes button:focus-visible {
-  background: var(--surface-3);
+:is(.appearance-modes, .skills-harnesses) button[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--navigation-ink);
+}
+:is(.appearance-modes, .skills-harnesses) button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+  background: var(--surface);
+}
+@media (forced-colors: active) {
+  :is(.appearance-modes, .skills-harnesses) {
+    outline: 1px solid ButtonBorder;
+  }
+  :is(.appearance-modes, .skills-harnesses) button[aria-pressed="true"] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
 }
 /* Each choice reads --font-sans from its own data-font (fonts.css), so it shows in its face. Centering on
    the capitals keeps faces with different ascents on one line. */
@@ -95,7 +109,6 @@
 .color-group h3 {
   color: var(--ink-3);
   font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
 }
 .color-rows {
   display: grid;
@@ -117,7 +130,7 @@
   height: var(--control-sm);
   padding: 0;
   border: var(--hairline) solid color-mix(in srgb, var(--ink) 28%, transparent);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-pill);
   background: none;
 }
 .color-swatch::-webkit-color-swatch-wrapper {
@@ -125,7 +138,9 @@
 }
 .color-swatch::-webkit-color-swatch {
   border: none;
-  border-radius: calc(var(--radius-sm) - 1px);
+  border-radius: var(--radius-pill);
+  /* Translucent fills and lines show as they paint: over the window ground. */
+  background-image: linear-gradient(var(--swatch-color), var(--swatch-color)), linear-gradient(var(--bg), var(--bg));
 }
 .color-row-label {
   overflow: hidden;
@@ -134,20 +149,20 @@
 }
 .color-row-hex {
   height: var(--control-sm);
-  padding: 0 8px;
-  border: var(--hairline) solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--control-fill);
   color: var(--ink-2);
   font-family: var(--font-mono);
   font-size: var(--text-sm);
 }
 .color-row-hex:focus {
-  border-color: var(--line-strong);
+  background-image: linear-gradient(var(--surface-2), var(--surface-2));
   color: var(--ink);
 }
 .color-row-hex-invalid {
-  border-color: var(--bad);
+  box-shadow: inset 0 0 0 1.5px var(--bad);
   color: var(--bad);
 }
 .color-row-reset {
@@ -156,7 +171,7 @@
   justify-content: center;
   width: var(--control-sm);
   height: var(--control-sm);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-pill);
   color: var(--ink-3);
 }
 .color-row-reset:hover {
@@ -169,30 +184,31 @@
   outline-offset: 2px;
 }
 
+/* Accent combinations are secondary pills; the current one carries a navigation ring. */
 .accent-combinations {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 16px;
+  gap: 6px;
+  margin-top: 4px;
 }
 .accent-combinations button {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 36px;
-  padding: 6px 10px;
-  border: var(--hairline) solid var(--line);
-  border-radius: var(--radius-md);
+  height: var(--control-lg);
+  padding: 0 14px 0 10px;
+  border-radius: var(--radius-pill);
+  background: var(--control-fill);
   color: var(--ink-2);
   font-size: var(--text-sm);
 }
 .accent-combinations button:hover {
-  background: var(--surface-2);
+  background-image: linear-gradient(var(--surface-2), var(--surface-2));
+  color: var(--ink);
 }
 .accent-combinations button[aria-pressed="true"] {
-  border-color: var(--navigation-ink);
-  background: var(--navigation-soft);
-  color: var(--navigation-ink);
+  box-shadow: inset 0 0 0 1.5px var(--navigation-ink);
+  color: var(--ink);
 }
 .accent-swatches {
   display: flex;
@@ -203,34 +219,37 @@
   height: 12px;
   border-radius: 50%;
   margin-left: -3px;
-  border: var(--hairline) solid var(--surface);
+  box-shadow: 0 0 0 1.5px var(--control-fill);
 }
+/* The editor is a tile card on the settings sheet; its example is a plane inside it. */
 .accent-editor {
   display: grid;
   grid-template-columns: minmax(260px, 1.2fr) minmax(200px, 1fr);
   align-items: center;
   gap: 24px;
-  margin-top: 20px;
+  margin-top: 12px;
+  padding: 20px;
+  border-radius: var(--radius-2xl);
+  background: var(--settings-card-fill, var(--surface-2));
 }
 .accent-role + .accent-role {
   margin-top: 12px;
 }
 .accent-role p,
 .accent-note {
-  color: var(--ink-3);
+  color: var(--ink-4);
   font-size: var(--text-sm);
-  line-height: 1.5;
+  line-height: 18px;
 }
 .accent-role p {
   padding-left: calc(var(--control-sm) + 8px);
 }
 .accent-note {
-  margin-top: 16px;
+  margin-top: 12px;
 }
 .accent-example {
   padding: 16px;
-  border: var(--hairline) solid var(--line);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl);
   background: var(--surface);
   font-size: var(--text-sm);
 }
@@ -238,8 +257,9 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px;
-  border-radius: var(--radius-sm);
+  height: var(--control-row);
+  padding: 0 10px;
+  border-radius: var(--radius-md);
   background: var(--navigation-soft);
   color: var(--navigation-ink);
 }
@@ -248,7 +268,7 @@
 }
 .accent-example p {
   margin: 16px 0;
-  line-height: 1.6;
+  line-height: 20px;
   color: var(--ink-2);
 }
 .accent-example-link {
@@ -257,15 +277,16 @@
   text-underline-offset: 3px;
 }
 .accent-example-action {
-  display: inline-block;
-  padding: 7px 10px;
-  border-radius: var(--radius-md);
+  display: inline-flex;
+  align-items: center;
+  height: var(--control-md);
+  padding: 0 14px;
+  border-radius: var(--radius-pill);
   background: var(--accent);
   color: var(--accent-fg);
-  font-weight: 500;
 }
 .accent-combinations button:focus-visible {
-  outline: 2px solid var(--accent-ink);
+  outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
 @container (max-width: 600px) {

@@ -130,7 +130,7 @@ export function ThreadPaneDivider({
         apply(keyboardResizeDelta(event.key, event.shiftKey), true);
         cleanup();
       }}
-      title="Drag or use arrow keys to resize. Double-click or press Enter to reset."
+      aria-description="Drag or use arrow keys to resize. Double-click or press Enter to reset."
     >
       <span className="resize-grip" aria-hidden="true" />
     </div>

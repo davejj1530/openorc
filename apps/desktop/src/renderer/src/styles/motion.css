@@ -1,0 +1,112 @@
+/* Shared motion utilities. Every value reads the motion tokens in app.css, which the
+   reduced-motion block zeroes, so each of these is in place on the first frame there.
+
+   motion-arrive      fades in from a 4px blur and a 4px rise when the element mounts, and
+                      leaves quicker when Base UI marks it [data-ending-style] or a caller sets
+                      [data-leaving]. Set --motion-delay to hold it back.
+   motion-stagger     on a list: each child waits one --stagger step more than the one before,
+                      capped at 8 rows. Children take motion-arrive themselves. --stagger-from
+                      offsets the whole list (menus start their rows after the shell).
+   motion-swap        a grid stack whose children share one cell. The child marked
+                      aria-hidden="true" leaves while the other arrives, in place.
+   motion-overshoot   transform, translate and scale settle with one overshoot (switch knobs,
+                      confirmations).
+   motion-resize      width, height and corner radius follow a shape change.
+   motion-disclosure  on <details>: the content opens and closes to its natural height.
+
+   Remounts and history loads should not take motion-arrive: only new things arrive. */
+
+.motion-arrive {
+  transition-property: opacity, filter, translate;
+  transition-duration: var(--duration-arrive);
+  transition-timing-function: var(--ease-out);
+  transition-delay: var(--motion-delay, 0ms);
+}
+@starting-style {
+  .motion-arrive {
+    opacity: 0;
+    filter: blur(var(--arrive-blur));
+    translate: 0 var(--arrive-rise);
+  }
+}
+.motion-arrive[data-starting-style],
+.motion-arrive:is([data-ending-style], [data-leaving]) {
+  opacity: 0;
+  filter: blur(var(--arrive-blur));
+  translate: 0 var(--arrive-rise);
+}
+.motion-arrive:is([data-ending-style], [data-leaving]) {
+  transition-duration: var(--duration-leave);
+  transition-delay: 0ms;
+}
+
+.motion-stagger > * {
+  --motion-index: 8;
+  --motion-delay: calc(var(--stagger-from, 0ms) + var(--stagger) * var(--motion-index));
+}
+.motion-stagger > :nth-child(1) {
+  --motion-index: 0;
+}
+.motion-stagger > :nth-child(2) {
+  --motion-index: 1;
+}
+.motion-stagger > :nth-child(3) {
+  --motion-index: 2;
+}
+.motion-stagger > :nth-child(4) {
+  --motion-index: 3;
+}
+.motion-stagger > :nth-child(5) {
+  --motion-index: 4;
+}
+.motion-stagger > :nth-child(6) {
+  --motion-index: 5;
+}
+.motion-stagger > :nth-child(7) {
+  --motion-index: 6;
+}
+.motion-stagger > :nth-child(8) {
+  --motion-index: 7;
+}
+
+.motion-swap {
+  display: grid;
+}
+.motion-swap > * {
+  grid-area: 1 / 1;
+  transition:
+    opacity var(--duration-leave) var(--ease-out),
+    filter var(--duration-leave) var(--ease-out),
+    translate var(--duration-arrive) var(--ease-out);
+}
+.motion-swap > [aria-hidden="true"] {
+  opacity: 0;
+  filter: blur(var(--arrive-blur));
+  translate: 0 var(--arrive-rise);
+  pointer-events: none;
+}
+
+.motion-overshoot {
+  transition:
+    transform var(--duration-confirm) var(--ease-overshoot),
+    translate var(--duration-confirm) var(--ease-overshoot),
+    scale var(--duration-confirm) var(--ease-overshoot);
+}
+
+.motion-resize {
+  transition:
+    width var(--duration-resize) var(--ease-out),
+    height var(--duration-resize) var(--ease-out),
+    border-radius var(--duration-resize) var(--ease-out);
+}
+
+details.motion-disclosure::details-content {
+  block-size: 0;
+  overflow-y: clip;
+  transition:
+    block-size var(--duration-resize) var(--ease-out),
+    content-visibility var(--duration-resize) allow-discrete;
+}
+details.motion-disclosure[open]::details-content {
+  block-size: auto;
+}

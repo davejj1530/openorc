@@ -8,8 +8,10 @@ export interface ThemeTemplate {
   colors: Record<Mode, Record<string, string>>;
 }
 // Source colors map to shell roles, not a house tint or contrast ladder.
-// Product presets keep flat grounds and their source's separation between sidebar,
-// canvas and controls. See docs/theme-references.md for sources and adaptations.
+// Every palette has the same structure: the window ground (--bg, the sidebar and conversation),
+// planes one step off it (--surface: the panel, sheets, cards, the composer), then the fills.
+// Product presets keep flat paint (no gradient); palettes whose source is one flat light color
+// get a hand-tuned ground step. See docs/theme-references.md for sources and adaptations.
 // Readable supporting text may use the next stronger source role.
 const neutralTokens = {
   sidebar: "bg",
@@ -49,16 +51,81 @@ function palette(neutrals: Neutrals, accent: string, accentInk: string, accentFo
 }
 // Original OpenOrc themes may retain their authored dark-plane treatment.
 const fadeIntoSidebar = "linear-gradient(var(--surface), var(--bg))";
-// Success and attention: +N counts, checks and diff additions; waiting, approvals and warnings.
-// Every palette starts from the shell's own, the values app.css declares before a palette loads,
-// and changes only the ones it names. The soft fills tint their ink unless a palette paints them.
-// Switching palettes only sets properties, never clears them, so every palette carries every key.
-const statusSoft = { "--ok-soft": "color-mix(in srgb, var(--ok) 8%, var(--surface))", "--warn-soft": "color-mix(in srgb, var(--warn) 8%, var(--surface))" };
-const statusTokens: Record<Mode, Record<string, string>> = {
-  light: { "--ok": "#157447", "--warn": "#8b5c0a", ...statusSoft },
-  dark: { "--ok": "#22975d", "--warn": "#a47f29", ...statusSoft },
+// Status: --ok for +N counts, checks and diff additions; --warn for waiting, approvals and warning
+// text; --bad for failures and diff removals; --attention for status dots, which default to --warn.
+// Every palette starts from these and changes only the ones it names. The soft fills tint their
+// ink unless a palette paints them. Switching palettes only sets properties, never clears them,
+// so every palette carries every key.
+const statusSoft = {
+  "--ok-soft": "color-mix(in srgb, var(--ok) 8%, var(--surface))",
+  "--warn-soft": "color-mix(in srgb, var(--warn) 8%, var(--surface))",
+  "--bad-soft": "color-mix(in srgb, var(--bad) 8%, var(--surface))",
+  "--attention": "var(--warn)",
 };
-// One shared foundation keeps OpenOrc and Cursor identical until a user customizes either.
+const statusTokens: Record<Mode, Record<string, string>> = {
+  light: { "--ok": "#157447", "--warn": "#8b5c0a", "--bad": "#aa4538", ...statusSoft },
+  dark: { "--ok": "#3fae74", "--warn": "#c0973a", "--bad": "#e27d6f", ...statusSoft },
+};
+// The approved OpenOrc faint gray measures 4.20 (light) and 4.21 (dark) on a fill over the tile.
+// The nudged one is the nearest gray that holds 4.5:1 there. Switch to compare the two.
+const openorcFaint = { approved: { light: "#6e6e6e", dark: "#888888" }, nudged: { light: "#666666", dark: "#8e8e8e" } }.nudged;
+// OpenOrc: a tile ground under the sidebar and conversation, white planes (carved darker than the
+// tile in dark), translucent ink fills, and one ink action.
+const openorcColors: ThemeTemplate["colors"] = {
+  light: palette(
+    {
+      sidebar: "#f4f4f4",
+      body: "#ffffff",
+      raised: "#1717170d",
+      hover: "#17171717",
+      border: "#17171717",
+      borderStrong: "#1717172e",
+      text: "#171717",
+      secondaryText: "#555555",
+      mutedText: "#555555",
+      faintText: openorcFaint.light,
+      bubble: "#ffffff",
+    },
+    "#171717",
+    "#171717",
+    "#ffffff",
+    {
+      "--navigation-soft": "#ffffff",
+      "--ok": "#1e7359",
+      "--ok-soft": "#e6f0eb",
+      "--bad": "#9b5050",
+      "--bad-soft": "#f7ebe9",
+      "--attention": "#b26a00",
+    },
+  ),
+  dark: palette(
+    {
+      sidebar: "#171717",
+      body: "#0a0a0a",
+      raised: "#ffffff12",
+      hover: "#ffffff1f",
+      border: "#ffffff1c",
+      borderStrong: "#ffffff2e",
+      text: "#ffffff",
+      secondaryText: "#b8b8b8",
+      mutedText: "#b8b8b8",
+      faintText: openorcFaint.dark,
+      bubble: "#0a0a0a",
+    },
+    "#ffffff",
+    "#ffffff",
+    "#000000",
+    {
+      "--navigation-soft": "#0a0a0a",
+      "--ok": "#7cc4a2",
+      "--ok-soft": "#1e735942",
+      "--bad": "#e2a3a3",
+      "--bad-soft": "#9b505047",
+      "--attention": "#f0b35a",
+    },
+  ),
+};
+// Cursor keeps its own grays: a light tile under softer planes, and white writing areas.
 const cursorColors: ThemeTemplate["colors"] = {
   light: palette(
     {
@@ -83,6 +150,8 @@ const cursorColors: ThemeTemplate["colors"] = {
       "--composer-input": "#ffffff",
       "--ok": "#1e7359",
       "--ok-soft": "#e6f0eb",
+      "--bad": "#9b5050",
+      "--bad-soft": "#f7ebe9",
     },
   ),
   dark: palette(
@@ -108,6 +177,8 @@ const cursorColors: ThemeTemplate["colors"] = {
       "--composer-input": "#202020",
       "--ok": "#8bc6aa",
       "--ok-soft": "#24372e",
+      "--bad": "#e2a3a3",
+      "--bad-soft": "#382626",
     },
   ),
 };
@@ -115,8 +186,8 @@ const presets: ThemeTemplate[] = [
   {
     id: "openorc",
     name: "OpenOrc",
-    description: "Cursor gray · ink accents",
-    colors: cursorColors,
+    description: "Tile and white · ink accents",
+    colors: openorcColors,
   },
   // Solid blue controls keep white labels in both modes; the fill meets 4.5:1 contrast.
   {
@@ -126,20 +197,20 @@ const presets: ThemeTemplate[] = [
     colors: {
       light: palette(
         {
-          sidebar: "#ffffff",
+          sidebar: "#f5f5f5",
           body: "#ffffff",
-          raised: "#f7f7f7",
-          hover: "#efefef",
+          raised: "#ececec",
+          hover: "#e5e5e5",
           border: "#ebebeb",
           borderStrong: "#d6d6d6",
           text: "#0d0d0d",
           secondaryText: "#444444",
-          mutedText: "#686868",
+          mutedText: "#646464",
           faintText: "#686868",
-          bubble: "#f4f4f4",
+          bubble: "#ffffff",
         },
         "#0169cc",
-        "#0169cc",
+        "#0163c0",
         "#ffffff",
         { "--mascot-body": "#0169cc", "--mascot-eyes": "#ffffff" },
       ),
@@ -153,7 +224,7 @@ const presets: ThemeTemplate[] = [
           borderStrong: "#3d3d3d",
           text: "#e6e6e6",
           secondaryText: "#b5b5b5",
-          mutedText: "#878787",
+          mutedText: "#8e8e8e",
           faintText: "#878787",
           bubble: "#1d1d1d",
         },
@@ -174,20 +245,20 @@ const presets: ThemeTemplate[] = [
         {
           sidebar: "#fafaf9",
           body: "#ffffff",
-          raised: "#fafaf9",
-          hover: "#f5f5f4",
+          raised: "#f5f5f4",
+          hover: "#eeedeb",
           border: "#eae8e6",
           borderStrong: "#d6d3d1",
           text: "#2c2826",
           secondaryText: "#57534e",
-          mutedText: "#756f6c",
+          mutedText: "#6f6967",
           faintText: "#756f6c",
-          bubble: "#fafaf9",
+          bubble: "#ffffff",
         },
         "#413030",
         "#413030",
         "#f3f2f1",
-        { "--navigation-soft": "#f5f5f4", "--composer-input": "#fafaf9" },
+        { "--navigation-soft": "#f5f5f4" },
       ),
       dark: palette(
         {
@@ -217,20 +288,20 @@ const presets: ThemeTemplate[] = [
     colors: {
       light: palette(
         {
-          sidebar: "lch(99% 0.5 282 / 1)",
+          sidebar: "lch(96.5% 0.9 282 / 1)",
           body: "lch(99% 0.5 282 / 1)",
-          raised: "lch(96.5% 0.9 282 / 1)",
-          hover: "lch(93.5% 1.1 282 / 1)",
+          raised: "lch(94% 1 282 / 1)",
+          hover: "lch(91.5% 1.1 282 / 1)",
           border: "lch(92.5% 0.6 282 / 1)",
           borderStrong: "lch(85.5% 1.2 282 / 1)",
           text: "lch(9.794% 0 282 / 1)",
           secondaryText: "lch(27.776% 1.25 282 / 1)",
           mutedText: "lch(42.961% 1.25 282 / 1)",
           faintText: "lch(42.961% 1.25 282 / 1)",
-          bubble: "lch(95.5% 0.7 282 / 1)",
+          bubble: "lch(99% 0.5 282 / 1)",
         },
         "lch(44.073% 70 286.91 / 1)",
-        "lch(44.073% 70 286.91 / 1)",
+        "lch(42.5% 70 286.91 / 1)",
         "lch(100% 5 286.91 / 1)",
         { "--mascot-body": "#5e6ad2", "--mascot-eyes": "#ffffff", "--accent-soft": "lch(92.254% 5.903 282.518 / 1)", "--navigation-accent": "#333333", "--navigation-soft": "#ededee" },
       ),
@@ -244,7 +315,7 @@ const presets: ThemeTemplate[] = [
           borderStrong: "lch(18.184% 1.5 272 / 1)",
           text: "lch(90.06% 0 272 / 1)",
           secondaryText: "lch(72.35% 1.2 272 / 1)",
-          mutedText: "lch(54.951% 1.2 272 / 1)",
+          mutedText: "lch(57.5% 1.2 272 / 1)",
           faintText: "lch(54.951% 1.2 272 / 1)",
           bubble: "#1b1b1b",
         },
@@ -268,22 +339,22 @@ const presets: ThemeTemplate[] = [
     colors: {
       light: palette(
         {
-          sidebar: "#fcfcfb",
-          body: "#f9f9f7",
-          raised: "#ffffff",
-          hover: "#f0efec",
+          sidebar: "#f9f9f7",
+          body: "#ffffff",
+          raised: "#f0efec",
+          hover: "#e8e7e3",
           border: "#0b0b0b1a",
           borderStrong: "#0b0b0b33",
           text: "#131313",
           secondaryText: "#383835",
-          mutedText: "#706e69",
-          faintText: "#706e69",
+          mutedText: "#696763",
+          faintText: "#6e6c67",
           bubble: "#f0efec",
         },
         // Claude's brand/clay role drives actions; its blue accent role is for content.
         // Deepen the light fill and text slightly so small labels stay readable.
         "#b95b3b",
-        "#a94f2e",
+        "#a64d2d",
         "#ffffff",
         {
           "--mascot-body": "#d97757",
@@ -306,12 +377,12 @@ const presets: ThemeTemplate[] = [
           borderStrong: "#ffffff33",
           text: "#f9f9f7",
           secondaryText: "#c3c2b7",
-          mutedText: "#97958d",
+          mutedText: "#9a9890",
           faintText: "#97958d",
           bubble: "#20201f",
         },
         "#d97757",
-        "#d97757",
+        "#dc8163",
         "#151515",
         {
           "--mascot-body": "#d97757",
@@ -335,18 +406,18 @@ const presets: ThemeTemplate[] = [
         {
           sidebar: "#f6f8fa",
           body: "#ffffff",
-          raised: "#f6f8fa",
-          hover: "#eff2f5",
+          raised: "#eff2f5",
+          hover: "#e9edf1",
           border: "#d1d9e0",
           borderStrong: "#818b98",
           text: "#1f2328",
           secondaryText: "#3d444d",
           mutedText: "#59636e",
           faintText: "#59636e",
-          bubble: "#f6f8fa",
+          bubble: "#ffffff",
         },
         "#1f883d",
-        "#1a7f37",
+        "#187734",
         "#ffffff",
         {
           "--mascot-body": "#1f883d",
@@ -403,20 +474,20 @@ const presets: ThemeTemplate[] = [
     colors: {
       light: palette(
         {
-          sidebar: "#f8f9fc",
+          sidebar: "#eff2f7",
           body: "#f8f9fc",
-          raised: "#eff2f7",
-          hover: "#e7ebf2",
+          raised: "#e7ebf2",
+          hover: "#dfe4ed",
           border: "#e2e7ef",
           borderStrong: "#c9d1df",
           text: "#171c28",
           secondaryText: "#2f3b54",
           mutedText: "#4f5d7d",
           faintText: "#4f5d7d",
-          bubble: "#eef1f7",
+          bubble: "#f8f9fc",
         },
         "#ffcc66",
-        "#8a5a00",
+        "#895900",
         "#171c28",
         { "--mascot-body": "#e6a817", "--mascot-eyes": "#171c28" },
       ),
@@ -430,7 +501,7 @@ const presets: ThemeTemplate[] = [
           borderStrong: "#3f495e",
           text: "#d7dce2",
           secondaryText: "#a2aabc",
-          mutedText: "#8695b7",
+          mutedText: "#99a6c3",
           faintText: "#8695b7",
           bubble: "#262f42",
         },
@@ -450,17 +521,17 @@ const presets: ThemeTemplate[] = [
     colors: {
       light: palette(
         {
-          sidebar: "#f5f3eb",
+          sidebar: "#eae8dd",
           body: "#f5f3eb",
-          raised: "#eae8dd",
-          hover: "#e0e2d4",
+          raised: "#e0e2d4",
+          hover: "#d7dacb",
           border: "#dcded1",
           borderStrong: "#b9bda9",
           text: "#252c22",
           secondaryText: "#48513f",
-          mutedText: "#5e6652",
+          mutedText: "#565e4c",
           faintText: "#5e6652",
-          bubble: "#e7e7d9",
+          bubble: "#f5f3eb",
         },
         "#575e51",
         "#454b40",
@@ -541,20 +612,20 @@ const presets: ThemeTemplate[] = [
     colors: {
       light: palette(
         {
-          sidebar: "#f3f4fa",
+          sidebar: "#e8eaf4",
           body: "#f3f4fa",
-          raised: "#e8eaf4",
-          hover: "#dde1ee",
+          raised: "#dde1ee",
+          hover: "#d3d8e8",
           border: "#d9ddeb",
           borderStrong: "#b6bdd3",
           text: "#20243d",
           secondaryText: "#424c69",
-          mutedText: "#58617f",
+          mutedText: "#545d7a",
           faintText: "#58617f",
-          bubble: "#e2eaf1",
+          bubble: "#f3f4fa",
         },
         "#007b8a",
-        "#006978",
+        "#006776",
         "#ffffff",
         { "--mascot-body": "#bf278e", "--mascot-eyes": "#ffffff" },
       ),
@@ -638,10 +709,10 @@ const presets: ThemeTemplate[] = [
     colors: {
       light: palette(
         {
-          sidebar: "#ffffff",
+          sidebar: "#f5f7f8",
           body: "#ffffff",
-          raised: "#f5f7f8",
-          hover: "#eceff1",
+          raised: "#eceff1",
+          hover: "#e3e7ea",
           border: "#e0e3e5",
           borderStrong: "#c6cbcf",
           text: "#191c20",

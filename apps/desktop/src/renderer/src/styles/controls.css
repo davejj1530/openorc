@@ -1,31 +1,125 @@
-/* Shared controls: the keyboard focus fill, native fields and the switch. */
+/* Shared controls: keyboard focus, the hover step, the segmented track, the switch, the
+   count badge and chips. */
 
-/* Keyboard navigation uses a neutral fill, including selects with custom arrows.
-   Keep this outside the base layer so utility backgrounds cannot hide it. */
-:is(button, a, select, [role="button"], [role="tab"]):focus-visible {
+/* Keyboard focus on quiet controls is the strong fill and full ink, including selects with
+   custom arrows. Filled controls (the ink pill, a pressed chip, a segmented choice) would turn
+   gray under it, so they take focus-ring instead. :where keeps the exclusion out of the
+   specificity, so the conversation, composer and queue rules that load later still override
+   this on their own controls. Keep it outside the base layer so utility backgrounds cannot
+   hide it. */
+:is(button, a, select, [role="button"], [role="tab"]):focus-visible:where(:not(.focus-ring, .segmented-option)) {
   background-color: var(--surface-3);
   color: var(--ink);
+}
+.focus-ring:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }
 
 label:has(input:is([type="checkbox"], [type="radio"]):focus-visible) {
   background-color: var(--surface-2);
 }
 
-@layer base {
-  .native-field:focus {
-    border-color: var(--line-strong);
+/* The fill step layered over a control's own fill, so a hover reads on the tile and on a plane
+   alike: --control-fill is white on the tile and a fill on a plane. The ink pill steps toward
+   its label instead. */
+.hover-step {
+  --hover-step: var(--surface-2);
+  --press-step: var(--surface-3);
+}
+.ink-pill {
+  --hover-step: color-mix(in srgb, var(--accent-fg) 12%, transparent);
+  --press-step: color-mix(in srgb, var(--accent-fg) 20%, transparent);
+}
+.hover-step:hover:not(:disabled) {
+  background-image: linear-gradient(var(--hover-step), var(--hover-step));
+}
+.hover-step:active:not(:disabled) {
+  background-image: linear-gradient(var(--press-step), var(--press-step));
+}
+
+/* A fill track at its natural width with a surface knob under the chosen label
+   (components/Segmented.tsx). When the row runs out of room the track scrolls sideways and
+   the knob, an absolute child of the track, scrolls with it. */
+.segmented {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  width: fit-content;
+  min-width: 0;
+  max-width: 100%;
+  padding: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.segmented-knob {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  pointer-events: none;
+}
+.segmented-knob[data-placed] {
+  transition:
+    transform var(--duration-swap) var(--ease-out),
+    width var(--duration-swap) var(--ease-out);
+}
+.segmented-option {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+  color: var(--ink-3);
+  transition: color var(--duration-arrive) var(--ease-out);
+}
+.segmented-option:hover:not(:disabled) {
+  color: var(--ink);
+}
+.segmented-option[aria-checked="true"] {
+  color: var(--navigation-ink);
+}
+.segmented-option:disabled {
+  color: var(--ink-4);
+}
+/* The track clips anything outside it, so the ring sits just inside the choice. */
+.segmented > .segmented-option:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+@media (forced-colors: active) {
+  .segmented {
+    outline: 1px solid ButtonBorder;
+  }
+  .segmented-knob {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
   }
 }
 
-/* A track tinted from the ink, so it reads on any ground, holding a paper knob. Checked fills
-   with --ink rather than --accent, which is what retires accent-color here and keeps one hot
-   element per view. */
+/* A fill track holding a surface knob. On fills the track with --ink rather than --accent,
+   which keeps one hot element per view. The knob springs across with one overshoot. */
 .settings-switch {
+  --switch-width: 38px;
+  --switch-height: var(--control-badge);
+  --switch-knob: 16px;
   position: relative;
   display: inline-block;
   flex-shrink: 0;
-  width: 32px;
-  height: var(--control-badge);
+  width: var(--switch-width);
+  height: var(--switch-height);
+}
+.settings-switch[data-size="sm"] {
+  --switch-width: 30px;
+  --switch-height: 18px;
+  --switch-knob: 12px;
 }
 .settings-switch input {
   appearance: none;
@@ -34,8 +128,8 @@ label:has(input:is([type="checkbox"], [type="radio"]):focus-visible) {
   margin: 0;
   border: 0;
   border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--ink) 14%, transparent);
-  transition: background-color 120ms var(--ease-out);
+  background: var(--surface-3);
+  transition: background-color var(--duration-arrive) var(--ease-out);
 }
 .settings-switch input:checked {
   background: var(--ink);
@@ -47,22 +141,24 @@ label:has(input:is([type="checkbox"], [type="radio"]):focus-visible) {
 .settings-switch input:disabled {
   pointer-events: none;
   opacity: 1;
-  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  background: var(--surface-2);
+}
+.settings-switch input:checked:disabled {
+  background: var(--ink-4);
 }
 .settings-switch-knob {
   position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 16px;
-  height: 16px;
+  top: 3px;
+  left: 3px;
+  width: var(--switch-knob);
+  height: var(--switch-knob);
   border-radius: var(--radius-pill);
-  background: var(--paper);
-  box-shadow: var(--material-seat);
-  transition: left 120ms var(--ease-out);
+  background: var(--surface);
+  transition: transform var(--duration-confirm) var(--ease-overshoot);
   pointer-events: none;
 }
 .settings-switch input:checked + .settings-switch-knob {
-  left: 14px;
+  transform: translateX(calc(var(--switch-width) - var(--switch-knob) - 6px));
 }
 /* appearance:none plus an aria-hidden knob renders invisible in Windows High Contrast
    without this; it ships in the same commit as the control, never later. */
@@ -77,7 +173,49 @@ label:has(input:is([type="checkbox"], [type="radio"]):focus-visible) {
   }
   .settings-switch-knob {
     background: ButtonFace;
-    box-shadow: none;
     outline: 1px solid ButtonBorder;
   }
+}
+
+/* A count on a round pill whose digits roll when the number changes: the new value comes in
+   from below when it grows and from above when it shrinks, with one overshoot. The outgoing
+   value is absolute so the pill takes the new value's width at once. */
+.count-badge {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  --roll-distance: 100%;
+}
+.count-badge[data-roll="down"] {
+  --roll-distance: -100%;
+}
+.count-badge-in {
+  animation: count-roll-in var(--duration-roll) var(--ease-overshoot) both;
+}
+.count-badge-out {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  animation: count-roll-out var(--duration-roll) var(--ease-overshoot) both;
+}
+@keyframes count-roll-in {
+  from {
+    transform: translateY(var(--roll-distance));
+  }
+}
+@keyframes count-roll-out {
+  to {
+    transform: translateY(calc(-1 * var(--roll-distance)));
+  }
+}
+
+/* A filter chip's count: faint beside the label, 60% of the label on the pressed ink pill. */
+.chip .chip-count {
+  color: var(--ink-4);
+}
+.chip[aria-pressed="true"] .chip-count {
+  color: color-mix(in srgb, currentColor 60%, transparent);
 }

@@ -59,33 +59,30 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
     <div className="fixed inset-0 z-50 bg-black/30" onMouseDown={() => onOpenChange(false)}>
       <CoversPreview />
       <div className="absolute left-1/2 top-1/5 -translate-x-1/2 w-full max-w-palette" onMouseDown={(e) => e.stopPropagation()}>
-        <Command className="rounded-lg border border-line bg-surface shadow-modal overflow-hidden" label="Command palette" shouldFilter={mode === "all"}>
+        <Command className="command-palette" label="Command palette" shouldFilter={mode === "all"}>
           <Command.Input
             autoFocus
             value={query}
             onValueChange={setQuery}
             placeholder={mode === "messages" ? "Search what was said in any thread…" : "Search threads, tasks, projects, messages, actions…"}
-            className="w-full h-11 px-4 bg-transparent border-0 border-b border-line text-md outline-none placeholder:text-ink-4"
+            className="command-palette-input native-field"
           />
-          <Command.List className="max-h-96 overflow-y-auto p-1.5">
+          <Command.List className="command-palette-list">
             <Command.Empty className="px-3 py-6 text-center text-base text-ink-3">{emptySearchMessage(query, mode === "messages", hits.isFetching)}</Command.Empty>
             {(hits.data ?? []).length > 0 ? (
-              <Command.Group
-                heading="Messages"
-                className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:text-ink-3 [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide"
-              >
+              <Command.Group heading="Messages" className="command-palette-group">
                 {(hits.data ?? []).map((h) => (
                   <Command.Item
                     key={`${h.runId}-${h.ts}`}
                     value={`message ${h.threadTitle} ${h.snippet} ${h.ts}`}
                     onSelect={() => go(() => (h.taskId ? openTask(h.taskId, "chat") : openThread(h.threadId)))}
-                    className="grid gap-0.5 px-2 py-1.5 rounded-md text-base text-ink-2 data-[selected=true]:bg-surface-2 data-[selected=true]:text-ink"
+                    className="command-palette-item command-palette-hit"
                   >
-                    <span className="flex items-center gap-2 min-w-0">
-                      <Search size={13} className="text-ink-3 shrink-0" />
+                    <span className="flex items-center gap-2.5 min-w-0">
+                      <Search size={14} className="command-palette-icon" />
                       <span className="truncate">{h.snippet}</span>
                     </span>
-                    <span className="pl-5 text-xs text-ink-4 truncate">
+                    <span className="pl-6 text-sm text-ink-4 truncate">
                       {messageSender(h.role, h.member)} in {h.taskTitle ?? h.threadTitle}
                       {h.member && h.taskTitle ? ` (team: ${h.threadTitle})` : ""}
                     </span>
@@ -94,10 +91,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
               </Command.Group>
             ) : null}
             {mode === "messages" ? null : (
-              <Command.Group
-                heading="Actions"
-                className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:text-ink-3 [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide"
-              >
+              <Command.Group heading="Actions" className="command-palette-group">
                 {paletteActions
                   .filter((action) => action.available?.() ?? true)
                   .map(({ label, icon: Icon, run }) => (
@@ -108,10 +102,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
               </Command.Group>
             )}
             {mode === "all" && (threads.data ?? []).length > 0 ? (
-              <Command.Group
-                heading="Threads"
-                className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:text-ink-3 [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide"
-              >
+              <Command.Group heading="Threads" className="command-palette-group">
                 {(threads.data ?? []).map((t) => (
                   <Item key={t.id} value={`thread ${t.title}`} onSelect={() => go(() => openThread(t.id))} icon={<MessageSquare size={14} />}>
                     {t.title}
@@ -120,10 +111,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
               </Command.Group>
             ) : null}
             {mode === "all" && (tasks.data ?? []).length > 0 ? (
-              <Command.Group
-                heading="Tasks"
-                className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:text-ink-3 [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide"
-              >
+              <Command.Group heading="Tasks" className="command-palette-group">
                 {(tasks.data ?? []).map((t) => (
                   <Item key={t.id} value={`task ${t.title}`} onSelect={() => go(() => openTask(t.id))} icon={<StatusIcon status={t.status} />}>
                     {t.title}
@@ -132,10 +120,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
               </Command.Group>
             ) : null}
             {mode === "all" && (projects.data ?? []).length > 0 ? (
-              <Command.Group
-                heading="Projects"
-                className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:text-ink-3 [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide"
-              >
+              <Command.Group heading="Projects" className="command-palette-group">
                 {(projects.data ?? []).map((p) => (
                   <Item key={p.id} value={`project ${p.name}`} onSelect={() => go(() => navigate({ view: "project", projectId: p.id }))} icon={<FolderGit2 size={14} />}>
                     {p.name}
@@ -152,8 +137,8 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
 
 function Item({ children, icon, onSelect, value }: { children: React.ReactNode; icon: React.ReactNode; onSelect: () => void; value?: string }) {
   return (
-    <Command.Item value={value} onSelect={onSelect} className="flex items-center gap-2 h-8 px-2 rounded-md text-base text-ink-2 data-[selected=true]:bg-surface-2 data-[selected=true]:text-ink">
-      <span className="text-ink-3">{icon}</span>
+    <Command.Item value={value} onSelect={onSelect} className="command-palette-item">
+      <span className="command-palette-icon">{icon}</span>
       <span className="truncate">{children}</span>
     </Command.Item>
   );

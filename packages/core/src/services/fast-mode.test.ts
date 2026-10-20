@@ -160,8 +160,8 @@ describe("Fast mode eligibility", () => {
     await vi.waitFor(async () => expect((await shown())?.supported).toBe(false));
     await call("agents.models.refresh", { agent: "claude" });
     expect(await shown()).toEqual({ supported: true });
-    core.runs.close(run.id);
-    await vi.waitFor(() => expect(core.runs.liveRunForThread(thread.id)).toBeNull());
+    await core.runs.closeAndWait(run.id);
+    expect(core.runs.liveRunForThread(thread.id)).toBeNull();
   });
 
   it.each(["CLAUDE_CODE_USE_FOUNDRY"])("respects %s", async (key) => {
@@ -195,8 +195,8 @@ describe("Fast mode persistence and delivery", () => {
     expect(run.fastMode).toBe(true);
     expect(runs.get(core.db, run.id)?.fastMode).toBe(true);
     expect(adapter.mock.calls[0]?.[0]).toMatchObject({ model, effort: "high", fastMode: true });
-    core.runs.close(run.id);
-    await vi.waitFor(() => expect(core.runs.liveRunForThread(thread.id)).toBeNull());
+    await core.runs.closeAndWait(run.id);
+    expect(core.runs.liveRunForThread(thread.id)).toBeNull();
     const fork = await core.threads.fork(thread.id);
     expect(fork.fastMode).toBe(true);
     vi.spyOn(core.threads, "onTaskRunFinished").mockResolvedValue(undefined);

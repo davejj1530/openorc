@@ -132,7 +132,7 @@ function TaskImageView({ node, editor, getPos, selected, updateAttributes, delet
         <span className="task-image-tools" role="toolbar" aria-label="Image actions">
           {tools.map(({ label, Icon, run }) => (
             <Tooltip key={label} label={label}>
-              <IconButton size="sm" aria-label={label} onMouseDown={(event) => event.preventDefault()} onClick={run}>
+              <IconButton size="xs" aria-label={label} onMouseDown={(event) => event.preventDefault()} onClick={run}>
                 <Icon size={14} />
               </IconButton>
             </Tooltip>

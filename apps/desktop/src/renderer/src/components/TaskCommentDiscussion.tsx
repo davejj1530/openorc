@@ -1,39 +1,8 @@
-import { effortLabel, harnessName, type CommentAttempt, type CommentRecipient, type ModelOption, type TaskComment, type TaskDiscussion } from "@openorc/protocol";
-import { modelLabel } from "../lib/model-effort-label";
-import { orclingById, useOrclings } from "../lib/orclings";
-import { OrclingAvatar } from "./OrclingAvatar";
-import { openThread } from "../lib/router";
+import type { CommentAttempt, CommentRecipient, ModelOption, TaskComment, TaskDiscussion } from "@openorc/protocol";
 import { relativeTime } from "../lib/time";
+import { AttemptResponse, type AttemptActions } from "./AttemptResponse";
 import { Button, TextButton } from "./ui";
 import { ThreadRichText } from "./ThreadImages";
-import { QuestionCard } from "./QuestionCard";
-
-const stateLabel: Record<CommentAttempt["state"], string> = {
-  queued: "Queued",
-  running: "Replying…",
-  success: "",
-  error: "Couldn’t finish",
-  cancelled: "Cancelled",
-  choose_executor: "Choose who should implement",
-  starting_work: "Starting work…",
-  working: "Working in thread",
-  completed: "",
-};
-
-function attemptStatus(item: CommentAttempt, discussion: TaskDiscussion): string {
-  if (discussion.questions?.some((question) => question.runId === item.runId)) return "Waiting for your answer";
-  if (discussion.executionActivity?.[item.id] === "waiting") return "Waiting for input in thread";
-  return stateLabel[item.state];
-}
-
-type AttemptActions = {
-  cancel: (attemptId: string) => void;
-  retry: (attemptId: string) => void;
-  execute: (attemptId: string) => void;
-  cancelPending: boolean;
-  retryPending: boolean;
-  executePending: boolean;
-};
 
 /** Discussion order follows the server's comment and attempt arrays; no local sorting is introduced. */
 export function TaskCommentDiscussion({
@@ -84,52 +53,13 @@ export function TaskCommentDiscussion({
             {attempts.length > 0 ? (
               <div className="task-comment-replies">
                 {attempts.map((item) => (
-                  <article key={item.id} id={`comment-${item.id}`} className="task-comment-response" aria-label={`${recipientName(item.recipient)} response`}>
-                    <div className="task-comment-meta">
-                      <ReplyAuthor recipient={item.recipient} models={models} />
-                      <time title={new Date(item.createdAt).toLocaleString()}>{relativeTime(item.createdAt)}</time>
-                    </div>
-                    {item.body ? (
-                      <div className="task-comment-body">
-                        <ThreadRichText>{item.body}</ThreadRichText>
-                      </div>
-                    ) : null}
-                    {stateLabel[item.state] ? (
-                      <p className="text-sm text-ink-3 mt-2" role="status">
-                        {attemptStatus(item, discussion)}
-                      </p>
-                    ) : null}
-                    {item.error ? (
-                      <p role="alert" className="text-sm text-bad mt-2">
-                        {item.error}
-                      </p>
-                    ) : null}
-                    {discussion.questions
-                      ?.filter((question) => question.runId === item.runId)
-                      .map((question) => (
-                        <QuestionCard key={question.approvalId} runId={question.runId} approvalId={question.approvalId} input={question.input} decided={undefined} />
-                      ))}
-                    <div className="task-comment-actions">
-                      <TextButton onClick={() => onReply(item)}>Reply</TextButton>
-                      {item.state === "queued" || item.state === "running" ? (
-                        <TextButton disabled={actions.cancelPending} onClick={() => actions.cancel(item.id)}>
-                          Cancel response
-                        </TextButton>
-                      ) : null}
-                      {(item.state === "error" || item.state === "cancelled") && !item.executionRunId ? (
-                        <TextButton disabled={actions.retryPending} onClick={() => actions.retry(item.id)}>
-                          Retry response
-                        </TextButton>
-                      ) : null}
-                      {item.threadId ? <TextButton onClick={() => openThread(item.threadId!)}>Open thread</TextButton> : null}
-                    </div>
-                  </article>
+                  <AttemptResponse key={item.id} item={item} discussion={discussion} models={models} recipientName={recipientName} onReply={onReply} actions={actions} />
                 ))}
               </div>
             ) : null}
             {chooseExecutor ? (
               <div className="task-comment-executor">
-                <p className="text-base font-medium">Who should implement?</p>
+                <p className="text-base">Who should implement?</p>
                 <div className="task-comment-actions">
                   {attempts.map((attempt) => (
                     <Button
@@ -149,29 +79,5 @@ export function TaskCommentDiscussion({
         );
       })}
     </ol>
-  );
-}
-
-/** Who replied: an Orcling by name, with the model it used, or the model with its effort and harness. */
-function ReplyAuthor({ recipient, models }: { recipient: CommentRecipient; models: readonly ModelOption[] | undefined }) {
-  const orcling = orclingById(useOrclings(), recipient.orclingId);
-  if (orcling) {
-    return (
-      <>
-        <strong className="inline-flex items-center gap-1.5">
-          <OrclingAvatar orcling={orcling} size={16} />
-          {orcling.name}
-        </strong>
-        <span>{modelLabel(recipient, models)}</span>
-      </>
-    );
-  }
-  return (
-    <>
-      <strong>{modelLabel(recipient, models)}</strong>
-      <span>
-        {recipient.effort ? effortLabel(recipient.effort) : "Default"} · {harnessName(recipient.agent)}
-      </span>
-    </>
   );
 }

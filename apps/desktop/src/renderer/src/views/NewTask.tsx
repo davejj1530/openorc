@@ -1,10 +1,11 @@
 import { useRef, useState, type ReactNode } from "react";
-import { ArrowLeft, Check, CircleDashed, FolderGit2, GitBranch, Plus } from "../components/icons";
+import { ArrowLeft, Check, FolderGit2, GitBranch, Plus } from "../components/icons";
 import type { TaskPriority, WorkspaceMode } from "@openorc/protocol";
 import { DocumentEditor, type DocumentEditorHandle } from "../components/DocumentEditor";
-import { PriorityIcon, priorityLabel, priorityOrder } from "../components/status";
+import { PriorityIcon, StatusIcon, priorityLabel, priorityOrder } from "../components/status";
+import { cn } from "../lib/cn";
 import { TopBar } from "../components/TopBar";
-import { Button, Empty, IconButton, Input, Kbd, Select, TextButton } from "../components/ui";
+import { Button, Empty, IconButton, Input, Select, TextButton } from "../components/ui";
 import { readDraft, removeDraft, writeDraft } from "../lib/drafts";
 import { useProjectGit } from "../lib/project-git";
 import { useRpc, useRpcMutation } from "../lib/query";
@@ -157,7 +158,7 @@ export function NewTask({ projectId, threadId }: { projectId?: string; threadId?
           else newThread(id ?? undefined);
         }}
         actions={
-          <span className={`text-sm inline-flex items-center gap-1.5 ${draftStored ? "text-ink-3" : "text-bad"}`} role="status">
+          <span className={cn("text-sm inline-flex items-center gap-1.5", draftStored ? "text-ink-4" : "text-bad")} role="status">
             {draftStored ? (
               <>
                 <Check size={12} /> Draft saved locally
@@ -174,7 +175,9 @@ export function NewTask({ projectId, threadId }: { projectId?: string; threadId?
         <TextButton tone="muted" onClick={() => useRouter.getState().navigate({ view: "tasks" })}>
           Tasks
         </TextButton>
-        <span className="text-ink-4">/</span>
+        <span className="text-ink-4" aria-hidden="true">
+          /
+        </span>
         <span className="truncate">New task</span>
       </TopBar>
       {projectGate ?? (
@@ -197,7 +200,7 @@ export function NewTask({ projectId, threadId }: { projectId?: string; threadId?
                 autoFocus
                 rows={1}
                 aria-label="Task title"
-                className="document-title"
+                className="document-title native-field"
                 placeholder="Task title"
                 value={draft.title}
                 onChange={(e) => patch({ title: e.target.value.replace(/\n/g, " ") })}
@@ -210,7 +213,7 @@ export function NewTask({ projectId, threadId }: { projectId?: string; threadId?
               />
               <div className="task-properties" aria-label="Task properties">
                 <span className="property-chip">
-                  <CircleDashed size={14} /> Backlog
+                  <StatusIcon status="backlog" /> Backlog
                 </span>
                 <label className="property-chip">
                   <PriorityIcon priority={draft.priority} />
@@ -265,10 +268,9 @@ export function NewTask({ projectId, threadId }: { projectId?: string; threadId?
                 </p>
               ) : null}
             </div>
-            <Button type="submit" disabled={!settings.data || Boolean(threadId && !thread.data) || !draft.title.trim() || !project || create.isPending || !imagesReady}>
+            <Button type="submit" variant="primary" size="lg" disabled={!settings.data || Boolean(threadId && !thread.data) || !draft.title.trim() || !project || create.isPending || !imagesReady}>
               <Plus size={14} />
               {create.isPending ? "Creating…" : "Create task"}
-              <Kbd>⌘↵</Kbd>
             </Button>
           </footer>
         </form>

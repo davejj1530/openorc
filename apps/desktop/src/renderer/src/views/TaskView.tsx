@@ -2,6 +2,7 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { TaskActivity } from "../components/TaskActivity";
 import { Panel, type PanelContext } from "../components/Panel";
 import { StatusIcon } from "../components/status";
+import { TabTrack } from "../components/TabTrack";
 import { TopBar } from "../components/TopBar";
 import { Button, Empty, TextButton } from "../components/ui";
 import { useLayout } from "../lib/layout";
@@ -77,7 +78,9 @@ export function TaskView({ taskId, tab }: { taskId: string; tab: TaskTab }) {
           <TextButton onClick={() => useRouter.getState().navigate({ view: "tasks" })} tone="muted">
             Tasks
           </TextButton>
-          <span className="text-ink-4">/</span>
+          <span className="text-ink-4" aria-hidden="true">
+            /
+          </span>
           {t ? (
             <>
               <StatusIcon status={t.status} />
@@ -91,13 +94,9 @@ export function TaskView({ taskId, tab }: { taskId: string; tab: TaskTab }) {
         </TopBar>
         {t && p ? (
           <>
-            <nav className="workspace-tabs" role="tablist" aria-label="Task workspace">
-              {tabs.map((item) => (
-                <button key={item.id} role="tab" aria-selected={tab === item.id} onClick={() => void selectTab(item.id)}>
-                  {item.label}
-                </button>
-              ))}
-            </nav>
+            <div className="task-tabs">
+              <TabTrack label="Task workspace" items={tabs} value={tab} onSelect={(next) => void selectTab(next)} />
+            </div>
             {document ? (
               <TaskDocument ref={editor} key={t.id} task={t} project={p} />
             ) : (

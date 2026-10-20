@@ -91,7 +91,7 @@ export function TaskForwarding({ task, team = false, children }: { task: Task; t
       </>
     );
   const notice = (
-    <section aria-label="Task handoff" className="shrink-0 max-h-64 overflow-y-auto px-6 py-3 text-sm text-ink-2 space-y-2">
+    <section aria-label="Task handoff" data-plane className="mx-6 mt-3 shrink-0 max-h-64 overflow-y-auto rounded-2xl bg-surface px-4 py-3 text-base text-ink-2 space-y-2">
       {noticeBody}
       {error || record?.error ? (
         <p role="alert" className="text-bad break-words">

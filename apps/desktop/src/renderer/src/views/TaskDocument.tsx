@@ -81,7 +81,7 @@ function TaskHistory({
 }) {
   return (
     <section className="task-activity">
-      <h2 className="text-base font-medium mb-4">Activity</h2>
+      <h2 className="text-base mb-4">Activity</h2>
       <div className="flex items-center gap-2 text-sm text-ink-3">
         <StatusIcon status="backlog" />
         <span>Created {relativeTime(task.createdAt)}</span>
@@ -145,7 +145,14 @@ export function TaskDocument({ task, project, ref }: { task: Task; project: Proj
     >
       <div className="task-scroll">
         <article className="task-document">
-          <textarea rows={1} aria-label="Task title" className="document-title" value={draft.title} onChange={(e) => patch({ title: e.target.value.replace(/\n/g, " ") })} onBlur={flush} />
+          <textarea
+            rows={1}
+            aria-label="Task title"
+            className="document-title native-field"
+            value={draft.title}
+            onChange={(e) => patch({ title: e.target.value.replace(/\n/g, " ") })}
+            onBlur={flush}
+          />
           <div className="task-properties" aria-label="Task properties">
             <label className="property-chip">
               <StatusIcon status={task.status} />

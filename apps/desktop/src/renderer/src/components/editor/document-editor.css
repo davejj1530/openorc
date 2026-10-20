@@ -8,9 +8,10 @@
 }
 .task-editor-mode {
   margin-left: auto;
-  padding: 4px 8px;
+  height: var(--control-sm);
+  padding: 0 12px;
   font-size: var(--text-sm);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-pill);
 }
 .task-editor-mode:hover,
 .task-editor-mode:focus-visible {
@@ -25,8 +26,9 @@
 .task-rich-editor {
   min-height: 232px;
   outline: none;
-  font-size: var(--text-prose);
-  line-height: var(--text-prose--line-height);
+  font-size: var(--text-md);
+  line-height: var(--text-md--line-height);
+  letter-spacing: var(--text-md--letter-spacing);
   color: var(--ink);
   overflow-wrap: anywhere;
   caret-color: var(--ink);
@@ -50,8 +52,7 @@
 .task-rich-editor h4,
 .task-rich-editor h5,
 .task-rich-editor h6 {
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
   margin: 28px 0 10px;
 }
 .task-rich-editor h1 {
@@ -59,18 +60,18 @@
   line-height: var(--text-title-sm--line-height);
 }
 .task-rich-editor h2 {
-  font-size: var(--text-xl);
-  line-height: var(--text-xl--line-height);
-}
-.task-rich-editor h3 {
   font-size: var(--text-lg);
   line-height: var(--text-lg--line-height);
+}
+.task-rich-editor h3 {
+  font-size: var(--text-md);
+  line-height: var(--text-md--line-height);
 }
 .task-rich-editor h4,
 .task-rich-editor h5,
 .task-rich-editor h6 {
-  font-size: var(--text-prose);
-  line-height: var(--text-prose--line-height);
+  font-size: var(--text-md);
+  line-height: var(--text-md--line-height);
   margin: 20px 0 8px;
   letter-spacing: 0;
 }
@@ -78,7 +79,8 @@
 .task-rich-editor h6 {
   color: var(--ink-2);
 }
-.task-rich-editor strong {
+/* Author emphasis, the one place bold survives in a document. */
+.task-rich-editor :is(strong, b) {
   font-weight: 600;
 }
 .task-rich-editor em {
@@ -109,9 +111,10 @@
   list-style: none;
   padding-left: 0;
 }
+/* Criteria are 34px rows: the box, then the item, 12px apart. Done items step back to muted. */
 .task-rich-editor li[data-type="taskItem"] {
   display: flex;
-  gap: 9px;
+  gap: 12px;
   align-items: flex-start;
 }
 .task-rich-editor li[data-type="taskItem"] > label {
@@ -120,18 +123,54 @@
   margin-top: 9px;
   flex-shrink: 0;
 }
+.task-rich-editor li[data-type="taskItem"] > div > p {
+  margin: 6px 0;
+}
 .task-rich-editor li[data-type="taskItem"] > div {
   flex: 1;
   min-width: 0;
 }
 .task-rich-editor li[data-checked="true"] > div > p {
-  text-decoration: line-through;
   color: var(--ink-3);
 }
+/* Check boxes are ink: an empty rounded square on the fill step, filled with ink and a check
+   (icons-check.svg as a mask) when done. */
 .task-rich-editor input[type="checkbox"] {
-  accent-color: var(--accent);
-  width: 14px;
-  height: 14px;
+  appearance: none;
+  display: grid;
+  place-content: center;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  border-radius: 5px;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1.5px var(--surface-3);
+  transition: background-color var(--duration-quick) var(--ease-out);
+}
+.task-rich-editor input[type="checkbox"]::before {
+  content: "";
+  width: 12px;
+  height: 12px;
+  background: var(--surface);
+  mask: url("../icons-check.svg") center / contain no-repeat;
+  transform: scale(0);
+  transition: transform var(--duration-confirm) var(--ease-overshoot);
+}
+.task-rich-editor input[type="checkbox"]:checked {
+  background: var(--ink);
+  box-shadow: none;
+}
+.task-rich-editor input[type="checkbox"]:checked::before {
+  transform: scale(1);
+}
+.task-rich-editor input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+@media (forced-colors: active) {
+  .task-rich-editor input[type="checkbox"] {
+    appearance: auto;
+  }
 }
 .task-rich-editor blockquote {
   border-left: var(--hairline) solid var(--line-strong);
@@ -141,8 +180,8 @@
 }
 .task-rich-editor pre {
   background: var(--surface-2);
-  border: var(--hairline) solid var(--line);
-  border-radius: var(--radius-lg);
+  border: 0;
+  border-radius: var(--radius-xl);
   padding: 16px;
   margin: 16px 0;
   overflow: auto;
@@ -151,7 +190,6 @@
   font-size: var(--text-base);
   line-height: var(--text-base--line-height);
   white-space: pre;
-  box-shadow: var(--material-recess);
 }
 .task-rich-editor code {
   font-family: var(--font-mono);
@@ -190,7 +228,6 @@
 }
 .task-rich-editor th {
   background: var(--surface-2);
-  font-weight: 600;
 }
 .task-rich-editor th p,
 .task-rich-editor td p {
@@ -228,23 +265,23 @@
 .task-format-menu,
 .task-link-editor,
 .task-insert-menu {
-  background: var(--surface);
-  border: var(--hairline) solid var(--line);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-panel);
+  background: var(--float-fill);
+  border-radius: var(--radius-xl);
   color: var(--ink);
   z-index: 60;
 }
+/* The bubble and the link editor are capsules: round ends, round tools inside. */
 .task-format-menu {
   display: flex;
   padding: 4px;
   gap: 2px;
+  border-radius: var(--radius-pill);
 }
 .task-insert-menu {
   position: fixed;
   width: 260px;
   max-width: calc(100vw - 24px);
-  padding: 4px;
+  padding: 6px;
 }
 .task-insert-heading {
   display: flex;
@@ -269,9 +306,9 @@
   width: 100%;
   align-items: center;
   gap: 10px;
-  padding: 8px;
-  min-height: var(--control-lg);
-  border-radius: var(--radius-sm);
+  padding: 0 10px;
+  min-height: var(--control-xl);
+  border-radius: var(--radius-md);
   font-size: var(--text-base);
   text-align: left;
 }
@@ -282,17 +319,6 @@
 .task-insert-menu [role="option"] svg {
   color: var(--ink-3);
   flex-shrink: 0;
-}
-.task-insert-menu small {
-  margin-left: auto;
-  color: var(--ink-3);
-  font-size: var(--text-xs);
-}
-.task-insert-footer {
-  padding: 8px 8px 4px;
-  border-top: var(--hairline) solid var(--line);
-  font-size: var(--text-xs);
-  color: var(--ink-3);
 }
 .task-insert-empty {
   padding: 16px 8px;
@@ -326,7 +352,7 @@
   max-width: 100%;
   max-height: 560px;
   height: auto;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   /* A hairline keeps light screenshots from dissolving into a light page. */
   box-shadow: 0 0 0 var(--hairline) var(--line);
 }
@@ -383,10 +409,8 @@
   display: flex;
   gap: 2px;
   padding: 2px;
-  border: var(--hairline) solid var(--line);
   border-radius: var(--radius-md);
-  background: var(--surface);
-  box-shadow: var(--shadow-panel);
+  background: var(--float-fill);
   opacity: 0;
   pointer-events: none;
   transition: opacity 120ms ease-out;
@@ -422,19 +446,22 @@
   width: 360px;
   max-width: calc(100vw - 24px);
   padding: 4px;
+  border-radius: var(--radius-3xl);
   font-size: var(--text-sm);
 }
 .task-link-editor input {
   flex: 1;
   min-width: 0;
-  padding: 4px 8px;
-  border-radius: var(--radius-sm);
+  height: var(--control-sm);
+  padding: 0 12px;
+  border-radius: var(--radius-pill);
   background: var(--surface-2);
   color: var(--ink);
 }
 .task-link-editor button {
-  padding: 4px 8px;
-  border-radius: var(--radius-sm);
+  height: var(--control-sm);
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
   color: var(--ink-2);
 }
 .task-link-editor button:hover,

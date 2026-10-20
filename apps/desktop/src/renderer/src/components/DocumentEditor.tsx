@@ -154,11 +154,11 @@ export function DocumentEditor({ value, onChange, basePath, disabled = false, on
   };
   const formatButtons = editor
     ? [
-        { label: "Bold (⌘B)", Icon: Bold, run: () => editor.chain().focus().toggleBold().run() },
-        { label: "Italic (⌘I)", Icon: Italic, run: () => editor.chain().focus().toggleItalic().run() },
+        { label: "Bold", Icon: Bold, run: () => editor.chain().focus().toggleBold().run() },
+        { label: "Italic", Icon: Italic, run: () => editor.chain().focus().toggleItalic().run() },
         { label: "Strikethrough", Icon: Strikethrough, run: () => editor.chain().focus().toggleStrike().run() },
         { label: "Inline code", Icon: Code2, run: () => editor.chain().focus().toggleCode().run() },
-        { label: "Edit link (⌘K)", Icon: Link2, run: () => setLink(String(editor.getAttributes("link").href ?? "")) },
+        { label: "Edit link", Icon: Link2, run: () => setLink(String(editor.getAttributes("link").href ?? "")) },
       ]
     : [];
   return (
@@ -245,12 +245,10 @@ export function DocumentEditor({ value, onChange, basePath, disabled = false, on
                     >
                       <command.icon size={17} />
                       <span>{command.label}</span>
-                      <small>{command.hint}</small>
                     </button>
                   ))}
                   {matchingCommands(commands.menu.query).length === 0 ? <p className="task-insert-empty">No matching commands</p> : null}
                 </div>
-                <div className="task-insert-footer">↑↓ to navigate · Enter to insert · Esc to close</div>
               </div>,
               document.body,
             )

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ClaudeAccountId } from "./claude-accounts.js";
 import { ModelExecutionSettings, TeamLimits } from "./orchestration.js";
 import { TeamContextSeed } from "./team-context.js";
 import { RunMode } from "./domain.js";
@@ -125,6 +126,8 @@ export const TeamAttemptRecord = z
     resumeSessionId: id.nullable().optional(),
     state: TeamAttemptState,
     settings: ModelExecutionSettings,
+    /** The Claude account its member names, fixed at reservation; omitted when the member runs on the conversation's. */
+    claudeAccountId: ClaudeAccountId.optional(),
     configurationVersion: z.number().int().positive(),
     directionVersion: z.number().int().nonnegative(),
     messageIds: z.array(id),

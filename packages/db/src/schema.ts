@@ -774,4 +774,6 @@ export const migrations: Migration[] = [
   /** A checkpoint saved as a turn starts marks files changed outside turns, and whether only the user could have changed them. */
   `ALTER TABLE thread_checkpoints ADD COLUMN outside TEXT CHECK (outside IN ('user', 'unknown'));
   CREATE INDEX thread_checkpoints_agent_turns ON thread_checkpoints(root, created_at) WHERE run_id IS NOT NULL;`,
+  /** The Claude account a team's Claude member runs on; without one it runs on the conversation's account. */
+  `ALTER TABLE orchestration_team_members ADD COLUMN claude_account_id TEXT REFERENCES claude_accounts(id);`,
 ];

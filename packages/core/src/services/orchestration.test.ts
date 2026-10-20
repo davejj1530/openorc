@@ -337,6 +337,18 @@ describe("team readiness", () => {
     expect(invalidate).not.toHaveBeenCalled();
   });
 
+  it("checks each Claude member on the account it runs on, and refuses an account that is switched off", async () => {
+    db.stmt("INSERT INTO claude_accounts (id, name, kind, enabled, created_at) VALUES ('side', 'Side', 'managed', 1, 0)").run();
+    const choice = draft();
+    choice.members.find((member) => member.key === "reviewer")!.claudeAccountId = "side";
+    expect(await service.preflight({ projectId: project.id, draft: choice }, { claudeAccountId: "claude-cli" })).toEqual({ ready: true, issues: [] });
+    expect(status).toHaveBeenCalledWith("claude", true, "side");
+    expect(models).toHaveBeenCalledWith("claude", "side");
+    expect(service.save({ projectId: project.id, expectedRevisionId: null, draft: choice }).revision.members.find((member) => member.key === "reviewer")?.claudeAccountId).toBe("side");
+    db.stmt("UPDATE claude_accounts SET enabled = 0 WHERE id = 'side'").run();
+    expect(() => service.save({ projectId: project.id, expectedRevisionId: null, draft: choice })).toThrow(/Side, which is disabled/);
+  });
+
   it("recovers from a failed provider probe without exposing its raw error or changing saved choices", async () => {
     const saved = service.save({ projectId: project.id, expectedRevisionId: null, draft: draft() });
     status.mockImplementation(async (agent) => {

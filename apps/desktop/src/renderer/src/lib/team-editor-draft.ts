@@ -34,6 +34,7 @@ function hasDraftStructure(value: unknown): value is TeamDraft {
       typeof member.name !== "string" ||
       typeof member.responsibility !== "string" ||
       (member.managerKey !== null && typeof member.managerKey !== "string") ||
+      (member.claudeAccountId != null && typeof member.claudeAccountId !== "string") ||
       !isRecord(member.settings)
     )
       return false;

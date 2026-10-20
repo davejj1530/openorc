@@ -48,6 +48,7 @@ interface MemberRow {
   model: string;
   effort: string | null;
   fast_mode: number;
+  claude_account_id: string | null;
 }
 
 interface MemberAvatarRow {
@@ -292,6 +293,7 @@ export const orchestration = {
         );
       }
       saveSeats(db, revisionId, draft.members);
+      saveAccounts(db, revisionId, draft.members);
       db.stmt("UPDATE orchestration_team_revisions SET sealed = 1 WHERE id = ?").run(revisionId);
       if (existing) {
         const result = db
@@ -413,10 +415,24 @@ function orclingSeats(db: Db, saved: string | null | undefined): Map<string, Orc
   );
 }
 
-/** An Orcling brings its own name and model to its seat, whatever the team saved when it sat down. */
-function seatSettings(member: MemberRow, orcling: Orcling | undefined): Pick<TeamMember, "name" | "settings" | "orclingId"> {
-  if (orcling) return { name: orcling.name, settings: { ...orcling.settings }, orclingId: orcling.id };
-  return { name: member.name, settings: { agent: member.agent, model: member.model, effort: member.effort, fastMode: Boolean(member.fast_mode) } };
+/**
+ * An Orcling brings its own name and model to its seat, whatever the team saved when it sat down. The seat's Claude
+ * account stays with it while the seat runs on Claude.
+ */
+function seatSettings(member: MemberRow, orcling: Orcling | undefined): Pick<TeamMember, "name" | "settings" | "orclingId" | "claudeAccountId"> {
+  const seat: Pick<TeamMember, "name" | "settings" | "orclingId"> = orcling
+    ? { name: orcling.name, settings: { ...orcling.settings }, orclingId: orcling.id }
+    : { name: member.name, settings: { agent: member.agent, model: member.model, effort: member.effort, fastMode: Boolean(member.fast_mode) } };
+  return seat.settings.agent === "claude" && member.claude_account_id ? { ...seat, claudeAccountId: member.claude_account_id } : seat;
+}
+
+/** Records the Claude accounts members run on, before the revision is sealed. A team without any records nothing. */
+function saveAccounts(db: Db, revisionId: string, members: readonly TeamMember[]): void {
+  for (const member of members) {
+    if (member.settings.agent === "claude" && member.claudeAccountId) {
+      db.stmt("UPDATE orchestration_team_members SET claude_account_id = ? WHERE revision_id = ? AND member_key = ?").run(member.claudeAccountId, revisionId, member.key);
+    }
+  }
 }
 
 /** Records which seats Orclings took, before the revision is sealed. A team without Orclings records nothing. */

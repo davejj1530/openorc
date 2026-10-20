@@ -1,4 +1,4 @@
-import { audit, orchestration, projects, type Db } from "@openorc/db";
+import { audit, claudeAccounts, orchestration, projects, type Db } from "@openorc/db";
 import {
   DEFAULT_TEAM_LIMITS,
   type ModelExecutionSettings,
@@ -8,6 +8,7 @@ import {
   type ModelOption,
   type RpcParams,
   type TeamDetail,
+  type TeamMember,
   type TeamMemberAvatar,
   type TeamPreflight,
 } from "@openorc/protocol";
@@ -58,6 +59,7 @@ export class OrchestrationService {
   save(input: RpcParams<"orchestration.save">): TeamDetail {
     this.requireProject(input.projectId);
     const draft = TeamDraft.parse(input.draft);
+    this.requireAccounts(draft);
     const detail = orchestration.save(this.db, { ...input, draft: { ...draft, members: draft.members.map((member) => ({ ...member, settings: normalizeModelSettings(member.settings) })) } });
     audit.record(this.db, {
       actor: "user",
@@ -68,6 +70,15 @@ export class OrchestrationService {
     });
     this.changed(detail);
     return detail;
+  }
+
+  /** A member's own Claude account must still be connected and switched on. */
+  private requireAccounts(draft: TeamDraft): void {
+    for (const member of draft.members) {
+      if (member.settings.agent !== "claude" || !member.claudeAccountId) continue;
+      const account = claudeAccounts.get(this.db, member.claudeAccountId);
+      if (!account.enabled) throw new Error(`${member.name} runs on ${account.name}, which is disabled. Choose another account, or enable it in Settings → Connections.`);
+    }
   }
 
   archive(input: RpcParams<"orchestration.archive">): TeamDetail {
@@ -202,51 +213,59 @@ export class OrchestrationService {
   async preflight(input: RpcParams<"orchestration.preflight">, options: { refresh?: boolean; claudeAccountId?: string | null } = {}): Promise<TeamPreflight> {
     this.requireProject(input.projectId);
     const draft = TeamDraft.parse(input.draft);
-    const providers = [...new Set(draft.members.map((member) => member.settings.agent))];
-    // One probe per provider even when several members use the same model.
-    const checks = await Promise.all(
-      providers.map(async (agent) => {
-        const issues: TeamPreflight["issues"] = [];
-        const members = draft.members.filter((member) => member.settings.agent === agent);
-        const providerIssue = (code: TeamPreflight["issues"][number]["code"], message: string) => {
-          for (const member of members) issues.push({ memberKey: member.key, code, message });
-          return issues;
-        };
-        let status: Awaited<ReturnType<TeamCatalog["status"]>>;
-        try {
-          status = await this.catalog.status(agent, options.refresh ?? true, options.claudeAccountId);
-        } catch {
-          return providerIssue("provider_unavailable", "Could not check this provider. Try checking readiness again.");
-        }
-        const label = harnessCatalog[agent].name;
-        if (!status.installed) return providerIssue("provider_unavailable", `${label} is not installed or is unavailable on the app's PATH.`);
-        if (status.loggedIn === false) return providerIssue("login_required", `Log in to ${label} to use this agent.`);
-        if (status.loggedIn !== true) return providerIssue("login_unknown", `Could not confirm login for ${label}.`);
-        let models: ModelOption[];
-        try {
-          models = await this.catalog.models(agent, options.claudeAccountId);
-        } catch {
-          return providerIssue("catalog_unavailable", `Could not load ${label} models. Your saved choices are unchanged.`);
-        }
-        for (const member of members) {
-          const settings = normalizeModelSettings(member.settings);
-          const model = models.find((option) => option.agent === agent && option.id === settings.model);
-          const add = (code: TeamPreflight["issues"][number]["code"], message: string) => issues.push({ memberKey: member.key, code, message });
-          if (!model || model.unavailable) {
-            add("model_unavailable", model?.unavailable ?? `${settings.model} is not available in this provider's model catalog.`);
-            continue;
-          }
-          if (settings.effort !== null && !model.efforts.includes(settings.effort)) {
-            add("effort_unsupported", `${model.label} does not support the saved effort level (${settings.effort}).`);
-          }
-          if (settings.fastMode && !model.fastMode?.supported) {
-            add("fast_unsupported", model.fastMode?.reason ?? `Fast mode is not available for ${model.label}.`);
-          }
-        }
-        return issues;
-      }),
-    );
+    // One probe per provider and Claude account, even when several members use the same model.
+    const checks = await Promise.all(probeGroups(draft.members, options.claudeAccountId).map((group) => this.checkGroup(group, options.refresh ?? true)));
     const issues = checks.flat();
     return { ready: issues.length === 0, issues };
   }
+
+  /** One provider on one account: whether it is installed and signed in, and whether its catalog serves each member's choice. */
+  private async checkGroup({ agent, claudeAccountId, members }: ProbeGroup, refresh: boolean): Promise<TeamPreflight["issues"]> {
+    const providerIssue = (code: TeamPreflight["issues"][number]["code"], message: string) => members.map((member) => ({ memberKey: member.key, code, message }));
+    let status: Awaited<ReturnType<TeamCatalog["status"]>>;
+    try {
+      status = await this.catalog.status(agent, refresh, claudeAccountId);
+    } catch {
+      return providerIssue("provider_unavailable", "Could not check this provider. Try checking readiness again.");
+    }
+    const label = harnessCatalog[agent].name;
+    if (!status.installed) return providerIssue("provider_unavailable", `${label} is not installed or is unavailable on the app's PATH.`);
+    if (status.loggedIn === false) return providerIssue("login_required", `Log in to ${label} to use this agent.`);
+    if (status.loggedIn !== true) return providerIssue("login_unknown", `Could not confirm login for ${label}.`);
+    let models: ModelOption[];
+    try {
+      models = await this.catalog.models(agent, claudeAccountId);
+    } catch {
+      return providerIssue("catalog_unavailable", `Could not load ${label} models. Your saved choices are unchanged.`);
+    }
+    return members.flatMap((member) => memberIssues(member, models));
+  }
+}
+
+type ProbeGroup = { agent: ExecutableAgent; claudeAccountId: string | undefined; members: TeamMember[] };
+
+/** Members by provider and, for Claude, by the account each runs on: its own, else the conversation's. */
+function probeGroups(members: readonly TeamMember[], conversationAccount: string | null | undefined): ProbeGroup[] {
+  const groups = new Map<string, ProbeGroup>();
+  for (const member of members) {
+    const agent = member.settings.agent;
+    const claudeAccountId = agent === "claude" ? (member.claudeAccountId ?? conversationAccount ?? undefined) : undefined;
+    const key = `${agent}:${claudeAccountId ?? ""}`;
+    const group = groups.get(key) ?? { agent, claudeAccountId, members: [] };
+    group.members.push(member);
+    groups.set(key, group);
+  }
+  return [...groups.values()];
+}
+
+/** What a member's saved model, effort and Fast choice lack in its provider's catalog. */
+function memberIssues(member: TeamMember, models: ModelOption[]): TeamPreflight["issues"] {
+  const settings = normalizeModelSettings(member.settings);
+  const model = models.find((option) => option.agent === settings.agent && option.id === settings.model);
+  const issue = (code: TeamPreflight["issues"][number]["code"], message: string) => ({ memberKey: member.key, code, message });
+  if (!model || model.unavailable) return [issue("model_unavailable", model?.unavailable ?? `${settings.model} is not available in this provider's model catalog.`)];
+  const issues: TeamPreflight["issues"] = [];
+  if (settings.effort !== null && !model.efforts.includes(settings.effort)) issues.push(issue("effort_unsupported", `${model.label} does not support the saved effort level (${settings.effort}).`));
+  if (settings.fastMode && !model.fastMode?.supported) issues.push(issue("fast_unsupported", model.fastMode?.reason ?? `Fast mode is not available for ${model.label}.`));
+  return issues;
 }

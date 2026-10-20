@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ClaudeAccountId } from "./claude-accounts.js";
 import { HarnessId } from "./harness.js";
 
 /** Only providers with an executable adapter may be saved in a team: exactly the registered harnesses. */
@@ -132,6 +133,8 @@ export const TeamMember = z
     settings: ModelExecutionSettings,
     /** An Orcling who takes this seat, bringing its instructions and memory. */
     orclingId: z.string().min(1).nullable().optional(),
+    /** The Claude account a Claude member runs on. Without one it runs on the conversation's account. */
+    claudeAccountId: ClaudeAccountId.nullable().optional(),
   })
   .strict();
 export type TeamMember = z.infer<typeof TeamMember>;
@@ -185,7 +188,15 @@ export const TeamDraft = z
         current = manager;
       }
     }
+  })
+  // A Claude account belongs to a Claude seat; any other provider runs on its own login.
+  .superRefine(({ members }, ctx) => {
+    for (const [index, member] of members.entries()) {
+      if (member.claudeAccountId && member.settings.agent !== "claude")
+        ctx.addIssue({ code: "custom", message: "Only a Claude agent runs on a Claude account.", path: ["members", index, "claudeAccountId"] });
+    }
   });
+
 export type TeamDraft = z.infer<typeof TeamDraft>;
 
 export const TeamDefinition = z.object({

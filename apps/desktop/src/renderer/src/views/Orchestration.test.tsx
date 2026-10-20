@@ -69,8 +69,23 @@ beforeEach(() => {
       return { enabled, reason: enabled ? null : "Team execution is disabled.", maxHierarchyDepth: 3 };
     }
     if (method === "agents.models") return [];
+    if (method === "claude.accounts.list")
+      return {
+        defaultId: "claude-cli",
+        accounts: [
+          { id: "claude-cli", name: "Existing CLI login", kind: "cli", enabled: true, createdAt: 0 },
+          { id: "work", name: "Work", kind: "managed", enabled: true, createdAt: 1 },
+          { id: "old", name: "Old", kind: "managed", enabled: false, createdAt: 2 },
+        ],
+      } as never;
     if (method === "orclings.list") return orclingList as never;
-    if (method === "system.info") return { harnesses: [{ id: "codex", state: "ready", path: "/bin/codex", version: "1", revision: 1 }] } as never;
+    if (method === "system.info")
+      return {
+        harnesses: [
+          { id: "codex", state: "ready", path: "/bin/codex", version: "1", revision: 1 },
+          { id: "claude", state: "ready", path: "/bin/claude", version: "1", revision: 1 },
+        ],
+      } as never;
     throw new Error(`Unexpected RPC: ${method}`);
   });
 });
@@ -222,4 +237,26 @@ it("shows saved teams as tabs, keeps archived ones out until asked, and opens th
   fireEvent.click(screen.getByRole("switch", { name: "Show archived" }));
   fireEvent.click(within(tabs).getByRole("radio", { name: "Old team · Archived" }));
   expect(useRouter.getState().route).toEqual({ view: "orchestration", projectId: "project", teamId: "old" });
+});
+
+it("lets a Claude member run on an account of its own, and saves that choice with the team", async () => {
+  const saved = savedTeam();
+  saved.revision.members = [
+    { ...saved.revision.members[0]!, settings: { agent: "claude", model: "model", effort: null, fastMode: false } },
+    { key: "builder", name: "Builder", responsibility: "Build", managerKey: "lead", settings: { agent: "codex", model: "model", effort: null, fastMode: false } },
+  ];
+  detail = saved;
+  render(
+    <QueryClientProvider client={queryClient}>
+      <Orchestration projectId="project" teamId="team" />
+    </QueryClientProvider>,
+  );
+  const account = (await screen.findByRole("combobox", { name: "Claude account" })) as HTMLSelectElement;
+  expect(screen.getAllByRole("combobox", { name: "Claude account" })).toHaveLength(1);
+  expect(account.value).toBe("");
+  expect((await within(account).findByRole("option", { name: "Old · disabled" })).matches(":disabled")).toBe(true);
+  fireEvent.change(account, { target: { value: "work" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save team" }));
+  await waitFor(() => expect(detail?.revision.members[0]?.claudeAccountId).toBe("work"));
+  expect(detail?.revision.members[1]).not.toHaveProperty("claudeAccountId");
 });

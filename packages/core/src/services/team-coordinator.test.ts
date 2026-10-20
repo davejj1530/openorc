@@ -300,6 +300,24 @@ async function nestedWorking() {
 }
 
 describe("durable team coordination with real run capture", () => {
+  it("runs a Claude member on the account the team names for it, and checks that account before it starts", async () => {
+    db.stmt("INSERT INTO claude_accounts (id, name, kind, enabled, created_at) VALUES ('review-account', 'Review', 'managed', 1, 0)").run();
+    const draft = roster();
+    draft.members[2]!.claudeAccountId = "review-account";
+    const execution = await startTeam(draft);
+    const lead = activeTurn(execution.id);
+    const reviewer = coordinator.dispatch(lead.spec.runId, assignment("reviewer"));
+    coordinator.wait(lead.spec.runId);
+    await finish(lead);
+    const turn = activeTurn(execution.id, reviewer.id);
+    const attempt = coordinator.status(execution.id).attempts.findLast((candidate) => candidate.actorId === reviewer.id)!;
+    expect(attempt.claudeAccountId).toBe("review-account");
+    expect(runs.get(db, turn.spec.runId)?.claudeAccountId).toBe("review-account");
+    expect(coordinatorHooks.validate).toHaveBeenCalledWith(expect.objectContaining({ agent: "claude" }), project.id, "review-account");
+    // The lead names no account and keeps the conversation's.
+    expect(coordinator.status(execution.id).attempts.find((candidate) => candidate.actorId === "lead")).not.toHaveProperty("claudeAccountId");
+  });
+
   it("resumes a waiting worker but starts a new actor on the same task with a fresh session", async () => {
     const execution = await startTeam();
     const lead = activeTurn(execution.id);

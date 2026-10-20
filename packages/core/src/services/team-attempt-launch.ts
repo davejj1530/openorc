@@ -1,5 +1,16 @@
 import { MAX_TEAM_ATTEMPTS, orchestration, projects, runs as runRows, storedReferences, tasks, teamContexts, teamRuntime, threads } from "@openorc/db";
-import { normalizeModelSettings, type Run, type RunMode, type TeamActorRecord, type TeamAttemptRecord, type TeamExecutionRecord, type Thread } from "@openorc/protocol";
+import {
+  DEFAULT_CLAUDE_ACCOUNT,
+  normalizeModelSettings,
+  type ModelExecutionSettings,
+  type Run,
+  type RunMode,
+  type TeamActorRecord,
+  type TeamAttemptRecord,
+  type TeamExecutionRecord,
+  type TeamRevision,
+  type Thread,
+} from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
 import { type StartRunInput } from "./runs.js";
 import { buildTeamContextSeed, buildTeamCoordinationContext, teamContextExecutions, type TeamContextScope } from "./team-context.js";
@@ -30,6 +41,15 @@ interface PreparedAttempt {
   warmRunId: string | null;
 }
 
+/**
+ * The Claude account a member's turn runs on: the one its seat names, else the conversation's. Only a named account is
+ * fixed on the attempt; the rest follow the conversation.
+ */
+function attemptAccount(revision: TeamRevision, memberKey: string, settings: ModelExecutionSettings, thread: Thread): { named: Pick<TeamAttemptRecord, "claudeAccountId">; effective: string } {
+  const named = settings.agent === "claude" ? revision.members.find((member) => member.key === memberKey)?.claudeAccountId : null;
+  return { named: named ? { claudeAccountId: named } : {}, effective: named ?? thread.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT };
+}
+
 export class TeamAttemptLaunch {
   constructor(private readonly services: StageServices) {}
 
@@ -56,16 +76,18 @@ export class TeamAttemptLaunch {
     this.services.assertGeneration(state, state.generation);
     if (state.attempts.length >= MAX_TEAM_ATTEMPTS) throw new Error("This execution reached its turn limit.");
     const actor = state.actors.find((item) => item.id === actorId)!;
-    const mode = threads.get(this.services.db, state.threadId)!.mode;
+    const thread = threads.get(this.services.db, state.threadId)!;
+    const mode = thread.mode;
     if (actor.taskId !== null && mode !== "act") throw new TeamModeDeferred();
     const messages = state.messages.filter((message) => message.recipientId === actorId && message.state === "pending").sort((a, b) => a.sequence - b.sequence);
     const instance = orchestration.getInstance(this.services.db, state.threadId)!;
     const revision = orchestration.getRevision(this.services.db, instance.teamRevisionId)!;
     const settings = normalizeModelSettings(actor.id === "lead" ? { ...revision.members.find((member) => member.key === actor.memberKey)!.settings, ...instance.leadOverrides } : actor.input.settings);
+    const account = attemptAccount(revision, actor.memberKey, settings, thread);
     const scope = this.services.contextScope(state, actorId);
     const context = teamContexts.latest(this.services.db, scope);
-    // Only the participant's latest turn in another execution may supply a session.
-    const session = this.reservedSession(state, actor, scope, context?.id, settings);
+    // Only the participant's latest turn in another execution may supply a session, and only one on the same account.
+    const session = this.reservedSession(state, actor, scope, context?.id, settings, account.effective);
     const attemptId = randomUUID();
     const ambient = messages.length === 0 && actor.ambient ? actor.ambient : null;
     const reason = this.attemptReason(actor, Boolean(ambient), messages.length);
@@ -88,6 +110,7 @@ export class TeamAttemptLaunch {
       mode,
       state: "starting",
       settings,
+      ...account.named,
       configurationVersion: instance.configurationVersion,
       directionVersion: actor.directionVersion,
       messageIds: messages.map((message) => message.id),
@@ -112,14 +135,22 @@ export class TeamAttemptLaunch {
     return { attempt, prompt: this.reservedPrompt(actor, chat, messages) };
   }
 
-  private reservedSession(state: TeamExecutionRecord, actor: TeamActorRecord, scope: TeamContextScope, contextId: string | undefined, settings: TeamAttemptRecord["settings"]): string | null {
+  private reservedSession(
+    state: TeamExecutionRecord,
+    actor: TeamActorRecord,
+    scope: TeamContextScope,
+    contextId: string | undefined,
+    settings: TeamAttemptRecord["settings"],
+    claudeAccountId: string,
+  ): string | null {
     return (
       teamContextExecutions(this.services.db, state.instanceId)
         .filter((record) => scope.executionId === null || record.id === scope.executionId || actor.participant)
         .flatMap((record) => (actor.participant && record.id !== state.id ? record.attempts.filter((item) => item.actorId === actor.id).slice(-1) : record.attempts))
         .filter((item) => item.actorId === actor.id && item.contextCheckpointId === contextId && item.runId)
         .map((item) => runRows.get(this.services.db, item.runId!))
-        .findLast((run) => run?.agent === settings.agent && run.externalSessionId)?.externalSessionId ?? null
+        .findLast((run) => run?.agent === settings.agent && (settings.agent !== "claude" || (run.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT) === claudeAccountId) && run.externalSessionId)
+        ?.externalSessionId ?? null
     );
   }
 
@@ -246,7 +277,7 @@ export class TeamAttemptLaunch {
     const { executionId, original, attempt, actor, reservedMode, assertActive, assertMode } = admission;
     assertActive();
     assertMode();
-    await this.services.hooks.validate(attempt.settings, original.projectId, threads.get(this.services.db, original.threadId)?.claudeAccountId);
+    await this.services.hooks.validate(attempt.settings, original.projectId, attempt.claudeAccountId ?? threads.get(this.services.db, original.threadId)?.claudeAccountId);
     assertActive();
     assertMode();
     const task = await this.prepareTask(admission);
@@ -275,6 +306,7 @@ export class TeamAttemptLaunch {
         ...shared,
         ...(seat ? { orclingId: seat } : {}),
         ...attempt.settings,
+        ...(attempt.claudeAccountId ? { claudeAccountId: attempt.claudeAccountId } : {}),
         effort: attempt.settings.effort ?? undefined,
         mode: reservedMode,
         permissionMode: thread.permissionMode,
@@ -342,6 +374,7 @@ export class TeamAttemptLaunch {
         fastMode: attempt.settings.fastMode,
         mode: reservedMode,
         permissionMode: thread.permissionMode,
+        ...(attempt.settings.agent === "claude" ? { claudeAccountId: attempt.claudeAccountId ?? thread.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT } : {}),
       })
         ? previous.runId!
         : null;

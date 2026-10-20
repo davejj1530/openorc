@@ -4,7 +4,7 @@ import { harnessCatalog, harnessIds, type AllowanceWindow, type ProviderUsage } 
 import { Button, IconButton, TextButton, Tooltip } from "../components/ui";
 import { HarnessLogo } from "../components/HarnessLogo";
 import { ChevronDown, ExternalLink, RefreshCw } from "../components/icons";
-import { allowanceState, formatUsageTime, usageResetLabel } from "../lib/provider-usage";
+import { allowanceState, formatUsageTime, percentLeft, usageResetLabel } from "../lib/provider-usage";
 import { useEffect, useId, useRef, useState } from "react";
 import { useRpc } from "../lib/query";
 import { cn } from "../lib/cn";
@@ -52,7 +52,7 @@ export function ProviderUsageOverview({ active }: { active: boolean }) {
  * to the report, the provider's notes and reset options, so opening it never resizes the grid.
  * Reset controls stay mounted on the back while hidden, so an attempt's outcome survives.
  */
-function ProviderReport({ provider, claudeAccountId, name, active, now }: { provider: ProviderUsage["provider"]; claudeAccountId?: string; name: string; active: boolean; now: number }) {
+export function ProviderReport({ provider, claudeAccountId, name, active, now }: { provider: ProviderUsage["provider"]; claudeAccountId?: string; name: string; active: boolean; now: number }) {
   const q = useRpc("providers.usage", { provider, ...(claudeAccountId ? { claudeAccountId } : {}) }, { enabled: active, staleTime: 60_000 });
   const d = q.data;
   const returning = useRef(false);
@@ -233,7 +233,7 @@ function UsageReportDetails({ report: d, stale }: { report: ProviderUsage; stale
 /** One limit: a 48px ring for the share left, the share as a stat, then the limit and its reset time. */
 function UsageWindow({ value: w, now, outdated }: { value: AllowanceWindow; now: number; outdated: boolean }) {
   const stale = outdated || allowanceState(w, now).stale;
-  const left = w.remainingPercent ?? (w.usedPercent === null ? null : 100 - w.usedPercent);
+  const left = percentLeft(w);
   const percent = left === null ? null : left.toLocaleString(undefined, { maximumFractionDigits: 1 });
   const filled = left === null ? 0 : Math.max(0, Math.min(100, left));
   const ring = (

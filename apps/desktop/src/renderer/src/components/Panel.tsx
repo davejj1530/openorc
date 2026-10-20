@@ -105,8 +105,6 @@ export function Panel({ context }: { context: PanelContext }) {
   };
   const closing = useFileTabClosing(session, { close: closeTab, show: (id) => usePanelSessions.getState().select(scope, id) });
   const trafficClearance = !sidebarOpen && trafficLights;
-  // The header shares the window's chrome line when it reaches the native controls: expanded past a hidden sidebar, or beside Windows and Linux controls.
-  const chrome = (expanded && trafficClearance) || windowsControls;
   return (
     <>
       {open && !expanded ? <ResizeHandle edge="panel" /> : null}
@@ -122,8 +120,8 @@ export function Panel({ context }: { context: PanelContext }) {
         }}
       >
         <div className="panel-pane h-full flex flex-col">
-          <div className="panel-card" data-plane data-chrome={chrome || undefined}>
-            <PanelHeader scope={scope} session={session} expanded={expanded} chrome={chrome} trafficClearance={trafficClearance} windowsControls={windowsControls} onClose={closing.requestClose} />
+          <PanelHeader scope={scope} session={session} expanded={expanded} trafficClearance={trafficClearance} windowsControls={windowsControls} onClose={closing.requestClose} />
+          <div className="panel-card" data-plane>
             <div
               id="panel-tab-content"
               role="tabpanel"

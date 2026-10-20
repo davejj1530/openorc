@@ -23,9 +23,10 @@ import { floatingGround } from "../lib/use-anchor-ground";
  * The header's side padding. The window's outermost headers clear the native controls; a thread's header otherwise
  * sits 20px in with its round tools 8px from the edge, and page headers keep 12px on both sides.
  */
-function headerInset({ leftmost, rightmost, thread }: { leftmost: boolean; rightmost: boolean; thread?: boolean }): string {
+function headerInset({ leftmost, rightmost, besideColumn, thread }: { leftmost: boolean; rightmost: boolean; besideColumn: boolean; thread?: boolean }): string {
   const left = thread ? "pl-5" : "pl-3";
-  const right = thread ? "pr-2" : "pr-3";
+  // A thread header keeps 8px at the window's edge, and 12px from the panel or pane beside it.
+  const right = thread && !besideColumn ? "pr-2" : "pr-3";
   return cn(leftmost ? "pl-traffic" : left, rightmost ? "pr-controls" : right);
 }
 
@@ -82,7 +83,7 @@ export function TopBar({
       className={cn(
         "drag-region app-topbar h-topbar shrink-0 flex items-center justify-between",
         windowDragSurface ? "thread-header" : "gap-2",
-        headerInset({ leftmost: leftmost && trafficLights, rightmost: rightmost && windowsControls, thread: windowDragSurface }),
+        headerInset({ leftmost: leftmost && trafficLights, rightmost: rightmost && windowsControls, besideColumn: !rightmost, thread: windowDragSurface }),
         className,
       )}
     >

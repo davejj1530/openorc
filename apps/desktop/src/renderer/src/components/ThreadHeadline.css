@@ -1,16 +1,17 @@
-/* Lines up under the title, past the row's status slot and the gap after it. */
+/* Lines up under the title, past the row's 16px status lead and the 8px gap after it. */
 .thread-preview-headline {
   display: block;
-  margin-left: calc(14px + 11px);
+  margin-left: calc(16px + 8px);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   line-height: 16px;
-  color: var(--ink-3);
+  letter-spacing: 0;
+  color: var(--ink-4);
 }
 .thread-preview-headline[data-tone="live"] {
-  color: var(--ink-2);
+  color: var(--ink-3);
 }
 .thread-preview-headline[data-tone="attention"] {
   color: var(--warn);

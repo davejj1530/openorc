@@ -15,8 +15,19 @@ import { WindowNav } from "./Sidebar";
 import { IconButton, Tooltip } from "./ui";
 import { useTrafficLights, useWindowsControls } from "../lib/window";
 import { useRpc } from "../lib/query";
-import { menuItem, menuPopup } from "./ThreadActions";
+import { menuItem, menuPopup } from "./menu";
 import { CoversPreview } from "../lib/browser-preview";
+import { floatingGround } from "../lib/use-anchor-ground";
+
+/**
+ * The header's side padding. The window's outermost headers clear the native controls; a thread's header otherwise
+ * sits 20px in with its round tools 8px from the edge, and page headers keep 12px on both sides.
+ */
+function headerInset({ leftmost, rightmost, thread }: { leftmost: boolean; rightmost: boolean; thread?: boolean }): string {
+  const left = thread ? "pl-5" : "pl-3";
+  const right = thread ? "pr-2" : "pr-3";
+  return cn(leftmost ? "pl-traffic" : left, rightmost ? "pr-controls" : right);
+}
 
 /**
  * The main column's header: the screen's title with a quiet project switcher.
@@ -71,16 +82,15 @@ export function TopBar({
       className={cn(
         "drag-region app-topbar h-topbar shrink-0 flex items-center justify-between",
         windowDragSurface ? "thread-header" : "gap-2",
-        leftmost && trafficLights ? "pl-traffic" : "pl-3",
-        rightmost && windowsControls ? "pr-controls" : "pr-3",
+        headerInset({ leftmost: leftmost && trafficLights, rightmost: rightmost && windowsControls, thread: windowDragSurface }),
         className,
       )}
     >
       {/* Native regions follow declaration order: controls must follow this layer. */}
       {windowDragSurface ? <span className="thread-header-drag-surface" aria-hidden="true" /> : null}
-      <div className="flex items-center gap-2 min-w-0 flex-1 text-base font-medium truncate">
+      <div className="flex items-center gap-2 min-w-0 flex-1 text-base truncate">
         {inSplit ? null : (
-          <span className="workspace-window-nav flex items-center gap-1 mr-1" data-sidebar-open={sidebarOpen}>
+          <span className="workspace-window-nav flex items-center mr-1" data-sidebar-open={sidebarOpen}>
             <WindowNav open={sidebarOpen} />
           </span>
         )}
@@ -95,7 +105,7 @@ export function TopBar({
         {panel && (onPanelToggle || !panelOpen) ? (
           <Tooltip label={panelLabel}>
             <IconButton onClick={onPanelToggle ?? (() => setPanel(true))} aria-label={panelLabel} aria-pressed={panelActive}>
-              <PanelRight size={15} />
+              <PanelRight size={16} />
             </IconButton>
           </Tooltip>
         ) : null}
@@ -124,7 +134,7 @@ function HeaderProjectPicker({ projectId, projectName, onProjectChange }: { proj
       <Menu.Portal>
         <CoversPreview />
         <Menu.Positioner sideOffset={6} align="start" className="z-40" collisionPadding={8}>
-          <Menu.Popup className={menuPopup}>
+          <Menu.Popup ref={floatingGround} className={menuPopup}>
             {projectOptions.map((option) => (
               <Menu.Item key={option.id ?? "all"} className={menuItem} onClick={() => chooseProject(option.id)}>
                 <Check size={13} className={selectedProjectId === option.id ? "text-ink" : "text-transparent"} />

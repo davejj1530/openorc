@@ -5,8 +5,8 @@ import { Folder, GitBranch, GitPullRequest } from "./icons";
 import { HarnessLogo } from "./HarnessLogo";
 import { ThreadStatusIndicator } from "./ThreadStatusIndicator";
 import { ThreadRowHeadline } from "./ThreadHeadline";
-import { menuPopup, ThreadMenuItems, type MenuParts } from "./ThreadActions";
-import { cn } from "../lib/cn";
+import { ThreadMenuItems, type MenuParts } from "./ThreadActions";
+import { menuPopup } from "./menu";
 import { useLayout } from "../lib/layout";
 import { useRouter } from "../lib/router";
 import { startThreadDrag, endThreadDrag } from "../lib/thread-drag";
@@ -16,6 +16,7 @@ import { dismissCompactNavigation } from "../lib/compact-navigation";
 import { relativeTime } from "../lib/time";
 import { orclingById, useOrclings } from "../lib/orclings";
 import { OrclingAvatar } from "./OrclingAvatar";
+import { floatingGround } from "../lib/use-anchor-ground";
 
 /** Where a thread works, as its row shows it: its branch, the pull request it reviews, or its folder. */
 function threadPlace(thread: ThreadSummary): { icon: ReactNode; label: string; title: string } {
@@ -25,7 +26,7 @@ function threadPlace(thread: ThreadSummary): { icon: ReactNode; label: string; t
   return { icon: <Folder size={11} className="shrink-0" />, label: thread.projectId === WORKSPACE_ID ? "Local" : "No branch", title: thread.workingDirectory ?? "No recorded branch" };
 }
 
-const pullRequestTone = { open: "text-ink-3", merged: "text-ok", closed: "text-bad" } as const;
+const pullRequestTone = { open: "text-ink-4", merged: "text-ok", closed: "text-bad" } as const;
 
 /** A resting thread's mark: the state of its pull request, if it has one. Most threads have none and show nothing. */
 function PullRequestMark({ thread }: { thread: ThreadSummary }) {
@@ -33,8 +34,8 @@ function PullRequestMark({ thread }: { thread: ThreadSummary }) {
   if (pull === null) return null;
   const state = thread.prState ?? "open";
   return (
-    <span role="img" aria-label={`Pull request #${pull}, ${state}`} title={`Pull request #${pull}, ${state}`} className="size-3.5 shrink-0 inline-flex items-center justify-center">
-      <GitPullRequest size={13} className={pullRequestTone[state]} />
+    <span role="img" aria-label={`Pull request #${pull}, ${state}`} title={`Pull request #${pull}, ${state}`} className="size-4 shrink-0 inline-flex items-center justify-center">
+      <GitPullRequest size={14} className={pullRequestTone[state]} />
     </span>
   );
 }
@@ -72,19 +73,16 @@ export function ThreadRow({ thread, active }: { thread: ThreadSummary; active: b
             }}
             aria-current={active ? "page" : undefined}
             data-open={open || undefined}
-            className={cn(
-              "sidebar-thread-row thread-preview no-drag min-w-0 w-full flex flex-col items-stretch gap-0.5 px-2 py-1.5 rounded-md text-base text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink",
-              open && "text-ink",
-            )}
+            className="sidebar-thread-row thread-preview no-drag"
             title={`${thread.title}\n${place.label} · ${agentLabel} · ${relativeTime(thread.lastActivityAt)}`}
           />
         }
       >
-        <span className="thread-preview-heading flex min-w-0 items-start">
+        <span className="thread-preview-heading">
           <span className="thread-preview-status">
             <ThreadStatusIndicator thread={thread} idle={<PullRequestMark thread={thread} />} />
           </span>
-          <span className={cn("thread-preview-title flex-1 min-w-0 text-left", (open || thread.unread || thread.activity === "waiting") && "text-ink")}>{thread.title}</span>
+          <span className="thread-preview-title">{thread.title}</span>
         </span>
         <ThreadRowHeadline thread={thread} />
         <span className="thread-preview-meta flex min-w-0 items-center gap-2 text-xs leading-4 text-ink-3">
@@ -118,7 +116,7 @@ export function ThreadRow({ thread, active }: { thread: ThreadSummary; active: b
       <ContextMenu.Portal>
         <CoversPreview />
         <ContextMenu.Positioner className="z-40" collisionPadding={8}>
-          <ContextMenu.Popup className={menuPopup}>
+          <ContextMenu.Popup ref={floatingGround} className={menuPopup}>
             <ThreadMenuItems thread={thread} parts={ContextMenu as unknown as MenuParts} />
           </ContextMenu.Popup>
         </ContextMenu.Positioner>

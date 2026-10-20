@@ -19,9 +19,11 @@ import { WindowNav } from "./Sidebar";
 
 afterEach(cleanup);
 
-it("puts Inbox between the sidebar toggle and search, counting what waits in it", () => {
+it("reads Inbox, Search, then the sidebar toggle, counting what waits in the inbox, with no window history buttons", () => {
   const { rerender } = render(<WindowNav open={false} />);
-  expect(screen.getAllByRole("button").map((button) => button.getAttribute("aria-label"))).toEqual(["Toggle sidebar", "Inbox, 4", "Search", "Back", "Forward"]);
+  expect(screen.getAllByRole("button").map((button) => button.getAttribute("aria-label"))).toEqual(["Inbox, 4", "Search", "Toggle sidebar"]);
+  expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Forward" })).toBeNull();
 
   const inbox = screen.getByRole("button", { name: "Inbox, 4" });
   expect(inbox.textContent).toBe("4");
@@ -30,6 +32,12 @@ it("puts Inbox between the sidebar toggle and search, counting what waits in it"
   expect(useRouter.getState().route).toEqual({ view: "inbox" });
   expect(inbox.getAttribute("aria-current")).toBe("page");
   rerender(<WindowNav open />);
-  expect(screen.queryByRole("button", { name: "Search" })).toBeNull();
-  expect(screen.getByRole("button", { name: "Inbox, 4" })).toBeTruthy();
+  expect(screen.getAllByRole("button").map((button) => button.getAttribute("aria-label"))).toEqual(["Inbox, 4", "Search", "Toggle sidebar"]);
+});
+
+it("caps the inbox count at 99+", async () => {
+  const query = await import("../lib/query");
+  vi.spyOn(query, "useRpc").mockReturnValue({ data: Array.from({ length: 120 }, () => ({ status: "review" })) } as never);
+  render(<WindowNav open={false} />);
+  expect(screen.getByRole("button", { name: "Inbox, 122" }).textContent).toBe("99+");
 });

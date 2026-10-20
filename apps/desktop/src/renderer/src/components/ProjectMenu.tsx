@@ -4,8 +4,9 @@ import { WORKSPACE_ID } from "@openorc/protocol";
 import { CoversPreview } from "../lib/browser-preview";
 import { useLayout } from "../lib/layout";
 import { useRpcMutation } from "../lib/query";
+import { floatingGround } from "../lib/use-anchor-ground";
 import { X } from "./icons";
-import { menuItem, menuPopup } from "./ThreadActions";
+import { menuItem, menuPopup } from "./menu";
 import { Button, Dialog } from "./ui";
 
 export const projectHeadingClassName = "flex items-center gap-1 h-8 pl-1 pr-1";
@@ -32,7 +33,7 @@ export function ProjectMenu({ project, children }: { project: { id: string; name
         <ContextMenu.Portal>
           <CoversPreview />
           <ContextMenu.Positioner collisionPadding={8} className="z-40">
-            <ContextMenu.Popup className={menuPopup}>
+            <ContextMenu.Popup ref={floatingGround} className={menuPopup}>
               <ContextMenu.Item className={menuItem} onClick={requestRemoval}>
                 <X size={13} /> Remove project…
               </ContextMenu.Item>
@@ -56,7 +57,7 @@ function RemoveProjectDialog({ project, onClose }: { project: { id: string; name
       title="Remove project?"
     >
       <p className="text-base text-ink-2 break-words">
-        Remove <span className="font-medium text-ink">{project.name}</span> from the Projects list? Files, worktrees, and history are kept. Add the folder again to bring it back.
+        Remove <span className="text-ink">{project.name}</span> from the Projects list? Files, worktrees, and history are kept. Add the folder again to bring it back.
       </p>
       <p className="mt-2 text-base text-ink-3">Running work and schedules will continue.</p>
       {remove.error ? (
@@ -64,11 +65,12 @@ function RemoveProjectDialog({ project, onClose }: { project: { id: string; name
           {remove.error.message}
         </p>
       ) : null}
-      <div className="mt-4 flex justify-end gap-2">
-        <Button variant="ghost" disabled={remove.isPending} onClick={() => onClose()}>
+      <div className="mt-5 flex justify-end gap-2">
+        <Button disabled={remove.isPending} onClick={() => onClose()}>
           Cancel
         </Button>
         <Button
+          variant="danger"
           disabled={remove.isPending}
           onClick={() =>
             remove.mutate(

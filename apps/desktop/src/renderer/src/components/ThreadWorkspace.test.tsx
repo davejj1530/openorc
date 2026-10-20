@@ -40,7 +40,7 @@ vi.mock("./ui", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./ui")>()),
   Tooltip: ({ children }: { children: ReactNode }) => children,
 }));
-vi.mock("./ThreadActions", () => ({ menuItem: "", menuPopup: "", ThreadMenuItems: () => null }));
+vi.mock("./ThreadActions", () => ({ ThreadMenuItems: () => null }));
 vi.mock("./Conversation", () => ({
   Conversation: ({ scope }: { scope: { thread: { id: string } } }) => (
     <div data-testid={`conversation-${scope.thread.id}`}>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ThreadSummary } from "@openorc/protocol";
-import { ORC_MODE_WINDOW, sidebarThreadPage, visibleSidebarThreadIds } from "./sidebar-thread-groups";
+import { ORC_MODE_WINDOW, projectMeta, sidebarThreadPage, visibleSidebarThreadIds } from "./sidebar-thread-groups";
 
 function thread(id: string, values: Partial<ThreadSummary> = {}): ThreadSummary {
   return { id, projectId: "project", archivedAt: null, pinnedAt: null, snoozedUntil: null, ...values } as ThreadSummary;
@@ -63,5 +63,22 @@ describe("sidebar thread page", () => {
     expect(page.pinned).toEqual([]);
     expect(page.snoozed).toEqual([]);
     expect(page.rest.map((row) => row.id)).toEqual(["pinned"]);
+  });
+});
+
+describe("project heading meta", () => {
+  const idle = { activity: "idle" } as const;
+  const running = { activity: "running" } as const;
+  const waiting = { activity: "waiting" } as const;
+  it("puts a waiting thread first, then running threads, then the count", () => {
+    expect(projectMeta([idle, running, waiting], { loaded: true })).toEqual({ text: "Needs you", tone: "attention" });
+    expect(projectMeta([idle, running, running], { loaded: true })).toEqual({ text: "2 running", tone: "faint" });
+    expect(projectMeta([idle], { loaded: true })).toEqual({ text: "1 thread", tone: "faint" });
+    expect(projectMeta([idle, idle], { loaded: true, more: true })).toEqual({ text: "2+ threads", tone: "faint" });
+    expect(projectMeta([], { loaded: true })).toEqual({ text: "No threads", tone: "faint" });
+  });
+  it("says nothing about counts while the list loads", () => {
+    expect(projectMeta([], { loaded: false })).toBeNull();
+    expect(projectMeta([running], { loaded: false })).toEqual({ text: "1 running", tone: "faint" });
   });
 });

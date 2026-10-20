@@ -5,29 +5,36 @@ import type { ProjectIconState } from "../../../shared/project-icons";
 import { PROJECT_STACK_LABELS, type ProjectStackIconId } from "../../../shared/project-stack-icons";
 import { projectIconKey, useProjectIcon } from "../lib/project-icons";
 import { CoversPreview } from "../lib/browser-preview";
-import { Folder, Check } from "./icons";
+import { floatingGround } from "../lib/use-anchor-ground";
+import { menuItem } from "./menu";
+import { Folder, FolderOpen, Check } from "./icons";
 import { Button, Tooltip } from "./ui";
+import { cn } from "../lib/cn";
 import { ProjectStackIcon } from "./ProjectStackIcon";
 
-function IconImage({ source, fallback }: { source: string | undefined; fallback?: ProjectStackIconId | null }) {
+function IconImage({ source, fallback, expanded }: { source: string | undefined; fallback?: ProjectStackIconId | null; expanded?: boolean }) {
   const [failed, setFailed] = useState<string | null>(null);
-  if (!source || failed === source) return fallback ? <ProjectStackIcon id={fallback} className="shrink-0 text-ink-3" /> : <Folder size={16} className="shrink-0 text-ink-3" />;
+  if (!source || failed === source) {
+    if (fallback) return <ProjectStackIcon id={fallback} className="shrink-0" />;
+    return expanded ? <FolderOpen size={16} className="shrink-0" /> : <Folder size={16} className="shrink-0" />;
+  }
   return <img src={source} alt="" width={16} height={16} className="size-4 shrink-0 object-contain" onError={() => setFailed(source)} />;
 }
 
 function DiscoveryStatus({ loading, state }: { loading: boolean; state: ProjectIconState | undefined }) {
   if (loading)
     return (
-      <p role="status" className="text-sm text-ink-3 mt-2">
+      <p role="status" className="px-2.5 pt-2 text-sm text-ink-3">
         Looking for icons…
       </p>
     );
-  if (state?.fallback) return <p className="text-sm text-ink-3 mt-2">Detected {PROJECT_STACK_LABELS[state.fallback]}. Automatic uses its icon when no repository image is selected.</p>;
-  if (state?.candidates.length === 0) return <p className="text-sm text-ink-3 mt-2">No suitable icons found in this repository.</p>;
+  if (state?.fallback) return <p className="px-2.5 pt-2 text-sm text-ink-3">Detected {PROJECT_STACK_LABELS[state.fallback]}. Automatic uses its icon when no repository image is selected.</p>;
+  if (state?.candidates.length === 0) return <p className="px-2.5 pt-2 text-sm text-ink-3">No suitable icons found in this repository.</p>;
   return null;
 }
 
-export function ProjectIconPicker({ rootPath, name }: { rootPath: string; name: string }) {
+/** A project's icon, and the popover that chooses it. A plain folder opens while its project's threads show. */
+export function ProjectIconPicker({ rootPath, name, expanded }: { rootPath: string; name: string; expanded?: boolean }) {
   const icons = useProjectIcon(rootPath);
   const client = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -56,21 +63,21 @@ export function ProjectIconPicker({ rootPath, name }: { rootPath: string; name: 
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Tooltip label={`Choose icon for ${name}${fallback && !state?.selected ? ` · ${detected}` : ""}`}>
-        <Popover.Trigger disabled={!api} aria-label={`Choose icon for ${name}`} className="no-drag inline-flex size-6 shrink-0 items-center justify-center rounded-sm hover:bg-surface-2">
-          <IconImage source={state?.selected?.dataUrl} fallback={fallback} />
+        <Popover.Trigger
+          disabled={!api}
+          aria-label={`Choose icon for ${name}`}
+          className="project-icon-trigger no-drag inline-flex size-6 shrink-0 items-center justify-center rounded-sm text-ink-3 hover:bg-surface-2"
+        >
+          <IconImage source={state?.selected?.dataUrl} fallback={fallback} expanded={expanded} />
         </Popover.Trigger>
       </Tooltip>
       <Popover.Portal>
         <CoversPreview />
         <Popover.Positioner side="right" align="start" sideOffset={8} className="z-50">
-          <Popover.Popup className="w-72 max-w-[calc(100vw-2rem)] rounded-lg border border-line bg-surface p-3 shadow-panel">
-            <Popover.Title className="text-md font-medium mb-3">Project icon</Popover.Title>
-            <div className="flex flex-col gap-1">
-              <button
-                disabled={busy}
-                onClick={() => void perform(() => api.choose(rootPath, { mode: "folder" }))}
-                className="flex items-center gap-2 rounded-md px-2 py-2 text-base text-ink-2 hover:bg-surface-2"
-              >
+          <Popover.Popup ref={floatingGround} className="floating-popover w-72">
+            <Popover.Title className="floating-popover-title">Project icon</Popover.Title>
+            <div className="flex flex-col gap-0.5">
+              <button disabled={busy} onClick={() => void perform(() => api.choose(rootPath, { mode: "folder" }))} className={menuItem}>
                 <Folder size={16} /> Use folder {state?.mode === "folder" ? <Check size={14} className="ml-auto" /> : null}
               </button>
               {(state?.candidates ?? []).map((candidate) => (
@@ -79,7 +86,7 @@ export function ProjectIconPicker({ rootPath, name }: { rootPath: string; name: 
                   disabled={busy}
                   aria-label={`Use ${candidate.path}`}
                   onClick={() => void perform(() => api.choose(rootPath, { mode: "manual", path: candidate.path }))}
-                  className="flex min-w-0 items-center gap-2 rounded-md px-2 py-2 text-base text-ink-2 hover:bg-surface-2"
+                  className={cn(menuItem, "min-w-0")}
                 >
                   <IconImage source={candidate.dataUrl} />
                   <span className="truncate" title={candidate.path}>
@@ -91,11 +98,11 @@ export function ProjectIconPicker({ rootPath, name }: { rootPath: string; name: 
             </div>
             <DiscoveryStatus loading={icons.isFetching} state={state} />
             {error || icons.isError ? (
-              <p role="alert" className="text-sm text-bad mt-2">
+              <p role="alert" className="px-2.5 pt-2 text-sm text-bad">
                 {error ?? "Could not read project icons. Try refreshing."}
               </p>
             ) : null}
-            <div className="mt-3 flex flex-wrap gap-1 border-t border-line pt-2">
+            <div className="mt-1.5 flex flex-wrap gap-1 border-t border-line px-1 pt-1.5">
               <Button variant="ghost" size="sm" disabled={busy} onClick={() => void perform(() => api.pick(rootPath))}>
                 Choose file…
               </Button>

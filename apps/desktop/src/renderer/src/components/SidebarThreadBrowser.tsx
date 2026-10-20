@@ -8,14 +8,16 @@ import { useOrclings } from "../lib/orclings";
 import { tagsFor, useRpc } from "../lib/query";
 import { useRouter } from "../lib/router";
 import { core } from "../lib/rpc";
-import { listedThreads, sidebarThreadPage, visibleSidebarThreadIds } from "../lib/sidebar-thread-groups";
+import { listedThreads, projectMeta, sidebarThreadPage, visibleSidebarThreadIds } from "../lib/sidebar-thread-groups";
 import { useUi } from "../lib/ui";
-import { Check, ChevronDown, ChevronRight, ListFilter, Pin, Search } from "./icons";
+import { Check, ChevronDown, ChevronRight, Funnel, Pin } from "./icons";
 import { OpenOrcMark } from "./OpenOrcMark";
 import { SidebarProjectGroup } from "./SidebarProjectGroup";
 import { ThreadRow } from "./ThreadLibraryRow";
-import { menuItem, menuPopup } from "./ThreadActions";
+import { menuItem, menuPopup, menuSeparator } from "./menu";
 import { IconButton } from "./ui";
+import { floatingGround } from "../lib/use-anchor-ground";
+import { cn } from "../lib/cn";
 
 const PAGE = 12;
 
@@ -97,20 +99,12 @@ function OrcModeEnd({ groups, shown }: { groups: ThreadGroup[]; shown: number })
 }
 
 /** The project list stays mounted across app destinations, keeping filters and loaded pages. */
-export function SidebarThreadBrowser() {
-  const [search, setSearch] = useState("");
+export function SidebarThreadBrowser({ search }: { search: string }) {
   const { visible, activeId, loadMore, projects, orc, pinnedOnly } = useThreadGroups(search);
   const shown = orc ? orcGroups(visible) : visible;
   const row = (thread: ThreadSummary) => <ThreadRow key={thread.id} thread={thread} active={activeId === thread.id} />;
   return (
     <section className="conversation-browser" aria-label="Thread browser">
-      <div className="browser-controls">
-        <label className="browser-search">
-          <Search size={13} />
-          <input aria-label="Filter loaded threads" placeholder="Filter threads…" value={search} onChange={(event) => setSearch(event.target.value)} />
-        </label>
-        <ThreadFilter />
-      </div>
       <div className="browser-threads">
         {projects.isError ? (
           <button className="browser-empty" onClick={() => void projects.refetch()}>
@@ -118,7 +112,7 @@ export function SidebarThreadBrowser() {
           </button>
         ) : null}
         {shown.map((group) => (
-          <SidebarProjectGroup key={group.id} id={group.id} name={group.name} rootPath={group.rootPath} threads={group.list}>
+          <SidebarProjectGroup key={group.id} id={group.id} name={group.name} rootPath={group.rootPath} meta={projectMeta(group.list, { loaded: group.query.isSuccess, more: group.hasMore })}>
             {group.pinned.length > 0 ? (
               <Section id={`pinned:${group.id}`} label="Pinned" count={group.pinned.length}>
                 {group.pinned.map(row)}
@@ -156,12 +150,12 @@ function Section({ id, label, count, children, defaultCollapsed = false }: { id:
   const open = defaultCollapsed ? collapsed.includes(id) : !collapsed.includes(id);
   return (
     <div>
-      <button aria-expanded={open} onClick={() => toggle(id)} className="w-full flex items-center gap-1 h-6 pl-2 pr-2 text-xs text-ink-3 hover:text-ink">
-        {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+      <button aria-expanded={open} onClick={() => toggle(id)} className="sidebar-section-toggle no-drag">
+        {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         <span>{label}</span>
         <span className="tabular">{count}</span>
       </button>
-      {open ? <div className="grid grid-cols-1 min-w-0 gap-px">{children}</div> : null}
+      {open ? <div className="sidebar-thread-list">{children}</div> : null}
     </div>
   );
 }
@@ -171,10 +165,11 @@ const FILTER_NAMES: Record<SidebarFilter | "pinned", string> = { active: "Active
 /** The filter's mark: orcmode and pins show their own, so a narrowed list never looks like the whole one. */
 function FilterMark({ selection }: { selection: SidebarFilter | "pinned" }) {
   if (selection === "orc") return <OpenOrcMark size={14} />;
-  return selection === "pinned" ? <Pin size={14} /> : <ListFilter size={14} />;
+  return selection === "pinned" ? <Pin size={14} /> : <Funnel size={14} />;
 }
 
-function ThreadFilter() {
+/** The thread list's filter: orcmode, active, archived or pinned threads, and importing terminal sessions. */
+export function ThreadFilter() {
   const filter = useLayout((s) => s.sidebarFilter);
   const pinned = useLayout((s) => s.pinnedOnly);
   const setFilter = useLayout((s) => s.setSidebarFilter);
@@ -183,14 +178,20 @@ function ThreadFilter() {
   return (
     <Menu.Root>
       <Menu.Trigger
-        render={<IconButton aria-label={`Filter threads${selection === "active" ? "" : `: ${FILTER_NAMES[selection]}`}`} size="sm" className={selection !== "active" ? "text-accent-ink" : ""} />}
+        render={
+          <IconButton
+            aria-label={`Filter threads${selection === "active" ? "" : `: ${FILTER_NAMES[selection]}`}`}
+            size="xs"
+            className={cn("no-drag", selection === "active" ? "text-ink-4" : "text-accent-ink")}
+          />
+        }
       >
         <FilterMark selection={selection} />
       </Menu.Trigger>
       <Menu.Portal>
         <CoversPreview />
         <Menu.Positioner sideOffset={6} align="end" className="z-40" collisionPadding={8}>
-          <Menu.Popup className={menuPopup}>
+          <Menu.Popup ref={floatingGround} className={menuPopup}>
             {(["orc", "active", "archived"] as const).map((value) => (
               <Menu.Item key={value} className={menuItem} onClick={() => setFilter(value)}>
                 <Check size={13} className={filter === value && !pinned ? "text-accent-ink" : "text-transparent"} />
@@ -201,7 +202,7 @@ function ThreadFilter() {
               <Check size={13} className={pinned ? "text-accent-ink" : "text-transparent"} />
               Pinned threads
             </Menu.Item>
-            <Menu.Separator className="my-1 border-t border-line" />
+            <Menu.Separator className={menuSeparator} />
             <Menu.Item className={menuItem} onClick={() => useUi.getState().setImportSessions(true, projectId ?? undefined)}>
               Import terminal sessions…
             </Menu.Item>

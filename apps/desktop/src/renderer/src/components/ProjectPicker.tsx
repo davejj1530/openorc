@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { Popover } from "@base-ui/react/popover";
 import { WORKSPACE_ID } from "@openorc/protocol";
-import { Check, ChevronDown, Folder, Globe, SquareStack, Plus } from "./icons";
+import { Check, ChevronDown, Globe, SquareStack, Plus } from "./icons";
 import { ProjectIconPicker } from "./ProjectIconPicker";
 import { ProjectMenu } from "./ProjectMenu";
-import { Tooltip } from "./ui";
 import { CoversPreview } from "../lib/browser-preview";
 import { useRpc } from "../lib/query";
 import { useUi } from "../lib/ui";
+import { floatingGround } from "../lib/use-anchor-ground";
 
 type PickerProject = { id: string | null; name: string; rootPath?: string };
 
@@ -37,30 +37,21 @@ function ProjectOption({ project, selected, onSelect }: { project: PickerProject
 }
 
 /** Project selection is a temporary popover, not a second navigation column. */
-export function ProjectPicker({ projectId, onProject, compact = false }: { projectId: string | null; onProject: (id: string | null) => void; compact?: boolean }) {
+export function ProjectPicker({ projectId, onProject }: { projectId: string | null; onProject: (id: string | null) => void }) {
   const [open, setOpen] = useState(false);
   const projects = useRpc("projects.list", {});
   const options: PickerProject[] = [{ id: null, name: "All projects" }, { id: WORKSPACE_ID, name: "Workspace" }, ...(projects.data ?? [])];
   const selected = options.find((option) => option.id === projectId)?.name ?? "Projects";
-  const trigger = (
-    <Popover.Trigger aria-label={`Projects: ${selected}`} className={compact ? "workspace-rail-button" : "thread-project-picker"}>
-      {compact ? (
-        <Folder size={19} />
-      ) : (
-        <>
-          <span>{selected}</span>
-          <ChevronDown size={15} />
-        </>
-      )}
-    </Popover.Trigger>
-  );
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
-      {compact ? <Tooltip label={`Projects · ${selected}`}>{trigger}</Tooltip> : trigger}
+      <Popover.Trigger aria-label={`Projects: ${selected}`} className="thread-project-picker">
+        <span>{selected}</span>
+        <ChevronDown size={15} />
+      </Popover.Trigger>
       <Popover.Portal>
         <CoversPreview />
-        <Popover.Positioner side={compact ? "right" : "bottom"} sideOffset={8} align="start" className="z-40" collisionPadding={8}>
-          <Popover.Popup className="project-picker-popup" aria-label="Choose project">
+        <Popover.Positioner side="bottom" sideOffset={8} align="start" className="z-40" collisionPadding={8}>
+          <Popover.Popup ref={floatingGround} className="project-picker-popup" aria-label="Choose project">
             <div className="project-picker-label">Projects</div>
             <div className="project-picker-options">
               {options.map((project) => (

@@ -73,7 +73,7 @@ interface LayoutState {
 }
 
 export const limits = {
-  sidebar: { min: 224, max: 380, default: 267 },
+  sidebar: { min: 224, max: 380, default: 272 },
   panel: { min: 340, max: 900, default: 640 },
 };
 

@@ -4,6 +4,7 @@ import { Sidebar } from "./components/Sidebar";
 import { DeleteThreadDialog } from "./components/ThreadActions";
 import { TeamMoveDialog } from "./components/TeamMoveDialog";
 import { ThreadMoveDialog } from "./components/ThreadMoveDialog";
+import { TooltipProvider } from "./components/ui";
 import { ImportProjectDialog } from "./dialogs/ImportProjectDialog";
 import { ImportSessionsDialog } from "./dialogs/ImportSessionsDialog";
 import { NewFileDialog } from "./dialogs/NewFileDialog";
@@ -127,43 +128,45 @@ export function App() {
   }
 
   return (
-    <div className="app-shell h-full flex text-ink">
-      <Sidebar />
-      <div className="work-row flex-1 min-w-0 h-full flex">
-        {route.view === "newthread" ? <NewThread key={route.projectId ?? ""} projectId={route.projectId} /> : null}
-        {route.view === "newtask" ? (
-          <Main>
-            <Suspense fallback={<div className="document-skeleton" aria-label="Loading editor" />}>
-              <NewTask key={`${route.projectId ?? ""}:${route.threadId ?? ""}`} projectId={route.projectId} threadId={route.threadId} />
+    <TooltipProvider>
+      <div className="app-shell h-full flex text-ink">
+        <Sidebar />
+        <div className="work-row flex-1 min-w-0 h-full flex">
+          {route.view === "newthread" ? <NewThread key={route.projectId ?? ""} projectId={route.projectId} /> : null}
+          {route.view === "newtask" ? (
+            <Main>
+              <Suspense fallback={<div className="document-skeleton" aria-label="Loading editor" />}>
+                <NewTask key={`${route.projectId ?? ""}:${route.threadId ?? ""}`} projectId={route.projectId} threadId={route.threadId} />
+              </Suspense>
+            </Main>
+          ) : null}
+          {route.view === "thread" ? <ThreadWorkspace /> : null}
+          {route.view === "task" ? (
+            <Suspense
+              fallback={
+                <Main>
+                  <div className="document-skeleton" aria-label="Loading task" />
+                </Main>
+              }
+            >
+              <TaskView key={route.taskId} taskId={route.taskId} tab={route.tab} />
             </Suspense>
-          </Main>
-        ) : null}
-        {route.view === "thread" ? <ThreadWorkspace /> : null}
-        {route.view === "task" ? (
-          <Suspense
-            fallback={
-              <Main>
-                <div className="document-skeleton" aria-label="Loading task" />
-              </Main>
-            }
-          >
-            <TaskView key={route.taskId} taskId={route.taskId} tab={route.tab} />
-          </Suspense>
-        ) : null}
-        <MainScreen route={route} currentProject={currentProject} />
+          ) : null}
+          <MainScreen route={route} currentProject={currentProject} />
+        </div>
+        <CommandPalette open={ui.palette} onOpenChange={ui.setPalette} />
+        <div className="workspace-update-notices">
+          <AppUpdateNotice />
+          <AgentUpdateNotice />
+        </div>
+        <ImportProjectDialog open={ui.importProject} onOpenChange={ui.setImportProject} />
+        <ImportSessionsDialog open={ui.importSessions.open} projectId={ui.importSessions.projectId ?? currentProject} onOpenChange={(open) => ui.setImportSessions(open)} />
+        <DeleteThreadDialog />
+        <TeamMoveDialog />
+        <ThreadMoveDialog />
+        <NewFileDialog />
       </div>
-      <CommandPalette open={ui.palette} onOpenChange={ui.setPalette} />
-      <div className="workspace-update-notices">
-        <AppUpdateNotice />
-        <AgentUpdateNotice />
-      </div>
-      <ImportProjectDialog open={ui.importProject} onOpenChange={ui.setImportProject} />
-      <ImportSessionsDialog open={ui.importSessions.open} projectId={ui.importSessions.projectId ?? currentProject} onOpenChange={(open) => ui.setImportSessions(open)} />
-      <DeleteThreadDialog />
-      <TeamMoveDialog />
-      <ThreadMoveDialog />
-      <NewFileDialog />
-    </div>
+    </TooltipProvider>
   );
 }
 

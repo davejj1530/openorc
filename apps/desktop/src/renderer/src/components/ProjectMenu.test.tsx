@@ -21,7 +21,7 @@ afterEach(() => {
 function show(id = "repo", name = "Studio") {
   return render(
     <QueryClientProvider client={queryClient}>
-      <SidebarProjectGroup id={id} name={name} threads={[]}>
+      <SidebarProjectGroup id={id} name={name} meta={null}>
         {null}
       </SidebarProjectGroup>
     </QueryClientProvider>,

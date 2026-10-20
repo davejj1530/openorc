@@ -81,7 +81,13 @@ it("shows the OpenOrc wordmark only while fullscreen and keeps the header contro
   expect(screen.queryByRole("img", { name: "OpenOrc" })).toBeNull();
   act(() => useWindow.setState({ fullscreen: true }));
   expect(screen.getByRole("img", { name: "OpenOrc" }).textContent).toBe("OpenOrc");
-  for (const name of ["Inbox", "Toggle sidebar", "Search"]) expect(screen.getByRole("button", { name })).toBeTruthy();
+  expect(
+    within(screen.getByRole("group", { name: "Window" }))
+      .getAllByRole("button")
+      .map((button) => button.getAttribute("aria-label")),
+  ).toEqual(["Inbox", "Search", "Toggle sidebar"]);
+  expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Forward" })).toBeNull();
   act(() => useWindow.setState({ fullscreen: false }));
   expect(screen.queryByRole("img", { name: "OpenOrc" })).toBeNull();
 });
@@ -169,9 +175,8 @@ it("goes back to a new thread when Settings was opened first", () => {
 
 it.each([
   ["Inbox", "inbox"],
-  ["Back", "tasks"],
-  ["Forward", "settings"],
-])("dismisses compact navigation after choosing %s in the footer", (label, destination) => {
+  ["Settings", "settings"],
+])("dismisses compact navigation after choosing %s", (label, destination) => {
   const matchMedia = window.matchMedia;
   window.matchMedia = (query) => ({ ...matchMedia(query), matches: query === "(max-width: 900px)" });
   try {
@@ -330,7 +335,18 @@ it("keeps activity visible in folded projects and keeps project navigation on ta
   mountSidebar();
   await screen.findByRole("button", { name: /Regular notes/ });
   fireEvent.click(screen.getByRole("button", { name: "Collapse First project threads" }));
-  expect(within(screen.getByRole("region", { name: "First project threads" })).getByText("Running")).toBeTruthy();
+  expect(within(screen.getByRole("region", { name: "First project threads" })).getByText("1 running")).toBeTruthy();
+  expect(within(screen.getByRole("region", { name: "Second project threads" })).getByText("1 thread")).toBeTruthy();
   expect(screen.queryByRole("button", { name: /Regular notes/ })).toBeNull();
   expect(screen.getByRole("button", { name: "New thread in First project" })).toBeTruthy();
+});
+
+it("says a folded project needs you before anything else", async () => {
+  projectThreads();
+  fixture.threads[1]!.activity = "running";
+  fixture.threads[0]!.activity = "waiting";
+  useLayout.setState({ collapsed: ["project:one"] });
+  mountSidebar();
+  const region = await screen.findByRole("region", { name: "First project threads" });
+  await waitFor(() => expect(region.querySelector(".project-group-activity")?.textContent).toBe("Needs you"));
 });

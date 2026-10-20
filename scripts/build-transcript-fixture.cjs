@@ -8,7 +8,7 @@ module.exports = async function buildTranscriptFixture(dir, fixture) {
   const html = path.join(desktop, htmlName);
   await fs.writeFile(
     html,
-    `<html data-theme="light"><head><link rel="stylesheet" href="./src/renderer/src/app.css"></head><body><div id="root" style="height:100vh"></div><script type="module" src="../../scripts/fixtures/${fixture}"></script></body></html>`,
+    `<!doctype html><html data-theme="light"><head><link rel="stylesheet" href="./src/renderer/src/app.css"></head><body><div id="root" style="height:100vh"></div><script type="module" src="../../scripts/fixtures/${fixture}"></script></body></html>`,
   );
   const { build } = await import(require.resolve("vite", { paths: [desktop] }));
   const { default: react } = await import(require.resolve("@vitejs/plugin-react", { paths: [desktop] }));

@@ -43,7 +43,7 @@ Memory is optional. Turn it off or configure automatic extraction in Settings.
 
 Capture an idea as a task, ask multiple models for input, then start implementation when you're ready. Work in your local checkout or an isolated worktree, and review changes beside the conversation.
 
-![OpenOrc with project threads in the sidebar, a Codex conversation ending in the OpenOrc cube, and a source diff in the Changes panel](docs/images/readme/workspace.png)
+![OpenOrc with project threads and weekly usage in the sidebar, a Codex conversation ending in the OpenOrc cube, and a source diff in the Changes panel](docs/images/readme/workspace.png)
 
 ![OpenOrc team conversation showing the lead, builder, and reviewer with their models, contributions, and shared composer](docs/images/readme/teams.png)
 

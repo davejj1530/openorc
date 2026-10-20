@@ -1,6 +1,6 @@
 # README screenshots
 
-Captured on October 6, 2026 from the production renderer, with the current sidebar, the OpenOrc cube that ends a conversation, the composer's workspace footer, Immaculate Gothic type and team avatars. The sample conversations name GPT-6-Astra and Opus 5.5 (1M context).
+Captured on October 20, 2026 from the production renderer after the desktop redesign. They show one tile ground with the Changes panel as a card, the sidebar's inbox, search and toggle beside the window buttons, its weekly usage chip, the composer's model and mode pills, the OpenOrc cube that ends a conversation, team avatars and Immaculate Gothic at one weight. The sample conversations name GPT-6-Astra and Opus 5.5 (1M context).
 
 The [product fixture](../../../scripts/fixtures/website-product-ui.tsx) renders real application components and styles with synthetic projects, conversations, task comments, and changes. It does not connect to real accounts, providers, project files, or the desktop database. The team view demonstrates team execution, now in Beta.
 

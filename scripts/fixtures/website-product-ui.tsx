@@ -6,6 +6,9 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { createDesignSettingsRpc } from "./design-settings";
 import { useRouter } from "../../apps/desktop/src/renderer/src/lib/router";
 import type { Block, RunTranscript } from "../../apps/desktop/src/renderer/src/lib/transcript";
+// main.tsx stamps the saved typefaces on <html>; the panel crops render without App, which would otherwise skip them.
+import "../../apps/desktop/src/renderer/src/lib/app-font";
+import "../../apps/desktop/src/renderer/src/lib/code-font";
 
 let automaticChecks = false;
 Object.assign(window, {

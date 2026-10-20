@@ -276,6 +276,9 @@ jobs:
         with:
           name: desktop-${{ matrix.platform }}-${{ matrix.arch }}
           if-no-files-found: error
+          # Only this run's release job reads them, and the release keeps the installers; held longer they fill the
+          # account's Actions storage. A release job re-run a day later needs the whole run again.
+          retention-days: 1
           path: |
             apps/desktop/release/*.dmg
             apps/desktop/release/*.zip

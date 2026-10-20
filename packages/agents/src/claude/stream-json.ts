@@ -408,28 +408,7 @@ export class ClaudeStreamParser {
       return;
     }
     if (subtype === "compact_boundary") {
-      const rawMeta = msg["compact_metadata"];
-      if (rawMeta !== undefined && !isRecord(rawMeta)) {
-        out.push(protocolError(this.runId, now, "Expected compact_metadata to be an object"));
-        return;
-      }
-      const meta = rawMeta as Record<string, unknown> | undefined;
-      const pre = num(meta?.["pre_tokens"]);
-      const post = num(meta?.["post_tokens"]);
-      const text = pre !== undefined && post !== undefined ? `${pre.toLocaleString()} tokens folded into ${post.toLocaleString()}.` : undefined;
-      const trigger = str(meta?.["trigger"]);
-      const id = this.compaction?.id ?? `compaction-${++this.compactions}`;
-      out.push({
-        type: "activity.updated",
-        runId: this.runId,
-        ts: now,
-        activityId: id,
-        label: "Compacting context",
-        status: "success",
-        ...(text ? { text } : {}),
-        detail: { mode: trigger === "manual" || this.compaction?.manual ? "manual" : "automatic" },
-      });
-      this.compaction = null;
+      this.compactBoundary(msg, now, out);
       return;
     }
     if (subtype === "thinking_tokens") {
@@ -471,6 +450,36 @@ export class ClaudeStreamParser {
       });
       return;
     }
+  }
+
+  /**
+   * The boundary closes a compaction, manual or automatic, and says what the conversation shrank to. That size is the
+   * context's new fill, reported ahead of the activity so the ring reads it as the compaction settles; no model request
+   * reports it, since the result that follows a manual compaction spends nothing and is no turn.
+   */
+  private compactBoundary(msg: Record<string, unknown>, now: number, out: AgentEvent[]): void {
+    const rawMeta = msg["compact_metadata"];
+    if (rawMeta !== undefined && !isRecord(rawMeta)) {
+      out.push(protocolError(this.runId, now, "Expected compact_metadata to be an object"));
+      return;
+    }
+    const meta = rawMeta as Record<string, unknown> | undefined;
+    const pre = num(meta?.["pre_tokens"]);
+    const post = num(meta?.["post_tokens"]);
+    if (post !== undefined) out.push({ type: "context.updated", runId: this.runId, ts: now, contextTokens: post });
+    const text = pre !== undefined && post !== undefined ? `${pre.toLocaleString()} tokens folded into ${post.toLocaleString()}.` : undefined;
+    const trigger = str(meta?.["trigger"]);
+    out.push({
+      type: "activity.updated",
+      runId: this.runId,
+      ts: now,
+      activityId: this.compaction?.id ?? `compaction-${++this.compactions}`,
+      label: "Compacting context",
+      status: "success",
+      ...(text ? { text } : {}),
+      detail: { mode: trigger === "manual" || this.compaction?.manual ? "manual" : "automatic" },
+    });
+    this.compaction = null;
   }
 
   private trackStandaloneTask(msg: Record<string, unknown>, taskId: string | null, toolCallId: string | null): boolean {

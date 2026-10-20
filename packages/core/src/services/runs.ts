@@ -422,12 +422,14 @@ export class RunService {
     return null;
   }
 
-  /** How full the conversation is, from the latest usage the agent reported. */
+  /** How full the conversation is, from the latest usage reported. A session that only compacted keeps the window last reported. */
   threadContext(threadId: string): { used: number; window: number | null } | null {
     const live = [...this.live.values()].find((e) => e.run.threadId === threadId);
-    const usage = live?.usage ?? runs.listForThread(this.db, threadId).at(-1)?.usage ?? null;
+    const history = runs.listForThread(this.db, threadId);
+    const usage = live?.usage ?? history.at(-1)?.usage ?? null;
     if (!usage || usage.contextTokens === undefined) return null;
-    return { used: usage.contextTokens, window: usage.contextWindow ?? null };
+    const window = usage.contextWindow ?? history.findLast((run) => run.usage?.contextWindow !== undefined)?.usage?.contextWindow ?? null;
+    return { used: usage.contextTokens, window };
   }
 
   /**

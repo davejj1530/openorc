@@ -209,6 +209,7 @@ describe("ClaudeStreamParser", () => {
     ]);
     expect(manual).toEqual([
       expect.objectContaining({ type: "activity.updated", activityId: "compaction-1", status: "running", detail: { mode: "manual" } }),
+      expect.objectContaining({ type: "context.updated", contextTokens: 1881 }),
       expect.objectContaining({ type: "activity.updated", activityId: "compaction-1", status: "success", text: "29,954 tokens folded into 1,881.", detail: { mode: "manual" } }),
     ]);
     // The next prompt is an ordinary turn again.
@@ -225,11 +226,80 @@ describe("ClaudeStreamParser", () => {
     expect(automatic.map((e) => [e.type, "status" in e ? e.status : null])).toEqual([
       ["turn.started", null],
       ["activity.updated", "running"],
+      ["context.updated", null],
       ["activity.updated", "success"],
       ["turn.completed", "success"],
     ]);
     expect(automatic[1]).toMatchObject({ detail: { mode: "automatic" } });
+    expect(automatic[2]).toMatchObject({ contextTokens: 2 });
     expect(p.turns).toBe(4);
+  });
+
+  it("reports the compacted size as a change of context, not as the usage of a turn", () => {
+    const p = new ClaudeStreamParser("run-compacted");
+    const types = (lines: unknown[]) => lines.flatMap((l) => p.parseLine(line(l), 1000)).filter((e) => e.type !== "raw");
+    const session_id = "dd1b0fd3-115e-4d6d-8274-0001c648144c";
+    p.parseLine(line({ type: "system", subtype: "init", session_id, model: "claude-opus-5-5" }), 1000);
+    p.parseLine(line({ type: "result", subtype: "success", num_turns: 1, duration_ms: 1 }), 1000);
+    p.expectManualCompaction();
+    // The lines Claude Code 2.1 writes for a /compact, as recorded from a live session.
+    const compacted = types([
+      { type: "system", subtype: "status", status: "compacting", session_id, uuid: "26f46039-8901-4004-addc-dc3c110a60a8" },
+      { type: "system", subtype: "hook_started", hook_id: "80adef2e", hook_name: "SessionStart:compact", hook_event: "SessionStart", uuid: "299d2c60", session_id },
+      { type: "system", subtype: "hook_response", hook_id: "80adef2e", hook_name: "SessionStart:compact", hook_event: "SessionStart", output: "", uuid: "7ba5a1d4", session_id },
+      { type: "system", subtype: "status", status: null, compact_result: "success", session_id, uuid: "88359417-0b1d-4e50-ab3f-89871cd95247" },
+      { type: "system", subtype: "init", cwd: "/Users/david/dev/why/openorc", session_id, model: "claude-opus-5-5", tools: ["Bash", "Read"], uuid: "5b4e2d1c" },
+      {
+        type: "system",
+        subtype: "compact_boundary",
+        session_id,
+        uuid: "93cfb0e3-125b-4ad5-8cb5-7ecbd8642986",
+        compact_metadata: {
+          trigger: "manual",
+          pre_tokens: 851927,
+          post_tokens: 22712,
+          cumulative_dropped_tokens: 1784374,
+          duration_ms: 71965,
+          pre_compact_discovered_tools: ["Monitor", "TaskStop"],
+          preserved_segment: { head_uuid: "a8d9f135", anchor_uuid: "2b397420", tail_uuid: "d8b8de13" },
+          preserved_messages: { anchor_uuid: "2b397420", uuids: ["a8d9f135", "d8b8de13"], all_uuids: ["a8d9f135", "d8b8de13"] },
+        },
+        logical_parent_uuid: "d8b8de13",
+      },
+      {
+        type: "user",
+        message: { role: "user", content: "This session is being continued from a previous conversation that ran out of context." },
+        session_id,
+        parent_tool_use_id: null,
+        uuid: "93c1",
+        isReplay: true,
+      },
+      { type: "user", message: { role: "user", content: "<local-command-stdout>Compacted </local-command-stdout>" }, session_id, parent_tool_use_id: null, uuid: "d50f", isReplay: true },
+      {
+        type: "result",
+        subtype: "success",
+        is_error: false,
+        duration_ms: 72886,
+        duration_api_ms: 0,
+        num_turns: 0,
+        result: "",
+        stop_reason: null,
+        session_id,
+        total_cost_usd: 414.5082074000025,
+        usage: { input_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 0, service_tier: "standard" },
+        modelUsage: {
+          "claude-opus-5-5": { inputTokens: 15148, outputTokens: 4376549, cacheReadInputTokens: 1117533612, cacheCreationInputTokens: 18396396, costUSD: 414.5082074000025, contextWindow: 1000000 },
+        },
+        fast_mode_state: "off",
+        fast_mode_disabled_reason: "sdk_opt_in_required",
+        local_command: "compact",
+        uuid: "360a6b32-aada-41e4-b7ca-89fa0068ad71",
+      },
+    ]);
+    // The ring reads the new size before the compaction settles; the swallowed result spends nothing and is no turn.
+    expect(compacted.map((e) => e.type)).toEqual(["activity.updated", "context.updated", "activity.updated"]);
+    expect(compacted[1]).toEqual({ type: "context.updated", runId: "run-compacted", ts: 1000, contextTokens: 22712 });
+    expect(p.turns).toBe(1);
   });
 
   it("never throws on garbage and marks max-turn results", () => {

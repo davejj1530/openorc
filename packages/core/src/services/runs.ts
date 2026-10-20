@@ -50,6 +50,7 @@ import {
   type ThreadPermissionState,
   type TurnSettledOutcome,
 } from "./run-types.js";
+import { deliverable, steerable, steerBlocker, takesQueued, type RunInput } from "./run-input.js";
 import { workspaceWriters, type WorkspaceWriters } from "./workspace-writers.js";
 
 export type { ContinueSettings, Notification, PendingApproval, RunAdapterRegistry, RunHooks, RunScope, SendOptions, StartRunInput, ThreadPermissionState, TurnSettledOutcome } from "./run-types.js";
@@ -555,18 +556,27 @@ export class RunService {
     return `task:${input.scope.task.id}`;
   }
 
+  private input(runId: string): RunInput {
+    return { entry: this.live.get(runId), closing: this.closing, compacting: this.compactions.has(runId) };
+  }
+
   canSteer(runId: string): boolean {
-    const entry = this.live.get(runId);
-    return !this.closing && Boolean(entry && entry.busy && !entry.exiting && !entry.closingRequested && !entry.failed && !this.compactions.has(runId) && entry.handle.canSteer);
+    return steerable(this.input(runId));
+  }
+
+  /** Whether a message reaches this run now: into its running turn, or as its next turn while it rests between turns. */
+  canDeliver(runId: string): boolean {
+    return deliverable(this.input(runId));
+  }
+
+  /** Whether the thread's next queued message can go now, background work running or not. */
+  threadTakesQueued(thread: Thread): boolean {
+    const entry = [...this.live.values()].find((e) => e.run.threadId === thread.id);
+    return takesQueued(this.threadActivity(thread.id), entry && this.input(entry.run.id), () => Boolean(entry && this.turns.reusable(entry, thread)));
   }
 
   steerUnavailableReason(runId: string): string | null {
-    const entry = this.live.get(runId);
-    if (!entry || entry.exiting || entry.closingRequested || entry.failed || this.closing) return "The provider is unavailable. Input is retained for the next turn.";
-    if (this.compactions.has(runId) || entry.handle.compacting) return "The provider is compacting context. Input will follow when it is ready.";
-    if (!entry.busy) return "The provider is between turns. Input is retained for the next turn.";
-    if (!entry.handle.canSteer) return "The provider is starting or cannot accept live input. Input is retained until it is ready.";
-    return null;
+    return steerBlocker(this.input(runId));
   }
 
   /** Internal coordinator transport. Its durable mailbox owns admission and history. */

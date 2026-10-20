@@ -117,7 +117,8 @@ export class ThreadMessageQueue {
     }
     const live = this.runs.liveRunForThread(id);
     if (!live) throw new Error("The agent is between turns. The message stays queued.");
-    if (live.agent !== thread.agent || !this.runs.canSteer(live.id)) {
+    // A run between turns takes the message as its next turn; background work it left running carries on.
+    if (live.agent !== thread.agent || !this.runs.canDeliver(live.id)) {
       throw new Error(this.runs.steerUnavailableReason(live.id) ?? "The agent cannot take a message right now. It stays queued.");
     }
     const operation = (async () => {
@@ -148,7 +149,7 @@ export class ThreadMessageQueue {
     if (this.closing) return Promise.resolve();
     const next = threadQueue.list(this.db, id)[0];
     const thread = threads.get(this.db, id);
-    if (!next || next.state !== "pending" || !thread || thread.archivedAt !== null || this.reservedTaskThreads.has(id) || this.runs.threadActivity(id) !== "idle") return Promise.resolve();
+    if (!next || next.state !== "pending" || !thread || thread.archivedAt !== null || this.reservedTaskThreads.has(id) || !this.runs.threadTakesQueued(thread)) return Promise.resolve();
     const operation = (async () => {
       threadQueue.update(this.db, next.id, "delivering");
       try {

@@ -3,16 +3,13 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { OrclingLook, PermissionPreset, RunMode } from "@openorc/protocol";
 import { Composer } from "../../apps/desktop/src/renderer/src/components/Composer";
-import { WorkspaceRail } from "../../apps/desktop/src/renderer/src/components/WorkspaceRail";
-import { SidebarToggle } from "../../apps/desktop/src/renderer/src/components/Sidebar";
-import { ResizeHandle } from "../../apps/desktop/src/renderer/src/components/ResizeHandle";
+import { Sidebar } from "../../apps/desktop/src/renderer/src/components/Sidebar";
 import { TopBar } from "../../apps/desktop/src/renderer/src/components/TopBar";
 import { TranscriptContents } from "../../apps/desktop/src/renderer/src/components/Transcript";
-import { Button, IconButton } from "../../apps/desktop/src/renderer/src/components/ui";
-import { ArrowLeft, ArrowUpRight, Check, Plus, Search, Settings } from "../../apps/desktop/src/renderer/src/components/icons";
+import { Button } from "../../apps/desktop/src/renderer/src/components/ui";
+import { ArrowLeft, ArrowUpRight, Check, Settings } from "../../apps/desktop/src/renderer/src/components/icons";
 import { useLayout } from "../../apps/desktop/src/renderer/src/lib/layout";
 import { useRouter } from "../../apps/desktop/src/renderer/src/lib/router";
-import { dismissCompactNavigation } from "../../apps/desktop/src/renderer/src/lib/compact-navigation";
 import { OrclingsRailContext } from "../../apps/desktop/src/renderer/src/lib/orclings-rail";
 import type { ModelChoice } from "../../apps/desktop/src/renderer/src/lib/model-picker-selection";
 import { OrclingStill } from "../../apps/desktop/src/renderer/src/components/OrclingAvatar";
@@ -56,8 +53,6 @@ export function DesignOrclings({ children }: { children: ReactNode }) {
   const route = useRouter((state) => state.route);
   const [companions, setCompanions] = useState(samples);
   const [profile, setProfile] = useState(false);
-  const [search, setSearch] = useState("");
-  const open = useLayout((state) => state.sidebarOpen);
   const current = route.view === "thread" ? companions.find((item) => item.id === route.threadId) : undefined;
   const lastOrcling = useRef(samples[0]!.id);
   const lastThread = useRef("onboarding");
@@ -69,79 +64,17 @@ export function DesignOrclings({ children }: { children: ReactNode }) {
     active: Boolean(current),
     open: () => {
       setProfile(false);
-      setSearch("");
       useRouter.getState().navigate({ view: "thread", threadId: lastOrcling.current });
       useLayout.setState({ sidebarOpen: true });
     },
   };
   if (!current) return <OrclingsRailContext.Provider value={navigation}>{children}</OrclingsRailContext.Provider>;
-  const choose = (id: string) => {
-    setProfile(false);
-    useRouter.getState().navigate({ view: "thread", threadId: id });
-    dismissCompactNavigation();
-  };
   const update = (patch: Partial<Companion>) => setCompanions((items) => items.map((item) => (item.id === current.id ? { ...item, ...patch } : item)));
-  const add = () => {
-    const next = { ...samples[0]!, id: `orcling-${Date.now()}`, name: "New Orcling", preview: "Start a conversation." };
-    setCompanions((items) => [...items, next]);
-    useRouter.getState().navigate({ view: "thread", threadId: next.id });
-    setProfile(true);
-    dismissCompactNavigation();
-  };
   return (
     <OrclingsRailContext.Provider value={navigation}>
       <div className="app-shell orcling-study h-full flex text-ink">
-        <aside className="sidebar-shell workspace-navigation h-full shrink-0" data-open={open} data-browsing="true" aria-hidden={!open} inert={!open}>
-          <WorkspaceRail
-            route={route}
-            projectId={null}
-            onProject={(id) => {
-              useLayout.getState().setProject(id);
-              choose(id === "website" ? "welcome" : "onboarding");
-            }}
-            onThreads={() => {
-              useRouter.getState().navigate({ view: "thread", threadId: lastThread.current });
-              useLayout.setState({ sidebarOpen: true });
-            }}
-          />
-          <section className="conversation-browser" aria-label="Orclings">
-            <header className="browser-toolbar drag-region h-topbar">
-              <span className="browser-close">
-                <SidebarToggle open />
-              </span>
-              <span>Orclings</span>
-              <IconButton aria-label="New Orcling" onClick={add}>
-                <Plus size={16} />
-              </IconButton>
-            </header>
-            <div className="browser-heading">
-              <h2>Your Orclings</h2>
-              <p>A conversation with each companion</p>
-            </div>
-            <div className="browser-controls">
-              <label className="browser-search">
-                <Search size={14} />
-                <input aria-label="Find an Orcling" placeholder="Find an Orcling…" value={search} onChange={(event) => setSearch(event.target.value)} />
-              </label>
-            </div>
-            <div className="browser-threads">
-              {companions
-                .filter((item) => item.name.toLowerCase().includes(search.toLowerCase()))
-                .map((item) => (
-                  <button key={item.id} className="orcling-contact" aria-current={item.id === current.id ? "page" : undefined} onClick={() => choose(item.id)}>
-                    <OrclingStill look={item.look} size={38} />
-                    <span>
-                      <strong>{item.name}</strong>
-                      <small>{item.preview}</small>
-                    </span>
-                  </button>
-                ))}
-              {!companions.some((item) => item.name.toLowerCase().includes(search.toLowerCase())) ? <p className="browser-empty">No matching Orclings.</p> : null}
-            </div>
-            <p className="browser-hint">Each Orcling keeps its own instructions and memory.</p>
-          </section>
-        </aside>
-        {open ? <ResizeHandle edge="sidebar" /> : null}
+        {/* The real sidebar lists the Orclings; this study only replaces the conversation beside it. */}
+        <Sidebar />
         <main className="workspace-main well flex-1 min-w-0 flex flex-col">
           <TopBar
             windowDragSurface

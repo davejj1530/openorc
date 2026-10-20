@@ -120,7 +120,7 @@ createRoot(document.getElementById("root")!).render(
       {params.get("view") === "settings" ? (
         <div className="memory-page">
           <div className="memory-content">
-            <h1 className="text-xl font-semibold mb-6">Memory settings</h1>
+            <h1 className="text-xl mb-6">Memory settings</h1>
             <MemorySettings />
           </div>
         </div>

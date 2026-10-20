@@ -13,6 +13,9 @@
                       confirmations).
    motion-resize      width, height and corner radius follow a shape change.
    motion-disclosure  on <details>: the content opens and closes to its natural height.
+   motion-collapse    on an element shown and hidden with the hidden attribute: it opens to its
+                      natural height and folds to nothing, fading as it goes. It clips, with room
+                      for rows that reach 8px past its edge.
 
    Remounts and history loads should not take motion-arrive: only new things arrive. */
 
@@ -98,6 +101,35 @@
     width var(--duration-resize) var(--ease-out),
     height var(--duration-resize) var(--ease-out),
     border-radius var(--duration-resize) var(--ease-out);
+}
+
+.motion-collapse {
+  /* A flex or grid item would otherwise keep its content's height as a floor and never fold. */
+  min-height: 0;
+  overflow: clip;
+  overflow-clip-margin: 8px;
+  transition:
+    height var(--duration-resize) var(--ease-out),
+    padding-block var(--duration-resize) var(--ease-out),
+    margin-block var(--duration-resize) var(--ease-out),
+    opacity var(--duration-arrive) var(--ease-out),
+    display var(--duration-resize) allow-discrete;
+}
+.motion-collapse[hidden] {
+  display: none;
+  height: 0;
+  padding-block: 0;
+  margin-block: 0;
+  opacity: 0;
+  transition-duration: var(--duration-resize), var(--duration-resize), var(--duration-resize), var(--duration-leave), var(--duration-resize);
+}
+@starting-style {
+  .motion-collapse:not([hidden]) {
+    height: 0;
+    padding-block: 0;
+    margin-block: 0;
+    opacity: 0;
+  }
 }
 
 details.motion-disclosure::details-content {

@@ -37,10 +37,14 @@
 .work-turn:has(> .transcript-block:last-child > .journal-prompt) + .work-turn {
   margin-top: 28px;
 }
+/* Margins rather than gap, so the work folding away takes its spacing with it. */
 .work-section {
   display: flex;
   flex-direction: column;
   min-width: 0;
+}
+.work-section > * + * {
+  margin-top: 14px;
 }
 .work-content[hidden],
 .work-step-detail[hidden] {
@@ -115,6 +119,15 @@
   gap: 6px;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
+  transition:
+    opacity var(--duration-arrive) var(--ease-out),
+    filter var(--duration-arrive) var(--ease-out);
+}
+@starting-style {
+  [data-arrivals] .turn-receipt-item {
+    opacity: 0;
+    filter: blur(var(--arrive-blur));
+  }
 }
 .turn-receipt-item[data-tone="bad"] {
   color: var(--bad);
@@ -970,12 +983,18 @@
 }
 
 /* Blocks below the fold skip layout until scrolled to. Only blocks that arrive while a turn runs, after the
+   conversation first filled, come in with the arrival: history loads and remounts never animate. A starting
+   style rather than an animation, so blocks already on screen stay put when a turn starts. */
 .transcript-block {
   content-visibility: auto;
   contain-intrinsic-size: auto 48px;
+  transition:
+    opacity var(--duration-arrive) var(--ease-out),
+    filter var(--duration-arrive) var(--ease-out),
+    translate var(--duration-arrive) var(--ease-out);
 }
-@keyframes transcript-block-in {
-  from {
+@starting-style {
+  [data-transcript][data-arrivals] .transcript-block {
     opacity: 0;
     filter: blur(var(--arrive-blur));
     translate: 0 var(--arrive-rise);

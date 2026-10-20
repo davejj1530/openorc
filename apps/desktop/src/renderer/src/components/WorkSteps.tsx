@@ -4,6 +4,7 @@ import { cn } from "../lib/cn";
 import { workDuration } from "../lib/work-transcript";
 import { Brain, Check, ChevronRight, Folder, Globe, Hammer, Loader2, Search, Terminal, WorkDelegate } from "./icons";
 import { FileGlyph } from "./FileGlyph";
+import { useVisited } from "../lib/use-visited";
 import { ThreadLink } from "./ThreadImages";
 import { chipCalls, type WorkChip } from "./work-chips";
 import { chipTitle, isLive, liveHeadline, liveSectionLabel, workEntries, type LiveHeadline, type PlanItem, type WorkEntry, type WorkPhase, type WorkSection } from "./work-steps";
@@ -92,7 +93,7 @@ export function WorkNow({ blocks, turn, taskCards = true }: { blocks: Block[]; t
   const entries = useMemo(() => workEntries(blocks, taskCards), [blocks, taskCards]);
   const headline = liveHeadline(entries, turn);
   return headline ? (
-    <div className="work-now" role="status">
+    <div className="work-now motion-arrive" role="status">
       <Loader2 size={16} className="tool-row-live" />
       <LiveWords headline={headline} elapsed />
     </div>
@@ -137,9 +138,11 @@ function Elapsed({ since }: { since: number | undefined }) {
   );
 }
 
+/** What is happening now, in ink, arriving afresh as it changes; the folded line adds how long it has been going. */
 function LiveWords({ headline, elapsed = false }: { headline: LiveHeadline; elapsed?: boolean }) {
   return (
     <>
+      <span key={headline.label} className="work-line-text motion-arrive" title={headline.label}>
         {headline.label}
       </span>
       {elapsed ? <Elapsed since={headline.since} /> : null}
@@ -191,10 +194,7 @@ const PhaseView = memo(function PhaseView({ phase, headline, renderBlocks }: Pha
   const live = headline !== null;
   const [choice, setChoice] = useState<boolean | null>(null);
   const open = choice ?? live;
-  const [visited, setVisited] = useState(open);
-  useEffect(() => {
-    if (open) setVisited(true);
-  }, [open]);
+  const visited = useVisited(open);
   const bodyId = useId();
   const expandable = phase.sections.length > 0 || phase.extras.length > 0 || phase.thoughts.length > 0 || Boolean(phase.detail || phase.narration);
   return (
@@ -212,7 +212,7 @@ const PhaseView = memo(function PhaseView({ phase, headline, renderBlocks }: Pha
         {expandable ? <ChevronRight size={12} className={cn("work-chevron", open && "rotate-90")} /> : null}
       </button>
       {expandable ? (
-        <div id={bodyId} hidden={!open} className="work-phase-body">
+        <div id={bodyId} hidden={!open} className="work-phase-body motion-collapse">
           {visited ? <PhaseBody phase={phase} live={live} renderBlocks={renderBlocks} /> : null}
         </div>
       ) : null}

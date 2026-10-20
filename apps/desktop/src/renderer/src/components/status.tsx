@@ -1,5 +1,5 @@
 import type { TaskPriority, TaskStatus } from "@openorc/protocol";
-import { Archive, Check, CircleDashed, CircleHelp, CircleReview, Loader2, Minus, Signal, SignalHigh, SignalLow, SignalMedium } from "./icons";
+import { Archive, CircleCheck, Minus, Signal, SignalHigh, SignalLow, SignalMedium } from "./icons";
 import { cn } from "../lib/cn";
 
 export const statusLabel: Record<TaskStatus, string> = {
@@ -13,22 +13,49 @@ export const statusLabel: Record<TaskStatus, string> = {
 
 export const statusOrder: TaskStatus[] = ["proposed", "backlog", "in_progress", "review", "done", "archived"];
 
+/** The task list's group order: work under way first, then what waits on you, then the rest. */
+export const groupOrder: TaskStatus[] = ["in_progress", "review", "proposed", "backlog", "done", "archived"];
+
+/** A group heading may say more than the status's short name. */
+export const groupLabel: Record<TaskStatus, string> = { ...statusLabel, review: "Ready for review" };
+
+/**
+ * A task's status as a 16px mark: an arc for work under way, the attention dot for review, an
+ * attention ring for a proposal, an empty ring for the backlog, a check for done.
+ */
 export function StatusIcon({ status, className }: { status: TaskStatus; className?: string }) {
-  const c = cn("shrink-0", className);
+  const c = cn("status-mark shrink-0", className);
   switch (status) {
     case "proposed":
-      return <CircleHelp size={14} className={cn(c, "text-warn")} />;
+      return <Ring className={cn(c, "text-attention")} />;
     case "backlog":
-      return <CircleDashed size={14} className={cn(c, "text-ink-4")} />;
+      return <Ring className={cn(c, "status-mark-empty")} />;
     case "in_progress":
-      return <Loader2 size={14} className={cn(c, "text-accent")} />;
+      return (
+        <svg width={16} height={16} viewBox="0 0 16 16" fill="none" aria-hidden="true" className={c}>
+          <circle cx="8" cy="8" r="6" strokeWidth="2" className="status-mark-track" />
+          <circle cx="8" cy="8" r="6" strokeWidth="2" strokeLinecap="round" strokeDasharray="15 37.7" transform="rotate(-90 8 8)" stroke="currentColor" className="text-ink" />
+        </svg>
+      );
     case "review":
-      return <CircleReview size={14} className={cn(c, "text-review")} />;
+      return (
+        <svg width={16} height={16} viewBox="0 0 16 16" aria-hidden="true" className={cn(c, "text-attention")}>
+          <circle cx="8" cy="8" r="4" fill="currentColor" />
+        </svg>
+      );
     case "done":
-      return <Check size={14} className={cn(c, "text-ok")} />;
+      return <CircleCheck size={16} className={cn(c, "text-ok")} />;
     case "archived":
-      return <Archive size={14} className={cn(c, "text-ink-4")} />;
+      return <Archive size={16} className={cn(c, "text-ink-4")} />;
   }
+}
+
+function Ring({ className }: { className: string }) {
+  return (
+    <svg width={16} height={16} viewBox="0 0 16 16" fill="none" aria-hidden="true" className={className}>
+      <circle cx="8" cy="8" r="5.25" strokeWidth="1.5" stroke="currentColor" />
+    </svg>
+  );
 }
 
 export const priorityLabel: Record<TaskPriority, string> = { none: "No priority", low: "Low", medium: "Medium", high: "High", urgent: "Urgent" };

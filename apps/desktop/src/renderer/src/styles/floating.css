@@ -1,32 +1,102 @@
-/* Floating layers: menus, tooltips and popovers. */
+/* Floating layers: menus, popovers, tooltips and dialogs.
 
+   No floating layer has a border or a shadow (D2). Each takes the fill step away from the ground
+   it opened from: --float-fill is --surface over the tile and --bg over a plane. The layer says
+   which with data-ground (lib/use-anchor-ground.ts). Dialogs are planes over their backdrop. */
+[data-ground="plane"] {
+  --float-fill: var(--bg);
+}
+.menu-popup,
+.floating-popover,
+.tooltip-popup,
 .project-picker-popup {
-  width: 300px;
-  max-width: calc(100vw - 24px);
-  border: var(--hairline) solid var(--line);
-  border-radius: 12px;
-  background: var(--surface);
+  border: 0;
+  background: var(--float-fill);
   color: var(--ink);
-  box-shadow: var(--shadow);
-  padding: 8px;
+  box-shadow: none;
+  outline: none;
+}
+/* A layer that lands across the tile and a plane (a composer picker over the conversation) has
+   no fill step away from both, so a hairline ring draws its edge. */
+[data-ground][data-straddles] {
+  box-shadow: 0 0 0 var(--hairline) var(--line-strong);
+}
+
+/* A popover: an r18 card with padding 6 that opens out of its anchor. */
+.floating-popover {
+  max-width: calc(100vw - 24px);
+  max-height: var(--available-height);
+  overflow-y: auto;
+  padding: 6px;
+  border-radius: var(--radius-2xl);
+}
+.floating-popover-title {
+  padding: 8px 10px 6px;
+  color: var(--ink);
+  font-size: var(--text-md);
+  line-height: 20px;
+  letter-spacing: var(--text-md--letter-spacing);
+}
+
+/* Menus, popovers and tooltips open out of the control that was touched: they settle from a
+   small drop toward their anchor and leave quicker than they arrive. */
+.menu-popup,
+.floating-popover {
+  transform-origin: var(--transform-origin);
+  transition:
+    opacity var(--duration-leave) var(--ease-out),
+    transform var(--duration-arrive) var(--ease-out);
+}
+.menu-popup:is([data-starting-style], [data-ending-style]),
+.floating-popover:is([data-starting-style], [data-ending-style]) {
+  opacity: 0;
+  transform: translateY(-6px) scale(0.96);
+}
+.menu-popup[data-side="top"]:is([data-starting-style], [data-ending-style]),
+.floating-popover[data-side="top"]:is([data-starting-style], [data-ending-style]) {
+  transform: translateY(6px) scale(0.96);
+}
+.menu-popup:is([data-side="right"], [data-side="inline-end"]):is([data-starting-style], [data-ending-style]),
+.floating-popover:is([data-side="right"], [data-side="inline-end"]):is([data-starting-style], [data-ending-style]) {
+  transform: translateX(-6px) scale(0.96);
+}
+.menu-popup:is([data-side="left"], [data-side="inline-start"]):is([data-starting-style], [data-ending-style]),
+.floating-popover:is([data-side="left"], [data-side="inline-start"]):is([data-starting-style], [data-ending-style]) {
+  transform: translateX(6px) scale(0.96);
+}
+.menu-popup[data-ending-style],
+.floating-popover[data-ending-style] {
+  transition-duration: var(--duration-leave);
+}
+
+/* The project picker is a list popover: r16 like a drop menu, 40px rows. */
+.project-picker-popup {
+  width: 320px;
+  max-width: calc(100vw - 24px);
+  border-radius: var(--radius-xl);
+  padding: 6px;
 }
 .project-picker-label {
-  padding: 6px 9px 10px;
-  color: var(--ink-3);
-  font-size: 11px;
-  font-weight: 550;
+  padding: 8px 12px 6px;
+  color: var(--ink-4);
+  font-size: var(--text-xs);
 }
 .project-picker-options {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   max-height: min(360px, 60vh);
   overflow-y: auto;
 }
 .project-option {
-  border-radius: 6px;
-  margin: 2px 0;
-  padding: 2px 0;
+  border-radius: var(--radius-md);
+  color: var(--ink-2);
+}
+.project-option > * {
+  min-height: 40px;
 }
 .project-option[data-selected="true"] {
-  background: var(--navigation-soft);
+  background: var(--current-row-fill);
   color: var(--navigation-ink);
 }
 .project-option:hover {
@@ -35,14 +105,15 @@
 .project-option-name {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex: 1;
   min-width: 0;
-  height: 32px;
-  padding: 0 8px 0 3px;
+  height: 40px;
+  padding: 0 12px 0 4px;
   text-align: left;
-  font-size: 13px;
-  border-radius: 4px;
+  font-size: var(--text-base);
+  letter-spacing: var(--text-base--letter-spacing);
+  border-radius: var(--radius-md);
 }
 .project-option-name > span {
   flex: 1;
@@ -63,45 +134,374 @@
   align-items: center;
   gap: 10px;
   width: 100%;
-  margin-top: 8px;
-  padding: 12px 9px 7px;
-  border-top: var(--hairline) solid var(--line);
+  height: 40px;
+  margin-top: 2px;
+  padding: 0 12px;
+  border-radius: var(--radius-md);
   color: var(--ink-2);
   text-align: left;
-  font-size: 12px;
+  font-size: var(--text-base);
+  letter-spacing: var(--text-base--letter-spacing);
+}
+.project-picker-add > svg {
+  color: var(--ink-4);
 }
 .project-picker-add:hover {
-  color: var(--navigation-ink);
+  background: var(--surface-2);
+  color: var(--ink);
 }
 .project-picker-feedback {
-  padding: 8px 9px;
+  padding: 8px 12px;
   color: var(--ink-3);
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 
-/* Menus never grow past the space Base UI measures between their anchor and the window edge; they scroll instead. */
+/* Menus. A drop menu is r16 with padding 6 and 36px r10 rows that take the fill step when
+   highlighted. It never grows past the space Base UI measures between its anchor and the
+   window edge; it scrolls instead. */
 .menu-popup {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 192px;
   max-height: var(--available-height);
   overflow-y: auto;
+  padding: 6px;
+  border-radius: var(--radius-xl);
+}
+.menu-popup [role="listbox"] {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.menu-item {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 0 10px;
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  font-size: var(--text-base);
+  line-height: 16px;
+  letter-spacing: var(--text-base--letter-spacing);
+  text-align: left;
+  outline: none;
+  cursor: default;
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    opacity var(--duration-leave) var(--ease-out) var(--row-delay, 0ms);
+}
+/* In the components layer so a glyph's own utilities (text-transparent, invisible, text-ink)
+   still win over the muted default. */
+@layer components {
+  .menu-item > svg {
+    flex-shrink: 0;
+    width: 15px;
+    height: 15px;
+    color: var(--ink-3);
+  }
+}
+.menu-item:is([data-highlighted], [data-popup-open]),
+:is(button, a).menu-item:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+.menu-item:is([data-disabled], :disabled) {
+  color: var(--ink-4);
+}
+.menu-item-danger {
+  color: var(--bad);
+}
+@layer components {
+  .menu-item:is([data-disabled], :disabled) > svg {
+    color: var(--ink-4);
+  }
+  .menu-item-danger > svg {
+    color: var(--bad);
+  }
+}
+/* A row with a second line: the label, then a faint hint under it. */
+.menu-item-detail {
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  padding-block: 8px;
+}
+.menu-separator {
+  flex-shrink: 0;
+  height: 0;
+  margin: 4px 10px;
+  border-top: var(--hairline) solid var(--line);
 }
 
-/* Two members of the floating layer that are not free-floating planes. The mention flyout
-   lives inside the already-raised composer shell, and a tooltip is a label, not a plane. */
-.composer-suggestions,
+/* Rows arrive after the shell, one --stagger apart from 80ms, capped at eight. */
+.menu-popup .menu-item {
+  --row-delay: calc(var(--stagger) * 9);
+}
+.menu-popup .menu-item:nth-child(1) {
+  --row-delay: calc(var(--stagger) * 2);
+}
+.menu-popup .menu-item:nth-child(2) {
+  --row-delay: calc(var(--stagger) * 3);
+}
+.menu-popup .menu-item:nth-child(3) {
+  --row-delay: calc(var(--stagger) * 4);
+}
+.menu-popup .menu-item:nth-child(4) {
+  --row-delay: calc(var(--stagger) * 5);
+}
+.menu-popup .menu-item:nth-child(5) {
+  --row-delay: calc(var(--stagger) * 6);
+}
+.menu-popup .menu-item:nth-child(6) {
+  --row-delay: calc(var(--stagger) * 7);
+}
+.menu-popup .menu-item:nth-child(7) {
+  --row-delay: calc(var(--stagger) * 8);
+}
+.menu-popup[data-starting-style] .menu-item {
+  opacity: 0;
+}
+.menu-popup[data-ending-style] .menu-item {
+  --row-delay: 0ms;
+}
+
+/* A menu that grows out of the pill it covers (menuGrowPopup with growOffset). The popup sits
+   on the trigger, starts clipped to the trigger's own size with the pill's r18 and opens to its
+   full size and r20 over 420ms. Rows arrive at 90ms plus one --stagger each. Flipped above its
+   trigger it has no pill to grow from, so it drops like any menu. */
+.menu-grow {
+  min-width: var(--anchor-width);
+  padding: 10px;
+  border-radius: var(--radius-3xl);
+  clip-path: inset(0 round var(--radius-3xl));
+  transition:
+    opacity var(--duration-leave) var(--ease-out),
+    clip-path var(--duration-resize) var(--ease-out);
+}
+.menu-grow:not([data-side="top"])[data-starting-style] {
+  opacity: 1;
+  transform: none;
+  clip-path: inset(0 calc(100% - var(--anchor-width)) calc(100% - var(--anchor-height)) 0 round var(--radius-2xl));
+}
+.menu-grow:not([data-side="top"])[data-align="end"][data-starting-style] {
+  clip-path: inset(0 0 calc(100% - var(--anchor-height)) calc(100% - var(--anchor-width)) round var(--radius-2xl));
+}
+.menu-grow:not([data-side="top"])[data-ending-style] {
+  transform: none;
+}
+.menu-grow[data-side="top"] {
+  transition:
+    opacity var(--duration-leave) var(--ease-out),
+    transform var(--duration-arrive) var(--ease-out);
+}
+.menu-grow .menu-item {
+  min-height: 40px;
+  padding: 0 12px 0 10px;
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    opacity var(--duration-leave) var(--ease-out) var(--row-delay, 0ms),
+    filter var(--duration-leave) var(--ease-out) var(--row-delay, 0ms),
+    translate var(--duration-arrive) var(--ease-out) var(--row-delay, 0ms);
+}
+.menu-popup.menu-grow .menu-item {
+  --row-delay: calc(90ms + var(--stagger) * var(--grow-index, 8));
+}
+.menu-grow .menu-item:nth-child(1) {
+  --grow-index: 0;
+}
+.menu-grow .menu-item:nth-child(2) {
+  --grow-index: 1;
+}
+.menu-grow .menu-item:nth-child(3) {
+  --grow-index: 2;
+}
+.menu-grow .menu-item:nth-child(4) {
+  --grow-index: 3;
+}
+.menu-grow .menu-item:nth-child(5) {
+  --grow-index: 4;
+}
+.menu-grow .menu-item:nth-child(6) {
+  --grow-index: 5;
+}
+.menu-grow .menu-item:nth-child(7) {
+  --grow-index: 6;
+}
+.menu-grow .menu-item:nth-child(8) {
+  --grow-index: 7;
+}
+.menu-grow[data-starting-style] .menu-item {
+  filter: blur(3px);
+  translate: 0 -4px;
+}
+.menu-grow[data-ending-style] .menu-item {
+  --row-delay: 0ms;
+}
+/* A filter field at the top of a grown list takes the pill's place and shape. */
+.menu-grow .menu-filter {
+  width: calc(100% + 20px);
+  max-width: none;
+  height: var(--anchor-height);
+  margin: -10px -10px 4px;
+  padding: 0 14px;
+  border-radius: var(--radius-2xl);
+}
+.menu-filter {
+  flex-shrink: 0;
+  width: auto;
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: var(--text-base);
+}
+.menu-filter::placeholder {
+  color: var(--ink-4);
+}
+.menu-filter:focus {
+  outline: none;
+}
+.menu-empty {
+  padding: 10px;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+
+/* A tooltip names a control. It takes the floating fill like every other layer, at 26px with a
+   10px corner, and arrives with the same short drop. */
 .tooltip-popup {
-  box-shadow: var(--material-contact);
-}
-
-/* Menus communicate opening with a short native pop; workspace content never flies in. */
-.menu-popup {
+  max-width: 280px;
+  padding: 5px 9px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  line-height: 16px;
   transform-origin: var(--transform-origin);
   transition:
-    opacity 100ms ease-out,
-    transform 100ms ease-out;
+    opacity var(--duration-leave) var(--ease-out),
+    transform var(--duration-arrive) var(--ease-out);
+}
+.tooltip-popup:is([data-starting-style], [data-ending-style]) {
+  opacity: 0;
+  transform: scale(0.96);
+}
+.tooltip-popup[data-instant] {
+  transition-duration: 0ms;
 }
 
-.menu-popup[data-starting-style],
-.menu-popup[data-ending-style] {
+/* Dialogs are r20 sheets over their backdrop: a 14px title with no divider under it and a round
+   close. They arrive in 220ms with the arrival blur and rise and leave in 160ms. */
+.dialog-backdrop {
+  background: color-mix(in srgb, #000 30%, transparent);
+  transition: opacity var(--duration-arrive) var(--ease-out);
+}
+.dialog-backdrop:is([data-starting-style], [data-ending-style]) {
   opacity: 0;
-  transform: translateY(2px);
+}
+.dialog-backdrop[data-ending-style] {
+  transition-duration: var(--duration-leave);
+}
+.dialog-sheet {
+  max-width: calc(100vw - 48px);
+  max-height: 75vh;
+  overflow-y: auto;
+  border-radius: var(--radius-3xl);
+  background: var(--surface);
+  color: var(--ink);
+  outline: none;
+  transition:
+    opacity var(--duration-arrive) var(--ease-out),
+    filter var(--duration-arrive) var(--ease-out),
+    translate var(--duration-arrive) var(--ease-out);
+}
+.dialog-sheet:is([data-starting-style], [data-ending-style]) {
+  opacity: 0;
+  filter: blur(var(--arrive-blur));
+  translate: 0 var(--arrive-rise);
+}
+.dialog-sheet[data-ending-style] {
+  transition-duration: var(--duration-leave);
+}
+.dialog-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 16px 4px 20px;
+}
+.dialog-sheet-title {
+  color: var(--ink);
+  font-size: var(--text-md);
+  line-height: 20px;
+  letter-spacing: var(--text-md--letter-spacing);
+}
+.dialog-sheet-body {
+  padding: 12px 20px 20px;
+}
+
+/* The command palette: an r18 card over its backdrop with the search field on top and 36px r10
+   rows. The highlighted row takes the fill step; its label and glyph step up to full ink. */
+.command-palette {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 6px;
+  border-radius: var(--radius-2xl);
+  background: var(--float-fill);
+  color: var(--ink);
+}
+.command-palette-input {
+  width: 100%;
+  height: 40px;
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: var(--text-md);
+  letter-spacing: var(--text-md--letter-spacing);
+  outline: none;
+}
+.command-palette-input::placeholder {
+  color: var(--ink-4);
+}
+.command-palette-list {
+  max-height: 384px;
+  overflow-y: auto;
+}
+.command-palette-group [cmdk-group-heading] {
+  padding: 10px 10px 4px;
+  color: var(--ink-4);
+  font-size: var(--text-xs);
+}
+.command-palette-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 0 10px;
+  border-radius: var(--radius-md);
+  color: var(--ink-2);
+  font-size: var(--text-base);
+  letter-spacing: var(--text-base--letter-spacing);
+}
+.command-palette-hit {
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  padding-block: 8px;
+}
+.command-palette-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--ink-4);
+}
+.command-palette-item[data-selected="true"] {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.command-palette-item[data-selected="true"] .command-palette-icon {
+  color: var(--ink-3);
 }

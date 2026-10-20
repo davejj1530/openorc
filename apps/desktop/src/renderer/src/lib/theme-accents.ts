@@ -1,4 +1,4 @@
-import { accentHex, accentPair, mixColor, onColor } from "./accent-colors";
+import { accentHex, accentPair, mixColor, onColor, readableAccent } from "./accent-colors";
 import type { Mode } from "./theme-palettes";
 
 export const accentRoles = [
@@ -34,13 +34,15 @@ export function resolveAccentColors(base: Record<string, string>, overrides: Rec
     colors["--accent-soft"] = overrides["--accent-soft"] ?? pair.soft;
     colors["--accent-fg"] = overrides["--accent-fg"] ?? onColor(action);
   }
+  const tile = accentHex(colors["--bg"]);
   for (const role of ["navigation", "content"]) {
     const token = `--${role}-accent`;
     const accent = overrides[token] ?? base[token] ?? base["--accent"]!;
-    const ground = role === "navigation" ? accentHex(colors["--bg"]) : surface;
-    const pair = accentPair(accentHex(accent), ground);
+    const pair = accentPair(accentHex(accent), role === "navigation" ? tile : surface);
     colors[token] = accent;
-    colors[`--${role}-ink`] = pair.ink;
+    // Content reads on the tile ground (the conversation) and on planes (panels, cards), so its ink
+    // holds on the tint over both.
+    colors[`--${role}-ink`] = role === "content" ? readableAccent(pair.ink, accentPair(accentHex(accent), tile).soft) : pair.ink;
     // Curated selections belong to the palette until that role or its ground is edited.
     colors[`--${role}-soft`] = selectionTint(role, base, overrides, pair.soft);
   }

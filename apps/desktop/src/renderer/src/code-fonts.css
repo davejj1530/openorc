@@ -13,11 +13,10 @@
 
 .settings-group > pre.code-font-preview {
   margin: 16px 0 0;
-  padding: 12px;
+  padding: 14px 16px;
   overflow: auto;
-  border: var(--hairline) solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--bg);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
   color: var(--ink);
   font-family: var(--font-mono);
   font-size: var(--text-sm);

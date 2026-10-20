@@ -8,6 +8,25 @@ describe("normalizeHex", () => {
   });
 });
 
+describe("translucent roles", () => {
+  it("lets fills and lines take an alpha, and keeps every other role opaque", () => {
+    expect(normalizeHex("#1717170D", true)).toBe("#1717170d");
+    expect(normalizeHex("#fff8", true)).toBe("#ffffff88");
+    expect(normalizeHex("#171717ff", true)).toBe("#171717");
+    expect(normalizeHex("#171717", true)).toBe("#171717");
+    let custom = withColor({}, "openorc", "light", "--surface-2", "#1717170d");
+    custom = withColor(custom, "openorc", "light", "--line", "#ff000080");
+    custom = withColor(custom, "openorc", "light", "--ink", "#11223344");
+    custom = withColor(custom, "openorc", "light", "--surface-3", "#eaeaea");
+    expect(overridesFor(custom, "openorc", "light")).toEqual({ "--surface-2": "#1717170d", "--line": "#ff000080", "--surface-3": "#eaeaea" });
+    expect(parseCustomColors(JSON.stringify(custom))).toEqual(custom);
+  });
+  it("keeps applying a Background saved before the redesign to the same token, now the planes", () => {
+    const saved = JSON.stringify({ openorc: { light: { "--surface": "#fafafa", "--surface-2": "#f7f7f7" } } });
+    expect(overridesFor(parseCustomColors(saved), "openorc", "light")).toEqual({ "--surface": "#fafafa", "--surface-2": "#f7f7f7" });
+  });
+});
+
 describe("overrides", () => {
   it("keeps palettes and appearance modes apart", () => {
     let custom: CustomColors = {};

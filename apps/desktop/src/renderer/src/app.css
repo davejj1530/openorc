@@ -15,6 +15,7 @@
 @import "./styles/sidebar.css";
 @import "./styles/floating.css";
 @import "./styles/controls.css";
+@import "./styles/motion.css";
 @import "./styles/conversation.css";
 @import "./styles/composer.css";
 @import "./components/MessageQueue.css";
@@ -61,105 +62,43 @@
   --ok-soft: color-mix(in srgb, var(--ok) 8%, var(--surface));
   --warn-soft: color-mix(in srgb, var(--warn) 8%, var(--surface));
   --bad-soft: color-mix(in srgb, var(--bad) 8%, var(--surface));
+  /* Status dots. Palettes without their own amber use the readable warning tone. */
+  --attention: var(--warn);
   --selection: color-mix(in srgb, #0169cc 26%, #ffffff);
   --bubble: #f4f4f4;
   /* An image a palette may paint over --surface on the work plane; see .well::before. */
   --surface-gradient: none;
-  --tone-read: var(--content-ink);
-  --tone-edit: #8a4fd6;
-  --tone-run: #1f8a5b;
-  --tone-search: #b8720a;
-  --tone-web: #0f8a9a;
-  --tone-task: #d1476a;
-  --tone-memory: #9a5b2c;
-  --tone-plan: #d14a3c;
+  /* The thinking glyph's tone in the transcript. */
   --tone-think: #7c5cd6;
-  --tone-context: #5f788b;
-  /* The floating layer: menus, popovers, tooltips, dialogs, the palette. One elevation for
-     all of them, derived from the material agents so it tracks the palette instead of being
-     literal black. No overlay takes --material-raise: a popup is already a floating plane,
-     and raising it again is what makes a submenu beside its parent read as two objects. */
-  /* RUNG 3, the near float: menus, popovers, the effort popup, the editor menus. The 28px
-     blur was already at the shipped dialog median; the -12 spread was throwing half of it
-     away. Clearance goes 0 to +6 against a shipped menu median of +7. */
-  --shadow: var(--material-contact), 0 12px 24px -6px var(--material-lo);
-  /* RUNG 4, the modal that owns the screen: the Dialog, the command palette, the image
-     viewer. Every system measured ships at least three floating tiers; this app shipped one,
-     at 0.37x the median dialog ink. This is the only place --material-lo-cast is spent in
-     light, which finally makes the name honest: lo-soft and lo rest, lo-cast floats. */
-  --shadow-far: var(--material-contact), 0 24px 48px -12px var(--material-lo-cast);
+  /* Floating layers (menus, popovers, tooltips) have no shadow. They paint the fill step away
+     from the ground they opened from: --surface over the tile, --bg over a plane, which
+     styles/floating.css switches with data-ground. */
+  --float-fill: var(--surface);
+  /* The one surviving shadow, for the sidebar overlaid at 900px and narrower: tile over tile,
+     so there is no fill step to give it an edge. */
+  --shadow-overlay: 0 0 32px -12px rgb(0 0 0 / 0.24);
   --ring: var(--accent-ink);
-  /* Material. One light source. --ink is the palette's far end from the ground in both
-     modes, so the colour source is constant and only the geometry flips. Measured on
-     --surface across the five palettes: ink 4% = 2.79-3.15 L*, 9% = 6.32-7.36,
-     14% = 10.22-11.61. Specular on surface-2: light +3.88-4.30, dark +3.90-3.96.
-     Chrome only, never content. Never derive from --line: Cursor sets it at alpha
-     0.075 and Claude at 0.102, so a mix would compound alpha twice. */
-  /* In light this is an occluded lip, not a highlight. Derived from --ink, like dark's, but
-     spent in the opposite direction: a white specular here rendered 2.08 to 3.49 L* DARKER
-     than the --bg immediately above the edge it sat on, in all five palettes. 4% is Primer's
-     shipped light --shadow-inset (#1f23280a = 3.92%). Light's depth is shadow; dark's is
-     light; --material-hi is the top-edge agent in both. */
-  --material-hi: color-mix(in srgb, var(--ink) 4%, transparent);
-  --material-lo-soft: color-mix(in srgb, var(--ink) 4%, transparent);
-  --material-lo: color-mix(in srgb, var(--ink) 9%, transparent);
-  --material-lo-cast: color-mix(in srgb, var(--ink) 14%, transparent);
-  --material-sheen: inset 0 1px 0 var(--material-hi);
-  /* Spread 0, not -1: the one character that is the whole defect in miniature. At -1 the
-     rect's bottom edge sat flush with the element and 69% of the ink was never painted. */
-  --material-contact: 0 1px 2px 0 var(--material-lo);
-  /* RUNG 1, a resting inline control such as the selected panel tab: a small cast sized for
-     a control rather than a menu, in the soft agent. */
-  --material-raise: var(--material-sheen), var(--material-contact), 0 3px 6px -2px var(--material-lo-soft);
-  /* RUNG 2, a resting plane, and the rung the app was missing: a 700x120 composer and a
-     32x32 chip cannot share an elevation. No inset layer, deliberately: the composer is
-     light's one genuine bump, so it must not wear the lip. */
-  --material-lift: var(--material-contact), 0 6px 14px -4px var(--material-lo);
-  /* Content. Recess is the mirror of --material-contact and reads the SOFT agent, because a
-     well repeats and a repeated gouge is noise. Measured as PAINTED rather than declared,
-     inside a --surface-2 fill: -1.92 to -2.19 L* on row 0, against the 1px --line border
-     these boxes already carry at -5.60 to -10.16. Seat means the object is touching the page,
-     so in light it collapses to the contact alone; dark still composes a real specular in. No content surface reads
-     --material-raise, so the three-per-group chrome budget is untouched. */
-  --material-recess: inset 0 1px 2px 0 var(--material-lo-soft);
-  /* Seated means touching the page, and touching is a contact, not an edge. With the lip
-     inverted, keeping the sheen would put a dark line inside the blocking card's own
-     chromatic border: a third edge on a two-edge object. Dark still composes a real
-     specular into this, which is why the token survives. */
-  --material-seat: var(--material-contact);
-  /* The work plane's edge, one hairline in both modes. Light's plane is the same white as the
-     ground around it, so the line is the whole boundary; dark's plane sits a small step below
-     its ground and takes the same line. Inset, so the edge never grows the plane's box. This
-     is not --material-raise; the three-per-group raise budget is untouched. */
-  --material-well: inset 0 0 0 var(--hairline) var(--line);
-  /* Content planes (settings groups, provider, memory and orchestration cards). Light's plane
-     is the page's white, told apart by its hairline and contact; dark's plane is the raised
-     step, lit along its top edge by --material-seat. */
-  --plane-fill: var(--bg);
-  /* Raised thread cards: the contact plus a soft cast, the lift the user's bubble has. */
-  --material-card: var(--material-contact), 0 4px 12px -6px var(--material-lo-cast);
+  /* Content planes (transcript cards, provider, memory and orchestration cards) are planes:
+     one fill step off the tile ground, with no border or shadow. */
+  --plane-fill: var(--surface);
   /* The selected segment of a --surface-2 track, such as the appearance modes. It sits one
      step lighter than the track. */
   --track-2-current: var(--surface);
-  /* The current row and the selected panel tab are RAISED in both modes. Light's selection is a
-     white plane on a white column, so its hairline draws the edge and the rung-1 contact
-     and cast lift it. No sheen: in light the sheen is an occluded lip, which reads as a
-     press. Dark keeps the lit top edge. */
-  --current-row-fill: var(--bg);
-  --current-row-material: 0 0 0 var(--hairline) var(--line), var(--material-contact), 0 3px 6px -2px var(--material-lo-soft);
-  --current-chip-material: var(--current-row-material);
-  /* The user's own message is a raised plane in the palette's --bubble tone. Light lifts it
-     with a soft cast under the contact, plus a faint lit top edge that only shows on a dark
-     bubble such as OpenOrc's black one. */
+  /* Contextual fills, one step from the ground they sit on. On the tile the current row takes the
+     palette's navigation tint and a secondary control takes the plane. Every plane restates both
+     as --surface-2, and a tile card inside a plane restates them back to --surface. */
+  --current-row-fill: var(--navigation-soft);
+  --control-fill: var(--surface);
+  /* The user's own message is a plane in the palette's --bubble tone. */
   --bubble-fill: var(--bubble);
   --bubble-ink: var(--ink);
-  --bubble-material: inset 0 1px 0 color-mix(in srgb, var(--bg) 16%, transparent), var(--material-contact), 0 6px 14px -6px var(--material-lo-cast);
   color-scheme: light;
 }
 @media (min-resolution: 2dppx) {
   :root {
     --hairline: 0.5px;
   }
+}
 }
 
 @media (prefers-color-scheme: dark) {
@@ -184,64 +123,10 @@
     --bad: #d06557;
     --selection: color-mix(in srgb, #339cff 26%, #151515);
     --bubble: #1d1d1d;
-    --tone-read: var(--content-ink);
-    --tone-edit: #b58cff;
-    --tone-run: #5fd39a;
-    --tone-search: #f0b44c;
-    --tone-web: #4fd0e0;
-    --tone-task: #ff7f9e;
-    --tone-memory: #d9a066;
-    --tone-plan: #ff7b6b;
     --tone-think: #a891ff;
-    --tone-context: #97b0c5;
-    --shadow: var(--material-sheen), var(--material-contact), 0 16px 32px -16px var(--material-lo-cast);
     --ring: var(--accent-ink);
-    /* Nothing in the palette is darker than --surface in dark, so the shadow agent scales
-       --surface's own lightness instead. Declared first: the three --material-lo-* below
-       read it. The seams flip from a cast to a lit lip, which is why this is not
-       light-dark(): that can swap a colour but not an offset.
-
-       Dark is not light's mirror. --surface is already near black, so a shadow has little
-       room: the weight moves to the specular, and the cast keeps a smaller negative spread
-       so it still clears the object. Two specular strengths, mirroring the --material-lo
-       pair: --material-hi lights a control's edge, --material-hi-soft a plane's, because a
-       full-strength lip down a whole column would read as a divider border, and columns are
-       separated by the gutter alone. --material-sheen and --material-contact are not
-       redeclared; they compose. --material-raise is, because its geometry has to change. */
-    --material-void: oklch(from var(--surface) calc(l * 0.4) c h);
-    --material-hi: color-mix(in srgb, var(--ink) 12%, transparent);
-    --material-hi-soft: color-mix(in srgb, var(--ink) 5%, transparent);
-    /* --surface is at the floor in dark and an occluder has nowhere to go: --material-lo-soft
-       inside a --surface card measures -0.26 L* in github/dark. So the far wall of the trough
-       catches the light instead, which is what a trough lit from above looks like when the
-       page is near black. Measured on --surface-2: +4.56 (github) to +4.93 (linear).
-       DO NOT "tidy" this to inset 0 1px 0 for symmetry with --material-sheen: the sign of the
-       offset is the entire cue, and flipping it turns every well in the product into a raise. */
-    --material-recess: inset 0 -1px 0 var(--material-hi-soft);
-    --material-lo-soft: color-mix(in srgb, var(--material-void) 35%, transparent);
-    --material-lo: color-mix(in srgb, var(--material-void) 55%, transparent);
-    --material-lo-cast: color-mix(in srgb, var(--material-void) 70%, transparent);
-    --material-raise: var(--material-sheen), var(--material-contact), 0 4px 12px -4px var(--material-lo-cast);
-    /* Pins and aliases, not design changes: today's dark strings written verbatim so dark is
-       byte-identical after light's geometry diverged. --material-contact and --material-seat
-       used to compose from :root and would otherwise inherit light's new clearance; --material-lift
-       and --shadow-far are new and would inherit light's values outright. Nothing errors if
-       these are dropped, dark just quietly gets heavier, so do not "tidy" them away. */
-    --material-contact: 0 1px 2px -1px var(--material-lo);
-    --material-seat: var(--material-sheen), var(--material-contact);
-    --material-lift: var(--material-raise);
-    --shadow-far: var(--shadow);
+    --shadow-overlay: 0 0 32px -8px rgb(0 0 0 / 0.6);
     --track-2-current: var(--surface-3);
-    /* Dark's current row is genuinely lighter than its ground, so it keeps the lit edge.
-       Planes and the bubble take the lit edge alone, because a cast has nowhere to go
-       near black. */
-    --current-row-fill: var(--surface-2);
-    --current-row-material: var(--material-sheen);
-    --current-chip-material: var(--material-raise);
-    /* Most of a step above the canvas, so a hover row inside a plane still lifts at --surface-2. */
-    --plane-fill: color-mix(in srgb, var(--surface-2) 60%, var(--surface));
-    --material-card: var(--material-sheen), var(--material-contact), 0 4px 12px -6px var(--material-lo-cast);
-    --bubble-material: var(--material-sheen);
     color-scheme: dark;
   }
 }
@@ -267,99 +152,18 @@
   --bad: #d06557;
   --selection: color-mix(in srgb, #339cff 26%, #151515);
   --bubble: #1d1d1d;
-  --tone-read: var(--content-ink);
-  --tone-edit: #b58cff;
-  --tone-run: #5fd39a;
-  --tone-search: #f0b44c;
-  --tone-web: #4fd0e0;
-  --tone-task: #ff7f9e;
-  --tone-memory: #d9a066;
-  --tone-plan: #ff7b6b;
   --tone-think: #a891ff;
-  --tone-context: #97b0c5;
-  --shadow: var(--material-sheen), var(--material-contact), 0 16px 32px -16px var(--material-lo-cast);
   --ring: var(--accent-ink);
-  /* Nothing in the palette is darker than --surface in dark, so the shadow agent scales
-     --surface's own lightness instead. Declared first: the three --material-lo-* below
-     read it. The seams flip from a cast to a lit lip, which is why this is not
-     light-dark(): that can swap a colour but not an offset.
-
-     Dark is not light's mirror. --surface is already near black, so a shadow has little
-     room: the weight moves to the specular, and the cast keeps a smaller negative spread
-     so it still clears the object. Two specular strengths, mirroring the --material-lo
-     pair: --material-hi lights a control's edge, --material-hi-soft a plane's, because a
-     full-strength lip down a whole column would read as a divider border, and columns are
-     separated by the gutter alone. --material-sheen and --material-contact are not
-     redeclared; they compose. --material-raise is, because its geometry has to change. */
-  --material-void: oklch(from var(--surface) calc(l * 0.4) c h);
-  --material-hi: color-mix(in srgb, var(--ink) 12%, transparent);
-  --material-hi-soft: color-mix(in srgb, var(--ink) 5%, transparent);
-  /* --surface is at the floor in dark and an occluder has nowhere to go: --material-lo-soft
-       inside a --surface card measures -0.26 L* in github/dark. So the far wall of the trough
-       catches the light instead, which is what a trough lit from above looks like when the
-       page is near black. Measured on --surface-2: +4.56 (github) to +4.93 (linear).
-       DO NOT "tidy" this to inset 0 1px 0 for symmetry with --material-sheen: the sign of the
-       offset is the entire cue, and flipping it turns every well in the product into a raise. */
-  --material-recess: inset 0 -1px 0 var(--material-hi-soft);
-  --material-lo-soft: color-mix(in srgb, var(--material-void) 35%, transparent);
-  --material-lo: color-mix(in srgb, var(--material-void) 55%, transparent);
-  --material-lo-cast: color-mix(in srgb, var(--material-void) 70%, transparent);
-  --material-raise: var(--material-sheen), var(--material-contact), 0 4px 12px -4px var(--material-lo-cast);
-  /* Pins and aliases, not design changes: today's dark strings written verbatim so dark is
-     byte-identical after light's geometry diverged. --material-contact and --material-seat
-     used to compose from :root and would otherwise inherit light's new clearance;
-     --material-lift and --shadow-far are new and would inherit light's values outright.
-     Nothing errors if these are dropped, dark just quietly gets heavier. Do not tidy away. */
-  --material-contact: 0 1px 2px -1px var(--material-lo);
-  --material-seat: var(--material-sheen), var(--material-contact);
-  --material-lift: var(--material-raise);
-  --shadow-far: var(--shadow);
+  --shadow-overlay: 0 0 32px -8px rgb(0 0 0 / 0.6);
   --track-2-current: var(--surface-3);
-  /* Dark's current row is genuinely lighter than its ground, so it keeps the lit edge.
-     Planes and the bubble take the lit edge alone, because a cast has nowhere to go
-     near black. */
-  --current-row-fill: var(--surface-2);
-  --current-row-material: var(--material-sheen);
-  --current-chip-material: var(--material-raise);
-  /* Most of a step above the canvas, so a hover row inside a plane still lifts at --surface-2. */
-  --plane-fill: color-mix(in srgb, var(--surface-2) 60%, var(--surface));
-  --material-card: var(--material-sheen), var(--material-contact), 0 4px 12px -6px var(--material-lo-cast);
-  --bubble-material: var(--material-sheen);
   color-scheme: dark;
 }
 
-/* github/dark's body is #010409, 1.02 L* above black: a cast tops out at -0.55 L* even
-   at 60%. Raise the specular there past the 12% dark base, never the cast. root.dataset.palette is written in
-   lib/theme.ts, so both the media and the explicit selector need the floor. */
-@media (prefers-color-scheme: dark) {
-  :root[data-palette="github"]:not([data-theme="light"]) {
-    --material-hi: color-mix(in srgb, var(--ink) 16%, transparent);
-  }
-}
-:root[data-palette="github"][data-theme="dark"] {
-  --material-hi: color-mix(in srgb, var(--ink) 16%, transparent);
-}
-
-/* Shadow rendering under forced colors is not dependable, so every primitive is nulled
-   rather than left to the UA. A blocking card's seat carries real information (the reader
-   must act on it), so it is restored with the one property forced colors preserves. The
-   shipped themes never draw focus outlines; this is the accessibility escape hatch, not a
-   focus style. */
+/* Under forced colors the overlay shadow goes, and a blocking card, which the reader must act on,
+   keeps an outline in the one color forced colors preserves. */
 @media (forced-colors: active) {
   :root {
-    --material-sheen: none;
-    --material-contact: none;
-    --material-raise: none;
-    --material-well: none;
-    --material-recess: none;
-    --material-seat: none;
-    --material-card: none;
-    --material-lift: none;
-    --shadow-far: none;
-    --current-row-material: none;
-    --current-chip-material: none;
-    --bubble-material: none;
-    --shadow: none;
+    --shadow-overlay: none;
   }
   [data-blocking="true"] {
     outline: 2px solid Highlight;
@@ -377,53 +181,106 @@
 @theme static {
   /* Keep font-mono utilities linked to the runtime code-font preference. */
   --font-mono: "JetBrains Mono Variable", "SF Mono", Menlo, Consolas, monospace;
-  /* Type. Eight roles plus the narrow-column title. Nothing else ships. */
-  --text-xs: 11px;
+  /* Type. Interface text is 12, 13 or 14px; headings are 16, 22 and 28px. Nothing smaller
+     than 12px ships, so xs is an alias of sm. Hierarchy comes from size and gray, never weight.
+     Single-line rows set their own 16px leading. */
+  --text-xs: 12px;
   --text-xs--line-height: 16px;
+  --text-xs--letter-spacing: 0em;
   --text-sm: 12px;
-  --text-sm--line-height: 18px;
+  --text-sm--line-height: 16px;
+  --text-sm--letter-spacing: 0em;
   --text-base: 13px;
   --text-base--line-height: 20px;
+  --text-base--letter-spacing: -0.005em;
   --text-md: 14px;
   --text-md--line-height: 22px;
+  --text-md--letter-spacing: -0.01em;
+  /* Reading size for replies and documents. */
   --text-prose: 16px;
   --text-prose--line-height: 27px;
+  --text-prose--letter-spacing: -0.01em;
   --text-lg: 16px;
-  --text-lg--line-height: 24px;
-  --text-xl: 20px;
-  --text-xl--line-height: 28px;
-  --text-title-sm: 24px;
-  --text-title-sm--line-height: 32px;
+  --text-lg--line-height: 22px;
+  --text-lg--letter-spacing: -0.01em;
+  /* Second heading level inside content (replies, documents) only. */
+  --text-xl: 18px;
+  --text-xl--line-height: 24px;
+  --text-xl--letter-spacing: -0.01em;
+  --text-title-sm: 22px;
+  --text-title-sm--line-height: 28px;
+  --text-title-sm--letter-spacing: -0.015em;
   --text-title: 28px;
-  --text-title--line-height: 36px;
+  --text-title--line-height: 34px;
+  --text-title--letter-spacing: -0.02em;
+  /* Numerals for usage and meters. Pair with .tabular. */
+  --text-stat: 18px;
+  --text-stat--line-height: 22px;
+  --text-stat-sm: 16px;
+  --text-stat-sm--line-height: 20px;
   /* streamdown's markdown headings reach for Tailwind's text-2xl and text-3xl, whose
      defaults are 24px and 30px. Pinned to the title steps so a dependency cannot
      introduce a size the scale does not have. */
-  --text-2xl: 24px;
-  --text-2xl--line-height: 32px;
+  --text-2xl: 22px;
+  --text-2xl--line-height: 28px;
   --text-3xl: 28px;
-  --text-3xl--line-height: 36px;
+  --text-3xl--line-height: 34px;
 
-  /* 400 body · 500 labels, selected state, headers · 600 document and dialog titles. */
+  /* One weight for the interface, in every font. medium and semibold stay as names so a
+     stray utility (Streamdown ships some) cannot reintroduce a heavier face. Bold is for
+     author emphasis inside content only (replies, documents, comments); rich-text.css and
+     document-editor.css set it. */
   --font-weight-normal: 400;
-  --font-weight-medium: 500;
-  --font-weight-semibold: 600;
+  --font-weight-medium: 400;
+  --font-weight-semibold: 400;
 
-  /* Radius. sm chips · md buttons, fields, rows · lg menus, cards, popovers ·
-     xl composer shell and message bubbles · pill round send, dots, avatars. */
-  --radius-sm: 5px;
-  --radius-md: 8px;
+  /* Radius, set per component:
+     sm 6 labels and diff runs · md 10 rows, menu items, inline fields ·
+     lg 12 tall rows, fields in sheets, file heads · viewport 14 browser viewport ·
+     xl 16 drop menus, command, schedule and toast cards, code blocks ·
+     2xl 18 popovers, inbox, palette, prompt bubble, summary and permission cards ·
+     3xl 20 panel, sheets, dialogs, grown menus, steps and question cards, conversation composer ·
+     4xl 22 commit sheet and account cards · 5xl 24 New thread composer ·
+     pill (rounded-full) buttons, chips, tracks, knobs and send. */
+  --radius-sm: 6px;
+  --radius-md: 10px;
   --radius-lg: 12px;
+  --radius-viewport: 14px;
   --radius-xl: 16px;
+  --radius-2xl: 18px;
+  --radius-3xl: 20px;
+  --radius-4xl: 22px;
+  --radius-5xl: 24px;
   --radius-pill: 999px;
 
-  /* Control heights. Every button, select, field and toolbar control lands on one. */
-  --control-badge: 20px;
-  --control-sm: 24px;
-  --control-md: 28px;
+  /* Control heights. Every button, chip, select, field and row lands on one.
+     Button sm/md/lg/xl/hero are h-7, h-7.5, h-8, h-9 and h-10. */
+  --control-badge: 22px;
+  --control-sm: 28px;
+  --control-md: 30px;
   --control-lg: 32px;
-  /* The round send button is the one deliberate exception to the ramp. */
-  --control-send: 36px;
+  --control-row: 34px;
+  --control-xl: 36px;
+  --control-hero: 40px;
+  /* The round send button: 32 in a conversation, 34 on New thread. */
+  --control-send: 32px;
+  --control-send-hero: 34px;
+
+  /* Motion. Leaving is quicker than arriving; arrivals clear a small blur and rise.
+     Lists stagger one step a row; confirmations overshoot once; shapes resize on one
+     ease-out curve. Under reduced motion every duration and delay is zero. */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-overshoot: cubic-bezier(0.24, 1.34, 0.38, 1);
+  --duration-quick: 120ms;
+  --duration-leave: 160ms;
+  --duration-arrive: 220ms;
+  --duration-confirm: 260ms;
+  --duration-swap: 320ms;
+  --duration-roll: 360ms;
+  --duration-resize: 420ms;
+  --stagger: 40ms;
+  --arrive-blur: 4px;
+  --arrive-rise: 4px;
 }
 
 @theme inline {
@@ -457,10 +314,12 @@
   --color-warn-soft: var(--warn-soft);
   --color-bad: var(--bad);
   --color-bad-soft: var(--bad-soft);
+  --color-attention: var(--attention);
   --color-bubble: var(--bubble);
-  --shadow-panel: var(--shadow);
-  --shadow-modal: var(--shadow-far);
-  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --color-control-fill: var(--control-fill);
+  --color-float-fill: var(--float-fill);
+  --color-current-row-fill: var(--current-row-fill);
+  --color-navigation-ink: var(--navigation-ink);
   /* Only until lib/app-font.ts applies the chosen face from fonts.css. */
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   /* Height utilities over the control ramp, so components stay off raw pixels. */
@@ -468,16 +327,20 @@
   --height-control-sm: var(--control-sm);
   --height-control-md: var(--control-md);
   --height-control-lg: var(--control-lg);
+  --height-control-row: var(--control-row);
+  --height-control-xl: var(--control-xl);
+  --height-control-hero: var(--control-hero);
   --height-control-send: var(--control-send);
+  --height-control-send-hero: var(--control-send-hero);
   /* Layout measures, so no screen hardcodes a pixel width. The resizable ones are set on :root by the layout store. */
-  --width-sidebar: var(--layout-sidebar, 267px);
+  --width-sidebar: var(--layout-sidebar, 272px);
   --width-panel: var(--layout-panel, 640px);
   /* The floors the work row keeps: the conversation's, then the panel's. The panel floor is
      limits.panel.min in lib/layout.ts. */
   --width-main-min: 440px;
   --width-panel-min: 340px;
   --width-details: 72px;
-  --height-topbar: max(40px, calc(32px / var(--window-zoom, 1)));
+  --height-topbar: max(44px, calc(32px / var(--window-zoom, 1)));
   /* border, border-t, divide-y and the rest draw hairlines. */
   --default-border-width: var(--hairline);
   --container-chat: 760px;
@@ -493,7 +356,7 @@
      measurements and must not scale. Linux measures its own window controls instead, since
      the desktop picks their end and size (lib/window.ts); these values stay macOS's and Windows'. */
   --spacing-well: 8px;
-  --spacing-traffic: var(--window-controls-left, calc(84px / var(--window-zoom, 1)));
+  --spacing-traffic: var(--window-controls-left, calc(86px / var(--window-zoom, 1)));
   --spacing-controls: var(--window-controls-right, calc(140px / var(--window-zoom, 1)));
 }
 
@@ -518,9 +381,18 @@
     font-family: var(--font-sans);
     font-size: var(--text-base);
     line-height: var(--text-base--line-height);
+    letter-spacing: var(--text-base--letter-spacing);
+    font-weight: var(--font-weight-normal);
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     overflow: hidden;
+  }
+  /* One interface weight: UI <strong>, <b> and <th> read regular. Content restates bold for
+     the author's emphasis (rich-text.css, document-editor.css). */
+  b,
+  strong,
+  th {
+    font-weight: var(--font-weight-normal);
   }
   ::selection {
     background: var(--selection);
@@ -576,18 +448,36 @@
   [role="tab"],
   [role="button"] {
     transition:
-      background-color 120ms var(--ease-out),
-      color 120ms var(--ease-out),
-      border-color 120ms var(--ease-out),
-      box-shadow 120ms var(--ease-out),
-      opacity 120ms var(--ease-out);
+      background-color var(--duration-leave) var(--ease-out),
+      color var(--duration-leave) var(--ease-out),
+      border-color var(--duration-leave) var(--ease-out),
+      box-shadow var(--duration-leave) var(--ease-out),
+      opacity var(--duration-leave) var(--ease-out);
   }
+  /* Lets height: auto and width: auto transition, so disclosures and pills can resize. */
+  :root {
+    interpolate-size: allow-keywords;
+  }
+  /* Zero durations and delays together, so a staggered row or a delayed swap is in place on
+     the first frame. Keyframes all end visible, so finishing them at once shows the end state. */
   @media (prefers-reduced-motion: reduce) {
+    :root {
+      --duration-quick: 0ms;
+      --duration-leave: 0ms;
+      --duration-arrive: 0ms;
+      --duration-confirm: 0ms;
+      --duration-swap: 0ms;
+      --duration-roll: 0ms;
+      --duration-resize: 0ms;
+      --stagger: 0ms;
+    }
     *,
     *::before,
     *::after {
       transition-duration: 0ms !important;
+      transition-delay: 0ms !important;
       animation-duration: 0ms !important;
+      animation-delay: 0ms !important;
     }
   }
   input[type="checkbox"],
@@ -697,7 +587,6 @@ html[data-transparent-shell="true"] .sidebar-shell .nav-row:not(:hover, :focus-v
   inset: var(--spacing-well) 0 0;
   z-index: -1;
   border-radius: var(--radius-lg);
-  box-shadow: var(--material-well);
 }
 /* The plane's paint: the palette's --surface-gradient over --surface. The gradient is fixed to
    the window rather than to each box, so anything that has to blend into the plane, such as a
@@ -910,7 +799,6 @@ body[data-resizing] .sidebar-shell {
   gap: 12px;
   min-height: 44px;
   padding: 0 24px;
-  border-bottom: var(--hairline) solid var(--line);
   flex-shrink: 0;
 }
 
@@ -1015,12 +903,6 @@ body[data-resizing] .sidebar-shell {
 .task-list [data-current] {
   box-shadow: var(--material-sheen);
 }
-.list-group-header {
-  background-color: var(--surface-2);
-}
-.list-group-header:hover {
-  background-color: var(--surface-3);
-}
 .task-list-row:hover,
 .task-list-row[data-current] {
   background-color: var(--surface-2);
@@ -1034,33 +916,12 @@ body[data-resizing] .sidebar-shell {
 .schedule-row {
   container-type: inline-size;
 }
-@container (max-width: 560px) {
   .schedule-actions {
     width: 100%;
     justify-content: flex-end;
   }
-}
-
-/* CONTENT. Three rungs and nothing between them.
-   A cue that states a class's fixed relationship to its ground is true of every instance, so
-   it may repeat: twenty code blocks are one page with twenty holes, and none of them claims
-   to be the important one. A cue that says this instance outranks its siblings is a lie the
-   moment there are two, so it is spent once. No content surface changes the token it uses as
-   a ground: one plane step (surface to surface-2) costs 51-82% of ink-3's headroom and
-   72-109% of ink-4's in nine of ten palette/mode pairs, and a box-shadow costs none. */
-
-/* Recessed: the box's own fill sits below its container. A predicate, not a preference. */
-[data-streamdown="code-block"],
-[data-streamdown="mermaid-block"],
-.prose-chat .katex-display,
-.tool-detail,
-.system-notice {
-  box-shadow: var(--material-recess);
-}
-
-/* RAISED CARDS. The surfaces a thread grows for a task, a turn's file changes, a question, an
-   MCP app or a failure to act on are raised planes, in the transcript and the panel alike. The
-   neutral ones take the plane fill; tinted ones keep their tint and take only the lift.
+/* CONTENT. Depth is a fill step, never a shadow. The surfaces a thread grows for a task, a turn's
+   file changes, a question or an MCP app are planes, in the transcript and the panel alike.
    Unlayered on purpose, so the fill beats the components' own bg utilities. The loading
    skeleton carries .surface-card too, so a card cannot change depth as it loads. */
 .surface-card,
@@ -1068,14 +929,6 @@ body[data-resizing] .sidebar-shell {
 .question-card,
 .mcp-app-card {
   background: var(--plane-fill);
-}
-.surface-card,
-.change-card,
-.question-card,
-.mcp-app-card,
-.error-card,
-[data-blocking="true"] {
-  box-shadow: var(--material-card);
 }
 
 /* The user's own plane: the palette's --bubble tone, seated in light and lit along its top
@@ -1171,15 +1024,13 @@ diffs-container {
   background: transparent;
   border: 0;
   padding: 0;
-  font-size: var(--text-title);
-  line-height: var(--text-title--line-height);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: -0.025em;
+  font-size: var(--text-title-sm);
+  line-height: var(--text-title-sm--line-height);
+  letter-spacing: var(--text-title-sm--letter-spacing);
   overflow-wrap: anywhere;
 }
 .document-title::placeholder {
   color: var(--ink-4);
-  font-weight: var(--font-weight-medium);
 }
 .task-properties {
   display: flex;
@@ -1191,24 +1042,37 @@ diffs-container {
 .property-chip {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   max-width: 100%;
-  min-height: var(--control-md);
+  height: var(--control-md);
+  padding-left: 10px;
+  border-radius: var(--radius-pill);
+  background: var(--control-fill);
   color: var(--ink-2);
   font-size: var(--text-sm);
+  transition: background-color var(--duration-leave) var(--ease-out);
+}
+.property-chip:has(select):hover {
+  background-image: linear-gradient(var(--surface-2), var(--surface-2));
+}
+span.property-chip {
+  padding-right: 12px;
+  color: var(--ink-3);
 }
 .property-select {
   width: auto;
   max-width: 220px;
   min-width: 0;
+  height: 100%;
   border: 0;
   background-color: transparent;
   padding-left: 0;
+  color: var(--ink);
   font-size: var(--text-sm);
   text-overflow: ellipsis;
 }
-.property-select:hover {
-  background-color: var(--surface-2);
+.property-select:is(:hover, :focus) {
+  background-color: transparent;
 }
 .document-editor {
   min-width: 0;
@@ -1247,8 +1111,7 @@ diffs-container {
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 12px;
-  padding: 12px 24px;
-  border-top: var(--hairline) solid var(--line);
+  padding: 10px 12px 10px 24px;
   flex-shrink: 0;
 }
 .document-footer > button {
@@ -1267,36 +1130,6 @@ diffs-container {
   margin: 64px auto;
   background: var(--surface-2);
   border-radius: var(--radius-md);
-}
-.workspace-tabs {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  padding: 0 24px;
-  height: 40px;
-  flex-shrink: 0;
-  border-bottom: var(--hairline) solid var(--line);
-}
-.workspace-tabs button {
-  height: 100%;
-  position: relative;
-  font-size: var(--text-sm);
-  color: var(--ink-3);
-  white-space: nowrap;
-}
-.workspace-tabs button[aria-selected="true"] {
-  color: var(--ink);
-  font-weight: var(--font-weight-medium);
-}
-.workspace-tabs button[aria-selected="true"]::after {
-  content: "";
-  position: absolute;
-  height: 2px;
-  bottom: -1px;
-  left: 0;
-  right: 0;
-  background: var(--ink-2); /* off-scale: a 2px rule rounds to its own height */
-  border-radius: 2px;
 }
 .task-activity {
   margin-top: 32px;
@@ -1350,10 +1183,6 @@ diffs-container {
   .thread-branch {
     display: none;
   }
-  .workspace-tabs {
-    padding: 0 16px;
-    gap: 16px;
-    overflow-x: auto;
   }
 }
 @container (max-width: 400px) {

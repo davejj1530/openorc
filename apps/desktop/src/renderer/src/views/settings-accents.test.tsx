@@ -27,7 +27,7 @@ it("applies a combination, saves a custom role, and restores it when returning f
   await act(() => useTheme.getState().set("light"));
   expect(screen.getByLabelText<HTMLInputElement>("Navigation hex value").value).toBe("#abcdef");
   fireEvent.click(screen.getByRole("button", { name: "Reset Navigation to the palette" }));
-  expect(screen.getByLabelText<HTMLInputElement>("Navigation hex value").value).toBe("#333333");
+  expect(screen.getByLabelText<HTMLInputElement>("Navigation hex value").value).toBe("#171717");
 });
 
 it("syncs another window's saved choices and reports a failed save without discarding the preview", async () => {
@@ -46,8 +46,8 @@ it("syncs another window's saved choices and reports a failed save without disca
 });
 
 it.each([
-  ["openorc", "light", ["#171717", "#333333", "#333333"]],
-  ["openorc", "dark", ["#e3e3e3", "#e5e5e5", "#e5e5e5"]],
+  ["openorc", "light", ["#171717", "#171717", "#171717"]],
+  ["openorc", "dark", ["#ffffff", "#ffffff", "#ffffff"]],
   ["conductor", "light", ["#413030", "#413030", "#413030"]],
   ["conductor", "dark", ["#f3f2f1", "#eae8e6", "#eae8e6"]],
   ["claude", "light", ["#b95b3b", "#383835", "#184f95"]],

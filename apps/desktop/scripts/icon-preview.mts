@@ -51,4 +51,6 @@ if (!process.argv.includes("--preview-only")) {
   });
   await writeFile(resolve(import.meta.dirname, "../src/renderer/src/components/icons-diff.svg"), `<svg xmlns="http://www.w3.org/2000/svg">${symbols.join("")}</svg>\n`);
   await writeFile(resolve(import.meta.dirname, "../src/renderer/src/components/icons-select.svg"), renderToStaticMarkup(createElement(icons.ChevronDown, { size: 14, stroke: "#777777" })) + "\n");
+  // CSS checkboxes paint this as a mask, so only its alpha matters; the box's own color fills it.
+  await writeFile(resolve(import.meta.dirname, "../src/renderer/src/components/icons-check.svg"), renderToStaticMarkup(createElement(icons.Check, { size: 16, stroke: "#000000" })) + "\n");
 }

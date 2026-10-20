@@ -1,5 +1,11 @@
 import { useSyncExternalStore } from "react";
 
+/**
+ * The shape-resize duration, --duration-resize in app.css. The panel shell animates its width
+ * over it, and Panel keeps the pane mounted exactly this long after it closes.
+ */
+export const PANE_MS = 420;
+
 const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 
 function subscribeToReducedMotion(onChange: () => void): () => void {

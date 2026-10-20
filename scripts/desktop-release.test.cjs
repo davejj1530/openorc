@@ -58,7 +58,9 @@ test("native release artifacts include update metadata, signatures, and separate
   const intel = releaseConfig({ ...input, arch: "x64" });
   const win = releaseConfig({ ...input, platform: "win32", arch: "x64" });
   assert.deepEqual(mac.mac.target, ["dmg", "zip"]);
-  assert.equal(mac.mac.notarize, true);
+  assert.equal(mac.mac.notarize, false, "the afterSign hook notarizes instead of electron-builder");
+  assert.match(mac.afterSign, /electron-builder\.notarize\.cjs$/);
+  assert.equal(win.afterSign, undefined);
   assert.equal(mac.mac.identity, "Fixture (FIXTURE)");
   assert.equal(mac.forceCodeSigning, true);
   assert.equal(mac.publish[0].channel, "latest-arm64");
@@ -109,7 +111,7 @@ test("unsigned Windows beta requires an exact-version opt-in and cannot weaken m
   assert.throws(() => releaseConfig({ ...beta, platform: "darwin" }), /CSC_LINK/);
   const mac = releaseConfig({ ...beta, platform: "darwin", env: { ...env, ...betaEnv } });
   assert.equal(mac.forceCodeSigning, true);
-  assert.equal(mac.mac.notarize, true);
+  assert.match(mac.afterSign, /electron-builder\.notarize\.cjs$/);
 });
 test("releases count up from the newest release unless the desktop package names a newer line", () => {
   const released = ["0.1.0-beta.10", "0.1.0-beta.8", "0.1.0-beta.9"];
@@ -146,4 +148,25 @@ test("release notes come from changes users get, without internal commits or dup
 test("a release build takes its version from the tag without reformatting the package", () => {
   const packageJson = '{\n  "name": "@openorc/desktop",\n  "version": "0.1.0-beta.8",\n  "private": true\n}\n';
   assert.equal(withVersion(packageJson, "0.1.0-beta.9"), packageJson.replace("0.1.0-beta.8", "0.1.0-beta.9"));
+});
+
+test("macOS notarization tries again only when stapling fails, and gives up after its last attempt", async () => {
+  const { notarizeWithRetries, attempts } = require("../apps/desktop/electron-builder.notarize.cjs");
+  const staple = new Error("Failed to staple your application with code: 68");
+  const run = async (failures) => {
+    const calls = [];
+    const notarize = async (options) => {
+      calls.push(options.appPath);
+      if (failures.length) throw failures.shift();
+    };
+    const outcome = await notarizeWithRetries({ appPath: "OpenOrc.app" }, { notarize, wait: async () => {}, log: () => {} }).then(
+      () => "notarized",
+      (error) => error,
+    );
+    return { outcome, calls: calls.length };
+  };
+  assert.deepEqual(await run([staple]), { outcome: "notarized", calls: 2 });
+  const rejected = new Error("The software asset has already been rejected");
+  assert.deepEqual(await run([rejected]), { outcome: rejected, calls: 1 }, "a rejection is not retried");
+  assert.deepEqual(await run(Array.from({ length: attempts }, () => staple)), { outcome: staple, calls: attempts });
 });

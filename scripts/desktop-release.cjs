@@ -62,10 +62,12 @@ function releaseConfig({ env = process.env, platform = process.platform, arch = 
       // electron-builder chooses Developer ID Application itself and rejects a repeated prefix.
       identity: certificateName,
       hardenedRuntime: true,
-      notarize: true,
+      // Notarized by the afterSign hook below, which retries when stapling loses its connection to Apple.
+      notarize: false,
       entitlements: "build/entitlements.mac.plist",
       entitlementsInherit: "build/entitlements.mac.plist",
     };
+    config.afterSign = path.resolve(__dirname, "../apps/desktop/electron-builder.notarize.cjs");
   } else if (platform === "linux") {
     // Linux packages carry no code signature; the draft's SHA256SUMS.txt covers them. Installed builds do not update
     // themselves, but the release still records their metadata beside the other platforms'.

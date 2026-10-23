@@ -200,7 +200,9 @@ describe("explicit setup and integration recovery through the public boundary", 
     const execution = teamRuntime.activeForThread(core.db, thread.id)!;
     await attention(execution.id, "lead");
     projects.updateSettings(core.db, project.id, { setupScript: 'until test -f "$OPENORC_ROOT_PATH/.release"; do sleep 0.05; done' });
-    const running = call("orchestration.workspace.retrySetup", { threadId: thread.id, executionId: execution.id, actorId: "lead", requestKey: "slow" });
+    const running = expect(call("orchestration.workspace.retrySetup", { threadId: thread.id, executionId: execution.id, actorId: "lead", requestKey: "slow" })).rejects.toThrow(
+      /stopped or replaced|Recovery did not continue|shutting down/,
+    );
     await vi.waitFor(() => expect(teamWorkspaces.get(core.db, execution.id, "lead")?.setupState).toBe("running"), { timeout: 15000 });
     expect(core.teamWorkspaces.pendingRecoveries(execution.id)).toHaveLength(1);
     expect(core.teamMoves.availability(thread.id)).toMatchObject({ allowed: false, reason: expect.stringMatching(/recovery is still running|unfinished execution/i) });
@@ -208,7 +210,7 @@ describe("explicit setup and integration recovery through the public boundary", 
     await writeFile(path.join(root, ".release"), "");
     const stopped = await stopping;
     expect(stopped.executions.at(-1)!.state).toBe("stopped");
-    await expect(running).rejects.toThrow(/stopped or replaced|Recovery did not continue|shutting down/);
+    await running;
     const record = teamWorkspaces.get(core.db, execution.id, "lead")!;
     expect(record.state).toBe("attention");
     expect(record.retired).toHaveLength(1);

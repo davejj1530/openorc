@@ -1,6 +1,7 @@
 import { Combobox } from "@base-ui/react/combobox";
 import { Check, ChevronDown, GitBranch } from "./icons";
 import { growOffset, menuGrowPopup, menuItem } from "./menu";
+import { CoversPreview } from "../lib/browser-preview";
 
 /**
  * One branch, chosen from a list with a filter of its own. The pill always shows the chosen
@@ -29,6 +30,7 @@ export function BranchPicker({ branches, value, onChange, disabled }: { branches
         </Combobox.Icon>
       </Combobox.Trigger>
       <Combobox.Portal>
+        <CoversPreview />
         <Combobox.Positioner sideOffset={growOffset} align="start" collisionPadding={8}>
           <Combobox.Popup aria-label="Branches" className={menuGrowPopup} data-ground="plane">
             <Combobox.Input placeholder="Filter branches" className="menu-filter native-field font-mono placeholder:font-sans" />

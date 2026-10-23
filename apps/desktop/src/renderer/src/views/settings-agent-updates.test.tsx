@@ -3,6 +3,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { harnessIds, type AgentUpdates, type SystemInfo } from "@openorc/protocol";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { AgentConnections, AgentUpdateNotice } from "./settings-agent-updates";
+import { isPreviewCovered } from "../lib/browser-preview";
 import { queryClient } from "../lib/query";
 import { core } from "../lib/rpc";
 import { useRouter } from "../lib/router";
@@ -69,8 +70,11 @@ it("routes Review updates to Connections without installing anything", async () 
 });
 it("dismisses only the current release set", async () => {
   show(true);
-  fireEvent.click(await screen.findByRole("button", { name: "Dismiss agent updates" }));
+  const dismiss = await screen.findByRole("button", { name: "Dismiss agent updates" });
+  expect(isPreviewCovered()).toBe(true);
+  fireEvent.click(dismiss);
   await waitFor(() => expect(screen.queryByRole("button", { name: "Review updates" })).toBeNull());
+  expect(isPreviewCovered()).toBe(false);
   state = { ...state, agents: state.agents.map((row) => (row.id === "codex" ? { ...row, latestVersion: "1.2.0" } : row)) };
   await queryClient.invalidateQueries();
   expect(await screen.findByRole("button", { name: "Review updates" })).toBeTruthy();

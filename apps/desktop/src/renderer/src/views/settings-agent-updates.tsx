@@ -1,5 +1,6 @@
 import { agentUpdateStatus, agentConnectionStatus } from "./settings-presentation";
 import { agentUpdateNoticeKey, harnessCatalog, harnessFailsToStart, harnessIds, harnessInstalled, harnessLoggedIn, type AgentUpdate, type HarnessInfo, type SystemInfo } from "@openorc/protocol";
+import { CoversPreview } from "../lib/browser-preview";
 import { cn } from "../lib/cn";
 import { useRpc, useRpcMutation } from "../lib/query";
 import { useRouter } from "../lib/router";
@@ -177,6 +178,7 @@ export function AgentUpdateNotice() {
   const available = data.agents.filter((row) => row.status === "available");
   return (
     <aside className="agent-update-notice" aria-label="Agent updates" role="status">
+      <CoversPreview />
       <Download size={16} className="shrink-0 text-ink-3" />
       <div className="min-w-0 flex-1">
         <p>{available.length === 1 ? `${harnessCatalog[available[0]!.id].name} update available` : `${available.length} agent updates available`}</p>

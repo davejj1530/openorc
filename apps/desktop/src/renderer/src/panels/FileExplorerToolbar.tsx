@@ -3,6 +3,7 @@ import type { FileScope } from "@openorc/protocol";
 import { Check, MoreHorizontal, Plus, RefreshCw } from "../components/icons";
 import { menuItem, menuPopup } from "../components/menu";
 import { floatingGround } from "../lib/use-anchor-ground";
+import { CoversPreview } from "../lib/browser-preview";
 import { IconButton, Tooltip } from "../components/ui";
 import { queryClient } from "../lib/query";
 import { useUi } from "../lib/ui";
@@ -26,6 +27,7 @@ export function FileExplorerToolbar({ scope, showIgnored, onShowIgnored }: { sco
           <MoreHorizontal size={14} />
         </Menu.Trigger>
         <Menu.Portal>
+          <CoversPreview />
           <Menu.Positioner sideOffset={6} align="end" className="z-40" collisionPadding={8}>
             <Menu.Popup ref={floatingGround} className={menuPopup}>
               <Menu.CheckboxItem className={menuItem} checked={showIgnored} onCheckedChange={onShowIgnored}>

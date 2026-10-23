@@ -3,6 +3,7 @@ import { Popover } from "@base-ui/react/popover";
 import { Button, Textarea } from "./ui";
 import { growOffset } from "./menu";
 import { floatingGround } from "../lib/use-anchor-ground";
+import { CoversPreview } from "../lib/browser-preview";
 import "./CommitSheet.css";
 
 /**
@@ -45,6 +46,7 @@ export function CommitSheet({
     <Popover.Root open={open} onOpenChange={onOpenChange}>
       <Popover.Trigger render={trigger} className="commit-sheet-pill" />
       <Popover.Portal>
+        <CoversPreview />
         <Popover.Positioner side="bottom" align="end" sideOffset={growOffset} collisionPadding={8} className="z-50">
           <Popover.Popup ref={floatingGround} data-plane className="commit-sheet">
             <div className="commit-sheet-head commit-sheet-part">

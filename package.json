@@ -21,6 +21,7 @@
     "precommit": "lint-staged",
     "dev": "pnpm --filter @openorc/desktop dev",
     "dev:website": "pnpm --filter @openorc/website dev",
+    "dev:internal": "./.local-development/pnpm dev",
     "preview:design": "node scripts/design-preview.cjs",
     "qa:onboarding": "node scripts/onboarding-disposable-profile.cjs",
     "qa:packaged": "node scripts/packaged-runtime-smoke.cjs",

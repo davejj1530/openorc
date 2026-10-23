@@ -4,6 +4,7 @@ import { ChevronRight, Copy, ExternalLink, Folder, FolderOpen, MoreHorizontal, R
 import { Button, IconButton, Segmented, Tooltip } from "../components/ui";
 import { menuItem, menuPopup, menuSeparator } from "../components/menu";
 import { floatingGround } from "../lib/use-anchor-ground";
+import { CoversPreview } from "../lib/browser-preview";
 import { hasUnsavedEdits } from "../lib/file-buffer";
 import { relativeFilePath, useFileExplorer } from "../lib/file-explorer";
 import { filesKey } from "../lib/files-tool";
@@ -93,6 +94,7 @@ function FileMenu({ path, buffer }: { path: string; buffer: FileBuffer }) {
           <MoreHorizontal size={15} />
         </Menu.Trigger>
         <Menu.Portal>
+          <CoversPreview />
           <Menu.Positioner sideOffset={6} align="end" className="z-40" collisionPadding={8}>
             <Menu.Popup ref={floatingGround} className={menuPopup}>
               {binary ? (

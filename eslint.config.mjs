@@ -62,6 +62,20 @@ export default [
     plugins: { "react-hooks": reactHooks },
     rules: { "react-hooks/rules-of-hooks": "error", "react-hooks/exhaustive-deps": "error" },
   },
+  // The browser preview is a native view drawn above the whole window, so no z-index lifts a popup
+  // over it. A portal mounts CoversPreview to swap the page for a still while it is open.
+  {
+    files: ["apps/desktop/src/renderer/**/*.tsx"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "JSXElement[openingElement.name.property.name='Portal'][openingElement.name.object.name!='BaseTooltip']:not(:has(JSXIdentifier[name='CoversPreview']))",
+          message: "Mount <CoversPreview /> inside this portal, or the browser preview draws over it.",
+        },
+      ],
+    },
+  },
   // Application projects already check unused declarations with TypeScript.
   // Standalone TypeScript fixtures/configuration do not belong to those projects.
   {

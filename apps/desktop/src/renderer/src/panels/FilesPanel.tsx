@@ -2,7 +2,7 @@ import { useDeferredValue, useRef, type KeyboardEvent } from "react";
 import type { FileScope } from "@openorc/protocol";
 import { requestFilesFocus, useFilesFocus, useFilesToolState, type FilesMode } from "../lib/files-tool";
 import { useLayout } from "../lib/layout";
-import { useRpc } from "../lib/query";
+import { useRpc } from "../lib/client";
 import { useUi } from "../lib/ui";
 import { FileText, Plus, Search } from "../components/icons";
 import { IconButton, Input, Segmented, Tooltip } from "../components/ui";

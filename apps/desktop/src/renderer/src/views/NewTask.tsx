@@ -8,7 +8,7 @@ import { TopBar } from "../components/TopBar";
 import { Button, Empty, IconButton, Input, Select, TextButton } from "../components/ui";
 import { readDraft, removeDraft, writeDraft } from "../lib/drafts";
 import { useProjectGit } from "../lib/project-git";
-import { useRpc, useRpcMutation } from "../lib/query";
+import { useRpc, useRpcMutation } from "../lib/client";
 import { newThread, openTask, openThread, useRouter } from "../lib/router";
 import { useUi } from "../lib/ui";
 import { ExecutionLocationSelect } from "../components/TaskExecutionSettings";

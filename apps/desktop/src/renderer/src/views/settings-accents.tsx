@@ -1,23 +1,22 @@
 import { type CSSProperties } from "react";
 import { Check, ChevronRight } from "../components/icons";
 import { ColorRow } from "../components/ColorRow";
-import { themePresets, useTheme } from "../lib/theme";
-import { accentCombinations, accentRoles, accentTokens, combinationColors, resolveAccentColors } from "../lib/theme-accents";
-import { accentHex } from "../lib/accent-colors";
-import { overridesFor } from "../lib/theme-custom";
+import { useTheme } from "../lib/theme";
+import { accentCombinations, accentRoles, accentTokens, combinationColors, resolveAccentColors, accentHex, overridesFor, themePresets } from "@openorc/client/theme";
+import { toHex } from "../lib/color";
 import { Section } from "./settings-shared";
 
 export function AccentSettings({ report }: { report: (saved: boolean) => void }) {
   const { preset, resolved, custom, setAccent, setAccentCombination, resetAccents } = useTheme();
   const overrides = overridesFor(custom, preset, resolved);
   const base = themePresets.find((theme) => theme.id === preset)!.colors[resolved];
-  const colors = resolveAccentColors(base, overrides);
+  const colors = resolveAccentColors(base, overrides, toHex);
   const changed = accentTokens.some((token) => token in overrides);
   return (
     <Section flush title="Accent colors" description="Start with your theme's accents, or customize actions, navigation, and content. Light and dark keep separate choices.">
       <div className="accent-combinations" role="group" aria-label="Accent combinations">
         <button type="button" aria-pressed={!changed} onClick={() => report(resetAccents())}>
-          <AccentSwatches colors={accentRoles.map(({ token }) => accentHex(base[token]))} />
+          <AccentSwatches colors={accentRoles.map(({ token }) => accentHex(base[token], toHex))} />
           Palette default
         </button>
         {accentCombinations.map((combination) => {
@@ -34,7 +33,13 @@ export function AccentSettings({ report }: { report: (saved: boolean) => void })
         <div className="accent-role-controls">
           {accentRoles.map(({ token, label, description }) => (
             <div key={token} className="accent-role">
-              <ColorRow label={label} value={accentHex(colors[token])} changed={token in overrides} onChange={(value) => report(setAccent(token, value))} onReset={() => report(resetAccents(token))} />
+              <ColorRow
+                label={label}
+                value={accentHex(colors[token], toHex)}
+                changed={token in overrides}
+                onChange={(value) => report(setAccent(token, value))}
+                onReset={() => report(resetAccents(token))}
+              />
               <p>{description}</p>
             </div>
           ))}

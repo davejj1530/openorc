@@ -5,7 +5,7 @@ import { PageFilters } from "../components/PageFilters";
 import { TopBar } from "../components/TopBar";
 import { Badge, Button, Empty, Input, Segmented, Switch, TextButton } from "../components/ui";
 import { useLayout } from "../lib/layout";
-import { queryClient, useRpc } from "../lib/query";
+import { queryClient, useRpc } from "../lib/client";
 import { newThread, useRouter } from "../lib/router";
 import { useTeamEditor } from "../lib/use-team-editor";
 import { useUi } from "../lib/ui";

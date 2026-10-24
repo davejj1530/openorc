@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { readDraft, removeDraft, writeDraft } from "./drafts";
-import { useRpcMutation } from "./query";
+import { useRpcMutation } from "./client";
 
 /** The local copy survives navigation; the delayed server copy follows it. */
 export function useConversationDraft({ draftKey, threadId, initialText }: { draftKey: string; threadId: string | null; initialText: string }) {

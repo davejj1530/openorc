@@ -2,7 +2,7 @@ import { Plus } from "../components/icons";
 import { useState } from "react";
 import { TopBar } from "../components/TopBar";
 import { Button, Empty, Segmented } from "../components/ui";
-import { useRpc } from "../lib/query";
+import { useRpc } from "../lib/client";
 import { newThread, useRouter } from "../lib/router";
 import { WORKSPACE_ID } from "@openorc/protocol";
 import { TaskRows } from "./TaskList";

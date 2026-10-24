@@ -1,6 +1,6 @@
 import { useContext, useEffect, useState } from "react";
 import { ConversationVoice } from "../lib/turn-authors";
-import { workDuration } from "../lib/work-transcript";
+import { workDuration } from "@openorc/client";
 import { AgentOrb } from "./AgentOrb";
 
 /** Seconds since `since`, ticking only while `active`; a resting orb needs no timer. */

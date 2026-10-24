@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Conversation } from "../components/Conversation";
 import { ThreadHeader, ThreadHeaderPlaceholder } from "../components/ThreadHeader";
 import { useLayout } from "../lib/layout";
-import { useRpc, useRpcMutation } from "../lib/query";
+import { useRpc, useRpcMutation } from "../lib/client";
 import { useConversationPlans } from "../lib/conversation-plans";
 import { useRouter } from "../lib/router";
 

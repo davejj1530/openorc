@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { executionModeAvailable, executionModePresentation, type AgentKind, type PermissionPreset, type ThreadSummary } from "@openorc/protocol";
-import { useRpcMutation } from "../lib/query";
+import { useRpcMutation } from "../lib/client";
 import { useConversationPlans } from "../lib/conversation-plans";
 import { Button, Input, Select, TextButton } from "./ui";
 import { RichText } from "./RichText";

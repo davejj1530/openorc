@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { useLayout } from "../lib/layout";
-import { useRpc } from "../lib/query";
+import { useRpc } from "../lib/client";
 import { MAX_THREAD_PANES, useRouter } from "../lib/router";
 import { core } from "../lib/rpc";
 import { threadDragId } from "../lib/thread-drag";

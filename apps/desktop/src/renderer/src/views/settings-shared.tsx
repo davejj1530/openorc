@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import type { RpcParams, RpcResults } from "@openorc/protocol";
 import { Button, Switch } from "../components/ui";
-import { queryClient, useRpc, useRpcMutation } from "../lib/query";
+import { queryClient, useRpc, useRpcMutation } from "../lib/client";
 
 const preferenceQueries = { "app.settings.set": "app.settings.get", "memory.settings.set": "memory.settings.get", "textGeneration.settings.set": "textGeneration.settings.get" } as const;
 

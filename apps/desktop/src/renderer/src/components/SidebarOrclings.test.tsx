@@ -4,14 +4,14 @@ import type { ReactNode } from "react";
 import { defaultOrclingLook, type ThreadMessage } from "@openorc/protocol";
 
 const { lastMessages } = vi.hoisted(() => ({ lastMessages: new Map<string, ThreadMessage>() }));
-vi.mock("../lib/query", () => {
+vi.mock("../lib/client", async (original) => {
   const rpcData = (method: string, params: { id?: string }) => {
     if (method === "orclings.list") return ["Opi", "Rini", "Nova"].map((name) => ({ id: name, name, threadId: `${name}-thread`, look: defaultOrclingLook }));
     if (method === "threads.get") return { id: params.id, projectId: "workspace", activity: "idle", unread: false, session: { status: "idle", message: null } };
     if (method === "threads.lastMessage") return lastMessages.get(params.id ?? "") ?? null;
     return undefined;
   };
-  return { useRpc: (method: string, params: { id?: string }) => ({ data: rpcData(method, params) }) };
+  return { ...(await original<object>()), useRpc: (method: string, params: { id?: string }) => ({ data: rpcData(method, params) }) };
 });
 vi.mock("./ui", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./ui")>()),

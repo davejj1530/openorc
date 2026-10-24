@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { commentRecipientKey, type CommentAttempt, type CommentRecipient, type TaskComment } from "@openorc/protocol";
 import { readDraft, writeDraft } from "../lib/drafts";
-import { useRpcMutation } from "../lib/query";
+import { useRpcMutation } from "../lib/client";
 
 type CommentDraft = { body: string; recipients: CommentRecipient[]; replyTo?: string; requestKey: string };
 type DraftEdit =

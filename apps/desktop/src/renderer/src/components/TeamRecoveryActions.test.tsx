@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, expect, it, vi } from "vitest";
-import { queryClient } from "../lib/query";
+import { queryClient } from "../lib/client";
 import { core } from "../lib/rpc";
 import { beginTeamDeleteRequest, readTeamDeleteRequest } from "../lib/team-delete-request";
 import { TeamRecoveryActions } from "./TeamRecoveryActions";

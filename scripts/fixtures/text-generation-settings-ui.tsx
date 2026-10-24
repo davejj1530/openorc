@@ -13,7 +13,7 @@ import {
 } from "../../packages/protocol/src/index";
 import { TextGenerationSettings } from "../../apps/desktop/src/renderer/src/views/settings-text-generation";
 import { core } from "../../apps/desktop/src/renderer/src/lib/rpc";
-import { queryClient } from "../../apps/desktop/src/renderer/src/lib/query";
+import { queryClient } from "../../apps/desktop/src/renderer/src/lib/client";
 import { useTheme, type ThemeChoice } from "../../apps/desktop/src/renderer/src/lib/theme";
 
 let state: { provider: Preferences["provider"]; models: Record<string, string | null> } = JSON.parse(localStorage.getItem("text-preferences") ?? '{"provider":"auto","models":{}}');

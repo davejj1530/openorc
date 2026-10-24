@@ -1,10 +1,10 @@
 /** Synthetic tool results in the production transcript; no provider calls or user data. */
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { createRoot } from "react-dom/client";
 import type { AgentEvent } from "@openorc/protocol";
 import { ThreadMedia } from "../../apps/desktop/src/renderer/src/components/ThreadImages";
 import { TranscriptContents } from "../../apps/desktop/src/renderer/src/components/Transcript";
-import { applyFrame, getRun, hydrate, resetTranscripts, useTranscripts } from "../../apps/desktop/src/renderer/src/lib/transcript";
+import { runs } from "../../apps/desktop/src/renderer/src/lib/client";
 import { core } from "../../apps/desktop/src/renderer/src/lib/rpc";
 import { useTheme } from "../../apps/desktop/src/renderer/src/lib/theme";
 
@@ -57,13 +57,13 @@ function selectSample(name: string) {
     { type: "tool.started", runId, ts: 1000, toolCallId: "search", name: "reference.search_screens", input: { query: "Appearance preferences", limit: 3 }, parentToolCallId: null },
     { type: "tool.completed", runId, ts: 2000, toolCallId: "search", name: "reference.search_screens", output: samples[name], isError: false },
   ];
-  resetTranscripts();
-  applyFrame({ runId, seq: 1, events: ledger });
+  runs.reset();
+  runs.applyFrame({ runId, seq: 1, events: ledger });
 }
 Object.assign(core, { call: async (method: string) => (method === "events.page" ? { events: JSON.parse(JSON.stringify(ledger)), fromTurn: 0, live: false } : null) });
 selectSample("Codex");
 function App() {
-  useTranscripts((s) => s.runs);
+  useSyncExternalStore(runs.subscribe, runs.snapshot);
   const [selected, setSelected] = useState("Codex");
   const [generation, setGeneration] = useState(0);
   const theme = useTheme((s) => s.resolved);
@@ -92,8 +92,8 @@ function App() {
           <button
             className="rounded-md bg-surface-2 px-3 py-2 text-sm"
             onClick={async () => {
-              resetTranscripts();
-              await hydrate(runId);
+              runs.reset();
+              await runs.hydrate(runId);
               setGeneration((n) => n + 1);
             }}
           >
@@ -101,7 +101,7 @@ function App() {
           </button>
         </div>
         <ThreadMedia key={generation} scopeKey={runId}>
-          <TranscriptContents runId={runId} blocks={[...(getRun(runId)?.blocks ?? [])]} groupTools={false} />
+          <TranscriptContents runId={runId} blocks={[...(runs.get(runId)?.blocks ?? [])]} groupTools={false} />
         </ThreadMedia>
       </div>
     </main>

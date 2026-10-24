@@ -3,9 +3,9 @@ import { harnessName, type Project, type Task, type TaskPriority, type TaskStatu
 import { Copy, MessageSquare, Play, Trash2 } from "../components/icons";
 import { PriorityIcon, priorityLabel, priorityOrder, statusLabel, statusOrder } from "../components/status";
 import { Badge, Button, Dialog, Field, IconButton, Input, Select, StatusDot, Textarea, TextButton } from "../components/ui";
-import { useRpc, useRpcMutation } from "../lib/query";
+import { useRpc, useRpcMutation } from "../lib/client";
 import { newThread, openTask, openThread } from "../lib/router";
-import { formatBytes, relativeTime, shortSha } from "../lib/time";
+import { formatBytes, relativeTime, shortSha } from "@openorc/client";
 import { TeamTaskAdmissions, TeamTaskStart } from "../components/TeamTaskStart";
 import { DeleteRetainedOwnerContent } from "../components/TeamRetainedDelete";
 import { useTaskFields } from "./useTaskFields";

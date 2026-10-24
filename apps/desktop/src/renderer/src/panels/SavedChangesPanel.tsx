@@ -1,7 +1,7 @@
 import { lazy, Suspense, type ReactNode } from "react";
 import { Button } from "../components/ui";
 import { PanelBar, PanelBarMeta } from "../components/PanelBar";
-import { useRpc } from "../lib/query";
+import { useRpc } from "../lib/client";
 import { useLayout, type ChangeSelection } from "../lib/layout";
 
 const DiffView = lazy(() => import("../components/DiffView").then((module) => ({ default: module.DiffView })));

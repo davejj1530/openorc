@@ -2,11 +2,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import type { AgentEvent, ProviderUsage } from "@openorc/protocol";
-import { applyFrame, getRun, hydrate, resetTranscripts, type Block } from "../lib/transcript";
+import { runs } from "../lib/client";
+import { type Block } from "@openorc/client";
 import { core } from "../lib/rpc";
 import { TeamWorkTranscript } from "./TeamWorkTranscript";
 import { Transcript, WorkTranscript, groupBlocks, groupSummary, AgentPresence } from "./Transcript";
-vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onFrame: vi.fn(), onInvalidate: vi.fn(), onReady: vi.fn() } }));
+vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: () => () => {} } }));
 vi.mock("./ThreadImages", () => ({
   ThreadRichText: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   ThreadMedia: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -189,13 +190,13 @@ it.each([["individual", WorkTranscript]] as const)("keeps failed attempts in %s 
     { ...base, type: "message.completed", messageId: "final", role: "assistant", text: "Verified all 37 tests." },
     { ...base, type: "turn.completed", turnId: "turn", status: "success", durationMs: 381000 },
   ];
-  applyFrame({ runId, seq: 1, events: events.slice(0, 3) });
-  const { rerender, unmount } = render(<Component runId={runId} blocks={getRun(runId)!.blocks} live />);
+  runs.applyFrame({ runId, seq: 1, events: events.slice(0, 3) });
+  const { rerender, unmount } = render(<Component runId={runId} blocks={runs.get(runId)!.blocks} live />);
   expect(screen.queryByRole("button", { name: /pnpm test.*Failed/ })).toBeNull();
   expect(screen.getByRole("button", { name: "Running the tests" })).toBeTruthy();
 
-  applyFrame({ runId, seq: 2, events: events.slice(3) });
-  rerender(<Component runId={runId} blocks={getRun(runId)!.blocks} />);
+  runs.applyFrame({ runId, seq: 2, events: events.slice(3) });
+  rerender(<Component runId={runId} blocks={runs.get(runId)!.blocks} />);
   expect(receipt().getAttribute("aria-label")).toContain("tests passed");
   expect(receipt().getAttribute("aria-expanded")).toBe("false");
   expect(document.querySelector(".turn-head")!.textContent).toContain("6m 21s");
@@ -203,10 +204,10 @@ it.each([["individual", WorkTranscript]] as const)("keeps failed attempts in %s 
   expect(screen.getByText("Verified all 37 tests.")).toBeTruthy();
 
   unmount();
-  resetTranscripts();
+  runs.reset();
   vi.mocked(core.call).mockResolvedValue({ events, fromTurn: 0, live: false });
-  await hydrate(runId);
-  render(<Component runId={runId} blocks={getRun(runId)!.blocks} />);
+  await runs.hydrate(runId);
+  render(<Component runId={runId} blocks={runs.get(runId)!.blocks} />);
   expect(screen.queryByRole("button", { name: /.*Failed/ })).toBeNull();
   fireEvent.click(receipt());
   expect(screen.queryByRole("button", { name: /.*Failed/ })).toBeNull();
@@ -274,8 +275,8 @@ it("keeps quota recovery visible when work is collapsed and preserves it through
   const navigate = vi.spyOn(useRouter.getState(), "navigate");
   const event: AgentEvent = { type: "activity.updated", runId: "quota", ts: 1, activityId: "limit", label: "Rate limit reached", status: "error", recovery: { kind: "usage", provider: "claude" } };
   vi.mocked(core.call).mockResolvedValueOnce({ events: [event], fromTurn: 0, live: false } as never);
-  await hydrate("quota");
-  const run = getRun("quota")!;
+  await runs.hydrate("quota");
+  const run = runs.get("quota")!;
   expect(run.blocks[0]).toMatchObject({ recovery: { kind: "usage", provider: "claude" } });
   render(<WorkTranscript runId="quota" blocks={[...run.blocks, { ...end, outcome: "error" }]} />);
   fireEvent.click(screen.getByRole("button", { name: "Manage usage" }));
@@ -346,9 +347,9 @@ it("offers an available Codex reset where the limit surfaced and uses it only af
 
 it("shows a manual compaction between turns as finished work, not a turn under way", () => {
   // The events core recorded on 2026-10-20 for a Claude thread's /compact, between two turns of one warm session.
-  resetTranscripts();
+  runs.reset();
   const runId = "7c17e6fe-855f-4133-816e-a3ec9a25b00e";
-  const frame = (seq: number, events: AgentEvent[]) => applyFrame({ runId, seq, events });
+  const frame = (seq: number, events: AgentEvent[]) => runs.applyFrame({ runId, seq, events });
   const heads = () => [...document.querySelectorAll(".turn-head")].map((head) => head.getAttribute("data-state"));
   frame(1, [
     { type: "session.started", runId, ts: 1792467848859, agent: "claude", externalSessionId: "dd1b0fd3-115e-4d6d-8274-0001c648144c", model: "claude-opus-5-5" },
@@ -359,7 +360,7 @@ it("shows a manual compaction between turns as finished work, not a turn under w
     { type: "activity.updated", runId, ts: 1792476274142, activityId: "compaction-1", label: "Compacting context", status: "running", detail: { mode: "manual" } },
   ]);
   // Core reports the thread busy while it compacts: the head and the live row say so.
-  const { rerender } = render(<Transcript run={getRun(runId)!} working />);
+  const { rerender } = render(<Transcript run={runs.get(runId)!} working />);
   expect(heads()).toEqual(["done", "working"]);
   expect(document.querySelector(".tool-row-live")).toBeTruthy();
   expect(document.body.textContent).toContain("Compacting context");
@@ -384,8 +385,8 @@ it("shows a manual compaction between turns as finished work, not a turn under w
     },
   ]);
   // The compaction ended and core reports the thread idle; the session stays open for the next message.
-  rerender(<Transcript run={getRun(runId)!} working={false} />);
-  expect(getRun(runId)!.live).toBe(true);
+  rerender(<Transcript run={runs.get(runId)!} working={false} />);
+  expect(runs.get(runId)!.live).toBe(true);
   expect(heads()).toEqual(["done", "done"]);
   expect(document.querySelector(".tool-row-live")).toBeNull();
   expect(document.querySelector(".work-now")).toBeNull();
@@ -396,6 +397,6 @@ it("shows a manual compaction between turns as finished work, not a turn under w
     { type: "turn.started", runId, ts: 1792476572650, turnId: "a1288048-7abe-43a4-8741-11e5680ce322" },
   ]);
   // The next prompt opens a turn before core's busy flag reaches the view.
-  rerender(<Transcript run={getRun(runId)!} working={false} />);
+  rerender(<Transcript run={runs.get(runId)!} working={false} />);
   expect(heads()).toEqual(["done", "done", "working"]);
 });

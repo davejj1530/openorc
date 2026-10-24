@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { WORKSPACE_ID, type Task, type WorkspaceMode } from "@openorc/protocol";
 import { useProjectGit } from "../lib/project-git";
-import { useRpc, useRpcMutation } from "../lib/query";
+import { useRpc, useRpcMutation } from "../lib/client";
 import { useUi } from "../lib/ui";
 import { Select, TextButton } from "./ui";
 import { taskExecutionDisabledReason } from "../lib/task-execution-availability";

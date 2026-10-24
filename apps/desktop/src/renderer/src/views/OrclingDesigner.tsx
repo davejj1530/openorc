@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { defaultOrclingLook, isHarnessId, orclingHandle, type Orcling, type OrclingDraft, type OrclingLook, type OrclingLookPart, type OrclingPermission } from "@openorc/protocol";
 import { cn } from "../lib/cn";
-import { defaultChoice, pickerCatalog, type ModelChoice } from "../lib/model-picker-selection";
+import { defaultChoice, pickerCatalog, type ModelChoice } from "@openorc/client";
 import { useOrclings } from "../lib/orclings";
-import { useRpcMutation } from "../lib/query";
+import { useRpcMutation } from "../lib/client";
 import { openThread, useRouter } from "../lib/router";
 import { useModelCatalog } from "../lib/use-model-catalog";
 import { ArrowLeft } from "../components/icons";

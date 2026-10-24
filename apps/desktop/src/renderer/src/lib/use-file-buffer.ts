@@ -6,7 +6,7 @@ import { closeEditorSession } from "../components/code-editor";
 import { afterSave, bufferText, bufferView, draftAfterEdit, formatRequest, hasUnsavedEdits, isEditable, keepMine, saveRequest, type BufferView } from "./file-buffer";
 import { fileKey, flushDrafts, loadDraft, putDraft, useDrafts, type FileKey } from "./file-drafts";
 import type { FileSelection } from "./layout";
-import { queryClient, useRpc } from "./query";
+import { queryClient, useRpc } from "./client";
 import { core } from "./rpc";
 
 type ReadParams = RpcParams<"files.read">;

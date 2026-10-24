@@ -4,11 +4,9 @@ import { WorkAgent, WorkDelegate, Loader2, AlertCircle, ArrowUpRight, Check, Che
 import { statusLabel } from "./status";
 import { Button, TextButton } from "./ui";
 import { cn } from "../lib/cn";
-import { useRpc, useRpcMutation } from "../lib/query";
+import { useRpc, useRpcMutation, runs as runStore, useRun } from "../lib/client";
 import { openTask, openThread } from "../lib/router";
-import { relativeTime } from "../lib/time";
-import { hydrate, useRun } from "../lib/transcript";
-import { taskActivity, taskCardStatusLabel, taskStepLabel } from "../lib/task-progress";
+import { relativeTime, taskActivity, taskCardStatusLabel, taskStepLabel } from "@openorc/client";
 
 function taskActivityIcon({ waiting, failed, working, finished, successful }: { waiting: boolean; failed: boolean; working: boolean; finished: boolean; successful: boolean }) {
   if (waiting || failed) return <AlertCircle size={14} className={cn("shrink-0", failed ? "text-bad" : "text-warn")} />;
@@ -27,6 +25,14 @@ function taskStepIcon({ failed, done, working }: { failed: boolean; done: boolea
   if (failed) return <AlertCircle size={12} className="shrink-0 text-bad" />;
   if (done) return <Check size={12} className="shrink-0" />;
   return <LoaderCircle size={12} className={cn("shrink-0", working && "animate-spin")} />;
+}
+
+/** Loads the run's newest turn again after a failed load, and clears the error once it is here. */
+function retryHistory(runId: string, loaded: () => void): void {
+  void runStore
+    .hydrate(runId, { turns: 1 })
+    .then(loaded)
+    .catch(() => {});
 }
 
 /**
@@ -48,12 +54,12 @@ export function TaskCard({ taskId, compact = false }: { taskId: string; compact?
   // ones only until those are all here.
   useEffect(() => {
     setHistoryError(null);
-    if (liveRun) void hydrate(liveRun.id, { turns: 1 }).catch(() => setHistoryError("Could not load the task's activity."));
+    if (liveRun) void runStore.hydrate(liveRun.id, { turns: 1 }).catch(() => setHistoryError("Could not load the task's activity."));
   }, [liveRun?.id]);
   useEffect(() => {
     if (!liveRun || !liveTranscript?.hydrated || liveTranscript.fromTurn === 0) return;
     const shown = taskActivity(liveTranscript.blocks);
-    if (shown.steps.length < 3 || !shown.message) void hydrate(liveRun.id, { fromTurn: liveTranscript.fromTurn - 1 }).catch(() => setHistoryError("Could not load the task's activity."));
+    if (shown.steps.length < 3 || !shown.message) void runStore.hydrate(liveRun.id, { fromTurn: liveTranscript.fromTurn - 1 }).catch(() => setHistoryError("Could not load the task's activity."));
   }, [liveRun, liveTranscript]);
   const activity = taskActivity(liveTranscript?.blocks ?? []);
   const finished = Boolean(liveRun?.endedAt);
@@ -176,10 +182,7 @@ export function TaskCard({ taskId, compact = false }: { taskId: string; compact?
             onClick={() => {
               void runs.refetch();
               void task.refetch();
-              if (liveRun)
-                void hydrate(liveRun.id, { turns: 1 })
-                  .then(() => setHistoryError(null))
-                  .catch(() => {});
+              if (liveRun) retryHistory(liveRun.id, () => setHistoryError(null));
             }}
           >
             Retry

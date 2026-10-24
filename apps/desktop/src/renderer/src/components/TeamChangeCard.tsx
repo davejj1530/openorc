@@ -1,5 +1,5 @@
 import { ChangeCard } from "./ChangeCard";
-import { useRpc } from "../lib/query";
+import { useRpc } from "../lib/client";
 import type { RpcParams } from "@openorc/protocol";
 import { useLayout } from "../lib/layout";
 

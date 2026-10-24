@@ -4,10 +4,10 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { PullRequestSummary } from "@openorc/protocol";
 import { core } from "../lib/rpc";
 import { useLayout } from "../lib/layout";
-import { queryClient } from "../lib/query";
+import { queryClient } from "../lib/client";
 import { PullRequestList } from "./PullRequestList";
 
-vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onInvalidate: vi.fn(), onReady: vi.fn() } }));
+vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: () => () => {} } }));
 vi.mock("../components/TopBar", () => ({ TopBar: () => null }));
 
 const pull = (number: number, title: string) =>

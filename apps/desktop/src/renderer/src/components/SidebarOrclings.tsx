@@ -3,7 +3,7 @@ import { cn } from "../lib/cn";
 import { useLayout } from "../lib/layout";
 import { messagePreview } from "../lib/message-preview";
 import { useOrclings } from "../lib/orclings";
-import { useRpc } from "../lib/query";
+import { useRpc } from "../lib/client";
 import { useRouter, type Route } from "../lib/router";
 import { Plus } from "./icons";
 import { OrclingAvatar } from "./OrclingAvatar";

@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, renderHook, screen } from "@testing-li
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { AgentEvent, Project, Run, ThreadSummary } from "@openorc/protocol";
-import { applyFrame, flushTranscripts, resetTranscripts } from "../lib/transcript";
+import { runs as runStore } from "../lib/client";
 import { core } from "../lib/rpc";
 import { Conversation } from "./Conversation";
 import { ThreadChangeCard } from "./ThreadChangeCard";
@@ -13,7 +13,8 @@ const restore = vi.hoisted(() => vi.fn(async () => undefined));
 vi.mock("../lib/rpc", () => ({
   core: new Proxy({ call: vi.fn() } as Record<string, unknown>, { get: (target, key: string) => (key in target ? target[key] : () => () => undefined) }),
 }));
-vi.mock("../lib/query", () => ({
+vi.mock("../lib/client", async (original) => ({
+  ...(await original<object>()),
   useRpc: (method: string) => ({ data: queries.get(method), isLoading: false, isPending: false, isError: false, error: null, refetch: () => undefined }),
   useRpcMutation: () => ({ mutate: () => undefined, mutateAsync: restore, isPending: false, error: null }),
   invalidateTags: () => undefined,
@@ -82,12 +83,12 @@ const view = () => (
 );
 const settle = async () => {
   for (let i = 0; i < 6; i++) await act(async () => void (await new Promise((resolve) => setTimeout(resolve, 0))));
-  act(() => flushTranscripts());
+  act(() => runStore.flush());
 };
 const answers = (container: HTMLElement, runId: string) => (container.textContent?.match(new RegExp(`${runId} answer \\d`, "g")) ?? []).length;
 
 beforeEach(() => {
-  resetTranscripts();
+  runStore.reset();
   ledger.clear();
   queries.clear();
   restore.mockClear();
@@ -111,8 +112,8 @@ it("keeps the earlier conversation in view while a new run starts", async () => 
   const prompt: AgentEvent[] = [{ type: "message.completed", runId: "C", ts: 50_000, messageId: "C-ask", role: "user", text: "next please", eventId: next() }];
   ledger.set("C", prompt);
   act(() => {
-    applyFrame({ runId: "C", seq: 1, events: prompt });
-    flushTranscripts();
+    runStore.applyFrame({ runId: "C", seq: 1, events: prompt });
+    runStore.flush();
   });
   queries.set("runs.listForThread", [run("A", 1000), run("C", 50_000)]);
   rerender(view());
@@ -127,8 +128,8 @@ it("reaches back past a live run seen from its start to the runs before it", asy
   const live = session("C", 1, 50_000, false);
   ledger.set("C", live);
   act(() => {
-    applyFrame({ runId: "C", seq: 1, events: live });
-    flushTranscripts();
+    runStore.applyFrame({ runId: "C", seq: 1, events: live });
+    runStore.flush();
   });
   queries.set("runs.listForThread", [run("A", 1000), run("C", 50_000)]);
   const { container } = render(view());
@@ -166,8 +167,8 @@ it("places each checkpoint after its completed turn and preserves cards while th
     ["turn-A-turn-1", { checkpointId: "second", previousCheckpointId: "first", paths: [] }],
   ]);
   act(() => {
-    applyFrame({ runId: "A", seq: 1, events: [{ type: "message.delta", runId: "A", ts: 2000, messageId: "next-reply", role: "assistant", text: "Working", eventId: next() }] });
-    flushTranscripts();
+    runStore.applyFrame({ runId: "A", seq: 1, events: [{ type: "message.delta", runId: "A", ts: 2000, messageId: "next-reply", role: "assistant", text: "Working", eventId: next() }] });
+    runStore.flush();
   });
   expect(result.current.merged?.blocks.at(-1)).toMatchObject({ text: "Working", streaming: true });
   expect(result.current.footers).toBe(footers);

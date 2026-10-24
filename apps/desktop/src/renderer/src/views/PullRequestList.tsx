@@ -9,10 +9,10 @@ import { Badge, Button, Empty, IconButton, metaSlot, Segmented, StatusDot, Toolt
 import { cn } from "../lib/cn";
 import { useLayout } from "../lib/layout";
 import { matchesPullRequest, onGitHub, pullRequestFilters, pullRequestDot, pullRequestTone, pullRequestToneLabel, reviewDecisionLabel } from "../lib/pull-requests";
-import { tagsFor, useRpc } from "../lib/query";
+import { tagsFor, relativeTime } from "@openorc/client";
+import { useRpc } from "../lib/client";
 import { core } from "../lib/rpc";
 import { openPullRequest } from "../lib/router";
-import { relativeTime } from "../lib/time";
 import "./pull-requests.css";
 
 const emptyTitle: Record<PullRequestFilter, string> = {

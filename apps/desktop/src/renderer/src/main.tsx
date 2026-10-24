@@ -4,7 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { App } from "./App";
 import { StartupNotice } from "./components/StartupNotice";
 import { core } from "./lib/rpc";
-import { queryClient } from "./lib/query";
+import { queryClient } from "./lib/client";
 import { installAutorun } from "./lib/autorun";
 import { installDiffRefresh } from "./lib/diff-refresh";
 import { installNotifications } from "./lib/notifications";
@@ -12,7 +12,7 @@ import { installWindowState } from "./lib/window";
 import "./lib/theme";
 import "./lib/app-font";
 import "./lib/code-font";
-import "./lib/transcript";
+
 import "./app.css";
 
 installAutorun();

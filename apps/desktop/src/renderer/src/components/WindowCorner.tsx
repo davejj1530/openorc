@@ -2,9 +2,8 @@ import { Inbox, PanelLeft, Search } from "./icons";
 import { cn } from "../lib/cn";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
 import { useLayout } from "../lib/layout";
-import { useRpc } from "../lib/query";
+import { useRpc, usePendingApprovals } from "../lib/client";
 import { useRouter } from "../lib/router";
-import { usePendingApprovals } from "../lib/transcript";
 import { useUi } from "../lib/ui";
 import { CountBadge, IconButton, Tooltip } from "./ui";
 

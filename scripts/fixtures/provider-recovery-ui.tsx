@@ -8,7 +8,7 @@ import { ProviderUsageOverview } from "../../apps/desktop/src/renderer/src/views
 import { ModelPicker, type ModelChoice } from "../../apps/desktop/src/renderer/src/components/ModelPicker";
 import { WorkTranscript } from "../../apps/desktop/src/renderer/src/components/Transcript";
 import { core } from "../../apps/desktop/src/renderer/src/lib/rpc";
-import { queryClient } from "../../apps/desktop/src/renderer/src/lib/query";
+import { queryClient } from "../../apps/desktop/src/renderer/src/lib/client";
 import { useTheme } from "../../apps/desktop/src/renderer/src/lib/theme";
 
 const now = Date.now();

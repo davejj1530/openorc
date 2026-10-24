@@ -6,7 +6,7 @@ import { HarnessLogo } from "../components/HarnessLogo";
 import { ChevronDown, ExternalLink, RefreshCw } from "../components/icons";
 import { allowanceState, formatUsageTime, percentLeft, usageResetLabel } from "../lib/provider-usage";
 import { useEffect, useId, useRef, useState } from "react";
-import { useRpc } from "../lib/query";
+import { useRpc } from "../lib/client";
 import { cn } from "../lib/cn";
 
 export function ProviderUsageOverview({ active }: { active: boolean }) {

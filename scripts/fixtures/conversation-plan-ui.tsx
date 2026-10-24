@@ -6,7 +6,7 @@ import { Composer } from "../../apps/desktop/src/renderer/src/components/Compose
 import { Panel } from "../../apps/desktop/src/renderer/src/components/Panel";
 import { useLayout } from "../../apps/desktop/src/renderer/src/lib/layout";
 import { core } from "../../apps/desktop/src/renderer/src/lib/rpc";
-import { queryClient } from "../../apps/desktop/src/renderer/src/lib/query";
+import { queryClient } from "../../apps/desktop/src/renderer/src/lib/client";
 
 import { useTheme } from "../../apps/desktop/src/renderer/src/lib/theme";
 

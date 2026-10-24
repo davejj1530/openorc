@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import type { MatchGroup, MatchLine } from "../lib/tool-text";
+import type { MatchGroup, MatchLine } from "@openorc/client";
 import { FileGlyph } from "./FileGlyph";
 import { ThreadLink } from "./ThreadImages";
 import "./ToolDetail.css";

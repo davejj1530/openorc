@@ -6,7 +6,7 @@ import { TaskStart } from "./TaskStart";
 import { core } from "../lib/rpc";
 import { useRouter } from "../lib/router";
 
-vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onInvalidate: vi.fn(), onReady: vi.fn() } }));
+vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: () => () => {} } }));
 const task: Task = {
   id: "task",
   projectId: "project",

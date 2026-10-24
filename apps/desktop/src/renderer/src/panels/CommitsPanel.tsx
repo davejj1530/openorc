@@ -3,10 +3,10 @@ import type { Commit, Project, PushState, Task, TeamActionAvailability, ThreadSu
 import { Upload } from "../components/icons";
 import { Badge, Button, Empty } from "../components/ui";
 import { PanelBar, PanelNotice } from "../components/PanelBar";
-import { useRpc, useRpcMutation } from "../lib/query";
+import { useRpc, useRpcMutation } from "../lib/client";
 import { teamGitActions } from "../lib/team-git-actions";
 import { useThreadMutationPending } from "../lib/thread-mutations";
-import { relativeTime, shortSha } from "../lib/time";
+import { relativeTime, shortSha } from "@openorc/client";
 import { ThreadPullRequest } from "./ThreadPullRequest";
 
 /** A task's branch, a thread's workspace, or the project's checkout outside any conversation. */

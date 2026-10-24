@@ -2,7 +2,7 @@ import { useRef } from "react";
 import { harnessShortName, isHarnessId } from "@openorc/protocol";
 import { cn } from "../lib/cn";
 import { useRunVoice, useTurnAuthor } from "../lib/turn-authors";
-import { workDuration } from "../lib/work-transcript";
+import { workDuration } from "@openorc/client";
 import { HarnessLogo } from "./HarnessLogo";
 
 /** Where a turn stands, as its head says it: working with its clock, writing the reply, or done, failed or stopped. */

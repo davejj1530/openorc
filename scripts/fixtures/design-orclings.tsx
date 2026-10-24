@@ -11,7 +11,7 @@ import { ArrowLeft, ArrowUpRight, Check, Settings } from "../../apps/desktop/src
 import { useLayout } from "../../apps/desktop/src/renderer/src/lib/layout";
 import { useRouter } from "../../apps/desktop/src/renderer/src/lib/router";
 import { OrclingsRailContext } from "../../apps/desktop/src/renderer/src/lib/orclings-rail";
-import type { ModelChoice } from "../../apps/desktop/src/renderer/src/lib/model-picker-selection";
+import type { ModelChoice } from "../../packages/client/src/index";
 import { OrclingStill } from "../../apps/desktop/src/renderer/src/components/OrclingAvatar";
 import { ORCLING_SHAPES, ORCLING_BODY_COLORS, ORCLING_EYES, ORCLING_GLASSES, ORCLING_ACCESSORIES, ORCLING_TEXTURES } from "../../apps/desktop/src/renderer/src/components/orcling-art";
 import "./design-orclings.css";

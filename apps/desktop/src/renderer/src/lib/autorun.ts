@@ -3,7 +3,8 @@ import { core } from "./rpc";
 import { openThread, routeFromSpec, useRouter } from "./router";
 import { beginBenchmarkFrames, finishBenchmarkFrames, receivedTotals, startStats, useStats } from "./stats";
 import { useTheme } from "./theme";
-import { useTranscripts, type Block } from "./transcript";
+import { runs } from "./client";
+import { type Block } from "@openorc/client";
 import { useUi } from "./ui";
 
 /**
@@ -224,8 +225,8 @@ function installSmoke(repo: string, prompt: string | null, agent: HarnessId): vo
         await new Promise<void>((resolve, reject) => {
           const timer = setTimeout(() => reject(new Error("run did not finish a turn in 240 s")), 240_000);
           let closed = false;
-          const unsubscribe = useTranscripts.subscribe((state) => {
-            const t = state.runs.get(run.id);
+          const unsubscribe = runs.subscribe((published) => {
+            const t = published.get(run.id);
             if (!t) return;
             for (const b of t.blocks) {
               if (b.kind === "approval" && !b.decision && !resolved.has(`${run.id}:${b.approvalId}`)) {
@@ -260,7 +261,7 @@ function installSmoke(repo: string, prompt: string | null, agent: HarnessId): vo
         const diff = await core.call("review.diff", { taskId: task.id });
         const fresh = await core.call("tasks.get", { id: task.id });
         const runsAfter = await core.call("runs.listForTask", { taskId: task.id });
-        const transcript = useTranscripts.getState().runs.get(run.id);
+        const transcript = runs.snapshot().get(run.id);
         window.openorc.report({
           kind: "smoke",
           final: true,
@@ -284,8 +285,8 @@ function installSmoke(repo: string, prompt: string | null, agent: HarnessId): vo
 /** Auto-answers approvals and questions on any run the transcript store sees, so smokes never stall. */
 function autoApprove(): () => void {
   const resolved = new Set<string>();
-  return useTranscripts.subscribe((state) => {
-    for (const t of state.runs.values()) {
+  return runs.subscribe((published) => {
+    for (const t of published.values()) {
       for (const b of t.blocks) {
         if (b.kind !== "approval" || b.decision) continue;
         const key = `${t.runId}:${b.approvalId}`;

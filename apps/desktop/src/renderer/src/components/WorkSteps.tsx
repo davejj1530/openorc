@@ -1,13 +1,25 @@
 import { Fragment, memo, useEffect, useId, useMemo, useState, type ReactNode } from "react";
-import type { Block } from "../lib/transcript";
+import {
+  type Block,
+  workDuration,
+  chipCalls,
+  type WorkChip,
+  chipTitle,
+  isLive,
+  liveHeadline,
+  liveSectionLabel,
+  workEntries,
+  type LiveHeadline,
+  type PlanItem,
+  type WorkEntry,
+  type WorkPhase,
+  type WorkSection,
+} from "@openorc/client";
 import { cn } from "../lib/cn";
-import { workDuration } from "../lib/work-transcript";
 import { Brain, Check, ChevronRight, Folder, Globe, Hammer, Loader2, Search, Terminal, WorkDelegate } from "./icons";
 import { FileGlyph } from "./FileGlyph";
 import { useVisited } from "../lib/use-visited";
 import { ThreadLink } from "./ThreadImages";
-import { chipCalls, type WorkChip } from "./work-chips";
-import { chipTitle, isLive, liveHeadline, liveSectionLabel, workEntries, type LiveHeadline, type PlanItem, type WorkEntry, type WorkPhase, type WorkSection } from "./work-steps";
 import "./WorkSteps.css";
 
 /** How raw blocks render: the transcript's own rows, so the work list never needs to know them. `open` starts calls open. */

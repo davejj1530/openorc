@@ -3,7 +3,7 @@ import { cn } from "../lib/cn";
 import { runInTerminal } from "../lib/terminal-requests";
 import { useThreadMedia } from "./ThreadImages";
 import { useClaudeAccountId } from "../lib/claude-account";
-import { useRpc, useRpcMutation } from "../lib/query";
+import { useRpc, useRpcMutation } from "../lib/client";
 import { useRouter } from "../lib/router";
 
 /** A provider that signed out signs back in with its own CLI, in the Terminal of the thread that hit it. */

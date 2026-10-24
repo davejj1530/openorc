@@ -4,7 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { Project, RpcMethod, RpcResults, ThreadSummary } from "@openorc/protocol";
 import { usePanelSessions } from "../lib/panel-tabs";
 import { useLayout } from "../lib/layout";
-import { queryClient } from "../lib/query";
+import { queryClient } from "../lib/client";
 import { core } from "../lib/rpc";
 import { Panel } from "./Panel";
 

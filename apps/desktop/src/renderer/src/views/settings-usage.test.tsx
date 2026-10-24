@@ -6,7 +6,7 @@ import { ResetControls } from "./settings-resets";
 import { ProviderUsageOverview } from "./settings-usage";
 
 const mocks = vi.hoisted(() => ({ call: vi.fn(), open: vi.fn() }));
-vi.mock("../lib/rpc", () => ({ core: { call: mocks.call, onInvalidate: () => {}, onReady: () => {} } }));
+vi.mock("../lib/rpc", () => ({ core: { call: mocks.call, onReady: () => {}, onPush: () => () => {} } }));
 afterEach(() => {
   cleanup();
   vi.resetAllMocks();

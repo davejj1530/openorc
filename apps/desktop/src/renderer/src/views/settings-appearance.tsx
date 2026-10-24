@@ -3,15 +3,14 @@ import { Monitor, Moon, Sun } from "../components/icons";
 import { Button } from "../components/ui";
 import { cn } from "../lib/cn";
 import { toHex } from "../lib/color";
-import { themePresets, useTheme, type ThemeChoice } from "../lib/theme";
-import { colorGroups, editableTokens, overridesFor, translucentTokens } from "../lib/theme-custom";
+import { useTheme, type ThemeChoice } from "../lib/theme";
+import { colorGroups, editableTokens, overridesFor, translucentTokens, resolveAccentColors, themePresets } from "@openorc/client/theme";
 import { Field, Section, Toggle } from "./settings-shared";
 import { useWindowAppearance } from "../lib/window-appearance";
 import { PaletteSelector } from "../components/PaletteSelector";
 import { MascotStill } from "../components/MascotStill";
 import { ColorRow } from "../components/ColorRow";
 import { AccentSettings } from "./settings-accents";
-import { resolveAccentColors } from "../lib/theme-accents";
 import { appFonts, useAppFont } from "../lib/app-font";
 import { CodeFontSettings } from "./settings-code-font";
 
@@ -118,7 +117,7 @@ function ColorEditor({ report }: { report: Report }) {
   const { preset, resolved, custom, setColor, resetColor, resetColors } = useTheme();
   const theme = themePresets.find((entry) => entry.id === preset)!;
   const overrides = overridesFor(custom, preset, resolved);
-  const colors = resolveAccentColors(theme.colors[resolved], overrides);
+  const colors = resolveAccentColors(theme.colors[resolved], overrides, toHex);
   const changed = Object.keys(overrides).length;
   // The palette authors colors in syntaxes the picker cannot read, so resolve
   // each one to hex once per palette and appearance mode.

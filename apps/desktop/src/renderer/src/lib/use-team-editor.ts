@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { TeamDraft, type TeamDetail } from "@openorc/protocol";
 import { removeDraft, writeDraft } from "./drafts";
-import { queryClient, useRpcMutation } from "./query";
+import { queryClient, useRpcMutation } from "./client";
 import { blankTeam, editorDraft, hasRevisionConflict, revisionDraft, type EditorDraft } from "./team-editor-draft";
 
 /** Owns an unfinished local team draft and its server revision until it is saved or discarded. */

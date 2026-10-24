@@ -1,6 +1,6 @@
 import { cn } from "../lib/cn";
 import { ChevronDown, CircleCheck, Lightbulb, Terminal } from "./icons";
-import type { ReceiptItem } from "./work-receipt";
+import type { ReceiptItem } from "@openorc/client";
 
 const icons = { thought: Lightbulb, steps: CircleCheck, check: Terminal } as const;
 

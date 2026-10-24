@@ -1,6 +1,6 @@
 import { useClaudeAccountId } from "./claude-account";
 import { useQueryClient } from "@tanstack/react-query";
-import { useRpc, useRpcMutation } from "./query";
+import { useRpc, useRpcMutation } from "./client";
 
 export function useModelCatalog() {
   const client = useQueryClient();

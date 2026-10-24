@@ -13,7 +13,7 @@ const [{ App }, { useWindow }, { useRouter }, { Onboarding }, { AppearanceSettin
   import("../../apps/desktop/src/renderer/src/views/Onboarding"),
   import("../../apps/desktop/src/renderer/src/views/settings-appearance"),
   import("../../apps/desktop/src/renderer/src/lib/rpc"),
-  import("../../apps/desktop/src/renderer/src/lib/query"),
+  import("../../apps/desktop/src/renderer/src/lib/client"),
   import("../../apps/desktop/src/renderer/src/lib/theme"),
 ]);
 

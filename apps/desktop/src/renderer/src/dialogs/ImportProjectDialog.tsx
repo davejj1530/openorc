@@ -2,7 +2,7 @@ import { Button, Dialog, Field, Input } from "../components/ui";
 import { useEffect, useState } from "react";
 
 import { useRouter } from "../lib/router";
-import { useRpcMutation } from "../lib/query";
+import { useRpcMutation } from "../lib/client";
 import { core } from "../lib/rpc";
 
 export function ImportProjectDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {

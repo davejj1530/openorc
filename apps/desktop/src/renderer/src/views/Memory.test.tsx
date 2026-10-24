@@ -5,10 +5,10 @@ import { rpcParams } from "@openorc/protocol";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { Memory } from "./Memory";
 import { core } from "../lib/rpc";
-import { queryClient } from "../lib/query";
+import { queryClient } from "../lib/client";
 import { useRouter } from "../lib/router";
 
-vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onInvalidate: vi.fn(), onReady: vi.fn() } }));
+vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: () => () => {} } }));
 // The title bar's project chip is the page's only project picker.
 vi.mock("../components/TopBar", () => ({
   TopBar: ({ onProjectChange }: { onProjectChange?: (id: string | null) => void }) => (

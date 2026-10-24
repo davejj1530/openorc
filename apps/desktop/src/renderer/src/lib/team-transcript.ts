@@ -1,5 +1,5 @@
 import type { TeamChatEntry } from "@openorc/protocol";
-import type { Block } from "./transcript";
+import type { Block } from "@openorc/client";
 import { mentionNameText } from "./mention-names";
 
 /** Add missing addressees; an ID mention rendered as a name already addresses them. */

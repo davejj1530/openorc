@@ -4,10 +4,10 @@ import { DEFAULT_TEAM_LIMITS, Schedule, TeamRevision } from "@openorc/protocol";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { Scheduled } from "./Scheduled";
 import { core } from "../lib/rpc";
-import { queryClient } from "../lib/query";
+import { queryClient } from "../lib/client";
 import { useLayout } from "../lib/layout";
 
-vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onInvalidate: vi.fn(), onReady: vi.fn() } }));
+vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: () => () => {} } }));
 vi.mock("../components/TopBar", () => ({
   TopBar: ({ children, actions }: { children: React.ReactNode; actions?: React.ReactNode }) => (
     <div>

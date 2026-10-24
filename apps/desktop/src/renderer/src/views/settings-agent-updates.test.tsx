@@ -4,10 +4,10 @@ import { harnessIds, type AgentUpdates, type SystemInfo } from "@openorc/protoco
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { AgentConnections, AgentUpdateNotice } from "./settings-agent-updates";
 import { isPreviewCovered } from "../lib/browser-preview";
-import { queryClient } from "../lib/query";
+import { queryClient } from "../lib/client";
 import { core } from "../lib/rpc";
 import { useRouter } from "../lib/router";
-vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onInvalidate: vi.fn(), onReady: vi.fn() } }));
+vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: () => () => {} } }));
 let state: AgentUpdates;
 const info: SystemInfo = {
   dataDir: "/fixture",

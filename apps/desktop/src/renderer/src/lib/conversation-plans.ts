@@ -1,4 +1,4 @@
-import { useRpc } from "./query";
+import { useRpc } from "./client";
 
 /** Validate provenance at the display boundary too: a dev renderer can be newer
  * than its core process, and persisted response copies are not plan documents. */

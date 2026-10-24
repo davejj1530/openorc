@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { Project } from "@openorc/protocol";
 import { Button, Field, Input, Textarea } from "../components/ui";
-import { useRpc, useRpcMutation } from "../lib/query";
+import { useRpc, useRpcMutation } from "../lib/client";
 
 /** What the repository already says about itself: its default branch, remote and other tools' config files. */
 function ProjectFacts({ project: p }: { project: Project }) {

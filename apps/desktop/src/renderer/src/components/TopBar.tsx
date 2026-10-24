@@ -14,7 +14,7 @@ import { useLayout } from "../lib/layout";
 import { WindowNav } from "./Sidebar";
 import { IconButton, Tooltip } from "./ui";
 import { useTrafficLights, useWindowsControls } from "../lib/window";
-import { useRpc } from "../lib/query";
+import { useRpc } from "../lib/client";
 import { menuItem, menuPopup } from "./menu";
 import { CoversPreview } from "../lib/browser-preview";
 import { floatingGround } from "../lib/use-anchor-ground";

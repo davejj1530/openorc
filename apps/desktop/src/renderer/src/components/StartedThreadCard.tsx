@@ -1,7 +1,7 @@
 import type { ThreadActivity } from "@openorc/protocol";
 import { cn } from "../lib/cn";
 import { orclingById, useOrclings } from "../lib/orclings";
-import { useRpc } from "../lib/query";
+import { useRpc } from "../lib/client";
 import { openThread } from "../lib/router";
 import { ArrowUpRight, Folder } from "./icons";
 import { OrclingAvatar } from "./OrclingAvatar";

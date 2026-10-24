@@ -3,7 +3,7 @@ import { useRef, useState } from "react";
 import type { TeamTaskView } from "@openorc/protocol";
 import { TeamRecoveryActions } from "./TeamRecoveryActions";
 import { Button } from "./ui";
-import { useRpcMutation } from "../lib/query";
+import { useRpcMutation } from "../lib/client";
 import { beginTeamDeleteRequest, finishTeamDeleteRequest } from "../lib/team-delete-request";
 import { useThreadMutationPending } from "../lib/thread-mutations";
 import { useTeamDeleteRequest } from "../lib/use-team-delete-request";

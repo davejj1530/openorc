@@ -1,0 +1,2315 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`transcript golden replay > joins a ledger page with the frames that arrived while it loaded 1`] = `
+{
+  "blocks": [
+    {
+      "at": 1760000000000,
+      "id": "status-start",
+      "kind": "status",
+      "runId": "golden-codex",
+      "text": "codex session started with gpt-5.5-codex",
+      "tone": "muted",
+      "turnKey": "golden-codex:0",
+    },
+    {
+      "at": 1760000000034,
+      "endedAt": 1760000000255,
+      "explicit": true,
+      "id": "think-rs_1",
+      "kind": "thinking",
+      "runId": "golden-codex",
+      "startedAt": 1760000000034,
+      "status": "success",
+      "text": "that clock so runs retry the
+
+a of failure the the and",
+      "turnKey": "golden-codex:0",
+    },
+    {
+      "at": 1760000000697,
+      "id": "msg_1",
+      "kind": "message",
+      "role": "assistant",
+      "runId": "golden-codex",
+      "streaming": false,
+      "text": "the before settles suite timeout the which race queue the the waits timer fake advances assertion the and reports instead real hides between drain",
+      "turnKey": "golden-codex:0",
+    },
+    {
+      "at": 1760000000714,
+      "done": true,
+      "id": "call_cmd_1",
+      "input": {
+        "command": "/bin/zsh -lc 'pnpm vitest run src/lib/flaky.test.ts'",
+        "commandActions": [
+          {
+            "command": "pnpm vitest run src/lib/flaky.test.ts",
+            "type": "unknown",
+          },
+        ],
+        "cwd": "/Projects/studio",
+      },
+      "isError": true,
+      "kind": "tool",
+      "name": "shell",
+      "outputOmitted": true,
+      "runId": "golden-codex",
+      "status": "error",
+      "turnKey": "golden-codex:0",
+    },
+    {
+      "approvalId": "901",
+      "approvalKind": "command",
+      "at": 1760000001751,
+      "decision": "allow",
+      "id": "approval-901",
+      "input": {
+        "command": "pnpm install",
+        "itemId": "call_cmd_1",
+        "reason": "Network access",
+        "threadId": "thr_golden",
+        "turnId": "turn-1",
+      },
+      "kind": "approval",
+      "reason": "Network access",
+      "runId": "golden-codex",
+      "toolName": "shell",
+      "turnKey": "golden-codex:0",
+    },
+    {
+      "at": 1760000001819,
+      "done": true,
+      "id": "call_patch_1",
+      "input": [
+        {
+          "diff": "@@ -10,3 +10,4 @@
+-  await waitFor(done);
++  vi.advanceTimersByTime(100);
++  await waitFor(done);
+",
+          "kind": {
+            "type": "update",
+          },
+          "path": "src/lib/flaky.test.ts",
+        },
+      ],
+      "isError": false,
+      "kind": "tool",
+      "name": "apply_patch",
+      "output": undefined,
+      "runId": "golden-codex",
+      "status": "success",
+      "turnKey": "golden-codex:0",
+    },
+    {
+      "at": 1760000001887,
+      "id": "activity-diff-turn-1",
+      "kind": "activity",
+      "label": "Changes",
+      "runId": "golden-codex",
+      "status": "success",
+      "text": "@@ -10,3 +10,4 @@
+-  await waitFor(done);
++  vi.advanceTimersByTime(100);
++  await waitFor(done);
+",
+      "turnKey": "golden-codex:0",
+    },
+    {
+      "at": 1760000001904,
+      "id": "activity-plan-turn-1",
+      "kind": "activity",
+      "label": "Plan",
+      "runId": "golden-codex",
+      "status": "success",
+      "text": "completed: Reproduce
+completed: Fix the timer",
+      "turnKey": "golden-codex:0",
+    },
+    {
+      "at": 1760000001921,
+      "done": true,
+      "id": "call_mcp_1",
+      "input": {
+        "query": "waitFor retry",
+      },
+      "isError": false,
+      "kind": "tool",
+      "mcp": {
+        "server": "codegraph",
+        "tool": "codegraph_explore",
+      },
+      "name": "codegraph.codegraph_explore",
+      "output": {
+        "content": [
+          {
+            "text": "waitFor in src/lib/flaky.test.ts:12",
+            "type": "text",
+          },
+        ],
+      },
+      "progress": "Indexed 412 symbols",
+      "runId": "golden-codex",
+      "status": "success",
+      "turnKey": "golden-codex:0",
+    },
+    {
+      "at": 1760000001972,
+      "done": true,
+      "id": "call_cmd_2",
+      "input": {
+        "command": "/bin/zsh -lc 'pnpm vitest run src/lib/flaky.test.ts'",
+        "commandActions": [
+          {
+            "command": "pnpm vitest run src/lib/flaky.test.ts",
+            "type": "unknown",
+          },
+        ],
+        "cwd": "/Projects/studio",
+      },
+      "isError": false,
+      "kind": "tool",
+      "name": "shell",
+      "output": " ✓ src/lib/flaky.test.ts > retry 0 settles
+ ✓ src/lib/flaky.test.ts > retry 1 settles
+ ✓ src/lib/flaky.test.ts > retry 2 settles
+ ✓ src/lib/flaky.test.ts > retry 3 settles
+ ✓ src/lib/flaky.test.ts > retry 4 settles
+ ✓ src/lib/flaky.test.ts > retry 5 settles
+ ✓ src/lib/flaky.test.ts > retry 6 settles
+ ✓ src/lib/flaky.test.ts > retry 7 settles
+",
+      "runId": "golden-codex",
+      "status": "success",
+      "turnKey": "golden-codex:0",
+    },
+    {
+      "at": 1760000002159,
+      "id": "msg_2",
+      "kind": "message",
+      "role": "assistant",
+      "runId": "golden-codex",
+      "streaming": false,
+      "text": "and reports instead real hides between drain store flaky on that clock so runs retry the a of failure the the and publish test a the never the before settles",
+      "turnKey": "golden-codex:0",
+    },
+    {
+      "at": 1760000002720,
+      "boundary": "turn",
+      "durationMs": 0,
+      "id": "turn-turn-1",
+      "kind": "status",
+      "outcome": "success",
+      "runId": "golden-codex",
+      "text": "turn finished in 0.0s",
+      "tone": "ok",
+      "turnKey": "golden-codex:0",
+    },
+    {
+      "at": 1760000002754,
+      "endedAt": 1760000002907,
+      "explicit": true,
+      "id": "think-rs_2",
+      "kind": "thinking",
+      "runId": "golden-codex",
+      "startedAt": 1760000002754,
+      "status": "success",
+      "text": "of failure the the and publish",
+      "turnKey": "golden-codex:1",
+    },
+    {
+      "answers": {
+        "scope": [
+          "Only the flaky file",
+        ],
+      },
+      "approvalId": "902",
+      "approvalKind": "user_input",
+      "at": 1760000002873,
+      "decision": "allow",
+      "id": "approval-902",
+      "input": {
+        "itemId": "ask_1",
+        "questions": [
+          {
+            "header": "Scope",
+            "id": "scope",
+            "options": [
+              {
+                "label": "Only the flaky file",
+              },
+              {
+                "label": "The whole suite",
+              },
+            ],
+            "question": "Which tests?",
+          },
+        ],
+        "threadId": "thr_golden",
+        "turnId": "turn-2",
+      },
+      "kind": "approval",
+      "reason": "Network access",
+      "runId": "golden-codex",
+      "toolName": "shell",
+      "turnKey": "golden-codex:1",
+    },
+    {
+      "at": 1760000002924,
+      "detail": {
+        "action": {
+          "query": "vitest fake timers waitFor",
+          "type": "search",
+        },
+        "id": "ws_1",
+        "query": "vitest fake timers waitFor",
+        "status": "completed",
+        "type": "webSearch",
+      },
+      "id": "activity-ws_1",
+      "kind": "activity",
+      "label": "Searching the web",
+      "runId": "golden-codex",
+      "status": "success",
+      "text": "vitest fake timers waitFor",
+      "turnKey": "golden-codex:1",
+    },
+    {
+      "activityKind": "image_generation",
+      "at": 1760000002958,
+      "detail": {
+        "id": "ig_1",
+        "revisedPrompt": "A timeline of the retry",
+        "savedPath": "/Users/me/.openorc/images/ig_1.png",
+        "status": "completed",
+        "type": "imageGeneration",
+      },
+      "id": "activity-ig_1",
+      "imagePath": "/Users/me/.openorc/images/ig_1.png",
+      "kind": "activity",
+      "label": "Generated image",
+      "runId": "golden-codex",
+      "status": "success",
+      "text": "",
+      "turnKey": "golden-codex:1",
+    },
+    {
+      "at": 1760000002992,
+      "id": "msg_3",
+      "kind": "message",
+      "role": "assistant",
+      "runId": "golden-codex",
+      "streaming": false,
+      "text": "race queue the the waits timer fake advances assertion the and reports instead real",
+      "turnKey": "golden-codex:1",
+    },
+    {
+      "at": 1760000003247,
+      "boundary": "turn",
+      "durationMs": 0,
+      "id": "turn-turn-2",
+      "kind": "status",
+      "outcome": "cancelled",
+      "runId": "golden-codex",
+      "text": "turn cancelled in 0.0s",
+      "tone": "bad",
+      "turnKey": "golden-codex:1",
+    },
+    {
+      "at": 1760000003264,
+      "boundary": "session",
+      "id": "status-end",
+      "kind": "status",
+      "outcome": "success",
+      "runId": "golden-codex",
+      "text": "session closed",
+      "tone": "muted",
+      "turnKey": "golden-codex:2",
+    },
+  ],
+  "eventAt": 1760000003264,
+  "eventCount": 108,
+  "fromTurn": 0,
+  "hydrated": true,
+  "live": false,
+  "pendingApprovals": 0,
+  "stderr": [],
+  "turnOf": [
+    [
+      "status-start",
+      0,
+    ],
+    [
+      "think-rs_1",
+      0,
+    ],
+    [
+      "msg_1",
+      0,
+    ],
+    [
+      "call_cmd_1",
+      0,
+    ],
+    [
+      "approval-901",
+      0,
+    ],
+    [
+      "call_patch_1",
+      0,
+    ],
+    [
+      "activity-diff-turn-1",
+      0,
+    ],
+    [
+      "activity-plan-turn-1",
+      0,
+    ],
+    [
+      "call_mcp_1",
+      0,
+    ],
+    [
+      "call_cmd_2",
+      0,
+    ],
+    [
+      "msg_2",
+      0,
+    ],
+    [
+      "turn-turn-1",
+      0,
+    ],
+    [
+      "think-rs_2",
+      1,
+    ],
+    [
+      "approval-902",
+      1,
+    ],
+    [
+      "activity-ws_1",
+      1,
+    ],
+    [
+      "activity-ig_1",
+      1,
+    ],
+    [
+      "msg_3",
+      1,
+    ],
+    [
+      "turn-turn-2",
+      1,
+    ],
+    [
+      "status-end",
+      2,
+    ],
+  ],
+  "turnOpen": false,
+  "turnsCompleted": 2,
+}
+`;
+
+exports[`transcript golden replay > loads the newest turns, then older ones, keeping the blocks already shown 1`] = `
+{
+  "newest": {
+    "blocks": [
+      {
+        "at": 1760000102415,
+        "id": "user-2",
+        "kind": "message",
+        "role": "user",
+        "runId": "golden-claude",
+        "streaming": false,
+        "text": "Delegate the docs update.",
+        "turnKey": "golden-claude:1",
+      },
+      {
+        "at": 1760000102438,
+        "endedAt": 1760000102461,
+        "id": "think-th-2",
+        "kind": "thinking",
+        "runId": "golden-claude",
+        "startedAt": 1760000102438,
+        "text": "A subagent can write the docs",
+        "turnKey": "golden-claude:1",
+      },
+      {
+        "at": 1760000102461,
+        "done": true,
+        "id": "tu-task",
+        "input": {
+          "description": "Update the docs",
+          "prompt": "Explain the retry rule",
+        },
+        "isError": false,
+        "kind": "tool",
+        "name": "Task",
+        "output": "Docs updated",
+        "runId": "golden-claude",
+        "status": "success",
+        "turnKey": "golden-claude:1",
+      },
+      {
+        "at": 1760000102484,
+        "done": true,
+        "id": "tu-child",
+        "input": {
+          "file_path": "docs/retry.md",
+        },
+        "isError": false,
+        "kind": "tool",
+        "name": "Read",
+        "output": "# Retry",
+        "runId": "golden-claude",
+        "status": "success",
+        "turnKey": "golden-claude:1",
+      },
+      {
+        "at": 1760000102599,
+        "boundary": "turn",
+        "durationMs": 9000,
+        "id": "turn-t2",
+        "kind": "status",
+        "outcome": "success",
+        "runId": "golden-claude",
+        "text": "turn finished in 9.0s",
+        "tone": "ok",
+        "turnKey": "golden-claude:1",
+      },
+      {
+        "at": 1760000102622,
+        "boundary": "session",
+        "id": "status-end",
+        "kind": "status",
+        "outcome": "success",
+        "runId": "golden-claude",
+        "text": "session closed",
+        "tone": "muted",
+        "turnKey": "golden-claude:2",
+      },
+    ],
+    "eventAt": 1760000102622,
+    "eventCount": 11,
+    "fromTurn": 1,
+    "hydrated": true,
+    "live": true,
+    "pendingApprovals": 0,
+    "stderr": [],
+    "turnOf": [
+      [
+        "user-2",
+        1,
+      ],
+      [
+        "think-th-2",
+        1,
+      ],
+      [
+        "tu-task",
+        1,
+      ],
+      [
+        "tu-child",
+        1,
+      ],
+      [
+        "turn-t2",
+        1,
+      ],
+      [
+        "status-end",
+        2,
+      ],
+    ],
+    "turnOpen": false,
+    "turnsCompleted": 2,
+  },
+  "whole": {
+    "blocks": [
+      {
+        "at": 1760000100000,
+        "id": "status-start",
+        "kind": "status",
+        "runId": "golden-claude",
+        "text": "claude session started with claude-opus-5-5",
+        "tone": "muted",
+        "turnKey": "golden-claude:0",
+      },
+      {
+        "at": 1760000100046,
+        "attachments": [
+          "/Users/me/.openorc/attachments/a1.png",
+        ],
+        "id": "user-1",
+        "kind": "message",
+        "role": "user",
+        "runId": "golden-claude",
+        "streaming": false,
+        "text": "Why does the retry test time out?",
+        "turnKey": "golden-claude:0",
+      },
+      {
+        "at": 1760000100069,
+        "endedAt": 1760000100322,
+        "explicit": true,
+        "id": "think-th-1",
+        "kind": "thinking",
+        "runId": "golden-claude",
+        "startedAt": 1760000100069,
+        "status": "success",
+        "text": "Look at the queue drain first, then the publish schedule.",
+        "turnKey": "golden-claude:0",
+      },
+      {
+        "at": 1760000100989,
+        "id": "m-1",
+        "kind": "message",
+        "role": "assistant",
+        "runId": "golden-claude",
+        "streaming": false,
+        "text": "I traced the timeout to the retry queue. The store publishes once per frame, so the assertion has to wait for a frame before it reads the run.",
+        "turnKey": "golden-claude:0",
+      },
+      {
+        "at": 1760000101012,
+        "done": true,
+        "id": "tu-grep",
+        "input": {
+          "path": "src",
+          "pattern": "await load",
+        },
+        "isError": false,
+        "kind": "tool",
+        "name": "Grep",
+        "output": "src/lib/module-0.ts:3:  const value0 = await load(0);
+src/lib/module-1.ts:4:  const value1 = await load(1);
+src/lib/module-2.ts:5:  const value2 = await load(2);
+src/lib/module-3.ts:6:  const value3 = await load(3);
+src/lib/module-4.ts:7:  const value4 = await load(4);
+src/lib/module-5.ts:8:  const value5 = await load(5);
+src/lib/module-6.ts:9:  const value6 = await load(6);
+src/lib/module-7.ts:10:  const value7 = await load(7);
+src/lib/module-8.ts:11:  const value8 = await load(8);
+src/lib/module-9.ts:12:  const value9 = await load(9);
+src/lib/module-10.ts:13:  const value10 = await load(10);
+src/lib/module-11.ts:14:  const value11 = await load(11);
+src/lib/module-12.ts:15:  const value12 = await load(12);
+src/lib/module-13.ts:16:  const value13 = await load(13);
+src/lib/module-14.ts:17:  const value14 = await load(14);
+src/lib/module-15.ts:18:  const value15 = await load(15);
+src/lib/module-16.ts:19:  const value16 = await load(16);
+src/lib/module-17.ts:20:  const value17 = await load(17);
+src/lib/module-18.ts:21:  const value18 = await load(18);
+src/lib/module-19.ts:22:  const value19 = await load(19);
+src/lib/module-20.ts:23:  const value20 = await load(20);
+src/lib/module-21.ts:24:  const value21 = await load(21);
+src/lib/module-22.ts:25:  const value22 = await load(22);
+src/lib/module-23.ts:26:  const value23 = await load(23);
+src/lib/module-24.ts:27:  const value24 = await load(24);
+src/lib/module-25.ts:28:  const value25 = await load(25);
+src/lib/module-26.ts:29:  const value26 = await load(26);
+src/lib/module-27.ts:30:  const value27 = await load(27);
+src/lib/module-28.ts:31:  const value28 = await load(28);
+src/lib/module-29.ts:32:  const value29 = await load(29);
+src/lib/module-30.ts:33:  const value30 = await load(30);
+src/lib/module-31.ts:34:  const value31 = await load(31);
+src/lib/module-32.ts:35:  const value32 = await load(32);
+src/lib/module-33.ts:36:  const value33 = await load(33);
+src/lib/module-34.ts:37:  const value34 = await load(34);
+src/lib/module-35.ts:38:  const value35 = await load(35);
+src/lib/module-36.ts:39:  const value36 = await load(36);
+src/lib/module-37.ts:40:  const value37 = await load(37);
+src/lib/module-38.ts:41:  const value38 = await load(38);
+src/lib/module-39.ts:42:  const value39 = await load(39);
+",
+        "runId": "golden-claude",
+        "status": "success",
+        "turnKey": "golden-claude:0",
+      },
+      {
+        "at": 1760000101978,
+        "done": true,
+        "id": "tu-bash",
+        "input": {
+          "command": "rm -rf dist && pnpm build",
+          "description": "Rebuild the app",
+        },
+        "isError": false,
+        "kind": "tool",
+        "name": "Bash",
+        "output": undefined,
+        "progress": "Building 3 of 7",
+        "runId": "golden-claude",
+        "status": "success",
+        "turnKey": "golden-claude:0",
+      },
+      {
+        "approvalId": "ap-bash",
+        "approvalKind": "command",
+        "at": 1760000102001,
+        "decision": "allow_for_run",
+        "id": "approval-ap-bash",
+        "input": {
+          "command": "rm -rf dist && pnpm build",
+        },
+        "kind": "approval",
+        "reason": "Deletes files",
+        "runId": "golden-claude",
+        "toolName": "Bash",
+        "turnKey": "golden-claude:0",
+      },
+      {
+        "answers": {
+          "Keep the fake clock?": [
+            "Yes",
+          ],
+        },
+        "approvalId": "ap-ask",
+        "approvalKind": "user_input",
+        "at": 1760000102162,
+        "decision": "allow",
+        "id": "approval-ap-ask",
+        "input": {
+          "questions": [
+            {
+              "options": [
+                {
+                  "label": "Yes",
+                },
+                {
+                  "label": "No",
+                },
+              ],
+              "question": "Keep the fake clock?",
+            },
+          ],
+        },
+        "kind": "approval",
+        "runId": "golden-claude",
+        "toolName": "AskUserQuestion",
+        "turnKey": "golden-claude:0",
+      },
+      {
+        "at": 1760000102208,
+        "done": true,
+        "id": "tu-mcp",
+        "input": {
+          "query": "retry",
+        },
+        "isError": false,
+        "kind": "tool",
+        "mcp": {
+          "resourceUri": "ui://screens/gallery",
+          "server": "screens",
+          "tool": "search",
+        },
+        "name": "mcp__screens__search",
+        "output": {
+          "content": [
+            {
+              "text": "2 screens",
+              "type": "text",
+            },
+          ],
+        },
+        "runId": "golden-claude",
+        "status": "success",
+        "turnKey": "golden-claude:0",
+      },
+      {
+        "approvalId": "ap-once",
+        "approvalKind": "tool",
+        "at": 1760000102346,
+        "decision": "expired",
+        "id": "approval-ap-once",
+        "input": {
+          "url": "https://example.com",
+        },
+        "kind": "approval",
+        "onceOnly": true,
+        "runId": "golden-claude",
+        "toolName": "WebFetch",
+        "turnKey": "golden-claude:0",
+      },
+      {
+        "at": 1760000102369,
+        "boundary": "turn",
+        "durationMs": 41250,
+        "id": "turn-t1",
+        "kind": "status",
+        "outcome": "cancelled",
+        "runId": "golden-claude",
+        "text": "turn cancelled in 41.3s, 12,345 in / 678 out",
+        "tone": "bad",
+        "turnKey": "golden-claude:0",
+      },
+      {
+        "at": 1760000102415,
+        "id": "user-2",
+        "kind": "message",
+        "role": "user",
+        "runId": "golden-claude",
+        "streaming": false,
+        "text": "Delegate the docs update.",
+        "turnKey": "golden-claude:1",
+      },
+      {
+        "at": 1760000102438,
+        "endedAt": 1760000102461,
+        "id": "think-th-2",
+        "kind": "thinking",
+        "runId": "golden-claude",
+        "startedAt": 1760000102438,
+        "text": "A subagent can write the docs",
+        "turnKey": "golden-claude:1",
+      },
+      {
+        "at": 1760000102461,
+        "done": true,
+        "id": "tu-task",
+        "input": {
+          "description": "Update the docs",
+          "prompt": "Explain the retry rule",
+        },
+        "isError": false,
+        "kind": "tool",
+        "name": "Task",
+        "output": "Docs updated",
+        "runId": "golden-claude",
+        "status": "success",
+        "turnKey": "golden-claude:1",
+      },
+      {
+        "at": 1760000102484,
+        "done": true,
+        "id": "tu-child",
+        "input": {
+          "file_path": "docs/retry.md",
+        },
+        "isError": false,
+        "kind": "tool",
+        "name": "Read",
+        "output": "# Retry",
+        "runId": "golden-claude",
+        "status": "success",
+        "turnKey": "golden-claude:1",
+      },
+      {
+        "at": 1760000102599,
+        "boundary": "turn",
+        "durationMs": 9000,
+        "id": "turn-t2",
+        "kind": "status",
+        "outcome": "success",
+        "runId": "golden-claude",
+        "text": "turn finished in 9.0s",
+        "tone": "ok",
+        "turnKey": "golden-claude:1",
+      },
+      {
+        "at": 1760000102622,
+        "boundary": "session",
+        "id": "status-end",
+        "kind": "status",
+        "outcome": "success",
+        "runId": "golden-claude",
+        "text": "session closed",
+        "tone": "muted",
+        "turnKey": "golden-claude:2",
+      },
+    ],
+    "eventAt": 1760000102622,
+    "eventCount": 46,
+    "fromTurn": 0,
+    "hydrated": true,
+    "live": false,
+    "pendingApprovals": 0,
+    "stderr": [
+      "warning: deprecated flag --legacy",
+      "warning: cache miss",
+    ],
+    "turnOf": [
+      [
+        "status-start",
+        0,
+      ],
+      [
+        "user-1",
+        0,
+      ],
+      [
+        "think-th-1",
+        0,
+      ],
+      [
+        "m-1",
+        0,
+      ],
+      [
+        "tu-grep",
+        0,
+      ],
+      [
+        "tu-bash",
+        0,
+      ],
+      [
+        "approval-ap-bash",
+        0,
+      ],
+      [
+        "approval-ap-ask",
+        0,
+      ],
+      [
+        "tu-mcp",
+        0,
+      ],
+      [
+        "approval-ap-once",
+        0,
+      ],
+      [
+        "turn-t1",
+        0,
+      ],
+      [
+        "user-2",
+        1,
+      ],
+      [
+        "think-th-2",
+        1,
+      ],
+      [
+        "tu-task",
+        1,
+      ],
+      [
+        "tu-child",
+        1,
+      ],
+      [
+        "turn-t2",
+        1,
+      ],
+      [
+        "status-end",
+        2,
+      ],
+    ],
+    "turnOpen": false,
+    "turnsCompleted": 2,
+  },
+}
+`;
+
+exports[`transcript golden replay > projects the claude stream the same however it is cut into frames 1`] = `
+{
+  "blocks": [
+    {
+      "at": 1760000100000,
+      "id": "status-start",
+      "kind": "status",
+      "runId": "golden-claude",
+      "text": "claude session started with claude-opus-5-5",
+      "tone": "muted",
+      "turnKey": "golden-claude:0",
+    },
+    {
+      "at": 1760000100046,
+      "attachments": [
+        "/Users/me/.openorc/attachments/a1.png",
+      ],
+      "id": "user-1",
+      "kind": "message",
+      "role": "user",
+      "runId": "golden-claude",
+      "streaming": false,
+      "text": "Why does the retry test time out?",
+      "turnKey": "golden-claude:0",
+    },
+    {
+      "at": 1760000100069,
+      "endedAt": 1760000100322,
+      "explicit": true,
+      "id": "think-th-1",
+      "kind": "thinking",
+      "runId": "golden-claude",
+      "startedAt": 1760000100069,
+      "status": "success",
+      "text": "Look at the queue drain first, then the publish schedule.",
+      "turnKey": "golden-claude:0",
+    },
+    {
+      "at": 1760000100345,
+      "id": "m-1",
+      "kind": "message",
+      "role": "assistant",
+      "runId": "golden-claude",
+      "streaming": false,
+      "text": "I traced the timeout to the retry queue. The store publishes once per frame, so the assertion has to wait for a frame before it reads the run.",
+      "turnKey": "golden-claude:0",
+    },
+    {
+      "at": 1760000101012,
+      "done": true,
+      "id": "tu-grep",
+      "input": {
+        "path": "src",
+        "pattern": "await load",
+      },
+      "isError": false,
+      "kind": "tool",
+      "name": "Grep",
+      "output": "src/lib/module-0.ts:3:  const value0 = await load(0);
+src/lib/module-1.ts:4:  const value1 = await load(1);
+src/lib/module-2.ts:5:  const value2 = await load(2);
+src/lib/module-3.ts:6:  const value3 = await load(3);
+src/lib/module-4.ts:7:  const value4 = await load(4);
+src/lib/module-5.ts:8:  const value5 = await load(5);
+src/lib/module-6.ts:9:  const value6 = await load(6);
+src/lib/module-7.ts:10:  const value7 = await load(7);
+src/lib/module-8.ts:11:  const value8 = await load(8);
+src/lib/module-9.ts:12:  const value9 = await load(9);
+src/lib/module-10.ts:13:  const value10 = await load(10);
+src/lib/module-11.ts:14:  const value11 = await load(11);
+src/lib/module-12.ts:15:  const value12 = await load(12);
+src/lib/module-13.ts:16:  const value13 = await load(13);
+src/lib/module-14.ts:17:  const value14 = await load(14);
+src/lib/module-15.ts:18:  const value15 = await load(15);
+src/lib/module-16.ts:19:  const value16 = await load(16);
+src/lib/module-17.ts:20:  const value17 = await load(17);
+src/lib/module-18.ts:21:  const value18 = await load(18);
+src/lib/module-19.ts:22:  const value19 = await load(19);
+src/lib/module-20.ts:23:  const value20 = await load(20);
+src/lib/module-21.ts:24:  const value21 = await load(21);
+src/lib/module-22.ts:25:  const value22 = await load(22);
+src/lib/module-23.ts:26:  const value23 = await load(23);
+src/lib/module-24.ts:27:  const value24 = await load(24);
+src/lib/module-25.ts:28:  const value25 = await load(25);
+src/lib/module-26.ts:29:  const value26 = await load(26);
+src/lib/module-27.ts:30:  const value27 = await load(27);
+src/lib/module-28.ts:31:  const value28 = await load(28);
+src/lib/module-29.ts:32:  const value29 = await load(29);
+src/lib/module-30.ts:33:  const value30 = await load(30);
+src/lib/module-31.ts:34:  const value31 = await load(31);
+src/lib/module-32.ts:35:  const value32 = await load(32);
+src/lib/module-33.ts:36:  const value33 = await load(33);
+src/lib/module-34.ts:37:  const value34 = await load(34);
+src/lib/module-35.ts:38:  const value35 = await load(35);
+src/lib/module-36.ts:39:  const value36 = await load(36);
+src/lib/module-37.ts:40:  const value37 = await load(37);
+src/lib/module-38.ts:41:  const value38 = await load(38);
+src/lib/module-39.ts:42:  const value39 = await load(39);
+",
+      "runId": "golden-claude",
+      "status": "success",
+      "turnKey": "golden-claude:0",
+    },
+    {
+      "at": 1760000101978,
+      "done": true,
+      "id": "tu-bash",
+      "input": {
+        "command": "rm -rf dist && pnpm build",
+        "description": "Rebuild the app",
+      },
+      "isError": false,
+      "kind": "tool",
+      "name": "Bash",
+      "output": "vite v8 building for production...
+",
+      "progress": "Building 3 of 7",
+      "runId": "golden-claude",
+      "status": "success",
+      "turnKey": "golden-claude:0",
+    },
+    {
+      "approvalId": "ap-bash",
+      "approvalKind": "command",
+      "at": 1760000102001,
+      "decision": "allow_for_run",
+      "id": "approval-ap-bash",
+      "input": {
+        "command": "rm -rf dist && pnpm build",
+      },
+      "kind": "approval",
+      "reason": "Deletes files",
+      "runId": "golden-claude",
+      "toolName": "Bash",
+      "turnKey": "golden-claude:0",
+    },
+    {
+      "answers": {
+        "Keep the fake clock?": [
+          "Yes",
+        ],
+      },
+      "approvalId": "ap-ask",
+      "approvalKind": "user_input",
+      "at": 1760000102162,
+      "decision": "allow",
+      "id": "approval-ap-ask",
+      "input": {
+        "questions": [
+          {
+            "options": [
+              {
+                "label": "Yes",
+              },
+              {
+                "label": "No",
+              },
+            ],
+            "question": "Keep the fake clock?",
+          },
+        ],
+      },
+      "kind": "approval",
+      "runId": "golden-claude",
+      "toolName": "AskUserQuestion",
+      "turnKey": "golden-claude:0",
+    },
+    {
+      "at": 1760000102208,
+      "done": true,
+      "id": "tu-mcp",
+      "input": {
+        "query": "retry",
+      },
+      "isError": false,
+      "kind": "tool",
+      "mcp": {
+        "resourceUri": "ui://screens/gallery",
+        "server": "screens",
+        "tool": "search",
+      },
+      "name": "mcp__screens__search",
+      "output": {
+        "content": [
+          {
+            "text": "2 screens",
+            "type": "text",
+          },
+        ],
+      },
+      "runId": "golden-claude",
+      "status": "success",
+      "turnKey": "golden-claude:0",
+    },
+    {
+      "approvalId": "ap-once",
+      "approvalKind": "tool",
+      "at": 1760000102346,
+      "decision": "expired",
+      "id": "approval-ap-once",
+      "input": {
+        "url": "https://example.com",
+      },
+      "kind": "approval",
+      "onceOnly": true,
+      "runId": "golden-claude",
+      "toolName": "WebFetch",
+      "turnKey": "golden-claude:0",
+    },
+    {
+      "at": 1760000102369,
+      "boundary": "turn",
+      "durationMs": 41250,
+      "id": "turn-t1",
+      "kind": "status",
+      "outcome": "cancelled",
+      "runId": "golden-claude",
+      "text": "turn cancelled in 41.3s, 12,345 in / 678 out",
+      "tone": "bad",
+      "turnKey": "golden-claude:0",
+    },
+    {
+      "at": 1760000102415,
+      "id": "user-2",
+      "kind": "message",
+      "role": "user",
+      "runId": "golden-claude",
+      "streaming": false,
+      "text": "Delegate the docs update.",
+      "turnKey": "golden-claude:1",
+    },
+    {
+      "at": 1760000102438,
+      "endedAt": 1760000102461,
+      "id": "think-th-2",
+      "kind": "thinking",
+      "runId": "golden-claude",
+      "startedAt": 1760000102438,
+      "text": "A subagent can write the docs",
+      "turnKey": "golden-claude:1",
+    },
+    {
+      "at": 1760000102461,
+      "done": true,
+      "id": "tu-task",
+      "input": {
+        "description": "Update the docs",
+        "prompt": "Explain the retry rule",
+      },
+      "isError": false,
+      "kind": "tool",
+      "name": "Task",
+      "output": "Docs updated",
+      "runId": "golden-claude",
+      "status": "success",
+      "turnKey": "golden-claude:1",
+    },
+    {
+      "at": 1760000102484,
+      "done": true,
+      "id": "tu-child",
+      "input": {
+        "file_path": "docs/retry.md",
+      },
+      "isError": false,
+      "kind": "tool",
+      "name": "Read",
+      "output": "# Retry",
+      "runId": "golden-claude",
+      "status": "success",
+      "turnKey": "golden-claude:1",
+    },
+    {
+      "at": 1760000102599,
+      "boundary": "turn",
+      "durationMs": 9000,
+      "id": "turn-t2",
+      "kind": "status",
+      "outcome": "success",
+      "runId": "golden-claude",
+      "text": "turn finished in 9.0s",
+      "tone": "ok",
+      "turnKey": "golden-claude:1",
+    },
+    {
+      "at": 1760000102622,
+      "boundary": "session",
+      "id": "status-end",
+      "kind": "status",
+      "outcome": "success",
+      "runId": "golden-claude",
+      "text": "session closed",
+      "tone": "muted",
+      "turnKey": "golden-claude:2",
+    },
+  ],
+  "eventAt": 1760000102622,
+  "eventCount": 115,
+  "fromTurn": 0,
+  "hydrated": false,
+  "live": false,
+  "pendingApprovals": 0,
+  "stderr": [
+    "warning: deprecated flag --legacy",
+    "warning: cache miss",
+  ],
+  "turnOf": [
+    [
+      "status-start",
+      0,
+    ],
+    [
+      "user-1",
+      0,
+    ],
+    [
+      "think-th-1",
+      0,
+    ],
+    [
+      "m-1",
+      0,
+    ],
+    [
+      "tu-grep",
+      0,
+    ],
+    [
+      "tu-bash",
+      0,
+    ],
+    [
+      "approval-ap-bash",
+      0,
+    ],
+    [
+      "approval-ap-ask",
+      0,
+    ],
+    [
+      "tu-mcp",
+      0,
+    ],
+    [
+      "approval-ap-once",
+      0,
+    ],
+    [
+      "turn-t1",
+      0,
+    ],
+    [
+      "user-2",
+      1,
+    ],
+    [
+      "think-th-2",
+      1,
+    ],
+    [
+      "tu-task",
+      1,
+    ],
+    [
+      "tu-child",
+      1,
+    ],
+    [
+      "turn-t2",
+      1,
+    ],
+    [
+      "status-end",
+      2,
+    ],
+  ],
+  "turnOpen": false,
+  "turnsCompleted": 2,
+}
+`;
+
+exports[`transcript golden replay > projects the codex stream the same however it is cut into frames 1`] = `
+{
+  "blocks": [
+    {
+      "at": 1760000000000,
+      "id": "status-start",
+      "kind": "status",
+      "runId": "golden-codex",
+      "text": "codex session started with gpt-5.5-codex",
+      "tone": "muted",
+      "turnKey": "golden-codex:0",
+    },
+    {
+      "at": 1760000000034,
+      "endedAt": 1760000000255,
+      "explicit": true,
+      "id": "think-rs_1",
+      "kind": "thinking",
+      "runId": "golden-codex",
+      "startedAt": 1760000000034,
+      "status": "success",
+      "text": "that clock so runs retry the
+
+a of failure the the and",
+      "turnKey": "golden-codex:0",
+    },
+    {
+      "at": 1760000000272,
+      "id": "msg_1",
+      "kind": "message",
+      "role": "assistant",
+      "runId": "golden-codex",
+      "streaming": false,
+      "text": "the before settles suite timeout the which race queue the the waits timer fake advances assertion the and reports instead real hides between drain",
+      "turnKey": "golden-codex:0",
+    },
+    {
+      "at": 1760000000714,
+      "done": true,
+      "id": "call_cmd_1",
+      "input": {
+        "command": "/bin/zsh -lc 'pnpm vitest run src/lib/flaky.test.ts'",
+        "commandActions": [
+          {
+            "command": "pnpm vitest run src/lib/flaky.test.ts",
+            "type": "unknown",
+          },
+        ],
+        "cwd": "/Projects/studio",
+      },
+      "isError": true,
+      "kind": "tool",
+      "name": "shell",
+      "output": " ✓ src/lib/suite-0.test.ts > case 0 passes after 0ms
+ ✓ src/lib/suite-0.test.ts > case 1 passes after 1ms
+ ✓ src/lib/suite-0.test.ts > case 2 passes after 2ms
+ ✓ src/lib/suite-0.test.ts > case 3 passes after 3ms
+ ✓ src/lib/suite-0.test.ts > case 4 passes after 4ms
+ ✓ src/lib/suite-0.test.ts > case 5 passes after 5ms
+ ✓ src/lib/suite-1.test.ts > case 0 passes after 6ms
+ ✓ src/lib/suite-1.test.ts > case 1 passes after 7ms
+ ✓ src/lib/suite-1.test.ts > case 2 passes after 8ms
+ ✓ src/lib/suite-1.test.ts > case 3 passes after 9ms
+ ✓ src/lib/suite-1.test.ts > case 4 passes after 10ms
+ ✓ src/lib/suite-1.test.ts > case 5 passes after 11ms
+ ✓ src/lib/suite-2.test.ts > case 0 passes after 12ms
+ ✓ src/lib/suite-2.test.ts > case 1 passes after 13ms
+ ✓ src/lib/suite-2.test.ts > case 2 passes after 14ms
+ ✓ src/lib/suite-2.test.ts > case 3 passes after 15ms
+ ✓ src/lib/suite-2.test.ts > case 4 passes after 16ms
+ ✓ src/lib/suite-2.test.ts > case 5 passes after 17ms
+ ✓ src/lib/suite-3.test.ts > case 0 passes after 18ms
+ ✓ src/lib/suite-3.test.ts > case 1 passes after 19ms
+ ✓ src/lib/suite-3.test.ts > case 2 passes after 20ms
+ ✓ src/lib/suite-3.test.ts > case 3 passes after 21ms
+ ✓ src/lib/suite-3.test.ts > case 4 passes after 22ms
+ ✓ src/lib/suite-3.test.ts > case 5 passes after 23ms
+ ✓ src/lib/suite-4.test.ts > case 0 passes after 24ms
+ ✓ src/lib/suite-4.test.ts > case 1 passes after 25ms
+ ✓ src/lib/suite-4.test.ts > case 2 passes after 26ms
+ ✓ src/lib/suite-4.test.ts > case 3 passes after 27ms
+ ✓ src/lib/suite-4.test.ts > case 4 passes after 28ms
+ ✓ src/lib/suite-4.test.ts > case 5 passes after 29ms
+ ✓ src/lib/suite-5.test.ts > case 0 passes after 30ms
+ ✓ src/lib/suite-5.test.ts > case 1 passes after 31ms
+ ✓ src/lib/suite-5.test.ts > case 2 passes after 32ms
+ ✓ src/lib/suite-5.test.ts > case 3 passes after 33ms
+ ✓ src/lib/suite-5.test.ts > case 4 passes after 34ms
+ ✓ src/lib/suite-5.test.ts > case 5 passes after 35ms
+ ✓ src/lib/suite-6.test.ts > case 0 passes after 36ms
+ ✓ src/lib/suite-6.test.ts > case 1 passes after 37ms
+ ✓ src/lib/suite-6.test.ts > case 2 passes after 38ms
+ ✓ src/lib/suite-6.test.ts > case 3 passes after 39ms
+ ✓ src/lib/suite-6.test.ts > case 4 passes after 40ms
+ ✓ src/lib/suite-6.test.ts > case 5 passes after 41ms
+ ✓ src/lib/suite-7.test.ts > case 0 passes after 42ms
+ ✓ src/lib/suite-7.test.ts > case 1 passes after 43ms
+ ✓ src/lib/suite-7.test.ts > case 2 passes after 44ms
+ ✓ src/lib/suite-7.test.ts > case 3 passes after 45ms
+ ✓ src/lib/suite-7.test.ts > case 4 passes after 46ms
+ ✓ src/lib/suite-7.test.ts > case 5 passes after 47ms
+ ✓ src/lib/suite-8.test.ts > case 0 passes after 48ms
+ ✓ src/lib/suite-8.test.ts > case 1 passes after 49ms
+ ✓ src/lib/suite-8.test.ts > case 2 passes after 50ms
+ ✓ src/lib/suite-8.test.ts > case 3 passes after 51ms
+ ✓ src/lib/suite-8.test.ts > case 4 passes after 52ms
+ ✓ src/lib/suite-8.test.ts > case 5 passes after 53ms
+ ✓ src/lib/suite-9.test.ts > case 0 passes after 54ms
+ ✓ src/lib/suite-9.test.ts > case 1 passes after 55ms
+ ✓ src/lib/suite-9.test.ts > case 2 passes after 56ms
+ ✓ src/lib/suite-9.test.ts > case 3 passes after 57ms
+ ✓ src/lib/suite-9.test.ts > case 4 passes after 58ms
+ ✓ src/lib/suite-9.test.ts > case 5 passes after 59ms
+ ✓ src/lib/suite-10.test.ts > case 0 passes after 60ms
+ ✓ src/lib/suite-10.test.ts > case 1 passes after 61ms
+ ✓ src/lib/suite-10.test.ts > case 2 passes after 62ms
+ ✓ src/lib/suite-10.test.ts > case 3 passes after 63ms
+ ✓ src/lib/suite-10.test.ts > case 4 passes after 64ms
+ ✓ src/lib/suite-10.test.ts > case 5 passes after 65ms
+ ✓ src/lib/suite-11.test.ts > case 0 passes after 66ms
+ ✓ src/lib/suite-11.test.ts > case 1 passes after 67ms
+ ✓ src/lib/suite-11.test.ts > case 2 passes after 68ms
+ ✓ src/lib/suite-11.test.ts > case 3 passes after 69ms
+ ✓ src/lib/suite-11.test.ts > case 4 passes after 70ms
+ ✓ src/lib/suite-11.test.ts > case 5 passes after 71ms
+ ✓ src/lib/suite-12.test.ts > case 0 passes after 72ms
+ ✓ src/lib/suite-12.test.ts > case 1 passes after 73ms
+ ✓ src/lib/suite-12.test.ts > case 2 passes after 74ms
+ ✓ src/lib/suite-12.test.ts > case 3 passes after 75ms
+ ✓ src/lib/suite-12.test.ts > case 4 passes after 76ms
+ ✓ src/lib/suite-12.test.ts > case 5 passes after 77ms
+ ✓ src/lib/suite-13.test.ts > case 0 passes after 78ms
+ ✓ src/lib/suite-13.test.ts > case 1 passes after 79ms
+ ✓ src/lib/suite-13.test.ts > case 2 passes after 80ms
+ ✓ src/lib/suite-13.test.ts > case 3 passes after 81ms
+ ✓ src/lib/suite-13.test.ts > case 4 passes after 82ms
+ ✓ src/lib/suite-13.test.ts > case 5 passes after 83ms
+ ✓ src/lib/suite-14.test.ts > case 0 passes after 84ms
+ ✓ src/lib/suite-14.test.ts > case 1 passes after 85ms
+ ✓ src/lib/suite-14.test.ts > case 2 passes after 86ms
+ ✓ src/lib/suite-14.test.ts > case 3 passes after 87ms
+ ✓ src/lib/suite-14.test.ts > case 4 passes after 88ms
+ ✓ src/lib/suite-14.test.ts > case 5 passes after 89ms
+ ✓ src/lib/suite-15.test.ts > case 0 passes after 90ms
+ ✓ src/lib/suite-15.test.ts > case 1 passes after 91ms
+ ✓ src/lib/suite-15.test.ts > case 2 passes after 92ms
+ ✓ src/lib/suite-15.test.ts > case 3 passes after 93ms
+ ✓ src/lib/suite-15.test.ts > case 4 passes after 94ms
+ ✓ src/lib/suite-15.test.ts > case 5 passes after 95ms
+ ✓ src/lib/suite-16.test.ts > case 0 passes after 96ms
+ ✓ src/lib/suite-16.test.ts > case 1 passes after 0ms
+ ✓ src/lib/suite-16.test.ts > case 2 passes after 1ms
+ ✓ src/lib/suite-16.test.ts > case 3 passes after 2ms
+ ✓ src/lib/suite-16.test.ts > case 4 passes after 3ms
+ ✓ src/lib/suite-16.test.ts > case 5 passes after 4ms
+ ✓ src/lib/suite-17.test.ts > case 0 passes after 5ms
+ ✓ src/lib/suite-17.test.ts > case 1 passes after 6ms
+ ✓ src/lib/suite-17.test.ts > case 2 passes after 7ms
+ ✓ src/lib/suite-17.test.ts > case 3 passes after 8ms
+ ✓ src/lib/suite-17.test.ts > case 4 passes after 9ms
+ ✓ src/lib/suite-17.test.ts > case 5 passes after 10ms
+ ✓ src/lib/suite-18.test.ts > case 0 passes after 11ms
+ ✓ src/lib/suite-18.test.ts > case 1 passes after 12ms
+ ✓ src/lib/suite-18.test.ts > case 2 passes after 13ms
+ ✓ src/lib/suite-18.test.ts > case 3 passes after 14ms
+ ✓ src/lib/suite-18.test.ts > case 4 passes after 15ms
+ ✓ src/lib/suite-18.test.ts > case 5 passes after 16ms
+ ✓ src/lib/suite-19.test.ts > case 0 passes after 17ms
+ ✓ src/lib/suite-19.test.ts > case 1 passes after 18ms
+ ✓ src/lib/suite-19.test.ts > case 2 passes after 19ms
+ ✓ src/lib/suite-19.test.ts > case 3 passes after 20ms
+ ✓ src/lib/suite-19.test.ts > case 4 passes after 21ms
+ ✓ src/lib/suite-19.test.ts > case 5 passes after 22ms
+ ✓ src/lib/suite-20.test.ts > case 0 passes after 23ms
+ ✓ src/lib/suite-20.test.ts > case 1 passes after 24ms
+ ✓ src/lib/suite-20.test.ts > case 2 passes after 25ms
+ ✓ src/lib/suite-20.test.ts > case 3 passes after 26ms
+ ✓ src/lib/suite-20.test.ts > case 4 passes after 27ms
+ ✓ src/lib/suite-20.test.ts > case 5 passes after 28ms
+ ✓ src/lib/suite-21.test.ts > case 0 passes after 29ms
+ ✓ src/lib/suite-21.test.ts > case 1 passes after 30ms
+ ✓ src/lib/suite-21.test.ts > case 2 passes after 31ms
+ ✓ src/lib/suite-21.test.ts > case 3 passes after 32ms
+ ✓ src/lib/suite-21.test.ts > case 4 passes after 33ms
+ ✓ src/lib/suite-21.test.ts > case 5 passes after 34ms
+ ✓ src/lib/suite-22.test.ts > case 0 passes after 35ms
+ ✓ src/lib/suite-22.test.ts > case 1 passes after 36ms
+ ✓ src/lib/suite-22.test.ts > case 2 passes after 37ms
+ ✓ src/lib/suite-22.test.ts > case 3 passes after 38ms
+ ✓ src/lib/suite-22.test.ts > case 4 passes after 39ms
+ ✓ src/lib/suite-22.test.ts > case 5 passes after 40ms
+ ✓ src/lib/suite-23.test.ts > case 0 passes after 41ms
+ ✓ src/lib/suite-23.test.ts > case 1 passes after 42ms
+ ✓ src/lib/suite-23.test.ts > case 2 passes after 43ms
+ ✓ src/lib/suite-23.test.ts > case 3 passes after 44ms
+ ✓ src/lib/suite-23.test.ts > case 4 passes after 45ms
+ ✓ src/lib/suite-23.test.ts > case 5 passes after 46ms
+ ✓ src/lib/suite-24.test.ts > case 0 passes after 47ms
+ ✓ src/lib/suite-24.test.ts > case 1 passes after 48ms
+ ✓ src/lib/suite-24.test.ts > case 2 passes after 49ms
+ ✓ src/lib/suite-24.test.ts > case 3 passes after 50ms
+ ✓ src/lib/suite-24.test.ts > case 4 passes after 51ms
+ ✓ src/lib/suite-24.test.ts > case 5 passes after 52ms
+ ✓ src/lib/suite-25.test.ts > case 0 passes after 53ms
+ ✓ src/lib/suite-25.test.ts > case 1 passes after 54ms
+ ✓ src/lib/suite-25.test.ts > case 2 passes after 55ms
+ ✓ src/lib/suite-25.test.ts > case 3 passes after 56ms
+ ✓ src/lib/suite-25.test.ts > case 4 passes after 57ms
+ ✓ src/lib/suite-25.test.ts > case 5 passes after 58ms
+ ✓ src/lib/suite-26.test.ts > case 0 passes after 59ms
+ ✓ src/lib/suite-26.test.ts > case 1 passes after 60ms
+ ✓ src/lib/suite-26.test.ts > case 2 passes after 61ms
+ ✓ src/lib/suite-26.test.ts > case 3 passes after 62ms
+ ✓ src/lib/suite-26.test.ts > case 4 passes after 63ms
+ ✓ src/lib/suite-26.test.ts > case 5 passes after 64ms
+ ✓ src/lib/suite-27.test.ts > case 0 passes after 65ms
+ ✓ src/lib/suite-27.test.ts > case 1 passes after 66ms
+ ✓ src/lib/suite-27.test.ts > case 2 passes after 67ms
+ ✓ src/lib/suite-27.test.ts > case 3 passes after 68ms
+ ✓ src/lib/suite-27.test.ts > case 4 passes after 69ms
+ ✓ src/lib/suite-27.test.ts > case 5 passes after 70ms
+ ✓ src/lib/suite-28.test.ts > case 0 passes after 71ms
+ ✓ src/lib/suite-28.test.ts > case 1 passes after 72ms
+ ✓ src/lib/suite-28.test.ts > case 2 passes after 73ms
+ ✓ src/lib/suite-28.test.ts > case 3 passes after 74ms
+ ✓ src/lib/suite-28.test.ts > case 4 passes after 75ms
+ ✓ src/lib/suite-28.test.ts > case 5 passes after 76ms
+ ✓ src/lib/suite-29.test.ts > case 0 passes after 77ms
+ ✓ src/lib/suite-29.test.ts > case 1 passes after 78ms
+ ✓ src/lib/suite-29.test.ts > case 2 passes after 79ms
+ ✓ src/lib/suite-29.test.ts > case 3 passes after 80ms
+ ✓ src/lib/suite-29.test.ts > case 4 passes after 81ms
+ ✓ src/lib/suite-29.test.ts > case 5 passes after 82ms
+ ✓ src/lib/suite-30.test.ts > case 0 passes after 83ms
+ ✓ src/lib/suite-30.test.ts > case 1 passes after 84ms
+ ✓ src/lib/suite-30.test.ts > case 2 passes after 85ms
+ ✓ src/lib/suite-30.test.ts > case 3 passes after 86ms
+ ✓ src/lib/suite-30.test.ts > case 4 passes after 87ms
+ ✓ src/lib/suite-30.test.ts > case 5 passes after 88ms
+ ✓ src/lib/suite-31.test.ts > case 0 passes after 89ms
+ ✓ src/lib/suite-31.test.ts > case 1 passes after 90ms
+ ✓ src/lib/suite-31.test.ts > case 2 passes after 91ms
+ ✓ src/lib/suite-31.test.ts > case 3 passes after 92ms
+ ✓ src/lib/suite-31.test.ts > case 4 passes after 93ms
+ ✓ src/lib/suite-31.test.ts > case 5 passes after 94ms
+ ✓ src/lib/suite-32.test.ts > case 0 passes after 95ms
+ ✓ src/lib/suite-32.test.ts > case 1 passes after 96ms
+ ✓ src/lib/suite-32.test.ts > case 2 passes after 0ms
+ ✓ src/lib/suite-32.test.ts > case 3 passes after 1ms
+ ✓ src/lib/suite-32.test.ts > case 4 passes after 2ms
+ ✓ src/lib/suite-32.test.ts > case 5 passes after 3ms
+ ✓ src/lib/suite-33.test.ts > case 0 passes after 4ms
+ ✓ src/lib/suite-33.test.ts > case 1 passes after 5ms
+ ✓ src/lib/suite-33.test.ts > case 2 passes after 6ms
+ ✓ src/lib/suite-33.test.ts > case 3 passes after 7ms
+ ✓ src/lib/suite-33.test.ts > case 4 passes after 8ms
+ ✓ src/lib/suite-33.test.ts > case 5 passes after 9ms
+ ✓ src/lib/suite-34.test.ts > case 0 passes after 10ms
+ ✓ src/lib/suite-34.test.ts > case 1 passes after 11ms
+ ✓ src/lib/suite-34.test.ts > case 2 passes after 12ms
+ ✓ src/lib/suite-34.test.ts > case 3 passes after 13ms
+ ✓ src/lib/suite-34.test.ts > case 4 passes after 14ms
+ ✓ src/lib/suite-34.test.ts > case 5 passes after 15ms
+ ✓ src/lib/suite-35.test.ts > case 0 passes after 16ms
+ ✓ src/lib/suite-35.test.ts > case 1 passes after 17ms
+ ✓ src/lib/suite-35.test.ts > case 2 passes after 18ms
+ ✓ src/lib/suite-35.test.ts > case 3 passes after 19ms
+ ✓ src/lib/suite-35.test.ts > case 4 passes after 20ms
+ ✓ src/lib/suite-35.test.ts > case 5 passes after 21ms
+ ✓ src/lib/suite-36.test.ts > case 0 passes after 22ms
+ ✓ src/lib/suite-36.test.ts > case 1 passes after 23ms
+ ✓ src/lib/suite-36.test.ts > case 2 passes after 24ms
+ ✓ src/lib/suite-36.test.ts > case 3 passes after 25ms
+ ✓ src/lib/suite-36.test.ts > case 4 passes after 26ms
+ ✓ src/lib/suite-36.test.ts > case 5 passes after 27ms
+ ✓ src/lib/suite-37.test.ts > case 0 passes after 28ms
+ ✓ src/lib/suite-37.test.ts > case 1 passes after 29ms
+ ✓ src/lib/suite-37.test.ts > case 2 passes after 30ms
+ ✓ src/lib/suite-37.test.ts > case 3 passes after 31ms
+ ✓ src/lib/suite-37.test.ts > case 4 passes after 32ms
+ ✓ src/lib/suite-37.test.ts > case 5 passes after 33ms
+ ✓ src/lib/suite-38.test.ts > case 0 passes after 34ms
+ ✓ src/lib/suite-38.test.ts > case 1 passes after 35ms
+ ✓ src/lib/suite-38.test.ts > case 2 passes after 36ms
+ ✓ src/lib/suite-38.test.ts > case 3 passes after 37ms
+ ✓ src/lib/suite-38.test.ts > case 4 passes after 38ms
+ ✓ src/lib/suite-38.test.ts > case 5 passes after 39ms
+ ✓ src/lib/suite-39.test.ts > case 0 passes after 40ms
+ ✓ src/lib/suite-39.test.ts > case 1 passes after 41ms
+ ✓ src/lib/suite-39.test.ts > case 2 passes after 42ms
+ ✓ src/lib/suite-39.test.ts > case 3 passes after 43ms
+ ✓ src/lib/suite-39.test.ts > case 4 passes after 44ms
+ ✓ src/lib/suite-39.test.ts > case 5 passes after 45ms
+ ✓ src/lib/suite-40.test.ts > case 0 passes after 46ms
+ ✓ src/lib/suite-40.test.ts > case 1 passes after 47ms
+ ✓ src/lib/suite-40.test.ts > case 2 passes after 48ms
+ ✓ src/lib/suite-40.test.ts > case 3 passes after 49ms
+ ✓ src/lib/suite-40.test.ts > case 4 passes after 50ms
+ ✓ src/lib/suite-40.test.ts > case 5 passes after 51ms
+ ✓ src/lib/suite-41.test.ts > case 0 passes after 52ms
+ ✓ src/lib/suite-41.test.ts > case 1 passes after 53ms
+ ✓ src/lib/suite-41.test.ts > case 2 passes after 54ms
+ ✓ src/lib/suite-41.test.ts > case 3 passes after 55ms
+ ✓ src/lib/suite-41.test.ts > case 4 passes after 56ms
+ ✓ src/lib/suite-41.test.ts > case 5 passes after 57ms
+ ✓ src/lib/suite-42.test.ts > case 0 passes after 58ms
+ ✓ src/lib/suite-42.test.ts > case 1 passes after 59ms
+ ✓ src/lib/suite-42.test.ts > case 2 passes after 60ms
+ ✓ src/lib/suite-42.test.ts > case 3 passes after 61ms
+ ✓ src/lib/suite-42.test.ts > case 4 passes after 62ms
+ ✓ src/lib/suite-42.test.ts > case 5 passes after 63ms
+ ✓ src/lib/suite-43.test.ts > case 0 passes after 64ms
+ ✓ src/lib/suite-43.test.ts > case 1 passes after 65ms
+ ✓ src/lib/suite-43.test.ts > case 2 passes after 66ms
+ ✓ src/lib/suite-43.test.ts > case 3 passes after 67ms
+ ✓ src/lib/suite-43.test.ts > case 4 passes after 68ms
+ ✓ src/lib/suite-43.test.ts > case 5 passes after 69ms
+ ✓ src/lib/suite-44.test.ts > case 0 passes after 70ms
+ ✓ src/lib/suite-44.test.ts > case 1 passes after 71ms
+ ✓ src/lib/suite-44.test.ts > case 2 passes after 72ms
+ ✓ src/lib/suite-44.test.ts > case 3 passes after 73ms
+ ✓ src/lib/suite-44.test.ts > case 4 passes after 74ms
+ ✓ src/lib/suite-44.test.ts > case 5 passes after 75ms
+ ✓ src/lib/suite-45.test.ts > case 0 passes after 76ms
+ ✓ src/lib/suite-45.test.ts > case 1 passes after 77ms
+ ✓ src/lib/suite-45.test.ts > case 2 passes after 78ms
+ ✓ src/lib/suite-45.test.ts > case 3 passes after 79ms
+ ✓ src/lib/suite-45.test.ts > case 4 passes after 80ms
+ ✓ src/lib/suite-45.test.ts > case 5 passes after 81ms
+ ✓ src/lib/suite-46.test.ts > case 0 passes after 82ms
+ ✓ src/lib/suite-46.test.ts > case 1 passes after 83ms
+ ✓ src/lib/suite-46.test.ts > case 2 passes after 84ms
+ ✓ src/lib/suite-46.test.ts > case 3 passes after 85ms
+ ✓ src/lib/suite-46.test.ts > case 4 passes after 86ms
+ ✓ src/lib/suite-46.test.ts > case 5 passes after 87ms
+ ✓ src/lib/suite-47.test.ts > case 0 passes after 88ms
+ ✓ src/lib/suite-47.test.ts > case 1 passes after 89ms
+ ✓ src/lib/suite-47.test.ts > case 2 passes after 90ms
+ ✓ src/lib/suite-47.test.ts > case 3 passes after 91ms
+ ✓ src/lib/suite-47.test.ts > case 4 passes after 92ms
+ ✓ src/lib/suite-47.test.ts > case 5 passes after 93ms
+ ✓ src/lib/suite-48.test.ts > case 0 passes after 94ms
+ ✓ src/lib/suite-48.test.ts > case 1 passes after 95ms
+ ✓ src/lib/suite-48.test.ts > case 2 passes after 96ms
+ ✓ src/lib/suite-48.test.ts > case 3 passes after 0ms
+ ✓ src/lib/suite-48.test.ts > case 4 passes after 1ms
+ ✓ src/lib/suite-48.test.ts > case 5 passes after 2ms
+ ✓ src/lib/suite-49.test.ts > case 0 passes after 3ms
+ ✓ src/lib/suite-49.test.ts > case 1 passes after 4ms
+ ✓ src/lib/suite-49.test.ts > case 2 passes after 5ms
+ ✓ src/lib/suite-49.test.ts > case 3 passes after 6ms
+ ✓ src/lib/suite-49.test.ts > case 4 passes after 7ms
+ ✓ src/lib/suite-49.test.ts > case 5 passes after 8ms
+ ✓ src/lib/suite-50.test.ts > case 0 passes after 9ms
+ ✓ src/lib/suite-50.test.ts > case 1 passes after 10ms
+ ✓ src/lib/suite-50.test.ts > case 2 passes after 11ms
+ ✓ src/lib/suite-50.test.ts > case 3 passes after 12ms
+ ✓ src/lib/suite-50.test.ts > case 4 passes after 13ms
+ ✓ src/lib/suite-50.test.ts > case 5 passes after 14ms
+ ✓ src/lib/suite-51.test.ts > case 0 passes after 15ms
+ ✓ src/lib/suite-51.test.ts > case 1 passes after 16ms
+ ✓ src/lib/suite-51.test.ts > case 2 passes after 17ms
+ ✓ src/lib/suite-51.test.ts > case 3 passes after 18ms
+ ✓ src/lib/suite-51.test.ts > case 4 passes after 19ms
+ ✓ src/lib/suite-51.test.ts > case 5 passes after 20ms
+ ✓ src/lib/suite-52.test.ts > case 0 passes after 21ms
+ ✓ src/lib/suite-52.test.ts > case 1 passes after 22ms
+ ✓ src/lib/suite-52.test.ts > case 2 passes after 23ms
+ ✓ src/lib/suite-52.test.ts > case 3 passes after 24ms
+ ✓ src/lib/suite-52.test.ts > case 4 passes after 25ms
+ ✓ src/lib/suite-52.test.ts > case 5 passes after 26ms
+ ✓ src/lib/suite-53.test.ts > case 0 passes after 27ms
+ ✓ src/lib/suite-53.test.ts > case 1 passes after 28ms
+ ✓ src/lib/suite-53.test.ts > case 2 passes after 29ms
+ ✓ src/lib/suite-53.test.ts > case 3 passes after 30ms
+ ✓ src/lib/suite-53.test.ts > case 4 passes after 31ms
+ ✓ src/lib/suite-53.test.ts > case 5 passes after 32ms
+ ✓ src/lib/suite-54.test.ts > case 0 passes after 33ms
+ ✓ src/lib/suite-54.test.ts > case 1 passes after 34ms
+ ✓ src/lib/suite-54.test.ts > case 2 passes after 35ms
+ ✓ src/lib/suite-54.test.ts > case 3 passes after 36ms
+ ✓ src/lib/suite-54.test.ts > case 4 passes after 37ms
+ ✓ src/lib/suite-54.test.ts > case 5 passes after 38ms
+ ✓ src/lib/suite-55.test.ts > case 0 passes after 39ms
+ ✓ src/lib/suite-55.test.ts > case 1 passes after 40ms
+ ✓ src/lib/suite-55.test.ts > case 2 passes after 41ms
+ ✓ src/lib/suite-55.test.ts > case 3 passes after 42ms
+ ✓ src/lib/suite-55.test.ts > case 4 passes after 43ms
+ ✓ src/lib/suite-55.test.ts > case 5 passes after 44ms
+ ✓ src/lib/suite-56.test.ts > case 0 passes after 45ms
+ ✓ src/lib/suite-56.test.ts > case 1 passes after 46ms
+ ✓ src/lib/suite-56.test.ts > case 2 passes after 47ms
+ ✓ src/lib/suite-56.test.ts > case 3 passes after 48ms
+ ✓ src/lib/suite-56.test.ts > case 4 passes after 49ms
+ ✓ src/lib/suite-56.test.ts > case 5 passes after 50ms
+ ✓ src/lib/suite-57.test.ts > case 0 passes after 51ms
+ ✓ src/lib/suite-57.test.ts > case 1 passes after 52ms
+ ✓ src/lib/suite-57.test.ts > case 2 passes after 53ms
+ ✓ src/lib/suite-57.test.ts > case 3 passes after 54ms
+ ✓ src/lib/suite-57.test.ts > case 4 passes after 55ms
+ ✓ src/lib/suite-57.test.ts > case 5 passes after 56ms
+ ✓ src/lib/suite-58.test.ts > case 0 passes after 57ms
+ ✓ src/lib/suite-58.test.ts > case 1 passes after 58ms
+ ✓ src/lib/suite-58.test.ts > case 2 passes after 59ms
+ ✓ src/lib/suite-58.test.ts > case 3 passes after 60ms
+ ✓ src/lib/suite-58.test.ts > case 4 passes after 61ms
+ ✓ src/lib/suite-58.test.ts > case 5 passes after 62ms
+ ✓ src/lib/suite-59.test.ts > case 0 passes after 63ms
+ ✓ src/lib/suite-59.test.ts > case 1 passes after 64ms
+ ✓ src/lib/suite-59.test.ts > case 2 passes after 65ms
+ ✓ src/lib/suite-59.test.ts > case 3 passes after 66ms
+ ✓ src/lib/suite-59.test.ts > case 4 passes after 67ms
+ ✓ src/lib/suite-59.test.ts > case 5 passes after 68ms
+ × src/lib/flaky.test.ts > retries settle
+Test Files  1 failed | 59 passed (60)
+",
+      "runId": "golden-codex",
+      "status": "error",
+      "turnKey": "golden-codex:0",
+    },
+    {
+      "approvalId": "901",
+      "approvalKind": "command",
+      "at": 1760000001751,
+      "decision": "allow",
+      "id": "approval-901",
+      "input": {
+        "command": "pnpm install",
+        "itemId": "call_cmd_1",
+        "reason": "Network access",
+        "threadId": "thr_golden",
+        "turnId": "turn-1",
+      },
+      "kind": "approval",
+      "reason": "Network access",
+      "runId": "golden-codex",
+      "toolName": "shell",
+      "turnKey": "golden-codex:0",
+    },
+    {
+      "at": 1760000001819,
+      "done": true,
+      "id": "call_patch_1",
+      "input": [
+        {
+          "diff": "@@ -10,3 +10,4 @@
+-  await waitFor(done);
++  vi.advanceTimersByTime(100);
++  await waitFor(done);
+",
+          "kind": {
+            "type": "update",
+          },
+          "path": "src/lib/flaky.test.ts",
+        },
+      ],
+      "isError": false,
+      "kind": "tool",
+      "name": "apply_patch",
+      "runId": "golden-codex",
+      "status": "success",
+      "turnKey": "golden-codex:0",
+    },
+    {
+      "at": 1760000001887,
+      "id": "activity-diff-turn-1",
+      "kind": "activity",
+      "label": "Changes",
+      "runId": "golden-codex",
+      "status": "success",
+      "text": "@@ -10,3 +10,4 @@
+-  await waitFor(done);
++  vi.advanceTimersByTime(100);
++  await waitFor(done);
+",
+      "turnKey": "golden-codex:0",
+    },
+    {
+      "at": 1760000001904,
+      "id": "activity-plan-turn-1",
+      "kind": "activity",
+      "label": "Plan",
+      "runId": "golden-codex",
+      "status": "success",
+      "text": "completed: Reproduce
+completed: Fix the timer",
+      "turnKey": "golden-codex:0",
+    },
+    {
+      "at": 1760000001921,
+      "done": true,
+      "id": "call_mcp_1",
+      "input": {
+        "query": "waitFor retry",
+      },
+      "isError": false,
+      "kind": "tool",
+      "mcp": {
+        "server": "codegraph",
+        "tool": "codegraph_explore",
+      },
+      "name": "codegraph.codegraph_explore",
+      "output": {
+        "content": [
+          {
+            "text": "waitFor in src/lib/flaky.test.ts:12",
+            "type": "text",
+          },
+        ],
+      },
+      "progress": "Indexed 412 symbols",
+      "runId": "golden-codex",
+      "status": "success",
+      "turnKey": "golden-codex:0",
+    },
+    {
+      "at": 1760000001972,
+      "done": true,
+      "id": "call_cmd_2",
+      "input": {
+        "command": "/bin/zsh -lc 'pnpm vitest run src/lib/flaky.test.ts'",
+        "commandActions": [
+          {
+            "command": "pnpm vitest run src/lib/flaky.test.ts",
+            "type": "unknown",
+          },
+        ],
+        "cwd": "/Projects/studio",
+      },
+      "isError": false,
+      "kind": "tool",
+      "name": "shell",
+      "output": " ✓ src/lib/flaky.test.ts > retry 0 settles
+ ✓ src/lib/flaky.test.ts > retry 1 settles
+ ✓ src/lib/flaky.test.ts > retry 2 settles
+ ✓ src/lib/flaky.test.ts > retry 3 settles
+ ✓ src/lib/flaky.test.ts > retry 4 settles
+ ✓ src/lib/flaky.test.ts > retry 5 settles
+ ✓ src/lib/flaky.test.ts > retry 6 settles
+ ✓ src/lib/flaky.test.ts > retry 7 settles
+",
+      "runId": "golden-codex",
+      "status": "success",
+      "turnKey": "golden-codex:0",
+    },
+    {
+      "at": 1760000002159,
+      "id": "msg_2",
+      "kind": "message",
+      "role": "assistant",
+      "runId": "golden-codex",
+      "streaming": false,
+      "text": "and reports instead real hides between drain store flaky on that clock so runs retry the a of failure the the and publish test a the never the before settles",
+      "turnKey": "golden-codex:0",
+    },
+    {
+      "at": 1760000002720,
+      "boundary": "turn",
+      "durationMs": 0,
+      "id": "turn-turn-1",
+      "kind": "status",
+      "outcome": "success",
+      "runId": "golden-codex",
+      "text": "turn finished in 0.0s",
+      "tone": "ok",
+      "turnKey": "golden-codex:0",
+    },
+    {
+      "at": 1760000002754,
+      "endedAt": 1760000002907,
+      "explicit": true,
+      "id": "think-rs_2",
+      "kind": "thinking",
+      "runId": "golden-codex",
+      "startedAt": 1760000002754,
+      "status": "success",
+      "text": "of failure the the and publish",
+      "turnKey": "golden-codex:1",
+    },
+    {
+      "answers": {
+        "scope": [
+          "Only the flaky file",
+        ],
+      },
+      "approvalId": "902",
+      "approvalKind": "user_input",
+      "at": 1760000002873,
+      "decision": "allow",
+      "id": "approval-902",
+      "input": {
+        "itemId": "ask_1",
+        "questions": [
+          {
+            "header": "Scope",
+            "id": "scope",
+            "options": [
+              {
+                "label": "Only the flaky file",
+              },
+              {
+                "label": "The whole suite",
+              },
+            ],
+            "question": "Which tests?",
+          },
+        ],
+        "threadId": "thr_golden",
+        "turnId": "turn-2",
+      },
+      "kind": "approval",
+      "reason": "Network access",
+      "runId": "golden-codex",
+      "toolName": "shell",
+      "turnKey": "golden-codex:1",
+    },
+    {
+      "at": 1760000002924,
+      "detail": {
+        "action": {
+          "query": "vitest fake timers waitFor",
+          "type": "search",
+        },
+        "id": "ws_1",
+        "query": "vitest fake timers waitFor",
+        "status": "completed",
+        "type": "webSearch",
+      },
+      "id": "activity-ws_1",
+      "kind": "activity",
+      "label": "Searching the web",
+      "runId": "golden-codex",
+      "status": "success",
+      "text": "vitest fake timers waitFor",
+      "turnKey": "golden-codex:1",
+    },
+    {
+      "activityKind": "image_generation",
+      "at": 1760000002958,
+      "detail": {
+        "id": "ig_1",
+        "revisedPrompt": "A timeline of the retry",
+        "savedPath": "/Users/me/.openorc/images/ig_1.png",
+        "status": "completed",
+        "type": "imageGeneration",
+      },
+      "id": "activity-ig_1",
+      "imagePath": "/Users/me/.openorc/images/ig_1.png",
+      "kind": "activity",
+      "label": "Generated image",
+      "runId": "golden-codex",
+      "status": "success",
+      "text": "",
+      "turnKey": "golden-codex:1",
+    },
+    {
+      "at": 1760000002992,
+      "id": "msg_3",
+      "kind": "message",
+      "role": "assistant",
+      "runId": "golden-codex",
+      "streaming": false,
+      "text": "race queue the the waits timer fake advances assertion the and reports instead real",
+      "turnKey": "golden-codex:1",
+    },
+    {
+      "at": 1760000003247,
+      "boundary": "turn",
+      "durationMs": 0,
+      "id": "turn-turn-2",
+      "kind": "status",
+      "outcome": "cancelled",
+      "runId": "golden-codex",
+      "text": "turn cancelled in 0.0s",
+      "tone": "bad",
+      "turnKey": "golden-codex:1",
+    },
+    {
+      "at": 1760000003264,
+      "boundary": "session",
+      "id": "status-end",
+      "kind": "status",
+      "outcome": "success",
+      "runId": "golden-codex",
+      "text": "session closed",
+      "tone": "muted",
+      "turnKey": "golden-codex:2",
+    },
+  ],
+  "eventAt": 1760000003264,
+  "eventCount": 193,
+  "fromTurn": 0,
+  "hydrated": false,
+  "live": false,
+  "pendingApprovals": 0,
+  "stderr": [],
+  "turnOf": [
+    [
+      "status-start",
+      0,
+    ],
+    [
+      "think-rs_1",
+      0,
+    ],
+    [
+      "msg_1",
+      0,
+    ],
+    [
+      "call_cmd_1",
+      0,
+    ],
+    [
+      "approval-901",
+      0,
+    ],
+    [
+      "call_patch_1",
+      0,
+    ],
+    [
+      "activity-diff-turn-1",
+      0,
+    ],
+    [
+      "activity-plan-turn-1",
+      0,
+    ],
+    [
+      "call_mcp_1",
+      0,
+    ],
+    [
+      "call_cmd_2",
+      0,
+    ],
+    [
+      "msg_2",
+      0,
+    ],
+    [
+      "turn-turn-1",
+      0,
+    ],
+    [
+      "think-rs_2",
+      1,
+    ],
+    [
+      "approval-902",
+      1,
+    ],
+    [
+      "activity-ws_1",
+      1,
+    ],
+    [
+      "activity-ig_1",
+      1,
+    ],
+    [
+      "msg_3",
+      1,
+    ],
+    [
+      "turn-turn-2",
+      1,
+    ],
+    [
+      "status-end",
+      2,
+    ],
+  ],
+  "turnOpen": false,
+  "turnsCompleted": 2,
+}
+`;
+
+exports[`transcript golden replay > projects the failure stream the same however it is cut into frames 1`] = `
+{
+  "blocks": [
+    {
+      "at": 1760000100000,
+      "id": "status-start",
+      "kind": "status",
+      "runId": "golden-failure",
+      "text": "codex session started",
+      "tone": "muted",
+      "turnKey": "golden-failure:0",
+    },
+    {
+      "activityKind": "image_generation",
+      "at": 1760000100046,
+      "detail": {
+        "savedPath": "/tmp/img.png",
+      },
+      "id": "activity-img",
+      "imagePath": "/tmp/img.png",
+      "kind": "activity",
+      "label": "Generated image",
+      "runId": "golden-failure",
+      "status": "success",
+      "text": "Sketching the layout",
+      "turnKey": "golden-failure:0",
+    },
+    {
+      "at": 1760000100138,
+      "id": "activity-quota",
+      "kind": "activity",
+      "label": "Provider error",
+      "recovery": {
+        "kind": "usage",
+        "provider": "codex",
+      },
+      "runId": "golden-failure",
+      "status": "error",
+      "text": "Usage limit reached",
+      "turnKey": "golden-failure:0",
+    },
+    {
+      "at": 1760000100161,
+      "id": "activity-new-activity",
+      "kind": "activity",
+      "label": "Compacting context",
+      "runId": "golden-failure",
+      "status": "error",
+      "text": "Folding",
+      "turnKey": "golden-failure:0",
+    },
+    {
+      "at": 1760000100184,
+      "endedAt": 1760000100230,
+      "id": "think-th-f",
+      "kind": "thinking",
+      "runId": "golden-failure",
+      "startedAt": 1760000100184,
+      "text": "Retrying with a smaller prompt",
+      "turnKey": "golden-failure:0",
+    },
+    {
+      "at": 1760000100230,
+      "done": true,
+      "id": "open-tool",
+      "input": {
+        "command": "sleep 100",
+      },
+      "isError": true,
+      "kind": "tool",
+      "name": "shell",
+      "runId": "golden-failure",
+      "status": "error",
+      "turnKey": "golden-failure:0",
+    },
+    {
+      "approvalId": "ap-open",
+      "approvalKind": "file_change",
+      "at": 1760000100322,
+      "decision": "expired",
+      "id": "approval-ap-open",
+      "input": {
+        "path": "a.ts",
+      },
+      "kind": "approval",
+      "runId": "golden-failure",
+      "turnKey": "golden-failure:0",
+    },
+    {
+      "at": 1760000100345,
+      "id": "m-f",
+      "kind": "message",
+      "role": "assistant",
+      "runId": "golden-failure",
+      "streaming": false,
+      "text": "Working on",
+      "turnKey": "golden-failure:0",
+    },
+    {
+      "at": 1760000100368,
+      "endedAt": 1760000100391,
+      "explicit": true,
+      "id": "think-th-g",
+      "kind": "thinking",
+      "runId": "golden-failure",
+      "startedAt": 1760000100368,
+      "status": "error",
+      "text": "",
+      "turnKey": "golden-failure:0",
+    },
+    {
+      "at": 1760000100391,
+      "boundary": "session",
+      "id": "err-1760000100391-9",
+      "kind": "status",
+      "outcome": "error",
+      "runId": "golden-failure",
+      "text": "Codex exited with code 1",
+      "tone": "bad",
+      "turnKey": "golden-failure:0",
+    },
+  ],
+  "eventAt": 1760000100391,
+  "eventCount": 18,
+  "fromTurn": 0,
+  "hydrated": false,
+  "live": false,
+  "pendingApprovals": 0,
+  "stderr": [],
+  "turnOf": [
+    [
+      "status-start",
+      0,
+    ],
+    [
+      "activity-img",
+      0,
+    ],
+    [
+      "activity-quota",
+      0,
+    ],
+    [
+      "activity-new-activity",
+      0,
+    ],
+    [
+      "think-th-f",
+      0,
+    ],
+    [
+      "open-tool",
+      0,
+    ],
+    [
+      "approval-ap-open",
+      0,
+    ],
+    [
+      "m-f",
+      0,
+    ],
+    [
+      "think-th-g",
+      0,
+    ],
+    [
+      "err-1760000100391-9",
+      0,
+    ],
+  ],
+  "turnOpen": false,
+  "turnsCompleted": 0,
+}
+`;
+
+exports[`transcript golden replay > publishes the same claude transcript after every frame 1`] = `
+[
+  "live idle 0 | status-start status claude session started with claude-opus-5-5",
+  "live turn 0 | status-start status claude session started with claude-opus-5-5 | user-1 message 33 | think-th-1 thinking 0~",
+  "live turn 0 | status-start status claude session started with claude-opus-5-5 | user-1 message 33 | think-th-1 thinking 40~",
+  "live turn 0 | status-start status claude session started with claude-opus-5-5 | user-1 message 33 | think-th-1 thinking 57~",
+  "live turn 0 | status-start status claude session started with claude-opus-5-5 | user-1 message 33 | think-th-1 thinking 57success | m-1 message 66~",
+  "live turn 0 | status-start status claude session started with claude-opus-5-5 | user-1 message 33 | think-th-1 thinking 57success | m-1 message 94~",
+  "live turn 0 | status-start status claude session started with claude-opus-5-5 | user-1 message 33 | think-th-1 thinking 57success | m-1 message 142 | tu-grep tool 433~",
+  "live turn 0 | status-start status claude session started with claude-opus-5-5 | user-1 message 33 | think-th-1 thinking 57success | m-1 message 142 | tu-grep tool 488~",
+  "live turn 0 | status-start status claude session started with claude-opus-5-5 | user-1 message 33 | think-th-1 thinking 57success | m-1 message 142 | tu-grep tool 659~",
+  "live turn 0 | status-start status claude session started with claude-opus-5-5 | user-1 message 33 | think-th-1 thinking 57success | m-1 message 142 | tu-grep tool 1123~",
+  "live turn 0 | status-start status claude session started with claude-opus-5-5 | user-1 message 33 | think-th-1 thinking 57success | m-1 message 142 | tu-grep tool 1239~",
+  "live turn 0 | status-start status claude session started with claude-opus-5-5 | user-1 message 33 | think-th-1 thinking 57success | m-1 message 142 | tu-grep tool 1993~",
+  "live turn 0 | status-start status claude session started with claude-opus-5-5 | user-1 message 33 | think-th-1 thinking 57success | m-1 message 142 | tu-grep tool 2283~",
+  "live turn 0 | status-start status claude session started with claude-opus-5-5 | user-1 message 33 | think-th-1 thinking 57success | m-1 message 142 | tu-grep tool 2283success | tu-bash tool 35success:Building 3 of 7 | approval-ap-bash approval allow_for_run | approval-ap-ask approval allow | tu-mcp tool objectsuccess | approval-ap-once approval expired | turn-t1 status turn cancelled in 41.3s, 12,345 in / 678 out | user-2 message 25",
+  "live turn 0 | status-start status claude session started with claude-opus-5-5 | user-1 message 33 | think-th-1 thinking 57success | m-1 message 142 | tu-grep tool 2283success | tu-bash tool 35success:Building 3 of 7 | approval-ap-bash approval allow_for_run | approval-ap-ask approval allow | tu-mcp tool objectsuccess | approval-ap-once approval expired | turn-t1 status turn cancelled in 41.3s, 12,345 in / 678 out | user-2 message 25 | think-th-2 thinking 29~",
+  "live turn 0 | status-start status claude session started with claude-opus-5-5 | user-1 message 33 | think-th-1 thinking 57success | m-1 message 142 | tu-grep tool 2283success | tu-bash tool 35success:Building 3 of 7 | approval-ap-bash approval allow_for_run | approval-ap-ask approval allow | tu-mcp tool objectsuccess | approval-ap-once approval expired | turn-t1 status turn cancelled in 41.3s, 12,345 in / 678 out | user-2 message 25 | think-th-2 thinking 29 | tu-task tool undefined~ | tu-child tool 7success",
+  "ended idle 0 | status-start status claude session started with claude-opus-5-5 | user-1 message 33 | think-th-1 thinking 57success | m-1 message 142 | tu-grep tool 2283success | tu-bash tool 35success:Building 3 of 7 | approval-ap-bash approval allow_for_run | approval-ap-ask approval allow | tu-mcp tool objectsuccess | approval-ap-once approval expired | turn-t1 status turn cancelled in 41.3s, 12,345 in / 678 out | user-2 message 25 | think-th-2 thinking 29 | tu-task tool 12success | tu-child tool 7success | turn-t2 status turn finished in 9.0s | status-end status session closed",
+]
+`;
+
+exports[`transcript golden replay > publishes the same codex transcript after every frame 1`] = `
+[
+  "live idle 0 | status-start status codex session started with gpt-5.5-codex",
+  "live turn 0 | status-start status codex session started with gpt-5.5-codex | think-rs_1 thinking 4~",
+  "live turn 0 | status-start status codex session started with gpt-5.5-codex | think-rs_1 thinking 43~",
+  "live turn 0 | status-start status codex session started with gpt-5.5-codex | think-rs_1 thinking 51~",
+  "live turn 0 | status-start status codex session started with gpt-5.5-codex | think-rs_1 thinking 54success | msg_1 message 57~",
+  "live turn 0 | status-start status codex session started with gpt-5.5-codex | think-rs_1 thinking 54success | msg_1 message 87~",
+  "live turn 0 | status-start status codex session started with gpt-5.5-codex | think-rs_1 thinking 54success | msg_1 message 146 | call_cmd_1 tool 3230~",
+  "live turn 0 | status-start status codex session started with gpt-5.5-codex | think-rs_1 thinking 54success | msg_1 message 146 | call_cmd_1 tool 3560~",
+  "live turn 0 | status-start status codex session started with gpt-5.5-codex | think-rs_1 thinking 54success | msg_1 message 146 | call_cmd_1 tool 4550~",
+  "live turn 0 | status-start status codex session started with gpt-5.5-codex | think-rs_1 thinking 54success | msg_1 message 146 | call_cmd_1 tool 7180~",
+  "live turn 0 | status-start status codex session started with gpt-5.5-codex | think-rs_1 thinking 54success | msg_1 message 146 | call_cmd_1 tool 7840~",
+  "live turn 0 | status-start status codex session started with gpt-5.5-codex | think-rs_1 thinking 54success | msg_1 message 146 | call_cmd_1 tool 12120~",
+  "live turn 0 | status-start status codex session started with gpt-5.5-codex | think-rs_1 thinking 54success | msg_1 message 146 | call_cmd_1 tool 13770~",
+  "live turn 0 | status-start status codex session started with gpt-5.5-codex | think-rs_1 thinking 54success | msg_1 message 146 | call_cmd_1 tool 19780error | approval-901 approval allow",
+  "live turn 0 | status-start status codex session started with gpt-5.5-codex | think-rs_1 thinking 54success | msg_1 message 146 | call_cmd_1 tool 19780error | approval-901 approval allow",
+  "live turn 0 | status-start status codex session started with gpt-5.5-codex | think-rs_1 thinking 54success | msg_1 message 146 | call_cmd_1 tool 19780error | approval-901 approval allow | call_patch_1 tool undefinedsuccess",
+  "live turn 0 | status-start status codex session started with gpt-5.5-codex | think-rs_1 thinking 54success | msg_1 message 146 | call_cmd_1 tool 19780error | approval-901 approval allow | call_patch_1 tool undefinedsuccess | activity-diff-turn-1 activity success:98 | activity-plan-turn-1 activity running:46 | call_mcp_1 tool objectsuccess:Indexed 412 symbols | call_cmd_2 tool 43~",
+  "live turn 0 | status-start status codex session started with gpt-5.5-codex | think-rs_1 thinking 54success | msg_1 message 146 | call_cmd_1 tool 19780error | approval-901 approval allow | call_patch_1 tool undefinedsuccess | activity-diff-turn-1 activity success:98 | activity-plan-turn-1 activity running:46 | call_mcp_1 tool objectsuccess:Indexed 412 symbols | call_cmd_2 tool 129~",
+  "live turn 0 | status-start status codex session started with gpt-5.5-codex | think-rs_1 thinking 54success | msg_1 message 146 | call_cmd_1 tool 19780error | approval-901 approval allow | call_patch_1 tool undefinedsuccess | activity-diff-turn-1 activity success:98 | activity-plan-turn-1 activity success:45 | call_mcp_1 tool objectsuccess:Indexed 412 symbols | call_cmd_2 tool 344success | msg_2 message 30~",
+  "live turn 0 | status-start status codex session started with gpt-5.5-codex | think-rs_1 thinking 54success | msg_1 message 146 | call_cmd_1 tool 19780error | approval-901 approval allow | call_patch_1 tool undefinedsuccess | activity-diff-turn-1 activity success:98 | activity-plan-turn-1 activity success:45 | call_mcp_1 tool objectsuccess:Indexed 412 symbols | call_cmd_2 tool 344success | msg_2 message 59~",
+  "live turn 0 | status-start status codex session started with gpt-5.5-codex | think-rs_1 thinking 54success | msg_1 message 146 | call_cmd_1 tool 19780error | approval-901 approval allow | call_patch_1 tool undefinedsuccess | activity-diff-turn-1 activity success:98 | activity-plan-turn-1 activity success:45 | call_mcp_1 tool objectsuccess:Indexed 412 symbols | call_cmd_2 tool 344success | msg_2 message 157",
+  "live turn 0 | status-start status codex session started with gpt-5.5-codex | think-rs_1 thinking 54success | msg_1 message 146 | call_cmd_1 tool 19780error | approval-901 approval allow | call_patch_1 tool undefinedsuccess | activity-diff-turn-1 activity success:98 | activity-plan-turn-1 activity success:45 | call_mcp_1 tool objectsuccess:Indexed 412 symbols | call_cmd_2 tool 344success | msg_2 message 157",
+  "live turn 0 | status-start status codex session started with gpt-5.5-codex | think-rs_1 thinking 54success | msg_1 message 146 | call_cmd_1 tool 19780error | approval-901 approval allow | call_patch_1 tool undefinedsuccess | activity-diff-turn-1 activity success:98 | activity-plan-turn-1 activity success:45 | call_mcp_1 tool objectsuccess:Indexed 412 symbols | call_cmd_2 tool 344success | msg_2 message 157 | turn-turn-1 status turn finished in 0.0s | think-rs_2 thinking 0~",
+  "live turn 0 | status-start status codex session started with gpt-5.5-codex | think-rs_1 thinking 54success | msg_1 message 146 | call_cmd_1 tool 19780error | approval-901 approval allow | call_patch_1 tool undefinedsuccess | activity-diff-turn-1 activity success:98 | activity-plan-turn-1 activity success:45 | call_mcp_1 tool objectsuccess:Indexed 412 symbols | call_cmd_2 tool 344success | msg_2 message 157 | turn-turn-1 status turn finished in 0.0s | think-rs_2 thinking 30~ | approval-902 approval allow",
+  "live turn 0 | status-start status codex session started with gpt-5.5-codex | think-rs_1 thinking 54success | msg_1 message 146 | call_cmd_1 tool 19780error | approval-901 approval allow | call_patch_1 tool undefinedsuccess | activity-diff-turn-1 activity success:98 | activity-plan-turn-1 activity success:45 | call_mcp_1 tool objectsuccess:Indexed 412 symbols | call_cmd_2 tool 344success | msg_2 message 157 | turn-turn-1 status turn finished in 0.0s | think-rs_2 thinking 30success | approval-902 approval allow | activity-ws_1 activity running:26",
+  "live turn 0 | status-start status codex session started with gpt-5.5-codex | think-rs_1 thinking 54success | msg_1 message 146 | call_cmd_1 tool 19780error | approval-901 approval allow | call_patch_1 tool undefinedsuccess | activity-diff-turn-1 activity success:98 | activity-plan-turn-1 activity success:45 | call_mcp_1 tool objectsuccess:Indexed 412 symbols | call_cmd_2 tool 344success | msg_2 message 157 | turn-turn-1 status turn finished in 0.0s | think-rs_2 thinking 30success | approval-902 approval allow | activity-ws_1 activity success:26 | activity-ig_1 activity success:0 | msg_3 message 54~",
+  "live turn 0 | status-start status codex session started with gpt-5.5-codex | think-rs_1 thinking 54success | msg_1 message 146 | call_cmd_1 tool 19780error | approval-901 approval allow | call_patch_1 tool undefinedsuccess | activity-diff-turn-1 activity success:98 | activity-plan-turn-1 activity success:45 | call_mcp_1 tool objectsuccess:Indexed 412 symbols | call_cmd_2 tool 344success | msg_2 message 157 | turn-turn-1 status turn finished in 0.0s | think-rs_2 thinking 30success | approval-902 approval allow | activity-ws_1 activity success:26 | activity-ig_1 activity success:0 | msg_3 message 83~",
+  "ended idle 0 | status-start status codex session started with gpt-5.5-codex | think-rs_1 thinking 54success | msg_1 message 146 | call_cmd_1 tool 19780error | approval-901 approval allow | call_patch_1 tool undefinedsuccess | activity-diff-turn-1 activity success:98 | activity-plan-turn-1 activity success:45 | call_mcp_1 tool objectsuccess:Indexed 412 symbols | call_cmd_2 tool 344success | msg_2 message 157 | turn-turn-1 status turn finished in 0.0s | think-rs_2 thinking 30success | approval-902 approval allow | activity-ws_1 activity success:26 | activity-ig_1 activity success:0 | msg_3 message 83 | turn-turn-2 status turn cancelled in 0.0s | status-end status session closed",
+]
+`;
+
+exports[`transcript golden replay > publishes the same failure transcript after every frame 1`] = `
+[
+  "live idle 0 | status-start status codex session started",
+  "live turn 0 | status-start status codex session started | activity-img activity running:9",
+  "live turn 0 | status-start status codex session started | activity-img activity success:20 | activity-quota activity error:19 | activity-new-activity activity running:7 | think-th-f thinking 30 | open-tool tool undefined~",
+  "live turn 0 | status-start status codex session started | activity-img activity success:20 | activity-quota activity error:19 | activity-new-activity activity running:7 | think-th-f thinking 30 | open-tool tool undefined~",
+  "ended idle 0 | status-start status codex session started | activity-img activity success:20 | activity-quota activity error:19 | activity-new-activity activity error:7 | think-th-f thinking 30 | open-tool tool undefinederror | approval-ap-open approval expired | m-f message 10 | think-th-g thinking 0error | err-1760000100391-9 status Codex exited with code 1",
+]
+`;

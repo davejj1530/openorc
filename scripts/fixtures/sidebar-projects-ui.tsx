@@ -42,7 +42,7 @@ async function main() {
   const params = new URLSearchParams(location.search);
   const iconPreview = params.has("icons");
   const { core } = await import("../../apps/desktop/src/renderer/src/lib/rpc");
-  const { queryClient } = await import("../../apps/desktop/src/renderer/src/lib/query");
+  const { queryClient } = await import("../../apps/desktop/src/renderer/src/lib/client");
   const { useLayout } = await import("../../apps/desktop/src/renderer/src/lib/layout");
   const { useRouter } = await import("../../apps/desktop/src/renderer/src/lib/router");
   const { useUi } = await import("../../apps/desktop/src/renderer/src/lib/ui");

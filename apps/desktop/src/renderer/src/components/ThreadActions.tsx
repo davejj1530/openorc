@@ -6,7 +6,7 @@ import type { ThreadSummary } from "@openorc/protocol";
 import { AlarmClock, AppWindow, Archive, ArchiveRestore, ChevronRight, Columns2, GitBranch, GitFork, Laptop, MailOpen, Pencil, Pin, PinOff, Trash2 } from "./icons";
 import { orclingHome, useOrclings } from "../lib/orclings";
 import { Button, Dialog } from "./ui";
-import { useRpc, useRpcMutation } from "../lib/query";
+import { useRpc, useRpcMutation } from "../lib/client";
 import { hasOpenTeamExecution } from "../lib/team-activity";
 import { MAX_THREAD_PANES, openThread, useRouter } from "../lib/router";
 import { useUi } from "../lib/ui";

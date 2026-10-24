@@ -4,7 +4,7 @@ import type { DocumentEditorHandle } from "../components/DocumentEditor";
 import { writeDraft } from "./drafts";
 import { acknowledgeTaskDraft, readTaskDraft, sameSavedTaskDraft, sameTaskDraft, taskDraftPatch, type TaskDocumentDraft } from "./task-draft";
 import { useTaskDraftActions } from "./task-draft-context";
-import { useRpcMutation } from "./query";
+import { useRpcMutation } from "./client";
 
 /** The locally kept draft when there is one. An unreadable draft is reported, never replaced. */
 function initialDraft(taskId: string, incoming: TaskDocumentDraft): { draft: TaskDocumentDraft; error: string | null } {

@@ -2,15 +2,15 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import type { AgentEvent } from "@openorc/protocol";
 import { core } from "../lib/rpc";
-import { applyFrame, getRun, hydrate, resetTranscripts } from "../lib/transcript";
+import { runs } from "../lib/client";
 import { TranscriptContents } from "./Transcript";
 
-vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onFrame: vi.fn(), onInvalidate: vi.fn(), onReady: vi.fn() } }));
+vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: () => () => {} } }));
 vi.mock("./TaskCard", () => ({ TaskCard: () => null }));
 vi.mock("./AgentOrb", () => ({ AgentOrb: () => null }));
 afterEach(() => {
   cleanup();
-  resetTranscripts();
+  runs.reset();
   vi.clearAllMocks();
 });
 
@@ -32,12 +32,12 @@ const events: AgentEvent[] = [
 ];
 
 it.each(["reopened"])("shows submitted choices and custom answers in the %s transcript", async (mode) => {
-  if (mode === "live") applyFrame({ runId: "run", seq: 1, events });
+  if (mode === "live") runs.applyFrame({ runId: "run", seq: 1, events });
   else {
     vi.mocked(core.call).mockResolvedValueOnce({ events, fromTurn: 0, live: false });
-    await hydrate("run");
+    await runs.hydrate("run");
   }
-  render(<TranscriptContents runId="run" blocks={getRun("run")!.blocks} />);
+  render(<TranscriptContents runId="run" blocks={runs.get("run")!.blocks} />);
   expect(screen.getByText("Better")).toBeTruthy();
   expect(screen.getByText("Spacing")).toBeTruthy();
   expect(screen.getByText("My custom answer")).toBeTruthy();

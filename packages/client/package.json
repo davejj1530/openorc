@@ -1,0 +1,32 @@
+{
+  "name": "@openorc/client",
+  "version": "0.0.0",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "description": "Client state shared by the desktop renderer and the phone: query cache tags, the transcript projection, and the turn, thread, model and theme logic both draw from.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./theme": "./src/theme/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@openorc/protocol": "workspace:*"
+  },
+  "peerDependencies": {
+    "@tanstack/react-query": "^5.90.0",
+    "react": "^19.0.0",
+    "zustand": "^5.0.0"
+  },
+  "devDependencies": {
+    "@tanstack/react-query": "^5.90.0",
+    "@types/react": "^19.2.0",
+    "react": "^19.2.0",
+    "typescript": "^5.9.0",
+    "vitest": "^4.1.11",
+    "zustand": "^5.0.0"
+  }
+}

@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import type { ThreadSummary } from "@openorc/protocol";
-import { useRun } from "../lib/transcript";
-import { threadHeadline } from "./thread-headline";
+import { useRun } from "../lib/client";
+import { threadHeadline } from "@openorc/client";
 import "./ThreadHeadline.css";
 
 /**

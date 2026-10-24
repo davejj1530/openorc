@@ -1,7 +1,7 @@
 import { useId, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, MoreHorizontal, PenSquare, SlidersHorizontal } from "./icons";
 import { useLayout, type SidebarScreen } from "../lib/layout";
-import { useRpc } from "../lib/query";
+import { useRpc } from "../lib/client";
 import { newThread, useRouter, type Route } from "../lib/router";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
 import { activeScheduleCount, openTaskCount } from "../lib/task-stage-counts";

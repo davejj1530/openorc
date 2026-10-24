@@ -4,7 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { Commit, Project, PushState, RpcMethod, RpcParams, RpcResults, ThreadSummary } from "@openorc/protocol";
 import { CommitsPanel } from "./CommitsPanel";
 import { core } from "../lib/rpc";
-import { invalidateTags, queryClient } from "../lib/query";
+import { invalidateTags, queryClient } from "../lib/client";
 
 const thread: ThreadSummary = {
   id: "thread",

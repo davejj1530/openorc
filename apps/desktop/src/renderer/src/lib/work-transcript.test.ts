@@ -1,10 +1,10 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import type { AgentEvent } from "@openorc/protocol";
-import { applyFrame, getRun, hydrate, resetTranscripts, type Block } from "./transcript";
+import { runs } from "./client";
+import { type Block, workParts, workTiming, workTurns } from "@openorc/client";
 import { core } from "./rpc";
-import { workParts, workTiming, workTurns } from "./work-transcript";
-vi.mock("./rpc", () => ({ core: { onFrame: vi.fn(), call: vi.fn() } }));
-beforeEach(() => resetTranscripts());
+vi.mock("./rpc", () => ({ core: { call: vi.fn(), onPush: () => () => {} } }));
+beforeEach(() => runs.reset());
 const tool: Block = { id: "read", kind: "tool", name: "read_file", input: { path: "file.ts" }, done: true };
 const reply: Block = { id: "reply", kind: "message", role: "assistant", text: "Finished", streaming: false };
 
@@ -20,8 +20,8 @@ it("uses actual turn timing and keeps warm-session boundaries identical after hi
     { type: "turn.completed", ts: 12000, runId: "run", turnId: "two", status: "cancelled", durationMs: 4000 },
     { type: "session.completed", ts: 12500, runId: "run", status: "cancelled", durationMs: 11500 },
   ];
-  applyFrame({ runId: "run", seq: 1, events });
-  const run = getRun("run")!;
+  runs.applyFrame({ runId: "run", seq: 1, events });
+  const run = runs.get("run")!;
   expect(run.turnOf.get("turn-one")).toBe(0);
   expect(run.turnOf.get("next")).toBe(1);
   expect(run.blocks.find((b) => b.id === "read")).toMatchObject({ at: 2000, turnKey: "run:0", runId: "run" });
@@ -30,9 +30,9 @@ it("uses actual turn timing and keeps warm-session boundaries identical after hi
   expect(workTiming(turns[0]!.blocks, true)).toMatchObject({ live: false, durationMs: 3900, outcome: "success" });
   expect(workTiming(turns[1]!.blocks, true)).toMatchObject({ live: false, durationMs: 4000, outcome: "cancelled" });
   vi.mocked(core.call).mockResolvedValue({ events, fromTurn: 0, live: false });
-  resetTranscripts();
-  await hydrate("run");
-  expect(workTurns(getRun("run")!.blocks)).toEqual(turns);
+  runs.reset();
+  await runs.hydrate("run");
+  expect(workTurns(runs.get("run")!.blocks)).toEqual(turns);
 });
 
 it("keeps final prose, questions, provider errors, media and task cards outside collapsed work", () => {
@@ -76,7 +76,7 @@ it("keeps steering messages visible without duplicate React keys", () => {
 });
 
 it("ends a fatal run and exposes its error even when no completion event follows", () => {
-  applyFrame({
+  runs.applyFrame({
     runId: "fatal",
     seq: 1,
     events: [
@@ -84,7 +84,7 @@ it("ends a fatal run and exposes its error even when no completion event follows
       { type: "error", ts: 2000, runId: "fatal", message: "Provider lost connection", fatal: true },
     ],
   });
-  const blocks = getRun("fatal")!.blocks;
+  const blocks = runs.get("fatal")!.blocks;
   expect(workTiming(blocks, true)).toMatchObject({ live: false, outcome: "error" });
   expect(workParts(blocks, false).after).toContainEqual(expect.objectContaining({ kind: "status", text: "Provider lost connection" }));
 });

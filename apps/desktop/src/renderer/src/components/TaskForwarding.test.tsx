@@ -5,7 +5,7 @@ import { Task, TaskForwarding as ForwardingRecord, type TaskForwardingState } fr
 import { TaskForwarding } from "./TaskForwarding";
 
 const mocks = vi.hoisted(() => ({ call: vi.fn(), flushTaskDraft: vi.fn(), openTask: vi.fn() }));
-vi.mock("../lib/rpc", () => ({ core: { call: mocks.call, onInvalidate: () => {}, onReady: () => {} } }));
+vi.mock("../lib/rpc", () => ({ core: { call: mocks.call, onReady: () => {}, onPush: () => () => {} } }));
 vi.mock("../lib/router", () => ({ openTask: mocks.openTask }));
 vi.mock("../lib/task-draft-context", () => ({ useTaskDraftActions: () => ({ flushTaskDraft: mocks.flushTaskDraft }) }));
 afterEach(() => {

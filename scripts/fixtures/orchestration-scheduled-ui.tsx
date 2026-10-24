@@ -7,7 +7,7 @@ import { DEFAULT_TEAM_LIMITS } from "../../packages/protocol/src/orchestration";
 import { Orchestration } from "../../apps/desktop/src/renderer/src/views/Orchestration";
 import { Scheduled } from "../../apps/desktop/src/renderer/src/views/Scheduled";
 import { core } from "../../apps/desktop/src/renderer/src/lib/rpc";
-import { queryClient } from "../../apps/desktop/src/renderer/src/lib/query";
+import { queryClient } from "../../apps/desktop/src/renderer/src/lib/client";
 import { useLayout } from "../../apps/desktop/src/renderer/src/lib/layout";
 import { useRouter } from "../../apps/desktop/src/renderer/src/lib/router";
 import { useTheme } from "../../apps/desktop/src/renderer/src/lib/theme";

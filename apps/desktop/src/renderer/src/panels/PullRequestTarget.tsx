@@ -3,7 +3,7 @@ import type { Project } from "@openorc/protocol";
 import { BranchPicker } from "../components/BranchPicker";
 import { Field } from "../components/ui";
 import { pullRequestTarget } from "../lib/pull-requests";
-import { useRpc } from "../lib/query";
+import { useRpc } from "../lib/client";
 
 export interface TargetBranch {
   /** The branch the pull request merges into; null while there is none to suggest. */

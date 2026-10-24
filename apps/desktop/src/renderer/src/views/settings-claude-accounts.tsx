@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { ClaudeAccountConnection } from "@openorc/protocol";
 import { Button, Input, TextButton } from "../components/ui";
-import { useRpc, useRpcMutation } from "../lib/query";
+import { useRpc, useRpcMutation } from "../lib/client";
 import { Section, Status } from "./settings-shared";
 
 export function ClaudeAccountSettings({ active }: { active: boolean }) {

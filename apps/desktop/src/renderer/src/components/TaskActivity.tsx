@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Project, Task } from "@openorc/protocol";
-import { useRpc, useRpcMutation } from "../lib/query";
+import { useRpc, useRpcMutation, runs, useRuns } from "../lib/client";
 import { openThread } from "../lib/router";
-import { hydrate, useRuns } from "../lib/transcript";
 import { TeamTaskConversation } from "./TeamConversation";
 import { Transcript } from "./Transcript";
 import { Button } from "./ui";
@@ -44,7 +43,7 @@ function TaskHistory({ task, project }: { task: Task; project: Project }) {
     for (const [index, run] of (history.data ?? []).entries()) {
       const transcript = transcripts[index];
       // A run seen live from its start is already whole; hydrate skips any other run loaded in full.
-      if (!transcript?.live || transcript.hydrated) void hydrate(run.id).catch(() => setHistoryError("Could not load task activity."));
+      if (!transcript?.live || transcript.hydrated) void runs.hydrate(run.id).catch(() => setHistoryError("Could not load task activity."));
     }
   }, [history.data, transcripts]);
   let historyPlaceholder: ReactNode = "No separate execution history. Work and replies appear in the thread.";
@@ -74,7 +73,7 @@ function TaskHistory({ task, project }: { task: Task; project: Project }) {
           <Button
             onClick={() => {
               setHistoryError(null);
-              void Promise.all((history.data ?? []).map((run) => hydrate(run.id))).catch(() => setHistoryError("Could not load task activity."));
+              void Promise.all((history.data ?? []).map((run) => runs.hydrate(run.id))).catch(() => setHistoryError("Could not load task activity."));
             }}
           >
             Retry

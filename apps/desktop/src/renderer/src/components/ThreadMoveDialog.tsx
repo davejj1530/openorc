@@ -3,7 +3,7 @@ import type { WorkspaceMode } from "@openorc/protocol";
 import { FileRows } from "../panels/FileRows";
 import { Button, Dialog } from "./ui";
 import { useUi } from "../lib/ui";
-import { useRpc, useRpcMutation } from "../lib/query";
+import { useRpc, useRpcMutation } from "../lib/client";
 
 /** One confirm for moving a conversation, listing the files that go with it. Team conversations use TeamMoveDialog. */
 export function ThreadMoveDialog() {

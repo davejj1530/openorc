@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { AppSettings, PermissionPreset } from "@openorc/protocol";
 import { core } from "./rpc";
-import { queryClient, useRpc } from "./query";
+import { queryClient, useRpc } from "./client";
 
 // Share optimistic selections between mounted composers. Serialize writes so a
 // slower response cannot replace a newer choice; the core broadcasts to other windows.

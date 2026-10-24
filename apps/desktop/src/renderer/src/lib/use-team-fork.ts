@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useRpc, useRpcMutation } from "./query";
+import { useRpc, useRpcMutation } from "./client";
 import { openThread, useRouter } from "./router";
 import { beginTeamForkRequest, finishTeamForkRequest, readTeamForkRequest, teamForkRequestChanged, teamForkStorageKey, type TeamForkRequest } from "./team-fork-request";
 import { useThreadMutationPending } from "./thread-mutations";

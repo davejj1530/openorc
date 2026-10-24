@@ -10,7 +10,7 @@ import { TopBar } from "../components/TopBar";
 import { Button, Dialog, Empty, Field, Input, Segmented, Select, Textarea } from "../components/ui";
 import { useLayout } from "../lib/layout";
 import { useOrclings } from "../lib/orclings";
-import { useRpc } from "../lib/query";
+import { useRpc } from "../lib/client";
 import { useScheduleEditor } from "../lib/use-schedule-editor";
 import { pickerTeam } from "../lib/team-settings";
 import { intervalLabel, intervals, ScheduleRow } from "./schedule-row";

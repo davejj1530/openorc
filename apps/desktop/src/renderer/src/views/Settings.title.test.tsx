@@ -4,7 +4,7 @@ import { useLayout } from "../lib/layout";
 import { useRouter } from "../lib/router";
 import { SettingsTitle } from "./Settings";
 
-vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onInvalidate: vi.fn(), onReady: vi.fn() } }));
+vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: () => () => {} } }));
 vi.mock("../lib/browser-preview", () => ({ CoversPreview: () => null }));
 vi.mock("../components/TopBar", () => ({ TopBar: () => null }));
 

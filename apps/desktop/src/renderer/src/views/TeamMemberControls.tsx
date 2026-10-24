@@ -7,7 +7,7 @@ import { ClaudeAccountScope } from "../lib/claude-account";
 import { orclingById, useOrclings } from "../lib/orclings";
 import { Badge, Button, Dialog, IconButton, Input, Select, Switch, Textarea, TextButton, Tooltip } from "../components/ui";
 import { addTeamMember, promoteTeamLead, removeTeamMember, updateTeamMember } from "../lib/team-editor-draft";
-import { useRpc, useRpcMutation } from "../lib/query";
+import { useRpc, useRpcMutation } from "../lib/client";
 
 /** How much the team talks on its own: every ambient read is a model turn, so the defaults stay small. */
 function DiscussionEditor({ draft, onChange }: { draft: TeamDraft; onChange: (discussion: NonNullable<TeamDraft["discussion"]>) => void }) {

@@ -5,7 +5,7 @@ import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { FileVersion, FolderPath, type FileRead, type FileWriteResult, type FormatResult, type RpcMethod, type RpcResults } from "@openorc/protocol";
 import { useDrafts } from "./file-drafts";
-import { queryClient } from "./query";
+import { queryClient } from "./client";
 import { core } from "./rpc";
 import { formatFile, saveFile, useFileBuffer } from "./use-file-buffer";
 

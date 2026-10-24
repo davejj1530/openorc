@@ -1,4 +1,4 @@
-import type { Block } from "./transcript";
+import type { Block } from "@openorc/client";
 
 /** A fork cutoff is the whole lead attempt, never a partial assistant message. */
 export function teamForkReplyId(blocks: Block[]): string | null {

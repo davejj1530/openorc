@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import type { TeamActorView, TeamExecutionView } from "@openorc/protocol";
-import type { Block, RunTranscript } from "./transcript";
+import type { Block, RunTranscript } from "@openorc/client";
 import { teamAttention } from "./team-attention";
 
 function actor(id: string, runIds: string[], extra: Partial<TeamActorView> = {}): TeamActorView {

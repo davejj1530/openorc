@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import type { Memory, MemorySource, MemoryType } from "@openorc/protocol";
 import { MemoryCard } from "../components/MemoryCard";
 import { Button, Empty } from "../components/ui";
-import { useRpc } from "../lib/query";
+import { useRpc } from "../lib/client";
 
 const PAGE_SIZE = 25;
 

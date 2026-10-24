@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { TeamActorView, TeamExecutionView } from "@openorc/protocol";
 import { hasOpenTeamExecution, teamActivityGroups, teamMemberActivity, teamChatDeliveryStatus, teamDirectionStatus, teamFileList, teamRunBlocks } from "./team-activity";
-import type { Block } from "./transcript";
+import type { Block } from "@openorc/client";
 
 function actor(id: string, createdAt: number, parentId: string | null = "lead"): TeamActorView {
   const runs = (

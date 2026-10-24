@@ -1,7 +1,7 @@
 import { Popover } from "@base-ui/react/popover";
 import { Button } from "./ui";
 import { cn } from "../lib/cn";
-import { formatTokens } from "../lib/time";
+import { formatTokens } from "@openorc/client";
 import { CoversPreview } from "../lib/browser-preview";
 import { floatingGround } from "../lib/use-anchor-ground";
 

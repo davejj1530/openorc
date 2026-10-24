@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import type { Task, TaskForwarding as ForwardingRecord, WorkspaceMode } from "@openorc/protocol";
-import { useRpc, useRpcMutation } from "../lib/query";
+import { useRpc, useRpcMutation } from "../lib/client";
 import { useTaskDraftActions } from "../lib/task-draft-context";
 import { openTask } from "../lib/router";
 import { Button, Select, TextButton } from "./ui";

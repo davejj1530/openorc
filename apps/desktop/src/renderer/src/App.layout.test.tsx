@@ -3,7 +3,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 
 vi.hoisted(() => Object.assign(window, { openorc: { platform: "darwin", onTheme: () => () => {}, setTheme: () => {}, openExternal: () => {} } }));
-vi.mock("./lib/rpc", () => ({ core: { call: vi.fn(async () => []), onFrame: () => () => {}, onInvalidate: () => () => {}, onReady: () => () => {} } }));
+vi.mock("./lib/rpc", () => ({ core: { call: vi.fn(async () => []), onReady: () => () => {}, onPush: () => () => {} } }));
 vi.mock("./components/Sidebar", () => ({ Sidebar: () => null, WindowNav: () => null }));
 vi.mock("./components/NewThreadMascot", () => ({ NewThreadMascot: () => null }));
 vi.mock("./components/Composer", () => ({ Composer: () => <textarea aria-label="Message" />, ComposerChoice: () => null }));
@@ -13,7 +13,7 @@ vi.mock("./components/Panel", () => ({
   Panel: () => <aside className="panel-shell" data-open="true" aria-label="Changes panel" />,
   PanelToggle: () => null,
 }));
-vi.mock("./lib/query", () => {
+vi.mock("./lib/client", async (original) => {
   const project = { id: "project", name: "Project", rootPath: "/fixture", settings: {} };
   const data: Record<string, unknown> = {
     "projects.list": [project],
@@ -25,6 +25,7 @@ vi.mock("./lib/query", () => {
   };
   const empty: unknown[] = [];
   return {
+    ...(await original<object>()),
     useRpc: (method: string) => ({ data: method in data ? data[method] : empty, isSuccess: true, refetch: vi.fn() }),
     useRpcMutation: () => ({ mutate: vi.fn(), mutateAsync: vi.fn() }),
     invalidateTags: vi.fn(),

@@ -11,7 +11,7 @@ const fixture: {
   threads: Pick<ThreadSummary, "id" | "title" | "projectId" | "agent" | "activity" | "unread" | "session" | "pinnedAt" | "snoozedUntil" | "lastActivityAt">[];
 } = vi.hoisted(() => ({ projects: [], threads: [] }));
 
-vi.mock("../lib/query", () => {
+vi.mock("../lib/client", async (original) => {
   const rpcData = (method: string, params: { id?: string }) => {
     if (method === "threads.get" && !params.id) return null;
     if (method === "projects.list") return fixture.projects;
@@ -30,16 +30,16 @@ vi.mock("../lib/query", () => {
       );
     return undefined;
   };
-  return { useRpc: (method: string, params: { id?: string }) => ({ data: rpcData(method, params) }), tagsFor: () => [] };
+  return { ...(await original<object>()), useRpc: (method: string, params: { id?: string }) => ({ data: rpcData(method, params) }), usePendingApprovals: () => 0, useRun: () => undefined };
 });
 vi.mock("../lib/rpc", () => ({
   core: {
     call: vi.fn(async (method: string, params: { projectId?: string; limit?: number }) =>
       method === "threads.list" ? fixture.threads.filter((thread) => thread.projectId === params.projectId).slice(0, params.limit) : [],
     ),
+    onPush: () => () => {},
   },
 }));
-vi.mock("../lib/transcript", () => ({ usePendingApprovals: () => 0, useRun: () => undefined }));
 vi.mock("../lib/browser-preview", () => ({ CoversPreview: () => null }));
 vi.mock("./ui", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./ui")>()),

@@ -9,9 +9,9 @@ import { TopBar } from "../components/TopBar";
 import { Badge, Button, Empty, IconButton, Segmented, StatusDot, Tooltip } from "../components/ui";
 import { cn } from "../lib/cn";
 import { diffComment, draftAuthor, pullRequestDot, pullRequestTone, pullRequestToneLabel, reviewDecisionLabel } from "../lib/pull-requests";
-import { invalidateTags, useRpc, useRpcMutation } from "../lib/query";
+import { invalidateTags, useRpc, useRpcMutation } from "../lib/client";
 import { useRouter } from "../lib/router";
-import { relativeTime } from "../lib/time";
+import { relativeTime } from "@openorc/client";
 import { useModelCatalog } from "../lib/use-model-catalog";
 import { useOrclings } from "../lib/orclings";
 

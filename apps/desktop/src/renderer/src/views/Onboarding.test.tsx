@@ -35,7 +35,8 @@ vi.mock("../components/RiveMascot", () => ({
   RiveMascot: ({ reaction, reactionKey }: { reaction?: string; reactionKey?: string }) => <div className="rive-mascot" data-reaction={reaction} data-reaction-key={reactionKey} />,
 }));
 
-vi.mock("../lib/query", () => ({
+vi.mock("../lib/client", async (original) => ({
+  ...(await original<object>()),
   queryClient: { setQueryData: vi.fn() },
   useRpc: (method: string) =>
     method === "system.info"

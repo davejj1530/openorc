@@ -9,7 +9,8 @@ const fixture = vi.hoisted(() => ({
   updatePending: false,
   updateError: null as Error | null,
 }));
-vi.mock("../lib/query", () => ({
+vi.mock("../lib/client", async (original) => ({
+  ...(await original<object>()),
   useRpc: (method: string) => (method === "orchestration.taskState" ? fixture.ownership : { data: method === "runs.listForTask" ? [] : undefined }),
   useRpcMutation: (method: string) => ({ mutate: fixture.mutate, isPending: method === "tasks.update" && fixture.updatePending, error: method === "tasks.update" ? fixture.updateError : null }),
 }));

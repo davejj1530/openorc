@@ -3,11 +3,11 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import type { ChangePreview } from "@openorc/protocol";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { core } from "../lib/rpc";
-import { queryClient } from "../lib/query";
+import { queryClient } from "../lib/client";
 import { useUi } from "../lib/ui";
 import { ThreadMoveDialog } from "./ThreadMoveDialog";
 
-vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onInvalidate: vi.fn(), onReady: vi.fn() } }));
+vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: () => () => {} } }));
 let preview: ChangePreview;
 beforeEach(() => {
   preview = {

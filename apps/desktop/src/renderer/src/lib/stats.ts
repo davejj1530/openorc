@@ -63,7 +63,9 @@ export function startStats(): void {
   core.onReady(({ mcpPort }) => useStats.setState({ connected: true, mcpPort }));
   // Counted here, published with the per-second sample: a store update per frame re-renders every subscriber per
   // frame, which on the diagnostics screen cost several times the bridge work the benchmark measures.
-  core.onFrame((frame) => {
+  core.onPush((push) => {
+    if (push.type !== "frame") return;
+    const { frame } = push;
     windowFrames += 1;
     windowEvents += frame.events.length;
     framesReceived += 1;

@@ -37,6 +37,7 @@
     "@modelcontextprotocol/ext-apps": "1.7.5",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@openorc/agents": "workspace:*",
+    "@openorc/client": "workspace:*",
     "@openorc/core": "workspace:*",
     "@openorc/mcp": "workspace:*",
     "@openorc/protocol": "workspace:*",

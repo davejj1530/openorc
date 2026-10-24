@@ -2,7 +2,7 @@ import { Command } from "cmdk";
 import { FolderGit2, MessageSquare, Search } from "./icons";
 import { useEffect, useState } from "react";
 import { paletteActions } from "../lib/palette-actions";
-import { useRpc } from "../lib/query";
+import { useRpc } from "../lib/client";
 import { openTask, openThread, useRouter } from "../lib/router";
 import { useUi } from "../lib/ui";
 import { CoversPreview } from "../lib/browser-preview";

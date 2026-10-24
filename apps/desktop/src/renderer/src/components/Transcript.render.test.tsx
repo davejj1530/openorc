@@ -1,11 +1,11 @@
 import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { AgentEvent } from "@openorc/protocol";
-import { applyFrame, flushTranscripts, resetTranscripts, useRun } from "../lib/transcript";
+import { runs, useRun } from "../lib/client";
 import { WorkTranscript } from "./Transcript";
 
 const counts = vi.hoisted(() => ({ messages: 0 }));
-vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onFrame: vi.fn(), onInvalidate: vi.fn(), onReady: vi.fn() } }));
+vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: () => () => {} } }));
 vi.mock("./AgentOrb", () => ({ AgentOrb: () => null }));
 vi.mock("./TaskCard", () => ({ TaskCard: () => null }));
 vi.mock("./QuestionCard", () => ({ QuestionCard: () => null }));
@@ -49,31 +49,31 @@ function Conversation({ runId }: { runId: string }) {
 }
 
 beforeEach(() => {
-  resetTranscripts();
+  runs.reset();
   counts.messages = 0;
 });
 afterEach(cleanup);
 
 it("re-renders only the streaming reply for each word, and nothing for another run's stream", () => {
-  applyFrame({ runId: "big", seq: 1, events: history("big", 60) });
-  applyFrame({ runId: "other", seq: 1, events: history("other", 2) });
-  flushTranscripts();
+  runs.applyFrame({ runId: "big", seq: 1, events: history("big", 60) });
+  runs.applyFrame({ runId: "other", seq: 1, events: history("other", 2) });
+  runs.flush();
   render(<Conversation runId="big" />);
   expect(counts.messages).toBe(61);
 
   for (const [seq, text] of [" on", " it", " now"].entries()) {
     counts.messages = 0;
     act(() => {
-      applyFrame({ runId: "big", seq: seq + 2, events: [word("big", text)] });
-      flushTranscripts();
+      runs.applyFrame({ runId: "big", seq: seq + 2, events: [word("big", text)] });
+      runs.flush();
     });
     expect(counts.messages).toBe(1);
   }
 
   counts.messages = 0;
   act(() => {
-    applyFrame({ runId: "other", seq: 2, events: [word("other", " elsewhere")] });
-    flushTranscripts();
+    runs.applyFrame({ runId: "other", seq: 2, events: [word("other", " elsewhere")] });
+    runs.flush();
   });
   expect(counts.messages).toBe(0);
 });

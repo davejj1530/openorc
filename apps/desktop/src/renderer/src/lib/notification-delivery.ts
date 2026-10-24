@@ -1,6 +1,5 @@
-import type { CorePush } from "@openorc/protocol";
+import type { Notice } from "@openorc/client";
 
-export type DesktopNotice = Extract<CorePush, { type: "notify" }>;
 export interface NoticeTarget {
   threadId: string | null;
   taskId: string | null;
@@ -27,14 +26,14 @@ export interface NotificationPlatform {
   visible(target: NoticeTarget): Promise<boolean>;
   settings(): Promise<{ notifications: boolean; sound: boolean }>;
   permission(): Promise<boolean>;
-  show(notice: DesktopNotice, sound: boolean): void;
+  show(notice: Notice, sound: boolean): void;
 }
 
 /** A single cross-window lock covers receipt storage, visibility and the OS side effect. */
 export class NotificationDelivery {
   constructor(private readonly platform: NotificationPlatform) {}
 
-  async receive(notice: DesktopNotice): Promise<void> {
+  async receive(notice: Notice): Promise<void> {
     // Older cores lack delivery identity. Do not guess an identity that merges
     // unrelated approvals or claim cross-window deduplication without one.
     if (!notice.id) return;

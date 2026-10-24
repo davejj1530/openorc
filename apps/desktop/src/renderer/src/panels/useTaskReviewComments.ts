@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { reviewCommentSent, type TeamTaskView } from "@openorc/protocol";
 import type { CommentDraft, ReviewCommentState } from "../components/DiffView";
 import { useTeamTaskRequest } from "../components/TeamTaskStart";
-import { useRpc, useRpcMutation } from "../lib/query";
+import { useRpc, useRpcMutation } from "../lib/client";
 import { retainedTeamComments, teamReviewCommentState } from "../lib/team-task-actions";
 
 /** A pending review owns its exact selection; later comments remain separate. */

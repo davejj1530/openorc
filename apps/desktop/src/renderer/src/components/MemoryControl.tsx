@@ -1,6 +1,6 @@
 import { useId } from "react";
 import { Button, Switch } from "./ui";
-import { queryClient, useRpc, useRpcMutation } from "../lib/query";
+import { queryClient, useRpc, useRpcMutation } from "../lib/client";
 import { extractionSummary } from "../lib/memory-extraction";
 import "./memory.css";
 

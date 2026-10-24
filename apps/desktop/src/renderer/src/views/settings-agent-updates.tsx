@@ -2,7 +2,7 @@ import { agentUpdateStatus, agentConnectionStatus } from "./settings-presentatio
 import { agentUpdateNoticeKey, harnessCatalog, harnessFailsToStart, harnessIds, harnessInstalled, harnessLoggedIn, type AgentUpdate, type HarnessInfo, type SystemInfo } from "@openorc/protocol";
 import { CoversPreview } from "../lib/browser-preview";
 import { cn } from "../lib/cn";
-import { useRpc, useRpcMutation } from "../lib/query";
+import { useRpc, useRpcMutation } from "../lib/client";
 import { useRouter } from "../lib/router";
 import { Download, X } from "../components/icons";
 import { Button, IconButton, TextButton } from "../components/ui";

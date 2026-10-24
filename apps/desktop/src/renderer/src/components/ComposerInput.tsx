@@ -3,7 +3,7 @@ import type { FileScope } from "@openorc/protocol";
 import type { SlashCommand } from "./Composer";
 import { ComposerSuggestions } from "./ComposerSuggestions";
 import { cn } from "../lib/cn";
-import { useRpc } from "../lib/query";
+import { useRpc } from "../lib/client";
 import { filterMentions, insertMention, mentionQueryAt, type MentionEntry } from "../lib/composer-mentions";
 import { skillSegments } from "../lib/skill-tokens";
 

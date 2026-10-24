@@ -5,7 +5,7 @@ import { createRoot } from "react-dom/client";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { createDesignSettingsRpc } from "./design-settings";
 import { useRouter } from "../../apps/desktop/src/renderer/src/lib/router";
-import type { Block, RunTranscript } from "../../apps/desktop/src/renderer/src/lib/transcript";
+import type { Block, RunTranscript } from "../../packages/client/src/index";
 // main.tsx stamps the saved typefaces on <html>; the panel crops render without App, which would otherwise skip them.
 import "../../apps/desktop/src/renderer/src/lib/app-font";
 import "../../apps/desktop/src/renderer/src/lib/code-font";
@@ -40,13 +40,14 @@ async function main() {
   sizeCapture();
   window.addEventListener("resize", sizeCapture);
   const { core } = await import("../../apps/desktop/src/renderer/src/lib/rpc");
-  const { queryClient } = await import("../../apps/desktop/src/renderer/src/lib/query");
+  const { queryClient } = await import("../../apps/desktop/src/renderer/src/lib/client");
   const { useLayout, limits } = await import("../../apps/desktop/src/renderer/src/lib/layout");
   const { useWindow } = await import("../../apps/desktop/src/renderer/src/lib/window");
   const fullscreen = query.get("fullscreen") === "1";
   useWindow.setState({ fullscreen });
   const { useTheme, parsePreset } = await import("../../apps/desktop/src/renderer/src/lib/theme");
-  const { emptyRun, seedRun } = await import("../../apps/desktop/src/renderer/src/lib/transcript");
+  const { emptyRun } = await import("../../packages/client/src/index");
+  const { runs } = await import("../../apps/desktop/src/renderer/src/lib/client");
   const mode = query.get("view") ?? "workspace";
   const now = Date.now();
   const project = {
@@ -182,7 +183,7 @@ async function main() {
   }));
   /** Holds a run's transcript as the app does once it has loaded, for the rows and views that read it. */
   const seedTranscript: Seed = (runId, blocks, state) =>
-    seedRun({
+    runs.seed({
       ...emptyRun(runId),
       blocks,
       blockIndex: new Map(blocks.map((block, index) => [block.id, index])),
@@ -339,7 +340,7 @@ async function main() {
   queryClient.setDefaultOptions({ queries: { retry: false } });
   useTheme.getState().setPreset(parsePreset(query.get("palette")));
   useTheme.getState().set(query.get("theme") === "light" ? "light" : "dark");
-  const { accentCombinations } = await import("../../apps/desktop/src/renderer/src/lib/theme-accents");
+  const { accentCombinations } = await import("../../packages/client/src/theme/index");
   const accent = accentCombinations.find((entry) => entry.id === query.get("accent"));
   if (accent) useTheme.getState().setAccentCombination(accent.id);
   else if (query.get("accent") === "default") useTheme.getState().resetAccents();

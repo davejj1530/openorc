@@ -6,7 +6,7 @@ import type { ModelOption, SystemInfo } from "@openorc/protocol";
 import { ComposerModelPicker, defaultChoice, ModelPicker, type ModelChoice } from "./ModelPicker";
 
 const mocks = vi.hoisted(() => ({ call: vi.fn(), navigate: vi.fn() }));
-vi.mock("../lib/rpc", () => ({ core: { call: mocks.call, onInvalidate: () => {}, onReady: () => {} } }));
+vi.mock("../lib/rpc", () => ({ core: { call: mocks.call, onReady: () => {}, onPush: () => () => {} } }));
 vi.mock("../lib/router", () => ({ useRouter: { getState: () => ({ navigate: mocks.navigate }) } }));
 vi.mock("./EffortGalaxy", () => ({ EffortGalaxy: () => <span data-testid="effort-galaxy" /> }));
 vi.mock("./FastModeRocket", () => ({ FastModeRocket: () => <span data-testid="fast-mode-rocket" /> }));

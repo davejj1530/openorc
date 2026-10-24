@@ -1,5 +1,5 @@
 import { effortLabel, formatModelEffortLabel, type ModelExecutionSettings, type ModelOption } from "@openorc/protocol";
-import { useRpc } from "./query";
+import { useRpc } from "./client";
 
 type ModelChoice = Pick<ModelExecutionSettings, "agent" | "model" | "effort">;
 

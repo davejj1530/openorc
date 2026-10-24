@@ -3,12 +3,12 @@ import { afterEach, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import { useRouter } from "../lib/router";
 
-vi.mock("../lib/query", () => ({
+vi.mock("../lib/client", async (original) => ({
+  ...(await original<object>()),
   useRpc: (method: string) => ({ data: method === "tasks.list" ? [{ status: "review" }, { status: "proposed" }, { status: "backlog" }] : undefined }),
-  tagsFor: () => [],
+  usePendingApprovals: () => 2,
 }));
-vi.mock("../lib/transcript", () => ({ usePendingApprovals: () => 2 }));
-vi.mock("../lib/rpc", () => ({ core: { call: vi.fn() } }));
+vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onPush: () => () => {} } }));
 vi.mock("../lib/window", () => ({ useTrafficLights: () => true, useWindowsControls: () => false }));
 vi.mock("./ui", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./ui")>()),
@@ -36,7 +36,7 @@ it("reads Inbox, Search, then the sidebar toggle, counting what waits in the inb
 });
 
 it("caps the inbox count at 99+", async () => {
-  const query = await import("../lib/query");
+  const query = await import("../lib/client");
   vi.spyOn(query, "useRpc").mockReturnValue({ data: Array.from({ length: 120 }, () => ({ status: "review" })) } as never);
   render(<WindowNav open={false} />);
   expect(screen.getByRole("button", { name: "Inbox, 122" }).textContent).toBe("99+");

@@ -1,6 +1,6 @@
 import type { Orcling } from "@openorc/protocol";
 import type { MentionEntry } from "./composer-mentions";
-import { useRpc } from "./query";
+import { useRpc } from "./client";
 
 const NONE: Orcling[] = [];
 

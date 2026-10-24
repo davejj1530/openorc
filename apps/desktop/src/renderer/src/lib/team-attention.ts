@@ -1,5 +1,5 @@
 import type { TeamActorView, TeamExecutionView } from "@openorc/protocol";
-import type { Block, RunTranscript } from "./transcript";
+import type { Block, RunTranscript } from "@openorc/client";
 
 type Approval = Extract<Block, { kind: "approval" }>;
 export type TeamAttentionItem = { id: string; execution: TeamExecutionView } & (

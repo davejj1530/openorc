@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { commentMentionOptions, commentRecipientKey, harnessName, orclingMentionOptions, type CommentAttempt, type CommentRecipient, type ModelOption, type TaskComment } from "@openorc/protocol";
 import { useOrclings } from "../lib/orclings";
-import { useRpc, useRpcMutation } from "../lib/query";
+import { useRpc, useRpcMutation } from "../lib/client";
 import { modelEffortLabel } from "../lib/model-effort-label";
 import { mentionQueryAt, insertMention } from "../lib/composer-mentions";
 import { Button, TextButton } from "./ui";

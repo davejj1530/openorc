@@ -1,0 +1,179 @@
+import { shellSteps, unwrapShell } from "./shell.js";
+import { commandParts, folderOf } from "./command-chips.js";
+import { commandOf } from "./tool-view.js";
+import type { Block } from "./transcript.js";
+import { patchStat } from "./diff-stat.js";
+import { toolCallPresentation } from "./tool-presentation.js";
+import { urlHost } from "./url-host.js";
+
+/** What a chip stands for, which decides its icon and whether it opens anything. */
+export type ChipKind = "file" | "edit" | "folder" | "query" | "command" | "intent" | "web" | "tool" | "agent" | "memory";
+
+export interface WorkChip {
+  key: string;
+  label: string;
+  title: string;
+  kind: ChipKind;
+  /** The local file the chip is about. A read opens it; an edit shows its diff. */
+  path?: string;
+  added?: number;
+  removed?: number;
+  /** Faint words that fill the middle of the row: a file's folder, a search's scope, or its query when the agent's words are the label. */
+  detail?: string;
+  /** Faint words at the row's end: the lines a read printed, how many matches a search found. */
+  note?: string;
+  /** What the live line says while the call runs, when that is not the section's verb before the label. */
+  live?: string;
+  /** Each thing a call with plain words ran, once done, for a phase named after it: ["Ran the tests"]. */
+  done?: string[];
+  blocks: Block[];
+}
+
+/** One call's share of a phase: the section it goes under and the chip it adds there, if any. */
+export interface CallPart {
+  section: string;
+  chip: Omit<WorkChip, "blocks"> | null;
+}
+
+type ToolBlock = Extract<Block, { kind: "tool" }>;
+
+const text = (value: unknown) => (typeof value === "string" ? value : "");
+
+export function basename(path: string): string {
+  return (
+    path
+      .replace(/[\\/]+$/, "")
+      .split(/[\\/]/)
+      .pop() || path
+  );
+}
+
+function hostname(url: string): string {
+  return urlHost(url)?.hostname.replace(/^www\./, "") ?? url;
+}
+
+/** A command as a chip: the first line of its first step that does something, past a `cd` or a comment. The title keeps it whole. */
+export function commandLabel(command: string): string {
+  const steps = shellSteps(unwrapShell(command.trim()));
+  const step = steps.find((candidate) => !/^(cd\s|#)/.test(candidate.text)) ?? steps[0];
+  return (step?.text.split("\n")[0] ?? "").trim();
+}
+
+/** The shell command a call ran, whichever field its provider used. */
+export function commandText(block: ToolBlock): string {
+  return commandOf(block.input as Record<string, unknown> | null);
+}
+
+/** The agent's own words for what a call is for. Only shells and subagents carry them; other tools' descriptions are content. */
+export function toolIntent(block: ToolBlock): string | null {
+  if (!/^(bash|task|agent)$/i.test(block.name)) return null;
+  const description = (block.input as { description?: unknown } | null)?.description;
+  return typeof description === "string" && description.trim() ? description.trim() : null;
+}
+
+const lines = (value: string) => (value ? value.split("\n").length : 0);
+
+/** Lines an edit added and removed: the old and new text without the lines they share at either end. */
+function lineDelta(before: string, after: string): { added: number; removed: number } {
+  const a = before.split("\n");
+  const b = after.split("\n");
+  let start = 0;
+  while (start < a.length && start < b.length && a[start] === b[start]) start++;
+  let end = 0;
+  while (end < a.length - start && end < b.length - start && a[a.length - 1 - end] === b[b.length - 1 - end]) end++;
+  return { added: b.length - start - end, removed: a.length - start - end };
+}
+
+/** Per file, what a successful edit call changed. A failed edit changed nothing, so it has no numbers. */
+function editStats(block: ToolBlock): Map<string, { added?: number; removed?: number }> {
+  const stats = new Map<string, { added?: number; removed?: number }>();
+  if (block.isError) return stats;
+  if (Array.isArray(block.input)) {
+    for (const entry of block.input as { path?: unknown; diff?: unknown }[])
+      if (typeof entry?.path === "string") {
+        const { insertions, deletions } = patchStat(text(entry.diff));
+        stats.set(entry.path, { added: insertions, removed: deletions });
+      }
+    return stats;
+  }
+  const input = (block.input ?? {}) as Record<string, unknown>;
+  const path = text(input["file_path"]) || text(input["path"]);
+  if (!path) return stats;
+  const edits = Array.isArray(input["edits"]) ? (input["edits"] as Record<string, unknown>[]) : [input];
+  if (typeof input["content"] === "string") stats.set(path, { added: lines(input["content"]) });
+  else if (edits.every((edit) => typeof edit?.["old_string"] === "string" && typeof edit["new_string"] === "string")) {
+    const total = edits
+      .map((edit) => lineDelta(text(edit["old_string"]), text(edit["new_string"])))
+      .reduce((sum, d) => ({ added: sum.added + d.added, removed: sum.removed + d.removed }), { added: 0, removed: 0 });
+    stats.set(path, total);
+  }
+  return stats;
+}
+
+function fileChip(path: string, stat?: { added?: number; removed?: number }, kind: "file" | "edit" = "file"): Omit<WorkChip, "blocks"> {
+  return { key: path, label: basename(path), title: path, kind, path, detail: folderOf(path), ...stat };
+}
+
+/** The calls a chip opens. An edit opens only its own file's part of each patch, so the diff is the one its numbers count. */
+export function chipCalls(chip: WorkChip): Block[] {
+  if (chip.kind !== "edit") return chip.blocks;
+  return chip.blocks.map((block) => {
+    if (block.kind !== "tool" || !Array.isArray(block.input)) return block;
+    const own = (block.input as { path?: unknown }[]).filter((entry) => entry?.path === chip.path);
+    return own.length ? { ...block, input: own } : block;
+  });
+}
+
+const sectionFor: Record<string, { section: string; kind: ChipKind }> = {
+  Read: { section: "Read", kind: "file" },
+  Searched: { section: "Searched", kind: "query" },
+  Ran: { section: "Ran", kind: "command" },
+  Fetched: { section: "Fetched", kind: "web" },
+  "Searched the web for": { section: "Searched the web", kind: "web" },
+  "Searched memory for": { section: "Searched memory", kind: "memory" },
+  Remembered: { section: "Remembered", kind: "memory" },
+  Delegated: { section: "Delegated", kind: "agent" },
+};
+
+/** A page reads as its site, a command as its first line, anything else as written. */
+function chipLabel(verb: string, kind: ChipKind | undefined, object: string): string {
+  if (verb === "Fetched") return hostname(object);
+  if (kind === "command") return commandLabel(object);
+  return object.replace(/\s+/g, " ").trim();
+}
+
+function presentedParts(block: ToolBlock): CallPart[] {
+  const { verb, object, summary } = toolCallPresentation(block.name, block.input);
+  // An MCP call reads as "Used Mobbin" with the tool it called as the chip; what it asked stays in the title.
+  if (summary) {
+    const action = verb.replace(/^[^:]+: /, "");
+    return [{ section: summary, chip: { key: action, label: action, title: object ? `${verb} · ${object}` : verb, kind: "tool" } }];
+  }
+  if (verb === "Edited") {
+    const stats = editStats(block);
+    const listed = Array.isArray(block.input) ? (block.input as { path?: unknown }[]).flatMap((entry) => (typeof entry?.path === "string" ? [entry.path] : [])) : [];
+    // A patch that names no file reads as its count ("3 files"), which is not a path to open.
+    if (!listed.length && /^\d+ files?$/.test(object)) return [{ section: "Edited", chip: { key: object, label: object, title: object, kind: "tool" } }];
+    const paths = listed.length ? listed : [object].filter(Boolean);
+    return paths.length ? paths.map((path) => ({ section: "Edited", chip: fileChip(path, stats.get(path), "edit") })) : [{ section: "Edited", chip: null }];
+  }
+  const known = sectionFor[verb];
+  if (!object) return [{ section: known?.section ?? verb, chip: null }];
+  if (known?.kind === "file") return [{ section: known.section, chip: fileChip(object) }];
+  const label = chipLabel(verb, known?.kind, object);
+  return [{ section: known?.section ?? verb, chip: { key: label, label, title: object, kind: known?.kind ?? "tool" } }];
+}
+
+/**
+ * Which sections a call belongs to and what it adds to each. Every call lands in at least one section. A shell call
+ * reads as what its command did, so a `sed -n` lands under Read even when the agent described it.
+ */
+export function callParts(block: Block): CallPart[] {
+  if (block.kind === "activity") return [{ section: block.label, chip: null }];
+  if (block.kind !== "tool") return [{ section: block.kind, chip: null }];
+  const intent = toolIntent(block);
+  if (intent && !/^bash$/i.test(block.name)) return [{ section: "Delegated", chip: { key: `intent:${block.id}`, label: intent, title: intent, kind: "agent" } }];
+  const command = commandText(block);
+  const { verb, summary } = toolCallPresentation(block.name, block.input);
+  return command && verb === "Ran" && !summary ? commandParts(block, command, intent) : presentedParts(block);
+}

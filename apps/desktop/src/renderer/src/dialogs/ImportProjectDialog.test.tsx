@@ -3,11 +3,11 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import type { Project } from "@openorc/protocol";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { core } from "../lib/rpc";
-import { queryClient } from "../lib/query";
+import { queryClient } from "../lib/client";
 import { useRouter } from "../lib/router";
 import { ImportProjectDialog } from "./ImportProjectDialog";
 
-vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onInvalidate: vi.fn(), onReady: vi.fn() } }));
+vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: () => () => {} } }));
 
 const missingFolder = "/Users/you/dev/new-app";
 const existingFolder = "/Users/you/dev/app";

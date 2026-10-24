@@ -1,5 +1,5 @@
 import type { TeamActorView, TeamChatEntry, TeamExecutionView } from "@openorc/protocol";
-import type { Block } from "./transcript";
+import type { Block } from "@openorc/client";
 
 /** One of an assignment's turns, with the assignments it delegated during that turn. */
 export interface TeamActivityGroup {

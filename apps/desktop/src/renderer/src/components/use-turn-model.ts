@@ -1,8 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { Block } from "../lib/transcript";
-import { workParts, workTiming } from "../lib/work-transcript";
-import { receiptItems } from "./work-receipt";
-import { workEntries } from "./work-steps";
+import { type Block, workParts, workTiming, receiptItems, workEntries } from "@openorc/client";
 import type { TurnStatus } from "./TurnHead";
 
 /** A clock that ticks once a second while `active`, and stands still otherwise. */

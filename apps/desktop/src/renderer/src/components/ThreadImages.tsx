@@ -7,7 +7,7 @@ import { cn } from "../lib/cn";
 import { imageSource, isImagePath, localPath } from "../../../shared/image-paths";
 import { fileReference } from "../../../shared/file-reference";
 import { useLayout, type FileSelection } from "../lib/layout";
-import type { Block } from "../lib/transcript";
+import type { Block } from "@openorc/client";
 import { Button } from "./ui";
 import { RichText } from "./RichText";
 import { rehypeMentionNames } from "../lib/mention-names";

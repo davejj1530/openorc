@@ -2,14 +2,27 @@ import { lazy, memo, Suspense, useEffect, useId, useLayoutEffect, useMemo, useRe
 import { useVisited } from "../lib/use-visited";
 import { harnessCatalog, type ActivityRecovery } from "@openorc/protocol";
 import { WorkMessage, WorkAgent, ChevronDown, ChevronRight, FileText, GitFork, Lightbulb, Loader2 } from "./icons";
-import { workTurns } from "../lib/work-transcript";
+import {
+  workTurns,
+  type Block,
+  type RunTranscript,
+  liveVerb,
+  stateLabel,
+  toolCallPresentation,
+  type Tone,
+  foldable,
+  startedWorkFromTool,
+  taskIdFromTool,
+  uniqueTaskCards,
+  isImageGeneration,
+  isImageView,
+  isUnifiedDiff,
+} from "@openorc/client";
 import { cn } from "../lib/cn";
 import type { FileSelection } from "../lib/layout";
-import type { Block, RunTranscript } from "../lib/transcript";
 import { QuestionCard } from "./QuestionCard";
 import { AgentPresence } from "./AgentPresence";
-import { liveVerb, stateLabel, toolCallPresentation, type Tone } from "./tool-presentation";
-import { foldable } from "./work-steps";
+import { toolIcons } from "./tool-icons";
 import { WorkNow, WorkSteps } from "./WorkSteps";
 import { TurnHead } from "./TurnHead";
 import { TurnReceipt } from "./TurnReceipt";
@@ -20,14 +33,11 @@ import { ApprovalCard, pretty } from "./ApprovalCard";
 export { AgentPresence } from "./AgentPresence";
 import { StartedThreadCard } from "./StartedThreadCard";
 import { TaskCard } from "./TaskCard";
-import { startedWorkFromTool, taskIdFromTool, uniqueTaskCards } from "../lib/task-progress";
 import { UsageRecovery } from "./UsageRecovery";
 import { SignInRecovery } from "./SignInRecovery";
 import { TranscriptErrorCard } from "./TranscriptErrorCard";
 import { IconButton, TextButton } from "./ui";
 import { ImageGenerationRow, ImageViewRow, ThreadImage, ThreadMedia, ThreadRichText } from "./ThreadImages";
-import { isImageGeneration, isImageView } from "../lib/image-activity";
-import { isUnifiedDiff } from "../lib/chat-diff";
 import { isImagePath } from "../../../shared/image-paths";
 import { CopyMessage, MessageTime, TurnActions } from "./MessageActions";
 
@@ -303,7 +313,8 @@ const GroupRow = memo(function GroupRow({ id, blocks, runId, taskCards }: GroupR
   const [open, setOpen] = useState(false);
   const [visited, setVisited] = useState(false);
   const first = blocks.find((b) => b.kind === "tool") ?? blocks.find((b) => b.kind !== "thinking");
-  const { icon: Icon, tone } = first?.kind === "tool" ? toolCallPresentation(first.name, first.input) : { icon: WorkMessage, tone: "neutral" as Tone };
+  const { icon, tone } = first?.kind === "tool" ? toolCallPresentation(first.name, first.input) : { icon: "WorkMessage" as const, tone: "neutral" as Tone };
+  const Icon = toolIcons[icon];
   const live = blocks.some((b) => (b.kind === "tool" && !b.done) || (b.kind === "thinking" && b.endedAt === null) || (b.kind === "activity" && b.status === "running"));
   let label: string;
   if (live && !first) label = "Thinking";

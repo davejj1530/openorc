@@ -166,6 +166,19 @@ describe("pairing a phone", () => {
     expect(within(sheet).queryByRole("button", { name: "New code" })).toBeNull();
   });
 
+  it("copies the pairing link, for a phone that pastes it instead of scanning", async () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    const sheet = await openSheet();
+    fireEvent.click(within(sheet).getByRole("button", { name: "Copy link" }));
+    expect(await within(sheet).findByRole("button", { name: "Copied" })).toBeTruthy();
+    expect(writeText).toHaveBeenCalledWith(offer!.url);
+    act(() => {
+      vi.advanceTimersByTime(300_000);
+    });
+    expect(within(sheet).queryByRole("button", { name: /Copy link|Copied/ })).toBeNull();
+  });
+
   it("cancels the code when the sheet is closed", async () => {
     const sheet = await openSheet();
     fireEvent.click(within(sheet).getByRole("button", { name: "Close" }));

@@ -207,13 +207,28 @@ function PairingCode({ sheet, retry }: { sheet: PairingSheet; retry: () => void 
         )}
       </div>
       <div>
-        <p className="text-ink-2">Scan with OpenOrc on your phone.</p>
+        <p className="text-ink-2">Scan with OpenOrc on your phone. {sheet.kind === "live" ? <CopyLink url={sheet.offer.url} /> : null}</p>
         <p className="motion-swap min-h-5 text-sm text-ink-4 tabular">
           <span aria-hidden={expired}>{sheet.kind === "live" ? `Expires in ${countdown(sheet.secondsLeft)}` : null}</span>
           <span aria-hidden={!expired}>This code expired.</span>
         </p>
       </div>
     </div>
+  );
+}
+
+/** The code as a link, for a phone that pastes it: Universal Clipboard carries it over. */
+function CopyLink({ url }: { url: string }) {
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 2000);
+    return () => clearTimeout(timer);
+  }, [copied]);
+  return (
+    <TextButton tone="muted" onClick={() => void navigator.clipboard.writeText(url).then(() => setCopied(true))}>
+      {copied ? "Copied" : "Copy link"}
+    </TextButton>
   );
 }
 

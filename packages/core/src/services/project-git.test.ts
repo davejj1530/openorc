@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { projects, tasks } from "@openorc/db";
+import { projects, runs, tasks, threads } from "@openorc/db";
 import { emptyTree, git } from "@openorc/git";
 import type { RunSpec } from "@openorc/protocol";
 import { CodexAdapter, RunHandle } from "@openorc/agents";
@@ -138,6 +138,35 @@ it("tracks a repository's changes before its first commit, and branches once it 
     expect(await threadTurnChanges(core.db, firstTurn)).toEqual(planAdded);
     expect((await core.threads.moveWorkspace(thread.id, "worktree")).worktreePath).toBeTruthy();
     expect(logs).toEqual([]);
+  } finally {
+    await core.close();
+  }
+});
+
+it("refuses a worktree in a folder that cannot branch and leaves nothing behind, then starts one once it can", async () => {
+  const root = await temp();
+  const folder = join(root, "plain");
+  await mkdir(folder);
+  const { core, logs, input, call } = await harness(root);
+  try {
+    const project = await core.projects.import(folder);
+    const start = { ...input, projectId: project.id, prompt: "Isolate it", workspaceMode: "worktree" as const };
+    const refusal = "plain isn't a git repository yet. Worktrees and teams need git and a first commit.";
+    // The phone and the desktop both start through threads.start; the Mac's reason is what they show.
+    await expect(call("threads.start", start)).rejects.toThrow(refusal);
+    expect(threads.list(core.db, { filter: "all" })).toEqual([]);
+    expect(core.db.stmt("SELECT COUNT(*) AS count FROM runs").get()).toEqual({ count: 0 });
+    expect(await core.workspaceWriters.reason([folder])).toBeNull();
+
+    await repository(folder, { commit: true });
+    const { thread, run } = await call("threads.start", start);
+    expect(thread).toMatchObject({ projectId: project.id, workspaceMode: "worktree", branch: expect.stringContaining("isolate-it") });
+    expect(thread.worktreePath).toBeTruthy();
+    expect(threads.list(core.db, { filter: "all" }).map((row) => row.id)).toEqual([thread.id]);
+    expect(runs.listForThread(core.db, thread.id).map((row) => row.id)).toEqual([run!.id]);
+    await vi.waitFor(() => expect(core.threads.get(thread.id)?.activity).toBe("idle"));
+    await core.runs.closeAndWait(run!.id);
+    expect(logs).toEqual([`threads.start: ${refusal}`]);
   } finally {
     await core.close();
   }

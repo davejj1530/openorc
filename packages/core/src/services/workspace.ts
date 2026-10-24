@@ -5,7 +5,7 @@ import path from "node:path";
 import { audit, taskForwardings, tasks, threads, type Db } from "@openorc/db";
 import { stopProcess, waitForProcessGroup } from "@openorc/agents";
 import { diskUsage, emptyTree, fetch, git, repoInfo, revParse, worktree } from "@openorc/git";
-import { WORKSPACE_ID, type BranchLoss, type Project, type RemovalImpact, type Task, type Thread } from "@openorc/protocol";
+import { WORKSPACE_ID, type BranchLoss, type Project, type RemovalImpact, type Task, type Thread, type WorkspaceMode } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
 import { assertCanBranch, projectGit } from "./project-git.js";
 import { inUnvettedCopy } from "./review-copies.js";
@@ -223,6 +223,16 @@ export class WorkspaceService {
       },
       inherited,
     );
+  }
+
+  /**
+   * Refuses a new thread's workspace before the thread exists, so a refused start leaves nothing behind. Once a thread
+   * is admitted, a preparation that fails keeps it, with the error, to retry from. An adopted checkout is a worktree already.
+   */
+  async assertNewThreadWorkspace(project: Project, workspaceMode: WorkspaceMode, adoptsCheckout: boolean): Promise<void> {
+    if (workspaceMode === "current") return;
+    if (project.id === WORKSPACE_ID) throw new Error("Workspace conversations run in a folder. Open a project to create a worktree.");
+    if (!adoptsCheckout) await assertCanBranch(project);
   }
 
   /**

@@ -217,7 +217,7 @@ export class ThreadService {
     const home = executionProject(this.db, { projectId: input.projectId });
     const project = input.projectId === WORKSPACE_ID ? { ...home, rootPath: await directory(input.workingDirectory ?? home.rootPath) } : home;
     const workspaceMode = input.checkout ? "worktree" : (input.workspaceMode ?? "current");
-    if (project.id === WORKSPACE_ID && workspaceMode === "worktree") throw new Error("Workspace conversations run in a folder. Open a project to create a worktree.");
+    await this.workspaces.assertNewThreadWorkspace(project, workspaceMode, Boolean(input.checkout));
     const id = randomUUID();
     const title = input.title?.trim() || titleFromPrompt(input.prompt);
     const destination = this.workspaces.threadPath({ id, title, workspaceMode, worktreePath: input.checkout?.path ?? null }, project);

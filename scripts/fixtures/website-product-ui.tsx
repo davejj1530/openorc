@@ -229,7 +229,7 @@ async function main() {
     { agent: "codex", id: "gpt-6-astra", label: "GPT-6-Astra", efforts: ["high"], defaultEffort: "high", isDefault: true },
     { agent: "claude", id: "claude-opus-5-5[1m]", label: "Opus 5.5 (1M context)", efforts: ["high"], defaultEffort: "high" },
   ];
-  const settingsRpc = createDesignSettingsRpc();
+  const settingsRpc = createDesignSettingsRpc({ phone: query.get("phone") });
   const pageRpc = pageViews.has(mode) ? pageStates({ mode, now, project, orclings, patch }) : null;
   core.call = (async (method: string, params: Record<string, unknown> = {}) => {
     const setting = settingsRpc(method, params);
@@ -381,7 +381,7 @@ async function main() {
   } else if (pageViews.has(mode)) useRouter.getState().navigate(pageRoute(mode));
   else if (mode === "tasks") useRouter.getState().navigate({ view: "tasks" });
   else if (mode === "inbox") useRouter.getState().navigate({ view: "inbox" });
-  else if (["usage", "connections", "slack", "skills", "appearance", "general", "memory", "data"].includes(mode)) {
+  else if (["usage", "connections", "slack", "phone", "skills", "appearance", "general", "memory", "data"].includes(mode)) {
     useRouter.getState().navigate({ view: "settings", section: mode as "usage" });
   } else if (mode === "new") useRouter.getState().navigate({ view: "newthread", projectId: "studio" });
   else if (mode === "orclings") useRouter.getState().navigate({ view: "thread", threadId: "orcling-rini" });
@@ -412,7 +412,7 @@ async function main() {
 function DesignPreviewBar() {
   const query = new URLSearchParams(location.search);
   const threadId = useRouter((state) => (state.route.view === "thread" ? state.route.threadId : null));
-  let previewView = ["connections", "slack", "skills", "general", "memory", "data"].includes(query.get("view") ?? "") ? "usage" : (query.get("view") ?? "workspace");
+  let previewView = ["connections", "slack", "phone", "skills", "general", "memory", "data"].includes(query.get("view") ?? "") ? "usage" : (query.get("view") ?? "workspace");
   if (threadId?.startsWith("orcling-")) previewView = "orclings";
   else if (threadId && previewView === "orclings") previewView = threadId === "team" ? "teams" : "workspace";
   return (

@@ -21,6 +21,7 @@ import { GitHubSettings } from "./settings-github";
 import { Field, LoadError, SaveStatus, Section, Toggle, usePreference } from "./settings-shared";
 import { SkillsSettings } from "./settings-skills";
 import { SlackSettings } from "./settings-slack";
+import { PairPhone, PhoneSettings } from "./settings-phone";
 import { ProviderUsageOverview } from "./settings-usage";
 import { TextGenerationSettings } from "./settings-text-generation";
 import { UpdateSettingsSection } from "./settings-updates";
@@ -58,6 +59,7 @@ export function Settings({ route }: { route: SettingsRoute }) {
                 {info.isFetching ? "Checking…" : "Refresh connections"}
               </Button>
             )}
+            {current.id === "phone" && <PairPhone />}
           </header>
           {settingsSections.map(({ id, label }) => (
             <section key={id} id={`settings-${id}`} aria-label={label} hidden={id !== current.id}>
@@ -125,6 +127,8 @@ function SectionSettings({ id, active, info }: { id: SettingsSection; active: bo
       );
     case "slack":
       return <SlackSettings active={active} />;
+    case "phone":
+      return <PhoneSettings active={active} />;
     case "skills":
       return <SkillsSettings active={active} />;
     case "appearance":

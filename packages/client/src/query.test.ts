@@ -83,6 +83,10 @@ const contract: Array<[RpcMethod, RpcMethod[]]> = [
   ["reviewerApp.cancelSetup", ["reviewerApp.get"]],
   ["reviewerApp.configure", ["reviewerApp.get"]],
   ["reviewerApp.remove", ["reviewerApp.get"]],
+  ["remote.configure", ["remote.status"]],
+  ["remote.pairing.begin", ["remote.status"]],
+  ["remote.pairing.cancel", ["remote.status"]],
+  ["remote.devices.remove", ["remote.status"]],
 ];
 
 const params = { id: "t1", taskId: "t1", threadId: "t1", projectId: "p1", scope: { kind: "thread" as const, id: "t1" }, path: "README.md", query: "" };
@@ -141,6 +145,7 @@ describe("query cache tags", () => {
       "pulls.get",
       "pulls.diff",
       "pulls.review.get",
+      "remote.status",
     ];
     for (const read of reads) expect(tagsFor(read, params).length, `${read} has no tag`).toBeGreaterThan(0);
   });

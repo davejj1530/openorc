@@ -281,6 +281,13 @@ export const Monitor = icon(
   </>,
 );
 export const Laptop = icon("Laptop", <path d="M5 16V5.5A1.5 1.5 0 0 1 6.5 4h11A1.5 1.5 0 0 1 19 5.5V16 M5 16h14l3 4H2Z" />);
+export const Smartphone = icon(
+  "Smartphone",
+  <>
+    <rect x="6" y="2.5" width="12" height="19" rx="2.5" />
+    <path d="M11 18.5h2" />
+  </>,
+);
 export const Clock = icon(
   "Clock",
   <>

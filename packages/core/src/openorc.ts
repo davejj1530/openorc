@@ -20,7 +20,7 @@ import {
   threads,
 } from "@openorc/db";
 import { startMcpServer, type OpenOrcMcpServer } from "@openorc/mcp";
-import { harnessInfo, harnessInstalled, harnessLoggedIn, rpcParams, type HarnessId, type RpcMethod, type RpcRequest } from "@openorc/protocol";
+import { harnessAvailability, harnessInfo, harnessInstalled, harnessLoggedIn, rpcParams, type HarnessId, type RpcMethod, type RpcRequest } from "@openorc/protocol";
 import { randomBytes, randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
@@ -81,6 +81,7 @@ import { OrchestrationService } from "./services/orchestration.js";
 import { inUnvettedCopy } from "./services/review-copies.js";
 import { ProjectService } from "./services/projects.js";
 import { ProviderLog } from "./services/provider-log.js";
+import { readPlanLimits } from "./services/plan-limits.js";
 import { ProviderUsageService } from "./services/provider-usage.js";
 import { PullRequestService } from "./services/pull-requests.js";
 import { ReviewerAppService } from "./services/reviewer-app.js";
@@ -739,6 +740,7 @@ export class OpenOrc {
         defaultAccountInfo: () => this.claudeSystemInfo(),
         agentUpdates: this.agentUpdates,
         providerUsage: this.providerUsage,
+        planLimits: () => readPlanLimits({ db: this.db, usage: this.providerUsage, availability: async () => harnessAvailability(await this.claudeSystemInfo()) }),
         invalidate,
       }),
       createProjectsHandlers({ db: this.db, projectService: this.projects, invalidate, transport: this.options.transport }),

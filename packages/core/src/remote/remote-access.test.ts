@@ -1,11 +1,11 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { decodePairingUrl } from "@openorc/link";
-import { projects, runs, threads } from "@openorc/db";
+import { claudeAccounts, projects, runs, threads } from "@openorc/db";
 import { commitAll, git } from "@openorc/git";
-import type { AgentEvent, CorePush, RemotePush, Route } from "@openorc/protocol";
+import { harnessIds, type AgentEvent, type CorePush, type HarnessInfo, type RemotePush, type Route } from "@openorc/protocol";
 import { OpenOrc } from "../openorc.js";
 import type { ProtectedSecretStore } from "../services/extraction-credentials.js";
 import { RemoteTestClient } from "./test-client.js";
@@ -137,6 +137,51 @@ describe("phone access", () => {
     const availability = await phone.call("agents.availability", {});
     expect(availability.map((row) => row.id)).toEqual(["codex", "claude", "opencode"]);
     expect(JSON.stringify(availability)).not.toMatch(/path|version|\//);
+  });
+
+  it("tells a phone its plan limits and nothing of whose accounts they are or where they live on the Mac", async () => {
+    const work = claudeAccounts.add(core.db, "Work");
+    const harnesses: HarnessInfo[] = harnessIds.map((id) => ({
+      id,
+      state: id === "opencode" ? "not_found" : "ready",
+      path: id === "opencode" ? null : `${dataDir}/bin/${id}`,
+      version: "1.0.0",
+      revision: 0,
+    }));
+    const system = vi.spyOn(core.system, "infoFor").mockResolvedValue({ dataDir, harnesses, gh: { installed: false, path: null } });
+    // The reports as the Mac's own Settings > Usage gets them: an email, a reset token, the CLI's words, a config folder.
+    const usage = vi.spyOn(core.providerUsage, "read").mockImplementation(async (provider, claudeAccountId) => ({
+      provider,
+      ...(claudeAccountId ? { claudeAccountId } : {}),
+      status: "available",
+      source: "Codex app-server · account usage",
+      context: "ChatGPT · pro · someone@example.com",
+      plan: provider === "codex" ? "Pro" : "Max",
+      checkedAt: Date.now(),
+      refreshedAt: Date.now(),
+      message: `Run codex login with CLAUDE_CONFIG_DIR=${dataDir}/claude-accounts/${work.id}`,
+      windows: [{ id: "codex:primary", label: `${provider} · 5-hour window`, usedPercent: 12, remainingPercent: 88, resetsAt: Date.now() + 3_600_000, observedAt: Date.now(), exhausted: false }],
+      credits: [{ label: "codex · workspace credits", balance: "12", unlimited: false }],
+      accountUrl: "https://chatgpt.com/codex/settings/usage",
+      localRuns: 3,
+      resets: { availableCount: 1, credits: null, redemption: "available", confirmationToken: "account-and-inventory-hash", pendingAttempt: { id: "attempt-1" } },
+    }));
+    try {
+      const phone = await pairPhone();
+      const limits = await phone.call("providers.limits", {});
+      expect(limits.map((account) => [account.name, account.plan, account.windows[0]?.label])).toEqual([
+        ["Codex", "Pro", "5-hour window"],
+        ["Claude · Existing CLI login", "Max", "5-hour window"],
+        ["Claude · Work", "Max", "5-hour window"],
+      ]);
+      expect(JSON.stringify(limits)).not.toMatch(/@|\/|token|hash|attempt|CLAUDE_CONFIG_DIR|claude-accounts|ChatGPT|credits/);
+      await expect(phone.call("providers.limits", { refresh: true } as never)).rejects.toThrow();
+      expect(usage).toHaveBeenCalledTimes(3);
+    } finally {
+      usage.mockRestore();
+      system.mockRestore();
+      claudeAccounts.update(core.db, { id: work.id, enabled: false });
+    }
   });
 
   it("reads a project's git live for a phone, so a folder that gains a first commit can branch", async () => {

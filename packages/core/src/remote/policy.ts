@@ -67,6 +67,8 @@ export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {
   "inbox.list": allow,
   "agents.models": allow,
   "agents.availability": allow,
+  // Takes nothing and answers the shares and plans alone, shaped by the core: no email, token, path or CLI text.
+  "providers.limits": allow,
   "app.settings.get": allow,
   "threads.start": (params, context) =>
     params.workingDirectory !== undefined ? "Choose a folder for this conversation on your Mac." : (phoneTitle(params.title) ?? storedImages(params.attachments, context)),

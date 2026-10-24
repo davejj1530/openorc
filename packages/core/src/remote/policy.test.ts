@@ -18,6 +18,16 @@ describe("phone policy", () => {
     expect(admitRemoteRequest("attachments.save", { name: "a.png", mime: "image/png", dataBase64: "AAAA" }, context)).toEqual({ ok: true });
     expect(admitRemoteRequest("agents.availability", {}, context)).toEqual({ ok: true });
     expect(admitRemoteRequest("projects.git", { id: "p" }, context)).toEqual({ ok: true });
+    expect(admitRemoteRequest("providers.limits", {}, context)).toEqual({ ok: true });
+  });
+
+  it("keeps the Mac's full usage reports and account list off the phone", () => {
+    for (const [method, params] of [
+      ["providers.usage", { provider: "codex" }],
+      ["claude.accounts.list", { refresh: true }],
+    ] as const) {
+      expect(admitRemoteRequest(method, params, context)).toEqual({ ok: false, message: "This is not available from a phone." });
+    }
   });
 
   it("lets the phone organize threads: pin, archive, snooze, rename and mark read or unread", () => {

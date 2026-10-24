@@ -17,6 +17,8 @@ export interface ProviderUsage {
   status: "available" | "unavailable" | "disconnected" | "error";
   source: string;
   context: string;
+  /** The plan as the provider names it ("Max", "Pro"), when the account reports one. */
+  plan: string | null;
   checkedAt: number;
   refreshedAt: number | null;
   message: string | null;
@@ -25,6 +27,24 @@ export interface ProviderUsage {
   accountUrl: string;
   localRuns: number | null;
   resets?: ResetInventory;
+}
+
+/**
+ * One account's plan limits as a phone draws them, from `providers.limits`: the shares and when they reset, and
+ * nothing of who the account belongs to (email, organization), how it signs in (tokens, config folders), what the CLI
+ * said, or how to reset it.
+ */
+export interface PlanLimits {
+  /** "codex", or "claude:" and the Claude account's id: stable from one read to the next. */
+  id: string;
+  provider: "codex" | "claude";
+  /** "Codex" or "Claude", followed by the account's own name when the Mac has more than one Claude account on. */
+  name: string;
+  plan: string | null;
+  status: ProviderUsage["status"];
+  /** Labels name the window alone ("5-hour window"); the card already names the provider and the plan. */
+  windows: AllowanceWindow[];
+  refreshedAt: number | null;
 }
 
 export interface ResetCredit {

@@ -3,7 +3,7 @@ import type { RpcMethod, RpcParams, RpcResults } from "@openorc/protocol";
 import type { CoreConnection } from "./connection.js";
 import { invalidatesFor, tagsFor } from "./query-tags.js";
 
-export type RpcQueryOptions<M extends RpcMethod> = Partial<Pick<UseQueryOptions<RpcResults[M]>, "enabled" | "staleTime" | "refetchInterval" | "placeholderData">>;
+export type RpcQueryOptions<M extends RpcMethod> = Partial<Pick<UseQueryOptions<RpcResults[M]>, "enabled" | "staleTime" | "gcTime" | "refetchInterval" | "placeholderData">>;
 
 interface QueryState {
   readonly connection: CoreConnection;

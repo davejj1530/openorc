@@ -27,7 +27,10 @@ async function open(options: { admit?: () => Admission<string>; pinned?: Uint8Ar
 async function sessions() {
   const opened = await open();
   if (!opened.connected.ok || !opened.accepted) throw new Error("no session");
-  return { ...opened, phoneSession: opened.connected.session, macSession: opened.accepted.session };
+  const macSession = opened.accepted.session;
+  // The phone speaks first, so its ping comes before anything a test sends.
+  expect(await new Promise((resolve) => macSession.onMessage(resolve))).toEqual({ t: "ping", id: 0 });
+  return { ...opened, phoneSession: opened.connected.session, macSession };
 }
 
 function collect<T>(session: { onMessage(listener: (message: T) => void): unknown }): T[] {
@@ -55,6 +58,27 @@ describe("link sessions", () => {
     );
     await connectLink({ socket: sockets.phone, crypto: nodeCrypto, device: deviceKey, macKey: macKey.publicKey, hello: { device: { name: "Phone" } }, timeoutMs: 1000 });
     expect(await heard).toEqual({ t: "ping", id: 0 });
+  });
+
+  it("keeps what the Mac sends right behind its answer until the phone listens", async () => {
+    const sockets = socketPair();
+    // The answer and the next record arrive in one read, before the phone's caller has had a turn.
+    let answer: Uint8Array | null = null;
+    sockets.mac.tap = (data) => {
+      if (answer) return [answer, data];
+      answer = data;
+      return [];
+    };
+    const accepted = acceptLink({ socket: sockets.mac, crypto: nodeCrypto, local: macKey, admit: () => admitted });
+    const connecting = connectLink({ socket: sockets.phone, crypto: nodeCrypto, device: deviceKey, macKey: macKey.publicKey, hello: { device: { name: "Phone" } }, timeoutMs: 1000 });
+    (await accepted)?.session.send({ t: "closing", reason: "removed" });
+    const connected = await connecting;
+    if (!connected.ok) throw new Error("no session");
+    await tick();
+    const first = collect<MacMessage>(connected.session);
+    const second = collect<MacMessage>(connected.session);
+    expect(first).toEqual([{ t: "closing", reason: "removed" }]);
+    expect(second).toEqual([]);
   });
 
   it("delivers messages in order and batches one tick's messages into one record", async () => {

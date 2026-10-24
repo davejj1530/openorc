@@ -1,0 +1,248 @@
+import type { ClientPush, CoreConnection } from "@openorc/client";
+import type { MacMessage, PhoneSession } from "@openorc/link";
+import type { AssetRef, RemotePush, RpcMethod, RpcParams, RpcResults } from "@openorc/protocol";
+import type { Clock } from "./route-race";
+
+/** What the Mac sends that the connection, not the session's owner, handles. */
+export type CallMessage = Exclude<MacMessage, { t: "pong" | "closing" }>;
+
+export interface Asset {
+  mime: string;
+  bytes: Uint8Array;
+}
+
+interface Pending {
+  session: PhoneSession;
+  resolve(value: unknown): void;
+  reject(error: Error): void;
+}
+
+interface Download {
+  session: PhoneSession;
+  mime: string;
+  chunks: Uint8Array[];
+  resolve(asset: Asset): void;
+  reject(error: Error): void;
+}
+
+interface Waiter {
+  ready(session: PhoneSession): void;
+  fail(error: Error): void;
+}
+
+/** How long a call made while the phone connects waits for a session. */
+export const CALL_WAIT_MS = 8_000;
+
+export const DROPPED = "The connection to your Mac dropped before it answered.";
+const NO_ANSWER = "Your Mac did not answer in time.";
+const NO_MAC = "This phone is not connected to a Mac.";
+
+function clientPush(push: RemotePush): ClientPush | null {
+  switch (push.type) {
+    case "frame":
+      return push;
+    case "invalidate":
+      return push;
+    case "notify": {
+      const { type: _type, ...notice } = push;
+      return { type: "notify", notice };
+    }
+    case "ready":
+      return null;
+  }
+}
+
+/**
+ * The phone's line to the core for `@openorc/client`, over whichever session is current. Calls made while the phone
+ * connects wait for a session; a call in flight when its session drops fails and is never sent again, since the Mac
+ * may already have acted on it. Every new session hears the phone's interest before anything else.
+ */
+export class LinkConnection implements CoreConnection {
+  readonly delivery = "interest";
+  private current: PhoneSession | null = null;
+  private interest: string[] = [];
+  private nextId = 0;
+  private resumable = false;
+  private readonly pending = new Map<number, Pending>();
+  private readonly downloads = new Map<number, Download>();
+  private readonly waiting = new Set<Waiter>();
+  private readonly drains = new Map<PhoneSession, () => void>();
+  private readonly listeners = new Set<(push: ClientPush) => void>();
+
+  constructor(
+    private readonly clock: Clock,
+    /** Whether a session may come: false while no Mac is paired, or the Mac cannot be talked to at all. */
+    private readonly canWait: () => boolean,
+  ) {}
+
+  call<M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> {
+    return this.withSession(
+      (session) =>
+        new Promise<RpcResults[M]>((resolve, reject) => {
+          const id = this.id();
+          this.pending.set(id, { session, resolve: resolve as (value: unknown) => void, reject });
+          session.send({ t: "rpc", id, method, params });
+        }),
+    );
+  }
+
+  /** The bytes behind an image the transcript names. */
+  asset(ref: AssetRef): Promise<Asset> {
+    return this.withSession(
+      (session) =>
+        new Promise<Asset>((resolve, reject) => {
+          const id = this.id();
+          this.downloads.set(id, { session, mime: "", chunks: [], resolve, reject });
+          session.send({ t: "asset", id, ref });
+        }),
+    );
+  }
+
+  onPush(listener: (push: ClientPush) => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  setFrameInterest(runIds: ReadonlySet<string>): void {
+    this.interest = [...runIds];
+    this.current?.send({ t: "interest", runIds: this.interest });
+  }
+
+  /** Makes `session` the one calls go over. Calls in flight on an earlier session still get their answers there. */
+  attach(session: PhoneSession): void {
+    this.current = session;
+    session.onClose(() => this.lost(session));
+    session.send({ t: "interest", runIds: this.interest });
+    this.emit({ type: "session", resumed: this.resumable });
+    this.resumable = true;
+    for (const waiter of this.waiting) waiter.ready(session);
+    this.waiting.clear();
+  }
+
+  /**
+   * For another Mac, or a client state cleared for one: nothing waiting carries over. `restored` says the client
+   * already shows what an earlier session told it, so the first session counts as resumed.
+   */
+  reset(restored: boolean): void {
+    this.resumable = restored;
+    for (const waiter of this.waiting) waiter.fail(new Error(NO_MAC));
+    this.waiting.clear();
+  }
+
+  receive(session: PhoneSession, message: CallMessage): void {
+    switch (message.t) {
+      case "rpc.result":
+        this.settle(message.id)?.resolve(message.result);
+        return;
+      case "rpc.error":
+        this.settle(message.id)?.reject(new Error(message.message));
+        return;
+      case "push": {
+        const push = session === this.current ? clientPush(message.push) : null;
+        if (push) this.emit(push);
+        return;
+      }
+      case "gap":
+        if (session === this.current) this.emit({ type: "gap", runIds: message.runIds });
+        return;
+      case "asset.bytes": {
+        const download = this.downloads.get(message.id);
+        if (download) download.mime = message.mime;
+        return;
+      }
+      case "asset.error":
+        this.downloads.get(message.id)?.reject(new Error(message.message));
+        this.downloads.delete(message.id);
+        return;
+    }
+  }
+
+  receiveBytes(stream: number, chunk: Uint8Array, end: boolean): void {
+    const download = this.downloads.get(stream);
+    if (!download) return;
+    download.chunks.push(Uint8Array.from(chunk));
+    if (!end) return;
+    this.downloads.delete(stream);
+    download.resolve({ mime: download.mime, bytes: joined(download.chunks) });
+  }
+
+  /** Resolves once nothing asked over `session` waits for an answer. */
+  drained(session: PhoneSession): Promise<void> {
+    return new Promise((done) => {
+      this.drains.set(session, done);
+      this.checkDrains();
+    });
+  }
+
+  private withSession<T>(send: (session: PhoneSession) => Promise<T>): Promise<T> {
+    if (this.current) return send(this.current);
+    if (!this.canWait()) return Promise.reject(new Error(NO_MAC));
+    return new Promise<PhoneSession>((ready, fail) => {
+      const waiter: Waiter = {
+        ready: (session) => {
+          this.clock.clearTimeout(timer);
+          ready(session);
+        },
+        fail: (error) => {
+          this.clock.clearTimeout(timer);
+          fail(error);
+        },
+      };
+      const timer = this.clock.setTimeout(() => {
+        this.waiting.delete(waiter);
+        fail(new Error(NO_ANSWER));
+      }, CALL_WAIT_MS);
+      this.waiting.add(waiter);
+    }).then(send);
+  }
+
+  private lost(session: PhoneSession): void {
+    if (this.current === session) this.current = null;
+    for (const [id, pending] of this.pending) {
+      if (pending.session !== session) continue;
+      this.pending.delete(id);
+      pending.reject(new Error(DROPPED));
+    }
+    this.checkDrains();
+    for (const [id, download] of this.downloads) {
+      if (download.session !== session) continue;
+      this.downloads.delete(id);
+      download.reject(new Error(DROPPED));
+    }
+  }
+
+  private settle(id: number): Pending | undefined {
+    const pending = this.pending.get(id);
+    this.pending.delete(id);
+    this.checkDrains();
+    return pending;
+  }
+
+  private checkDrains(): void {
+    for (const [session, done] of this.drains) {
+      if ([...this.pending.values()].some((pending) => pending.session === session)) continue;
+      this.drains.delete(session);
+      done();
+    }
+  }
+
+  private id(): number {
+    // Ids double as the u32 stream ids of asset bytes.
+    this.nextId = (this.nextId % 0xffff_ffff) + 1;
+    return this.nextId;
+  }
+
+  private emit(push: ClientPush): void {
+    for (const listener of this.listeners) listener(push);
+  }
+}
+
+function joined(chunks: Uint8Array[]): Uint8Array {
+  const out = new Uint8Array(chunks.reduce((sum, chunk) => sum + chunk.length, 0));
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return out;
+}

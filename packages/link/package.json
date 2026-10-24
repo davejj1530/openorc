@@ -7,7 +7,8 @@
   "description": "The encrypted session between OpenOrc on a Mac and a paired phone: Noise IK over a WebSocket, records, messages and the pairing code.",
   "exports": {
     ".": "./src/index.ts",
-    "./node": "./src/node.ts"
+    "./node": "./src/node.ts",
+    "./test-fixtures/*": "./src/test-fixtures/*.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

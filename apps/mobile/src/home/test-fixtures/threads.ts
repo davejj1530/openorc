@@ -1,6 +1,6 @@
 import { WORKSPACE_ID, type Project, type ThreadSummary } from "@openorc/protocol";
 
-// Home reads these until the phone connects to a Mac. Fixed times keep the order stable.
+// A Mac's projects and threads for Home's tests. Fixed times keep the order stable.
 const now = Date.UTC(2026, 9, 23, 12);
 const minutes = (count: number) => now - count * 60_000;
 

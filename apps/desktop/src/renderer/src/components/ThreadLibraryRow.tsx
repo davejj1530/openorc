@@ -1,4 +1,4 @@
-import { harnessShortName, isHarnessId, WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
+import { harnessShortName, isHarnessId, type ThreadSummary } from "@openorc/protocol";
 import { ContextMenu } from "@base-ui/react/context-menu";
 import type { ReactNode } from "react";
 import { Folder, GitBranch, GitPullRequest } from "./icons";
@@ -11,31 +11,34 @@ import { useLayout } from "../lib/layout";
 import { useRouter } from "../lib/router";
 import { startThreadDrag, endThreadDrag } from "../lib/thread-drag";
 import { CoversPreview } from "../lib/browser-preview";
-import { pullRequestNumber } from "../lib/pull-requests";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
-import { relativeTime } from "@openorc/client";
+import { pullRequestMark, relativeTime, threadPlace, type ThreadPlace } from "@openorc/client";
 import { orclingById, useOrclings } from "../lib/orclings";
 import { OrclingAvatar } from "./OrclingAvatar";
 import { floatingGround } from "../lib/use-anchor-ground";
 
-/** Where a thread works, as its row shows it: its branch, the pull request it reviews, or its folder. */
-function threadPlace(thread: ThreadSummary): { icon: ReactNode; label: string; title: string } {
-  if (thread.branch) return { icon: <GitBranch size={11} className="shrink-0" />, label: thread.branch, title: thread.branch };
-  const pull = pullRequestNumber(thread.prUrl);
-  if (thread.prUrl && pull !== null) return { icon: <GitPullRequest size={11} className="shrink-0" />, label: `PR #${pull}`, title: thread.prUrl };
-  return { icon: <Folder size={11} className="shrink-0" />, label: thread.projectId === WORKSPACE_ID ? "Local" : "No branch", title: thread.workingDirectory ?? "No recorded branch" };
+const placeIcons: Record<ThreadPlace["kind"], ReactNode> = {
+  branch: <GitBranch size={11} className="shrink-0" />,
+  pull: <GitPullRequest size={11} className="shrink-0" />,
+  folder: <Folder size={11} className="shrink-0" />,
+};
+
+/** The hover title for where a thread works: the branch, the pull request's address, or the folder. */
+function placeTitle(thread: ThreadSummary, place: ThreadPlace): string {
+  if (place.kind === "pull" && thread.prUrl) return thread.prUrl;
+  if (place.kind === "folder") return thread.workingDirectory ?? "No recorded branch";
+  return place.label;
 }
 
 const pullRequestTone = { open: "text-ink-4", merged: "text-ok", closed: "text-bad" } as const;
 
 /** A resting thread's mark: the state of its pull request, if it has one. Most threads have none and show nothing. */
 function PullRequestMark({ thread }: { thread: ThreadSummary }) {
-  const pull = pullRequestNumber(thread.prUrl);
-  if (pull === null) return null;
-  const state = thread.prState ?? "open";
+  const mark = pullRequestMark(thread);
+  if (!mark) return null;
   return (
-    <span role="img" aria-label={`Pull request #${pull}, ${state}`} title={`Pull request #${pull}, ${state}`} className="size-4 shrink-0 inline-flex items-center justify-center">
-      <GitPullRequest size={14} className={pullRequestTone[state]} />
+    <span role="img" aria-label={mark.label} title={mark.label} className="size-4 shrink-0 inline-flex items-center justify-center">
+      <GitPullRequest size={14} className={pullRequestTone[mark.state]} />
     </span>
   );
 }
@@ -55,6 +58,7 @@ export function ThreadRow({ thread, active }: { thread: ThreadSummary; active: b
   const team = agents.length > 1;
   const agentLabel = providers.map(({ agent, count }) => `${team ? `${count} × ` : ""}${harnessShortName(agent)}`).join(", ");
   const place = threadPlace(thread);
+  const title = placeTitle(thread, place);
   return (
     <ContextMenu.Root>
       <ContextMenu.Trigger
@@ -86,8 +90,8 @@ export function ThreadRow({ thread, active }: { thread: ThreadSummary; active: b
         </span>
         <ThreadRowHeadline thread={thread} />
         <span className="thread-preview-meta flex min-w-0 items-center gap-2 text-xs leading-4 text-ink-3">
-          <span className="flex flex-1 min-w-0 items-center gap-1" title={place.title}>
-            {place.icon}
+          <span className="flex flex-1 min-w-0 items-center gap-1" title={title}>
+            {placeIcons[place.kind]}
             <span className="truncate">{place.label}</span>
           </span>
           {orcling ? (

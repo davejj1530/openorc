@@ -1,4 +1,4 @@
-import { QueryClient, useMutation, useQuery, type Query, type UseQueryOptions } from "@tanstack/react-query";
+import { QueryClient, useMutation, useQueries, useQuery, type Query, type UseQueryOptions } from "@tanstack/react-query";
 import type { RpcMethod, RpcParams, RpcResults } from "@openorc/protocol";
 import type { CoreConnection } from "./connection.js";
 import { invalidatesFor, tagsFor } from "./query-tags.js";
@@ -45,13 +45,22 @@ function invalidateTags(q: QueryState, keys: string[], options: { immediate?: bo
   if (!q.flushTimer) q.flushTimer = setTimeout(() => flushInvalidations(q, false), q.batchMs);
 }
 
-function useRpcOf<M extends RpcMethod>(q: QueryState, method: M, params: RpcParams<M>, options: RpcQueryOptions<M> = {}) {
-  return useQuery<RpcResults[M]>({
+function rpcQuery<M extends RpcMethod>(q: QueryState, method: M, params: RpcParams<M>, options: RpcQueryOptions<M>): UseQueryOptions<RpcResults[M]> {
+  return {
     queryKey: [method, params],
     queryFn: () => q.connection.call(method, params),
     meta: { tags: tagsFor(method, params) },
     ...options,
-  });
+  };
+}
+
+function useRpcOf<M extends RpcMethod>(q: QueryState, method: M, params: RpcParams<M>, options: RpcQueryOptions<M> = {}) {
+  return useQuery<RpcResults[M]>(rpcQuery(q, method, params, options));
+}
+
+/** One read of `method` per params, for a list of them that grows and shrinks, each keyed as `useRpc` keys it. */
+function useRpcsOf<M extends RpcMethod>(q: QueryState, method: M, paramsList: readonly RpcParams<M>[], options: RpcQueryOptions<M> = {}) {
+  return useQueries({ queries: paramsList.map((params) => rpcQuery(q, method, params, options)) });
 }
 
 function useRpcMutationOf<M extends RpcMethod>(q: QueryState, method: M) {
@@ -74,6 +83,7 @@ export function createQueries(connection: CoreConnection, invalidationBatchMs: n
     queryClient: q.client,
     invalidateTags: (keys: string[], options?: { immediate?: boolean }) => invalidateTags(q, keys, options),
     useRpc: <M extends RpcMethod>(method: M, params: RpcParams<M>, options?: RpcQueryOptions<M>) => useRpcOf(q, method, params, options),
+    useRpcs: <M extends RpcMethod>(method: M, paramsList: readonly RpcParams<M>[], options?: RpcQueryOptions<M>) => useRpcsOf(q, method, paramsList, options),
     useRpcMutation: <M extends RpcMethod>(method: M) => useRpcMutationOf(q, method),
   };
 }

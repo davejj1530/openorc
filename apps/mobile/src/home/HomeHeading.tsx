@@ -1,11 +1,16 @@
+import type { ProjectMeta } from "@openorc/client";
 import type { ComponentType } from "react";
 import { View } from "react-native";
 import { Folder, FolderOpen, Globe, Inbox } from "../generated/icons";
 import type { IconProps } from "../ui/icon";
+import { cn } from "../ui/cn";
 import { Text } from "../ui/Text";
 import type { HomeItem } from "./home-items";
 
 type Heading = Extract<HomeItem, { kind: "heading" }>;
+
+// The desktop's project-group-activity tones.
+const metaTones: Record<ProjectMeta["tone"], string> = { attention: "text-warn", faint: "text-ink-4" };
 
 const groupIcons: Record<Heading["group"], (open: boolean) => ComponentType<IconProps>> = {
   "needs-you": () => Inbox,
@@ -13,7 +18,7 @@ const groupIcons: Record<Heading["group"], (open: boolean) => ComponentType<Icon
   project: (open) => (open ? FolderOpen : Folder),
 };
 
-/** A section heading like the sidebar's project heading: a faint 16 pt glyph, the name in ink, a faint meta. */
+/** A section heading like the sidebar's project heading: a faint 16 pt glyph, the name in ink, the meta in its tone. */
 export function HomeHeading({ heading: { group, title, meta, open } }: { heading: Heading }) {
   const Icon = groupIcons[group](open);
   return (
@@ -24,7 +29,7 @@ export function HomeHeading({ heading: { group, title, meta, open } }: { heading
       <Text numberOfLines={1} className="flex-1 leading-4">
         {title}
       </Text>
-      <Text className="pr-1.25 text-sm leading-4 text-ink-4">{meta}</Text>
+      {meta ? <Text className={cn("pr-1.25 text-sm leading-4", metaTones[meta.tone])}>{meta.text}</Text> : null}
     </View>
   );
 }

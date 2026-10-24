@@ -2,7 +2,7 @@ import type { PrState } from "@openorc/protocol";
 import { View } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 import { AlertCircle, CircleHelp, GitPullRequest, LoaderCircle } from "../generated/icons";
-import type { ThreadMark } from "./thread-row-model";
+import type { ThreadMark } from "@openorc/client";
 
 const pullTone: Record<PrState, string> = { open: "text-ink-4", merged: "text-ok", closed: "text-bad" };
 

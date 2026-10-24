@@ -1,3 +1,4 @@
+import { renamedTitle } from "@openorc/client";
 import { useRef, useState } from "react";
 
 /** The thread's name stays in the window toolbar, beside its navigation. */
@@ -21,8 +22,8 @@ function TitleInput({ title, onFinish, onSave }: { title: string; onFinish: () =
   const finish = (save: boolean) => {
     if (finished.current) return;
     finished.current = true;
-    const next = value.trim();
-    if (save && next && next !== title) onSave(next);
+    const next = renamedTitle(title, value);
+    if (save && next) onSave(next);
     onFinish();
   };
   return (

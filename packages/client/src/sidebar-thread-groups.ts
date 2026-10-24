@@ -66,6 +66,30 @@ export function sidebarThreadPage({
   return filter === "orc" ? orcPage(page, selected, now) : page;
 }
 
+/** A part of a project's list that folds: the project itself, its pinned threads, or its snoozed threads. */
+export type SidebarFold = "project" | "pinned" | "snoozed";
+
+/**
+ * The saved key of each fold. Projects and pins are listed while they are open, so their keys mark a fold; snoozed
+ * threads start folded, so theirs marks an opening.
+ */
+export const sidebarFoldKey: Record<SidebarFold, (projectId: string) => string> = {
+  project: (id) => `project:${id}`,
+  pinned: (id) => `pinned:${id}`,
+  snoozed: (id) => `snoozed-open:${id}`,
+};
+
+/** Whether a section shows its threads, by the keys the reader saved. */
+export function sidebarSectionOpen(collapsed: readonly string[], fold: SidebarFold, projectId: string): boolean {
+  const saved = collapsed.includes(sidebarFoldKey[fold](projectId));
+  return fold === "snoozed" ? saved : !saved;
+}
+
+/** The saved keys after the reader folds or opens the section `key` names. */
+export function toggleSidebarFold(collapsed: readonly string[], key: string): string[] {
+  return collapsed.includes(key) ? collapsed.filter((saved) => saved !== key) : [...collapsed, key];
+}
+
 /** Match expanded rows, including opt-in snoozed rows. Single-project browsing ignores project folds. */
 export function visibleSidebarThreadIds(
   sections: readonly { id: string; pinned: ThreadSummary[]; rest: ThreadSummary[]; snoozed: ThreadSummary[] }[],
@@ -74,9 +98,9 @@ export function visibleSidebarThreadIds(
 ): string[] {
   return sections
     .flatMap((section) =>
-      projectId === null && collapsed.includes(`project:${section.id}`)
+      projectId === null && !sidebarSectionOpen(collapsed, "project", section.id)
         ? []
-        : [...(collapsed.includes(`pinned:${section.id}`) ? [] : section.pinned), ...section.rest, ...(collapsed.includes(`snoozed-open:${section.id}`) ? section.snoozed : [])],
+        : [...(sidebarSectionOpen(collapsed, "pinned", section.id) ? section.pinned : []), ...section.rest, ...(sidebarSectionOpen(collapsed, "snoozed", section.id) ? section.snoozed : [])],
     )
     .map((thread) => thread.id);
 }

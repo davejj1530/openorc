@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { WORKSPACE_ID } from "@openorc/protocol";
 import type { RpcParams } from "@openorc/protocol";
 import type { FileReference } from "../../../shared/file-reference";
-import type { SidebarFilter } from "@openorc/client";
+import { toggleSidebarFold, type SidebarFilter } from "@openorc/client";
 
 export type PanelTab = "newtab" | "orcling" | "plan" | "file" | "changes" | "tasks" | "task" | "terminal" | "browser" | "commits" | "checkpoints" | "memory" | "instructions";
 /** One turn's saved diff, opened from its change card: a team attempt's checkpoint or a thread turn's. */
@@ -191,7 +191,7 @@ export const useLayout = create<LayoutState>((set, get) => {
       const others = get().hiddenScreens.filter((hidden) => hidden !== screen);
       commit({ hiddenScreens: shown ? others : [...others, screen] });
     },
-    toggleCollapsed: (key) => commit({ collapsed: get().collapsed.includes(key) ? get().collapsed.filter((k) => k !== key) : [...get().collapsed, key] }),
+    toggleCollapsed: (key) => commit({ collapsed: toggleSidebarFold(get().collapsed, key) }),
     // Bounded because the key is a surface id and threads are unbounded; the
     // oldest entries are the ones whose thread the reader has stopped opening.
     rememberPreviewUrl: (key, url) => {

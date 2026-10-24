@@ -44,3 +44,9 @@ export function threadPlace(thread: Pick<ThreadSummary, "branch" | "prUrl" | "pr
   if (pull !== null) return { kind: "pull", label: `PR #${pull}` };
   return { kind: "folder", label: thread.projectId === WORKSPACE_ID ? "Local" : "No branch" };
 }
+
+/** The title a rename saves: what was typed, trimmed, or null when it is empty or unchanged and nothing should save. */
+export function renamedTitle(current: string, typed: string): string | null {
+  const next = typed.trim();
+  return next && next !== current ? next : null;
+}

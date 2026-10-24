@@ -6,10 +6,10 @@ import type { LinkState } from "./manager";
 export const QUIET_CONNECT_MS = 1_500;
 
 /**
- * The connection's words, held back while a connect that had no trouble before it is still quick, so a line does not
- * flash in and move what is under the person's finger. `quiet` is true meanwhile.
+ * The connection's words, holding back the status while a connect that had no trouble before it is still quick, so
+ * words do not flash in beside the Mac's name. The dot changes at once.
  */
-export function useLinkWords(state: LinkState): LinkWords & { quiet: boolean } {
+export function useLinkWords(state: LinkState): LinkWords {
   const quick = state.kind === "connecting" && state.why === null;
   const [late, setLate] = useState(false);
   useEffect(() => {
@@ -18,5 +18,6 @@ export function useLinkWords(state: LinkState): LinkWords & { quiet: boolean } {
     const timer = setTimeout(() => setLate(true), QUIET_CONNECT_MS);
     return () => clearTimeout(timer);
   }, [quick]);
-  return { ...linkWords(state), quiet: quick && !late };
+  const words = linkWords(state);
+  return quick && !late ? { ...words, status: null } : words;
 }

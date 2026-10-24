@@ -8,6 +8,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { restoreAppearance } from "../appearance";
 import { link, queryClient } from "../client";
 import { fonts } from "../generated/tokens";
+import { useMacLook } from "../look/use-mac-look";
 import { leaveOnMacChange } from "../navigation";
 import { useColors, useMode } from "../ui/mode";
 
@@ -20,6 +21,12 @@ restoreAppearance();
 const sheet = { presentation: "formSheet", sheetGrabberVisible: true } as const;
 const onePerThread = (_name: string, params: Record<string, unknown>) => String(params.id);
 
+/** Holds the shown Mac's look on the phone; draws nothing. */
+function MacLook() {
+  useMacLook();
+  return null;
+}
+
 export default function RootLayout() {
   const colors = useColors();
   const mode = useMode();
@@ -28,6 +35,7 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <KeyboardProvider>
         <QueryClientProvider client={queryClient}>
+          <MacLook />
           <StatusBar style="auto" />
           <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
             {/* The back button's long-press menu and VoiceOver name Home by this title. */}
@@ -50,8 +58,7 @@ export default function RootLayout() {
             />
             <Stack.Screen name="pair" dangerouslySingular options={{ presentation: "modal" }} />
             <Stack.Screen name="new" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [1] }} />
-            <Stack.Screen name="macs" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [0.5, 1] }} />
-            <Stack.Screen name="appearance" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: "fitToContents" }} />
+            <Stack.Screen name="settings" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [1] }} />
             <Stack.Screen name="filter" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: "fitToContents" }} />
             <Stack.Screen name="tool" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [0.6, 1] }} />
             <Stack.Screen name="model" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [0.6, 1] }} />

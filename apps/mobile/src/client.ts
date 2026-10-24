@@ -10,10 +10,11 @@ import { randomUUID } from "react-native-quick-crypto";
 import { createAssetCache } from "./connection/asset-cache";
 import { linkHooks } from "./connection/link-hooks";
 import { ConnectionManager, type LinkState } from "./connection/manager";
-import { keychainKeys, openSocket, phoneCrypto, storedMacs, systemClock } from "./connection/native";
+import { keychainKeys, openSocket, phoneCrypto, reachesInternet, storedMacs, systemClock } from "./connection/native";
 import type { NetworkKind, SavedMac } from "./connection/saved-macs";
 import { forgetFolds } from "./home/fold-keys";
 import { forgetLists, keepLists, restoreLists } from "./lists-cache";
+import { followMacLook } from "./look/look";
 import { timeFrame } from "./thread/perf-probe";
 
 /** The app's own key-value store: saved Macs, lists Home paints from on a cold start, drafts. */
@@ -33,6 +34,7 @@ export const link = new ConnectionManager({
     forgetFolds(storage, macId);
     assets.forget(macId);
   },
+  reachesInternet,
 });
 
 /** Client state over the link, built like the desktop's: same tags, same transcript reducer, another connection. */
@@ -59,6 +61,8 @@ function show(macId: string | null): void {
   link.connection.reset(macId !== null && restoreLists(client.queryClient, storage, macId));
 }
 
+// Before the link starts, so the look kept for the shown Mac paints before the first frame.
+followMacLook(client.queryClient.getQueryCache());
 link.subscribe(() => show(macOf(link.getState())));
 keepLists(client.queryClient, storage, () => shownMac);
 

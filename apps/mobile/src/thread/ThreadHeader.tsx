@@ -25,8 +25,7 @@ export function ThreadTitle({ thread, onRename }: { thread: ThreadSummary | null
   const link = useLinkWords(useLinkState());
   const project = projects.data?.find((item) => item.id === thread?.projectId)?.name;
   if (!thread) return null;
-  const down = link.tone !== "ok" && !link.quiet;
-  const line = down ? link.status : statusLine(thread, project);
+  const line = link.tone !== "ok" && link.status ? link.status : statusLine(thread, project);
   return (
     <Pressable accessibilityRole="header" accessibilityLabel={[thread.title, line].filter(Boolean).join(", ")} onPress={onRename} className="max-w-60 items-center active:opacity-60">
       <Text numberOfLines={1} className="text-md leading-5">

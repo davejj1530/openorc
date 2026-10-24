@@ -40,6 +40,9 @@ export class FakeMac {
   readonly paired = new Set<string>();
   offer: { offerId: string; secret: Uint8Array } | null = null;
   mute = false;
+  /** How the internet answers the phone's check, as the network around this Mac would: at once, not at all, or never. */
+  internet: "up" | "down" | "hung" = "up";
+  internetChecks = 0;
   /** Answers a call, or holds it when this returns undefined. */
   answer: (method: string, params: unknown) => unknown = () => undefined;
 
@@ -67,6 +70,12 @@ export class FakeMac {
       session.send({ t: "closing", reason });
       session.close(LinkCloseCode.closing, reason);
     }
+  }
+
+  reachesInternet(signal: AbortSignal): Promise<boolean> {
+    this.internetChecks++;
+    if (this.internet === "hung") return new Promise((resolve) => signal.addEventListener("abort", () => resolve(false)));
+    return Promise.resolve(this.internet === "up");
   }
 
   openSocket(route: Route): OpeningSocket {
@@ -142,6 +151,7 @@ export function effectsFor(
     keys,
     deviceName: "Test iPhone",
     forgetCache: (id) => void forgotten.push(id),
+    reachesInternet: (signal) => mac.reachesInternet(signal),
     forgotten,
   };
 }

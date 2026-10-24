@@ -1,7 +1,6 @@
 import type { MarkdownStyle } from "react-native-enriched-markdown";
-import { fonts, syntax, text, type colors } from "../generated/tokens";
-
-type Palette = (typeof colors)[keyof typeof colors];
+import { fonts, syntax, text } from "../generated/tokens";
+import type { Palette } from "../ui/mode";
 
 const reply = text.md;
 // Headings take size, not weight: the interface has one weight.

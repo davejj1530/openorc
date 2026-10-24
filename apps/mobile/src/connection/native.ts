@@ -25,6 +25,19 @@ export const systemClock: Clock = {
   clearTimeout: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
 };
 
+/** A page Apple keeps for iOS's own check that a network reaches the internet. */
+const INTERNET_CHECK = "https://www.apple.com/library/test/success.html";
+
+/** Whether the internet answers: any answer over HTTPS counts, which a carrier's or hotel's redirect cannot give. */
+export async function reachesInternet(signal: AbortSignal): Promise<boolean> {
+  try {
+    await fetch(INTERNET_CHECK, { method: "HEAD", cache: "no-store", signal });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** A React Native WebSocket to the Mac's link endpoint, as a session uses it. */
 export function openSocket(route: Route): OpeningSocket {
   const host = route.host.includes(":") ? `[${route.host}]` : route.host;

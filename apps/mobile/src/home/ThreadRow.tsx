@@ -3,12 +3,13 @@ import { harnessShortName, isHarnessId, type ThreadSummary } from "@openorc/prot
 import { Link } from "expo-router";
 import { memo, useMemo, type ComponentType } from "react";
 import { View } from "react-native";
-import Animated, { useReducedMotion } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { Folder, GitBranch, GitPullRequest } from "../generated/icons";
 import { cn } from "../ui/cn";
 import type { IconProps } from "../ui/icon";
 import { ListPressable } from "../ui/ListPressable";
 import { arrive } from "../ui/motion";
+import { useReducedMotion } from "../ui/reduced-motion";
 import { swipeAccessibility, type SwipeAction } from "../ui/swipe";
 import { SwipeRow } from "../ui/SwipeRow";
 import { Text } from "../ui/Text";

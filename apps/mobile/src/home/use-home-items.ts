@@ -46,8 +46,11 @@ function useOpening(): [string | null, (projectId: string) => void] {
   return [opened, setOpened];
 }
 
-/** Home's rows from the shown Mac's lists, each project a page at a time and folded as the reader left it. */
-export function useHomeItems() {
+/**
+ * Home's rows from the shown Mac's lists, each project a page at a time and folded as the reader left it. While the
+ * phone is not `connected` a list that fails keeps the threads it had and shows no retry: the header says once why.
+ */
+export function useHomeItems(connected: boolean) {
   const projects = useRpc("projects.list", {});
   const { filter, pinnedOnly } = useHomeFilter();
   // How many threads each project shows per list (active or archived), a page more for each Show more.
@@ -62,11 +65,11 @@ export function useHomeItems() {
     { refetchInterval: 60_000 },
   );
   const inbox = useRpc("inbox.list", {}, { refetchInterval: 60_000 });
-  const shown = groups.map((group, index) => shownPage({ ...group, failed: Boolean(lists[index]?.isError) }, filter, lists[index]?.data));
+  const shown = groups.map((group, index) => shownPage({ ...group, failed: connected && Boolean(lists[index]?.isError) }, filter, lists[index]?.data));
   const listed = new Set(shown.flatMap((group) => group.threads?.map((thread) => thread.id) ?? []));
   const waiting = useWaitingElsewhere(inbox.data, listed);
   return {
-    items: homeItems(shown, { now: Date.now(), filter, pinnedOnly, collapsed, waiting, projectsFailed: projects.isError, opened }),
+    items: homeItems(shown, { now: Date.now(), filter, pinnedOnly, collapsed, waiting, projectsFailed: connected && projects.isError, opened }),
     showMore: (projectId: string) => setLimits((current) => ({ ...current, [limitKey(projectId)]: (current[limitKey(projectId)] ?? THREAD_PAGE) + THREAD_PAGE })),
     /** Folds or opens a section; a project the reader opens rises its rows in. */
     toggle: (key: string, projectId: string) => {

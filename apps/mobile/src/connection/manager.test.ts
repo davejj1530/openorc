@@ -64,6 +64,31 @@ describe("route race", () => {
     expect(dialed(mac)).toEqual(["100.64.0.7@0"]);
   });
 
+  it("says Tailscale is the way in when no tailnet address answers on cellular", async () => {
+    const mac = new FakeMac();
+    mac.behave(lan, { kind: "answer" });
+    mac.behave(tailnet, { kind: "down" });
+    const { manager } = start(mac, "cellular");
+    await advance(10);
+    expect(manager.getState()).toMatchObject({ kind: "waiting", why: "tailnet" });
+    manager.setNetwork("wifi");
+    // Tailscale was cellular's reason: on Wi-Fi the attempt starts with none.
+    expect(manager.getState()).toMatchObject({ kind: "connecting", why: null });
+    await advance(10);
+    expect(manager.getState()).toMatchObject({ kind: "connected", route: lan });
+  });
+
+  it("has no route on cellular to a Mac without a tailnet address, and tries again on Wi-Fi", async () => {
+    const mac = new FakeMac();
+    mac.routes = [lan];
+    mac.behave(lan, { kind: "answer" });
+    const { manager } = start(mac, "cellular", pairedWith(mac));
+    expect(manager.getState()).toMatchObject({ kind: "waiting", why: "no-route", retryAt: null });
+    manager.setNetwork("wifi");
+    await advance(10);
+    expect(manager.getState()).toMatchObject({ kind: "connected", route: lan });
+  });
+
   it("gives each route 4 s, then waits to try again", async () => {
     const mac = new FakeMac();
     mac.behave(lan, { kind: "silent" });
@@ -109,6 +134,67 @@ describe("route race", () => {
   });
 });
 
+describe("with no internet", () => {
+  it("blames Tailscale on cellular only while the internet answers, and says No internet while nothing does", async () => {
+    const mac = new FakeMac();
+    mac.behave(tailnet, { kind: "silent" });
+    mac.internet = "down";
+    const { manager } = start(mac, "cellular");
+    await advance(4_000);
+    expect(manager.getState()).toMatchObject({ kind: "waiting", why: "offline" });
+    expect(manager.getState()).not.toMatchObject({ retryAt: null });
+    // Mobile data comes back with no change iOS reports: the next attempt finds the internet, and the tailnet still silent.
+    mac.internet = "up";
+    await advance(500);
+    expect(manager.getState()).toMatchObject({ kind: "connecting", why: "offline" });
+    await advance(4_000);
+    expect(manager.getState()).toMatchObject({ kind: "waiting", why: "tailnet" });
+    mac.internet = "down";
+    await advance(1_000 + 4_000);
+    expect(manager.getState()).toMatchObject({ kind: "waiting", why: "offline" });
+    mac.behave(tailnet, { kind: "answer" });
+    mac.internet = "up";
+    await advance(2_000 + 10);
+    expect(manager.getState()).toMatchObject({ kind: "connected", route: tailnet });
+  });
+
+  it("takes a check that does not answer in 3 s as no internet", async () => {
+    const mac = new FakeMac();
+    mac.behave(tailnet, { kind: "down" });
+    mac.internet = "hung";
+    const { manager } = start(mac, "cellular");
+    await advance(3_000 - 1);
+    expect(manager.getState()).toMatchObject({ kind: "connecting", why: null });
+    await advance(1);
+    expect(manager.getState()).toMatchObject({ kind: "waiting", why: "offline" });
+  });
+
+  it("says No internet over every route when the network is not Wi-Fi, and asks only after a race no route answered", async () => {
+    const mac = new FakeMac();
+    mac.behave(lan, { kind: "down" });
+    mac.behave(tailnet, { kind: "down" });
+    mac.internet = "down";
+    const { manager } = start(mac, "other");
+    await advance(10);
+    expect(manager.getState()).toMatchObject({ kind: "waiting", why: "offline" });
+    mac.behave(tailnet, { kind: "answer" });
+    await advance(500);
+    expect(manager.getState().kind).toBe("connected");
+    expect(mac.internetChecks).toBe(1);
+  });
+
+  it("never asks on Wi-Fi, where the LAN answers without the internet", async () => {
+    const mac = new FakeMac();
+    mac.behave(lan, { kind: "down" });
+    mac.behave(tailnet, { kind: "down" });
+    mac.internet = "down";
+    const { manager } = start(mac, "wifi");
+    await advance(10);
+    expect(manager.getState()).toMatchObject({ kind: "waiting", why: "unreachable" });
+    expect(mac.internetChecks).toBe(0);
+  });
+});
+
 describe("reconnecting", () => {
   it("backs off 0.5, 1, 2, 4, 8, then 15 s with jitter", async () => {
     const mac = new FakeMac();
@@ -149,6 +235,164 @@ describe("reconnecting", () => {
     await advance(20_000 + 10_000);
     expect(mac.sessions[0]!.closed).toBe(true);
     expect(manager.getState().kind).not.toBe("connected");
+  });
+});
+
+describe("a Mac that stays silent", () => {
+  it("is not reachable once it has not answered for a minute, from the minute on, until a session starts over", async () => {
+    const mac = new FakeMac();
+    mac.behave(lan, { kind: "silent" });
+    mac.behave(tailnet, { kind: "silent" });
+    const { manager, states } = start(mac);
+    // The first race gives up at 4.25 s: the phone has not heard the Mac since.
+    await advance(4_250);
+    expect(manager.getState()).toMatchObject({ kind: "waiting", why: "unreachable" });
+    await advance(60_000 - 1);
+    expect(manager.getState()).toMatchObject({ why: "unreachable" });
+    await advance(1);
+    expect(manager.getState()).toMatchObject({ kind: "waiting", why: "silent" });
+    states.length = 0;
+    await advance(30_000);
+    expect(states.length).toBeGreaterThan(1);
+    expect(states.every((state) => "why" in state && state.why === "silent")).toBe(true);
+    mac.behave(lan, { kind: "answer" });
+    await advance(20_000);
+    expect(manager.getState().kind).toBe("connected");
+    mac.behave(lan, { kind: "silent" });
+    mac.live[0]!.close(LinkCloseCode.normal);
+    await advance(10);
+    expect(manager.getState()).toMatchObject({ kind: "waiting", why: "unreachable" });
+    // The next race fails too, and the session was this minute's start.
+    await advance(500 + 4_250);
+    expect(manager.getState()).toMatchObject({ kind: "waiting", why: "unreachable" });
+  });
+
+  it("reads not reachable the moment the minute ends, even mid-attempt", async () => {
+    const mac = new FakeMac();
+    mac.routes = [lan];
+    mac.behave(lan, { kind: "silent" });
+    const { manager } = start(mac, "wifi", pairedWith(mac, [lan]));
+    // The minute starts as the first race gives up, at 4 s; Try again at 63 s runs until 67 s.
+    await advance(63_000);
+    void manager.retry();
+    await advance(1_000 - 1);
+    expect(manager.getState()).toMatchObject({ kind: "connecting", why: "unreachable" });
+    await advance(1);
+    expect(manager.getState()).toMatchObject({ kind: "connecting", why: "silent" });
+  });
+
+  it("counts only time spent asking: not while offline, on another network, or suspended", async () => {
+    const away: Array<(manager: ConnectionManager, mac: FakeMac) => Promise<void>> = [
+      async (manager) => {
+        manager.setNetwork("none");
+        await advance(5 * 60_000);
+        manager.setNetwork("wifi");
+      },
+      async (manager) => {
+        manager.setNetwork("cellular");
+        await advance(5 * 60_000);
+        expect(manager.getState()).toMatchObject({ why: "tailnet" });
+        manager.setNetwork("wifi");
+      },
+      async (manager, mac) => {
+        mac.internet = "down";
+        manager.setNetwork("cellular");
+        await advance(5 * 60_000);
+        expect(manager.getState()).toMatchObject({ why: "offline" });
+        manager.setNetwork("wifi");
+      },
+      async (manager) => {
+        manager.appState("background");
+        await advance(10 * 60_000);
+        expect(manager.getState().kind).toBe("suspended");
+        manager.appState("active");
+      },
+    ];
+    for (const [index, gap] of away.entries()) {
+      const mac = new FakeMac();
+      mac.behave(lan, { kind: "answer" });
+      const { manager } = start(mac);
+      await advance(10);
+      mac.behave(lan, { kind: "silent" });
+      mac.behave(tailnet, { kind: "silent" });
+      mac.live[0]!.close(LinkCloseCode.normal);
+      await advance(10);
+      await gap(manager, mac);
+      await advance(4_300);
+      expect(manager.getState(), `gap ${index}`).toMatchObject({ kind: "waiting", why: "unreachable" });
+    }
+  });
+
+  it("starts the minute over once the internet answers again on the same network", async () => {
+    const mac = new FakeMac();
+    mac.behave(lan, { kind: "silent" });
+    mac.behave(tailnet, { kind: "silent" });
+    mac.internet = "down";
+    const { manager, states } = start(mac, "other");
+    await advance(5 * 60_000);
+    expect(manager.getState()).toMatchObject({ why: "offline" });
+    mac.internet = "up";
+    states.length = 0;
+    await advance(30_000);
+    expect(states.filter((state) => state.kind === "waiting").map((state) => "why" in state && state.why)).toEqual(["unreachable", "unreachable"]);
+  });
+
+  it("gives another Mac its own minute, shown from the list or after the shown one is forgotten", async () => {
+    for (const how of ["select", "forget"] as const) {
+      const studio = new FakeMac();
+      studio.routes = [lan];
+      studio.behave(lan, { kind: "silent" });
+      const laptop = new FakeMac();
+      laptop.routes = [{ kind: "lan", host: "laptop.local", port: 47820 }];
+      laptop.behave(laptop.routes[0]!, { kind: "silent" });
+      const effects = pairedWith(studio, [lan]);
+      const laptopKeys = pairedWith(laptop);
+      effects.macs.save(laptopKeys.macs.saved.get(laptop.id)!);
+      effects.keys.stored.set(laptop.id, laptopKeys.keys.stored.get(laptop.id)!);
+      effects.openSocket = (route) => (route.host === "laptop.local" ? laptop : studio).openSocket(route);
+      const { manager } = start(studio, "wifi", effects);
+      await advance(70_000);
+      expect(manager.getState(), how).toMatchObject({ mac: { name: "Studio" }, why: "silent" });
+      if (how === "select") manager.select(laptop.id);
+      else await manager.forget(studio.id);
+      await advance(4_010);
+      expect(manager.getState(), how).toMatchObject({ kind: "waiting", mac: { id: laptop.id }, why: "unreachable" });
+    }
+  });
+
+  it("stays not reachable through Try again", async () => {
+    const mac = new FakeMac();
+    mac.routes = [lan];
+    mac.behave(lan, { kind: "silent" });
+    const { manager, states } = start(mac, "wifi", pairedWith(mac, [lan]));
+    await advance(70_000);
+    expect(manager.getState()).toMatchObject({ why: "silent" });
+    states.length = 0;
+    const settled = manager.retry();
+    await advance(4_000);
+    await settled;
+    expect(states.map((state) => [state.kind, "why" in state && state.why])).toEqual([
+      ["connecting", "silent"],
+      ["waiting", "silent"],
+    ]);
+  });
+
+  it("keeps a reason the Mac gave, and Check Tailscale on cellular, past the minute", async () => {
+    const mac = new FakeMac();
+    mac.behave(tailnet, { kind: "silent" });
+    const { manager } = start(mac, "cellular");
+    await advance(4_000);
+    expect(manager.getState()).toMatchObject({ kind: "waiting", why: "tailnet" });
+    await advance(120_000);
+    expect(manager.getState()).toMatchObject({ why: "tailnet" });
+    manager.setNetwork("wifi");
+    mac.behave(lan, { kind: "answer" });
+    await advance(10);
+    mac.behave(lan, { kind: "down" });
+    mac.behave(tailnet, { kind: "down" });
+    mac.closeAll("update");
+    await advance(120_000);
+    expect(manager.getState()).toMatchObject({ why: "restarting" });
   });
 });
 

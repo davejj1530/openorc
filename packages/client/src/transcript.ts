@@ -4,6 +4,12 @@ import type { ActivityRecovery, ActivityStatus, AgentEvent, AgentEventType, McpT
  * Transcript projection. Events fold into blocks. A change replaces only the blocks it touches and the arrays that
  * hold them, and each run is its own snapshot, so a component showing one run ignores every other run's stream.
  */
+const ACTIVITY_BLOCK = "activity-";
+
+/** An activity's block id in a run transcript, and back: the agent's own activity id is what the Mac knows it by. */
+export const activityBlockId = (activityId: string) => `${ACTIVITY_BLOCK}${activityId}`;
+export const activityIdOf = (blockId: string) => (blockId.startsWith(ACTIVITY_BLOCK) ? blockId.slice(ACTIVITY_BLOCK.length) : blockId);
+
 export type Block = { at?: number; turnKey?: string; runId?: string } & (
   | { id: string; kind: "message"; role: "assistant" | "user" | "system"; text: string; streaming: boolean; at?: number; attachments?: string[]; runId?: string }
   | { id: string; kind: "thinking"; text: string; startedAt: number; endedAt: number | null; explicit?: boolean; status?: ActivityStatus }
@@ -171,7 +177,7 @@ const handlers: { [T in AgentEventType]: Handler<T> } = {
     upsert(run, { id, kind: "thinking", text: ev.text || existing?.text || "", startedAt: existing?.startedAt ?? ev.ts, endedAt: ev.ts, explicit: true, status: "success" });
   },
   "activity.updated": (run, ev) => {
-    const id = `activity-${ev.activityId}`;
+    const id = activityBlockId(ev.activityId);
     const existing = get(run, id, "activity");
     upsert(run, {
       ...existing,
@@ -187,7 +193,7 @@ const handlers: { [T in AgentEventType]: Handler<T> } = {
     });
   },
   "activity.delta": (run, ev) => {
-    const id = `activity-${ev.activityId}`;
+    const id = activityBlockId(ev.activityId);
     const existing = get(run, id, "activity");
     upsert(run, { ...existing, id, kind: "activity", label: ev.label, status: existing?.status ?? "running", text: (existing?.text ?? "") + ev.text });
   },

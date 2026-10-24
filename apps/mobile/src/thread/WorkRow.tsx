@@ -67,7 +67,7 @@ function Blocks({ blocks, runId }: { blocks: Block[]; runId: string }) {
           case "thinking":
             return <ThinkingRow key={block.id} block={block} />;
           case "activity":
-            return <ActivityRow key={block.id} block={block} />;
+            return <ActivityRow key={block.id} block={block} runId={runId} />;
           case "message":
             return (
               <Text key={block.id} className="text-ink-3">

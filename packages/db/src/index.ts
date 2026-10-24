@@ -1,7 +1,7 @@
 export { taskComments } from "./task-comments.js";
 export { claudeAccounts } from "./claude-accounts.js";
 export { Db } from "./database.js";
-export { LedgerWriter, listEvents, countEvents, completedToolCall, generatedImagePath, type LedgerOptions, type ListEventsOptions } from "./ledger.js";
+export { LedgerWriter, listEvents, countEvents, completedToolCall, activityImagePath, type LedgerOptions, type ListEventsOptions } from "./ledger.js";
 export { ledgerMaintenance, type LedgerSpace } from "./maintenance.js";
 export { OMIT_OUTPUT_CHARS, pagedEvent, transcriptPage, type TranscriptPage } from "./transcript-page.js";
 export { lastThreadMessage } from "./last-message.js";

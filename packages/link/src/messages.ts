@@ -87,7 +87,7 @@ const route = shape({ kind: oneOf("lan", "tailnet"), host: text(253), port });
 const assetRef = variants("kind", {
   attachment: shape({ kind: present, name: text(255) }),
   "tool-image": shape({ kind: present, url: text(512) }),
-  generated: shape({ kind: present, runId: text(100), activityId: text(200) }),
+  activity: shape({ kind: present, runId: text(100), activityId: text(200) }),
 } satisfies Record<AssetRef["kind"], Check>);
 const pushTypes: RemotePush["type"][] = ["frame", "invalidate", "notify", "ready"];
 // The Mac is authenticated and pushes are the hot path, so the phone checks the envelope and trusts the body.

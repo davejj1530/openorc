@@ -203,22 +203,24 @@ export function completedToolCall(db: Db, runId: string, callId: string): Extrac
   return call;
 }
 
-/** Where the newest announcement of an agent's generated image says its file is, or null. */
-export function generatedImagePath(db: Db, runId: string, activityId: string): string | null {
+/** Where the newest announcement of an activity's image says its file is: one the agent generated or viewed, or null. */
+export function activityImagePath(db: Db, runId: string, activityId: string): string | null {
   const body = "COALESCE(a.content, e.payload)";
   const row = db
     .stmt(
       `SELECT ${body} AS payload FROM events e
     LEFT JOIN artifacts a ON a.event_id = e.id AND a.kind = 'payload'
     WHERE e.run_id = ? AND e.kind = 'activity.updated' AND json_extract(${body}, '$.activityId') = ?
-    AND (json_type(${body}, '$.imagePath') = 'text' OR json_type(${body}, '$.detail.savedPath') = 'text')
+    AND (json_type(${body}, '$.imagePath') = 'text' OR json_type(${body}, '$.detail.savedPath') = 'text'
+      OR (json_extract(${body}, '$.detail.type') = 'imageView' AND json_type(${body}, '$.detail.path') = 'text'))
     ORDER BY e.seq DESC LIMIT 1`,
     )
     .get(runId, activityId) as { payload: string } | undefined;
   if (!row) return null;
-  const event = JSON.parse(row.payload) as { imagePath?: string; detail?: { savedPath?: unknown } };
+  const event = JSON.parse(row.payload) as { imagePath?: string; detail?: { savedPath?: unknown; path?: unknown } };
   if (typeof event.imagePath === "string") return event.imagePath;
-  return typeof event.detail?.savedPath === "string" ? event.detail.savedPath : null;
+  if (typeof event.detail?.savedPath === "string") return event.detail.savedPath;
+  return typeof event.detail?.path === "string" ? event.detail.path : null;
 }
 
 function eventToolName(event: AgentEvent): string | null {

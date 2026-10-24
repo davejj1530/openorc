@@ -1,4 +1,4 @@
-import { approvalDetail, approvalSummary, isImageGeneration, type Block, type Question, readQuestions } from "@openorc/client";
+import { activityIdOf, approvalDetail, approvalSummary, type Block, isImageGeneration, type Question, readQuestions } from "@openorc/client";
 import { harnessShortName, isHarnessId } from "@openorc/protocol";
 import * as Haptics from "expo-haptics";
 import { memo, useRef, useState } from "react";
@@ -311,7 +311,7 @@ function ImageGeneration({ block, runId }: { block: Extract<Block, { kind: "acti
         <Text className="text-ink-4">{imageWords(block.status)}</Text>
         {running ? <Spinner size={14} /> : null}
       </View>
-      {block.status === "success" && block.imagePath ? <ImageTile asset={{ kind: "generated", runId: block.runId ?? runId, activityId: block.id }} label="Generated image" /> : null}
+      {block.status === "success" && block.imagePath ? <ImageTile asset={{ kind: "activity", runId: block.runId ?? runId, activityId: activityIdOf(block.id) }} label="Generated image" /> : null}
       {block.status === "error" && block.text ? <Text className="text-sm text-bad">{block.text}</Text> : null}
     </View>
   );
@@ -327,7 +327,7 @@ export const Card = memo(function Card({ block, runId }: { block: Block; runId: 
     case "status":
       return <ErrorCard text={block.text} />;
     case "activity":
-      return isImageGeneration(block) ? <ImageGeneration block={block} runId={runId} /> : <ActivityRow block={block} />;
+      return isImageGeneration(block) ? <ImageGeneration block={block} runId={runId} /> : <ActivityRow block={block} runId={runId} />;
     case "tool":
       return <ToolRow block={block} runId={runId} />;
     case "thinking":

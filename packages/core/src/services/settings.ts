@@ -11,6 +11,7 @@ const defaults: AppSettings = {
   defaultWorkspaceMode: "current",
   defaultPermissionMode: "trusted",
   defaultHarness: null,
+  look: null,
   idleProcessMinutes: 10,
   claudeUserMcpServers: true,
 };

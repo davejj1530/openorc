@@ -1,6 +1,6 @@
-import { cleanup, fireEvent, render, renderHook, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, renderHook, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { HarnessId, HarnessInfo } from "@openorc/protocol";
+import type { AppLook, HarnessId, HarnessInfo } from "@openorc/protocol";
 
 vi.mock("./components/CommandPalette", () => ({ CommandPalette: () => null }));
 vi.mock("./components/RiveMascot", () => ({ RiveMascot: () => null }));
@@ -41,11 +41,12 @@ let harnesses: HarnessInfo[] | undefined;
 let projectCount = 1;
 let checkFailed = false;
 let coreDefault: HarnessId | null | undefined;
+let coreLook: AppLook | null | undefined;
 const saveSettings = vi.fn();
 vi.mock("./lib/client", async (original) => {
   const rpcData = (method: string) => {
     if (method === "system.info") return harnesses ? { harnesses } : undefined;
-    if (method === "app.settings.get") return coreDefault === undefined ? undefined : { defaultHarness: coreDefault };
+    if (method === "app.settings.get") return coreDefault === undefined ? undefined : { defaultHarness: coreDefault, ...(coreLook === undefined ? {} : { look: coreLook }) };
     return Array.from({ length: projectCount }, (_, i) => ({
       id: `project-${i}`,
       name: "Existing project",
@@ -75,6 +76,7 @@ vi.mock("./lib/client", async (original) => {
 
 import { App } from "./App";
 import { useRouter } from "./lib/router";
+import { useTheme } from "./lib/theme";
 import { useOnboardingDefaultHarness } from "./lib/default-harness";
 import { writeOnboardingState } from "./lib/onboarding";
 
@@ -97,7 +99,24 @@ beforeEach(() => {
   checkFailed = false;
   trafficLights = true;
   coreDefault = null;
+  coreLook = undefined;
   saveSettings.mockReset();
+});
+
+describe("the look", () => {
+  it("hands the palette on screen to the core once its settings show none, for phones to follow", () => {
+    vi.useFakeTimers();
+    try {
+      harnesses = bothReady();
+      act(() => void useTheme.getState().setPreset("claude"));
+      coreLook = null;
+      render(<App />);
+      act(() => void vi.advanceTimersByTime(1_000));
+      expect(saveSettings).toHaveBeenCalledWith({ look: { palette: "claude", colors: {} } });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("the default harness", () => {

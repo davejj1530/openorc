@@ -333,6 +333,16 @@ export type Schedule = z.infer<typeof Schedule>;
 export type ScheduleRunResult = { status: "started"; firingId: string; thread: Thread } | { status: "skipped" | "cancelled" | "failed"; firingId: string; reason: string; threadId?: string };
 
 /**
+ * The palette a Mac's windows paint with and the colors changed on it in each mode, so a phone can look the same. Palette
+ * ids and color tokens belong to the clients (`@openorc/client/theme`); each client keeps only what it can paint.
+ */
+export const AppLook = z.object({
+  palette: z.string().min(1).max(40),
+  colors: z.object({ light: z.record(z.string().max(40), z.string().max(16)).optional(), dark: z.record(z.string().max(40), z.string().max(16)).optional() }),
+});
+export type AppLook = z.infer<typeof AppLook>;
+
+/**
  * App-wide preferences that are not about memory. The settings service fills what a profile never saved: a schema
  * default would also fill every partial `app.settings.set` and reset the setting it names.
  */
@@ -352,6 +362,8 @@ export const AppSettings = z.object({
   defaultPermissionMode: PermissionPreset,
   /** The harness new threads start with on every client, chosen at onboarding; null until one is. */
   defaultHarness: HarnessId.nullable(),
+  /** The desktop's look, which phones follow; null until the desktop hands it over. One this version cannot read is none, so it never resets the other settings. */
+  look: AppLook.nullable().catch(null),
   /** Minutes a provider process may sit idle between turns before it is closed; the session resumes on the next message. Null keeps processes running. */
   idleProcessMinutes: z.number().int().positive().nullable(),
   /** Whether Claude Code connects the MCP servers from the user's own Claude configuration in threads. Off, only OpenOrc's tools load and the CLI starts about two seconds sooner. */

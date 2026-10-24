@@ -639,16 +639,20 @@
   color: var(--ink);
   overflow-wrap: anywhere;
 }
+/* The summary is short (approvalSummary keeps a long request's start and end), so it shows whole and a command's last
+   line is read before it is allowed; the raw request can run long and scrolls. */
 .approval-card-detail {
-  max-height: 10rem;
   margin: 0;
-  overflow: auto;
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   line-height: 16px;
   color: var(--ink-4);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+.approval-card-detail[data-raw] {
+  max-height: 10rem;
+  overflow: auto;
 }
 .approval-card-raw {
   align-self: flex-start;

@@ -1,5 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_TEAM_LIMITS, executionMode, harnessIds, WORKSPACE_ID, type AppSettings, type HarnessId, type ModelOption, type Project, type RpcParams, type TeamRevision } from "@openorc/protocol";
+import {
+  DEFAULT_TEAM_LIMITS,
+  executionMode,
+  harnessAvailability,
+  harnessIds,
+  WORKSPACE_ID,
+  type AppSettings,
+  type HarnessId,
+  type ModelOption,
+  type Project,
+  type RpcParams,
+  type SystemInfo,
+  type TeamRevision,
+} from "@openorc/protocol";
 import { decodeNewThreadDraft, newThreadChoice, newThreadStartInput, newThreadWorkspaceMode, targetModel } from "./new-thread.js";
 
 const option = (agent: ModelOption["agent"], id: string, extra: Partial<ModelOption> = {}): ModelOption => ({
@@ -43,7 +56,7 @@ const project = (id: string, rootPath: string): Project => ({
 
 /**
  * Workspace, a repository, one before its first commit, a plain folder, and a project whose git state is still loading.
- * `canBranch` is what the desktop reads from `projects.git`; a phone cannot read it and treats every project as `checking`.
+ * `canBranch` is what both apps read from `projects.git`.
  */
 const projects: Record<string, { project: Project; canBranch: boolean }> = {
   workspace: { project: project(WORKSPACE_ID, "/Users/me"), canBranch: false },
@@ -70,8 +83,8 @@ interface Row {
   name: string;
   project: keyof typeof projects;
   models: keyof typeof catalogs;
-  /** Harnesses signed in on the Mac, and the one chosen at onboarding. Null on a phone, which cannot see them. */
-  signedIn: HarnessId[] | null;
+  /** Harnesses signed in on the Mac, and the core's default harness, chosen at onboarding. */
+  signedIn: HarnessId[];
   preferred?: HarnessId;
   /** App settings, absent while they load. */
   settings?: Settings;
@@ -119,6 +132,51 @@ const rows: (Row & { expected: Record<string, unknown> })[] = [
     signedIn: ["claude"],
     settings: local,
     expected: { agent: "claude", model: "opus", effort: "high", fastMode: false, mode: "act", permissionMode: "trusted", execution: "trusted", workspaceMode: "current" },
+  },
+  {
+    name: "only Claude signed in, and Claude the default",
+    project: "repo",
+    models: "full",
+    signedIn: ["claude"],
+    preferred: "claude",
+    settings: local,
+    expected: { agent: "claude", model: "opus", effort: "high", fastMode: false, mode: "act", permissionMode: "trusted", execution: "trusted", workspaceMode: "current" },
+  },
+  {
+    name: "Claude the default and every harness signed in",
+    project: "repo",
+    models: "full",
+    signedIn: [...harnessIds],
+    preferred: "claude",
+    settings: worktree,
+    expected: { agent: "claude", model: "opus", effort: "high", fastMode: false, mode: "act", permissionMode: "review", execution: "review", workspaceMode: "worktree" },
+  },
+  {
+    name: "Claude the default before a first commit",
+    project: "noCommits",
+    models: "full",
+    signedIn: both,
+    preferred: "claude",
+    settings: worktree,
+    expected: { agent: "claude", model: "opus", effort: "high", fastMode: false, mode: "act", permissionMode: "review", execution: "review", workspaceMode: "current" },
+  },
+  {
+    name: "Claude the default in Workspace with only Claude models",
+    project: "workspace",
+    models: "claudeOnly",
+    signedIn: both,
+    preferred: "claude",
+    settings: worktree,
+    expected: { agent: "claude", model: "opus", effort: "high", fastMode: false, mode: "act", permissionMode: "review", execution: "review", workspaceMode: "current" },
+  },
+  {
+    name: "Codex the default, only Claude signed in",
+    project: "checking",
+    models: "full",
+    signedIn: ["claude"],
+    preferred: "codex",
+    settings: worktree,
+    expected: { agent: "claude", model: "opus", effort: "high", fastMode: false, mode: "act", permissionMode: "review", execution: "review", workspaceMode: "worktree" },
   },
   {
     name: "nothing signed in: the catalog's first default, never a legacy one",
@@ -292,56 +350,6 @@ const rows: (Row & { expected: Record<string, unknown> })[] = [
   },
 ];
 
-/** A phone sees the same catalog and settings but not which harnesses are signed in, so it takes the catalog's default. */
-const phoneRows: (Row & { expected: Record<string, unknown> })[] = [
-  {
-    name: "phone: the catalog's first default",
-    project: "repo",
-    models: "full",
-    signedIn: null,
-    settings: worktree,
-    expected: { agent: "codex", model: "gpt-main", effort: "high", fastMode: false, mode: "act", permissionMode: "review", execution: "review", workspaceMode: "worktree" },
-  },
-  {
-    name: "phone: a default that cannot run is passed over",
-    project: "checking",
-    models: "codexDefaultBlocked",
-    signedIn: null,
-    settings: local,
-    expected: { agent: "claude", model: "opus", effort: "high", fastMode: false, mode: "act", permissionMode: "trusted", execution: "trusted", workspaceMode: "current" },
-  },
-  {
-    name: "phone: Workspace",
-    project: "workspace",
-    models: "claudeOnly",
-    signedIn: null,
-    settings: worktree,
-    expected: { agent: "claude", model: "opus", effort: "high", fastMode: false, mode: "act", permissionMode: "review", execution: "review", workspaceMode: "current" },
-  },
-  {
-    name: "phone: a saved draft",
-    project: "checking",
-    models: "full",
-    signedIn: null,
-    settings: worktree,
-    saved: { target: { kind: "model", choice: { agent: "claude", model: "sonnet", effort: "low" } }, mode: "plan" },
-    text: "",
-    attachments: ["/attachments/0b1c.jpg"],
-    expected: {
-      agent: "claude",
-      model: "sonnet",
-      effort: "low",
-      fastMode: false,
-      mode: "plan",
-      permissionMode: "review",
-      execution: "plan",
-      workspaceMode: "worktree",
-      prompt: "See the attached image.",
-      attachments: ["/attachments/0b1c.jpg"],
-    },
-  },
-];
-
 /** The fields a new thread's defaults decide, as `threads.start` receives them. */
 function decided(params: RpcParams<"threads.start">) {
   const { agent, model, effort, fastMode, executionTarget, mode, permissionMode, workspaceMode } = params;
@@ -360,18 +368,26 @@ function decided(params: RpcParams<"threads.start">) {
   };
 }
 
+/** The Mac's harness checks for a row, with the paths `system.info` carries. */
+function systemInfo(row: Row): Pick<SystemInfo, "harnesses"> {
+  return { harnesses: harnessIds.map((id) => ({ id, state: row.signedIn.includes(id) ? "ready" : "sign_in", path: `/Users/me/.local/bin/${id}`, version: "1.0.0", revision: 1 })) };
+}
+
+/** What each app reads of those checks: the desktop `system.info` itself, a phone what the core answers `agents.availability` with. */
+const harnessesOf = {
+  desktop: (info: Pick<SystemInfo, "harnesses">) => info.harnesses,
+  phone: harnessAvailability,
+};
+
 /**
  * What a client sends for a row, composed as the desktop's New thread view and the phone's sheet compose it: the saved
  * draft, the model offered while it has none, where it works, and the permission new work starts with.
  */
-function start(row: Row): Record<string, unknown> {
+function start(row: Row, app: keyof typeof harnessesOf): Record<string, unknown> {
   const { project: selected, canBranch } = projects[row.project]!;
-  const system = row.signedIn && {
-    harnesses: harnessIds.map((id) => ({ id, state: row.signedIn!.includes(id) ? ("ready" as const) : ("sign_in" as const), path: `/bin/${id}`, version: "1.0.0", revision: 1 })),
-  };
   let draft = decodeNewThreadDraft(selected.id, row.saved ?? null);
   if (draft.target.kind === "model" && !draft.target.choice) {
-    const choice = newThreadChoice(catalogs[row.models], system ? { preferred: row.preferred ?? null, system } : null);
+    const choice = newThreadChoice(catalogs[row.models], { preferred: row.preferred ?? null, harnesses: harnessesOf[app](systemInfo(row)) });
     if (choice) draft = { ...draft, target: { kind: "model", choice } };
   }
   const workspaceMode = newThreadWorkspaceMode({ canBranch, chosen: draft.workspace, preferred: row.settings?.defaultWorkspaceMode });
@@ -390,8 +406,14 @@ function start(row: Row): Record<string, unknown> {
 
 describe("new thread defaults", () => {
   // The desktop rows were first checked against the desktop's own New thread code, before it moved here.
-  it.each([...rows, ...phoneRows])("$name", ({ expected, ...row }) => {
-    expect(start(row)).toEqual("error" in expected ? expected : { prompt: "Fix the flaky test", attachments: [], ...expected });
+  it.each(rows)("$name, on the desktop and on a phone", ({ expected, ...row }) => {
+    const sent = "error" in expected ? expected : { prompt: "Fix the flaky test", attachments: [], ...expected };
+    expect(start(row, "desktop")).toEqual(sent);
+    expect(start(row, "phone")).toEqual(sent);
+  });
+
+  it("shows a phone no path on the Mac", () => {
+    expect(JSON.stringify(harnessAvailability(systemInfo({ name: "", project: "repo", models: "full", signedIn: both })))).not.toContain("/Users/");
   });
 });
 

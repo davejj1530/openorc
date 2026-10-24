@@ -58,6 +58,7 @@ const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
   "slack.status": ["slack"],
   "remote.status": ["remote"],
   "system.info": ["system"],
+  "agents.availability": ["system", "claude-accounts"],
   "agents.updates.get": ["agent-updates"],
   "providers.usage": ["provider-usage", "system", "settings"],
   "agents.models": ["models"],

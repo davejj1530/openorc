@@ -28,11 +28,10 @@ interface FormProps {
 function NewThreadForm({ projectId, choices, onProject }: FormProps) {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
-  // Undefined until the Mac's projects load; Workspace is always listed.
-  const project = choices.find((choice) => choice.id === projectId);
-  const sheet = useNewThread(projectId, project?.canBranch);
+  const sheet = useNewThread(projectId);
   useShareSettings(COMPOSER_ID, sheet.settings);
-  const name = projectId === WORKSPACE_ID ? null : project?.name;
+  // Undefined until the Mac's projects load; Workspace is always listed.
+  const name = projectId === WORKSPACE_ID ? null : choices.find((choice) => choice.id === projectId)?.name;
   const activity = composerActivity({ stopping: false, submitting: sheet.starting, generatingImage: false });
   const start = async () => {
     const threadId = await sheet.submit();

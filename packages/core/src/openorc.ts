@@ -736,6 +736,7 @@ export class OpenOrc {
       createSystemHandlers({
         system: this.system,
         accountInfo: (refresh, id) => (id ? this.claudeSystemInfo(id, refresh) : this.system.info(refresh)),
+        defaultAccountInfo: () => this.claudeSystemInfo(),
         agentUpdates: this.agentUpdates,
         providerUsage: this.providerUsage,
         invalidate,

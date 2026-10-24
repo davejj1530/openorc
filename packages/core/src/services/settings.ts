@@ -10,6 +10,7 @@ const defaults: AppSettings = {
   autoArchiveDoneDays: 14,
   defaultWorkspaceMode: "current",
   defaultPermissionMode: "trusted",
+  defaultHarness: null,
   idleProcessMinutes: 10,
   claudeUserMcpServers: true,
 };

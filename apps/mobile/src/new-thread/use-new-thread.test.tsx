@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { WORKSPACE_ID, type ModelOption, type RpcMethod, type RpcParams } from "@openorc/protocol";
+import { harnessIds, WORKSPACE_ID, type HarnessId, type ModelOption, type ProjectGit, type RpcMethod, type RpcParams } from "@openorc/protocol";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { attachImage, pickImages } from "../composer/attachments";
@@ -7,37 +7,55 @@ import type { DraftImage } from "../composer/drafts";
 import type { FakeMac } from "../test-fixtures/fake-mac";
 import { useNewThread } from "./use-new-thread";
 
-/** The Mac as the sheet hears it: a catalog, its settings, and a start that a test answers. */
+/**
+ * The Mac as the sheet hears it: a catalog, which harnesses are signed in, its settings, each project's git (a promise
+ * while the Mac is still reading it), and a start that a test answers.
+ */
 const mac = vi.hoisted(() => {
   const models: ModelOption[] = [
     { id: "gpt-mini", label: "GPT mini", agent: "codex", isDefault: false, efforts: ["low", "medium"], defaultEffort: "low" },
     { id: "gpt-main", label: "GPT", agent: "codex", isDefault: true, efforts: ["medium", "high"], defaultEffort: "high" },
+    { id: "opus", label: "Opus", agent: "claude", isDefault: true, efforts: ["high", "max"], defaultEffort: "high" },
   ];
-  const reads: Partial<Record<RpcMethod, unknown>> = { "agents.models": models, "app.settings.get": { defaultWorkspaceMode: "worktree", defaultPermissionMode: "review" } };
-  return { reads, phone: null as FakeMac | null, start: vi.fn<(params: RpcParams<"threads.start">) => Promise<{ thread: { id: string } }>>() };
+  const reads: Partial<Record<RpcMethod, unknown>> = {};
+  const git: Record<string, ProjectGit | Promise<ProjectGit>> = {};
+  return { models, reads, git, phone: null as FakeMac | null, start: vi.fn<(params: RpcParams<"threads.start">) => Promise<{ thread: { id: string } }>>() };
 });
 
 vi.mock("../client", async () => {
   const { fakeMac } = await import("../test-fixtures/fake-mac");
-  mac.phone = fakeMac((method, params) => (method === "threads.start" ? mac.start(params as RpcParams<"threads.start">) : Promise.resolve(mac.reads[method])));
+  mac.phone = fakeMac((method, params) => {
+    if (method === "threads.start") return mac.start(params as RpcParams<"threads.start">);
+    if (method === "projects.git") return Promise.resolve(mac.git[(params as RpcParams<"projects.git">).id] ?? "ready");
+    return Promise.resolve(mac.reads[method]);
+  });
   return mac.phone.module;
 });
 vi.mock("../composer/attachments", () => ({ pickImages: vi.fn(), attachImage: vi.fn() }));
 vi.mock("expo-haptics", () => ({ impactAsync: () => Promise.resolve(), ImpactFeedbackStyle: { Light: "light" } }));
 
+/** What the Mac answers about its harnesses and settings: Codex and Claude signed in, no default harness yet. */
+function macState({ signedIn = ["codex", "claude"], defaultHarness = null }: { signedIn?: HarnessId[]; defaultHarness?: HarnessId | null } = {}) {
+  mac.reads["agents.models"] = mac.models;
+  mac.reads["agents.availability"] = harnessIds.map((id) => ({ id, state: signedIn.includes(id) ? "ready" : "sign_in" }));
+  mac.reads["app.settings.get"] = { defaultWorkspaceMode: "worktree", defaultPermissionMode: "review", defaultHarness };
+}
+
 beforeEach(() => {
   mac.phone!.saved.clear();
   mac.phone!.module.queryClient.clear();
   mac.start.mockReset();
+  for (const id of Object.keys(mac.git)) delete mac.git[id];
+  macState();
 });
 afterEach(cleanup);
 
 const image = { path: "/Users/me/Library/Application Support/OpenOrc/attachments/0b1c.jpg", preview: "file:///cache/0b1c.jpg" };
 const sent = () => mac.start.mock.calls.at(-1)![0];
 
-/** The sheet in a project, as the Mac's projects describe it: `canBranch` is undefined while they load. */
-function open(projectId: string, project: { canBranch: boolean | undefined } = { canBranch: projectId !== WORKSPACE_ID }) {
-  return renderHook((props: { canBranch: boolean | undefined }) => useNewThread(projectId, props.canBranch), { initialProps: project, wrapper: mac.phone!.wrapper });
+/** The sheet in a project. */
+function open(projectId: string) {
+  return renderHook(() => useNewThread(projectId), { wrapper: mac.phone!.wrapper });
 }
 type Sheet = ReturnType<typeof open>;
 
@@ -78,21 +96,85 @@ it("starts with the desktop's defaults and never names a folder", async () => {
   expect(sent()).not.toHaveProperty("workingDirectory");
 });
 
-it("works in the folder itself where the Mac found nothing to branch from, and waits for the Mac's projects to know", async () => {
-  // A folder without git or a first commit: the desktop's New thread works in it whatever the Mac's default.
-  const plain = open("notes", { canBranch: false });
+it.each([
+  { name: "the first signed-in harness without a default", signedIn: ["codex", "claude"], defaultHarness: null, expected: { agent: "codex", model: "gpt-main", effort: "high" } },
+  { name: "Claude, chosen as the default at onboarding", signedIn: ["codex", "claude"], defaultHarness: "claude", expected: { agent: "claude", model: "opus", effort: "high" } },
+  { name: "Claude, the only harness signed in", signedIn: ["claude"], defaultHarness: null, expected: { agent: "claude", model: "opus", effort: "high" } },
+  { name: "Claude, when the default is signed out", signedIn: ["claude"], defaultHarness: "codex", expected: { agent: "claude", model: "opus", effort: "high" } },
+] satisfies { name: string; signedIn: HarnessId[]; defaultHarness: HarnessId | null; expected: object }[])(
+  "offers the model the desktop would: $name",
+  async ({ signedIn, defaultHarness, expected }) => {
+    macState({ signedIn, defaultHarness });
+    const sheet = open("openorc");
+    await write(sheet, "Fix the build");
+    expect(sheet.result.current.settings.choice).toEqual(expected);
+    mac.start.mockResolvedValue({ thread: { id: "thread-1" } });
+    await submit(sheet);
+    expect(sent()).toMatchObject(expected);
+  },
+);
+
+it.each([
+  ["a folder without git", "none"],
+  ["a repository before its first commit", "no_commits"],
+] as const)("works in %s itself, as the desktop's New thread does whatever the Mac's default", async (_case, state) => {
+  mac.git["notes"] = state;
+  const plain = open("notes");
   await write(plain, "Tidy the notes folder");
   mac.start.mockResolvedValue({ thread: { id: "thread-1" } });
   await submit(plain);
   expect(sent()).toMatchObject({ projectId: "notes", workspaceMode: "current" });
+});
 
-  const loading = open("openorc", { canBranch: undefined });
-  act(() => loading.result.current.setText("Fix the build"));
-  await waitFor(() => expect(loading.result.current.settings).toMatchObject({ choice: { model: "gpt-main" }, permission: "review" }));
-  expect(loading.result.current.controls.canSend).toBe(false);
-  loading.rerender({ canBranch: true });
-  expect(loading.result.current.controls.canSend).toBe(true);
-  await submit(loading);
+it("asks the Mac's git when Start is tapped, holding the start meanwhile, then branches where it can", async () => {
+  let read!: (state: ProjectGit) => void;
+  mac.git["openorc"] = new Promise((resolve) => (read = resolve));
+  const sheet = open("openorc");
+  await write(sheet, "Fix the build");
+  mac.start.mockResolvedValue({ thread: { id: "thread-1" } });
+  let started!: Promise<string | null>;
+  act(() => void (started = sheet.result.current.submit()));
+  expect(sheet.result.current.starting).toBe(true);
+  expect(sheet.result.current.controls.canSend).toBe(false);
+  expect(mac.start).not.toHaveBeenCalled();
+  await act(async () => {
+    read("ready");
+    await started;
+  });
+  expect(sent()).toMatchObject({ projectId: "openorc", workspaceMode: "worktree" });
+  expect(sheet.result.current.starting).toBe(false);
+});
+
+it("branches in a project that got its first commit on the Mac after the sheet opened, and not once its git is gone", async () => {
+  mac.git["later"] = "none";
+  const sheet = open("later");
+  await write(sheet, "Isolate the change");
+  mac.git["later"] = "ready";
+  mac.start.mockResolvedValue({ thread: { id: "thread-1" } });
+  await submit(sheet);
+  expect(sent()).toMatchObject({ projectId: "later", workspaceMode: "worktree" });
+
+  mac.git["later"] = "none";
+  await write(sheet, "Try again in the folder");
+  await submit(sheet);
+  expect(sent()).toMatchObject({ projectId: "later", workspaceMode: "current" });
+});
+
+it("sends nothing when the Mac cannot say whether the project can branch, keeps the draft and says why", async () => {
+  const unreadable = Promise.reject(new Error("git rev-parse failed"));
+  unreadable.catch(() => undefined);
+  mac.git["openorc"] = unreadable;
+  const sheet = open("openorc");
+  await write(sheet, "Fix the build");
+  expect(await submit(sheet)).toBeNull();
+  expect(mac.start).not.toHaveBeenCalled();
+  expect(sheet.result.current.error).toBe("git rev-parse failed");
+  expect(sheet.result.current.draft.prompt).toBe("Fix the build");
+
+  // Start stays on, so the next tap asks again.
+  mac.git["openorc"] = "ready";
+  mac.start.mockResolvedValue({ thread: { id: "thread-1" } });
+  expect(await submit(sheet)).toBe("thread-1");
   expect(sent()).toMatchObject({ projectId: "openorc", workspaceMode: "worktree" });
 });
 

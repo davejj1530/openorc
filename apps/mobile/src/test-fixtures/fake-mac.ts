@@ -5,7 +5,8 @@ import { createElement, type ReactNode } from "react";
 
 /**
  * The phone's `../client` over a Mac a test answers: the real query cache, mutations and permission default, every
- * call going to `answer`, and a map standing in for the phone's MMKV. `wrapper` gives rendered hooks the cache.
+ * call (through the hooks or `link.connection`) going to `answer`, and a map standing in for the phone's MMKV.
+ * `wrapper` gives rendered hooks the cache.
  */
 export function fakeMac(answer: (method: RpcMethod, params: unknown) => Promise<unknown>) {
   const connection: CoreConnection = {
@@ -21,7 +22,16 @@ export function fakeMac(answer: (method: RpcMethod, params: unknown) => Promise<
   return {
     saved,
     wrapper,
-    module: { client, queryClient: client.queryClient, storage, shownMacId: () => "mac-1", useRpc: client.useRpc, useRpcs: client.useRpcs, useRpcMutation: client.useRpcMutation },
+    module: {
+      client,
+      link: { connection },
+      queryClient: client.queryClient,
+      storage,
+      shownMacId: () => "mac-1",
+      useRpc: client.useRpc,
+      useRpcs: client.useRpcs,
+      useRpcMutation: client.useRpcMutation,
+    },
   };
 }
 

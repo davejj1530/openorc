@@ -12,7 +12,7 @@ import { orclingRpcParams, type OrclingRpcResults } from "./orclings.js";
 import { projectRpcParams, type ProjectRpcResults } from "./projects.js";
 import { fileRpcParams, type FileRpcResults } from "./files.js";
 import { remoteRpcParams, type RemoteRpcResults } from "./remote.js";
-import { HarnessId, type HarnessInfo } from "./harness.js";
+import { HarnessId, type HarnessAvailability, type HarnessInfo } from "./harness.js";
 import { AgentEvent, AgentKind, ApprovalDecision, Frame } from "./events.js";
 import type { McpAppOpenResult } from "./mcp-apps.js";
 import { ExecutionTarget, LeadOverrides, TeamDraft, type TeamDetail, type TeamPreflight } from "./orchestration.js";
@@ -439,6 +439,8 @@ export const rpcParams = {
   "review.createPr": z.object({ taskId: z.string(), title: z.string().min(1), body: z.string(), base: BranchName }),
   "git.log": z.object({ taskId: z.string(), limit: z.number().int().positive().max(200).optional() }),
   "agents.models": z.object({ agent: AgentKind.optional(), claudeAccountId: ClaudeAccountId.optional() }),
+  /** Which harnesses can start a thread for the default Claude account: `system.info`'s checks without the Mac's paths. */
+  "agents.availability": z.object({}),
   "agents.modelCatalog": z.object({ agent: HarnessId.optional(), claudeAccountId: ClaudeAccountId.optional() }),
   "agents.models.refresh": z.object({ agent: HarnessId.optional(), claudeAccountId: ClaudeAccountId.optional() }),
   /**
@@ -719,6 +721,7 @@ export interface RpcResults extends PullRequestRpcResults, OrclingRpcResults, Pr
   "review.createPr": { url: string };
   "git.log": Commit[];
   "agents.models": ModelOption[];
+  "agents.availability": HarnessAvailability[];
   "agents.modelCatalog": import("./model-catalog.js").ModelCatalog;
   "agents.models.refresh": import("./model-catalog.js").ModelCatalog;
   "skills.list": AgentSkill[];

@@ -9,6 +9,7 @@ import { ImportProjectDialog } from "./dialogs/ImportProjectDialog";
 import { ImportSessionsDialog } from "./dialogs/ImportSessionsDialog";
 import { NewFileDialog } from "./dialogs/NewFileDialog";
 import { useAppShortcuts } from "./lib/app-shortcuts";
+import { useOnboardingDefaultHarness } from "./lib/default-harness";
 import { useLayout } from "./lib/layout";
 import { readOnboardingState, resolveOnboarding, writeOnboardingState, type PersistedOnboardingState } from "./lib/onboarding";
 import { useRpc } from "./lib/client";
@@ -59,6 +60,7 @@ export function App() {
   const system = useRpc("system.info", { refresh: false });
   const projects = useRpc("projects.list", {});
   const [onboardingState, setOnboardingState] = useState(readOnboardingState);
+  const recordDefaultHarness = useOnboardingDefaultHarness();
   const [onboardingSession, setOnboardingSession] = useState<"first_run" | "recovery" | "dismissed" | null>(null);
   const currentProject = projectForRoute(route, projectId);
   const onboarding =
@@ -92,6 +94,7 @@ export function App() {
   const persistOnboarding = (next: PersistedOnboardingState): boolean => {
     if (!writeOnboardingState(next)) return false;
     setOnboardingState(next);
+    recordDefaultHarness(next.defaultHarness);
     return true;
   };
 

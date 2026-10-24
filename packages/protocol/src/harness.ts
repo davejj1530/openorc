@@ -114,7 +114,13 @@ export interface HarnessInfo {
 }
 
 export const harnessInstalled = (row: HarnessInfo): boolean => row.path !== null && row.state !== "not_found";
-export const harnessLoggedIn = (row: HarnessInfo): boolean => row.state === "ready";
+export const harnessLoggedIn = (row: Pick<HarnessInfo, "state">): boolean => row.state === "ready";
+
+/** A harness check without where the harness is installed: what a phone hears of it. */
+export type HarnessAvailability = Pick<HarnessInfo, "id" | "state">;
+
+/** The checks as `agents.availability` answers them, in registry order. */
+export const harnessAvailability = (info: { harnesses: readonly HarnessInfo[] }): HarnessAvailability[] => info.harnesses.map(({ id, state }) => ({ id, state }));
 /** Found, but its version command failed, so nothing can run through it until it is reinstalled. */
 export const harnessFailsToStart = (row: HarnessInfo): boolean => row.state === "check_failed" && row.path !== null && row.version === null;
 

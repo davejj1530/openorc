@@ -1,16 +1,15 @@
 import {
   harnessIds,
-  harnessInfo,
   harnessLoggedIn,
   LeadOverrides,
   ModelExecutionSettings,
   normalizeModelSettings,
   TeamRevision,
+  type HarnessAvailability,
   type HarnessId,
   type ModelOption,
   type RpcParams,
   type RunMode,
-  type SystemInfo,
   type WorkspaceMode,
 } from "@openorc/protocol";
 import { defaultChoice, type ModelChoice } from "./model-picker-selection.js";
@@ -105,12 +104,12 @@ export function targetModel(target: NewThreadTarget): ModelChoice | null {
 }
 
 /**
- * The model a new thread offers before the person picks one: the catalog's default for the harness chosen at onboarding
- * when it is signed in, else for the first signed-in harness. A client that cannot see which harnesses are signed in
- * (a phone) passes null and takes the catalog's own first default.
+ * The model a new thread offers before the person picks one: the catalog's default for the core's default harness when
+ * it is signed in, else for the first signed-in harness. The desktop passes the harness rows of `system.info`, a phone
+ * those of `agents.availability`, the same checks without the Mac's paths.
  */
-export function newThreadChoice(models: ModelOption[], harnesses: { preferred: HarnessId | null; system: Pick<SystemInfo, "harnesses"> } | null): ModelChoice | null {
-  const signedIn = harnesses ? [...(harnesses.preferred ? [harnesses.preferred] : []), ...harnessIds].find((id) => harnessLoggedIn(harnessInfo(harnesses.system, id))) : undefined;
+export function newThreadChoice(models: ModelOption[], input: { preferred: HarnessId | null; harnesses: readonly HarnessAvailability[] }): ModelChoice | null {
+  const signedIn = [...(input.preferred ? [input.preferred] : []), ...harnessIds].find((id) => input.harnesses.some((row) => row.id === id && harnessLoggedIn(row)));
   return defaultChoice(models, signedIn ?? null);
 }
 

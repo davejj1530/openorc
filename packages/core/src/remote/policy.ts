@@ -33,6 +33,8 @@ function storedImages(paths: readonly string[] | undefined, { attachmentsDir }: 
 export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {
   "projects.list": allow,
   "projects.get": allow,
+  // Takes a project id and answers none, no_commits or ready: nothing of the folder's path.
+  "projects.git": allow,
   "threads.list": allow,
   "threads.get": allow,
   "threads.messages": allow,
@@ -42,6 +44,7 @@ export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {
   "events.toolOutput": allow,
   "inbox.list": allow,
   "agents.models": allow,
+  "agents.availability": allow,
   "app.settings.get": allow,
   "threads.start": (params, context) => (params.workingDirectory !== undefined ? "Choose a folder for this conversation on your Mac." : storedImages(params.attachments, context)),
   "threads.update": (params) => (params.taskId === undefined && Object.keys(params.patch).every((key) => PHONE_THREAD_PATCH.has(key)) ? null : "Make this change on your Mac."),

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { readdir, rm } from "node:fs/promises";
 import path from "node:path";
-import { TOOL_IMAGE_URL, inlineToolImages, type ToolImage } from "@openorc/protocol";
+import { TOOL_IMAGE_URL, inlineToolImages, storeToolImages, type AgentEvent, type ToolImage } from "@openorc/protocol";
 
 const extensions: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp" };
 const mimes: Record<string, string> = { png: "image/png", jpg: "image/jpeg", gif: "image/gif", webp: "image/webp" };
@@ -44,6 +44,16 @@ export class ToolImageStore {
     } catch {
       return null;
     }
+  }
+
+  /**
+   * An event as the ledger and frames keep it: each base64 image in a tool's output written to a file and replaced
+   * by its URL. Runs and session imports both write through here; the same object when there is nothing to store.
+   */
+  withStoredImages(ev: AgentEvent): AgentEvent {
+    if (ev.type !== "tool.completed") return ev;
+    const output = storeToolImages(ev.output, (image) => this.save(ev.runId, image));
+    return output === ev.output ? ev : { ...ev, output };
   }
 
   /** A tool output as the tool returned it, for a reader that needs the bytes. */

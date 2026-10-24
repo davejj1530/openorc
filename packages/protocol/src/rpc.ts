@@ -11,6 +11,7 @@ import { BranchName, pullRequestRpcParams, type PullRequestRpcResults } from "./
 import { orclingRpcParams, type OrclingRpcResults } from "./orclings.js";
 import { projectRpcParams, type ProjectRpcResults } from "./projects.js";
 import { fileRpcParams, type FileRpcResults } from "./files.js";
+import { remoteRpcParams, type RemoteRpcResults } from "./remote.js";
 import { HarnessId, type HarnessInfo } from "./harness.js";
 import { AgentEvent, AgentKind, ApprovalDecision, Frame } from "./events.js";
 import type { McpAppOpenResult } from "./mcp-apps.js";
@@ -71,6 +72,7 @@ export const rpcParams = {
   ...orclingRpcParams,
   ...projectRpcParams,
   ...fileRpcParams,
+  ...remoteRpcParams,
   "tasks.comments.list": z.object({ taskId: z.string() }),
   "tasks.comments.post": z
     .object({
@@ -571,7 +573,7 @@ export interface ResolvedExtraction {
   viaApiKey: boolean;
 }
 
-export interface RpcResults extends PullRequestRpcResults, OrclingRpcResults, ProjectRpcResults, FileRpcResults, ClaudeAccountRpcResults {
+export interface RpcResults extends PullRequestRpcResults, OrclingRpcResults, ProjectRpcResults, FileRpcResults, ClaudeAccountRpcResults, RemoteRpcResults {
   "tasks.comments.list": TaskDiscussion;
   "tasks.comments.post": TaskComment;
   "tasks.comments.retry": CommentAttempt;

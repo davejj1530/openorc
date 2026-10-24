@@ -39,8 +39,8 @@ const outputs: Array<[string, unknown]> = [
 ];
 
 it.each(outputs)("stores %s images as files in the ledger and gives them back to readers that need the bytes", (_shape, output) => {
-  const writer = new LedgerWriter(db, { storeImage: (id, image) => store.save(id, image) });
-  writer.push({ type: "tool.completed", runId, ts: 1, toolCallId: "c1", name: "Read", output, isError: false } as AgentEvent);
+  const writer = new LedgerWriter(db);
+  writer.push(store.withStoredImages({ type: "tool.completed", runId, ts: 1, toolCallId: "c1", name: "Read", output, isError: false } as AgentEvent));
   writer.flush();
   const [stored] = listEvents(db, runId);
   const text = JSON.stringify(stored);
@@ -49,13 +49,13 @@ it.each(outputs)("stores %s images as files in the ledger and gives them back to
   expect(store.inline(completedToolCall(db, runId, "c1")?.output)).toEqual(output);
 });
 
-it("leaves outputs without images as the same object, and keeps an image inline when it cannot be written", () => {
+it("leaves events without images as the same object, and keeps an image inline when it cannot be written", () => {
   const plain = { content: [{ type: "text", text: "no images" }] };
-  const writer = new LedgerWriter(db, { storeImage: () => null });
-  writer.push({ type: "tool.completed", runId, ts: 1, toolCallId: "c1", name: "Read", output: outputs[0]![1], isError: false });
-  writer.flush();
-  expect(JSON.stringify(listEvents(db, runId))).toContain(png);
+  const completed = (id: string, output: unknown): AgentEvent => ({ type: "tool.completed", runId: id, ts: 1, toolCallId: "c1", name: "Read", output, isError: false });
+  const event = completed(runId, plain);
+  expect(store.withStoredImages(event)).toBe(event);
   expect(store.inline(plain)).toBe(plain);
+  expect(JSON.stringify(store.withStoredImages(completed("not/a/run", outputs[0]![1])))).toContain(png);
 });
 
 it("removes the folders of runs that are gone and keeps the rest", async () => {

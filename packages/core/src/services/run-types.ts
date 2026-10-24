@@ -223,6 +223,8 @@ export interface RunHooks {
   taskImages?(spec: string): Promise<string[]>;
   /** A tool output from the ledger with its stored images inlined again. */
   inlineToolImages?(output: unknown): unknown;
+  /** An event with its tool's base64 images written to files and replaced by their URLs; the same object when it has none. */
+  storeToolImages?(ev: AgentEvent): AgentEvent;
   onProviderEvent?(event: AgentEvent): void;
   onSteerable?(runId: string): void;
   /** Includes host-generated Codex/Claude requests, after their pending handle exists. */

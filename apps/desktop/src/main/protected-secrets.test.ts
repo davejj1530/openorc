@@ -54,7 +54,7 @@ function connect() {
     client.receive(message);
   });
   installProtectedSecrets(child as unknown as UtilityProcess, dataDir);
-  return { child, memory: client.store("memory.secrets"), slack: client.store("slack.secrets"), github: client.store("github.secrets") };
+  return { child, memory: client.store("memory.secrets"), slack: client.store("slack.secrets"), github: client.store("github.secrets"), remote: client.store("remote.secrets") };
 }
 
 describe("desktop protected stores", () => {
@@ -89,6 +89,15 @@ describe("desktop protected stores", () => {
     expect((await readFile(join(dataDir, "github-reviewer-app.enc"))).includes("reviewer-key-fixture")).toBe(false);
     await expect(connect().github.load()).resolves.toBe("reviewer-key-fixture");
     await expect(memory.load()).resolves.toBe("memory-fixture");
+  });
+
+  it("keeps the Mac's phone access key in a file of its own", async () => {
+    const { github, remote } = connect();
+    await github.save("reviewer-key-fixture");
+    await remote.save('{"privateKey":"remote-key-fixture"}');
+    expect((await readFile(join(dataDir, "remote-access-key.enc"))).includes("remote-key-fixture")).toBe(false);
+    await expect(connect().remote.load()).resolves.toBe('{"privateKey":"remote-key-fixture"}');
+    await expect(github.load()).resolves.toBe("reviewer-key-fixture");
   });
 
   it("orders simultaneous saves and loads per store", async () => {

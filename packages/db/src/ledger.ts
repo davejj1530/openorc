@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { storeToolImages, type AgentEvent, type ToolImage } from "@openorc/protocol";
+import type { AgentEvent } from "@openorc/protocol";
 import type { Db } from "./database.js";
 import { FragmentTracker, factsOf } from "./fragments.js";
 import { redactValue } from "./redact.js";
@@ -14,8 +14,6 @@ export interface LedgerOptions {
   previewBytes?: number;
   /** Native provider payloads go here instead of the ledger. The app replays normalized events and never reads these back. */
   native?: (ev: Extract<AgentEvent, { type: "raw" }>) => void;
-  /** Stores one image from a tool's output and returns the URL the ledger keeps in its place, or null to keep it inline. */
-  storeImage?: (runId: string, image: ToolImage) => string | null;
 }
 
 interface EventRow {
@@ -45,7 +43,6 @@ export class LedgerWriter {
   private readonly artifactThreshold: number;
   private readonly previewBytes: number;
   private readonly native: LedgerOptions["native"];
-  private readonly storeImage: LedgerOptions["storeImage"];
   eventsWritten = 0;
   artifactsWritten = 0;
   redactions = 0;
@@ -59,7 +56,6 @@ export class LedgerWriter {
     this.artifactThreshold = options.artifactThresholdBytes ?? 8 * 1024;
     this.previewBytes = options.previewBytes ?? 1024;
     this.native = options.native;
-    this.storeImage = options.storeImage;
   }
 
   push(ev: AgentEvent): void {
@@ -67,20 +63,12 @@ export class LedgerWriter {
       this.native(ev);
       return;
     }
-    this.queue.push(this.withStoredImages(ev));
+    this.queue.push(ev);
     if (this.queue.length >= this.maxBatch) {
       this.flush();
       return;
     }
     if (!this.timer) this.timer = setTimeout(() => this.flush(), this.flushMs);
-  }
-
-  /** A tool's images go to files before the event is queued, so neither redaction nor the ledger handles their base64. */
-  private withStoredImages(ev: AgentEvent): AgentEvent {
-    const store = this.storeImage;
-    if (ev.type !== "tool.completed" || !store) return ev;
-    const output = storeToolImages(ev.output, (image) => store(ev.runId, image));
-    return output === ev.output ? ev : { ...ev, output };
   }
 
   flush(): void {
@@ -213,6 +201,24 @@ export function completedToolCall(db: Db, runId: string, callId: string): Extrac
     .get(runId, callId) as { payload: string } | undefined;
   if (discovered) call.mcp = JSON.parse(discovered.payload).mcp;
   return call;
+}
+
+/** Where the newest announcement of an agent's generated image says its file is, or null. */
+export function generatedImagePath(db: Db, runId: string, activityId: string): string | null {
+  const body = "COALESCE(a.content, e.payload)";
+  const row = db
+    .stmt(
+      `SELECT ${body} AS payload FROM events e
+    LEFT JOIN artifacts a ON a.event_id = e.id AND a.kind = 'payload'
+    WHERE e.run_id = ? AND e.kind = 'activity.updated' AND json_extract(${body}, '$.activityId') = ?
+    AND (json_type(${body}, '$.imagePath') = 'text' OR json_type(${body}, '$.detail.savedPath') = 'text')
+    ORDER BY e.seq DESC LIMIT 1`,
+    )
+    .get(runId, activityId) as { payload: string } | undefined;
+  if (!row) return null;
+  const event = JSON.parse(row.payload) as { imagePath?: string; detail?: { savedPath?: unknown } };
+  if (typeof event.imagePath === "string") return event.imagePath;
+  return typeof event.detail?.savedPath === "string" ? event.detail.savedPath : null;
 }
 
 function eventToolName(event: AgentEvent): string | null {

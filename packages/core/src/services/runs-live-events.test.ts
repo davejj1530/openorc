@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -14,6 +15,7 @@ let dataDir: string;
 let core: OpenOrc;
 let project: Project;
 const pushed: CorePush[] = [];
+let onPush: ((message: CorePush) => void) | null = null;
 const live: string[] = [];
 
 beforeAll(async () => {
@@ -24,7 +26,16 @@ beforeAll(async () => {
   await git(root, ["config", "user.name", "Test"]);
   await writeFile(path.join(root, "README.md"), "# Diff refresh fixture\n");
   await commitAll(root, "init");
-  core = await OpenOrc.create({ dataDir, ephemeral: true, transport: { push: (message) => pushed.push(message) } });
+  core = await OpenOrc.create({
+    dataDir,
+    ephemeral: true,
+    transport: {
+      push: (message) => {
+        pushed.push(message);
+        onPush?.(message);
+      },
+    },
+  });
   project = await core.projects.import(root);
 });
 afterEach(async () => {
@@ -157,4 +168,39 @@ it("sends pending frames before a transcript page, so a loading window can drop 
   expect(page.type).toBe("rpc.result");
   // The window gets the page on the same port as the pushes, after every push made before it resolved.
   expect(pushed.some((p) => p.type === "frame" && p.frame.events.some((ev) => ev.type === "message.completed"))).toBe(true);
+});
+
+it("stores a tool's base64 image as a file before the frame or the ledger sees the event", async () => {
+  const png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=";
+  const imageUrl = /openorc-asset:\/\/tool-images\/[A-Za-z0-9-]+\/[a-f0-9-]+\.png/;
+  const { emit, runId } = await session();
+  const framed: Array<{ text: string; fileExisted: boolean }> = [];
+  onPush = (message) => {
+    const completed = message.type === "frame" ? message.frame.events.find((ev) => ev.type === "tool.completed" && ev.toolCallId === "shot") : undefined;
+    if (!completed) return;
+    const text = JSON.stringify(completed);
+    const url = imageUrl.exec(text)?.[0];
+    framed.push({ text, fileExisted: Boolean(url && existsSync(path.join(dataDir, url.slice("openorc-asset://".length)))) });
+  };
+  try {
+    emit({
+      type: "tool.completed",
+      runId,
+      ts: Date.now(),
+      toolCallId: "shot",
+      name: "Screenshot",
+      output: [{ type: "image", source: { type: "base64", media_type: "image/png", data: png } }],
+      isError: false,
+    });
+    await vi.waitFor(() => expect(framed).toHaveLength(1));
+  } finally {
+    onPush = null;
+  }
+  core.ledger.flush();
+  const stored = JSON.stringify(listEvents(core.db, runId).find((ev) => ev.type === "tool.completed" && ev.toolCallId === "shot"));
+  const [frame] = framed;
+  expect(frame!.text).not.toContain(png);
+  expect(frame!.fileExisted).toBe(true);
+  expect(stored).toContain(imageUrl.exec(frame!.text)![0]);
+  expect(stored).not.toContain(png);
 });

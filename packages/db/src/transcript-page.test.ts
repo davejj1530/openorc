@@ -3,7 +3,7 @@ import type { AgentEvent } from "@openorc/protocol";
 import { Db } from "./database.js";
 import { LedgerWriter } from "./ledger.js";
 import { projects, runs, threads } from "./repos.js";
-import { transcriptPage } from "./transcript-page.js";
+import { pagedEvent, transcriptPage } from "./transcript-page.js";
 
 function fixture(events: (runId: string) => AgentEvent[]) {
   const db = Db.memory();
@@ -32,4 +32,13 @@ it("pages a run by turns, newest first, counting turns as the transcript does", 
   expect(transcriptPage(db, runId, {}).events).toHaveLength(13);
   expect(transcriptPage(db, runId, { turns: 9 }).fromTurn).toBe(0);
   expect(transcriptPage(db, runId, { fromTurn: 9 })).toEqual({ events: [], fromTurn: 3 });
+});
+
+it("leaves the same tool results out of a live event as out of its stored row", () => {
+  const { db, runId } = fixture((id) => [...turn(id, 1, "x".repeat(10_000)), ...turn(id, 2, "small"), ...turn(id, 3, { id: "t".repeat(5_000) }, "openorc.task_create")]);
+  const completed = (events: AgentEvent[]) => events.filter((ev) => ev.type === "tool.completed");
+  const live = completed(turn(runId, 1, "x".repeat(10_000)).concat(turn(runId, 2, "small"), turn(runId, 3, { id: "t".repeat(5_000) }, "openorc.task_create"))).map(pagedEvent);
+  const stored = completed(transcriptPage(db, runId, {}).events);
+  expect(live.map((ev) => "outputOmitted" in ev && ev.outputOmitted === true)).toEqual([true, false, false]);
+  expect(stored.map((ev) => ({ ...ev, eventId: undefined }))).toEqual(live.map((ev) => ({ ...ev, eventId: undefined })));
 });

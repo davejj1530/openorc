@@ -2,12 +2,9 @@ import { randomUUID } from "node:crypto";
 import { open, readFile, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { safeStorage, type UtilityProcess } from "electron";
+import { PROTECTED_SECRET_FILES } from "../shared/protected-secrets";
 
-const files = new Map([
-  ["slack.secrets", "slack-secrets.enc"],
-  ["memory.secrets", "memory-extraction-key.enc"],
-  ["github.secrets", "github-reviewer-app.enc"],
-]);
+const files = new Map<string, string>(Object.entries(PROTECTED_SECRET_FILES));
 const storageError = "Cannot access protected storage. Unlock your OS keychain or secret service and retry.";
 
 function requireEncryption(): void {

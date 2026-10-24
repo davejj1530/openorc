@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "OpenOrc",
+    "slug": "openorc",
+    "scheme": "openorc",
+    "version": "0.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "bundleIdentifier": "app.openorc.mobile",
+      "supportsTablet": false
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-font",
+        {
+          "fonts": ["./assets/fonts/ImmaculateGothic-Text.ttf", "./assets/fonts/ImmaculateGothic-Bold.ttf", "./node_modules/@expo-google-fonts/jetbrains-mono/400Regular/JetBrainsMono_400Regular.ttf"]
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "OpenOrc uses the camera to scan the pairing code on your Mac.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
+      "expo-secure-store",
+      "react-native-quick-crypto"
+    ]
+  }
+}

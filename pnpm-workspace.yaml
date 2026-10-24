@@ -6,6 +6,8 @@ allowBuilds:
   electron: true
   esbuild: true
   node-pty: true
+  # Downloads the tree-sitter grammars and math renderer its native build compiles in.
+  react-native-enriched-markdown: true
   sqlite-vec: true
   electron-winstaller: false
   # Its install script only downloads ~350 MB of CUDA providers on Linux x64. Embeddings run on the CPU binaries the

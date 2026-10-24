@@ -87,7 +87,11 @@ export default [
     ignores: ["apps/mobile/src/generated/**"],
     rules: {
       "no-restricted-imports": ["error", { patterns: [...codeEditorFence.patterns, { regex: "(^|/)desktop/", message: "Generate what the phone needs from the desktop with design-sync." }] }],
-      "no-restricted-syntax": ["error", { selector: "Literal[value=/^#[0-9a-fA-F]{3,8}$/]", message: "Use a palette role (a class like text-ink-3, or useColors())." }],
+      "no-restricted-syntax": [
+        "error",
+        { selector: "Literal[value=/^#[0-9a-fA-F]{3,8}$/]", message: "Use a palette role (a class like text-ink-3, or useColors())." },
+        { selector: "Literal[value=/placeholder:/]", message: 'Uniwind ignores the placeholder: variant. Color a placeholder with placeholderTextColorClassName="accent-ink-4".' },
+      ],
     },
   },
   // Application projects already check unused declarations with TypeScript.

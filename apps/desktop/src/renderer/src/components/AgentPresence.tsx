@@ -1,17 +1,11 @@
-import { useContext, useEffect, useState } from "react";
+import { useContext } from "react";
 import { ConversationVoice } from "../lib/turn-authors";
-import { workDuration } from "@openorc/client";
+import { useTicking, workDuration } from "@openorc/client";
 import { AgentOrb } from "./AgentOrb";
 
 /** Seconds since `since`, ticking only while `active`; a resting orb needs no timer. */
 function useElapsed(active: boolean, since: number | undefined): string | null {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    if (!active) return;
-    setNow(Date.now());
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, [active]);
+  const now = useTicking(active);
   return active && since !== undefined ? workDuration(Math.max(1000, now - since)) : null;
 }
 

@@ -11,6 +11,16 @@ const EVICT_AFTER_MS = 3 * 60_000;
 /** What to load: the newest `turns`, or everything from `fromTurn` on (the whole run when omitted). */
 export type LoadRequest = { turns: number } | { fromTurn?: number };
 
+interface Published {
+  /** A new map and a new run object whenever a run changes; unchanged runs keep their identity. */
+  runs: ReadonlyMap<string, RunTranscript>;
+  /**
+   * Runs whose last load from the ledger failed. Views leave them until a resync, after which calls may work again,
+   * or until another view takes hold of them and asks afresh.
+   */
+  failed: ReadonlySet<string>;
+}
+
 /**
  * The runs a client keeps. Live runs feed from frames; the rest load from the ledger, newest turns first, and leave
  * memory a few minutes after nothing shows them.
@@ -18,8 +28,7 @@ export type LoadRequest = { turns: number } | { fromTurn?: number };
 interface Store {
   readonly connection: CoreConnection;
   readonly scheduleFrame: (callback: () => void) => void;
-  /** A new map and a new run object whenever a run changes; unchanged runs keep their identity. */
-  readonly published: UseBoundStore<StoreApi<{ runs: ReadonlyMap<string, RunTranscript> }>>;
+  readonly published: UseBoundStore<StoreApi<Published>>;
   /** Runs as of the last event, ahead of what subscribers have been told by at most one animation frame. */
   current: Map<string, RunTranscript>;
   scheduled: boolean;
@@ -146,6 +155,10 @@ async function loadPage(s: Store, runId: string, request: LoadRequest): Promise<
     run.eventCount = page.events.length + buffered.length - seen - 1;
     keepUnchanged(run, s.current.get(runId));
     replace(s, run);
+    forgetFailures(s, [runId]);
+  } catch (error) {
+    s.published.setState(({ failed }) => ({ failed: new Set(failed).add(runId) }));
+    throw error;
   } finally {
     s.hydrating.delete(runId);
     syncInterest(s);
@@ -181,8 +194,17 @@ function sameJson(a: unknown, b: unknown): boolean {
  * the ledger leaves too, and the views that need its history load it again. Never rejects: a run that fails to
  * reload stays as it was.
  */
-async function resync(s: Store, runIds: readonly string[] = [...s.current.keys()]): Promise<void> {
-  await Promise.allSettled(runIds.map((runId) => (s.holds.has(runId) ? reload(s, runId) : drop(s, runId))));
+async function resync(s: Store, runIds?: readonly string[]): Promise<void> {
+  forgetFailures(s, runIds ?? [...s.published.getState().failed]);
+  await Promise.allSettled((runIds ?? [...s.current.keys()]).map((runId) => (s.holds.has(runId) ? reload(s, runId) : drop(s, runId))));
+}
+
+function forgetFailures(s: Store, runIds: readonly string[]): void {
+  const { failed } = s.published.getState();
+  if (!runIds.some((runId) => failed.has(runId))) return;
+  const next = new Set(failed);
+  for (const runId of runIds) next.delete(runId);
+  s.published.setState({ failed: next });
 }
 
 async function reload(s: Store, runId: string): Promise<void> {
@@ -208,7 +230,7 @@ function reset(s: Store): void {
   s.evictions.clear();
   s.holds.clear();
   s.scheduled = false;
-  s.published.setState({ runs: s.current });
+  s.published.setState({ runs: s.current, failed: new Set() });
   syncInterest(s);
 }
 
@@ -221,6 +243,7 @@ function seed(s: Store, run: RunTranscript): void {
 
 /** Keeps runs loaded until the returned release is called. Views of the same run share it. */
 function retain(s: Store, runIds: readonly string[]): () => void {
+  forgetFailures(s, runIds);
   for (const id of runIds) {
     s.holds.set(id, (s.holds.get(id) ?? 0) + 1);
     clearTimeout(s.evictions.get(id));
@@ -280,6 +303,11 @@ function useRunMapOf(s: Store, runIds: readonly string[]): ReadonlyMap<string, R
   return useMemo(() => new Map(runs.flatMap((run) => (run ? [[run.runId, run] as const] : []))), [runs]);
 }
 
+/** Runs whose last load failed, so a view stops asking for them until the store says they may load again. */
+function useFailedLoadsOf(s: Store): ReadonlySet<string> {
+  return s.published((state) => state.failed);
+}
+
 /** Approvals waiting across every loaded run, for the inbox count. */
 function usePendingApprovalsOf(s: Store): number {
   return s.published((state) => {
@@ -293,7 +321,7 @@ export function createRunStore(connection: CoreConnection, scheduleFrame: (callb
   const s: Store = {
     connection,
     scheduleFrame,
-    published: create(() => ({ runs: new Map<string, RunTranscript>() as ReadonlyMap<string, RunTranscript> })),
+    published: create<Published>(() => ({ runs: new Map(), failed: new Set() })),
     current: new Map(),
     scheduled: false,
     hydrating: new Map(),
@@ -320,6 +348,7 @@ export function createRunStore(connection: CoreConnection, scheduleFrame: (callb
     useRun: (runId: string | undefined) => useRunOf(s, runId),
     useRuns: (runIds: readonly string[]) => useRunsOf(s, runIds),
     useRunMap: (runIds: readonly string[]) => useRunMapOf(s, runIds),
+    useFailedLoads: () => useFailedLoadsOf(s),
     usePendingApprovals: () => usePendingApprovalsOf(s),
   };
 }

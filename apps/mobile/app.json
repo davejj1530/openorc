@@ -21,9 +21,17 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "OpenOrc uses the camera to scan the pairing code on your Mac.",
+          "cameraPermission": "OpenOrc uses the camera to scan the pairing code on your Mac and to take photos you attach.",
           "microphonePermission": false,
           "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "OpenOrc attaches the photos you choose to your messages.",
+          "cameraPermission": "OpenOrc uses the camera to scan the pairing code on your Mac and to take photos you attach.",
+          "microphonePermission": false
         }
       ],
       "expo-secure-store",

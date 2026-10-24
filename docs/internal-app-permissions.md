@@ -62,7 +62,7 @@ The Preview shares your signed-in sessions (see [agent access to the sidebar pre
 
 ## Default mode for new work
 
-Choosing a mode in a permission picker saves it as your default (`app.settings.defaultPermissionMode`). New conversations and new schedules start with it. A task conversation takes its mode from the task's previous run, then from the conversation that created the task, and only then from the default. Existing conversations and schedules keep their own mode; changing the default never raises them. New work waits for settings to load before it can start. Until you choose, the default is **Accept edits**.
+Choosing a mode in a permission picker saves it as your default (`app.settings.defaultPermissionMode`). New conversations and new schedules start with it. A task conversation takes its mode from the task's previous run, then from the conversation that created the task, and only then from the default. Existing conversations and schedules keep their own mode; changing the default never raises them. New work waits for settings to load before it can start. Until you choose, the default is **Accept edits**. A choice made on the phone stays with its thread and leaves the default as it was.
 
 ## For contributors
 
@@ -71,6 +71,6 @@ The policy is in `packages/core/src/services/app-actions.ts`, and `RunService.au
 - `packages/core/src/services/permissions.test.ts`: approval paths for each provider, copied tool names, external approvals in the same session, forms that need data, and task and forwarded-work policies. "App actions follow the conversation's mode" runs every app action in every mode for Claude and Codex, and in Plan and Autonomous for OpenCode, plus the message chain limit, request keys, and protection of your memories.
 - `packages/agents/src/codex/adapter.test.ts`: approval for the OpenOrc connection only, with the sandbox and command policy unchanged; other MCP URLs get no exemption.
 - `packages/core/src/services/settings.test.ts` and `packages/core/src/openorc.test.ts`: saving the default, older settings, and task start defaults.
-- `apps/desktop/src/renderer/src/lib/permission-default.test.ts`: rapid selections and recovery from a failed save.
+- `packages/client/src/permission-default.test.ts`: rapid selections, recovery from a failed save, and a phone choice that stays with its thread.
 
 Provider tests run the real adapters, core, JSON-RPC transport and local MCP endpoint against scripted provider processes. They make no live model calls.

@@ -4,7 +4,7 @@ import { ThreadChangeCard, UndoTurnButton } from "./ThreadChangeCard";
 import { useRpc } from "../lib/client";
 import { useLayout } from "../lib/layout";
 import type { Block } from "@openorc/client";
-import type { OutsideLine, TurnFooters } from "../lib/conversation-transcript";
+import type { OutsideLine, TurnFooters } from "../lib/turn-footers";
 
 /** How each kind of outside change reads. `unknown` stays neutral: an agent may have made some of the changes. */
 const OUTSIDE_WORDING: Record<OutsideLine["by"], { heading: (count: number) => string; label: string; hint: string; confirmHint: string }> = {

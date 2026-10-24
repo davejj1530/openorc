@@ -11,6 +11,7 @@ import type { LinkState } from "../connection/manager";
 import { Plus } from "../generated/icons";
 import { LinkDot } from "../macs/LinkDot";
 import { reportFirstFrame } from "../startup";
+import { usePerfAutoOpen } from "../thread/PerfProbe";
 import { Text } from "../ui/Text";
 import { HomeHeading, PinnedLabel } from "./HomeHeading";
 import { homeItems, type HomeItem } from "./home-items";
@@ -105,6 +106,7 @@ export function HomeScreen() {
   const insets = useSafeAreaInsets();
   const state = useLinkState();
   useEffect(reportFirstFrame, []);
+  usePerfAutoOpen();
   if (state.kind === "unpaired") {
     return (
       <View className="flex-1 bg-bg">

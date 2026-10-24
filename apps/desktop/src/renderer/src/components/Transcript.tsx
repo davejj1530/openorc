@@ -17,6 +17,7 @@ import {
   isImageGeneration,
   isImageView,
   isUnifiedDiff,
+  useTurnModel,
 } from "@openorc/client";
 import { cn } from "../lib/cn";
 import type { FileSelection } from "../lib/layout";
@@ -26,7 +27,6 @@ import { toolIcons } from "./tool-icons";
 import { WorkNow, WorkSteps } from "./WorkSteps";
 import { TurnHead } from "./TurnHead";
 import { TurnReceipt } from "./TurnReceipt";
-import { useTurnModel } from "./use-turn-model";
 import { useTurnAuthor } from "../lib/turn-authors";
 import { ToolRow } from "./ToolRow";
 import { ApprovalCard, pretty } from "./ApprovalCard";

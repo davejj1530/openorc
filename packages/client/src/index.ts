@@ -4,10 +4,13 @@ export type { RpcQueryOptions } from "./query.js";
 export type { LoadRequest, RunStore } from "./run-store.js";
 export { approvalDetail, approvalSummary, type Question, readQuestions } from "./approval-request.js";
 export { isUnifiedDiff, toolDiff } from "./chat-diff.js";
-export { conversationCanSteer, conversationSendDisabledReason, conversationSteerReason } from "./conversation-presentation.js";
+export { composerActivity, composerSendHint } from "./composer-presentation.js";
+export { conversationActivity, conversationCanSteer, conversationPlaceholder, conversationSendDisabledReason, conversationSteerReason } from "./conversation-presentation.js";
 export { composerActions, messageBody, planSubmit, processFit, type ComposerActionsInput, type SubmitInput, type SubmitPlan, type SubmitRequest, type SubmitTarget } from "./conversation-submit.js";
 export { patchStat } from "./diff-stat.js";
+export type { SavedThreadSettings } from "./conversation-settings.js";
 export { editedPaths } from "./edited-paths.js";
+export { citationLinks } from "./file-citations.js";
 export { isImageGeneration, isImageView } from "./image-activity.js";
 export {
   browserModels,
@@ -28,11 +31,26 @@ export { threadHeadline, type ThreadHeadline } from "./thread-headline.js";
 export { pullRequestMark, pullRequestNumber, threadMark, threadPlace, threadStatus, type ThreadMark, type ThreadPlace, type ThreadStatus } from "./thread-row.js";
 export { formatBytes, formatTokens, relativeTime, shortSha, untilTime } from "./time.js";
 export { liveVerb, stateLabel, type Tone, toolCallPresentation, type ToolIconName } from "./tool-presentation.js";
+export { toolResult, toolResultDetails, type ToolResultMedia } from "./tool-result.js";
 export { type ChangedFile, type ChangeStatus, languageFor, type MatchGroup, type MatchLine, type TestTally } from "./tool-text.js";
 export { type CommandStep, type Field, type InputView, joinPath, type OutputView, toolInputView, toolOutputView } from "./tool-view.js";
 export { type Block, emptyRun, type RunTranscript } from "./transcript.js";
 export { visualizationFromTool } from "./visualization.js";
 export { chipCalls, toolIntent, type WorkChip } from "./work-chips.js";
 export { isCheckCommand, type ReceiptItem, receiptItems } from "./work-receipt.js";
-export { chipTitle, foldable, isLive, liveHeadline, type LiveHeadline, liveSectionLabel, type PlanItem, workEntries, type WorkEntry, type WorkPhase, type WorkSection } from "./work-steps.js";
+export {
+  chipTitle,
+  foldable,
+  isLive,
+  liveHeadline,
+  type LiveHeadline,
+  liveSectionLabel,
+  type PlanItem,
+  reasoningSections,
+  workEntries,
+  type WorkEntry,
+  type WorkPhase,
+  type WorkSection,
+} from "./work-steps.js";
 export { workDuration, workParts, workTiming, workTurns } from "./work-transcript.js";
+export { turnReply, turnStatus, turnStatusWords, type TurnStatus, useTicking, useTurnModel } from "./turn-model.js";

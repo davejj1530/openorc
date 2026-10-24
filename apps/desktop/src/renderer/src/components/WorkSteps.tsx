@@ -1,4 +1,4 @@
-import { Fragment, memo, useEffect, useId, useMemo, useState, type ReactNode } from "react";
+import { Fragment, memo, useId, useMemo, useState, type ReactNode } from "react";
 import {
   type Block,
   workDuration,
@@ -14,6 +14,7 @@ import {
   type WorkEntry,
   type WorkPhase,
   type WorkSection,
+  useTicking,
 } from "@openorc/client";
 import { cn } from "../lib/cn";
 import { Brain, Check, ChevronRight, Folder, Globe, Hammer, Loader2, Search, Terminal, WorkDelegate } from "./icons";
@@ -129,20 +130,9 @@ function EntryView({ entry, headline, live, renderBlocks }: { entry: WorkEntry; 
   );
 }
 
-function useNow(active: boolean): number {
-  const [now, setNow] = useState(Date.now);
-  useEffect(() => {
-    if (!active) return;
-    setNow(Date.now());
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, [active]);
-  return now;
-}
-
 /** Kept out of accessible names and the live region: a reading that changes every second is noise there. */
 function Elapsed({ since }: { since: number | undefined }) {
-  const now = useNow(since !== undefined);
+  const now = useTicking(since !== undefined);
   return since === undefined ? null : (
     <span className="work-elapsed" aria-hidden="true">
       {workDuration(now - since)}

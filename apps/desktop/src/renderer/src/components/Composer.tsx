@@ -22,12 +22,11 @@ import { ComposerModelPicker, type ModelChoice } from "./ModelPicker";
 import { Button, Tooltip } from "./ui";
 import { cn } from "../lib/cn";
 import { useRpcMutation } from "../lib/client";
-import { composerActions } from "@openorc/client";
+import { composerActions, composerActivity, composerSendHint } from "@openorc/client";
 import { useComposerAttachments, removeAcceptedAttachments } from "../lib/composer-attachments";
 import { formatBytes } from "../lib/file-imports";
 import { type MentionEntry } from "../lib/composer-mentions";
 import { useComposerSubmission } from "../lib/composer-submission";
-import { composerActivity, composerSendHint } from "../lib/composer-presentation";
 
 export const permissionLabel: Record<PermissionPreset, string> = { review: "Review", trusted: "Workspace access", autonomous: "Autonomous" };
 

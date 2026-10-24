@@ -7,6 +7,7 @@ const COMPOSER_MESSAGES = {
   queue: "Queue for after this turn",
 } as const;
 
+/** What the composer is doing with the last send or the running turn, in a word or two; null when nothing. */
 export function composerActivity(input: { stopping: boolean; submitting: boolean; generatingImage: boolean }): string | null {
   if (input.stopping) return COMPOSER_MESSAGES.stopping;
   if (input.submitting) return COMPOSER_MESSAGES.sending;
@@ -14,6 +15,7 @@ export function composerActivity(input: { stopping: boolean; submitting: boolean
   return null;
 }
 
+/** Why Send is dim, or what it will do with the message. */
 export function composerSendHint(input: {
   disabledReason?: string | null;
   attachmentBlock?: string | null;

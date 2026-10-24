@@ -1,7 +1,8 @@
 import { lazy, Suspense, useMemo, useState, type ReactNode } from "react";
-import { toolResult, toolResultDetails } from "../lib/tool-result";
 import {
   languageFor,
+  toolResult,
+  toolResultDetails,
   type ChangedFile,
   type ChangeStatus,
   type TestTally,

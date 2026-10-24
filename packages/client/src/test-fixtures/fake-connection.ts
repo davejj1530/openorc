@@ -1,6 +1,8 @@
+import { QueryClientProvider } from "@tanstack/react-query";
+import { createElement, type ReactNode } from "react";
 import { vi } from "vitest";
 import type { RpcMethod } from "@openorc/protocol";
-import { createClientState } from "../client-state.js";
+import { createClientState, type ClientStateOptions } from "../client-state.js";
 import type { ClientPush, CoreConnection } from "../connection.js";
 
 /**
@@ -29,9 +31,13 @@ export function fakeConnection(delivery: CoreConnection["delivery"] = "all") {
   return { connection, call, push, wire };
 }
 
-/** A client over a fake connection that publishes only when the test flushes or the store's timer fires. */
-export function testClient(delivery: CoreConnection["delivery"] = "all") {
+/**
+ * A client over a fake connection that publishes only when the test flushes or the store's timer fires. `wrapper`
+ * gives hooks rendered by a test the client's query cache.
+ */
+export function testClient(delivery: CoreConnection["delivery"] = "all", options: Partial<ClientStateOptions> = {}) {
   const fake = fakeConnection(delivery);
-  const client = createClientState(fake.connection, { scheduleFrame: () => undefined, invalidationBatchMs: 50, randomId: () => "request" });
-  return { ...fake, client };
+  const client = createClientState(fake.connection, { scheduleFrame: () => undefined, invalidationBatchMs: 50, randomId: () => "request", savesDefaultPermission: true, ...options });
+  const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: client.queryClient }, children);
+  return { ...fake, client, wrapper };
 }

@@ -1,8 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { cn } from "../lib/cn";
 import { core } from "../lib/rpc";
-import { toolResult } from "../lib/tool-result";
-import { type Block, visualizationFromTool, liveVerb, stateLabel, toolCallPresentation, toolIntent, isCheckCommand } from "@openorc/client";
+import { type Block, visualizationFromTool, liveVerb, stateLabel, toolCallPresentation, toolIntent, isCheckCommand, toolResult } from "@openorc/client";
 import { ChevronRight, CircleCheck, Loader2, Terminal, X } from "./icons";
 import { toolIcons } from "./tool-icons";
 import { ToolDetail } from "./ToolDetail";

@@ -1,4 +1,4 @@
-import { conversationWorkspaceMode, conversationLocation, conversationEmptyHint, conversationPlaceholder, conversationEmptyTitle, workspaceDestination } from "../lib/conversation-status-presentation";
+import { conversationWorkspaceMode, conversationLocation, conversationEmptyHint, conversationEmptyTitle, workspaceDestination } from "../lib/conversation-status-presentation";
 import { WORKSPACE_ID } from "@openorc/protocol";
 import { TaskForwarding } from "./TaskForwarding";
 import { useCallback, useMemo, useState } from "react";
@@ -10,16 +10,15 @@ import { Transcript } from "./Transcript";
 import { MessageQueue } from "./MessageQueue";
 import { BackgroundCommands } from "./BackgroundCommands";
 import { useTurnFooter } from "./TurnFooter";
-import { isImageGeneration, conversationSteerReason, conversationSendDisabledReason, messageBody, processFit, type SubmitRequest } from "@openorc/client";
+import { conversationActivity, conversationPlaceholder, conversationSteerReason, conversationSendDisabledReason, messageBody, processFit, type SubmitRequest } from "@openorc/client";
 import { useComposerChanges } from "../lib/composer-changes";
 import { useProjectGit } from "../lib/project-git";
 import { Button, Empty } from "./ui";
-import { useRpc, useRpcMutation, useSubmit } from "../lib/client";
+import { useConversationSettings, useConversationTranscript, useRpc, useRpcMutation, useSubmit } from "../lib/client";
 import { useConversationDraft } from "../lib/conversation-draft";
 import { openThread } from "../lib/router";
 import { useSkillCommands } from "../lib/skill-commands";
-import { useConversationTranscript } from "../lib/conversation-transcript";
-import { useConversationSettings } from "../lib/conversation-settings";
+import { useTurnFooters } from "../lib/turn-footers";
 import { TeamConversation, TeamTaskConversation } from "./TeamConversation";
 import { useOrclingConversation } from "./useOrclingConversation";
 import { ConversationVoice } from "../lib/turn-authors";
@@ -144,7 +143,8 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
 
   const activeRun: Run | undefined = runs[runs.length - 1];
   const basePath = (scope.kind === "task" ? scope.task.worktreePath : (scope.thread.workingDirectory ?? scope.thread.worktreePath)) ?? project.rootPath;
-  const { merged, liveTranscript, footers, hasOlder, loadOlder } = useConversationTranscript({ runs, threadId: thread?.id ?? null, basePath });
+  const { merged, transcripts, liveTranscript, hasOlder, loadOlder } = useConversationTranscript({ runs, threadId: thread?.id ?? null });
+  const footers = useTurnFooters({ threadId: thread?.id ?? null, transcripts, blocks: merged?.blocks, basePath });
 
   const settings = useConversationSettings({ thread, activeRun });
   const { choice, mode, permission, permissionReady, permissionError } = settings;
@@ -165,12 +165,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
     if (threadId) forkThread({ id: threadId }, { onSuccess: (t) => void (!("rejected" in t) && openThread(t.id)) });
   }, [threadId, forkThread]);
 
-  const live = Boolean(activeRun && liveTranscript?.live);
-  const generatingImage = Boolean(liveTranscript?.blocks.some((b) => isImageGeneration(b) && b.kind === "activity" && b.status === "running"));
-  const working =
-    generatingImage ||
-    compact.isPending ||
-    (thread ? thread.activity !== "idle" : live && Boolean(liveTranscript && liveTranscript.blocks.some((b) => b.kind === "message" && b.role === "assistant" && b.streaming)));
+  const { live, working, generatingImage } = conversationActivity({ thread, activeRun, liveTranscript, compacting: compact.isPending });
   const { sameAgent, settingsPending, canSteer } = processFit({ live, activeRun, choice, mode, permission, compacting: compact.isPending });
   const steerReason = conversationSteerReason({ canSteer, compacting: compact.isPending, settingsPending, sameAgent, agent: activeRun?.agent });
   const sendDisabledReason = conversationSendDisabledReason({ permissionReady, historyLoading: runsQuery.isLoading, historyFailed: Boolean(runsQuery.error), hasModel: Boolean(choice) });

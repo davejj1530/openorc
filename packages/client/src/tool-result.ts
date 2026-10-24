@@ -1,4 +1,5 @@
 import { TOOL_IMAGE_URL } from "@openorc/protocol";
+import { urlHost } from "./url-host.js";
 
 /** Presentation only: tool results stay as the ledger holds them, with their images stored as files. */
 export type ToolResultMedia = { kind: "image"; src: string | null; label: string } | { kind: "resource"; uri: string; href: string | null; label: string; text?: string };
@@ -21,14 +22,13 @@ function image(mimeType: unknown, data: unknown, asset: unknown): string | null 
   return inlineImage(mimeType, data);
 }
 
-/** Resource URIs can also be opaque MCP identifiers; only web links are actionable. */
+/**
+ * Resource URIs can also be opaque MCP identifiers; only web links without credentials are actionable. Parsed by hand
+ * because React Native's URL only partly implements its fields.
+ */
 function webLink(uri: string): string | null {
-  try {
-    const url = new URL(uri);
-    return (url.protocol === "https:" || url.protocol === "http:") && !url.username && !url.password ? url.href : null;
-  } catch {
-    return null;
-  }
+  const link = uri.trim();
+  return /^https?:\/\//i.test(link) && urlHost(link) && !/^[a-z]+:\/\/[^/?#]*@/i.test(link) ? link : null;
 }
 
 /** Debug details never expand binary content into megabytes of visible base64. */
@@ -52,6 +52,38 @@ export function toolResultDetails(output: unknown): string {
   }
 }
 
+/** A content block's image: MCP uses data/mimeType, Claude's tool_result a base64 source object, stored ones an asset URL. */
+function imageBlock(block: Record<string, unknown>): string | null {
+  const source = record(block.source);
+  if (!source) return image(block.mimeType, block.data, block.asset);
+  return source.type === "base64" || source.type === "asset" ? image(source.media_type, source.data, source.url) : null;
+}
+
+/** A resource block as media: an image it carries, or a link to what it names. Null when it names nothing. */
+function resourceMedia(block: Record<string, unknown>): ToolResultMedia | null {
+  const resource = block.type === "resource" ? record(block.resource) : block;
+  if (!resource || typeof resource.uri !== "string") return null;
+  let label = resource.uri;
+  if (typeof resource.title === "string") label = resource.title;
+  else if (typeof resource.name === "string") label = resource.name;
+  const carriesImage = (typeof resource.blob === "string" || typeof resource.asset === "string") && typeof resource.mimeType === "string" && resource.mimeType.startsWith("image/");
+  if (carriesImage) return { kind: "image", src: image(resource.mimeType, resource.blob, resource.asset), label };
+  return { kind: "resource", label, uri: resource.uri, href: webLink(resource.uri), ...(typeof resource.text === "string" ? { text: resource.text } : {}) };
+}
+
+/** One content item, added to the text or the media it belongs with. Image blocks are numbered as they come. */
+function addItem(item: unknown, text: string[], media: ToolResultMedia[], images: { count: number }): void {
+  const block = record(item);
+  if (typeof item === "string") text.push(item);
+  else if (block?.type === "text" && typeof block.text === "string") text.push(block.text);
+  else if (block?.type === "image") media.push({ kind: "image", src: imageBlock(block), label: `Tool image ${++images.count}` });
+  else if (block && (block.type === "resource" || block.type === "resource_link")) {
+    const resource = resourceMedia(block);
+    if (resource) media.push(resource);
+    else text.push(toolResultDetails(item));
+  } else text.push(toolResultDetails(item));
+}
+
 /** Understand content types, never vendor-specific JSON fields or URLs buried in text. */
 export function toolResult(output: unknown): { text: string; media: ToolResultMedia[]; details: boolean } {
   const envelope = record(output);
@@ -61,35 +93,8 @@ export function toolResult(output: unknown): { text: string; media: ToolResultMe
   if (!content) return { text: toolResultDetails(output), media: [], details: false };
   const text: string[] = [];
   const media: ToolResultMedia[] = [];
-  let images = 0;
-  for (const item of content) {
-    const block = record(item);
-    if (typeof item === "string") text.push(item);
-    else if (block?.type === "text" && typeof block.text === "string") text.push(block.text);
-    else if (block?.type === "image") {
-      // MCP uses data/mimeType; Claude's tool_result uses a base64 source object. Stored ones carry an asset URL instead.
-      const source = record(block.source);
-      let src: string | null = null;
-      if (source) {
-        if (source.type === "base64" || source.type === "asset") src = image(source.media_type, source.data, source.url);
-      } else src = image(block.mimeType, block.data, block.asset);
-      media.push({ kind: "image", src, label: `Tool image ${++images}` });
-    } else if (block?.type === "resource" || block?.type === "resource_link") {
-      const resource = block.type === "resource" ? record(block.resource) : block;
-      if (!resource || typeof resource.uri !== "string") {
-        text.push(toolResultDetails(item));
-        continue;
-      }
-      let label = resource.uri;
-      if (typeof resource.title === "string") label = resource.title;
-      else if (typeof resource.name === "string") label = resource.name;
-      if ((typeof resource.blob === "string" || typeof resource.asset === "string") && typeof resource.mimeType === "string" && resource.mimeType.startsWith("image/")) {
-        media.push({ kind: "image", src: image(resource.mimeType, resource.blob, resource.asset), label });
-      } else {
-        media.push({ kind: "resource", label, uri: resource.uri, href: webLink(resource.uri), ...(typeof resource.text === "string" ? { text: resource.text } : {}) });
-      }
-    } else text.push(toolResultDetails(item));
-  }
+  const images = { count: 0 };
+  for (const item of content) addItem(item, text, media, images);
   // Structured-only and empty results must not disappear either.
   if (!content.length && envelope?.structuredContent !== undefined) text.push(toolResultDetails(envelope.structuredContent));
   return { text: text.join(""), media, details: media.length > 0 || envelope?.structuredContent !== undefined || content.some((item) => record(item)?.type !== "text") };

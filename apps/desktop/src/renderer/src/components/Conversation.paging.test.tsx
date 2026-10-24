@@ -2,11 +2,11 @@ import { act, cleanup, fireEvent, render, renderHook, screen } from "@testing-li
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { AgentEvent, Project, Run, ThreadSummary } from "@openorc/protocol";
-import { runs as runStore } from "../lib/client";
+import { queryClient, runs as runStore, useConversationTranscript } from "../lib/client";
 import { core } from "../lib/rpc";
 import { Conversation } from "./Conversation";
 import { ThreadChangeCard } from "./ThreadChangeCard";
-import { useConversationTranscript } from "../lib/conversation-transcript";
+import { useTurnFooters } from "../lib/turn-footers";
 
 const queries = vi.hoisted(() => new Map<string, unknown>());
 const restore = vi.hoisted(() => vi.fn(async () => undefined));
@@ -94,12 +94,26 @@ beforeEach(() => {
   restore.mockClear();
   vi.mocked(core.call).mockReset();
   vi.mocked(core.call).mockImplementation((async (method: string, params: { runId: string; fromTurn?: number; turns?: number }) => {
+    if (method === "threads.messages") return [];
     if (method !== "events.page") return undefined;
     const { runId, ...request } = params;
     return page(runId, request);
   }) as never);
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  queryClient.clear();
+});
+
+/** The window's own query cache, which the shared conversation hooks read through. */
+const cached = ({ children }: { children: React.ReactNode }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+
+/** A conversation's turn footers, composed the way Conversation composes them. */
+function useConversationFooters(runs: Run[]) {
+  const { merged, transcripts } = useConversationTranscript({ runs, threadId: "thread" });
+  const footers = useTurnFooters({ threadId: "thread", transcripts, blocks: merged?.blocks, basePath: "/tmp/project" });
+  return { merged, footers };
+}
 
 it("keeps the earlier conversation in view while a new run starts", async () => {
   ledger.set("A", session("A", 3, 1000));
@@ -159,7 +173,7 @@ it("places each checkpoint after its completed turn and preserves cards while th
     { id: "second", runId: "A", turn: 2 },
   ]);
   const runs = [run("A", 1000)];
-  const { result } = renderHook(() => useConversationTranscript({ runs, threadId: "thread", basePath: "/tmp/project" }));
+  const { result } = renderHook(() => useConversationFooters(runs), { wrapper: cached });
   await settle();
   const footers = result.current.footers;
   expect([...footers.cards]).toEqual([
@@ -182,7 +196,7 @@ it("offers Undo on the first turn using its starting files without a separate ba
   ]);
   queries.set("threads.turnChanges", { files: [{ path: "README.md", added: 1, removed: 1 }] });
   const runs = [run("A", 1000)];
-  const { result } = renderHook(() => useConversationTranscript({ runs, threadId: "thread", basePath: "/tmp/project" }));
+  const { result } = renderHook(() => useConversationFooters(runs), { wrapper: cached });
   await settle();
   expect(result.current.footers.cards.size).toBe(1);
   const card = result.current.footers.cards.get("turn-A-turn-0")!;

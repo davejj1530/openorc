@@ -33,8 +33,8 @@ vi.mock("../lib/client", async (original) => ({
   },
   useRpcMutation: (method: string) =>
     method === "threads.start" ? { mutateAsync: start, reset: resetStart, isPending: false, error: null } : { mutateAsync: vi.fn(), mutate: vi.fn(), reset: vi.fn(), isPending: false, error: null },
+  usePermissionSelection: () => ({ permission: "review", ready: true, select: vi.fn(), error: null }),
 }));
-vi.mock("../lib/permission-default", () => ({ usePermissionSelection: () => ({ permission: "review", ready: true, select: vi.fn(), error: null }) }));
 vi.mock("../lib/skill-commands", () => ({ useSkillCommands: () => [] }));
 vi.mock("../lib/composer-changes", () => ({ useComposerChanges: () => null }));
 vi.mock("../components/NewThreadActivity", () => ({ useArrivalActivity: () => ({ any: false }), NewThreadRecent: () => null }));

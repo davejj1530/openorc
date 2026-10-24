@@ -3,6 +3,7 @@ import type { Route } from "@openorc/protocol";
 import * as SecureStore from "expo-secure-store";
 import type { MMKV } from "react-native-mmkv";
 import QuickCrypto, { type KeyObject } from "react-native-quick-crypto";
+import { perfEnabled, timeRecord } from "../thread/perf-probe";
 import type { OpeningSocket } from "./manager";
 import type { Clock } from "./route-race";
 import type { DeviceKeys, MacStore, SavedMac } from "./saved-macs";
@@ -48,9 +49,12 @@ export function openSocket(route: Route): OpeningSocket {
       onClose(event.code, event.reason);
     };
   });
+  const timed = perfEnabled();
   ws.onmessage = (event: MessageEvent<unknown>) => {
-    if (event.data instanceof ArrayBuffer) onMessage(new Uint8Array(event.data));
-    else ws.close(LinkCloseCode.protocol, "binary messages only");
+    const data = event.data;
+    if (!(data instanceof ArrayBuffer)) ws.close(LinkCloseCode.protocol, "binary messages only");
+    else if (timed) timeRecord(() => onMessage(new Uint8Array(data)));
+    else onMessage(new Uint8Array(data));
   };
   return { opened, close: () => ws.close(LinkCloseCode.normal, "") };
 }

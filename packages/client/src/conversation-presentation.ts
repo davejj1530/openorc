@@ -1,4 +1,6 @@
-import { harnessCatalog, isHarnessId } from "@openorc/protocol";
+import { defaultHarnessId, harnessCatalog, harnessShortName, isHarnessId, type AgentKind, type Run, type ThreadSummary } from "@openorc/protocol";
+import { isImageGeneration } from "./image-activity.js";
+import type { RunTranscript } from "./transcript.js";
 
 const CONVERSATION_REASONS = {
   compacting: "Wait for the conversation to finish compacting.",
@@ -37,4 +39,24 @@ export function conversationSendDisabledReason(input: { permissionReady: boolean
   if (input.historyFailed) return CONVERSATION_REASONS.failedHistory;
   if (!input.hasModel) return CONVERSATION_REASONS.missingModel;
   return null;
+}
+
+/**
+ * Whether a conversation's newest process is attached, and whether the conversation is busy: a turn, background work,
+ * an image being made, a compaction. A thread says for itself; a task's conversation is busy while a reply streams.
+ */
+export function conversationActivity(input: { thread: Pick<ThreadSummary, "activity"> | null; activeRun: Run | undefined; liveTranscript: RunTranscript | undefined; compacting: boolean }) {
+  const { liveTranscript } = input;
+  const live = Boolean(input.activeRun && liveTranscript?.live);
+  const generatingImage = Boolean(liveTranscript?.blocks.some((b) => isImageGeneration(b) && b.kind === "activity" && b.status === "running"));
+  const replying = live && Boolean(liveTranscript?.blocks.some((b) => b.kind === "message" && b.role === "assistant" && b.streaming));
+  const working = generatingImage || input.compacting || (input.thread ? input.thread.activity !== "idle" : replying);
+  return { live, working, generatingImage };
+}
+
+/** What the empty prompt invites: a message to the agent, one for the running turn, or one for after it. */
+export function conversationPlaceholder({ firstTaskRun, working, canSteer, agent }: { firstTaskRun: boolean; working: boolean; canSteer: boolean; agent: AgentKind | undefined }): string {
+  if (firstTaskRun) return "Add direction, or send to start this task…";
+  if (working) return canSteer ? "Say it during this turn…" : "Queue a message for when it finishes…";
+  return `Message ${harnessShortName(agent ?? defaultHarnessId)}…`;
 }

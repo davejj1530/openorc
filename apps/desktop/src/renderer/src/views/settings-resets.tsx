@@ -1,7 +1,7 @@
 import type { ProviderUsage, ResetInventory } from "@openorc/protocol";
 import { Button } from "../components/ui";
 import { CodexResetDialog, useCodexReset, type CodexReset } from "../components/CodexReset";
-import { formatUsageTime } from "../lib/provider-usage";
+import { formatUsageTime } from "@openorc/client";
 
 export function ResetControls({ report, stale }: { report: ProviderUsage; stale: boolean }) {
   const reset = useCodexReset(report);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { allowanceState, usageResetLabel, weeklyWindow } from "./provider-usage";
+import { allowanceState, usageResetLabel, weeklyWindow } from "./provider-usage.js";
 const report = { id: "5h", label: "5-hour", usedPercent: 50, remainingPercent: 50, resetsAt: 2_000_000, observedAt: 1_000_000, exhausted: false };
 describe("usage freshness", () => {
   it("marks old and expired reports stale without inferring a reset to zero", () => {

@@ -1,6 +1,6 @@
 import { harnessCatalog, harnessFailsToStart, isHarnessId, type ExtractionProviderChoice, type HarnessInfo, type ProviderUsage, type RpcResults, type SlackStatus } from "@openorc/protocol";
 import { extractionSummary } from "../lib/memory-extraction";
-import { allowanceState, formatUsageTime } from "../lib/provider-usage";
+import { allowanceState, formatUsageTime } from "@openorc/client";
 
 export function installationLabel(loaded: boolean, installed: boolean): string {
   if (!loaded) return "Checking…";

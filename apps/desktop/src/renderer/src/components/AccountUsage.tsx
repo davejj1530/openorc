@@ -1,7 +1,7 @@
 import { Popover } from "@base-ui/react/popover";
 import { DEFAULT_CLAUDE_ACCOUNT, harnessCatalog, isHarnessId, type ProviderUsage } from "@openorc/protocol";
 import { CoversPreview } from "../lib/browser-preview";
-import { percentLeft, weeklyWindow } from "../lib/provider-usage";
+import { percentLeft, weeklyWindow } from "@openorc/client";
 import { useRpc } from "../lib/client";
 import { useRouter } from "../lib/router";
 import { floatingGround } from "../lib/use-anchor-ground";

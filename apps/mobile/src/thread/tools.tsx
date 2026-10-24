@@ -1,7 +1,7 @@
 import { activityIdOf, isCheckCommand, isImageView, liveVerb, stateLabel, toolCallPresentation, toolIntent, toolResult, type Block, type ToolIconName } from "@openorc/client";
 import { router } from "expo-router";
 import { memo, useRef, type ComponentType } from "react";
-import { Pressable, View } from "react-native";
+import { Keyboard, View } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 import {
   Check,
@@ -31,14 +31,19 @@ import { Spinner } from "../ui/Spinner";
 import { Text } from "../ui/Text";
 import { ImageTile } from "./images";
 import { useOpen } from "./disclosure";
+import { TranscriptPressable } from "./TranscriptPressable";
 
 export type ToolBlock = Extract<Block, { kind: "tool" }>;
 
 /** How the phone draws each tool icon the transcript logic names. */
 export const toolIcons = { Check, FileText, Globe, Hammer, Search, WorkCommand, WorkDelegate, WorkEdit, WorkMessage, WorkRead, WorkSearch } satisfies Record<ToolIconName, ComponentType<IconProps>>;
 
-/** Opens a call's detail in the tool sheet. The sheet reads the call from the run, so it follows it live. */
+/**
+ * Opens a call's detail in the tool sheet. The sheet reads the call from the run, so it follows it live. The keyboard
+ * goes first, as it would cover the sheet's lower part.
+ */
 export function openTool(block: ToolBlock, runId: string) {
+  Keyboard.dismiss();
   router.push({ pathname: "/tool", params: { runId: block.runId ?? runId, id: block.id } });
 }
 
@@ -61,7 +66,7 @@ const PlainToolRow = memo(function PlainToolRow({ block, runId }: { block: ToolB
   const label = block.done ? verb : liveVerb(verb);
   return (
     <View>
-      <Pressable
+      <TranscriptPressable
         accessibilityRole="button"
         accessibilityLabel={[label, object].filter(Boolean).join(" ")}
         onPress={() => openTool(block, runId)}
@@ -76,7 +81,7 @@ const PlainToolRow = memo(function PlainToolRow({ block, runId }: { block: ToolB
           </Text>
         ) : null}
         <ToolStatus block={block} />
-      </Pressable>
+      </TranscriptPressable>
       {block.progress ? <Text className="ml-6 text-xs leading-4.5 text-ink-4">{block.progress}</Text> : null}
     </View>
   );
@@ -123,7 +128,7 @@ export const CommandCard = memo(function CommandCard({ block, runId, inset = fal
   const state = toolState(block);
   const line = commandLine(block);
   return (
-    <Pressable
+    <TranscriptPressable
       accessibilityRole="button"
       accessibilityLabel={`${block.done ? "Ran" : liveVerb("Ran")} ${command}${state === "running" || state === "success" ? "" : `, ${stateLabel(state)}`}`}
       onPress={() => openTool(block, runId)}
@@ -142,7 +147,7 @@ export const CommandCard = memo(function CommandCard({ block, runId, inset = fal
         </Text>
       ) : null}
       {block.progress ? <Text className="pl-6 font-mono text-xs leading-4.5 text-ink-4">{block.progress}</Text> : null}
-    </Pressable>
+    </TranscriptPressable>
   );
 });
 
@@ -168,12 +173,12 @@ export const ThinkingRow = memo(function ThinkingRow({ block }: { block: Extract
   const text = block.text.trim();
   return (
     <View>
-      <Pressable
+      <TranscriptPressable
         accessibilityRole="button"
         accessibilityState={text ? { expanded: open } : undefined}
         disabled={!text}
         onPress={() => setOpen(!open)}
-        className="h-8 flex-row items-center gap-2 active:opacity-60"
+        className="min-h-touch flex-row items-center gap-2 active:opacity-60"
       >
         {live ? <Spinner /> : <Lightbulb size={16} className="text-ink-4" />}
         <Text className="text-ink-4">{thoughtWords(block)}</Text>
@@ -182,14 +187,14 @@ export const ThinkingRow = memo(function ThinkingRow({ block }: { block: Extract
             <ChevronDown size={14} className="text-ink-4" />
           </View>
         ) : null}
-      </Pressable>
+      </TranscriptPressable>
       {text && open ? (
         <View className="mb-1 ml-2 gap-2 border-line pl-3" style={{ borderLeftWidth: 1.5 }}>
           {text
             .split(/\n\s*\n/)
             .filter((paragraph) => paragraph.trim())
             .map((paragraph, index) => (
-              <Text key={index} className="leading-5.5 text-ink-4">
+              <Text key={index} prose className="leading-5.5 text-ink-4">
                 {paragraph}
               </Text>
             ))}
@@ -214,7 +219,12 @@ function ImageViewRow({ block, runId }: { block: Extract<Block, { kind: "activit
   const failed = block.status === "error";
   return (
     <View>
-      <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => setOpen(!open)} className="min-h-control-row flex-row items-center gap-2 active:opacity-60">
+      <TranscriptPressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        onPress={() => setOpen(!open)}
+        className="min-h-control-row flex-row items-center gap-2 active:opacity-60"
+      >
         <ImageIcon size={16} className={failed ? "text-bad" : "text-ink-4"} />
         <Text className={cn("text-ink-4", failed && "text-bad")}>{viewWords(block.status)}</Text>
         {name ? (
@@ -226,7 +236,7 @@ function ImageViewRow({ block, runId }: { block: Extract<Block, { kind: "activit
         <View style={{ transform: [{ rotate: open ? "90deg" : "0deg" }] }}>
           <ChevronRight size={12} className="text-ink-4" />
         </View>
-      </Pressable>
+      </TranscriptPressable>
       {open && block.status === "success" && name ? (
         <View className="ml-6 mt-1">
           <ImageTile asset={{ kind: "activity", runId: block.runId ?? runId, activityId: activityIdOf(block.id) }} label={name} />
@@ -250,7 +260,7 @@ function Activity({ block }: { block: Extract<Block, { kind: "activity" }> }) {
   const finishedAgent = block.status === "success" && /agent|finished|completed/i.test(block.label);
   return (
     <View>
-      <Pressable
+      <TranscriptPressable
         accessibilityRole="button"
         accessibilityState={expandable ? { expanded: open } : undefined}
         disabled={!expandable}
@@ -266,8 +276,12 @@ function Activity({ block }: { block: Extract<Block, { kind: "activity" }> }) {
             <ChevronRight size={12} className="text-ink-4" />
           </View>
         ) : null}
-      </Pressable>
-      {showText ? <Text className="ml-6 text-ink-3">{block.text}</Text> : null}
+      </TranscriptPressable>
+      {showText ? (
+        <Text prose className="ml-6 text-ink-3">
+          {block.text}
+        </Text>
+      ) : null}
     </View>
   );
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emptyRowMemo, fixedHeight, newestRow, transcriptRows, unsentRows, type Row } from "./rows";
+import { emptyRowMemo, endMark, fixedHeight, isNews, newestRow, transcriptRows, unsentRows, type Row } from "./rows";
 import { activity, finishedTurn, runStore, type Draft } from "./test-fixtures/run-store";
 
 const outline = (rows: Row[]) => rows.map((row) => row.key);
@@ -146,7 +146,7 @@ describe("transcriptRows", () => {
     expect(ended.filter((row, i) => row !== progressed[i]).map((row) => row.kind)).toEqual(["head", "work", "presence"]);
   });
 
-  it("spaces turns in the desktop's rhythm: 28 under a prompt, 14 between a turn's parts, 24 before the next turn", () => {
+  it("spaces turns in the desktop's rhythm: 28 under a prompt, 14 between a turn's parts, 24 before the next turn, the work's receipt keeping its own 14 around it", () => {
     const { frame } = runStore();
     frame(...finishedTurn);
     const run = frame(
@@ -159,14 +159,39 @@ describe("transcriptRows", () => {
     expect(rows.map((row) => [row.kind, row.gap])).toEqual([
       ["prompt", 24],
       ["head", 28],
-      ["work", 14],
-      ["reply", 14],
+      ["work", 0],
+      ["reply", 0],
       ["actions", 10],
       ["prompt", 24],
       ["head", 28],
       ["reply", 14],
       ["actions", 10],
       ["presence", 14],
+    ]);
+  });
+
+  it("lets the space under a turn's work be its receipt's, so the next turn and the agent's presence sit their usual distance below", () => {
+    const { frame } = runStore();
+    const run = frame(
+      { type: "session.started", agent: "codex", externalSessionId: "s", model: "gpt", tools: [] },
+      { type: "turn.started", turnId: "t1" },
+      { type: "message.completed", messageId: "ask-1", role: "user", text: "List the folder" },
+      { type: "tool.started", toolCallId: "ls", name: "commandExecution", input: { command: "ls" }, parentToolCallId: null },
+      { type: "tool.completed", toolCallId: "ls", name: "commandExecution", output: "a", isError: false },
+      { type: "turn.completed", turnId: "t1", status: "cancelled", durationMs: 500 },
+      { type: "turn.started", turnId: "t2" },
+      { type: "message.completed", messageId: "ask-2", role: "user", text: "Run the tests" },
+      { type: "tool.started", toolCallId: "test", name: "commandExecution", input: { command: "pnpm test" }, parentToolCallId: null },
+    );
+    const rows = transcriptRows(run.blocks, activity(run), "r", emptyRowMemo());
+    expect(rows.map((row) => [row.kind, row.gap])).toEqual([
+      ["prompt", 24],
+      ["head", 28],
+      ["work", 0],
+      ["prompt", 10],
+      ["head", 28],
+      ["work", 0],
+      ["presence", 0],
     ]);
   });
 
@@ -263,6 +288,26 @@ describe("transcriptRows", () => {
     const rows = transcriptRows(run.blocks, activity(run), "r", memo);
     expect(rows.at(-1)?.kind).toBe("presence");
     expect(newestRow(rows)?.key).toBe("reply:reply-2:0");
+  });
+
+  it("counts a streaming reply growing inside its row as news, as well as a new row", () => {
+    const { frame } = runStore();
+    frame(...finishedTurn);
+    const memo = emptyRowMemo();
+    let run = frame(
+      { type: "turn.started", turnId: "t2" },
+      { type: "message.completed", messageId: "ask-2", role: "user", text: "More" },
+      { type: "message.delta", messageId: "reply-2", role: "assistant", text: "Wor" },
+    );
+    let rows = transcriptRows(run.blocks, activity(run), "r", memo);
+    const seen = endMark(rows, run.blocks);
+    expect(isNews(seen, seen)).toBe(false);
+    run = frame({ type: "message.delta", messageId: "reply-2", role: "assistant", text: "king on it" });
+    rows = transcriptRows(run.blocks, activity(run), "r", memo);
+    const grown = endMark(rows, run.blocks);
+    expect(grown.row).toBe(seen.row);
+    expect(isNews(seen, grown)).toBe(true);
+    expect(isNews(null, grown)).toBe(false);
   });
 
   it("gives the list the exact height of the rows that never change theirs, and leaves the rest to be measured", () => {

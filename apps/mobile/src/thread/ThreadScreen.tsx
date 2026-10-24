@@ -2,11 +2,12 @@ import type { LegendListRef } from "@legendapp/list/react-native";
 import { useKeyboardChatComposerInset } from "@legendapp/list/keyboard";
 import { conversationActivity, conversationSendDisabledReason, processFit, type SubmitRequest } from "@openorc/client";
 import type { Run, ThreadSummary } from "@openorc/protocol";
-import { Stack, useLocalSearchParams } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
-import { View } from "react-native";
+import { Pressable, View } from "react-native";
 import type { SharedValue } from "react-native-reanimated";
-import { client, useRpc } from "../client";
+import { client, useLinkState, useRpc } from "../client";
+import type { LinkState } from "../connection/manager";
 import { Composer } from "../composer/Composer";
 import { useShareSettings } from "../composer/settings-bridge";
 import { useCoverHome } from "../home/home-cover";
@@ -16,11 +17,16 @@ import { holdTranscriptList, perfEnabled, reportThreadOpened } from "./perf-prob
 import { PerfProbe } from "./PerfProbe";
 import { createDisclosure, DisclosureContext } from "./disclosure";
 import { useMarkSeen } from "./mark-seen";
-import { ThreadTitle, ThreadStop } from "./ThreadHeader";
+import { useSnoozeClock } from "./snooze-clock";
+import { threadMenu } from "./thread-actions";
+import { ThreadTitle } from "./ThreadHeader";
+import { headerMenu } from "./ThreadMenu";
 import { Transcript } from "./Transcript";
+import { useThreadActions } from "./use-thread-actions";
 import { VoicesContext, type Voice } from "./voices";
 
 const NO_RUNS: Run[] = [];
+const goBack = () => router.back();
 
 /** Each run's agent and model for the turn heads, named as the catalog names the model. */
 function useVoices(runs: Run[]): ReadonlyMap<string, Voice> {
@@ -40,17 +46,32 @@ interface PaneProps {
   thread: ThreadSummary | null;
   runs: Run[];
   loading: boolean;
+  /** The Mac could not list the thread's runs; `retry` asks again. */
+  failed: boolean;
+  retry: () => void;
   onActivity: (activity: Activity) => void;
   composerInset: SharedValue<number>;
   listRef: RefObject<LegendListRef | null>;
   followKey: number;
 }
 
+/** History that would not load: one quiet line and a way to ask again. */
+function LoadFailed({ retry }: { retry: () => void }) {
+  return (
+    <View className="flex-1 items-center justify-center gap-1">
+      <Text className="text-ink-4">Couldn’t load this thread</Text>
+      <Pressable accessibilityRole="button" onPress={retry} className="min-h-touch justify-center rounded-full px-4 active:bg-surface-2">
+        <Text className="text-ink-2">Retry</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 /**
  * The conversation itself, and the only part of the screen that hears every streamed frame: the header and the
  * composer hear only when the conversation starts or stops being busy.
  */
-function TranscriptPane({ threadId, thread, runs, loading, onActivity, composerInset, listRef, followKey }: PaneProps) {
+function TranscriptPane({ threadId, thread, runs, loading, failed, retry, onActivity, composerInset, listRef, followKey }: PaneProps) {
   const { merged, liveTranscript, hasOlder, loadOlder } = client.useConversationTranscript({ runs, threadId });
   const { live, working, generatingImage } = conversationActivity({ thread, activeRun: runs.at(-1), liveTranscript, compacting: false });
   useEffect(() => onActivity({ live, working, generatingImage }), [live, working, generatingImage, onActivity]);
@@ -59,6 +80,7 @@ function TranscriptPane({ threadId, thread, runs, loading, onActivity, composerI
   useEffect(() => {
     if (blocks?.length) reportThreadOpened(threadId, blocks.length);
   }, [threadId, blocks?.length]);
+  if (failed && !blocks?.length) return <LoadFailed retry={retry} />;
   if (!merged || !blocks?.length) return <View className="flex-1 items-center justify-center">{loading || runs.length ? <Spinner /> : <Text className="text-ink-4">Nothing yet</Text>}</View>;
   return (
     <Transcript
@@ -79,8 +101,20 @@ function TranscriptPane({ threadId, thread, runs, loading, onActivity, composerI
 }
 
 /**
+ * Why nothing can be sent while the phone has no session with the Mac. A first connect on its way may still carry a
+ * message; a retry after trouble is not counted on.
+ */
+function linkReason(state: LinkState): string | null {
+  if (state.kind === "connected" || state.kind === "unpaired") return null;
+  if (state.kind === "connecting" && state.why === null) return null;
+  return `Not connected to ${state.mac.name}`;
+}
+
+/**
  * A thread on the phone: its conversation at phone size, from the newest turn back a page at a time, with the composer
- * pinned above the keyboard. The send tree, the paging and the settings are the desktop's, from @openorc/client.
+ * pinned above the keyboard. The send tree, the paging and the settings are the desktop's, from @openorc/client. The
+ * header's More menu organizes the thread; marking it unread goes back to Home, since reading it here would mark it
+ * read again.
  */
 export function ThreadScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -96,14 +130,20 @@ export function ThreadScreen() {
   const voices = useVoices(runs);
   const [disclosure] = useState(createDisclosure);
   const [{ live, working, generatingImage }, setActivity] = useState(IDLE);
+  const actions = useThreadActions(thread, { onUnread: goBack });
+  const now = useSnoozeClock();
+  const menu = useMemo(() => thread && headerMenu(threadMenu(thread, "header", now), actions.run), [thread, actions.run, now]);
+  const linkState = useLinkState();
 
   const { canSteer } = processFit({ live, activeRun, choice: settings.choice, mode: settings.mode, permission: settings.permission, compacting: false });
-  const disabledReason = conversationSendDisabledReason({
-    permissionReady: settings.permissionReady,
-    historyLoading: runsQuery.isLoading,
-    historyFailed: Boolean(runsQuery.error),
-    hasModel: Boolean(settings.choice),
-  });
+  const disabledReason =
+    linkReason(linkState) ??
+    conversationSendDisabledReason({
+      permissionReady: settings.permissionReady,
+      historyLoading: runsQuery.isLoading,
+      historyFailed: Boolean(runsQuery.error),
+      hasModel: Boolean(settings.choice),
+    });
   const request: Omit<SubmitRequest, "now"> = {
     target: { kind: "thread", threadId: id },
     working,
@@ -128,12 +168,8 @@ export function ThreadScreen() {
 
   return (
     <View className="flex-1 bg-bg">
-      <Stack.Screen
-        options={{
-          headerTitle: () => <ThreadTitle thread={thread} />,
-          headerRight: () => (live && working && activeRun ? <ThreadStop runId={activeRun.id} /> : null),
-        }}
-      />
+      <Stack.Screen options={{ headerTitle: () => <ThreadTitle thread={thread} onRename={actions.rename} /> }} />
+      {menu}
       <DisclosureContext.Provider value={disclosure}>
         <VoicesContext.Provider value={voices}>
           <TranscriptPane
@@ -141,6 +177,8 @@ export function ThreadScreen() {
             thread={thread}
             runs={runs}
             loading={runsQuery.isLoading}
+            failed={Boolean(runsQuery.error)}
+            retry={() => void runsQuery.refetch()}
             onActivity={setActivity}
             composerInset={contentInsetEndAdjustment}
             listRef={listRef}

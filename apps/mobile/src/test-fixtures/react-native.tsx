@@ -16,8 +16,8 @@ export interface NativeProps {
 /** The window the views lay out in; a test sets the reader's text size here. */
 export const screen = { width: 390, height: 844, scale: 3, fontScale: 1 };
 
-/** Where each view sits in the view `measureLayout` measures against; a test places views here. */
-export const placed = { y: (_view: Element): number => 0 };
+/** Where each view sits in the view `measureLayout` measures against, and how tall it is; a test places views here. */
+export const placed = { y: (_view: Element): number => 0, height: (_view: Element): number => 0 };
 
 /** The phone props each element on screen was last drawn with, so a test reads styles and calls handlers. */
 export const nativeProps = new WeakMap<Element, NativeProps>();
@@ -35,17 +35,20 @@ export function flatStyle(style: unknown): Record<string, unknown> {
 function host(tag: string) {
   return forwardRef(function Host(props: NativeProps, ref: Ref<unknown>) {
     const node = useRef<HTMLElement>(null);
-    useImperativeHandle(ref, () =>
-      Object.assign(node.current!, {
-        measureLayout: (_relativeTo: unknown, onSuccess: (x: number, y: number, width: number, height: number) => void) => onSuccess(0, placed.y(node.current!), screen.width, 0),
-        scrollTo: () => undefined,
-      }),
-    );
+    // Every view measures, held by a ref or not: a focus event's target is the view itself.
     useLayoutEffect(() => {
       nativeProps.set(node.current!, props);
+      Object.assign(node.current!, {
+        measureLayout: (_relativeTo: unknown, onSuccess: (x: number, y: number, width: number, height: number) => void) =>
+          onSuccess(0, placed.y(node.current!), screen.width, placed.height(node.current!)),
+        scrollTo: () => undefined,
+      });
     });
+    useImperativeHandle(ref, () => node.current!);
     // As on the phone, a view reports its layout once, after the whole tree it mounted in has.
-    useEffect(() => nativeProps.get(node.current!)?.onLayout?.({ nativeEvent: { layout: { x: 0, y: 0, width: screen.width, height: screen.height } } }), []);
+    useEffect(() => {
+      nativeProps.get(node.current!)?.onLayout?.({ nativeEvent: { layout: { x: 0, y: 0, width: screen.width, height: screen.height } } });
+    }, []);
     const { children, accessibilityLabel, accessibilityRole, accessibilityState, disabled, onPress } = props;
     return createElement(
       tag,
@@ -54,6 +57,7 @@ function host(tag: string) {
         role: accessibilityRole,
         "aria-label": accessibilityLabel,
         "aria-expanded": accessibilityState?.expanded,
+        "aria-disabled": accessibilityState?.disabled,
         disabled: tag === "button" ? Boolean(disabled) : undefined,
         onClick: onPress,
       },
@@ -70,7 +74,21 @@ export const Image = host("img");
 export const Modal = host("div");
 export const TextInput = host("input");
 
+type AlertButton = { text?: string; style?: string; onPress?: (value?: string) => void };
+/** Alerts and prompts the app showed, newest last; a test presses their buttons. */
+export const alerts: { title: string; message?: string; buttons?: AlertButton[]; defaultValue?: string }[] = [];
+export const Alert = {
+  alert: (title: string, message?: string, buttons?: AlertButton[]) => void alerts.push({ title, message, buttons }),
+  prompt: (title: string, message?: string, buttons?: AlertButton[], _type?: string, defaultValue?: string) => void alerts.push({ title, message, buttons, defaultValue }),
+};
+
+/** What the app said to VoiceOver, in order. */
+export const announced: string[] = [];
+export const AccessibilityInfo = { announceForAccessibility: (text: string) => void announced.push(text) };
 export const Dimensions = { get: () => screen };
+/** Whether the keyboard is up: a test raises it, and `Keyboard.dismiss` puts it away. */
+export const keyboard = { up: false };
+export const Keyboard = { dismiss: () => void (keyboard.up = false) };
 export const useWindowDimensions = () => screen;
 export const StyleSheet = { create: <T,>(styles: T) => styles, hairlineWidth: 1 / 3, absoluteFill: {} };
 export const AppState = { currentState: "active", addEventListener: () => ({ remove: () => undefined }) };

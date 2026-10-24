@@ -2,14 +2,18 @@
 import { workEntries } from "@openorc/client";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
+import { keyboard, nativeProps } from "../test-fixtures/react-native";
 import { createDisclosure, DisclosureContext } from "./disclosure";
 import { emptyRowMemo, transcriptRows, type Row } from "./rows";
 import { activity, finishedTurn, type Draft, type runStore } from "./test-fixtures/run-store";
 import { WorkRow } from "./WorkRow";
 
-const work = vi.hoisted(() => ({ store: null as ReturnType<typeof runStore> | null }));
+const work = vi.hoisted(() => ({ store: null as ReturnType<typeof runStore> | null, pushed: [] as { href: unknown; keyboardUp: boolean }[] }));
 
-vi.mock("expo-router", () => ({ router: { push: () => undefined } }));
+vi.mock("expo-router", async () => {
+  const { keyboard } = await import("../test-fixtures/react-native");
+  return { router: { push: (href: unknown) => void work.pushed.push({ href, keyboardUp: keyboard.up }) } };
+});
 vi.mock("./Markdown", () => ({ Markdown: ({ text }: { text: string }) => <div>{text}</div> }));
 vi.mock("../client", async () => {
   const { runStore } = await import("./test-fixtures/run-store");
@@ -20,6 +24,7 @@ vi.mock("../client", async () => {
 afterEach(() => {
   cleanup();
   work.store!.client.runs.reset();
+  work.pushed.length = 0;
 });
 
 type WorkRowProps = Extract<Row, { kind: "work" }>;
@@ -77,4 +82,68 @@ it("leaves a finished step alone while the live one changes", () => {
   );
   expect(read).toHaveBeenCalled();
   expect(read).not.toHaveBeenCalledWith(`phase:${finished}`);
+});
+
+it("stays open when the turn ends once the reader has pressed inside the live work, and folds otherwise", () => {
+  workRow(...finishedTurn);
+  const live = workRow(
+    { type: "turn.started", turnId: "t3" },
+    { type: "message.completed", messageId: "ask-3", role: "user", text: "Run the tests" },
+    { type: "thinking.delta", messageId: "plan", text: "**Running the tests**\n\nFirst the unit tests." },
+    { type: "tool.started", toolCallId: "test", name: "commandExecution", input: { command: "pnpm test" }, parentToolCallId: null },
+  );
+  const disclosure = createDisclosure();
+  const view = render(
+    <DisclosureContext.Provider value={disclosure}>
+      <WorkRow row={live} />
+    </DisclosureContext.Provider>,
+  );
+  const chip = () => screen.queryByRole("button", { name: "pnpm test" });
+  act(() => chip()!.click());
+  const done = workRow(
+    { type: "tool.completed", toolCallId: "test", name: "commandExecution", output: "ok", isError: false },
+    { type: "message.completed", messageId: "reply-3", role: "assistant", text: "Green." },
+    { type: "turn.completed", turnId: "t3", status: "success", durationMs: 2_000 },
+  );
+  view.rerender(
+    <DisclosureContext.Provider value={disclosure}>
+      <WorkRow row={done} />
+    </DisclosureContext.Provider>,
+  );
+  const work = () => screen.getByRole("button", { name: /step/ }).getAttribute("aria-expanded");
+  expect(work()).toBe("true");
+
+  view.rerender(
+    <DisclosureContext.Provider value={createDisclosure()}>
+      <WorkRow row={done} />
+    </DisclosureContext.Provider>,
+  );
+  expect(work()).toBe("false");
+  expect(chip()).toBeNull();
+});
+
+it("puts the keyboard away before a call's sheet opens, as it would cover the sheet's lower part", () => {
+  workRow(...finishedTurn);
+  const row = workRow(
+    { type: "turn.started", turnId: "t4" },
+    { type: "message.completed", messageId: "ask-4", role: "user", text: "Lint it" },
+    { type: "thinking.delta", messageId: "lint", text: "**Linting**\n\nRunning the linter." },
+    { type: "tool.started", toolCallId: "lint", name: "commandExecution", input: { command: "pnpm lint" }, parentToolCallId: null },
+  );
+  render(<WorkRow row={row} />);
+  keyboard.up = true;
+  act(() => screen.getByRole("button", { name: "pnpm lint" }).click());
+  expect(work.pushed).toEqual([{ href: { pathname: "/tool", params: { runId: "r", id: expect.any(String) } }, keyboardUp: false }]);
+});
+
+it("gives the work's receipt a 44 pt row of its own, the space around its line inside it, reaching into no other row", () => {
+  const row = workRow(...finishedTurn);
+  const view = render(<WorkRow row={row} />);
+  const classes = () => String(nativeProps.get(screen.getByRole("button", { name: /step/ }))!.className).split(" ");
+  expect(classes()).toEqual(expect.arrayContaining(["min-h-touch", "py-3.5"]));
+  expect(classes().filter((name) => /^-m[tby]?-/.test(name))).toEqual([]);
+  // What shows under the receipt keeps the space to the next row, which the list leaves to the work.
+  act(() => screen.getByRole("button", { name: /step/ }).click());
+  const below = view.container.firstElementChild!.lastElementChild!;
+  expect(String(nativeProps.get(below)!.className).split(" ")).toContain("pb-3.5");
 });

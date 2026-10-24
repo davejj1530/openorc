@@ -1,12 +1,12 @@
 import { modelChoiceFor, pickerCatalog, pickerSettings, providerGroups, catalogModel } from "@openorc/client";
 import { effortLabel, harnessShortName, isHarnessId, type ModelOption } from "@openorc/protocol";
-import * as Haptics from "expo-haptics";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { Pressable, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRpc } from "../client";
 import { Check } from "../generated/icons";
 import { cn } from "../ui/cn";
+import { haptic } from "../ui/haptics";
 import { HarnessLogo } from "../ui/HarnessLogo";
 import { Text } from "../ui/Text";
 import { useSharedSettings } from "./settings-bridge";
@@ -24,11 +24,11 @@ export function ModelSheet() {
   const agents = [...new Set(catalog.map((model) => model.agent))];
   const pick = (model: ModelOption) => {
     if (!settings || model.unavailable) return;
-    void Haptics.selectionAsync();
+    haptic.select();
     settings.selectModel(modelChoiceFor(model, choice));
   };
   return (
-    <ScrollView className="flex-1 bg-bg" contentContainerClassName="gap-5 px-5 pt-6" contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
+    <ScrollView className="flex-1 bg-bg" contentContainerClassName="gap-5 px-5 pt-6" contentContainerStyle={{ paddingBottom: insets.bottom + 24 }} onAccessibilityEscape={() => router.back()}>
       <Text accessibilityRole="header" className="text-xl">
         Model
       </Text>
@@ -41,8 +41,12 @@ export function ModelSheet() {
                 key={level}
                 accessibilityRole="radio"
                 accessibilityState={{ checked: level === effort }}
-                onPress={() => settings && choice && settings.selectModel({ ...choice, effort: level })}
-                className={cn("h-control-md flex-1 items-center justify-center rounded-full", level === effort && "bg-surface")}
+                onPress={() => {
+                  if (!settings || !choice || level === effort) return;
+                  haptic.select();
+                  settings.selectModel({ ...choice, effort: level });
+                }}
+                className={cn("min-h-touch flex-1 items-center justify-center rounded-full", level === effort && "bg-surface")}
               >
                 <Text className={cn("text-sm text-ink-3", level === effort && "text-ink")}>{effortLabel(level)}</Text>
               </Pressable>

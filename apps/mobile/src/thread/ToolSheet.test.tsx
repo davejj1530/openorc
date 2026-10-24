@@ -97,3 +97,14 @@ it("reads an output the page left out again once the link is back, loading meanw
   await act(async () => answers[1]!.resolve({ output: numbered(3) }));
   expect(drawnLines()).toEqual(["line 1", "line 2", "line 3"]);
 });
+
+it("copies the whole output as written, not the lines one piece of it draws", async () => {
+  const { copied } = await import("../test-fixtures/clipboard");
+  const output = `${numbered(300)}\n${"x".repeat(900)}`;
+  sheet.store!.frame(...call({ output }));
+  render(<ToolSheet />);
+  const copies = shown.getAllByRole("button", { name: "Copy" });
+  await act(async () => fireEvent.click(copies.at(-1)!));
+  expect(copied.at(-1)).toBe(output);
+  expect(shown.getByRole("button", { name: "Copied" })).toBeTruthy();
+});

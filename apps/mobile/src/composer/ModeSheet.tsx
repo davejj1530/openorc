@@ -1,9 +1,9 @@
 import { ExecutionMode, executionMode, executionModeAvailable, executionModePresentation, executionModeSettings } from "@openorc/protocol";
-import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
 import { Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Check, Lightbulb, Pencil, ShieldCheck, Wand } from "../generated/icons";
+import { haptic } from "../ui/haptics";
 import { Text } from "../ui/Text";
 import { useSharedSettings } from "./settings-bridge";
 
@@ -17,7 +17,7 @@ export function ModeSheet() {
   const agent = settings?.choice?.agent;
   const current = settings ? executionMode(settings.mode, settings.permission) : null;
   return (
-    <View className="gap-1 bg-bg px-5 pt-6" style={{ paddingBottom: insets.bottom + 16 }}>
+    <View className="gap-1 bg-bg px-5 pt-6" style={{ paddingBottom: insets.bottom + 16 }} onAccessibilityEscape={() => router.back()}>
       <Text accessibilityRole="header" className="mb-2 text-xl">
         Mode
       </Text>
@@ -33,7 +33,7 @@ export function ModeSheet() {
               accessibilityState={{ checked: mode === current }}
               onPress={() => {
                 if (!settings) return;
-                void Haptics.selectionAsync();
+                haptic.select();
                 settings.selectExecutionMode(executionModeSettings(mode));
                 router.back();
               }}

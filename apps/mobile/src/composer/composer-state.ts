@@ -1,4 +1,5 @@
 import { composerActions } from "@openorc/client";
+import type { Draft } from "./drafts";
 
 /** Everything the composer's controls are decided from. */
 export interface ComposerState {
@@ -38,3 +39,8 @@ export function composerControls(state: ComposerState) {
 }
 
 export type ComposerControls = ReturnType<typeof composerControls>;
+
+/** What a send that failed puts back: the text and images it took, ahead of anything written or attached since. */
+export function unsent(taken: Draft, since: Draft): Draft {
+  return { text: [taken.text, since.text].filter((text) => text.trim()).join("\n"), images: [...taken.images, ...since.images] };
+}

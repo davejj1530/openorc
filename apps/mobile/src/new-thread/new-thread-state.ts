@@ -1,5 +1,6 @@
 import { conversationSendDisabledReason, decodeNewThreadDraft, targetModel, type NewThreadDraft } from "@openorc/client";
 import { WORKSPACE_ID } from "@openorc/protocol";
+import { unsent } from "../composer/composer-state";
 import type { DraftImage } from "../composer/drafts";
 import type { ProjectChoice } from "../projects";
 
@@ -31,7 +32,8 @@ export function startBlocker(draft: Pick<SheetDraft, "target">, { permissionRead
   return conversationSendDisabledReason({ permissionReady, historyLoading: false, historyFailed: false, hasModel: Boolean(targetModel(draft.target)) });
 }
 
-/** A started thread took this prompt and these images; anything written or attached since stays for the next one. */
-export function afterStart(draft: SheetDraft, sent: { prompt: string; attachments: readonly string[] }): SheetDraft {
-  return { ...draft, prompt: draft.prompt.trim() === sent.prompt ? "" : draft.prompt, images: draft.images.filter((image) => !sent.attachments.includes(image.path)) };
+/** What a start that failed puts back: the prompt and images it took, ahead of anything written or attached since. */
+export function unstarted(taken: Pick<SheetDraft, "prompt" | "images">, since: SheetDraft): SheetDraft {
+  const { text, images } = unsent({ text: taken.prompt, images: taken.images }, { text: since.prompt, images: since.images });
+  return { ...since, prompt: text, images };
 }

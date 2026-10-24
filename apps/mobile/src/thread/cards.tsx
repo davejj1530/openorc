@@ -1,12 +1,12 @@
 import { activityIdOf, approvalDetail, approvalSummary, type Block, isImageGeneration, type Question, readQuestions } from "@openorc/client";
 import { harnessShortName, isHarnessId } from "@openorc/protocol";
-import * as Haptics from "expo-haptics";
-import { memo, useRef, useState } from "react";
-import { Pressable, TextInput, useWindowDimensions, View } from "react-native";
+import { createContext, memo, useContext, useRef, useState } from "react";
+import { Pressable, TextInput, useWindowDimensions, View, type FocusEvent, type HostInstance, type LayoutChangeEvent } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 import { client } from "../client";
 import { AlertCircle, Check, Hammer, Image as ImageIcon, Terminal, X } from "../generated/icons";
 import { cn } from "../ui/cn";
+import { haptic } from "../ui/haptics";
 import { HarnessLogo } from "../ui/HarnessLogo";
 import { useColors } from "../ui/mode";
 import { arrive, confirm, ease } from "../ui/motion";
@@ -17,6 +17,26 @@ import { ActivityRow, ToolRow } from "./tools";
 import { useVoice } from "./voices";
 
 type ApprovalBlock = Extract<Block, { kind: "approval" }>;
+
+/**
+ * Brings a focused answer field into view above the composer and the keyboard: by its card's block id, and how far the
+ * field's bottom sits above the card's.
+ */
+export const RevealCard = createContext<(blockId: string, belowField: number) => void>(() => undefined);
+
+/** A card's answer fields asking the transcript to keep the focused one in view: how far its bottom sits above the card's. */
+function useRevealField(blockId: string) {
+  const reveal = useContext(RevealCard);
+  const card = useRef<HostInstance>(null);
+  const height = useRef(0);
+  return {
+    card,
+    onCardLayout: (event: LayoutChangeEvent) => (height.current = event.nativeEvent.layout.height),
+    onFieldFocus: ({ currentTarget: field }: FocusEvent) => {
+      if (card.current && typeof field !== "number") field.measureLayout(card.current, (_x, y, _width, fieldHeight) => reveal(blockId, height.current - y - fieldHeight));
+    },
+  };
+}
 type Decision = "allow" | "allow_for_run" | "deny";
 
 /** Answers an agent's request once; a second tap while the answer is on its way does nothing. */
@@ -27,8 +47,7 @@ function useResolve(runId: string, approvalId: string) {
     error: resolve.error?.message ?? null,
     send(decision: Decision, answers?: Record<string, string[]>) {
       if (resolve.isPending) return;
-      void Haptics.notificationAsync(decision === "deny" ? Haptics.NotificationFeedbackType.Warning : Haptics.NotificationFeedbackType.Success);
-      resolve.mutate({ runId, approvalId, decision, ...(answers ? { answers } : {}) });
+      resolve.mutate({ runId, approvalId, decision, ...(answers ? { answers } : {}) }, { onSuccess: decision === "deny" ? haptic.warn : haptic.confirm, onError: haptic.fail });
     },
   };
 }
@@ -88,7 +107,7 @@ export function ApprovalCard({ block, runId }: { block: ApprovalBlock; runId: st
           <Text selectable className="font-mono text-xs leading-4 text-ink-4">
             {raw ? pretty(block.input, 800) : approvalSummary(block)}
           </Text>
-          <Pressable accessibilityRole="button" onPress={() => setRaw(!raw)} hitSlop={8} className="self-start active:opacity-60">
+          <Pressable accessibilityRole="button" onPress={() => setRaw(!raw)} hitSlop={{ top: 14, bottom: 14, left: 8, right: 8 }} className="self-start active:opacity-60">
             <Text className="text-xs leading-4 text-ink-4">{raw ? "Summary" : "Raw request"}</Text>
           </Pressable>
         </View>
@@ -122,13 +141,19 @@ function OptionCheck({ chosen, asked }: { chosen: boolean; asked: boolean }) {
   );
 }
 
+/** A settled option reads as text; an open one as a checkbox where several can be picked, else a radio. */
+function optionRole(settled: boolean, multi: boolean): "text" | "checkbox" | "radio" {
+  if (settled) return "text";
+  return multi ? "checkbox" : "radio";
+}
+
 /**
  * One option as a 44 pt r12 row. Picking it marks it with a check that lands with an overshoot; once the answer is
  * sent the chosen rows take the ink pill and the rest step back, one after another. A card that was already answered
  * when it mounted (`asked` false) shows its check at once.
  */
-function Option(props: { option: { label: string; description: string }; state: OptionState; index: number; asked: boolean; onPress: () => void }) {
-  const { option, state, index, asked, onPress } = props;
+function Option(props: { option: { label: string; description: string }; state: OptionState; index: number; asked: boolean; multi: boolean; onPress: () => void }) {
+  const { option, state, index, asked, multi, onPress } = props;
   const palette = useColors();
   const still = useReducedMotion();
   const background = { open: palette["surface-2"], picked: palette["surface-3"], chosen: palette.accent, dropped: palette["surface-2"] }[state];
@@ -144,7 +169,7 @@ function Option(props: { option: { label: string; description: string }; state: 
       }}
     >
       <Pressable
-        accessibilityRole={settled ? "text" : "radio"}
+        accessibilityRole={optionRole(settled, multi)}
         accessibilityState={{ checked: state === "picked" || chosen }}
         disabled={settled}
         onPress={onPress}
@@ -174,13 +199,20 @@ function QuestionFoot(props: { decided: string | undefined; asked: boolean; agen
   return (
     <View className="flex-row items-center gap-1.5">
       <Text className="min-w-0 flex-1 text-xs leading-4 text-ink-4">{props.hint}</Text>
-      <Pressable accessibilityRole="button" disabled={props.pending} onPress={props.onDecline} className="h-control-xl justify-center rounded-full px-3.5 active:bg-surface-2">
+      <Pressable
+        accessibilityRole="button"
+        disabled={props.pending}
+        onPress={props.onDecline}
+        hitSlop={{ top: 4, bottom: 4 }}
+        className="h-control-xl justify-center rounded-full px-3.5 active:bg-surface-2"
+      >
         <Text>Decline</Text>
       </Pressable>
       <Pressable
         accessibilityRole="button"
         disabled={!props.ready}
         onPress={props.onAnswer}
+        hitSlop={{ top: 4, bottom: 4 }}
         className={cn("h-control-xl justify-center rounded-full bg-accent px-4 active:opacity-80", !props.ready && "bg-surface-3")}
       >
         <Text className={cn("text-accent-fg", !props.ready && "text-ink-3")}>Answer</Text>
@@ -198,6 +230,7 @@ export function QuestionCard({ block, runId }: { block: ApprovalBlock; runId: st
   const [other, setOther] = useState<Record<string, string>>({});
   const asked = useRef(!block.decision).current;
   const decided = block.decision;
+  const revealField = useRevealField(block.id);
 
   const answerFor = (q: Question): string[] => {
     const chosen = (picked[q.key] ?? []).filter((value) => value !== "__other");
@@ -208,7 +241,7 @@ export function QuestionCard({ block, runId }: { block: ApprovalBlock; runId: st
   };
   const complete = questions.length > 0 && questions.every((q) => answerFor(q).length > 0);
   const toggle = (q: Question, value: string) => {
-    void Haptics.selectionAsync();
+    haptic.select();
     setPicked((state) => {
       const current = state[q.key] ?? [];
       if (q.multi) return { ...state, [q.key]: current.includes(value) ? current.filter((v) => v !== value) : [...current, value] };
@@ -230,7 +263,7 @@ export function QuestionCard({ block, runId }: { block: ApprovalBlock; runId: st
   };
 
   return (
-    <View className="gap-3 rounded-3xl bg-surface p-4">
+    <View ref={revealField.card} onLayout={revealField.onCardLayout} className="gap-3 rounded-3xl bg-surface p-4">
       {questions.map((q, i) => (
         <View key={q.key} className="gap-3">
           <View className="flex-row items-center gap-2">
@@ -239,7 +272,7 @@ export function QuestionCard({ block, runId }: { block: ApprovalBlock; runId: st
           </View>
           <View className="gap-1">
             {q.options?.map((option, index) => (
-              <Option key={option.label} option={option} index={index} asked={asked} state={stateOf(q, option.label)} onPress={() => toggle(q, option.label)} />
+              <Option key={option.label} option={option} index={index} asked={asked} multi={Boolean(q.multi)} state={stateOf(q, option.label)} onPress={() => toggle(q, option.label)} />
             ))}
             {!decided && q.allowOther ? (
               <TextInput
@@ -247,7 +280,10 @@ export function QuestionCard({ block, runId }: { block: ApprovalBlock; runId: st
                 placeholder={q.options ? "Something else" : "Your answer"}
                 secureTextEntry={q.secret}
                 value={other[q.key] ?? ""}
-                onFocus={() => q.options && !(picked[q.key] ?? []).includes("__other") && toggle(q, "__other")}
+                onFocus={(event) => {
+                  revealField.onFieldFocus(event);
+                  if (q.options && !(picked[q.key] ?? []).includes("__other")) toggle(q, "__other");
+                }}
                 onChangeText={(value) => setOther((state) => ({ ...state, [q.key]: value }))}
                 onSubmitEditing={submit}
                 returnKeyType="send"
@@ -288,7 +324,7 @@ function ErrorCard({ text }: { text: string }) {
       <View className="mt-0.5">
         <AlertCircle size={16} className="text-bad" />
       </View>
-      <Text selectable className="min-w-0 flex-1">
+      <Text prose selectable className="min-w-0 flex-1">
         {text.replace(/^API Error:\s*(\d+\s*)?/, "")}
       </Text>
     </View>

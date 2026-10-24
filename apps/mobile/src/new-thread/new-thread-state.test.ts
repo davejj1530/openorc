@@ -1,7 +1,7 @@
 import { WORKSPACE_ID } from "@openorc/protocol";
 import { describe, expect, it } from "vitest";
 import { projectChoices } from "../projects";
-import { afterStart, decodeSheetDraft, openingProject, startBlocker } from "./new-thread-state";
+import { decodeSheetDraft, openingProject, startBlocker, unstarted } from "./new-thread-state";
 
 const choices = projectChoices([
   { id: "openorc", name: "openorc" },
@@ -49,10 +49,10 @@ describe("the new thread sheet", () => {
     expect(startBlocker(broken, loaded)).toBe("This saved model selection cannot be restored. Choose a model again; your message and images are kept.");
   });
 
-  it("clears only what a started thread took", () => {
+  it("puts back what a refused start took, ahead of anything written or attached since", () => {
     const later = { path: "/attachments/later.jpg", preview: "file:///cache/later.jpg" };
-    const draft = { ...decodeSheetDraft("openorc", null), prompt: "Fix the build ", images: [image, later] };
-    expect(afterStart(draft, { prompt: "Fix the build", attachments: [image.path] })).toMatchObject({ prompt: "", images: [later] });
-    expect(afterStart({ ...draft, prompt: "Something else" }, { prompt: "Fix the build", attachments: [] })).toMatchObject({ prompt: "Something else", images: [image, later] });
+    const since = { ...decodeSheetDraft("openorc", null), mode: "plan" as const, prompt: "and the docs", images: [later] };
+    expect(unstarted({ prompt: "Fix the build", images: [image] }, since)).toMatchObject({ prompt: "Fix the build\nand the docs", images: [image, later], mode: "plan" });
+    expect(unstarted({ prompt: "Fix the build", images: [] }, { ...since, prompt: "  ", images: [] })).toMatchObject({ prompt: "Fix the build", images: [] });
   });
 });

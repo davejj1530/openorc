@@ -1,10 +1,10 @@
 import * as Clipboard from "expo-clipboard";
-import * as Haptics from "expo-haptics";
 import { memo, useEffect } from "react";
 import { Pressable, View } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 import { Check, Copy } from "../generated/icons";
 import { cn } from "../ui/cn";
+import { haptic } from "../ui/haptics";
 import { arrive, confirm } from "../ui/motion";
 import { Text } from "../ui/Text";
 import { useRowState } from "./row-state";
@@ -33,7 +33,7 @@ export const TurnActions = memo(function TurnActions({ row }: { row: ActionsRow 
     Clipboard.setStringAsync(text).then(
       () => {
         setState("copied");
-        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        haptic.tap();
       },
       () => setState("failed"),
     );

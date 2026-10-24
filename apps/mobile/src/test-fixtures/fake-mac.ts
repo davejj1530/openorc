@@ -17,7 +17,7 @@ export function fakeMac(answer: (method: RpcMethod, params: unknown) => Promise<
   };
   const client = createClientState(connection, { scheduleFrame: () => undefined, invalidationBatchMs: 0, randomId: () => "id", savesDefaultPermission: false });
   const saved = new Map<string, string>();
-  const storage = { getString: (key: string) => saved.get(key), set: (key: string, value: string) => void saved.set(key, value) };
+  const storage = { getString: (key: string) => saved.get(key), set: (key: string, value: string) => void saved.set(key, value), remove: (key: string) => saved.delete(key) };
   const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: client.queryClient }, children);
   return {
     saved,

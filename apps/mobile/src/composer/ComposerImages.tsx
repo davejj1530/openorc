@@ -14,7 +14,7 @@ export function ComposerImages({ images, uploading, onRemove }: { images: DraftI
             accessibilityRole="button"
             accessibilityLabel="Remove image"
             onPress={() => onRemove(image.path)}
-            hitSlop={8}
+            hitSlop={11}
             className="absolute right-1 top-1 size-5.5 items-center justify-center rounded-full bg-accent"
           >
             <X size={12} className="text-accent-fg" />

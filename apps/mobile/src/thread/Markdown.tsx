@@ -1,22 +1,25 @@
 import { citationLinks } from "@openorc/client";
-import * as Haptics from "expo-haptics";
 import { memo, useEffect, useMemo } from "react";
 import { Linking, StyleSheet } from "react-native";
 import { EnrichedMarkdownText, type LinkPressEvent } from "react-native-enriched-markdown";
 import remend from "remend";
+import { haptic } from "../ui/haptics";
+import { openInApp } from "../ui/web";
 import { useColors, useMode } from "../ui/mode";
 import { markdownStyle, type MarkdownTone } from "./markdown-style";
 import { countMarkdownMount } from "./perf-probe";
 
-/** A link the phone can follow. Files on the Mac read as references; the phone has no file panel to open them in. */
-const webLink = (url: string) => /^(https?:|mailto:)/i.test(url);
-
+/**
+ * A link the phone can follow: a web page in Safari over the thread, mail in Mail. Files on the Mac read as
+ * references; the phone has no file panel to open them in.
+ */
 function openLink({ url }: LinkPressEvent) {
-  if (webLink(url)) void Linking.openURL(url);
+  if (/^https?:/i.test(url)) openInApp(url);
+  else if (/^mailto:/i.test(url)) void Linking.openURL(url);
 }
 
 /** A copied code block confirms itself with the light tap the desktop shows as a check. */
-const copied = () => void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+const copied = haptic.tap;
 
 const streamingConfig = { tableMode: "progressive", codeBlockMode: "progressive" } as const;
 const remendOptions = { linkMode: "text-only" } as const;

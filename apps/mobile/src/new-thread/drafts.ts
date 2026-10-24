@@ -17,20 +17,22 @@ function read(projectId: string): SheetDraft {
 
 /**
  * A project's new thread, kept on the phone per Mac and project as the person writes and chooses, so closing the sheet,
- * switching projects or a start the Mac refuses keeps it.
+ * switching projects or a start the Mac refuses keeps it. Switching projects switches the draft in place.
  */
 export function useSheetDraft(projectId: string): [SheetDraft, (update: (draft: SheetDraft) => SheetDraft) => void] {
-  const [draft, setDraft] = useState(() => read(projectId));
+  const [shown, setShown] = useState(() => ({ projectId, draft: read(projectId) }));
+  // Another project: its own saved draft, read as the project changes.
+  if (shown.projectId !== projectId) setShown({ projectId, draft: read(projectId) });
   const update = useCallback(
     (change: (draft: SheetDraft) => SheetDraft) => {
       // The saved draft is the one to change: a start or an image can land after the sheet has closed.
       const next = change(read(projectId));
       storage.set(draftKey(projectId), JSON.stringify(next));
-      setDraft(next);
+      setShown({ projectId, draft: next });
     },
     [projectId],
   );
-  return [draft, update];
+  return [shown.projectId === projectId ? shown.draft : read(projectId), update];
 }
 
 /**

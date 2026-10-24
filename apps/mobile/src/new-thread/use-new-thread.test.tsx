@@ -4,6 +4,7 @@ import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { attachImage, pickImages } from "../composer/attachments";
 import type { DraftImage } from "../composer/drafts";
+import { KEYBOARD_LEFTOVER_MS } from "../composer/keyboard-leftover";
 import type { FakeMac } from "../test-fixtures/fake-mac";
 import { useNewThread } from "./use-new-thread";
 
@@ -32,7 +33,6 @@ vi.mock("../client", async () => {
   return mac.phone.module;
 });
 vi.mock("../composer/attachments", () => ({ pickImages: vi.fn(), attachImage: vi.fn() }));
-vi.mock("expo-haptics", () => ({ impactAsync: () => Promise.resolve(), ImpactFeedbackStyle: { Light: "light" } }));
 
 /** What the Mac answers about its harnesses and settings: Codex and Claude signed in, no default harness yet. */
 function macState({ signedIn = ["codex", "claude"], defaultHarness = null }: { signedIn?: HarnessId[]; defaultHarness?: HarnessId | null } = {}) {
@@ -73,7 +73,7 @@ const submit = async (sheet: Sheet) => {
 it("starts with the desktop's defaults and never names a folder", async () => {
   const sheet = open("openorc");
   await write(sheet, " Fix the build ");
-  expect(sheet.result.current.settings.choice).toEqual({ agent: "codex", model: "gpt-main", effort: "high" });
+  expect(sheet.result.current.settings.choice).toMatchObject({ agent: "codex", model: "gpt-main", effort: "high" });
   mac.start.mockResolvedValue({ thread: { id: "thread-1" } });
   expect(await submit(sheet)).toBe("thread-1");
   expect(sent()).toEqual({
@@ -155,6 +155,8 @@ it("branches in a project that got its first commit on the Mac after the sheet o
   expect(sent()).toMatchObject({ projectId: "later", workspaceMode: "worktree" });
 
   mac.git["later"] = "none";
+  // A full prompt right after a send reads as the keyboard's leftover autocorrection.
+  await new Promise((resolve) => setTimeout(resolve, KEYBOARD_LEFTOVER_MS));
   await write(sheet, "Try again in the folder");
   await submit(sheet);
   expect(sent()).toMatchObject({ projectId: "later", workspaceMode: "current" });
@@ -203,6 +205,46 @@ it("keeps the draft, its mode and permission through a start the Mac refuses, an
   mac.start.mockResolvedValue({ thread: { id: "thread-2" } });
   await submit(other);
   expect(sent()).toMatchObject({ projectId: "openorc", permissionMode: "autonomous" });
+});
+
+it("empties the prompt as it starts, so what is written meanwhile is not started again", async () => {
+  const sheet = open("openorc");
+  await write(sheet, "Fix the build");
+  let answer!: (result: { thread: { id: string } }) => void;
+  mac.start.mockReturnValue(new Promise((resolve) => (answer = resolve)));
+  let started!: Promise<string | null>;
+  act(() => void (started = sheet.result.current.submit()));
+  await waitFor(() => expect(mac.start).toHaveBeenCalled());
+  await new Promise((resolve) => setTimeout(resolve, KEYBOARD_LEFTOVER_MS));
+  act(() => sheet.result.current.setText(`${sheet.result.current.draft.prompt}and the docs`));
+  await act(async () => {
+    answer({ thread: { id: "thread-4" } });
+    await started;
+  });
+  expect(sheet.result.current.draft.prompt).toBe("and the docs");
+});
+
+it("keeps out the autocorrection iOS lands in the emptied prompt as it starts, but not what is typed next", async () => {
+  const sheet = open("openorc");
+  await write(sheet, "Fix teh");
+  mac.start.mockResolvedValue({ thread: { id: "thread-1" } });
+  vi.useFakeTimers({ toFake: ["Date"] });
+  try {
+    let started!: Promise<string | null>;
+    act(() => void (started = sheet.result.current.submit()));
+    // iOS had "the" pending for the last word, and puts the corrected prompt in the field the start just emptied, at once.
+    act(() => sheet.result.current.setText("Fix the"));
+    expect(sheet.result.current.draft.prompt).toBe("");
+    act(() => sheet.result.current.setText("A"));
+    expect(sheet.result.current.draft.prompt).toBe("A");
+    vi.setSystemTime(Date.now() + KEYBOARD_LEFTOVER_MS);
+    act(() => sheet.result.current.setText("And the docs"));
+    expect(sheet.result.current.draft.prompt).toBe("And the docs");
+    await act(async () => void (await started));
+    expect(sent()).toMatchObject({ prompt: "Fix teh" });
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 it("starts one thread however quickly Start is tapped again", async () => {
@@ -259,4 +301,14 @@ it("keeps the images that land after the sheet has closed", async () => {
     uploads[1]!(second);
   });
   expect(JSON.parse(mac.phone!.saved.get("newthread.mac-1.openorc")!)).toMatchObject({ images: [image, second] });
+});
+
+it("switches drafts in place when the project changes, keeping each project's own prompt", () => {
+  const sheet = renderHook((props: { projectId: string }) => useNewThread(props.projectId), { initialProps: { projectId: "openorc" }, wrapper: mac.phone!.wrapper });
+  act(() => sheet.result.current.setText("Fix the build"));
+  sheet.rerender({ projectId: "notes" });
+  expect(sheet.result.current.draft.prompt).toBe("");
+  act(() => sheet.result.current.setText("Tidy the notes"));
+  sheet.rerender({ projectId: "openorc" });
+  expect(sheet.result.current.draft.prompt).toBe("Fix the build");
 });

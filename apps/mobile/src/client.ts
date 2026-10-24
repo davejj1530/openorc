@@ -11,7 +11,8 @@ import { createAssetCache } from "./connection/asset-cache";
 import { linkHooks } from "./connection/link-hooks";
 import { ConnectionManager, type LinkState } from "./connection/manager";
 import { keychainKeys, openSocket, phoneCrypto, storedMacs, systemClock } from "./connection/native";
-import type { NetworkKind } from "./connection/saved-macs";
+import type { NetworkKind, SavedMac } from "./connection/saved-macs";
+import { forgetFolds } from "./home/fold-keys";
 import { forgetLists, keepLists, restoreLists } from "./lists-cache";
 import { timeFrame } from "./thread/perf-probe";
 
@@ -29,6 +30,7 @@ export const link = new ConnectionManager({
   deviceName: Constants.deviceName ?? "iPhone",
   forgetCache: (macId) => {
     forgetLists(storage, macId);
+    forgetFolds(storage, macId);
     assets.forget(macId);
   },
 });
@@ -78,6 +80,11 @@ export const shownMacId = (): string | null => shownMac;
 
 export function useLinkState(): LinkState {
   return useSyncExternalStore(link.subscribe, link.getState);
+}
+
+/** The Macs this phone paired with, as the list changes. */
+export function useSavedMacs(): readonly SavedMac[] {
+  return useSyncExternalStore(link.subscribe, link.getMacs);
 }
 
 export const { useSession, useLinkRead } = linkHooks(link);

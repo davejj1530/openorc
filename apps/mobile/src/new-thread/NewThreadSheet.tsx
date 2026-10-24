@@ -41,7 +41,13 @@ function NewThreadForm({ projectId, choices, onProject }: FormProps) {
     router.push({ pathname: "/thread/[id]", params: { id: threadId } });
   };
   return (
-    <ScrollView keyboardShouldPersistTaps="handled" className="flex-1 bg-bg" contentContainerClassName="gap-4 pt-6" contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}>
+    <ScrollView
+      keyboardShouldPersistTaps="handled"
+      className="flex-1 bg-bg"
+      contentContainerClassName="gap-4 pt-6"
+      contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
+      onAccessibilityEscape={() => router.back()}
+    >
       <Text accessibilityRole="header" className="px-5 text-xl">
         {name ? `What should we work on in ${name}?` : "What should we work on?"}
       </Text>
@@ -53,12 +59,16 @@ function NewThreadForm({ projectId, choices, onProject }: FormProps) {
             {sheet.error}
           </Text>
         ) : null}
+        {!sheet.error && sheet.dimReason ? (
+          <Text accessibilityRole="alert" className="px-1 text-sm text-ink-4">
+            {sheet.dimReason}
+          </Text>
+        ) : null}
         <ComposerPlane
           composerId={COMPOSER_ID}
           settings={sheet.settings}
           draft={{ text: sheet.draft.prompt, images: sheet.draft.images }}
           uploading={sheet.uploading}
-          editable={!sheet.starting}
           placeholder="Ask OpenOrc to build, fix bugs, explore"
           autoFocus
           onText={sheet.setText}
@@ -66,7 +76,7 @@ function NewThreadForm({ projectId, choices, onProject }: FormProps) {
           onAttach={sheet.chooseImages}
         >
           {activity ? <Text className="text-sm text-ink-4">{activity}</Text> : null}
-          <SendButton state="send" label="Start" disabled={!sheet.controls.canSend} onPress={() => void start()} />
+          <SendButton state="send" label="Start" disabled={!sheet.controls.canSend} onPress={() => void start()} onDimPress={sheet.explainDim} />
         </ComposerPlane>
       </View>
     </ScrollView>
@@ -89,7 +99,8 @@ export function NewThreadSheet() {
   return (
     <>
       <SheetStatusBar />
-      <NewThreadForm key={projectId} projectId={projectId} choices={choices} onProject={setChosen} />
+      {/* One form for every project, so the prompt keeps the keyboard while the person switches projects. */}
+      <NewThreadForm projectId={projectId} choices={choices} onProject={setChosen} />
     </>
   );
 }

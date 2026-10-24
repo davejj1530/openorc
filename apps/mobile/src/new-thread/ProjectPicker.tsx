@@ -1,10 +1,10 @@
 import { WORKSPACE_ID } from "@openorc/protocol";
-import * as Haptics from "expo-haptics";
 import { useRef } from "react";
 import { Pressable, ScrollView, type ScrollViewInstance } from "react-native";
 import { Folder, FolderOpen, Globe } from "../generated/icons";
 import type { ProjectChoice } from "../projects";
 import { cn } from "../ui/cn";
+import { haptic } from "../ui/haptics";
 import { Text } from "../ui/Text";
 
 /** Workspace's globe, or a project's folder, open while it is the one chosen, as Home's headings draw them. */
@@ -21,7 +21,7 @@ export function ProjectPicker({ choices, selected, disabled, onSelect }: { choic
   const row = useRef<ScrollViewInstance>(null);
   const shown = useRef(false);
   return (
-    <ScrollView ref={row} horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerClassName="gap-1 px-3">
+    <ScrollView ref={row} horizontal scrollsToTop={false} showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerClassName="gap-1 px-3">
       {choices.map((choice) => {
         const on = choice.id === selected;
         const Icon = choiceIcon(choice.id, on);
@@ -32,7 +32,7 @@ export function ProjectPicker({ choices, selected, disabled, onSelect }: { choic
             accessibilityLabel={choice.name}
             accessibilityState={{ checked: on, disabled }}
             disabled={disabled}
-            hitSlop={{ top: 6, bottom: 6 }}
+            hitSlop={{ top: 7, bottom: 7 }}
             onLayout={(event) => {
               if (!on || shown.current) return;
               shown.current = true;
@@ -40,7 +40,7 @@ export function ProjectPicker({ choices, selected, disabled, onSelect }: { choic
             }}
             onPress={() => {
               if (on) return;
-              void Haptics.selectionAsync();
+              haptic.select();
               onSelect(choice.id);
             }}
             className={cn("h-control-md max-w-56 flex-row items-center gap-1.5 rounded-full pl-2.5 pr-3 active:bg-surface-2", on && "bg-surface-2")}

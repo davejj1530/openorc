@@ -40,6 +40,7 @@ describe("settings persistence", () => {
       defaultWorkspaceMode: "worktree" as const,
       defaultPermissionMode: "review" as const,
       defaultHarness: "claude" as const,
+      look: { palette: "linear", colors: { dark: { "--accent": "#5e6ad2" } } },
       experimentalTeamExecution: true,
       idleProcessMinutes: null,
       claudeUserMcpServers: false,
@@ -53,5 +54,17 @@ describe("settings persistence", () => {
     expect(reopened.get().autoDoneDays).toBeNull();
     expect(() => reopened.set({ idleProcessMinutes: 0 })).toThrow();
     expect(reopened.get().idleProcessMinutes).toBeNull();
+  });
+  it("holds the desktop's look for phones, null until it is handed over, and reads one it cannot as none", () => {
+    const db = Db.memory();
+    databases.push(db);
+    const service = new AppSettingsService(db);
+    expect(service.get().look).toBeNull();
+    service.set({ sound: true, look: { palette: "claude", colors: { light: { "--accent": "#b64e48" } } } });
+    service.set({ notifications: false });
+    expect(new AppSettingsService(db).get()).toMatchObject({ sound: true, notifications: false, look: { palette: "claude", colors: { light: { "--accent": "#b64e48" } } } });
+    // A look saved by another version keeps every other setting.
+    settings.set(db, "app.settings", JSON.stringify({ sound: true, defaultHarness: "codex", look: { palette: 7, colors: [] } }));
+    expect(new AppSettingsService(db).get()).toMatchObject({ sound: true, defaultHarness: "codex", look: null });
   });
 });

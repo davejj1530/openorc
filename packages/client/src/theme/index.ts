@@ -7,6 +7,7 @@ export {
   normalizeHex,
   overridesFor,
   parseCustomColors,
+  type TokenOverrides,
   translucentTokens,
   withAccents,
   withColor,
@@ -15,3 +16,4 @@ export {
   withoutOverrides,
 } from "./theme-custom.js";
 export { type Mode, type ThemePreset, themePresets } from "./theme-palettes.js";
+export { lookOf, type PaletteLook, readLook, sameLook } from "./theme-look.js";

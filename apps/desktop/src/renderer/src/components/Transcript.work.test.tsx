@@ -307,6 +307,7 @@ it("signs a signed-out Claude back in from the thread's Terminal, under the fold
 const codexUsage: ProviderUsage = {
   provider: "codex",
   context: "ChatGPT · pro · fixture@example.test",
+  plan: "Pro",
   status: "available",
   source: "Fixture",
   checkedAt: 1,

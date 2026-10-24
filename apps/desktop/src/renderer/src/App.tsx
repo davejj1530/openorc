@@ -11,6 +11,7 @@ import { NewFileDialog } from "./dialogs/NewFileDialog";
 import { useAppShortcuts } from "./lib/app-shortcuts";
 import { useOnboardingDefaultHarness } from "./lib/default-harness";
 import { useLayout } from "./lib/layout";
+import { useLookHandover } from "./lib/mac-look";
 import { readOnboardingState, resolveOnboarding, writeOnboardingState, type PersistedOnboardingState } from "./lib/onboarding";
 import { useRpc } from "./lib/client";
 import { useRouter, type Route } from "./lib/router";
@@ -61,6 +62,7 @@ export function App() {
   const projects = useRpc("projects.list", {});
   const [onboardingState, setOnboardingState] = useState(readOnboardingState);
   const recordDefaultHarness = useOnboardingDefaultHarness();
+  useLookHandover();
   const [onboardingSession, setOnboardingSession] = useState<"first_run" | "recovery" | "dismissed" | null>(null);
   const currentProject = projectForRoute(route, projectId);
   const onboarding =

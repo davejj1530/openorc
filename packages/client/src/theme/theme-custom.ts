@@ -127,15 +127,18 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 /** Drops anything a past version, a hand edit, or another tab may have left behind. */
 export function parseCustomColors(raw: string | null): CustomColors {
-  let parsed: unknown;
   try {
-    parsed = raw === null ? null : JSON.parse(raw);
+    return acceptedColors(raw === null ? null : JSON.parse(raw));
   } catch {
     return {};
   }
-  if (!isObject(parsed)) return {};
+}
+
+/** The overrides in `value` this version can paint: known palettes and modes, editable tokens, hex values. */
+export function acceptedColors(value: unknown): CustomColors {
+  if (!isObject(value)) return {};
   let custom: CustomColors = {};
-  for (const [preset, modes] of Object.entries(parsed)) {
+  for (const [preset, modes] of Object.entries(value)) {
     if (!presetIds.has(preset) || !isObject(modes)) continue;
     for (const [mode, overrides] of Object.entries(modes)) {
       if ((mode !== "light" && mode !== "dark") || !isObject(overrides)) continue;

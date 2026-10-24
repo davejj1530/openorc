@@ -587,11 +587,10 @@ export class OpenOrc {
   async handle(request: RpcRequest): Promise<RpcReply> {
     const { id, method } = request;
     const privateParams = method.startsWith("slack.") || method === "memory.settings.set";
-    const schema = (rpcParams as Record<string, (typeof rpcParams)[RpcMethod]>)[method];
-    if (!schema) return { type: "rpc.error", id, message: `unknown method ${method}` };
-    const parsed = schema.safeParse(request.params ?? {});
-    if (!parsed.success) return { type: "rpc.error", id, message: invalidParamsMessage(method, parsed.error.message) };
     try {
+      if (!Object.hasOwn(rpcParams, method)) return { type: "rpc.error", id, message: `unknown method ${method}` };
+      const parsed = rpcParams[method as RpcMethod].safeParse(request.params ?? {});
+      if (!parsed.success) return { type: "rpc.error", id, message: invalidParamsMessage(method, parsed.error.message) };
       this.guardTeamRequest(method as RpcMethod, parsed.data);
       const handler = this.handlers[method as RpcMethod] as (p: unknown) => Promise<unknown> | unknown;
       const started = Date.now();

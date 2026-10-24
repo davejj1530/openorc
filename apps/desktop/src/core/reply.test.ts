@@ -48,6 +48,15 @@ describe("window ports", () => {
     expect(staying.received).toEqual([{ type: "invalidate", keys: ["threads"] }]);
   });
 
+  it("answers a request whose handling rejected with an error on the asking port", async () => {
+    const windows = windowPorts(() => Promise.reject(new Error("core failed to start")));
+    const window = new FakeWindow();
+    windows.attach(window);
+    window.request(5, null);
+    await settled();
+    expect(window.received).toEqual([{ type: "rpc.error", id: 5, message: "core failed to start" }]);
+  });
+
   it("delivers what the core broadcast while answering before the answer", async () => {
     const frame: Broadcast = { type: "frame", frame: { runId: "run", seq: 1, events: [] } };
     const windows = windowPorts(async (request) => {

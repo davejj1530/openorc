@@ -75,6 +75,46 @@ it("keeps steering messages visible without duplicate React keys", () => {
   expect(workParts(turns[1]!.blocks, true).before[0]?.id).toBe("steer");
 });
 
+it("reads a steer the turn ends without answering with the turn it steered, under the head that says how the turn ended", () => {
+  // The reply keeps the place it started in while it streams on, so the steer sent during it lands after it.
+  const steered: AgentEvent[] = [
+    { type: "message.completed", ts: 1000, runId: "run", messageId: "ask", role: "user", text: "Write it slowly" },
+    { type: "message.delta", ts: 2000, runId: "run", messageId: "answer", role: "assistant", text: "Sentence one." },
+    { type: "message.completed", ts: 3000, runId: "run", messageId: "steer", role: "user", text: "Mention the tests" },
+    { type: "message.completed", ts: 4000, runId: "run", messageId: "again", role: "user", text: "And the docs" },
+  ];
+  runs.applyFrame({ runId: "run", seq: 1, events: steered });
+  expect(workTurns(runs.get("run")!.blocks).map((turn) => turn.blocks[0]!.id)).toEqual(["ask", "steer"]);
+  runs.applyFrame({
+    runId: "run",
+    seq: 2,
+    events: [
+      { type: "message.completed", ts: 5000, runId: "run", messageId: "answer", role: "assistant", text: "Sentence one. Sentence two." },
+      { type: "turn.completed", ts: 27000, runId: "run", turnId: "one", status: "cancelled", durationMs: 26000 },
+    ],
+  });
+  const turns = workTurns(runs.get("run")!.blocks);
+  expect(turns).toHaveLength(1);
+  expect(workParts(turns[0]!.blocks, false)).toMatchObject({ before: [{ id: "ask" }, { id: "steer" }, { id: "again" }], work: [], after: [{ id: "answer" }] });
+  expect(workTiming(turns[0]!.blocks, false)).toMatchObject({ durationMs: 26000, outcome: "cancelled" });
+});
+
+it("gives a steer the agent answered the rest of the turn and its outcome", () => {
+  const blocks: Block[] = [
+    { ...reply, id: "ask", role: "user", turnKey: "run:0" },
+    { ...tool, turnKey: "run:0" },
+    { ...reply, id: "steer", role: "user", turnKey: "run:0" },
+    { ...tool, id: "second", turnKey: "run:0" },
+    { id: "end", kind: "status", boundary: "turn", durationMs: 9000, outcome: "success", text: "turn finished in 9.0s", tone: "ok", turnKey: "run:0" },
+  ];
+  const turns = workTurns(blocks);
+  expect(turns.map((turn) => turn.blocks.map((block) => block.id))).toEqual([
+    ["ask", "read"],
+    ["steer", "second", "end"],
+  ]);
+  expect(workTiming(turns[1]!.blocks, false)).toMatchObject({ durationMs: 9000, outcome: "success" });
+});
+
 it("ends a fatal run and exposes its error even when no completion event follows", () => {
   runs.applyFrame({
     runId: "fatal",

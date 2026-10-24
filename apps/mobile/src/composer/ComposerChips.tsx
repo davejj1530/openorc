@@ -1,4 +1,4 @@
-import { catalogModel, pickerSettings, type ClientState } from "@openorc/client";
+import { catalogModel, pickerSettings } from "@openorc/client";
 import { effortLabel, executionMode, executionModePresentation } from "@openorc/protocol";
 import { router } from "expo-router";
 import type { ReactNode } from "react";
@@ -7,8 +7,7 @@ import { useRpc } from "../client";
 import { Lightbulb, Pencil, ShieldCheck, Wand } from "../generated/icons";
 import { HarnessLogo } from "../ui/HarnessLogo";
 import { Text } from "../ui/Text";
-
-type Settings = ReturnType<ClientState["useConversationSettings"]>;
+import type { ComposerSettings } from "./settings-bridge";
 
 const modeIcons = { plan: Lightbulb, review: ShieldCheck, trusted: Pencil, autonomous: Wand } as const;
 
@@ -27,8 +26,8 @@ function Chip({ label, children, onPress }: { label: string; children: ReactNode
   );
 }
 
-/** The model with its effort, and the mode, as the desktop's composer shows them; each opens its sheet. */
-export function ComposerChips({ threadId, settings }: { threadId: string; settings: Settings }) {
+/** The model with its effort, and the mode, as the desktop's composer shows them; each opens its sheet for this composer. */
+export function ComposerChips({ composerId, settings }: { composerId: string; settings: ComposerSettings }) {
   const models = useRpc("agents.models", {}, { staleTime: 5 * 60_000 });
   const { choice } = settings;
   const model = catalogModel(models.data, choice);
@@ -39,14 +38,14 @@ export function ComposerChips({ threadId, settings }: { threadId: string; settin
   const ModeIcon = modeIcons[mode];
   return (
     <>
-      <Chip label={`Model, ${name}`} onPress={() => router.push({ pathname: "/model", params: { threadId } })}>
+      <Chip label={`Model, ${name}`} onPress={() => router.push({ pathname: "/model", params: { composerId } })}>
         {choice ? <HarnessLogo agent={choice.agent} size={13} /> : null}
         <Text numberOfLines={1} className="min-w-0 flex-shrink text-sm text-ink-2">
           {name}
         </Text>
         {effort ? <Text className="text-sm text-ink-4">{effortLabel(effort)}</Text> : null}
       </Chip>
-      <Chip label={`Mode, ${modeLabel}`} onPress={() => router.push({ pathname: "/mode", params: { threadId } })}>
+      <Chip label={`Mode, ${modeLabel}`} onPress={() => router.push({ pathname: "/mode", params: { composerId } })}>
         <ModeIcon size={13} className="text-ink-4" />
         <Text numberOfLines={1} className="min-w-0 flex-shrink text-sm text-ink-2">
           {modeLabel}

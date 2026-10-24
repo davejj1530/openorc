@@ -38,13 +38,13 @@ function Layer({ state, current, disabled }: { state: SendState; current: SendSt
 
 /**
  * The composer's one ink control, 32 pt. Send, Queue and Stop are layers of the same pill, so a turn starting or
- * ending swaps the glyph in place with a small overshoot instead of replacing the button.
+ * ending swaps the glyph in place with a small overshoot instead of replacing the button. A new thread's send says Start.
  */
-export function SendButton({ state, disabled, onPress }: { state: SendState; disabled: boolean; onPress: () => void }) {
+export function SendButton({ state, disabled, onPress, label }: { state: SendState; disabled: boolean; onPress: () => void; label?: string }) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={labels[state]}
+      accessibilityLabel={label ?? labels[state]}
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}

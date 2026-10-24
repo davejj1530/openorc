@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { decodeNewThreadDraft, newThreadStartInput } from "@openorc/client";
 import { DEFAULT_TEAM_LIMITS, type TeamRevision } from "@openorc/protocol";
-import { newThreadStartInput, decodeNewThreadDraft, readNewThreadDraft, targetModel, teamDepth, teamLaunchRequest, writeNewThreadDraft } from "./new-thread-draft";
+import { readNewThreadDraft, teamDepth, teamLaunchRequest, writeNewThreadDraft } from "./new-thread-draft";
 
 const revision: TeamRevision = {
   id: "revision-1",
@@ -19,29 +20,9 @@ const revision: TeamRevision = {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("new task execution drafts", () => {
-  it("preserves the exact saved revision and applies lead overrides without editing it", () => {
-    const draft = decodeNewThreadDraft("project-1", {
-      projectId: "project-1",
-      prompt: "Keep my request",
-      target: { kind: "team", revision, initialLeadOverrides: { effort: "high", fastMode: true } },
-      mode: "plan",
-      workspace: "current",
-    });
-    expect(draft).toMatchObject({ prompt: "Keep my request", target: { kind: "team", revision: { id: "revision-1", number: 1 } }, mode: "plan", workspace: "current" });
-    expect(targetModel(draft.target)).toEqual({ agent: "codex", model: "fixture-lead", effort: "high", fastMode: true });
-    expect(revision.members[0]?.settings).toMatchObject({ effort: "medium", fastMode: false });
+  it("measures a team's depth from its lead", () => {
     expect(teamDepth(revision)).toBe(2);
-  });
-
-  it.each([
-    { kind: "team", revision: { ...revision, projectId: "other-project" }, initialLeadOverrides: {} },
-    { kind: "team", revision: { ...revision, members: [{}] }, initialLeadOverrides: {} },
-    { kind: "model", choice: { model: "missing-provider" } },
-  ])("retains the message and blocks a malformed or mismatched target instead of selecting another", (target) => {
-    const draft = decodeNewThreadDraft("project-1", { projectId: "project-1", prompt: "Unsaved direction", target });
-    expect(draft.prompt).toBe("Unsaved direction");
-    expect(draft.target.kind).toBe("unavailable");
-    expect(targetModel(draft.target)).toBeNull();
+    expect(teamDepth({ ...revision, members: revision.members.map((member) => ({ ...member, managerKey: member.key === "lead" ? "worker" : "lead" })) })).toBe(Infinity);
   });
 
   it("migrates the existing prompt and keeps attachment storage and other projects separate", () => {

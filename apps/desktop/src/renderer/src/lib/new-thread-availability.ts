@@ -1,6 +1,7 @@
 import { harnessInfo, harnessLoggedIn, harnessName, isHarnessId, normalizeModelSettings, type Project, type RpcResults, type TeamRevision } from "@openorc/protocol";
 import type { ModelChoice, TeamPickerChoices } from "../components/ModelPicker";
-import { teamDepth, type NewThreadTarget } from "./new-thread-draft";
+import type { NewThreadTarget } from "@openorc/client";
+import { teamDepth } from "./new-thread-draft";
 
 interface QueryState<T> {
   data: T | undefined;

@@ -1,11 +1,9 @@
 import { LegendList } from "@legendapp/list/react-native";
-import { threadListParams } from "@openorc/client";
-import { WORKSPACE_ID } from "@openorc/protocol";
-import { Link } from "expo-router";
+import { Link, router } from "expo-router";
 import { useEffect } from "react";
 import { Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useLinkState, useRpc, useRpcs } from "../client";
+import { useLinkState } from "../client";
 import { linkWords } from "../connection/link-words";
 import type { LinkState } from "../connection/manager";
 import { Plus } from "../generated/icons";
@@ -13,13 +11,14 @@ import { LinkDot } from "../macs/LinkDot";
 import { reportFirstFrame } from "../startup";
 import { usePerfAutoOpen } from "../thread/PerfProbe";
 import { Text } from "../ui/Text";
-import { HomeHeading, PinnedLabel } from "./HomeHeading";
-import { homeItems, type HomeItem } from "./home-items";
+import { HomeHeading, PinnedLabel, ShowMore } from "./HomeHeading";
+import type { HomeItem } from "./home-items";
 import { ThreadRow } from "./ThreadRow";
+import { useHomeItems } from "./use-home-items";
 
 type Paired = Exclude<LinkState, { kind: "unpaired" }>;
 
-function HomeRow({ item }: { item: HomeItem }) {
+function HomeRow({ item, onMore }: { item: HomeItem; onMore: (projectId: string) => void }) {
   switch (item.kind) {
     case "heading":
       return <HomeHeading heading={item} />;
@@ -27,6 +26,8 @@ function HomeRow({ item }: { item: HomeItem }) {
       return <PinnedLabel count={item.count} />;
     case "thread":
       return <ThreadRow thread={item.thread} project={item.project} />;
+    case "more":
+      return <ShowMore onPress={() => onMore(item.projectId)} />;
   }
 }
 
@@ -59,24 +60,14 @@ function Title({ state }: { state: Paired }) {
 
 function Threads({ state }: { state: Paired }) {
   const insets = useSafeAreaInsets();
-  const projects = useRpc("projects.list", {});
-  const groups = [{ id: WORKSPACE_ID, name: "Workspace" }, ...(projects.data ?? []).map(({ id, name }) => ({ id, name }))];
-  const lists = useRpcs(
-    "threads.list",
-    groups.map((group) => threadListParams(group.id, "active")),
-    { refetchInterval: 60_000 },
-  );
-  const items = homeItems(
-    groups.map((group, index) => ({ ...group, threads: lists[index]?.data })),
-    Date.now(),
-  );
+  const { items, showMore } = useHomeItems();
   return (
     <LegendList
       data={items}
       keyExtractor={(item) => item.key}
       getItemType={(item) => item.kind}
       recycleItems
-      renderItem={({ item }) => <HomeRow item={item} />}
+      renderItem={({ item }) => <HomeRow item={item} onMore={showMore} />}
       ListHeaderComponent={<Title state={state} />}
       ListFooterComponent={<View className="h-24" />}
       contentContainerStyle={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
@@ -120,7 +111,7 @@ export function HomeScreen() {
       {/* Rows scroll under the status bar on the tile, not over it. */}
       <View className="absolute inset-x-0 top-0 bg-bg" style={{ height: insets.top }} />
       <View pointerEvents="box-none" className="absolute inset-x-0 bottom-0 items-center" style={{ paddingBottom: insets.bottom }}>
-        <Pressable accessibilityRole="button" className="mb-2 h-touch flex-row items-center gap-2 rounded-full bg-accent pl-4 pr-5 active:opacity-80">
+        <Pressable accessibilityRole="button" onPress={() => router.push("/new")} className="mb-2 h-touch flex-row items-center gap-2 rounded-full bg-accent pl-4 pr-5 active:opacity-80">
           <Plus size={16} className="text-accent-fg" />
           <Text className="text-md text-accent-fg">New thread</Text>
         </Pressable>

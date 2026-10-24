@@ -6,6 +6,7 @@ import { Pressable, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { X } from "../generated/icons";
 import { cn } from "../ui/cn";
+import { SheetStatusBar } from "../ui/SheetStatusBar";
 import { Text } from "../ui/Text";
 import { isPairingUrl, pairWith, usePairing, type Pairing } from "./pairing";
 
@@ -66,6 +67,7 @@ export function PairScreen() {
   const canPair = text.trim().length > 0 && pairing.kind !== "pairing";
   return (
     <View className="flex-1 bg-bg px-5" style={{ paddingTop: 16, paddingBottom: insets.bottom + 16 }}>
+      <SheetStatusBar />
       <View className="h-touch flex-row items-center justify-between">
         <Text accessibilityRole="header" className="text-xl">
           Pair with your Mac

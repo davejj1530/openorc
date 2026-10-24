@@ -28,13 +28,17 @@ export function flatStyle(style: unknown): Record<string, unknown> {
   return style && typeof style === "object" ? (style as Record<string, unknown>) : {};
 }
 
-/** A host view as a DOM element: it lays out once mounted, measures where `placed` says, and presses on click. */
+/**
+ * A host view as a DOM element: it lays out once mounted, measures where `placed` says, and presses on click. A scroll
+ * view's `scrollTo` moves nothing, as nothing lays out here.
+ */
 function host(tag: string) {
   return forwardRef(function Host(props: NativeProps, ref: Ref<unknown>) {
     const node = useRef<HTMLElement>(null);
     useImperativeHandle(ref, () =>
       Object.assign(node.current!, {
         measureLayout: (_relativeTo: unknown, onSuccess: (x: number, y: number, width: number, height: number) => void) => onSuccess(0, placed.y(node.current!), screen.width, 0),
+        scrollTo: () => undefined,
       }),
     );
     useLayoutEffect(() => {
@@ -72,3 +76,6 @@ export const StyleSheet = { create: <T,>(styles: T) => styles, hairlineWidth: 1 
 export const AppState = { currentState: "active", addEventListener: () => ({ remove: () => undefined }) };
 export const Settings = { get: () => undefined };
 export const Platform = { OS: "ios", select: <T,>(options: { ios?: T; default?: T }) => options.ios ?? options.default };
+
+/** An action sheet answers at once with its first option, as if the person tapped it. */
+export const ActionSheetIOS = { showActionSheetWithOptions: (_options: unknown, onChoice: (index: number) => void) => onChoice(0) };

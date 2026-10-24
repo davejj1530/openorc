@@ -24,6 +24,7 @@ export {
   pickerSettings,
   providerGroups,
 } from "./model-picker-selection.js";
+export { decodeNewThreadDraft, type NewThreadDraft, type NewThreadTarget, newThreadChoice, newThreadStartInput, newThreadWorkspaceMode, targetModel } from "./new-thread.js";
 export { invalidatesFor, tagsFor } from "./query-tags.js";
 export { listedThreads, projectMeta, type ProjectMeta, type SidebarFilter, sidebarThreadPage, THREAD_PAGE, threadListParams, visibleSidebarThreadIds } from "./sidebar-thread-groups.js";
 export { startedWorkFromTool, taskActivity, taskCardStatusLabel, taskIdFromTool, taskStepLabel, uniqueTaskCards } from "./task-progress.js";

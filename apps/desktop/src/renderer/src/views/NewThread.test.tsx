@@ -42,7 +42,6 @@ vi.mock("../components/NewThreadMascot", () => ({ NewThreadMascot: () => null })
 vi.mock("../components/Panel", () => ({ Panel: () => null }));
 vi.mock("../components/TopBar", () => ({ TopBar: ({ children }: { children: React.ReactNode }) => <header>{children}</header> }));
 vi.mock("../components/ModelPicker", () => ({
-  defaultChoice: () => null,
   ModelPicker: () => <button type="button">Choose model</button>,
   ComposerModelPicker: () => <button type="button">Choose model</button>,
 }));

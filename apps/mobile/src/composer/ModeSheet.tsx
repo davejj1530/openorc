@@ -9,11 +9,11 @@ import { useSharedSettings } from "./settings-bridge";
 
 const icons = { plan: Lightbulb, review: ShieldCheck, trusted: Pencil, autonomous: Wand } as const;
 
-/** How the agent works in this thread: plan, or how much it may do before asking. Only the modes the agent offers. */
+/** How the agent works: plan, or how much it may do before asking. Only the modes the agent offers. */
 export function ModeSheet() {
-  const { threadId } = useLocalSearchParams<{ threadId: string }>();
+  const { composerId } = useLocalSearchParams<{ composerId: string }>();
   const insets = useSafeAreaInsets();
-  const settings = useSharedSettings(threadId);
+  const settings = useSharedSettings(composerId);
   const agent = settings?.choice?.agent;
   const current = settings ? executionMode(settings.mode, settings.permission) : null;
   return (

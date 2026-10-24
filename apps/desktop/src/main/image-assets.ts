@@ -1,6 +1,5 @@
-import { open } from "node:fs/promises";
-import { extname, isAbsolute, join } from "node:path";
-import { TOOL_IMAGE_URL } from "@openorc/protocol";
+import { isAbsolute } from "node:path";
+import { profileAssetPath, readImageFile, type ImageFileRead } from "@openorc/core/profile-assets";
 
 const mimeTypes: Record<string, string> = {
   ".png": "image/png",
@@ -14,42 +13,34 @@ const mimeTypes: Record<string, string> = {
   ".svg": "image/svg+xml",
 };
 
+const failures: Record<Exclude<ImageFileRead, { ok: true }>["reason"], () => Response> = {
+  unsupported: () => new Response(null, { status: 415 }),
+  missing: () => new Response(null, { status: 404 }),
+  "too-large": () => new Response("Image exceeds 32 MB", { status: 413 }),
+};
+
 /** Image-only file access; never expose a general-purpose file fetch endpoint. */
 export async function imageAssetResponse(request: Request, dataDir: string): Promise<Response> {
   try {
     if (request.method !== "GET") return new Response(null, { status: 405 });
     const url = new URL(request.url);
-    let path: string;
-    if (url.hostname === "attachments") {
-      const name = decodeURIComponent(url.pathname.slice(1));
-      if (!/^[a-f0-9-]+\.(png|jpg|gif|webp)$/.test(name)) return new Response(null, { status: 404 });
-      path = join(dataDir, "attachments", name);
-    } else if (url.hostname === "tool-images") {
-      const match = TOOL_IMAGE_URL.exec(url.href);
-      if (!match) return new Response(null, { status: 404 });
-      path = join(dataDir, "tool-images", match[1]!, match[2]!);
-    } else if (url.hostname === "local-image") {
+    let path: string | null;
+    // Any image on disk, for the app's own windows only. Phone access never reaches this branch.
+    if (url.hostname === "local-image") {
       path = url.searchParams.get("path") ?? "";
       if (!isAbsolute(path) || path.includes("\0")) return new Response(null, { status: 400 });
-    } else return new Response(null, { status: 404 });
-    const mime = mimeTypes[extname(path).toLowerCase()];
-    if (!mime) return new Response(null, { status: 415 });
-    const file = await open(path, "r");
-    try {
-      const stat = await file.stat();
-      if (!stat.isFile()) return new Response(null, { status: 404 });
-      if (stat.size > 32 * 1024 * 1024) return new Response("Image exceeds 32 MB", { status: 413 });
-      return new Response(new Uint8Array(await file.readFile()), {
-        headers: {
-          "Content-Type": mime,
-          "X-Content-Type-Options": "nosniff",
-          "Cache-Control": "no-store",
-          "Content-Security-Policy": "default-src 'none'; sandbox",
-        },
-      });
-    } finally {
-      await file.close();
-    }
+    } else path = profileAssetPath(url.href, dataDir);
+    if (!path) return new Response(null, { status: 404 });
+    const read = await readImageFile(path, mimeTypes);
+    if (!read.ok) return failures[read.reason]();
+    return new Response(read.bytes, {
+      headers: {
+        "Content-Type": read.mime,
+        "X-Content-Type-Options": "nosniff",
+        "Cache-Control": "no-store",
+        "Content-Security-Policy": "default-src 'none'; sandbox",
+      },
+    });
   } catch {
     return new Response(null, { status: 404 });
   }

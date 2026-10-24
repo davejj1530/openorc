@@ -83,6 +83,7 @@
   "devDependencies": {
     "@electron/fuses": "1.8.0",
     "@openorc/db": "workspace:*",
+    "@openorc/link": "workspace:*",
     "@tailwindcss/vite": "^4.1.0",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/react": "^16.3.0",
@@ -95,6 +96,7 @@
     "electron": "^44.3.0",
     "electron-builder": "^26.15.0",
     "electron-vite": "^5.0.0",
+    "esbuild": "0.28.2",
     "fake-indexeddb": "6.2.5",
     "jsdom": "^26.0.0",
     "tailwindcss": "^4.1.0",

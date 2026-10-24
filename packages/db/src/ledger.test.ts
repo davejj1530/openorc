@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import type { AgentEvent } from "@openorc/protocol";
 import { Db } from "./database.js";
-import { LedgerWriter, listEvents } from "./ledger.js";
+import { generatedImagePath, LedgerWriter, listEvents } from "./ledger.js";
 import { checkpoints } from "./checkpoints.js";
 import { insertLegacyCheckpoint } from "./fixtures/legacy-checkpoint.js";
 import { audit, projects, runs, tasks, threads } from "./repos.js";
@@ -313,5 +313,31 @@ describe("ledger", () => {
     const [message, started] = listEvents(db, run.id);
     expect(message).toMatchObject({ text: "Use this token:\n[redacted:github-token]\nDB_PASSWORD=[redacted:secret-assignment]" });
     expect(started).toMatchObject({ input: { url: "postgres://admin:[redacted:url-credentials]@db.internal/app", password: "[redacted:secret-field]" } });
+  });
+});
+
+describe("generated images", () => {
+  it("finds the file the newest announcement of an activity names, by imagePath or by its saved path", () => {
+    const { db, run } = fixture();
+    const writer = new LedgerWriter(db);
+    const activity = (activityId: string, extra: Partial<Extract<AgentEvent, { type: "activity.updated" }>>): AgentEvent => ({
+      type: "activity.updated",
+      runId: run.id,
+      ts: 1,
+      activityId,
+      label: "Generating image",
+      status: "success",
+      activityKind: "image_generation",
+      ...extra,
+    });
+    writer.push(activity("image-1", { status: "running" }));
+    writer.push(activity("image-1", { imagePath: "/tmp/first.png" }));
+    writer.push(activity("image-1", { imagePath: "/tmp/second.png" }));
+    writer.push(activity("image-2", { detail: { savedPath: "/tmp/saved.webp" } }));
+    writer.flush();
+    expect(generatedImagePath(db, run.id, "image-1")).toBe("/tmp/second.png");
+    expect(generatedImagePath(db, run.id, "image-2")).toBe("/tmp/saved.webp");
+    expect(generatedImagePath(db, run.id, "image-3")).toBeNull();
+    expect(generatedImagePath(db, "another-run", "image-1")).toBeNull();
   });
 });

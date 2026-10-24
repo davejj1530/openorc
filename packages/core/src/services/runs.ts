@@ -732,6 +732,8 @@ export class RunService {
 
   private emit(ev: AgentEvent): void {
     ev = { ...ev, eventId: ev.eventId ?? randomUUID() };
+    // Before the fan-out, so the ledger and every frame carry the same stored-file URL, and the file exists by then.
+    if (this.hooks.storeToolImages) ev = this.hooks.storeToolImages(ev);
     const planRun = this.live.get(ev.runId)?.run ?? runs.get(this.db, ev.runId);
     if (planRun && plans.capture(this.db, planRun, ev)) this.invalidate([`plans:${planRun.threadId}`]);
     if (ev.type === "turn.completed" && ev.fastMode && planRun?.agent === "claude" && this.catalog.noteClaudeFastMode(planRun.claudeAccountId ?? "claude-cli", ev.fastMode)) {

@@ -20,8 +20,6 @@ import {
   threads,
 } from "@openorc/db";
 import { startMcpServer, type OpenOrcMcpServer } from "@openorc/mcp";
-import type { TextEmbedder } from "@openorc/memory";
-import type { BrowserHost } from "@openorc/protocol";
 import { harnessInfo, harnessInstalled, harnessLoggedIn, rpcParams, type HarnessId, type RpcMethod, type RpcRequest } from "@openorc/protocol";
 import { randomBytes, randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
@@ -30,6 +28,7 @@ import { BenchGenerator } from "./bench.js";
 import { FrameCoalescer } from "./frames.js";
 import { createAttachmentsHandlers } from "./handlers/attachments.js";
 import { createBenchHandlers } from "./handlers/bench.js";
+import { createRemoteHandlers } from "./handlers/remote.js";
 import { createCatalogHandlers } from "./handlers/catalog.js";
 import { createEventsHandlers } from "./handlers/events.js";
 import { createFilesHandlers } from "./handlers/files.js";
@@ -71,8 +70,7 @@ import { createThreadsHost } from "./mcp-host/threads.js";
 import { createOrclingHost } from "./mcp-host/orcling.js";
 import { AgentUpdateService } from "./services/agent-updates.js";
 import { AttachmentService } from "./services/attachments.js";
-import type { ProtectedSecretStore } from "./services/extraction-credentials.js";
-import { FileFormatter, type BundledFormatter } from "./services/file-format.js";
+import { FileFormatter } from "./services/file-format.js";
 import { FileService } from "./services/files.js";
 import { ImportService } from "./services/imports.js";
 import { LedgerUpkeep } from "./services/ledger-upkeep.js";
@@ -90,8 +88,8 @@ import { ReviewService } from "./services/review.js";
 import { RunService, type Notification, type RunHooks } from "./services/runs.js";
 import { ScheduleService } from "./services/schedules.js";
 import { AppSettingsService } from "./services/settings.js";
-import { ShellEnvironment, inheritedProbe, type ShellProbe } from "./services/shell-environment.js";
-import { SlackService, type SlackSecretStore } from "./services/slack/service.js";
+import { ShellEnvironment, inheritedProbe } from "./services/shell-environment.js";
+import { SlackService } from "./services/slack/service.js";
 import { SystemService } from "./services/system.js";
 import { TaskCheckoutService } from "./services/task-checkout.js";
 import { TaskCommentService } from "./services/task-comments.js";
@@ -113,37 +111,9 @@ import { ToolImageStore } from "./services/tool-images.js";
 import { ensureWorkspaceHome } from "./services/workspace-home.js";
 import { WorkspaceWriters } from "./services/workspace-writers.js";
 import { WorkspaceService } from "./services/workspace.js";
-import { transportLogger, type Logger, type RpcReply, type Transport } from "./transport.js";
-
-export interface OpenOrcOptions {
-  browser?: BrowserHost;
-  slackSecrets?: SlackSecretStore;
-  memorySecrets?: ProtectedSecretStore;
-  /** Keeps the reviewer app's private key. Without it, reviews post only as the user. */
-  githubSecrets?: ProtectedSecretStore;
-  /** Where memory's embedding model runs. Defaults to the core's own thread, where loading it and each batch block everything else. */
-  embedder?: TextEmbedder;
-  /** The bundled Prettier, run off the core's thread. Without it, files format only with the project's own formatter. */
-  formatter?: BundledFormatter;
-  dataDir: string;
-  /**
-   * Signs the file panel's viewer URLs; the app verifies them with the same key before serving a file. A core
-   * without one signs with a key nobody holds, so its viewer URLs load nowhere. Tests pass none.
-   */
-  fileKey?: string;
-  transport: Transport;
-  /** In-memory database, for tests. */
-  ephemeral?: boolean;
-  /**
-   * How the login shell is asked for PATH and the harness binaries. Defaults
-   * to the real shell, except that an ephemeral core inherits this process's
-   * environment instead: a test should not pay for a login shell it never
-   * asked about. Pass a probe to test that path on purpose.
-   */
-  shellProbe?: ShellProbe;
-  /** Serves the bench.* methods, which stream synthetic events and write a synthetic thread into the ledger. Development and QA builds only. */
-  benchmarks?: boolean;
-}
+import type { OpenOrcOptions } from "./options.js";
+import { RemoteAccess } from "./remote/remote-access.js";
+import { transportLogger, type Logger, type RpcReply } from "./transport.js";
 
 /**
  * The application core. One instance per app, living in the utility process.
@@ -196,22 +166,35 @@ export class OpenOrc {
   readonly workspaceWriters = new WorkspaceWriters();
   private readonly log: Logger;
   private readonly bench: BenchGenerator;
+  /** Phone access. Its listener runs once the host attaches its request path. */
+  readonly remote: RemoteAccess;
+  private readonly options: OpenOrcOptions;
+  private closingForUpdate = false;
   private mcp: Promise<OpenOrcMcpServer> | null = null;
   private readonly handlers: Handlers;
 
-  private constructor(
-    private readonly options: OpenOrcOptions,
-    db: Db,
-  ) {
+  private constructor(options: OpenOrcOptions, db: Db) {
+    // Phones hear what the windows hear, through this one tap.
+    const host = options.transport;
+    this.options = options = {
+      ...options,
+      transport: {
+        push: (message) => {
+          host.push(message);
+          this.remote?.publish(message);
+        },
+      },
+    };
     this.db = db;
     this.log = transportLogger(options.transport);
     this.providerLog = new ProviderLog(path.join(options.dataDir, "logs", "provider"));
     this.toolImages = new ToolImageStore(options.dataDir);
-    this.ledger = new LedgerWriter(db, { native: (ev) => this.providerLog.write(ev), storeImage: (runId, image) => this.toolImages.save(runId, image) });
+    this.ledger = new LedgerWriter(db, { native: (ev) => this.providerLog.write(ev) });
     this.upkeep = new LedgerUpkeep(db, { log: this.log, toolImages: this.toolImages });
     this.frames = new FrameCoalescer((frame) => options.transport.push({ type: "frame", frame }));
     this.bench = new BenchGenerator((ev) => this.frames.push(ev));
     const invalidate = (keys: string[]) => options.transport.push({ type: "invalidate", keys });
+    this.remote = new RemoteAccess({ db, dataDir: options.dataDir, ledger: this.ledger, secrets: options.remoteSecrets, log: this.log, invalidate, network: options.remoteNetwork });
     this.settings = new AppSettingsService(db);
     this.environment = new ShellEnvironment({ probe: options.shellProbe ?? (options.ephemeral ? inheritedProbe() : undefined) });
     this.system = new SystemService(options.dataDir, this.environment);
@@ -418,7 +401,7 @@ export class OpenOrc {
       formatter: new FileFormatter({ bundled: options.formatter ?? null, environment: () => this.environment.current() }),
       fileKey: options.fileKey ?? randomBytes(32).toString("hex"),
     });
-    this.imports = new ImportService(db, this.ledger, invalidate, this.log);
+    this.imports = new ImportService(db, this.ledger, invalidate, this.log, this.toolImages);
     this.reviewerApp = new ReviewerAppService(db, { secrets: options.githubSecrets, invalidate });
     this.pullRequests = new PullRequestService(db, {
       dataDir: options.dataDir,
@@ -450,6 +433,7 @@ export class OpenOrc {
       orclings: this.orclings.runHooks,
       taskImages: (spec) => new AttachmentService(options.dataDir).forTask(spec),
       inlineToolImages: (output) => this.toolImages.inline(output),
+      storeToolImages: (ev) => this.toolImages.withStoredImages(ev),
       brief: (project) => this.memory.brief(project),
       threadContext: (thread) => this.pullRequests.brief(thread),
       untrustedCheckout: (thread) => inUnvettedCopy(db, thread),
@@ -705,10 +689,12 @@ export class OpenOrc {
     if (this.runs.backgroundCommandsRunning) return "Stop the background commands running in your conversations before restarting to update.";
     if (!this.runs.prepareForUpdate()) return "Wait for agent work, approvals, and context maintenance to finish before restarting to update.";
     this.schedules.stopAccepting();
+    this.closingForUpdate = true;
     return null;
   }
 
   async close(): Promise<void> {
+    await this.remote.close(this.closingForUpdate ? "update" : "shutdown");
     this.threads.stopAccepting();
     await this.claudeAccounts.close();
     await this.agentUpdates.close();
@@ -790,6 +776,7 @@ export class OpenOrc {
       createMemoryHandlers({ memory: this.memory, db: this.db, files: this.files }),
       createOrclingHandlers({ orclings: this.orclings }),
       createInboxHandlers({ runService: this.runs, db: this.db, teams: this.teams }),
+      createRemoteHandlers({ remote: this.remote }),
       createBenchHandlers({ frames: this.frames, bench: this.bench, db: this.db, ledger: this.ledger, transport: this.options.transport, benchmarks: Boolean(this.options.benchmarks) }),
     );
   }

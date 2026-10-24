@@ -7,6 +7,7 @@ import { isHarnessId, type AgentKind, type HarnessId, type ImportableSession, ty
 /** Each harness keeps its sessions in its own on-disk format; a harness without a reader cannot be imported yet. */
 const sessionReaders: Partial<Record<HarnessId, typeof readClaudeSession>> = { codex: readCodexSession, claude: readClaudeSession };
 import type { Logger } from "../transport.js";
+import type { ToolImageStore } from "./tool-images.js";
 
 /**
  * Sessions the user ran from a terminal become threads: the transcript goes
@@ -22,6 +23,7 @@ export class ImportService {
     private readonly ledger: LedgerWriter,
     private readonly invalidate: (keys: string[]) => void,
     private readonly log: Logger,
+    private readonly toolImages: ToolImageStore,
   ) {}
 
   async importable(projectId: string): Promise<ImportableSession[]> {
@@ -82,7 +84,7 @@ export class ImportService {
       });
       runs.insert(this.db, { id: runId, taskId: null, threadId: thread.id, agent: read.agent, model: null, mode: "act", permissionMode: "trusted" });
       runs.update(this.db, runId, { state: "success", externalSessionId: read.sessionId, endedAt: read.endedAt, resultText: read.lastReply });
-      for (const ev of read.events) this.ledger.push(ev);
+      for (const ev of read.events) this.ledger.push(this.toolImages.withStoredImages(ev));
       this.ledger.flush();
       this.db.stmt("UPDATE threads SET last_activity_at = ?, seen_at = ?, updated_at = ? WHERE id = ?").run(read.endedAt, read.endedAt, read.endedAt, thread.id);
       audit.record(this.db, { actor: "user", action: "thread.import", resourceType: "thread", resourceId: thread.id, metadata: { agent: read.agent, path: s.path, messages: read.messages } });

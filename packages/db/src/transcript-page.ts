@@ -2,7 +2,16 @@ import type { AgentEvent } from "@openorc/protocol";
 import type { Db } from "./database.js";
 
 /** Tool results whose stored event is larger than this stay out of a page; the row loads its output when opened. */
-const OMIT_OUTPUT_CHARS = 4096;
+export const OMIT_OUTPUT_CHARS = 4096;
+/** Task tools stay whole: their rows read the task id from the output. */
+const KEEPS_OUTPUT = /task_(?:create|start)$/;
+
+/** The page's rule for one event already in hand, as a live view applies it to a redacted event. */
+export function pagedEvent(event: AgentEvent): AgentEvent {
+  if (event.type !== "tool.completed" || KEEPS_OUTPUT.test(event.name) || JSON.stringify(event).length <= OMIT_OUTPUT_CHARS) return event;
+  // Undefined leaves the key out of the JSON, as the page's json_remove does.
+  return { ...event, output: undefined, outputOmitted: true };
+}
 
 export interface TranscriptPage {
   events: AgentEvent[];

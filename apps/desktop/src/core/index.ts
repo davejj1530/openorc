@@ -43,6 +43,7 @@ const corePromise = OpenOrc.create({
   slackSecrets: secrets.store("slack.secrets"),
   memorySecrets: secrets.store("memory.secrets"),
   githubSecrets: secrets.store("github.secrets"),
+  remoteSecrets: secrets.store("remote.secrets"),
   // The embedding model runs in its own thread, so loading it and embedding memories never stall the core.
   embedder: new WorkerEmbedder(() => new Worker(join(import.meta.dirname, "embedder-worker.mjs"), { workerData: { cacheDir: dataDir } })),
   // Prettier formats in its own thread too, so a large file never stalls the core.
@@ -59,6 +60,9 @@ void corePromise.then((core) => {
   core.environment.onChange(publish);
   publish(core.environment.current());
 });
+
+// Phones use the same fenced path as windows, so an update waits for their requests and refuses new ones.
+void corePromise.then((core) => core.remote.attach(answer));
 
 function attach(port: MessagePortMain): void {
   windows.attach(port);

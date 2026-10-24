@@ -1,8 +1,7 @@
 import type { ProtectedSecretStore } from "@openorc/core";
+import { PROTECTED_SECRET_CHANNELS, type ProtectedSecretChannel as Channel } from "../shared/protected-secrets";
 
-const channels = ["slack.secrets", "memory.secrets", "github.secrets"] as const;
-type Channel = (typeof channels)[number];
-const results = new Set<unknown>(channels.map((channel) => `${channel}.result`));
+const results = new Set<unknown>(PROTECTED_SECRET_CHANNELS.map((channel) => `${channel}.result`));
 interface Pending {
   channel: Channel;
   resolve(value: string | null): void;

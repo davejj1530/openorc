@@ -20,13 +20,35 @@ type Guard<M extends RemoteMethod> = (params: RpcParams<M>, context: GuardContex
 const allow = () => null;
 const STORED_IMAGE = /^[a-f0-9-]+\.(?:png|jpg|gif|webp)$/;
 const MAX_ATTACHMENT_BASE64 = Math.ceil(REMOTE_ATTACHMENT_BYTES / 3) * 4;
-/** What the phone's own controls change: read state and the composer's settings. */
-const PHONE_THREAD_PATCH = new Set(["seen", "agent", "model", "effort", "fastMode", "mode", "permissionMode"]);
+/** What the phone's own controls change: the composer's settings, and how threads are organized (read state, pins, archive, snooze, title). */
+const PHONE_THREAD_PATCH = new Set(["seen", "agent", "model", "effort", "fastMode", "mode", "permissionMode", "pinned", "archived", "snoozedUntil", "title"]);
+/** A snooze from the phone wakes within this long. */
+const SNOOZE_HORIZON_MS = 366 * 24 * 60 * 60 * 1000;
+const TITLE_MAX = 200;
+/** Control characters, line and paragraph breaks, and bidi overrides and isolates: a title goes into briefs, logs and notifications. */
+const TITLE_FORBIDDEN = /[\p{Cc}\p{Zl}\p{Zp}\u202A-\u202E\u2066-\u2069]/u;
 
 /** Each path must be an image this profile stored with attachments.save. */
 function storedImages(paths: readonly string[] | undefined, { attachmentsDir }: GuardContext): string | null {
   const foreign = paths?.some((file) => path.resolve(file) !== file || path.dirname(file) !== attachmentsDir || !STORED_IMAGE.test(path.basename(file)));
   return foreign ? "Only images attached from your phone can be sent from it." : null;
+}
+
+function phoneTitle(title: string | undefined): string | null {
+  if (title === undefined) return null;
+  // Characters, not UTF-16 units: an emoji is one.
+  return title.trim() && [...title].length <= TITLE_MAX && !TITLE_FORBIDDEN.test(title) ? null : `A title must be one line of up to ${TITLE_MAX} characters.`;
+}
+
+function phoneSnooze(until: number | null | undefined): string | null {
+  if (until === undefined || until === null) return null;
+  const now = Date.now();
+  return until > now && until <= now + SNOOZE_HORIZON_MS ? null : "Choose a time within the next year.";
+}
+
+function threadUpdate({ taskId, patch }: RpcParams<"threads.update">): string | null {
+  if (taskId !== undefined || !Object.keys(patch).every((key) => PHONE_THREAD_PATCH.has(key))) return "Make this change on your Mac.";
+  return phoneTitle(patch.title) ?? phoneSnooze(patch.snoozedUntil);
 }
 
 /** Typed over REMOTE_METHODS: a method listed there without a guard here, or guarded but not listed, fails the build. */
@@ -46,8 +68,9 @@ export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {
   "agents.models": allow,
   "agents.availability": allow,
   "app.settings.get": allow,
-  "threads.start": (params, context) => (params.workingDirectory !== undefined ? "Choose a folder for this conversation on your Mac." : storedImages(params.attachments, context)),
-  "threads.update": (params) => (params.taskId === undefined && Object.keys(params.patch).every((key) => PHONE_THREAD_PATCH.has(key)) ? null : "Make this change on your Mac."),
+  "threads.start": (params, context) =>
+    params.workingDirectory !== undefined ? "Choose a folder for this conversation on your Mac." : (phoneTitle(params.title) ?? storedImages(params.attachments, context)),
+  "threads.update": threadUpdate,
   "runs.start": (params, context) => storedImages(params.attachments, context),
   "runs.send": (params, context) => storedImages(params.attachments, context),
   "runs.interrupt": allow,

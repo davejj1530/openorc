@@ -236,7 +236,8 @@ export const rpcParams = {
       archived: z.boolean().optional(),
       pinned: z.boolean().optional(),
       done: z.boolean().optional(),
-      snoozedUntil: z.number().nullable().optional(),
+      /** Epoch milliseconds as a safe integer (zod's int): SQLite stores larger ones that node:sqlite then cannot read back. */
+      snoozedUntil: z.number().int().nonnegative().nullable().optional(),
       /** True marks the thread read; false marks it unread. */
       seen: z.boolean().optional(),
       draft: z.string().nullable().optional(),

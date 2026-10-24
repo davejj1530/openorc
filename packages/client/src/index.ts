@@ -36,7 +36,7 @@ export { liveVerb, stateLabel, type Tone, toolCallPresentation, type ToolIconNam
 export { toolResult, toolResultDetails, type ToolResultMedia } from "./tool-result.js";
 export { type ChangedFile, type ChangeStatus, languageFor, type MatchGroup, type MatchLine, type TestTally } from "./tool-text.js";
 export { type CommandStep, type Field, type InputView, joinPath, type OutputView, toolInputView, toolOutputView } from "./tool-view.js";
-export { type Block, emptyRun, type RunTranscript } from "./transcript.js";
+export { activityBlockId, activityIdOf, type Block, emptyRun, type RunTranscript } from "./transcript.js";
 export { visualizationFromTool } from "./visualization.js";
 export { chipCalls, toolIntent, type WorkChip } from "./work-chips.js";
 export { isCheckCommand, type ReceiptItem, receiptItems } from "./work-receipt.js";

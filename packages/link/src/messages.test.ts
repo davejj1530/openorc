@@ -8,7 +8,7 @@ describe("link messages", () => {
     { t: "rpc", id: 2, method: "projects.list" },
     { t: "interest", runIds: [] },
     { t: "asset", id: 3, ref: { kind: "attachment", name: "0b9f.png" } },
-    { t: "asset", id: 4, ref: { kind: "generated", runId: "run", activityId: "activity" } },
+    { t: "asset", id: 4, ref: { kind: "activity", runId: "run", activityId: "activity" } },
     { t: "asset", id: 2 ** 32 - 1, ref: { kind: "attachment", name: "0b9f.png" } },
     { t: "ping", id: 5 },
   ])("accept the phone message %j", (message) => {

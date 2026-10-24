@@ -1,4 +1,4 @@
-import { isCheckCommand, liveVerb, stateLabel, toolCallPresentation, toolIntent, toolResult, type Block, type ToolIconName } from "@openorc/client";
+import { activityIdOf, isCheckCommand, isImageView, liveVerb, stateLabel, toolCallPresentation, toolIntent, toolResult, type Block, type ToolIconName } from "@openorc/client";
 import { router } from "expo-router";
 import { memo, useRef, type ComponentType } from "react";
 import { Pressable, View } from "react-native";
@@ -11,6 +11,7 @@ import {
   FileText,
   Globe,
   Hammer,
+  Image as ImageIcon,
   Lightbulb,
   Search,
   Terminal,
@@ -28,6 +29,7 @@ import type { IconProps } from "../ui/icon";
 import { confirm } from "../ui/motion";
 import { Spinner } from "../ui/Spinner";
 import { Text } from "../ui/Text";
+import { ImageTile } from "./images";
 import { useOpen } from "./disclosure";
 
 export type ToolBlock = Extract<Block, { kind: "tool" }>;
@@ -197,8 +199,50 @@ export const ThinkingRow = memo(function ThinkingRow({ block }: { block: Extract
   );
 });
 
+function viewWords(status: string): string {
+  if (status === "running") return "Viewing image";
+  if (status === "success") return "Viewed image";
+  if (status === "error") return "Image viewing failed";
+  return "Image viewing interrupted";
+}
+
+/** An image the agent looked at, open by default as on the desktop. Its file stays on the Mac and comes by the activity. */
+function ImageViewRow({ block, runId }: { block: Extract<Block, { kind: "activity" }>; runId: string }) {
+  const [open, setOpen] = useOpen(`activity:${block.id}`, true);
+  const path = (block.detail as { path?: unknown } | undefined)?.path;
+  const name = typeof path === "string" ? path.split(/[\\/]/).pop() : undefined;
+  const failed = block.status === "error";
+  return (
+    <View>
+      <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => setOpen(!open)} className="min-h-control-row flex-row items-center gap-2 active:opacity-60">
+        <ImageIcon size={16} className={failed ? "text-bad" : "text-ink-4"} />
+        <Text className={cn("text-ink-4", failed && "text-bad")}>{viewWords(block.status)}</Text>
+        {name ? (
+          <Text numberOfLines={1} className="min-w-0 flex-shrink font-mono text-xs text-ink-3">
+            {name}
+          </Text>
+        ) : null}
+        {block.status === "running" ? <Spinner size={14} /> : null}
+        <View style={{ transform: [{ rotate: open ? "90deg" : "0deg" }] }}>
+          <ChevronRight size={12} className="text-ink-4" />
+        </View>
+      </Pressable>
+      {open && block.status === "success" && name ? (
+        <View className="ml-6 mt-1">
+          <ImageTile asset={{ kind: "activity", runId: block.runId ?? runId, activityId: activityIdOf(block.id) }} label={name} />
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 /** The hue an activity's icon takes: a failure in bad, a finished agent hand-off with the agent mark. */
-export const ActivityRow = memo(function ActivityRow({ block }: { block: Extract<Block, { kind: "activity" }> }) {
+export const ActivityRow = memo(function ActivityRow({ block, runId }: { block: Extract<Block, { kind: "activity" }>; runId: string }) {
+  if (isImageView(block)) return <ImageViewRow block={block} runId={runId} />;
+  return <Activity block={block} />;
+});
+
+function Activity({ block }: { block: Extract<Block, { kind: "activity" }> }) {
   const [open, setOpen] = useOpen(`activity:${block.id}`, false);
   const live = block.status === "running";
   const showText = Boolean(block.text && (live || open || block.status === "error"));
@@ -226,7 +270,7 @@ export const ActivityRow = memo(function ActivityRow({ block }: { block: Extract
       {showText ? <Text className="ml-6 text-ink-3">{block.text}</Text> : null}
     </View>
   );
-});
+}
 
 /** The step mark the work rail draws: an empty ring, a turning loader, or an ink check that lands with an overshoot. */
 export function StepMark({ state, arrived }: { state: "pending" | "running" | "done"; arrived: boolean }) {

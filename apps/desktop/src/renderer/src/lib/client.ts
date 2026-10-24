@@ -11,4 +11,4 @@ export const client = createClientState(core, {
   randomId: () => crypto.randomUUID(),
 });
 
-export const { queryClient, useRpc, useRpcMutation, invalidateTags, runs, useRun, useRuns, useRunMap, usePendingApprovals, useSubmit } = client;
+export const { queryClient, useRpc, useRpcs, useRpcMutation, invalidateTags, runs, useRun, useRuns, useRunMap, usePendingApprovals, useSubmit } = client;

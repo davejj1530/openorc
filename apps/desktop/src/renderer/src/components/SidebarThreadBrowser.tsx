@@ -1,14 +1,12 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { useQueries } from "@tanstack/react-query";
 import { Menu } from "@base-ui/react/menu";
 import { WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
 import { CoversPreview } from "../lib/browser-preview";
 import { useLayout } from "../lib/layout";
-import { type SidebarFilter, tagsFor, listedThreads, projectMeta, sidebarThreadPage, visibleSidebarThreadIds } from "@openorc/client";
+import { type SidebarFilter, listedThreads, projectMeta, sidebarThreadPage, THREAD_PAGE, threadListParams, visibleSidebarThreadIds } from "@openorc/client";
 import { useOrclings } from "../lib/orclings";
-import { useRpc } from "../lib/client";
+import { useRpc, useRpcs } from "../lib/client";
 import { useRouter } from "../lib/router";
-import { core } from "../lib/rpc";
 import { useUi } from "../lib/ui";
 import { Check, ChevronDown, ChevronRight, Funnel, Pin } from "./icons";
 import { OpenOrcMark } from "./OpenOrcMark";
@@ -18,8 +16,6 @@ import { menuItem, menuPopup, menuSeparator } from "./menu";
 import { IconButton } from "./ui";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { cn } from "../lib/cn";
-
-const PAGE = 12;
 
 function emptyMessage(search: string, pinned: boolean): string {
   if (search) return "No matches in loaded threads.";
@@ -42,12 +38,11 @@ function useThreadGroups(search: string) {
   const activeId = useRouter((s) => (s.route.view === "thread" ? s.route.threadId : null));
   const active = useRpc("threads.get", { id: activeId ?? "" }, { enabled: Boolean(activeId) });
   const activeProject = activeId && !homes.has(activeId) ? active.data?.projectId : undefined;
-  const queries = useQueries({
-    queries: groups.map((group) => {
-      const params = { projectId: group.id, filter, limit: (limits[`${filter}:${group.id}`] ?? PAGE) + 1 };
-      return { queryKey: ["threads.list", params], queryFn: () => core.call("threads.list", params), meta: { tags: tagsFor("threads.list", params) }, refetchInterval: 60_000 };
-    }),
-  });
+  const queries = useRpcs(
+    "threads.list",
+    groups.map((group) => threadListParams(group.id, chosen, limits[`${filter}:${group.id}`])),
+    { refetchInterval: 60_000 },
+  );
   useEffect(() => {
     if (!activeProject) return;
     const layout = useLayout.getState();
@@ -62,14 +57,22 @@ function useThreadGroups(search: string) {
   const matches = (thread: ThreadSummary) => thread.title.toLowerCase().includes(search.toLowerCase());
   const visible = groups.map((group, index) => {
     const query = queries[index]!;
-    const page = sidebarThreadPage({ projectId: group.id, fetched: query.data, selected: active.data, filter: view, limit: limits[`${filter}:${group.id}`] ?? PAGE, now: Date.now(), hidden: homes });
+    const page = sidebarThreadPage({
+      projectId: group.id,
+      fetched: query.data,
+      selected: active.data,
+      filter: view,
+      limit: limits[`${filter}:${group.id}`] ?? THREAD_PAGE,
+      now: Date.now(),
+      hidden: homes,
+    });
     return { ...group, query, ...page, pinned: page.pinned.filter(matches), rest: pinnedOnly ? [] : page.rest.filter(matches), snoozed: pinnedOnly ? [] : page.snoozed.filter(matches) };
   });
   const orderKey = JSON.stringify(visibleSidebarThreadIds(visible, collapsed));
   useEffect(() => {
     useUi.getState().setThreadOrder(JSON.parse(orderKey) as string[]);
   }, [orderKey]);
-  const loadMore = (id: string) => setLimits((old) => ({ ...old, [`${filter}:${id}`]: (old[`${filter}:${id}`] ?? PAGE) + PAGE }));
+  const loadMore = (id: string) => setLimits((old) => ({ ...old, [`${filter}:${id}`]: (old[`${filter}:${id}`] ?? THREAD_PAGE) + THREAD_PAGE }));
   return { visible, activeId, loadMore, projects, orc: view === "orc", pinnedOnly };
 }
 

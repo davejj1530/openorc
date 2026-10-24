@@ -16,6 +16,14 @@ export function listedThreads(filter: SidebarFilter): "active" | "archived" {
   return filter === "archived" ? "archived" : "active";
 }
 
+/** How many threads a project lists at first, and how many more each "Load more" adds. */
+export const THREAD_PAGE = 12;
+
+/** The `threads.list` read behind a project's list: one more than it shows, so the list knows when there are more. */
+export function threadListParams(projectId: string, filter: SidebarFilter, shown = THREAD_PAGE) {
+  return { projectId, filter: listedThreads(filter), limit: shown + 1 };
+}
+
 type ThreadPage = { list: ThreadSummary[]; pinned: ThreadSummary[]; rest: ThreadSummary[]; snoozed: ThreadSummary[]; hasMore: boolean; leftOut: number };
 
 /** Orcmode keeps the working set and the open thread. Snoozed threads wait, and the rest are counted rather than shown. */

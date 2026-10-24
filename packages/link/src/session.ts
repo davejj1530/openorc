@@ -54,6 +54,11 @@ export class LinkSession<In, Out> {
   private pumpTimer: ReturnType<typeof setTimeout> | null = null;
   private ended = false;
   private readonly reader = new RecordReader();
+  /**
+   * Messages that arrived before anyone listened. The other end may speak right behind the handshake, in the same
+   * read as its answer, before the code that opened the session has had a turn to attach a listener.
+   */
+  private held: In[] | null = [];
   private readonly messageListeners = new Set<(message: In) => void>();
   private readonly bytesListeners = new Set<(stream: number, chunk: Uint8Array, end: boolean) => void>();
   private readonly closeListeners = new Set<(code: number, reason: string) => void>();
@@ -100,8 +105,12 @@ export class LinkSession<In, Out> {
     return pending;
   }
 
+  /** The first listener also hears, at once, what arrived before it. */
   onMessage(listener: (message: In) => void): () => void {
     this.messageListeners.add(listener);
+    const held = this.held;
+    this.held = null;
+    for (const message of held ?? []) listener(message);
     return () => this.messageListeners.delete(listener);
   }
 
@@ -174,7 +183,10 @@ export class LinkSession<In, Out> {
       return;
     }
     if (received?.kind === "bytes") for (const listener of this.bytesListeners) listener(received.stream, received.chunk, received.end);
-    for (const message of messages) for (const listener of this.messageListeners) listener(message);
+    for (const message of messages) {
+      if (this.held) this.held.push(message);
+      else for (const listener of this.messageListeners) listener(message);
+    }
   }
 
   private finish(code: number, reason: string): void {

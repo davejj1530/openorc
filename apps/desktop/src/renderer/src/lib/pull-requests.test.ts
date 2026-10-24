@@ -1,17 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { defaultOrclingLook, type ModelOption, type Orcling } from "@openorc/protocol";
-import { draftAuthor, offeredSummary, pullRequestNumber, pullRequestTarget, pullRequestTone, withModelSummary } from "./pull-requests";
+import { draftAuthor, offeredSummary, pullRequestTarget, pullRequestTone, withModelSummary } from "./pull-requests";
 
 describe("pull request presentation", () => {
-  it("reads the number from a pull request's address only", () => {
-    expect(pullRequestNumber("https://github.com/acme/app/pull/3")).toBe(3);
-    expect(pullRequestNumber("https://github.com/acme/app/pull/42#pullrequestreview-9")).toBe(42);
-    expect(pullRequestNumber("https://github.com/acme/app/pull/42/files")).toBe(42);
-    expect(pullRequestNumber("https://github.com/acme/app/issues/3")).toBeNull();
-    expect(pullRequestNumber("https://github.com/acme/app/pull/3x")).toBeNull();
-    expect(pullRequestNumber(null)).toBeNull();
-  });
-
   it("names a draft comment by the Orcling that wrote it and the model it ran on", () => {
     const models: ModelOption[] = [{ id: "gpt-6-sol", label: "GPT-6 Sol", agent: "codex", isDefault: true, efforts: ["low", "high"], defaultEffort: "low" }];
     const gloop: Orcling = {

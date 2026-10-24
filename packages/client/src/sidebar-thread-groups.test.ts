@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ThreadSummary } from "@openorc/protocol";
-import { ORC_MODE_WINDOW, projectMeta, sidebarThreadPage, visibleSidebarThreadIds } from "./sidebar-thread-groups.js";
+import { ORC_MODE_WINDOW, projectMeta, sidebarThreadPage, threadListParams, visibleSidebarThreadIds } from "./sidebar-thread-groups.js";
 
 function thread(id: string, values: Partial<ThreadSummary> = {}): ThreadSummary {
   return { id, projectId: "project", archivedAt: null, pinnedAt: null, snoozedUntil: null, ...values } as ThreadSummary;
@@ -80,5 +80,12 @@ describe("project heading meta", () => {
   it("says nothing about counts while the list loads", () => {
     expect(projectMeta([], { loaded: false })).toBeNull();
     expect(projectMeta([running], { loaded: false })).toEqual({ text: "1 running", tone: "faint" });
+  });
+});
+
+describe("thread list reads", () => {
+  it("asks for one more thread than a project shows, from the list its filter reads", () => {
+    expect(threadListParams("project", "orc")).toEqual({ projectId: "project", filter: "active", limit: 13 });
+    expect(threadListParams("project", "archived", 24)).toEqual({ projectId: "project", filter: "archived", limit: 25 });
   });
 });

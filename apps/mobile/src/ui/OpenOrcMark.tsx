@@ -1,8 +1,9 @@
 import { StyleSheet, View } from "react-native";
-import Animated, { useReducedMotion } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import Svg, { Path } from "react-native-svg";
 import { openOrcMark } from "../generated/openorc-mark";
 import { useColors } from "./mode";
+import { useReducedMotion } from "./reduced-motion";
 
 const { outline, faces, turn } = openOrcMark;
 const sides = ["top", "right", "left"] as const;

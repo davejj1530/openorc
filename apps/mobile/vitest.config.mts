@@ -7,6 +7,8 @@ const fixture = (file: string) => resolve(import.meta.dirname, "src/test-fixture
 export default defineConfig({
   test: {
     alias: {
+      "@expo/ui/swift-ui/modifiers": fixture("expo-ui.tsx"),
+      "@expo/ui/swift-ui": fixture("expo-ui.tsx"),
       "expo-clipboard": fixture("clipboard.ts"),
       "expo-haptics": fixture("haptics.ts"),
       "expo-status-bar": fixture("status-bar.ts"),

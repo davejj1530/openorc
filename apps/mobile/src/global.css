@@ -9,4 +9,11 @@
 @theme {
   --spacing-touch: 44px;
   --spacing-touch-row: 52px;
+  /*
+   * The wordmark's step: the website's -0.02em tracking, in points, as React Native tracks. The cube that goes with it
+   * is sized in ui/Wordmark.tsx.
+   */
+  --text-wordmark: 20px;
+  --text-wordmark--line-height: 24px;
+  --text-wordmark--letter-spacing: -0.4px;
 }

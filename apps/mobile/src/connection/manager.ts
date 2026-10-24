@@ -20,8 +20,17 @@ import { LinkConnection } from "./link-connection";
 import { raceRoutes, ROUTE_TIMEOUT_MS, type Attempt, type Clock, type RaceResult } from "./route-race";
 import { learnRoutes, routesFor, type DeviceKeys, type MacStore, type NetworkKind, type SavedMac } from "./saved-macs";
 
-/** Why the phone is not connected to the Mac it shows, as far as it knows. */
-export type DownReason = "unreachable" | "offline" | "restarting" | "disabled" | "busy";
+/**
+ * Why the phone is not connected to the Mac it shows, as far as it knows. `unreachable`: no route answered, or the
+ * session dropped. `silent`: the Mac has not answered for a minute, so it is likely asleep or on another network.
+ * `tailnet`: on cellular, where only the Mac's tailnet addresses can answer, none did, though the internet answers.
+ * `no-route`: this network has no way to the Mac (cellular, and the Mac has no tailnet address). `offline`: nothing
+ * gets out, with no network at all or one that reaches nowhere.
+ */
+export type DownReason = "unreachable" | "silent" | "tailnet" | "no-route" | "offline" | "restarting" | "disabled" | "busy";
+
+/** The reasons the Mac itself gave, which still stand while it does not answer. */
+const macReasons: ReadonlySet<DownReason> = new Set(["restarting", "disabled", "busy"]);
 
 export interface MacName {
   id: string;
@@ -71,6 +80,8 @@ export interface ConnectionEffects {
   deviceName: string;
   /** Deletes what the app cached for a Mac it forgets. */
   forgetCache(macId: string): void;
+  /** Whether anything on the internet answers, for a race lost off Wi-Fi. Aborted once the phone stops waiting. */
+  reachesInternet(signal: AbortSignal): Promise<boolean>;
 }
 
 /** `spent` when the same code can never pair: the Mac refused it, it expired, or it is not a pairing code. */
@@ -84,6 +95,10 @@ const BACKOFF_CAP_MS = 15_000;
 const PING_EVERY_MS = 20_000;
 const PONG_WITHIN_MS = 10_000;
 const BACKGROUND_GRACE_MS = 20_000;
+/** A Mac the phone has not heard from for this long is not reachable rather than reconnecting. */
+const SILENT_AFTER_MS = 60_000;
+/** How long the phone waits to learn whether the internet answers before it takes that as no. */
+const INTERNET_WITHIN_MS = 3_000;
 /**
  * Back after this long, the session is not trusted: iOS suspends the app's timers and sockets a few seconds into the
  * background, so the grace timer may never have fired and the socket may be dead while the phase still says connected.
@@ -127,6 +142,12 @@ export class ConnectionManager {
   private pongTimer: unknown = null;
   private backgroundTimer: unknown = null;
   private backgroundedAt: number | null = null;
+  /**
+   * Since when the phone has asked the shown Mac on this network without an answer: from a session's end or the first
+   * failed attempt. Only time spent asking counts, so it starts over whenever the phone could not have asked.
+   */
+  private unheardSince: number | null = null;
+  private silentTimer: unknown = null;
   private readonly keyPairs = new Map<string, KeyPair>();
   private readonly listeners = new Set<() => void>();
 
@@ -205,6 +226,7 @@ export class ConnectionManager {
     if (this.effects.macs.activeId() === id) return;
     this.effects.macs.setActiveId(id);
     this.abandon();
+    this.clearSilence();
     this.attempt = 0;
     this.connectNow(null);
   }
@@ -222,6 +244,7 @@ export class ConnectionManager {
     if (wasActive) {
       this.effects.macs.setActiveId(this.effects.macs.list()[0]?.id ?? null);
       this.abandon();
+      this.clearSilence();
       this.attempt = 0;
       if (this.active()) this.connectNow(null);
       else this.enter({ kind: "unpaired", lost: lost && { why: lost, macName: name } });
@@ -248,8 +271,9 @@ export class ConnectionManager {
   setNetwork(network: NetworkKind): void {
     if (network === this.network) return;
     this.network = network;
+    this.clearSilence();
     const phase = this.phase;
-    if (phase.kind === "waiting") this.retryNow(phase.why === "offline" ? null : phase.why);
+    if (phase.kind === "waiting") this.retryNow(macReasons.has(phase.why) ? phase.why : null);
     else if (phase.kind === "connected" && phase.route.kind === "lan" && network === "cellular") this.retryNow(null);
     else if (phase.kind === "connected" && phase.route.kind === "tailnet" && network === "wifi") void this.moveToLan(phase);
   }
@@ -300,7 +324,7 @@ export class ConnectionManager {
     const mac = this.active();
     if (!mac) return this.enter({ kind: "unpaired", lost: null });
     const routes = routesFor(mac, this.network);
-    if (routes.length === 0) return this.enter({ kind: "waiting", why: "offline", retryAt: null });
+    if (routes.length === 0) return this.enter({ kind: "waiting", why: this.network === "none" ? "offline" : "no-route", retryAt: null });
     const epoch = ++this.epoch;
     this.enter({ kind: "connecting", why });
     void this.keyPair(mac.id).then(async (key) => {
@@ -309,11 +333,32 @@ export class ConnectionManager {
       if (!key) return this.forget(mac.id, "key-lost");
       const result = await raceRoutes(routes, (route) => this.dial(route, fromBase64Url(mac.id), key), this.effects.clock, closeLinked);
       if (epoch !== this.epoch) return result.ok ? closeLinked(result.value) : undefined;
-      this.settleRace(mac, result, why);
+      // Off Wi-Fi every route runs over the internet, so with none nothing could have answered, Tailscale included.
+      const online = result.ok || result.refused !== null || this.network === "wifi" || (await this.online());
+      if (epoch !== this.epoch) return;
+      this.settleRace(mac, result, why, online);
     });
   }
 
-  private settleRace(mac: SavedMac, result: RaceResult<Linked>, why: DownReason | null): void {
+  /** Whether the internet answers, or false once the phone has waited `INTERNET_WITHIN_MS`. */
+  private online(): Promise<boolean> {
+    const abort = new AbortController();
+    return new Promise((resolve) => {
+      const timer = this.effects.clock.setTimeout(() => {
+        abort.abort();
+        resolve(false);
+      }, INTERNET_WITHIN_MS);
+      void this.effects
+        .reachesInternet(abort.signal)
+        .catch(() => false)
+        .then((online) => {
+          this.effects.clock.clearTimeout(timer);
+          resolve(online);
+        });
+    });
+  }
+
+  private settleRace(mac: SavedMac, result: RaceResult<Linked>, why: DownReason | null, online: boolean): void {
     if (result.ok) return this.adopt(mac, result.route, result.value);
     switch (result.refused) {
       case "unpaired":
@@ -323,8 +368,38 @@ export class ConnectionManager {
       case "busy":
         return this.retryLater("busy");
       default:
-        return this.retryLater(why ?? "unreachable");
+        return this.retryLater(this.unanswered(why, online));
     }
+  }
+
+  /**
+   * Why no route answered: nothing gets out, or a reason the Mac gave still stands; otherwise the network says which
+   * routes were tried, and a minute without hearing the Mac makes it not reachable rather than reconnecting.
+   */
+  private unanswered(why: DownReason | null, online: boolean): DownReason {
+    if (!online) return "offline";
+    if (why && macReasons.has(why)) return why;
+    if (this.network === "cellular") return "tailnet";
+    const since = this.unheardSince;
+    return since !== null && this.effects.clock.now() - since >= SILENT_AFTER_MS ? "silent" : "unreachable";
+  }
+
+  /** The phone heard the Mac, shows another one, or could not have asked it: the next silence starts its own minute. */
+  private clearSilence(): void {
+    this.unheardSince = null;
+    this.effects.clock.clearTimeout(this.silentTimer);
+    this.silentTimer = null;
+  }
+
+  /** Starts the minute after which a Mac that still does not answer reads as not reachable, at that very moment. */
+  private startSilence(): void {
+    if (this.unheardSince !== null) return;
+    this.unheardSince = this.effects.clock.now();
+    this.silentTimer = this.effects.clock.setTimeout(() => {
+      this.silentTimer = null;
+      const phase = this.phase;
+      if ((phase.kind === "waiting" || phase.kind === "connecting") && phase.why === "unreachable") this.enter({ ...phase, why: "silent" });
+    }, SILENT_AFTER_MS);
   }
 
   /** Makes `linked` the session for `mac`, learning the routes its hello lists. */
@@ -332,6 +407,7 @@ export class ConnectionManager {
     const learned: SavedMac = { ...mac, name: hello.mac.name, routes: learnRoutes(mac.routes, hello.routes), lastRoute: route };
     this.saveMac(learned);
     this.stopPings();
+    this.clearSilence();
     this.attempt = 0;
     this.closing = null;
     this.enter({ kind: "connected", route, session, serial: ++this.sessions });
@@ -366,9 +442,12 @@ export class ConnectionManager {
   }
 
   private retryLater(why: DownReason): void {
+    if (why === "offline") this.clearSilence();
+    else this.startSilence();
     const delay = backoffMs(this.attempt++, this.effects.random);
     this.enter({ kind: "waiting", why, retryAt: this.effects.clock.now() + delay });
-    this.retryTimer = this.effects.clock.setTimeout(() => this.connectNow(why), delay);
+    // The reason may have moved on while waiting (a minute of silence), so the attempt keeps the current one.
+    this.retryTimer = this.effects.clock.setTimeout(() => this.connectNow(this.phase.kind === "waiting" ? this.phase.why : why), delay);
   }
 
   private retryNow(why: DownReason | null): void {
@@ -399,6 +478,7 @@ export class ConnectionManager {
     this.backgroundTimer = null;
     if (this.phase.kind === "unpaired" || this.phase.kind === "incompatible") return;
     this.abandon();
+    this.clearSilence();
     this.enter({ kind: "suspended" });
   }
 

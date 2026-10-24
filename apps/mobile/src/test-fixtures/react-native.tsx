@@ -6,6 +6,8 @@ export interface NativeProps {
   accessibilityLabel?: string;
   accessibilityRole?: string;
   accessibilityState?: { expanded?: boolean; disabled?: boolean };
+  accessibilityElementsHidden?: boolean;
+  testID?: string;
   disabled?: boolean;
   style?: unknown;
   onPress?: () => void;
@@ -49,13 +51,16 @@ function host(tag: string) {
     useEffect(() => {
       nativeProps.get(node.current!)?.onLayout?.({ nativeEvent: { layout: { x: 0, y: 0, width: screen.width, height: screen.height } } });
     }, []);
-    const { children, accessibilityLabel, accessibilityRole, accessibilityState, disabled, onPress } = props;
+    const { children, accessibilityLabel, accessibilityRole, accessibilityState, accessibilityElementsHidden, testID, disabled, onPress } = props;
     return createElement(
       tag,
       {
         ref: node,
         role: accessibilityRole,
         "aria-label": accessibilityLabel,
+        // Hidden from VoiceOver, hidden from queries by role.
+        "aria-hidden": accessibilityElementsHidden || undefined,
+        "data-testid": testID,
         "aria-expanded": accessibilityState?.expanded,
         "aria-disabled": accessibilityState?.disabled,
         disabled: tag === "button" ? Boolean(disabled) : undefined,
@@ -84,7 +89,23 @@ export const Alert = {
 
 /** What the app said to VoiceOver, in order. */
 export const announced: string[] = [];
-export const AccessibilityInfo = { announceForAccessibility: (text: string) => void announced.push(text) };
+/** The reader's Reduce Motion: a test calls `set` to turn it on or off while the app runs. */
+export const reduceMotion = {
+  on: false,
+  listeners: new Set<(on: boolean) => void>(),
+  set(on: boolean) {
+    this.on = on;
+    this.listeners.forEach((listener) => listener(on));
+  },
+};
+export const AccessibilityInfo = {
+  announceForAccessibility: (text: string) => void announced.push(text),
+  isReduceMotionEnabled: async () => reduceMotion.on,
+  addEventListener: (_event: "reduceMotionChanged", listener: (on: boolean) => void) => {
+    reduceMotion.listeners.add(listener);
+    return { remove: () => void reduceMotion.listeners.delete(listener) };
+  },
+};
 export const Dimensions = { get: () => screen };
 /** Whether the keyboard is up: a test raises it, and `Keyboard.dismiss` puts it away. */
 export const keyboard = { up: false };

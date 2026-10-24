@@ -14,6 +14,7 @@ afterEach(() => {
 const report: ProviderUsage = {
   provider: "codex",
   context: "ChatGPT · pro · fixture@example.test",
+  plan: "Pro",
   status: "available",
   source: "Fixture",
   checkedAt: 1800000000000,

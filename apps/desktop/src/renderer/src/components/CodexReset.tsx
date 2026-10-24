@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { ProviderUsage, RpcParams } from "@openorc/protocol";
 import { Button, Dialog } from "./ui";
 import { useRpcMutation } from "../lib/client";
-import { formatUsageTime } from "../lib/provider-usage";
+import { formatUsageTime } from "@openorc/client";
 
 type ResetInput = RpcParams<"providers.codex.reset">;
 

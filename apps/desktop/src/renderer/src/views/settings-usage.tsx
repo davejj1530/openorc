@@ -4,7 +4,7 @@ import { harnessCatalog, harnessIds, type AllowanceWindow, type ProviderUsage } 
 import { Button, IconButton, TextButton, Tooltip } from "../components/ui";
 import { HarnessLogo } from "../components/HarnessLogo";
 import { ChevronDown, ExternalLink, RefreshCw } from "../components/icons";
-import { allowanceState, formatUsageTime, percentLeft, usageResetLabel } from "../lib/provider-usage";
+import { allowanceState, formatUsageTime, percentLeft, usageResetLabel } from "@openorc/client";
 import { useEffect, useId, useRef, useState } from "react";
 import { useRpc } from "../lib/client";
 import { cn } from "../lib/cn";

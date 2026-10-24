@@ -1,4 +1,5 @@
 import { useState, type CSSProperties, type ReactNode } from "react";
+import { type Question, readQuestions } from "@openorc/client";
 import { harnessShortName, isHarnessId } from "@openorc/protocol";
 import { core } from "../lib/rpc";
 import { useRunVoice } from "../lib/turn-authors";
@@ -6,36 +7,6 @@ import { Button, Input } from "./ui";
 import { cn } from "../lib/cn";
 import { Check } from "./icons";
 import { HarnessLogo } from "./HarnessLogo";
-
-interface Question {
-  /** Answer key: Codex uses an id, Claude the question text. */
-  key: string;
-  header: string;
-  question: string;
-  options: { label: string; description: string }[] | null;
-  allowOther: boolean;
-  secret: boolean;
-  multi: boolean;
-}
-
-/** Codex `requestUserInput` and Claude `AskUserQuestion` ask in different shapes; the card is one. */
-function readQuestions(input: unknown): Question[] {
-  const p = (input ?? {}) as Record<string, unknown>;
-  const raw = Array.isArray(p["questions"]) ? (p["questions"] as Record<string, unknown>[]) : [];
-  return raw.map((q, i) => {
-    const options = Array.isArray(q["options"]) ? (q["options"] as Record<string, unknown>[]).map((o) => ({ label: String(o["label"] ?? ""), description: String(o["description"] ?? "") })) : null;
-    const question = String(q["question"] ?? "");
-    return {
-      key: typeof q["id"] === "string" ? q["id"] : question || String(i),
-      header: String(q["header"] ?? ""),
-      question,
-      options: options && options.length > 0 ? options : null,
-      allowOther: typeof q["allowOther"] === "boolean" ? q["allowOther"] || options === null : q["isOther"] === true || options === null || q["multiSelect"] === true,
-      secret: q["isSecret"] === true,
-      multi: q["multiSelect"] === true,
-    };
-  });
-}
 
 /** What was answered outside the options: a custom answer, or a question that had none. Secret answers stay hidden. */
 function answeredText(q: Question, answer: string[]): ReactNode {

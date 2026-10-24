@@ -2,6 +2,7 @@ export { createClientState, type ClientState, type ClientStateOptions } from "./
 export type { ClientPush, CoreConnection, Notice } from "./connection.js";
 export type { RpcQueryOptions } from "./query.js";
 export type { LoadRequest, RunStore } from "./run-store.js";
+export { approvalDetail, approvalSummary, type Question, readQuestions } from "./approval-request.js";
 export { isUnifiedDiff, toolDiff } from "./chat-diff.js";
 export { conversationCanSteer, conversationSendDisabledReason, conversationSteerReason } from "./conversation-presentation.js";
 export { composerActions, messageBody, planSubmit, processFit, type ComposerActionsInput, type SubmitInput, type SubmitPlan, type SubmitRequest, type SubmitTarget } from "./conversation-submit.js";

@@ -1,31 +1,10 @@
 import { useState } from "react";
 import { core } from "../lib/rpc";
-import type { Block } from "@openorc/client";
+import { approvalDetail, approvalSummary, type Block } from "@openorc/client";
 import { Hammer, Terminal, X } from "./icons";
 import { Button, TextButton } from "./ui";
 
 type ApprovalBlock = Extract<Block, { kind: "approval" }>;
-
-/**
- * What the user actually needs to judge, per approval shape: the command for
- * shell approvals, the tool arguments for MCP calls, the tool input for
- * Claude's permission prompt. Raw params stay one click away.
- */
-function approvalDetail(block: ApprovalBlock): unknown {
-  const p = (block.input ?? {}) as Record<string, unknown>;
-  if (typeof p["command"] === "string") return p["command"];
-  const meta = p["_meta"] as Record<string, unknown> | undefined;
-  if (meta && meta["tool_params"] !== undefined) return meta["tool_params"];
-  if (p["permissions"] !== undefined) return p["permissions"];
-  if (p["input"] !== undefined) return p["input"];
-  return block.input;
-}
-
-export function summaryText(v: unknown): string {
-  if (v === null || v === undefined) return "no arguments";
-  if (typeof v === "object" && Object.keys(v as object).length === 0) return "no arguments";
-  return pretty(v, 600);
-}
 
 export function pretty(v: unknown, max = 2000): string {
   const s = typeof v === "string" ? v : (JSON.stringify(v, null, 1) ?? "");
@@ -42,7 +21,7 @@ function DeniedLine({ block, label }: { block: ApprovalBlock; label: string }) {
         <span className="shrink-0">Denied</span>
         <span className="approval-answer-label">{label}</span>
       </button>
-      {open ? <pre className="approval-answer-detail">{summaryText(approvalDetail(block))}</pre> : null}
+      {open ? <pre className="approval-answer-detail">{approvalSummary(block)}</pre> : null}
     </div>
   );
 }
@@ -64,7 +43,9 @@ export function ApprovalCard({ block, runId }: { block: ApprovalBlock; runId: st
         </span>
         <div className="approval-card-words">
           <span className="approval-card-title">{block.reason ?? `Allow ${label}?`}</span>
-          <pre className="approval-card-detail">{raw ? pretty(block.input, 800) : summaryText(detail)}</pre>
+          <pre className="approval-card-detail" data-raw={raw || undefined}>
+            {raw ? pretty(block.input, 800) : approvalSummary(block)}
+          </pre>
           <TextButton tone="faint" onClick={() => setRaw((v) => !v)} className="approval-card-raw">
             {raw ? "Summary" : "Raw request"}
           </TextButton>

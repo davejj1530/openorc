@@ -56,6 +56,7 @@ const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
   "claude.accounts.list": ["claude-accounts"],
   "workspace.get": ["workspace"],
   "slack.status": ["slack"],
+  "remote.status": ["remote"],
   "system.info": ["system"],
   "agents.updates.get": ["agent-updates"],
   "providers.usage": ["provider-usage", "system", "settings"],
@@ -183,6 +184,10 @@ const fixedInvalidations: Partial<Record<RpcMethod, readonly string[]>> = {
   "orclings.instructions.restore": ["orclings"],
   "orclings.ask": ["threads"],
   "orclings.assign": ["orclings", "threads"],
+  "remote.configure": ["remote"],
+  "remote.pairing.begin": ["remote"],
+  "remote.pairing.cancel": ["remote"],
+  "remote.devices.remove": ["remote"],
 };
 
 function workspaceMutationTags(id: string): string[] {

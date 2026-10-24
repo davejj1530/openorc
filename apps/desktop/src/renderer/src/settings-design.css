@@ -529,3 +529,105 @@
   font-size: var(--text-sm);
   line-height: 18px;
 }
+
+/* Phone access. The addresses open under the switch as a row of the card; a note under the switch
+   (a failure) clears the hairline above it. */
+.phone-addresses > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  color: var(--ink);
+  list-style: none;
+  cursor: default;
+}
+.phone-addresses > summary::-webkit-details-marker {
+  display: none;
+}
+.phone-addresses > summary > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.phone-addresses > summary svg {
+  color: var(--ink-4);
+  transition: transform var(--duration-swap) var(--ease-out);
+}
+.phone-addresses[open] > summary svg {
+  transform: rotate(180deg);
+}
+.phone-addresses > summary:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+.phone-addresses ul {
+  display: grid;
+  gap: 8px;
+  padding-bottom: 16px;
+}
+.phone-addresses li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+.phone-addresses li code {
+  overflow-wrap: anywhere;
+}
+.phone-addresses li span {
+  flex-shrink: 0;
+  color: var(--ink-4);
+}
+.settings-group > .phone-addresses:last-child {
+  margin-bottom: 0;
+}
+.phone-note {
+  padding-top: 12px;
+  font-size: var(--text-sm);
+}
+/* The pairing code stays dark on white in every theme, the contrast phone cameras read best. */
+.pairing-code {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  text-align: center;
+}
+/* A dead code dims in place, and its New code button sits over it. */
+.pairing-code-stage {
+  display: grid;
+  place-items: center;
+}
+.pairing-code-stage > * {
+  grid-area: 1 / 1;
+}
+.pairing-code-plate {
+  width: 248px;
+  aspect-ratio: 1;
+  padding: 16px;
+  border-radius: var(--radius-xl);
+  background: #fff;
+  color: #000;
+  transition: background-color var(--duration-arrive) var(--ease-out);
+}
+.pairing-code-plate:is([data-state="starting"], [data-state="expired"]) {
+  background: var(--surface-2);
+}
+.pairing-code-plate svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transition:
+    opacity var(--duration-arrive) var(--ease-out),
+    filter var(--duration-arrive) var(--ease-out);
+}
+.pairing-code-plate[data-state="expired"] svg {
+  opacity: 0.08;
+  filter: blur(var(--arrive-blur));
+}

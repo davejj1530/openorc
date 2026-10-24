@@ -330,6 +330,13 @@ export const SlidersHorizontal = icon(
     <Circle cx="9" cy="18" r="2" />
   </>,
 );
+export const Smartphone = icon(
+  "Smartphone",
+  <>
+    <Rect x="6" y="2.5" width="12" height="19" rx="2.5" />
+    <Path d="M11 18.5h2" />
+  </>,
+);
 export const Square = icon("Square", <Rect x="3.5" y="3.5" width="17" height="17" rx="2.5" />);
 export const SquareDot = icon(
   "SquareDot",

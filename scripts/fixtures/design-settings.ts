@@ -1,9 +1,11 @@
 import { createDesignClaudeAccountsRpc } from "./design-claude-accounts";
+import { createDesignRemoteRpc } from "./design-remote";
 import type { ProviderUsage, SlackStatus } from "@openorc/protocol";
 
 /** Session-only settings for the design preview. Never reads or writes a real account. */
-export function createDesignSettingsRpc() {
+export function createDesignSettingsRpc({ phone = null }: { phone?: string | null } = {}) {
   const claudeAccountsRpc = createDesignClaudeAccountsRpc();
+  const remoteRpc = createDesignRemoteRpc(phone);
   const settings: Record<string, Record<string, unknown>> = {
     "app.settings": { defaultWorkspaceMode: "current", defaultPermissionMode: "review", notifications: true, sound: false, experimentalTeamExecution: true },
     "memory.settings": { enabled: true, provider: "auto", model: null, hasApiKey: false, resolved: null, automatic: [], reason: "Finished runs use each agent’s default summary model." },
@@ -12,6 +14,8 @@ export function createDesignSettingsRpc() {
   return (method: string, params: Record<string, unknown>): unknown => {
     const account = claudeAccountsRpc(method, params);
     if (account !== undefined) return account;
+    const remote = remoteRpc(method, params);
+    if (remote !== undefined) return remote;
     const key = method.replace(/\.(get|set)$/, "");
     if (settings[key]) {
       if (method.endsWith(".set")) settings[key] = { ...settings[key], ...params };

@@ -1,10 +1,11 @@
-import { BookText, Brain, Laptop, Link2, MessageSquare, Signal, SlidersHorizontal, SunMoon } from "../components/icons";
+import { BookText, Brain, Laptop, Link2, MessageSquare, Signal, SlidersHorizontal, Smartphone, SunMoon } from "../components/icons";
 import { SETTINGS_SECTIONS, type Route, type SettingsSection } from "./router";
 
 const presentation: Record<SettingsSection, { label: string; description: string; Icon: typeof Brain }> = {
   usage: { label: "Usage", description: "Account allowances, across your providers.", Icon: Signal },
   connections: { label: "Connections", description: "The agents and tools connected to OpenOrc.", Icon: Link2 },
   slack: { label: "Slack", description: "Bring requests from Slack to this computer.", Icon: MessageSquare },
+  phone: { label: "Phone", description: "Your threads, from your phone.", Icon: Smartphone },
   skills: { label: "Skills", description: "Browse the skills your agents can use.", Icon: BookText },
   appearance: { label: "Appearance", description: "Your workspace, in your own colors.", Icon: SunMoon },
   general: { label: "General", description: "Everyday preferences for the way you work.", Icon: SlidersHorizontal },

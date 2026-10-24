@@ -91,6 +91,14 @@ describe("core", () => {
     await expect(call("files.read", { scope: { kind: "thread", id: "missing-thread" }, path: "README.md" })).rejects.toThrow("not found");
   });
 
+  it("keeps every setting through a change to another", async () => {
+    const optedOut = { experimentalTeamExecution: false, idleProcessMinutes: null, claudeUserMcpServers: false };
+    await call("app.settings.set", optedOut);
+    await call("app.settings.set", { defaultPermissionMode: "trusted" });
+    await call("app.settings.set", { sound: true });
+    expect(await call("app.settings.get", {})).toMatchObject({ ...optedOut, defaultPermissionMode: "trusted", sound: true });
+  });
+
   it("loads terminal history beyond the default ledger page while respecting explicit limits", async () => {
     const p = await call("projects.import", { rootPath: root });
     const thread = threads.insert(core.db, { projectId: p.id, title: "Long transcript", agent: "codex", model: null, mode: "act", permissionMode: "trusted" });

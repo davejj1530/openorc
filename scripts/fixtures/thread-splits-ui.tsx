@@ -16,11 +16,11 @@ Object.assign(window, {
 
 async function main() {
   const { core } = await import("../../apps/desktop/src/renderer/src/lib/rpc");
-  const { queryClient } = await import("../../apps/desktop/src/renderer/src/lib/query");
+  const { queryClient } = await import("../../apps/desktop/src/renderer/src/lib/client");
   const { useRouter } = await import("../../apps/desktop/src/renderer/src/lib/router");
   const { useLayout } = await import("../../apps/desktop/src/renderer/src/lib/layout");
   const { useTheme } = await import("../../apps/desktop/src/renderer/src/lib/theme");
-  const { applyFrame } = await import("../../apps/desktop/src/renderer/src/lib/transcript");
+  const { runs: runStore } = await import("../../apps/desktop/src/renderer/src/lib/client");
   const project = {
     id: "project",
     name: new URLSearchParams(location.search).get("project") ?? "Split workspace",
@@ -150,7 +150,7 @@ async function main() {
         const event: AgentEvent = { type: "message.delta", eventId: `${++seq}`, runId, ts: Date.now(), messageId: `message-${id}`, role: "assistant", text };
         const events: AgentEvent[] = [{ type: "session.started", eventId: `session-${id}`, runId, ts: Date.now(), agent: "codex", externalSessionId: id, model: "fixture" }, event];
         ledger.set(runId, [...(ledger.get(runId) ?? []), ...events]);
-        applyFrame({ runId, seq, events });
+        runStore.applyFrame({ runId, seq, events });
         await queryClient.invalidateQueries({ queryKey: ["runs.listForThread", { threadId: id }] });
       },
     },

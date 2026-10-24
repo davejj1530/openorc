@@ -2,9 +2,9 @@ import { CircleHelp, Eye, MessageSquare, ShieldQuestion } from "../components/ic
 import type { InboxItem } from "@openorc/protocol";
 import { TopBar } from "../components/TopBar";
 import { Empty, metaSlot } from "../components/ui";
-import { useRpc } from "../lib/query";
+import { useRpc } from "../lib/client";
 import { openTask, openThread } from "../lib/router";
-import { relativeTime } from "../lib/time";
+import { relativeTime } from "@openorc/client";
 import { cn } from "../lib/cn";
 import type { ReactNode } from "react";
 import "./Inbox.css";

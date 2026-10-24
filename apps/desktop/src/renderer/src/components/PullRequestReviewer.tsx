@@ -15,7 +15,7 @@ import { defaultChoice, ModelPicker, type ModelChoice } from "./ModelPicker";
 import { Button, Segmented, TextButton } from "./ui";
 import { draftAuthor, readPullReviewer, writePullReviewer, type PullReviewer } from "../lib/pull-requests";
 import { orclingById, useOrclings } from "../lib/orclings";
-import { useRpc, useRpcMutation } from "../lib/query";
+import { useRpc, useRpcMutation } from "../lib/client";
 import { openThread } from "../lib/router";
 import { useModelCatalog } from "../lib/use-model-catalog";
 

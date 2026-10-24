@@ -5,7 +5,7 @@ import { mentionedOrcling, orclingById, orclingHome, orclingMentionEntries, useO
 import type { ConversationVoice } from "../lib/turn-authors";
 import { OrclingPreview } from "./OrclingPreview";
 import { Empty } from "./ui";
-import { useRpcMutation } from "../lib/query";
+import { useRpcMutation } from "../lib/client";
 import { ComposerModelPicker, type ModelChoice } from "./ModelPicker";
 
 interface OrclingConversation {

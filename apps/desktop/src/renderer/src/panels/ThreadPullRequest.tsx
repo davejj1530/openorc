@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { Project, TeamActionAvailability, Thread, ThreadSummary } from "@openorc/protocol";
 import { GitPullRequest } from "../components/icons";
 import { Button, Dialog, Field, Input, Textarea } from "../components/ui";
-import { useRpc, type useRpcMutation } from "../lib/query";
+import { useRpc, type useRpcMutation } from "../lib/client";
 import { TargetBranchField, useTargetBranch } from "./PullRequestTarget";
 
 function compareUrl(project: Project, thread: Thread): string | null {

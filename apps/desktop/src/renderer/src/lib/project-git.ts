@@ -1,5 +1,5 @@
 import { WORKSPACE_ID, type ProjectGit } from "@openorc/protocol";
-import { useRpc } from "./query";
+import { useRpc } from "./client";
 
 export interface ProjectGitView {
   /** Null until it is known, and for Workspace, which never uses git. */

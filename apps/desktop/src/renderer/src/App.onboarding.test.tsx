@@ -30,7 +30,7 @@ vi.mock("./views/Scheduled", () => ({ Scheduled: () => null }));
 vi.mock("./views/Settings", () => ({ Settings: () => null }));
 vi.mock("./views/TaskList", () => ({ TaskListView: () => null }));
 vi.mock("./components/ThreadWorkspace", () => ({ ThreadWorkspace: () => null }));
-vi.mock("./lib/rpc", () => ({ core: { call: vi.fn() } }));
+vi.mock("./lib/rpc", () => ({ core: { call: vi.fn(), onPush: () => () => {} } }));
 vi.mock("./lib/ui", () => ({
   useUi: () => ({ importSessions: { open: false } }),
 }));
@@ -40,7 +40,7 @@ vi.mock("./lib/window", () => ({ useTrafficLights: () => trafficLights, useWindo
 let harnesses: HarnessInfo[] | undefined;
 let projectCount = 1;
 let checkFailed = false;
-vi.mock("./lib/query", () => {
+vi.mock("./lib/client", async (original) => {
   const rpcData = (method: string) => {
     if (method === "system.info") return harnesses ? { harnesses } : undefined;
     return Array.from({ length: projectCount }, (_, i) => ({
@@ -50,6 +50,7 @@ vi.mock("./lib/query", () => {
     }));
   };
   return {
+    ...(await original<object>()),
     queryClient: { setQueryData: vi.fn() },
     useRpc: (method: string) => ({
       data: rpcData(method),

@@ -6,9 +6,9 @@ import { Pencil } from "../components/icons";
 import { Button, Empty, Textarea, TextButton } from "../components/ui";
 import { SavePill } from "../components/SavePill";
 import { orclingById, useOrclings } from "../lib/orclings";
-import { useRpc, useRpcMutation } from "../lib/query";
+import { useRpc, useRpcMutation } from "../lib/client";
 import { useRouter } from "../lib/router";
-import { relativeTime } from "../lib/time";
+import { relativeTime } from "@openorc/client";
 import { modelLabel } from "../lib/model-effort-label";
 import { useModelCatalog } from "../lib/use-model-catalog";
 

@@ -1,4 +1,4 @@
-import { invalidateTags } from "./query";
+import { invalidateTags } from "./client";
 
 /**
  * Working-tree diffs are not polled. The core refreshes the ones an agent's changes can reach; files that change

@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import type { ModelExecutionSettings, TeamConversation, TeamInstance, TeamRetainedTaskRuntime, Thread } from "@openorc/protocol";
 import type { ModelChoice } from "./ModelPicker";
-import { queryClient, useRpcMutation } from "../lib/query";
+import { queryClient, useRpcMutation } from "../lib/client";
 import { effectiveTeamLead, effectiveTeamPolicy, type TeamLeadAcknowledgement, type TeamPolicy, type TeamPolicyAcknowledgement } from "../lib/team-settings";
 import { refreshTeamPermissionReport } from "../lib/team-permission-report";
 import { teamControlParams, teamRuntimeData, teamRuntimeQueryKey, teamTaskScope } from "../lib/team-control-scope";

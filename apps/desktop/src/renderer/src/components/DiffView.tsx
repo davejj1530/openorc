@@ -4,7 +4,7 @@ import DiffWorker from "@pierre/diffs/worker/worker.js?worker";
 import { commentAnchor, isOutdated, patchFiles, reviewCommentLines, reviewCommentSent, type CommentAnchor, type DiffLine, type DiffSide, type PatchFile, type ReviewComment } from "@openorc/protocol";
 import { ChevronRight, X } from "./icons";
 import { applyDiffIcons } from "./icons-diff";
-import { patchStat } from "./diff-stat";
+import { patchStat } from "@openorc/client";
 import { cn } from "../lib/cn";
 import { useTheme } from "../lib/theme";
 import { Button, Textarea, TextButton } from "./ui";

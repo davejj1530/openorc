@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type { UpdateSettings } from "../../../shared/types";
-import { queryClient } from "../lib/query";
+import { queryClient } from "../lib/client";
 import { LoadError, Section, Toggle } from "./settings-shared";
 
 const key = ["updates.settings"];

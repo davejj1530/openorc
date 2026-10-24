@@ -4,7 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { harnessIds, type AgentUpdates, type RpcMethod, type RpcParams, type RpcResults, type SystemInfo } from "../../packages/protocol/src/index";
 import { AgentConnections, AgentUpdateNotice } from "../../apps/desktop/src/renderer/src/views/settings-agent-updates";
 import { core } from "../../apps/desktop/src/renderer/src/lib/rpc";
-import { queryClient } from "../../apps/desktop/src/renderer/src/lib/query";
+import { queryClient } from "../../apps/desktop/src/renderer/src/lib/client";
 import { useRouter } from "../../apps/desktop/src/renderer/src/lib/router";
 import { useTheme } from "../../apps/desktop/src/renderer/src/lib/theme";
 const params = new URLSearchParams(location.search);

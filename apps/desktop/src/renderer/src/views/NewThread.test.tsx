@@ -14,7 +14,8 @@ let branches: Record<string, string | null | undefined>;
 let branchError: boolean;
 let accounts: RpcResults["claude.accounts.list"] | undefined;
 
-vi.mock("../lib/query", () => ({
+vi.mock("../lib/client", async (original) => ({
+  ...(await original<object>()),
   useRpc: (method: string, params: { id?: string }) => {
     const data: Record<string, unknown> = {
       "projects.list": projects,

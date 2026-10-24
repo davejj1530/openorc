@@ -7,11 +7,12 @@ const configureWorkspace = vi.fn();
 const call = vi.fn();
 let statusData: RpcResults["slack.status"];
 
-vi.mock("../lib/query", () => ({
+vi.mock("../lib/client", async (original) => ({
+  ...(await original<object>()),
   useRpc: (method: string) => (method === "slack.status" ? { data: statusData, isError: false, refetch: refetchStatus } : { data: { rootPath: "/workspace" }, isError: false }),
   useRpcMutation: () => ({ isPending: false, error: null, mutateAsync: configureWorkspace }),
 }));
-vi.mock("../lib/rpc", () => ({ core: { call: (...args: unknown[]) => call(...args) } }));
+vi.mock("../lib/rpc", () => ({ core: { call: (...args: unknown[]) => call(...args), onPush: () => () => {} } }));
 vi.mock("./settings-slack-direct", () => ({ DirectSlackSettings: ({ active }: { active: boolean }) => <div data-testid="direct" data-active={active} /> }));
 
 import { SlackSettings } from "./settings-slack";

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Thread } from "@openorc/protocol";
 import { readDraft, writeDraft } from "../lib/drafts";
-import { useRpcMutation } from "../lib/query";
+import { useRpcMutation } from "../lib/client";
 import { prepareTeamSendRequest, restoreTeamSendRequest, type TeamSendRequest } from "../lib/team-send-request";
 import { teamControlParams, teamTaskScope } from "../lib/team-control-scope";
 

@@ -5,7 +5,7 @@ import { ThreadRichText } from "../../apps/desktop/src/renderer/src/components/T
 import { RichText } from "../../apps/desktop/src/renderer/src/components/RichText";
 import { Panel } from "../../apps/desktop/src/renderer/src/components/Panel";
 import { useLayout } from "../../apps/desktop/src/renderer/src/lib/layout";
-import { queryClient } from "../../apps/desktop/src/renderer/src/lib/query";
+import { queryClient } from "../../apps/desktop/src/renderer/src/lib/client";
 import { core } from "../../apps/desktop/src/renderer/src/lib/rpc";
 
 const project: Project = {

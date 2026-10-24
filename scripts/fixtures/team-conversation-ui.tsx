@@ -6,8 +6,9 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Panel } from "../../apps/desktop/src/renderer/src/components/Panel";
 import { TeamConversation } from "../../apps/desktop/src/renderer/src/components/TeamConversation";
 import { core } from "../../apps/desktop/src/renderer/src/lib/rpc";
-import { queryClient } from "../../apps/desktop/src/renderer/src/lib/query";
-import { emptyRun, getRun, seedRun } from "../../apps/desktop/src/renderer/src/lib/transcript";
+import { queryClient } from "../../apps/desktop/src/renderer/src/lib/client";
+import { emptyRun } from "../../packages/client/src/index";
+import { runs } from "../../apps/desktop/src/renderer/src/lib/client";
 import { useTheme } from "../../apps/desktop/src/renderer/src/lib/theme";
 
 window.addEventListener("error", (event) => console.error(event.error?.stack ?? event.message));
@@ -64,7 +65,7 @@ for (const actor of actors) {
   if (actor.id === "lead") entries = [message("lead-reply", "I’ll coordinate the changes. @Sol 1, please check the implementation.")];
   else if (actor.memberKey !== "sol1")
     entries = [{ kind: "tool", id: "ambient-read", name: "read_file", input: { path: "README.md" }, done: true, output: "Project overview" }, message("silent", "Nothing to add.")];
-  seedRun({
+  runs.seed({
     ...emptyRun(actor.memberKey),
     blocks: entries,
     blockIndex: new Map(entries.map((b, i) => [b.id, i])),
@@ -128,8 +129,8 @@ core.call = (async (method, params) => {
   }
   if (method === "approvals.resolve") {
     approvalCalls.push(params);
-    const run = getRun(params.runId)!;
-    seedRun({
+    const run = runs.get(params.runId)!;
+    runs.seed({
       ...run,
       blocks: run.blocks.map((block) => (block.kind === "approval" && block.approvalId === params.approvalId ? { ...block, decision: params.decision, answers: params.answers } : block)),
     });
@@ -154,7 +155,7 @@ function App() {
       reviewCalls,
       approvalCalls,
       streamReply: (text, complete = false) => {
-        seedRun({ ...getRun("sol1")!, blocks: [...blocks.slice(0, -1), { ...message("final", text), streaming: !complete }], live: !complete });
+        runs.seed({ ...runs.get("sol1")!, blocks: [...blocks.slice(0, -1), { ...message("final", text), streaming: !complete }], live: !complete });
         data = {
           ...data,
           executions: [
@@ -193,8 +194,8 @@ function App() {
         setRuntime(data);
       },
       finish: () => {
-        const run = getRun("sol1")!;
-        seedRun({ ...run, blocks: [...run.blocks, { kind: "status", id: "done", boundary: "turn", outcome: "success", tone: "ok", text: "turn finished", at: at + 15000 }] });
+        const run = runs.get("sol1")!;
+        runs.seed({ ...run, blocks: [...run.blocks, { kind: "status", id: "done", boundary: "turn", outcome: "success", tone: "ok", text: "turn finished", at: at + 15000 }] });
         // A settled transcript also has a settled runtime turn. Its end time
         // moves the turn below earlier chat and assignment entries in the feed.
         data = {
@@ -238,8 +239,8 @@ function App() {
         setRuntime(data);
       },
       approval: () => {
-        const run = getRun("sol1")!;
-        seedRun({ ...run, pendingApprovals: 1, blocks: [...run.blocks, { kind: "approval", id: "approval", approvalId: "approval", approvalKind: "command", input: { command: "pnpm verify" } }] });
+        const run = runs.get("sol1")!;
+        runs.seed({ ...run, pendingApprovals: 1, blocks: [...run.blocks, { kind: "approval", id: "approval", approvalId: "approval", approvalKind: "command", input: { command: "pnpm verify" } }] });
       },
     },
   });

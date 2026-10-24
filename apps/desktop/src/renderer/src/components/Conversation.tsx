@@ -10,16 +10,15 @@ import { Transcript } from "./Transcript";
 import { MessageQueue } from "./MessageQueue";
 import { BackgroundCommands } from "./BackgroundCommands";
 import { useTurnFooter } from "./TurnFooter";
-import { isImageGeneration } from "../lib/image-activity";
+import { isImageGeneration, conversationSteerReason, conversationSendDisabledReason, messageBody, processFit, type SubmitRequest } from "@openorc/client";
 import { useComposerChanges } from "../lib/composer-changes";
 import { useProjectGit } from "../lib/project-git";
 import { Button, Empty } from "./ui";
-import { useRpc, useRpcMutation } from "../lib/query";
+import { useRpc, useRpcMutation, useSubmit } from "../lib/client";
 import { useConversationDraft } from "../lib/conversation-draft";
 import { openThread } from "../lib/router";
 import { useSkillCommands } from "../lib/skill-commands";
 import { useConversationTranscript } from "../lib/conversation-transcript";
-import { conversationCanSteer, conversationSteerReason, conversationSendDisabledReason } from "../lib/conversation-presentation";
 import { useConversationSettings } from "../lib/conversation-settings";
 import { TeamConversation, TeamTaskConversation } from "./TeamConversation";
 import { useOrclingConversation } from "./useOrclingConversation";
@@ -153,10 +152,8 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   const voice = useRunVoices(orclings.voice, runs, thread);
   const draftKey = `conversation.${conversation.id}`;
   const { prompt, setPrompt, clearDraft, error: draftError } = useConversationDraft({ draftKey, threadId: thread?.id ?? null, initialText: thread?.draft ?? "" });
-  const start = useRpcMutation("runs.start");
-  const send = useRpcMutation("runs.send");
+  const submitter = useSubmit();
   const [sends, setSends] = useState(0);
-  const queue = useRpcMutation("threads.queue");
   const unqueue = useRpcMutation("threads.unqueue");
   const sendQueued = useRpcMutation("threads.sendQueued");
   const stopCommand = useRpcMutation("threads.stopCommand");
@@ -174,56 +171,34 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
     generatingImage ||
     compact.isPending ||
     (thread ? thread.activity !== "idle" : live && Boolean(liveTranscript && liveTranscript.blocks.some((b) => b.kind === "message" && b.role === "assistant" && b.streaming)));
-  const sameAgent = Boolean(activeRun && choice && activeRun.agent === choice.agent);
-  // Mode and permissions are fixed when a process starts, so a change needs a new one; the model, effort and Fast
-  // change on the live session when the next message is sent.
-  const settingsPending = Boolean(live && activeRun && (activeRun.mode !== mode || activeRun.permissionMode !== permission));
-  const canSteer = conversationCanSteer({ live, sameAgent, agent: activeRun?.agent, compacting: compact.isPending, settingsPending });
+  const { sameAgent, settingsPending, canSteer } = processFit({ live, activeRun, choice, mode, permission, compacting: compact.isPending });
   const steerReason = conversationSteerReason({ canSteer, compacting: compact.isPending, settingsPending, sameAgent, agent: activeRun?.agent });
   const sendDisabledReason = conversationSendDisabledReason({ permissionReady, historyLoading: runsQuery.isLoading, historyFailed: Boolean(runsQuery.error), hasModel: Boolean(choice) });
-  const busy = start.isPending || send.isPending || queue.isPending;
+  const busy = submitter.pending;
   const turnFooter = useTurnFooter({ footers, threadId, working });
   const switching = Boolean(thread && choice && runs.length > 0 && !runs.some((r) => r.agent === choice.agent));
 
-  const startRun = async (body: string, attachments: string[], fresh = false) => {
-    if (!permissionReady) throw new Error("Wait for your saved permissions to load.");
-    await settings.waitForSave();
-    if (!choice) throw new Error("Choose a model first.");
-    const target = scope.kind === "task" ? { taskId: scope.task.id, ...(firstTaskRun ? { workspaceMode } : {}) } : { threadId: scope.thread.id };
-    await start.mutateAsync({
-      ...target,
-      agent: choice.agent,
-      model: choice.model,
-      effort: choice.effort ?? undefined,
-      fastMode: Boolean(choice.fastMode),
-      attachments,
-      mode,
-      permissionMode: permission,
-      prompt: body,
-      resume: fresh ? false : runs.some((r) => r.agent === choice.agent),
-    });
+  const request: Omit<SubmitRequest, "now"> = {
+    target: scope.kind === "task" ? { kind: "task", taskId: scope.task.id, ...(firstTaskRun ? { workspaceMode } : {}) } : { kind: "thread", threadId: scope.thread.id },
+    working,
+    live,
+    activeRun,
+    agentsUsed: runs.map((r) => r.agent),
+    choice,
+    mode,
+    permission,
+    permissionReady,
+    compacting: compact.isPending,
+    waitForSave: settings.waitForSave,
+  };
+  const submit = async (text: string, attachments: string[], now: boolean) => {
+    setSends((count) => count + 1);
+    // A message to an Orcling goes to the Orcling, not to this conversation's agent.
+    if (await orclings.ask(messageBody(text, attachments), attachments)) return clearDraft();
+    await submitter.submit({ ...request, now }, { text, attachments });
     clearDraft();
   };
-
-  const submit = async (text: string, attachments: string[], now: boolean) => {
-    if (!choice) throw new Error("Choose a model first.");
-    setSends((count) => count + 1);
-    await settings.waitForSave();
-    const body = text || (attachments.length ? "See the attached image." : "Start working on this task.");
-    if (await orclings.ask(body, attachments)) return clearDraft();
-    if (thread && working) {
-      if (now && canSteer && activeRun) await send.mutateAsync({ runId: activeRun.id, text: body, attachments });
-      else await queue.mutateAsync({ id: thread.id, text: body, attachments, requestKey: crypto.randomUUID() });
-      clearDraft();
-      return;
-    }
-    if (live && sameAgent && activeRun && !settingsPending) {
-      await send.mutateAsync({ runId: activeRun.id, text: body, attachments });
-      clearDraft();
-      return;
-    }
-    await startRun(body, attachments);
-  };
+  const restart = () => submitter.submit({ ...request, now: false, restart: true }, { text: "Continue where you left off. Check the working tree first.", attachments: [] }).then(clearDraft);
 
   const skills = useSkillCommands(project.id, choice?.agent, thread?.workingDirectory);
   const commands: SlashCommand[] = [
@@ -284,14 +259,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
             />
           ) : null}
           {thread ? <BackgroundCommands commands={thread.backgroundCommands ?? []} pending={stopCommand.isPending} onStop={(commandId) => stopCommand.mutate({ id: thread.id, commandId })} /> : null}
-          {session && !working ? (
-            <SessionRecovery
-              session={session}
-              agent={thread?.agent ?? defaultHarnessId}
-              disabled={!choice || busy}
-              onRestart={() => void startRun("Continue where you left off. Check the working tree first.", [], true).catch(() => {})}
-            />
-          ) : null}
+          {session && !working ? <SessionRecovery session={session} agent={thread?.agent ?? defaultHarnessId} disabled={!choice || busy} onRestart={() => void restart().catch(() => {})} /> : null}
           {switching && choice ? (
             <div className="text-xs text-ink-3 px-1">Switching to {harnessShortName(choice.agent)} starts a fresh session. It gets a brief of this conversation, not the other agent's session.</div>
           ) : null}
@@ -333,10 +301,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
             compactDisabledReason={working ? "Available after this turn finishes." : undefined}
             fileSearch={conversation}
             commands={commands}
-            error={
-              (start.error ?? send.error ?? queue.error ?? sendQueued.error ?? stopCommand.error ?? compact.error ?? unqueue.error ?? fork.error ?? settings.error ?? draftError)?.message ??
-              permissionError
-            }
+            error={(submitter.error ?? sendQueued.error ?? stopCommand.error ?? compact.error ?? unqueue.error ?? fork.error ?? settings.error ?? draftError)?.message ?? permissionError}
           >
             {firstTaskRun && scope.kind === "task" ? (
               <ComposerChoice

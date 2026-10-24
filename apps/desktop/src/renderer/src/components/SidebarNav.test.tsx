@@ -3,12 +3,12 @@ import { afterEach, expect, it, vi } from "vitest";
 import { useLayout } from "../lib/layout";
 import { useRouter } from "../lib/router";
 
-vi.mock("../lib/query", () => {
+vi.mock("../lib/client", async (original) => {
   const rows: Record<string, unknown[]> = {
     "tasks.list": [{ status: "proposed" }, { status: "in_progress" }, { status: "review" }, { status: "backlog" }, { status: "done" }],
     "schedules.list": [{ enabled: true }, { enabled: false }],
   };
-  return { useRpc: (method: string) => ({ data: rows[method] }) };
+  return { ...(await original<object>()), useRpc: (method: string) => ({ data: rows[method] }) };
 });
 
 import { SidebarNav } from "./SidebarNav";

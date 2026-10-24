@@ -1,6 +1,6 @@
 import { Button } from "./ui";
 import { PanelBar, PanelBarMeta, PanelNotice } from "./PanelBar";
-import { useRpc } from "../lib/query";
+import { useRpc } from "../lib/client";
 import { extractionSummary } from "../lib/memory-extraction";
 
 /** The Memory tool's bar: whether memory is on, as last acknowledged, and what summarizes runs. Settings owns the switch. */

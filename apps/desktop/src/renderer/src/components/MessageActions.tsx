@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Check, Copy, GitFork } from "./icons";
 import { IconButton } from "./ui";
 import { cn } from "../lib/cn";
-import { relativeTime } from "../lib/time";
+import { relativeTime } from "@openorc/client";
 
 /** When the message landed. Hidden until hover, the way the chat apps do it. */
 export function MessageTime({ at, className }: { at: number | undefined; className?: string }) {

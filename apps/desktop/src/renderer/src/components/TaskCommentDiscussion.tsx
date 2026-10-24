@@ -1,5 +1,5 @@
 import type { CommentAttempt, CommentRecipient, ModelOption, TaskComment, TaskDiscussion } from "@openorc/protocol";
-import { relativeTime } from "../lib/time";
+import { relativeTime } from "@openorc/client";
 import { AttemptResponse, type AttemptActions } from "./AttemptResponse";
 import { Button, TextButton } from "./ui";
 import { ThreadRichText } from "./ThreadImages";

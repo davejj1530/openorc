@@ -6,7 +6,7 @@ import { TabTrack } from "../components/TabTrack";
 import { TopBar } from "../components/TopBar";
 import { Button, Empty, TextButton } from "../components/ui";
 import { useLayout } from "../lib/layout";
-import { useRpc } from "../lib/query";
+import { useRpc } from "../lib/client";
 import { newThread, openTask, useRouter, type TaskTab } from "../lib/router";
 import { TaskDocument, type TaskDocumentHandle } from "./TaskDocument";
 import { TaskDraftProvider } from "../lib/task-draft-context";

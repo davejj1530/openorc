@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, renderHook, screen } from "@testing-li
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { AgentEvent, Project, Run, ThreadCheckpoint, ThreadSummary } from "@openorc/protocol";
-import { applyFrame, flushTranscripts, resetTranscripts } from "../lib/transcript";
+import { runs as runStore } from "../lib/client";
 import { useConversationTranscript } from "../lib/conversation-transcript";
 import { core } from "../lib/rpc";
 import { Conversation } from "./Conversation";
@@ -12,7 +12,8 @@ const restore = vi.hoisted(() => vi.fn(async () => null));
 vi.mock("../lib/rpc", () => ({
   core: new Proxy({ call: vi.fn() } as Record<string, unknown>, { get: (target, key: string) => (key in target ? target[key] : () => () => undefined) }),
 }));
-vi.mock("../lib/query", () => ({
+vi.mock("../lib/client", async (original) => ({
+  ...(await original<object>()),
   useRpc: (method: string, params: Record<string, unknown>) => ({ data: answers.get(method)?.(params), isLoading: false, isPending: false, isError: false, error: null, refetch: () => undefined }),
   useRpcMutation: () => ({ mutate: () => undefined, mutateAsync: restore, isPending: false, error: null }),
   invalidateTags: () => undefined,
@@ -91,7 +92,7 @@ function serve(runs: Run[], history: ThreadCheckpoint[], diffs: Record<string, R
 
 async function settle() {
   for (let i = 0; i < 6; i++) await act(async () => void (await new Promise((resolve) => setTimeout(resolve, 0))));
-  act(() => flushTranscripts());
+  act(() => runStore.flush());
 }
 
 async function show() {
@@ -120,7 +121,7 @@ const liveTurns = () => {
 };
 
 beforeEach(() => {
-  resetTranscripts();
+  runStore.reset();
   ledger.clear();
   answers.clear();
   restore.mockClear();
@@ -178,8 +179,8 @@ it("keeps the footers while the next reply streams, so finished turns keep their
   expect([...footers.outside]).toEqual([["turn-A-turn-0", [{ checkpointId: "mine", previousCheckpointId: "A1", by: "user" }]]]);
   expect(footers.cards.get("turn-A-turn-1")?.previousCheckpointId).toBe("mine");
   act(() => {
-    applyFrame({ runId: "A", seq: 1, events: [{ type: "message.delta", runId: "A", ts: 2000, messageId: "next-reply", role: "assistant", text: "Working", eventId: next() }] });
-    flushTranscripts();
+    runStore.applyFrame({ runId: "A", seq: 1, events: [{ type: "message.delta", runId: "A", ts: 2000, messageId: "next-reply", role: "assistant", text: "Working", eventId: next() }] });
+    runStore.flush();
   });
   expect(result.current.merged?.blocks.at(-1)).toMatchObject({ text: "Working", streaming: true });
   expect(result.current.footers).toBe(footers);

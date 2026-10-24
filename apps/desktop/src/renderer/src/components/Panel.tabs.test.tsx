@@ -4,7 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { Project, ThreadSummary } from "@openorc/protocol";
 import { useLayout } from "../lib/layout";
 import { usePanelSessions } from "../lib/panel-tabs";
-import { queryClient } from "../lib/query";
+import { queryClient } from "../lib/client";
 import { Panel } from "./Panel";
 
 vi.mock("../lib/window", () => ({ useTrafficLights: () => false, useWindowsControls: () => false }));

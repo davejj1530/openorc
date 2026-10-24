@@ -3,7 +3,7 @@ import { reviewCommentPlace, type PullRequestDetail, type PullRequestDraftCommen
 import { ChevronDown, ChevronRight, ExternalLink, Pencil, X } from "./icons";
 import { Button, Dialog, Field, IconButton, Segmented, Textarea, TextButton, Tooltip } from "./ui";
 import { draftAuthor, offeredSummary, readReviewAuthor, withModelSummary, writeReviewAuthor } from "../lib/pull-requests";
-import { useRpc, useRpcMutation } from "../lib/query";
+import { useRpc, useRpcMutation } from "../lib/client";
 import { useModelCatalog } from "../lib/use-model-catalog";
 import { useOrclings } from "../lib/orclings";
 

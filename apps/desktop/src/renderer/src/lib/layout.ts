@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { WORKSPACE_ID } from "@openorc/protocol";
 import type { RpcParams } from "@openorc/protocol";
 import type { FileReference } from "../../../shared/file-reference";
+import type { SidebarFilter } from "@openorc/client";
 
 export type PanelTab = "newtab" | "orcling" | "plan" | "file" | "changes" | "tasks" | "task" | "terminal" | "browser" | "commits" | "checkpoints" | "memory" | "instructions";
 /** One turn's saved diff, opened from its change card: a team attempt's checkpoint or a thread turn's. */
@@ -9,9 +10,6 @@ export type ChangeSelection = ({ kind: "team" } & Omit<RpcParams<"orchestration.
 export type FileSelection = FileReference & { scope: RpcParams<"files.read">["scope"] };
 export type WorkspaceChangesTarget = { kind: "thread" | "project"; id: string };
 export type WorkspaceChangesRequest = WorkspaceChangesTarget & { comparison: "base" | "head"; commit: boolean; requestId: number };
-
-/** Which threads the sidebar lists: every active thread, orcmode's working set of them, or the archive. */
-export type SidebarFilter = "active" | "orc" | "archived";
 
 /** A screen the sidebar can list. The ones the user hides wait under More; Inbox sits in the window's header instead. */
 export type SidebarScreen = "tasks" | "pulls" | "scheduled" | "orchestration" | "memory";

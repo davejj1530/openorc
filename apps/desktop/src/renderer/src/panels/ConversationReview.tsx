@@ -4,7 +4,7 @@ import type { CommentDraft } from "../components/DiffView";
 import { Send } from "../components/icons";
 import { Button } from "../components/ui";
 import { PanelNotice } from "../components/PanelBar";
-import { useRpc, useRpcMutation } from "../lib/query";
+import { useRpc, useRpcMutation } from "../lib/client";
 import { ReviewCommentList } from "./ReviewCommentList";
 
 const DiffView = lazy(() => import("../components/DiffView").then((m) => ({ default: m.DiffView })));

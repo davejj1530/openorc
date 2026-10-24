@@ -5,7 +5,7 @@ import type { Task } from "@openorc/protocol";
 import { TaskExecutionSettings, useTaskExecutionLocation } from "./TaskExecutionSettings";
 
 const mocks = vi.hoisted(() => ({ call: vi.fn(), teamMove: vi.fn() }));
-vi.mock("../lib/rpc", () => ({ core: { call: mocks.call, onInvalidate: () => {}, onReady: () => {} } }));
+vi.mock("../lib/rpc", () => ({ core: { call: mocks.call, onReady: () => {}, onPush: () => () => {} } }));
 vi.mock("../lib/ui", () => ({ useUi: { getState: () => ({ setTeamMoveThread: mocks.teamMove }) } }));
 afterEach(() => {
   cleanup();

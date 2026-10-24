@@ -3,11 +3,11 @@ import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import { WORKSPACE_ID, type AgentSkill } from "@openorc/protocol";
-import { queryClient } from "./query";
+import { queryClient } from "./client";
 import { useSkillCommands } from "./skill-commands";
 
 const rpc = vi.hoisted(() => ({ call: vi.fn() }));
-vi.mock("./rpc", () => ({ core: { call: rpc.call, onInvalidate: () => {}, onReady: () => {} } }));
+vi.mock("./rpc", () => ({ core: { call: rpc.call, onReady: () => {}, onPush: () => () => {} } }));
 const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 
 /** Rini's own conversation works in its folder, not in a project. */

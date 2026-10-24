@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import type { ImportableSession } from "@openorc/protocol";
 import { Button, Dialog, Field, Select } from "../components/ui";
 import { cn } from "../lib/cn";
-import { useRpc, useRpcMutation } from "../lib/query";
+import { useRpc, useRpcMutation } from "../lib/client";
 import { openThread } from "../lib/router";
-import { relativeTime } from "../lib/time";
+import { relativeTime } from "@openorc/client";
 
 const agentLabel: Record<string, string> = { claude: "Claude Code", codex: "Codex" };
 

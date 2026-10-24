@@ -14,14 +14,15 @@ import {
 import { FileText, Laptop, Lightbulb, Pencil, Plus, ShieldCheck, Square, Wand, X } from "./icons";
 import { ComposerInput } from "./ComposerInput";
 import { ComposerChoice } from "./ComposerChoice";
-import { ComposerSendButton, type ComposerSendState } from "./ComposerSendButton";
+import { ComposerSendButton } from "./ComposerSendButton";
 import { ComposerFooter } from "./ComposerFooter";
 import { ComposerDropZone, useComposerDrop } from "./ComposerDropZone";
 import { ContextUsage } from "./ContextUsage";
 import { ComposerModelPicker, type ModelChoice } from "./ModelPicker";
 import { Button, Tooltip } from "./ui";
 import { cn } from "../lib/cn";
-import { useRpcMutation } from "../lib/query";
+import { useRpcMutation } from "../lib/client";
+import { composerActions } from "@openorc/client";
 import { useComposerAttachments, removeAcceptedAttachments } from "../lib/composer-attachments";
 import { formatBytes } from "../lib/file-imports";
 import { type MentionEntry } from "../lib/composer-mentions";
@@ -177,7 +178,16 @@ export function Composer(props: ComposerProps) {
   const attachmentBlock = attachments.length > 0 ? props.attachmentsDisabledReason : null;
   const canSend = Boolean(props.allowEmpty || props.value.trim() || attachments.length > 0) && !props.busy && !submitting && !props.disabledReason && !attachmentBlock && uploading === 0;
 
-  const submit = (now = Boolean(props.liveByDefault && queueing)) => {
+  const queueing = Boolean(props.queueing);
+  const canStop = Boolean(props.stopAction?.working || (!props.stopAction && props.live?.working));
+  const actions = composerActions({
+    queueing,
+    liveByDefault: Boolean(props.liveByDefault),
+    steerable: Boolean(props.steerable),
+    canStop,
+    hasDraft: Boolean(props.value.trim()) || attachments.length > 0 || uploading > 0,
+  });
+  const submit = (now = actions.sendsNow) => {
     if (!canSend) return;
     files.clearError();
     const sent = attachments.map((attachment) => attachment.path);
@@ -197,9 +207,7 @@ export function Composer(props: ComposerProps) {
     input.click();
   };
 
-  const queueing = Boolean(props.queueing);
-  const canStop = Boolean(props.stopAction?.working || (!props.stopAction && props.live?.working));
-  const stopInsteadOfSend = canStop && !props.value.trim() && attachments.length === 0 && uploading === 0;
+  const stopInsteadOfSend = actions.primary === "stop";
   const stopping = props.stopAction?.pending ?? interrupt.isPending;
   const activityLabel = composerActivity({ stopping, submitting, generatingImage: Boolean(props.generatingImage) });
   const sendHint = composerSendHint({
@@ -215,8 +223,6 @@ export function Composer(props: ComposerProps) {
     if (props.stopAction) props.stopAction.onStop();
     else if (props.live) interrupt.mutate({ runId: props.live.runId });
   };
-  let sendState: ComposerSendState = queueing && !props.liveByDefault ? "queue" : "send";
-  if (stopInsteadOfSend) sendState = "stop";
 
   return (
     <div className={cn("composer min-w-0", props.size === "lg" && "composer-large", isNewThread && "composer-new-thread")}>
@@ -264,7 +270,7 @@ export function Composer(props: ComposerProps) {
           <ComposerInput
             value={props.value}
             onChange={props.onChange}
-            onSubmit={(duringTurn) => submit(Boolean(props.liveByDefault && queueing) || duringTurn)}
+            onSubmit={(duringTurn) => submit(actions.sendsNow || duringTurn)}
             onFiles={addFiles}
             disabled={Boolean(props.busy || submitting)}
             placeholder={props.placeholder}
@@ -304,7 +310,7 @@ export function Composer(props: ComposerProps) {
             {props.context ? (
               <ContextUsage used={props.context.used} window={props.context.window} onCompact={props.onCompact} compacting={props.compacting} disabledReason={props.compactDisabledReason} />
             ) : null}
-            {canStop && !stopInsteadOfSend ? (
+            {actions.stop ? (
               <Tooltip label="Stop this turn">
                 <button onClick={stop} disabled={stopping} aria-label="Stop" className="composer-icon-button">
                   <Square size={14} />
@@ -315,14 +321,14 @@ export function Composer(props: ComposerProps) {
                 Disabled controls drop their pointer events, so a dim button
                 could never show why it was dim. The reason goes on the queue
                 button instead, which is enabled and therefore hoverable. */}
-            {!stopInsteadOfSend && !props.liveByDefault && queueing && props.steerable ? (
+            {actions.sendNow ? (
               <Tooltip label="Say it during this turn">
                 <button onClick={() => void submit(true)} disabled={!canSend} aria-label="Send now" className="composer-send-now">
                   Send now
                 </button>
               </Tooltip>
             ) : null}
-            {!stopInsteadOfSend && props.liveByDefault && queueing ? (
+            {actions.queue ? (
               <Tooltip label="Queue for after this turn">
                 <Button size="sm" variant="ghost" disabled={!canSend} onClick={() => void submit(false)}>
                   Queue
@@ -330,7 +336,7 @@ export function Composer(props: ComposerProps) {
               </Tooltip>
             ) : null}
             <ComposerSendButton
-              state={sendState}
+              state={actions.primary}
               disabled={stopInsteadOfSend ? stopping : !canSend}
               hint={stopInsteadOfSend ? "Stop this turn" : sendHint}
               onClick={stopInsteadOfSend ? stop : () => void submit()}

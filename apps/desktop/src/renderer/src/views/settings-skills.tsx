@@ -5,7 +5,7 @@ import { ChevronDown, RefreshCw, Search } from "../components/icons";
 import { Button, Input, Select } from "../components/ui";
 import { cn } from "../lib/cn";
 import { useLayout } from "../lib/layout";
-import { useRpc } from "../lib/query";
+import { useRpc } from "../lib/client";
 import { LoadError } from "./settings-shared";
 
 const harnesses = [

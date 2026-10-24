@@ -7,7 +7,7 @@ import { fakeFileDisk, nthVersion } from "../fixtures/file-disk";
 import { useDrafts } from "../lib/file-drafts";
 import { useLayout, type FileSelection } from "../lib/layout";
 import { usePanelSessions } from "../lib/panel-tabs";
-import { invalidateTags, queryClient } from "../lib/query";
+import { invalidateTags, queryClient } from "../lib/client";
 import { core } from "../lib/rpc";
 import type { CodeEditorProps } from "./code-editor";
 import { Panel } from "./Panel";

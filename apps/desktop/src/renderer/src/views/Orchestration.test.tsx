@@ -3,11 +3,11 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { Orchestration } from "./Orchestration";
 import { core } from "../lib/rpc";
-import { queryClient } from "../lib/query";
+import { queryClient } from "../lib/client";
 import { useRouter } from "../lib/router";
 import { DEFAULT_TEAM_LIMITS, defaultOrclingLook, TeamDetail, type Orcling } from "@openorc/protocol";
 
-vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onInvalidate: vi.fn(), onReady: vi.fn() } }));
+vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: () => () => {} } }));
 vi.mock("../components/TopBar", () => ({ TopBar: () => null }));
 
 let enabled = false;

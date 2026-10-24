@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Block } from "./transcript";
+import type { Block } from "@openorc/client";
 import { teamForkReplyId } from "./team-fork-reply";
 
 const reply = (id: string, streaming = false): Block => ({ id, kind: "message", role: "assistant", text: `Reply ${id}`, streaming });

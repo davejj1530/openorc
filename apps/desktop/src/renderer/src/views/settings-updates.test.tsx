@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, expect, it, vi } from "vitest";
 import type { OpenOrcApi, UpdateSettings } from "../../../shared/types";
-import { queryClient } from "../lib/query";
+import { queryClient } from "../lib/client";
 import { UpdateSettingsSection } from "./settings-updates";
 
 function show(saved: UpdateSettings, save = vi.fn(async (on: boolean) => ({ ...saved, automaticChecks: on }))) {

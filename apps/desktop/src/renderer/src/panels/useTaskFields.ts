@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Task, TaskPriority, TaskStatus } from "@openorc/protocol";
-import { useRpcMutation } from "../lib/query";
+import { useRpcMutation } from "../lib/client";
 
 type FieldDraft = { spec: string; labels: string; receivedSpec: string; receivedLabels: string };
 

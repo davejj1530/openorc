@@ -3,7 +3,7 @@ import { useRef, useState } from "react";
 import type { WorkspaceMode } from "@openorc/protocol";
 import { Button, Dialog } from "./ui";
 import { useUi } from "../lib/ui";
-import { useRpc, useRpcMutation } from "../lib/query";
+import { useRpc, useRpcMutation } from "../lib/client";
 import { useThreadMutationPending } from "../lib/thread-mutations";
 import { useTeamMoveRequest } from "../lib/use-team-move-request";
 import { beginTeamMoveCancellation, beginTeamMoveRequest, finishTeamMoveRequest, pendingTeamMove } from "../lib/team-move-request";

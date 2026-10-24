@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import type { ReviewerAppStatus, SystemInfo } from "@openorc/protocol";
 import { Button, TextButton } from "../components/ui";
-import { useRpc, useRpcMutation } from "../lib/query";
+import { useRpc, useRpcMutation } from "../lib/client";
 import { installationLabel } from "./settings-presentation";
 import { Section, Status, Toggle } from "./settings-shared";
 

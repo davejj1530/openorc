@@ -5,7 +5,7 @@ import { Check, ChevronDown, Globe, SquareStack, Plus } from "./icons";
 import { ProjectIconPicker } from "./ProjectIconPicker";
 import { ProjectMenu } from "./ProjectMenu";
 import { CoversPreview } from "../lib/browser-preview";
-import { useRpc } from "../lib/query";
+import { useRpc } from "../lib/client";
 import { useUi } from "../lib/ui";
 import { floatingGround } from "../lib/use-anchor-ground";
 

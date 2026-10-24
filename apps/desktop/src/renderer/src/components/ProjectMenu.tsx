@@ -3,7 +3,7 @@ import { ContextMenu } from "@base-ui/react/context-menu";
 import { WORKSPACE_ID } from "@openorc/protocol";
 import { CoversPreview } from "../lib/browser-preview";
 import { useLayout } from "../lib/layout";
-import { useRpcMutation } from "../lib/query";
+import { useRpcMutation } from "../lib/client";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { X } from "./icons";
 import { menuItem, menuPopup } from "./menu";

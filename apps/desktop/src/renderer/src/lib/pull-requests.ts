@@ -12,7 +12,7 @@ import {
   type ReviewComment,
 } from "@openorc/protocol";
 import { orclingById } from "./orclings";
-import type { ModelChoice } from "./model-picker-selection";
+import type { ModelChoice } from "@openorc/client";
 
 export const pullRequestFilters: readonly { value: PullRequestFilter; label: string }[] = [
   { value: "open", label: "Open" },

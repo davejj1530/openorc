@@ -3,7 +3,7 @@ import { harnessCatalog, harnessIds, type HarnessId, type HarnessInfo, type Proj
 import type { HarnessRow } from "../components/HarnessScan";
 import type { OnboardingMascotMood } from "../components/OnboardingMascot";
 import { readOnboardingState, writeOnboardingState, type OnboardingStep, type PersistedOnboardingState } from "../lib/onboarding";
-import { queryClient, useRpc, useRpcMutation } from "../lib/query";
+import { queryClient, useRpc, useRpcMutation } from "../lib/client";
 import { useRouter } from "../lib/router";
 
 interface OnboardingFlowInput {

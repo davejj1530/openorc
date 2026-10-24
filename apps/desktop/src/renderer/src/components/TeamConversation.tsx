@@ -28,8 +28,8 @@ import { MemberAvatar } from "./MemberAvatar";
 import { orclingById, useOrclings } from "../lib/orclings";
 import { AlertCircle, ChevronDown, Folder, GitFork, Loader2 } from "./icons";
 import { Button, TextButton, Tooltip } from "./ui";
-import { emptyRun, getRun, hydrate, useRun, useRunMap, useRuns, type Block, type RunTranscript } from "../lib/transcript";
-import { useRpc, useRpcMutation } from "../lib/query";
+import { emptyRun, type Block, type RunTranscript } from "@openorc/client";
+import { runs as runStore, useRun, useRunMap, useRuns, useRpc, useRpcMutation } from "../lib/client";
 import { readDraft, writeDraft } from "../lib/drafts";
 import { openTask, openThread } from "../lib/router";
 import { useSkillCommands } from "../lib/skill-commands";
@@ -1276,10 +1276,10 @@ function RunActivity({ runId, turn, fork, live, ambient = false, author }: { aut
   const [error, setError] = useState<string | null>(null);
   const load = useCallback(() => {
     setError(null);
-    void hydrate(runId).catch((failure) => setError(failure instanceof Error ? failure.message : String(failure)));
+    void runStore.hydrate(runId).catch((failure) => setError(failure instanceof Error ? failure.message : String(failure)));
   }, [runId]);
   useEffect(() => {
-    if (!getRun(runId)?.hydrated) load();
+    if (!runStore.get(runId)?.hydrated) load();
   }, [runId, load]);
   // User direction is rendered once from the execution journal, as its own feed item.
   // A conversation member's process serves several turns; a turn shows only the blocks recorded during it.

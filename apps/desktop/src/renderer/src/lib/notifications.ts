@@ -1,3 +1,4 @@
+import { client } from "./client";
 import { core } from "./rpc";
 import { openThread, useRouter } from "./router";
 import { NotificationDelivery, NotificationVisibility, noticeDestination, noticeVisible, type NoticeTarget } from "./notification-delivery";
@@ -38,7 +39,7 @@ export function installNotifications(): void {
       };
     },
   });
-  const unsubscribe = core.onNotify((n) => {
+  const unsubscribe = client.onNotify((n) => {
     void delivery.receive(n).catch(() => undefined);
   });
   window.addEventListener(

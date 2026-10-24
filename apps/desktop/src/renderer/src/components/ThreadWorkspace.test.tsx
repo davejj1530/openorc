@@ -9,7 +9,7 @@ const { mutate, planThreads, documents, teamThreads } = vi.hoisted(() => ({
   documents: new Map<string, ConversationPlan[]>(),
   teamThreads: new Set<string>(),
 }));
-vi.mock("../lib/query", () => {
+vi.mock("../lib/client", async (original) => {
   const rpcData = (method: string, params: { id?: string }) => {
     if (method === "projects.list") return [];
     if (method === "threads.get")
@@ -26,12 +26,9 @@ vi.mock("../lib/query", () => {
     if (method === "orchestration.runtime") return { executions: [{ actors: [{ id: "lead", runIds: ["run"] }] }] };
     return { id: "project", name: "Project" };
   };
-  return {
-    useRpc: (method: string, params: { id?: string }) => ({ isSuccess: true, data: rpcData(method, params) }),
-    useRpcMutation: () => ({ mutate }),
-  };
+  return { ...(await original<object>()), useRpc: (method: string, params: { id?: string }) => ({ isSuccess: true, data: rpcData(method, params) }), useRpcMutation: () => ({ mutate }) };
 });
-vi.mock("../lib/rpc", () => ({ core: { call: vi.fn() } }));
+vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onPush: () => () => {} } }));
 vi.mock("../lib/window", () => ({ useTrafficLights: () => true, useWindowsControls: () => false }));
 vi.mock("./Sidebar", () => ({ WindowNav: () => null }));
 vi.mock("./Panel", () => ({ Panel: () => null }));

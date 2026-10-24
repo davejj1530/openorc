@@ -3,9 +3,9 @@ import { harnessName, type Schedule } from "@openorc/protocol";
 import { ArrowUpRight, CalendarClock, RefreshCw, Trash2, Zap } from "../components/icons";
 import { IconButton, Switch, Tooltip } from "../components/ui";
 import { cn } from "../lib/cn";
-import { useRpcMutation } from "../lib/query";
+import { useRpcMutation } from "../lib/client";
 import { openThread, useRouter } from "../lib/router";
-import { relativeTime, untilTime } from "../lib/time";
+import { relativeTime, untilTime } from "@openorc/client";
 import { beginScheduleTrigger, finishScheduleTrigger, readScheduleTrigger } from "../lib/schedule-draft";
 import "./schedules.css";
 

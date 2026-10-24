@@ -5,7 +5,7 @@ import { useTaskDocumentDraft } from "./task-document-draft";
 
 const mutation = vi.hoisted(() => ({ mutateAsync: vi.fn(), isPending: false, error: null as Error | null }));
 let actions: ReturnType<typeof createTaskDraftBarrier>;
-vi.mock("./query", () => ({ useRpcMutation: () => mutation }));
+vi.mock("./client", async (original) => ({ ...(await original<object>()), useRpcMutation: () => mutation }));
 vi.mock("./task-draft-context", () => ({ useTaskDraftActions: () => actions }));
 const task = { id: "task", title: "Task", spec: "saved", labels: [] };
 function deferred() {

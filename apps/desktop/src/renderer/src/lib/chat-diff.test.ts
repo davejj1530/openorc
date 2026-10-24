@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { parsePatchFiles } from "@pierre/diffs";
-import { toolDiff } from "./chat-diff";
+import { toolDiff } from "@openorc/client";
 
 it("retains provider line numbers and quoted file paths in per-file hunks", () => {
   const patch = toolDiff([

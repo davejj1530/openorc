@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { core } from "./rpc";
-import { queryClient } from "./query";
+import { queryClient } from "./client";
 import { saveDefaultPermission } from "./permission-default";
 
 afterEach(() => {

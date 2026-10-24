@@ -1,9 +1,23 @@
 import { create } from "zustand";
 import { syncWindowAppearance } from "./window-appearance";
-import { themePresets, type Mode, type ThemePreset } from "./theme-palettes";
-import { overridesFor, parseCustomColors, withColor, withoutColor, withoutOverrides, withAccents, withoutAccents, type CustomColors } from "./theme-custom";
-import { combinationColors, resolveAccentColors, type AccentCombination, type AccentToken } from "./theme-accents";
-export { themePresets, type ThemePreset } from "./theme-palettes";
+import { toHex } from "./color";
+import {
+  themePresets,
+  type Mode,
+  type ThemePreset,
+  overridesFor,
+  parseCustomColors,
+  withColor,
+  withoutColor,
+  withoutOverrides,
+  withAccents,
+  withoutAccents,
+  type CustomColors,
+  combinationColors,
+  resolveAccentColors,
+  type AccentCombination,
+  type AccentToken,
+} from "@openorc/client/theme";
 
 export type ThemeChoice = "system" | "light" | "dark";
 
@@ -41,7 +55,7 @@ function apply(choice: ThemeChoice, preset: ThemePreset, custom: CustomColors): 
   root.dataset.theme = resolved;
   root.dataset.palette = preset;
   root.classList.toggle("dark", resolved === "dark");
-  const colors = resolveAccentColors(themePresets.find((p) => p.id === preset)!.colors[resolved], overridesFor(custom, preset, resolved));
+  const colors = resolveAccentColors(themePresets.find((p) => p.id === preset)!.colors[resolved], overridesFor(custom, preset, resolved), toHex);
   for (const [key, value] of Object.entries(colors)) root.style.setProperty(key, value);
   syncWindowAppearance(choice);
   return resolved;

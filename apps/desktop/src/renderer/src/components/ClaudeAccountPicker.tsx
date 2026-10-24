@@ -1,7 +1,7 @@
 import type { ClaudeAccounts } from "@openorc/protocol";
 import { Select, TextButton } from "./ui";
 import { useRouter } from "../lib/router";
-import { useRpc } from "../lib/query";
+import { useRpc } from "../lib/client";
 import { useClaudeAccountId } from "../lib/claude-account";
 
 /** The Claude account a run uses. The compact chip drops the visible label; its select keeps the name. */

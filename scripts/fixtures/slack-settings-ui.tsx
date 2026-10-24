@@ -4,7 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import type { RpcMethod, RpcParams, RpcResults, SlackStatus } from "@openorc/protocol";
 import { SlackSettings } from "../../apps/desktop/src/renderer/src/views/settings-slack";
 import { core } from "../../apps/desktop/src/renderer/src/lib/rpc";
-import { queryClient } from "../../apps/desktop/src/renderer/src/lib/query";
+import { queryClient } from "../../apps/desktop/src/renderer/src/lib/client";
 
 const state: SlackStatus = {
   mode: "direct",

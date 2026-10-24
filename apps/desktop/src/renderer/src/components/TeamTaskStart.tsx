@@ -4,7 +4,7 @@ import type { TeamTaskAdmissionView, TeamTaskView } from "@openorc/protocol";
 import { Button, TextButton } from "./ui";
 import { Play } from "./icons";
 import { permissionLabel } from "./Composer";
-import { queryClient, useRpcMutation } from "../lib/query";
+import { queryClient, useRpcMutation } from "../lib/client";
 import { openTask, openThread } from "../lib/router";
 import { useTaskDraftActions } from "../lib/task-draft-context";
 import { beginTeamTaskRequest, finishTeamTaskRequest, readTeamTaskRequest, teamTaskAdmissionLabel, type TeamTaskRequest, type TeamTaskRequestScope } from "../lib/team-task-actions";

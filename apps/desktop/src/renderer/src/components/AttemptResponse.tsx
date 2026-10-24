@@ -2,7 +2,7 @@ import { effortLabel, harnessName, type CommentAttempt, type CommentRecipient, t
 import { modelLabel } from "../lib/model-effort-label";
 import { orclingById, useOrclings } from "../lib/orclings";
 import { openThread } from "../lib/router";
-import { relativeTime } from "../lib/time";
+import { relativeTime } from "@openorc/client";
 import { OrclingAvatar } from "./OrclingAvatar";
 import { QuestionCard } from "./QuestionCard";
 import { ThreadRichText } from "./ThreadImages";

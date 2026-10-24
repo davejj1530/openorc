@@ -13,7 +13,7 @@ import { startThreadDrag, endThreadDrag } from "../lib/thread-drag";
 import { CoversPreview } from "../lib/browser-preview";
 import { pullRequestNumber } from "../lib/pull-requests";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
-import { relativeTime } from "../lib/time";
+import { relativeTime } from "@openorc/client";
 import { orclingById, useOrclings } from "../lib/orclings";
 import { OrclingAvatar } from "./OrclingAvatar";
 import { floatingGround } from "../lib/use-anchor-ground";

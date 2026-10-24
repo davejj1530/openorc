@@ -6,7 +6,7 @@ import { Input } from "../components/ui";
 import { ROOT_FOLDERS, relativeFilePath, useFileExplorer } from "../lib/file-explorer";
 import { filesKey, useFilesFocus } from "../lib/files-tool";
 import { useLayout } from "../lib/layout";
-import { useRpc } from "../lib/query";
+import { useRpc } from "../lib/client";
 import { FileExplorerToolbar } from "./FileExplorerToolbar";
 
 interface ExplorerProps {

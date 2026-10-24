@@ -1,7 +1,7 @@
 import { useState, type CSSProperties } from "react";
 import { RotateCcw } from "./icons";
 import { cn } from "../lib/cn";
-import { normalizeHex } from "../lib/theme-custom";
+import { normalizeHex } from "@openorc/client/theme";
 
 /** One editable color. With `alpha`, `value` may be `#rrggbbaa`: the swatch shows it over the window
  * ground and edits the color while keeping the alpha; the hex field edits both. */

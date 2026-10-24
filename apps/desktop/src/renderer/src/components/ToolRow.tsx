@@ -2,13 +2,10 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { cn } from "../lib/cn";
 import { core } from "../lib/rpc";
 import { toolResult } from "../lib/tool-result";
-import type { Block } from "../lib/transcript";
-import { visualizationFromTool } from "../lib/visualization";
+import { type Block, visualizationFromTool, liveVerb, stateLabel, toolCallPresentation, toolIntent, isCheckCommand } from "@openorc/client";
 import { ChevronRight, CircleCheck, Loader2, Terminal, X } from "./icons";
-import { liveVerb, stateLabel, toolCallPresentation } from "./tool-presentation";
+import { toolIcons } from "./tool-icons";
 import { ToolDetail } from "./ToolDetail";
-import { toolIntent } from "./work-chips";
-import { isCheckCommand } from "./work-receipt";
 
 const McpAppResult = lazy(() => import("./McpAppResult"));
 const VisualizationResult = lazy(() => import("./VisualizationResult"));
@@ -78,7 +75,8 @@ function rowLabel(block: ToolBlock, verb: string, visualization: boolean): strin
 
 function PlainToolRow({ block, label, object, defaultOpen }: { block: ToolBlock; label: string; object: string; defaultOpen: boolean }) {
   const { open, toggle, output, approach } = useToolDisclosure(block, defaultOpen);
-  const { icon: Icon, tone } = toolCallPresentation(block.name, block.input);
+  const { icon, tone } = toolCallPresentation(block.name, block.input);
+  const Icon = toolIcons[icon];
   return (
     <>
       <button type="button" aria-expanded={open} data-state={toolState(block)} onClick={toggle} onPointerEnter={approach} onFocus={approach} className="tool-row">

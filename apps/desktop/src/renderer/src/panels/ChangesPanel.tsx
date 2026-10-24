@@ -8,7 +8,7 @@ import { cn } from "../lib/cn";
 import { ConversationReview } from "./ConversationReview";
 import { FileRows } from "./FileRows";
 import { PullRequestLink } from "./ThreadPullRequest";
-import { useRpc, useRpcMutation } from "../lib/query";
+import { useRpc, useRpcMutation } from "../lib/client";
 import { teamGitActions } from "../lib/team-git-actions";
 import { useThreadMutationPending } from "../lib/thread-mutations";
 import { useLayout, type WorkspaceChangesTarget } from "../lib/layout";

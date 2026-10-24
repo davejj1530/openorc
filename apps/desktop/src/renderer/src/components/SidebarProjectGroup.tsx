@@ -3,7 +3,7 @@ import { useLayout } from "../lib/layout";
 import { WORKSPACE_ID } from "@openorc/protocol";
 import { newThread } from "../lib/router";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
-import type { ProjectMeta } from "../lib/sidebar-thread-groups";
+import type { ProjectMeta } from "@openorc/client";
 import { Globe, Plus } from "./icons";
 import { ProjectIconPicker } from "./ProjectIconPicker";
 import { ProjectMenu } from "./ProjectMenu";

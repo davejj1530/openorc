@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { SlackClientConfig } from "@openorc/protocol";
-import { useRpc, useRpcMutation } from "../lib/query";
+import { useRpc, useRpcMutation } from "../lib/client";
 import { core } from "../lib/rpc";
 
 /** Owns the relay forms and the save/connect/refetch lifecycle behind each action. */

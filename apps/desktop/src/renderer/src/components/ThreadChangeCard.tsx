@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { ChangeCard } from "./ChangeCard";
 import { Button, Tooltip } from "./ui";
 import { cn } from "../lib/cn";
-import { useRpc, useRpcMutation } from "../lib/query";
+import { useRpc, useRpcMutation } from "../lib/client";
 import { useLayout } from "../lib/layout";
 
 /** How long an Undo waits for its confirming second click before it settles back. */

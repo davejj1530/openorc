@@ -7,7 +7,7 @@ import { CoversPreview } from "../lib/browser-preview";
 import { usePanelSessions } from "../lib/panel-tabs";
 import { useLayout } from "../lib/layout";
 import { PANE_MS } from "../lib/motion";
-import { queryClient } from "../lib/query";
+import { queryClient } from "../lib/client";
 import { core } from "../lib/rpc";
 import { Panel } from "./Panel";
 

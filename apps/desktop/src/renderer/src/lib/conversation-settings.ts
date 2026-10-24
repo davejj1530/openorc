@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { normalizeModelSettings, type AgentKind, type PermissionPreset, type Run, type RunMode, type ThreadSummary } from "@openorc/protocol";
 import { defaultChoice, type ModelChoice } from "../components/ModelPicker";
-import { useRpc, useRpcMutation } from "./query";
+import { useRpc, useRpcMutation } from "./client";
 import { usePermissionSelection } from "./permission-default";
 
 type SavedThreadSettings = Pick<ThreadSummary, "id" | "agent" | "model" | "effort" | "fastMode" | "mode" | "permissionMode">;

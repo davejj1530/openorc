@@ -4,7 +4,7 @@ import { Button, Segmented, Textarea } from "../components/ui";
 import { PanelNotice } from "../components/PanelBar";
 import { SavePill } from "../components/SavePill";
 import { readDraft, removeDraft, writeDraft } from "../lib/drafts";
-import { queryClient, useRpc, useRpcMutation } from "../lib/query";
+import { queryClient, useRpc, useRpcMutation } from "../lib/client";
 import "./instructions.css";
 
 /** Unsaved text, with the version of the file it started from. */

@@ -1,7 +1,7 @@
 import { createContext, useContext, useRef, type ReactNode } from "react";
 import { createTaskDraftBarrier, taskDraftPatch } from "./task-draft";
 import { core } from "./rpc";
-import { invalidateTags } from "./query";
+import { invalidateTags } from "./client";
 
 type TaskDraftActions = ReturnType<typeof createTaskDraftBarrier>;
 const TaskDraftContext = createContext<TaskDraftActions | null>(null);

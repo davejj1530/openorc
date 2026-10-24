@@ -1,9 +1,9 @@
 /** Representative completed/live turns rendered with the production thread and Hollow. */
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Transcript } from "../../apps/desktop/src/renderer/src/components/Transcript";
-import { applyFrame, getRun, hydrate, resetTranscripts, useTranscripts } from "../../apps/desktop/src/renderer/src/lib/transcript";
+import { runs } from "../../apps/desktop/src/renderer/src/lib/client";
 import { core } from "../../apps/desktop/src/renderer/src/lib/rpc";
 import { useTheme } from "../../apps/desktop/src/renderer/src/lib/theme";
 import type { AgentEvent } from "@openorc/protocol";
@@ -13,11 +13,11 @@ let counter = 0;
 function emit(event: AgentEvent) {
   const stamped = { ...event, eventId: `work-${counter++}` };
   ledger.push(stamped);
-  applyFrame({ runId: "work-demo", seq: counter, events: [stamped] });
+  runs.applyFrame({ runId: "work-demo", seq: counter, events: [stamped] });
 }
 const base = { runId: "work-demo", ts: Date.now() - 222000 };
 function seed() {
-  resetTranscripts();
+  runs.reset();
   ledger = [];
   counter = 0;
   emit({ ...base, type: "session.started", agent: "codex", externalSessionId: "fixture", model: null });
@@ -57,7 +57,7 @@ function seed() {
 }
 /** A turn that recovers: two failed attempts, a successful retry, then success. */
 function seedRecovered() {
-  resetTranscripts();
+  runs.reset();
   ledger = [];
   counter = 0;
   emit({ ...base, type: "session.started", agent: "codex", externalSessionId: "fixture", model: null });
@@ -90,7 +90,7 @@ useTheme.getState().set(params.get("theme") === "dark" ? "dark" : "light");
 core.call = async (method) => (method === "events.page" ? ({ events: ledger, fromTurn: 0, live: false } as never) : ([] as never));
 const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 function App() {
-  useTranscripts((s) => s.runs);
+  useSyncExternalStore(runs.subscribe, runs.snapshot);
   const [working, setWorking] = useState(false);
   Object.assign(window, {
     workSmoke: {
@@ -104,7 +104,7 @@ function App() {
         setWorking(false);
       },
       startupFailure: () => {
-        resetTranscripts();
+        runs.reset();
         ledger = [];
         counter = 0;
         emit({ ...base, type: "activity.updated", activityId: "startup", label: "Starting OpenCode", status: "success" });
@@ -127,12 +127,12 @@ function App() {
         setWorking(false);
       },
       reload: async () => {
-        resetTranscripts();
-        await hydrate("work-demo");
+        runs.reset();
+        await runs.hydrate("work-demo");
       },
     },
   });
-  const run = getRun("work-demo");
+  const run = runs.get("work-demo");
   return <QueryClientProvider client={client}>{run ? <Transcript run={run} working={working} /> : <div>Loading history…</div>}</QueryClientProvider>;
 }
 createRoot(document.getElementById("root")!).render(<App />);

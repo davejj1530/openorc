@@ -58,7 +58,7 @@ export default [
     },
   },
   {
-    files: ["apps/desktop/src/renderer/**/*.{ts,tsx}", "scripts/fixtures/**/*.tsx"],
+    files: ["apps/desktop/src/renderer/**/*.{ts,tsx}", "packages/client/src/**/*.ts", "scripts/fixtures/**/*.tsx"],
     plugins: { "react-hooks": reactHooks },
     rules: { "react-hooks/rules-of-hooks": "error", "react-hooks/exhaustive-deps": "error" },
   },

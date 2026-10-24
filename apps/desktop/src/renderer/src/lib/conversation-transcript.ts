@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Run, ThreadCheckpoint } from "@openorc/protocol";
-import { useRpc } from "./query";
-import { editedPaths } from "./edited-paths";
-import { emptyRun, getRun, hydrate, useRuns, type Block, type RunTranscript } from "./transcript";
+import { useRpc, runs as runStore, useRuns } from "./client";
+import { editedPaths, emptyRun, type Block, type RunTranscript } from "@openorc/client";
 
 /** Paging, conversation messages and checkpoint placement follow the same loaded run window. */
 export function useConversationTranscript({ runs, threadId, basePath }: { runs: Run[]; threadId: string | null; basePath: string }) {
@@ -184,16 +183,16 @@ function useRecentRuns(runs: Run[]) {
   useEffect(() => {
     // Every shown run reads its turns from the ledger once, a live one too; frames that arrive meanwhile follow.
     for (const id of shown) {
-      if (getRun(id)?.hydrated || failed.has(id)) continue;
-      hydrate(id, { turns: PAGE_TURNS }).catch(() => setFailed((ids) => new Set(ids).add(id)));
+      if (runStore.get(id)?.hydrated || failed.has(id)) continue;
+      runStore.hydrate(id, { turns: PAGE_TURNS }).catch(() => setFailed((ids) => new Set(ids).add(id)));
     }
   }, [shown, transcripts, failed]);
 
   const loadOlder = useCallback(() => {
     const id = shown[0];
-    const oldest = id ? getRun(id) : undefined;
+    const oldest = id ? runStore.get(id) : undefined;
     if (!id || !oldest?.hydrated) return;
-    if (oldest.fromTurn > 0) hydrate(id, { fromTurn: Math.max(0, oldest.fromTurn - PAGE_TURNS) }).catch(() => setFailed((ids) => new Set(ids).add(id)));
+    if (oldest.fromTurn > 0) runStore.hydrate(id, { fromTurn: Math.max(0, oldest.fromTurn - PAGE_TURNS) }).catch(() => setFailed((ids) => new Set(ids).add(id)));
     else if (start > 0) setShownFrom(ids[start - 1]!);
   }, [shown, start, ids]);
 
@@ -203,10 +202,10 @@ function useRecentRuns(runs: Run[]) {
 /** Where to start showing runs: the newest, extended back over runs still loaded in full from an earlier visit. */
 function loadedFrom(ids: string[]): number {
   const whole = (id: string) => {
-    const run = getRun(id);
+    const run = runStore.get(id);
     return Boolean(run?.hydrated && run.fromTurn === 0);
   };
   let start = Math.max(0, ids.length - 1);
-  while (start > 0 && whole(ids[start]!) && getRun(ids[start - 1]!)?.hydrated) start--;
+  while (start > 0 && whole(ids[start]!) && runStore.get(ids[start - 1]!)?.hydrated) start--;
   return start;
 }

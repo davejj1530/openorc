@@ -7,7 +7,7 @@ import { ChangesPanel } from "../panels/ChangesPanel";
 import { useComposerChanges } from "../lib/composer-changes";
 import { useLayout, type WorkspaceChangesTarget } from "../lib/layout";
 import { core } from "../lib/rpc";
-import { invalidateTags, queryClient } from "../lib/query";
+import { invalidateTags, queryClient } from "../lib/client";
 
 vi.mock("./DiffView", () => ({ DiffView: () => <div>Diff viewer</div> }));
 const project: Project = {

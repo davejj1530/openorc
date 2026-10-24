@@ -1,7 +1,7 @@
 import type { Task } from "@openorc/protocol";
 import { Loader2, MessageSquare } from "./icons";
 import { IconButton, Tooltip } from "./ui";
-import { useRpcMutation } from "../lib/query";
+import { useRpcMutation } from "../lib/client";
 import { openThread, useRouter } from "../lib/router";
 
 /** A task links to a conversation; opening it never launches an agent. */

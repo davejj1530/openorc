@@ -8,7 +8,7 @@ import { Panel } from "../../apps/desktop/src/renderer/src/components/Panel";
 import { useComposerChanges } from "../../apps/desktop/src/renderer/src/lib/composer-changes";
 import { useLayout } from "../../apps/desktop/src/renderer/src/lib/layout";
 import { core } from "../../apps/desktop/src/renderer/src/lib/rpc";
-import { invalidateTags, queryClient } from "../../apps/desktop/src/renderer/src/lib/query";
+import { invalidateTags, queryClient } from "../../apps/desktop/src/renderer/src/lib/client";
 import { useTheme, type ThemeChoice } from "../../apps/desktop/src/renderer/src/lib/theme";
 
 const project: Project = {

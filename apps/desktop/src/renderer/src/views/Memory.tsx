@@ -6,7 +6,7 @@ import { PageFilters, PageSearch } from "../components/PageFilters";
 import { TopBar } from "../components/TopBar";
 import { Button, Empty, Select, TextButton } from "../components/ui";
 import { useLayout } from "../lib/layout";
-import { useRpc } from "../lib/query";
+import { useRpc } from "../lib/client";
 import { newThread, useRouter } from "../lib/router";
 import { MemoryResults } from "./memory-results";
 

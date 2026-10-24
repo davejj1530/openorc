@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { useRpcMutation } from "../lib/query";
+import { useRpcMutation } from "../lib/client";
 import { useThreadMutationPending } from "../lib/thread-mutations";
 import { finishTeamForkRequest, readTeamForkRequest } from "../lib/team-fork-request";
 import { finishTeamRestoreRequest, readTeamRestoreRequest } from "../lib/team-restore-request";

@@ -2,8 +2,8 @@ import type { PanelContext } from "../components/Panel";
 import { MemoryCard } from "../components/MemoryCard";
 import { MemoryStatusBar } from "../components/MemoryStatusBar";
 import { Empty } from "../components/ui";
-import { useRpc } from "../lib/query";
-import { relativeTime } from "../lib/time";
+import { useRpc } from "../lib/client";
+import { relativeTime } from "@openorc/client";
 
 /** What the runs here taught the project: summaries per run for a task, the project's live memory for a thread. */
 export function MemoryPanel({ context }: { context: PanelContext }) {

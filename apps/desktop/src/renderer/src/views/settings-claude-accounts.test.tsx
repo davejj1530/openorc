@@ -2,11 +2,11 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { ClaudeAccounts } from "@openorc/protocol";
-import { queryClient } from "../lib/query";
+import { queryClient } from "../lib/client";
 import { ClaudeAccountSettings } from "./settings-claude-accounts";
 
 const mocks = vi.hoisted(() => ({ call: vi.fn() }));
-vi.mock("../lib/rpc", () => ({ core: { call: mocks.call, onInvalidate: () => {}, onReady: () => {} } }));
+vi.mock("../lib/rpc", () => ({ core: { call: mocks.call, onReady: () => {}, onPush: () => () => {} } }));
 let data: ClaudeAccounts;
 beforeEach(() => {
   queryClient.clear();

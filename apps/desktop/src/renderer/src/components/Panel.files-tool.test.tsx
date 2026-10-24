@@ -11,7 +11,7 @@ import { useFilesTool } from "../lib/files-tool";
 import { useFileExplorer } from "../lib/file-explorer";
 import { useLayout } from "../lib/layout";
 import { usePanelSessions } from "../lib/panel-tabs";
-import { queryClient } from "../lib/query";
+import { queryClient } from "../lib/client";
 import { core } from "../lib/rpc";
 import { useRouter } from "../lib/router";
 import type { CodeEditorProps } from "./code-editor";

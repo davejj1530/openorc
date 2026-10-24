@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TeamChatEntry } from "@openorc/protocol";
-import type { Block } from "./transcript";
+import type { Block } from "@openorc/client";
 import { teamChatText, teamTranscriptParts } from "./team-transcript";
 
 const message = (id: string, text: string): Block => ({ kind: "message", id, text, role: "assistant", streaming: false });

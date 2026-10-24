@@ -4,13 +4,13 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { AgentEvent } from "@openorc/protocol";
 import { CodexAdapter, type RunHandle } from "@openorc/agents";
-import { applyFrame, getRun, hydrate, resetTranscripts } from "./transcript";
+import { runs as runStore } from "./client";
 import { Db, LedgerWriter, listEvents, projects, threads, runs } from "@openorc/db";
 import { core } from "./rpc";
 
 vi.mock("node:child_process", () => ({ spawn: vi.fn() }));
-vi.mock("./rpc", () => ({ core: { onFrame: vi.fn(), call: vi.fn() } }));
-beforeEach(() => resetTranscripts());
+vi.mock("./rpc", () => ({ core: { call: vi.fn(), onPush: () => () => {} } }));
+beforeEach(() => runStore.reset());
 const sessions = new Set<RunHandle>();
 async function closeSession(handle: RunHandle): Promise<void> {
   handle.close();
@@ -59,11 +59,11 @@ async function server() {
   handle.on("event", (event) => {
     const ev = AgentEvent.parse(event);
     ledger.push(ev);
-    applyFrame({ runId: "run", seq: seq++, events: [ev] });
+    runStore.applyFrame({ runId: "run", seq: seq++, events: [ev] });
   });
   await vi.waitFor(() => expect(requests).toContain("turn/start"));
   const item = (phase: "started" | "completed", type: string, id: string, fields = {}) => notify(`item/${phase}`, { threadId: "thread", turnId: "turn", item: { type, id, ...fields } });
-  const blocks = () => getRun("run")!.blocks;
+  const blocks = () => runStore.get("run")!.blocks;
   return { handle, close: () => closeSession(handle), notify, item, blocks, ledger, requests, proc };
 }
 
@@ -201,9 +201,9 @@ it("keeps normal assistant streaming and transcript order on reload and conversa
   s.item("completed", "agentMessage", "reply", { text: "Hello there" });
   await s.close();
   const before = structuredClone(s.blocks());
-  applyFrame({ runId: "other", seq: 1, events: [{ type: "message.completed", runId: "other", ts: 1, messageId: "user", role: "user", text: "Other thread" }] });
+  runStore.applyFrame({ runId: "other", seq: 1, events: [{ type: "message.completed", runId: "other", ts: 1, messageId: "user", role: "user", text: "Other thread" }] });
   expect(s.blocks()).toEqual(before);
-  resetTranscripts();
+  runStore.reset();
   const db = Db.memory();
   const project = projects.insert(db, { name: "Replay", rootPath: "/tmp/replay", gitRemote: null, defaultBranch: "main", settings: {} });
   const thread = threads.insert(db, { projectId: project.id, title: "Replay", agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
@@ -216,7 +216,7 @@ it("keeps normal assistant streaming and transcript order on reload and conversa
     expect(persisted.every((event) => event.type !== "raw")).toBe(true);
     expect(writer.artifactsWritten).toBeGreaterThan(0);
     vi.mocked(core.call).mockResolvedValue({ events: persisted, fromTurn: 0, live: false });
-    await hydrate("run");
+    await runStore.hydrate("run");
     expect(s.blocks()).toEqual(before);
   } finally {
     writer.close();
@@ -236,11 +236,11 @@ it("does not double append deltas delivered both in history and buffered live fr
         resolve = r;
       }),
   );
-  const pending = hydrate("run");
-  applyFrame({ runId: "run", seq: 1, events: [events[1]!, { ...events[1]!, eventId: "3" }] });
+  const pending = runStore.hydrate("run");
+  runStore.applyFrame({ runId: "run", seq: 1, events: [events[1]!, { ...events[1]!, eventId: "3" }] });
   resolve({ events, fromTurn: 0, live: false });
   await pending;
-  expect(getRun("run")?.blocks.find((b) => b.id === "cmd")).toMatchObject({ output: "same\nsame\n" });
+  expect(runStore.get("run")?.blocks.find((b) => b.id === "cmd")).toMatchObject({ output: "same\nsame\n" });
 });
 
 it("preserves approval resolution and shows empty response starts, terminal input and turn diffs", async () => {
@@ -255,9 +255,9 @@ it("preserves approval resolution and shows empty response starts, terminal inpu
     s.notify("turn/diff/updated", { turnId: "turn", diff: "+added" });
     s.notify("turn/diff/updated", { turnId: "turn", diff: "+added\n+more" });
     expect(s.blocks().find((b) => b.id === "activity-diff-turn")).toMatchObject({ text: "+added\n+more" });
-    applyFrame({ runId: "run", seq: 100, events: [{ type: "approval.requested", runId: "run", ts: 1, approvalId: "ask", kind: "command", input: {} }] });
-    applyFrame({ runId: "run", seq: 101, events: [{ type: "approval.resolved", runId: "run", ts: 2, approvalId: "ask", decision: "deny" }] });
-    expect(getRun("run")?.pendingApprovals).toBe(0);
+    runStore.applyFrame({ runId: "run", seq: 100, events: [{ type: "approval.requested", runId: "run", ts: 1, approvalId: "ask", kind: "command", input: {} }] });
+    runStore.applyFrame({ runId: "run", seq: 101, events: [{ type: "approval.resolved", runId: "run", ts: 2, approvalId: "ask", decision: "deny" }] });
+    expect(runStore.get("run")?.pendingApprovals).toBe(0);
     expect(s.blocks().find((b) => b.kind === "approval")).toMatchObject({ decision: "deny" });
   } finally {
     await s.close();
@@ -297,9 +297,9 @@ it("tracks image generation, exposes its saved preview, and preserves it on repl
     expect(s.blocks().find((b) => b.id === "activity-image")).not.toHaveProperty("detail.result");
     await s.close();
     const before = structuredClone(s.blocks());
-    resetTranscripts();
+    runStore.reset();
     vi.mocked(core.call).mockResolvedValue({ events: s.ledger, fromTurn: 0, live: false });
-    await hydrate("run");
+    await runStore.hydrate("run");
     expect(s.blocks()).toEqual(before);
   } finally {
     await s.close();

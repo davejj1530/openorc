@@ -3,7 +3,7 @@ import type { Project, Thread } from "@openorc/protocol";
 import { PanelBar, PanelBarMeta } from "../components/PanelBar";
 import { TaskCard } from "../components/TaskCard";
 import { Button, Empty } from "../components/ui";
-import { useRpc } from "../lib/query";
+import { useRpc } from "../lib/client";
 import { useUi } from "../lib/ui";
 
 /** The tasks this thread delegated, live, plus a way to add one by hand. */

@@ -2,7 +2,7 @@ import { useClaudeAccountId } from "./claude-account";
 import { useMemo } from "react";
 import { WORKSPACE_ID, type AgentKind } from "@openorc/protocol";
 import type { SlashCommand } from "../components/Composer";
-import { useRpc } from "./query";
+import { useRpc } from "./client";
 
 /**
  * The selected harness's explicit skills, for every composer rather than one.

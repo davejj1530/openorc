@@ -4,7 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { PullRequestDetail, RpcMethod, RpcParams, RpcResults } from "@openorc/protocol";
 import type { CommentDraft, CommentLocation } from "../components/DiffView";
 import { core } from "../lib/rpc";
-import { invalidateTags, queryClient } from "../lib/query";
+import { invalidateTags, queryClient } from "../lib/client";
 import { PullRequestView } from "./PullRequestView";
 
 /** The diff viewer's own rendering is covered elsewhere; this test drives the comment it asks for. */

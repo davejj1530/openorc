@@ -12,9 +12,9 @@ import { Badge, Button, Empty, IconButton, metaSlot } from "../components/ui";
 import { CoversPreview } from "../lib/browser-preview";
 import { cn } from "../lib/cn";
 import { useLayout } from "../lib/layout";
-import { useRpc, useRpcMutation } from "../lib/query";
+import { useRpc, useRpcMutation } from "../lib/client";
 import { openTask } from "../lib/router";
-import { relativeTime } from "../lib/time";
+import { relativeTime } from "@openorc/client";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { stageCount } from "../lib/task-stage-counts";
 

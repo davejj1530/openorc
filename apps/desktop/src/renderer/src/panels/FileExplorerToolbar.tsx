@@ -5,7 +5,7 @@ import { menuItem, menuPopup } from "../components/menu";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { CoversPreview } from "../lib/browser-preview";
 import { IconButton, Tooltip } from "../components/ui";
-import { queryClient } from "../lib/query";
+import { queryClient } from "../lib/client";
 import { useUi } from "../lib/ui";
 
 export function FileExplorerToolbar({ scope, showIgnored, onShowIgnored }: { scope: FileScope; showIgnored: boolean; onShowIgnored: (show: boolean) => void }) {

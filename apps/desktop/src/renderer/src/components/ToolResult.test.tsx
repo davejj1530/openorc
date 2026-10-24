@@ -2,11 +2,11 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { storeToolImages, type AgentEvent } from "@openorc/protocol";
 import { core } from "../lib/rpc";
-import { applyFrame, getRun, hydrate, resetTranscripts } from "../lib/transcript";
+import { runs } from "../lib/client";
 import { ThreadMedia } from "./ThreadImages";
 import { TranscriptContents } from "./Transcript";
 
-vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onFrame: vi.fn(), onInvalidate: vi.fn(), onReady: vi.fn() } }));
+vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: () => () => {} } }));
 vi.mock("./AgentOrb", () => ({ AgentOrb: () => null }));
 vi.mock("./TaskCard", () => ({ TaskCard: () => null }));
 vi.mock("./QuestionCard", () => ({ QuestionCard: () => null }));
@@ -20,18 +20,18 @@ const completed = (output: unknown): AgentEvent => ({ ...base, type: "tool.compl
 function view() {
   return (
     <ThreadMedia scopeKey={base.runId}>
-      <TranscriptContents runId={base.runId} blocks={[...(getRun(base.runId)?.blocks ?? [])]} groupTools={false} />
+      <TranscriptContents runId={base.runId} blocks={[...(runs.get(base.runId)?.blocks ?? [])]} groupTools={false} />
     </ThreadMedia>
   );
 }
 function show(output: unknown) {
-  applyFrame({ runId: base.runId, seq: 1, events: [start, completed(output)] });
+  runs.applyFrame({ runId: base.runId, seq: 1, events: [start, completed(output)] });
   const result = render(view());
   fireEvent.click(screen.getByRole("button", { name: /Mobbin: search screens/ }));
   return result;
 }
 beforeEach(() => {
-  resetTranscripts();
+  runs.reset();
   vi.clearAllMocks();
 });
 afterEach(cleanup);
@@ -70,7 +70,7 @@ it.each([
 
 it("restores image-only results from the ledger without requiring a live provider", async () => {
   vi.mocked(core.call).mockResolvedValue({ events: JSON.parse(JSON.stringify([start, completed({ content: [image] })])), fromTurn: 0, live: false });
-  await hydrate(base.runId);
+  await runs.hydrate(base.runId);
   render(view());
   fireEvent.click(screen.getByRole("button", { name: /Mobbin: search screens/ }));
   expect(screen.getAllByRole("img")).toHaveLength(1);
@@ -80,7 +80,7 @@ it("restores image-only results from the ledger without requiring a live provide
 it("keeps plain output verbatim and replaces it with media on completion", () => {
   const { rerender } = show("first line\n<script>not markup</script>");
   expect(screen.getByText(/first line/).textContent).toBe("first line\n<script>not markup</script>");
-  applyFrame({ runId: base.runId, seq: 2, events: [completed({ content: [image] })] });
+  runs.applyFrame({ runId: base.runId, seq: 2, events: [completed({ content: [image] })] });
   rerender(view());
   expect(screen.queryByText(/first line/)).toBeNull();
   expect(screen.getByRole("img")).toBeTruthy();
@@ -123,7 +123,7 @@ it("shows broken-image feedback and recovers when a new image replaces it", () =
   fireEvent.error(screen.getByRole("img"));
   expect(screen.getByText(/Image unavailable/)).toBeTruthy();
   const next = { ...image, data: png + "\n" };
-  applyFrame({ runId: base.runId, seq: 2, events: [completed({ content: [next] })] });
+  runs.applyFrame({ runId: base.runId, seq: 2, events: [completed({ content: [next] })] });
   rerender(view());
   expect(screen.getByRole("img").getAttribute("src")).toBe(`data:image/png;base64,${next.data}`);
 });

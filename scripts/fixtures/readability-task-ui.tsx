@@ -6,7 +6,7 @@ import { TaskDocument, type TaskDocumentHandle } from "../../apps/desktop/src/re
 import { ReviewPanel } from "../../apps/desktop/src/renderer/src/panels/ReviewPanel";
 import { TaskDraftProvider } from "../../apps/desktop/src/renderer/src/lib/task-draft-context";
 import { core } from "../../apps/desktop/src/renderer/src/lib/rpc";
-import { queryClient } from "../../apps/desktop/src/renderer/src/lib/query";
+import { queryClient } from "../../apps/desktop/src/renderer/src/lib/client";
 import { useTheme } from "../../apps/desktop/src/renderer/src/lib/theme";
 import "../../apps/desktop/src/renderer/src/app.css";
 

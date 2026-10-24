@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { NotificationDelivery, NotificationVisibility, noticeDestination, noticeVisible, type DesktopNotice, type NotificationPlatform, type VisibilityChannel } from "./notification-delivery";
+import type { Notice } from "@openorc/client";
+import { NotificationDelivery, NotificationVisibility, noticeDestination, noticeVisible, type NotificationPlatform, type VisibilityChannel } from "./notification-delivery";
 
-const notice: DesktopNotice = { type: "notify", id: "approval:run:request", kind: "approval", threadId: "thread", taskId: "worker", title: "Team", body: "Engineer needs approval" };
+const notice: Notice = { id: "approval:run:request", kind: "approval", threadId: "thread", taskId: "worker", title: "Team", body: "Engineer needs approval" };
 function platform() {
   let receipts: unknown = [];
   let lock: Promise<unknown> = Promise.resolve();

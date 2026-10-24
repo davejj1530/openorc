@@ -7,7 +7,7 @@ import { ThreadMedia } from "../components/ThreadImages";
 import { IconButton, Input, Tooltip } from "../components/ui";
 import { cn } from "../lib/cn";
 import { filesKey, useFilesFocus } from "../lib/files-tool";
-import { useRpc } from "../lib/query";
+import { useRpc } from "../lib/client";
 
 type Found = Extract<FindResult, { kind: "matches" }>;
 

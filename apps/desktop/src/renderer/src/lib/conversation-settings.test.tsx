@@ -2,11 +2,11 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
-import { queryClient } from "./query";
+import { queryClient } from "./client";
 import { useConversationSettings } from "./conversation-settings";
 
 const rpc = vi.hoisted(() => ({ call: vi.fn() }));
-vi.mock("./rpc", () => ({ core: { call: rpc.call, onInvalidate: () => {}, onReady: () => {} } }));
+vi.mock("./rpc", () => ({ core: { call: rpc.call, onReady: () => {}, onPush: () => () => {} } }));
 const thread = { id: "thread", agent: "codex" as const, model: "gpt-6-sol", effort: "medium", fastMode: false, mode: "act" as const, permissionMode: "trusted" as const };
 const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 afterEach(() => {

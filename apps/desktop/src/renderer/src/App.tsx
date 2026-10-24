@@ -11,7 +11,7 @@ import { NewFileDialog } from "./dialogs/NewFileDialog";
 import { useAppShortcuts } from "./lib/app-shortcuts";
 import { useLayout } from "./lib/layout";
 import { readOnboardingState, resolveOnboarding, writeOnboardingState, type PersistedOnboardingState } from "./lib/onboarding";
-import { useRpc } from "./lib/query";
+import { useRpc } from "./lib/client";
 import { useRouter, type Route } from "./lib/router";
 import { useUi } from "./lib/ui";
 import { useTrafficLights } from "./lib/window";

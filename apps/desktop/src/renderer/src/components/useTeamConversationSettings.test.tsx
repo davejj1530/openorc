@@ -2,11 +2,11 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
-import { queryClient } from "../lib/query";
+import { queryClient } from "../lib/client";
 import { useTeamConversationSettings } from "./useTeamConversationSettings";
 
 const rpc = vi.hoisted(() => ({ call: vi.fn() }));
-vi.mock("../lib/rpc", () => ({ core: { call: rpc.call, onInvalidate: () => {}, onReady: () => {} } }));
+vi.mock("../lib/rpc", () => ({ core: { call: rpc.call, onReady: () => {}, onPush: () => () => {} } }));
 
 const thread = { id: "thread", mode: "act" as const, permissionMode: "trusted" as const, updatedAt: 1 };
 const data = { instance: { leadOverrides: {}, configurationVersion: 1 } };

@@ -15,7 +15,7 @@ import { menuItem, menuPopup } from "../components/menu";
 import { TopBar } from "../components/TopBar";
 import { MemoryControl } from "../components/MemoryControl";
 import { Button, Input, Select } from "../components/ui";
-import { useRpc } from "../lib/query";
+import { useRpc } from "../lib/client";
 import { AppearanceSettings } from "./settings-appearance";
 import { GitHubSettings } from "./settings-github";
 import { Field, LoadError, SaveStatus, Section, Toggle, usePreference } from "./settings-shared";

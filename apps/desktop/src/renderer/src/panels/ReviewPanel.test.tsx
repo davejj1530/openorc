@@ -4,7 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { Project, ReviewComment, RpcMethod, RpcParams, RpcResults, Task, TeamTaskView } from "@openorc/protocol";
 import { ReviewPanel } from "./ReviewPanel";
 import { core } from "../lib/rpc";
-import { queryClient } from "../lib/query";
+import { queryClient } from "../lib/client";
 import { TaskDraftProvider } from "../lib/task-draft-context";
 import { readTeamTaskRequest } from "../lib/team-task-actions";
 

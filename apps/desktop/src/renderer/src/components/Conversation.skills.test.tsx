@@ -9,7 +9,8 @@ vi.mock("../lib/skill-commands", () => skills);
 vi.mock("../lib/rpc", () => ({
   core: new Proxy({ call: vi.fn() } as Record<string, unknown>, { get: (target, key: string) => (key in target ? target[key] : () => () => undefined) }),
 }));
-vi.mock("../lib/query", () => ({
+vi.mock("../lib/client", async (original) => ({
+  ...(await original<object>()),
   useRpc: () => ({ data: undefined, isLoading: false, isPending: false, isError: false, error: null, refetch: () => undefined }),
   useRpcMutation: () => ({ mutate: () => undefined, mutateAsync: async () => undefined, isPending: false, error: null }),
   invalidateTags: () => undefined,

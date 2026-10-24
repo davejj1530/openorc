@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 import type { ComposerChanges } from "../components/Composer";
-import { patchStat } from "../components/diff-stat";
+import { patchStat } from "@openorc/client";
 import { useLayout, type WorkspaceChangesTarget } from "./layout";
-import { useRpc } from "./query";
+import { useRpc } from "./client";
 import { teamGitActions } from "./team-git-actions";
 import { useThreadMutationPending } from "./thread-mutations";
 

@@ -1,11 +1,11 @@
 /** The production MCP Apps component and transcript, with an isolated test backend. */
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { createRoot } from "react-dom/client";
 import type { AgentEvent } from "@openorc/protocol";
 import { TranscriptContents } from "../../apps/desktop/src/renderer/src/components/Transcript";
 import { ThreadMedia } from "../../apps/desktop/src/renderer/src/components/ThreadImages";
 import { core } from "../../apps/desktop/src/renderer/src/lib/rpc";
-import { applyFrame, getRun, resetTranscripts, useTranscripts } from "../../apps/desktop/src/renderer/src/lib/transcript";
+import { runs } from "../../apps/desktop/src/renderer/src/lib/client";
 import { useTheme } from "../../apps/desktop/src/renderer/src/lib/theme";
 
 declare global {
@@ -26,12 +26,12 @@ function show(tool: string) {
     output: { content: [{ type: "text", text: "The original result stays available." }] },
     isError: false,
   };
-  resetTranscripts();
-  applyFrame({ runId: "fixture", seq: 1, events: [ev] });
+  runs.reset();
+  runs.applyFrame({ runId: "fixture", seq: 1, events: [ev] });
 }
 show("gallery");
 function App() {
-  useTranscripts((s) => s.runs);
+  useSyncExternalStore(runs.subscribe, runs.snapshot);
   const [choice, setChoice] = useState("gallery");
   const theme = useTheme((s) => s.resolved);
   return (
@@ -56,7 +56,7 @@ function App() {
         </button>
       </div>
       <ThreadMedia scopeKey={choice}>
-        <TranscriptContents key={choice} runId="fixture" blocks={getRun("fixture")?.blocks ?? []} groupTools={false} />
+        <TranscriptContents key={choice} runId="fixture" blocks={runs.get("fixture")?.blocks ?? []} groupTools={false} />
       </ThreadMedia>
     </main>
   );

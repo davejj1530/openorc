@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { Task } from "@openorc/protocol";
 import { Trash2 } from "./icons";
 import { Button, Dialog, TextButton } from "./ui";
-import { useRpcMutation } from "../lib/query";
+import { useRpcMutation } from "../lib/client";
 import { useRouter } from "../lib/router";
 
 /** Deletes an ordinary task and its discussion. Its conversation keeps its messages, its worktree and its changes. */

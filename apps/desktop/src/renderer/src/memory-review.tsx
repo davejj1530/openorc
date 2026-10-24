@@ -4,7 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import type { Memory as MemoryEntry, MemorySettings as Settings } from "@openorc/protocol";
 import { Memory } from "./views/Memory";
 import { MemorySettings } from "./views/Settings";
-import { queryClient } from "./lib/query";
+import { queryClient } from "./lib/client";
 import { core } from "./lib/rpc";
 import { useTheme } from "./lib/theme";
 import { useLayout } from "./lib/layout";

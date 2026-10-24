@@ -7,7 +7,8 @@ const fixture = vi.hoisted(() => ({
   implement: vi.fn(),
   plan: { id: "plan", threadId: "thread", runId: "run", revision: 1, text: "Ship it", state: "ready", source: "native", updatedAt: 1 } as const,
 }));
-vi.mock("../lib/query", () => ({
+vi.mock("../lib/client", async (original) => ({
+  ...(await original<object>()),
   useRpcMutation: (method: string) => ({ mutate: method === "threads.implementPlan" ? fixture.implement : vi.fn(), isPending: false, error: null }),
 }));
 vi.mock("../lib/conversation-plans", () => ({

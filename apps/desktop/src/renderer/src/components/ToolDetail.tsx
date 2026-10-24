@@ -1,8 +1,19 @@
 import { lazy, Suspense, useMemo, useState, type ReactNode } from "react";
 import { toolResult, toolResultDetails } from "../lib/tool-result";
-import { languageFor, type ChangedFile, type ChangeStatus, type TestTally } from "../lib/tool-text";
-import { joinPath, toolInputView, toolOutputView, type CommandStep, type Field, type InputView, type OutputView } from "../lib/tool-view";
-import type { Block } from "../lib/transcript";
+import {
+  languageFor,
+  type ChangedFile,
+  type ChangeStatus,
+  type TestTally,
+  joinPath,
+  toolInputView,
+  toolOutputView,
+  type CommandStep,
+  type Field,
+  type InputView,
+  type OutputView,
+  type Block,
+} from "@openorc/client";
 import { Check, Globe, Search, WorkDelegate, X } from "./icons";
 import { FileLine, Matches } from "./Matches";
 import { ThreadLink, ThreadRichText } from "./ThreadImages";

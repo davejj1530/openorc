@@ -1,7 +1,7 @@
 import { useId, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
 import { Popover } from "@base-ui/react/popover";
 import { ULTRACODE_EFFORT, effortHint, effortLabel, type AgentKind, type ModelOption } from "@openorc/protocol";
-import type { ModelChoice } from "../lib/model-picker-selection";
+import type { ModelChoice } from "@openorc/client";
 import { EffortGalaxy } from "./EffortGalaxy";
 import { FastModeRocket } from "./FastModeRocket";
 import { RotateCcw, Zap } from "./icons";

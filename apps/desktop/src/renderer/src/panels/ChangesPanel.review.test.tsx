@@ -5,7 +5,7 @@ import type { Project, ReviewComment, RpcMethod, RpcParams, RpcResults, Task, Th
 import type { CommentLocation } from "../components/DiffView";
 import { ChangesPanel } from "./ChangesPanel";
 import { core } from "../lib/rpc";
-import { queryClient } from "../lib/query";
+import { queryClient } from "../lib/client";
 
 /** The diff viewer's own rendering is covered elsewhere; this test drives what a click on a line number reports. */
 const viewer = vi.hoisted(() => ({

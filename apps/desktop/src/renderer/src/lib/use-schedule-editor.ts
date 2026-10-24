@@ -3,7 +3,7 @@ import { harnessInfo, harnessLoggedIn, isHarnessId, type RunMode, type Schedule,
 import { defaultChoice, type ModelChoice } from "../components/ModelPicker";
 import { usePermissionSelection } from "./permission-default";
 import { branchingReason, useProjectGit } from "./project-git";
-import { useRpc, useRpcMutation } from "./query";
+import { useRpc, useRpcMutation } from "./client";
 import {
   scheduleDraftIssue,
   scheduleModelTarget,

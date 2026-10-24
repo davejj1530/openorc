@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import type { Block } from "../lib/transcript";
+import type { Block } from "@openorc/client";
 import { ToolDetail } from "./ToolDetail";
 
 vi.mock("./ThreadImages", () => ({

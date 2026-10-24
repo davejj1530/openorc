@@ -4,9 +4,9 @@ import type { MemorySettings } from "@openorc/protocol";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { MemoryControl } from "./MemoryControl";
 import { core } from "../lib/rpc";
-import { queryClient } from "../lib/query";
+import { queryClient } from "../lib/client";
 
-vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onInvalidate: vi.fn(), onReady: vi.fn() } }));
+vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: () => () => {} } }));
 
 let saved: MemorySettings;
 let failSave: boolean;

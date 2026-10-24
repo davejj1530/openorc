@@ -2,9 +2,9 @@ import { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
 import { Transcript } from "../../apps/desktop/src/renderer/src/components/Transcript";
-import { applyFrame, getRun } from "../../apps/desktop/src/renderer/src/lib/transcript";
+import { runs } from "../../apps/desktop/src/renderer/src/lib/client";
 
-applyFrame({ runId: "scroll", seq: 1, events: [{ type: "session.started", runId: "scroll", ts: 1, agent: "codex", externalSessionId: "scroll", model: "fixture" }] });
+runs.applyFrame({ runId: "scroll", seq: 1, events: [{ type: "session.started", runId: "scroll", ts: 1, agent: "codex", externalSessionId: "scroll", model: "fixture" }] });
 function App() {
   const [revision, update] = useState(0);
   const [runId, setRunId] = useState("scroll");
@@ -18,7 +18,7 @@ function App() {
       send: () => flushSync(() => setSends((n) => n + 1)),
     },
   });
-  const run = getRun("scroll")!;
+  const run = runs.get("scroll")!;
   return (
     <Transcript
       followKey={sends}

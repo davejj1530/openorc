@@ -1,6 +1,5 @@
-import type { CorePush, Frame, RpcMethod, RpcParams, RpcResults } from "@openorc/protocol";
-
-export type Notification = Extract<CorePush, { type: "notify" }>;
+import type { CorePush, RpcMethod, RpcParams, RpcResults } from "@openorc/protocol";
+import type { ClientPush, CoreConnection } from "@openorc/client";
 
 type Listener<T> = (value: T) => void;
 
@@ -10,21 +9,21 @@ interface Pending {
 }
 
 /**
- * The renderer's one line to the core: request/response RPC plus pushes
- * (frames, invalidations, logs) over the MessagePort main handed us.
+ * The renderer's one line to the core: request/response RPC plus pushes over the MessagePort main handed us. A window
+ * hears every run's frames, so interest is never sent. Logs, benchmarks, startup and the MCP port are desktop matters
+ * with listeners of their own.
  */
-class CoreClient {
+class CoreClient implements CoreConnection {
+  readonly delivery = "all";
   private port: MessagePort | null = null;
   private nextId = 1;
   private readonly pending = new Map<number, Pending>();
   private readonly queued: Array<{ id: number; method: string; params: unknown }> = [];
-  private readonly frameListeners = new Set<Listener<Frame>>();
-  private readonly invalidateListeners = new Set<Listener<string[]>>();
+  private readonly pushListeners = new Set<Listener<ClientPush>>();
   private readonly logListeners = new Set<Listener<{ level: string; message: string }>>();
   private readonly benchListeners = new Set<Listener<{ eventsSent: number; framesSent: number; durationMs: number }>>();
   private readonly readyListeners = new Set<Listener<{ mcpPort: number }>>();
   private readonly startupListeners = new Set<Listener<string | null>>();
-  private readonly notifyListeners = new Set<Listener<Notification>>();
   ready: { mcpPort: number } | null = null;
   /** What the core is doing before it is ready, when that takes a while. */
   startup: string | null = null;
@@ -34,7 +33,7 @@ class CoreClient {
       if (e.source !== window || e.data !== "openorc:port" || e.ports.length === 0) return;
       const port = e.ports[0] as MessagePort;
       this.port = port;
-      port.onmessage = (m: MessageEvent<CorePush>) => this.onPush(m.data);
+      port.onmessage = (m: MessageEvent<CorePush>) => this.receive(m.data);
       port.start();
       for (const q of this.queued.splice(0)) port.postMessage({ type: "rpc", ...q });
     });
@@ -51,13 +50,11 @@ class CoreClient {
     });
   }
 
-  onFrame(fn: Listener<Frame>): () => void {
-    this.frameListeners.add(fn);
-    return () => this.frameListeners.delete(fn);
-  }
-  onInvalidate(fn: Listener<string[]>): () => void {
-    this.invalidateListeners.add(fn);
-    return () => this.invalidateListeners.delete(fn);
+  setFrameInterest(): void {}
+
+  onPush(fn: Listener<ClientPush>): () => void {
+    this.pushListeners.add(fn);
+    return () => this.pushListeners.delete(fn);
   }
   onLog(fn: Listener<{ level: string; message: string }>): () => void {
     this.logListeners.add(fn);
@@ -66,10 +63,6 @@ class CoreClient {
   onBenchDone(fn: Listener<{ eventsSent: number; framesSent: number; durationMs: number }>): () => void {
     this.benchListeners.add(fn);
     return () => this.benchListeners.delete(fn);
-  }
-  onNotify(fn: Listener<Notification>): () => void {
-    this.notifyListeners.add(fn);
-    return () => this.notifyListeners.delete(fn);
   }
   onReady(fn: Listener<{ mcpPort: number }>): () => void {
     this.readyListeners.add(fn);
@@ -82,16 +75,24 @@ class CoreClient {
     return () => this.startupListeners.delete(fn);
   }
 
-  private onPush(msg: CorePush): void {
+  private push(push: ClientPush): void {
+    for (const l of this.pushListeners) l(push);
+  }
+
+  private receive(msg: CorePush): void {
     switch (msg.type) {
       case "startup":
         this.setStartup(msg.message);
         return;
-      case "ready":
+      case "ready": {
+        // A second ready means the core started again, and whatever it pushed in between is lost.
+        const resumed = this.ready !== null;
         this.ready = { mcpPort: msg.mcpPort };
         this.setStartup(null);
         for (const l of this.readyListeners) l(this.ready);
+        this.push({ type: "session", resumed });
         return;
+      }
       case "rpc.result": {
         const p = this.pending.get(msg.id);
         if (!p) return;
@@ -108,14 +109,16 @@ class CoreClient {
         return;
       }
       case "frame":
-        for (const l of this.frameListeners) l(msg.frame);
+        this.push({ type: "frame", frame: msg.frame });
         return;
       case "invalidate":
-        for (const l of this.invalidateListeners) l(msg.keys);
+        this.push({ type: "invalidate", keys: msg.keys });
         return;
-      case "notify":
-        for (const l of this.notifyListeners) l(msg);
+      case "notify": {
+        const { type: _push, ...notice } = msg;
+        this.push({ type: "notify", notice });
         return;
+      }
       case "log":
         for (const l of this.logListeners) l({ level: msg.level, message: msg.message });
         return;

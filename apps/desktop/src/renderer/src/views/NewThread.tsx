@@ -31,7 +31,7 @@ import {
   type NewThreadTarget,
 } from "../lib/new-thread-draft";
 import { branchingReason, useProjectGit } from "../lib/project-git";
-import { useRpc, useRpcMutation } from "../lib/query";
+import { useRpc, useRpcMutation } from "../lib/client";
 import { openThread, useRouter } from "../lib/router";
 import { useSkillCommands } from "../lib/skill-commands";
 import { useUi } from "../lib/ui";

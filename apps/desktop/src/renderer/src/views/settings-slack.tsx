@@ -12,7 +12,7 @@ import {
   type SlackClientConfig,
 } from "@openorc/protocol";
 import { Button, Input, Select } from "../components/ui";
-import { useRpc } from "../lib/query";
+import { useRpc } from "../lib/client";
 import { Field, LoadError, Section, Status } from "./settings-shared";
 import { DirectSlackSettings } from "./settings-slack-direct";
 import { useSlackRelaySettings } from "./settings-slack-relay";

@@ -9,7 +9,8 @@ const files: InstructionFile[] = [
   { scope: "personal", path: "/home/me/.claude/CLAUDE.md", content: "Be brief.\n", version: "p1" },
 ];
 const mutate = vi.fn();
-vi.mock("../lib/query", () => ({
+vi.mock("../lib/client", async (original) => ({
+  ...(await original<object>()),
   queryClient: { setQueryData: vi.fn() },
   useRpc: () => ({ data: files, isLoading: false, error: null, refetch: vi.fn() }),
   useRpcMutation: () => ({ mutate, reset: vi.fn(), isPending: false, error: null, variables: undefined }),

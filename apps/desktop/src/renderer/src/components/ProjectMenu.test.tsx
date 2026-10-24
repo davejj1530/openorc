@@ -3,7 +3,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { WORKSPACE_ID } from "@openorc/protocol";
 import { core } from "../lib/rpc";
-import { queryClient } from "../lib/query";
+import { queryClient } from "../lib/client";
 import { useLayout } from "../lib/layout";
 import { useRouter } from "../lib/router";
 import { SidebarProjectGroup } from "./SidebarProjectGroup";

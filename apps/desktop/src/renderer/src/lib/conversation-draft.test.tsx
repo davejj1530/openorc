@@ -4,7 +4,7 @@ import { useConversationDraft } from "./conversation-draft";
 import { readDraft } from "./drafts";
 
 const mutation = vi.hoisted(() => ({ mutate: vi.fn(), error: null }));
-vi.mock("./query", () => ({ useRpcMutation: () => mutation }));
+vi.mock("./client", async (original) => ({ ...(await original<object>()), useRpcMutation: () => mutation }));
 afterEach(() => {
   cleanup();
   localStorage.clear();

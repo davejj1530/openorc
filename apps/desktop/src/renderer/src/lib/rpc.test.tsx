@@ -1,4 +1,5 @@
 import { expect, it, vi } from "vitest";
+import type { ClientPush } from "@openorc/client";
 import { core } from "./rpc";
 
 it("only accepts the preload's window message when connecting the privileged core port", async () => {
@@ -18,4 +19,33 @@ it("only accepts the preload's window message when connecting the privileged cor
   trusted.onmessage!(new MessageEvent("message", { data: { type: "rpc.result", id: request.id, result: null } }));
   await expect(pending).resolves.toBeNull();
   foreign.remove();
+});
+
+it("tells the client what the port pushes, with a core that starts again as a resumed session", () => {
+  Object.defineProperty(window, "openorc", { configurable: true, value: { connectBridge: vi.fn() } });
+  core.connect();
+  const port = { start: vi.fn(), postMessage: vi.fn(), onmessage: null as ((event: MessageEvent) => void) | null };
+  window.dispatchEvent(new MessageEvent("message", { data: "openorc:port", source: window, ports: [port as unknown as MessagePort] }));
+  const heard: ClientPush[] = [];
+  const stop = core.onPush((push) => heard.push(push));
+  const frame = { runId: "run", seq: 1, events: [] };
+  const notice = { kind: "finished" as const, threadId: "thread", taskId: null, title: "Done", body: "Reply ready" };
+  for (const data of [
+    { type: "ready", pid: 1, mcpPort: 9 },
+    { type: "frame", frame },
+    { type: "invalidate", keys: ["threads"] },
+    { type: "notify", ...notice },
+    { type: "log", level: "info", message: "x" },
+    { type: "ready", pid: 2, mcpPort: 10 },
+  ])
+    port.onmessage!(new MessageEvent("message", { data }));
+  stop();
+  expect(heard).toEqual([
+    { type: "session", resumed: false },
+    { type: "frame", frame },
+    { type: "invalidate", keys: ["threads"] },
+    { type: "notify", notice },
+    { type: "session", resumed: true },
+  ]);
+  expect(core.ready).toEqual({ mcpPort: 10 });
 });

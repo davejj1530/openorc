@@ -7,8 +7,8 @@ import { StatusDot } from "./ui";
 import { StatusIcon, statusLabel } from "./status";
 import { cn } from "../lib/cn";
 import { useLayout } from "../lib/layout";
-import { useRpc } from "../lib/query";
-import { relativeTime } from "../lib/time";
+import { useRpc } from "../lib/client";
+import { relativeTime } from "@openorc/client";
 import { openThread, useRouter } from "../lib/router";
 
 /**

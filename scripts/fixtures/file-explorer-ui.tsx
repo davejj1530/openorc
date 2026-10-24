@@ -42,7 +42,7 @@ async function main() {
   const [{ Panel }, { core }, { queryClient }, { useLayout }, { usePanelSessions }, { useTheme }, { useDrafts }] = await Promise.all([
     import("../../apps/desktop/src/renderer/src/components/Panel"),
     import("../../apps/desktop/src/renderer/src/lib/rpc"),
-    import("../../apps/desktop/src/renderer/src/lib/query"),
+    import("../../apps/desktop/src/renderer/src/lib/client"),
     import("../../apps/desktop/src/renderer/src/lib/layout"),
     import("../../apps/desktop/src/renderer/src/lib/panel-tabs"),
     import("../../apps/desktop/src/renderer/src/lib/theme"),

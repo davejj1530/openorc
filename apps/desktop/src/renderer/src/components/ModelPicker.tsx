@@ -6,7 +6,7 @@ import { harnessCatalog, harnessIds, harnessInfo, harnessInstalled, harnessLogge
 import { Check, ChevronDown, Orcling as OrclingIcon, Plus, Search, Workflow, RotateCcw, Zap } from "./icons";
 import { OrclingAvatar } from "./OrclingAvatar";
 import { Popover } from "@base-ui/react/popover";
-import { useRpc } from "../lib/query";
+import { useRpc } from "../lib/client";
 import { cn } from "../lib/cn";
 import { useRouter } from "../lib/router";
 import { HarnessLogo } from "./HarnessLogo";
@@ -14,10 +14,10 @@ import { CoversPreview } from "../lib/browser-preview";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { BrowserEffortFooter, ComposerEffortPanel, fastStatus, orclingLed, type EffortTeam } from "./ModelPickerEffort";
 import { OrclingRows, TeamRows, type OrclingPickerChoices, type TeamPickerChoices } from "./ModelPickerRows";
-import { browserModels, catalogModel, modelChoiceFor, pickerCatalog, pickerSettings, providerGroups, type ModelChoice } from "../lib/model-picker-selection";
+import { browserModels, catalogModel, modelChoiceFor, pickerCatalog, pickerSettings, providerGroups, type ModelChoice } from "@openorc/client";
 
-export { defaultChoice, matchesQuery, multiProviderAgents, providerGroups } from "../lib/model-picker-selection";
-export type { ModelChoice } from "../lib/model-picker-selection";
+export { defaultChoice, matchesQuery, multiProviderAgents, providerGroups } from "@openorc/client";
+export type { ModelChoice } from "@openorc/client";
 export type { OrclingPickerChoices, TeamPickerChoices, TeamPickerOption } from "./ModelPickerRows";
 
 /** The chosen model's name with the exact ID it pins, for tooltips. */

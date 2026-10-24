@@ -2,7 +2,7 @@ import { harnessIds } from "@openorc/protocol";
 import { StrictMode, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { queryClient } from "./lib/query";
+import { queryClient } from "./lib/client";
 import { core } from "./lib/rpc";
 import { useTheme } from "./lib/theme";
 import { NewThread } from "./views/NewThread";

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { core } from "../lib/rpc";
-import type { Block } from "../lib/transcript";
+import type { Block } from "@openorc/client";
 import { Hammer, Terminal, X } from "./icons";
 import { Button, TextButton } from "./ui";
 

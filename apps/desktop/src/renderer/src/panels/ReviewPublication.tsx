@@ -3,7 +3,7 @@ import type { Project, Task } from "@openorc/protocol";
 import { Download, GitPullRequest, Upload } from "../components/icons";
 import { CommitSheet } from "../components/CommitSheet";
 import { Button, Dialog, Field, Input, Textarea } from "../components/ui";
-import { useRpc, useRpcMutation } from "../lib/query";
+import { useRpc, useRpcMutation } from "../lib/client";
 import { taskBaseLabel, taskCompareUrl } from "../lib/task-review-availability";
 import { TargetBranchField, useTargetBranch } from "./PullRequestTarget";
 

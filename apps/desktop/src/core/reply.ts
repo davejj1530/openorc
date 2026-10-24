@@ -30,10 +30,13 @@ export function windowPorts(answer: (request: RpcRequest) => Promise<RpcReply>) 
           console.warn(`[core] dropped malformed message: ${parsed.error.message}`);
           return;
         }
+        const { id } = parsed.data;
         // A window that closed while its request ran has nobody left to read the answer.
-        void answer(parsed.data).then((reply) => {
-          if (ports.includes(port)) port.postMessage(reply);
-        });
+        void answer(parsed.data)
+          .catch((error: unknown): RpcReply => ({ type: "rpc.error", id, message: error instanceof Error ? error.message : String(error) }))
+          .then((reply) => {
+            if (ports.includes(port)) port.postMessage(reply);
+          });
       });
     },
   };

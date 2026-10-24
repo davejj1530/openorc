@@ -301,6 +301,10 @@ describe("core", () => {
     expect(await core.handle({ type: "rpc", id: 999, method: "nope", params: {} })).toMatchObject({ type: "rpc.error", id: 999 });
   });
 
+  it.each(["toString", "constructor", "__proto__", "hasOwnProperty"])("answers the inherited name %s as an unknown method", async (method) => {
+    expect(await core.handle({ type: "rpc", id: 1000, method, params: {} })).toEqual({ type: "rpc.error", id: 1000, message: `unknown method ${method}` });
+  });
+
   it("deletes a task with its worktree and branch once the branch's own commits are accepted as lost", async () => {
     const wt = task.worktreePath as string;
     const branch = task.branch as string;

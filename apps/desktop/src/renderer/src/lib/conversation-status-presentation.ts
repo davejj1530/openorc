@@ -1,4 +1,4 @@
-import { WORKSPACE_ID, defaultHarnessId, harnessShortName, type AgentKind, type Project, type Thread, type WorkspaceMode } from "@openorc/protocol";
+import { WORKSPACE_ID, type Project, type Thread, type WorkspaceMode } from "@openorc/protocol";
 import type { ConversationScope } from "../components/Conversation";
 
 export function conversationWorkspaceMode({ scope, firstTaskRun, selected }: { scope: ConversationScope; firstTaskRun: boolean; selected: WorkspaceMode | null }): WorkspaceMode {
@@ -34,12 +34,6 @@ export function conversationEmptyHint({ task, workspace }: { task: boolean; work
   if (task) return "Your task description is included. Add any direction below, or send to start.";
   if (workspace) return "Continue the conversation. The agent works in the folder shown below.";
   return "Say what you want. The agent works in the project root and can delegate isolated changes to tasks.";
-}
-
-export function conversationPlaceholder({ firstTaskRun, working, canSteer, agent }: { firstTaskRun: boolean; working: boolean; canSteer: boolean; agent: AgentKind | undefined }): string {
-  if (firstTaskRun) return "Add direction, or send to start this task…";
-  if (working) return canSteer ? "Say it during this turn…" : "Queue a message for when it finishes…";
-  return `Message ${harnessShortName(agent ?? defaultHarnessId)}…`;
 }
 
 export function conversationEmptyTitle({ count, firstTaskRun }: { count: number; firstTaskRun: boolean }): string {

@@ -234,10 +234,10 @@ describe("app and network changes", () => {
     mac.behave(tailnet, { kind: "answer" });
     const { manager, pushes } = start(mac, "cellular");
     await advance(10);
-    expect(manager.getState()).toMatchObject({ route: tailnet });
+    expect(manager.getState()).toMatchObject({ route: tailnet, serial: 1 });
     manager.setNetwork("wifi");
     await advance(10);
-    expect(manager.getState()).toMatchObject({ kind: "connected", route: lan });
+    expect(manager.getState()).toMatchObject({ kind: "connected", route: lan, serial: 2 });
     expect(mac.sessions[0]!.closed).toBe(true);
     expect(mac.live).toHaveLength(1);
     expect(pushes.filter((push) => push.type === "session")).toEqual([

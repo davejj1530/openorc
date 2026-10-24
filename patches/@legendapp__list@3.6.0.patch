@@ -1,0 +1,30 @@
+diff --git a/react-native.js b/react-native.js
+index 0b730ecae1086eae294f5fad7938502557f9569e..b16320eb695746666a5a02f8fbd1df5332287826 100644
+--- a/react-native.js
++++ b/react-native.js
+@@ -6131,7 +6131,9 @@ var ContainersLayer = typedMemo(function ContainersLayer2({
+       }
+     }
+   }
+-  return /* @__PURE__ */ React2__namespace.createElement(ReactNative.Animated.View, { pointerEvents: isVisible ? void 0 : "none", style }, /* @__PURE__ */ React2__namespace.createElement(ContainerLayoutCoordinator, null, children));
++  // Rows off screen leave the native view tree, so iOS composites only those in view; the ScrollView puts them back as
++  // they near the screen, on each mount and every 44 pt of scroll.
++  return /* @__PURE__ */ React2__namespace.createElement(ReactNative.Animated.View, { pointerEvents: isVisible ? void 0 : "none", style, removeClippedSubviews: true }, /* @__PURE__ */ React2__namespace.createElement(ContainerLayoutCoordinator, null, children));
+ });
+ var Containers = typedMemo(function Containers2({
+   freshDataTransitionEpoch,
+diff --git a/react-native.mjs b/react-native.mjs
+index a3d8d9a3939b11d410dbc04d5bc54df820a90534..907ef5c9a02d12c00707bc3b51c342c02178cd40 100644
+--- a/react-native.mjs
++++ b/react-native.mjs
+@@ -6110,7 +6110,9 @@ var ContainersLayer = typedMemo(function ContainersLayer2({
+       }
+     }
+   }
+-  return /* @__PURE__ */ React2.createElement(Animated.View, { pointerEvents: isVisible ? void 0 : "none", style }, /* @__PURE__ */ React2.createElement(ContainerLayoutCoordinator, null, children));
++  // Rows off screen leave the native view tree, so iOS composites only those in view; the ScrollView puts them back as
++  // they near the screen, on each mount and every 44 pt of scroll.
++  return /* @__PURE__ */ React2.createElement(Animated.View, { pointerEvents: isVisible ? void 0 : "none", style, removeClippedSubviews: true }, /* @__PURE__ */ React2.createElement(ContainerLayoutCoordinator, null, children));
+ });
+ var Containers = typedMemo(function Containers2({
+   freshDataTransitionEpoch,

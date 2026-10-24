@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { outsideAnchor } from "./conversation-transcript";
+import { outsideAnchor } from "./turn-footers";
 
 const block = (id: string, at: number, startsTurn = false) => ({ id, at, startsTurn });
 const lastTurn = [block("ask", 10, true), block("reply", 11), block("done", 12)];

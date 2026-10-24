@@ -2,8 +2,8 @@ import { act, cleanup, fireEvent, render, renderHook, screen } from "@testing-li
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { AgentEvent, Project, Run, ThreadCheckpoint, ThreadSummary } from "@openorc/protocol";
-import { runs as runStore } from "../lib/client";
-import { useConversationTranscript } from "../lib/conversation-transcript";
+import { queryClient, runs as runStore, useConversationTranscript } from "../lib/client";
+import { useTurnFooters } from "../lib/turn-footers";
 import { core } from "../lib/rpc";
 import { Conversation } from "./Conversation";
 
@@ -90,6 +90,16 @@ function serve(runs: Run[], history: ThreadCheckpoint[], diffs: Record<string, R
   return runs;
 }
 
+/** The window's own query cache, which the shared conversation hooks read through. */
+const cached = ({ children }: { children: React.ReactNode }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+
+/** A conversation's turn footers, composed the way Conversation composes them. */
+function useConversationFooters(runs: Run[]) {
+  const { merged, transcripts } = useConversationTranscript({ runs, threadId: "thread" });
+  const footers = useTurnFooters({ threadId: "thread", transcripts, blocks: merged?.blocks, basePath: "/tmp/project" });
+  return { merged, footers };
+}
+
 async function settle() {
   for (let i = 0; i < 6; i++) await act(async () => void (await new Promise((resolve) => setTimeout(resolve, 0))));
   act(() => runStore.flush());
@@ -126,10 +136,15 @@ beforeEach(() => {
   answers.clear();
   restore.mockClear();
   vi.mocked(core.call).mockReset();
-  vi.mocked(core.call).mockImplementation((async (method: string, params: { runId: string }) =>
-    method === "events.page" ? { events: structuredClone(ledger.get(params.runId) ?? []), fromTurn: 0, live: false } : undefined) as never);
+  vi.mocked(core.call).mockImplementation((async (method: string, params: { runId: string }) => {
+    if (method === "threads.messages") return [];
+    return method === "events.page" ? { events: structuredClone(ledger.get(params.runId) ?? []), fromTurn: 0, live: false } : undefined;
+  }) as never);
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  queryClient.clear();
+});
 
 it("says the reader changed the files, between the last turn and the next prompt, with the files folded", async () => {
   liveTurns();
@@ -173,7 +188,7 @@ it("undoes the reader's changes back to where the last turn left the files, afte
 
 it("keeps the footers while the next reply streams, so finished turns keep their identity", async () => {
   const runs = liveTurns();
-  const { result } = renderHook(() => useConversationTranscript({ runs, threadId: "thread", basePath: "/tmp/project" }));
+  const { result } = renderHook(() => useConversationFooters(runs), { wrapper: cached });
   await settle();
   const footers = result.current.footers;
   expect([...footers.outside]).toEqual([["turn-A-turn-0", [{ checkpointId: "mine", previousCheckpointId: "A1", by: "user" }]]]);

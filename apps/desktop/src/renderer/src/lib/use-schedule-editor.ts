@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { harnessInfo, harnessLoggedIn, isHarnessId, type RunMode, type Schedule, type TeamRevision, type WorkspaceMode } from "@openorc/protocol";
 import { defaultChoice, type ModelChoice } from "../components/ModelPicker";
-import { usePermissionSelection } from "./permission-default";
 import { branchingReason, useProjectGit } from "./project-git";
-import { useRpc, useRpcMutation } from "./client";
+import { usePermissionSelection, useRpc, useRpcMutation } from "./client";
 import {
   scheduleDraftIssue,
   scheduleModelTarget,

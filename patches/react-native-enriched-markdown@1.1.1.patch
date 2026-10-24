@@ -1,0 +1,584 @@
+diff --git a/ios/EnrichedMarkdown.mm b/ios/EnrichedMarkdown.mm
+index b7edde7a019a91eac7c2e78eacab2654106d607b..487c1325fe6199b5c079fc813f8db682ccfc2a87 100644
+--- a/ios/EnrichedMarkdown.mm
++++ b/ios/EnrichedMarkdown.mm
+@@ -1150,6 +1150,11 @@ static char kENRMSegmentFadeAnimatorKey;
+   if (newViewProps.streamingAnimation != oldViewProps.streamingAnimation) {
+     _streamingAnimation = newViewProps.streamingAnimation;
+     _dirtyFlags |= ENRMDirtyForceHeight | ENRMDirtyRender;
++    // Streaming that starts over finds earlier text here (another piece of a reply, in a list cell reused for it), so
++    // the next render builds its segments afresh, and they fade in as a new view's do.
++    if (_streamingAnimation) {
++      _dirtyFlags |= ENRMDirtyRecreateSegments;
++    }
+     if (!_streamingAnimation) {
+       for (RCTUIView *segment in _segmentViews) {
+         if ([segment isKindOfClass:[EnrichedMarkdownInternalText class]]) {
+diff --git a/ios/internals/ENRMViewFreeMeasurement.h b/ios/internals/ENRMViewFreeMeasurement.h
+index 8f7b44006ef080ff62976be02520c08c5b6463f2..cd4a2772caa006b2fe9591599c56377c1fa00afb 100644
+--- a/ios/internals/ENRMViewFreeMeasurement.h
++++ b/ios/internals/ENRMViewFreeMeasurement.h
+@@ -307,7 +307,7 @@ static inline CGSize ENRMMeasureSegmentedMarkdownViewFree(const PropsT &typedPro
+                                                 allowFontScaling:typedProps.allowFontScaling
+                                            maxFontSizeMultiplier:typedProps.maxFontSizeMultiplier
+                                             writingDirectionMode:writingDirectionMode
+-                                         resolvedLayoutDirection:resolvedLayoutDirection];
++                                         resolvedLayoutDirection:resolvedLayoutDirection fillWidth:maxWidth];
+         maxContentWidth = maxWidth;
+         if (shouldAddBottomMargin) {
+           yOffset += config.tableMarginBottom;
+diff --git a/ios/segments/ENRMCodeBlockContainerView.m b/ios/segments/ENRMCodeBlockContainerView.m
+index 0c022cfd5644ed59ffc492b12f79ca0b3521fdc1..c18df948196399f3303a471889114376a7b6a100 100644
+--- a/ios/segments/ENRMCodeBlockContainerView.m
++++ b/ios/segments/ENRMCodeBlockContainerView.m
+@@ -20,12 +20,10 @@
+ // header metrics, so the reported height matches the drawn height. Since
+ // lines never wrap, the height is independent of the available width.
+ 
+-static const CGFloat kENRMHeaderLabelScale = 0.85;
+ // The copy glyph reads cleaner a touch smaller than the language label and at a
+ // regular (not medium) weight; sized independently so the two never couple.
+ static const CGFloat kENRMHeaderIconScale = 0.72;
+ static const CGFloat kENRMHeaderSecondaryAlpha = 0.6;
+-static const CGFloat kENRMHeaderDividerAlpha = 0.2;
+ 
+ // Height geometry and code-run construction shared by the instance layout path
+ // and the view-free measureHeightForCodeBlockNode:, so the two cannot drift.
+@@ -36,9 +34,10 @@ static CGFloat ENRMCodeBlockContentInset(StyleConfig *config)
+ }
+ 
+ #if !TARGET_OS_OSX
++// The language label is set in the text face at the code's size, like the header of a code block on the desktop.
+ static UIFont *ENRMCodeBlockHeaderFont(StyleConfig *config)
+ {
+-  return [UIFont systemFontOfSize:[config codeBlockFont].pointSize * kENRMHeaderLabelScale weight:UIFontWeightMedium];
++  return [[config paragraphFont] fontWithSize:[config codeBlockFont].pointSize];
+ }
+ 
+ static CGFloat ENRMCodeBlockHeaderLabelLineHeight(UIFont *headerFont)
+@@ -48,7 +47,7 @@ static CGFloat ENRMCodeBlockHeaderLabelLineHeight(UIFont *headerFont)
+ #else
+ static NSFont *ENRMCodeBlockHeaderFont(StyleConfig *config)
+ {
+-  return [NSFont systemFontOfSize:[config codeBlockFont].pointSize * kENRMHeaderLabelScale weight:NSFontWeightMedium];
++  return [NSFont fontWithDescriptor:[config paragraphFont].fontDescriptor size:[config codeBlockFont].pointSize];
+ }
+ 
+ static CGFloat ENRMCodeBlockHeaderLabelLineHeight(NSFont *headerFont)
+@@ -515,19 +514,6 @@ static BOOL ENRMColorIsDark(RCTUIColor *color)
+   CGFloat inset = [self contentInset];
+   CGFloat headerH = [self headerHeight];
+ 
+-  // Divider between the header and the code, centered in the gap the code
+-  // text's top inset creates, so it adds no height of its own.
+-  RCTUIColor *dividerColor = [[_config codeBlockColor] colorWithAlphaComponent:kENRMHeaderDividerAlpha];
+-  if (dividerColor) {
+-    CGRect dividerRect = CGRectMake(borderWidth, headerH + inset / 2, self.bounds.size.width - borderWidth * 2, 1);
+-    [dividerColor setFill];
+-#if !TARGET_OS_OSX
+-    [[UIBezierPath bezierPathWithRect:dividerRect] fill];
+-#else
+-    [[NSBezierPath bezierPathWithRect:dividerRect] fill];
+-#endif
+-  }
+-
+   if (_languageLabel.length > 0) {
+     [_languageLabel drawAtPoint:CGPointMake(inset, headerH - _languageLabelSize.height)];
+   }
+diff --git a/ios/segments/ENRMSegmentHeightMeasurer.mm b/ios/segments/ENRMSegmentHeightMeasurer.mm
+index 0f4eeb1e6adf3ab21c6713846b972ffce425a329..cadae0ac565f9ebc478dd9eb44a46e270aea5b53 100644
+--- a/ios/segments/ENRMSegmentHeightMeasurer.mm
++++ b/ios/segments/ENRMSegmentHeightMeasurer.mm
+@@ -43,7 +43,7 @@ CGFloat ENRMMeasureSegmentsHeightViewFree(NSArray<ENRMRenderedSegment *> *segmen
+                                                   allowFontScaling:allowFontScaling
+                                              maxFontSizeMultiplier:config.maxFontSizeMultiplier
+                                               writingDirectionMode:writingDirectionMode
+-                                           resolvedLayoutDirection:resolvedLayoutDirection];
++                                           resolvedLayoutDirection:resolvedLayoutDirection fillWidth:contentWidth];
+       if (shouldAddBottomMargin) {
+         totalHeight += config.tableMarginBottom;
+       }
+diff --git a/ios/segments/ENRMTableIOSGridView.m b/ios/segments/ENRMTableIOSGridView.m
+index 138435033005771ce0bb194f273316a5328e3057..5347b79e6a16e43a8cbf305fdfbe59b7a22a2d2c 100644
+--- a/ios/segments/ENRMTableIOSGridView.m
++++ b/ios/segments/ENRMTableIOSGridView.m
+@@ -88,10 +88,11 @@
+       [rowData.backgroundColor setFill];
+       UIRectFill(cellRect);
+ 
+-      [_borderColor setStroke];
+-      UIBezierPath *border = [UIBezierPath bezierPathWithRect:cellRect];
+-      border.lineWidth = _borderWidth;
+-      [border stroke];
++      // Rows are set apart by one hairline above each, as on the desktop; columns by their padding alone.
++      if (r > 0) {
++        [_borderColor setFill];
++        UIRectFill(CGRectMake(xOffset, yOffset, columnWidth + _borderWidth, _borderWidth));
++      }
+ 
+       NSAttributedString *text = rowData.cellTexts[c];
+       if (text.length > 0) {
+diff --git a/ios/segments/TableContainerView.h b/ios/segments/TableContainerView.h
+index 1b2846dd5940000f6cfcd4ef239604cdb62bbb9b..66d4724f6f7fb3e386db24fd7d212a6e48153f59 100644
+--- a/ios/segments/TableContainerView.h
++++ b/ios/segments/TableContainerView.h
+@@ -24,14 +24,16 @@ typedef void (^TableLinkPressBlock)(NSString *url);
+ /// runs in `applyTableNode:`/`computeLayout` — shared statics, so measured and
+ /// rendered heights cannot drift — without creating any view. Safe on any
+ /// thread; the iOS counterpart of Android's
+-/// `TableContainerView.measureTableNodeHeight`. Table height is intrinsic
+-/// (content-sized columns, horizontal scroll), so no maxWidth parameter.
++/// `TableContainerView.measureTableNodeHeight`. A table narrower than
++/// `fillWidth` widens its columns to fill it, which can unwrap cells, so the
++/// height depends on the width it is laid out in.
+ + (CGFloat)measureHeightForTableNode:(MarkdownASTNode *)tableNode
+                               config:(StyleConfig *)config
+                     allowFontScaling:(BOOL)allowFontScaling
+                maxFontSizeMultiplier:(CGFloat)maxFontSizeMultiplier
+                 writingDirectionMode:(ENRMWritingDirectionMode)writingDirectionMode
+-             resolvedLayoutDirection:(NSWritingDirection)resolvedLayoutDirection;
++             resolvedLayoutDirection:(NSWritingDirection)resolvedLayoutDirection
++                           fillWidth:(CGFloat)fillWidth;
+ 
+ @property (nonatomic, strong) StyleConfig *config;
+ 
+diff --git a/ios/segments/TableContainerView.m b/ios/segments/TableContainerView.m
+index 7a39908bd40067a817051d4f0a1c9e7f23e9b4eb..306cefa68fffb9fc228f7a5388baebda7235b313 100644
+--- a/ios/segments/TableContainerView.m
++++ b/ios/segments/TableContainerView.m
+@@ -62,7 +62,8 @@ static StyleConfig *ENRMTableCellConfig(StyleConfig *config, BOOL isHeader)
+   NSString *headerFamily =
+       config.tableHeaderFontFamily.length > 0 ? config.tableHeaderFontFamily : config.tableFontFamily;
+   [cellConfig setParagraphFontFamily:isHeader ? headerFamily : config.tableFontFamily];
+-  [cellConfig setParagraphFontWeight:isHeader ? @"bold" : config.tableFontWeight];
++  // Headers keep the table's weight: the desktop sets them apart by color, not by bold.
++  [cellConfig setParagraphFontWeight:config.tableFontWeight];
+   [cellConfig setParagraphColor:isHeader ? config.tableHeaderTextColor : config.tableColor];
+   [cellConfig setParagraphLineHeight:config.tableLineHeight];
+ 
+@@ -175,7 +176,8 @@ static NSArray<NSArray<TableCellData *> *> *ENRMTableBuildRows(MarkdownASTNode *
+ }
+ 
+ static void ENRMTableComputeLayout(NSArray<NSArray<TableCellData *> *> *rows, NSUInteger colCount, StyleConfig *config,
+-                                   CGFloat borderWidth, NSMutableArray<NSNumber *> *_Nullable *_Nullable outColWidths,
++                                   CGFloat borderWidth, CGFloat fillWidth,
++                                   NSMutableArray<NSNumber *> *_Nullable *_Nullable outColWidths,
+                                    NSMutableArray<NSNumber *> *_Nullable *_Nullable outRowHeights,
+                                    CGFloat *_Nullable outTotalWidth, CGFloat *_Nullable outTotalHeight)
+ {
+@@ -202,6 +204,19 @@ static void ENRMTableComputeLayout(NSArray<NSArray<TableCellData *> *> *rows, NS
+     }
+   }
+ 
++  // A table narrower than its column fills it, as a full-width table does on the desktop: each column takes a share
++  // of the spare width in proportion to its content, and rows are measured at the widths they are drawn at.
++  CGFloat available = fillWidth - MAX(config.tableHorizontalOverflow, 0) * 2 - borderWidth;
++  CGFloat natural = [[colWidths valueForKeyPath:@"@sum.self"] doubleValue];
++  if (colCount > 0 && natural > 0 && available > natural) {
++    CGFloat given = 0;
++    for (NSUInteger column = 0; column < colCount; column++) {
++      CGFloat width = column + 1 == colCount ? available - given : floor([colWidths[column] doubleValue] * available / natural);
++      colWidths[column] = @(width);
++      given += width;
++    }
++  }
++
+   NSMutableArray<NSNumber *> *rowHeights = [NSMutableArray arrayWithCapacity:rows.count];
+   for (NSArray<TableCellData *> *row in rows) {
+     CGFloat maxHeight = 0;
+@@ -244,6 +259,7 @@ static void ENRMTableComputeLayout(NSArray<NSArray<TableCellData *> *> *rows, NS
+   NSMutableArray<NSNumber *> *_rowHeights;
+   CGFloat _totalTableWidth;
+   CGFloat _totalTableHeight;
++  CGFloat _fillWidth;
+ 
+   NSString *_cachedMarkdown;
+ 
+@@ -360,8 +376,8 @@ static void ENRMTableComputeLayout(NSArray<NSArray<TableCellData *> *> *rows, NS
+   NSMutableArray<NSNumber *> *rowHeights = nil;
+   CGFloat totalWidth = 0;
+   CGFloat totalHeight = 0;
+-  ENRMTableComputeLayout(_rows, _colCount, self.config, self.config.tableBorderWidth, &colWidths, &rowHeights,
+-                         &totalWidth, &totalHeight);
++  ENRMTableComputeLayout(_rows, _colCount, self.config, self.config.tableBorderWidth, _fillWidth, &colWidths,
++                         &rowHeights, &totalWidth, &totalHeight);
+   _colWidths = colWidths;
+   _rowHeights = rowHeights;
+   _totalTableWidth = totalWidth;
+@@ -374,6 +390,7 @@ static void ENRMTableComputeLayout(NSArray<NSArray<TableCellData *> *> *rows, NS
+                maxFontSizeMultiplier:(CGFloat)maxFontSizeMultiplier
+                 writingDirectionMode:(ENRMWritingDirectionMode)writingDirectionMode
+              resolvedLayoutDirection:(NSWritingDirection)resolvedLayoutDirection
++                           fillWidth:(CGFloat)fillWidth
+ {
+   NSUInteger colCount = 0;
+   NSArray<NSArray<TableCellData *> *> *rows =
+@@ -383,7 +400,7 @@ static void ENRMTableComputeLayout(NSArray<NSArray<TableCellData *> *> *rows, NS
+     return 0;
+ 
+   CGFloat totalHeight = 0;
+-  ENRMTableComputeLayout(rows, colCount, config, config.tableBorderWidth, NULL, NULL, NULL, &totalHeight);
++  ENRMTableComputeLayout(rows, colCount, config, config.tableBorderWidth, fillWidth, NULL, NULL, NULL, &totalHeight);
+   return totalHeight;
+ }
+ 
+@@ -681,12 +698,21 @@ static void ENRMTableComputeLayout(NSArray<NSArray<TableCellData *> *> *rows, NS
+   return [rowsResult copy];
+ }
+ 
++/// Lays the table out to fill `width` and draws it that way, unless it already is.
++- (void)fillWidth:(CGFloat)width
++{
++  if (width == _fillWidth && _rowHeights.count > 0)
++    return;
++  _fillWidth = width;
++  [self computeLayout];
++  [self renderGrid];
++}
++
+ - (CGFloat)measureHeight:(CGFloat)maxWidth
+ {
+   if (_rows.count == 0)
+     return 0;
+-  if (_rowHeights.count == 0)
+-    [self computeLayout];
++  [self fillWidth:maxWidth];
+   return _totalTableHeight;
+ }
+ 
+@@ -705,6 +731,8 @@ static void ENRMTableComputeLayout(NSArray<NSArray<TableCellData *> *> *rows, NS
+ - (void)layoutSubviews
+ {
+   [super layoutSubviews];
++  if (_rows.count > 0)
++    [self fillWidth:self.bounds.size.width];
+   _scrollView.frame = self.bounds;
+ #if !TARGET_OS_OSX
+   CGFloat overhang = MAX(self.config.tableHorizontalOverflow, 0);
+diff --git a/ios/utils/CodeBackground.m b/ios/utils/CodeBackground.m
+index 5e5d5bf06370c9a94ed5645ccba4436894fe2bdb..eded5e2c5620155325ecf73cf4afc5dbf739b391 100644
+--- a/ios/utils/CodeBackground.m
++++ b/ios/utils/CodeBackground.m
+@@ -4,7 +4,7 @@
+ 
+ NSString *const CodeAttributeName = @"Code";
+ 
+-static const CGFloat kCodeBackgroundCornerRadius = 2.0;
++static const CGFloat kCodeBackgroundCornerRadius = 6.0;
+ static const CGFloat kCodeBackgroundBorderWidth = 0.5;
+ 
+ @implementation CodeBackground {
+diff --git a/ios/utils/ENRMTailFadeInAnimator.m b/ios/utils/ENRMTailFadeInAnimator.m
+index 5c4c3bafd6abb00030a1a3689695f3d9d9113408..b5bb9bf4d221c9ce6caf8cb5640babdf5c57a6b3 100644
+--- a/ios/utils/ENRMTailFadeInAnimator.m
++++ b/ios/utils/ENRMTailFadeInAnimator.m
+@@ -3,23 +3,53 @@
+ #import <QuartzCore/QuartzCore.h>
+ #include <TargetConditionals.h>
+ 
+-static const NSTimeInterval kFadeDuration = 0.20;
++// Streamed words fade in on the schedule of Streamdown's word animation as OpenOrc's desktop styles it: each new word
++// fades over 240 ms on the desktop's ease-out, starting 40 ms after the word before it. Words still waiting never
++// start more than 320 ms from now; a burst that would overrun that compresses its stagger, down to 4 ms. A new update
++// never cuts short a word still fading.
++static const NSTimeInterval kFadeDuration = 0.24;
++static const NSTimeInterval kStagger = 0.04;
++static const NSTimeInterval kMaxBacklog = 0.32;
++static const NSTimeInterval kMinStagger = 0.004;
++
++/** The desktop's ease-out, cubic-bezier(0.22, 1, 0.36, 1), at progress `x`. */
++static CGFloat ENRMEase(CGFloat x)
++{
++  const CGFloat x1 = 0.22, y1 = 1.0, x2 = 0.36, y2 = 1.0;
++  CGFloat t = x;
++  for (int i = 0; i < 8; i++) {
++    CGFloat u = 1 - t;
++    CGFloat error = 3 * u * u * t * x1 + 3 * u * t * t * x2 + t * t * t - x;
++    if (fabs(error) < 1e-5)
++      break;
++    CGFloat slope = 3 * u * u * x1 + 6 * u * t * (x2 - x1) + 3 * t * t * (1 - x2);
++    if (fabs(slope) < 1e-6)
++      break;
++    t = fmin(fmax(t - error / slope, 0), 1);
++  }
++  CGFloat u = 1 - t;
++  return 3 * u * u * t * y1 + 3 * u * t * t * y2 + t * t * t;
++}
++
++/** One word on its way in, with the colors the renderer gave its characters. */
++@interface ENRMFadingWord : NSObject
++@property (nonatomic) NSRange range;
++@property (nonatomic) CFTimeInterval start;
++@property (nonatomic, copy) NSArray<NSValue *> *colorRanges;
++@property (nonatomic, copy) NSArray<RCTUIColor *> *colors;
++@end
+ 
+-typedef struct {
+-  NSRange range;
+-  __unsafe_unretained RCTUIColor *color;
+-} ENRMColorEntry;
++@implementation ENRMFadingWord
++@end
+ 
+ @implementation ENRMTailFadeInAnimator {
+   __weak ENRMPlatformTextView *_textView;
+ #if !TARGET_OS_OSX
+   CADisplayLink *_displayLink;
+ #endif
+-  CFTimeInterval _startTime;
+-
+-  NSArray<RCTUIColor *> *_retainedColors;
+-  ENRMColorEntry *_colorEntries;
+-  NSUInteger _entriesCount;
++  NSMutableArray<ENRMFadingWord *> *_words;
++  /** When the next new word may start: the end of the queue so far. */
++  CFTimeInterval _cursor;
+ }
+ 
+ - (instancetype)initWithTextView:(ENRMPlatformTextView *)textView
+@@ -27,6 +57,7 @@ typedef struct {
+   self = [super init];
+   if (self) {
+     _textView = textView;
++    _words = [NSMutableArray array];
+   }
+   return self;
+ }
+@@ -37,101 +68,149 @@ typedef struct {
+   [_displayLink invalidate];
+   _displayLink = nil;
+ #endif
+-  [self cleanupEntries];
+ }
+ 
+ - (void)animateFrom:(NSUInteger)tailStart to:(NSUInteger)tailEnd
+ {
+-  [self cancel];
+-
+   NSTextStorage *storage = _textView.textStorage;
+-  if (!storage || tailEnd <= tailStart || tailEnd > storage.length)
++  if (!storage) {
++    [self cancel];
+     return;
+-
++  }
+ #if !TARGET_OS_OSX
+   if (UIAccessibilityIsReduceMotionEnabled()) {
++    [self cancel];
+     return;
+   }
++#else
++  // TODO: Drive the fade from a display-sync callback on macOS, gated on accessibilityDisplayShouldReduceMotion.
++  [self cancel];
++  return;
+ #endif
+ 
+-  NSRange range = NSMakeRange(tailStart, tailEnd - tailStart);
++  // The renderer has just set the text afresh at full opacity. Words before the tail keep fading from where they
++  // are; words the update rewrote show as they now are.
++  NSUInteger kept = MIN(tailStart, storage.length);
++  NSMutableArray<ENRMFadingWord *> *still = [NSMutableArray arrayWithCapacity:_words.count];
++  for (ENRMFadingWord *word in _words) {
++    if (NSMaxRange(word.range) > kept)
++      continue;
++    [self snapshotColorsOfWord:word storage:storage];
++    [still addObject:word];
++  }
++  _words = still;
+ 
+-  [self snapshotColorsInRange:range storage:storage];
+-  [self updateAlpha:0.0];
++  if (tailEnd > tailStart && tailEnd <= storage.length) {
++    [self scheduleWordsInRange:NSMakeRange(tailStart, tailEnd - tailStart) storage:storage];
++  }
+ 
++  [self applyAt:CACurrentMediaTime() storage:storage];
+ #if !TARGET_OS_OSX
+-  _startTime = CACurrentMediaTime();
+-  _displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(step:)];
+-  // 0 tells the system to use the display's maximum frame rate — 60 Hz on standard displays and 120 Hz on ProMotion ones
+-  _displayLink.preferredFramesPerSecond = 0;
+-  [_displayLink addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
+-#else
+-  // TODO: Implement the tail fade-in animation on macOS.
+-  // CADisplayLink doesn't exist on macOS; the equivalent is CVDisplayLink (Core Video)
+-  // or an NSTimer driven at the display refresh rate. The iOS step:/eased-progress
+-  // logic below can be reused directly once a display-sync callback is wired up.
+-  // TODO: When this is implemented, gate it on
+-  // NSWorkspace.sharedWorkspace.accessibilityDisplayShouldReduceMotion so macOS
+-  // users with Reduce Motion enabled also skip the fade.
+-  [self updateAlpha:1.0];
+-  [self cleanupEntries];
++  if (_words.count > 0 && !_displayLink) {
++    _displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(step:)];
++    // 0 asks for the display's maximum frame rate: 60 Hz on standard displays, 120 Hz on ProMotion ones.
++    _displayLink.preferredFramesPerSecond = 0;
++    [_displayLink addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
++  }
+ #endif
+ }
+ 
+-#if !TARGET_OS_OSX
+-- (void)step:(CADisplayLink *)link
++/** Streamdown's timeline: one pass's words share a stagger, and the queue's tail stays within the backlog cap. */
++- (void)scheduleWordsInRange:(NSRange)range storage:(NSTextStorage *)storage
+ {
+-  CFTimeInterval elapsed = CACurrentMediaTime() - _startTime;
+-  CGFloat progress = fmin(elapsed / kFadeDuration, 1.0);
+-
+-  CGFloat eased = 1.0 - (1.0 - progress) * (1.0 - progress);
+-
+-  [self updateAlpha:eased];
+-
+-  if (progress >= 1.0) {
+-    [self cancel];
++  NSMutableArray<NSValue *> *ranges = [NSMutableArray array];
++  NSString *string = storage.string;
++  NSCharacterSet *space = [NSCharacterSet whitespaceAndNewlineCharacterSet];
++  NSUInteger index = range.location;
++  NSUInteger end = NSMaxRange(range);
++  while (index < end) {
++    while (index < end && [space characterIsMember:[string characterAtIndex:index]])
++      index++;
++    NSUInteger start = index;
++    while (index < end && ![space characterIsMember:[string characterAtIndex:index]])
++      index++;
++    if (index > start)
++      [ranges addObject:[NSValue valueWithRange:NSMakeRange(start, index - start)]];
+   }
+-}
+-#endif
+-
+-- (void)updateAlpha:(CGFloat)alpha
+-{
+-  NSTextStorage *storage = _textView.textStorage;
+-  if (!storage || _entriesCount == 0)
++  if (ranges.count == 0)
+     return;
+ 
+-  [storage beginEditing];
+-  for (NSUInteger i = 0; i < _entriesCount; i++) {
+-    ENRMColorEntry entry = _colorEntries[i];
+-    if (NSMaxRange(entry.range) <= storage.length) {
+-      RCTUIColor *fadedColor = [entry.color colorWithAlphaComponent:alpha];
+-      [storage addAttribute:NSForegroundColorAttributeName value:fadedColor range:entry.range];
+-    }
++  CFTimeInterval now = CACurrentMediaTime();
++  CFTimeInterval deadline = now + kMaxBacklog;
++  CFTimeInterval first = MIN(MAX(_cursor, now), deadline);
++  NSUInteger count = ranges.count;
++  NSTimeInterval step = kStagger;
++  if (count > 1 && first + (count - 1) * kStagger > deadline) {
++    step = first < deadline ? MAX(kMinStagger, (deadline - first) / (count - 1)) : kMinStagger;
+   }
+-  [storage endEditing];
++  _cursor = first + count * step;
++
++  [ranges enumerateObjectsUsingBlock:^(NSValue *value, NSUInteger i, BOOL *stop) {
++    ENRMFadingWord *word = [ENRMFadingWord new];
++    word.range = value.rangeValue;
++    word.start = first + i * step;
++    [self snapshotColorsOfWord:word storage:storage];
++    [self->_words addObject:word];
++  }];
+ }
+ 
+-- (void)snapshotColorsInRange:(NSRange)range storage:(NSTextStorage *)storage
++- (void)snapshotColorsOfWord:(ENRMFadingWord *)word storage:(NSTextStorage *)storage
+ {
+-  [self cleanupEntries];
+-
+   NSMutableArray<RCTUIColor *> *colors = [NSMutableArray array];
+   NSMutableArray<NSValue *> *ranges = [NSMutableArray array];
+   [storage enumerateAttribute:NSForegroundColorAttributeName
+-                      inRange:range
++                      inRange:word.range
+                       options:0
+                    usingBlock:^(RCTUIColor *color, NSRange subRange, BOOL *stop) {
+                      [colors addObject:color ?: [RCTUIColor labelColor]];
+                      [ranges addObject:[NSValue valueWithRange:subRange]];
+                    }];
++  word.colors = colors;
++  word.colorRanges = ranges;
++}
+ 
+-  _entriesCount = colors.count;
+-  _retainedColors = [colors copy];
+-  _colorEntries = malloc(sizeof(ENRMColorEntry) * _entriesCount);
++#if !TARGET_OS_OSX
++- (void)step:(CADisplayLink *)link
++{
++  NSTextStorage *storage = _textView.textStorage;
++  if (!storage) {
++    [self cancel];
++    return;
++  }
++  [self applyAt:CACurrentMediaTime() storage:storage];
++  if (_words.count == 0) {
++    [_displayLink invalidate];
++    _displayLink = nil;
++  }
++}
++#endif
+ 
+-  for (NSUInteger i = 0; i < _entriesCount; i++) {
+-    _colorEntries[i].color = _retainedColors[i];
+-    _colorEntries[i].range = [ranges[i] rangeValue];
++/** Paints every word at its point in its fade, and lets go of the words that are fully in. */
++- (void)applyAt:(CFTimeInterval)now storage:(NSTextStorage *)storage
++{
++  if (_words.count == 0)
++    return;
++  NSMutableArray<ENRMFadingWord *> *fading = [NSMutableArray arrayWithCapacity:_words.count];
++  [storage beginEditing];
++  for (ENRMFadingWord *word in _words) {
++    CGFloat progress = fmin(fmax((now - word.start) / kFadeDuration, 0), 1);
++    [self paintWord:word opacity:ENRMEase(progress) storage:storage];
++    if (progress < 1)
++      [fading addObject:word];
++  }
++  [storage endEditing];
++  _words = fading;
++}
++
++- (void)paintWord:(ENRMFadingWord *)word opacity:(CGFloat)opacity storage:(NSTextStorage *)storage
++{
++  for (NSUInteger i = 0; i < word.colors.count; i++) {
++    NSRange range = word.colorRanges[i].rangeValue;
++    if (NSMaxRange(range) > storage.length)
++      continue;
++    RCTUIColor *color = word.colors[i];
++    CGFloat alpha = CGColorGetAlpha(color.CGColor);
++    [storage addAttribute:NSForegroundColorAttributeName value:[color colorWithAlphaComponent:alpha * opacity] range:range];
+   }
+ }
+ 
+@@ -141,21 +220,14 @@ typedef struct {
+   [_displayLink invalidate];
+   _displayLink = nil;
+ #endif
+-
+-  if (_entriesCount > 0) {
+-    [self updateAlpha:1.0];
+-    [self cleanupEntries];
+-  }
+-}
+-
+-- (void)cleanupEntries
+-{
+-  if (_colorEntries) {
+-    free(_colorEntries);
+-    _colorEntries = NULL;
++  NSTextStorage *storage = _textView.textStorage;
++  if (storage && _words.count > 0) {
++    [storage beginEditing];
++    for (ENRMFadingWord *word in _words)
++      [self paintWord:word opacity:1 storage:storage];
++    [storage endEditing];
+   }
+-  _retainedColors = nil;
+-  _entriesCount = 0;
++  [_words removeAllObjects];
+ }
+ 
+ @end

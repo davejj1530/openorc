@@ -151,8 +151,7 @@ export class LinkConnection implements CoreConnection {
         return;
       }
       case "asset.error":
-        this.downloads.get(message.id)?.reject(new Error(message.message));
-        this.downloads.delete(message.id);
+        this.settleDownload(message.id)?.reject(new Error(message.message));
         return;
     }
   }
@@ -161,12 +160,10 @@ export class LinkConnection implements CoreConnection {
     const download = this.downloads.get(stream);
     if (!download) return;
     download.chunks.push(Uint8Array.from(chunk));
-    if (!end) return;
-    this.downloads.delete(stream);
-    download.resolve({ mime: download.mime, bytes: joined(download.chunks) });
+    if (end) this.settleDownload(stream)?.resolve({ mime: download.mime, bytes: joined(download.chunks) });
   }
 
-  /** Resolves once nothing asked over `session` waits for an answer. */
+  /** Resolves once nothing asked over `session` waits for an answer: no call, and no image still downloading. */
   drained(session: PhoneSession): Promise<void> {
     return new Promise((done) => {
       this.drains.set(session, done);
@@ -203,12 +200,12 @@ export class LinkConnection implements CoreConnection {
       this.pending.delete(id);
       pending.reject(new Error(DROPPED));
     }
-    this.checkDrains();
     for (const [id, download] of this.downloads) {
       if (download.session !== session) continue;
       this.downloads.delete(id);
       download.reject(new Error(DROPPED));
     }
+    this.checkDrains();
   }
 
   private settle(id: number): Pending | undefined {
@@ -218,9 +215,16 @@ export class LinkConnection implements CoreConnection {
     return pending;
   }
 
+  private settleDownload(id: number): Download | undefined {
+    const download = this.downloads.get(id);
+    this.downloads.delete(id);
+    this.checkDrains();
+    return download;
+  }
+
   private checkDrains(): void {
     for (const [session, done] of this.drains) {
-      if ([...this.pending.values()].some((pending) => pending.session === session)) continue;
+      if ([...this.pending.values(), ...this.downloads.values()].some((asked) => asked.session === session)) continue;
       this.drains.delete(session);
       done();
     }

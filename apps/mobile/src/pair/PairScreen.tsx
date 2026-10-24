@@ -6,7 +6,6 @@ import { Pressable, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { X } from "../generated/icons";
 import { cn } from "../ui/cn";
-import { useColors } from "../ui/mode";
 import { Text } from "../ui/Text";
 import { isPairingUrl, pairWith, usePairing, type Pairing } from "./pairing";
 
@@ -50,7 +49,6 @@ function Scanner({ onCode }: { onCode(code: string): void }) {
 /** Scans the code the Mac shows, takes a pasted link, or spends one the system camera opened the app with. */
 export function PairScreen() {
   const insets = useSafeAreaInsets();
-  const colors = useColors();
   const pairing = usePairing((state) => state.pairing);
   const opened = useLinkingURL();
   const [text, setText] = useState("");
@@ -86,7 +84,7 @@ export function PairScreen() {
           onChangeText={setText}
           onSubmitEditing={() => canPair && submit(text.trim())}
           placeholder="Or paste the pairing link"
-          placeholderTextColor={colors["ink-4"]}
+          placeholderTextColorClassName="accent-ink-4"
           autoCapitalize="none"
           autoCorrect={false}
           returnKeyType="go"

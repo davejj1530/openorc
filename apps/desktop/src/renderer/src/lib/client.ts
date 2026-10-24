@@ -9,6 +9,22 @@ export const client = createClientState(core, {
   },
   invalidationBatchMs: 50,
   randomId: () => crypto.randomUUID(),
+  savesDefaultPermission: true,
 });
 
-export const { queryClient, useRpc, useRpcs, useRpcMutation, invalidateTags, runs, useRun, useRuns, useRunMap, usePendingApprovals, useSubmit } = client;
+export const {
+  queryClient,
+  useRpc,
+  useRpcs,
+  useRpcMutation,
+  invalidateTags,
+  runs,
+  useRun,
+  useRuns,
+  useRunMap,
+  usePendingApprovals,
+  useSubmit,
+  useConversationTranscript,
+  useConversationSettings,
+  usePermissionSelection,
+} = client;

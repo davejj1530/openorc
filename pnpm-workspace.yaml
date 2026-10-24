@@ -17,8 +17,10 @@ allowBuilds:
   webgpu: false
 
 patchedDependencies:
+  "@legendapp/list@3.6.0": patches/@legendapp__list@3.6.0.patch
   "@pierre/diffs@1.4.2": patches/@pierre__diffs@1.4.2.patch
   fastembed@2.1.0: patches/fastembed@2.1.0.patch
+  react-native-enriched-markdown@1.1.1: patches/react-native-enriched-markdown@1.1.1.patch
 
 packageExtensions:
   fastembed@2.1.0:

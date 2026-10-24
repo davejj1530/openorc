@@ -1,5 +1,5 @@
 import { memo, useMemo, useState } from "react";
-import { toolResult, toolResultDetails } from "../lib/tool-result";
+import { toolResult, toolResultDetails } from "@openorc/client";
 import { ThreadImage, ThreadLink } from "./ThreadImages";
 
 const textStyle = "px-3 py-2 whitespace-pre-wrap break-words text-ink-3 max-h-72 overflow-auto";

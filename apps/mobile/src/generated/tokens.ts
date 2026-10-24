@@ -121,3 +121,37 @@ export const motion = {
   arrive: { blur: 4, rise: 4 },
 } as const;
 export const fonts = { text: "ImmaculateGothic-Text", bold: "ImmaculateGothic-Bold", mono: "JetBrainsMono-Regular" } as const;
+export const syntax = {
+  light: {
+    keyword: "#cf222e",
+    operator: "#cf222e",
+    punctuation: "#1f2328",
+    string: "#0a3069",
+    number: "#0550ae",
+    constant: "#0550ae",
+    comment: "#6e7781",
+    function: "#8250df",
+    type: "#953800",
+    variable: "#1f2328",
+    property: "#0550ae",
+    tag: "#116329",
+    attribute: "#0550ae",
+    embedded: "#1f2328",
+  },
+  dark: {
+    keyword: "#ff7b72",
+    operator: "#ff7b72",
+    punctuation: "#e6edf3",
+    string: "#a5d6ff",
+    number: "#79c0ff",
+    constant: "#79c0ff",
+    comment: "#8b949e",
+    function: "#d2a8ff",
+    type: "#ffa657",
+    variable: "#e6edf3",
+    property: "#79c0ff",
+    tag: "#7ee787",
+    attribute: "#79c0ff",
+    embedded: "#e6edf3",
+  },
+} as const;

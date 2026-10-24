@@ -33,7 +33,8 @@ export type LinkState =
   | { kind: "unpaired" }
   /** `why` is what ended the last session or attempt, kept so a retry does not flicker the screen. */
   | { kind: "connecting"; mac: MacName; why: DownReason | null }
-  | { kind: "connected"; mac: MacName; route: Route }
+  /** `serial` counts the sessions: each new one, on any route, has a new serial, so a call that failed can tell. */
+  | { kind: "connected"; mac: MacName; route: Route; serial: number }
   /** Trying again at `retryAt`, or once there is a network when it is null. */
   | { kind: "waiting"; mac: MacName; why: DownReason; retryAt: number | null }
   /** Closed after a while in the background; reconnects when the app comes back. */
@@ -43,7 +44,7 @@ export type LinkState =
 /** The state with what each one holds: the session while connected. The Mac's name comes from the store. */
 type Phase =
   { kind: "unpaired" } | { kind: "connecting"; why: DownReason | null } | Live | { kind: "waiting"; why: DownReason; retryAt: number | null } | { kind: "suspended" } | { kind: "incompatible" };
-type Live = { kind: "connected"; route: Route; session: PhoneSession };
+type Live = { kind: "connected"; route: Route; session: PhoneSession; serial: number };
 
 /** A socket being opened. `close` also abandons one that has not opened yet. */
 export interface OpeningSocket {
@@ -101,6 +102,7 @@ export class ConnectionManager {
   /** Bumped whenever work in flight stops mattering: a race that finishes for an old epoch closes what it made. */
   private epoch = 0;
   private attempt = 0;
+  private sessions = 0;
   private network: NetworkKind = "other";
   private closing: ClosingReason | null = null;
   private pingId = 0;
@@ -273,7 +275,7 @@ export class ConnectionManager {
     this.stopPings();
     this.attempt = 0;
     this.closing = null;
-    this.enter({ kind: "connected", route, session });
+    this.enter({ kind: "connected", route, session, serial: ++this.sessions });
     this.connection.attach(session);
     session.onBytes((stream, chunk, end) => this.connection.receiveBytes(stream, chunk, end));
     session.onMessage((message) => this.receive(session, message));
@@ -386,7 +388,7 @@ export class ConnectionManager {
 
 function toState(phase: Phase, mac: MacName | null): LinkState {
   if (!mac || phase.kind === "unpaired") return { kind: "unpaired" };
-  if (phase.kind === "connected") return { kind: "connected", mac, route: phase.route };
+  if (phase.kind === "connected") return { kind: "connected", mac, route: phase.route, serial: phase.serial };
   return { ...phase, mac };
 }
 

@@ -1,18 +1,6 @@
 import { expect, it } from "vitest";
-import {
-  conversationEmptyHint,
-  conversationEmptyTitle,
-  conversationPlaceholder,
-  durableActionLabel,
-  teamActorStateLabel,
-  teamMessageHint,
-  workspaceDestination,
-} from "./conversation-status-presentation";
+import { conversationEmptyHint, conversationEmptyTitle, durableActionLabel, teamActorStateLabel, teamMessageHint, workspaceDestination } from "./conversation-status-presentation";
 
-it("puts first task direction before active-turn placeholder states", () => {
-  expect(conversationPlaceholder({ firstTaskRun: true, working: true, canSteer: true, agent: undefined })).toBe("Add direction, or send to start this task…");
-  expect(conversationPlaceholder({ firstTaskRun: false, working: true, canSteer: false, agent: undefined })).toBe("Queue a message for when it finishes…");
-});
 it("keeps task instructions ahead of the workspace hint", () => {
   expect(conversationEmptyHint({ task: true, workspace: true })).toBe("Your task description is included. Add any direction below, or send to start.");
   expect(conversationEmptyTitle({ count: 2, firstTaskRun: true })).toBe("Loading transcript");

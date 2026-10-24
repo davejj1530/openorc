@@ -2,7 +2,7 @@
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import type { FakeLink } from "../test-fixtures/fake-link";
-import { nativeProps } from "../test-fixtures/react-native";
+import { keyboard, nativeProps } from "../test-fixtures/react-native";
 import { ImageTile } from "./images";
 
 /** The link, and the phone's cache of the Mac's images. */
@@ -32,4 +32,14 @@ it("loads an image again once the link is back, after the link dropped it", asyn
   const image = screen.getByLabelText("Attached image").querySelector("img")!;
   expect(nativeProps.get(image)?.source).toEqual({ uri: "file:///cache/shot.png" });
   expect(tile.uri).toHaveBeenLastCalledWith({ kind: "attachment", name: "shot.png" });
+});
+
+it("puts the keyboard away as an image opens full screen", async () => {
+  tile.uri.mockResolvedValue("file:///cache/shot.png");
+  render(<ImageTile asset={{ kind: "attachment", name: "shot.png" }} label="Attached image" compact />);
+  await act(async () => undefined);
+  keyboard.up = true;
+  act(() => screen.getByRole("imagebutton", { name: "Attached image" }).click());
+  expect(keyboard.up).toBe(false);
+  expect(screen.getByRole("button", { name: "Close" })).toBeTruthy();
 });

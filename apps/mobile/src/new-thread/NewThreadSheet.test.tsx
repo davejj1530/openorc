@@ -2,7 +2,7 @@
 import type { ProjectGit, RpcMethod, RpcParams } from "@openorc/protocol";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { router } from "expo-router";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, onTestFinished, vi } from "vitest";
 import { attachImage, pickImages } from "../composer/attachments";
 import type { DraftImage } from "../composer/drafts";
 import type { FakeMac } from "../test-fixtures/fake-mac";
@@ -42,8 +42,6 @@ vi.mock("expo-router", () => ({
   useLocalSearchParams: () => ({ projectId: "openorc" }),
   useNavigation: () => ({ isFocused: () => mac.focused }),
 }));
-vi.mock("expo-status-bar", () => ({ StatusBar: () => null }));
-vi.mock("expo-haptics", () => ({ impactAsync: () => Promise.resolve(), selectionAsync: () => Promise.resolve(), ImpactFeedbackStyle: { Light: "light" } }));
 vi.mock("../composer/attachments", () => ({ pickImages: vi.fn(), attachImage: vi.fn() }));
 
 beforeEach(() => {
@@ -65,7 +63,7 @@ async function openAndWrite(prompt: string) {
   render(<NewThreadSheet />, { wrapper: mac.phone!.wrapper });
   await waitFor(() => expect(project("notes")).toBeTruthy());
   act(() => (nativeProps.get(screen.getByLabelText("Message"))!.onChangeText as (text: string) => void)(prompt));
-  await waitFor(() => expect(button("Start").disabled).toBe(false));
+  await waitFor(() => expect(button("Start").getAttribute("aria-disabled")).toBe("false"));
 }
 
 it("opens the started thread over Home while the sheet is still showing", async () => {
@@ -120,4 +118,17 @@ it("holds the project while an image is on its way to the Mac", async () => {
   await act(async () => upload({ path: "/attachments/a.jpg", preview: "file:///cache/a.jpg" }));
   expect(project("notes").disabled).toBe(false);
   expect(screen.getByLabelText("Attached image")).toBeTruthy();
+});
+
+it("says why Start is dim when it is tapped, and starts nothing", async () => {
+  const models = mac.reads["agents.models"];
+  mac.reads["agents.models"] = [];
+  onTestFinished(() => void (mac.reads["agents.models"] = models));
+  render(<NewThreadSheet />, { wrapper: mac.phone!.wrapper });
+  await waitFor(() => expect(project("notes")).toBeTruthy());
+  act(() => (nativeProps.get(screen.getByLabelText("Message"))!.onChangeText as (text: string) => void)("Fix it"));
+  expect(screen.queryByRole("alert")).toBeNull();
+  fireEvent.click(button("Start"));
+  expect((await screen.findByRole("alert")).textContent).toBe("Choose a model");
+  expect(mac.start).not.toHaveBeenCalled();
 });

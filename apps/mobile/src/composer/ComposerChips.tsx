@@ -2,7 +2,7 @@ import { catalogModel, pickerSettings } from "@openorc/client";
 import { effortLabel, executionMode, executionModePresentation } from "@openorc/protocol";
 import { router } from "expo-router";
 import type { ReactNode } from "react";
-import { Pressable } from "react-native";
+import { Keyboard, Pressable } from "react-native";
 import { useRpc } from "../client";
 import { Lightbulb, Pencil, ShieldCheck, Wand } from "../generated/icons";
 import { HarnessLogo } from "../ui/HarnessLogo";
@@ -11,13 +11,19 @@ import type { ComposerSettings } from "./settings-bridge";
 
 const modeIcons = { plan: Lightbulb, review: ShieldCheck, trusted: Pencil, autonomous: Wand } as const;
 
-/** A 28 pt chip on the composer's fill that opens one of the thread's native sheets. */
+/**
+ * A 28 pt chip on the composer's fill that opens one of the thread's native sheets. The keyboard goes first: a focused
+ * prompt would keep it up over the sheet.
+ */
 function Chip({ label, children, onPress }: { label: string; children: ReactNode; onPress: () => void }) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
-      onPress={onPress}
+      onPress={() => {
+        Keyboard.dismiss();
+        onPress();
+      }}
       hitSlop={{ top: 8, bottom: 8 }}
       className="h-control-sm min-w-0 flex-shrink flex-row items-center gap-1.5 rounded-full bg-surface-2 pl-2 pr-2.5 active:bg-surface-3"
     >

@@ -39,15 +39,16 @@ function Layer({ state, current, disabled }: { state: SendState; current: SendSt
 /**
  * The composer's one ink control, 32 pt. Send, Queue and Stop are layers of the same pill, so a turn starting or
  * ending swaps the glyph in place with a small overshoot instead of replacing the button. A new thread's send says Start.
+ * A dim pill with `onDimPress` still takes a tap, which asks why it is dim.
  */
-export function SendButton({ state, disabled, onPress, label }: { state: SendState; disabled: boolean; onPress: () => void; label?: string }) {
+export function SendButton({ state, disabled, onPress, onDimPress, label }: { state: SendState; disabled: boolean; onPress: () => void; onDimPress?: () => void; label?: string }) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label ?? labels[state]}
       accessibilityState={{ disabled }}
-      disabled={disabled}
-      onPress={onPress}
+      disabled={disabled && !onDimPress}
+      onPress={disabled ? onDimPress : onPress}
       hitSlop={6}
       className={cn("h-control-send w-8 rounded-full bg-accent active:opacity-80", state === "queue" && "bg-surface-3", disabled && "bg-surface-3")}
     >

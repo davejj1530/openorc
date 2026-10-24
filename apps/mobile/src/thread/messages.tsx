@@ -40,7 +40,7 @@ export const Prompt = memo(function Prompt({ block }: { block: MessageBlock }) {
       ) : null}
       {block.text ? (
         <View className="rounded-2xl bg-bubble px-4 py-3">
-          <Text selectable className="text-md text-bubble-ink">
+          <Text prose selectable className="text-md text-bubble-ink">
             {block.text}
           </Text>
         </View>
@@ -63,10 +63,22 @@ export const Notice = memo(function Notice({ block }: { block: MessageBlock }) {
         <WorkMessage size={16} className="text-ink-4" />
       </View>
       <View className="min-w-0 flex-1 gap-1">
-        <Text className="text-ink-2">{head}</Text>
-        {details && open ? <Text className="text-ink-3">{details}</Text> : null}
+        <Text prose className="text-ink-2">
+          {head}
+        </Text>
+        {details && open ? (
+          <Text prose className="text-ink-3">
+            {details}
+          </Text>
+        ) : null}
         {details ? (
-          <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => setOpen(!open)} hitSlop={8} className="self-start active:opacity-60">
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ expanded: open }}
+            onPress={() => setOpen(!open)}
+            hitSlop={{ top: 14, bottom: 14, left: 8, right: 8 }}
+            className="self-start active:opacity-60"
+          >
             <Text className="text-sm text-ink-4">{open ? "Hide details" : "Show details"}</Text>
           </Pressable>
         ) : null}

@@ -24,20 +24,24 @@ function read(threadId: string): Draft {
   }
 }
 
+function write(threadId: string, draft: Draft): void {
+  if (draft.text || draft.images.length) storage.set(keyOf(threadId), JSON.stringify(draft));
+  else storage.remove(keyOf(threadId));
+}
+
 /**
  * What the person is writing in a thread, kept on the phone per Mac and thread as they type, so leaving the thread or
- * the app keeps it. A send clears it only once the Mac took the message.
+ * the app keeps it. A send empties it at once; a send the Mac refuses puts back what it took.
  */
 export function useDraft(threadId: string): [Draft, (update: (draft: Draft) => Draft) => void] {
   const [draft, setDraft] = useState(() => read(threadId));
   const update = useCallback(
-    (change: (draft: Draft) => Draft) =>
-      setDraft((current) => {
-        const next = change(current);
-        if (next.text || next.images.length) storage.set(keyOf(threadId), JSON.stringify(next));
-        else storage.remove(keyOf(threadId));
-        return next;
-      }),
+    (change: (draft: Draft) => Draft) => {
+      // The saved draft is the one to change: an image or a send can land after the reader swiped back.
+      const next = change(read(threadId));
+      write(threadId, next);
+      setDraft(next);
+    },
     [threadId],
   );
   return [draft, update];

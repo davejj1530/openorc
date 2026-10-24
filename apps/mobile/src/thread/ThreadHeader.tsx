@@ -1,26 +1,34 @@
-import { threadMark } from "@openorc/client";
+import { snoozeWakeLabel, threadMark } from "@openorc/client";
 import { WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
-import * as Haptics from "expo-haptics";
-import { Pressable, View } from "react-native";
-import { useRpc, useRpcMutation } from "../client";
-import { Square } from "../generated/icons";
+import { Pressable } from "react-native";
+import { useLinkState, useRpc } from "../client";
+import { useLinkWords } from "../connection/use-link-words";
 import { Text } from "../ui/Text";
 
-/** The header's faint line: where the thread lives, then what it is doing when that is worth saying. */
-function statusLine(thread: ThreadSummary, project: string | undefined): string {
+const pullWords = { open: "PR open", merged: "PR merged", closed: "PR closed" } as const;
+
+/**
+ * The header's faint line: where the thread lives, its pull request, when a snooze ends and what it is doing when that
+ * is worth saying. While the phone is not connected, the connection's state takes the line instead.
+ */
+export function statusLine(thread: ThreadSummary, project: string | undefined, now = Date.now()): string {
   const mark = threadMark(thread);
   const doing = mark && (mark.kind === "running" || mark.kind === "waiting" || mark.kind === "failed") ? mark.label : null;
-  return [thread.projectId === WORKSPACE_ID ? "Workspace" : project, doing].filter(Boolean).join(" · ");
+  const pull = thread.prUrl ? pullWords[thread.prState ?? "open"] : null;
+  const snoozed = thread.snoozedUntil && thread.snoozedUntil > now ? `Snoozed until ${snoozeWakeLabel(thread.snoozedUntil)}` : null;
+  return [thread.projectId === WORKSPACE_ID ? "Workspace" : project, pull, snoozed, doing].filter(Boolean).join(" · ");
 }
 
-/** The thread's title over a faint line of where it lives and what it is doing. */
-export function ThreadTitle({ thread }: { thread: ThreadSummary | null }) {
+/** The thread's title over a faint line of where it lives and what it is doing, or how the link is. Tapping the title renames it. */
+export function ThreadTitle({ thread, onRename }: { thread: ThreadSummary | null; onRename: () => void }) {
   const projects = useRpc("projects.list", {});
+  const link = useLinkWords(useLinkState());
   const project = projects.data?.find((item) => item.id === thread?.projectId)?.name;
   if (!thread) return null;
-  const line = statusLine(thread, project);
+  const down = link.tone !== "ok" && !link.quiet;
+  const line = down ? link.status : statusLine(thread, project);
   return (
-    <View accessibilityRole="header" className="max-w-60 items-center">
+    <Pressable accessibilityRole="header" accessibilityLabel={[thread.title, line].filter(Boolean).join(", ")} onPress={onRename} className="max-w-60 items-center active:opacity-60">
       <Text numberOfLines={1} className="text-md leading-5">
         {thread.title}
       </Text>
@@ -29,26 +37,6 @@ export function ThreadTitle({ thread }: { thread: ThreadSummary | null }) {
           {line}
         </Text>
       ) : null}
-    </View>
-  );
-}
-
-/** Stop in the header while a turn runs: ends the turn and keeps the session warm. */
-export function ThreadStop({ runId }: { runId: string }) {
-  const interrupt = useRpcMutation("runs.interrupt");
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel="Stop"
-      disabled={interrupt.isPending}
-      onPress={() => {
-        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        interrupt.mutate({ runId });
-      }}
-      hitSlop={8}
-      className="size-8 items-center justify-center rounded-full bg-surface-2 active:bg-surface-3"
-    >
-      <Square size={14} className={interrupt.isPending ? "text-ink-4" : "text-ink"} />
     </Pressable>
   );
 }

@@ -13,9 +13,9 @@ import { Text } from "../ui/Text";
 import { AgentPresence } from "./AgentPresence";
 import { newArrivals, useArrival } from "./arrivals";
 import { countArrivals } from "./perf-probe";
-import { Card } from "./cards";
+import { Card, RevealCard } from "./cards";
 import { Notice, Prompt, Reply } from "./messages";
-import { emptyRowMemo, fixedHeight, newestRow, transcriptRows, unsentRows, type Row } from "./rows";
+import { emptyRowMemo, endMark, fixedHeight, isNews, transcriptRows, unsentRows, type EndMark, type Row } from "./rows";
 import { TurnActions } from "./TurnActions";
 import { TurnHead } from "./TurnHead";
 import { WorkRow } from "./WorkRow";
@@ -86,18 +86,23 @@ function useArrivals(rows: Row[], filled: boolean): Set<string> {
   return arrivals;
 }
 
+/** How far the New chip's touch reaches past its 32 pt pill, top and bottom, to make 44 pt. */
+const CHIP_SLOP = 6;
+
 /** A quiet chip over the composer when something new came in below where the reader is. */
 function NewChip({ composerInset, onPress }: { composerInset: SharedValue<number>; onPress: () => void }) {
   const still = useReducedMotion();
   const insets = useSafeAreaInsets();
   const keyboard = useReanimatedKeyboardAnimation();
-  const place = useAnimatedStyle(() => ({ bottom: composerInset.value + Math.max(0, -keyboard.height.value - insets.bottom) + 12 }));
+  // The chip's slop must lie inside this view for iOS to deliver touches there, so the view is taller by it.
+  const place = useAnimatedStyle(() => ({ bottom: composerInset.value + Math.max(0, -keyboard.height.value - insets.bottom) + 12 - CHIP_SLOP }));
   return (
-    <Animated.View className="absolute inset-x-0 items-center" style={[place, still ? undefined : arrive]} pointerEvents="box-none">
+    <Animated.View className="absolute inset-x-0 items-center" style={[place, { paddingVertical: CHIP_SLOP }, still ? undefined : arrive]} pointerEvents="box-none">
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Show new messages"
         onPress={onPress}
+        hitSlop={{ top: CHIP_SLOP, bottom: CHIP_SLOP, left: 4, right: 4 }}
         className="h-control-lg flex-row items-center gap-1.5 rounded-full bg-surface px-3.5 active:bg-surface-3"
       >
         <ArrowDown size={14} className="text-ink-3" />
@@ -137,10 +142,10 @@ export function Transcript({ blocks, live, working, runId, hasOlder, loadOlder, 
   const memo = useRef(emptyRowMemo());
   const rows = useMemo(() => transcriptRows(blocks, { live, working }, runId, memo.current), [blocks, live, working, runId]);
   const arrivals = useArrivals(rows, filled);
-  const last = newestRow(rows);
-  // The newest row the reader saw before scrolling up; any change to the end after that is news.
-  const seen = useRef<Row | null>(null);
-  if (following) seen.current = last;
+  const end = endMark(rows, blocks);
+  // The end the reader saw before scrolling up; a new row there, or a reply that grew, is news.
+  const seen = useRef<EndMark | null>(null);
+  if (following) seen.current = end;
 
   const nearStart = useRef(false);
   // Only the reader lets go of the end. Layout moves the list too (rows measuring, the keyboard, a page above), and
@@ -165,7 +170,7 @@ export function Transcript({ blocks, live, working, runId, hasOlder, loadOlder, 
     },
     [onScroll],
   );
-  const showNew = !following && filled && seen.current !== null && last !== seen.current;
+  const showNew = !following && filled && isNews(seen.current, end);
   const toEnd = () => {
     onFollow(true);
     void listRef.current?.scrollToEnd({ animated: true });
@@ -186,21 +191,33 @@ export function Transcript({ blocks, live, working, runId, hasOlder, loadOlder, 
     void listRef.current?.scrollToEnd({ animated: false });
   }, [followKey, onFollow, listRef]);
 
+  // The keyboard rises as a card's field takes focus; once it has, the field's bottom comes to the foot of what stays in
+  // view, however tall the card. A card ends its row, so its bottom is the row's.
+  const reveal = useCallback(
+    (blockId: string, belowField: number) => {
+      const index = rows.findIndex((row) => row.kind === "card" && row.block.id === blockId);
+      if (index !== -1) setTimeout(() => void listRef.current?.scrollToIndex({ index, viewPosition: 1, viewOffset: belowField - 12, animated: true }), 250);
+    },
+    [rows, listRef],
+  );
+
   return (
     <View className="flex-1">
-      <RowList
-        rows={rows}
-        arrivals={arrivals}
-        hasOlder={hasOlder}
-        filled={filled}
-        following={following}
-        loadOlder={loadOlder}
-        composerInset={composerInset}
-        listRef={listRef}
-        onScroll={onScroll}
-        onGrab={grab}
-        onSettle={settle}
-      />
+      <RevealCard.Provider value={reveal}>
+        <RowList
+          rows={rows}
+          arrivals={arrivals}
+          hasOlder={hasOlder}
+          filled={filled}
+          following={following}
+          loadOlder={loadOlder}
+          composerInset={composerInset}
+          listRef={listRef}
+          onScroll={onScroll}
+          onGrab={grab}
+          onSettle={settle}
+        />
+      </RevealCard.Provider>
       {showNew ? <NewChip composerInset={composerInset} onPress={toEnd} /> : null}
     </View>
   );

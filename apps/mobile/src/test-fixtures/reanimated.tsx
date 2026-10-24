@@ -11,3 +11,6 @@ export const Easing = { bezier: cubicBezier };
 export const useSharedValue = <T,>(value: T) => ({ value });
 export const useAnimatedStyle = (style: () => object) => style();
 export const useFrameCallback = () => undefined;
+export const useAnimatedReaction = () => undefined;
+export const withTiming = <T,>(value: T) => value;
+export const withSpring = <T,>(value: T) => value;

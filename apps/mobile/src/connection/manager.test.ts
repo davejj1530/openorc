@@ -18,7 +18,10 @@ const started = 1_000_000;
 function start(mac: FakeMac, network: NetworkKind = "wifi", effects = pairedWith(mac)) {
   const manager = new ConnectionManager(effects);
   const states: LinkState[] = [];
-  manager.subscribe(() => states.push(manager.getState()));
+  manager.subscribe(() => {
+    const state = manager.getState();
+    if (state !== states.at(-1)) states.push(state);
+  });
   const pushes: ClientPush[] = [];
   manager.connection.onPush((push) => pushes.push(push));
   manager.start(network);
@@ -89,7 +92,7 @@ describe("route race", () => {
     mac.paired.clear();
     const { manager } = start(mac, "wifi", effects);
     await advance(10);
-    expect(manager.getState()).toEqual({ kind: "unpaired" });
+    expect(manager.getState()).toEqual({ kind: "unpaired", lost: { why: "removed", macName: "Studio" } });
     expect(effects.macs.saved.size).toBe(0);
     expect(effects.keys.stored.size).toBe(0);
     expect(effects.forgotten).toEqual([mac.id]);
@@ -186,7 +189,7 @@ describe("the Mac's reasons for closing", () => {
     await advance(10);
     mac.closeAll("removed");
     await advance(10);
-    expect(manager.getState()).toEqual({ kind: "unpaired" });
+    expect(manager.getState()).toEqual({ kind: "unpaired", lost: { why: "removed", macName: "Studio" } });
     expect(effects.macs.saved.size).toBe(0);
     expect(effects.keys.stored.size).toBe(0);
     await advance(60_000);
@@ -221,11 +224,30 @@ describe("app and network changes", () => {
     const { manager } = start(mac);
     await advance(10);
     manager.appState("background");
-    await advance(5_000);
+    await advance(3_000);
     manager.appState("active");
     await advance(10);
     expect(mac.sessions[0]!.closed).toBe(false);
     expect(mac.heard.filter((message) => message.t === "ping")).toHaveLength(2);
+  });
+
+  it("reconnects at once after more than a few seconds away, even when iOS held the app's timers", async () => {
+    const mac = new FakeMac();
+    mac.behave(lan, { kind: "answer" });
+    const { manager, states } = start(mac);
+    await advance(10);
+    manager.appState("background");
+    // Suspended JS runs no timers: the clock moves on, the grace timer never fires, the phase still says connected.
+    vi.setSystemTime(Date.now() + 9_000);
+    expect(manager.getState().kind).toBe("connected");
+    states.length = 0;
+    manager.appState("active");
+    expect(manager.getState().kind).toBe("connecting");
+    await advance(10);
+    expect(mac.sessions[0]!.closed).toBe(true);
+    expect(manager.getState()).toMatchObject({ kind: "connected", serial: 2 });
+    expect(states[0]!.kind).toBe("connecting");
+    expect(states.filter((state) => state.kind === "connected")).toHaveLength(1);
   });
 
   it("moves a tailnet session to the LAN when Wi-Fi returns", async () => {
@@ -270,13 +292,64 @@ describe("app and network changes", () => {
   });
 });
 
+describe("saved Macs and retries", () => {
+  it("publishes the saved list, so a Mac forgotten from the sheet leaves it even when another is shown", async () => {
+    const mac = new FakeMac();
+    mac.behave(lan, { kind: "answer" });
+    const effects = pairedWith(mac);
+    effects.macs.save({ id: "other", name: "Laptop", routes: [lan], lastRoute: null });
+    const { manager } = start(mac, "wifi", effects);
+    await advance(10);
+    const before = manager.getMacs();
+    expect(before.map((saved) => saved.name)).toEqual(["Studio", "Laptop"]);
+    let heard = 0;
+    manager.subscribe(() => heard++);
+    await manager.forget("other");
+    expect(heard).toBeGreaterThan(0);
+    expect(manager.getMacs()).not.toBe(before);
+    expect(manager.getMacs().map((saved) => saved.name)).toEqual(["Studio"]);
+    expect(manager.getState()).toMatchObject({ kind: "connected", mac: { name: "Studio" } });
+  });
+
+  it("tries again now instead of at the next backoff step, and says when that attempt settled", async () => {
+    const mac = new FakeMac();
+    mac.behave(lan, { kind: "down" });
+    const { manager } = start(mac);
+    await advance(10);
+    expect(manager.getState()).toMatchObject({ kind: "waiting", why: "unreachable" });
+    const dialed = mac.dials.length;
+    mac.behave(lan, { kind: "answer", delayMs: 50 });
+    let settled = false;
+    const retry = manager.retry().then(() => (settled = true));
+    expect(manager.getState().kind).toBe("connecting");
+    await advance(20);
+    expect(settled).toBe(false);
+    await advance(40);
+    await retry;
+    expect(manager.getState().kind).toBe("connected");
+    expect(mac.dials).toHaveLength(dialed + 1);
+    await manager.retry();
+    expect(mac.dials).toHaveLength(dialed + 1);
+  });
+
+  it("says when the Keychain lost the key the phone pairs with", async () => {
+    const mac = new FakeMac();
+    mac.behave(lan, { kind: "answer" });
+    const effects = pairedWith(mac);
+    effects.keys.stored.clear();
+    const { manager } = start(mac, "wifi", effects);
+    await advance(10);
+    expect(manager.getState()).toEqual({ kind: "unpaired", lost: { why: "key-lost", macName: "Studio" } });
+  });
+});
+
 describe("pairing", () => {
   it("spends the code over the first route that answers and keeps the Mac", async () => {
     const mac = new FakeMac();
     mac.behave(lan, { kind: "answer" });
     const effects = effectsFor(mac);
     const { manager } = start(mac, "wifi", effects);
-    expect(manager.getState()).toEqual({ kind: "unpaired" });
+    expect(manager.getState()).toEqual({ kind: "unpaired", lost: null });
     const pairing = manager.pair(mac.pairingUrl());
     await advance(10);
     expect(await pairing).toEqual({ ok: true, mac: { id: mac.id, name: "Studio" } });
@@ -295,11 +368,39 @@ describe("pairing", () => {
     mac.offer = null;
     const pairing = manager.pair(spent);
     await advance(10);
-    expect(await pairing).toEqual({ ok: false, message: "This code was already used or has expired. Show a new one on your Mac." });
-    expect(await manager.pair(mac.pairingUrl(Date.now() - 1))).toEqual({ ok: false, message: "This code has expired. Show a new one on your Mac." });
-    expect(await manager.pair("https://example.com")).toEqual({ ok: false, message: "This is not an OpenOrc pairing code." });
+    expect(await pairing).toEqual({ ok: false, message: "This code was already used or has expired. Show a new one on your Mac.", spent: true });
+    expect(await manager.pair(mac.pairingUrl(Date.now() - 1))).toEqual({ ok: false, message: "This code has expired. Show a new one on your Mac.", spent: true });
+    expect(await manager.pair("https://example.com")).toEqual({ ok: false, message: "This is not an OpenOrc pairing code.", spent: true });
     expect(effects.macs.saved.size).toBe(0);
     expect(effects.keys.stored.size).toBe(0);
-    expect(manager.getState()).toEqual({ kind: "unpaired" });
+    expect(manager.getState()).toEqual({ kind: "unpaired", lost: null });
+  });
+
+  it("spends a code a Mac of another version refused, and keeps one a busy Mac refused", async () => {
+    const mac = new FakeMac();
+    mac.behave(lan, { kind: "refuse", reason: "incompatible" });
+    mac.behave(tailnet, { kind: "down" });
+    const { manager } = start(mac, "wifi", effectsFor(mac));
+    const other = manager.pair(mac.pairingUrl());
+    await advance(10);
+    expect(await other).toMatchObject({ ok: false, spent: true });
+    mac.behave(lan, { kind: "refuse", reason: "busy" });
+    const busy = manager.pair(mac.pairingUrl());
+    await advance(10);
+    expect(await busy).toMatchObject({ ok: false, spent: false });
+  });
+
+  it("keeps a code it could not deliver, since the same code can pair once the Mac is reachable", async () => {
+    const mac = new FakeMac();
+    mac.behave(lan, { kind: "down" });
+    mac.behave(tailnet, { kind: "down" });
+    const effects = effectsFor(mac);
+    const { manager } = start(mac, "wifi", effects);
+    const url = mac.pairingUrl();
+    expect(await manager.pair(url)).toEqual({ ok: false, message: "Could not reach your Mac. Check that this phone is on its network or tailnet.", spent: false });
+    mac.behave(lan, { kind: "answer" });
+    const again = manager.pair(url);
+    await advance(10);
+    expect(await again).toMatchObject({ ok: true });
   });
 });

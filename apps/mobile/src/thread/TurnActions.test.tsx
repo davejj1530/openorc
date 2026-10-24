@@ -5,9 +5,6 @@ import { flatStyle, nativeProps } from "../test-fixtures/react-native";
 import { FIXED_HEIGHT, type Row } from "./rows";
 import { TurnActions } from "./TurnActions";
 
-vi.mock("expo-clipboard", () => ({ setStringAsync: () => Promise.resolve(true) }));
-vi.mock("expo-haptics", () => ({ impactAsync: () => Promise.resolve(), ImpactFeedbackStyle: { Light: "light" } }));
-
 beforeEach(() => {
   vi.useFakeTimers();
 });

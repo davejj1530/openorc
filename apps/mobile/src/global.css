@@ -2,8 +2,11 @@
 @import "uniwind";
 @import "./generated/theme.css";
 
-/* Phone-only sizes: touch needs taller targets than the desktop's pointer sizes. The rest of the scale is the desktop's. */
+/*
+ * Phone-only sizes: touch needs taller targets than the desktop's pointer sizes. The rest of the scale is the desktop's.
+ * They sit in the spacing scale because size-* reads no height token; there h-, min-h- and size-touch are all 44 pt.
+ */
 @theme {
-  --height-touch: 44px;
-  --height-touch-row: 52px;
+  --spacing-touch: 44px;
+  --spacing-touch-row: 52px;
 }

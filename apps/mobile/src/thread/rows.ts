@@ -34,6 +34,12 @@ export type Row = { key: string; gap: number } & (
  * below the last. The actions row tucks 4 closer, as the desktop's does.
  */
 const GAP = { part: 14, prompt: 28, turn: 24, actions: 10 };
+/**
+ * The work's receipt is a 44 pt touch row on a 16 pt line, so the work row keeps this much inside itself above the
+ * line and below what it shows; the gaps beside it give that back.
+ */
+const WORK_SPACE = (44 - 16) / 2;
+const spaceBelow = (row: Unspaced | undefined) => (row?.kind === "work" ? WORK_SPACE : 0);
 
 export type RowKind = Row["kind"];
 
@@ -164,7 +170,8 @@ function turnParts(turn: { id: string; blocks: Block[] }, live: boolean, fallbac
 function gapAbove(row: Unspaced, above: Unspaced | undefined, opening: number): number {
   if (!above) return opening;
   if (row.kind === "actions") return GAP.actions;
-  return above.kind === "prompt" ? GAP.prompt : GAP.part;
+  if (row.kind === "work") return GAP.part - WORK_SPACE;
+  return (above.kind === "prompt" ? GAP.prompt : GAP.part) - spaceBelow(above);
 }
 
 /** A turn's rows with the space above each; `opening` is the space above its first. */
@@ -194,7 +201,7 @@ export function transcriptRows(blocks: Block[], { live, working }: TranscriptAct
   turns.forEach((turn, index) => {
     const turnLive = live && index === turns.length - 1;
     // A prompt whose answer came as a turn of its own still sits 28 above it.
-    const opening = rows.at(-1)?.kind === "prompt" ? GAP.prompt : GAP.turn;
+    const opening = (rows.at(-1)?.kind === "prompt" ? GAP.prompt : GAP.turn) - spaceBelow(rows.at(-1));
     const previous = memo.turns.get(turn.id);
     if (previous && previous.live === turnLive && previous.opening === opening && sameItems(previous.blocks, turn.blocks)) {
       next.set(turn.id, previous);
@@ -210,20 +217,35 @@ export function transcriptRows(blocks: Block[], { live, working }: TranscriptAct
     rows.push(...fresh);
   });
   memo.turns = next;
-  if (turns.length) rows.push(presenceRow(memo, working));
+  if (turns.length) rows.push(presenceRow(memo, working, GAP.part - spaceBelow(rows.at(-1))));
   if (sameItems(rows, memo.rows)) return memo.rows;
   memo.rows = rows;
   return rows;
 }
 
 /** The agent at the end of the conversation, working while the thread is, the same row object until that changes. */
-function presenceRow(memo: RowMemo, working: boolean): Row {
+function presenceRow(memo: RowMemo, working: boolean, gap: number): Row {
   const last = memo.rows.at(-1);
-  return last?.kind === "presence" && last.working === working ? last : { kind: "presence", key: "presence", gap: GAP.part, working };
+  return last?.kind === "presence" && last.working === working && last.gap === gap ? last : { kind: "presence", key: "presence", gap, working };
 }
 
 /** The newest row, the one the New chip watches: the agent's presence always ends the list, so it is not news. */
 export const newestRow = (rows: Row[]): Row | null => rows.findLast((row) => row.kind !== "presence") ?? null;
+
+/** What the end of the conversation holds: its newest row, and how much the newest reply has said so far. */
+export interface EndMark {
+  row: Row | null;
+  said: number;
+}
+
+/** A streaming reply grows inside one row, so the length of what it has said counts as well as a new row. */
+export function endMark(rows: Row[], blocks: readonly Block[]): EndMark {
+  const last = blocks.at(-1);
+  return { row: newestRow(rows), said: last?.kind === "message" && last.role === "assistant" ? last.text.length : 0 };
+}
+
+/** Something arrived at the end since the reader last saw it there. */
+export const isNews = (seen: EndMark | null, now: EndMark): boolean => seen !== null && (now.row !== seen.row || now.said > seen.said);
 
 /** Question cards still waiting for an answer: they hold picks and typed text, so they stay mounted off screen. */
 export function unsentRows(rows: Row[]): string[] {

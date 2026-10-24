@@ -28,9 +28,13 @@ export interface MacName {
   name: string;
 }
 
+/** Why the phone has no Mac any more: the Mac removed it, or the Keychain lost the key it pairs with. */
+export type LostMac = { why: "removed" | "key-lost"; macName: string };
+
 /** The phone's connection to the Mac it shows: one state at a time, so a screen never reconciles flags. */
 export type LinkState =
-  | { kind: "unpaired" }
+  /** `lost` says why the last Mac went, when it was not the person's own Forget. */
+  | { kind: "unpaired"; lost: LostMac | null }
   /** `why` is what ended the last session or attempt, kept so a retry does not flicker the screen. */
   | { kind: "connecting"; mac: MacName; why: DownReason | null }
   /** `serial` counts the sessions: each new one, on any route, has a new serial, so a call that failed can tell. */
@@ -43,7 +47,12 @@ export type LinkState =
 
 /** The state with what each one holds: the session while connected. The Mac's name comes from the store. */
 type Phase =
-  { kind: "unpaired" } | { kind: "connecting"; why: DownReason | null } | Live | { kind: "waiting"; why: DownReason; retryAt: number | null } | { kind: "suspended" } | { kind: "incompatible" };
+  | { kind: "unpaired"; lost: LostMac | null }
+  | { kind: "connecting"; why: DownReason | null }
+  | Live
+  | { kind: "waiting"; why: DownReason; retryAt: number | null }
+  | { kind: "suspended" }
+  | { kind: "incompatible" };
 type Live = { kind: "connected"; route: Route; session: PhoneSession; serial: number };
 
 /** A socket being opened. `close` also abandons one that has not opened yet. */
@@ -64,7 +73,8 @@ export interface ConnectionEffects {
   forgetCache(macId: string): void;
 }
 
-export type PairResult = { ok: true; mac: MacName } | { ok: false; message: string };
+/** `spent` when the same code can never pair: the Mac refused it, it expired, or it is not a pairing code. */
+export type PairResult = { ok: true; mac: MacName } | { ok: false; message: string; spent: boolean };
 
 type Linked = { session: PhoneSession; hello: MacGreeting };
 
@@ -74,6 +84,11 @@ const BACKOFF_CAP_MS = 15_000;
 const PING_EVERY_MS = 20_000;
 const PONG_WITHIN_MS = 10_000;
 const BACKGROUND_GRACE_MS = 20_000;
+/**
+ * Back after this long, the session is not trusted: iOS suspends the app's timers and sockets a few seconds into the
+ * background, so the grace timer may never have fired and the socket may be dead while the phase still says connected.
+ */
+const STALE_AFTER_MS = 5_000;
 /** How long a session replaced by a better route keeps answering calls already sent over it. */
 const DRAIN_MS = 5_000;
 
@@ -97,8 +112,9 @@ export function backoffMs(attempt: number, random: () => number): number {
  */
 export class ConnectionManager {
   readonly connection: LinkConnection;
-  private phase: Phase = { kind: "unpaired" };
-  private state: LinkState = { kind: "unpaired" };
+  private phase: Phase = { kind: "unpaired", lost: null };
+  private state: LinkState = { kind: "unpaired", lost: null };
+  private saved: SavedMac[];
   /** Bumped whenever work in flight stops mattering: a race that finishes for an old epoch closes what it made. */
   private epoch = 0;
   private attempt = 0;
@@ -110,29 +126,52 @@ export class ConnectionManager {
   private pingTimer: unknown = null;
   private pongTimer: unknown = null;
   private backgroundTimer: unknown = null;
+  private backgroundedAt: number | null = null;
   private readonly keyPairs = new Map<string, KeyPair>();
   private readonly listeners = new Set<() => void>();
 
   constructor(private readonly effects: ConnectionEffects) {
     this.connection = new LinkConnection(effects.clock, () => this.phase.kind !== "unpaired" && this.phase.kind !== "incompatible");
+    this.saved = effects.macs.list();
   }
 
   getState = (): LinkState => this.state;
+
+  /** The saved Macs, as one value that changes whenever one is saved or forgotten, so a screen can follow the list. */
+  getMacs = (): readonly SavedMac[] => this.saved;
 
   subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   };
 
-  macs(): SavedMac[] {
-    return this.effects.macs.list();
-  }
-
   /** Connects to the Mac the app showed last, if any. */
   start(network: NetworkKind): void {
     this.network = network;
     if (this.active()) this.connectNow(null);
-    else this.enter({ kind: "unpaired" });
+    else this.enter({ kind: "unpaired", lost: null });
+  }
+
+  /**
+   * Tries the shown Mac again now instead of at the next backoff step, when the phone is not connected; resolves once
+   * that attempt has settled. A session already up, or one on its way, is left alone.
+   */
+  retry(): Promise<void> {
+    const phase = this.phase;
+    if (phase.kind === "waiting" || phase.kind === "suspended" || phase.kind === "incompatible") this.retryNow(phase.kind === "waiting" ? phase.why : null);
+    return this.settled();
+  }
+
+  /** Resolves once the phone is not on its way to the Mac. */
+  private settled(): Promise<void> {
+    if (this.phase.kind !== "connecting") return Promise.resolve();
+    return new Promise((resolve) => {
+      const stop = this.subscribe(() => {
+        if (this.phase.kind === "connecting") return;
+        stop();
+        resolve();
+      });
+    });
   }
 
   /** Scans a pairing code: spends it over the first route that answers and makes that Mac the one shown. */
@@ -141,20 +180,20 @@ export class ConnectionManager {
     try {
       offer = decodePairingUrl(url.trim());
     } catch {
-      return { ok: false, message: "This is not an OpenOrc pairing code." };
+      return { ok: false, message: "This is not an OpenOrc pairing code.", spent: true };
     }
-    if (offer.expiresAt <= this.effects.clock.now()) return { ok: false, message: "This code has expired. Show a new one on your Mac." };
+    if (offer.expiresAt <= this.effects.clock.now()) return { ok: false, message: "This code has expired. Show a new one on your Mac.", spent: true };
     const id = toBase64Url(offer.macKey);
     const saved = this.effects.macs.list().find((mac) => mac.id === id);
     const key = (await this.keyPair(id)) ?? this.effects.crypto.generateKeyPair();
     const pair = { offerId: offer.offerId, secret: toBase64Url(offer.secret) };
     const routes = routesFor({ routes: offer.routes, lastRoute: null }, this.network === "none" ? "other" : this.network);
     const result = await raceRoutes(routes, (route) => this.dial(route, offer.macKey, key, pair), this.effects.clock, closeLinked);
-    if (!result.ok) return { ok: false, message: result.refused ? refusalWords[result.refused] : "Could not reach your Mac. Check that this phone is on its network or tailnet." };
+    if (!result.ok) return pairFailure(result.refused);
     await this.effects.keys.write(id, key.privateKey);
     this.keyPairs.set(id, key);
     const mac: SavedMac = { id, name: offer.macName, routes: learnRoutes(saved?.routes ?? [], offer.routes), lastRoute: saved?.lastRoute ?? null };
-    this.effects.macs.save(mac);
+    this.saveMac(mac);
     this.effects.macs.setActiveId(id);
     this.abandon();
     this.adopt(mac, result.route, result.value);
@@ -170,10 +209,14 @@ export class ConnectionManager {
     this.connectNow(null);
   }
 
-  /** Forgets a Mac here: its record, this phone's key for it and what was cached from it. */
-  async forget(id: string): Promise<void> {
+  /**
+   * Forgets a Mac here: its record, this phone's key for it and what was cached from it. `lost` says why when the
+   * person did not ask, which the unpaired screen tells them.
+   */
+  async forget(id: string, lost: LostMac["why"] | null = null): Promise<void> {
     const wasActive = this.effects.macs.activeId() === id;
-    this.effects.macs.remove(id);
+    const name = this.saved.find((mac) => mac.id === id)?.name ?? "Your Mac";
+    this.removeMac(id);
     this.keyPairs.delete(id);
     this.effects.forgetCache(id);
     if (wasActive) {
@@ -181,21 +224,25 @@ export class ConnectionManager {
       this.abandon();
       this.attempt = 0;
       if (this.active()) this.connectNow(null);
-      else this.enter({ kind: "unpaired" });
+      else this.enter({ kind: "unpaired", lost: lost && { why: lost, macName: name } });
     }
     await this.effects.keys.remove(id);
   }
 
   appState(state: "active" | "background"): void {
     if (state === "background") {
+      this.backgroundedAt ??= this.effects.clock.now();
       this.backgroundTimer ??= this.effects.clock.setTimeout(() => this.suspend(), BACKGROUND_GRACE_MS);
       return;
     }
+    const away = this.backgroundedAt === null ? 0 : this.effects.clock.now() - this.backgroundedAt;
+    this.backgroundedAt = null;
     this.effects.clock.clearTimeout(this.backgroundTimer);
     this.backgroundTimer = null;
     const phase = this.phase;
-    if (phase.kind === "connected") this.ping(phase.session);
-    else if (phase.kind === "suspended" || phase.kind === "waiting") this.retryNow(phase.kind === "waiting" ? phase.why : null);
+    if (phase.kind === "connected" && away < STALE_AFTER_MS) this.ping(phase.session);
+    else if (phase.kind === "connected" || phase.kind === "suspended") this.retryNow(null);
+    else if (phase.kind === "waiting") this.retryNow(phase.why);
   }
 
   setNetwork(network: NetworkKind): void {
@@ -205,6 +252,18 @@ export class ConnectionManager {
     if (phase.kind === "waiting") this.retryNow(phase.why === "offline" ? null : phase.why);
     else if (phase.kind === "connected" && phase.route.kind === "lan" && network === "cellular") this.retryNow(null);
     else if (phase.kind === "connected" && phase.route.kind === "tailnet" && network === "wifi") void this.moveToLan(phase);
+  }
+
+  private saveMac(mac: SavedMac): void {
+    this.effects.macs.save(mac);
+    this.saved = this.effects.macs.list();
+    for (const listener of this.listeners) listener();
+  }
+
+  private removeMac(id: string): void {
+    this.effects.macs.remove(id);
+    this.saved = this.effects.macs.list();
+    for (const listener of this.listeners) listener();
   }
 
   private active(): SavedMac | null {
@@ -239,7 +298,7 @@ export class ConnectionManager {
   private connectNow(why: DownReason | null): void {
     this.effects.clock.clearTimeout(this.retryTimer);
     const mac = this.active();
-    if (!mac) return this.enter({ kind: "unpaired" });
+    if (!mac) return this.enter({ kind: "unpaired", lost: null });
     const routes = routesFor(mac, this.network);
     if (routes.length === 0) return this.enter({ kind: "waiting", why: "offline", retryAt: null });
     const epoch = ++this.epoch;
@@ -247,7 +306,7 @@ export class ConnectionManager {
     void this.keyPair(mac.id).then(async (key) => {
       if (epoch !== this.epoch) return;
       // The Keychain lost this phone's key: only pairing again can help.
-      if (!key) return this.forget(mac.id);
+      if (!key) return this.forget(mac.id, "key-lost");
       const result = await raceRoutes(routes, (route) => this.dial(route, fromBase64Url(mac.id), key), this.effects.clock, closeLinked);
       if (epoch !== this.epoch) return result.ok ? closeLinked(result.value) : undefined;
       this.settleRace(mac, result, why);
@@ -258,7 +317,7 @@ export class ConnectionManager {
     if (result.ok) return this.adopt(mac, result.route, result.value);
     switch (result.refused) {
       case "unpaired":
-        return void this.forget(mac.id);
+        return void this.forget(mac.id, "removed");
       case "incompatible":
         return this.enter({ kind: "incompatible" });
       case "busy":
@@ -271,7 +330,7 @@ export class ConnectionManager {
   /** Makes `linked` the session for `mac`, learning the routes its hello lists. */
   private adopt(mac: SavedMac, route: Route, { session, hello }: Linked): void {
     const learned: SavedMac = { ...mac, name: hello.mac.name, routes: learnRoutes(mac.routes, hello.routes), lastRoute: route };
-    this.effects.macs.save(learned);
+    this.saveMac(learned);
     this.stopPings();
     this.attempt = 0;
     this.closing = null;
@@ -300,7 +359,7 @@ export class ConnectionManager {
     const closing = this.closing ?? (code === LinkCloseCode.closing && closingReasons.has(reason) ? (reason as ClosingReason) : null);
     this.closing = null;
     const mac = this.active();
-    if (closing === "removed" && mac) return void this.forget(mac.id);
+    if (closing === "removed" && mac) return void this.forget(mac.id, "removed");
     if (closing === "disabled") return this.retryLater("disabled");
     if (closing === "update" || closing === "shutdown") return this.retryLater("restarting");
     this.retryLater("unreachable");
@@ -387,9 +446,16 @@ export class ConnectionManager {
 }
 
 function toState(phase: Phase, mac: MacName | null): LinkState {
-  if (!mac || phase.kind === "unpaired") return { kind: "unpaired" };
+  if (phase.kind === "unpaired") return { kind: "unpaired", lost: phase.lost };
+  if (!mac) return { kind: "unpaired", lost: null };
   if (phase.kind === "connected") return { kind: "connected", mac, route: phase.route, serial: phase.serial };
   return { ...phase, mac };
+}
+
+function pairFailure(refused: Refusal | null): PairResult {
+  if (!refused) return { ok: false, message: "Could not reach your Mac. Check that this phone is on its network or tailnet.", spent: false };
+  // Only a busy Mac may take the same code a moment later; another version will not until one of them updates.
+  return { ok: false, message: refusalWords[refused], spent: refused !== "busy" };
 }
 
 function closeLinked({ session }: Linked): void {

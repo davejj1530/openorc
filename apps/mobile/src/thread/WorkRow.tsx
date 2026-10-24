@@ -16,8 +16,8 @@ import {
   type WorkPhase,
   type WorkSection,
 } from "@openorc/client";
-import { memo, useMemo, useRef, useState, type ComponentType } from "react";
-import { Pressable, View } from "react-native";
+import { memo, useCallback, useMemo, useRef, useState, type ComponentType } from "react";
+import { View } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 import { Brain, ChevronDown, ChevronRight, CircleCheck, FileText, Folder, Globe, Hammer, Lightbulb, Search, Terminal, WorkDelegate } from "../generated/icons";
 import { cn } from "../ui/cn";
@@ -29,6 +29,7 @@ import { client } from "../client";
 import { useRunRead } from "../run-read";
 import { useOpen } from "./disclosure";
 import { Markdown } from "./Markdown";
+import { TranscriptPressable, WorkChoice } from "./TranscriptPressable";
 import type { Row } from "./rows";
 import { keepPhases, phaseDetail } from "./work-entries";
 import { ActivityRow, openTool, StepMark, ThinkingRow, ToolRow } from "./tools";
@@ -70,7 +71,7 @@ function Blocks({ blocks, runId }: { blocks: Block[]; runId: string }) {
             return <ActivityRow key={block.id} block={block} runId={runId} />;
           case "message":
             return (
-              <Text key={block.id} className="text-ink-3">
+              <Text key={block.id} prose className="text-ink-3">
                 {block.text}
               </Text>
             );
@@ -106,12 +107,12 @@ function Chip({ chip, live, runId }: { chip: WorkChip; live: boolean; runId: str
   const call = chipCalls(chip).findLast((block) => block.kind === "tool");
   const named = chip.kind === "file" || chip.kind === "edit" || chip.kind === "folder";
   return (
-    <Pressable
+    <TranscriptPressable
       accessibilityRole="button"
       accessibilityLabel={chip.title}
       disabled={!call}
       onPress={() => call && openTool(call, runId)}
-      className="-mx-2 h-7 flex-row items-center gap-2 rounded-md px-2 active:bg-surface-2"
+      className="-mx-2 min-h-touch flex-row items-center gap-2 rounded-md px-2 active:bg-surface-2"
     >
       <Icon size={14} className="text-ink-3" />
       <Text numberOfLines={1} className={cn("min-w-0 flex-shrink text-ink-2", named && "text-ink", chip.kind === "command" && "font-mono text-xs", live && "text-ink")}>
@@ -127,7 +128,7 @@ function Chip({ chip, live, runId }: { chip: WorkChip; live: boolean; runId: str
       {chip.note ? <Text className="text-xs text-ink-4 tabular-nums">{chip.note}</Text> : null}
       {chip.added ? <Text className="font-mono text-xs text-ok">+{chip.added}</Text> : null}
       {chip.removed ? <Text className="font-mono text-xs text-bad">−{chip.removed}</Text> : null}
-    </Pressable>
+    </TranscriptPressable>
   );
 }
 
@@ -146,23 +147,23 @@ function Section({ section, live, runId }: { section: WorkSection; live: boolean
   return (
     <View className="gap-1">
       <View className="flex-row gap-3">
-        <Pressable
+        <TranscriptPressable
           accessibilityRole="button"
           accessibilityState={{ expanded: calls }}
           onPress={() => setCalls(!calls)}
-          className="min-h-7 min-w-18 flex-row items-center gap-1 self-start active:opacity-60"
+          className="min-h-touch min-w-18 flex-row items-center gap-1 self-start active:opacity-60"
         >
           <Text className="text-xs leading-4 text-ink-4">{running ? liveSectionLabel(section.label) : section.label}</Text>
           {calls ? <ChevronDown size={10} className="text-ink-4" /> : null}
-        </Pressable>
+        </TranscriptPressable>
         <View className="min-w-0 flex-1 gap-px">
           {shown.map((chip) => (
             <Chip key={chip.key} chip={chip} live={live && chip.blocks.some(isLive)} runId={runId} />
           ))}
           {section.chips.length > shown.length ? (
-            <Pressable accessibilityRole="button" onPress={() => setAll(true)} className="h-7 justify-center pl-5.5">
+            <TranscriptPressable accessibilityRole="button" onPress={() => setAll(true)} className="min-h-touch justify-center pl-5.5">
               <Text className="text-xs text-ink-4">{section.chips.length - shown.length} more</Text>
-            </Pressable>
+            </TranscriptPressable>
           ) : null}
         </View>
       </View>
@@ -174,7 +175,11 @@ function Section({ section, live, runId }: { section: WorkSection; live: boolean
 /** A phase's words; the live phase reads them from the run as they arrive (see `phaseDetail`). */
 function PhaseDetail({ phase, live, runId }: { phase: WorkPhase; live: boolean; runId: string }) {
   const detail = useRunRead(client.runs, (runs) => (live ? phaseDetail(runs, runId, phase) : phase.detail), live);
-  return detail ? <Text className="text-ink-3">{detail}</Text> : null;
+  return detail ? (
+    <Text prose className="text-ink-3">
+      {detail}
+    </Text>
+  ) : null;
 }
 
 function PhaseBody({ phase, live, runId }: { phase: WorkPhase; live: boolean; runId: string }) {
@@ -212,12 +217,12 @@ const Phase = memo(function Phase({ phase, headline, runId, live }: { phase: Wor
   const expandable = phase.sections.length > 0 || phase.extras.length > 0 || phase.thoughts.length > 0 || Boolean(phase.detail || phase.narration);
   return (
     <Animated.View style={arriving ? arrive : undefined}>
-      <Pressable
+      <TranscriptPressable
         accessibilityRole="button"
         accessibilityState={expandable ? { expanded: open } : undefined}
         disabled={!expandable}
         onPress={() => setOpen(!open)}
-        className="flex-row gap-2.5 active:opacity-60"
+        className="min-h-touch flex-row items-center gap-2.5 active:opacity-60"
       >
         <StepMark state={running ? "running" : "done"} arrived={arriving} />
         <View className="min-h-control-md min-w-0 flex-1 flex-row items-center gap-2">
@@ -234,7 +239,7 @@ const Phase = memo(function Phase({ phase, headline, runId, live }: { phase: Wor
             </View>
           ) : null}
         </View>
-      </Pressable>
+      </TranscriptPressable>
       {expandable && open ? (
         <View className="pl-6.5">
           <PhaseBody phase={phase} live={running} runId={runId} />
@@ -325,17 +330,18 @@ export const WorkRow = memo(function WorkRow({ row }: { row: WorkRowProps }) {
   const entries = useMemo(() => keepPhases(workEntries(row.work), phases.current), [row.work]);
   const receipt = useMemo(() => receiptItems(row.work, entries.length, row.live), [row.work, entries.length, row.live]);
   const [open, setOpen] = useOpen(`work:${row.turnId}`, row.live);
+  // A press inside the open work records the reader's choice, so the card stays open when the turn ends.
+  const keepOpen = useCallback(() => setOpen(true), [setOpen]);
   const now = row.now && row.now !== "reply" ? [row.now] : [];
   const headline = row.live && row.now !== "reply" ? liveHeadline(entries, now) : null;
   return (
-    <View className="gap-3.5">
-      <Pressable
+    <View>
+      <TranscriptPressable
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
         accessibilityLabel={receipt.map((item) => item.label).join(", ") || "Work"}
         onPress={() => setOpen(!open)}
-        hitSlop={8}
-        className="min-h-4 flex-row flex-wrap items-center gap-x-4 gap-y-1 self-start active:opacity-60"
+        className="-mx-2 min-h-touch flex-row flex-wrap items-center gap-x-4 gap-y-1 self-start px-2 py-3.5 active:opacity-60"
       >
         {receipt.map((item) => {
           const Icon = receiptIcons[item.kind];
@@ -349,14 +355,23 @@ export const WorkRow = memo(function WorkRow({ row }: { row: WorkRowProps }) {
         <View style={{ transform: [{ rotate: open ? "180deg" : "0deg" }] }}>
           <ChevronDown size={14} className="text-ink-4" />
         </View>
-      </Pressable>
-      {!open && headline ? (
-        <View accessibilityRole="text" className="min-h-control-md flex-row items-center gap-2">
-          <Spinner />
-          <LiveWords headline={headline} elapsed />
+      </TranscriptPressable>
+      {/* The row keeps the space under what it shows, as the receipt alone does under its line (see rows.ts). */}
+      {open || headline ? (
+        <View className="pb-3.5">
+          {!open && headline ? (
+            <View accessibilityRole="text" className="min-h-control-md flex-row items-center gap-2">
+              <Spinner />
+              <LiveWords headline={headline} elapsed />
+            </View>
+          ) : null}
+          {open ? (
+            <WorkChoice.Provider value={keepOpen}>
+              <StepsCard entries={entries} headline={headline} live={row.live} runId={row.runId} />
+            </WorkChoice.Provider>
+          ) : null}
         </View>
       ) : null}
-      {open ? <StepsCard entries={entries} headline={headline} live={row.live} runId={row.runId} /> : null}
     </View>
   );
 });

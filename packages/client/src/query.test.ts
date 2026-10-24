@@ -150,6 +150,10 @@ describe("query cache tags", () => {
     for (const read of reads) expect(tagsFor(read, params).length, `${read} has no tag`).toBeGreaterThan(0);
   });
 
+  it("rereads a phone's plan limits when usage, accounts or CLIs change, but not for a palette changed on the Mac", () => {
+    expect(tagsFor("providers.limits", {}).sort()).toEqual(["claude-accounts", "provider-usage", "system"]);
+  });
+
   it("refreshes an open file when an agent changes its conversation's folder, and on the workspace refresh", () => {
     expect(tagsFor("files.read", { scope: { kind: "thread", id: "t1" }, path: "src/app.ts" }).sort()).toEqual(["threaddiff:t1", "workspace-diff"]);
     expect(tagsFor("files.read", { scope: { kind: "task", id: "k1" }, path: "src/app.ts" }).sort()).toEqual(["diff:k1", "workspace-diff"]);

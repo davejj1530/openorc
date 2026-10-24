@@ -93,6 +93,8 @@ export const rpcParams = {
   "agents.updates.install": z.object({ ids: z.array(HarnessId).min(1).max(3) }).strict(),
   "agents.updates.configure": z.object({ automatic: z.boolean().optional(), dismissed: z.string().max(300).optional() }).strict(),
   "providers.usage": z.object({ provider: z.enum([...HarnessId.options, "anthropic-api"]), claudeAccountId: ClaudeAccountId.optional() }),
+  /** The Mac's plan limits for a phone: Codex, then each enabled Claude account. Takes nothing, so a phone cannot force a fresh read. */
+  "providers.limits": z.object({}).strict(),
   "providers.codex.reset": z.object({ attemptId: z.string().uuid(), creditId: z.string().min(1).optional(), confirmationToken: z.string().min(1) }),
   "orchestration.list": z.object({ projectId: z.string().min(1), includeArchived: z.boolean().optional() }),
   "orchestration.get": z.object({ id: z.string().min(1) }),
@@ -600,6 +602,7 @@ export interface RpcResults extends PullRequestRpcResults, OrclingRpcResults, Pr
   "agents.updates.install": AgentUpdates;
   "agents.updates.configure": AgentUpdates;
   "providers.usage": import("./provider-usage.js").ProviderUsage;
+  "providers.limits": import("./provider-usage.js").PlanLimits[];
   "providers.codex.reset": import("./provider-usage.js").ResetResult;
   "orchestration.list": TeamDetail[];
   "orchestration.get": TeamDetail | null;

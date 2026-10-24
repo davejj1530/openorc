@@ -19,6 +19,7 @@ export const REMOTE_METHODS = [
   "inbox.list",
   "agents.models",
   "agents.availability",
+  "providers.limits",
   "app.settings.get",
   "threads.start",
   "threads.update",

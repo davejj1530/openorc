@@ -42,7 +42,8 @@ const claudeLabels: Record<string, string> = {
   seven_day_sonnet: "7-day window · Sonnet",
   overage: "Extra usage window",
 };
-const claudePlans: Record<string, string> = { pro: "Claude Pro", max: "Claude Max", team: "Claude Team", enterprise: "Claude Enterprise" };
+const claudePlans: Record<string, string> = { pro: "Pro", max: "Max", team: "Team", enterprise: "Enterprise" };
+const capitalized = (word: string) => word.charAt(0).toUpperCase() + word.slice(1);
 
 function allowanceWindow({ id, label, used, resets, at, exhausted = false }: { id: string; label: string; used: unknown; resets: unknown; at: number; exhausted?: boolean }): AllowanceWindow {
   const usedPercent = number(used);
@@ -198,6 +199,10 @@ export class ProviderUsageService {
   /** Windows Claude reported during runs in this app; the fallback when the account cannot be asked directly. */
   private readonly claude = new Map<string, Map<string, AllowanceWindow>>();
   private readonly inFlight = new Map<string, Promise<ProviderUsage>>();
+  /** Each account's last report, with the environment revision it was read under, for `recent`. */
+  private readonly latest = new Map<string, { usage: ProviderUsage; revision: number | undefined }>();
+  /** Bumped when an account signs in or out, so a read that started before then is never kept or joined. */
+  private readonly logins = new Map<string, number>();
   private readonly codex: typeof readCodexUsage;
   private readonly resets: CodexResetService;
   private readonly apiKey: NonNullable<ProviderUsageReaders["apiKey"]>;
@@ -206,10 +211,10 @@ export class ProviderUsageService {
     codex: { source: "Codex app-server · account usage", read: (result, _at, _row, snapshot) => this.readCodex(result, snapshot) },
     claude: {
       source: "Claude Code · account usage",
-      forget: (accountId) => this.forgetClaudeAccount(accountId),
+      forget: (accountId) => this.dropClaudeReports(accountId),
       read: (result, at, row, snapshot) => {
         if (harnessLoggedIn(row)) return this.readClaude(result, at, snapshot);
-        this.forgetClaudeAccount(result.claudeAccountId);
+        this.dropClaudeReports(result.claudeAccountId);
         result.status = "disconnected";
         result.message = "Sign in to this Claude account in Settings → Connections, then refresh.";
         return Promise.resolve(result);
@@ -250,13 +255,26 @@ export class ProviderUsageService {
   }
 
   read(provider: ProviderUsage["provider"], claudeAccountId?: string): Promise<ProviderUsage> {
-    const id = provider === "claude" ? (claudeAccountId ?? claudeAccounts.defaultId(this.db)) : undefined;
-    const key = id ? `${provider}:${id}` : provider;
+    const id = this.accountId(provider, claudeAccountId);
+    const key = usageKey(provider, id);
     const pending = this.inFlight.get(key);
     if (pending) return pending;
-    const next = this.fetch(provider, id).finally(() => this.inFlight.delete(key));
+    const revision = this.environment?.().revision;
+    const login = this.logins.get(key);
+    const next = this.fetch(provider, id)
+      .then((usage) => (this.logins.get(key) === login ? this.remember(key, revision, usage) : usage))
+      .finally(() => {
+        if (this.inFlight.get(key) === next) this.inFlight.delete(key);
+      });
     this.inFlight.set(key, next);
     return next;
+  }
+
+  /** The account's last report while it is younger than `maxAgeMs` and from the current environment, or a fresh read. */
+  recent(provider: ProviderUsage["provider"], claudeAccountId: string | undefined, maxAgeMs: number): Promise<ProviderUsage> {
+    const kept = this.latest.get(usageKey(provider, this.accountId(provider, claudeAccountId)));
+    const fresh = kept && this.now() - kept.usage.checkedAt < maxAgeMs && kept.revision === this.environment?.().revision;
+    return fresh ? Promise.resolve(kept.usage) : this.read(provider, claudeAccountId);
   }
 
   async redeemCodex(input: ResetInput): Promise<ResetResult> {
@@ -266,7 +284,17 @@ export class ProviderUsageService {
     const result = await this.resets.redeem(input, launch ? { binary: launch.binary, env: launch.env } : {}, launch?.binary ?? "codex");
     // A read that started before redemption cannot be the post-reset report.
     await this.inFlight.get("codex");
-    return { ...result, usage: await this.fetch("codex") };
+    const revision = this.environment?.().revision;
+    return { ...result, usage: this.remember("codex", revision, await this.fetch("codex")) };
+  }
+
+  private accountId(provider: ProviderUsage["provider"], claudeAccountId: string | undefined): string | undefined {
+    return provider === "claude" ? (claudeAccountId ?? claudeAccounts.defaultId(this.db)) : undefined;
+  }
+
+  private remember(key: string, revision: number | undefined, usage: ProviderUsage): ProviderUsage {
+    this.latest.set(key, { usage, revision });
+    return usage;
   }
 
   private windowsKey(id: string): string {
@@ -282,8 +310,18 @@ export class ProviderUsageService {
     return saved;
   }
 
+  /** The account signed in or out: what was read of its old login, or is being read, no longer stands. */
   forgetClaudeAccount(id = DEFAULT_CLAUDE_ACCOUNT): void {
+    const key = usageKey("claude", id);
+    this.logins.set(key, (this.logins.get(key) ?? 0) + 1);
+    this.inFlight.delete(key);
+    this.dropClaudeReports(id);
+  }
+
+  /** Drops what was kept of an account that is gone, from a read that found it so. */
+  private dropClaudeReports(id = DEFAULT_CLAUDE_ACCOUNT): void {
     this.claude.delete(id);
+    this.latest.delete(usageKey("claude", id));
     settings.remove(this.db, this.windowsKey(id));
   }
 
@@ -294,7 +332,8 @@ export class ProviderUsageService {
     if (live.status === "ok") {
       Object.assign(result, normalizeClaudeAccount(live.usage, at));
       result.source = "Claude Code · live account usage";
-      result.context = live.subscriptionType ? (claudePlans[live.subscriptionType] ?? `Claude ${live.subscriptionType}`) : "Claude Code login";
+      result.plan = live.subscriptionType ? (claudePlans[live.subscriptionType] ?? live.subscriptionType) : null;
+      result.context = result.plan ? `Claude ${result.plan}` : "Claude Code login";
       result.refreshedAt = at;
       result.status = result.windows.length ? "available" : "unavailable";
       result.message ??= result.status === "unavailable" ? "The account returned no allowance metrics. Check your account usage page." : null;
@@ -333,7 +372,9 @@ export class ProviderUsageService {
       result.message = "API spending, remaining credits, and reset times are unavailable through Codex. Check your API provider’s billing dashboard.";
       return result;
     }
-    result.context = `ChatGPT · ${text(a["planType"]) ?? "plan unavailable"}${text(a["email"]) ? ` · ${text(a["email"])}` : ""}`;
+    const plan = text(a["planType"]);
+    result.plan = plan && capitalized(plan);
+    result.context = `ChatGPT · ${plan ?? "plan unavailable"}${text(a["email"]) ? ` · ${text(a["email"])}` : ""}`;
     Object.assign(result, normalizeCodex(limits, this.now()));
     result.resets = this.resets.describe({ account, limits }, launch?.binary ?? "codex");
     result.refreshedAt = this.now();
@@ -352,6 +393,7 @@ export class ProviderUsageService {
       status: apiUsageStatus(Boolean(apiKeyError), saved),
       source: "OpenOrc API configuration",
       context: "Anthropic API · memory distillation",
+      plan: null,
       checkedAt: at,
       refreshedAt: null,
       message:
@@ -379,6 +421,7 @@ export class ProviderUsageService {
       status: "unavailable",
       source: reader.source,
       context: "CLI account",
+      plan: null,
       checkedAt: at,
       refreshedAt: null,
       message: null,
@@ -419,6 +462,10 @@ export class ProviderUsageService {
       return { ...result, status: "error", message: "Could not refresh usage. Check your connection and CLI login, update the CLI if needed, then try Refresh." };
     }
   }
+}
+
+function usageKey(provider: ProviderUsage["provider"], claudeAccountId: string | undefined): string {
+  return claudeAccountId ? `${provider}:${claudeAccountId}` : provider;
 }
 
 function restoreWindows(json: string | null): AllowanceWindow[] {

@@ -1,0 +1,9 @@
+@import "tailwindcss";
+@import "uniwind";
+@import "./generated/theme.css";
+
+/* Phone-only sizes: touch needs taller targets than the desktop's pointer sizes. The rest of the scale is the desktop's. */
+@theme {
+  --height-touch: 44px;
+  --height-touch-row: 52px;
+}

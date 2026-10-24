@@ -2,7 +2,7 @@ import tseslint from "typescript-eslint";
 import reactHooks from "eslint-plugin-react-hooks";
 
 const typescriptFiles = ["**/*.{ts,tsx,mts,cts}"];
-const applicationTypeScript = ["packages/*/src/**/*.{ts,tsx}", "apps/desktop/src/**/*.{ts,tsx}", "apps/website/src/**/*.ts"];
+const applicationTypeScript = ["packages/*/src/**/*.{ts,tsx}", "apps/desktop/src/**/*.{ts,tsx}", "apps/mobile/src/**/*.{ts,tsx}", "apps/website/src/**/*.ts"];
 // The editor engine stays behind one folder, so swapping or upgrading it touches nothing else.
 const codeEditorFolder = "apps/desktop/src/renderer/src/components/code-editor";
 const codeEditorFence = {
@@ -27,6 +27,10 @@ export default [
       "output/**",
       "licenses/vendor/**",
       "apps/website/public/licenses/**",
+      // Expo generates the phone's native projects and its own state from app.json.
+      "apps/mobile/ios/**",
+      "apps/mobile/android/**",
+      "apps/mobile/.expo/**",
     ],
   },
   {
@@ -48,7 +52,7 @@ export default [
     files: applicationTypeScript,
     languageOptions: {
       parserOptions: {
-        project: ["packages/*/tsconfig.json", "apps/desktop/tsconfig.node.json", "apps/desktop/tsconfig.web.json", "apps/website/tsconfig.json"],
+        project: ["packages/*/tsconfig.json", "apps/desktop/tsconfig.node.json", "apps/desktop/tsconfig.web.json", "apps/mobile/tsconfig.json", "apps/website/tsconfig.json"],
         tsconfigRootDir: import.meta.dirname,
       },
     },
@@ -58,7 +62,7 @@ export default [
     },
   },
   {
-    files: ["apps/desktop/src/renderer/**/*.{ts,tsx}", "packages/client/src/**/*.ts", "scripts/fixtures/**/*.tsx"],
+    files: ["apps/desktop/src/renderer/**/*.{ts,tsx}", "packages/client/src/**/*.ts", "apps/mobile/src/**/*.{ts,tsx}", "scripts/fixtures/**/*.tsx"],
     plugins: { "react-hooks": reactHooks },
     rules: { "react-hooks/rules-of-hooks": "error", "react-hooks/exhaustive-deps": "error" },
   },
@@ -74,6 +78,16 @@ export default [
           message: "Mount <CoversPreview /> inside this portal, or the browser preview draws over it.",
         },
       ],
+    },
+  },
+  // The phone takes the desktop's look through scripts/design-sync.mts, never by importing desktop code or pasting
+  // its colors.
+  {
+    files: ["apps/mobile/src/**/*.{ts,tsx}"],
+    ignores: ["apps/mobile/src/generated/**"],
+    rules: {
+      "no-restricted-imports": ["error", { patterns: [...codeEditorFence.patterns, { regex: "(^|/)desktop/", message: "Generate what the phone needs from the desktop with design-sync." }] }],
+      "no-restricted-syntax": ["error", { selector: "Literal[value=/^#[0-9a-fA-F]{3,8}$/]", message: "Use a palette role (a class like text-ink-3, or useColors())." }],
     },
   },
   // Application projects already check unused declarations with TypeScript.

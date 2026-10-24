@@ -3,7 +3,7 @@ import { useLayout } from "../lib/layout";
 import { WORKSPACE_ID } from "@openorc/protocol";
 import { newThread } from "../lib/router";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
-import type { ProjectMeta } from "@openorc/client";
+import { sidebarFoldKey, sidebarSectionOpen, type ProjectMeta } from "@openorc/client";
 import { Globe, Plus } from "./icons";
 import { ProjectIconPicker } from "./ProjectIconPicker";
 import { ProjectMenu } from "./ProjectMenu";
@@ -19,7 +19,7 @@ export function SidebarProjectGroup({ id, name, rootPath, meta, children }: { id
   const collapsed = useLayout((state) => state.collapsed);
   const toggle = useLayout((state) => state.toggleCollapsed);
   const contentId = useId();
-  const expanded = !collapsed.includes(`project:${id}`);
+  const expanded = sidebarSectionOpen(collapsed, "project", id);
   // Only a fold the user opens animates; loads and remounts show the list in place.
   const [animate, setAnimate] = useState(false);
   const header = (
@@ -33,7 +33,7 @@ export function SidebarProjectGroup({ id, name, rootPath, meta, children }: { id
         aria-controls={contentId}
         onClick={() => {
           setAnimate(true);
-          toggle(`project:${id}`);
+          toggle(sidebarFoldKey.project(id));
         }}
       >
         <span className="truncate">{name}</span>

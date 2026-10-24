@@ -1,4 +1,5 @@
 import { threadForkLabel, threadMoveLabel, threadDeletionDescription, threadDeleteBlockedReason, deleteButtonLabel } from "../lib/team-action-presentation";
+import { snoozePresets } from "@openorc/client";
 import { WORKSPACE_ID } from "@openorc/protocol";
 import { useRef, useState } from "react";
 import { Menu } from "@base-ui/react/menu";
@@ -24,30 +25,6 @@ import { floatingGround } from "../lib/use-anchor-ground";
 
 /** The parts a dropdown and a context menu share, so one item list serves both. */
 export type MenuParts = Pick<typeof Menu, "Item" | "Separator" | "SubmenuRoot" | "SubmenuTrigger" | "Portal" | "Positioner" | "Popup">;
-
-/** When a snoozed thread comes back, from now. */
-export function snoozePresets(now = new Date()): { label: string; until: number }[] {
-  const at = (h: number, m = 0, addDays = 0) => {
-    const d = new Date(now);
-    d.setDate(d.getDate() + addDays);
-    d.setHours(h, m, 0, 0);
-    return d.getTime();
-  };
-  const evening = at(18);
-  const nextMonday = (() => {
-    const d = new Date(now);
-    d.setDate(d.getDate() + ((8 - d.getDay()) % 7 || 7));
-    d.setHours(9, 0, 0, 0);
-    return d.getTime();
-  })();
-  return [
-    { label: "In 1 hour", until: now.getTime() + 3_600_000 },
-    { label: "In 3 hours", until: now.getTime() + 3 * 3_600_000 },
-    ...(evening > now.getTime() + 600_000 ? [{ label: "This evening", until: evening }] : []),
-    { label: "Tomorrow morning", until: at(9, 0, 1) },
-    { label: "Next week", until: nextMonday },
-  ];
-}
 
 /** Every action a thread has, as menu items. The same list serves the header menu and the sidebar's context menu. */
 export function ThreadMenuItems({ thread, parts: M }: { thread: ThreadSummary; parts: MenuParts }) {
@@ -157,7 +134,7 @@ function ThreadMenuContent({ thread, parts: M }: { thread: ThreadSummary; parts:
           <M.Positioner sideOffset={4} alignOffset={-6} collisionPadding={8}>
             <M.Popup ref={floatingGround} className={menuPopup}>
               {snoozePresets().map((p) => (
-                <M.Item key={p.label} className={menuItem} disabled={lifecycleBlocked} closeOnClick={!team} onClick={() => patch({ snoozedUntil: p.until })}>
+                <M.Item key={p.label} className={menuItem} disabled={lifecycleBlocked} closeOnClick={!team} onClick={() => patch({ snoozedUntil: p.until(new Date()) })}>
                   {p.label}
                 </M.Item>
               ))}

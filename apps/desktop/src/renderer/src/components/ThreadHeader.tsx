@@ -1,3 +1,4 @@
+import { snoozeWakeLabel } from "@openorc/client";
 import type { Project, ThreadSummary as Thread } from "@openorc/protocol";
 import { Menu } from "@base-ui/react/menu";
 import { AlarmClock, ArrowLeft, GitFork, GitPullRequest, MoreHorizontal, X } from "./icons";
@@ -136,7 +137,7 @@ function ThreadFacts({ thread: t }: { thread: Thread }) {
       {snoozed ? (
         <span className="thread-header-fact">
           <AlarmClock size={12} />
-          until {new Date(t.snoozedUntil as number).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" })}
+          until {snoozeWakeLabel(t.snoozedUntil as number)}
         </span>
       ) : null}
     </>

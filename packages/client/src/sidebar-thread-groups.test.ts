@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ThreadSummary } from "@openorc/protocol";
-import { ORC_MODE_WINDOW, projectMeta, sidebarThreadPage, threadListParams, visibleSidebarThreadIds } from "./sidebar-thread-groups.js";
+import { ORC_MODE_WINDOW, projectMeta, sidebarSectionOpen, sidebarThreadPage, threadListParams, toggleSidebarFold, visibleSidebarThreadIds } from "./sidebar-thread-groups.js";
 
 function thread(id: string, values: Partial<ThreadSummary> = {}): ThreadSummary {
   return { id, projectId: "project", archivedAt: null, pinnedAt: null, snoozedUntil: null, ...values } as ThreadSummary;
@@ -63,6 +63,20 @@ describe("sidebar thread page", () => {
     expect(page.pinned).toEqual([]);
     expect(page.snoozed).toEqual([]);
     expect(page.rest.map((row) => row.id)).toEqual(["pinned"]);
+  });
+});
+
+describe("sidebar folds", () => {
+  it("lists projects and pins until folded, and snoozed threads once opened", () => {
+    expect([sidebarSectionOpen([], "project", "p"), sidebarSectionOpen([], "pinned", "p"), sidebarSectionOpen([], "snoozed", "p")]).toEqual([true, true, false]);
+    const saved = ["project:p", "pinned:p", "snoozed-open:p"];
+    expect([sidebarSectionOpen(saved, "project", "p"), sidebarSectionOpen(saved, "pinned", "p"), sidebarSectionOpen(saved, "snoozed", "p")]).toEqual([false, false, true]);
+    expect(sidebarSectionOpen(saved, "project", "other")).toBe(true);
+  });
+
+  it("folds and opens a section by its key, leaving the others", () => {
+    expect(toggleSidebarFold(["pinned:a"], "project:b")).toEqual(["pinned:a", "project:b"]);
+    expect(toggleSidebarFold(["pinned:a", "project:b"], "project:b")).toEqual(["pinned:a"]);
   });
 });
 

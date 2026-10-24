@@ -27,10 +27,24 @@ export {
 export { decodeNewThreadDraft, type NewThreadDraft, type NewThreadTarget, newThreadChoice, newThreadStartInput, newThreadWorkspaceMode, targetModel } from "./new-thread.js";
 export { projectGitView, type ProjectGitView } from "./project-git.js";
 export { invalidatesFor, tagsFor } from "./query-tags.js";
-export { listedThreads, projectMeta, type ProjectMeta, type SidebarFilter, sidebarThreadPage, THREAD_PAGE, threadListParams, visibleSidebarThreadIds } from "./sidebar-thread-groups.js";
+export {
+  listedThreads,
+  projectMeta,
+  type ProjectMeta,
+  type SidebarFilter,
+  type SidebarFold,
+  sidebarFoldKey,
+  sidebarSectionOpen,
+  sidebarThreadPage,
+  THREAD_PAGE,
+  threadListParams,
+  toggleSidebarFold,
+  visibleSidebarThreadIds,
+} from "./sidebar-thread-groups.js";
+export { snoozePresets, snoozePresetsChangeAt, snoozeWakeLabel } from "./snooze.js";
 export { startedWorkFromTool, taskActivity, taskCardStatusLabel, taskIdFromTool, taskStepLabel, uniqueTaskCards } from "./task-progress.js";
 export { threadHeadline, type ThreadHeadline } from "./thread-headline.js";
-export { pullRequestMark, pullRequestNumber, threadMark, threadPlace, threadStatus, type ThreadMark, type ThreadPlace, type ThreadStatus } from "./thread-row.js";
+export { pullRequestMark, pullRequestNumber, renamedTitle, threadMark, threadPlace, threadStatus, type ThreadMark, type ThreadPlace, type ThreadStatus } from "./thread-row.js";
 export { formatBytes, formatTokens, relativeTime, shortSha, untilTime } from "./time.js";
 export { liveVerb, stateLabel, type Tone, toolCallPresentation, type ToolIconName } from "./tool-presentation.js";
 export { toolResult, toolResultDetails, type ToolResultMedia } from "./tool-result.js";

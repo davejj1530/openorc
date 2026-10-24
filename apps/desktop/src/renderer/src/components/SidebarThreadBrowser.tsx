@@ -3,7 +3,18 @@ import { Menu } from "@base-ui/react/menu";
 import { WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
 import { CoversPreview } from "../lib/browser-preview";
 import { useLayout } from "../lib/layout";
-import { type SidebarFilter, listedThreads, projectMeta, sidebarThreadPage, THREAD_PAGE, threadListParams, visibleSidebarThreadIds } from "@openorc/client";
+import {
+  type SidebarFilter,
+  type SidebarFold,
+  listedThreads,
+  projectMeta,
+  sidebarFoldKey,
+  sidebarSectionOpen,
+  sidebarThreadPage,
+  THREAD_PAGE,
+  threadListParams,
+  visibleSidebarThreadIds,
+} from "@openorc/client";
 import { useOrclings } from "../lib/orclings";
 import { useRpc, useRpcs } from "../lib/client";
 import { useRouter } from "../lib/router";
@@ -46,8 +57,7 @@ function useThreadGroups(search: string) {
   useEffect(() => {
     if (!activeProject) return;
     const layout = useLayout.getState();
-    const key = `project:${activeProject}`;
-    if (layout.collapsed.includes(key)) layout.toggleCollapsed(key);
+    if (!sidebarSectionOpen(layout.collapsed, "project", activeProject)) layout.toggleCollapsed(sidebarFoldKey.project(activeProject));
   }, [activeId, activeProject]);
   useEffect(() => {
     if (!projects.data) return;
@@ -117,7 +127,7 @@ export function SidebarThreadBrowser({ search }: { search: string }) {
         {shown.map((group) => (
           <SidebarProjectGroup key={group.id} id={group.id} name={group.name} rootPath={group.rootPath} meta={projectMeta(group.list, { loaded: group.query.isSuccess, more: group.hasMore })}>
             {group.pinned.length > 0 ? (
-              <Section id={`pinned:${group.id}`} label="Pinned" count={group.pinned.length}>
+              <Section fold="pinned" projectId={group.id} label="Pinned" count={group.pinned.length}>
                 {group.pinned.map(row)}
               </Section>
             ) : null}
@@ -135,7 +145,7 @@ export function SidebarThreadBrowser({ search }: { search: string }) {
               </button>
             ) : null}
             {group.snoozed.length > 0 ? (
-              <Section id={`snoozed-open:${group.id}`} label="Snoozed" count={group.snoozed.length} defaultCollapsed>
+              <Section fold="snoozed" projectId={group.id} label="Snoozed" count={group.snoozed.length}>
                 {group.snoozed.map(row)}
               </Section>
             ) : null}
@@ -147,13 +157,13 @@ export function SidebarThreadBrowser({ search }: { search: string }) {
   );
 }
 
-function Section({ id, label, count, children, defaultCollapsed = false }: { id: string; label: string; count: number; children: ReactNode; defaultCollapsed?: boolean }) {
+function Section({ fold, projectId, label, count, children }: { fold: SidebarFold; projectId: string; label: string; count: number; children: ReactNode }) {
   const collapsed = useLayout((s) => s.collapsed);
   const toggle = useLayout((s) => s.toggleCollapsed);
-  const open = defaultCollapsed ? collapsed.includes(id) : !collapsed.includes(id);
+  const open = sidebarSectionOpen(collapsed, fold, projectId);
   return (
     <div>
-      <button aria-expanded={open} onClick={() => toggle(id)} className="sidebar-section-toggle no-drag">
+      <button aria-expanded={open} onClick={() => toggle(sidebarFoldKey[fold](projectId))} className="sidebar-section-toggle no-drag">
         {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         <span>{label}</span>
         <span className="tabular">{count}</span>

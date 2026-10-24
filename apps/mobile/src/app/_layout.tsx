@@ -32,6 +32,7 @@ export default function RootLayout() {
             }}
           />
           <Stack.Screen name="pair" options={{ presentation: "modal" }} />
+          <Stack.Screen name="new" options={{ ...sheet, sheetAllowedDetents: [1] }} />
           <Stack.Screen name="macs" options={{ ...sheet, sheetAllowedDetents: [0.5, 1] }} />
           <Stack.Screen name="tool" options={{ ...sheet, sheetAllowedDetents: [0.6, 1] }} />
           <Stack.Screen name="model" options={{ ...sheet, sheetAllowedDetents: [0.6, 1] }} />

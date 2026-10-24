@@ -1,7 +1,8 @@
 import { ClaudeAccountPicker } from "../components/ClaudeAccountPicker";
 import { ClaudeAccountScope } from "../lib/claude-account";
 import { useEffect, useRef, useState } from "react";
-import { WORKSPACE_ID, harnessIds, harnessInfo, harnessLoggedIn, type HarnessId, type Project, type TeamDetail } from "@openorc/protocol";
+import { newThreadChoice, newThreadWorkspaceMode, targetModel, type NewThreadDraft, type NewThreadTarget } from "@openorc/client";
+import { WORKSPACE_ID, type HarnessId, type Project, type TeamDetail } from "@openorc/protocol";
 import { FolderGit2 } from "../components/icons";
 import { Composer } from "../components/Composer";
 import { Panel } from "../components/Panel";
@@ -10,7 +11,7 @@ import { NewThreadStarters } from "../components/NewThreadStarters";
 import { NewThreadProjectChoice } from "../components/NewThreadContext";
 import { NewThreadOptions } from "../components/NewThreadOptions";
 import { NewThreadRecent, useArrivalActivity } from "../components/NewThreadActivity";
-import { ComposerModelPicker, defaultChoice, ModelPicker, type ModelChoice, type OrclingPickerChoices, type TeamPickerChoices } from "../components/ModelPicker";
+import { ComposerModelPicker, ModelPicker, type ModelChoice, type OrclingPickerChoices, type TeamPickerChoices } from "../components/ModelPicker";
 import { useOrclings } from "../lib/orclings";
 import { pickerTeam } from "../lib/team-settings";
 import { TopBar } from "../components/TopBar";
@@ -20,16 +21,7 @@ import { useLayout } from "../lib/layout";
 import { readOnboardingState } from "../lib/onboarding";
 import { evaluateNewThreadAvailability } from "../lib/new-thread-availability";
 import { useNewThreadLocation } from "../lib/new-thread-location";
-import {
-  newThreadWorkspaceMode,
-  readNewThreadDraft,
-  readNewThreadProject,
-  rememberNewThreadProject,
-  targetModel,
-  writeNewThreadDraft,
-  type NewThreadDraft,
-  type NewThreadTarget,
-} from "../lib/new-thread-draft";
+import { readNewThreadDraft, readNewThreadProject, rememberNewThreadProject, writeNewThreadDraft } from "../lib/new-thread-draft";
 import { branchingReason, useProjectGit } from "../lib/project-git";
 import { usePermissionSelection, useRpc, useRpcMutation } from "../lib/client";
 import { openThread, useRouter } from "../lib/router";
@@ -121,7 +113,7 @@ function NewThreadProject({
 
   useEffect(() => {
     if (target.kind !== "model" || target.choice || !models.data || !info.data) return;
-    const initial = defaultChoice(models.data, [...(preferredHarness ? [preferredHarness] : []), ...harnessIds].find((id) => harnessLoggedIn(harnessInfo(info.data, id))) ?? null);
+    const initial = newThreadChoice(models.data, { preferred: preferredHarness, system: info.data });
     if (initial) changeDraft({ target: { kind: "model", choice: initial } });
   }, [target, models.data, info.data, preferredHarness]);
 

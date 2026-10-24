@@ -1,0 +1,59 @@
+import { WORKSPACE_ID } from "@openorc/protocol";
+import { describe, expect, it } from "vitest";
+import { projectChoices } from "../projects";
+import { afterStart, decodeSheetDraft, openingProject, startBlocker } from "./new-thread-state";
+
+const choices = projectChoices([
+  { id: "openorc", name: "openorc", defaultBranch: "main" },
+  { id: "website", name: "website", defaultBranch: null },
+]);
+const image = { path: "/attachments/0b1c.jpg", preview: "file:///cache/0b1c.jpg" };
+
+describe("the new thread sheet", () => {
+  it("lists Workspace first, then the Mac's projects, branching only where the Mac found a branch", () => {
+    expect(choices).toEqual([
+      { id: WORKSPACE_ID, name: "Workspace", canBranch: false },
+      { id: "openorc", name: "openorc", canBranch: true },
+      { id: "website", name: "website", canBranch: false },
+    ]);
+  });
+
+  it("opens on the project it was opened for, else the last one shown while the Mac lists it, else Workspace", () => {
+    expect(openingProject("website", "openorc", choices)).toBe("website");
+    expect(openingProject(undefined, "openorc", choices)).toBe("openorc");
+    expect(openingProject(undefined, "removed", choices)).toBe(WORKSPACE_ID);
+    expect(openingProject(undefined, "openorc", undefined)).toBe("openorc");
+    expect(openingProject(undefined, null, choices)).toBe(WORKSPACE_ID);
+  });
+
+  it("keeps the prompt, model, mode and images it saved, and drops what it cannot read", () => {
+    const saved = { prompt: "Fix the build", target: { kind: "model", choice: { agent: "claude", model: "opus", effort: "high" } }, mode: "plan", images: [image, { path: 3 }, "x"] };
+    const draft = decodeSheetDraft("openorc", JSON.parse(JSON.stringify(saved)));
+    expect(draft).toMatchObject({
+      projectId: "openorc",
+      prompt: "Fix the build",
+      target: { kind: "model", choice: { agent: "claude", model: "opus", effort: "high", fastMode: false } },
+      mode: "plan",
+      images: [image],
+    });
+    expect(decodeSheetDraft("openorc", null)).toMatchObject({ prompt: "", target: { kind: "model", choice: null }, mode: "act", workspace: null, images: [] });
+  });
+
+  it("holds Start until the projects and saved permission load and a model is chosen, and says why a saved choice is gone", () => {
+    const chosen = decodeSheetDraft("openorc", { target: { kind: "model", choice: { agent: "codex", model: "gpt", effort: null } } });
+    const loaded = { projectReady: true, permissionReady: true };
+    expect(startBlocker(chosen, { ...loaded, projectReady: false })).toBe("Loading projects…");
+    expect(startBlocker(chosen, { ...loaded, permissionReady: false })).toBe("Loading saved permissions…");
+    expect(startBlocker(chosen, loaded)).toBeNull();
+    expect(startBlocker(decodeSheetDraft("openorc", null), loaded)).toBe("Choose a model");
+    const broken = decodeSheetDraft("openorc", { target: { kind: "model", choice: { model: "missing-provider" } } });
+    expect(startBlocker(broken, loaded)).toBe("This saved model selection cannot be restored. Choose a model again; your message and images are kept.");
+  });
+
+  it("clears only what a started thread took", () => {
+    const later = { path: "/attachments/later.jpg", preview: "file:///cache/later.jpg" };
+    const draft = { ...decodeSheetDraft("openorc", null), prompt: "Fix the build ", images: [image, later] };
+    expect(afterStart(draft, { prompt: "Fix the build", attachments: [image.path] })).toMatchObject({ prompt: "", images: [later] });
+    expect(afterStart({ ...draft, prompt: "Something else" }, { prompt: "Fix the build", attachments: [] })).toMatchObject({ prompt: "Something else", images: [image, later] });
+  });
+});

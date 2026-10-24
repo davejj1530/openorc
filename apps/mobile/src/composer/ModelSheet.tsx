@@ -11,11 +11,11 @@ import { HarnessLogo } from "../ui/HarnessLogo";
 import { Text } from "../ui/Text";
 import { useSharedSettings } from "./settings-bridge";
 
-/** The models the thread can run, by harness: the current one checked, its effort levels as a segmented row below. */
+/** The models a composer can run, by harness: the current one checked, its effort levels as a segmented row below. */
 export function ModelSheet() {
-  const { threadId } = useLocalSearchParams<{ threadId: string }>();
+  const { composerId } = useLocalSearchParams<{ composerId: string }>();
   const insets = useSafeAreaInsets();
-  const settings = useSharedSettings(threadId);
+  const settings = useSharedSettings(composerId);
   const models = useRpc("agents.models", {}, { staleTime: 5 * 60_000 });
   const catalog = pickerCatalog(models.data ?? []).filter((model) => !model.legacy);
   const choice = settings?.choice ?? null;

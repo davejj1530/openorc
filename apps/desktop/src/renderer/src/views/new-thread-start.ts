@@ -1,6 +1,7 @@
+import { newThreadStartInput, type NewThreadDraft } from "@openorc/client";
 import type { Project, RpcParams, RpcResults, WorkspaceMode } from "@openorc/protocol";
 import { readDraft, writeDraft } from "../lib/drafts";
-import { newThreadStartInput, readNewThreadDraft, teamLaunchRequest, writeNewThreadDraft, type NewThreadDraft } from "../lib/new-thread-draft";
+import { readNewThreadDraft, teamLaunchRequest, writeNewThreadDraft } from "../lib/new-thread-draft";
 
 interface StartNewThreadInput {
   draft: NewThreadDraft;
@@ -20,7 +21,7 @@ export async function startNewThread(input: StartNewThreadInput): Promise<string
   const payload = newThreadStartInput(draft, {
     workspaceMode: input.workspaceMode,
     permissionMode: input.permissionMode,
-    prompt: input.text || "See the attached image.",
+    prompt: input.text,
     attachments,
   });
   const request = draft.target.kind === "team" ? teamLaunchRequest(draft.launchRequest, JSON.stringify(payload)) : null;

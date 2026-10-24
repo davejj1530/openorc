@@ -1,13 +1,11 @@
 import type { SubmitRequest } from "@openorc/client";
 import * as Haptics from "expo-haptics";
 import { useState } from "react";
-import { ActionSheetIOS } from "react-native";
 import { client, useRpcMutation } from "../client";
-import { attachImage, pickImages, type ImageSource } from "./attachments";
+import { failureMessage } from "../failure";
 import { composerControls } from "./composer-state";
 import { useDraft } from "./drafts";
-
-const message = (failure: unknown) => (failure instanceof Error ? failure.message : String(failure));
+import { useImageAttach } from "./use-image-attach";
 
 export interface ComposerInput {
   threadId: string;
@@ -25,9 +23,12 @@ export interface ComposerInput {
  */
 export function useComposer({ threadId, request, live, working, canSteer, disabledReason, onSent }: ComposerInput) {
   const [draft, setDraft] = useDraft(threadId);
-  const [uploading, setUploading] = useState(0);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { uploading, chooseImages } = useImageAttach({
+    onImage: (image) => setDraft((current) => ({ ...current, images: [...current.images, image] })),
+    onError: setError,
+  });
   const submitter = client.useSubmit();
   const interrupt = useRpcMutation("runs.interrupt");
   const controls = composerControls({
@@ -53,7 +54,7 @@ export function useComposer({ threadId, request, live, working, canSteer, disabl
       setDraft(() => ({ text: "", images: [] }));
       onSent();
     } catch (failure) {
-      setError(message(failure));
+      setError(failureMessage(failure));
     } finally {
       setSending(false);
     }
@@ -62,20 +63,6 @@ export function useComposer({ threadId, request, live, working, canSteer, disabl
     if (!live || interrupt.isPending) return;
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     interrupt.mutate({ runId: live.runId });
-  };
-  const attach = async (source: ImageSource) => {
-    const assets = await pickImages(source);
-    if (!assets.length) return;
-    setUploading((count) => count + assets.length);
-    setError(null);
-    await Promise.all(
-      assets.map((asset) =>
-        attachImage(asset)
-          .then((image) => setDraft((current) => ({ ...current, images: [...current.images, image] })))
-          .catch((failure: unknown) => setError(message(failure)))
-          .finally(() => setUploading((count) => count - 1)),
-      ),
-    );
   };
 
   return {
@@ -91,10 +78,6 @@ export function useComposer({ threadId, request, live, working, canSteer, disabl
     primary: () => (controls.primary === "stop" ? stop() : void send(controls.sendsNow)),
     queue: () => void send(false),
     stop,
-    chooseImages: () =>
-      ActionSheetIOS.showActionSheetWithOptions({ options: ["Photo Library", "Take Photo", "Cancel"], cancelButtonIndex: 2 }, (index) => {
-        if (index === 0) void attach("library");
-        if (index === 1) void attach("camera");
-      }),
+    chooseImages,
   };
 }

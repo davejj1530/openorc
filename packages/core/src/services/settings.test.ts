@@ -11,7 +11,7 @@ describe("settings persistence", () => {
     databases.push(db);
     settings.set(db, "app.settings", JSON.stringify({ sound: true, defaultWorkspaceMode: "worktree" }));
     const service = new AppSettingsService(db);
-    expect(service.get()).toMatchObject({ sound: true, defaultWorkspaceMode: "worktree", defaultPermissionMode: "trusted", experimentalTeamExecution: true });
+    expect(service.get()).toMatchObject({ sound: true, defaultWorkspaceMode: "worktree", defaultPermissionMode: "trusted", defaultHarness: null, experimentalTeamExecution: true });
     for (const permission of ["autonomous", "review", "trusted"] as const) {
       service.set({ defaultPermissionMode: permission });
       expect(new AppSettingsService(db).get()).toMatchObject({ sound: true, defaultWorkspaceMode: "worktree", defaultPermissionMode: permission });
@@ -39,6 +39,7 @@ describe("settings persistence", () => {
       autoArchiveDoneDays: 30,
       defaultWorkspaceMode: "worktree" as const,
       defaultPermissionMode: "review" as const,
+      defaultHarness: "claude" as const,
       experimentalTeamExecution: true,
       idleProcessMinutes: null,
       claudeUserMcpServers: false,

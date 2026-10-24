@@ -1,3 +1,4 @@
+import { harnessAvailability } from "@openorc/protocol";
 import { AgentUpdateService } from "../services/agent-updates.js";
 import { ProviderUsageService } from "../services/provider-usage.js";
 import { SystemService } from "../services/system.js";
@@ -5,6 +6,8 @@ import type { Handlers } from "./types.js";
 type Dependencies = {
   system: Pick<SystemService, "info">;
   accountInfo?: (refresh?: boolean, id?: string) => ReturnType<SystemService["info"]>;
+  /** The checks for the default Claude account, which a thread started without naming one runs on. */
+  defaultAccountInfo: () => ReturnType<SystemService["info"]>;
   agentUpdates: Pick<AgentUpdateService, "get" | "check" | "install" | "configure">;
   providerUsage: Pick<ProviderUsageService, "read" | "redeemCodex">;
   invalidate: (keys: string[]) => void;
@@ -13,12 +16,17 @@ type Dependencies = {
 export function createSystemHandlers({
   system,
   accountInfo,
+  defaultAccountInfo,
   agentUpdates,
   providerUsage,
   invalidate,
-}: Dependencies): Pick<Handlers, "system.info" | "agents.updates.get" | "agents.updates.check" | "agents.updates.install" | "agents.updates.configure" | "providers.usage" | "providers.codex.reset"> {
+}: Dependencies): Pick<
+  Handlers,
+  "system.info" | "agents.availability" | "agents.updates.get" | "agents.updates.check" | "agents.updates.install" | "agents.updates.configure" | "providers.usage" | "providers.codex.reset"
+> {
   return {
     "system.info": ({ refresh, claudeAccountId }) => (accountInfo ? accountInfo(refresh, claudeAccountId) : system.info(refresh)),
+    "agents.availability": async () => harnessAvailability(await defaultAccountInfo()),
     "agents.updates.get": () => agentUpdates.get(),
     "agents.updates.check": () => agentUpdates.check(),
     "agents.updates.install": ({ ids }) => agentUpdates.install(ids),

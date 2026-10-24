@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { RpcMethod, RpcParams } from "@openorc/protocol";
+import type { ProjectGit, RpcMethod, RpcParams } from "@openorc/protocol";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { router } from "expo-router";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -9,22 +9,32 @@ import type { FakeMac } from "../test-fixtures/fake-mac";
 import { nativeProps } from "../test-fixtures/react-native";
 import { NewThreadSheet } from "./NewThreadSheet";
 
-/** A Mac with a repository and a plain folder, and a start the test answers; `focused` is whether the sheet is on top. */
+/**
+ * A Mac with a repository, two folders without git (a test gives `later` its first commit while the Mac's project row
+ * still names no default branch), and a start the test answers; `focused` is whether the sheet is on top.
+ */
 const mac = vi.hoisted(() => {
+  const git: Record<string, ProjectGit> = {};
   const reads: Partial<Record<RpcMethod, unknown>> = {
     "projects.list": [
       { id: "openorc", name: "openorc", defaultBranch: "main" },
       { id: "notes", name: "notes", defaultBranch: null },
+      { id: "later", name: "later", defaultBranch: null },
     ],
     "agents.models": [{ id: "gpt-main", label: "GPT", agent: "codex", isDefault: true, efforts: ["high"], defaultEffort: "high" }],
-    "app.settings.get": { defaultWorkspaceMode: "worktree", defaultPermissionMode: "review" },
+    "agents.availability": [{ id: "codex", state: "ready" }],
+    "app.settings.get": { defaultWorkspaceMode: "worktree", defaultPermissionMode: "review", defaultHarness: null },
   };
-  return { reads, focused: true, phone: null as FakeMac | null, start: vi.fn<(params: RpcParams<"threads.start">) => Promise<{ thread: { id: string } }>>() };
+  return { git, reads, focused: true, phone: null as FakeMac | null, start: vi.fn<(params: RpcParams<"threads.start">) => Promise<{ thread: { id: string } }>>() };
 });
 
 vi.mock("../client", async () => {
   const { fakeMac } = await import("../test-fixtures/fake-mac");
-  mac.phone = fakeMac((method, params) => (method === "threads.start" ? mac.start(params as RpcParams<"threads.start">) : Promise.resolve(mac.reads[method])));
+  mac.phone = fakeMac((method, params) => {
+    if (method === "threads.start") return mac.start(params as RpcParams<"threads.start">);
+    if (method === "projects.git") return Promise.resolve(mac.git[(params as RpcParams<"projects.git">).id]);
+    return Promise.resolve(mac.reads[method]);
+  });
   return mac.phone.module;
 });
 vi.mock("expo-router", () => ({
@@ -41,6 +51,7 @@ beforeEach(() => {
   mac.phone!.module.queryClient.clear();
   mac.start.mockReset();
   mac.focused = true;
+  Object.assign(mac.git, { openorc: "ready", notes: "none", later: "none" });
   vi.mocked(router.back).mockClear();
   vi.mocked(router.push).mockClear();
 });
@@ -85,6 +96,18 @@ it("starts a plain folder's thread in the folder, as the desktop does", async ()
   mac.start.mockResolvedValue({ thread: { id: "thread-2" } });
   await act(async () => fireEvent.click(button("Start")));
   expect(mac.start.mock.calls[0]![0]).toMatchObject({ projectId: "notes", workspaceMode: "current", prompt: "Tidy the notes" });
+});
+
+it("starts a worktree in a project that got its first commit after the sheet showed it, as the desktop does", async () => {
+  await openAndWrite("Fix the build");
+  await act(async () => fireEvent.click(project("later")));
+  act(() => (nativeProps.get(screen.getByLabelText("Message"))!.onChangeText as (text: string) => void)("Isolate the change"));
+  await waitFor(() => expect(button("Start").disabled).toBe(false));
+  // The first commit, made on the Mac outside OpenOrc.
+  mac.git["later"] = "ready";
+  mac.start.mockResolvedValue({ thread: { id: "thread-3" } });
+  await act(async () => fireEvent.click(button("Start")));
+  expect(mac.start.mock.calls[0]![0]).toMatchObject({ projectId: "later", workspaceMode: "worktree", prompt: "Isolate the change" });
 });
 
 it("holds the project while an image is on its way to the Mac", async () => {

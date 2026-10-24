@@ -91,14 +91,6 @@ describe("core", () => {
     await expect(call("files.read", { scope: { kind: "thread", id: "missing-thread" }, path: "README.md" })).rejects.toThrow("not found");
   });
 
-  it("keeps every setting through a change to another", async () => {
-    const optedOut = { experimentalTeamExecution: false, idleProcessMinutes: null, claudeUserMcpServers: false };
-    await call("app.settings.set", optedOut);
-    await call("app.settings.set", { defaultPermissionMode: "trusted" });
-    await call("app.settings.set", { sound: true });
-    expect(await call("app.settings.get", {})).toMatchObject({ ...optedOut, defaultPermissionMode: "trusted", sound: true });
-  });
-
   it("loads terminal history beyond the default ledger page while respecting explicit limits", async () => {
     const p = await call("projects.import", { rootPath: root });
     const thread = threads.insert(core.db, { projectId: p.id, title: "Long transcript", agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
@@ -329,5 +321,25 @@ describe("core", () => {
     const info = await call("system.info", {});
     expect(info.dataDir).toBe(dataDir);
     expect(info.harnesses.map((row) => row.id)).toEqual(harnessIds);
+  });
+
+  it("keeps every setting through a change to another, the default harness for every client included", async () => {
+    expect((await call("app.settings.get", {})).defaultHarness).toBeNull();
+    const optedOut = { experimentalTeamExecution: false, idleProcessMinutes: null, claudeUserMcpServers: false };
+    await call("app.settings.set", optedOut);
+    await call("app.settings.set", { defaultHarness: "claude" });
+    await call("app.settings.set", { defaultPermissionMode: "trusted" });
+    await call("app.settings.set", { sound: true });
+    expect(await call("app.settings.get", {})).toMatchObject({ ...optedOut, defaultHarness: "claude", defaultPermissionMode: "trusted", sound: true });
+    await call("app.settings.set", { defaultHarness: null });
+    expect((await call("app.settings.get", {})).defaultHarness).toBeNull();
+    await expect(call("app.settings.set", { defaultHarness: "pi" as never })).rejects.toThrow();
+  });
+
+  it("answers which harnesses can start a thread as the desktop's New thread reads them, without their paths", async () => {
+    const info = await call("system.info", { claudeAccountId: core.claudeAccounts.defaultId() });
+    const availability = await call("agents.availability", {});
+    expect(availability).toEqual(info.harnesses.map(({ id, state }) => ({ id, state })));
+    expect(availability.map((row) => Object.keys(row))).toEqual(harnessIds.map(() => ["id", "state"]));
   });
 });

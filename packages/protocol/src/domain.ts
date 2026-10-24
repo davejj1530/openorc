@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { AgentKind, BackgroundCommand, Usage } from "./events.js";
+import { HarnessId } from "./harness.js";
 import { ExecutionTarget, TeamRevision } from "./orchestration.js";
 
 /** Domain records as the renderer sees them. Columns are nullable, not optional. */
@@ -349,6 +350,8 @@ export const AppSettings = z.object({
   defaultWorkspaceMode: WorkspaceMode,
   /** Most recent user selection; defaults new work without changing live run policies. */
   defaultPermissionMode: PermissionPreset,
+  /** The harness new threads start with on every client, chosen at onboarding; null until one is. */
+  defaultHarness: HarnessId.nullable(),
   /** Minutes a provider process may sit idle between turns before it is closed; the session resumes on the next message. Null keeps processes running. */
   idleProcessMinutes: z.number().int().positive().nullable(),
   /** Whether Claude Code connects the MCP servers from the user's own Claude configuration in threads. Off, only OpenOrc's tools load and the CLI starts about two seconds sooner. */

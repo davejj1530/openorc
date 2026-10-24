@@ -1,6 +1,6 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, renderHook, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { HarnessInfo } from "@openorc/protocol";
+import type { HarnessId, HarnessInfo } from "@openorc/protocol";
 
 vi.mock("./components/CommandPalette", () => ({ CommandPalette: () => null }));
 vi.mock("./components/RiveMascot", () => ({ RiveMascot: () => null }));
@@ -40,9 +40,12 @@ vi.mock("./lib/window", () => ({ useTrafficLights: () => trafficLights, useWindo
 let harnesses: HarnessInfo[] | undefined;
 let projectCount = 1;
 let checkFailed = false;
+let coreDefault: HarnessId | null | undefined;
+const saveSettings = vi.fn();
 vi.mock("./lib/client", async (original) => {
   const rpcData = (method: string) => {
     if (method === "system.info") return harnesses ? { harnesses } : undefined;
+    if (method === "app.settings.get") return coreDefault === undefined ? undefined : { defaultHarness: coreDefault };
     return Array.from({ length: projectCount }, (_, i) => ({
       id: `project-${i}`,
       name: "Existing project",
@@ -59,12 +62,12 @@ vi.mock("./lib/client", async (original) => {
       isFetching: false,
       refetch: vi.fn(),
     }),
-    useRpcMutation: () => ({
+    useRpcMutation: (method: string) => ({
       isPending: false,
       isError: false,
       data: undefined,
       error: null,
-      mutate: vi.fn(),
+      mutate: method === "app.settings.set" ? saveSettings : vi.fn(),
       mutateAsync: vi.fn(),
     }),
   };
@@ -72,6 +75,7 @@ vi.mock("./lib/client", async (original) => {
 
 import { App } from "./App";
 import { useRouter } from "./lib/router";
+import { useOnboardingDefaultHarness } from "./lib/default-harness";
 import { writeOnboardingState } from "./lib/onboarding";
 
 const harness = (id: HarnessInfo["id"], state: HarnessInfo["state"]): HarnessInfo => ({
@@ -92,6 +96,49 @@ beforeEach(() => {
   projectCount = 1;
   checkFailed = false;
   trafficLights = true;
+  coreDefault = null;
+  saveSettings.mockReset();
+});
+
+describe("the default harness", () => {
+  const completed = (defaultHarness: HarnessId | null) => writeOnboardingState({ version: 1, step: "done", completedAt: 1, selectedHarnesses: ["claude", "codex"], defaultHarness });
+
+  it("hands a choice made before the core kept it to the core once its settings show none", () => {
+    completed("claude");
+    harnesses = bothReady();
+    coreDefault = undefined;
+    const view = render(<App />);
+    expect(saveSettings).not.toHaveBeenCalled();
+    coreDefault = null;
+    view.rerender(<App />);
+    expect(saveSettings).toHaveBeenCalledExactlyOnceWith({ defaultHarness: "claude" });
+    coreDefault = "claude";
+    view.rerender(<App />);
+    expect(saveSettings).toHaveBeenCalledOnce();
+  });
+
+  it("hands it over once, so a default onboarding saves later is never replaced by the older choice", () => {
+    completed("claude");
+    const handover = renderHook(() => useOnboardingDefaultHarness());
+    coreDefault = "claude";
+    handover.rerender();
+    // Recovery: the person deselects Claude while two other harnesses are ready, so onboarding saves no default.
+    handover.result.current(null);
+    coreDefault = null;
+    handover.rerender();
+    expect(saveSettings.mock.calls).toEqual([[{ defaultHarness: "claude" }], [{ defaultHarness: null }]]);
+  });
+
+  it.each([
+    { name: "the core already holds one", onboarding: "claude", core: "codex" },
+    { name: "onboarding chose none", onboarding: null, core: null },
+  ] as const)("leaves the core's default alone when $name", ({ onboarding, core }) => {
+    completed(onboarding);
+    harnesses = bothReady();
+    coreDefault = core;
+    render(<App />);
+    expect(saveSettings).not.toHaveBeenCalled();
+  });
 });
 
 describe("app onboarding recovery", () => {
@@ -157,6 +204,9 @@ describe("app onboarding recovery", () => {
       view: "newthread",
       projectId: "project-0",
     });
+    // The default chosen here is the core's, so the phone starts new threads with it too.
+    expect(saveSettings).toHaveBeenCalledWith({ defaultHarness: "claude" });
+    expect(saveSettings).not.toHaveBeenCalledWith({ defaultHarness: "codex" });
   });
 
   it("does not latch recovery during loading for a completed profile", () => {

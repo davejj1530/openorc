@@ -10,6 +10,8 @@ describe("phone policy", () => {
     expect(admitRemoteRequest("threads.update", { id: "t", patch: { seen: true, model: "gpt", permissionMode: "trusted" } }, context)).toEqual({ ok: true });
     expect(admitRemoteRequest("runs.send", { runId: "r", text: "look", attachments: [image] }, context)).toEqual({ ok: true });
     expect(admitRemoteRequest("attachments.save", { name: "a.png", mime: "image/png", dataBase64: "AAAA" }, context)).toEqual({ ok: true });
+    expect(admitRemoteRequest("agents.availability", {}, context)).toEqual({ ok: true });
+    expect(admitRemoteRequest("projects.git", { id: "p" }, context)).toEqual({ ok: true });
   });
 
   it("leaves params a method rejects for the core to word", () => {

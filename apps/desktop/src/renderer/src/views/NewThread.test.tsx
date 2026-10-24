@@ -13,6 +13,7 @@ let system: RpcResults["system.info"];
 let branches: Record<string, string | null | undefined>;
 let branchError: boolean;
 let accounts: RpcResults["claude.accounts.list"] | undefined;
+let settings: Partial<RpcResults["app.settings.get"]>;
 
 vi.mock("../lib/client", async (original) => ({
   ...(await original<object>()),
@@ -25,7 +26,7 @@ vi.mock("../lib/client", async (original) => ({
       "workspace.get": undefined,
       "system.info": system,
       "agents.models": models,
-      "app.settings.get": { defaultWorkspaceMode: "current" },
+      "app.settings.get": settings,
       "orchestration.list": teams,
       "orchestration.availability": { enabled: true, reason: null, maxHierarchyDepth: 3 },
     };
@@ -70,6 +71,7 @@ beforeEach(() => {
     accounts: ["personal", "work", "client"].map((id, createdAt) => ({ id, name: id, kind: "managed", enabled: true, createdAt, status: "ready", email: null, organization: null, message: null })),
   };
   teams = [];
+  settings = { defaultWorkspaceMode: "current", defaultHarness: null };
   models = [{ id: "codex-model", label: "Codex", agent: "codex", isDefault: true, efforts: ["medium"], defaultEffort: "medium" }];
   system = {
     dataDir: "/data",
@@ -249,4 +251,21 @@ it("keeps a chosen third Claude account in the draft and sends it when starting"
   expect(picker.value).toBe("client");
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
   await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ agent: "claude", claudeAccountId: "client", prompt: "Use the client account" })));
+});
+
+it.each([
+  { name: "the core's default harness", defaultHarness: "claude", onboarding: null, agent: "claude" },
+  { name: "the first signed-in harness without one", defaultHarness: null, onboarding: null, agent: "codex" },
+  // Before App hands a profile's earlier onboarding choice to the core, the choice still decides.
+  { name: "an onboarding choice the core does not hold yet", defaultHarness: null, onboarding: "claude", agent: "claude" },
+  { name: "the core's default over an older onboarding choice", defaultHarness: "codex", onboarding: "claude", agent: "codex" },
+] as const)("offers $name, as a phone would", async ({ defaultHarness, onboarding, agent }) => {
+  models = [...models, { id: "claude-fixture", label: "Claude", agent: "claude", isDefault: true, efforts: [], defaultEffort: null }];
+  system.harnesses = system.harnesses.map((row) => ({ ...row, state: "ready" }));
+  settings = { ...settings, defaultHarness };
+  if (onboarding) localStorage.setItem("openorc.onboarding", JSON.stringify({ version: 1, step: "done", completedAt: 1, selectedHarnesses: ["codex", "claude"], defaultHarness: onboarding }));
+  render(<NewThread projectId="p1" />);
+  fireEvent.change(screen.getByRole("textbox", { name: "Message" }), { target: { value: "Fix the build" } });
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ agent, prompt: "Fix the build" })));
 });

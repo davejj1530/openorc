@@ -2,7 +2,7 @@ import { ClaudeAccountPicker } from "../components/ClaudeAccountPicker";
 import { ClaudeAccountScope } from "../lib/claude-account";
 import { useEffect, useRef, useState } from "react";
 import { newThreadChoice, newThreadWorkspaceMode, targetModel, type NewThreadDraft, type NewThreadTarget } from "@openorc/client";
-import { WORKSPACE_ID, type HarnessId, type Project, type TeamDetail } from "@openorc/protocol";
+import { WORKSPACE_ID, type Project, type TeamDetail } from "@openorc/protocol";
 import { FolderGit2 } from "../components/icons";
 import { Composer } from "../components/Composer";
 import { Panel } from "../components/Panel";
@@ -17,8 +17,8 @@ import { pickerTeam } from "../lib/team-settings";
 import { TopBar } from "../components/TopBar";
 import { Button, TextButton } from "../components/ui";
 import { teamMentionEntries } from "../lib/composer-mentions";
+import { useDefaultHarness } from "../lib/default-harness";
 import { useLayout } from "../lib/layout";
-import { readOnboardingState } from "../lib/onboarding";
 import { evaluateNewThreadAvailability } from "../lib/new-thread-availability";
 import { useNewThreadLocation } from "../lib/new-thread-location";
 import { readNewThreadDraft, readNewThreadProject, rememberNewThreadProject, writeNewThreadDraft } from "../lib/new-thread-draft";
@@ -34,7 +34,6 @@ export function NewThread({ projectId }: { projectId?: string }) {
   const projects = useRpc("projects.list", {});
   const home = useRpc("workspace.get", {});
   const railProject = useLayout((s) => s.projectId);
-  const [preferredHarness] = useState<HarnessId | null>(() => readOnboardingState().defaultHarness);
   const [project, setProject] = useState(() => projectId ?? railProject ?? readNewThreadProject() ?? WORKSPACE_ID);
   const chooseProject = (id: string) => {
     rememberNewThreadProject(id);
@@ -54,7 +53,6 @@ export function NewThread({ projectId }: { projectId?: string }) {
       projectsError={projects.error?.message}
       onProject={chooseProject}
       onRetryProjects={() => void projects.refetch()}
-      preferredHarness={preferredHarness}
     />
   );
 }
@@ -65,14 +63,12 @@ function NewThreadProject({
   projectsError,
   onProject,
   onRetryProjects,
-  preferredHarness,
 }: {
   projectId: string;
   projects: Project[] | undefined;
   projectsError?: string;
   onProject: (id: string) => void;
   onRetryProjects: () => void;
-  preferredHarness: HarnessId | null;
 }) {
   const isWorkspace = projectId === WORKSPACE_ID;
   const git = useProjectGit(projectId);
@@ -82,6 +78,7 @@ function NewThreadProject({
   const info = useRpc("system.info", { claudeAccountId });
   const models = useRpc("agents.models", { claudeAccountId }, { staleTime: 5 * 60_000 });
   const settings = useRpc("app.settings.get", {});
+  const defaultHarness = useDefaultHarness();
   const teams = useRpc("orchestration.list", { projectId, includeArchived: true }, { enabled: Boolean(projectId) });
   const availability = useRpc("orchestration.availability", {});
   const activity = useArrivalActivity();
@@ -112,10 +109,10 @@ function NewThreadProject({
   const workspaceMode = newThreadWorkspaceMode({ canBranch: !isWorkspace && !git.cannotBranch, chosen: draft.workspace, preferred: settings.data?.defaultWorkspaceMode });
 
   useEffect(() => {
-    if (target.kind !== "model" || target.choice || !models.data || !info.data) return;
-    const initial = newThreadChoice(models.data, { preferred: preferredHarness, system: info.data });
+    if (target.kind !== "model" || target.choice || !models.data || !info.data || defaultHarness === undefined) return;
+    const initial = newThreadChoice(models.data, { preferred: defaultHarness, harnesses: info.data.harnesses });
     if (initial) changeDraft({ target: { kind: "model", choice: initial } });
-  }, [target, models.data, info.data, preferredHarness]);
+  }, [target, models.data, info.data, defaultHarness]);
 
   const {
     selectedProject: selected,

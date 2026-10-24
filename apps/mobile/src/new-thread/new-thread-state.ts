@@ -25,12 +25,8 @@ export function openingProject(opened: string | undefined, remembered: string | 
   return WORKSPACE_ID;
 }
 
-/**
- * Why Start cannot go yet, or null: the Mac's projects still loading (where the thread works depends on its project),
- * the saved permission still loading, a saved choice that cannot be restored, no model.
- */
-export function startBlocker(draft: Pick<SheetDraft, "target">, { projectReady, permissionReady }: { projectReady: boolean; permissionReady: boolean }): string | null {
-  if (!projectReady) return "Loading projects…";
+/** Why Start cannot go yet, or null: the saved permission still loading, a saved choice that cannot be restored, no model. */
+export function startBlocker(draft: Pick<SheetDraft, "target">, { permissionReady }: { permissionReady: boolean }): string | null {
   if (permissionReady && draft.target.kind === "unavailable") return draft.target.reason;
   return conversationSendDisabledReason({ permissionReady, historyLoading: false, historyFailed: false, hasModel: Boolean(targetModel(draft.target)) });
 }

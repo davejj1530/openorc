@@ -1,9 +1,10 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { decodePairingUrl } from "@openorc/link";
 import { projects, runs, threads } from "@openorc/db";
+import { commitAll, git } from "@openorc/git";
 import type { AgentEvent, CorePush, RemotePush, Route } from "@openorc/protocol";
 import { OpenOrc } from "../openorc.js";
 import type { ProtectedSecretStore } from "../services/extraction-credentials.js";
@@ -129,6 +130,28 @@ describe("phone access", () => {
     await expect(phone.call("runs.send", { runId: "r", text: "look", attachments: ["/Users/someone/.ssh/id_ed25519"] })).rejects.toThrow("Only images attached from your phone");
     await expect(phone.call("threads.update", { id: "t", patch: { prUrl: "https://example.com" } })).rejects.toThrow("Make this change on your Mac.");
     expect(await phone.call("projects.list", {})).toBeInstanceOf(Array);
+  });
+
+  it("tells a phone which harnesses can run, and nothing of where they are installed", async () => {
+    const phone = await pairPhone();
+    const availability = await phone.call("agents.availability", {});
+    expect(availability.map((row) => row.id)).toEqual(["codex", "claude", "opencode"]);
+    expect(JSON.stringify(availability)).not.toMatch(/path|version|\//);
+  });
+
+  it("reads a project's git live for a phone, so a folder that gains a first commit can branch", async () => {
+    const folder = path.join(dataDir, "later");
+    await mkdir(folder);
+    const project = await core.projects.import(folder);
+    const phone = await pairPhone();
+    expect(await phone.call("projects.git", { id: project.id })).toBe("none");
+    await git(folder, ["init", "-q", "-b", "main"]);
+    await git(folder, ["config", "user.email", "test@example.com"]);
+    await git(folder, ["config", "user.name", "Test"]);
+    await writeFile(path.join(folder, "plan.md"), "# Plan\n");
+    await commitAll(folder, "init");
+    expect(await phone.call("projects.git", { id: project.id })).toBe("ready");
+    expect(await phone.call("projects.get", { id: project.id })).toMatchObject({ defaultBranch: "main" });
   });
 
   it("serves a stored tool image by its URL, and nothing by a path", async () => {

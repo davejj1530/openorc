@@ -4,17 +4,17 @@ import { projectChoices } from "../projects";
 import { afterStart, decodeSheetDraft, openingProject, startBlocker } from "./new-thread-state";
 
 const choices = projectChoices([
-  { id: "openorc", name: "openorc", defaultBranch: "main" },
-  { id: "website", name: "website", defaultBranch: null },
+  { id: "openorc", name: "openorc" },
+  { id: "website", name: "website" },
 ]);
 const image = { path: "/attachments/0b1c.jpg", preview: "file:///cache/0b1c.jpg" };
 
 describe("the new thread sheet", () => {
-  it("lists Workspace first, then the Mac's projects, branching only where the Mac found a branch", () => {
+  it("lists Workspace first, then the Mac's projects", () => {
     expect(choices).toEqual([
-      { id: WORKSPACE_ID, name: "Workspace", canBranch: false },
-      { id: "openorc", name: "openorc", canBranch: true },
-      { id: "website", name: "website", canBranch: false },
+      { id: WORKSPACE_ID, name: "Workspace" },
+      { id: "openorc", name: "openorc" },
+      { id: "website", name: "website" },
     ]);
   });
 
@@ -39,11 +39,10 @@ describe("the new thread sheet", () => {
     expect(decodeSheetDraft("openorc", null)).toMatchObject({ prompt: "", target: { kind: "model", choice: null }, mode: "act", workspace: null, images: [] });
   });
 
-  it("holds Start until the projects and saved permission load and a model is chosen, and says why a saved choice is gone", () => {
+  it("holds Start until the saved permission loads and a model is chosen, and says why a saved choice is gone", () => {
     const chosen = decodeSheetDraft("openorc", { target: { kind: "model", choice: { agent: "codex", model: "gpt", effort: null } } });
-    const loaded = { projectReady: true, permissionReady: true };
-    expect(startBlocker(chosen, { ...loaded, projectReady: false })).toBe("Loading projects…");
-    expect(startBlocker(chosen, { ...loaded, permissionReady: false })).toBe("Loading saved permissions…");
+    const loaded = { permissionReady: true };
+    expect(startBlocker(chosen, { permissionReady: false })).toBe("Loading saved permissions…");
     expect(startBlocker(chosen, loaded)).toBeNull();
     expect(startBlocker(decodeSheetDraft("openorc", null), loaded)).toBe("Choose a model");
     const broken = decodeSheetDraft("openorc", { target: { kind: "model", choice: { model: "missing-provider" } } });

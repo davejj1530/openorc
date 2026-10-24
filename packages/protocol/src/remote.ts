@@ -8,6 +8,7 @@ import type { CorePush, RpcMethod } from "./rpc.js";
 export const REMOTE_METHODS = [
   "projects.list",
   "projects.get",
+  "projects.git",
   "threads.list",
   "threads.get",
   "threads.messages",
@@ -17,6 +18,7 @@ export const REMOTE_METHODS = [
   "events.toolOutput",
   "inbox.list",
   "agents.models",
+  "agents.availability",
   "app.settings.get",
   "threads.start",
   "threads.update",

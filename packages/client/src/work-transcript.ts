@@ -7,19 +7,38 @@ function endsTurn(block: Block): boolean {
   return block.kind === "status" && Boolean(block.boundary || /^turn (finished|error|cancelled) in /.test(block.text));
 }
 
-/** A block opens a new turn when its persisted turn differs, or when a person speaks after the turn did some work. */
-function startsTurn(current: { blocks: Block[] }, block: Block): boolean {
-  const key = current.blocks[0]?.turnKey;
-  if (block.turnKey && key && block.turnKey !== key) return true;
-  return block.kind === "message" && block.role === "user" && current.blocks.some((b) => b.kind !== "status");
+type WorkTurn = { id: string; blocks: Block[] };
+
+/** Anything but a person's message or a status line: what the agent did in its turn, and notices about it. */
+function fromAgent(block: Block): boolean {
+  return block.kind !== "status" && !(block.kind === "message" && block.role === "user");
 }
 
-/** Persisted turn identity wins; user messages and terminal events also cover older transcripts. */
-export function workTurns(blocks: Block[]): { id: string; blocks: Block[] }[] {
-  const turns: { id: string; blocks: Block[] }[] = [];
-  let current: { id: string; blocks: Block[] } | undefined;
+/**
+ * Where a block opens a new turn: "turn" when its persisted turn differs, "steer" when a person speaks after the agent
+ * did something, so what the agent does next reads below the message.
+ */
+function startsTurn(current: WorkTurn, block: Block): "turn" | "steer" | null {
+  const key = current.blocks[0]?.turnKey;
+  if (block.turnKey && key && block.turnKey !== key) return "turn";
+  return block.kind === "message" && block.role === "user" && current.blocks.some(fromAgent) ? "steer" : null;
+}
+
+/**
+ * Persisted turn identity wins; user messages and terminal events also cover older transcripts. A steer reads where it
+ * was sent while the turn runs. If the turn ends before the agent answers it, it joins the part it steered, whose head
+ * then carries the turn's outcome instead of a head of its own over nothing.
+ */
+export function workTurns(blocks: Block[]): WorkTurn[] {
+  const turns: WorkTurn[] = [];
+  let current: WorkTurn | undefined;
+  let steered: WorkTurn | undefined;
   for (const block of blocks) {
-    if (current && startsTurn(current, block)) current = undefined;
+    const starts = current && startsTurn(current, block);
+    if (starts) {
+      steered = starts === "steer" ? current : undefined;
+      current = undefined;
+    }
     if (!current && block.kind === "status" && block.boundary === "session" && turns.length) {
       turns.at(-1)!.blocks.push(block);
       continue;
@@ -29,7 +48,13 @@ export function workTurns(blocks: Block[]): { id: string; blocks: Block[] }[] {
       turns.push(current);
     }
     current.blocks.push(block);
-    if (endsTurn(block)) current = undefined;
+    if (!endsTurn(block)) continue;
+    if (steered && !current.blocks.some(fromAgent)) {
+      steered.blocks.push(...current.blocks);
+      turns.pop();
+    }
+    current = undefined;
+    steered = undefined;
   }
   return turns;
 }

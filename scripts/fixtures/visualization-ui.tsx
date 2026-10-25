@@ -48,25 +48,35 @@ const example: Visualization = {
     document.getElementById('next').onclick=()=>{step++;render()};document.getElementById('back').onclick=()=>{step--;render()};render();
   </script>`,
 };
+const looping: Visualization = { title: "Endless loop", description: "A page whose script never returns.", html: "<p>Spinning</p><script>for(;;){}</script>" };
+const broken: Visualization = { ...example, html: "<p>A saved explanation remains readable.</p><script>throw Error('Example script failed')</script>" };
 const runId = "visualization-fixture";
 const server = `openorc_${"a".repeat(32)}`;
-const names = { Codex: `${server}.visualize`, "Claude Code": `mcp__${server}__visualize`, OpenCode: `${server}_visualize`, "Broken example": `${server}.visualize` };
+const names = {
+  Codex: `${server}.visualize`,
+  "Claude Code": `mcp__${server}__visualize`,
+  OpenCode: `${server}_visualize`,
+  "Broken example": `${server}.visualize`,
+  "Looping example": `${server}.visualize`,
+};
+const shown: Record<string, Visualization[]> = { "Broken example": [broken], "Looping example": [looping, example] };
 let ledger: AgentEvent[] = [];
-function show(name: string, broken = false) {
-  const input = broken ? { ...example, html: "<p>A saved explanation remains readable.</p><script>throw Error('Example script failed')</script>" } : example;
+function show(name: string, label = "") {
   ledger = [
     { type: "message.completed", runId, ts: 1, messageId: "ask", role: "user", text: "Help me understand binary search visually." },
-    { type: "tool.started", runId, ts: 2, toolCallId: "visual", name, input, parentToolCallId: null },
-    {
-      type: "tool.completed",
-      runId,
-      ts: 3,
-      toolCallId: "visual",
-      name,
-      mcp: { server, tool: "visualize" },
-      output: { content: [{ type: "text", text: "Visualization added to the conversation." }] },
-      isError: false,
-    },
+    ...(shown[label] ?? [example]).flatMap((input, index): AgentEvent[] => [
+      { type: "tool.started", runId, ts: 2, toolCallId: `visual-${index}`, name, input, parentToolCallId: null },
+      {
+        type: "tool.completed",
+        runId,
+        ts: 3,
+        toolCallId: `visual-${index}`,
+        name,
+        mcp: { server, tool: "visualize" },
+        output: { content: [{ type: "text", text: "Visualization added to the conversation." }] },
+        isError: false,
+      },
+    ]),
     {
       type: "message.completed",
       runId,
@@ -104,7 +114,7 @@ function App() {
             <button
               key={label}
               onClick={() => {
-                show(name, label === "Broken example");
+                show(name, label);
                 setGeneration((n) => n + 1);
               }}
             >

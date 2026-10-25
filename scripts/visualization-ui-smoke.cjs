@@ -28,14 +28,15 @@ async function check() {
   const { app, BrowserWindow, ipcMain, session } = require("electron");
   const dir = process.env.OPENORC_VISUALIZATION_UI_DIR;
   app.setPath("userData", path.join(dir, "profile"));
+  const { McpAppSandbox, hostSandboxFrames, isolateSandboxFrames } = require(path.join(dir, "sandbox.cjs"));
+  isolateSandboxFrames(app.commandLine);
   await app.whenReady();
-  const { McpAppSandbox, hostSandboxFrames } = require(path.join(dir, "sandbox.cjs"));
   const sandbox = new McpAppSandbox();
   await sandbox.start({ session: session.defaultSession, direct: [] });
-  const registrations = new Set();
+  const registrations = new Map();
   ipcMain.handle("sandbox:register", async (event, doc) => {
     const registration = await sandbox.register(event.sender.id, doc);
-    registrations.add(registration.id);
+    registrations.set(registration.id, doc.html);
     return registration;
   });
   ipcMain.on("sandbox:release", (event, id) => {
@@ -45,9 +46,16 @@ async function check() {
   const win = new BrowserWindow({ show: false, width: 1000, height: 950, webPreferences: { preload: path.join(dir, "preload.cjs"), sandbox: true, contextIsolation: true, nodeIntegration: false } });
   hostSandboxFrames(win.webContents);
   const read = (code) => win.webContents.executeJavaScript(code);
-  const view = () => win.webContents.mainFrame.frames.flatMap((frame) => frame.frames).find((frame) => frame.url.endsWith("/view"));
-  const waitFor = async (predicate, label) => {
-    for (let i = 0; i < 100; i++) {
+  // A frame whose renderer ended is destroyed, and Electron never returns from reading its URL.
+  const views = () => win.webContents.mainFrame.frames.flatMap((frame) => frame.frames).filter((frame) => !frame.isDestroyed() && frame.url.endsWith("/view"));
+  const view = () => views()[0];
+  const viewOf = (marker) => views().find((frame) => registrations.get(frame.url.split("/").at(-2))?.includes(marker));
+  const section = (title) => read(`document.querySelector('section[aria-label="${title}"]').innerText`);
+  const running = (pid) => app.getAppMetrics().some((metric) => metric.pid === pid);
+  // A page held in a loop never answers, and neither does one that shares its renderer.
+  const answer = (frame, code) => Promise.race([frame?.executeJavaScript(code), pause(1000)]);
+  const waitFor = async (predicate, label, tries = 100) => {
+    for (let i = 0; i < tries; i++) {
       if (await predicate()) return;
       await pause(100);
     }
@@ -118,10 +126,28 @@ async function check() {
     assert.equal(registrations.size, 1);
     await click("Broken example");
     await waitFor(async () => /Example script failed/.test(await read("document.body.innerText")), "readable runtime error");
+    await click("Looping example");
+    await waitFor(async () => (await answer(viewOf("Looking for"), "!!document.getElementById('next')")) && !/Loading/.test(await section("Binary search")), "a page beside an endless loop", 50);
+    assert.match(await section("Endless loop"), /Loading visualization/, "the loop still spins");
+    const loop = viewOf("for(;;)").osProcessId;
+    assert.notEqual(loop, viewOf("Looking for").osProcessId, "each page has its own renderer");
+    await waitFor(
+      async () => /did not finish loading/.test(await section("Endless loop")) && !viewOf("for(;;)") && !running(loop),
+      "the loop ends as its line, and Chromium then ends its renderer",
+      400,
+    );
+    const page = viewOf("Looking for").osProcessId;
+    process.kill(page, "SIGKILL");
+    await waitFor(async () => /This visualization stopped/.test(await section("Binary search")) && !viewOf("Looking for"), "a page that dies after it was up");
+    await read(`document.querySelector('section[aria-label="Binary search"] button').click()`);
+    await waitFor(async () => !!(await answer(viewOf("Looking for"), "!!document.getElementById('next')")), "reset after the page died");
     await click("Codex");
     await ready();
     assert.equal(registrations.size, 1, "replaced views release registrations");
-    console.log("PASS: interaction, keyboard, provider names, saved history, themes, 320px layout, sizing, reset, release, errors, isolation and no WebRTC contact. Captures: " + dir);
+    console.log(
+      "PASS: interaction, keyboard, provider names, saved history, themes, 320px layout, sizing, reset, release, errors, a page per renderer, loops and crashes, isolation and no WebRTC contact. Captures: " +
+        dir,
+    );
   } finally {
     win.destroy();
     await sandbox.close();

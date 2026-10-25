@@ -10,7 +10,7 @@ import { configureReleaseFeed } from "./release-feed";
 import { installUpdateControls } from "./update-ipc";
 import { installUpdateMenu } from "./update-menu";
 import { closeCoreForUpdate } from "./update-handoff";
-import { hostSandboxFrames, McpAppSandbox } from "./mcp-app-sandbox";
+import { hostSandboxFrames, isolateSandboxFrames, McpAppSandbox } from "./mcp-app-sandbox";
 import { listenForShellEnv } from "./shell-env";
 import { installProtectedSecrets } from "./protected-secrets";
 import { configureAppIdentity } from "./app-identity";
@@ -43,6 +43,7 @@ if (ignoredLaunchVariables.length > 0) console.log(`[main] ignored launch variab
 if (process.env["OPENORC_GPU_RASTER"] !== "1") {
   app.commandLine.appendSwitch("disable-gpu-rasterization");
 }
+isolateSandboxFrames(app.commandLine);
 let coldStartMs: number | null = null;
 let core: UtilityProcess | null = null;
 let preparingUpdate = false;

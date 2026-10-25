@@ -10,14 +10,24 @@
 export type VisualizationHost = "frame" | "react-native";
 
 const post: Record<VisualizationHost, string> = {
-  frame: "parent.postMessage(message,'*')",
+  frame: "parent.postMessage(message,'*',transfer)",
   "react-native": "window.ReactNativeWebView.postMessage(JSON.stringify(message))",
+};
+
+/**
+ * What the page hands its host as it comes up. The desktop's frame gets one end of a channel the page keeps the other
+ * end of, so the host learns when the page's renderer ends, which a frame never reports itself. The phone's web view
+ * reports it.
+ */
+const lifeline: Record<VisualizationHost, string> = {
+  frame: "(()=>{const channel=new MessageChannel();channel.port1.start();return [channel.port2];})()",
+  "react-native": "[]",
 };
 
 /**
  * What a host's page does with a link. WebKit connects to a link's host as the link is followed, before the phone's
  * guard refuses the load, so the phone's page never follows one; the desktop's frame goes to its sandbox's blocked
- * page, as it always has.
+ * page, and the row, which hears the page end, shows its quiet line.
  */
 const links: Record<VisualizationHost, string> = {
   frame: "",
@@ -116,7 +126,7 @@ button{cursor:pointer}button:disabled{opacity:.5;cursor:default}button:hover:not
 </style>
 <script>
 (() => {
-  const send=(method,params={})=>{const message={jsonrpc:'2.0',method,params};${post[host]};};${links[host]}
+  const send=(method,params={},transfer=[])=>{const message={jsonrpc:'2.0',method,params};${post[host]};};${links[host]}
   let lastHeight=0, scheduled=false, errorMessage='';
   const measure=()=>{
     if(scheduled)return;
@@ -141,7 +151,7 @@ button{cursor:pointer}button:disabled{opacity:.5;cursor:default}button:hover:not
   addEventListener('error',event=>report(event.message || 'The visualization could not load.'));
   addEventListener('unhandledrejection',()=>report('An interaction could not finish.'));
   addEventListener('DOMContentLoaded',()=>{
-    send('ui/notifications/initialized');
+    send('ui/notifications/initialized',{},${lifeline[host]});
     if(errorMessage)report(errorMessage);
     new ResizeObserver(measure).observe(document.body);
     measure();

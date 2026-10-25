@@ -27,19 +27,54 @@ export default function VisualizationResult({ visualization }: { visualization: 
   );
 }
 
-type FrameState = { kind: "loading" } | { kind: "ready" } | { kind: "error"; message: string };
+const TIMED_OUT = "This visualization did not finish loading. Try Reset.";
+const STOPPED = "This visualization stopped. Try Reset.";
 
+function FrameStatus({ text }: { text: string }) {
+  return (
+    <p role="status" className="my-2 text-xs text-ink-3">
+      {text}
+    </p>
+  );
+}
+
+/**
+ * A visualization's page, or once it fails, only its quiet line. The frame goes with the failure, and with it the
+ * page's renderer, which Chromium ends once no frame is left in it, even one a page holds in a loop. Reset makes a new
+ * one.
+ */
 function VisualizationFrame({ title, html }: { title: string; html: string }) {
+  const [failure, setFailure] = useState<string>();
+  return failure === undefined ? <FramePage title={title} html={html} onFail={setFailure} /> : <FrameStatus text={`Visualization unavailable: ${failure}`} />;
+}
+
+/**
+ * Calls back when the page's end of the channel it handed over as it came up closes, which happens when its renderer
+ * ends: a page that crashes after it was up says nothing, and its frame would stay a gray box.
+ */
+function watchLifeline(port: MessagePort, ended: () => void): () => void {
+  port.addEventListener("close", ended);
+  port.start();
+  return () => {
+    port.removeEventListener("close", ended);
+    port.close();
+  };
+}
+
+function FramePage({ title, html, onFail }: { title: string; html: string; onFail: (message: string) => void }) {
   const frame = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState(320);
-  const [state, setState] = useState<FrameState>({ kind: "loading" });
+  const [ready, setReady] = useState(false);
   useEffect(() => {
     const iframe = frame.current;
     if (!iframe) return;
     let disposed = false;
     let registration: { id: string; url: string } | undefined;
-    setState({ kind: "loading" });
-    const timeout = window.setTimeout(() => setState({ kind: "error", message: "This visualization did not finish loading. Try Reset." }), 15_000);
+    let unwatch: (() => void) | undefined;
+    const fail = (message: string) => {
+      if (!disposed) onFail(message);
+    };
+    const timeout = window.setTimeout(() => fail(TIMED_OUT), 15_000);
     const send = (method: string, params: unknown) => {
       if (registration) iframe.contentWindow?.postMessage({ jsonrpc: "2.0", method, params }, new URL(registration.url).origin);
     };
@@ -55,15 +90,15 @@ function VisualizationFrame({ title, html }: { title: string; html: string }) {
           break;
         case "ui/notifications/initialized":
           window.clearTimeout(timeout);
+          if (!unwatch && event.ports[0]) unwatch = watchLifeline(event.ports[0], () => fail(STOPPED));
           context();
-          setState({ kind: "ready" });
+          setReady(true);
           break;
         case "ui/notifications/size-changed":
           setHeight(visualizationFrameHeight(message.params.height));
           break;
         case "openorc/visualization-error":
-          window.clearTimeout(timeout);
-          setState({ kind: "error", message: message.params.message });
+          fail(message.params.message);
           break;
       }
     };
@@ -77,32 +112,25 @@ function VisualizationFrame({ title, html }: { title: string; html: string }) {
         return;
       }
       iframe.src = registration.url;
-    })().catch((error: unknown) => {
-      if (disposed) return;
-      window.clearTimeout(timeout);
-      setState({ kind: "error", message: error instanceof Error ? error.message : "This visualization could not open." });
-    });
+    })().catch((error: unknown) => fail(error instanceof Error ? error.message : "This visualization could not open."));
     return () => {
       disposed = true;
       observer.disconnect();
       window.removeEventListener("message", receive);
       window.clearTimeout(timeout);
+      unwatch?.();
       if (registration) window.openorc.mcpApps.release(registration.id);
     };
-  }, [html]);
+  }, [html, onFail]);
   return (
     <>
-      {state.kind !== "ready" ? (
-        <p role="status" className="my-2 text-xs text-ink-3">
-          {state.kind === "loading" ? "Loading visualization…" : `Visualization unavailable: ${state.message}`}
-        </p>
-      ) : null}
+      {ready ? null : <FrameStatus text="Loading visualization…" />}
       <iframe
         ref={frame}
         title={title}
         sandbox="allow-scripts allow-same-origin"
         referrerPolicy="no-referrer"
-        style={{ width: "100%", height, border: 0, display: state.kind === "error" ? "none" : "block", visibility: state.kind === "loading" ? "hidden" : "visible" }}
+        style={{ width: "100%", height, border: 0, display: "block", visibility: ready ? "visible" : "hidden" }}
       />
     </>
   );

@@ -1,4 +1,5 @@
 import type { AssetRef, RemotePush, Route } from "@openorc/protocol";
+import { anyText, count, isRecord, list, oneOf, present, shape, text, variants, type Check, type Fields } from "./checks.js";
 
 /** Bumped when either end would misread the other. The Mac refuses a phone that speaks another version. */
 export const LINK_VERSION = 1;
@@ -42,45 +43,9 @@ export type LinkMessage = PhoneHello | MacHello | PhoneMessage | MacMessage;
 
 export class LinkProtocolError extends Error {}
 
-type Check = (value: unknown) => boolean;
-type Fields = Record<string, Check>;
-
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
-const text =
-  (max: number): Check =>
-  (value) =>
-    typeof value === "string" && value.length > 0 && value.length <= max;
-const anyText: Check = (value) => typeof value === "string";
-const count: Check = (value) => Number.isSafeInteger(value) && (value as number) >= 0;
 /** An asset's id doubles as the u32 stream id of its byte records. */
 const streamId: Check = (value) => count(value) && (value as number) <= 0xffff_ffff;
 const port: Check = (value) => Number.isInteger(value) && (value as number) >= 1 && (value as number) <= 65_535;
-const present: Check = () => true;
-const oneOf =
-  (...values: string[]): Check =>
-  (value) =>
-    typeof value === "string" && values.includes(value);
-const list =
-  (item: Check, max: number): Check =>
-  (value) =>
-    Array.isArray(value) && value.length <= max && value.every(item);
-
-/** Exactly these keys: every required one, any optional one, nothing else. */
-function shape(required: Fields, optional: Fields = {}): Check {
-  return (value) =>
-    isRecord(value) &&
-    Object.keys(value).every((key) => Object.hasOwn(required, key) || Object.hasOwn(optional, key)) &&
-    Object.entries(required).every(([key, check]) => Object.hasOwn(value, key) && check(value[key])) &&
-    Object.entries(optional).every(([key, check]) => !Object.hasOwn(value, key) || check(value[key]));
-}
-
-function variants(tag: string, table: Record<string, Check>): Check {
-  return (value) => {
-    if (!isRecord(value)) return false;
-    const kind = value[tag];
-    return typeof kind === "string" && Object.hasOwn(table, kind) && table[kind]!(value);
-  };
-}
 
 const message = (fields: Fields, optional?: Fields) => shape({ t: present, ...fields }, optional);
 const route = shape({ kind: oneOf("lan", "tailnet"), host: text(253), port });

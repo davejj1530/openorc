@@ -40,9 +40,13 @@ class FakeLink {
   }
 }
 
-function session(answer: Answer = async (request) => ({ type: "rpc.result", id: request.id, result: null }), readAsset: SessionDeps["readAsset"] = async () => ({ ok: false, reason: "missing" })) {
+function session(
+  answer: Answer = async (request) => ({ type: "rpc.result", id: request.id, result: null }),
+  readAsset: SessionDeps["readAsset"] = async () => ({ ok: false, reason: "missing" }),
+  device: SessionDeps["device"] = async () => "no-key",
+) {
   const link = new FakeLink();
-  const remote = new RemoteSession("device", link as unknown as MacSession, { answer, guard: { attachmentsDir: "/data/attachments" }, readAsset });
+  const remote = new RemoteSession("device", link as unknown as MacSession, { answer, guard: { attachmentsDir: "/data/attachments" }, readAsset, device });
   return { link, remote };
 }
 
@@ -105,6 +109,35 @@ describe("a phone session", () => {
     link.receive({ t: "rpc", id: 4, method: "workspace.configure", params: { entrypoint: "/" } });
     await vi.waitFor(() => expect(link.sent).toEqual([{ t: "rpc.error", id: 4, message: "This is not available from a phone." }]));
     expect(answer).not.toHaveBeenCalled();
+  });
+
+  it("answers a method about the phone itself for its own device, without asking the core", async () => {
+    const answer = vi.fn<Answer>(async (request): Promise<RpcReply> => ({ type: "rpc.result", id: request.id, result: null }));
+    const device = vi.fn<SessionDeps["device"]>(async () => "ready");
+    const { link } = session(answer, undefined, device);
+    const registration = { token: "ab".repeat(32), environment: "sandbox", alerts: "needs-you", sound: false } as const;
+    link.receive({ t: "rpc", id: 5, method: "push.register", params: { registration } });
+    await vi.waitFor(() => expect(link.sent).toEqual([{ t: "rpc.result", id: 5, result: "ready" }]));
+    expect(device).toHaveBeenCalledWith("device", "push.register", { registration });
+    expect(answer).not.toHaveBeenCalled();
+  });
+
+  it("refuses device params the schema rejects, and keeps the session", async () => {
+    const device = vi.fn<SessionDeps["device"]>(async () => "ready");
+    const { link } = session(undefined, undefined, device);
+    const registration = { token: "ab".repeat(32), environment: "sandbox", alerts: "all", sound: true };
+    const refused = [
+      { registration: { ...registration, token: "AB".repeat(32) } },
+      { registration: { ...registration, alerts: "off" } },
+      { registration, deviceId: "another-phone" },
+      { registration: { ...registration, deviceId: "another-phone" } },
+      {},
+    ];
+    refused.forEach((params, index) => link.receive({ t: "rpc", id: index + 1, method: "push.register", params }));
+    await vi.waitFor(() => expect(link.sent).toHaveLength(refused.length));
+    for (const message of link.sent) expect(message).toMatchObject({ t: "rpc.error", message: expect.stringContaining("invalid params for push.register") });
+    expect(device).not.toHaveBeenCalled();
+    expect(link.closed).toBe(false);
   });
 
   it("streams at most four images at once and turns the rest away until one is sent", async () => {

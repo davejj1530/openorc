@@ -1,7 +1,7 @@
 import type { RemoteAccess } from "../remote/remote-access.js";
 import type { Handlers } from "./types.js";
 
-type RemoteMethods = "remote.status" | "remote.configure" | "remote.pairing.begin" | "remote.pairing.cancel" | "remote.devices.remove";
+type RemoteMethods = Extract<keyof Handlers, `remote.${string}`>;
 
 export function createRemoteHandlers({ remote }: { remote: RemoteAccess }): Pick<Handlers, RemoteMethods> {
   return {
@@ -16,5 +16,8 @@ export function createRemoteHandlers({ remote }: { remote: RemoteAccess }): Pick
       remote.removeDevice(id);
       return null;
     },
+    "remote.push.setKey": ({ keyId, pem }) => remote.setPushKey(keyId, pem),
+    "remote.push.removeKey": () => remote.removePushKey(),
+    "remote.push.test": () => remote.testPush(),
   };
 }

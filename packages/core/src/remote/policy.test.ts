@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { REMOTE_ATTACHMENT_BYTES } from "@openorc/protocol";
+import { deviceRpcParams, isRemoteMethod, REMOTE_ATTACHMENT_BYTES, remoteRpcParams, rpcParams } from "@openorc/protocol";
 import { admitRemoteRequest, remotePush } from "./policy.js";
 
 const context = { attachmentsDir: "/data/attachments" };
@@ -19,6 +19,15 @@ describe("phone policy", () => {
     expect(admitRemoteRequest("agents.availability", {}, context)).toEqual({ ok: true });
     expect(admitRemoteRequest("projects.git", { id: "p" }, context)).toEqual({ ok: true });
     expect(admitRemoteRequest("providers.limits", {}, context)).toEqual({ ok: true });
+  });
+
+  it("keeps phone access and its push key out of a phone's reach", () => {
+    expect(Object.keys(remoteRpcParams)).toEqual(expect.arrayContaining(["remote.push.setKey", "remote.push.removeKey", "remote.push.test"]));
+    for (const method of Object.keys(remoteRpcParams)) expect(isRemoteMethod(method), method).toBe(false);
+  });
+
+  it("keeps methods about the phone itself apart from every core method", () => {
+    for (const method of Object.keys(deviceRpcParams)) expect(Object.hasOwn(rpcParams, method), method).toBe(false);
   });
 
   it("keeps the Mac's full usage reports and account list off the phone", () => {

@@ -1099,3 +1099,28 @@ describe("background work", () => {
     expect(hooks.onThreadIdle).not.toHaveBeenCalled();
   });
 });
+
+describe("notification text", () => {
+  // 139 letters, then an emoji whose two UTF-16 units straddle the 140th place.
+  const reply = `${"a".repeat(139)}🚀 and more after the cut`;
+  const cut = `${"a".repeat(139)}🚀`;
+
+  it("cuts a finished turn's reply between characters, never through an emoji", async () => {
+    const thread = threads.insert(db, { projectId: project.id, title: "Release", agent: "codex", model: "fixture", mode: "act", permissionMode: "trusted" });
+    const run = await service.start({ scope: { task: null, thread }, project, agent: "codex", model: "fixture", mode: "act", permissionMode: "trusted", prompt: "Ship it", resume: false });
+    emit(run.id, { type: "session.started", runId: run.id, ts: Date.now(), agent: "codex", externalSessionId: "release", model: "fixture" });
+    emit(run.id, { type: "message.completed", runId: run.id, ts: Date.now(), messageId: "reply", role: "assistant", text: reply });
+    emit(run.id, { type: "turn.completed", runId: run.id, ts: Date.now(), turnId: "one", status: "success", durationMs: 1 });
+    await vi.waitFor(() => expect(hooks.notify).toHaveBeenCalledWith(expect.objectContaining({ kind: "finished", body: cut })));
+    await service.closeAndWait(run.id);
+  });
+
+  it("cuts a finished task's result the same way", async () => {
+    const run = await service.start(taskInput());
+    emit(run.id, { type: "session.started", runId: run.id, ts: Date.now(), agent: "codex", externalSessionId: "assignment", model: "fixture" });
+    emit(run.id, { type: "message.completed", runId: run.id, ts: Date.now(), messageId: "reply", role: "assistant", text: reply });
+    emit(run.id, { type: "turn.completed", runId: run.id, ts: Date.now(), turnId: "one", status: "success", durationMs: 1 });
+    await service.closeAndWait(run.id);
+    expect(hooks.notify).toHaveBeenCalledWith(expect.objectContaining({ kind: "task", title: "Assignment", body: cut }));
+  });
+});

@@ -108,7 +108,7 @@ it("gives a phone removed while it reconnects no usable session", async () => {
     if (typeof first === "string") throw new Error(first);
     first.close();
 
-    const reconnecting = RemoteTestClient.connect({ route: offer.routes[0]!, macKey: offer.macKey, device: first.device });
+    const reconnecting = RemoteTestClient.connect({ route: offer.routes[0]!, macKey: offer.macKey, device: first.keys });
     await sleep(300);
     core.remote.removeDevice(first.deviceId);
     const again = await reconnecting;

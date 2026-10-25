@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { Project } from "@openorc/protocol";
 import { BranchPicker } from "../components/BranchPicker";
 import { Field } from "../components/ui";
-import { pullRequestTarget } from "../lib/pull-requests";
+import { pullRequestTarget } from "@openorc/client";
 import { useRpc } from "../lib/client";
 
 export interface TargetBranch {

@@ -316,7 +316,7 @@ async function main() {
     if (method === "tasks.executionThread") return null;
     if (method === "orchestration.taskState") return null;
     if (method === "review.threadDiff" || method === "review.projectDiff" || method === "review.diff") return String(params.threadId).startsWith("orcling-") ? { ...diff, files: [], patch: "" } : diff;
-    if (method === "git.threadPushState") return { branch: "main", blocked: null, published: true, unpushedCount: 0, unpushed: [] };
+    if (method === "git.threadPushState") return { branch: "main", blocked: null, published: true, unpushedCount: 0, unpushed: [], busy: false };
     if (method === "orchestration.runtime") return team;
     if (method === "orchestration.availability") return { enabled: true, maxHierarchyDepth: 3 };
     if (method === "agents.models") return models;

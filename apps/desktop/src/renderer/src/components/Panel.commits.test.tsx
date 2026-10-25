@@ -42,7 +42,7 @@ beforeEach(() => {
   usePanelSessions.setState({ sessions: {} });
   log = [commit];
   changed = [];
-  state = { branch: "feat/bots", blocked: null, published: true, unpushedCount: 1, unpushed: [commit.sha] };
+  state = { branch: "feat/bots", blocked: null, published: true, unpushedCount: 1, unpushed: [commit.sha], busy: false };
   queryClient.clear();
   queryClient.setDefaultOptions({ queries: { retry: false, staleTime: Infinity } });
   useLayout.setState({ panelOpen: true, panelTab: "commits", panelRequest: { tab: "commits" } });

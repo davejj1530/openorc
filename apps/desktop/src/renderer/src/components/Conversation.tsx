@@ -125,7 +125,7 @@ function OwnedTaskConversation({ task, project }: { task: Task; project: Project
 function useCheckout(thread: ThreadSummary | null, project: Project) {
   const git = useProjectGit(project.id);
   const checkout = useRpc("git.threadPushState", { threadId: thread?.id ?? "" }, { enabled: Boolean(thread) && git.tracks && thread?.workspaceMode === "current", refetchInterval: 8000 });
-  const changes = useComposerChanges(thread && git.tracks ? { kind: "thread", id: thread.id, projectName: project.name } : null);
+  const changes = useComposerChanges(thread && git.tracks ? { kind: "thread", id: thread.id, projectName: project.name, thread } : null);
   return { checkout, changes, git };
 }
 

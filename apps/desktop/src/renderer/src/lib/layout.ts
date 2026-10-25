@@ -2,9 +2,9 @@ import { create } from "zustand";
 import { WORKSPACE_ID } from "@openorc/protocol";
 import type { RpcParams } from "@openorc/protocol";
 import type { FileReference } from "../../../shared/file-reference";
-import { toggleSidebarFold, type SidebarFilter } from "@openorc/client";
+import { toggleSidebarFold, type PanelTool, type SidebarFilter } from "@openorc/client";
 
-export type PanelTab = "newtab" | "orcling" | "plan" | "file" | "changes" | "tasks" | "task" | "terminal" | "browser" | "commits" | "checkpoints" | "memory" | "instructions";
+export type PanelTab = PanelTool;
 /** One turn's saved diff, opened from its change card: a team attempt's checkpoint or a thread turn's. */
 export type ChangeSelection = ({ kind: "team" } & Omit<RpcParams<"orchestration.turnChanges">, "includePatch">) | ({ kind: "thread" } & Omit<RpcParams<"threads.turnChanges">, "includePatch">);
 export type FileSelection = FileReference & { scope: RpcParams<"files.read">["scope"] };

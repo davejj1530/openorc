@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
-import { isDetachedCopy, type Project, type Task, type ThreadSummary } from "@openorc/protocol";
+import type { Project, Task, ThreadSummary } from "@openorc/protocol";
+import { comparisons, fileCount, patchStat, publishView, teamGitActions, type GitActions, type GitStep } from "@openorc/client";
 import { RefreshCw } from "../components/icons";
 import { CommitSheet } from "../components/CommitSheet";
 import { DiffStat, PanelBar, PanelBarMeta, PanelNotice } from "../components/PanelBar";
@@ -9,7 +10,6 @@ import { ConversationReview } from "./ConversationReview";
 import { FileRows } from "./FileRows";
 import { PullRequestLink } from "./ThreadPullRequest";
 import { useRpc, useRpcMutation } from "../lib/client";
-import { teamGitActions } from "../lib/team-git-actions";
 import { useThreadMutationPending } from "../lib/thread-mutations";
 import { useLayout, type WorkspaceChangesTarget } from "../lib/layout";
 
@@ -42,15 +42,16 @@ export function ChangesPanel({ thread, project, task }: { thread?: ThreadSummary
   const [notice, setNotice] = useState<string | null>(null);
   const files = diff.data?.files ?? [];
   const patch = diff.data?.patch ?? "";
-  const stat = countStat(patch);
+  const stat = patchStat(patch);
   const where = thread?.workspaceMode === "worktree" ? "this thread's worktree" : project.name;
   const actions = teamGitActions(team, runtime);
   const threadMutationPending = useThreadMutationPending(thread?.id ?? "");
   const busy = commit.isPending || (team && threadMutationPending);
-  const canCommit = actions.commit.allowed && !uncommitted.isError && (uncommitted.data?.files.length ?? 0) > 0 && !busy;
+  const step = commitStep({ thread, project, uncommitted, team: actions, committing: commit.isPending });
+  const canCommit = step !== null && !step.reason && !busy;
   const commitReason = actions.commit.allowed ? null : actions.commit.reason;
   // A pull request's copy under review is someone else's code: it is read, never committed.
-  const commits = !thread || Boolean(thread.teamInstanceId) || !isDetachedCopy(thread);
+  const commits = step !== null;
   const refresh = () => {
     void diff.refetch();
     if (thread && comparison !== "head") void headDiff.refetch();
@@ -118,7 +119,7 @@ export function ChangesPanel({ thread, project, task }: { thread?: ThreadSummary
         meta={
           <>
             <PanelBarMeta>{fileCount(files.length)}</PanelBarMeta>
-            <DiffStat add={stat.add} del={stat.del} />
+            <DiffStat add={stat.insertions} del={stat.deletions} />
           </>
         }
       >
@@ -135,12 +136,12 @@ export function ChangesPanel({ thread, project, task }: { thread?: ThreadSummary
               if (!busy) setCommitOpen(open);
             }}
             trigger={
-              <Button variant="primary" disabled={!canCommit} title={actions.commit.reason ?? undefined}>
+              <Button variant="primary" disabled={!canCommit} title={step?.reason ?? undefined}>
                 Commit
               </Button>
             }
             title="Commit changes"
-            summary={<CommitSummary files={uncommitted.data?.files.length ?? 0} stat={countStat(uncommitted.data?.patch ?? "")} />}
+            summary={<CommitSummary files={uncommitted.data?.files.length ?? 0} stat={patchStat(uncommitted.data?.patch ?? "")} />}
             message={message}
             onMessageChange={setMessage}
             busy={busy}
@@ -181,31 +182,36 @@ export function ChangesPanel({ thread, project, task }: { thread?: ThreadSummary
   );
 }
 
-const comparisons = [
-  { value: "head", label: "Uncommitted" },
-  { value: "base", label: "Branch" },
-] as const;
-
-const fileCount = (count: number) => `${count} ${count === 1 ? "file" : "files"}`;
+/**
+ * Commit as publishView sees it: a thread's step with its reasons, the agent's work among them. A checkout outside a
+ * conversation commits whenever it has changes.
+ */
+function commitStep({
+  thread,
+  project,
+  uncommitted,
+  team,
+  committing,
+}: {
+  thread: ThreadSummary | undefined;
+  project: Project;
+  uncommitted: { isError: boolean; data?: { files: unknown[] } };
+  team: GitActions;
+  committing: boolean;
+}): GitStep | null {
+  let read: "failed" | "loading" | { files: number } = "loading";
+  if (uncommitted.isError) read = "failed";
+  else if (uncommitted.data) read = { files: uncommitted.data.files.length };
+  if (!thread) return { label: "Commit", reason: typeof read === "object" && read.files > 0 ? null : "Nothing to commit.", running: committing };
+  return publishView({ thread, project, uncommitted: read, push: { state: undefined, error: null }, gh: undefined, team, running: committing ? "commit" : null, offline: null }).commit;
+}
 
 /** What a commit takes: its files and line counts, under the sheet's title. */
-export function CommitSummary({ files, stat }: { files: number; stat: { add: number; del: number } }) {
+export function CommitSummary({ files, stat }: { files: number; stat: { insertions: number; deletions: number } }) {
   return (
     <span className="inline-flex items-center gap-2">
       {fileCount(files)}
-      <DiffStat add={stat.add} del={stat.del} />
+      <DiffStat add={stat.insertions} del={stat.deletions} />
     </span>
   );
-}
-
-/** Added and removed line counts straight from the patch, so the header never disagrees with the diff. */
-export function countStat(patch: string): { add: number; del: number } {
-  let add = 0;
-  let del = 0;
-  for (const line of patch.split("\n")) {
-    if (line.startsWith("+++") || line.startsWith("---")) continue;
-    if (line.startsWith("+")) add += 1;
-    else if (line.startsWith("-")) del += 1;
-  }
-  return { add, del };
 }

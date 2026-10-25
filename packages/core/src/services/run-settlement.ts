@@ -1,9 +1,10 @@
 import { realpath } from "node:fs/promises";
-import { checkpoints, runCosts, runs, snapshots, tasks, threads, type Db, type LedgerWriter } from "@openorc/db";
+import { checkpoints, redact, runCosts, runs, snapshots, tasks, threads, type Db, type LedgerWriter } from "@openorc/db";
 import { diffStat, pinObject, treeHash, worktree } from "@openorc/git";
 import type { Project, Run, Task, Thread } from "@openorc/protocol";
 import type { OpenOrcMcpServer } from "@openorc/mcp";
 import { checkpointRefs, snapshotRefs } from "./checkpoint-refs.js";
+import { noticeLine } from "./notice-text.js";
 import { projectGit } from "./project-git.js";
 import type { McpAppService } from "./mcp-apps.js";
 import type { Logger } from "../transport.js";
@@ -16,6 +17,9 @@ export function isSessionLost(message: string | null): boolean {
     message,
   );
 }
+
+/** A reply as one line, short enough for a notification. */
+const noticeBody = (text: string) => noticeLine(text, 140);
 
 /** Captures completed work and releases the process/lease after its event barrier. */
 interface RunSettlementDependencies {
@@ -96,7 +100,7 @@ export class RunSettlement {
     this.deps.invalidate([...this.deps.keysFor(entry.scope), `checkpoints:${thread.id}`, `threaddiff:${thread.id}`, `projectgit:${project.id}`]);
     const reply = turn.resultText ?? entry.reply;
     this.deps.hooks.onThreadTurn(thread, { prompt: entry.prompt, reply });
-    if (turn.status === "success") this.deps.notifyFor(entry.scope, "finished", thread.title, reply ? reply.replace(/\s+/g, " ").slice(0, 140) : "The agent finished its turn.");
+    if (turn.status === "success") this.deps.notifyFor(entry.scope, "finished", thread.title, reply ? noticeBody(reply) : "The agent finished its turn.");
     else if (turn.status !== "cancelled") this.deps.notifyFor(entry.scope, "error", thread.title, entry.failed ?? "The turn failed.");
   }
 
@@ -181,7 +185,7 @@ export class RunSettlement {
   private notifyInitialFailure(entry: LiveRun, error: string | null): void {
     if (!error || entry.turns !== 0) return;
     this.deps.log.warn(`run ${entry.run.id} failed: ${error}`);
-    const body = isSessionLost(error) ? "The provider no longer has this session. Start a fresh one from the thread." : (error.split("\n")[0] ?? "The run failed.");
+    const body = isSessionLost(error) ? "The provider no longer has this session. Start a fresh one from the thread." : (redact(error).text.split("\n")[0] ?? "The run failed.");
     this.deps.notifyFor(entry.scope, "error", this.deps.scopeTitle(entry.scope), body);
   }
 
@@ -195,7 +199,7 @@ export class RunSettlement {
     const task = entry.scope.task;
     if (!finished || entry.scope.comment || (entry.turns === 0 && !task) || this.deps.isClosing()) return;
     if (task) {
-      const body = finished.resultText ? finished.resultText.replace(/\s+/g, " ").slice(0, 140) : "The task finished and reported back.";
+      const body = finished.resultText ? noticeBody(finished.resultText) : "The task finished and reported back.";
       this.deps.notifyFor(entry.scope, "task", task.title, body);
     }
     this.deps.hooks.onRunFinished(finished, entry.scope, project);

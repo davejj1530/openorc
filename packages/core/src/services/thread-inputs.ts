@@ -1,4 +1,6 @@
+import { redact } from "@openorc/db";
 import type { AgentKind, PermissionPreset, RunMode, TaskPriority, WorkspaceMode } from "@openorc/protocol";
+import { leadingText } from "./notice-text.js";
 
 export interface StartThreadInput {
   claudeAccountId?: string;
@@ -50,12 +52,15 @@ export interface ThreadPatch {
   prUrl?: string | null;
 }
 
-/** The first line of the prompt makes a fine title until the user renames the thread. */
+/**
+ * The first line of the prompt makes a fine title until the user renames the thread. Its secrets are masked before the
+ * cut, which could otherwise leave part of a token no rule recognizes, in the thread's name and its notices.
+ */
 export function titleFromPrompt(prompt: string): string {
   const line =
-    prompt
-      .split("\n")
+    redact(prompt)
+      .text.split("\n")
       .find((l) => l.trim().length > 0)
       ?.trim() ?? "New thread";
-  return line.length > 72 ? `${line.slice(0, 71).trimEnd()}…` : line;
+  return leadingText(line, 72) === line ? line : `${leadingText(line, 71).trimEnd()}…`;
 }

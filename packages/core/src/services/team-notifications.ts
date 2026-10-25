@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { orchestration, teamDeletedThreads, teamNotifications, teamRuntime, teamTasks, threads, type Db } from "@openorc/db";
 import type { AgentEvent, TeamActorRecord, TeamExecutionRecord } from "@openorc/protocol";
+import { noticeLine } from "./notice-text.js";
 import type { Notification, RunService } from "./runs.js";
 
 type ApprovalEvent = Extract<AgentEvent, { type: "approval.requested" }>;
@@ -134,5 +135,5 @@ export class TeamNotificationService {
 }
 
 function clip(text: string): string {
-  return text.replace(/\s+/g, " ").slice(0, 180);
+  return noticeLine(text, 180);
 }

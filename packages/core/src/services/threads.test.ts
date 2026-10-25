@@ -648,6 +648,12 @@ describe("threads", () => {
     }
   });
 
+  it("titles a thread from its prompt's first line, cut between characters, never through an emoji or a secret", () => {
+    expect(titleFromPrompt(`${"a".repeat(70)}🚀🚀`)).toBe(`${"a".repeat(70)}🚀🚀`);
+    expect(titleFromPrompt(`${"a".repeat(70)}🚀🚀 and more`)).toBe(`${"a".repeat(70)}🚀…`);
+    expect(titleFromPrompt(`${"a".repeat(50)} ghp_${"b".repeat(36)} to push`)).toBe(`${"a".repeat(50)} [redacted:github-tok…`);
+  });
+
   it("names a thread from its first exchange while the title is still the prompt's first line", async () => {
     const prompt = "Add CSV export\nwith filters";
     const thread = threads.insert(core.db, { projectId: project.id, title: titleFromPrompt(prompt), agent: "codex", model: null, mode: "act", permissionMode: "trusted" });

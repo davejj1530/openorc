@@ -22,9 +22,20 @@ vi.mock("expo-router", () => ({
 
 const studio = { id: "studio", name: "Studio", routes: [], lastRoute: null };
 const laptop = { id: "laptop", name: "Laptop", routes: [], lastRoute: null };
-const phone = vi.hoisted(() => ({ state: null as LinkState | null, macs: [] as unknown[], forgot: [] as string[], saved: new Map<string, string>() }));
+const phone = vi.hoisted(() => ({
+  state: null as LinkState | null,
+  macs: [] as unknown[],
+  forgot: [] as string[],
+  saved: new Map<string, string>(),
+  alerts: { permission: "granted", prefs: { choice: "all", sound: true }, senders: new Map() },
+}));
 vi.mock("../client", () => ({
-  link: { select: () => undefined, retry: () => Promise.resolve(), forget: (id: string) => void phone.forgot.push(id) },
+  link: { select: () => undefined, retry: () => Promise.resolve() },
+  alerts: {
+    subscribe: () => () => undefined,
+    getState: () => phone.alerts,
+    forget: (id: string) => void phone.forgot.push(id),
+  },
   useLinkState: () => phone.state,
   useSavedMacs: () => phone.macs,
   storage: {

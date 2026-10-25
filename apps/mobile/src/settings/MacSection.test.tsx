@@ -40,7 +40,9 @@ vi.mock("../client", () => {
     retry: () => (phone.retried++, Promise.resolve()),
     forget: (id: string) => void phone.forgot.push(id),
   };
-  return { link, useLinkState: () => phone.state, useSavedMacs: () => [studio, laptop] };
+  // Alerts stop that Mac's notices, then forget it through the link.
+  const alerts = { forget: async (id: string) => link.forget(id) };
+  return { link, alerts, useLinkState: () => phone.state, useSavedMacs: () => [studio, laptop] };
 });
 
 const connected: LinkState = { kind: "connected", mac: studio, route: { kind: "lan", host: "studio.local", port: 1 }, serial: 1 };

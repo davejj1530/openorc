@@ -1,6 +1,6 @@
 import type { ClientPush, CoreConnection } from "@openorc/client";
 import type { MacMessage, PhoneSession } from "@openorc/link";
-import type { AssetRef, RemotePush, RpcMethod, RpcParams, RpcResults } from "@openorc/protocol";
+import type { AssetRef, DeviceMethod, DeviceParams, DeviceRpcResults, RemotePush, RpcMethod, RpcParams, RpcResults } from "@openorc/protocol";
 import type { Clock } from "./route-race";
 
 /** What the Mac sends that the connection, not the session's owner, handles. */
@@ -76,14 +76,12 @@ export class LinkConnection implements CoreConnection {
   ) {}
 
   call<M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> {
-    return this.withSession(
-      (session) =>
-        new Promise<RpcResults[M]>((resolve, reject) => {
-          const id = this.id();
-          this.pending.set(id, { session, resolve: resolve as (value: unknown) => void, reject });
-          session.send({ t: "rpc", id, method, params });
-        }),
-    );
+    return this.rpc(method, params) as Promise<RpcResults[M]>;
+  }
+
+  /** A method about this phone itself, which the Mac's session answers for this phone alone. */
+  device<M extends DeviceMethod>(method: M, params: DeviceParams<M>): Promise<DeviceRpcResults[M]> {
+    return this.rpc(method, params) as Promise<DeviceRpcResults[M]>;
   }
 
   /** The bytes behind an image the transcript names. */
@@ -169,6 +167,17 @@ export class LinkConnection implements CoreConnection {
       this.drains.set(session, done);
       this.checkDrains();
     });
+  }
+
+  private rpc(method: string, params: unknown): Promise<unknown> {
+    return this.withSession(
+      (session) =>
+        new Promise((resolve, reject) => {
+          const id = this.id();
+          this.pending.set(id, { session, resolve, reject });
+          session.send({ t: "rpc", id, method, params });
+        }),
+    );
   }
 
   private withSession<T>(send: (session: PhoneSession) => Promise<T>): Promise<T> {

@@ -15,6 +15,10 @@ import type { NetworkKind, SavedMac } from "./connection/saved-macs";
 import { forgetFolds } from "./home/fold-keys";
 import { forgetLists, keepLists, restoreLists } from "./lists-cache";
 import { followMacLook } from "./look/look";
+import { PhoneAlerts } from "./notifications/alerts";
+import { presentationFor } from "./notifications/foreground";
+import { handleAlerts, pushPlatform } from "./notifications/native";
+import { threadOnScreen } from "./notifications/on-screen";
 import { timeFrame } from "./thread/perf-probe";
 
 /** The app's own key-value store: saved Macs, lists Home paints from on a cold start, drafts. */
@@ -47,6 +51,9 @@ export const client = createClientState(link.connection, {
   savesDefaultPermission: false,
 });
 
+/** Which alerts this phone wants from each Mac, told to the shown one on every session and at once on a change. */
+export const alerts = new PhoneAlerts({ link, platform: pushPlatform, storage });
+
 const assets = createAssetCache((ref) => link.connection.asset(ref), phoneCrypto.sha256);
 
 const macOf = (state: LinkState) => (state.kind === "unpaired" ? null : state.mac.id);
@@ -75,9 +82,15 @@ const networkKinds: Partial<Record<NetworkStateType, NetworkKind>> = {
 const networkKind = (state: NetworkState): NetworkKind => (state.isConnected === false ? "none" : (networkKinds[state.type ?? NetworkStateType.UNKNOWN] ?? "other"));
 
 link.start("other");
+alerts.start();
+handleAlerts((data) => presentationFor(data, link.getState(), threadOnScreen()));
 void getNetworkStateAsync().then((state) => link.setNetwork(networkKind(state)));
 addNetworkStateListener((state) => link.setNetwork(networkKind(state)));
-AppState.addEventListener("change", (state) => link.appState(state === "background" ? "background" : "active"));
+AppState.addEventListener("change", (state) => {
+  link.appState(state === "background" ? "background" : "active");
+  // iOS Settings may have changed alerts while the app was away.
+  if (state === "active") void alerts.refresh();
+});
 
 /** The Mac this phone shows, or null while none is paired. */
 export const shownMacId = (): string | null => shownMac;

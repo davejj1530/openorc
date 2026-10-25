@@ -1,7 +1,7 @@
 import { router } from "expo-router";
 import { Fragment, useState, type ReactNode } from "react";
 import { Alert } from "react-native";
-import { link, useSavedMacs } from "../client";
+import { alerts, link, useSavedMacs } from "../client";
 import type { LinkState, MacName } from "../connection/manager";
 import type { SavedMac } from "../connection/saved-macs";
 import { useLinkWords } from "../connection/use-link-words";
@@ -22,7 +22,7 @@ const pressable = cn(rowClass, "active:bg-surface-2");
 function confirmForget(mac: MacName): void {
   Alert.alert(`Forget ${mac.name}?`, "To connect again, scan a new code on your Mac.", [
     { text: "Cancel", style: "cancel" },
-    { text: "Forget", style: "destructive", onPress: () => void link.forget(mac.id) },
+    { text: "Forget", style: "destructive", onPress: () => void alerts.forget(mac.id) },
   ]);
 }
 

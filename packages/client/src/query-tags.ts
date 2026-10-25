@@ -58,6 +58,7 @@ const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
   "slack.status": ["slack"],
   "remote.status": ["remote"],
   "system.info": ["system"],
+  "system.gh": ["system"],
   "agents.availability": ["system", "claude-accounts"],
   "agents.updates.get": ["agent-updates"],
   "providers.usage": ["provider-usage", "system", "settings"],
@@ -111,7 +112,8 @@ const idReadTags: MethodRules = {
   "threads.checkpoints": (p) => [`checkpoints:${String(p["id"])}`],
   "threads.importable": (p) => ["threads", `importable:${String(p["projectId"])}`],
   "runs.listForThread": (p) => [`runs:thread:${String(p["threadId"])}`],
-  "review.threadDiff": (p) => ["workspace-diff", `threaddiff:${String(p["threadId"])}`, `thread:${String(p["threadId"])}`],
+  // The phone's list and single-file reads of the same changes refresh with the full diff.
+  ...each(["review.threadDiff", "review.threadChanges", "review.threadFileDiff"], (p) => ["workspace-diff", `threaddiff:${String(p["threadId"])}`, `thread:${String(p["threadId"])}`]),
   // A checkout's branch moves with commits and pushes made anywhere, so these refresh with workspace-diff too.
   ...each(["git.threadLog", "git.threadPushState"], (p) => ["workspace-diff", `threadlog:${String(p["threadId"])}`, `thread:${String(p["threadId"])}`]),
   ...each(["git.projectLog", "git.projectPushState"], (p) => ["workspace-diff", `projectlog:${String(p["projectId"])}`]),

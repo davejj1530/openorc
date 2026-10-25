@@ -63,7 +63,7 @@ let pushError: Error | null;
 let teamReason: string | null;
 
 beforeEach(() => {
-  state = { branch: "site-refresh", blocked: null, published: true, unpushedCount: 1, unpushed: [commits[0]!.sha] };
+  state = { branch: "site-refresh", blocked: null, published: true, unpushedCount: 1, unpushed: [commits[0]!.sha], busy: false };
   pushError = null;
   teamReason = null;
   queryClient.clear();
@@ -128,7 +128,7 @@ it("publishes a branch origin doesn't have yet", async () => {
 });
 
 it("says why it can't push", async () => {
-  state = { branch: "site-refresh", blocked: "This repository has no origin remote to push to.", published: false, unpushedCount: 0, unpushed: [] };
+  state = { branch: "site-refresh", blocked: "This repository has no origin remote to push to.", published: false, unpushedCount: 0, unpushed: [], busy: false };
   mount();
   expect(await screen.findByText("This repository has no origin remote to push to.")).toBeTruthy();
   expect(screen.queryByRole("button", { name: /^Push|^Publish/ })).toBeNull();
@@ -180,7 +180,7 @@ it("targets the branch the thread started from, and opens the pull request into 
 });
 
 it("never offers a pull request from the default branch", async () => {
-  state = { branch: "main", blocked: null, published: true, unpushedCount: 0, unpushed: [] };
+  state = { branch: "main", blocked: null, published: true, unpushedCount: 0, unpushed: [], busy: false };
   mount();
   await waitFor(() => expect(queryClient.getQueryData(["git.threadPushState", { threadId: thread.id }])).toEqual(state));
   expect(screen.queryByRole("button", { name: "PR" })).toBeNull();

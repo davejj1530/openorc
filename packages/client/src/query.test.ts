@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fileReads, type RpcMethod } from "@openorc/protocol";
+import { fileReads, type FolderPath, type RpcMethod } from "@openorc/protocol";
 import { QueryObserver } from "@tanstack/react-query";
 import { invalidatesFor, tagsFor } from "./query-tags.js";
 import { testClient } from "./test-fixtures/fake-connection.js";
@@ -148,6 +148,16 @@ describe("query cache tags", () => {
       "remote.status",
     ];
     for (const read of reads) expect(tagsFor(read, params).length, `${read} has no tag`).toBeGreaterThan(0);
+  });
+
+  it("refreshes a thread's change list and file diffs with its full diff, and gh with the system", () => {
+    const diff = tagsFor("review.threadDiff", { threadId: "t1" }).sort();
+    expect(tagsFor("review.threadChanges", { threadId: "t1", comparison: "head" }).sort()).toEqual(diff);
+    expect(tagsFor("review.threadFileDiff", { threadId: "t1", path: "src/app.ts" as FolderPath }).sort()).toEqual(diff);
+    expect(tagsFor("system.gh", {})).toEqual(["system"]);
+    for (const write of ["review.commitThread", "review.pushThread", "review.createThreadPr"] as const) {
+      expect(invalidatesFor(write, { threadId: "t1" } as never), write).toEqual(expect.arrayContaining([`threaddiff:t1`]));
+    }
   });
 
   it("rereads a phone's plan limits when usage, accounts or CLIs change, but not for a palette changed on the Mac", () => {

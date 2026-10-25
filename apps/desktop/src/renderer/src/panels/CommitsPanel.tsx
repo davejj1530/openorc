@@ -1,12 +1,11 @@
 import { useState, type ReactNode } from "react";
-import type { Commit, Project, PushState, Task, TeamActionAvailability, ThreadSummary } from "@openorc/protocol";
+import type { Commit, Project, PushState, Task, ThreadSummary } from "@openorc/protocol";
 import { Upload } from "../components/icons";
 import { Badge, Button, Empty } from "../components/ui";
 import { PanelBar, PanelNotice } from "../components/PanelBar";
 import { useRpc, useRpcMutation } from "../lib/client";
-import { teamGitActions } from "../lib/team-git-actions";
 import { useThreadMutationPending } from "../lib/thread-mutations";
-import { relativeTime, shortSha } from "@openorc/client";
+import { hasUnpushed, heldNotice, publishView, pushLabel, relativeTime, shortSha, teamGitActions, type GitStep, type PublishInput } from "@openorc/client";
 import { ThreadPullRequest } from "./ThreadPullRequest";
 
 /** A task's branch, a thread's workspace, or the project's checkout outside any conversation. */
@@ -78,60 +77,72 @@ function CommitList({ commits, unpushed }: { commits: Commit[]; unpushed: Readon
 
 type PushOutcome = { onSuccess: (r: { remote: string; branch: string }) => void; onError: (e: Error) => void };
 
+/** Which of a thread's publish steps is running, for publishView. */
+function runningStep(pushing: boolean, opening: boolean): PublishInput["running"] {
+  if (pushing) return "push";
+  return opening ? "pr" : null;
+}
+
 /** A thread's Push, and its pull request once the branch is on origin. A team's work waits for the team's go-ahead. */
 function ThreadPushBar({ thread, project, state, error }: { thread: ThreadSummary; project: Project; state: PushState | undefined; error: Error | null }) {
   const team = Boolean(thread.teamInstanceId);
   const runtime = useRpc("orchestration.runtime", { threadId: thread.id }, { enabled: team, refetchInterval: 8000 });
+  const info = useRpc("system.info", {});
   const push = useRpcMutation("review.pushThread");
   const pr = useRpcMutation("review.createThreadPr");
   const threadMutationPending = useThreadMutationPending(thread.id);
   const actions = teamGitActions(team, runtime);
   const busy = push.isPending || pr.isPending || (team && threadMutationPending);
+  const view = publishView({
+    thread,
+    project,
+    uncommitted: { files: 0 },
+    push: { state, error: error?.message ?? null },
+    gh: info.data?.gh.installed,
+    team: actions,
+    running: runningStep(push.isPending, pr.isPending),
+    offline: null,
+  });
   return (
     <PushBar
       state={state}
-      error={error}
-      action={actions.push}
+      step={view.push}
+      reason={view.pushBlocked ?? actions.push.reason}
       busy={busy}
-      pushing={push.isPending}
       onPush={(outcome) => push.mutate({ threadId: thread.id }, outcome)}
-      pullRequest={(onOpened) => <ThreadPullRequest thread={thread} project={project} pr={pr} action={actions.createPr} busy={busy} head={pullRequestHead(state, project)} onOpened={onOpened} />}
+      pullRequest={(onOpened) => <ThreadPullRequest thread={thread} project={project} pr={pr} step={view.pullRequest} busy={busy} onOpened={onOpened} />}
     />
   );
 }
 
-const anyone: TeamActionAvailability = { allowed: true, reason: null };
-
 /** Push for the checkout's branch outside a conversation, such as after committing from a new thread's Changes. */
 function CheckoutPushBar({ project, state, error }: { project: Project; state: PushState | undefined; error: Error | null }) {
   const push = useRpcMutation("review.pushProject");
-  return <PushBar state={state} error={error} action={anyone} busy={push.isPending} pushing={push.isPending} onPush={(outcome) => push.mutate({ projectId: project.id }, outcome)} />;
+  const reason = error?.message ?? state?.blocked ?? null;
+  const step = hasUnpushed(state) && !state?.blocked ? { label: pushLabel(state, push.isPending), reason, running: push.isPending } : null;
+  return <PushBar state={state} step={step} reason={reason} busy={push.isPending} onPush={(outcome) => push.mutate({ projectId: project.id }, outcome)} />;
 }
 
 /** Push, shown once origin lacks a commit, then what it or the pull request did. */
 function PushBar({
   state,
-  error,
-  action,
+  step,
+  reason,
   busy,
-  pushing,
   onPush,
   pullRequest,
 }: {
   state: PushState | undefined;
-  error: Error | null;
-  action: TeamActionAvailability;
+  /** publishView's push step; null when there is nothing to push or pushing is blocked. */
+  step: GitStep | null;
+  /** Why nothing can be pushed, or why a team's push waits. */
+  reason: string | null;
   busy: boolean;
-  pushing: boolean;
   onPush: (outcome: PushOutcome) => void;
   pullRequest?: (onOpened: (url: string) => void) => ReactNode;
 }) {
   const [notice, setNotice] = useState<{ message: string; error?: boolean } | null>(null);
-  const reason = error?.message ?? state?.blocked ?? action.reason;
-  const pending = hasUnpushed(state);
-  const canPush = action.allowed && !reason && !busy;
-  // A success holds until new commits arrive; a failure until nothing is left to push.
-  const shown = notice && (notice.error ? pending : !pending) ? notice : null;
+  const shown = heldNotice(notice, hasUnpushed(state));
   const pushNow = () => {
     setNotice(null);
     onPush({ onSuccess: (r) => setNotice({ message: `Pushed ${r.branch} to ${r.remote}` }), onError: (e) => setNotice({ message: e.message, error: true }) });
@@ -139,9 +150,9 @@ function PushBar({
   return (
     <>
       <PanelBar title="Commits">
-        {pending && !state?.blocked ? (
-          <Button variant="primary" disabled={!canPush} title={state?.branch ? `Push ${state.branch} to origin` : undefined} onClick={pushNow}>
-            <Upload size={14} /> {pushLabel(state, pushing)}
+        {step ? (
+          <Button variant="primary" disabled={Boolean(step.reason) || busy} title={step.reason ?? (state?.branch ? `Push ${state.branch} to origin` : undefined)} onClick={pushNow}>
+            <Upload size={14} /> {step.label}
           </Button>
         ) : null}
         {pullRequest?.((url) => setNotice({ message: `Opened ${url}` }))}
@@ -154,23 +165,4 @@ function PushBar({
       ) : null}
     </>
   );
-}
-
-/** The branch a pull request would open from now: its own, on origin with every commit. Null until then, or on the default branch. */
-function pullRequestHead(state: PushState | undefined, project: Project): string | null {
-  if (!state?.branch || state.blocked || hasUnpushed(state) || state.branch === (project.defaultBranch ?? "main")) return null;
-  return state.branch;
-}
-
-/** Whether origin lacks the branch or some of its commits. */
-function hasUnpushed(state: PushState | undefined): boolean {
-  return Boolean(state && (state.unpushedCount > 0 || !state.published));
-}
-
-/** "Push 2 commits" while origin lacks some, "Publish branch" until origin has the branch at all. */
-function pushLabel(state: PushState | undefined, pushing: boolean): string {
-  if (state && !state.published && !state.blocked) return pushing ? "Publishing…" : "Publish branch";
-  if (pushing) return "Pushing…";
-  const count = state?.unpushedCount ?? 0;
-  return count > 0 ? `Push ${count} ${count === 1 ? "commit" : "commits"}` : "Push";
 }

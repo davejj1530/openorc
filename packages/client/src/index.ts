@@ -10,6 +10,26 @@ export { composerActions, messageBody, planSubmit, processFit, type ComposerActi
 export { patchStat } from "./diff-stat.js";
 export type { SavedThreadSettings } from "./conversation-settings.js";
 export { editedPaths } from "./edited-paths.js";
+export {
+  comparisons,
+  compareUrl,
+  fileCount,
+  fileMarks,
+  type FileMarkTone,
+  type GitActions,
+  type GitStep,
+  hasUnpushed,
+  heldNotice,
+  type PublishInput,
+  publishView,
+  type PublishView,
+  pullRequestHead,
+  type PullRequestStep,
+  pullRequestTarget,
+  pushLabel,
+  teamGitActions,
+} from "./git-actions.js";
+export { panelToolLabels, type PanelTool, type PanelToolContext, tabsFor } from "./panel-tools.js";
 export { citationLinks } from "./file-citations.js";
 export { isImageGeneration, isImageView } from "./image-activity.js";
 export {

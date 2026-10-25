@@ -3,12 +3,11 @@ import type { Project, Task } from "@openorc/protocol";
 import { Send } from "../components/icons";
 import { Button, Empty, TextButton } from "../components/ui";
 import { DiffStat, PanelBar, PanelBarMeta, PanelNotice } from "../components/PanelBar";
-import { countStat } from "./ChangesPanel";
 import { FileRows } from "./FileRows";
 import { ReviewCommentList } from "./ReviewCommentList";
 import { cn } from "../lib/cn";
 import { useRpc, useRpcMutation } from "../lib/client";
-import { relativeTime } from "@openorc/client";
+import { patchStat, relativeTime } from "@openorc/client";
 import { taskPublicationBlockedReason } from "../lib/task-review-availability";
 import { ReviewPublication } from "./ReviewPublication";
 import { useTaskReviewComments } from "./useTaskReviewComments";
@@ -93,7 +92,7 @@ function TaskReview({ task, project }: { task: Task; project: Project }) {
   });
   const files = diff.data?.files ?? [];
   const patch = diff.data?.patch ?? "";
-  const stat = countStat(patch);
+  const stat = patchStat(patch);
   const blockedAction = blockedReviewAction({ team, taskId: task.id, ownershipError: ownership.isError, retry: () => void ownership.refetch() });
   let diffContent: ReactNode = null;
   if (diff.error) diffContent = <Empty title="Could not read the diff">{diff.error.message}</Empty>;
@@ -137,7 +136,7 @@ function TaskReview({ task, project }: { task: Task; project: Project }) {
             <PanelBarMeta>
               {files.length} {files.length === 1 ? "file" : "files"}
             </PanelBarMeta>
-            <DiffStat add={stat.add} del={stat.del} />
+            <DiffStat add={stat.insertions} del={stat.deletions} />
           </>
         }
       >

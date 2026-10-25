@@ -5,7 +5,7 @@ import { windowPorts } from "./reply";
 import { join } from "node:path";
 import { Worker } from "node:worker_threads";
 import type { MessagePortMain } from "electron";
-import { OpenOrc, WorkerEmbedder, WorkerFormatter, type Broadcast, type EnvSnapshot, type RpcReply, type Transport } from "@openorc/core";
+import { OpenOrc, WorkerEmbedder, WorkerFormatter, type Broadcast, type EnvSnapshot, type RequestOrigin, type RpcReply, type Transport } from "@openorc/core";
 import type { RpcRequest } from "@openorc/protocol";
 
 /**
@@ -75,12 +75,15 @@ function attach(port: MessagePortMain): void {
   if (lastStatus) port.postMessage(lastStatus);
 }
 
-/** Counted from the moment a request arrives, with no await before, so an update never fences one mid-flight. */
-async function answer(request: RpcRequest): Promise<RpcReply> {
+/**
+ * Counted from the moment a request arrives, with no await before, so an update never fences one mid-flight. Only a
+ * phone's session passes an origin; a window's request has none.
+ */
+async function answer(request: RpcRequest, origin?: RequestOrigin): Promise<RpcReply> {
   if (closing) return { type: "rpc.error", id: request.id, message: "OpenOrc is restarting to update. Please wait." };
   pendingRequests++;
   try {
-    return await (await corePromise).handle(request);
+    return await (await corePromise).handle(request, origin);
   } finally {
     pendingRequests--;
   }

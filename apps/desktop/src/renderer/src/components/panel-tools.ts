@@ -1,4 +1,5 @@
-import { WORKSPACE_ID, isDetachedCopy, type Project, type Task, type ThreadSummary } from "@openorc/protocol";
+import { WORKSPACE_ID, type Project, type Task, type ThreadSummary } from "@openorc/protocol";
+import { panelToolLabels } from "@openorc/client";
 import type { FileSelection, PanelTab } from "../lib/layout";
 import { pageType, type PanelPage } from "../lib/panel-tabs";
 import { fileIcon } from "./FileGlyph";
@@ -11,19 +12,19 @@ export type PanelContext =
   | { kind: "newthread"; project: Project; workingDirectory: string; changes: boolean };
 
 export const panelTools = {
-  newtab: { label: "New tab", icon: Globe },
-  browser: { label: "Preview", icon: Globe },
-  changes: { label: "Changes", icon: FileDiff },
-  terminal: { label: "Terminal", icon: Terminal },
-  file: { label: "Files", icon: Folder },
-  plan: { label: "Plan", icon: FileText },
-  tasks: { label: "Tasks", icon: ListTodo },
-  task: { label: "Task details", icon: SlidersHorizontal },
-  commits: { label: "Commits", icon: GitCommitHorizontal },
-  checkpoints: { label: "Checkpoints", icon: History },
-  memory: { label: "Memory", icon: Brain },
-  instructions: { label: "Instructions", icon: BookText },
-  orcling: { label: "Orcling", icon: Orcling },
+  newtab: { label: panelToolLabels.newtab, icon: Globe },
+  browser: { label: panelToolLabels.browser, icon: Globe },
+  changes: { label: panelToolLabels.changes, icon: FileDiff },
+  terminal: { label: panelToolLabels.terminal, icon: Terminal },
+  file: { label: panelToolLabels.file, icon: Folder },
+  plan: { label: panelToolLabels.plan, icon: FileText },
+  tasks: { label: panelToolLabels.tasks, icon: ListTodo },
+  task: { label: panelToolLabels.task, icon: SlidersHorizontal },
+  commits: { label: panelToolLabels.commits, icon: GitCommitHorizontal },
+  checkpoints: { label: panelToolLabels.checkpoints, icon: History },
+  memory: { label: panelToolLabels.memory, icon: Brain },
+  instructions: { label: panelToolLabels.instructions, icon: BookText },
+  orcling: { label: panelToolLabels.orcling, icon: Orcling },
 } satisfies Record<PanelTab, { label: string; icon: typeof Globe }>;
 
 export function panelScope(context: PanelContext): string {
@@ -53,18 +54,7 @@ export function panelFileScope(context: PanelContext): FileSelection["scope"] {
 }
 
 /** Available tools are launchers, never tabs opened on the user's behalf. */
-export function tabsFor(context: PanelContext): PanelTab[] {
-  if (context.kind === "project") return ["changes", "file"];
-  if (context.kind === "newthread") return [...(context.changes ? (["changes"] as const) : []), "terminal", "file", ...(context.changes ? (["commits"] as const) : []), "memory"];
-  if (context.kind === "task") return context.project.id === WORKSPACE_ID ? ["terminal", "file", "task", "memory"] : ["changes", "terminal", "file", "task", "commits", "memory"];
-  const tools: PanelTab[] =
-    context.project.id === WORKSPACE_ID
-      ? ["terminal", "file", "tasks", "plan", "memory", "instructions"]
-      : ["changes", "terminal", "file", "plan", "tasks", "checkpoints", "commits", "memory", "instructions"];
-  if (isDetachedCopy(context.thread)) tools.splice(tools.indexOf("commits"), tools.includes("commits") ? 1 : 0);
-  if (context.thread.orclingId) tools.push("orcling");
-  return tools;
-}
+export { tabsFor } from "@openorc/client";
 
 export function pageHost(url: string): string {
   try {

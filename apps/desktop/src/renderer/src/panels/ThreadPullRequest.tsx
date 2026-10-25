@@ -1,18 +1,10 @@
 import { useState } from "react";
-import type { Project, TeamActionAvailability, Thread, ThreadSummary } from "@openorc/protocol";
+import type { Project, TeamActionAvailability, ThreadSummary } from "@openorc/protocol";
+import type { PullRequestStep } from "@openorc/client";
 import { GitPullRequest } from "../components/icons";
 import { Button, Dialog, Field, Input, Textarea } from "../components/ui";
 import { useRpc, type useRpcMutation } from "../lib/client";
 import { TargetBranchField, useTargetBranch } from "./PullRequestTarget";
-
-function compareUrl(project: Project, thread: Thread): string | null {
-  const remote = project.gitRemote;
-  if (!remote || !thread.branch || thread.workspaceMode !== "worktree") return null;
-  const m = /github\.com[:/]([^/]+)\/([^/.]+)(?:\.git)?$/.exec(remote);
-  if (!m) return null;
-  const base = thread.baseBranch ?? project.defaultBranch ?? "main";
-  return `https://github.com/${m[1]}/${m[2]}/compare/${encodeURIComponent(base)}...${encodeURIComponent(thread.branch)}?expand=1`;
-}
 
 /** The thread's pull request once it exists, with its state, opening it on GitHub. */
 export function PullRequestLink({ thread }: { thread: ThreadSummary }) {
@@ -33,40 +25,37 @@ export function ThreadPullRequest({
   thread,
   project,
   pr,
-  action,
+  step,
   busy,
-  head,
   onOpened,
 }: {
   thread: ThreadSummary;
   project: Project;
   /** Owned by the panel, so its other Git actions wait while this one runs. */
   pr: ReturnType<typeof useRpcMutation<"review.createThreadPr">>;
-  action: TeamActionAvailability;
+  /** publishView's pull request step: what exists or can be opened now, and why it cannot run. */
+  step: PullRequestStep | null;
   busy: boolean;
-  /** The branch the pull request opens from, once it can: its own, and on origin with every commit. */
-  head: string | null;
   onOpened: (url: string) => void;
 }) {
-  const info = useRpc("system.info", {});
   const [open, setOpen] = useState(false);
-  if (thread.prUrl) return <PullRequestLink thread={thread} />;
-  if (!head) return null;
-  const disabled = !action.allowed || busy;
-  if (!info.data?.gh.installed) {
-    const ghUrl = compareUrl(project, thread);
-    return ghUrl ? (
-      <Button disabled={disabled} onClick={() => window.openorc.openExternal(ghUrl)} title={action.reason ?? "Compare on GitHub"}>
+  if (!step) return null;
+  if (step.kind === "exists") return <PullRequestLink thread={thread} />;
+  const { reason } = step.step;
+  const disabled = Boolean(reason) || busy;
+  if (step.kind === "compare") {
+    return (
+      <Button disabled={disabled} onClick={() => window.openorc.openExternal(step.url)} title={reason ?? "Compare on GitHub"}>
         <GitPullRequest size={14} /> PR
       </Button>
-    ) : null;
+    );
   }
   return (
     <>
-      <Button disabled={disabled} onClick={() => setOpen(true)} title={action.reason ?? "Open a pull request"}>
+      <Button disabled={disabled} onClick={() => setOpen(true)} title={reason ?? "Open a pull request"}>
         <GitPullRequest size={14} /> PR
       </Button>
-      <PullRequestDialog open={open} onOpenChange={setOpen} thread={thread} project={project} head={head} pr={pr} action={action} busy={busy} onOpened={onOpened} />
+      <PullRequestDialog open={open} onOpenChange={setOpen} thread={thread} project={project} head={step.head} pr={pr} action={{ allowed: !reason, reason }} busy={busy} onOpened={onOpened} />
     </>
   );
 }

@@ -3,14 +3,46 @@ import { randomUUID } from "node:crypto";
 import { access, mkdir, realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { audit, comments, orchestration, projects, snapshots, tasks, teamDeletedThreads, teamRuntime, teamTasks, threads, type Db, type ReviewCommentScope } from "@openorc/db";
-import { changedFiles, commitAll, createPr, git, GitHubPulls, hasGh, headCommit, log, patchAgainst, patchSinceTree, pullRequestTemplate, push, teamTransfer, unpushedCommits } from "@openorc/git";
-import type { Commit, Project, PushState, ReviewComment, ReviewDiff, Snapshot, Task, TeamActionAvailability, TeamReviewComment, Thread } from "@openorc/protocol";
+import {
+  changedFiles,
+  changeStats,
+  commitAll,
+  createPr,
+  filePatch,
+  git,
+  GitHubPulls,
+  hasGh,
+  headCommit,
+  log,
+  patchAgainst,
+  patchSinceTree,
+  pullRequestTemplate,
+  push,
+  teamTransfer,
+  unpushedCommits,
+} from "@openorc/git";
+import type {
+  ChangeComparison,
+  Commit,
+  FileDiff,
+  Project,
+  PushState,
+  ReviewComment,
+  ReviewDiff,
+  Snapshot,
+  Task,
+  TeamActionAvailability,
+  TeamReviewComment,
+  Thread,
+  WorkspaceChanges,
+} from "@openorc/protocol";
 import { assertRepository, projectGit } from "./project-git.js";
 import { executionFolder } from "./conversation-folder.js";
 import { workspaceWriters, type WorkspaceWriters } from "./workspace-writers.js";
 import { teamPublicationBranch, teamWorkspaceLocation } from "./team-workspace-location.js";
 import type { TeamTaskExport } from "./team-task-export.js";
 import { slugify } from "./workspace.js";
+import { phoneOrigin } from "../request-origin.js";
 
 export interface ReviewTeamMutations {
   /** Reserve before any await; new team work stays blocked until release. */
@@ -105,11 +137,14 @@ function acceptedMessage(selected: ReviewComment[]): string | null {
 
 const DETACHED_COPY = "This conversation's copy is on no branch, so nothing in it is committed or pushed.";
 
+/** What a thread's changes are measured against: its worktree's base for "base", else HEAD (null). */
+const threadBase = (thread: Thread, comparison: ChangeComparison): string | null => (comparison === "base" && thread.worktreePath ? thread.baseSha : null);
+
 /**
  * What Push would publish from `cwd`, judged by what origin was last seen to have: `head`, the branch itself unless
  * given, against the branch `branchOf` names. When no branch can be named, that is why nothing can be pushed.
  */
-async function pushState(cwd: string, branchOf: () => string | Promise<string>, head?: string): Promise<PushState> {
+async function pushState(cwd: string, branchOf: () => string | Promise<string>, head?: string): Promise<Omit<PushState, "busy">> {
   let branch: string;
   try {
     branch = await branchOf();
@@ -168,7 +203,7 @@ export class ReviewService {
   /** What Push would publish from the checkout's branch, whoever made its commits. */
   async projectPushState(project: Project): Promise<PushState> {
     await assertRepository(project);
-    return pushState(project.rootPath, () => this.checkoutBranch(project));
+    return this.withBusy(project.rootPath, () => pushState(project.rootPath, () => this.checkoutBranch(project)));
   }
 
   async pushProject(project: Project): Promise<{ remote: string; branch: string }> {
@@ -189,11 +224,25 @@ export class ReviewService {
     return executionFolder({ thread, task: null }, project);
   }
 
-  async threadDiff(thread: Thread, project: Project, comparison: "base" | "head" = "base"): Promise<ReviewDiff> {
+  async threadDiff(thread: Thread, project: Project, comparison: ChangeComparison = "base"): Promise<ReviewDiff> {
     const cwd = await this.threadCwd(thread, project);
-    const base = comparison === "base" && thread.worktreePath ? thread.baseSha : null;
+    const base = threadBase(thread, comparison);
     const [patch, files] = await Promise.all([patchAgainst(cwd, base), changedFiles(cwd, base)]);
     return { baseSha: base, patch, files, since: null };
+  }
+
+  /** The same changes as threadDiff, as a capped list with line counts and true totals. */
+  async threadChanges(thread: Thread, project: Project, comparison: ChangeComparison = "base"): Promise<WorkspaceChanges> {
+    const cwd = await this.threadCwd(thread, project);
+    const base = threadBase(thread, comparison);
+    return { comparison: base ? "base" : "head", baseSha: base, ...(await changeStats(cwd, base)) };
+  }
+
+  /** One file of those changes. A path with no changes is refused, so nothing is read that the list would not name. */
+  async threadFileDiff(thread: Thread, project: Project, file: string, comparison: ChangeComparison = "base"): Promise<FileDiff> {
+    const diff = await filePatch(await this.threadCwd(thread, project), threadBase(thread, comparison), file);
+    if (!diff) throw new Error("This file has no changes.");
+    return diff;
   }
 
   async commitThread(thread: Thread, project: Project, message: string): Promise<{ sha: string }> {
@@ -203,7 +252,7 @@ export class ReviewService {
       const publication = context.team && context.thread.workspaceMode === "worktree" ? await this.publicationRef(context) : null;
       context.assertCurrent();
       const sha = await commitAll(context.cwd, message);
-      audit.record(this.db, { actor: "user", action: "thread.commit", resourceType: "thread", resourceId: thread.id, metadata: { sha } });
+      audit.record(this.db, { actor: "user", action: "thread.commit", resourceType: "thread", resourceId: thread.id, metadata: { sha, ...phoneOrigin() } });
       if (publication) {
         try {
           await this.updatePublicationRef(context, { ...publication, head: sha });
@@ -230,12 +279,21 @@ export class ReviewService {
     return head.stdout.trim();
   }
 
+  /**
+   * A push state with whether a Git write holds `cwd` now, so a phone that lost a write's answer waits for it to land.
+   * The rest is read after: once it says no write holds the workspace, it shows what the last one did.
+   */
+  private async withBusy(cwd: string, state: () => Promise<Omit<PushState, "busy">>): Promise<PushState> {
+    const busy = await this.writers.writing(cwd);
+    return { ...(await state()), busy };
+  }
+
   /** What Push would publish from the thread's workspace, judged by what origin was last seen to have. */
   async threadPushState(thread: Thread, project: Project): Promise<PushState> {
     const cwd = await this.threadCwd(thread, project);
     // A team worktree stays detached, and Push first advances its publication branch to HEAD.
     const team = thread.workspaceMode === "worktree" && Boolean(orchestration.getInstance(this.db, thread.id));
-    return team ? pushState(cwd, () => this.teamBranch(thread.id), "HEAD") : pushState(cwd, () => this.threadBranch(thread, project));
+    return this.withBusy(cwd, () => (team ? pushState(cwd, () => this.teamBranch(thread.id), "HEAD") : pushState(cwd, () => this.threadBranch(thread, project))));
   }
 
   async pushThread(thread: Thread, project: Project): Promise<{ remote: string; branch: string }> {
@@ -244,7 +302,7 @@ export class ReviewService {
       const branch = publication ? await this.updatePublicationRef(context, publication) : await this.threadBranch(context.thread, context.project);
       context.assertCurrent();
       await push(context.cwd, branch);
-      audit.record(this.db, { actor: "user", action: "thread.push", resourceType: "thread", resourceId: thread.id, metadata: { branch } });
+      audit.record(this.db, { actor: "user", action: "thread.push", resourceType: "thread", resourceId: thread.id, metadata: { branch, ...phoneOrigin() } });
       return { remote: "origin", branch };
     });
   }
@@ -271,7 +329,7 @@ export class ReviewService {
       context.assertCurrent();
       const url = await this.openPullRequest(context.cwd, { title, body, base, head: branch });
       threads.update(this.db, thread.id, { prUrl: url, prState: "open" });
-      audit.record(this.db, { actor: "user", action: "thread.pr", resourceType: "thread", resourceId: thread.id, metadata: { url } });
+      audit.record(this.db, { actor: "user", action: "thread.pr", resourceType: "thread", resourceId: thread.id, metadata: { url, ...phoneOrigin() } });
       return { url };
     });
   }

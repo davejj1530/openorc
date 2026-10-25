@@ -224,6 +224,27 @@ describe("push", () => {
     await commitAll(local, "mine");
     await expect(push(local, "main")).rejects.toThrow("origin has newer commits on main. Pull them in first, then push again.");
   });
+
+  it("words a commit or push a hook refused in the hook's own output, not the command line and its message", async () => {
+    const hooks = path.join(folder, "refusing-hooks");
+    await mkdir(hooks);
+    await writeFile(path.join(hooks, "pre-commit"), '#!/bin/sh\necho "lint failed: 2 problems" >&2\nexit 1\n', { mode: 0o755 });
+    await writeFile(path.join(hooks, "pre-push"), '#!/bin/sh\necho "tests failed"\nexit 1\n', { mode: 0o755 });
+    await git(local, ["config", "core.hooksPath", hooks]);
+    try {
+      await writeFile(path.join(local, "refused.md"), "Refused\n");
+      const commit = await commitAll(local, "Add the refused file\n\nWith a body").catch((error: Error) => error);
+      expect(commit).toMatchObject({ message: "lint failed: 2 problems" });
+      await expect(push(local, "main")).rejects.toThrow(/^tests failed\n/);
+      await expect(push(local, "main")).rejects.not.toThrow(/git push/);
+    } finally {
+      await git(local, ["config", "--unset", "core.hooksPath"]);
+    }
+    await git(local, ["add", "-A"]);
+    await git(local, ["commit", "-q", "-m", "Clean up"]);
+    // Nothing to commit: Git says so on stdout alone.
+    await expect(commitAll(local, "Nothing here")).rejects.toThrow(/nothing to commit/);
+  });
 });
 
 describe("pull request template", () => {

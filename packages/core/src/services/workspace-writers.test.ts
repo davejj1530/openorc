@@ -32,6 +32,19 @@ describe("physical workspace reservations", () => {
     next.release();
   });
 
+  it("says a tree is being written only while an exclusive operation holds it, never for agent sessions", async () => {
+    const root = path.join(directory, "checkout");
+    await mkdir(root);
+    const turn = await writers.acquire(root, "a turn", undefined, { shared: true });
+    expect(await writers.writing(root)).toBe(false);
+    turn.release();
+    const commit = await writers.acquire(root, "committing thread t1");
+    expect(await writers.writing(path.join(root, "src"))).toBe(true);
+    expect(await writers.writing(path.join(directory, "elsewhere"))).toBe(false);
+    commit.release();
+    expect(await writers.writing(root)).toBe(false);
+  });
+
   it("claims multiple paths atomically and never retains a partial claim after conflict", async () => {
     const first = path.join(directory, "a");
     const second = path.join(directory, "b");

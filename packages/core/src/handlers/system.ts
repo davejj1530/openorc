@@ -5,7 +5,7 @@ import { ProviderUsageService } from "../services/provider-usage.js";
 import { SystemService } from "../services/system.js";
 import type { Handlers } from "./types.js";
 type Dependencies = {
-  system: Pick<SystemService, "info">;
+  system: Pick<SystemService, "info" | "gh">;
   accountInfo?: (refresh?: boolean, id?: string) => ReturnType<SystemService["info"]>;
   /** The checks for the default Claude account, which a thread started without naming one runs on. */
   defaultAccountInfo: () => ReturnType<SystemService["info"]>;
@@ -26,6 +26,7 @@ export function createSystemHandlers({
 }: Dependencies): Pick<
   Handlers,
   | "system.info"
+  | "system.gh"
   | "agents.availability"
   | "agents.updates.get"
   | "agents.updates.check"
@@ -37,6 +38,7 @@ export function createSystemHandlers({
 > {
   return {
     "system.info": ({ refresh, claudeAccountId }) => (accountInfo ? accountInfo(refresh, claudeAccountId) : system.info(refresh)),
+    "system.gh": () => system.gh(),
     "agents.availability": async () => harnessAvailability(await defaultAccountInfo()),
     "agents.updates.get": () => agentUpdates.get(),
     "agents.updates.check": () => agentUpdates.check(),

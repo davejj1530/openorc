@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import { captureProcessEnvironment, launchCommand } from "@openorc/agents";
+import { hasGh } from "@openorc/git";
 import { harnessIds, type HarnessId, type HarnessInfo, type SystemInfo } from "@openorc/protocol";
 import { resolveBinary, type EnvSnapshot, type RefreshResult, type ShellEnvironment } from "./shell-environment.js";
 
@@ -70,13 +71,21 @@ const runCommand: CommandProbe = (binary, args, env) =>
 export class SystemService {
   private readonly cache = new Map<string, { at: number; info: SystemInfo }>();
   private readonly inFlight = new Map<string, Promise<SystemInfo>>();
+  private ghAnswer: { at: number; installed: Promise<boolean> } | null = null;
 
   constructor(
     private readonly dataDir: string,
     private readonly environment: Pick<ShellEnvironment, "current" | "refresh">,
     private readonly command: CommandProbe = runCommand,
     private readonly probes: Record<HarnessId, HarnessProbe> = harnessProbes,
+    private readonly ghProbe: () => Promise<boolean> = hasGh,
   ) {}
+
+  /** Whether gh runs, asked at most every 30 s. Unlike `info`, nothing about the Mac's paths or harnesses. */
+  async gh(): Promise<{ installed: boolean }> {
+    if (!this.ghAnswer || Date.now() - this.ghAnswer.at >= 30_000) this.ghAnswer = { at: Date.now(), installed: this.ghProbe() };
+    return { installed: await this.ghAnswer.installed };
+  }
 
   /** Cached for a minute per environment revision. Concurrent callers share provider probes. */
   async info(refresh = false): Promise<SystemInfo> {

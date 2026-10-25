@@ -102,6 +102,12 @@ export class WorkspaceWriters {
     return conflict ? `Workspace is in use by ${conflict.owner}. Finish or stop that operation before applying changes.` : null;
   }
 
+  /** Whether an exclusive operation, such as a commit or a push, holds part of these trees now. Agent sessions share theirs and do not count. */
+  async writing(paths: string | readonly string[]): Promise<boolean> {
+    const resolved = await Promise.all((typeof paths === "string" ? [paths] : paths).map(canonical));
+    return [...this.reservations.values()].some((reservation) => !reservation.shared && overlaps(reservation.paths, resolved));
+  }
+
   async acquire(paths: string | readonly string[], owner: string, inherited?: WorkspaceLease, options: AcquireOptions = {}): Promise<WorkspaceLease> {
     const inputs = typeof paths === "string" ? [paths] : paths;
     if (!inputs.length) throw new Error("A workspace reservation needs at least one path.");

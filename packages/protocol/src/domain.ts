@@ -531,6 +531,8 @@ export const PushState = z.object({
   unpushedCount: z.number().int(),
   /** The newest of those commits, enough to mark every row of the longest log. */
   unpushed: z.array(z.string()),
+  /** Whether a Git write (a commit, push or pull request, from either app) holds the workspace now; an agent's turn does not count. */
+  busy: z.boolean(),
 });
 export type PushState = z.infer<typeof PushState>;
 

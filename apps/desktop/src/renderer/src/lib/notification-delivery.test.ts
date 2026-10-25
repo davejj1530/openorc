@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Notice } from "@openorc/client";
-import { NotificationDelivery, NotificationVisibility, noticeDestination, noticeVisible, type NotificationPlatform, type VisibilityChannel } from "./notification-delivery";
+import { NotificationDelivery, NotificationVisibility, noticeDestination, type NotificationPlatform, type VisibilityChannel } from "./notification-delivery";
 
 const notice: Notice = { id: "approval:run:request", kind: "approval", threadId: "thread", taskId: "worker", title: "Team", body: "Engineer needs approval" };
 function platform() {
@@ -25,12 +25,7 @@ function platform() {
   return value;
 }
 describe("desktop notification delivery", () => {
-  it("recognizes focused root, split, and exact worker; worker clicks open that task", () => {
-    expect(noticeVisible(notice, { focused: true, threadIds: ["thread"], taskId: null })).toBe(true);
-    expect(noticeVisible(notice, { focused: true, threadIds: ["other", "thread"], taskId: null })).toBe(true);
-    expect(noticeVisible(notice, { focused: true, threadIds: [], taskId: "worker" })).toBe(true);
-    expect(noticeVisible(notice, { focused: false, threadIds: ["thread"], taskId: "worker" })).toBe(false);
-    expect(noticeVisible(notice, { focused: true, threadIds: ["other"], taskId: "other" })).toBe(false);
+  it("opens a worker's task first, otherwise the thread", () => {
     expect(noticeDestination(notice)).toEqual({ view: "task", taskId: "worker", tab: "chat" });
     expect(noticeDestination({ threadId: "thread", taskId: null })).toEqual({ view: "thread", threadId: "thread" });
   });

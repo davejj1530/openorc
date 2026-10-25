@@ -54,7 +54,14 @@ function connect() {
     client.receive(message);
   });
   installProtectedSecrets(child as unknown as UtilityProcess, dataDir);
-  return { child, memory: client.store("memory.secrets"), slack: client.store("slack.secrets"), github: client.store("github.secrets"), remote: client.store("remote.secrets") };
+  return {
+    child,
+    memory: client.store("memory.secrets"),
+    slack: client.store("slack.secrets"),
+    github: client.store("github.secrets"),
+    remote: client.store("remote.secrets"),
+    push: client.store("push.secrets"),
+  };
 }
 
 describe("desktop protected stores", () => {
@@ -98,6 +105,19 @@ describe("desktop protected stores", () => {
     expect((await readFile(join(dataDir, "remote-access-key.enc"))).includes("remote-key-fixture")).toBe(false);
     await expect(connect().remote.load()).resolves.toBe('{"privateKey":"remote-key-fixture"}');
     await expect(github.load()).resolves.toBe("reviewer-key-fixture");
+  });
+
+  it("keeps the Apple push key in a file of its own, and clears it to an empty one", async () => {
+    const { remote, push } = connect();
+    await remote.save('{"privateKey":"remote-key-fixture"}');
+    await push.save("-----BEGIN PRIVATE KEY-----\napns-key-fixture\n-----END PRIVATE KEY-----");
+    expect((await readFile(join(dataDir, "apns-key.enc"))).includes("apns-key-fixture")).toBe(false);
+    if (platform !== "win32") expect((await stat(join(dataDir, "apns-key.enc"))).mode & 0o777).toBe(0o600);
+    await expect(connect().push.load()).resolves.toContain("apns-key-fixture");
+    await push.save("");
+    await expect(connect().push.load()).resolves.toBe("");
+    await expect(remote.load()).resolves.toBe('{"privateKey":"remote-key-fixture"}');
+    expect((await readdir(dataDir)).sort()).toEqual(["apns-key.enc", "remote-access-key.enc"]);
   });
 
   it("orders simultaneous saves and loads per store", async () => {

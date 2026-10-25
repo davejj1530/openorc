@@ -8,6 +8,8 @@ export const PROTECTED_SECRET_FILES = {
   "github.secrets": "github-reviewer-app.enc",
   /** The Mac's static key pair for phone access. */
   "remote.secrets": "remote-access-key.enc",
+  /** The Apple push key phone alerts are signed with, as the user added it. */
+  "push.secrets": "apns-key.enc",
 } as const;
 
 export type ProtectedSecretChannel = keyof typeof PROTECTED_SECRET_FILES;

@@ -1,0 +1,161 @@
+{
+  "mac": {
+    "privateKey": "hkOOfHMkI43lILYsm4cr6cGYbNLiExY6axGSIeQ7OMc",
+    "publicKey": "G6X4zn3KoOFi7qfkoP0asZlzLNqUL7F-W5GfB28Suig"
+  },
+  "phone": {
+    "privateKey": "qKMXXrLc8HodaeWv-3sQMJPO1i9jiqxFJpGAev7eDuU",
+    "publicKey": "fjPJXc0XeYDvOpIQUWztpCRWhh3nUi3Z9zEsmtDlo10"
+  },
+  "otherMac": {
+    "privateKey": "RrWW0abPgF26cdrlg4J8Acfw4-tR0T3-TjFgdov-pkA",
+    "publicKey": "hpPD66V_iq3uoLhGiRvDpiV1PggdUzgI8HTaJGN7YUQ"
+  },
+  "keys": {
+    "seal": "EGXjdGq0wjepYmJfVszPhYkrrGm4-hyeNVrI1q507Yo",
+    "collapse": "jQayzFPp0Lin3vUIqwZHMivNH8ftdKrkF0XTG1UnLbg"
+  },
+  "collapseIds": [
+    {
+      "threadId": "thread-1",
+      "id": "owCdjC9Y1AkDw9T-9DL2JQ"
+    },
+    {
+      "threadId": "thread-2",
+      "id": "MZ51EhIHYFSY-H6zkH3Y7Q"
+    },
+    {
+      "threadId": null,
+      "id": "-kBwG29JeIo1SSJLJiB80Q"
+    }
+  ],
+  "good": [
+    {
+      "name": "approval with ids",
+      "nonce": "QZHf3rYWP9jUAExl",
+      "notice": {
+        "id": "notice-1",
+        "kind": "approval",
+        "threadId": "thread-1",
+        "title": "Approve a command",
+        "body": "git push origin main",
+        "approval": {
+          "runId": "run-1",
+          "approvalId": "approval-1"
+        }
+      },
+      "envelope": {
+        "v": 1,
+        "m": "G6X4zn3KoOFi7qfkoP0asZlzLNqUL7F-W5GfB28Suig",
+        "n": "QZHf3rYWP9jUAExl",
+        "c": "rAeT5Wmb2LmtNwSNsq2-zFZfuzBVvE1t0sQLlkyrwVfCB3-Gfl3JjYn2F8XyGlAgD2qxknQYUPajFPnTS1mji1-H3TPg4AeHFu6JpclculDm4DahhpzfQo5hZ_cc-7EW14y8v5f_A5FF_zgRdmEiUk7q7fKRQFBMSipnNZeIp7PkrHOBKf8GIMaexFozTjIxVJE6fkX4gt6S-kL2LXyDl9CF9mDnnEFibddh1-YjWlnrRNmanwqztVVn"
+      }
+    },
+    {
+      "name": "finished turn",
+      "nonce": "i_PFL0jkUfc_i1OA",
+      "notice": {
+        "id": "notice-2",
+        "kind": "finished",
+        "threadId": "thread-2",
+        "title": "Fix the login bug",
+        "body": "Done. The tests pass."
+      },
+      "envelope": {
+        "v": 1,
+        "m": "G6X4zn3KoOFi7qfkoP0asZlzLNqUL7F-W5GfB28Suig",
+        "n": "i_PFL0jkUfc_i1OA",
+        "c": "dmUvg4V2buPrzSusup9-h6sVHBPHGvXCl6l-tKHgvOoSevOF2824oh5xJf5rPebCCVlHEAzrRlJckuuG95XOTiMZ4ruIx52HO7M4KRUo-C6oMrh235VQiAl2Lzk6s5fBNlWGdV8BB2H_nTDsBjmeBBMelsx3v9LKE7JLa9B51zYyX4Fk"
+      }
+    },
+    {
+      "name": "test notice",
+      "nonce": "VZ0P4sMUt72HtGST",
+      "notice": {
+        "id": "notice-3",
+        "kind": "test",
+        "threadId": null,
+        "title": "OpenOrc",
+        "body": "Notifications from Studio Mac reach this iPhone."
+      },
+      "envelope": {
+        "v": 1,
+        "m": "G6X4zn3KoOFi7qfkoP0asZlzLNqUL7F-W5GfB28Suig",
+        "n": "VZ0P4sMUt72HtGST",
+        "c": "fS5KAPxJFFs2RvdF91n2wFNoWr9ewl9980-2Ks4Rr1x62drGmFLse0vhP32cxH7vcjIoQ4UFzzFg2xnF2F2pm1fJaHiZ4g15yPvsYy8tITm2_5cMKWST8DfaGrxVAloTI0DqQGd4PGbesp1F-GVvHSB_hrOVZGIr11-Il5W8hyeO_CkeLBaaaJdF8A"
+      }
+    },
+    {
+      "name": "emoji and quotes at the clip limits",
+      "nonce": "puE1tUo_vQFD1yjq",
+      "notice": {
+        "id": "notice-4",
+        "kind": "question",
+        "threadId": "thread-4",
+        "title": "\"Ship it\" 🚀 \\ \"Ship it\" 🚀 \\ \"Ship it\" 🚀 \\ \"Ship it\" 🚀 \\ \"Ship it\" 🚀 \\ \"Ship it\" 🚀 \\ \"Ship it\" 🚀 \\ \"Ship it\" 🚀 \\ \"Ship i…",
+        "body": "👩🏽‍💻 said \"done\"\n\t'ok' \\ 👩🏽‍💻 said \"done\"\n\t'ok' \\ 👩🏽‍💻 said \"done\"\n\t'ok' \\ 👩🏽‍💻 said \"done\"\n\t'ok' \\ 👩🏽‍💻 said \"done\"\n\t'ok' \\ 👩🏽‍💻 said \"done\"\n\t'ok' \\ 👩🏽‍💻 said \"done\"\n\t'ok' \\ 👩🏽‍💻 said \"done\"\n\t'ok' \\ 👩🏽‍💻 said \"done\"\n\t'ok' \\ 👩🏽‍💻 said \"done\"\n\t'ok' \\ 👩🏽‍💻 said \"done\"\n\t'ok' \\ 👩🏽‍💻 said \"done\"\n\t'ok' \\ 👩🏽‍💻 said \"done\"\n\t'ok' \\ 👩🏽‍💻 said \"done\"\n\t'ok' \\ 👩🏽‍💻 said \"done\"\n\t'ok' \\ 👩🏽‍💻 said \"done\"\n\t'ok' \\ 👩🏽‍💻 said \"done\"\n\t'ok' \\ 👩🏽‍💻 said \"done\"\n\t'ok' \\ 👩🏽‍💻 said \"done\"\n\t'ok' \\ 👩🏽‍💻 said \"done\"\n\t'ok' \\ 👩🏽‍💻 said \"done\"\n\t'ok' \\ 👩🏽‍💻 said \"done\"\n\t'ok' \\ 👩🏽‍💻 said \"done\"\n\t'ok' \\ 👩🏽‍💻 said \"done\"\n\t'ok' \\…"
+      },
+      "envelope": {
+        "v": 1,
+        "m": "G6X4zn3KoOFi7qfkoP0asZlzLNqUL7F-W5GfB28Suig",
+        "n": "puE1tUo_vQFD1yjq",
+        "c": "hBzFLFiIvYPpe1DylPyqvoB6ihKdBS-NbjXZd7-ceKp9b1LjPmG3GIUTWE1yWFtnIj0WY6EsQjlf6XZAhRdfzOSz8dkN1ev206vrnD0_y8RNPkUXmCIfyTaw_vxGD1hG4AP9E1wVf0f33fAiqL6wKJjNtVuDNfKvLOm4_u_0oJk2iHcgLJcL26j8PYIxXYFhOrcd0Def-e0ghD-F8vS8uBfzPUM8EkwwwLDHzyJPkDhdTz3FkBUP0ORG4pqJhmME6hP_kuPKYxTv5hZzMUYGoAS0CJnZAqi90W4G-Rx1fGXhwNjqBZgUPPGwQIVMplJOSfyTzuVD6RZz8P3_xt8ZnPQk7v5hZQIWTUW0akLOEklUhHfhNZ8Nh1FWq323cZclxxUMWAMUTfKIM895tBsmed-Zp26azLYpKJcCY6jQe6VgFe5IwoHyRsKQZptgGSV5qWdKNyJa9DU2-RDKY-ev1_W_GJHhSclW5DTSxpbvWAU9RpM4YnYvB1z6i5uv1o2zr1vUdWbOdgPp3a0o9ONYAoHq_NEiWHnE3jWhyT_qN84mVLc5VvKiP6lktcTgvcDDD0xSLD7WKEdhp7NH03v8mR6vZQqRSCdonE_NzUUZs93HUlo1a4oGegVIB3QAAFSN6huW4qzMhVm9-EdGcG-hdK6EHomPiUXm4Zpf6pHSTdGZNuTGog-4nwGZVpx39vYhTbOiWiiXjZuIbXP_MS5N9Gzp9YpWPUZBYDBiwvxnHyCRS3_aeqtj6wJjOIQijQQPZznUvYJPwyUStlsRdA9WxL_C-yrl8Ca6_IsgBCWoFzkbL2Bd_-vziVYWQUk1ww1UxMo0bg5cXUJRH-B1f7gTOAppgYFH9iOZx8TpkC3LLV7AIAOexMhuys91UpQe2p4149Fo_sGJ7qj0S1p1ecF3DkNLBb1f0ZWIYi2xKKh4pkgzfiCWGfZf1Qk5O0EX5tjA9pfSxJfvzmBzhVLkQUKtUolxOpXMv97x0D8GdKbbwr2jczh__zqKz1NJTnui3ZvYnwu7bHKVhQb2YwA4EHiEdumR7ABmLtU6G9v_cWLyr6xdUYCkt5-J_9LS2qBkqoWqnX4gy73HiCPI-O-ksir2Qm_dqAJsI4xY5NUKDEw6u2HjfHcqX_t0cpXvkW-vYMX09DBqOGWT94K-bCp5K-t4LrKS8B8ReX3kTzwoKk0TEBMorbGsuDPVnW4eeTCqA0a2eX40N8c2M2-CS_pxIIOgeV-guwLeJVPLrcPt1f_HRSbXLaf9M2BaXd3wZbK912DRBMLDMMPsE0peoV4zn8I4vhKL1uRrfv91Gb293Dbb_r4QzfHUVHXIyo-7uZLmlbWwSsurnmyQ8cCbRWIdYi0U8YecU95At9Vh_CsgdrMHzQe9ovomJi_uu-znPnbIcVoa58lmG4jWljUVIFAsPL-sjGZ0WwmIgWJzo1NkfoqeMhDk8rnolG_o7SGyS-Y2KN1J4HaBFJg_fs0rTunMXeQlWE2Eg8J108gUlkYP8oAeAwEuEjdDcJcBgL3YC0d_YvJCUswtFJ6ySFOsqu8YmZrtfMSOK7tfYMD6eZHtKT4SNvGB3Tsqk8yHajMO2v6bgxZPyNtcCXhfJs_egULxdIUOwVO0mpi6Rh1H3Irubn4COWlQFU2DeHXT-f85H08XhEFn2s4m"
+      }
+    },
+    {
+      "name": "a lone surrogate where a cut split an emoji",
+      "nonce": "0naUlKcWVBA5BySY",
+      "notice": {
+        "id": "notice-5",
+        "kind": "finished",
+        "threadId": "thread-5",
+        "title": "Launch �",
+        "body": "Shipped �"
+      },
+      "envelope": {
+        "v": 1,
+        "m": "G6X4zn3KoOFi7qfkoP0asZlzLNqUL7F-W5GfB28Suig",
+        "n": "0naUlKcWVBA5BySY",
+        "c": "HOiiecdHl4Dy64b8_hzopzZYaSs8O-xopHt7sDQAsbtc2iSRB0Osu6cuQ7T55e_WVdIrig_dQ031iR2I6fQJQBRv2avtctwEkobMPOcU-jjnuUqQYdNrkVoGMN4UbbV-m8Lq1rTKXaapdVncfncr95FivQ"
+      }
+    }
+  ],
+  "bad": [
+    {
+      "name": "tampered ciphertext",
+      "envelope": {
+        "v": 1,
+        "m": "G6X4zn3KoOFi7qfkoP0asZlzLNqUL7F-W5GfB28Suig",
+        "n": "QZHf3rYWP9jUAExl",
+        "c": "rQeT5Wmb2LmtNwSNsq2-zFZfuzBVvE1t0sQLlkyrwVfCB3-Gfl3JjYn2F8XyGlAgD2qxknQYUPajFPnTS1mji1-H3TPg4AeHFu6JpclculDm4DahhpzfQo5hZ_cc-7EW14y8v5f_A5FF_zgRdmEiUk7q7fKRQFBMSipnNZeIp7PkrHOBKf8GIMaexFozTjIxVJE6fkX4gt6S-kL2LXyDl9CF9mDnnEFibddh1-YjWlnrRNmanwqztVVn"
+      }
+    },
+    {
+      "name": "another Mac's m",
+      "envelope": {
+        "v": 1,
+        "m": "hpPD66V_iq3uoLhGiRvDpiV1PggdUzgI8HTaJGN7YUQ",
+        "n": "QZHf3rYWP9jUAExl",
+        "c": "rAeT5Wmb2LmtNwSNsq2-zFZfuzBVvE1t0sQLlkyrwVfCB3-Gfl3JjYn2F8XyGlAgD2qxknQYUPajFPnTS1mji1-H3TPg4AeHFu6JpclculDm4DahhpzfQo5hZ_cc-7EW14y8v5f_A5FF_zgRdmEiUk7q7fKRQFBMSipnNZeIp7PkrHOBKf8GIMaexFozTjIxVJE6fkX4gt6S-kL2LXyDl9CF9mDnnEFibddh1-YjWlnrRNmanwqztVVn"
+      }
+    },
+    {
+      "name": "flipped nonce",
+      "envelope": {
+        "v": 1,
+        "m": "G6X4zn3KoOFi7qfkoP0asZlzLNqUL7F-W5GfB28Suig",
+        "n": "QJHf3rYWP9jUAExl",
+        "c": "rAeT5Wmb2LmtNwSNsq2-zFZfuzBVvE1t0sQLlkyrwVfCB3-Gfl3JjYn2F8XyGlAgD2qxknQYUPajFPnTS1mji1-H3TPg4AeHFu6JpclculDm4DahhpzfQo5hZ_cc-7EW14y8v5f_A5FF_zgRdmEiUk7q7fKRQFBMSipnNZeIp7PkrHOBKf8GIMaexFozTjIxVJE6fkX4gt6S-kL2LXyDl9CF9mDnnEFibddh1-YjWlnrRNmanwqztVVn"
+      }
+    },
+    {
+      "name": "unknown version",
+      "envelope": {
+        "v": 2,
+        "m": "G6X4zn3KoOFi7qfkoP0asZlzLNqUL7F-W5GfB28Suig",
+        "n": "QZHf3rYWP9jUAExl",
+        "c": "rAeT5Wmb2LmtNwSNsq2-zFZfuzBVvE1t0sQLlkyrwVfCB3-Gfl3JjYn2F8XyGlAgD2qxknQYUPajFPnTS1mji1-H3TPg4AeHFu6JpclculDm4DahhpzfQo5hZ_cc-7EW14y8v5f_A5FF_zgRdmEiUk7q7fKRQFBMSipnNZeIp7PkrHOBKf8GIMaexFozTjIxVJE6fkX4gt6S-kL2LXyDl9CF9mDnnEFibddh1-YjWlnrRNmanwqztVVn"
+      }
+    }
+  ]
+}

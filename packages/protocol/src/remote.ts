@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { PushRefusal, RemotePushStatus } from "./push.js";
 import type { CorePush, RpcMethod } from "./rpc.js";
 
 /**
@@ -72,6 +73,7 @@ export interface RemoteStatus {
   devices: RemoteDevice[];
   /** The open pairing offer, if any; its secret stays on the Mac and in the QR code. */
   pairing: { offerId: string; expiresAt: number } | null;
+  push: RemotePushStatus;
 }
 
 export interface PairingOfferView {
@@ -89,6 +91,16 @@ export const remoteRpcParams = {
   "remote.pairing.begin": z.object({}).strict(),
   "remote.pairing.cancel": z.object({ offerId: z.string().min(1).max(64) }).strict(),
   "remote.devices.remove": z.object({ id: z.string().min(1).max(64) }).strict(),
+  /** The `.p8` Apple gave the user, its key id read from the file name. The PEM never comes back out. */
+  "remote.push.setKey": z
+    .object({
+      keyId: z.string().regex(/^[A-Z0-9]{10}$/),
+      pem: z.string().min(1).max(4096),
+    })
+    .strict(),
+  "remote.push.removeKey": z.object({}).strict(),
+  /** A test notice to every phone with notifications on. */
+  "remote.push.test": z.object({}).strict(),
 };
 
 export interface RemoteRpcResults {
@@ -97,4 +109,8 @@ export interface RemoteRpcResults {
   "remote.pairing.begin": PairingOfferView;
   "remote.pairing.cancel": null;
   "remote.devices.remove": null;
+  "remote.push.setKey": RemoteStatus;
+  "remote.push.removeKey": RemoteStatus;
+  /** How many phones APNs took it for, how many it could not be handed over for (a network failure or an Apple outage), and Apple's refusal of the key if it refused. */
+  "remote.push.test": { sent: number; failed: number; problem: PushRefusal | null };
 }

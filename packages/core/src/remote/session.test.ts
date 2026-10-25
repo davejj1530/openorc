@@ -46,7 +46,13 @@ function session(
   device: SessionDeps["device"] = async () => "no-key",
 ) {
   const link = new FakeLink();
-  const remote = new RemoteSession("device", link as unknown as MacSession, { answer, guard: { attachmentsDir: "/data/attachments" }, readAsset, device });
+  const remote = new RemoteSession("device", link as unknown as MacSession, {
+    answer,
+    guard: { attachmentsDir: "/data/attachments", thread: () => ({ team: false }) },
+    roots: () => ({ home: "/Users/me", dataDir: "/Users/me/.openorc", projects: [] }),
+    readAsset,
+    device,
+  });
   return { link, remote };
 }
 
@@ -162,6 +168,55 @@ describe("a phone session", () => {
     expect(link.closed).toBe(false);
     await vi.advanceTimersByTimeAsync(1);
     expect(link.closed).toBe(true);
+  });
+
+  it("tells the core each request came from this phone", async () => {
+    const answer = vi.fn<Answer>(async (request): Promise<RpcReply> => ({ type: "rpc.result", id: request.id, result: null }));
+    const { link } = session(answer);
+    link.receive({ t: "rpc", id: 6, method: "review.pushThread", params: { threadId: "t" } });
+    await vi.waitFor(() => expect(link.sent).toEqual([{ t: "rpc.result", id: 6, result: null }]));
+    expect(answer).toHaveBeenCalledWith({ type: "rpc", id: 6, method: "review.pushThread", params: { threadId: "t" } }, { kind: "phone", deviceId: "device" });
+  });
+
+  it("redacts every error a phone hears, a hook's output or a thrown one", async () => {
+    const token = "ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij12";
+    const answer: Answer = async (request) => {
+      if (request.id === 8) throw new Error(`git push failed in /Users/me/repo: ${token}`);
+      return { type: "rpc.error", id: request.id, message: `git commit failed: pre-commit printed ${token}` };
+    };
+    const { link } = session(answer);
+    link.receive({ t: "rpc", id: 7, method: "review.commitThread", params: { threadId: "t", message: "x" } });
+    link.receive({ t: "rpc", id: 8, method: "review.pushThread", params: { threadId: "t" } });
+    await vi.waitFor(() => expect(link.sent).toHaveLength(2));
+    for (const message of link.sent) {
+      expect(message).toMatchObject({ t: "rpc.error", message: expect.stringContaining("[redacted:github-token]") });
+      expect(JSON.stringify(message)).not.toContain(token);
+    }
+  });
+
+  it("leaves the Mac's folders out of a Git error", async () => {
+    const answer: Answer = async (request) => ({ type: "rpc.error", id: request.id, message: "git commit -q -F - failed (1) in /Users/me/.openorc/worktrees/a1b2: nothing to commit" });
+    const { link } = session(answer);
+    link.receive({ t: "rpc", id: 10, method: "review.commitThread", params: { threadId: "t", message: "x" } });
+    await vi.waitFor(() => expect(link.sent).toEqual([{ t: "rpc.error", id: 10, message: "git commit -q -F - failed (1): nothing to commit" }]));
+  });
+
+  it("strips the Mac's known folders from a result's reasons, as from its errors", async () => {
+    const blocked = "git symbolic-ref failed (128) in /Users/me/.openorc/worktrees/site-a1/fix-b2: fatal: ref HEAD is not a symbolic ref, see /Users/me/.openorc/worktrees/site-a1/fix-b2/.git";
+    const answer: Answer = async (request) => ({ type: "rpc.result", id: request.id, result: { branch: null, blocked, published: false, unpushedCount: 0, unpushed: [], busy: false } });
+    const { link } = session(answer);
+    link.receive({ t: "rpc", id: 11, method: "git.threadPushState", params: { threadId: "t" } });
+    await vi.waitFor(() => expect(link.sent).toHaveLength(1));
+    expect(link.sent[0]).toMatchObject({ t: "rpc.result", result: { blocked: "git symbolic-ref failed (128): fatal: ref HEAD is not a symbolic ref, see .git", busy: false } });
+  });
+
+  it("shapes a result by its method before the phone hears it", async () => {
+    const token = "ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij12";
+    const diff = { path: "a.ts", oldPath: null, status: "modified", body: { kind: "text", insertions: 1, deletions: 0 }, patch: `@@ -0,0 +1 @@\n+${token}\n`, cut: null };
+    const { link } = session(async (request) => ({ type: "rpc.result", id: request.id, result: diff }));
+    link.receive({ t: "rpc", id: 9, method: "review.threadFileDiff", params: { threadId: "t", path: "a.ts" } });
+    await vi.waitFor(() => expect(link.sent).toHaveLength(1));
+    expect(link.sent[0]).toMatchObject({ t: "rpc.result", id: 9, result: { path: "a.ts", patch: "@@ -0,0 +1 @@\n+[redacted:github-token]\n" } });
   });
 
   it("says why before it closes", () => {

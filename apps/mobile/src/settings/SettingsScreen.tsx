@@ -3,10 +3,10 @@ import { View } from "react-native";
 import Animated, { useAnimatedRef, useScrollOffset } from "react-native-reanimated";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLinkState } from "../client";
+import { SheetHeader } from "../ui/SheetHeader";
 import { swipes } from "../ui/swipe";
 import { ForgetMac, MacSection } from "./MacSection";
 import { PhoneSection } from "./PhoneSection";
-import { SettingsHeader } from "./SettingsHeader";
 import { UsageSection } from "./UsageSection";
 
 const close = () => router.back();
@@ -38,12 +38,12 @@ export function SettingsScreen() {
       <Stack.Screen options={{ sheetAllowedDetents: paired ? [1] : "fitToContents" }} />
       {paired ? (
         <Animated.ScrollView ref={scroller} className="flex-1 bg-bg" stickyHeaderIndices={[0]} contentContainerStyle={bottom} onAccessibilityEscape={close} onTouchStart={swipes.touched}>
-          <SettingsHeader scrollY={scrollY} onClose={close} />
+          <SheetHeader title="Settings" scrollY={scrollY} onClose={close} />
           <View className={body}>{sections}</View>
         </Animated.ScrollView>
       ) : (
         <View className="bg-bg" onAccessibilityEscape={close}>
-          <SettingsHeader scrollY={scrollY} onClose={close} />
+          <SheetHeader title="Settings" scrollY={scrollY} onClose={close} />
           <View className={body}>{sections}</View>
           {/* A fitted sheet floats clear of the home indicator on iOS 26: only what of it the sheet covers is kept. */}
           <SafeAreaView edges={["bottom"]} style={{ paddingTop: 24 }} />

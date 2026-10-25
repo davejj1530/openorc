@@ -1,8 +1,9 @@
 import { router } from "expo-router";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useFrameCallback, useSharedValue } from "react-native-reanimated";
 import { isLive } from "@openorc/client";
 import { client, link } from "../client";
+import { isChangesScenario, openChanges } from "../changes/changes-perf";
 import { markThreadOpening, percentile, perfEnabled, perfScenario, perfStepMs, perfThread, perfTurns, report, startFrames, stopFrames, takeArrivals, takeMounts, transcriptList } from "./perf-probe";
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -37,7 +38,7 @@ const streaming = () => liveIn(["message"]);
 /** Reasoning or a call under way: the work a turn does before its reply. */
 const working = () => liveIn(["thinking", "tool"]);
 
-interface Sampler {
+export interface Sampler {
   begin(): void;
   finish(scenario: string, extra?: Record<string, unknown>): void;
 }
@@ -129,10 +130,10 @@ function streamRun(sampler: Sampler, name: string, live: () => boolean): () => v
 }
 
 /**
- * Drives a performance run on the open thread and reports what it measured: JS work per frame (median, p95), the JS
- * thread's pacing and the UI thread's frames, while scrolling the whole history or while a reply streams.
+ * A sampler for one performance run: JS work per published frame, the JS thread's pacing and the UI thread's frames,
+ * between `begin` and `finish`, reported under the scenario's name.
  */
-export function PerfProbe() {
+export function useFrameSampler(): Sampler {
   const sampling = useSharedValue(false);
   const intervals = useSharedValue<number[]>([]);
   useFrameCallback(({ timeSincePreviousFrame }) => {
@@ -144,10 +145,7 @@ export function PerfProbe() {
         return list;
       });
   });
-
-  useEffect(() => {
-    if (!perfEnabled()) return;
-    let cancelled = false;
+  return useMemo(() => {
     // The JS thread's own frame pacing: a frame it was too busy to start on time shows as a long gap here.
     let jsGaps: number[] = [];
     let pacing = 0;
@@ -157,7 +155,7 @@ export function PerfProbe() {
         pace(now);
       });
     };
-    const sampler: Sampler = {
+    return {
       begin() {
         intervals.value = [];
         sampling.value = true;
@@ -173,9 +171,23 @@ export function PerfProbe() {
         report(scenario, { ...summary(stopFrames(), jsGaps, intervals.value), ...extra });
       },
     };
+  }, [intervals, sampling]);
+}
+
+/**
+ * Drives a performance run on the open thread and reports what it measured: JS work per frame (median, p95), the JS
+ * thread's pacing and the UI thread's frames, while scrolling the whole history or while a reply streams. The Changes
+ * scenarios open the thread's Changes screen, which runs them.
+ */
+export function PerfProbe() {
+  const sampler = useFrameSampler();
+  useEffect(() => {
+    if (!perfEnabled()) return;
+    let cancelled = false;
     const scenario = perfScenario();
     if (scenario === "scroll") void scrollRun(sampler, () => cancelled);
     if (scenario === "live-scroll") void liveScrollRun(sampler, () => cancelled, perfTurns());
+    if (isChangesScenario(scenario)) void openChanges(() => cancelled);
     const samplers: Record<string, () => boolean> = { stream: streaming, work: working };
     const live = samplers[scenario];
     const stop = live ? streamRun(sampler, scenario, live) : undefined;
@@ -183,6 +195,6 @@ export function PerfProbe() {
       cancelled = true;
       stop?.();
     };
-  }, [intervals, sampling]);
+  }, [sampler]);
   return null;
 }

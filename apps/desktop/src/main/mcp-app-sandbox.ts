@@ -1,6 +1,7 @@
 import { createServer, type Server } from "node:http";
 import { randomBytes, randomUUID } from "node:crypto";
 import { McpAppDocument, type McpAppCsp } from "@openorc/protocol";
+import type { Session, WebContents } from "electron";
 
 /** Only CSP host sources are accepted; never keywords, schemes, paths or header syntax. */
 function domains(values: string[] = []): string[] {
@@ -31,12 +32,37 @@ export function appContentSecurityPolicy(csp: McpAppCsp): string {
   ].join("; ");
 }
 
+/**
+ * The window that shows sandbox frames sends WebRTC nothing over UDP, which no content security policy governs, so its
+ * WebRTC goes over TCP through the session's proxy (see `SandboxNetwork`). The app itself never uses WebRTC.
+ */
+export function hostSandboxFrames(contents: Pick<WebContents, "setWebRTCIPHandlingPolicy">): void {
+  contents.setWebRTCIPHandlingPolicy("disable_non_proxied_udp");
+}
+
+/**
+ * The session of the window that shows sandbox frames. The sandbox makes itself that session's proxy: it answers only
+ * its own documents and tunnels nothing, so a connection no policy governs (WebRTC's TCP, also from a frame a page
+ * writes itself, which no policy refuses) reaches no host. Only the sandbox, `direct` and the domains an open MCP App
+ * declared are reached without it; loopback and link-local addresses get no exemption.
+ */
+export interface SandboxNetwork {
+  session: Pick<Session, "setProxy">;
+  /** Hosts the window's own page loads from besides the sandbox: the development server. */
+  direct: string[];
+}
+
+/** The hosts a document's policy lets it reach, as proxy bypass rules: scheme, host pattern and port, as declared. */
+const declaredHosts = (csp: McpAppCsp) => domains([...(csp.resourceDomains ?? []), ...(csp.connectDomains ?? []), ...(csp.frameDomains ?? [])]);
+
 /** Separate loopback origin, with an opaque-origin inner frame and an HTTP-enforced CSP. */
 export class McpAppSandbox {
-  private readonly documents = new Map<string, { owner: number; html: string; csp: string }>();
+  private readonly documents = new Map<string, { owner: number; html: string; csp: string; hosts: string[] }>();
   private server: Server | null = null;
   private origin = "";
-  async start(): Promise<void> {
+  private network: SandboxNetwork | undefined;
+  private bypass = "";
+  async start(network?: SandboxNetwork): Promise<void> {
     const server = createServer((req, res) => {
       const [id, page, extra] = (req.url ?? "").slice(1).split("/");
       const document = id ? this.documents.get(id) : undefined;
@@ -71,20 +97,37 @@ export class McpAppSandbox {
     if (!address || typeof address === "string") throw new Error("MCP App sandbox did not start.");
     this.server = server;
     this.origin = `http://127.0.0.1:${address.port}`;
+    this.network = network;
+    await this.route();
   }
-  register(owner: number, raw: unknown): { id: string; url: string } {
+  /** Resolves once the session reaches the hosts the document declared, so its first loads go through. */
+  async register(owner: number, raw: unknown): Promise<{ id: string; url: string }> {
     const doc = McpAppDocument.parse(raw);
     if (!this.server) throw new Error("The MCP App sandbox is unavailable.");
     if (this.documents.size >= 64) throw new Error("Too many interactive apps are open.");
     const id = randomUUID();
-    this.documents.set(id, { owner, html: doc.html, csp: appContentSecurityPolicy(doc.csp) });
+    this.documents.set(id, { owner, html: doc.html, csp: appContentSecurityPolicy(doc.csp), hosts: declaredHosts(doc.csp) });
+    await this.route();
     return { id, url: `${this.origin}/${id}/proxy` };
   }
   release(owner: number, id: string): void {
     if (this.documents.get(id)?.owner === owner) this.documents.delete(id);
+    void this.route();
   }
   releaseOwner(owner: number): void {
     for (const [id, doc] of this.documents) if (doc.owner === owner) this.documents.delete(id);
+    void this.route();
+  }
+  /** Points the session at this server for every connection but those to the hosts that must be reached directly. */
+  private async route(): Promise<void> {
+    if (!this.network || !this.server) return;
+    const declared = new Set([...this.documents.values()].flatMap((doc) => doc.hosts));
+    const bypass = ["<-loopback>", new URL(this.origin).host, ...this.network.direct, ...declared].join(",");
+    if (bypass === this.bypass) return;
+    this.bypass = bypass;
+    await this.network.session
+      .setProxy({ mode: "fixed_servers", proxyRules: this.origin, proxyBypassRules: bypass })
+      .catch((error: unknown) => console.warn("The MCP App sandbox could not route the window's connections:", error));
   }
   async close(): Promise<void> {
     this.documents.clear();

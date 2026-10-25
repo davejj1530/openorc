@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } fro
 import { Pressable, View } from "react-native";
 import type { SharedValue } from "react-native-reanimated";
 import { client, useLinkState, useRpc } from "../client";
-import type { LinkState } from "../connection/manager";
+import { linkReason } from "../connection/link-reason";
 import { Composer } from "../composer/Composer";
 import { useShareSettings } from "../composer/settings-bridge";
 import { useCoverHome } from "../home/home-cover";
@@ -22,6 +22,7 @@ import { useSnoozeClock } from "./snooze-clock";
 import { threadMenu } from "./thread-actions";
 import { ThreadTitle } from "./ThreadHeader";
 import { headerMenu } from "./ThreadMenu";
+import { usePanelButton } from "./use-panel-button";
 import { Transcript } from "./Transcript";
 import { useThreadActions } from "./use-thread-actions";
 import { VoicesContext, type Voice } from "./voices";
@@ -105,16 +106,6 @@ function TranscriptPane({ threadId, thread, runs, loading, failed, retry, onActi
 }
 
 /**
- * Why nothing can be sent while the phone has no session with the Mac. A first connect on its way may still carry a
- * message; a retry after trouble is not counted on.
- */
-function linkReason(state: LinkState): string | null {
-  if (state.kind === "connected" || state.kind === "unpaired") return null;
-  if (state.kind === "connecting" && state.why === null) return null;
-  return `Not connected to ${state.mac.name}`;
-}
-
-/**
  * A thread on the phone: its conversation at phone size, from the newest turn back a page at a time, with the composer
  * pinned above the keyboard. The send tree, the paging and the settings are the desktop's, from @openorc/client. The
  * header's More menu organizes the thread; marking it unread goes back to Home, since reading it here would mark it
@@ -136,7 +127,8 @@ export function ThreadScreen() {
   const [{ live, working, generatingImage }, setActivity] = useState(IDLE);
   const actions = useThreadActions(thread, { onUnread: goBack });
   const now = useSnoozeClock();
-  const menu = useMemo(() => thread && headerMenu(threadMenu(thread, "header", now), actions.run), [thread, actions.run, now]);
+  const panel = usePanelButton(thread);
+  const menu = useMemo(() => thread && headerMenu(threadMenu(thread, "header", now), actions.run, panel), [thread, actions.run, now, panel]);
   const linkState = useLinkState();
   useThreadOnScreen(linkState.kind === "unpaired" ? null : linkState.mac.id, id);
 

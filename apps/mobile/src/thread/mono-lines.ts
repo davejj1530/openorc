@@ -37,7 +37,7 @@ function expandTabs(line: string): string {
 }
 
 /** One line as a terminal leaves it, on one drawn line: a carriage return goes back to the start and draws over it. */
-function drawnLine(line: string, lineChars: number): string {
+export function drawnLine(line: string, lineChars: number): string {
   const ended = line.replace(/\r+$/, "");
   const last = expandTabs(ended.slice(ended.lastIndexOf("\r") + 1));
   return (last.length > lineChars ? `${last.slice(0, lineChars - 1)}…` : last).replace(BREAKS, " ");

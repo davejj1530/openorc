@@ -1,5 +1,6 @@
 import { Link, Stack } from "expo-router";
 import type { ReactElement } from "react";
+import { PanelButtonView, type PanelButton } from "./PanelButton";
 import type { ThreadAction } from "./thread-actions";
 
 type Run = (action: ThreadAction) => void;
@@ -50,10 +51,19 @@ function toolbarItems(actions: ThreadAction[], run: Run): ReactElement[] {
   );
 }
 
-/** The open thread's More menu in the header's trailing corner. */
-export function headerMenu(sections: ThreadAction[][], run: Run): ReactElement {
+function panelButton(button: PanelButton): ReactElement {
+  return (
+    <Stack.Toolbar.View>
+      <PanelButtonView {...button} />
+    </Stack.Toolbar.View>
+  );
+}
+
+/** The open thread's header trailing corner: the side panel's button, when the thread has one, then the More menu. */
+export function headerMenu(sections: ThreadAction[][], run: Run, panel: PanelButton | null): ReactElement {
   return (
     <Stack.Toolbar placement="right">
+      {panel ? panelButton(panel) : null}
       <Stack.Toolbar.Menu icon="ellipsis" accessibilityLabel="More">
         {sections.map((section, index) => (
           <Stack.Toolbar.Menu key={index} inline>

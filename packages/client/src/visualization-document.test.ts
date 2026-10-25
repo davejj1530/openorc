@@ -32,11 +32,16 @@ it("posts through the bridge on the phone and to the parent frame on the desktop
   const desktop = visualizationDocument("<p>x</p>");
   expect(phone).toContain("window.ReactNativeWebView.postMessage(JSON.stringify(message))");
   expect(phone).not.toContain("parent.postMessage");
-  expect(desktop).toContain("parent.postMessage(message,'*')");
+  expect(desktop).toContain("parent.postMessage(message,'*',transfer)");
   expect(desktop).not.toContain("ReactNativeWebView");
 });
 
-it("stops links on the phone's page only; the desktop's sandbox frame goes to its blocked page as before", () => {
+it("hands the desktop's host a channel as the page comes up, and the phone, whose web view reports its end, none", () => {
+  expect(visualizationDocument("<p>x</p>")).toContain("send('ui/notifications/initialized',{},(()=>{const channel=new MessageChannel();");
+  expect(visualizationDocument("<p>x</p>", { host: "react-native" })).not.toContain("MessageChannel");
+});
+
+it("stops links on the phone's page only; the desktop's sandbox frame goes to its blocked page", () => {
   expect(visualizationDocument("<p>x</p>", { host: "react-native" })).toContain("event.preventDefault()");
   expect(visualizationDocument("<p>x</p>")).not.toContain("preventDefault");
 });

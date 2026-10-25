@@ -54,8 +54,9 @@ async function check() {
   const { app, BrowserWindow, ipcMain, session } = require("electron");
   const dir = process.env.OPENORC_MCP_APPS_UI_DIR;
   app.setPath("userData", path.join(dir, "profile"));
+  const { McpAppSandbox, hostSandboxFrames, isolateSandboxFrames } = require(path.join(dir, "sandbox.cjs"));
+  isolateSandboxFrames(app.commandLine);
   await app.whenReady();
-  const { McpAppSandbox, hostSandboxFrames } = require(path.join(dir, "sandbox.cjs"));
   const { McpAppService } = require(path.join(dir, "service.cjs"));
   const sandbox = new McpAppSandbox();
   await sandbox.start({ session: session.defaultSession, direct: [] });

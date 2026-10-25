@@ -1,7 +1,7 @@
 import { createServer, type Server } from "node:http";
 import { randomBytes, randomUUID } from "node:crypto";
 import { McpAppDocument, type McpAppCsp } from "@openorc/protocol";
-import type { Session, WebContents } from "electron";
+import type { CommandLine, Session, WebContents } from "electron";
 
 /** Only CSP host sources are accepted; never keywords, schemes, paths or header syntax. */
 function domains(values: string[] = []): string[] {
@@ -30,6 +30,16 @@ export function appContentSecurityPolicy(csp: McpAppCsp): string {
     "worker-src 'none'",
     "sandbox allow-scripts",
   ].join("; ");
+}
+
+/**
+ * Gives every sandboxed frame with an opaque origin, which every MCP App and visualization page is, a renderer of its
+ * own document. Chromium otherwise shares one renderer among such frames from the same origin, here the sandbox's, so
+ * a page in an endless loop kept every other page from loading or drawing. Must run before the app is ready.
+ */
+export function isolateSandboxFrames(commandLine: Pick<CommandLine, "appendSwitch" | "getSwitchValue">): void {
+  const features = commandLine.getSwitchValue("enable-features");
+  commandLine.appendSwitch("enable-features", [features, "IsolateSandboxedIframes:grouping/per-document"].filter(Boolean).join(","));
 }
 
 /**
@@ -153,7 +163,7 @@ function proxyDocument(nonce: string): string {
         view.src = 'view';
         document.body.append(view);
       } else if (view) view.contentWindow.postMessage(data, '*');
-    } else if (view && event.source === view.contentWindow) parent.postMessage(data, '*');
+    } else if (view && event.source === view.contentWindow) parent.postMessage(data, '*', event.ports);
   });
   parent.postMessage({jsonrpc:'2.0',method:'ui/notifications/sandbox-proxy-ready',params:{}}, '*');
   </script></body></html>`;

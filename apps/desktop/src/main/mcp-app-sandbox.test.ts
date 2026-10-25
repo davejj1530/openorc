@@ -1,7 +1,7 @@
 import { visualizationCsp } from "@openorc/client";
 import { connect } from "node:net";
 import { afterEach, expect, it } from "vitest";
-import { McpAppSandbox, appContentSecurityPolicy } from "./mcp-app-sandbox";
+import { McpAppSandbox, appContentSecurityPolicy, isolateSandboxFrames } from "./mcp-app-sandbox";
 
 const hosts: McpAppSandbox[] = [];
 afterEach(async () => {
@@ -78,4 +78,13 @@ it("holds a visualization to the policy its own document carries, which is all t
     .map((directive) => directive.trim())
     .filter((directive) => directive !== "sandbox allow-scripts");
   expect(header).toEqual(visualizationCsp.split("; "));
+});
+it("gives every sandboxed document a renderer of its own, keeping the features already switched on", () => {
+  const switches = new Map([["enable-features", "PdfViewer"]]);
+  const commandLine = { getSwitchValue: (name: string) => switches.get(name) ?? "", appendSwitch: (name: string, value?: string) => void switches.set(name, value ?? "") };
+  isolateSandboxFrames(commandLine);
+  expect(switches.get("enable-features")).toBe("PdfViewer,IsolateSandboxedIframes:grouping/per-document");
+  switches.clear();
+  isolateSandboxFrames(commandLine);
+  expect(switches.get("enable-features")).toBe("IsolateSandboxedIframes:grouping/per-document");
 });

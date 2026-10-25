@@ -1,6 +1,6 @@
 import path from "node:path";
-import { redactValue } from "@openorc/db";
-import { isRemoteMethod, REMOTE_ATTACHMENT_BYTES, rpcParams, type RemoteMethod, type RemotePush, type RpcParams } from "@openorc/protocol";
+import { redact, redactValue } from "@openorc/db";
+import { isRemoteMethod, REMOTE_ATTACHMENT_BYTES, rpcParams, type RemoteMethod, type RemotePush, type RpcParams, type RpcResults } from "@openorc/protocol";
 import type { Broadcast } from "../transport.js";
 
 /*
@@ -12,6 +12,8 @@ import type { Broadcast } from "../transport.js";
 export interface GuardContext {
   /** The only folder a phone's attachment paths may name. */
   attachmentsDir: string;
+  /** A thread as the guards need it, read synchronously; null when there is no such thread. */
+  thread(id: string): { team: boolean } | null;
 }
 
 /** Null admits; a string refuses with that message. Guards see params already parsed by the method's schema. */
@@ -27,6 +29,12 @@ const SNOOZE_HORIZON_MS = 366 * 24 * 60 * 60 * 1000;
 const TITLE_MAX = 200;
 /** Control characters, line and paragraph breaks, and bidi overrides and isolates: a title goes into briefs, logs and notifications. */
 const TITLE_FORBIDDEN = /[\p{Cc}\p{Zl}\p{Zp}\u202A-\u202E\u2066-\u2069]/u;
+/** A commit message keeps tabs and line feeds, and nothing else that moves a terminal or reorders text. */
+const MESSAGE_FORBIDDEN = /(?![\t\n])[\p{Cc}\u202A-\u202E\u2066-\u2069]/u;
+const COMMIT_MESSAGE_MAX = 10_000;
+/** GitHub's own limits for a pull request's title and body. */
+const PR_TITLE_MAX = 256;
+const PR_BODY_MAX = 65_536;
 
 /** Each path must be an image this profile stored with attachments.save. */
 function storedImages(paths: readonly string[] | undefined, { attachmentsDir }: GuardContext): string | null {
@@ -44,6 +52,25 @@ function phoneSnooze(until: number | null | undefined): string | null {
   if (until === undefined || until === null) return null;
   const now = Date.now();
   return until > now && until <= now + SNOOZE_HORIZON_MS ? null : "Choose a time within the next year.";
+}
+
+/** A team's Git availability comes from its own projection, which a phone does not read, so its work is published on the Mac. */
+function teamWork(threadId: string, { thread }: GuardContext): string | null {
+  return thread(threadId)?.team ? "Publish a team's work on your Mac." : null;
+}
+
+function commitMessage(message: string): string | null {
+  return [...message].length <= COMMIT_MESSAGE_MAX && !MESSAGE_FORBIDDEN.test(message)
+    ? null
+    : `A commit message must be plain text of up to ${COMMIT_MESSAGE_MAX.toLocaleString("en-US")} characters.`;
+}
+
+function prTitle(title: string): string | null {
+  return title.trim() && [...title].length <= PR_TITLE_MAX && !TITLE_FORBIDDEN.test(title) ? null : `A pull request title must be one line of up to ${PR_TITLE_MAX} characters.`;
+}
+
+function prBody(body: string): string | null {
+  return [...body].length <= PR_BODY_MAX ? null : `A pull request body must be up to ${PR_BODY_MAX.toLocaleString("en-US")} characters.`;
 }
 
 function threadUpdate({ taskId, patch }: RpcParams<"threads.update">): string | null {
@@ -81,7 +108,77 @@ export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {
   "threads.sendQueued": allow,
   "approvals.resolve": allow,
   "attachments.save": (params) => (params.dataBase64.length > MAX_ATTACHMENT_BASE64 ? `Images sent from a phone must be ${REMOTE_ATTACHMENT_BYTES / 1024 / 1024} MB or smaller.` : null),
+  // Repository-relative paths and counts.
+  "review.threadChanges": allow,
+  // The schema's FolderPath and the core's own check that the file is among the changes hold the path.
+  "review.threadFileDiff": allow,
+  "git.threadLog": allow,
+  "git.threadPushState": allow,
+  "review.threadPrTemplate": allow,
+  // Branch names; one gh call.
+  "pulls.branches": allow,
+  "system.gh": allow,
+  // The core's mutation fence and the user's own hooks and gh login, exactly as for a window.
+  "review.commitThread": (params, context) => teamWork(params.threadId, context) ?? commitMessage(params.message),
+  "review.pushThread": (params, context) => teamWork(params.threadId, context),
+  "review.createThreadPr": (params, context) => teamWork(params.threadId, context) ?? prTitle(params.title) ?? prBody(params.body),
 };
+
+/** What a reply's shaping needs besides the result: how an error or a reason reads on a phone. */
+export interface ReplyContext {
+  words: (message: string) => string;
+}
+type Reply<M extends RemoteMethod> = (result: RpcResults[M], context: ReplyContext) => RpcResults[M];
+const same = <T>(result: T): T => result;
+
+/**
+ * What a phone hears of each result. Typed over REMOTE_METHODS like the guards, so a method added later must say how
+ * its result is shaped. Guards see only params: file text, commit subjects and a repository's template can hold a
+ * token the ledger would have redacted.
+ */
+export const remoteReplies: { [M in RemoteMethod]: Reply<M> } = {
+  "projects.list": same,
+  "projects.get": same,
+  "projects.git": same,
+  "threads.list": same,
+  "threads.get": same,
+  "threads.messages": same,
+  "threads.lastMessage": same,
+  "runs.listForThread": same,
+  "events.page": same,
+  "events.toolOutput": same,
+  "inbox.list": same,
+  "agents.models": same,
+  "agents.availability": same,
+  "providers.limits": same,
+  "app.settings.get": same,
+  "threads.start": same,
+  "threads.update": same,
+  "runs.start": same,
+  "runs.send": same,
+  "runs.interrupt": same,
+  "threads.queue": same,
+  "threads.unqueue": same,
+  "threads.sendQueued": same,
+  "approvals.resolve": same,
+  "attachments.save": same,
+  "review.threadChanges": same,
+  "review.threadFileDiff": (diff) => ({ ...diff, patch: redact(diff.patch).text }),
+  "git.threadLog": (log) => redactValue(log).value,
+  // Why Push is blocked can be Git's own error, which names the Mac's folders.
+  "git.threadPushState": (state, { words }) => (state.blocked ? { ...state, blocked: words(state.blocked) } : state),
+  "review.threadPrTemplate": (template) => redactValue(template).value,
+  "pulls.branches": same,
+  "system.gh": same,
+  "review.commitThread": same,
+  "review.pushThread": same,
+  "review.createThreadPr": same,
+};
+
+/** One result shaped for a phone by its method's entry in remoteReplies. */
+export function remoteReply<M extends RemoteMethod>(method: M, result: RpcResults[M], context: ReplyContext): RpcResults[M] {
+  return (remoteReplies[method] as Reply<M>)(result, context);
+}
 
 export type RemoteAdmission = { ok: true } | { ok: false; message: string };
 

@@ -32,6 +32,18 @@ export const REMOTE_METHODS = [
   "threads.sendQueued",
   "approvals.resolve",
   "attachments.save",
+  // A thread's changes, its commits and what Push would send, then commit, push and a pull request through the
+  // desktop's own methods. Never the whole patch (`review.threadDiff`) or the Mac's paths (`system.info`).
+  "review.threadChanges",
+  "review.threadFileDiff",
+  "git.threadLog",
+  "git.threadPushState",
+  "review.threadPrTemplate",
+  "pulls.branches",
+  "system.gh",
+  "review.commitThread",
+  "review.pushThread",
+  "review.createThreadPr",
 ] as const satisfies readonly RpcMethod[];
 export type RemoteMethod = (typeof REMOTE_METHODS)[number];
 

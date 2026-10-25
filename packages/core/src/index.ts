@@ -3,6 +3,7 @@ export type { OpenOrcOptions } from "./options.js";
 export { ShellEnvironment, type EnvSnapshot, type HarnessBinaries, type RefreshResult, type ShellProbe } from "./services/shell-environment.js";
 export { FrameCoalescer } from "./frames.js";
 export type { Broadcast, Logger, RpcReply, Transport } from "./transport.js";
+export type { RequestOrigin } from "./request-origin.js";
 export { slugify, portBlockFor } from "./services/workspace.js";
 export type { SlackSecretStore } from "./services/slack/service.js";
 export type { ProtectedSecretStore } from "./services/extraction-credentials.js";

@@ -1,5 +1,6 @@
+import os from "node:os";
 import path from "node:path";
-import { remoteDevices, remotePushTargets, settings, type Db, type LedgerWriter, type RemoteDeviceRecord } from "@openorc/db";
+import { orchestration, projects, remoteDevices, remotePushTargets, settings, threads, type Db, type LedgerWriter, type RemoteDeviceRecord } from "@openorc/db";
 import { acceptLink, encodePairingUrl, fromBase64Url, LinkCloseCode, toBase64Url, type Admission, type ClosingReason, type KeyPair, type LinkSocket, type PhoneHello } from "@openorc/link";
 import { nodeCrypto } from "@openorc/link/node";
 import {
@@ -320,7 +321,8 @@ export class RemoteAccess {
     const { dataDir, db, ledger } = this.options;
     const session = new RemoteSession(accepted.value.id, accepted.session, {
       answer,
-      guard: { attachmentsDir: path.join(dataDir, "attachments") },
+      guard: { attachmentsDir: path.join(dataDir, "attachments"), thread: (id) => (threads.get(db, id) ? { team: Boolean(orchestration.getInstance(db, id)) } : null) },
+      roots: () => ({ home: os.homedir(), dataDir, projects: projects.list(db, { includeRemoved: true }).map((project) => project.rootPath) }),
       readAsset: (ref) => readRemoteAsset(ref, { dataDir, db, ledger }),
       device: (deviceId, method, params) => this.device(deviceId, method, params),
     });

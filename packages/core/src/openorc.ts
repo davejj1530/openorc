@@ -96,6 +96,8 @@ import { TaskCheckoutService } from "./services/task-checkout.js";
 import { TaskCommentService } from "./services/task-comments.js";
 import { TaskForwardingService } from "./services/task-forwarding.js";
 import { TeamConversationService } from "./services/team-conversation.js";
+import { DELETED_BY_ID, DELETED_BY_THREAD, TASK_SCOPED } from "./team-request-methods.js";
+import { requestOrigin, type RequestOrigin } from "./request-origin.js";
 import { TeamCoordinator } from "./services/team-coordinator.js";
 import { TeamDeletionService } from "./services/team-deletions.js";
 import { TeamForkService } from "./services/team-forks.js";
@@ -580,9 +582,10 @@ export class OpenOrc {
 
   /**
    * Dispatch one renderer request and resolve to its reply. Never rejects: failures resolve to rpc.error. The caller
-   * posts the reply on the port the request came from, because every window counts request ids from 1.
+   * posts the reply on the port the request came from, because every window counts request ids from 1. A phone's
+   * request names its origin, which the handler's audit rows can read for as long as it runs.
    */
-  async handle(request: RpcRequest): Promise<RpcReply> {
+  async handle(request: RpcRequest, origin?: RequestOrigin): Promise<RpcReply> {
     const { id, method } = request;
     const privateParams = method.startsWith("slack.") || method === "memory.settings.set" || method === "remote.push.setKey";
     try {
@@ -592,7 +595,7 @@ export class OpenOrc {
       this.guardTeamRequest(method as RpcMethod, parsed.data);
       const handler = this.handlers[method as RpcMethod] as (p: unknown) => Promise<unknown> | unknown;
       const started = Date.now();
-      const result = await handler(parsed.data);
+      const result = await requestOrigin.run(origin, () => handler(parsed.data));
       if (process.env["OPENORC_RPC_LOG"] === "1") {
         console.log(`[rpc] ${method} ${privateParams ? "[private]" : JSON.stringify(parsed.data).slice(0, 120)} -> ${resultSummary(result)} in ${Date.now() - started} ms`);
       }
@@ -610,51 +613,11 @@ export class OpenOrc {
     const params = value as Record<string, unknown>;
     const pinned = (id: unknown) => typeof id === "string" && Boolean(orchestration.getInstance(this.db, id));
     const ownedTask = (id: unknown) => typeof id === "string" && Boolean(teamRuntime.assignmentForTask(this.db, id) || pinned(tasks.get(this.db, id)?.threadId));
-    // A deleted conversation is reachable only through its saved tasks. Generic
-    // thread reads and mutations must not resurrect it; historical file reads stay.
     const hidden = (id: unknown) => typeof id === "string" && teamDeletedThreads.has(this.db, id);
-    if (
-      ([
-        "threads.fork",
-        "threads.moveWorkspace",
-        "threads.cancelMove",
-        "threads.compact",
-        "threads.queue",
-        "threads.unqueue",
-        "threads.sendQueued",
-        "threads.stopCommand",
-        "threads.checkpoints",
-        "threads.turnChanges",
-        "threads.restore",
-        "threads.send",
-      ].includes(method) &&
-        hidden(params["id"])) ||
-      (["review.threadDiff", "review.commitThread", "review.pushThread", "review.createThreadPr", "review.threadPrTemplate", "git.threadLog", "git.threadPushState", "runs.listForThread"].includes(
-        method,
-      ) &&
-        hidden(params["threadId"]))
-    ) {
+    if ((DELETED_BY_ID.has(method) && hidden(params["id"])) || (DELETED_BY_THREAD.has(method) && hidden(params["threadId"]))) {
       throw new Error("This conversation was deleted. Its saved tasks keep their team activity and controls.");
     }
-    if (
-      [
-        "orchestration.turnChanges",
-        "orchestration.stop",
-        "orchestration.retry",
-        "orchestration.compact",
-        "orchestration.cancelDirection",
-        "orchestration.sendNow",
-        "orchestration.implementPlan",
-        "orchestration.send",
-        "orchestration.configureLead",
-        "orchestration.workspace.retrySetup",
-        "orchestration.workspace.acceptSetup",
-        "orchestration.integration.retry",
-        "orchestration.integration.accept",
-      ].includes(method)
-    ) {
-      this.teamConversations.assertTaskScope(params["threadId"] as string, params["taskId"] as string | undefined);
-    }
+    if (TASK_SCOPED.has(method)) this.teamConversations.assertTaskScope(params["threadId"] as string, params["taskId"] as string | undefined);
     const taskId = params["taskId"] ?? params["id"];
     const forwarding = typeof taskId === "string" ? (taskForwardings.target(this.db, taskId) ?? taskForwardings.source(this.db, taskId)) : null;
     if (

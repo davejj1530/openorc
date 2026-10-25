@@ -1,12 +1,14 @@
 import { LinkCloseCode, type ClosingReason, type MacMessage, type MacSession, type PhoneMessage } from "@openorc/link";
-import { deviceRpcParams, isDeviceMethod, type AssetRef, type DeviceMethod, type DeviceParams, type RemotePush, type RpcRequest } from "@openorc/protocol";
+import { deviceRpcParams, isDeviceMethod, isRemoteMethod, type AssetRef, type DeviceMethod, type DeviceParams, type RemotePush, type RpcRequest } from "@openorc/protocol";
 import { invalidParamsMessage } from "../handlers/diagnostics.js";
+import type { RequestOrigin } from "../request-origin.js";
 import type { ImageFileRead } from "../services/profile-assets.js";
 import type { RpcReply } from "../transport.js";
-import { admitRemoteRequest, type GuardContext } from "./policy.js";
+import { remoteError, type MacRoots } from "./phone-words.js";
+import { admitRemoteRequest, remoteReply, type GuardContext } from "./policy.js";
 
-/** The request path the windows use: counted while in flight and refused while the app restarts. */
-export type Answer = (request: RpcRequest) => Promise<RpcReply>;
+/** The request path the windows use: counted while in flight and refused while the app restarts. A phone's request names its origin. */
+export type Answer = (request: RpcRequest, origin?: RequestOrigin) => Promise<RpcReply>;
 
 const BATCH_MS = 50;
 /** A phone sends at least a ping more often than this; a session that hears nothing for this long ends. */
@@ -20,6 +22,8 @@ const MAX_ASSET_STREAMS = 4;
 export interface SessionDeps {
   answer: Answer;
   guard: GuardContext;
+  /** The Mac's folders as they are now, which no error or reason a phone hears may name. */
+  roots(): MacRoots;
   readAsset(ref: AssetRef): Promise<ImageFileRead>;
   /** A method about the calling phone itself, for the session's own device. */
   device(deviceId: string, method: DeviceMethod, params: DeviceParams<DeviceMethod>): Promise<unknown>;
@@ -149,11 +153,15 @@ export class RemoteSession {
     }
   }
 
+  /** Hook output and Git's stderr can hold a token, and Git names the Mac's folders. */
+  private readonly words = (message: string): string => remoteError(message, this.deps.roots());
+
+  /** Every error passes remoteError. */
   private async call(id: number, method: string, params: unknown): Promise<void> {
     const reply = await this.reply(id, method, params).catch((error: unknown): RpcReply => ({ type: "rpc.error", id, message: error instanceof Error ? error.message : String(error) }));
     if (this.link.closed) return;
     this.flush();
-    this.link.send(reply.type === "rpc.result" ? { t: "rpc.result", id, result: reply.result } : { t: "rpc.error", id, message: reply.message });
+    this.link.send(reply.type === "rpc.result" ? { t: "rpc.result", id, result: reply.result } : { t: "rpc.error", id, message: this.words(reply.message) });
   }
 
   /** A method about this phone is answered for its own device id, so it can never name another; the rest goes to the core. */
@@ -164,7 +172,9 @@ export class RemoteSession {
       return { type: "rpc.result", id, result: await this.deps.device(this.deviceId, method, parsed.data) };
     }
     const admission = admitRemoteRequest(method, params, this.deps.guard);
-    return admission.ok ? this.deps.answer({ type: "rpc", id, method, params }) : { type: "rpc.error", id, message: admission.message };
+    if (!admission.ok || !isRemoteMethod(method)) return { type: "rpc.error", id, message: admission.ok ? "This is not available from a phone." : admission.message };
+    const reply = await this.deps.answer({ type: "rpc", id, method, params }, { kind: "phone", deviceId: this.deviceId });
+    return reply.type === "rpc.result" ? { ...reply, result: remoteReply(method, reply.result as never, { words: this.words }) } : reply;
   }
 
   private async asset(id: number, ref: AssetRef): Promise<void> {

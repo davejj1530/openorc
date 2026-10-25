@@ -253,9 +253,9 @@ describe("team Git admission through the public runtime", () => {
     await finish(thread.id);
     const { sha } = await call("review.commitThread", { threadId: thread.id, message: "Integrated team changes" });
     const branch = `openorc/team-${thread.id}`;
-    expect(await call("git.threadPushState", { threadId: thread.id })).toEqual({ branch, blocked: null, published: false, unpushedCount: 1, unpushed: [sha] });
+    expect(await call("git.threadPushState", { threadId: thread.id })).toEqual({ branch, blocked: null, published: false, unpushedCount: 1, unpushed: [sha], busy: false });
     await call("review.pushThread", { threadId: thread.id });
-    expect(await call("git.threadPushState", { threadId: thread.id })).toEqual({ branch, blocked: null, published: true, unpushedCount: 0, unpushed: [] });
+    expect(await call("git.threadPushState", { threadId: thread.id })).toEqual({ branch, blocked: null, published: true, unpushedCount: 0, unpushed: [], busy: false });
   });
 
   it("rejects new execution admission while PR readiness awaits, then allows the unchanged request after release", async () => {

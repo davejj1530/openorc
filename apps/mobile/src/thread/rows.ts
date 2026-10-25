@@ -1,9 +1,11 @@
-import { isLive, reasoningSections, turnReply, workParts, workTiming, workTurns, type Block } from "@openorc/client";
+import { isLive, reasoningSections, turnReply, visualizationFromTool, workParts, workTiming, workTurns, type Block } from "@openorc/client";
+import type { Visualization } from "@openorc/protocol";
 import { height } from "../generated/tokens";
 import { messagePieces } from "./markdown-chunks";
 import type { WaitingApproval } from "./waiting-approvals";
 
 export type MessageBlock = Extract<Block, { kind: "message" }>;
+type ToolBlock = Extract<Block, { kind: "tool" }>;
 
 /** The live block a turn's work line follows: a step still running, the reply streaming after the work, or nothing. */
 export type WorkNow = Block | "reply" | null;
@@ -27,6 +29,8 @@ export type Row = { key: string; gap: number } & (
   | { kind: "card"; runId: string; block: Block }
   /** The run that asks what the cards after it ask, outside the loaded conversation: its task's title, or its agent's. */
   | { kind: "waiting"; runId: string; title: string | null }
+  /** An explanation the agent drew with the visualize tool, in a web view of its own. */
+  | { kind: "visualization"; runId: string; block: ToolBlock; visualization: Visualization }
   /** Copy for a finished turn's reply. */
   | { kind: "actions"; text: string }
   | { kind: "presence"; working: boolean }
@@ -103,6 +107,7 @@ const sameAs: { [K in RowKind]: (a: RowOf<K>, b: RowOf<K>) => boolean } = {
   notice: sameBlock,
   card: sameBlock,
   waiting: (a, b) => a.runId === b.runId && a.title === b.title,
+  visualization: sameBlock,
   actions: (a, b) => a.text === b.text,
   presence: (a, b) => a.working === b.working,
   head: (a, b) => a.live === b.live && a.writing === b.writing && a.startedAt === b.startedAt && a.durationMs === b.durationMs && a.outcome === b.outcome && a.runId === b.runId,
@@ -140,6 +145,8 @@ function replyRows(block: MessageBlock, runId: string): Unspaced[] {
 function afterRows(block: Block, runId: string): Unspaced[] {
   if (block.kind === "message" && block.role === "assistant" && !/^API Error:/.test(block.text)) return replyRows(block, runId);
   if (block.kind === "message" && block.role === "system") return [{ kind: "notice", key: `notice:${block.id}`, block }];
+  const visualization = block.kind === "tool" ? visualizationFromTool(block) : null;
+  if (block.kind === "tool" && visualization) return [{ kind: "visualization", key: `visualization:${block.id}`, runId, block, visualization }];
   return [{ kind: "card", key: `card:${block.id}`, runId, block }];
 }
 

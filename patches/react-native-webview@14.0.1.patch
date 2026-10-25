@@ -1,0 +1,322 @@
+diff --git a/apple/RNCWebView.mm b/apple/RNCWebView.mm
+index 2be787788bbfdfefe8e327f3aac3c86bf300874d..1908d371180402ae3daf5f3ac35c58c7b5cf4728 100644
+--- a/apple/RNCWebView.mm
++++ b/apple/RNCWebView.mm
+@@ -309,6 +309,7 @@ static inline std::string nullSafeStringWithLength(id value) {
+     REMAP_WEBVIEW_PROP(hideKeyboardAccessoryView)
+     REMAP_WEBVIEW_PROP(allowsBackForwardNavigationGestures)
+     REMAP_WEBVIEW_PROP(incognito)
++    REMAP_WEBVIEW_PROP(sandboxed)
+     REMAP_WEBVIEW_PROP(pagingEnabled)
+     REMAP_WEBVIEW_STRING_PROP(applicationNameForUserAgent)
+     REMAP_WEBVIEW_PROP(cacheEnabled)
+diff --git a/apple/RNCWebViewImpl.h b/apple/RNCWebViewImpl.h
+index 1f637c1d761c867ac5b63c1e16de866798944fc8..5f59dac90d75b2a4c9636173ebfff7b0bb49ae0e 100644
+--- a/apple/RNCWebViewImpl.h
++++ b/apple/RNCWebViewImpl.h
+@@ -92,6 +92,8 @@ shouldStartLoadForRequest:(NSMutableDictionary<NSString *, id> *)request
+ @property (nonatomic, assign) BOOL removeIosKeyboardObserver;
+ @property (nonatomic, assign) BOOL allowsBackForwardNavigationGestures;
+ @property (nonatomic, assign) BOOL incognito;
++// The page is untrusted and reaches nothing outside itself; see RNCWebViewImpl.m.
++@property (nonatomic, assign) BOOL sandboxed;
+ @property (nonatomic, assign) BOOL useSharedProcessPool;
+ @property (nonatomic, copy) NSString * _Nullable userAgent;
+ @property (nonatomic, copy) NSString * _Nullable applicationNameForUserAgent;
+diff --git a/apple/RNCWebViewImpl.m b/apple/RNCWebViewImpl.m
+index 38904266dc37b006274104f4680778ffbfece369..7d125d34a64746547b89e2cd9a843759dc59315c 100644
+--- a/apple/RNCWebViewImpl.m
++++ b/apple/RNCWebViewImpl.m
+@@ -16,6 +16,7 @@
+ #endif // !TARGET_OS_OSX
+ 
+ #import "objc/runtime.h"
++#import <Network/Network.h>
+ 
+ static NSTimer *keyboardTimer;
+ static NSString *const HistoryShimName = @"ReactNativeHistoryShim";
+@@ -23,6 +24,65 @@ static NSString *const MessageHandlerName = @"ReactNativeWebView";
+ static NSURLCredential* clientAuthenticationCredential;
+ static NSDictionary* customCertificatesForHost;
+ 
++/**
++ * A sandboxed page is untrusted, so the web view keeps it from reaching anything outside itself, below the page's own
++ * policy: WebKit does not hold WebRTC, `<link rel=preconnect>` or the connection it opens to a link's host as the link
++ * is followed (before any navigation policy is asked) to a content security policy.
++ *
++ * - Lockdown Mode, which takes WebRTC away along with other features an untrusted page has no need for.
++ * - Content rules that refuse every http(s) and ws(s) load WebKit checks against them, `<link rel=preconnect>` too.
++ * - One ephemeral data store for every sandboxed page of the app session (making and dropping one per page costs the
++ *   UI thread a frame or two; its pages have opaque origins and keep nothing in it), whose connections all go through
++ *   a proxy at port 0 of the phone, where nothing can listen, with no way around it: a followed link's host is never
++ *   reached or looked up. The system never proxies the phone's own addresses or link-local ones (169.254.0.0/16), so a
++ *   link a page clicks outside its document can still open a connection to those, though nothing is sent on it.
++ * - JavaScript dialogs answered at once, as a sandboxed frame without allow-modals answers them, so a page can neither
++ *   put a native alert over the app nor ask the reader for text.
++ *
++ * A system without data store proxies (before iOS 17) cannot keep a page from the network, so it does not load one.
++ */
++static NSString *const SandboxRulesIdentifier = @"RNCWebViewSandbox";
++static NSString *const SandboxRules = @"[{\"trigger\":{\"url-filter\":\"^https?:\"},\"action\":{\"type\":\"block\"}},{\"trigger\":{\"url-filter\":\"^wss?:\"},\"action\":{\"type\":\"block\"}}]";
++
++/** The data store every sandboxed page shares for the app session, with no way to the network. */
++static WKWebsiteDataStore *RNCSandboxDataStore(void)
++{
++  static WKWebsiteDataStore *store;
++  if (!store) {
++    store = [WKWebsiteDataStore nonPersistentDataStore];
++    if (@available(iOS 17.0, macOS 14.0, *)) {
++      nw_proxy_config_t nowhere = nw_proxy_config_create_http_connect(nw_endpoint_create_host("127.0.0.1", "0"), nil);
++      nw_proxy_config_set_failover_allowed(nowhere, false);
++      store.proxyConfigurations = @[nowhere];
++    }
++  }
++  return store;
++}
++
++/** Hands `ready` the sandbox's rules, compiled once for the app; nil if they could not compile. */
++static void RNCWithSandboxRules(void (^ready)(WKContentRuleList *_Nullable rules))
++{
++  static WKContentRuleList *compiled;
++  static NSMutableArray *waiting;
++  if (compiled) {
++    ready(compiled);
++    return;
++  }
++  if (waiting) {
++    [waiting addObject:ready];
++    return;
++  }
++  waiting = [NSMutableArray arrayWithObject:ready];
++  [WKContentRuleListStore.defaultStore compileContentRuleListForIdentifier:SandboxRulesIdentifier encodedContentRuleList:SandboxRules completionHandler:^(WKContentRuleList *rules, NSError *error) {
++    compiled = rules;
++    NSArray *blocks = waiting;
++    waiting = nil;
++    for (void (^block)(WKContentRuleList *) in blocks) {
++      block(rules);
++    }
++  }];
++}
++
+ NSString *const CUSTOM_SELECTOR = @"_CUSTOM_SELECTOR_";
+ 
+ #if TARGET_OS_IOS
+@@ -137,6 +197,7 @@ RCTAutoInsetsProtocol>
+ #endif // !TARGET_OS_OSX
+   BOOL _savedHideKeyboardAccessoryView;
+   BOOL _savedKeyboardDisplayRequiresUserAction;
++  BOOL _sandboxRulesAdded;
+ 
+   // Workaround for StatusBar appearance bug for iOS 12
+   // https://github.com/react-native-webview/react-native-webview/issues/62
+@@ -459,7 +520,9 @@ RCTAutoInsetsProtocol>
+   if (_prefsUsed) {
+     wkWebViewConfig.preferences = prefs;
+   }
+-  if (_incognito) {
++  if (_sandboxed) {
++    wkWebViewConfig.websiteDataStore = RNCSandboxDataStore();
++  } else if (_incognito) {
+     wkWebViewConfig.websiteDataStore = [WKWebsiteDataStore nonPersistentDataStore];
+   } else if (_cacheEnabled) {
+     wkWebViewConfig.websiteDataStore = [WKWebsiteDataStore defaultDataStore];
+@@ -473,6 +536,11 @@ RCTAutoInsetsProtocol>
+   if (@available(iOS 13.0, *)) {
+     WKWebpagePreferences *pagePrefs = [[WKWebpagePreferences alloc]init];
+     pagePrefs.preferredContentMode = _contentMode;
++    if (_sandboxed) {
++      if (@available(iOS 16.0, macOS 13.0, *)) {
++        pagePrefs.lockdownModeEnabled = YES;
++      }
++    }
+     wkWebViewConfig.defaultWebpagePreferences = pagePrefs;
+   }
+ #endif
+@@ -517,6 +585,7 @@ RCTAutoInsetsProtocol>
+   if (self.window != nil && _webView == nil) {
+     WKWebViewConfiguration *wkWebViewConfig = [self setUpWkWebViewConfig];
+     _webView = [[RNCWKWebView alloc] initWithFrame:self.bounds configuration: wkWebViewConfig];
++    _sandboxRulesAdded = NO;
+     [self setBackgroundColor: _savedBackgroundColor];
+ #if !TARGET_OS_OSX
+     // Apply once at creation time. The prop is documented as non-reactive —
+@@ -789,6 +858,11 @@ RCTAutoInsetsProtocol>
+ - (void)userContentController:(WKUserContentController *)userContentController
+       didReceiveScriptMessage:(WKScriptMessage *)message
+ {
++  // Both handlers carry strings, but a page can post anything to them, `undefined` included, which arrives as nil and
++  // cannot go into an event.
++  if (![message.body isKindOfClass:[NSString class]]) {
++    return;
++  }
+   if ([message.name isEqualToString:HistoryShimName]) {
+     if (_onLoadingFinish) {
+       NSMutableDictionary<NSString *, id> *event = [self baseEvent];
+@@ -799,7 +873,7 @@ RCTAutoInsetsProtocol>
+     if (_onMessage) {
+       NSMutableDictionary<NSString *, id> *event = [self baseEvent];
+       [event addEntriesFromDictionary: @{@"data": message.body}];
+-      [event addEntriesFromDictionary: @{@"url": message.frameInfo.request.URL.absoluteString}];
++      [event addEntriesFromDictionary: @{@"url": message.frameInfo.request.URL.absoluteString ?: @""}];
+       _onMessage(event);
+     }
+   }
+@@ -847,8 +921,51 @@ RCTAutoInsetsProtocol>
+ }
+ 
+ 
++/**
++ * Whether a sandboxed page may load now. Its rules go into its web view before the first load, which follows as soon
++ * as they are ready (at once once they have been compiled); where the sandbox cannot hold, the page never loads and
++ * the web view says why.
++ */
++- (BOOL)prepareSandbox
++{
++  if (_sandboxRulesAdded) {
++    return YES;
++  }
++  if (@available(iOS 17.0, macOS 14.0, *)) {
++    __weak RNCWebViewImpl *weakSelf = self;
++    RNCWithSandboxRules(^(WKContentRuleList *rules) {
++      RNCWebViewImpl *strongSelf = weakSelf;
++      if (!strongSelf || !strongSelf->_webView || strongSelf->_sandboxRulesAdded) {
++        return;
++      }
++      if (!rules) {
++        [strongSelf failSandbox:@"The page's sandbox could not be set up."];
++        return;
++      }
++      [strongSelf->_webView.configuration.userContentController addContentRuleList:rules];
++      strongSelf->_sandboxRulesAdded = YES;
++      [strongSelf visitSource];
++    });
++  } else {
++    [self failSandbox:@"This system cannot keep the page offline."];
++  }
++  return NO;
++}
++
++- (void)failSandbox:(NSString *)reason
++{
++  if (_onLoadingError) {
++    NSMutableDictionary<NSString *, id> *event = [self baseEvent];
++    [event addEntriesFromDictionary:@{@"domain": @"RNCWebViewSandbox", @"code": @0, @"description": reason}];
++    _onLoadingError(event);
++  }
++}
++
+ - (void)visitSource
+ {
++  if (_sandboxed && ![self prepareSandbox]) {
++    return;
++  }
+   // Check for a static html source first
+   NSString *html = [RCTConvert NSString:_source[@"html"]];
+   if (html) {
+@@ -1215,6 +1332,10 @@ RCTAutoInsetsProtocol>
+  */
+ - (void)webView:(WKWebView *)webView runJavaScriptAlertPanelWithMessage:(NSString *)message initiatedByFrame:(WKFrameInfo *)frame completionHandler:(void (^)(void))completionHandler
+ {
++  if (_sandboxed) {
++    completionHandler();
++    return;
++  }
+ #if !TARGET_OS_OSX
+   UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"" message:message preferredStyle:UIAlertControllerStyleAlert];
+   [alert addAction:[UIAlertAction actionWithTitle:@"Ok" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
+@@ -1234,6 +1355,10 @@ RCTAutoInsetsProtocol>
+  * confirm
+  */
+ - (void)webView:(WKWebView *)webView runJavaScriptConfirmPanelWithMessage:(NSString *)message initiatedByFrame:(WKFrameInfo *)frame completionHandler:(void (^)(BOOL))completionHandler{
++  if (_sandboxed) {
++    completionHandler(NO);
++    return;
++  }
+ #if !TARGET_OS_OSX
+   UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"" message:message preferredStyle:UIAlertControllerStyleAlert];
+   [alert addAction:[UIAlertAction actionWithTitle:@"Ok" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
+@@ -1259,6 +1384,10 @@ RCTAutoInsetsProtocol>
+  * prompt
+  */
+ - (void)webView:(WKWebView *)webView runJavaScriptTextInputPanelWithPrompt:(NSString *)prompt defaultText:(NSString *)defaultText initiatedByFrame:(WKFrameInfo *)frame completionHandler:(void (^)(NSString *))completionHandler{
++  if (_sandboxed) {
++    completionHandler(nil);
++    return;
++  }
+ #if !TARGET_OS_OSX
+   UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"" message:prompt preferredStyle:UIAlertControllerStyleAlert];
+   [alert addTextFieldWithConfigurationHandler:^(UITextField *textField) {
+diff --git a/apple/RNCWebViewManager.mm b/apple/RNCWebViewManager.mm
+index a510ffd9ce9d2d78df46803ca9966ea38c49d27c..13407f76fb01c8c7360c76d58166d19b5893bbbe 100644
+--- a/apple/RNCWebViewManager.mm
++++ b/apple/RNCWebViewManager.mm
+@@ -74,6 +74,7 @@ RCT_EXPORT_VIEW_PROPERTY(hideKeyboardAccessoryView, BOOL)
+ RCT_EXPORT_VIEW_PROPERTY(removeIosKeyboardObserver, BOOL)
+ RCT_EXPORT_VIEW_PROPERTY(allowsBackForwardNavigationGestures, BOOL)
+ RCT_EXPORT_VIEW_PROPERTY(incognito, BOOL)
++RCT_EXPORT_VIEW_PROPERTY(sandboxed, BOOL)
+ RCT_EXPORT_VIEW_PROPERTY(pagingEnabled, BOOL)
+ RCT_EXPORT_VIEW_PROPERTY(applicationNameForUserAgent, NSString)
+ RCT_EXPORT_VIEW_PROPERTY(cacheEnabled, BOOL)
+diff --git a/lib/RNCWebViewNativeComponent.d.ts b/lib/RNCWebViewNativeComponent.d.ts
+index 6b789f988382b14e4c615d2289fb77a424270430..816f59d5cf275abcc6ccf4109399bce2900063c6 100644
+--- a/lib/RNCWebViewNativeComponent.d.ts
++++ b/lib/RNCWebViewNativeComponent.d.ts
+@@ -190,6 +190,7 @@ export interface NativeProps extends ViewProps {
+     }>;
+     cacheEnabled?: WithDefault<boolean, true>;
+     incognito?: boolean;
++    sandboxed?: boolean;
+     injectedJavaScript?: string;
+     injectedJavaScriptBeforeContentLoaded?: string;
+     injectedJavaScriptForMainFrameOnly?: WithDefault<boolean, true>;
+diff --git a/lib/WebViewTypes.d.ts b/lib/WebViewTypes.d.ts
+index f666e8142adcf0e976d60024065291fb291ec012..02989cb73c545a57717d4bc251281e6adc63d70e 100644
+--- a/lib/WebViewTypes.d.ts
++++ b/lib/WebViewTypes.d.ts
+@@ -271,6 +271,14 @@ export interface IOSWebViewProps extends WebViewSharedProps {
+      * Does not store any data within the lifetime of the WebView.
+      */
+     incognito?: boolean;
++    /**
++     * Treats the page as untrusted and keeps it from anything outside itself, below its own policy: Lockdown Mode
++     * (no WebRTC), no http(s) or ws(s) load WebKit checks against content rules, a proxy that does not exist for every
++     * connection but those to the phone's own and link-local addresses, and JavaScript dialogs answered at once
++     * without showing. Before iOS 17 the page does not load and `onError` says why.
++     * @platform ios
++     */
++    sandboxed?: boolean;
+     /**
+      * Boolean value that determines whether the web view bounces
+      * when it reaches the edge of the content. The default value is `true`.
+diff --git a/src/RNCWebViewNativeComponent.ts b/src/RNCWebViewNativeComponent.ts
+index ca3af151a378c516266ae965a44898920e831172..31212f6dcc1de4cf0e92181aedcacab374546162 100644
+--- a/src/RNCWebViewNativeComponent.ts
++++ b/src/RNCWebViewNativeComponent.ts
+@@ -236,6 +236,7 @@ export interface NativeProps extends ViewProps {
+   }>;
+   cacheEnabled?: WithDefault<boolean, true>;
+   incognito?: boolean;
++  sandboxed?: boolean;
+   injectedJavaScript?: string;
+   injectedJavaScriptBeforeContentLoaded?: string;
+   injectedJavaScriptForMainFrameOnly?: WithDefault<boolean, true>;
+diff --git a/src/WebViewTypes.ts b/src/WebViewTypes.ts
+index 4e7247f82e2bc418b495196132add7b416780a08..7aa126cc5c57a4f57fda5ef98a4e6a5a3407c8e7 100644
+--- a/src/WebViewTypes.ts
++++ b/src/WebViewTypes.ts
+@@ -386,6 +386,14 @@ export interface IOSWebViewProps extends WebViewSharedProps {
+    * Does not store any data within the lifetime of the WebView.
+    */
+   incognito?: boolean;
++  /**
++   * Treats the page as untrusted and keeps it from anything outside itself, below its own policy: Lockdown Mode
++   * (no WebRTC), no http(s) or ws(s) load WebKit checks against content rules, a proxy that does not exist for every
++   * connection but those to the phone's own and link-local addresses, and JavaScript dialogs answered at once
++   * without showing. Before iOS 17 the page does not load and `onError` says why.
++   * @platform ios
++   */
++  sandboxed?: boolean;
+ 
+   /**
+    * Boolean value that determines whether the web view bounces

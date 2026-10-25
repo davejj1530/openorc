@@ -14,20 +14,27 @@ export const perfThread = (): string | null => (perfEnabled() ? ((Settings.get("
 export const perfScenario = (): string => (Settings.get("openorcPerfScenario") as string | undefined) ?? "open";
 /** For `live-scroll`: how many turns to watch arrive before scrolling (`-openorcPerfTurns <n>`). */
 export const perfTurns = (): number => Number(Settings.get("openorcPerfTurns") ?? 10);
+/** For the scroll scenarios: how long each screen-high step takes, scrolling included (`-openorcPerfStepMs <ms>`). */
+export const perfStepMs = (): number => Number(Settings.get("openorcPerfStepMs") ?? 300);
 
 export function report(event: string, values: Record<string, unknown>): void {
   console.info(`openorc-perf ${JSON.stringify({ event, ...values })}`);
 }
 
-let markdownMounts = 0;
-/** Counts a Markdown view mounting, which costs a native view, a parse and a measure; free unless measuring. */
-export function countMarkdownMount(): void {
-  if (perfEnabled()) markdownMounts++;
+/**
+ * Heavy native views mounted while measuring: a Markdown view costs a native view, a parse and a measure; a
+ * visualization's web view costs a WebKit view and its page. Free unless measuring.
+ */
+const mounts = { markdown: 0, frame: 0 };
+export type HeavyView = keyof typeof mounts;
+
+export function countMount(view: HeavyView): void {
+  if (perfEnabled()) mounts[view]++;
 }
-/** Markdown views mounted since the last call. */
-export function takeMarkdownMounts(): number {
-  const count = markdownMounts;
-  markdownMounts = 0;
+/** Views of that kind mounted since the last call. */
+export function takeMounts(view: HeavyView): number {
+  const count = mounts[view];
+  mounts[view] = 0;
   return count;
 }
 

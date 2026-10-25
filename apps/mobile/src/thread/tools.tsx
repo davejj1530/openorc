@@ -59,11 +59,15 @@ function ToolStatus({ block }: { block: ToolBlock }) {
   return null;
 }
 
-/** A call as one quiet row: its icon, verb and object. Tapping it opens the call. */
-const PlainToolRow = memo(function PlainToolRow({ block, runId }: { block: ToolBlock; runId: string }) {
-  const { icon, verb, object } = toolCallPresentation(block.name, block.input);
-  const Icon = toolIcons[icon];
-  const label = block.done ? verb : liveVerb(verb);
+/**
+ * A call as one quiet row: its icon, verb and object. Tapping it opens the call. `label` says what the tap opens in
+ * place of the verb and object, as under a visualization, whose row opens its source.
+ */
+export const PlainToolRow = memo(function PlainToolRow({ block, runId, label: named }: { block: ToolBlock; runId: string; label?: string }) {
+  const presentation = toolCallPresentation(block.name, block.input);
+  const Icon = toolIcons[presentation.icon];
+  const label = named ?? (block.done ? presentation.verb : liveVerb(presentation.verb));
+  const object = named ? "" : presentation.object;
   return (
     <View>
       <TranscriptPressable

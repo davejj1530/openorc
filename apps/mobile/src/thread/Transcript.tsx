@@ -18,6 +18,9 @@ import { Notice, Prompt, Reply } from "./messages";
 import { emptyRowMemo, endMark, fixedHeight, isNews, transcriptRows, unsentRows, withWaitingApprovals, type EndMark, type Row } from "./rows";
 import { TurnActions } from "./TurnActions";
 import { TurnHead, WaitingHead } from "./TurnHead";
+import { WebKitWarmUp } from "./VisualizationFrame";
+import { VisualizationRow } from "./VisualizationRow";
+import { FrameWindowContext, useFramePlacement } from "./visualization-window";
 import type { WaitingApproval } from "./waiting-approvals";
 import { WorkRow } from "./WorkRow";
 
@@ -43,6 +46,8 @@ function RowView({ row }: { row: Row }): ReactElement | null {
       return <Reply text={row.text} streaming={row.streaming} source={row.source} />;
     case "card":
       return <Card block={row.block} runId={row.runId} />;
+    case "visualization":
+      return <VisualizationRow row={row} />;
     case "actions":
       return <TurnActions row={row} />;
     case "presence":
@@ -57,14 +62,15 @@ const spaced = (gap: number) => spacing.get(gap) ?? spacing.set(gap, { paddingTo
 /**
  * A row that arrived while the thread was open rises in once; history is simply there. Every row has the same
  * wrapper, and the list hands views from one item to the next: a row keeps what it shows in its props or in state
- * keyed to it. A card remounts instead, so it never shows another card's half-made answer. An arriving row's wrapper
- * is keyed to it, so its rise starts afresh even in a view another row just left.
+ * keyed to it. A card remounts instead, so it never shows another card's half-made answer, and so does a
+ * visualization, so its web view never shows another row. An arriving row's wrapper is keyed to it, so its rise starts
+ * afresh even in a view another row just left.
  */
 const ListRow = memo(function ListRow({ row, arrivals }: { row: Row; arrivals: Set<string> }) {
   const play = useArrival(row.key, arrivals);
   return (
     <Animated.View key={play ? row.key : undefined} style={play ? [spaced(row.gap), arrive] : spaced(row.gap)}>
-      <RowView key={row.kind === "card" ? row.key : undefined} row={row} />
+      <RowView key={row.kind === "card" || row.kind === "visualization" ? row.key : undefined} row={row} />
     </Animated.View>
   );
 });
@@ -149,6 +155,7 @@ export function Transcript({ blocks, live, working, runId, hasOlder, loadOlder, 
   const memo = useRef(emptyRowMemo());
   const conversation = useMemo(() => transcriptRows(blocks, { live, working }, runId, memo.current), [blocks, live, working, runId]);
   const rows = useMemo(() => withWaitingApprovals(conversation, waiting), [conversation, waiting]);
+  const { frames, place, placeAtRest, warm } = useFramePlacement(rows, listRef, hasOlder);
   const arrivals = useArrivals(rows, filled);
   const end = endMark(rows, blocks);
   // The end the reader saw before scrolling up; a new row there, or a reply that grew, is news.
@@ -165,8 +172,10 @@ export function Transcript({ blocks, live, working, runId, hasOlder, loadOlder, 
       const atEnd = contentOffset.y + layoutMeasurement.height - (contentInset?.bottom ?? 0) >= contentSize.height - AT_END;
       nearStart.current = contentOffset.y < layoutMeasurement.height;
       if (atEnd || touching.current) onFollow(atEnd);
+      if (atEnd) place();
+      else placeAtRest();
     },
-    [onFollow],
+    [onFollow, place, placeAtRest],
   );
   const grab = useCallback(() => {
     touching.current = true;
@@ -212,20 +221,24 @@ export function Transcript({ blocks, live, working, runId, hasOlder, loadOlder, 
   return (
     <View className="flex-1">
       <RevealCard.Provider value={reveal}>
-        <RowList
-          rows={rows}
-          arrivals={arrivals}
-          hasOlder={hasOlder}
-          filled={filled}
-          following={following}
-          loadOlder={loadOlder}
-          composerInset={composerInset}
-          listRef={listRef}
-          onScroll={onScroll}
-          onGrab={grab}
-          onSettle={settle}
-        />
+        <FrameWindowContext.Provider value={frames}>
+          <RowList
+            rows={rows}
+            arrivals={arrivals}
+            hasOlder={hasOlder}
+            filled={filled}
+            following={following}
+            loadOlder={loadOlder}
+            composerInset={composerInset}
+            listRef={listRef}
+            onScroll={onScroll}
+            onGrab={grab}
+            onSettle={settle}
+            onLoad={place}
+          />
+        </FrameWindowContext.Provider>
       </RevealCard.Provider>
+      {warm ? <WebKitWarmUp /> : null}
       {showNew ? <NewChip composerInset={composerInset} onPress={toEnd} /> : null}
     </View>
   );
@@ -243,6 +256,8 @@ interface RowListProps {
   onScroll: (event: { nativeEvent: ScrollPosition }) => void;
   onGrab: () => void;
   onSettle: (event: { nativeEvent: ScrollPosition }) => void;
+  /** The list has laid out its first rows. */
+  onLoad: () => void;
 }
 
 const keyOf = (row: Row) => row.key;
@@ -251,7 +266,7 @@ const contentStyle = { paddingHorizontal: 12 };
 const footer = <View className="h-4" />;
 
 /** The list itself, which renders only when its rows or its place change: a streamed word reaches only its piece. */
-const RowList = memo(function RowList({ rows, arrivals, hasOlder, filled, following, loadOlder, composerInset, listRef, onScroll, onGrab, onSettle }: RowListProps) {
+const RowList = memo(function RowList({ rows, arrivals, hasOlder, filled, following, loadOlder, composerInset, listRef, onScroll, onGrab, onSettle, onLoad }: RowListProps) {
   const insets = useSafeAreaInsets();
   const renderItem = useCallback(({ item }: { item: Row }) => <ListRow row={item} arrivals={arrivals} />, [arrivals]);
   const alwaysRender = useMemo(() => ({ keys: unsentRows(rows) }), [rows]);
@@ -277,6 +292,7 @@ const RowList = memo(function RowList({ rows, arrivals, hasOlder, filled, follow
       onScrollBeginDrag={onGrab}
       onScrollEndDrag={onSettle}
       onMomentumScrollEnd={onSettle}
+      onLoad={onLoad}
       scrollEventThrottle={32}
       contentInsetEndAdjustment={composerInset}
       keyboardLiftBehavior="whenAtEnd"

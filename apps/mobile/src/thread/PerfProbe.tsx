@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { useFrameCallback, useSharedValue } from "react-native-reanimated";
 import { isLive } from "@openorc/client";
 import { client, link } from "../client";
-import { markThreadOpening, percentile, perfEnabled, perfScenario, perfThread, perfTurns, report, startFrames, stopFrames, takeArrivals, takeMarkdownMounts, transcriptList } from "./perf-probe";
+import { markThreadOpening, percentile, perfEnabled, perfScenario, perfStepMs, perfThread, perfTurns, report, startFrames, stopFrames, takeArrivals, takeMounts, transcriptList } from "./perf-probe";
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -65,7 +65,8 @@ function summary({ total: frames, records, render }: ReturnType<typeof stopFrame
       .sort((a, b) => b - a)
       .slice(0, 8)
       .map(round),
-    markdownMounts: takeMarkdownMounts(),
+    markdownMounts: takeMounts("markdown"),
+    frameMounts: takeMounts("frame"),
   };
 }
 
@@ -81,14 +82,14 @@ async function scrollRun(sampler: Sampler, cancelled: () => boolean, name = "scr
     const { scroll: at } = list.getState();
     atTop = at <= 1 ? atTop + 1 : 0;
     void list.scrollToOffset({ offset: Math.max(0, at - 600), animated: true });
-    await wait(300);
+    await wait(perfStepMs());
   }
   sampler.finish(`${name}-up`, { steps, items: list.getState().data.length });
   await wait(1500);
   sampler.begin();
   for (steps = 0; steps < 400 && !cancelled() && !list.getState().isAtEnd; steps++) {
     void list.scrollToOffset({ offset: list.getState().scroll + 600, animated: true });
-    await wait(300);
+    await wait(perfStepMs());
   }
   sampler.finish(name, { steps, items: list.getState().data.length, contentLength: Math.round(list.getState().contentLength) });
 }
@@ -101,7 +102,8 @@ async function liveScrollRun(sampler: Sampler, cancelled: () => boolean, turns: 
   takeArrivals();
   while (!cancelled() && (prompts() < start + turns || liveIn(["message", "thinking", "tool"]))) await wait(500);
   report("live-arrivals", { turns, rows: takeArrivals() });
-  takeMarkdownMounts();
+  takeMounts("markdown");
+  takeMounts("frame");
   await scrollRun(sampler, cancelled, "live-scroll");
 }
 
@@ -159,7 +161,8 @@ export function PerfProbe() {
       begin() {
         intervals.value = [];
         sampling.value = true;
-        takeMarkdownMounts();
+        takeMounts("markdown");
+        takeMounts("frame");
         startFrames();
         jsGaps = [];
         pace(performance.now());

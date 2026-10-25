@@ -22,6 +22,7 @@ export default defineConfig({
       "react-native-reanimated": fixture("reanimated.tsx"),
       "react-native-safe-area-context": fixture("safe-area.ts"),
       "react-native-svg": fixture("svg.tsx"),
+      "react-native-webview": fixture("webview.tsx"),
       uniwind: fixture("uniwind.ts"),
     },
   },

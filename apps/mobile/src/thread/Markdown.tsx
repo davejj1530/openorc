@@ -7,7 +7,7 @@ import { haptic } from "../ui/haptics";
 import { openInApp } from "../ui/web";
 import { useColors, useMode } from "../ui/mode";
 import { markdownStyle, type MarkdownTone } from "./markdown-style";
-import { countMarkdownMount } from "./perf-probe";
+import { countMount } from "./perf-probe";
 
 /**
  * A link the phone can follow: a web page in Safari over the thread, mail in Mail. Files on the Mac read as
@@ -32,7 +32,7 @@ const remendOptions = { linkMode: "text-only" } as const;
 export const Markdown = memo(function Markdown({ text, streaming, tone = "reply" }: { text: string; streaming: boolean; tone?: MarkdownTone }) {
   const mode = useMode();
   const palette = useColors();
-  useEffect(countMarkdownMount, []);
+  useEffect(() => countMount("markdown"), []);
   const style = useMemo(() => {
     const base = markdownStyle(palette, mode, StyleSheet.hairlineWidth, tone);
     // A file the agent cites reads as code, not as a link to follow.

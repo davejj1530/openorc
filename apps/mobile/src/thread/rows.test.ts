@@ -18,6 +18,26 @@ describe("transcriptRows", () => {
     ]);
   });
 
+  it("places a visualization after the turn's work and before its reply, as the desktop does, and keeps its row as the reply streams", () => {
+    const { frame } = runStore();
+    frame(...finishedTurn);
+    const input = { title: "A queue", description: "First in, first out.", html: "<p>1 2 3</p>" };
+    let run = frame(
+      { type: "turn.started", turnId: "t2" },
+      { type: "message.completed", messageId: "ask-2", role: "user", text: "Draw it" },
+      { type: "tool.started", toolCallId: "viz", name: "openorc.visualize", input, parentToolCallId: null },
+      { type: "tool.completed", toolCallId: "viz", name: "openorc.visualize", input, output: "Shown", isError: false },
+      { type: "message.delta", messageId: "reply-2", role: "assistant", text: "Drawn " },
+    );
+    const memo = emptyRowMemo();
+    const rows = transcriptRows(run.blocks, activity(run), "r", memo);
+    expect(outline(rows).slice(-4)).toEqual([expect.stringMatching(/^head:/), "visualization:viz", "reply:reply-2:0", "presence"]);
+    const drawn = rows.find((row) => row.kind === "visualization");
+    expect(drawn).toMatchObject({ kind: "visualization", runId: "r", visualization: input });
+    run = frame({ type: "message.delta", messageId: "reply-2", role: "assistant", text: "above." });
+    expect(transcriptRows(run.blocks, activity(run), "r", memo).find((row) => row.kind === "visualization")).toBe(drawn);
+  });
+
   it("hands the list the same rows while a word streams: the streaming piece reads its words from the run", () => {
     const { frame } = runStore();
     frame(...finishedTurn);

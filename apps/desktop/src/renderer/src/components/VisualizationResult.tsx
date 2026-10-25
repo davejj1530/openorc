@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
+import { visualizationDocument, visualizationFrameHeight } from "@openorc/client";
 import { VisualizationFrameMessage, type Visualization } from "@openorc/protocol";
-import { visualizationContext, visualizationDocument } from "../lib/visualization-document";
+import { visualizationContext } from "../lib/visualization-context";
 import { TextButton } from "./ui";
 
 export default function VisualizationResult({ visualization }: { visualization: Visualization }) {
@@ -58,7 +59,7 @@ function VisualizationFrame({ title, html }: { title: string; html: string }) {
           setState({ kind: "ready" });
           break;
         case "ui/notifications/size-changed":
-          setHeight(Math.min(1200, Math.max(120, message.params.height)));
+          setHeight(visualizationFrameHeight(message.params.height));
           break;
         case "openorc/visualization-error":
           window.clearTimeout(timeout);

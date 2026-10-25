@@ -54,6 +54,16 @@ export { type ChangedFile, type ChangeStatus, languageFor, type MatchGroup, type
 export { type CommandStep, type Field, type InputView, joinPath, type OutputView, toolInputView, toolOutputView } from "./tool-view.js";
 export { activityBlockId, activityIdOf, type Block, emptyRun, type RunTranscript } from "./transcript.js";
 export { visualizationFromTool } from "./visualization.js";
+export {
+  type VisualizationColor,
+  visualizationColors,
+  type VisualizationContext,
+  visualizationContextScript,
+  visualizationCsp,
+  visualizationDocument,
+  visualizationFrameHeight,
+  type VisualizationHost,
+} from "./visualization-document.js";
 export { chipCalls, toolIntent, type WorkChip } from "./work-chips.js";
 export { isCheckCommand, type ReceiptItem, receiptItems } from "./work-receipt.js";
 export {

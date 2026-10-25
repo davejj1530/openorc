@@ -51,14 +51,14 @@ function appHtml(kind) {
 }
 
 async function check() {
-  const { app, BrowserWindow, ipcMain } = require("electron");
+  const { app, BrowserWindow, ipcMain, session } = require("electron");
   const dir = process.env.OPENORC_MCP_APPS_UI_DIR;
   app.setPath("userData", path.join(dir, "profile"));
   await app.whenReady();
-  const { McpAppSandbox } = require(path.join(dir, "sandbox.cjs"));
+  const { McpAppSandbox, hostSandboxFrames } = require(path.join(dir, "sandbox.cjs"));
   const { McpAppService } = require(path.join(dir, "service.cjs"));
   const sandbox = new McpAppSandbox();
-  await sandbox.start();
+  await sandbox.start({ session: session.defaultSession, direct: [] });
   let mobbin;
   let mobbinResult;
   if (process.env.OPENORC_MOBBIN_RESOURCE) mobbin = JSON.parse(await fs.readFile(process.env.OPENORC_MOBBIN_RESOURCE, "utf8"));
@@ -107,6 +107,7 @@ async function check() {
     return null;
   });
   const win = new BrowserWindow({ show: false, width: 1100, height: 800, webPreferences: { preload: path.join(dir, "preload.cjs"), sandbox: true, contextIsolation: true, nodeIntegration: false } });
+  hostSandboxFrames(win.webContents);
   const read = (code) => win.webContents.executeJavaScript(code);
   const links = [];
   win.webContents.setWindowOpenHandler(({ url }) => {

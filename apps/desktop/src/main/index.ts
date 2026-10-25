@@ -10,7 +10,7 @@ import { configureReleaseFeed } from "./release-feed";
 import { installUpdateControls } from "./update-ipc";
 import { installUpdateMenu } from "./update-menu";
 import { closeCoreForUpdate } from "./update-handoff";
-import { McpAppSandbox } from "./mcp-app-sandbox";
+import { hostSandboxFrames, McpAppSandbox } from "./mcp-app-sandbox";
 import { listenForShellEnv } from "./shell-env";
 import { installProtectedSecrets } from "./protected-secrets";
 import { configureAppIdentity } from "./app-identity";
@@ -147,6 +147,7 @@ function createWindow(route?: string): BrowserWindow {
   });
   installLinkNavigation(win, isAppOrigin);
   installImageContextMenu(win, app.getPath("userData"));
+  hostSandboxFrames(win.webContents);
   // A reload replaces the page without running React cleanup, so no panel gets
   // to say it stopped watching its shell. Main drops every viewer here and
   // lets the new page attach again; the shells keep running throughout.
@@ -202,7 +203,7 @@ app.whenReady().then(async () => {
   // The app window may show notifications and copy text; nothing else, and nothing for another page or embedded frame.
   session.defaultSession.setPermissionRequestHandler((_contents, permission, callback, details) => callback(permitted(permission, details.requestingUrl, isAppOrigin)));
   session.defaultSession.setPermissionCheckHandler((contents, permission, _origin, details) => permitted(permission, details.requestingUrl ?? contents?.getURL() ?? "", isAppOrigin));
-  await mcpAppSandbox.start().catch((error: unknown) => console.warn("MCP Apps sandbox unavailable:", error));
+  await mcpAppSandbox.start({ session: session.defaultSession, direct: devServer ? [new URL(devServer).host] : [] }).catch((error: unknown) => console.warn("MCP Apps sandbox unavailable:", error));
   ipcMain.handle("mcp-app:register", (event, document: unknown) => {
     if (event.senderFrame !== event.sender.mainFrame || !isAppOrigin(event.senderFrame.url)) throw new Error("Only the app window can host MCP Apps.");
     return mcpAppSandbox.register(event.sender.id, document);

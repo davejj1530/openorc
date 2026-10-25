@@ -25,16 +25,16 @@ async function build() {
 }
 
 async function check() {
-  const { app, BrowserWindow, ipcMain } = require("electron");
+  const { app, BrowserWindow, ipcMain, session } = require("electron");
   const dir = process.env.OPENORC_VISUALIZATION_UI_DIR;
   app.setPath("userData", path.join(dir, "profile"));
   await app.whenReady();
-  const { McpAppSandbox } = require(path.join(dir, "sandbox.cjs"));
+  const { McpAppSandbox, hostSandboxFrames } = require(path.join(dir, "sandbox.cjs"));
   const sandbox = new McpAppSandbox();
-  await sandbox.start();
+  await sandbox.start({ session: session.defaultSession, direct: [] });
   const registrations = new Set();
-  ipcMain.handle("sandbox:register", (event, doc) => {
-    const registration = sandbox.register(event.sender.id, doc);
+  ipcMain.handle("sandbox:register", async (event, doc) => {
+    const registration = await sandbox.register(event.sender.id, doc);
     registrations.add(registration.id);
     return registration;
   });
@@ -43,6 +43,7 @@ async function check() {
     registrations.delete(id);
   });
   const win = new BrowserWindow({ show: false, width: 1000, height: 950, webPreferences: { preload: path.join(dir, "preload.cjs"), sandbox: true, contextIsolation: true, nodeIntegration: false } });
+  hostSandboxFrames(win.webContents);
   const read = (code) => win.webContents.executeJavaScript(code);
   const view = () => win.webContents.mainFrame.frames.flatMap((frame) => frame.frames).find((frame) => frame.url.endsWith("/view"));
   const waitFor = async (predicate, label) => {
@@ -74,6 +75,7 @@ async function check() {
       return {isolated,network,storage,evaluation,node:typeof require,bridge:typeof window.openorc};
     })()`);
     assert.deepEqual(isolation, { isolated: true, network: true, storage: true, evaluation: true, node: "undefined", bridge: "undefined" });
+    assert.deepEqual(await peerContacts(view()), { datagrams: 0, connections: 0 }, "WebRTC in the visual, or in a frame it writes, reaches nothing");
     for (let step = 1; step <= 4; step++) await view().executeJavaScript(`document.getElementById('next').click()`);
     assert.match(await view().executeJavaScript("document.getElementById('status').textContent"), /Found 32 in four comparisons/);
     assert.equal(await view().executeJavaScript("document.getElementById('next').disabled"), true);
@@ -119,12 +121,33 @@ async function check() {
     await click("Codex");
     await ready();
     assert.equal(registrations.size, 1, "replaced views release registrations");
-    console.log("PASS: interaction, keyboard, provider names, saved history, themes, 320px layout, sizing, reset, release, errors and isolation. Captures: " + dir);
+    console.log("PASS: interaction, keyboard, provider names, saved history, themes, 320px layout, sizing, reset, release, errors, isolation and no WebRTC contact. Captures: " + dir);
   } finally {
     win.destroy();
     await sandbox.close();
     app.quit();
   }
+}
+
+/**
+ * What reaches a STUN and a TURN server on loopback from WebRTC in the view and in a frame the view writes itself, which
+ * no policy refuses: datagrams over UDP and connections over TCP.
+ */
+async function peerContacts(frame) {
+  const udp = require("node:dgram").createSocket("udp4");
+  const tcp = require("node:net").createServer((socket) => socket.destroy());
+  const seen = { datagrams: 0, connections: 0 };
+  udp.on("message", () => seen.datagrams++);
+  tcp.on("connection", () => seen.connections++);
+  await new Promise((resolve) => udp.bind(0, "127.0.0.1", resolve));
+  await new Promise((resolve) => tcp.listen(0, "127.0.0.1", resolve));
+  const servers = JSON.stringify([{ urls: `stun:127.0.0.1:${udp.address().port}` }, { urls: `turn:127.0.0.1:${tcp.address().port}?transport=tcp`, username: "probe", credential: "probe" }]);
+  const peer = `const pc=new RTCPeerConnection({iceServers:${servers}});pc.createDataChannel('probe');pc.createOffer().then(o=>pc.setLocalDescription(o));`;
+  await frame.executeJavaScript(`${peer}const f=document.createElement('iframe');f.style.display='none';f.srcdoc=${JSON.stringify(`<script>${peer}<\/script>`)};document.body.append(f);`);
+  await pause(3000);
+  udp.close();
+  tcp.close();
+  return seen;
 }
 
 /** A loopback-only review fixture for OpenOrc's shared Preview, with the production sandbox. */
@@ -148,7 +171,7 @@ async function preview(dir) {
           res.end("{}");
         } else {
           res.setHeader("content-type", "application/json");
-          res.end(JSON.stringify(sandbox.register(1, data)));
+          res.end(JSON.stringify(await sandbox.register(1, data)));
         }
         return;
       }

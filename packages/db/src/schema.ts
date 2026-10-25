@@ -22,6 +22,7 @@ import { teamCancellationMigration } from "./team-cancellation-schema.js";
 import { pullRequestReviewMigration } from "./pull-review-schema.js";
 import { orclingMigration } from "./orcling-schema.js";
 import { remoteDeviceMigration } from "./remote-device-schema.js";
+import { remotePushTargetMigration } from "./remote-push-target-schema.js";
 /**
  * Migrations run in order; `PRAGMA user_version` records how many applied.
  * Never edit a shipped migration. Append a new one.
@@ -778,4 +779,5 @@ export const migrations: Migration[] = [
   /** The Claude account a team's Claude member runs on; without one it runs on the conversation's account. */
   `ALTER TABLE orchestration_team_members ADD COLUMN claude_account_id TEXT REFERENCES claude_accounts(id);`,
   remoteDeviceMigration,
+  remotePushTargetMigration,
 ];

@@ -9,9 +9,11 @@ import { arrive } from "../ui/motion";
 import { Text } from "../ui/Text";
 import { useRowState } from "./row-state";
 import { FIXED_HEIGHT, type Row } from "./rows";
-import { useVoice } from "./voices";
+import { useVoice, type Voice } from "./voices";
 
 type HeadRow = Extract<Row, { kind: "head" }>;
+
+const agentName = (voice: Voice | undefined) => (voice && isHarnessId(voice.agent) ? harnessShortName(voice.agent) : "Assistant");
 
 /**
  * One head per turn: the agent's mark and name, then its model and a status that swaps in place as the turn moves
@@ -24,7 +26,7 @@ export const TurnHead = memo(function TurnHead({ row }: { row: HeadRow }) {
   // The status this turn's head first showed in this view; a view the list recycles starts over for its new turn.
   const [first] = useRowState(row.key, () => status.kind);
   const still = useReducedMotion();
-  const name = voice && isHarnessId(voice.agent) ? harnessShortName(voice.agent) : "Assistant";
+  const name = agentName(voice);
   const words = [voice?.model, turnStatusWords(status)].filter(Boolean).join(" · ");
   const swapped = status.kind !== first && !still;
   return (
@@ -41,3 +43,21 @@ export const TurnHead = memo(function TurnHead({ row }: { row: HeadRow }) {
     </View>
   );
 });
+
+type WaitingRow = Extract<Row, { kind: "waiting" }>;
+
+/**
+ * Above what a run outside the loaded conversation asks: its task's title, as its alert showed it, or for one of the
+ * thread's own runs, its agent, as a turn head names it.
+ */
+export function WaitingHead({ row }: { row: WaitingRow }) {
+  const voice = useVoice(row.runId);
+  return (
+    <View className="flex-row items-center gap-2" style={{ height: FIXED_HEIGHT.waiting }}>
+      {row.title === null && voice ? <HarnessLogo agent={voice.agent} size={14} /> : null}
+      <Text numberOfLines={1} className="shrink leading-4">
+        {row.title ?? agentName(voice)}
+      </Text>
+    </View>
+  );
+}

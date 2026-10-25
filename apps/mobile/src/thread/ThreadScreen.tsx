@@ -11,6 +11,7 @@ import type { LinkState } from "../connection/manager";
 import { Composer } from "../composer/Composer";
 import { useShareSettings } from "../composer/settings-bridge";
 import { useCoverHome } from "../home/home-cover";
+import { useThreadOnScreen } from "../notifications/on-screen";
 import { Spinner } from "../ui/Spinner";
 import { Text } from "../ui/Text";
 import { holdTranscriptList, perfEnabled, reportThreadOpened } from "./perf-probe";
@@ -24,6 +25,7 @@ import { headerMenu } from "./ThreadMenu";
 import { Transcript } from "./Transcript";
 import { useThreadActions } from "./use-thread-actions";
 import { VoicesContext, type Voice } from "./voices";
+import { useWaitingApprovals } from "./waiting-approvals";
 
 const NO_RUNS: Run[] = [];
 const goBack = () => router.back();
@@ -72,7 +74,8 @@ function LoadFailed({ retry }: { retry: () => void }) {
  * composer hear only when the conversation starts or stops being busy.
  */
 function TranscriptPane({ threadId, thread, runs, loading, failed, retry, onActivity, composerInset, listRef, followKey }: PaneProps) {
-  const { merged, liveTranscript, hasOlder, loadOlder } = client.useConversationTranscript({ runs, threadId });
+  const { merged, liveTranscript, hasOlder, loadOlder, shown } = client.useConversationTranscript({ runs, threadId });
+  const waiting = useWaitingApprovals(threadId, shown);
   const { live, working, generatingImage } = conversationActivity({ thread, activeRun: runs.at(-1), liveTranscript, compacting: false });
   useEffect(() => onActivity({ live, working, generatingImage }), [live, working, generatingImage, onActivity]);
   const [following, setFollowing] = useState(true);
@@ -96,6 +99,7 @@ function TranscriptPane({ threadId, thread, runs, loading, failed, retry, onActi
       following={following}
       onFollow={setFollowing}
       followKey={followKey}
+      waiting={waiting}
     />
   );
 }
@@ -134,6 +138,7 @@ export function ThreadScreen() {
   const now = useSnoozeClock();
   const menu = useMemo(() => thread && headerMenu(threadMenu(thread, "header", now), actions.run), [thread, actions.run, now]);
   const linkState = useLinkState();
+  useThreadOnScreen(linkState.kind === "unpaired" ? null : linkState.mac.id, id);
 
   const { canSteer } = processFit({ live, activeRun, choice: settings.choice, mode: settings.mode, permission: settings.permission, compacting: false });
   const disabledReason =

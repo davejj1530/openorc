@@ -1,14 +1,30 @@
 import path from "node:path";
-import { remoteDevices, settings, type Db, type LedgerWriter, type RemoteDeviceRecord } from "@openorc/db";
+import { remoteDevices, remotePushTargets, settings, type Db, type LedgerWriter, type RemoteDeviceRecord } from "@openorc/db";
 import { acceptLink, encodePairingUrl, fromBase64Url, LinkCloseCode, toBase64Url, type Admission, type ClosingReason, type KeyPair, type LinkSocket, type PhoneHello } from "@openorc/link";
 import { nodeCrypto } from "@openorc/link/node";
-import type { PairingOfferView, RemoteListener, RemoteStatus, Route } from "@openorc/protocol";
+import {
+  PUSH_SENDER_TAG,
+  type CorePush,
+  type DeviceMethod,
+  type DeviceParams,
+  type DeviceRpcResults,
+  type PairingOfferView,
+  type PushEnvironment,
+  type PushSenderState,
+  type RemoteListener,
+  type RemotePushStatus,
+  type RemoteRpcResults,
+  type RemoteStatus,
+  type Route,
+} from "@openorc/protocol";
 import type { ProtectedSecretStore } from "../services/extraction-credentials.js";
 import type { Broadcast, Logger } from "../transport.js";
 import { readRemoteAsset } from "./assets.js";
 import { listen, type Listener } from "./listener.js";
 import { PairingOffers } from "./offers.js";
 import { remotePush } from "./policy.js";
+import { PushKeys } from "./push/keys.js";
+import { PushSender } from "./push/sender.js";
 import { currentRoutes, machineProbe, type MachineProbe } from "./routes.js";
 import { RemoteSession, type Answer } from "./session.js";
 import { RemoteFrameShaper } from "./shaper.js";
@@ -16,11 +32,14 @@ import { RemoteFrameShaper } from "./shaper.js";
 const SETTING = "remote.access";
 const DEFAULT_PORT = 47_820;
 const MAX_SESSIONS = 16;
+/** The desktop's status, and phones, which register again to hear whether this Mac can send now. */
+const SENDER_CHANGED = ["remote", PUSH_SENDER_TAG];
 
-/** Where phone access listens and how the Mac describes itself. Tests pass port 0 and a fixed machine. */
+/** Where phone access listens and how the Mac describes itself. Tests pass port 0, a fixed machine and a fake APNs. */
 export interface RemoteNetwork {
   port: number;
   machine: MachineProbe;
+  apns?: Record<PushEnvironment, string>;
 }
 
 export interface RemoteAccessOptions {
@@ -32,6 +51,10 @@ export interface RemoteAccessOptions {
   log: Logger;
   invalidate(keys: string[]): void;
   network?: RemoteNetwork;
+  /** Keeps the Apple push key. Without it, no key can be added. */
+  pushSecrets?: ProtectedSecretStore;
+  /** Whether someone is using the Mac. Without it, the Mac always reads as away. */
+  presence?: () => Promise<boolean>;
 }
 
 interface AccessSetting {
@@ -69,9 +92,15 @@ export class RemoteAccess {
   private readonly network: RemoteNetwork;
   /** The routes last found, so admitting a phone never waits on the Tailscale CLI. */
   private knownRoutes: Route[] = [];
+  private readonly pushKeys: PushKeys;
+  private readonly push: PushSender;
 
   constructor(private readonly options: RemoteAccessOptions) {
     this.network = options.network ?? { port: DEFAULT_PORT, machine: machineProbe() };
+    const { db, log } = options;
+    this.pushKeys = new PushKeys({ db, secrets: options.pushSecrets, log, ...(this.network.apns ? { origins: this.network.apns } : {}) });
+    const presence = options.presence ?? (async () => false);
+    this.push = new PushSender({ db, log, presence, route: () => this.pushKeys.current(), changed: (what) => options.invalidate(what === "sender" ? SENDER_CHANGED : ["remote"]) });
   }
 
   /** Called once by the host with the request path its windows use. Starts listening if the user left it on. */
@@ -87,6 +116,7 @@ export class RemoteAccess {
       listener: await this.listenerView(),
       devices: remoteDevices.list(this.options.db).map(({ id, name, createdAt, lastSeenAt }) => ({ id, name, createdAt, lastSeenAt, connected: connected.has(id) })),
       pairing: this.offers.open(Date.now()),
+      push: this.pushStatus(),
     };
   }
 
@@ -116,6 +146,48 @@ export class RemoteAccess {
     remoteDevices.remove(this.options.db, id);
     for (const session of this.sessions) if (session.deviceId === id) session.close("removed");
     this.options.invalidate(["remote"]);
+  }
+
+  /** Methods about the calling phone itself, for the device its session was admitted as. */
+  async device(deviceId: string, method: DeviceMethod, params: DeviceParams<DeviceMethod>): Promise<DeviceRpcResults[DeviceMethod]> {
+    switch (method) {
+      case "push.register": {
+        const { db } = this.options;
+        if (params.registration) remotePushTargets.set(db, deviceId, params.registration, Date.now());
+        else remotePushTargets.remove(db, deviceId);
+        this.options.invalidate(["remote"]);
+        return { sandbox: this.senderState("sandbox"), production: this.senderState("production") };
+      }
+    }
+  }
+
+  /** Every notice the core makes, before the desktop's own switch: phones choose for themselves. Never throws into the core. */
+  alert(notice: Extract<CorePush, { type: "notify" }>): void {
+    if (this.state.state !== "on") return;
+    try {
+      const redacted = remotePush(notice);
+      if (redacted?.type === "notify") void this.push.send(redacted, this.state.keys);
+    } catch (error) {
+      this.options.log.warn(`phone access dropped an alert: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /** The Apple push key, from the file Apple gave the user. Refused unless it is a P-256 key. */
+  async setPushKey(keyId: string, pem: string): Promise<RemoteStatus> {
+    await this.pushKeys.set(keyId, pem);
+    return this.pushKeyChanged();
+  }
+
+  async removePushKey(): Promise<RemoteStatus> {
+    await this.pushKeys.remove();
+    return this.pushKeyChanged();
+  }
+
+  /** The desktop's "Send a test", to every phone with notifications on. */
+  async testPush(): Promise<RemoteRpcResults["remote.push.test"]> {
+    await this.work;
+    if (this.state.state !== "on") throw new Error("Turn on phone access first.");
+    return this.push.test(this.state.keys, this.network.machine.name());
   }
 
   /** The core's push tap: every broadcast, shaped once, to every phone that may hear it. Never throws into the core. */
@@ -182,6 +254,8 @@ export class RemoteAccess {
     if (offer) this.offers.cancel(offer.offerId);
     for (const session of this.sessions) session.close(reason);
     this.sessions.clear();
+    this.pushKeys.close();
+    this.push.close();
     await listener.close();
     this.options.invalidate(["remote"]);
   }
@@ -201,6 +275,22 @@ export class RemoteAccess {
       this.keys = keys;
     }
     return this.keys;
+  }
+
+  private pushKeyChanged(): Promise<RemoteStatus> {
+    this.push.keyChanged();
+    this.options.invalidate(SENDER_CHANGED);
+    return this.status();
+  }
+
+  /** What a phone on this host hears: a refusal on the other host says nothing about its alerts. */
+  private senderState(environment: PushEnvironment): PushSenderState {
+    if (!this.pushKeys.keyId()) return "no-key";
+    return this.push.refuses(environment) ? "refused" : "ready";
+  }
+
+  private pushStatus(): RemotePushStatus {
+    return { keyId: this.pushKeys.keyId(), phones: remotePushTargets.count(this.options.db), problem: this.push.problem };
   }
 
   private async listenerView(): Promise<RemoteListener> {
@@ -232,6 +322,7 @@ export class RemoteAccess {
       answer,
       guard: { attachmentsDir: path.join(dataDir, "attachments") },
       readAsset: (ref) => readRemoteAsset(ref, { dataDir, db, ledger }),
+      device: (deviceId, method, params) => this.device(deviceId, method, params),
     });
     // Removing a phone ends the sessions it finds, and this one may have been admitted just before.
     if (remoteDevices.byKey(db, accepted.session.remoteStatic)?.id !== session.deviceId) {

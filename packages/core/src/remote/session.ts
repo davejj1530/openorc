@@ -1,5 +1,6 @@
 import { LinkCloseCode, type ClosingReason, type MacMessage, type MacSession, type PhoneMessage } from "@openorc/link";
-import type { AssetRef, RemotePush, RpcRequest } from "@openorc/protocol";
+import { deviceRpcParams, isDeviceMethod, type AssetRef, type DeviceMethod, type DeviceParams, type RemotePush, type RpcRequest } from "@openorc/protocol";
+import { invalidParamsMessage } from "../handlers/diagnostics.js";
 import type { ImageFileRead } from "../services/profile-assets.js";
 import type { RpcReply } from "../transport.js";
 import { admitRemoteRequest, type GuardContext } from "./policy.js";
@@ -20,6 +21,8 @@ export interface SessionDeps {
   answer: Answer;
   guard: GuardContext;
   readAsset(ref: AssetRef): Promise<ImageFileRead>;
+  /** A method about the calling phone itself, for the session's own device. */
+  device(deviceId: string, method: DeviceMethod, params: DeviceParams<DeviceMethod>): Promise<unknown>;
 }
 
 /**
@@ -147,13 +150,21 @@ export class RemoteSession {
   }
 
   private async call(id: number, method: string, params: unknown): Promise<void> {
-    const admission = admitRemoteRequest(method, params, this.deps.guard);
-    const reply: RpcReply = admission.ok
-      ? await this.deps.answer({ type: "rpc", id, method, params }).catch((error: unknown): RpcReply => ({ type: "rpc.error", id, message: error instanceof Error ? error.message : String(error) }))
-      : { type: "rpc.error", id, message: admission.message };
+    const reply = await this.reply(id, method, params).catch((error: unknown): RpcReply => ({ type: "rpc.error", id, message: error instanceof Error ? error.message : String(error) }));
     if (this.link.closed) return;
     this.flush();
     this.link.send(reply.type === "rpc.result" ? { t: "rpc.result", id, result: reply.result } : { t: "rpc.error", id, message: reply.message });
+  }
+
+  /** A method about this phone is answered for its own device id, so it can never name another; the rest goes to the core. */
+  private async reply(id: number, method: string, params: unknown): Promise<RpcReply> {
+    if (isDeviceMethod(method)) {
+      const parsed = deviceRpcParams[method].safeParse(params ?? {});
+      if (!parsed.success) return { type: "rpc.error", id, message: invalidParamsMessage(method, parsed.error.message) };
+      return { type: "rpc.result", id, result: await this.deps.device(this.deviceId, method, parsed.data) };
+    }
+    const admission = admitRemoteRequest(method, params, this.deps.guard);
+    return admission.ok ? this.deps.answer({ type: "rpc", id, method, params }) : { type: "rpc.error", id, message: admission.message };
   }
 
   private async asset(id: number, ref: AssetRef): Promise<void> {

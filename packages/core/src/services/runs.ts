@@ -762,7 +762,7 @@ export class RunService {
       if (question) what = "has a question";
       else if (typeof input["command"] === "string") what = `wants to run ${input["command"]}`;
       else what = `wants to use ${ev.toolName ?? ev.kind}`;
-      this.notifyFor(entry.scope, question ? "question" : "approval", this.scopeTitle(entry.scope), `${harnessShortName(entry.run.agent)} ${what}`);
+      this.notifyFor(entry.scope, question ? "question" : "approval", this.scopeTitle(entry.scope), `${harnessShortName(entry.run.agent)} ${what}`, { runId: ev.runId, approvalId: ev.approvalId });
     } catch (error) {
       this.log.warn(`approval notification failed: ${String(error)}`);
     }
@@ -774,12 +774,12 @@ export class RunService {
     return ["threads", `thread:${scope.thread.id}`, `runs:thread:${scope.thread.id}`, "inbox"];
   }
 
-  private notifyFor(scope: RunScope, kind: Notification["kind"], title: string, body: string): void {
+  private notifyFor(scope: RunScope, kind: Notification["kind"], title: string, body: string, approval?: { runId: string; approvalId: string }): void {
     let threadId: string | null;
     if (scope.comment) threadId = null;
     else if (scope.thread) threadId = scope.thread.id;
     else threadId = scope.task.threadId;
-    this.hooks.notify({ kind, threadId, taskId: scope.comment?.task.id ?? scope.task?.id ?? null, title, body });
+    this.hooks.notify({ kind, threadId, taskId: scope.comment?.task.id ?? scope.task?.id ?? null, title, body, ...approval });
   }
 
   private scopeTitle(scope: RunScope): string {

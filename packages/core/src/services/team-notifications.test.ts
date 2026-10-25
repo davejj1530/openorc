@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Db, orchestration, projects, runs, tasks, teamRuntime, threads } from "@openorc/db";
 import { DEFAULT_TEAM_LIMITS, type TeamActorRecord, type TeamExecutionRecord } from "@openorc/protocol";
+import { createInboxHandlers } from "../handlers/inbox.js";
 import type { PendingApproval } from "./runs.js";
 import { TeamNotificationService } from "./team-notifications.js";
 
@@ -155,6 +156,40 @@ describe("aggregate team notifications", () => {
     enabled = true;
     filtered.observe(complete);
     expect(f.notify).not.toHaveBeenCalled();
+  });
+  it("points a request from a member on a task at the team's thread, where the phone finds the run among its tasks", async () => {
+    const f = fixture();
+    f.addWorker("one");
+    const record = f.start("one");
+    const runId = record.attempts[0]!.runId!;
+    f.pending.push({ runId, taskId: record.actors[1]!.taskId, threadId: null, approvalId: "a", detail: "request" });
+    f.service.approval({ type: "approval.requested", runId, approvalId: "a", kind: "command", input: {}, ts: 3 });
+    const notice = f.notify.mock.lastCall![0];
+    expect(notice).toMatchObject({ kind: "approval", threadId: f.thread.id, runId, approvalId: "a" });
+    // Its run keeps apart from the team's conversation, so the phone's thread screen finds it in the inbox instead.
+    expect(runs.listForThread(f.db, notice.threadId).map((run) => run.id)).not.toContain(runId);
+    const inbox = await createInboxHandlers({ runService: { pending: () => f.pending }, db: f.db, teams: { binding: () => null } })["inbox.list"]({});
+    expect(inbox.items).toContainEqual(expect.objectContaining({ kind: "task", runId, task: expect.objectContaining({ threadId: notice.threadId }) }));
+  });
+
+  it("cuts a member's request between characters, never through an emoji", () => {
+    const f = fixture();
+    f.addWorker("one");
+    const record = f.start("one");
+    const runId = record.attempts[0]!.runId!;
+    f.pending.push({ runId, taskId: record.actors[1]!.taskId, threadId: null, approvalId: "long", detail: "request" });
+    f.service.approval({ type: "approval.requested", runId, approvalId: "long", kind: "command", reason: `${"a".repeat(179)}🚀 and more`, input: {}, ts: 3 });
+    expect(f.notify.mock.lastCall![0].body).toBe(`Engineer needs approval. ${"a".repeat(179)}🚀`);
+  });
+
+  it("masks a secret in a member's request before the cut, so no part of it reaches the notice", () => {
+    const f = fixture();
+    f.addWorker("one");
+    const record = f.start("one");
+    const runId = record.attempts[0]!.runId!;
+    f.pending.push({ runId, taskId: record.actors[1]!.taskId, threadId: null, approvalId: "secret", detail: "request" });
+    f.service.approval({ type: "approval.requested", runId, approvalId: "secret", kind: "command", reason: `${"a".repeat(160)} ghp_${"b".repeat(36)} to push`, input: {}, ts: 3 });
+    expect(f.notify.mock.lastCall![0].body).toBe(`Engineer needs approval. ${"a".repeat(160)} [redacted:github-to`);
   });
   it("keeps identical approval IDs distinct by run, preserves questions, and rejects stale/nonpending requests", () => {
     const f = fixture();

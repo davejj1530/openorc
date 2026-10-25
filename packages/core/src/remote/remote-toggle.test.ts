@@ -42,7 +42,7 @@ it("ends phone sessions when turned off, and comes back on the same port with th
     expect(on.listener).toMatchObject({ state: "on", port: before.routes[0]!.port });
     const after = decodePairingUrl((await core.remote.beginPairing()).url);
     expect(after.macKey).toEqual(before.macKey);
-    const again = await RemoteTestClient.connect({ route: after.routes[0]!, macKey: after.macKey, device: phone.device });
+    const again = await RemoteTestClient.connect({ route: after.routes[0]!, macKey: after.macKey, device: phone.keys });
     if (typeof again === "string") throw new Error(again);
     expect(await again.call("projects.list", {})).toBeInstanceOf(Array);
     again.close();

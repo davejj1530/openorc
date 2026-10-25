@@ -2,6 +2,7 @@
 export function invalidParamsMessage(method: string, detail: string): string {
   if (method.startsWith("slack.")) return "Invalid Slack settings. Check token prefixes, IDs, and port.";
   if (method === "memory.settings.set") return "Invalid memory settings. Check the provider, model, and API key.";
+  if (method === "remote.push.setKey") return "This is not an Apple push key.";
   return `invalid params for ${method}: ${detail}`;
 }
 

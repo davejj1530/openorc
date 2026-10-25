@@ -16,8 +16,12 @@ export interface OpenOrcOptions {
   githubSecrets?: ProtectedSecretStore;
   /** Keeps the Mac's key pair for phone access. Without it, phone access cannot turn on. */
   remoteSecrets?: ProtectedSecretStore;
-  /** Where phone access listens and how the Mac describes itself. Tests pass port 0 and a fixed machine. */
+  /** Where phone access listens and how the Mac describes itself. Tests pass port 0, a fixed machine and a fake APNs. */
   remoteNetwork?: RemoteNetwork;
+  /** Keeps the Apple push key phone alerts are signed with. Without it, no key can be added. */
+  pushSecrets?: ProtectedSecretStore;
+  /** Whether someone is using the Mac, asked once per alert. Without it, the Mac always reads as away. */
+  presence?: () => Promise<boolean>;
   /** Where memory's embedding model runs. Defaults to the core's own thread, where loading it and each batch block everything else. */
   embedder?: TextEmbedder;
   /** The bundled Prettier, run off the core's thread. Without it, files format only with the project's own formatter. */

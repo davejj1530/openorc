@@ -1,11 +1,12 @@
+import { randomBytes } from "node:crypto";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { decodePairingUrl } from "@openorc/link";
-import { claudeAccounts, projects, runs, threads } from "@openorc/db";
+import { claudeAccounts, projects, remotePushTargets, runs, threads } from "@openorc/db";
 import { commitAll, git } from "@openorc/git";
-import { harnessIds, type AgentEvent, type CorePush, type HarnessInfo, type RemotePush, type Route } from "@openorc/protocol";
+import { harnessIds, type AgentEvent, type CorePush, type HarnessInfo, type PushRegistration, type RemotePush, type Route } from "@openorc/protocol";
 import { OpenOrc } from "../openorc.js";
 import type { ProtectedSecretStore } from "../services/extraction-credentials.js";
 import { RemoteTestClient } from "./test-client.js";
@@ -213,12 +214,40 @@ describe("phone access", () => {
     await expect(phone.asset({ kind: "tool-image", url: `file://${saved}` })).rejects.toThrow("not available");
   });
 
+  it("keeps each phone's push registration under its own device, counts it, and forgets it on null or removal", async () => {
+    const [first, second] = [await pairPhone("First"), await pairPhone("Second")];
+    const before = (await core.remote.status()).push.phones;
+    const registration = (alerts: PushRegistration["alerts"]): PushRegistration => ({ token: randomBytes(32).toString("hex"), environment: "sandbox", alerts, sound: true });
+    const [a, b] = [registration("all"), registration("needs-you")];
+    const tokens = () => new Map(remotePushTargets.recipients(core.db).map((recipient) => [recipient.deviceId, recipient.token]));
+    // A session's first record tells the desktop it connected; only the registration's own change is left after.
+    await Promise.all([first.call("projects.list", {}), second.call("projects.list", {})]);
+    pushed.splice(0);
+
+    expect(await first.device("push.register", { registration: a })).toEqual({ sandbox: "no-key", production: "no-key" });
+    // The desktop's phone count changes; whether this Mac can send does not, so phones are not asked to register again.
+    expect(pushed).toEqual([{ type: "invalidate", keys: ["remote"] }]);
+    expect(await second.device("push.register", { registration: b })).toEqual({ sandbox: "no-key", production: "no-key" });
+    expect([tokens().get(first.deviceId), tokens().get(second.deviceId)]).toEqual([a.token, b.token]);
+    expect((await core.remote.status()).push).toEqual({ keyId: null, phones: before + 2, problem: null });
+
+    await expect(second.request("push.register", { registration: a, deviceId: first.deviceId })).rejects.toThrow("invalid params for push.register");
+    await expect(second.request("push.unregister", {})).rejects.toThrow("not available from a phone");
+    expect(await second.call("projects.list", {})).toBeInstanceOf(Array);
+    expect(tokens().get(first.deviceId)).toBe(a.token);
+
+    expect(await first.device("push.register", { registration: null })).toEqual({ sandbox: "no-key", production: "no-key" });
+    expect(tokens().has(first.deviceId)).toBe(false);
+    core.remote.removeDevice(second.deviceId);
+    expect((await core.remote.status()).push.phones).toBe(before);
+  });
+
   it("ends a removed phone's session and refuses it afterwards", async () => {
     const phone = await pairPhone();
     await core.handle({ type: "rpc", id: 2, method: "remote.devices.remove", params: { id: phone.deviceId } });
     await phone.until(() => phone.closed);
     expect(phone.closing).toBe("removed");
-    expect(await RemoteTestClient.connect({ route, macKey, device: phone.device })).toBe("unpaired");
+    expect(await RemoteTestClient.connect({ route, macKey, device: phone.keys })).toBe("unpaired");
   });
 
   it("tells phones the Mac is shutting down before it closes", async () => {

@@ -1,6 +1,6 @@
 import { connectLink, decodePairingUrl, toBase64Url, type ClosingReason, type KeyPair, type MacMessage, type PhoneSession, type Refusal } from "@openorc/link";
 import { nodeCrypto } from "@openorc/link/node";
-import type { AssetRef, RemotePush, Route, RpcMethod, RpcParams, RpcResults } from "@openorc/protocol";
+import type { AssetRef, DeviceMethod, DeviceParams, DeviceRpcResults, RemotePush, Route, RpcMethod, RpcParams, RpcResults } from "@openorc/protocol";
 import { WebSocket } from "ws";
 import { LINK_PATH } from "./listener.js";
 import { linkSocket } from "./ws-socket.js";
@@ -41,7 +41,8 @@ export class RemoteTestClient {
   private constructor(
     private readonly session: PhoneSession,
     readonly deviceId: string,
-    readonly device: KeyPair,
+    /** The phone's static pair: what the Mac knows it by, and what its alerts are sealed for. */
+    readonly keys: KeyPair,
   ) {
     session.onMessage((message) => this.receive(message));
     session.onBytes((stream, chunk, end) => {
@@ -82,6 +83,11 @@ export class RemoteTestClient {
 
   call<M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> {
     return this.request(method, params) as Promise<RpcResults[M]>;
+  }
+
+  /** A method about this phone itself, as LinkConnection.device sends it. */
+  device<M extends DeviceMethod>(method: M, params: DeviceParams<M>): Promise<DeviceRpcResults[M]> {
+    return this.request(method, params) as Promise<DeviceRpcResults[M]>;
   }
 
   /** Any method name at all, as a hostile phone would send it. */

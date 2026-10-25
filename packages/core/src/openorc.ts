@@ -195,7 +195,17 @@ export class OpenOrc {
     this.frames = new FrameCoalescer((frame) => options.transport.push({ type: "frame", frame }));
     this.bench = new BenchGenerator((ev) => this.frames.push(ev));
     const invalidate = (keys: string[]) => options.transport.push({ type: "invalidate", keys });
-    this.remote = new RemoteAccess({ db, dataDir: options.dataDir, ledger: this.ledger, secrets: options.remoteSecrets, log: this.log, invalidate, network: options.remoteNetwork });
+    this.remote = new RemoteAccess({
+      db,
+      dataDir: options.dataDir,
+      ledger: this.ledger,
+      secrets: options.remoteSecrets,
+      log: this.log,
+      invalidate,
+      network: options.remoteNetwork,
+      pushSecrets: options.pushSecrets,
+      presence: options.presence,
+    });
     this.settings = new AppSettingsService(db);
     this.environment = new ShellEnvironment({ probe: options.shellProbe ?? (options.ephemeral ? inheritedProbe() : undefined) });
     this.system = new SystemService(options.dataDir, this.environment);
@@ -224,9 +234,12 @@ export class OpenOrc {
       read: (key) => storedSettings.get(db, key),
       write: (key, value) => storedSettings.set(db, key, value),
     });
-    // Notifications are the user's call; the renderer decides whether the thread is already on screen.
+    // Phones choose their own alerts, so they hear every notice; "Desktop notifications" is the windows' switch.
+    // The renderer decides whether the thread is already on screen.
     const notify = (n: Omit<Notification, "type">) => {
-      if (this.settings.get().notifications) options.transport.push({ type: "notify", ...n, id: n.id ?? randomUUID() });
+      const notice: Notification = { type: "notify", ...n, id: n.id ?? randomUUID() };
+      this.remote.alert(notice);
+      if (this.settings.get().notifications) options.transport.push(notice);
     };
     this.projects = new ProjectService(db);
     this.workspaces = new WorkspaceService(db, { dataDir: options.dataDir }, this.log, this.workspaceWriters);
@@ -571,7 +584,7 @@ export class OpenOrc {
    */
   async handle(request: RpcRequest): Promise<RpcReply> {
     const { id, method } = request;
-    const privateParams = method.startsWith("slack.") || method === "memory.settings.set";
+    const privateParams = method.startsWith("slack.") || method === "memory.settings.set" || method === "remote.push.setKey";
     try {
       if (!Object.hasOwn(rpcParams, method)) return { type: "rpc.error", id, message: `unknown method ${method}` };
       const parsed = rpcParams[method as RpcMethod].safeParse(request.params ?? {});

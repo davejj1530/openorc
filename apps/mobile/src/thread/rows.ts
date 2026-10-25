@@ -1,6 +1,7 @@
 import { isLive, reasoningSections, turnReply, workParts, workTiming, workTurns, type Block } from "@openorc/client";
 import { height } from "../generated/tokens";
 import { messagePieces } from "./markdown-chunks";
+import type { WaitingApproval } from "./waiting-approvals";
 
 export type MessageBlock = Extract<Block, { kind: "message" }>;
 
@@ -24,6 +25,8 @@ export type Row = { key: string; gap: number } & (
    */
   | { kind: "reply"; text: string; streaming: boolean; source: PieceSource }
   | { kind: "card"; runId: string; block: Block }
+  /** The run that asks what the cards after it ask, outside the loaded conversation: its task's title, or its agent's. */
+  | { kind: "waiting"; runId: string; title: string | null }
   /** Copy for a finished turn's reply. */
   | { kind: "actions"; text: string }
   | { kind: "presence"; working: boolean }
@@ -99,6 +102,7 @@ const sameAs: { [K in RowKind]: (a: RowOf<K>, b: RowOf<K>) => boolean } = {
   prompt: sameBlock,
   notice: sameBlock,
   card: sameBlock,
+  waiting: (a, b) => a.runId === b.runId && a.title === b.title,
   actions: (a, b) => a.text === b.text,
   presence: (a, b) => a.working === b.working,
   head: (a, b) => a.live === b.live && a.writing === b.writing && a.startedAt === b.startedAt && a.durationMs === b.durationMs && a.outcome === b.outcome && a.runId === b.runId,
@@ -223,6 +227,23 @@ export function transcriptRows(blocks: Block[], { live, working }: TranscriptAct
   return rows;
 }
 
+/**
+ * What waits on the person outside the loaded conversation, after it and before the agent's presence: a head for each
+ * run, then a card for each approval or question it asks.
+ */
+export function withWaitingApprovals(rows: Row[], waiting: readonly WaitingApproval[]): Row[] {
+  if (!waiting.length) return rows;
+  const presence = rows.at(-1)?.kind === "presence" ? rows.at(-1) : undefined;
+  const added: Row[] = presence ? rows.slice(0, -1) : rows.slice();
+  for (const { runId, task, blocks } of waiting) {
+    const above = added.at(-1);
+    added.push({ kind: "waiting", key: `waiting:${runId}`, gap: above ? GAP.turn - spaceBelow(above) : 0, runId, title: task });
+    for (const block of blocks) added.push({ kind: "card", key: `card:${runId}:${block.id}`, gap: GAP.part, runId, block });
+  }
+  if (presence) added.push({ ...presence, gap: GAP.part });
+  return added;
+}
+
 /** The agent at the end of the conversation, working while the thread is, the same row object until that changes. */
 function presenceRow(memo: RowMemo, working: boolean, gap: number): Row {
   const last = memo.rows.at(-1);
@@ -253,10 +274,10 @@ export function unsentRows(rows: Row[]): string[] {
 }
 
 /**
- * Rows that are always this tall below their gap, so the list places them exactly before they draw: a head, the
- * actions (one control) and the agent's presence. Their views take these heights from here.
+ * Rows that are always this tall below their gap, so the list places them exactly before they draw: a head, a waiting
+ * run's head, the actions (one control) and the agent's presence. Their views take these heights from here.
  */
-export const FIXED_HEIGHT = { head: 16, actions: height["control-md"], presence: 36 } as const satisfies Partial<Record<RowKind, number>>;
+export const FIXED_HEIGHT = { head: 16, waiting: 16, actions: height["control-md"], presence: 36 } as const satisfies Partial<Record<RowKind, number>>;
 
 export function fixedHeight(row: Row): number | undefined {
   const fixed: number | undefined = (FIXED_HEIGHT as Partial<Record<RowKind, number>>)[row.kind];

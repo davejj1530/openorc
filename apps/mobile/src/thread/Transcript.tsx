@@ -15,9 +15,10 @@ import { newArrivals, useArrival } from "./arrivals";
 import { countArrivals } from "./perf-probe";
 import { Card, RevealCard } from "./cards";
 import { Notice, Prompt, Reply } from "./messages";
-import { emptyRowMemo, endMark, fixedHeight, isNews, transcriptRows, unsentRows, type EndMark, type Row } from "./rows";
+import { emptyRowMemo, endMark, fixedHeight, isNews, transcriptRows, unsentRows, withWaitingApprovals, type EndMark, type Row } from "./rows";
 import { TurnActions } from "./TurnActions";
-import { TurnHead } from "./TurnHead";
+import { TurnHead, WaitingHead } from "./TurnHead";
+import type { WaitingApproval } from "./waiting-approvals";
 import { WorkRow } from "./WorkRow";
 
 /** What a scroll event says about where the reader is. */
@@ -34,6 +35,8 @@ function RowView({ row }: { row: Row }): ReactElement | null {
       return <Notice block={row.block} />;
     case "head":
       return <TurnHead row={row} />;
+    case "waiting":
+      return <WaitingHead row={row} />;
     case "work":
       return <WorkRow row={row} />;
     case "reply":
@@ -131,16 +134,21 @@ export interface TranscriptProps {
   following: boolean;
   /** Changes when the person sends, which returns the view to the newest turn to follow the message. */
   followKey: number;
+  /** What waits on the person outside the loaded runs, answered here: the phone has no task view, and older runs page in late. */
+  waiting?: readonly WaitingApproval[];
 }
+
+const NOTHING_WAITING: readonly WaitingApproval[] = [];
 
 /**
  * The conversation as a list of rows, opening at the newest turn. Older turns load a page at a time as the reader
  * nears the top, without moving what they read. While the reader is at the end, new content keeps them there; scrolled
  * up, a New chip offers the way back.
  */
-export function Transcript({ blocks, live, working, runId, hasOlder, loadOlder, filled, composerInset, listRef, onFollow, following, followKey }: TranscriptProps) {
+export function Transcript({ blocks, live, working, runId, hasOlder, loadOlder, filled, composerInset, listRef, onFollow, following, followKey, waiting = NOTHING_WAITING }: TranscriptProps) {
   const memo = useRef(emptyRowMemo());
-  const rows = useMemo(() => transcriptRows(blocks, { live, working }, runId, memo.current), [blocks, live, working, runId]);
+  const conversation = useMemo(() => transcriptRows(blocks, { live, working }, runId, memo.current), [blocks, live, working, runId]);
+  const rows = useMemo(() => withWaitingApprovals(conversation, waiting), [conversation, waiting]);
   const arrivals = useArrivals(rows, filled);
   const end = endMark(rows, blocks);
   // The end the reader saw before scrolling up; a new row there, or a reply that grew, is news.

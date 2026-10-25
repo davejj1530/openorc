@@ -1,10 +1,11 @@
 import { activityIdOf, approvalDetail, approvalSummary, type Block, isImageGeneration, type Question, readQuestions } from "@openorc/client";
 import { harnessShortName, isHarnessId } from "@openorc/protocol";
-import { createContext, memo, useContext, useRef, useState } from "react";
+import { createContext, memo, useContext, useEffect, useRef, useState } from "react";
 import { Pressable, TextInput, useWindowDimensions, View, type FocusEvent, type HostInstance, type LayoutChangeEvent } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
-import { client } from "../client";
+import { client, shownMacId } from "../client";
 import { AlertCircle, Check, Hammer, Image as ImageIcon, Terminal, X } from "../generated/icons";
+import { takeQueued, useQueuedAnswer } from "../notifications/answers";
 import { cn } from "../ui/cn";
 import { haptic } from "../ui/haptics";
 import { HarnessLogo } from "../ui/HarnessLogo";
@@ -86,11 +87,41 @@ function DeniedLine({ block }: { block: ApprovalBlock }) {
   );
 }
 
+/**
+ * Whether the Mac still waits on this approval. A card on screen since before the app went away may not have heard it
+ * was answered, so the run reloads first; one that does not reload leaves the Mac to answer for itself.
+ */
+async function stillOpen(runId: string, approvalId: string): Promise<boolean> {
+  await client.runs.resync([runId]);
+  const block = client.runs.get(runId)?.blocks.find((item) => item.kind === "approval" && item.approvalId === approvalId);
+  return block?.kind !== "approval" || !block.decision;
+}
+
+/**
+ * Allow or Deny chosen on this approval's alert, sent by its card once, and only while the approval is still open. It is
+ * taken in the commit that sends it: a card that leaves the screen before its effects run leaves it to the next card.
+ */
+function useAlertAnswer(runId: string, block: ApprovalBlock, send: (decision: Decision) => void) {
+  const macId = shownMacId();
+  const { approvalId } = block;
+  const waiting = useQueuedAnswer(macId ? { macId, runId, approvalId } : null);
+  const open = !block.decision;
+  const sent = useRef(false);
+  useEffect(() => {
+    if (!waiting || !macId) return;
+    const answer = takeQueued({ macId, runId, approvalId }, Date.now());
+    if (!answer || !open || sent.current) return;
+    sent.current = true;
+    void stillOpen(runId, approvalId).then((still) => still && send(answer));
+  }, [waiting, open, send, macId, runId, approvalId]);
+}
+
 /** The agent asks before it acts: what it wants to do, then Deny, Allow for this run and Allow, the one ink pill. */
 export function ApprovalCard({ block, runId }: { block: ApprovalBlock; runId: string }) {
   const { width } = useWindowDimensions();
   const resolve = useResolve(runId, block.approvalId);
   const [raw, setRaw] = useState(false);
+  useAlertAnswer(runId, block, resolve.send);
   if (block.decision && block.decision !== "deny") return null;
   if (block.decision) return <DeniedLine block={block} />;
   const detail = approvalDetail(block);

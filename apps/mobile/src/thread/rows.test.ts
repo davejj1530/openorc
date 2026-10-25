@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emptyRowMemo, endMark, fixedHeight, isNews, newestRow, transcriptRows, unsentRows, type Row } from "./rows";
+import { emptyRowMemo, endMark, fixedHeight, isNews, newestRow, transcriptRows, unsentRows, withWaitingApprovals, type Row } from "./rows";
 import { activity, finishedTurn, runStore, type Draft } from "./test-fixtures/run-store";
 
 const outline = (rows: Row[]) => rows.map((row) => row.key);
@@ -347,5 +347,32 @@ describe("transcriptRows", () => {
     expect(unsentRows(transcriptRows(run.blocks, activity(run), "r", emptyRowMemo()))).toEqual(["card:approval-q"]);
     run = frame({ type: "approval.resolved", approvalId: "q", decision: "allow", answers: { runner: ["Vitest"] } });
     expect(unsentRows(transcriptRows(run.blocks, activity(run), "r", emptyRowMemo()))).toEqual([]);
+  });
+});
+
+describe("withWaitingApprovals", () => {
+  const approval = (id: string) => ({ id, kind: "approval", approvalId: id, approvalKind: "command", input: { command: "ls" } }) as const;
+
+  it("adds a head and the cards of each waiting run after the conversation, before the agent's presence, keyed by run", () => {
+    const { frame } = runStore();
+    const run = frame(...finishedTurn);
+    const conversation = transcriptRows(run.blocks, activity(run), "r", emptyRowMemo());
+    const rows = withWaitingApprovals(conversation, [
+      { runId: "fix", task: "Fix the flaky test", blocks: [approval("0"), approval("1")] },
+      { runId: "lead", task: null, blocks: [approval("0")] },
+    ]);
+    expect(outline(rows).slice(conversation.length - 1)).toEqual(["waiting:fix", "card:fix:0", "card:fix:1", "waiting:lead", "card:lead:0", "presence"]);
+    expect(rows.find((row) => row.key === "waiting:fix")).toMatchObject({ kind: "waiting", runId: "fix", title: "Fix the flaky test", gap: 24 });
+    expect(rows.find((row) => row.key === "waiting:lead")).toMatchObject({ kind: "waiting", runId: "lead", title: null });
+    expect(rows.find((row) => row.key === "card:lead:0")).toMatchObject({ kind: "card", runId: "lead", gap: 14 });
+    expect(newestRow(rows)).toMatchObject({ key: "card:lead:0" });
+    expect(fixedHeight(rows.find((row) => row.kind === "waiting")!)).toBe(24 + 16);
+  });
+
+  it("hands back the conversation's own rows when nothing waits", () => {
+    const { frame } = runStore();
+    const run = frame(...finishedTurn);
+    const conversation = transcriptRows(run.blocks, activity(run), "r", emptyRowMemo());
+    expect(withWaitingApprovals(conversation, [])).toBe(conversation);
   });
 });

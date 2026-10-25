@@ -8,6 +8,7 @@ import { nativeProps, placed, screen as phone } from "../test-fixtures/react-nat
 import type { Row } from "./rows";
 import { activity, finishedTurn, type runStore } from "./test-fixtures/run-store";
 import { Transcript } from "./Transcript";
+import { VoicesContext } from "./voices";
 
 const transcript = vi.hoisted(() => ({ store: null as ReturnType<typeof runStore> | null, rows: [] as Row[] }));
 
@@ -74,4 +75,40 @@ it("scrolls a focused answer field to the foot of what stays in view once the ke
   const card = transcript.rows.findIndex((row) => row.kind === "card");
   expect(card).toBeGreaterThan(0);
   expect(scrollToIndex).toHaveBeenCalledWith({ index: card, viewPosition: 1, viewOffset: phone.height - 600 - 44 - 12, animated: true });
+});
+
+it("shows what waits outside the loaded conversation after it, under its task's title or its agent, to answer here", () => {
+  const { client, frame } = transcript.store!;
+  const run = frame(...finishedTurn);
+  const question = { id: "q", kind: "approval", approvalId: "0", approvalKind: "user_input", input: { questions: [{ id: "runner", question: "Which runner?" }] } } as const;
+  const listRef = { current: { scrollToIndex: () => undefined, scrollToEnd: () => undefined, getState: () => ({ contentLength: 0, scrollLength: 1 }) } as unknown as LegendListRef };
+  const asked = { id: "a", kind: "approval", approvalId: "a", approvalKind: "user_input", input: { questions: [{ id: "target", question: "Which environment?" }] } } as const;
+  render(
+    <QueryClientProvider client={client.queryClient}>
+      <VoicesContext.Provider value={new Map([["lead", { agent: "codex", model: null }]])}>
+        <Transcript
+          blocks={run.blocks}
+          {...activity(run)}
+          runId="r"
+          hasOlder={false}
+          loadOlder={() => undefined}
+          filled
+          composerInset={{ value: 0 } as never}
+          listRef={listRef}
+          onFollow={() => undefined}
+          following
+          followKey={0}
+          waiting={[
+            { runId: "fix", task: "Fix the flaky test", blocks: [question] },
+            { runId: "lead", task: null, blocks: [asked] },
+          ]}
+        />
+      </VoicesContext.Provider>
+    </QueryClientProvider>,
+  );
+  expect(screen.getByText("Fix the flaky test")).toBeTruthy();
+  expect(screen.getByLabelText("Which runner?")).toBeTruthy();
+  expect(screen.getByLabelText("Which environment?")).toBeTruthy();
+  expect(screen.getAllByText("Codex")).toHaveLength(1);
+  expect(transcript.rows.map((row) => row.key).slice(-5)).toEqual(["waiting:fix", "card:fix:q", "waiting:lead", "card:lead:a", "presence"]);
 });

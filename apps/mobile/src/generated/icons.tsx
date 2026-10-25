@@ -52,6 +52,7 @@ export const AtSign = icon(
     <Path d="M15 8v6c0 3 6 3 6-3a9 9 0 1 0-4 8.5" />
   </>,
 );
+export const Bell = icon("Bell", <Path d="M18 15.5V10a6 6 0 0 0-12 0v5.5L4.5 18h15L18 15.5Z M10 21h4" />);
 export const Bold = icon("Bold", <Path strokeWidth="2.25" d="M6 4h7a4 4 0 0 1 0 8H6V4Z M6 12h8a4 4 0 0 1 0 8H6Z" />);
 export const BookText = icon("BookText", <Path d="M6 20.5h14V3.5H6a2.5 2.5 0 0 0-2.5 2.5v12A2.5 2.5 0 0 1 6 15.5h14 M3.5 18a2.5 2.5 0 0 0 2.5 2.5 M8 7.5h8 M8 11h6" />);
 export const Brain = icon("Brain", <Path d="m12 3 9 5-9 5-9-5Z M3 12l9 5 9-5 M3 16l9 5 9-5" />);

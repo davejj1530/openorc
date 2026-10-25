@@ -2,3 +2,5 @@
 /ios/
 /android/
 /.expo/
+# apple-targets writes a target's Info.plist on prebuild when it is missing.
+/targets/*/Info.plist

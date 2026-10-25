@@ -9,8 +9,10 @@ export default defineConfig({
     alias: {
       "@expo/ui/swift-ui/modifiers": fixture("expo-ui.tsx"),
       "@expo/ui/swift-ui": fixture("expo-ui.tsx"),
+      "expo-application": fixture("notifications.ts"),
       "expo-clipboard": fixture("clipboard.ts"),
       "expo-haptics": fixture("haptics.ts"),
+      "expo-notifications": fixture("notifications.ts"),
       "expo-status-bar": fixture("status-bar.ts"),
       "expo-web-browser": fixture("web-browser.ts"),
       "react-native-gesture-handler/ReanimatedSwipeable": fixture("swipeable.tsx"),

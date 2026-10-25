@@ -10,6 +10,7 @@ import { link, queryClient } from "../client";
 import { fonts } from "../generated/tokens";
 import { useMacLook } from "../look/use-mac-look";
 import { leaveOnMacChange } from "../navigation";
+import { useNoticeTaps } from "../notifications/use-notice-taps";
 import { useColors, useMode } from "../ui/mode";
 
 // A pairing link opens the Pair screen over Home, so leaving it lands on Home.
@@ -31,6 +32,7 @@ export default function RootLayout() {
   const colors = useColors();
   const mode = useMode();
   useEffect(() => leaveOnMacChange(link, () => router.dismissTo("/")), []);
+  useNoticeTaps();
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <KeyboardProvider>

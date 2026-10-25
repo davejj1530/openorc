@@ -14,6 +14,7 @@ vi.mock("react-native-mmkv", () => ({
   },
 }));
 vi.mock("react-native-quick-crypto", () => ({ randomUUID: () => "id" }));
+vi.mock("./notifications/on-screen", () => ({ threadOnScreen: () => null }));
 vi.mock("./connection/asset-cache", () => ({ createAssetCache: () => ({ forget: () => undefined, uri: async () => "" }) }));
 // No Mac paired: the link starts unpaired and dials nothing.
 vi.mock("./connection/native", () => ({

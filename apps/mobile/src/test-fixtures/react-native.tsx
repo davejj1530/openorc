@@ -116,5 +116,9 @@ export const AppState = { currentState: "active", addEventListener: () => ({ rem
 export const Settings = { get: () => undefined };
 export const Platform = { OS: "ios", select: <T,>(options: { ios?: T; default?: T }) => options.ios ?? options.default };
 
+/** What the app opened outside itself, in order: "settings" for its page in iOS Settings. */
+export const opened: string[] = [];
+export const Linking = { openSettings: async () => void opened.push("settings") };
+
 /** An action sheet answers at once with its first option, as if the person tapped it. */
 export const ActionSheetIOS = { showActionSheetWithOptions: (_options: unknown, onChoice: (index: number) => void) => onChoice(0) };

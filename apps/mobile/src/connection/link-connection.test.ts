@@ -108,6 +108,19 @@ describe("calls over the link", () => {
     ]);
   });
 
+  it("asks about this phone over the same rpc as calls, and hears the Mac's answer", async () => {
+    const mac = new FakeMac();
+    mac.behave(lan, { kind: "answer" });
+    const states = { sandbox: "ready", production: "no-key" };
+    mac.answer = (method) => (method === "push.register" ? states : undefined);
+    const { connection } = connect(mac);
+    const registration = { token: "ab".repeat(32), environment: "sandbox", alerts: "all", sound: true } as const;
+    const registered = connection.device("push.register", { registration });
+    await advance(10);
+    expect(await registered).toEqual(states);
+    expect(mac.heard).toContainEqual(expect.objectContaining({ t: "rpc", method: "push.register", params: { registration } }));
+  });
+
   it("hands over an image's bytes", async () => {
     const mac = new FakeMac();
     mac.behave(lan, { kind: "answer" });

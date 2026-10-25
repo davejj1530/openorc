@@ -6,7 +6,8 @@ import { ChevronsUpDown, SunMoon } from "../generated/icons";
 import { haptic } from "../ui/haptics";
 import { useMode } from "../ui/mode";
 import { Text } from "../ui/Text";
-import { Card, RowLines, rowClass, Section } from "./parts";
+import { NotificationsRow } from "./NotificationsRow";
+import { Card, Divider, RowLines, rowClass, Section } from "./parts";
 
 function choose(choice: AppearanceChoice, current: AppearanceChoice): void {
   if (choice === current) return;
@@ -60,6 +61,8 @@ export function PhoneSection() {
     <Section title="This iPhone">
       <Card>
         <AppearanceRow />
+        <Divider />
+        <NotificationsRow />
       </Card>
     </Section>
   );

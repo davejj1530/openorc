@@ -2,7 +2,8 @@ import { Children, createElement, isValidElement, useState, type ReactElement, t
 
 /*
  * Expo UI's SwiftUI views in tests, as DOM elements that act as the views do: a menu is a button that opens its items,
- * a picker inside it is a set of radio items checked on its selection, and a close button is a button named Close.
+ * a picker inside it is a set of radio items checked on its selection, a toggle is a switch, and a close button is a
+ * button named Close.
  * Modifiers are plain records a stand-in reads.
  */
 
@@ -51,11 +52,17 @@ export function Button({ role, label, onPress, modifiers }: Modified & { role?: 
   return createElement("button", { "aria-label": spoken(modifiers) ?? label ?? (role === "close" ? "Close" : undefined), onClick: onPress }, label);
 }
 
+export function Toggle({ label, isOn, onIsOnChange, modifiers }: Modified & { label?: string; isOn?: boolean; onIsOnChange?: (isOn: boolean) => void }) {
+  const disabled = read(modifiers, "disabled") === true;
+  return createElement("button", { role: "switch", "aria-label": label, "aria-checked": Boolean(isOn), "aria-disabled": disabled, disabled, onClick: () => onIsOnChange?.(!isOn) }, label);
+}
+
 export const accessibilityLabel = modifier("accessibilityLabel");
 export const accessibilityValue = modifier("accessibilityValue");
 export const buttonBorderShape = modifier("buttonBorderShape");
 export const buttonStyle = modifier("buttonStyle");
 export const controlSize = modifier("controlSize");
+export const disabled = modifier("disabled");
 export const dynamicTypeSize = modifier("dynamicTypeSize");
 export const labelStyle = modifier("labelStyle");
 export const pickerStyle = modifier("pickerStyle");

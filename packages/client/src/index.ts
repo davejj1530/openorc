@@ -24,6 +24,7 @@ export {
   pickerSettings,
   providerGroups,
 } from "./model-picker-selection.js";
+export { type NoticePresence, type NoticeTarget, noticeVisible } from "./notice-visible.js";
 export { decodeNewThreadDraft, type NewThreadDraft, type NewThreadTarget, newThreadChoice, newThreadStartInput, newThreadWorkspaceMode, targetModel } from "./new-thread.js";
 export { projectGitView, type ProjectGitView } from "./project-git.js";
 export { allowanceState, formatUsageTime, percentLeft, usageResetLabel, weeklyWindow } from "./provider-usage.js";

@@ -11,7 +11,7 @@ const PAGE_TURNS = 4;
 
 /**
  * A thread's runs read as one conversation: their loaded turns in run order, with the thread's own messages placed by
- * time. Paging and the live run follow the same loaded window.
+ * time. Paging and the live run follow the same loaded window, whose runs `shown` names, oldest first.
  */
 export function useConversationTranscriptWith(queries: ClientQueries, store: Runs, { runs, threadId }: { runs: Run[]; threadId: string | null }) {
   const activeRun = runs.at(-1);
@@ -50,7 +50,7 @@ export function useConversationTranscriptWith(queries: ClientQueries, store: Run
   }, [transcripts, hasOlder, activeRun?.id, messages]);
 
   const liveTranscript = activeRun && shown.at(-1) === activeRun.id ? transcripts.at(-1) : undefined;
-  return { merged, transcripts, liveTranscript, hasOlder, loadOlder };
+  return { merged, transcripts, liveTranscript, hasOlder, loadOlder, shown };
 }
 
 const at = (block: Block) => block.at ?? 0;

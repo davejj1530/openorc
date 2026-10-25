@@ -2,10 +2,26 @@ import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { git, run, GitError } from "./exec.js";
 
+/**
+ * A commit or push Git refused, in its own words: a hook's output when a hook stopped it, then Git's. A pre-push hook
+ * prints to stdout and Git to stderr, so the hook's part comes first. The command line would repeat the message and
+ * name the folder, and says nothing the reader can act on.
+ */
+function refusal(error: unknown): unknown {
+  if (!(error instanceof GitError)) return error;
+  // No exit code: a timeout or a signal stopped it, and what it printed so far does not say so.
+  const stopped = error.code === null ? `git ${error.args[0] ?? ""} stopped before it finished.` : "";
+  const words = [error.stdout, error.stderr, stopped]
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join("\n");
+  return new Error(words || `git ${error.args[0] ?? ""} failed (${error.code})`);
+}
+
 /** Commits everything for the user, running their hooks as their own commit would. */
 export async function commitAll(cwd: string, message: string): Promise<string> {
   await git(cwd, ["add", "-A"], { hooks: true });
-  await git(cwd, ["commit", "-m", message], { hooks: true });
+  await git(cwd, ["commit", "-m", message], { hooks: true }).catch((error: unknown) => Promise.reject(refusal(error)));
   return (await git(cwd, ["rev-parse", "HEAD"])).stdout.trim();
 }
 
@@ -16,7 +32,7 @@ export async function push(cwd: string, branch: string, remote = "origin"): Prom
   } catch (e) {
     // Git's own report is a page of hints; the remedy is one sentence.
     if (e instanceof GitError && /\[rejected\].*\((fetch first|non-fast-forward)\)/.test(e.stderr)) throw new Error(`${remote} has newer commits on ${branch}. Pull them in first, then push again.`);
-    throw e;
+    throw refusal(e);
   }
 }
 

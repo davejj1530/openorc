@@ -108,8 +108,15 @@ export async function revParse(cwd: string, ref: string): Promise<string> {
 
 /** Changed files versus a base commit, plus untracked files. */
 export async function changedFiles(cwd: string, baseSha: string | null): Promise<FileChange[]> {
+  const out = await trackedChanges(cwd, baseSha ?? (await headOrEmptyTree(cwd)));
+  for (const p of await untrackedFiles(cwd)) out.push({ path: p, status: "untracked", oldPath: null });
+  return out;
+}
+
+/** What differs between `base` and the working tree, staged or not, in git's order. Renames name both paths. */
+export async function trackedChanges(cwd: string, base: string): Promise<FileChange[]> {
   const out: FileChange[] = [];
-  const tracked = (await git(cwd, ["diff", "--name-status", "-z", "-M", baseSha ?? (await headOrEmptyTree(cwd))])).stdout;
+  const tracked = (await git(cwd, ["diff", "--name-status", "-z", "-M", base])).stdout;
   const parts = tracked.split("\0");
   for (let i = 0; i < parts.length;) {
     const code = parts[i];
@@ -126,12 +133,17 @@ export async function changedFiles(cwd: string, baseSha: string | null): Promise
       i += 2;
     }
   }
-  const untracked = (await git(cwd, ["ls-files", "--others", "--exclude-standard", "-z"])).stdout.split("\0").filter(Boolean);
-  for (const p of untracked) out.push({ path: p, status: "untracked", oldPath: null });
   return out;
 }
 
-const MAX_UNTRACKED_DIFF_BYTES = 1024 * 1024;
+/** Untracked files git would add, in its order, or only `file` when it is one. */
+export async function untrackedFiles(cwd: string, file?: string): Promise<string[]> {
+  const args = ["ls-files", "--others", "--exclude-standard", "-z", ...(file === undefined ? [] : ["--", file])];
+  return (await git(cwd, args, { env: { GIT_LITERAL_PATHSPECS: "1" } })).stdout.split("\0").filter(Boolean);
+}
+
+/** An untracked file larger than this is listed without a diff. */
+export const MAX_UNTRACKED_DIFF_BYTES = 1024 * 1024;
 
 /**
  * A unified patch of everything that differs from the base: tracked changes
@@ -141,7 +153,7 @@ export async function patchAgainst(cwd: string, baseSha: string | null): Promise
   const parts: string[] = [];
   const base = baseSha ?? (await headOrEmptyTree(cwd));
   parts.push((await git(cwd, ["diff", "--no-color", "--no-ext-diff", "-M", base], { okCodes: [0, 1] })).stdout);
-  const untracked = (await git(cwd, ["ls-files", "--others", "--exclude-standard", "-z"])).stdout.split("\0").filter(Boolean);
+  const untracked = await untrackedFiles(cwd);
   const renderable: string[] = [];
   const placeholders: string[] = [];
   for (const file of untracked) {
@@ -206,7 +218,7 @@ export async function isDirty(cwd: string): Promise<boolean> {
   return out.trim().length > 0;
 }
 
-function changedFileStatus(letter: string | undefined): FileChange["status"] {
+export function changedFileStatus(letter: string | undefined): FileChange["status"] {
   if (letter === "A") return "added";
   if (letter === "D") return "deleted";
   return "modified";

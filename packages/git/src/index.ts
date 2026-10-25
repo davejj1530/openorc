@@ -1,6 +1,7 @@
 export { git, run, GitError, type ExecOptions, type ExecResult } from "./exec.js";
 export { grepWorkingTree, type GrepLimits, type GrepLine, type GrepQuery, type GrepResult } from "./grep.js";
 export { isGitRepo, gitState, headCommit, emptyTree, originUrl, repoInfo, defaultBranch, fetch, revParse, changedFiles, patchAgainst, log, isDirty, type RepoInfo } from "./repo.js";
+export { changeStats, filePatch, type ChangeList } from "./changes.js";
 export * as worktree from "./worktree.js";
 export { treeHash, diffStat, patchSinceTree, switchFiles } from "./snapshot.js";
 export { pinObject, unpinAll } from "./refs.js";

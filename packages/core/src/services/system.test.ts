@@ -20,6 +20,28 @@ function environment(current: EnvSnapshot, refresh: RefreshResult = { ok: true, 
   return { current: vi.fn(() => current), refresh: vi.fn(async () => refresh) };
 }
 
+describe("SystemService gh", () => {
+  it("answers whether gh is installed, asking it at most once every 30 s", async () => {
+    let now = 100_000;
+    const clock = vi.spyOn(Date, "now").mockImplementation(() => now);
+    try {
+      let installed = true;
+      const gh = vi.fn(async () => installed);
+      const service = new SystemService("/data", environment(snapshot()), undefined, undefined, gh);
+      expect(await Promise.all([service.gh(), service.gh()])).toEqual([{ installed: true }, { installed: true }]);
+      expect(gh).toHaveBeenCalledTimes(1);
+      installed = false;
+      now += 29_999;
+      expect(await service.gh()).toEqual({ installed: true });
+      now += 1;
+      expect(await service.gh()).toEqual({ installed: false });
+      expect(gh).toHaveBeenCalledTimes(2);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+});
+
 describe("SystemService harness registry", () => {
   it("shares recent probes across callers, then rechecks after a minute or an environment change", async () => {
     let now = 100_000;

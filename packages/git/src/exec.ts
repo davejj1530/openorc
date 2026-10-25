@@ -6,6 +6,7 @@ export class GitError extends Error {
     readonly cwd: string,
     readonly code: number | null,
     readonly stderr: string,
+    readonly stdout = "",
   ) {
     super(`git ${args.join(" ")} failed (${code ?? "signal"}) in ${cwd}: ${stderr.trim() || "no stderr"}`);
     this.name = "GitError";
@@ -62,7 +63,7 @@ function execute(bin: string, cwd: string, args: string[], options: ExecOptions,
       (error, stdout, stderr) => {
         const code = commandExitCode(error);
         if (error && !(code !== null && okCodes.includes(code))) {
-          reject(new GitError([bin === "git" ? "" : bin, ...args].filter(Boolean), cwd, code, String(stderr)));
+          reject(new GitError([bin === "git" ? "" : bin, ...args].filter(Boolean), cwd, code, String(stderr), String(stdout)));
           return;
         }
         resolve({ stdout: String(stdout), stderr: String(stderr), code: code ?? 0 });

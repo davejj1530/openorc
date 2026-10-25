@@ -52,12 +52,13 @@ it("reports what Push would publish from a shared checkout, and clears once it's
     published: false,
     unpushedCount: 0,
     unpushed: [],
+    busy: false,
   });
 
   await addOrigin();
-  expect(await call("git.threadPushState", { threadId: thread.id })).toEqual({ branch: "site", blocked: null, published: false, unpushedCount: 1, unpushed: [sha] });
+  expect(await call("git.threadPushState", { threadId: thread.id })).toEqual({ branch: "site", blocked: null, published: false, unpushedCount: 1, unpushed: [sha], busy: false });
   await call("review.pushThread", { threadId: thread.id });
-  expect(await call("git.threadPushState", { threadId: thread.id })).toEqual({ branch: "site", blocked: null, published: true, unpushedCount: 0, unpushed: [] });
+  expect(await call("git.threadPushState", { threadId: thread.id })).toEqual({ branch: "site", blocked: null, published: true, unpushedCount: 0, unpushed: [], busy: false });
 
   await git(root, ["switch", "-q", "--detach"]);
   expect(await call("git.threadPushState", { threadId: thread.id })).toMatchObject({ branch: null, blocked: "The checkout isn't on a branch.", unpushed: [] });
@@ -75,7 +76,7 @@ it("counts a worktree thread's own branch, not the checkout's", async () => {
   await writeFile(path.join(root, "README.md"), "Checkout work\n");
   await commitAll(root, "Checkout work");
 
-  expect(await call("git.threadPushState", { threadId: thread.id })).toEqual({ branch: "feature/site", blocked: null, published: false, unpushedCount: 1, unpushed: [sha] });
+  expect(await call("git.threadPushState", { threadId: thread.id })).toEqual({ branch: "feature/site", blocked: null, published: false, unpushedCount: 1, unpushed: [sha], busy: false });
 });
 
 it("refuses a pull request until the checkout's branch is on origin with every commit", async () => {
@@ -126,9 +127,9 @@ it("pushes the checkout's branch outside any conversation, after committing it f
   const { sha } = await call("review.commitProject", { projectId: project.id, message: "fix: mentions skip the check" });
 
   expect((await call("git.projectLog", { projectId: project.id }))[0]).toMatchObject({ sha, subject: "fix: mentions skip the check" });
-  expect(await call("git.projectPushState", { projectId: project.id })).toEqual({ branch: "feat/bots", blocked: null, published: true, unpushedCount: 1, unpushed: [sha] });
+  expect(await call("git.projectPushState", { projectId: project.id })).toEqual({ branch: "feat/bots", blocked: null, published: true, unpushedCount: 1, unpushed: [sha], busy: false });
   expect(await call("review.pushProject", { projectId: project.id })).toEqual({ remote: "origin", branch: "feat/bots" });
-  expect(await call("git.projectPushState", { projectId: project.id })).toEqual({ branch: "feat/bots", blocked: null, published: true, unpushedCount: 0, unpushed: [] });
+  expect(await call("git.projectPushState", { projectId: project.id })).toEqual({ branch: "feat/bots", blocked: null, published: true, unpushedCount: 0, unpushed: [], busy: false });
   expect((await git(root, ["ls-remote", "origin", "refs/heads/feat/bots"])).stdout.split(/\s/)[0]).toBe(sha);
 
   await git(root, ["switch", "-q", "--detach"]);
@@ -164,4 +165,25 @@ it("publishes nothing from a pull request's copy under review, and throws the co
   expect(await exists()).toBe(true);
   await core.threads.delete(fork.id);
   expect(await exists()).toBe(false);
+});
+
+it("says a Git write holds the workspace until it lands, and a refused one asks for its log and push state again", async () => {
+  const pushed: unknown[] = [];
+  await core.close();
+  core = await OpenOrc.create({ dataDir: path.join(folder, "data"), ephemeral: true, transport: { push: (message) => pushed.push(message) } });
+  project = projects.insert(core.db, { name: "Site", rootPath: root, defaultBranch: "main", gitRemote: null, settings: {} });
+  const thread = threads.insert(core.db, { projectId: project.id, title: "Checkout", agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
+  const gate = path.join(folder, "gate");
+  const hook = path.join(root, ".git", "hooks", "pre-commit");
+  await writeFile(hook, `#!/bin/sh\nwhile [ ! -f "${gate}" ]; do sleep 0.05; done\necho "lint failed" >&2\nexit 1\n`, { mode: 0o755 });
+  await writeFile(path.join(root, "README.md"), "Changed\n");
+
+  expect(await call("git.threadPushState", { threadId: thread.id })).toMatchObject({ busy: false });
+  const commit = call("review.commitThread", { threadId: thread.id, message: "Change the readme" }).catch((error: Error) => error);
+  await vi.waitFor(async () => expect(await call("git.threadPushState", { threadId: thread.id })).toMatchObject({ busy: true }), { timeout: 5000 });
+  pushed.length = 0;
+  await writeFile(gate, "");
+  expect(await commit).toMatchObject({ message: "lint failed" });
+  expect(await call("git.threadPushState", { threadId: thread.id })).toMatchObject({ busy: false });
+  expect(pushed).toContainEqual(expect.objectContaining({ type: "invalidate", keys: [`threadlog:${thread.id}`] }));
 });

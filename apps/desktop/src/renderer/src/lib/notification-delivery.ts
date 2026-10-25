@@ -1,17 +1,5 @@
-import type { Notice } from "@openorc/client";
+import type { Notice, NoticeTarget } from "@openorc/client";
 
-export interface NoticeTarget {
-  threadId: string | null;
-  taskId: string | null;
-}
-export interface NoticePresence {
-  focused: boolean;
-  threadIds: readonly string[];
-  taskId: string | null;
-}
-export function noticeVisible(target: NoticeTarget, presence: NoticePresence): boolean {
-  return presence.focused && Boolean((target.threadId && presence.threadIds.includes(target.threadId)) || (target.taskId && target.taskId === presence.taskId));
-}
 export function noticeDestination(notice: NoticeTarget): { view: "task"; taskId: string; tab: "chat" } | { view: "thread"; threadId: string } | null {
   if (notice.taskId) return { view: "task", taskId: notice.taskId, tab: "chat" };
   if (notice.threadId) return { view: "thread", threadId: notice.threadId };

@@ -25,6 +25,7 @@ import { installWindowAppearance } from "./window-appearance";
 import { installProjectIcons } from "./project-icon-ipc";
 import { closeAllPanes, executeBrowserCommand, installBrowserPane } from "./browser-pane";
 import { installBrowserBridge } from "./browser-bridge";
+import { installPresence } from "./presence-ipc";
 import { cancelPtyUpdate, detachAllPtys, installPtyHost, killAllPtys, preparePtysForUpdate } from "./pty-host";
 
 const here = import.meta.dirname;
@@ -100,6 +101,7 @@ function startCore(): UtilityProcess {
   listenForShellEnv(child);
   installProtectedSecrets(child, app.getPath("userData"));
   installBrowserBridge(child, executeBrowserCommand);
+  installPresence(child);
   child.stdout?.on("data", (d: Buffer) => process.stdout.write(`[core] ${d}`));
   child.stderr?.on("data", (d: Buffer) => process.stderr.write(`[core!] ${d}`));
   child.on("exit", (code) => {

@@ -1,7 +1,8 @@
+import { noticeVisible, type NoticeTarget } from "@openorc/client";
 import { client } from "./client";
 import { core } from "./rpc";
 import { openThread, useRouter } from "./router";
-import { NotificationDelivery, NotificationVisibility, noticeDestination, noticeVisible, type NoticeTarget } from "./notification-delivery";
+import { NotificationDelivery, NotificationVisibility, noticeDestination } from "./notification-delivery";
 
 /**
  * Notifications reach the OS only when the user is not already looking at

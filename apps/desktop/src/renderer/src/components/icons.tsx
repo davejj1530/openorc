@@ -495,6 +495,7 @@ export const SunMoon = icon(
     <path d="M12 3a9 9 0 1 0 9 9 7.5 7.5 0 0 1-9-9Z M19 2v4 M17 4h4" />
   </>,
 );
+export const Bell = icon("Bell", <path d="M18 15.5V10a6 6 0 0 0-12 0v5.5L4.5 18h15L18 15.5Z M10 21h4" />);
 
 /** Quiet transcript glyphs: matched optical size, open silhouettes, no window chrome. */
 export const WorkRead = icon("WorkRead", <path d="M12 6.5C9.4 4.7 6.7 4 3.5 4.5v14c3.2-.5 5.9.2 8.5 2 2.6-1.8 5.3-2.5 8.5-2v-14c-3.2-.5-5.9.2-8.5 2Zm0 0v14" />);

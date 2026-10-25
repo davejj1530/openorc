@@ -6,9 +6,10 @@ import { QrCode } from "../components/QrCode";
 import { Button, Dialog, TextButton } from "../components/ui";
 import { queryClient, useRpc, useRpcMutation } from "../lib/client";
 import { core } from "../lib/rpc";
+import { PushKey } from "./settings-phone-push";
 import { LoadError, Section, Status, Toggle } from "./settings-shared";
 
-/** Phone access: the switch, where this Mac listens, and the phones paired with it. */
+/** Phone access: the switch, where this Mac listens, the phones paired with it, and the key their alerts are signed with. */
 export function PhoneSettings({ active }: { active: boolean }) {
   const status = useRpc("remote.status", {}, { enabled: active });
   const configure = useRpcMutation("remote.configure");
@@ -42,6 +43,7 @@ export function PhoneSettings({ active }: { active: boolean }) {
           {devices.length ? devices.map((device) => <PhoneRow key={device.id} device={device} />) : <p className="flex min-h-13 items-center text-ink-3">No paired phones yet.</p>}
         </Section>
       </div>
+      {enabled && status.data && <PushKey push={status.data.push} />}
     </>
   );
 }

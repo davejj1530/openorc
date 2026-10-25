@@ -1,5 +1,6 @@
 import { ProtectedSecretsClient } from "./protected-secrets";
 import { BrowserClient } from "./browser-client";
+import { PresenceClient } from "./presence";
 import { windowPorts } from "./reply";
 import { join } from "node:path";
 import { Worker } from "node:worker_threads";
@@ -35,6 +36,7 @@ const transport: Transport = {
 
 const secrets = new ProtectedSecretsClient((message) => process.parentPort.postMessage(message));
 const browser = new BrowserClient((message) => process.parentPort.postMessage(message));
+const presence = new PresenceClient((message) => process.parentPort.postMessage(message));
 const corePromise = OpenOrc.create({
   browser: browser.execute,
   dataDir,
@@ -44,6 +46,8 @@ const corePromise = OpenOrc.create({
   memorySecrets: secrets.store("memory.secrets"),
   githubSecrets: secrets.store("github.secrets"),
   remoteSecrets: secrets.store("remote.secrets"),
+  pushSecrets: secrets.store("push.secrets"),
+  presence: presence.inUse,
   // The embedding model runs in its own thread, so loading it and embedding memories never stall the core.
   embedder: new WorkerEmbedder(() => new Worker(join(import.meta.dirname, "embedder-worker.mjs"), { workerData: { cacheDir: dataDir } })),
   // Prettier formats in its own thread too, so a large file never stalls the core.
@@ -84,6 +88,7 @@ async function answer(request: RpcRequest): Promise<RpcReply> {
 
 process.parentPort.on("message", (e) => {
   if (browser.receive(e.data)) return;
+  if (presence.receive(e.data)) return;
   if (secrets.receive(e.data)) return;
   if (e.data?.type === "update:prepare" && typeof e.data.id === "string") {
     void prepareUpdate(e.data.id);

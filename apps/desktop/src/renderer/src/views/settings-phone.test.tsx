@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
-import type { PairingOfferView, RemoteDevice, RemoteStatus, RpcMethod } from "@openorc/protocol";
+import type { PairingOfferView, RemoteDevice, RemotePushStatus, RemoteStatus, RpcMethod, RpcResults } from "@openorc/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { invalidateTags, queryClient } from "../lib/client";
 import { core } from "../lib/rpc";
@@ -22,6 +22,8 @@ let offer: PairingOfferView | null;
 let offers: number;
 /** How long a status read takes. The real core answers over IPC, after a begin's own reply. */
 let statusDelay: number;
+let push: RemotePushStatus;
+let tested: RpcResults["remote.push.test"];
 
 /** The core's side of phone access, kept in memory: offers expire, cancel and redeem the way remote-access.ts does. */
 async function fakeCore(method: RpcMethod, params: Record<string, unknown>): Promise<unknown> {
@@ -29,6 +31,7 @@ async function fakeCore(method: RpcMethod, params: Record<string, unknown>): Pro
     listener,
     devices: structuredClone(devices),
     pairing: offer && Date.now() < offer.expiresAt ? { offerId: offer.offerId, expiresAt: offer.expiresAt } : null,
+    push: { ...push },
   });
   switch (method) {
     case "remote.status":
@@ -47,6 +50,16 @@ async function fakeCore(method: RpcMethod, params: Record<string, unknown>): Pro
     case "remote.devices.remove":
       devices = devices.filter((device) => device.id !== params.id);
       return null;
+    case "remote.push.setKey":
+      // The core refuses anything but a P-256 key; this fake knows one by its armor.
+      if (!String(params.pem).startsWith("-----BEGIN PRIVATE KEY-----")) throw new Error("This is not an Apple push key.");
+      push = { ...push, keyId: String(params.keyId), problem: null };
+      return status();
+    case "remote.push.removeKey":
+      push = { ...push, keyId: null, problem: null };
+      return status();
+    case "remote.push.test":
+      return tested;
     default:
       throw new Error(`Unexpected ${method}`);
   }
@@ -67,6 +80,8 @@ beforeEach(() => {
   offer = null;
   offers = 0;
   statusDelay = 0;
+  push = { keyId: null, phones: 0, problem: null };
+  tested = { sent: 0, failed: 0, problem: null };
   vi.mocked(core.call).mockImplementation((method, params) => fakeCore(method, params as Record<string, unknown>) as never);
 });
 afterEach(() => {
@@ -127,6 +142,99 @@ describe("phone access", () => {
     await waitFor(() => expect(screen.queryByText("Studio iPad")).toBeNull());
     expect(calls("remote.devices.remove")).toEqual([["remote.devices.remove", { id: "phone-2" }]]);
     expect(screen.getByText("David's iPhone")).toBeTruthy();
+  });
+});
+
+describe("notifications on phones", () => {
+  const PEM = "-----BEGIN PRIVATE KEY-----\nMIGTAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBHkwdwIBAQQg\n-----END PRIVATE KEY-----\n";
+  // jsdom's File has no text(), which Chromium's has.
+  const keyFile = (name: string, text = PEM) => Object.assign(new File([text], name), { text: async () => text });
+  const notifications = async () => (await screen.findByRole("heading", { name: "Notifications" })).closest<HTMLElement>("section")!;
+  const choose = (section: HTMLElement, file: File) => fireEvent.change(section.querySelector<HTMLInputElement>('input[type="file"]')!, { target: { files: [file] } });
+
+  it("appears once phone access is on, with no key yet", async () => {
+    show();
+    const toggle = await screen.findByRole("switch", { name: "Allow paired phones" });
+    await waitFor(() => expect(toggle).toHaveProperty("disabled", false));
+    expect(screen.queryByRole("heading", { name: "Notifications" })).toBeNull();
+    fireEvent.click(toggle);
+    const section = await notifications();
+    expect(within(section).getByText("Apple push key")).toBeTruthy();
+    expect(within(section).getByText("Not added")).toBeTruthy();
+    const input = section.querySelector<HTMLInputElement>('input[type="file"]')!;
+    expect(input.accept).toBe(".p8");
+    const opened = vi.spyOn(input, "click");
+    fireEvent.click(within(section).getByRole("button", { name: "Add key" }));
+    expect(opened).toHaveBeenCalledOnce();
+  });
+
+  it("adds the key from Apple's file, reading its id from the file's name", async () => {
+    listener = on;
+    show();
+    const section = await notifications();
+    choose(section, keyFile("AuthKey_ABC123DEFG.p8"));
+    expect(await within(section).findByText("Key ABC123DEFG")).toBeTruthy();
+    expect(calls("remote.push.setKey")).toEqual([["remote.push.setKey", { keyId: "ABC123DEFG", pem: PEM }]]);
+    expect(within(section).getByRole("button", { name: "Send a test" })).toBeTruthy();
+    expect(within(section).queryByRole("alert")).toBeNull();
+  });
+
+  it.each(["key.p8", "AuthKey_ABC123DEFG (1).p8", "AuthKey_abc123defg.p8"])("asks for Apple's file with its name unchanged, not %s", async (name) => {
+    listener = on;
+    show();
+    const section = await notifications();
+    choose(section, keyFile(name));
+    expect((await within(section).findByRole("alert")).textContent).toBe("Choose the AuthKey file from Apple, with its name unchanged.");
+    expect(calls("remote.push.setKey")).toEqual([]);
+    expect(within(section).getByText("Not added")).toBeTruthy();
+  });
+
+  it("says when the file is not an Apple push key", async () => {
+    listener = on;
+    show();
+    const section = await notifications();
+    choose(section, keyFile("AuthKey_ABC123DEFG.p8", "ssh-ed25519 AAAA"));
+    expect((await within(section).findByRole("alert")).textContent).toBe("This is not an Apple push key.");
+    expect(within(section).getByText("Not added")).toBeTruthy();
+  });
+
+  it.each([
+    [{ reason: "BadEnvironmentKeyIdInToken", environment: "sandbox" }, "This key can't reach builds from Xcode. Add a Sandbox key."],
+    [{ reason: "BadEnvironmentKeyIdInToken", environment: "production" }, "Apple did not accept this key (BadEnvironmentKeyIdInToken)."],
+    [{ reason: "InvalidProviderToken", environment: "sandbox" }, "Apple did not accept this key (InvalidProviderToken)."],
+  ] as const)("explains Apple's refusal %o", async (problem, line) => {
+    listener = on;
+    push = { keyId: "ABC123DEFG", phones: 1, problem };
+    show();
+    expect((await within(await notifications()).findByRole("alert")).textContent).toBe(line);
+  });
+
+  it.each([
+    [0, { sent: 0, failed: 0, problem: null }, "No phone has notifications on."],
+    [1, { sent: 1, failed: 0, problem: null }, "Sent to 1 phone."],
+    [3, { sent: 3, failed: 0, problem: null }, "Sent to 3 phones."],
+    [2, { sent: 0, failed: 0, problem: { reason: "BadEnvironmentKeyIdInToken", environment: "sandbox" } }, "This key can't reach builds from Xcode. Add a Sandbox key."],
+    [2, { sent: 0, failed: 2, problem: null }, "The test did not go through."],
+  ] as const)("says what a test reached with %i phones registered", async (phones, result, line) => {
+    listener = on;
+    push = { keyId: "ABC123DEFG", phones, problem: null };
+    tested = result;
+    show();
+    const section = await notifications();
+    fireEvent.click(await within(section).findByRole("button", { name: "Send a test" }));
+    await waitFor(() => expect(within(section).getByText(line)).toBeTruthy());
+    expect(calls("remote.push.test")).toEqual([["remote.push.test", {}]]);
+  });
+
+  it("removes the key", async () => {
+    listener = on;
+    push = { keyId: "ABC123DEFG", phones: 1, problem: { reason: "InvalidProviderToken", environment: "sandbox" } };
+    show();
+    const section = await notifications();
+    fireEvent.click(await within(section).findByRole("button", { name: "Remove" }));
+    expect(await within(section).findByText("Not added")).toBeTruthy();
+    expect(calls("remote.push.removeKey")).toEqual([["remote.push.removeKey", {}]]);
+    expect(within(section).queryByRole("alert")).toBeNull();
   });
 });
 

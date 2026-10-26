@@ -2,7 +2,7 @@
 
 Original third-party text is preserved in this directory. It retains its own terms; the repository's Apache-2.0 license does not replace them.
 
-`manifest.json` records reviewed package versions, exact source URLs or installed-package paths, SHA-256 hashes, and desktop/website destinations. `vendor/` holds supplemental upstream notices. `shadercn-MIT.txt` covers the adapted orb runtime. Electron's downloaded MIT and Chromium notice files are copied into `licenses/electron/` during desktop packaging. Font and selected package notices remain inside the desktop archive.
+`manifest.json` records reviewed package versions, exact source URLs or installed-package paths, SHA-256 hashes, and desktop/website destinations. `vendor/` holds supplemental upstream notices. `shadercn-MIT.txt` covers the adapted orb runtime; `t3code-MIT.txt` covers the adapted device viewer. Electron's downloaded MIT and Chromium notice files are copied into `licenses/electron/` during desktop packaging. Font and selected package notices remain inside the desktop archive.
 
 `tokenizer-notice-sources.json` records the archives and original notice hashes used in the historical native-tokenizer collection. The current dependency is JavaScript Tokenizers.js, whose original Apache license is also preserved here. `rive-header-sources.json` records the exact source bytes preserved in the Skia and Unicode copyright-header collections. See [native notice evidence](../docs/native-notice-evidence.md) and [the replacement](../docs/tokenizer-replacement.md) for the distinction between historical and current inputs.
 

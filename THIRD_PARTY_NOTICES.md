@@ -12,6 +12,12 @@ The conversation indicator uses the original Apache-2.0 Hollow shader in `orbs/h
 
 The original Rive mascot and its source availability are described in [the mascot record](assets/mascot/README.md).
 
+## Adapted Device panel code
+
+Parts of the Device panel were adapted from [t3code](https://github.com/pingdotgg/t3code): the stream decoding under `apps/desktop/src/renderer/src/lib/device/` (AVCC and SEMU demuxing, the SPS VUI repair, and the iOS and Android input encoding), and in `packages/core/src/devices/` the hub supervision and device operations, the tool installer, the agent-device launcher and its how-to text, and device selection for the `device` tool. The MIT license, Copyright (c) 2026 T3 Tools Inc., is reproduced in [licenses/t3code-MIT.txt](licenses/t3code-MIT.txt), retrieved from upstream commit `0a3b561bc0901d8fa47e430fc9d8593918cde978`.
+
+OpenOrc relays the streams through its core process instead of fetching them from the device hub, installs the tools from pinned lockfiles, and split the decoder into smaller units. expo-device-hub and agent-device are not bundled: OpenOrc installs them into its data folder after the user turns on device support, and they keep their own licenses.
+
 ## Fonts
 
 | Font package                          | Reviewed version | Terms and distribution                                                                                                                                                      |

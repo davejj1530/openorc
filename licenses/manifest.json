@@ -362,6 +362,15 @@
       }
     },
     {
+      "id": "t3code",
+      "input": "licenses/t3code-MIT.txt",
+      "source": "https://github.com/pingdotgg/t3code/blob/0a3b561bc0901d8fa47e430fc9d8593918cde978/LICENSE",
+      "sha256": "935d8f2af0c703f9c39517ee57cc4930b19d02d533be930b63f0e82f93614b43",
+      "desktop": {
+        "resource": "licenses/t3code-MIT.txt"
+      }
+    },
+    {
       "id": "geist",
       "input": "apps/desktop/node_modules/@fontsource-variable/geist/LICENSE",
       "source": {

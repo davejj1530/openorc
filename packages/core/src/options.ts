@@ -1,5 +1,5 @@
 import type { TextEmbedder } from "@openorc/memory";
-import type { BrowserHost } from "@openorc/protocol";
+import type { BrowserHost, PreviewHost } from "@openorc/protocol";
 import type { DeviceSystem } from "./devices/system.js";
 import type { RemoteNetwork } from "./remote/remote-access.js";
 import type { ProtectedSecretStore } from "./services/extraction-credentials.js";
@@ -11,6 +11,8 @@ import type { Transport } from "./transport.js";
 /** What the host gives the core. */
 export interface OpenOrcOptions {
   browser?: BrowserHost;
+  /** What the Mac's Preview shows, for phones. Read-only; without it, every thread's Preview reads as closed. */
+  preview?: PreviewHost;
   slackSecrets?: SlackSecretStore;
   memorySecrets?: ProtectedSecretStore;
   /** Keeps the reviewer app's private key. Without it, reviews post only as the user. */

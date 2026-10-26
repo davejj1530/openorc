@@ -53,8 +53,9 @@ const assetRef = variants("kind", {
   attachment: shape({ kind: present, name: text(255) }),
   "tool-image": shape({ kind: present, url: text(512) }),
   activity: shape({ kind: present, runId: text(100), activityId: text(200) }),
+  preview: shape({ kind: present, threadId: text(100), seq: count }),
 } satisfies Record<AssetRef["kind"], Check>);
-const pushTypes: RemotePush["type"][] = ["frame", "invalidate", "notify", "ready"];
+const pushTypes: RemotePush["type"][] = ["frame", "invalidate", "notify", "ready", "preview", "preview.ended"];
 // The Mac is authenticated and pushes are the hot path, so the phone checks the envelope and trusts the body.
 const push: Check = (value) => isRecord(value) && oneOf(...pushTypes)(value["type"]);
 

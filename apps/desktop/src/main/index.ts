@@ -25,6 +25,8 @@ import { installWindowAppearance } from "./window-appearance";
 import { installProjectIcons } from "./project-icon-ipc";
 import { closeAllPanes, executeBrowserCommand, installBrowserPane } from "./browser-pane";
 import { installBrowserBridge } from "./browser-bridge";
+import { installPreviewBridge } from "./preview-bridge";
+import { createPreviewHost } from "./preview-host";
 import { installPresence } from "./presence-ipc";
 import { cancelPtyUpdate, detachAllPtys, installPtyHost, killAllPtys, preparePtysForUpdate } from "./pty-host";
 
@@ -83,6 +85,9 @@ protocol.registerSchemesAsPrivileged([
 ]);
 // Signs the file panel's viewer URLs. The core gets it once, at fork; main verifies every URL with it.
 const fileKey = randomBytes(32).toString("hex");
+const previewHost = createPreviewHost();
+// QA builds let a kit reach the host through main's inspector, to time captures against the real panes.
+if (__OPENORC_QA__) Object.assign(globalThis, { __openorcPreview: previewHost });
 const mcpAppSandbox = new McpAppSandbox();
 
 /**
@@ -102,6 +107,7 @@ function startCore(): UtilityProcess {
   listenForShellEnv(child);
   installProtectedSecrets(child, app.getPath("userData"));
   installBrowserBridge(child, executeBrowserCommand);
+  installPreviewBridge(child, previewHost);
   installPresence(child);
   child.stdout?.on("data", (d: Buffer) => process.stdout.write(`[core] ${d}`));
   child.stderr?.on("data", (d: Buffer) => process.stderr.write(`[core!] ${d}`));

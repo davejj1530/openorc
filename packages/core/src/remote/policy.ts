@@ -2,6 +2,7 @@ import path from "node:path";
 import { redact, redactValue } from "@openorc/db";
 import { isRemoteMethod, REMOTE_ATTACHMENT_BYTES, rpcParams, type RemoteMethod, type RemotePush, type RpcParams, type RpcResults } from "@openorc/protocol";
 import type { Broadcast } from "../transport.js";
+import { previewReply, type PhoneShaping } from "./phone-words.js";
 
 /*
  * What a paired phone may do and hear. A paired phone is the user, able to start autonomous work on this Mac, so
@@ -122,12 +123,12 @@ export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {
   "review.commitThread": (params, context) => teamWork(params.threadId, context) ?? commitMessage(params.message),
   "review.pushThread": (params, context) => teamWork(params.threadId, context),
   "review.createThreadPr": (params, context) => teamWork(params.threadId, context) ?? prTitle(params.title) ?? prBody(params.body),
+  // One page's state; the handler answers closed for a missing or team-deleted thread.
+  "preview.state": allow,
 };
 
-/** What a reply's shaping needs besides the result: how an error or a reason reads on a phone. */
-export interface ReplyContext {
-  words: (message: string) => string;
-}
+/** What a reply's shaping needs besides the result: how an error or a reason reads on a phone, and the Mac's folders. */
+export type ReplyContext = PhoneShaping;
 type Reply<M extends RemoteMethod> = (result: RpcResults[M], context: ReplyContext) => RpcResults[M];
 const same = <T>(result: T): T => result;
 
@@ -173,6 +174,7 @@ export const remoteReplies: { [M in RemoteMethod]: Reply<M> } = {
   "review.commitThread": same,
   "review.pushThread": same,
   "review.createThreadPr": same,
+  "preview.state": (state, context) => previewReply(state, context),
 };
 
 /** One result shaped for a phone by its method's entry in remoteReplies. */

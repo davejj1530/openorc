@@ -1,11 +1,26 @@
 import { LinkCloseCode, type ClosingReason, type MacMessage, type MacSession, type PhoneMessage } from "@openorc/link";
-import { deviceRpcParams, isDeviceMethod, isRemoteMethod, type AssetRef, type DeviceMethod, type DeviceParams, type RemotePush, type RpcRequest } from "@openorc/protocol";
+import {
+  deviceRpcParams,
+  isDeviceMethod,
+  isRemoteMethod,
+  isSessionMethod,
+  sessionRpcParams,
+  type AssetRef,
+  type DeviceMethod,
+  type DeviceParams,
+  type RemotePush,
+  type RpcRequest,
+  type SessionMethod,
+  type SessionParams,
+} from "@openorc/protocol";
 import { invalidParamsMessage } from "../handlers/diagnostics.js";
 import type { RequestOrigin } from "../request-origin.js";
+import { PREVIEW_THREAD_GONE } from "../services/preview.js";
 import type { ImageFileRead } from "../services/profile-assets.js";
 import type { RpcReply } from "../transport.js";
 import { remoteError, type MacRoots } from "./phone-words.js";
 import { admitRemoteRequest, remoteReply, type GuardContext } from "./policy.js";
+import type { PreviewCasters } from "./preview-casters.js";
 
 /** The request path the windows use: counted while in flight and refused while the app restarts. A phone's request names its origin. */
 export type Answer = (request: RpcRequest, origin?: RequestOrigin) => Promise<RpcReply>;
@@ -27,6 +42,10 @@ export interface SessionDeps {
   readAsset(ref: AssetRef): Promise<ImageFileRead>;
   /** A method about the calling phone itself, for the session's own device. */
   device(deviceId: string, method: DeviceMethod, params: DeviceParams<DeviceMethod>): Promise<unknown>;
+  /** The Mac's Preview, watched per session. Null on a Mac without one: a watch reads as closed, no frame is served. */
+  preview: Pick<PreviewCasters, "watch" | "unwatch" | "frame"> | null;
+  /** Whether a thread's Preview may be watched: the thread exists and no team deletion hid it. */
+  watchable(threadId: string): boolean;
 }
 
 /**
@@ -64,6 +83,7 @@ export class RemoteSession {
       this.receive(message);
     });
     link.onClose(() => {
+      deps.preview?.unwatch(this);
       clearTimeout(this.idle);
       if (this.timer) clearTimeout(this.timer);
       this.timer = null;
@@ -171,10 +191,35 @@ export class RemoteSession {
       if (!parsed.success) return { type: "rpc.error", id, message: invalidParamsMessage(method, parsed.error.message) };
       return { type: "rpc.result", id, result: await this.deps.device(this.deviceId, method, parsed.data) };
     }
+    if (isSessionMethod(method)) return this.ownSession(id, method, params);
     const admission = admitRemoteRequest(method, params, this.deps.guard);
     if (!admission.ok || !isRemoteMethod(method)) return { type: "rpc.error", id, message: admission.ok ? "This is not available from a phone." : admission.message };
     const reply = await this.deps.answer({ type: "rpc", id, method, params }, { kind: "phone", deviceId: this.deviceId });
-    return reply.type === "rpc.result" ? { ...reply, result: remoteReply(method, reply.result as never, { words: this.words }) } : reply;
+    return reply.type === "rpc.result" ? { ...reply, result: remoteReply(method, reply.result as never, { words: this.words, roots: this.deps.roots }) } : reply;
+  }
+
+  /** A method about this session itself: its one watch of a thread's Preview. */
+  private async ownSession(id: number, method: SessionMethod, params: unknown): Promise<RpcReply> {
+    const parsed = sessionRpcParams[method].safeParse(params ?? {});
+    if (!parsed.success) return { type: "rpc.error", id, message: invalidParamsMessage(method, parsed.error.message) };
+    if (method === "preview.unwatch") {
+      this.deps.preview?.unwatch(this);
+      return { type: "rpc.result", id, result: null };
+    }
+    const watch = parsed.data as SessionParams<"preview.watch">;
+    if (!this.deps.watchable(watch.threadId)) return { type: "rpc.error", id, message: PREVIEW_THREAD_GONE };
+    return { type: "rpc.result", id, result: this.deps.preview ? await this.deps.preview.watch(this, watch) : { open: false } };
+  }
+
+  /** The newest frame of the Preview this session watches. Never through readAsset: frames are not files. */
+  private preview(id: number, ref: Extract<AssetRef, { kind: "preview" }>): Promise<void> {
+    const bytes = this.deps.preview?.frame(this, ref.threadId, ref.seq) ?? null;
+    if (!bytes) {
+      this.link.send({ t: "asset.error", id, message: "This page is not being watched." });
+      return Promise.resolve();
+    }
+    this.link.send({ t: "asset.bytes", id, mime: "image/jpeg", size: bytes.length });
+    return this.link.sendBytes(id, bytes);
   }
 
   private async asset(id: number, ref: AssetRef): Promise<void> {
@@ -184,6 +229,7 @@ export class RemoteSession {
     }
     this.streaming++;
     try {
+      if (ref.kind === "preview") return await this.preview(id, ref);
       const read = await this.deps.readAsset(ref).catch((): ImageFileRead => ({ ok: false, reason: "missing" }));
       if (this.link.closed) return;
       if (!read.ok) {

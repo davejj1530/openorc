@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { FileChange } from "./domain.js";
+import { FolderPath } from "./files.js";
 
 /** What a move or a restore would change, for its confirmation. `blocked` says why it cannot run at all. */
 export interface ChangePreview {
@@ -48,3 +49,11 @@ export interface FileDiff {
   patch: string;
   cut: { shownLines: number; totalLines: number } | null;
 }
+
+/** The capped reads of a thread's changes, for a reader that draws one file at a time. */
+export const workspaceChangeRpcParams = {
+  /** The same changes as a capped list of files with line counts and true totals, without the patch. */
+  "review.threadChanges": z.object({ threadId: z.string(), comparison: ChangeComparison.optional() }),
+  /** One changed file's diff, capped. A path with no changes is refused. */
+  "review.threadFileDiff": z.object({ threadId: z.string(), comparison: ChangeComparison.optional(), path: FolderPath }),
+};

@@ -120,7 +120,7 @@ function paneSession(): Electron.Session {
   return created;
 }
 
-interface Pane {
+export interface Pane {
   agentBusy?: boolean;
   revealRequested?: boolean;
   view: WebContentsView;
@@ -131,9 +131,16 @@ interface Pane {
   /** The panel wants this pane on screen. Attaching it can lag that while a page is still coming. */
   desired: boolean;
   attached: boolean;
+  /**
+   * Attached, but off its window while the window is minimized or hidden, so the page keeps painting for a phone
+   * watching it. It goes back as the window shows.
+   */
+  parked: boolean;
   /** A load is in flight and nothing has painted yet, so there is nothing worth compositing. */
   pending: boolean;
   error: string | null;
+  /** The page's renderer is gone; the next load starts it again. */
+  crashed: boolean;
   /** The last URL this pane was told to open, so a failed load still has a name to report. */
   requested: string;
   /**
@@ -149,6 +156,26 @@ const agentPanes = new Map<string, Pane>();
 let reveals = 0;
 /** Windows already carrying a teardown listener, so reopening a pane does not stack another. */
 const watchedWindows = new WeakSet<BrowserWindow>();
+const changeListeners = new Set<(surface: string) => void>();
+
+/** Hears every change a pane goes through, by its surface: its page, its state, being shown, hidden or closed. */
+export function onPaneChange(listener: (surface: string) => void): () => void {
+  changeListeners.add(listener);
+  return () => changeListeners.delete(listener);
+}
+
+function changed(surface: string): void {
+  for (const listener of changeListeners) listener(surface);
+}
+
+/** A thread's live panes, every tab of it, and the one its agent's browser tool acts on (also the tab shown last). */
+export function threadPanes(threadId: string): { agent: Pane | null; tabs: Pane[] } {
+  const surface = `thread:${threadId}`;
+  const alive = (pane: Pane) => !pane.view.webContents.isDestroyed() && !pane.window.isDestroyed();
+  const agent = agentPanes.get(surface);
+  const tabs = [...panes.values()].filter((pane) => (pane.surface === surface || pane.surface.startsWith(`${surface}:tab:`)) && alive(pane));
+  return { agent: agent && alive(agent) ? agent : null, tabs };
+}
 
 /**
  * A pane belongs to one window. The panel names a surface, and the same
@@ -191,6 +218,7 @@ function readState(pane: Pane): BrowserPaneState {
 }
 
 function publish(pane: Pane): void {
+  changed(pane.surface);
   if (pane.window.isDestroyed()) return;
   pane.window.webContents.send("browser:state", { id: pane.surface, state: readState(pane) });
 }
@@ -202,17 +230,43 @@ function attach(pane: Pane): void {
   pane.window.contentView.addChildView(pane.view);
   pane.view.setVisible(true);
   pane.attached = true;
+  changed(pane.surface);
 }
 
 function detach(pane: Pane): void {
   if (!pane.attached) return;
   pane.attached = false;
+  const parked = pane.parked;
+  pane.parked = false;
+  changed(pane.surface);
   // A closing window takes its child views down with it, and the view is not
   // safe to touch after that. The window is the thing to ask, because the
   // view has no isDestroyed of its own.
   if (pane.window.isDestroyed()) return;
   pane.view.setVisible(false);
+  if (!parked) pane.window.contentView.removeChildView(pane.view);
+}
+
+/**
+ * A view on a minimized or hidden window paints nothing new, and a phone
+ * watching it would see one frame forever. Off the window it paints on its
+ * own, as an agent's pane that was never shown does. Only the view moves: the
+ * page is the same, with its scroll and its fields as they were, and it goes
+ * back on the window as the window shows, before anyone can see the gap.
+ */
+export function keepPainting(pane: Pane): void {
+  if (!pane.attached || pane.parked || pane.window.isDestroyed()) return;
+  pane.parked = true;
   pane.window.contentView.removeChildView(pane.view);
+}
+
+function unpark(window: BrowserWindow): void {
+  if (window.isDestroyed()) return;
+  for (const pane of panes.values()) {
+    if (pane.window !== window || !pane.parked) continue;
+    pane.parked = false;
+    window.contentView.addChildView(pane.view);
+  }
 }
 
 /** Off the window until the panel asks for it again. The page keeps running, so coming back does not reload it. */
@@ -240,6 +294,7 @@ function destroy(key: string, pane: Pane): void {
   pane.desired = false;
   detach(pane);
   if (!pane.view.webContents.isDestroyed()) pane.view.webContents.close();
+  changed(pane.surface);
 }
 
 /**
@@ -280,6 +335,10 @@ function watch(window: BrowserWindow): void {
     contexts.delete(window);
     for (const [key, pane] of [...panes]) if (pane.window === window) destroy(key, pane);
   });
+  // Restored from the Dock, shown again after the app was hidden, or focused: whichever the window hears first.
+  window.on("restore", () => unpark(window));
+  window.on("show", () => unpark(window));
+  window.on("focus", () => unpark(window));
   window.webContents.on("did-navigate", () => {
     contexts.delete(window);
     for (const pane of panes.values()) if (pane.window === window) hide(pane);
@@ -325,7 +384,7 @@ function create(key: string, surface: string, window: BrowserWindow): Pane {
   // through one.
   view.setBackgroundColor("#ffffff");
 
-  const pane: Pane = { view, window, surface, desired: false, attached: false, pending: false, error: null, requested: "about:blank", shown: ++reveals };
+  const pane: Pane = { view, window, surface, desired: false, attached: false, parked: false, pending: false, error: null, crashed: false, requested: "about:blank", shown: ++reveals };
   const contents = view.webContents;
 
   // A preview has no second window to open into, and the window it would get
@@ -355,6 +414,7 @@ function create(key: string, surface: string, window: BrowserWindow): Pane {
 
   contents.on("did-start-loading", () => {
     pane.error = null;
+    pane.crashed = false;
     pane.pending = true;
     publish(pane);
   });
@@ -375,6 +435,7 @@ function create(key: string, surface: string, window: BrowserWindow): Pane {
   });
   contents.on("render-process-gone", (_event, details) => {
     pane.error = `The preview stopped (${details.reason}). Reload to start it again.`;
+    pane.crashed = true;
     publish(pane);
   });
   contents.on("destroyed", () => {
@@ -384,6 +445,7 @@ function create(key: string, surface: string, window: BrowserWindow): Pane {
   watch(window);
   panes.set(key, pane);
   evict(pane);
+  changed(surface);
   return pane;
 }
 
@@ -436,7 +498,9 @@ export function openBrowserLink(window: BrowserWindow, url: string): boolean {
 
 function selectBrowserTab(window: BrowserWindow, pane: Pane, context: unknown): void {
   if (typeof context !== "string" || contexts.get(window) !== context) return;
-  if (pane.surface === context || pane.surface.startsWith(`${context}:tab:`)) agentPanes.set(context, pane);
+  if (pane.surface !== context && !pane.surface.startsWith(`${context}:tab:`)) return;
+  agentPanes.set(context, pane);
+  changed(context);
 }
 
 /**
@@ -578,6 +642,13 @@ export function installBrowserPane(ipcMain: Electron.IpcMain, options: { getWind
   });
 }
 
+/** A deleted thread's panes in every window, each of its tabs, and the one its agent acted on. */
+export function closeThreadPanes(threadId: string): void {
+  const surface = `thread:${threadId}`;
+  agentPanes.delete(surface);
+  for (const [key, pane] of [...panes]) if (pane.surface === surface || pane.surface.startsWith(`${surface}:tab:`)) destroy(key, pane);
+}
+
 /** Every pane, gone. Quitting runs this so no page outlives the window it was painted into. */
 export function closeAllPanes(): void {
   for (const [key, pane] of [...panes]) destroy(key, pane);
@@ -615,6 +686,7 @@ export async function executeBrowserCommand(surface: string, command: BrowserCom
   target.shown = ++reveals;
   target.revealRequested = true;
   if (contexts.get(target.window) === surface) target.window.webContents.send("browser:reveal", target.surface);
+  changed(surface);
   try {
     return await runBrowserAction({
       contents,
@@ -631,6 +703,7 @@ export async function executeBrowserCommand(surface: string, command: BrowserCom
     });
   } finally {
     target.agentBusy = false;
+    changed(surface);
   }
 }
 

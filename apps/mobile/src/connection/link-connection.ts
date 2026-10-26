@@ -1,7 +1,10 @@
 import type { ClientPush, CoreConnection } from "@openorc/client";
 import type { MacMessage, PhoneSession } from "@openorc/link";
-import type { AssetRef, DeviceMethod, DeviceParams, DeviceRpcResults, RemotePush, RpcMethod, RpcParams, RpcResults } from "@openorc/protocol";
+import type { AssetRef, DeviceMethod, DeviceParams, DeviceRpcResults, RemotePush, RpcMethod, RpcParams, RpcResults, SessionMethod, SessionParams, SessionRpcResults } from "@openorc/protocol";
 import type { Clock } from "./route-race";
+
+/** A watched Preview's newest state, or the end of the watch, which only its screen hears. */
+export type PreviewPush = Extract<RemotePush, { type: "preview" | "preview.ended" }>;
 
 /** What the Mac sends that the connection, not the session's owner, handles. */
 export type CallMessage = Exclude<MacMessage, { t: "pong" | "closing" }>;
@@ -49,6 +52,10 @@ function clientPush(push: RemotePush): ClientPush | null {
     }
     case "ready":
       return null;
+    // A watched Preview's frames go to its own screen, never into the client's caches.
+    case "preview":
+    case "preview.ended":
+      return null;
   }
 }
 
@@ -68,6 +75,7 @@ export class LinkConnection implements CoreConnection {
   private readonly waiting = new Set<Waiter>();
   private readonly drains = new Map<PhoneSession, () => void>();
   private readonly listeners = new Set<(push: ClientPush) => void>();
+  private readonly previews = new Set<(push: PreviewPush) => void>();
 
   constructor(
     private readonly clock: Clock,
@@ -84,7 +92,12 @@ export class LinkConnection implements CoreConnection {
     return this.rpc(method, params) as Promise<DeviceRpcResults[M]>;
   }
 
-  /** The bytes behind an image the transcript names. */
+  /** A method about this phone's current session, such as its one watch of a Preview, which ends with the session. */
+  session<M extends SessionMethod>(method: M, params: SessionParams<M>): Promise<SessionRpcResults[M]> {
+    return this.rpc(method, params) as Promise<SessionRpcResults[M]>;
+  }
+
+  /** The bytes behind an image the transcript names, or a watched Preview's frame. */
   asset(ref: AssetRef): Promise<Asset> {
     return this.withSession(
       (session) =>
@@ -99,6 +112,12 @@ export class LinkConnection implements CoreConnection {
   onPush(listener: (push: ClientPush) => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+
+  /** Hears the Preview pushes of the current session, which the Mac sends only while this phone watches. */
+  onPreview(listener: (push: PreviewPush) => void): () => void {
+    this.previews.add(listener);
+    return () => this.previews.delete(listener);
   }
 
   setFrameInterest(runIds: ReadonlySet<string>): void {
@@ -136,7 +155,10 @@ export class LinkConnection implements CoreConnection {
         this.settle(message.id)?.reject(new Error(message.message));
         return;
       case "push": {
-        const push = session === this.current ? clientPush(message.push) : null;
+        if (session !== this.current) return;
+        const pushed = message.push;
+        if (pushed.type === "preview" || pushed.type === "preview.ended") for (const listener of this.previews) listener(pushed);
+        const push = clientPush(pushed);
         if (push) this.emit(push);
         return;
       }
@@ -157,7 +179,9 @@ export class LinkConnection implements CoreConnection {
   receiveBytes(stream: number, chunk: Uint8Array, end: boolean): void {
     const download = this.downloads.get(stream);
     if (!download) return;
-    download.chunks.push(Uint8Array.from(chunk));
+    // A copy, as the chunk may be a view of a buffer the session reuses; made natively, as Uint8Array.from walks the
+    // chunk byte by byte, which for a Preview frame twice a second was most of the app's JS garbage.
+    download.chunks.push(chunk.slice());
     if (end) this.settleDownload(stream)?.resolve({ mime: download.mime, bytes: joined(download.chunks) });
   }
 

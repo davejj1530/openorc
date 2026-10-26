@@ -112,7 +112,21 @@ export const keyboard = { up: false };
 export const Keyboard = { dismiss: () => void (keyboard.up = false) };
 export const useWindowDimensions = () => screen;
 export const StyleSheet = { create: <T,>(styles: T) => styles, hairlineWidth: 1 / 3, absoluteFill: {} };
-export const AppState = { currentState: "active", addEventListener: () => ({ remove: () => undefined }) };
+/** The app's state as iOS reports it: a test calls `appState.set` to move the app in or out of the front. */
+export const appState = {
+  listeners: new Set<(state: string) => void>(),
+  set(state: "active" | "inactive" | "background") {
+    AppState.currentState = state;
+    this.listeners.forEach((listener) => listener(state));
+  },
+};
+export const AppState = {
+  currentState: "active",
+  addEventListener: (_event: "change", listener: (state: string) => void) => {
+    appState.listeners.add(listener);
+    return { remove: () => void appState.listeners.delete(listener) };
+  },
+};
 export const Settings = { get: () => undefined };
 export const Platform = { OS: "ios", select: <T,>(options: { ios?: T; default?: T }) => options.ios ?? options.default };
 

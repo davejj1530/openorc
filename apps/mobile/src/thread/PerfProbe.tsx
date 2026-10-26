@@ -4,6 +4,8 @@ import { useFrameCallback, useSharedValue } from "react-native-reanimated";
 import { isLive } from "@openorc/client";
 import { client, link } from "../client";
 import { isChangesScenario, openChanges } from "../changes/changes-perf";
+import { isPreviewScenario } from "../preview/preview-perf";
+import { openPreview } from "../preview/open-preview";
 import { markThreadOpening, percentile, perfEnabled, perfScenario, perfStepMs, perfThread, perfTurns, report, startFrames, stopFrames, takeArrivals, takeMounts, transcriptList } from "./perf-probe";
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -177,7 +179,7 @@ export function useFrameSampler(): Sampler {
 /**
  * Drives a performance run on the open thread and reports what it measured: JS work per frame (median, p95), the JS
  * thread's pacing and the UI thread's frames, while scrolling the whole history or while a reply streams. The Changes
- * scenarios open the thread's Changes screen, which runs them.
+ * and Preview scenarios open their screens, which run them.
  */
 export function PerfProbe() {
   const sampler = useFrameSampler();
@@ -188,6 +190,7 @@ export function PerfProbe() {
     if (scenario === "scroll") void scrollRun(sampler, () => cancelled);
     if (scenario === "live-scroll") void liveScrollRun(sampler, () => cancelled, perfTurns());
     if (isChangesScenario(scenario)) void openChanges(() => cancelled);
+    if (isPreviewScenario(scenario)) void openPreview(() => cancelled);
     const samplers: Record<string, () => boolean> = { stream: streaming, work: working };
     const live = samplers[scenario];
     const stop = live ? streamRun(sampler, scenario, live) : undefined;

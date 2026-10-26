@@ -275,6 +275,7 @@ export const Pin = icon("Pin", <Path d="M9 3.5h6 M10 3.5v6l-3 4v2h10v-2l-3-4v-6 
 export const PinOff = icon("PinOff", <Path d="M10 3.5h5 M14 3.5v5 M8.5 10l-1.5 3.5v2h7 M12 15.5v5 M3 3l18 18" />);
 export const Play = icon("Play", <Path d="M7 4.5 20 12 7 19.5Z" />);
 export const Plus = icon("Plus", <Path d="M12 5v14 M5 12h14" />);
+export const Power = icon("Power", <Path d="M12 3v8 M7.4 6.2a7.5 7.5 0 1 0 9.2 0" />);
 export const Quote = icon("Quote", <Path d="M4 7h6v7H5c0 3 1 4 3 5 M14 7h6v7h-5c0 3 1 4 3 5" />);
 export const RefreshCw = icon("RefreshCw", <Path d="M3.5 10A8.5 8.5 0 0 1 18 6l2.5 3 M20.5 3v6h-6 M20.5 14A8.5 8.5 0 0 1 6 18l-2.5-3 M3.5 21v-6h6" />);
 export const RotateCcw = icon("RotateCcw", <Path d="M3 10a9 9 0 1 1 1 7 M3 4v6h6" />);
@@ -377,6 +378,13 @@ export const Sun = icon(
   </>,
 );
 export const SunMoon = icon("SunMoon", <Path d="M12 3a9 9 0 1 0 9 9 7.5 7.5 0 0 1-9-9Z M19 2v4 M17 4h4" />);
+export const Tablet = icon(
+  "Tablet",
+  <>
+    <Rect x="4" y="3" width="16" height="18" rx="2.5" />
+    <Path d="M11 18h2" />
+  </>,
+);
 export const Terminal = icon(
   "Terminal",
   <>

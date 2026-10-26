@@ -2,8 +2,9 @@
   "expo": {
     "name": "OpenOrc",
     "slug": "openorc",
+    "owner": "david1530",
     "scheme": "openorc",
-    "version": "0.0.0",
+    "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "ios": {
@@ -39,7 +40,12 @@
           "microphonePermission": false
         }
       ],
-      "expo-secure-store",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": false
+        }
+      ],
       "react-native-quick-crypto",
       [
         "expo-notifications",
@@ -49,6 +55,11 @@
       ],
       "@bacons/apple-targets",
       "./plugins/strip-after-info-plist"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "ea45e9f0-4deb-4a44-b2fb-c81b5951200c"
+      }
+    }
   }
 }

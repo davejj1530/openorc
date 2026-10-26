@@ -1,0 +1,51 @@
+---
+import Layout from "../layouts/Layout.astro";
+import SiteHeader from "../components/SiteHeader.astro";
+import SiteFooter from "../components/SiteFooter.astro";
+import { docHref } from "../data/docs";
+import { supportEmail } from "../data/support";
+import "../styles/prose-page.css";
+
+const repository = "https://github.com/davejj1530/openorc";
+---
+
+<Layout title="Support · OpenOrc" description="How to get help with OpenOrc on your computer or iPhone: the docs, GitHub issues, and private security reports.">
+  <SiteHeader />
+  <main id="main" class="container prose-page">
+    <header class="prose-intro">
+      <h1>Support</h1>
+      <p>How to get help with the OpenOrc desktop app and the OpenOrc iPhone app.</p>
+    </header>
+    <article class="prose-article" aria-label="Support">
+      <section aria-labelledby="docs-title">
+        <h2 id="docs-title">Start with the docs</h2>
+        <p>The <a href="/docs/">docs</a> cover setup and every feature, starting with the <a href={docHref("quickstart")}>quickstart</a>. <a href={docHref("troubleshooting")}>Troubleshooting</a> has fixes for the problems people run into most, and <a href={docHref("known-issues")}>known issues</a> lists the limitations and bugs in the current version.</p>
+      </section>
+      <section aria-labelledby="issues-title">
+        <h2 id="issues-title">Ask on GitHub</h2>
+        <p>Questions, bug reports, and feature requests go to the <a href={`${repository}/issues`}>issues in the OpenOrc GitHub repository</a>. <a href={`${repository}/issues/new/choose`}>Open a new issue</a> and choose Question, Bug report, or Feature request. Search the existing issues first, since yours may already have an answer.</p>
+        <p>Say which OpenOrc version and operating system you use, and which agent command-line tool and version is involved. For the iPhone app, add your iOS version and the app’s version, which the App Store or TestFlight shows. A small example that shows the problem helps most.</p>
+        <p>Issues are public. Before you post a screenshot or a log, remove credentials, private conversations, project names, and local paths. Do not attach OpenOrc’s database or a full profile.</p>
+      </section>
+      {supportEmail && (
+        <section aria-labelledby="email-title">
+          <h2 id="email-title">Email</h2>
+          <p>For something you would rather not post in public, email <a href={`mailto:${supportEmail}`}>{supportEmail}</a>.</p>
+        </section>
+      )}
+      <section aria-labelledby="security-title">
+        <h2 id="security-title">Security problems</h2>
+        <p>Report a suspected vulnerability privately, not in an issue: on the repository’s <a href={`${repository}/security`}>Security and quality</a> tab, choose Report a vulnerability. GitHub shares the report only with the maintainers.</p>
+      </section>
+      <section aria-labelledby="providers-title">
+        <h2 id="providers-title">Agents and accounts</h2>
+        <p>OpenOrc runs the agent command-line tools you install, signed in to your own accounts. Billing, account access, and outages for those services belong with each provider’s support.</p>
+      </section>
+      <section aria-labelledby="response-title">
+        <h2 id="response-title">What to expect</h2>
+        <p>OpenOrc is free and open source. Help comes from its maintainer and the people who use it, as time allows, with no promised response time. The <a href="/privacy/">privacy policy</a> describes how OpenOrc handles information.</p>
+      </section>
+    </article>
+  </main>
+  <SiteFooter />
+</Layout>

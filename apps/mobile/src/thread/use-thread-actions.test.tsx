@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import type { RpcMethod, RpcParams } from "@openorc/protocol";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import { router } from "expo-router";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { fixtureThreads } from "../home/test-fixtures/threads";
 import type { FakeMac } from "../test-fixtures/fake-mac";
@@ -9,6 +10,7 @@ import { opened } from "../test-fixtures/web-browser";
 import { threadMenu, threadSwipes, type ThreadAction } from "./thread-actions";
 import { useThreadActions } from "./use-thread-actions";
 
+vi.mock("expo-router", () => ({ router: { push: vi.fn() } }));
 const mac = vi.hoisted(() => ({ phone: null as FakeMac | null, updates: [] as RpcParams<"threads.update">[], refuse: null as string | null }));
 vi.mock("../client", async () => {
   const { fakeMac } = await import("../test-fixtures/fake-mac");
@@ -25,6 +27,7 @@ beforeEach(() => {
   mac.refuse = null;
   alerts.length = 0;
   opened.length = 0;
+  vi.mocked(router.push).mockClear();
 });
 afterEach(cleanup);
 
@@ -101,6 +104,13 @@ it("opens the pull request in Safari over the app", () => {
   const { result } = renderHook(() => useThreadActions(settings), { wrapper: mac.phone!.wrapper });
   act(() => result.current.run(find(threadMenu(settings, "row", new Date()), "Open Pull Request")));
   expect(opened).toEqual(["https://github.com/me/openorc/pull/471"]);
+  expect(mac.updates).toEqual([]);
+});
+
+it("opens the thread's Changes from the header's menu", () => {
+  const { result } = renderHook(() => useThreadActions(settings), { wrapper: mac.phone!.wrapper });
+  act(() => result.current.run(find(threadMenu(settings, "header", new Date(), 3), "Changes")));
+  expect(router.push).toHaveBeenCalledWith({ pathname: "/changes", params: { threadId: "t-settings" } });
   expect(mac.updates).toEqual([]);
 });
 

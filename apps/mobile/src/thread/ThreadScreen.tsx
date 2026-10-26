@@ -22,8 +22,8 @@ import { useSnoozeClock } from "./snooze-clock";
 import { threadMenu } from "./thread-actions";
 import { ThreadTitle } from "./ThreadHeader";
 import { headerMenu } from "./ThreadMenu";
-import { usePanelButton } from "./use-panel-button";
 import { Transcript } from "./Transcript";
+import { useChangesCount } from "./use-changes-count";
 import { useThreadActions } from "./use-thread-actions";
 import { VoicesContext, type Voice } from "./voices";
 import { useWaitingApprovals } from "./waiting-approvals";
@@ -127,8 +127,8 @@ export function ThreadScreen() {
   const [{ live, working, generatingImage }, setActivity] = useState(IDLE);
   const actions = useThreadActions(thread, { onUnread: goBack });
   const now = useSnoozeClock();
-  const panel = usePanelButton(thread);
-  const menu = useMemo(() => thread && headerMenu(threadMenu(thread, "header", now), actions.run, panel), [thread, actions.run, now, panel]);
+  const uncommitted = useChangesCount(thread);
+  const menu = useMemo(() => thread && headerMenu(threadMenu(thread, "header", now, uncommitted), actions.run), [thread, actions.run, now, uncommitted]);
   const linkState = useLinkState();
   useThreadOnScreen(linkState.kind === "unpaired" ? null : linkState.mac.id, id);
 

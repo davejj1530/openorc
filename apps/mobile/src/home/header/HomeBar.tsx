@@ -1,11 +1,11 @@
 import { Link } from "expo-router";
 import { Pressable, View } from "react-native";
 import Animated, { Extrapolation, interpolate, useAnimatedStyle } from "react-native-reanimated";
-import type { LinkState } from "../../connection/manager";
+import { showsDemo, type LinkState } from "../../connection/manager";
 import { LinkDot } from "../../ui/LinkDot";
 import { ScrollEdge } from "../../ui/ScrollEdge";
 import { Wordmark, WORDMARK_MAX_SCALE } from "../../ui/Wordmark";
-import { HeaderButtons } from "./HeaderButtons";
+import { HeaderButtons, type BarFor } from "./HeaderButtons";
 import { StatusWords, useLineUnder, useMacLine, type HomeScroll, type MacLineWords } from "./MacLine";
 
 /** The bar's height: `pt-1` over the 44 pt touch row. The list starts under it. */
@@ -54,13 +54,15 @@ function PinnedStatus({ state, ...scroll }: HomeScroll & { state: Exclude<LinkSt
  * With no Mac nothing scrolls, so there is no hairline or status to show.
  */
 export function HomeBar({ state, scroll }: { state: LinkState; scroll?: HomeScroll }) {
+  let shows: BarFor = state.kind === "unpaired" ? "unpaired" : "paired";
+  if (showsDemo(state)) shows = "demo";
   return (
     <View className="px-5 pt-1">
       <View className="h-touch flex-row items-center">
         <Wordmark className="self-stretch" />
         {scroll && state.kind !== "unpaired" ? <PinnedStatus state={state} {...scroll} /> : null}
         <View className="flex-1" />
-        <HeaderButtons paired={state.kind !== "unpaired"} />
+        <HeaderButtons shows={shows} />
       </View>
       {scroll ? <ScrollEdge scrollY={scroll.scrollY} /> : null}
     </View>

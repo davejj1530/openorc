@@ -1,5 +1,4 @@
-import type { Route } from "@openorc/protocol";
-import type { DownReason, LinkState, LostMac } from "./manager";
+import type { DownReason, LinkRoute, LinkState, LostMac } from "./manager";
 
 /** The connection dot: connected, on its way, held up by something the person may want to know, or not trying. */
 export type LinkTone = "ok" | "busy" | "attention" | "off";
@@ -14,7 +13,10 @@ export interface LinkWords {
   detail: string;
 }
 
-const routeNames: Record<Route["kind"], string> = { lan: "Wi-Fi", tailnet: "Tailscale" };
+const routeNames: Record<Exclude<LinkRoute["kind"], "demo">, string> = { lan: "Wi-Fi", tailnet: "Tailscale" };
+
+/** The demo Mac lives in the app: its name says what it is, and Settings says where. */
+const demoWords: LinkWords = { tone: "ok", status: null, spoken: "On this iPhone", detail: "On this iPhone" };
 
 const down: Record<DownReason, LinkWords> = {
   restarting: { tone: "attention", status: "Restarting", spoken: "Restarting OpenOrc", detail: "OpenOrc is restarting on this Mac." },
@@ -38,6 +40,7 @@ export function linkWords(state: LinkState): LinkWords {
     case "unpaired":
       return { tone: "off", status: null, spoken: "Not paired", detail: "Not paired" };
     case "connected": {
+      if (state.route.kind === "demo") return demoWords;
       const via = routeNames[state.route.kind];
       return { tone: "ok", status: via, spoken: `Connected over ${via}`, detail: `Connected over ${via}` };
     }

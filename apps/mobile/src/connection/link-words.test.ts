@@ -28,6 +28,11 @@ it("names how the phone reaches the Mac, and what is in the way when it does not
   expect(lostWords.removed("Studio")).toBe("Studio removed this iPhone");
 });
 
+it("says the demo Mac lives on this iPhone, with no route to name", () => {
+  const demo: LinkState = { kind: "connected", mac: { id: "demo", name: "Demo Mac" }, route: { kind: "demo" }, serial: 1 };
+  expect(linkWords(demo)).toEqual({ tone: "ok", status: null, spoken: "On this iPhone", detail: "On this iPhone" });
+});
+
 it("holds a quick connect's words back, so only the dot changes", () => {
   const words = renderHook(({ state }) => useLinkWords(state), { initialProps: { state: { kind: "connecting", mac, why: null } as LinkState } });
   expect(words.result.current).toMatchObject({ tone: "busy", status: null });

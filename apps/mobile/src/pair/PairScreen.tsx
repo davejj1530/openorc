@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { primeLocalNetwork } from "../connection/local-network";
 import { X } from "../generated/icons";
 import { cn } from "../ui/cn";
+import { LineAction } from "../ui/LineAction";
 import { useColors } from "../ui/mode";
 import { SheetStatusBar } from "../ui/SheetStatusBar";
 import { Text } from "../ui/Text";
@@ -34,15 +35,6 @@ function leave(): void {
 
 const pair = (code: string) => void offerCode(code).then((ok) => ok && leave());
 const scan = (code: string) => void scanCode(code).then((ok) => ok && leave());
-
-/** A faint text button, touch height. */
-function LineAction({ label, onPress }: { label: string; onPress: () => void }) {
-  return (
-    <Pressable accessibilityRole="button" onPress={onPress} className="-mx-3 min-h-touch justify-center rounded-full px-3 active:bg-surface-2">
-      <Text className="text-ink-3">{label}</Text>
-    </Pressable>
-  );
-}
 
 /** The camera, asked for as the screen opens: the reason for it is on screen. */
 function Scanner() {

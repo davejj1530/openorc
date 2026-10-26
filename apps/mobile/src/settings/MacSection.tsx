@@ -1,7 +1,7 @@
 import { router } from "expo-router";
 import { Fragment, useState, type ReactNode } from "react";
-import { Alert } from "react-native";
-import { alerts, link, useSavedMacs } from "../client";
+import { Alert, View } from "react-native";
+import { alerts, endDemo, link, useSavedMacs } from "../client";
 import type { LinkState, MacName } from "../connection/manager";
 import type { SavedMac } from "../connection/saved-macs";
 import { useLinkWords } from "../connection/use-link-words";
@@ -94,9 +94,25 @@ function PairRow({ label }: { label: string }) {
   );
 }
 
+/** The demo Mac, which is nothing to switch to or forget: its name and where it lives, then pairing a real one. */
+function DemoSection({ state }: { state: Paired }) {
+  const words = useLinkWords(state);
+  return (
+    <Section title="Mac">
+      <Card>
+        <View accessible accessibilityLabel={`${state.mac.name}, ${words.spoken}`} className={rowClass}>
+          <RowLines lead={<LinkDot tone={words.tone} />} label={state.mac.name} detail={words.detail} />
+        </View>
+        <Divider />
+        <PairRow label="Pair a Mac" />
+      </Card>
+    </Section>
+  );
+}
+
 /**
  * The Macs this phone paired with: the one Home shows and how it is reached, a way to try again while it is not, the
- * others to switch to, and pairing another. With none, pairing.
+ * others to switch to, and pairing another. With none, pairing; with the demo, the demo Mac and pairing.
  */
 export function MacSection({ state }: { state: LinkState }) {
   const macs = useSavedMacs();
@@ -108,6 +124,7 @@ export function MacSection({ state }: { state: LinkState }) {
         </Card>
       </Section>
     );
+  if (state.kind === "connected" && state.route.kind === "demo") return <DemoSection state={state} />;
   const others = macs.filter((mac) => mac.id !== state.mac.id);
   return (
     <Section title="Mac">
@@ -138,6 +155,17 @@ export function ForgetMac({ mac }: { mac: MacName }) {
     <Card>
       <ListPressable accessibilityRole="button" onPress={() => confirmForget(mac)} className={pressable}>
         <RowLines label={`Forget ${mac.name}`} labelClassName="text-bad" />
+      </ListPressable>
+    </Card>
+  );
+}
+
+/** Leaving the demo, where Forget sits for a Mac: nothing of it is the person's, so it asks nothing first. */
+export function EndDemo() {
+  return (
+    <Card>
+      <ListPressable accessibilityRole="button" onPress={endDemo} className={pressable}>
+        <RowLines label="End demo" />
       </ListPressable>
     </Card>
   );

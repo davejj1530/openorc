@@ -3,9 +3,10 @@ import { View } from "react-native";
 import Animated, { useAnimatedRef, useScrollOffset } from "react-native-reanimated";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLinkState } from "../client";
+import { showsDemo } from "../connection/manager";
 import { SheetHeader } from "../ui/SheetHeader";
 import { swipes } from "../ui/swipe";
-import { ForgetMac, MacSection } from "./MacSection";
+import { EndDemo, ForgetMac, MacSection } from "./MacSection";
 import { PhoneSection } from "./PhoneSection";
 import { UsageSection } from "./UsageSection";
 
@@ -21,14 +22,17 @@ export function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const state = useLinkState();
   const paired = state.kind !== "unpaired";
+  const demo = showsDemo(state);
   const scroller = useAnimatedRef<Animated.ScrollView>();
   const scrollY = useScrollOffset(scroller);
   const sections = (
     <>
       <MacSection state={state} />
       {paired ? <UsageSection /> : null}
-      <PhoneSection />
-      {paired ? <ForgetMac mac={state.mac} /> : null}
+      {/* Only a real Mac sends alerts: with none, or the demo's, choosing them would only ask iOS for permission. */}
+      <PhoneSection notifications={paired && !demo} />
+      {paired && !demo ? <ForgetMac mac={state.mac} /> : null}
+      {demo ? <EndDemo /> : null}
     </>
   );
   const bottom = { paddingBottom: insets.bottom + 24 };

@@ -22,18 +22,19 @@ jobs:
     # Keep the existing required-check name while the work runs in parallel.
     name: Typecheck, test, build
     runs-on: ubuntu-24.04
-    needs: [quality, core-tests]
+    needs: [quality, core-tests, linux]
     if: always()
     steps:
       - name: Require all checks and test shards to pass
         env:
           QUALITY_RESULT: ${{ needs.quality.result }}
           CORE_TESTS_RESULT: ${{ needs.core-tests.result }}
+          LINUX_RESULT: ${{ needs.linux.result }}
         run: |
-          [[ "$QUALITY_RESULT" == "success" && "$CORE_TESTS_RESULT" == "success" ]]
+          [[ "$QUALITY_RESULT" == "success" && "$CORE_TESTS_RESULT" == "success" && "$LINUX_RESULT" == "success" ]]
 
   quality:
-    name: Typecheck, lint, build and workspace tests
+    name: Typecheck, build and workspace tests
     runs-on: macos-15
     timeout-minutes: 20
     steps:
@@ -47,10 +48,6 @@ jobs:
       - run: pnpm check:size
       - run: node --test scripts/size-limit.test.cjs
       - run: pnpm -r typecheck
-      - run: pnpm lint
-        env:
-          # Type-aware ESLint exceeds the runner's default ~2 GB heap.
-          NODE_OPTIONS: --max-old-space-size=4096
       - run: pnpm format:check
       - run: node --test scripts/distribution-notices.test.cjs scripts/desktop-release.test.cjs scripts/packaged-native-target.test.cjs scripts/packaged-runtime-dependencies.test.cjs
       # Core has its own shards; keep every other workspace's test script here.
@@ -113,7 +110,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
 
   linux:
-    name: Linux typecheck, test and build
+    name: Linux typecheck, lint, test and build
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -125,6 +122,11 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r typecheck
+      # Type-aware ESLint holds every tsconfig's program at once (about 5 GB), more than the 7 GB macOS runner
+      # can spare, so it runs here on the 16 GB Linux runner.
+      - run: pnpm lint
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
       - run: node --test scripts/distribution-notices.test.cjs scripts/desktop-release.test.cjs scripts/packaged-native-target.test.cjs scripts/packaged-runtime-dependencies.test.cjs
       - run: pnpm -r test
         env:

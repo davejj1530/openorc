@@ -2,6 +2,7 @@ import { BrowserWindow, session, WebContentsView } from "electron";
 import type { BrowserPaneState, PaneRect } from "../shared/types";
 import type { BrowserCommand, BrowserResult } from "@openorc/protocol";
 import { runBrowserAction } from "./browser-command";
+import { takeTurn } from "./pane-turns";
 
 /**
  * The single gate. Every URL passes through it: the one the panel opens with,
@@ -688,23 +689,35 @@ export async function executeBrowserCommand(surface: string, command: BrowserCom
   if (contexts.get(target.window) === surface) target.window.webContents.send("browser:reveal", target.surface);
   changed(surface);
   try {
-    return await runBrowserAction({
-      contents,
-      command,
-      navigate: async (url) => {
-        target.requested = url;
-        target.error = null;
-        target.pending = true;
-        publish(target);
-        await contents.loadURL(url);
-      },
-      readError: () => target.error,
-      isAllowedUrl: isAllowedPaneUrl,
-    });
+    return await agentTurn(target, () =>
+      runBrowserAction({
+        contents,
+        command,
+        navigate: async (url) => {
+          target.requested = url;
+          target.error = null;
+          target.pending = true;
+          publish(target);
+          await contents.loadURL(url);
+        },
+        readError: () => target.error,
+        isAllowedUrl: isAllowedPaneUrl,
+      }),
+    );
   } finally {
     target.agentBusy = false;
     changed(surface);
   }
+}
+
+/** A phone's input holds a pane for 4 s at most, so the agent's command always gets its turn within this. */
+const AGENT_WAITS_MS = 5_000;
+
+/** The agent's command, once no phone input is landing on the pane. */
+async function agentTurn(pane: Pane, run: () => Promise<BrowserResult>): Promise<BrowserResult> {
+  const turn = await takeTurn(pane, run, AGENT_WAITS_MS, "agent");
+  if (!turn.ok) throw new Error("The preview is busy. Retry the browser action.");
+  return turn.value;
 }
 
 function revealedUrl(existing: boolean, requested: string, incoming: unknown): string | null {

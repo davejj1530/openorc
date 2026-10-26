@@ -21,6 +21,8 @@ export const REMOTE_METHODS = [
   "inbox.list",
   "agents.models",
   "agents.availability",
+  // Names and whether each can run, for a new thread's account choice; no email, organization or CLI text.
+  "claude.accounts.list",
   "providers.limits",
   "app.settings.get",
   "threads.start",

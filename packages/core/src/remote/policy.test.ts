@@ -34,13 +34,45 @@ describe("phone policy", () => {
     for (const method of Object.keys(deviceRpcParams)) expect(Object.hasOwn(rpcParams, method), method).toBe(false);
   });
 
-  it("keeps the Mac's full usage reports and account list off the phone", () => {
+  it("keeps the Mac's full usage reports and account checks off the phone", () => {
     for (const [method, params] of [
       ["providers.usage", { provider: "codex" }],
       ["claude.accounts.list", { refresh: true }],
     ] as const) {
       expect(admitRemoteRequest(method, params, context)).toEqual({ ok: false, message: "This is not available from a phone." });
     }
+  });
+
+  it("lists Claude accounts for a new thread's choice by name, without the sign-in's details", () => {
+    expect(admitRemoteRequest("claude.accounts.list", {}, context)).toEqual({ ok: true });
+    const signedIn = { kind: "managed", enabled: true, createdAt: 1, status: "ready", email: "me@example.com", organization: "Acme", message: null } as const;
+    const words = { words: (message: string) => message, roots: () => ({ home: "/Users/me", dataDir: "/Users/me/.openorc", projects: [] }) };
+    const shaped = remoteReply(
+      "claude.accounts.list",
+      {
+        defaultId: "work",
+        accounts: [
+          { ...signedIn, id: "work", name: "Work" },
+          {
+            ...signedIn,
+            id: "home",
+            name: "Home",
+            status: "signed_out",
+            email: null,
+            organization: null,
+            message: "Run claude auth login with CLAUDE_CONFIG_DIR=/Users/me/.openorc/claude-accounts/home",
+          },
+        ],
+      },
+      words,
+    );
+    expect(shaped).toEqual({
+      defaultId: "work",
+      accounts: [
+        { id: "work", name: "Work", kind: "managed", enabled: true, createdAt: 1, status: "ready", email: null, organization: null, message: null },
+        { id: "home", name: "Home", kind: "managed", enabled: true, createdAt: 1, status: "signed_out", email: null, organization: null, message: null },
+      ],
+    });
   });
 
   it("lets the phone organize threads: pin, archive, snooze, rename and mark read or unread", () => {

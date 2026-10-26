@@ -185,6 +185,39 @@ describe("phone access", () => {
     }
   });
 
+  it("tells a phone its Claude accounts by name, and nothing of who signed in to them", async () => {
+    const list = vi.spyOn(core.claudeAccounts, "list").mockResolvedValue({
+      defaultId: "claude-cli",
+      accounts: [
+        { id: "claude-cli", name: "Existing CLI login", kind: "cli", enabled: true, createdAt: 1, status: "ready", email: "someone@example.com", organization: "Acme", message: null },
+        {
+          id: "work",
+          name: "Work",
+          kind: "managed",
+          enabled: true,
+          createdAt: 2,
+          status: "signed_out",
+          email: null,
+          organization: null,
+          message: `Run claude auth login with CLAUDE_CONFIG_DIR=${dataDir}/claude-accounts/work`,
+        },
+      ],
+    });
+    try {
+      const phone = await pairPhone();
+      const accounts = await phone.call("claude.accounts.list", {});
+      expect(accounts.accounts.map((account) => [account.id, account.name, account.status])).toEqual([
+        ["claude-cli", "Existing CLI login", "ready"],
+        ["work", "Work", "signed_out"],
+      ]);
+      expect(JSON.stringify(accounts)).not.toMatch(/@|\/|Acme|CLAUDE_CONFIG_DIR/);
+      await expect(phone.call("claude.accounts.list", { refresh: true })).rejects.toThrow("This is not available from a phone.");
+      expect(list).toHaveBeenCalledTimes(1);
+    } finally {
+      list.mockRestore();
+    }
+  });
+
   it("reads a project's git live for a phone, so a folder that gains a first commit can branch", async () => {
     const folder = path.join(dataDir, "later");
     await mkdir(folder);

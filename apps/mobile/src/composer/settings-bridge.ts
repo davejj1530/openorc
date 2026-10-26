@@ -1,8 +1,14 @@
 import type { ClientState } from "@openorc/client";
 import { useEffect, useSyncExternalStore } from "react";
 
-/** What the model and mode sheets read and change: an open thread's settings, or a new thread's choices. */
-export type ComposerSettings = Pick<ReturnType<ClientState["useConversationSettings"]>, "choice" | "mode" | "permission" | "selectModel" | "selectExecutionMode">;
+/**
+ * What the model, mode and account sheets read and change: an open thread's settings, or a new thread's choices. Only a
+ * new thread has `claudeAccount`: a thread keeps the account it started on.
+ */
+export type ComposerSettings = Pick<ReturnType<ClientState["useConversationSettings"]>, "choice" | "mode" | "permission" | "selectModel" | "selectExecutionMode"> & {
+  /** The account chosen here, undefined until one is: then the Mac's default runs. */
+  claudeAccount?: { chosen: string | undefined; select: (id: string) => void };
+};
 
 /**
  * A composer's settings, for the model and mode sheets. A sheet is its own screen, but a choice made there must go

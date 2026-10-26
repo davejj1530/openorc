@@ -15,8 +15,8 @@ import { startBlocker, unstarted, type SheetDraft } from "./new-thread-state";
 
 /**
  * A new thread in one project, with the desktop's defaults: the model for the Mac's default harness or its first
- * signed-in one, mode act, the Mac's default permission until one is chosen here, and the Mac's default workspace
- * where the project can branch. The phone never names a folder: Workspace runs where the Mac's Workspace does. A start
+ * signed-in one, mode act, the Mac's default permission and Claude account until one is chosen here, and the Mac's
+ * default workspace where the project can branch. The phone never names a folder: Workspace runs where the Mac's Workspace does. A start
  * the Mac refuses keeps the draft and says why.
  */
 export function useNewThread(projectId: string) {
@@ -47,6 +47,7 @@ export function useNewThread(projectId: string) {
       change({ mode: next.mode });
       permission.select(next.permissionMode);
     },
+    claudeAccount: { chosen: draft.claudeAccountId, select: (claudeAccountId) => change({ claudeAccountId }) },
   };
   const blocker = startBlocker(draft, { permissionReady: permission.ready });
   const controls = composerControls({

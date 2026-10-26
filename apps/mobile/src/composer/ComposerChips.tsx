@@ -3,10 +3,10 @@ import { effortLabel, executionMode, executionModePresentation } from "@openorc/
 import { router } from "expo-router";
 import type { ReactNode } from "react";
 import { Keyboard, Pressable } from "react-native";
-import { useRpc } from "../client";
 import { Lightbulb, Pencil, ShieldCheck, Wand } from "../generated/icons";
 import { HarnessLogo } from "../ui/HarnessLogo";
 import { Text } from "../ui/Text";
+import { useComposerModels } from "./claude-account";
 import type { ComposerSettings } from "./settings-bridge";
 
 const modeIcons = { plan: Lightbulb, review: ShieldCheck, trusted: Pencil, autonomous: Wand } as const;
@@ -34,7 +34,7 @@ function Chip({ label, children, onPress }: { label: string; children: ReactNode
 
 /** The model with its effort, and the mode, as the desktop's composer shows them; each opens its sheet for this composer. */
 export function ComposerChips({ composerId, settings }: { composerId: string; settings: ComposerSettings }) {
-  const models = useRpc("agents.models", {}, { staleTime: 5 * 60_000 });
+  const models = useComposerModels(settings);
   const { choice } = settings;
   const model = catalogModel(models.data, choice);
   const { effort } = pickerSettings({ model, value: choice, loading: models.isLoading, failed: Boolean(models.error) });

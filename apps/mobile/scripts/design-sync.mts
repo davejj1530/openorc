@@ -6,6 +6,7 @@
  *   apps/desktop/src/renderer/src/components/icons.tsx
  *   apps/desktop/src/renderer/src/assets/providers/*.svg, as HarnessLogo.tsx maps them
  *   apps/desktop/src/renderer/src/components/OpenOrcMark.tsx and workspace-design.css, for OpenOrc's mark
+ *   apps/desktop/resources/icon.svg, the Dock icon the home-screen icon is drawn from
  *   the Shiki code themes RichText.tsx names
  *   apps/desktop/src/renderer/src/assets/fonts/*.woff2
  *
@@ -17,6 +18,7 @@ import { format, resolveConfig } from "prettier";
 import { themePresets } from "@openorc/client/theme";
 import { paletteColors, resolvePalette, stylesheetColors, type Cascade, type Hex } from "./design-sync/colors.mts";
 import { convertFonts, postScriptName } from "./design-sync/fonts.mts";
+import { renderAppIcon } from "./design-sync/app-icon.mts";
 import { renderHarnessLogos } from "./design-sync/harness-logos.mts";
 import { renderIcons } from "./design-sync/icons.mts";
 import { renderOpenOrcMark } from "./design-sync/openorc-mark.mts";
@@ -132,6 +134,9 @@ async function outputs(): Promise<Output[]> {
   const marks = await renderHarnessLogos(renderer, css);
   const openOrcMark = await renderOpenOrcMark(renderer);
   const syntax = await readSyntax(desktop);
+  const appIcon = await renderAppIcon(desktop);
+  // app.json's ios.icon names this document.
+  const iconDocument = resolve(app, "assets/OpenOrc.icon");
   const generated = resolve(app, "src/generated");
   return [
     await formatted(resolve(generated, "theme.css"), themeCss(colors, scales, fonts)),
@@ -140,6 +145,8 @@ async function outputs(): Promise<Output[]> {
     await formatted(resolve(generated, "icons.tsx"), `// ${header}\n${icons}`),
     await formatted(resolve(generated, "harness-marks.ts"), `// ${header}\n${marks}`),
     await formatted(resolve(generated, "openorc-mark.ts"), `// ${header}\n${openOrcMark}`),
+    await formatted(resolve(iconDocument, "icon.json"), appIcon.document),
+    { path: resolve(iconDocument, "Assets/cube.svg"), contents: appIcon.cube },
     ...faces,
   ];
 }

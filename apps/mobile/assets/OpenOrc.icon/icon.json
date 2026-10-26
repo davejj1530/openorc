@@ -1,0 +1,5 @@
+{
+  "fill": { "solid": "srgb:0.14118,0.14118,0.14118,1.00000" },
+  "groups": [{ "layers": [{ "image-name": "cube.svg", "name": "cube" }], "shadow": { "kind": "neutral", "opacity": 0.5 }, "translucency": { "enabled": true, "value": 0.5 } }],
+  "supported-platforms": { "squares": "shared" }
+}

@@ -7,6 +7,7 @@
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "ios": {
+      "icon": "./assets/OpenOrc.icon",
       "bundleIdentifier": "app.openorc.mobile",
       "appleTeamId": "8VR6L6XPS9",
       "supportsTablet": false,

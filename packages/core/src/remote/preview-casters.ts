@@ -1,12 +1,30 @@
-import type { PreviewHost, PreviewHostPage, PreviewPace, PreviewState, RemotePush, SessionParams } from "@openorc/protocol";
+import {
+  PREVIEW_INPUT_RATE,
+  PREVIEW_INPUT_WORDS,
+  type PreviewFocus,
+  type PreviewHost,
+  type PreviewHostPage,
+  type PreviewPace,
+  type PreviewState,
+  type RemotePush,
+  type SessionParams,
+  type SessionRpcResults,
+} from "@openorc/protocol";
 import { previewState } from "../services/preview.js";
 import { previewReply, type PhoneShaping } from "./phone-words.js";
 
-/** Intervals while nothing changes, in steps; the first is the pace while the page keeps painting. */
+/**
+ * Intervals while nothing changes, in steps; the first is the pace while the page keeps painting. `interactiveMs` is
+ * the pace while a phone drives the page, so what its input did comes back quickly.
+ */
 export const PREVIEW_PACE = {
-  lan: { everyMs: [500, 1000, 2000], quality: 60, maxWidth: 1600 },
-  tailnet: { everyMs: [1000, 2000], quality: 50, maxWidth: 1200 },
+  lan: { everyMs: [500, 1000, 2000], interactiveMs: 200, quality: 60, maxWidth: 1600 },
+  tailnet: { everyMs: [1000, 2000], interactiveMs: 500, quality: 50, maxWidth: 1200 },
 } as const;
+/** After an applied input the page paints once, then the caster captures it. */
+const AFTER_INPUT_MS = 60;
+/** The interactive pace holds this long after the last input. */
+const INTERACTIVE_MS = 2_000;
 /** Pane events in a burst (a load's start, its title, its stop) leave as one state push. */
 const COALESCE_MS = 250;
 
@@ -48,6 +66,9 @@ class Caster {
   private seq = 0;
   private step = 0;
   private lastStart = -Infinity;
+  /** When a phone's input asks for the next capture, sooner than the interval would. */
+  private soon: number | null = null;
+  private interactiveUntil = -Infinity;
   private stopped = false;
   /** No page: nothing to capture until a pane event says otherwise. */
   private closed = false;
@@ -88,6 +109,17 @@ class Caster {
     }, COALESCE_MS);
   }
 
+  /** A phone's input landed: its effect is captured after one paint, and the pace stays quick while input goes on. */
+  afterInput(): void {
+    const now = Date.now();
+    this.step = 0;
+    this.closed = false;
+    this.interactiveUntil = now + INTERACTIVE_MS;
+    // A drag's next input must not push back the capture its first one asked for.
+    this.soon ??= now + AFTER_INPUT_MS;
+    this.nudge();
+  }
+
   nudge(): void {
     this.wake?.();
   }
@@ -112,12 +144,22 @@ class Caster {
     for (const watcher of this.watchers.values()) watcher.session.push(push);
   }
 
+  private interactive(): boolean {
+    return Date.now() < this.interactiveUntil;
+  }
+
+  /** The gap a route allows between two frames now. */
+  private gap(pace: PreviewPace): number {
+    return this.interactive() ? PREVIEW_PACE[pace].interactiveMs : PREVIEW_PACE[pace].everyMs[0];
+  }
+
   /** The leanest pace serves only routes that are all lean; one LAN watcher sets the full pace. */
   private settings() {
     const watchers = [...this.watchers.values()];
     const pace = PREVIEW_PACE[watchers.some((watcher) => watcher.pace === "lan") ? "lan" : "tailnet"];
     const width = Math.max(...watchers.map((watcher) => Math.min(watcher.width, PREVIEW_PACE[watcher.pace].maxWidth)));
-    return { everyMs: pace.everyMs[Math.min(this.step, pace.everyMs.length - 1)]!, quality: pace.quality, width };
+    const everyMs = this.interactive() ? pace.interactiveMs : pace.everyMs[Math.min(this.step, pace.everyMs.length - 1)]!;
+    return { everyMs, quality: pace.quality, width };
   }
 
   private hasCredit(): boolean {
@@ -144,12 +186,14 @@ class Caster {
         continue;
       }
       const { everyMs, quality, width } = this.settings();
-      const wait = Math.min(this.lastStart + everyMs, owed ?? Infinity) - Date.now();
+      const due = this.soon === null ? this.lastStart + everyMs : Math.max(this.soon, this.lastStart + everyMs);
+      const wait = Math.min(due, owed ?? Infinity) - Date.now();
       if (wait > 0) {
         await this.pause(wait);
         continue;
       }
       this.lastStart = Date.now();
+      this.soon = null;
       const capture = await this.deps.host.capture(this.threadId, { width, quality, unless: this.held?.digest ?? null }).catch(() => null);
       if (this.stopped) return;
       if (capture?.kind === "frame") {
@@ -180,7 +224,7 @@ class Caster {
     let push: RemotePush | null = null;
     for (const watcher of this.watchers.values()) {
       if (!watcher.fetched || (watcher.told ?? 0) >= held.seq) continue;
-      const opens = watcher.toldAt + PREVIEW_PACE[watcher.pace].everyMs[0] - 50;
+      const opens = watcher.toldAt + this.gap(watcher.pace) - 50;
       if (opens > now) {
         next = Math.min(next ?? opens, opens);
         continue;
@@ -195,6 +239,12 @@ class Caster {
   }
 }
 
+/** The Mac's focus as a phone hears it: a select's labels are page text, so they pass the phone's words. */
+function phoneFocus(focus: PreviewFocus | null, words: (message: string) => string): PreviewFocus | null {
+  if (focus?.kind !== "choice") return focus;
+  return { ...focus, options: focus.options.map((option) => ({ ...option, label: words(option.label) })) };
+}
+
 /**
  * Every Preview a phone watches, one caster per thread, paced by the core. A watch belongs to one session and ends
  * with it; frames are served only to a watching session, from the one frame its caster holds.
@@ -202,6 +252,8 @@ class Caster {
 export class PreviewCasters {
   private readonly casters = new Map<string, Caster>();
   private readonly watching = new Map<PreviewSession, string>();
+  /** When each session's inputs of the last second came. */
+  private readonly inputs = new WeakMap<PreviewSession, number[]>();
   private readonly unsubscribe: () => void;
 
   constructor(private readonly deps: Deps) {
@@ -247,6 +299,36 @@ export class PreviewCasters {
     if (!caster || caster.watchers.size > 0) return;
     caster.stop();
     this.casters.delete(threadId);
+  }
+
+  /**
+   * A phone's input on the page it watches, for the pane its frame shows; main checks the pane again, as the core's
+   * state can lag a tab switch. Refusals throw in the phone's words.
+   */
+  async input(session: PreviewSession, { threadId, ...request }: SessionParams<"preview.input">): Promise<SessionRpcResults["preview.input"]> {
+    const caster = this.watching.get(session) === threadId ? this.casters.get(threadId) : undefined;
+    if (!caster) throw new Error(PREVIEW_INPUT_WORDS.unwatched);
+    if (!this.admit(session)) throw new Error(PREVIEW_INPUT_WORDS.rate);
+    if (!caster.page) throw new Error(PREVIEW_INPUT_WORDS.closed);
+    if (caster.page.pane !== request.pane) throw new Error(PREVIEW_INPUT_WORDS.pane);
+    const result = await this.deps.host.input(threadId, request);
+    if (!result) throw new Error(PREVIEW_INPUT_WORDS.closed);
+    if (result.kind === "refused") {
+      if (result.reason === "pane") caster.changed();
+      throw new Error(PREVIEW_INPUT_WORDS[result.reason]);
+    }
+    caster.afterInput();
+    return { focus: phoneFocus(result.focus, this.deps.words) };
+  }
+
+  /** At most 30 inputs in any second per session. */
+  private admit(session: PreviewSession): boolean {
+    const now = Date.now();
+    const recent = (this.inputs.get(session) ?? []).filter((at) => now - at < PREVIEW_INPUT_RATE.perMs);
+    this.inputs.set(session, recent);
+    if (recent.length >= PREVIEW_INPUT_RATE.inputs) return false;
+    recent.push(now);
+    return true;
   }
 
   /** The newest frame's bytes for a watching session, at most its newest `seq`; fetching it gives the credit back. */

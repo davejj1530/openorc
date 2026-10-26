@@ -41,6 +41,9 @@ class FakeMac implements PreviewHost {
   }
   /** The threads main was told are gone. */
   readonly gone: string[] = [];
+  async input() {
+    return null;
+  }
   threadGone(threadId: string) {
     this.gone.push(threadId);
   }

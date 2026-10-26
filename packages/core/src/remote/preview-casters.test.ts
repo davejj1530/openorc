@@ -31,6 +31,9 @@ class FakeMac implements PreviewHost {
   change(threadId: string, lifecycle: boolean) {
     this.listener?.(threadId, lifecycle);
   }
+  async input() {
+    return null;
+  }
   threadGone() {}
 }
 

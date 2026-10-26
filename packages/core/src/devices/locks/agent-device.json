@@ -1,0 +1,32 @@
+{
+  "name": "agent",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "dependencies": {
+        "agent-device": "0.21.31"
+      }
+    },
+    "node_modules/agent-device": {
+      "version": "0.21.31",
+      "resolved": "https://registry.npmjs.org/agent-device/-/agent-device-0.21.31.tgz",
+      "integrity": "sha512-541X/tXHqQS3Xg5PutPSek1nQFLgEJEXFdLPiZ9jTvSb+SMHr/Z4kzVCnBkGza59R+EHO1atLWx0ZAW5vK84IQ==",
+      "license": "MIT",
+      "bin": {
+        "agent-device": "bin/agent-device.mjs"
+      },
+      "engines": {
+        "node": ">=22.12"
+      },
+      "peerDependencies": {
+        "ai": "^6.0.0 || ^7.0.0"
+      },
+      "peerDependenciesMeta": {
+        "ai": {
+          "optional": true
+        }
+      }
+    }
+  }
+}

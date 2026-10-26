@@ -44,6 +44,8 @@ import { createThreadQueriesHandlers } from "./handlers/thread-queries.js";
 import { createThreadWorkspaceHandlers } from "./handlers/thread-workspace.js";
 import { composeHandlers, type Handlers } from "./handlers/types.js";
 import { createWorkspaceHandlers } from "./handlers/workspace.js";
+import { createDeviceHandlers } from "./handlers/devices.js";
+import { DeviceService } from "./devices/service.js";
 import { createBrowserHost } from "./mcp-host/browser.js";
 import { createContextHost } from "./mcp-host/context.js";
 import { createMemoryHost } from "./mcp-host/memory.js";
@@ -152,6 +154,7 @@ export class OpenOrc {
   readonly teamRestores: TeamRestoreService;
   readonly teamMoves: TeamMoveService;
   readonly teamDeletions: TeamDeletionService;
+  readonly devices: DeviceService;
   readonly workspaceWriters = new WorkspaceWriters();
   private readonly log: Logger;
   private readonly bench: BenchGenerator;
@@ -196,6 +199,7 @@ export class OpenOrc {
     });
     this.settings = new AppSettingsService(db);
     this.environment = new ShellEnvironment({ probe: options.shellProbe ?? (options.ephemeral ? inheritedProbe() : undefined) });
+    this.devices = new DeviceService({ db, dataDir: options.dataDir, environment: () => this.environment.current(), transport: options.transport, log: this.log, system: options.deviceSystem });
     this.system = new SystemService(options.dataDir, this.environment);
     this.claudeAccounts = new ClaudeAccountService(
       db,
@@ -511,6 +515,7 @@ export class OpenOrc {
     core.threads.recoverQueue();
     core.upkeep.start();
     if (!options.ephemeral) core.agentUpdates.start();
+    void core.devices.reapStale();
     // Embed any memories that predate the vector index, off the startup path.
     void core.memory.backfillVectors().catch(() => undefined);
     return core;
@@ -656,6 +661,7 @@ export class OpenOrc {
     await this.teams.shutdown();
     await this.workspaces.shutdown();
     await this.runs.closeAll();
+    await this.devices.close();
     await this.threads.shutdown();
     await this.teamWorkspaces.shutdown();
     await this.memory.shutdown();
@@ -719,6 +725,7 @@ export class OpenOrc {
       createCatalogHandlers({ runService: this.runs, invalidate }),
       createMemoryHandlers({ memory: this.memory, db: this.db, files: this.files }),
       createOrclingHandlers({ orclings: this.orclings }),
+      createDeviceHandlers({ devices: this.devices }),
       createInboxHandlers({ runService: this.runs, db: this.db, teams: this.teams }),
       createRemoteHandlers({ remote: this.remote }),
       createBenchHandlers({ frames: this.frames, bench: this.bench, db: this.db, ledger: this.ledger, transport: this.options.transport, benchmarks: Boolean(this.options.benchmarks) }),

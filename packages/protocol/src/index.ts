@@ -28,6 +28,7 @@ export * from "./task-forwarding.js";
 export * from "./execution-mode.js";
 export * from "./model-effort.js";
 export * from "./browser.js";
+export * from "./devices.js";
 export * from "./file-boundary.js";
 export * from "./files.js";
 export * from "./tool-images.js";

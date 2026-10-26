@@ -79,6 +79,22 @@ describe("publish store", () => {
     expect(store.get("t2")).toEqual({ kind: "idle" });
   });
 
+  it("lets go of every write it holds on reset, as a fresh install has", async () => {
+    const { store } = setup();
+    await store.run(
+      "t1",
+      { action: "push" },
+      () => Promise.resolve(null),
+      () => "Pushed main to origin",
+    );
+    expect(store.get("t1").kind).toBe("notice");
+    const listener = vi.fn();
+    store.subscribe(listener);
+    store.reset();
+    expect(store.get("t1")).toEqual({ kind: "idle" });
+    expect(listener).toHaveBeenCalledOnce();
+  });
+
   it("does not start a second write while one is out, and drops a notice on clear", async () => {
     const { store } = setup();
     const write = vi.fn(() => new Promise<never>(() => undefined));

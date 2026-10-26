@@ -30,6 +30,12 @@ export function chooseAppearance(choice: AppearanceChoice): void {
   listeners.forEach((listener) => listener());
 }
 
+// An appearance chosen in the demo goes with it: the kept one applies again, the system's included.
+storage.onDropped(() => {
+  Uniwind.setTheme(savedAppearance());
+  listeners.forEach((listener) => listener());
+});
+
 export function restoreAppearance(): void {
   const saved = savedAppearance();
   if (saved !== "system") Uniwind.setTheme(saved);

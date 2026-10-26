@@ -9,9 +9,10 @@ import { createMMKV } from "react-native-mmkv";
 import { randomUUID } from "react-native-quick-crypto";
 import { createAssetCache } from "./connection/asset-cache";
 import { linkHooks } from "./connection/link-hooks";
-import { ConnectionManager, type LinkState } from "./connection/manager";
+import { ConnectionManager, showsDemo, type LinkState } from "./connection/manager";
 import { keychainKeys, openSocket, phoneCrypto, reachesInternet, storedMacs, systemClock } from "./connection/native";
 import type { NetworkKind, SavedMac } from "./connection/saved-macs";
+import { createDemoMac, DEMO_MAC } from "./demo/demo-mac";
 import { forgetFolds } from "./home/fold-keys";
 import { forgetLists, keepLists, restoreLists } from "./lists-cache";
 import { followMacLook } from "./look/look";
@@ -19,10 +20,14 @@ import { PhoneAlerts } from "./notifications/alerts";
 import { presentationFor } from "./notifications/foreground";
 import { handleAlerts, pushPlatform } from "./notifications/native";
 import { threadOnScreen } from "./notifications/on-screen";
+import { ScratchStore } from "./scratch-store";
 import { timeFrame } from "./thread/perf-probe";
 
-/** The app's own key-value store: saved Macs, lists Home paints from on a cold start, drafts. */
-export const storage = createMMKV({ id: "openorc" });
+/** The app's own key-value store on disk. Only saved Macs use it directly; the demo never touches them. */
+const kept = createMMKV({ id: "openorc" });
+
+/** What the app keeps (lists Home paints from on a cold start, folds, drafts, settings), scratched while the demo shows. */
+export const storage = new ScratchStore(kept);
 
 /** The phone's one connection to its Macs. Created at load, so the route race starts while React mounts. */
 export const link = new ConnectionManager({
@@ -30,7 +35,7 @@ export const link = new ConnectionManager({
   crypto: phoneCrypto,
   clock: systemClock,
   random: Math.random,
-  macs: storedMacs(storage),
+  macs: storedMacs(kept),
   keys: keychainKeys,
   deviceName: Constants.deviceName ?? "iPhone",
   forgetCache: (macId) => {
@@ -59,10 +64,11 @@ const assets = createAssetCache((ref) => link.connection.asset(ref), phoneCrypto
 const macOf = (state: LinkState) => (state.kind === "unpaired" ? null : state.mac.id);
 let shownMac: string | null = null;
 
-/** Data never mixes between Macs: another Mac starts from its own saved lists, or from nothing. */
+/** Data never mixes between Macs: another Mac starts from its own saved lists, or from nothing; the demo keeps none. */
 function show(macId: string | null): void {
   if (macId === shownMac) return;
   shownMac = macId;
+  storage.scratch(macId === DEMO_MAC.id);
   client.queryClient.clear();
   client.runs.reset();
   link.connection.reset(macId !== null && restoreLists(client.queryClient, storage, macId));
@@ -81,7 +87,22 @@ const networkKinds: Partial<Record<NetworkStateType, NetworkKind>> = {
 };
 const networkKind = (state: NetworkState): NetworkKind => (state.isConnected === false ? "none" : (networkKinds[state.type ?? NetworkStateType.UNKNOWN] ?? "other"));
 
+/** The demo Mac in place of none, fresh each time. */
+export const showDemo = (): void => link.showDemo(createDemoMac(systemClock));
+/** Back to no Mac, as a fresh install has. */
+export const endDemo = (): void => link.endDemo();
+
+// However the demo ends (End demo, Skip, or a pairing from inside it), the images it served go with it.
+let demoShown = false;
+link.subscribe(() => {
+  const shown = showsDemo(link.getState());
+  if (demoShown && !shown) assets.forget(DEMO_MAC.id);
+  demoShown = shown;
+});
+
 link.start("other");
+// A first launch, or any launch with no Mac paired, opens on the demo; Skip is in reach from its first frame.
+showDemo();
 alerts.start();
 handleAlerts((data) => presentationFor(data, link.getState(), threadOnScreen()));
 void getNetworkStateAsync().then((state) => link.setNetwork(networkKind(state)));

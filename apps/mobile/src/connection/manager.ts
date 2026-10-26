@@ -16,7 +16,7 @@ import {
   type Refusal,
 } from "@openorc/link";
 import type { Route } from "@openorc/protocol";
-import { LinkConnection } from "./link-connection";
+import { LinkConnection, type PhoneLine } from "./link-connection";
 import { raceRoutes, ROUTE_TIMEOUT_MS, type Attempt, type Clock, type RaceResult } from "./route-race";
 import { learnRoutes, routesFor, type DeviceKeys, type MacStore, type NetworkKind, type SavedMac } from "./saved-macs";
 
@@ -40,6 +40,19 @@ export interface MacName {
 /** Why the phone has no Mac any more: the Mac removed it, or the Keychain lost the key it pairs with. */
 export type LostMac = { why: "removed" | "key-lost"; macName: string };
 
+/** How the phone reaches the Mac it shows: over the network, or inside the app for the demo Mac. */
+export type LinkRoute = Route | { kind: "demo" };
+
+/**
+ * A Mac inside the app, for a look around before pairing. Nothing it does touches a network, a saved Mac or a key,
+ * and nothing done over a line outlives it.
+ */
+export interface DemoMac {
+  readonly mac: MacName;
+  /** A line to a fresh demo Mac. */
+  open(): PhoneLine;
+}
+
 /** The phone's connection to the Mac it shows: one state at a time, so a screen never reconciles flags. */
 export type LinkState =
   /** `lost` says why the last Mac went, when it was not the person's own Forget. */
@@ -47,22 +60,27 @@ export type LinkState =
   /** `why` is what ended the last session or attempt, kept so a retry does not flicker the screen. */
   | { kind: "connecting"; mac: MacName; why: DownReason | null }
   /** `serial` counts the sessions: each new one, on any route, has a new serial, so a call that failed can tell. */
-  | { kind: "connected"; mac: MacName; route: Route; serial: number }
+  | { kind: "connected"; mac: MacName; route: LinkRoute; serial: number }
   /** Trying again at `retryAt`, or once there is a network when it is null. */
   | { kind: "waiting"; mac: MacName; why: DownReason; retryAt: number | null }
   /** Closed after a while in the background; reconnects when the app comes back. */
   | { kind: "suspended"; mac: MacName }
   | { kind: "incompatible"; mac: MacName };
 
-/** The state with what each one holds: the session while connected. The Mac's name comes from the store. */
+/** The demo Mac is the one shown. */
+export const showsDemo = (state: LinkState): boolean => state.kind === "connected" && state.route.kind === "demo";
+
+/** The state with what each one holds: the session while connected. The Mac's name comes from the store, or the demo. */
 type Phase =
   | { kind: "unpaired"; lost: LostMac | null }
+  | Demo
   | { kind: "connecting"; why: DownReason | null }
   | Live
   | { kind: "waiting"; why: DownReason; retryAt: number | null }
   | { kind: "suspended" }
   | { kind: "incompatible" };
 type Live = { kind: "connected"; route: Route; session: PhoneSession; serial: number };
+type Demo = { kind: "demo"; mac: MacName; line: PhoneLine; serial: number };
 
 /** A socket being opened. `close` also abandons one that has not opened yet. */
 export interface OpeningSocket {
@@ -221,6 +239,30 @@ export class ConnectionManager {
     return { ok: true, mac: { id, name: result.value.hello.mac.name } };
   }
 
+  /** Shows the demo Mac, while no Mac is paired. */
+  showDemo(demo: DemoMac): void {
+    if (this.phase.kind !== "unpaired" || this.saved.length > 0) return;
+    const line = demo.open();
+    const phase: Demo = { kind: "demo", mac: demo.mac, line, serial: ++this.sessions };
+    this.enter(phase);
+    this.connection.attach(line);
+    line.onBytes((stream, chunk, end) => this.connection.receiveBytes(stream, chunk, end));
+    line.onMessage((message) => {
+      if (message.t !== "pong" && message.t !== "closing") this.connection.receive(line, message);
+    });
+    line.onClose(() => {
+      if (this.phase === phase) this.enter({ kind: "unpaired", lost: null });
+    });
+  }
+
+  /** Back to no Mac, leaving nothing of the demo behind. */
+  endDemo(): void {
+    const phase = this.phase;
+    if (phase.kind !== "demo") return;
+    this.enter({ kind: "unpaired", lost: null });
+    phase.line.close(LinkCloseCode.normal, "");
+  }
+
   /** Shows another saved Mac. */
   select(id: string): void {
     if (this.effects.macs.activeId() === id) return;
@@ -236,6 +278,7 @@ export class ConnectionManager {
    * person did not ask, which the unpaired screen tells them.
    */
   async forget(id: string, lost: LostMac["why"] | null = null): Promise<void> {
+    if (this.phase.kind === "demo" && this.phase.mac.id === id) return this.endDemo();
     const wasActive = this.effects.macs.activeId() === id;
     const name = this.saved.find((mac) => mac.id === id)?.name ?? "Your Mac";
     this.removeMac(id);
@@ -253,6 +296,8 @@ export class ConnectionManager {
   }
 
   appState(state: "active" | "background"): void {
+    // The demo needs no network, so iOS suspending sockets in the background leaves it be.
+    if (this.phase.kind === "demo") return;
     if (state === "background") {
       this.backgroundedAt ??= this.effects.clock.now();
       this.backgroundTimer ??= this.effects.clock.setTimeout(() => this.suspend(), BACKGROUND_GRACE_MS);
@@ -482,15 +527,16 @@ export class ConnectionManager {
     this.enter({ kind: "suspended" });
   }
 
-  /** Stops whatever is in flight and closes the session, without treating the close as a drop. */
+  /** Stops whatever is in flight and closes the session or the demo's line, without treating the close as a drop. */
   private abandon(): void {
     this.epoch++;
     this.effects.clock.clearTimeout(this.retryTimer);
     this.stopPings();
     const phase = this.phase;
-    if (phase.kind !== "connected") return;
+    if (phase.kind !== "connected" && phase.kind !== "demo") return;
     this.enter({ kind: "connecting", why: null });
-    phase.session.close(LinkCloseCode.normal);
+    if (phase.kind === "demo") phase.line.close(LinkCloseCode.normal, "");
+    else phase.session.close(LinkCloseCode.normal);
   }
 
   private schedulePing(session: PhoneSession): void {
@@ -527,6 +573,7 @@ export class ConnectionManager {
 
 function toState(phase: Phase, mac: MacName | null): LinkState {
   if (phase.kind === "unpaired") return { kind: "unpaired", lost: phase.lost };
+  if (phase.kind === "demo") return { kind: "connected", mac: phase.mac, route: { kind: "demo" }, serial: phase.serial };
   if (!mac) return { kind: "unpaired", lost: null };
   if (phase.kind === "connected") return { kind: "connected", mac, route: phase.route, serial: phase.serial };
   return { ...phase, mac };

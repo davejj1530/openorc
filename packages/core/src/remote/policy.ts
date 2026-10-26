@@ -95,6 +95,8 @@ export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {
   "inbox.list": allow,
   "agents.models": allow,
   "agents.availability": allow,
+  // The cached list only: a refresh asks every account's CLI again, which is the Mac's Settings' to do.
+  "claude.accounts.list": ({ refresh }) => (refresh ? "This is not available from a phone." : null),
   // Takes nothing and answers the shares and plans alone, shaped by the core: no email, token, path or CLI text.
   "providers.limits": allow,
   "app.settings.get": allow,
@@ -151,6 +153,8 @@ export const remoteReplies: { [M in RemoteMethod]: Reply<M> } = {
   "inbox.list": same,
   "agents.models": same,
   "agents.availability": same,
+  // A sign-in's email and organization, and the CLI's own words, stay on the Mac.
+  "claude.accounts.list": ({ accounts, defaultId }) => ({ defaultId, accounts: accounts.map((account) => ({ ...account, email: null, organization: null, message: null })) }),
   "providers.limits": same,
   "app.settings.get": same,
   "threads.start": same,

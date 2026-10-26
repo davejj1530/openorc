@@ -4,7 +4,7 @@ import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { fixtureThreads } from "../home/test-fixtures/threads";
 import type { FakeMac } from "../test-fixtures/fake-mac";
-import { usePreviewOpen } from "./use-preview-open";
+import { usePreviewPanel } from "./use-preview-panel";
 
 const live: PreviewState = { open: true, pane: "p1", address: "http://127.0.0.1:47831/", title: "QA Page", phase: "live", error: null, frame: null };
 const mac = vi.hoisted(() => ({ phone: null as FakeMac | null, state: null as PreviewState | null, refuse: null as string | null, asked: [] as { method: RpcMethod; params: unknown }[] }));
@@ -28,31 +28,31 @@ afterEach(cleanup);
 
 const settings = fixtureThreads.find((thread) => thread.id === "t-settings")!;
 
-it("lists Preview while the Mac shows a page for the thread", async () => {
-  const { result } = renderHook(() => usePreviewOpen(settings), { wrapper: mac.phone!.wrapper });
-  await waitFor(() => expect(result.current).toBe(true));
+it("names the page the Mac shows for the thread", async () => {
+  const { result } = renderHook(() => usePreviewPanel(settings), { wrapper: mac.phone!.wrapper });
+  await waitFor(() => expect(result.current).toEqual({ page: "QA Page" }));
   expect(mac.asked).toEqual([{ method: "preview.state", params: { threadId: "t-settings" } }]);
 });
 
-it("takes Preview away when the Mac says the thread's page closed", async () => {
-  const { result } = renderHook(() => usePreviewOpen(settings), { wrapper: mac.phone!.wrapper });
-  await waitFor(() => expect(result.current).toBe(true));
+it("keeps Preview with no page once the Mac says the thread's page closed", async () => {
+  const { result } = renderHook(() => usePreviewPanel(settings), { wrapper: mac.phone!.wrapper });
+  await waitFor(() => expect(result.current).toEqual({ page: "QA Page" }));
   mac.state = { open: false };
   act(() => mac.phone!.module.client.invalidateTags(["preview:t-settings"]));
-  await waitFor(() => expect(result.current).toBe(false));
+  await waitFor(() => expect(result.current).toEqual({ page: null }));
 });
 
 it("lists no Preview from a Mac that does not know it", async () => {
   mac.refuse = "This is not available from a phone.";
-  const { result } = renderHook(() => usePreviewOpen(settings), { wrapper: mac.phone!.wrapper });
+  const { result } = renderHook(() => usePreviewPanel(settings), { wrapper: mac.phone!.wrapper });
   await waitFor(() => expect(mac.asked.length).toBeGreaterThan(0));
-  await new Promise((resolve) => setTimeout(resolve, 20));
-  expect(result.current).toBe(false);
+  // The client asks once more before it settles on the refusal.
+  await waitFor(() => expect(result.current).toBeNull(), { timeout: 3000 });
 });
 
 it("asks nothing before the thread is read", async () => {
-  const { result } = renderHook(() => usePreviewOpen(null), { wrapper: mac.phone!.wrapper });
+  const { result } = renderHook(() => usePreviewPanel(null), { wrapper: mac.phone!.wrapper });
   await new Promise((resolve) => setTimeout(resolve, 20));
-  expect(result.current).toBe(false);
+  expect(result.current).toBeNull();
   expect(mac.asked).toEqual([]);
 });

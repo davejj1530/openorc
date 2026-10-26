@@ -30,32 +30,38 @@ describe("a thread's menu on the phone", () => {
   });
 
   it("puts Changes first in the header of a thread with Git, the uncommitted files beneath it, and keeps the rest in order", () => {
-    const menu = threadMenu(thread("t-settings"), "header", wednesday, { uncommitted: 3, preview: false });
+    const menu = threadMenu(thread("t-settings"), "header", wednesday, { uncommitted: 3, preview: null });
     const [, ...rest] = outline(threadMenu(thread("t-settings"), "header", wednesday));
     expect(outline(menu)).toEqual([["Changes", "Rename…"], ...rest]);
     expect(menu[0]![0]).toEqual({ kind: "screen", label: "Changes", icon: expect.any(String), subtitle: "3 files", pathname: "/changes" });
-    expect(threadMenu(thread("t-settings"), "header", wednesday, { uncommitted: 1, preview: false })[0]![0]).toMatchObject({ label: "Changes", subtitle: "1 file" });
+    expect(threadMenu(thread("t-settings"), "header", wednesday, { uncommitted: 1, preview: null })[0]![0]).toMatchObject({ label: "Changes", subtitle: "1 file" });
   });
 
   it("names no count under Changes when nothing waits to be committed", () => {
-    const changes = threadMenu(thread("t-settings"), "header", wednesday, { uncommitted: 0, preview: false })[0]![0]!;
+    const changes = threadMenu(thread("t-settings"), "header", wednesday, { uncommitted: 0, preview: null })[0]![0]!;
     expect(changes.label).toBe("Changes");
     expect(changes).not.toHaveProperty("subtitle");
   });
 
-  it("puts Preview after Changes while the Mac shows a page for the thread", () => {
-    const menu = threadMenu(thread("t-settings"), "header", wednesday, { uncommitted: 3, preview: true });
+  it("puts Preview after Changes, with the page the Mac shows for the thread beneath it", () => {
+    const menu = threadMenu(thread("t-settings"), "header", wednesday, { uncommitted: 3, preview: { page: "QA Page" } });
+    expect(outline(menu)[0]).toEqual(["Changes", "Preview", "Rename…"]);
+    expect(menu[0]![1]).toEqual({ kind: "screen", label: "Preview", icon: "globe", pathname: "/preview", subtitle: "QA Page" });
+  });
+
+  it("lists Preview while the Mac shows no page, with nothing beneath it", () => {
+    const menu = threadMenu(thread("t-settings"), "header", wednesday, { uncommitted: 3, preview: { page: null } });
     expect(outline(menu)[0]).toEqual(["Changes", "Preview", "Rename…"]);
     expect(menu[0]![1]).toEqual({ kind: "screen", label: "Preview", icon: "globe", pathname: "/preview" });
   });
 
-  it("leads with Preview in a thread without Git, and lists no Preview while the Mac shows no page", () => {
-    expect(outline(threadMenu(thread("t-plan"), "header", wednesday, { uncommitted: null, preview: true }))[0]).toEqual(["Preview", "Rename…"]);
-    expect(outline(threadMenu(thread("t-settings"), "header", wednesday, { uncommitted: 3, preview: false }))[0]).toEqual(["Changes", "Rename…"]);
+  it("leads with Preview in a thread without Git, and lists none for a Mac that cannot show one", () => {
+    expect(outline(threadMenu(thread("t-plan"), "header", wednesday, { uncommitted: null, preview: { page: null } }))[0]).toEqual(["Preview", "Rename…"]);
+    expect(outline(threadMenu(thread("t-settings"), "header", wednesday, { uncommitted: 3, preview: null }))[0]).toEqual(["Changes", "Rename…"]);
   });
 
   it("leaves Changes and Preview out of a Home row's menu", () => {
-    const row = outline(threadMenu(thread("t-settings"), "row", wednesday, { uncommitted: 3, preview: true })).flat();
+    const row = outline(threadMenu(thread("t-settings"), "row", wednesday, { uncommitted: 3, preview: { page: "QA Page" } })).flat();
     expect(row).not.toContain("Changes");
     expect(row).not.toContain("Preview");
   });

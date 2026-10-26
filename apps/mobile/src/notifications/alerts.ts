@@ -36,6 +36,11 @@ export interface AlertsState {
   senders: ReadonlyMap<string, MacSender>;
 }
 
+/** A Mac this phone may register with: a real one it is connected to, never the demo's, which can send nothing. */
+function sender(state: LinkState): string | null {
+  return state.kind === "connected" && state.route.kind !== "demo" ? state.mac.id : null;
+}
+
 /** MMKV `notifications`: the choice, its sound, and whether the one automatic iOS prompt has been shown. */
 const KEY = "notifications";
 const NOT_FROM_PHONE = "This is not available from a phone.";
@@ -121,8 +126,7 @@ export class PhoneAlerts {
 
   /** Stops that Mac's alerts first, while it can still hear this phone, then forgets it as the link does. */
   async forget(macId: string): Promise<void> {
-    const state = this.deps.link.getState();
-    if (state.kind === "connected" && state.mac.id === macId) {
+    if (sender(this.deps.link.getState()) === macId) {
       let timer: ReturnType<typeof setTimeout> | undefined;
       const waited = new Promise<void>((resolve) => (timer = setTimeout(resolve, FORGET_WAIT_MS)));
       await Promise.race([this.deps.link.connection.device("push.register", { registration: null }).catch(() => undefined), waited]);
@@ -166,14 +170,15 @@ export class PhoneAlerts {
 
   private linkChanged(): void {
     const state = this.deps.link.getState();
-    if (state.kind !== "connected" || state.serial === this.serial) return;
+    const macId = sender(state);
+    if (state.kind !== "connected" || !macId || state.serial === this.serial) return;
     this.serial = state.serial;
-    void this.register(state.mac.id, true);
+    void this.register(macId, true);
   }
 
   private registerShown(mayAsk = false): Promise<void> {
-    const state = this.deps.link.getState();
-    return state.kind === "connected" ? this.register(state.mac.id, mayAsk) : Promise.resolve();
+    const macId = sender(this.deps.link.getState());
+    return macId ? this.register(macId, mayAsk) : Promise.resolve();
   }
 
   private async register(macId: string, mayAsk: boolean): Promise<void> {

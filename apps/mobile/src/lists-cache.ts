@@ -1,12 +1,12 @@
 import type { RpcMethod } from "@openorc/protocol";
 import type { Query, QueryClient, QueryKey } from "@tanstack/react-query";
-import type { MMKV } from "react-native-mmkv";
+import type { KeyValue } from "./scratch-store";
 
 /** The reads the phone paints from on a cold start, before the Mac answers: Home's lists, and the Mac's look in its settings. */
 const KEPT: ReadonlySet<RpcMethod> = new Set<RpcMethod>(["projects.list", "threads.list", "app.settings.get"]);
 const SAVE_AFTER_MS = 1_000;
 
-type Storage = Pick<MMKV, "getString" | "set" | "remove">;
+type Storage = KeyValue;
 
 interface Kept {
   key: QueryKey;

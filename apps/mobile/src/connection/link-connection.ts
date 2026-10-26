@@ -6,6 +6,9 @@ import type { Clock } from "./route-race";
 /** A watched Preview's newest state, or the end of the watch, which only its screen hears. */
 export type PreviewPush = Extract<RemotePush, { type: "preview" | "preview.ended" }>;
 
+/** What the phone needs of a session with a Mac: the link's own over the network, or the demo Mac's inside the app. */
+export type PhoneLine = Pick<PhoneSession, "send" | "onMessage" | "onBytes" | "onClose" | "close" | "closed">;
+
 /** What the Mac sends that the connection, not the session's owner, handles. */
 export type CallMessage = Exclude<MacMessage, { t: "pong" | "closing" }>;
 
@@ -15,13 +18,13 @@ export interface Asset {
 }
 
 interface Pending {
-  session: PhoneSession;
+  session: PhoneLine;
   resolve(value: unknown): void;
   reject(error: Error): void;
 }
 
 interface Download {
-  session: PhoneSession;
+  session: PhoneLine;
   mime: string;
   chunks: Uint8Array[];
   resolve(asset: Asset): void;
@@ -29,7 +32,7 @@ interface Download {
 }
 
 interface Waiter {
-  ready(session: PhoneSession): void;
+  ready(session: PhoneLine): void;
   fail(error: Error): void;
 }
 
@@ -66,14 +69,14 @@ function clientPush(push: RemotePush): ClientPush | null {
  */
 export class LinkConnection implements CoreConnection {
   readonly delivery = "interest";
-  private current: PhoneSession | null = null;
+  private current: PhoneLine | null = null;
   private interest: string[] = [];
   private nextId = 0;
   private resumable = false;
   private readonly pending = new Map<number, Pending>();
   private readonly downloads = new Map<number, Download>();
   private readonly waiting = new Set<Waiter>();
-  private readonly drains = new Map<PhoneSession, () => void>();
+  private readonly drains = new Map<PhoneLine, () => void>();
   private readonly listeners = new Set<(push: ClientPush) => void>();
   private readonly previews = new Set<(push: PreviewPush) => void>();
 
@@ -126,7 +129,7 @@ export class LinkConnection implements CoreConnection {
   }
 
   /** Makes `session` the one calls go over. Calls in flight on an earlier session still get their answers there. */
-  attach(session: PhoneSession): void {
+  attach(session: PhoneLine): void {
     this.current = session;
     session.onClose(() => this.lost(session));
     session.send({ t: "interest", runIds: this.interest });
@@ -146,7 +149,7 @@ export class LinkConnection implements CoreConnection {
     this.waiting.clear();
   }
 
-  receive(session: PhoneSession, message: CallMessage): void {
+  receive(session: PhoneLine, message: CallMessage): void {
     switch (message.t) {
       case "rpc.result":
         this.settle(message.id)?.resolve(message.result);
@@ -186,7 +189,7 @@ export class LinkConnection implements CoreConnection {
   }
 
   /** Resolves once nothing asked over `session` waits for an answer: no call, and no image still downloading. */
-  drained(session: PhoneSession): Promise<void> {
+  drained(session: PhoneLine): Promise<void> {
     return new Promise((done) => {
       this.drains.set(session, done);
       this.checkDrains();
@@ -204,10 +207,10 @@ export class LinkConnection implements CoreConnection {
     );
   }
 
-  private withSession<T>(send: (session: PhoneSession) => Promise<T>): Promise<T> {
+  private withSession<T>(send: (session: PhoneLine) => Promise<T>): Promise<T> {
     if (this.current) return send(this.current);
     if (!this.canWait()) return Promise.reject(new Error(NO_MAC));
-    return new Promise<PhoneSession>((ready, fail) => {
+    return new Promise<PhoneLine>((ready, fail) => {
       const waiter: Waiter = {
         ready: (session) => {
           this.clock.clearTimeout(timer);
@@ -226,7 +229,7 @@ export class LinkConnection implements CoreConnection {
     }).then(send);
   }
 
-  private lost(session: PhoneSession): void {
+  private lost(session: PhoneLine): void {
     if (this.current === session) this.current = null;
     for (const [id, pending] of this.pending) {
       if (pending.session !== session) continue;

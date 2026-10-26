@@ -81,6 +81,10 @@ function phone(options: { permission?: Permission; grant?: Permission; answer?: 
       state = { kind: "waiting", mac: studio, why: "unreachable", retryAt: null };
       emit();
     },
+    showDemo(serial: number) {
+      state = { kind: "connected", mac: { id: "demo", name: "Demo Mac" }, route: { kind: "demo" }, serial };
+      emit();
+    },
     answerWith: (next: Answer) => void (answer = next),
     iosSays: (next: Permission) => void (permission = next),
     newToken: (next: string) => tokenListener(next),
@@ -153,6 +157,26 @@ describe("registering with the Mac", () => {
     expect(iphone.alerts.getState().permission).toBe("denied");
     await iphone.alerts.refresh();
     expect(iphone.sent).toHaveLength(2);
+  });
+});
+
+describe("the demo Mac", () => {
+  it("is never told about this phone, never makes it ask iOS, and is forgotten without a word to it", async () => {
+    const iphone = phone({ permission: "undetermined" });
+    iphone.showDemo(1);
+    await settle();
+    iphone.hears(["push.sender"]);
+    iphone.newToken("cd".repeat(32));
+    await iphone.alerts.refresh();
+    await iphone.alerts.forget("demo");
+    await settle();
+    expect(iphone.sent).toEqual([]);
+    expect(iphone.asked).toEqual([]);
+    expect(iphone.order).toEqual(["forget demo"]);
+    iphone.connect(2);
+    await settle();
+    expect(iphone.sent.length).toBeGreaterThan(0);
+    expect(iphone.sent.every((sent) => sent.macId === "studio")).toBe(true);
   });
 });
 

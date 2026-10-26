@@ -40,6 +40,12 @@ export function chooseFilter(choice: FilterChoice): void {
   listeners.forEach((listener) => listener());
 }
 
+// A filter chosen in the demo goes with it, pinned-only too, as on a fresh install.
+storage.onDropped(() => {
+  shown = { filter: readFilter(), pinnedOnly: false };
+  listeners.forEach((listener) => listener());
+});
+
 export function useHomeFilter(): HomeFilter {
   return useSyncExternalStore(
     (listener) => {

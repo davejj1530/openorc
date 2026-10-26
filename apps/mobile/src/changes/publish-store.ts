@@ -105,6 +105,12 @@ export function createPublishStore({ storage, macId, dropped, haptic, now }: Pub
       const kind = get(threadId).kind;
       if (kind === "notice") set(threadId, IDLE);
     },
+    /** Lets go of every write held in memory, as a fresh install has; a write kept in storage is still read back. */
+    reset(): void {
+      states.clear();
+      lostAt.clear();
+      listeners.forEach((listener) => listener());
+    },
   };
 }
 

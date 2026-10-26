@@ -129,7 +129,8 @@ export function usePreview(threadId: string) {
   const active = useForeground();
   const linkState = useLinkState();
   const serial = linkState.kind === "connected" ? linkState.serial : null;
-  const pace: PreviewPace = linkState.kind === "connected" ? linkState.route.kind : "lan";
+  // The demo's frames come from inside the app, as fast as the same network's.
+  const pace: PreviewPace = linkState.kind === "connected" && linkState.route.kind === "tailnet" ? "tailnet" : "lan";
   const { width: points } = useWindowDimensions();
   const [deep, setDeep] = useState(false);
   const width = watchWidth(points, deep);

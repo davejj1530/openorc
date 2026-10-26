@@ -49,7 +49,8 @@ export function Picker<T>({ selection, onSelectionChange, children }: Modified &
 }
 
 export function Button({ role, label, onPress, modifiers }: Modified & { role?: string; label?: string; onPress?: () => void }) {
-  return createElement("button", { "aria-label": spoken(modifiers) ?? label ?? (role === "close" ? "Close" : undefined), onClick: onPress }, label);
+  const disabled = read(modifiers, "disabled") === true;
+  return createElement("button", { "aria-label": spoken(modifiers) ?? label ?? (role === "close" ? "Close" : undefined), disabled, onClick: onPress }, label);
 }
 
 export function Toggle({ label, isOn, onIsOnChange, modifiers }: Modified & { label?: string; isOn?: boolean; onIsOnChange?: (isOn: boolean) => void }) {

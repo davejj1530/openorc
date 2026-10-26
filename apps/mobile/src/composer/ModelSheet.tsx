@@ -3,20 +3,25 @@ import { effortLabel, harnessShortName, isHarnessId, type ModelOption } from "@o
 import { router, useLocalSearchParams } from "expo-router";
 import { Pressable, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRpc } from "../client";
 import { Check } from "../generated/icons";
 import { cn } from "../ui/cn";
 import { haptic } from "../ui/haptics";
 import { HarnessLogo } from "../ui/HarnessLogo";
 import { Text } from "../ui/Text";
+import { useClaudeAccountChoice, useComposerModels } from "./claude-account";
+import { ClaudeAccountMenu } from "./ClaudeAccountMenu";
 import { useSharedSettings } from "./settings-bridge";
 
-/** The models a composer can run, by harness: the current one checked, its effort levels as a segmented row below. */
+/**
+ * The models a composer can run, by harness: the current one checked, its effort levels as a segmented row below, and
+ * on a new Claude thread the account it runs on, once the Mac has more than one.
+ */
 export function ModelSheet() {
   const { composerId } = useLocalSearchParams<{ composerId: string }>();
   const insets = useSafeAreaInsets();
   const settings = useSharedSettings(composerId);
-  const models = useRpc("agents.models", {}, { staleTime: 5 * 60_000 });
+  const models = useComposerModels(settings);
+  const account = useClaudeAccountChoice(settings);
   const catalog = pickerCatalog(models.data ?? []).filter((model) => !model.legacy);
   const choice = settings?.choice ?? null;
   const current = catalogModel(catalog, choice);
@@ -32,6 +37,7 @@ export function ModelSheet() {
       <Text accessibilityRole="header" className="text-xl">
         Model
       </Text>
+      {account && choice?.agent === "claude" ? <ClaudeAccountMenu choice={account} /> : null}
       {current && efforts.length ? (
         <View className="gap-2">
           <Text className="text-sm text-ink-4">Effort</Text>

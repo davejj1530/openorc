@@ -242,6 +242,35 @@ test("browser tools bind identity to the MCP connection and return images as ima
   ]);
 });
 
+// node:test owns the returned promise and reports its failure.
+void test("the device tool binds identity to the MCP connection, takes flat input and returns screenshots as images", async (t) => {
+  const { host, connect } = await fixture(t);
+  const device = { id: "UDID", platform: "ios" as const, name: "iPhone 17 Pro", os: "iOS 26.5", formFactor: "phone" as const, state: "booted" as const };
+  const calls: unknown[] = [];
+  host.device = async (runId, input) => {
+    calls.push({ runId, input });
+    if (input.action === "close") throw new Error("No device is open in this conversation.");
+    return { action: "screenshot", device, screenshot: { data: "cG5n", mimeType: "image/png" } };
+  };
+  const client = await connect("device-run");
+  const tool = (await client.listTools()).tools.find((item) => item.name === "device");
+  assert.deepEqual(Object.keys(tool?.inputSchema.properties ?? {}).sort(), ["action", "deviceId", "platform", "shutdown"]);
+  assert.ok(internalToolNames.includes("device"));
+  const image = await client.callTool({ name: "device", arguments: { action: "screenshot", deviceId: "UDID" } });
+  assert.deepEqual(image.content, [
+    { type: "text", text: JSON.stringify({ action: "screenshot", device }) },
+    { type: "image", data: "cG5n", mimeType: "image/png" },
+  ]);
+  const refused = await client.callTool({ name: "device", arguments: { action: "close" } });
+  assert.equal(refused.isError, true);
+  assert.match(JSON.stringify(refused.content), /No device is open in this conversation\./);
+  assert.equal((await client.callTool({ name: "device", arguments: { action: "list", surface: "thread:other" } })).isError, true);
+  assert.deepEqual(calls, [
+    { runId: "device-run", input: { action: "screenshot", deviceId: "UDID" } },
+    { runId: "device-run", input: { action: "close" } },
+  ]);
+});
+
 test("browser is absent from hosts without a browser and from read-only task comments", async (t) => {
   const { host, connect } = await fixture(t);
   const client = await connect("comment");

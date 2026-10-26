@@ -48,6 +48,7 @@ import { createDeviceHandlers } from "./handlers/devices.js";
 import { DeviceService } from "./devices/service.js";
 import { createBrowserHost } from "./mcp-host/browser.js";
 import { createContextHost } from "./mcp-host/context.js";
+import { createDeviceHost } from "./mcp-host/device.js";
 import { createMemoryHost } from "./mcp-host/memory.js";
 import { createRunHost } from "./mcp-host/run.js";
 import { createTaskCreateHost } from "./mcp-host/task-create.js";
@@ -444,7 +445,7 @@ export class OpenOrc {
       threadContext: (thread) => this.pullRequests.brief(thread),
       untrustedCheckout: (thread) => inUnvettedCopy(db, thread),
       memoryEnabled: () => this.memory.enabled(),
-      environment: () => this.environment.current(),
+      environment: () => this.devices.launchEnvironment(this.environment.current()),
       claudeEnvironment: (snapshot, id) => this.claudeAccounts.environment(snapshot, id),
       claudeAccountFor: (input) => claudeRunAccount(this.db, input),
       claudeVersion: (snapshot, env) => (snapshot ? this.system.infoFor(snapshot, env) : this.system.info()).then((info) => harnessInfo(info, "claude").version),
@@ -527,6 +528,7 @@ export class OpenOrc {
       this.mcp = startMcpServer({
         ...createRunHost({ runService: this.runs, db: this.db, comments: this.comments, assertTeamActor }),
         ...createBrowserHost({ db: this.db, runService: this.runs, browser: this.options.browser, assertTeamActor }),
+        ...createDeviceHost({ db: this.db, runService: this.runs, devices: this.devices, assertTeamActor }),
         ...createMemoryHost({ memoryService: this.memory, runService: this.runs, db: this.db, assertTeamActor, taskFor, projectFor }),
         ...createTeamHost({ teams: this.teams, slack: this.slack }),
         ...threadsHost,

@@ -40,6 +40,10 @@ vi.mock("../client", async () => {
   };
   return { ...mac.phone.module, link: { connection }, useLinkState: () => connected };
 });
+vi.mock("react-native-keyboard-controller", () => ({
+  useKeyboardState: () => 0,
+  KeyboardStickyView: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+}));
 vi.mock("expo-router", () => {
   const Stack = ({ children }: { children?: ReactNode }) => <>{children}</>;
   // The header's title draws where a test can read it.

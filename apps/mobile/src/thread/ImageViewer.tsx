@@ -52,7 +52,7 @@ export function ImageViewer({ uri, label, onClose }: { uri: string; label: strin
       <View className="flex-1" onAccessibilityEscape={onClose}>
         <Animated.View className="absolute inset-0 bg-bg" style={ground} />
         <Animated.View className="flex-1" style={image}>
-          <ZoomView width={width} height={height} centered gesture={swipeDown} onZoom={(scale) => setZoomed(scale > 1.01)}>
+          <ZoomView width={width} height={height} centered gestures={[swipeDown]} onZoom={(scale) => setZoomed(scale > 1.01)}>
             <Image source={{ uri }} accessibilityLabel={label} accessibilityIgnoresInvertColors style={{ width, height }} resizeMode="contain" />
           </ZoomView>
         </Animated.View>

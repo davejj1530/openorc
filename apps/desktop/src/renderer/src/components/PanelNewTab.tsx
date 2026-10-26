@@ -1,5 +1,6 @@
+import { pageHost } from "@openorc/client";
 import { Globe } from "./icons";
-import { pageHost, panelTools, tabsFor, type PanelContext } from "./panel-tools";
+import { panelTools, tabsFor, type PanelContext } from "./panel-tools";
 import type { PanelTab } from "../lib/layout";
 
 /** A blank tab's page: every tool this context offers, in launcher order, then the pages visited lately. */

@@ -30,6 +30,7 @@ export {
   teamGitActions,
 } from "./git-actions.js";
 export { panelToolLabels, type PanelTool, type PanelToolContext, tabsFor } from "./panel-tools.js";
+export { pageHost, pageLabel, publicAddress } from "./browser-page.js";
 export { citationLinks } from "./file-citations.js";
 export { isImageGeneration, isImageView } from "./image-activity.js";
 export {

@@ -1,6 +1,6 @@
 import { beforeAll, beforeEach, expect, it, vi } from "vitest";
 import type { CorePush } from "@openorc/protocol";
-import { pageLabel } from "../components/panel-tools";
+import { tabLabel } from "../components/panel-tools";
 import { activeTab, currentPage, newPanelSession, usePanelSessions, type DevicePage, type PanelPage } from "./panel-tabs";
 import { toolPage } from "./panel-workspace";
 import { core } from "./rpc";
@@ -29,10 +29,10 @@ beforeEach(() => {
 
 it("opens Device as a picker tab and turns that tab into the device chosen there", () => {
   actions().navigate(scope, toolPage("device"));
-  expect(pageLabel(currentPage(activeTab(session())))).toBe("Device");
+  expect(tabLabel(currentPage(activeTab(session())))).toBe("Device");
   actions().pickDevice(scope, session().activeId, iphone);
   expect(pages()).toEqual([iphone]);
-  expect(pageLabel(currentPage(activeTab(session())))).toBe("iPhone 17");
+  expect(tabLabel(currentPage(activeTab(session())))).toBe("iPhone 17");
 });
 
 it("selects the tab already showing a device instead of showing it twice", () => {

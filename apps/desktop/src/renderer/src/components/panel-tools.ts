@@ -1,5 +1,5 @@
 import { WORKSPACE_ID, type Project, type Task, type ThreadSummary } from "@openorc/protocol";
-import { panelToolLabels, tabsFor as sharedTabsFor } from "@openorc/client";
+import { pageLabel, panelToolLabels, tabsFor as sharedTabsFor } from "@openorc/client";
 import type { FileSelection, PanelTab } from "../lib/layout";
 import { pageType, type PanelPage } from "../lib/panel-tabs";
 import { fileIcon } from "./FileGlyph";
@@ -60,16 +60,9 @@ export function tabsFor(context: PanelContext): PanelTab[] {
   return context.kind === "thread" || context.kind === "task" ? [...tools, "device"] : tools;
 }
 
-export function pageHost(url: string): string {
-  try {
-    return new URL(url).host || url;
-  } catch {
-    return url;
-  }
-}
-
-export function pageLabel(page: PanelPage): string {
-  if (page.kind === "browser") return page.title || (page.url ? pageHost(page.url) : "Preview");
+/** A tab's name: a page's title or host, a shell's number, a file's name, else its tool's. */
+export function tabLabel(page: PanelPage): string {
+  if (page.kind === "browser") return pageLabel(page);
   if (page.kind === "tool" && page.shell) return `${panelTools.terminal.label} ${page.shell.number}`;
   if (page.kind === "file" && page.selection) return page.selection.path.split(/[\\/]/).pop() ?? page.selection.path;
   if (page.kind === "device" && page.deviceId) return page.name;

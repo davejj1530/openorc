@@ -20,6 +20,7 @@ import { AppearanceSettings } from "./settings-appearance";
 import { GitHubSettings } from "./settings-github";
 import { Field, LoadError, SaveStatus, Section, Toggle, usePreference } from "./settings-shared";
 import { SkillsSettings } from "./settings-skills";
+import { DeviceSettings } from "./settings-devices";
 import { SlackSettings } from "./settings-slack";
 import { PairPhone, PhoneSettings } from "./settings-phone";
 import { ProviderUsageOverview } from "./settings-usage";
@@ -131,6 +132,8 @@ function SectionSettings({ id, active, info }: { id: SettingsSection; active: bo
       return <PhoneSettings active={active} />;
     case "skills":
       return <SkillsSettings active={active} />;
+    case "devices":
+      return <DeviceSettings active={active} />;
     case "appearance":
       return <AppearanceSettings />;
     case "general":

@@ -288,6 +288,14 @@ export const Smartphone = icon(
     <path d="M11 18.5h2" />
   </>,
 );
+export const Tablet = icon(
+  "Tablet",
+  <>
+    <rect x="4" y="3" width="16" height="18" rx="2.5" />
+    <path d="M11 18h2" />
+  </>,
+);
+export const Power = icon("Power", <path d="M12 3v8 M7.4 6.2a7.5 7.5 0 1 0 9.2 0" />);
 export const Clock = icon(
   "Clock",
   <>

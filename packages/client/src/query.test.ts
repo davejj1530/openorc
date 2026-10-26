@@ -83,6 +83,10 @@ const contract: Array<[RpcMethod, RpcMethod[]]> = [
   ["reviewerApp.cancelSetup", ["reviewerApp.get"]],
   ["reviewerApp.configure", ["reviewerApp.get"]],
   ["reviewerApp.remove", ["reviewerApp.get"]],
+  ["devices.setup", ["devices.status", "devices.list"]],
+  ["devices.settings.set", ["devices.status", "devices.list"]],
+  ["devices.boot", ["devices.list"]],
+  ["devices.shutdown", ["devices.list"]],
   ["remote.configure", ["remote.status"]],
   ["remote.pairing.begin", ["remote.status"]],
   ["remote.pairing.cancel", ["remote.status"]],
@@ -146,6 +150,8 @@ describe("query cache tags", () => {
       "pulls.diff",
       "pulls.review.get",
       "remote.status",
+      "devices.status",
+      "devices.list",
     ];
     for (const read of reads) expect(tagsFor(read, params).length, `${read} has no tag`).toBeGreaterThan(0);
   });

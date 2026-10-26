@@ -4,7 +4,8 @@ import type { RpcParams } from "@openorc/protocol";
 import type { FileReference } from "../../../shared/file-reference";
 import { toggleSidebarFold, type PanelTool, type SidebarFilter } from "@openorc/client";
 
-export type PanelTab = PanelTool;
+/** The shared panel tools, and the desktop's own Device panel. */
+export type PanelTab = PanelTool | "device";
 /** One turn's saved diff, opened from its change card: a team attempt's checkpoint or a thread turn's. */
 export type ChangeSelection = ({ kind: "team" } & Omit<RpcParams<"orchestration.turnChanges">, "includePatch">) | ({ kind: "thread" } & Omit<RpcParams<"threads.turnChanges">, "includePatch">);
 export type FileSelection = FileReference & { scope: RpcParams<"files.read">["scope"] };

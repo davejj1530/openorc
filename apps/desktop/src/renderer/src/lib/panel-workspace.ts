@@ -1,13 +1,33 @@
 import { useCallback, useEffect, useMemo } from "react";
-import { panelFileScope, panelScope, type PanelContext } from "../components/panel-tools";
+import { panelFileScope, panelScope, panelTools, type PanelContext } from "../components/panel-tools";
 import { useBrowserPreview } from "./browser-preview";
 import { useLayout, type ChangeSelection, type FileSelection, type PanelTab } from "./layout";
 import { activeTab, currentPage, newPanelSession, pageType, usePanelSessions, type PanelPage } from "./panel-tabs";
+import { core, type DevicePanelPush } from "./rpc";
 
 export function toolPage(tool: PanelTab): PanelPage {
   if (tool === "newtab" || tool === "browser") return { kind: "newtab" };
   if (tool === "file" || tool === "changes") return { kind: tool, selection: null };
+  if (tool === "device") return { kind: "device", deviceId: null, name: panelTools.device.label };
   return { kind: "tool", tool };
+}
+
+/** An agent's device joins or leaves its conversation's tabs, whether or not that conversation is on screen. */
+export function applyDevicePanelPush(push: DevicePanelPush): void {
+  const sessions = usePanelSessions.getState();
+  if (push.action === "open") sessions.open(push.surface, { kind: "device", deviceId: push.deviceId, name: push.name });
+  else sessions.dropDevice(push.surface, push.deviceId);
+}
+core.onDevicePanel(applyDevicePanelPush);
+
+/** A device an agent opens in the conversation on screen shows the panel too, the way its browser preview does. */
+function useDeviceReveal(surface: string | null): void {
+  useEffect(() => {
+    if (!surface) return;
+    return core.onDevicePanel((push) => {
+      if (push.action === "open" && push.surface === surface) useLayout.getState().setPanel(true);
+    });
+  }, [surface]);
 }
 
 function scopedChanges(context: PanelContext, changes: ChangeSelection | null): ChangeSelection | null {
@@ -51,7 +71,9 @@ export function usePanelWorkspace(context: PanelContext) {
     },
     [scope],
   );
-  useBrowserPreview(context.kind === "thread" || context.kind === "task" ? scope : null, reveal);
+  const agentSurface = context.kind === "thread" || context.kind === "task" ? scope : null;
+  useBrowserPreview(agentSurface, reveal);
+  useDeviceReveal(agentSurface);
   const navigate = (next: PanelPage) => {
     if (next.kind === "newtab" && page.kind === "newtab") return;
     if (next.kind === "browser") window.openorc.browser?.navigate?.(tab.id, next.url);

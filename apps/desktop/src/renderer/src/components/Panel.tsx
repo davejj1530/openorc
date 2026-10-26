@@ -15,6 +15,7 @@ import { useFileTabClosing } from "./UnsavedFileDialog";
 
 export { tabsFor, type PanelContext } from "./panel-tools";
 const BrowserPanel = lazy(() => import("../panels/BrowserPanel").then((m) => ({ default: m.BrowserPanel })));
+const DevicePanel = lazy(() => import("../panels/DevicePanel").then((m) => ({ default: m.DevicePanel })));
 
 function useMountedThroughClose(open: boolean): boolean {
   const [mounted, setMounted] = useState(open);
@@ -62,6 +63,8 @@ function PanelBody({ context, workspace, open }: { context: PanelContext; worksp
         }}
       />
     ) : null;
+  // A device streams only while its tab is the one on screen, so a hidden panel unmounts it.
+  if (page.kind === "device") return open ? <DevicePanel key={tab.id} scope={scope} tabId={tab.id} page={page} /> : null;
   // Only the browser and the new tab, where an address can be typed, carry browser controls.
   if (page.kind !== "newtab") return <PanelContent context={context} page={page} onNavigate={navigate} />;
   const recentUrls = [...new Set(Object.values(previewUrls).filter((url) => /^https?:\/\//i.test(url)))].reverse().slice(0, 4);

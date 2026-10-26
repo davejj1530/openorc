@@ -23,17 +23,26 @@ export function ClaudeAccountPicker({
       {compact ? null : <span className="text-sm text-ink-2 shrink-0">Claude account</span>}
       <Select aria-label="Claude account" value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled || !accounts} className="h-7 max-w-48 rounded-full text-sm">
         {!accounts ? <option value={value}>Loading accounts…</option> : null}
-        {accounts?.accounts.map((account) => (
-          <option key={account.id} value={account.id} disabled={!account.enabled}>
-            {account.name}
-            {account.enabled ? "" : " · disabled"}
-          </option>
-        ))}
+        <ClaudeAccountOptions accounts={accounts} value={value} />
       </Select>
       <TextButton className="text-sm shrink-0 px-2" onClick={() => useRouter.getState().navigate({ view: "settings", section: "connections" })}>
         Manage
       </TextButton>
     </div>
+  );
+}
+
+/** Each account as a choice. A disabled one stays listed, and only the choice already made can keep it. */
+export function ClaudeAccountOptions({ accounts, value }: { accounts: ClaudeAccounts | undefined; value: string | null | undefined }) {
+  return (
+    <>
+      {accounts?.accounts.map((account) => (
+        <option key={account.id} value={account.id} disabled={!account.enabled && account.id !== value}>
+          {account.name}
+          {account.enabled ? "" : " · disabled"}
+        </option>
+      ))}
+    </>
   );
 }
 

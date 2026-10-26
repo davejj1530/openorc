@@ -3,16 +3,18 @@ import { defaultOrclingLook, isHarnessId, orclingHandle, type Orcling, type Orcl
 import { cn } from "../lib/cn";
 import { defaultChoice, pickerCatalog, type ModelChoice } from "@openorc/client";
 import { useOrclings } from "../lib/orclings";
-import { useRpcMutation } from "../lib/client";
+import { ClaudeAccountScope } from "../lib/claude-account";
+import { useRpc, useRpcMutation } from "../lib/client";
 import { openThread, useRouter } from "../lib/router";
 import { useModelCatalog } from "../lib/use-model-catalog";
+import { ClaudeAccountOptions } from "../components/ClaudeAccountPicker";
 import { ArrowLeft } from "../components/icons";
 import { ModelPicker } from "../components/ModelPicker";
 import { OrclingSilhouette, OrclingStill } from "../components/OrclingAvatar";
 import { OrclingPreview } from "../components/OrclingPreview";
 import { ORCLING_ACCESSORIES, ORCLING_BODY_COLORS, ORCLING_EYE_COLORS, ORCLING_EYES, ORCLING_GLASSES, ORCLING_SHAPES, ORCLING_TEXTURES } from "../components/orcling-art";
 import { TopBar } from "../components/TopBar";
-import { Button, Dialog, IconButton, Segmented } from "../components/ui";
+import { Button, Dialog, IconButton, Segmented, Select } from "../components/ui";
 import "./OrclingDesigner.css";
 
 const TABS: readonly { part: OrclingLookPart; label: string; options: readonly { name: string }[] }[] = [
@@ -23,7 +25,7 @@ const TABS: readonly { part: OrclingLookPart; label: string; options: readonly {
   { part: "accessory", label: "Accessories", options: ORCLING_ACCESSORIES },
 ];
 
-/** Design a new Orcling, or change one: its look, name, model and permission. */
+/** Design a new Orcling, or change one: its look, name, model, Claude account and permission. */
 export function OrclingDesigner({ orclingId }: { orclingId?: string | undefined }) {
   const orclings = useOrclings();
   const models = useModelCatalog();
@@ -57,6 +59,8 @@ function DesignerForm({ existing, initialModel }: { existing: Orcling | undefine
   const [name, setName] = useState(start.name);
   const [model, setModel] = useState(start.model);
   const [permission, setPermission] = useState(start.permission);
+  // A new Orcling shows the default account until another is chosen, and the core gives it the default.
+  const [account, setAccount] = useState(existing?.claudeAccountId);
   const orclings = useOrclings();
   const problem = nameProblem(name, orclings, existing);
   const create = useRpcMutation("orclings.create");
@@ -69,6 +73,7 @@ function DesignerForm({ existing, initialModel }: { existing: Orcling | undefine
       look,
       settings: { agent: model.agent, model: model.model, effort: model.effort, fastMode: Boolean(model.fastMode) },
       permission,
+      ...(account ? { claudeAccountId: account } : {}),
     };
     const done = (saved: Orcling) => openThread(saved.threadId);
     if (existing) update.mutate({ id: existing.id, draft }, { onSuccess: done });
@@ -96,8 +101,11 @@ function DesignerForm({ existing, initialModel }: { existing: Orcling | undefine
           <div className="orcling-designer-fields">
             <div className="orcling-designer-field">
               <span>Model</span>
-              <ModelPicker value={model} onChange={setModel} ariaLabel="Model" />
+              <ClaudeAccountScope id={account}>
+                <ModelPicker value={model} onChange={setModel} ariaLabel="Model" />
+              </ClaudeAccountScope>
             </div>
+            {model?.agent === "claude" ? <AccountField value={account} onChange={setAccount} /> : null}
             <div className="orcling-designer-field">
               <span>Permission</span>
               <Segmented
@@ -120,6 +128,21 @@ function DesignerForm({ existing, initialModel }: { existing: Orcling | undefine
           </div>
         </section>
       </div>
+    </div>
+  );
+}
+
+/** Which Claude account a Claude Orcling runs on, once there is more than one to choose from. */
+function AccountField({ value, onChange }: { value: string | undefined; onChange: (id: string) => void }) {
+  const accounts = useRpc("claude.accounts.list", {}).data;
+  if (!accounts || accounts.accounts.length < 2) return null;
+  const chosen = value ?? accounts.defaultId;
+  return (
+    <div className="orcling-designer-field">
+      <span>Claude account</span>
+      <Select aria-label="Claude account" value={chosen} onChange={(event) => onChange(event.target.value)} className="h-7 max-w-48 rounded-full text-sm">
+        <ClaudeAccountOptions accounts={accounts} value={chosen} />
+      </Select>
     </div>
   );
 }

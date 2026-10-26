@@ -3,6 +3,7 @@ import { MAX_TEAM_DEPTH, MAX_TEAM_MEMBERS, harnessInfo, harnessLoggedIn, isHarne
 import { Plus, Trash2, Workflow } from "../components/icons";
 import { MemberAvatar, TEAM_AVATARS } from "../components/MemberAvatar";
 import { defaultChoice, ModelPicker } from "../components/ModelPicker";
+import { ClaudeAccountOptions } from "../components/ClaudeAccountPicker";
 import { ClaudeAccountScope } from "../lib/claude-account";
 import { orclingById, useOrclings } from "../lib/orclings";
 import { Badge, Button, Dialog, IconButton, Input, Select, Switch, Textarea, TextButton, Tooltip } from "../components/ui";
@@ -426,21 +427,17 @@ function accountFor(agent: string): Pick<TeamMember, "claudeAccountId"> {
   return agent === "claude" ? {} : { claudeAccountId: null };
 }
 
-/** The Claude account a Claude member runs on: the conversation's, or one of its own. */
+/** The Claude account a Claude member runs on: the conversation's, or one of its own. An Orcling brings its own. */
 function MemberAccount({ member, onChange }: { member: TeamMember; onChange: (patch: Partial<TeamMember>) => void }) {
-  const accounts = useRpc("claude.accounts.list", {}, { enabled: member.settings.agent === "claude" }).data;
-  if (member.settings.agent !== "claude") return null;
+  const chooses = member.settings.agent === "claude" && !member.orclingId;
+  const accounts = useRpc("claude.accounts.list", {}, { enabled: chooses }).data;
+  if (!chooses) return null;
   return (
     <label className="grid gap-1.5 text-sm text-ink-3">
       Claude account
       <Select className="h-8" value={member.claudeAccountId ?? ""} onChange={(event) => onChange({ claudeAccountId: event.target.value || null })}>
         <option value="">Conversation's account</option>
-        {accounts?.accounts.map((account) => (
-          <option key={account.id} value={account.id} disabled={!account.enabled && account.id !== member.claudeAccountId}>
-            {account.name}
-            {account.enabled ? "" : " · disabled"}
-          </option>
-        ))}
+        <ClaudeAccountOptions accounts={accounts} value={member.claudeAccountId} />
       </Select>
     </label>
   );
@@ -464,7 +461,8 @@ function MemberModel({ id, member, onChange }: { id: string; member: TeamMember;
           orclings={{
             options: orclings,
             selectedId: member.orclingId ?? null,
-            onSelect: (orcling) => onChange({ settings: { ...orcling.settings }, orclingId: orcling.id, name: orcling.name, ...accountFor(orcling.settings.agent) }),
+            onSelect: (orcling) =>
+              onChange({ settings: { ...orcling.settings }, orclingId: orcling.id, name: orcling.name, claudeAccountId: orcling.settings.agent === "claude" ? orcling.claudeAccountId : null }),
           }}
         />
       </div>

@@ -100,6 +100,7 @@ it("seats an Orcling under its own name and face, which only the Orcling's own s
       name: "Gloop",
       look: defaultOrclingLook,
       settings: { agent: "codex", model: "model", effort: null, fastMode: false },
+      claudeAccountId: "claude-cli",
       permission: "allow",
       threadId: "home",
       createdAt: 1,

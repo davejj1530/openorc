@@ -14,6 +14,8 @@ import { FrameCoalescer } from "./frames.js";
 import { createAttachmentsHandlers } from "./handlers/attachments.js";
 import { createBenchHandlers } from "./handlers/bench.js";
 import { createRemoteHandlers } from "./handlers/remote.js";
+import { createPreviewHandlers } from "./handlers/preview.js";
+import { invalidateOnLifecycle, previewThreadLive } from "./services/preview.js";
 import { createCatalogHandlers } from "./handlers/catalog.js";
 import { createEventsHandlers } from "./handlers/events.js";
 import { createFilesHandlers } from "./handlers/files.js";
@@ -197,6 +199,7 @@ export class OpenOrc {
       network: options.remoteNetwork,
       pushSecrets: options.pushSecrets,
       presence: options.presence,
+      preview: options.preview,
     });
     this.settings = new AppSettingsService(db);
     this.environment = new ShellEnvironment({ probe: options.shellProbe ?? (options.ephemeral ? inheritedProbe() : undefined) });
@@ -263,6 +266,7 @@ export class OpenOrc {
       (exchange, agent, accountId) => this.textGeneration.title(exchange, agent, accountId),
       this.workspaceWriters,
       (id) => this.teams.modeChanged(id),
+      (id) => this.previewGone(id),
     );
     this.comments = new TaskCommentService(db, this.runs, this.threads, invalidate, options.dataDir);
     this.orchestration = new OrchestrationService(
@@ -351,6 +355,8 @@ export class OpenOrc {
     this.teamMoves = new TeamMoveService(db, options.dataDir, this.teamOperations, this.workspaceWriters, workspaceReplaced);
     this.teamDeletions = new TeamDeletionService(db, options.dataDir, this.teamOperations, this.workspaceWriters, (id) => {
       invalidate(["orchestration", "threads", "tasks", "inbox", `thread:${id}`]);
+      // A cancelled or failed deletion leaves the thread as it was.
+      if (!previewThreadLive(db, id)) this.previewGone(id);
       // What deleted runs leave outside the database goes with them.
       void this.upkeep.forgetDeletedRuns();
     });
@@ -421,6 +427,13 @@ export class OpenOrc {
     });
     this.slack = new SlackService(this, options.slackSecrets, new AttachmentService(options.dataDir));
     this.handlers = this.buildHandlers(invalidate);
+    invalidateOnLifecycle(options.preview, invalidate);
+  }
+
+  /** A deleted thread's Preview goes with it: phones watching it hear so, and main closes its pages. */
+  private previewGone(threadId: string): void {
+    this.remote.previewGone(threadId);
+    this.options.preview?.threadGone(threadId);
   }
 
   /** What the run module asks of the rest of the app: briefs, permissions, the environment, and what to do as turns end. */
@@ -730,6 +743,7 @@ export class OpenOrc {
       createDeviceHandlers({ devices: this.devices }),
       createInboxHandlers({ runService: this.runs, db: this.db, teams: this.teams }),
       createRemoteHandlers({ remote: this.remote }),
+      createPreviewHandlers({ db: this.db, preview: this.options.preview }),
       createBenchHandlers({ frames: this.frames, bench: this.bench, db: this.db, ledger: this.ledger, transport: this.options.transport, benchmarks: Boolean(this.options.benchmarks) }),
     );
   }

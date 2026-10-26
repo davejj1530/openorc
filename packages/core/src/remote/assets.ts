@@ -19,6 +19,9 @@ function assetPath(ref: AssetRef, { dataDir, db, ledger }: AssetSources): string
       // The activity may have arrived in a frame a moment ago and still be queued for the ledger.
       ledger.flush();
       return activityImagePath(db, ref.runId, ref.activityId);
+    case "preview":
+      // A Preview frame is never a file; the session serves it from its caster.
+      return null;
   }
 }
 

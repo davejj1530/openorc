@@ -1,7 +1,7 @@
 import { lstat, realpath, stat, mkdir } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
-import { projects, settings, type Db } from "@openorc/db";
+import { projects, settings, threads, type Db } from "@openorc/db";
 import { WORKSPACE_ID, type Project, type Thread } from "@openorc/protocol";
 
 /** The existing ownership table also holds one explicit personal scope. It is
@@ -62,4 +62,10 @@ export async function configureWorkspace(db: Db, entrypoint: string): Promise<Pr
   const root = await directory(entrypoint);
   settings.set(db, "workspace.entrypoint", root);
   return workspaceHome(db);
+}
+
+/** Forks share their parent's worktree; it goes only with the last thread that uses it. */
+export function worktreeShared(db: Db, thread: Thread): boolean {
+  if (!thread.worktreePath) return false;
+  return threads.list(db, { projectId: thread.projectId, filter: "all" }).some((t) => t.id !== thread.id && t.worktreePath === thread.worktreePath);
 }

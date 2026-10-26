@@ -1,5 +1,6 @@
 import { ProtectedSecretsClient } from "./protected-secrets";
 import { BrowserClient } from "./browser-client";
+import { PreviewClient } from "./preview-client";
 import { PresenceClient } from "./presence";
 import { windowPorts } from "./reply";
 import { join } from "node:path";
@@ -36,9 +37,11 @@ const transport: Transport = {
 
 const secrets = new ProtectedSecretsClient((message) => process.parentPort.postMessage(message));
 const browser = new BrowserClient((message) => process.parentPort.postMessage(message));
+const preview = new PreviewClient((message) => process.parentPort.postMessage(message));
 const presence = new PresenceClient((message) => process.parentPort.postMessage(message));
 const corePromise = OpenOrc.create({
   browser: browser.execute,
+  preview: preview.host,
   dataDir,
   fileKey,
   transport,
@@ -91,6 +94,7 @@ async function answer(request: RpcRequest, origin?: RequestOrigin): Promise<RpcR
 
 process.parentPort.on("message", (e) => {
   if (browser.receive(e.data)) return;
+  if (preview.receive(e.data)) return;
   if (presence.receive(e.data)) return;
   if (secrets.receive(e.data)) return;
   if (e.data?.type === "update:prepare" && typeof e.data.id === "string") {

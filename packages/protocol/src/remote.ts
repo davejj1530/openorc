@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { PreviewState } from "./preview.js";
 import type { PushRefusal, RemotePushStatus } from "./push.js";
 import type { CorePush, RpcMethod } from "./rpc.js";
 
@@ -44,6 +45,8 @@ export const REMOTE_METHODS = [
   "review.commitThread",
   "review.pushThread",
   "review.createThreadPr",
+  // Whether the Mac shows a page for a thread, its address and title shaped. Frames come only to a session watching it.
+  "preview.state",
 ] as const satisfies readonly RpcMethod[];
 export type RemoteMethod = (typeof REMOTE_METHODS)[number];
 
@@ -63,12 +66,21 @@ export interface Route {
 /**
  * Bytes a phone may fetch, always by a reference its transcript already holds, never by a path on the Mac. An
  * attachment by its stored file name, a tool image by the URL the ledger stored, an image an agent generated or
- * viewed by the activity that recorded it.
+ * viewed by the activity that recorded it, and the newest frame of a Preview the session watches, by its `seq`.
  */
-export type AssetRef = { kind: "attachment"; name: string } | { kind: "tool-image"; url: string } | { kind: "activity"; runId: string; activityId: string };
+export type AssetRef =
+  { kind: "attachment"; name: string } | { kind: "tool-image"; url: string } | { kind: "activity"; runId: string; activityId: string } | { kind: "preview"; threadId: string; seq: number };
 
-/** The pushes a phone hears. `ready` carries nothing about the Mac's processes or ports. */
-export type RemotePush = Extract<CorePush, { type: "frame" | "invalidate" | "notify" }> | { type: "ready" };
+/**
+ * The pushes a phone hears. `ready` carries nothing about the Mac's processes or ports. `preview` and `preview.ended`
+ * go only to a thread's watchers: its page as it changes, and the end of the watch in the Mac's words when the thread
+ * is deleted.
+ */
+export type RemotePush =
+  | Extract<CorePush, { type: "frame" | "invalidate" | "notify" }>
+  | { type: "ready" }
+  | { type: "preview"; threadId: string; state: PreviewState }
+  | { type: "preview.ended"; threadId: string; message: string };
 
 export interface RemoteDevice {
   id: string;

@@ -42,7 +42,7 @@ import { titleFromPrompt, type StartThreadInput, type ThreadPatch, type ThreadTi
 import { inUnvettedCopy } from "./review-copies.js";
 import type { RunService } from "./runs.js";
 import type { WorkspaceService } from "./workspace.js";
-import { directory, executionProject } from "./workspace-home.js";
+import { directory, executionProject, worktreeShared } from "./workspace-home.js";
 import { executionFolder } from "./conversation-folder.js";
 import { workspaceWriters, type WorkspaceWriters } from "./workspace-writers.js";
 import { checkpointRefs, unpinProjectRefs } from "./checkpoint-refs.js";
@@ -76,6 +76,7 @@ export class ThreadService {
     private readonly titler: ThreadTitler,
     private readonly writers: WorkspaceWriters = workspaceWriters,
     private readonly onTeamModeChanged?: (threadId: string) => void,
+    private readonly onDeleted?: (threadId: string) => void,
   ) {
     this.messageQueue = new ThreadMessageQueue(
       db,
@@ -569,19 +570,13 @@ export class ThreadService {
     return t;
   }
 
-  /** Forks share their parent's worktree; it goes only with the last thread that uses it. */
-  private worktreeShared(thread: Thread): boolean {
-    if (!thread.worktreePath) return false;
-    return threads.list(this.db, { projectId: thread.projectId, filter: "all" }).some((t) => t.id !== thread.id && t.worktreePath === thread.worktreePath);
-  }
-
   async delete(id: string): Promise<void> {
     const thread = this.thread(id);
     const live = this.runs.liveRunForThread(id);
     if (live) await this.runs.closeAndWait(live.id);
     const project = executionProject(this.db, thread);
     await this.writers.withLease(this.workspaces.threadPath(thread, project), `deleting thread ${id}`, async (lease) => {
-      if (thread.worktreePath && !this.worktreeShared(thread)) {
+      if (thread.worktreePath && !worktreeShared(this.db, thread)) {
         // A pull request's copy under review is someone else's code, so any changes in it go with it.
         await this.workspaces.cleanupThread(thread, project, { save: !inUnvettedCopy(this.db, thread) }, lease);
       }
@@ -590,6 +585,7 @@ export class ThreadService {
       // Its checkpoints go with it; nothing else keeps their trees.
       await unpinProjectRefs(project, checkpointRefs(id)).catch((e: unknown) => this.log.warn(`checkpoint refs of thread ${id} were kept: ${e instanceof Error ? e.message : String(e)}`));
       this.invalidate(["threads", "tasks", "inbox"]);
+      this.onDeleted?.(id);
     });
   }
 
@@ -663,7 +659,7 @@ export class ThreadService {
     return this.writers.withLease([from, this.workspaces.threadPath(destination, project)], `moving thread ${id}`, async (lease) => {
       const moves = new ThreadMoves(this.db, this.workspaces);
       try {
-        const moved = to === "worktree" ? await moves.toWorktree(thread, project, lease) : await moves.toCheckout(thread, project, lease, this.worktreeShared(thread));
+        const moved = to === "worktree" ? await moves.toWorktree(thread, project, lease) : await moves.toCheckout(thread, project, lease, worktreeShared(this.db, thread));
         audit.record(this.db, { actor: "user", action: "thread.move", resourceType: "thread", resourceId: id, metadata: { to, files: moved.files } });
         return moved.thread;
       } finally {

@@ -186,7 +186,7 @@ describe("phone policy", () => {
       patch: `@@ -0,0 +1 @@\n+const token = "${TOKEN}";\n`,
       cut: null,
     };
-    const context = { words: (message: string) => `shaped: ${message}` };
+    const context = { words: (message: string) => `shaped: ${message}`, roots: () => ({ home: "/Users/me", dataDir: "/Users/me/.openorc", projects: [] }) };
     const shaped = remoteReply("review.threadFileDiff", diff, context);
     expect(shaped.patch).toContain("[redacted:github-token]");
     expect(shaped.patch).not.toContain(TOKEN);

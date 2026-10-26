@@ -44,16 +44,35 @@ function session(
   answer: Answer = async (request) => ({ type: "rpc.result", id: request.id, result: null }),
   readAsset: SessionDeps["readAsset"] = async () => ({ ok: false, reason: "missing" }),
   device: SessionDeps["device"] = async () => "no-key",
+  preview: SessionDeps["preview"] = null,
 ) {
   const link = new FakeLink();
   const remote = new RemoteSession("device", link as unknown as MacSession, {
     answer,
-    guard: { attachmentsDir: "/data/attachments", thread: () => ({ team: false }) },
+    guard: { attachmentsDir: "/data/attachments", thread: (id) => (id === "gone" ? null : { team: false }) },
     roots: () => ({ home: "/Users/me", dataDir: "/Users/me/.openorc", projects: [] }),
     readAsset,
     device,
+    preview,
+    watchable: (id) => id !== "gone",
   });
   return { link, remote };
+}
+
+function casters() {
+  return {
+    watch: vi.fn(async (_session: unknown, { threadId }: { threadId: string }) => ({
+      open: true as const,
+      pane: "p",
+      address: `http://127.0.0.1:47831/${threadId}`,
+      title: "QA",
+      phase: "live" as const,
+      error: null,
+      frame: null,
+    })),
+    unwatch: vi.fn(),
+    frame: vi.fn((_session: unknown, threadId: string, seq: number) => (threadId === "t1" && seq === 1 ? new Uint8Array([0xff, 0xd8, 0xff]) : null)),
+  };
 }
 
 const frame = (runId: string, seq = 1): RemotePush => ({ type: "frame", frame: { runId, seq, events: [] } });
@@ -217,6 +236,57 @@ describe("a phone session", () => {
     link.receive({ t: "rpc", id: 9, method: "review.threadFileDiff", params: { threadId: "t", path: "a.ts" } });
     await vi.waitFor(() => expect(link.sent).toHaveLength(1));
     expect(link.sent[0]).toMatchObject({ t: "rpc.result", id: 9, result: { path: "a.ts", patch: "@@ -0,0 +1 @@\n+[redacted:github-token]\n" } });
+  });
+
+  it("answers its own watch of a Preview, never the core, and ends it on unwatch and on close", async () => {
+    const answer = vi.fn<Answer>(async (request) => ({ type: "rpc.result", id: request.id, result: null }));
+    const preview = casters();
+    const { link, remote } = session(answer, undefined, undefined, preview);
+    link.receive({ t: "rpc", id: 1, method: "preview.watch", params: { threadId: "t1", width: 786, pace: "lan" } });
+    await vi.waitFor(() => expect(link.sent).toHaveLength(1));
+    expect(link.sent[0]).toEqual({ t: "rpc.result", id: 1, result: expect.objectContaining({ open: true, address: "http://127.0.0.1:47831/t1" }) });
+    expect(preview.watch).toHaveBeenCalledWith(remote, { threadId: "t1", width: 786, pace: "lan" });
+    link.receive({ t: "rpc", id: 2, method: "preview.unwatch", params: {} });
+    await vi.waitFor(() => expect(link.sent).toHaveLength(2));
+    expect(link.sent[1]).toEqual({ t: "rpc.result", id: 2, result: null });
+    expect(preview.unwatch).toHaveBeenCalledWith(remote);
+    expect(answer).not.toHaveBeenCalled();
+    link.close();
+    expect(preview.unwatch).toHaveBeenCalledTimes(2);
+  });
+
+  it("refuses a watch of a thread that is gone, or with params outside its schema", async () => {
+    const preview = casters();
+    const { link } = session(undefined, undefined, undefined, preview);
+    link.receive({ t: "rpc", id: 1, method: "preview.watch", params: { threadId: "gone", width: 786, pace: "lan" } });
+    link.receive({ t: "rpc", id: 2, method: "preview.watch", params: { threadId: "task:t1", width: 786, pace: "lan" } });
+    link.receive({ t: "rpc", id: 3, method: "preview.watch", params: { threadId: "t1", width: 786, pace: "lan", command: { action: "click", ref: "e1" } } });
+    await vi.waitFor(() => expect(link.sent).toHaveLength(3));
+    expect(link.sent[0]).toEqual({ t: "rpc.error", id: 1, message: "This thread is gone." });
+    for (const message of link.sent.slice(1)) expect(message).toMatchObject({ t: "rpc.error", message: expect.stringContaining("invalid params for preview.watch") });
+    expect(preview.watch).not.toHaveBeenCalled();
+  });
+
+  it("reads a watch as closed on a Mac without a Preview host", async () => {
+    const { link } = session();
+    link.receive({ t: "rpc", id: 1, method: "preview.watch", params: { threadId: "t1", width: 786, pace: "lan" } });
+    await vi.waitFor(() => expect(link.sent).toEqual([{ t: "rpc.result", id: 1, result: { open: false } }]));
+  });
+
+  it("serves a watched frame as JPEG bytes from the caster, and refuses any other", async () => {
+    const readAsset = vi.fn<SessionDeps["readAsset"]>(async () => ({ ok: true, mime: "image/png", bytes: new Uint8Array(8) }));
+    const preview = casters();
+    const { link, remote } = session(undefined, readAsset, undefined, preview);
+    link.receive({ t: "asset", id: 1, ref: { kind: "preview", threadId: "t1", seq: 1 } });
+    link.receive({ t: "asset", id: 2, ref: { kind: "preview", threadId: "t2", seq: 1 } });
+    await vi.waitFor(() => expect(link.sent).toHaveLength(2));
+    expect(link.sent).toEqual([
+      { t: "asset.bytes", id: 1, mime: "image/jpeg", size: 3 },
+      { t: "asset.error", id: 2, message: "This page is not being watched." },
+    ]);
+    expect(link.streams.map((stream) => stream.id)).toEqual([1]);
+    expect(preview.frame).toHaveBeenCalledWith(remote, "t1", 1);
+    expect(readAsset).not.toHaveBeenCalled();
   });
 
   it("says why before it closes", () => {

@@ -10,6 +10,7 @@ describe("link messages", () => {
     { t: "asset", id: 3, ref: { kind: "attachment", name: "0b9f.png" } },
     { t: "asset", id: 4, ref: { kind: "activity", runId: "run", activityId: "activity" } },
     { t: "asset", id: 2 ** 32 - 1, ref: { kind: "attachment", name: "0b9f.png" } },
+    { t: "asset", id: 6, ref: { kind: "preview", threadId: "thread-1", seq: 12 } },
     { t: "ping", id: 5 },
   ])("accept the phone message %j", (message) => {
     expect(parsePhoneMessage(message)).toBe(message);
@@ -27,6 +28,9 @@ describe("link messages", () => {
     ["an asset id a byte stream cannot carry", { t: "asset", id: 2 ** 32, ref: { kind: "attachment", name: "0b9f.png" } }],
     ["an asset by path", { t: "asset", id: 1, ref: { kind: "path", path: "/etc/passwd" } }],
     ["an asset with an extra field", { t: "asset", id: 1, ref: { kind: "attachment", name: "a.png", path: "/etc/passwd" } }],
+    ["a preview frame without its seq", { t: "asset", id: 1, ref: { kind: "preview", threadId: "thread-1" } }],
+    ["a preview frame by a fractional seq", { t: "asset", id: 1, ref: { kind: "preview", threadId: "thread-1", seq: 1.5 } }],
+    ["a preview frame of an overlong thread id", { t: "asset", id: 1, ref: { kind: "preview", threadId: "t".repeat(101), seq: 1 } }],
     ["a Mac message", { t: "pong", id: 1 }],
     ["an array", [{ t: "ping", id: 1 }]],
     ["null", null],
@@ -46,6 +50,8 @@ describe("link messages", () => {
   it("check the envelope of Mac messages and leave push bodies to the authenticated Mac", () => {
     expect(parseMacMessage({ t: "push", push: { type: "frame", frame: { runId: "r", seq: 1, events: [] } } })).toBeTruthy();
     expect(parseMacMessage({ t: "closing", reason: "removed" })).toBeTruthy();
+    expect(parseMacMessage({ t: "push", push: { type: "preview", threadId: "t", state: { open: false } } })).toBeTruthy();
+    expect(parseMacMessage({ t: "push", push: { type: "preview.ended", threadId: "t", message: "This thread is gone." } })).toBeTruthy();
     expect(() => parseMacMessage({ t: "push", push: { type: "log", message: "x" } })).toThrow();
     expect(() => parseMacMessage({ t: "closing", reason: "bored" })).toThrow();
   });

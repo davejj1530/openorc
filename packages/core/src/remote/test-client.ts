@@ -1,6 +1,6 @@
 import { connectLink, decodePairingUrl, toBase64Url, type ClosingReason, type KeyPair, type MacMessage, type PhoneSession, type Refusal } from "@openorc/link";
 import { nodeCrypto } from "@openorc/link/node";
-import type { AssetRef, DeviceMethod, DeviceParams, DeviceRpcResults, RemotePush, Route, RpcMethod, RpcParams, RpcResults } from "@openorc/protocol";
+import type { AssetRef, DeviceMethod, DeviceParams, DeviceRpcResults, RemotePush, Route, RpcMethod, RpcParams, RpcResults, SessionMethod, SessionParams, SessionRpcResults } from "@openorc/protocol";
 import { WebSocket } from "ws";
 import { LINK_PATH } from "./listener.js";
 import { linkSocket } from "./ws-socket.js";
@@ -88,6 +88,11 @@ export class RemoteTestClient {
   /** A method about this phone itself, as LinkConnection.device sends it. */
   device<M extends DeviceMethod>(method: M, params: DeviceParams<M>): Promise<DeviceRpcResults[M]> {
     return this.request(method, params) as Promise<DeviceRpcResults[M]>;
+  }
+
+  /** A method about this session itself, such as its watch of a Preview. */
+  sessionMethod<M extends SessionMethod>(method: M, params: SessionParams<M>): Promise<SessionRpcResults[M]> {
+    return this.request(method, params) as Promise<SessionRpcResults[M]>;
   }
 
   /** Any method name at all, as a hostile phone would send it. */

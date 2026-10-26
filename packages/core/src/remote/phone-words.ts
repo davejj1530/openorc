@@ -1,5 +1,6 @@
 import path from "node:path";
 import { redact } from "@openorc/db";
+import type { PreviewState } from "@openorc/protocol";
 
 /** The Mac's folders a phone never hears of. Paths inside a project or a worktree read as repository-relative. */
 export interface MacRoots {
@@ -69,4 +70,59 @@ export function remoteError(message: string, macRoots: MacRoots): string {
     text = text.replace(new RegExp(`(?:file://)?${root.pattern}(?:/|${ROOT_END})`, "g"), (matched) => (matched.endsWith("/") ? "" : root.label(matched)));
   }
   return text.replace(SYSTEM_PATH, (match, lead: string) => (lead === "file://" ? "" : lead) + path.basename(match.slice(lead.length)));
+}
+
+/** Query keys whose values are credentials or one-time proofs in the addresses sign-in flows pass through. */
+const SECRET_QUERY_KEY = /^(?:code|state|token|[\w.-]*_token|key|[\w.-]*_key|sig|signature|session|sid|password|secret|otp|ticket|nonce)$/i;
+
+function secretKey(raw: string): boolean {
+  try {
+    return SECRET_QUERY_KEY.test(decodeURIComponent(raw.replace(/\+/g, " ")));
+  } catch {
+    return SECRET_QUERY_KEY.test(raw);
+  }
+}
+
+/** How the Mac's text reads on a phone: its words, and its own folders, which a page's address can name as well. */
+export interface PhoneShaping {
+  /** An error, a reason or a title: redacted, without the Mac's folders. */
+  words: (message: string) => string;
+  roots: () => MacRoots;
+}
+
+/** Each of the Mac's own folders in a web address reads as its name, the home as `~`, and the address keeps its shape. */
+function foldersNamed(url: string, macRoots: MacRoots): string {
+  let text = url;
+  for (const root of roots(macRoots)) text = text.replace(new RegExp(`${root.pattern}(?=[/?#&;]|$)`, "g"), (matched) => `/${root.label(matched)}`);
+  return text;
+}
+
+/**
+ * A Preview's address as a phone hears it. A web address loses its fragment, where implicit OAuth puts tokens, and the
+ * values of secret-named query keys; then it is redacted, and the Mac's own folders in it (a file path typed into the
+ * address field loads as one) read as their names. The rest stays as the page wrote it. Anything else is text the pane
+ * refused to open, and reads like the Mac's other words.
+ */
+export function phoneAddress(url: string, macRoots: MacRoots): string {
+  if (!/^https?:\/\//i.test(url)) return remoteError(url, macRoots);
+  const unhashed = url.split("#")[0]!;
+  const at = unhashed.indexOf("?");
+  const query =
+    at < 0
+      ? ""
+      : `?${unhashed
+          .slice(at + 1)
+          .split("&")
+          .map((pair) => {
+            const equals = pair.indexOf("=");
+            return equals > 0 && secretKey(pair.slice(0, equals)) ? `${pair.slice(0, equals)}=[redacted:query]` : pair;
+          })
+          .join("&")}`;
+  return foldersNamed(redact(`${at < 0 ? unhashed : unhashed.slice(0, at)}${query}`).text, macRoots);
+}
+
+/** One shaping for preview.state and for every watcher's push: the address, the title and the error, as a phone hears them. */
+export function previewReply(state: PreviewState, { words, roots }: PhoneShaping): PreviewState {
+  if (!state.open) return state;
+  return { ...state, address: phoneAddress(state.address, roots()), title: words(state.title), error: state.error === null ? null : words(state.error) };
 }

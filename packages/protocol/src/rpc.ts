@@ -2,7 +2,7 @@ import { CommentRecipient, type TaskDiscussion, type TaskComment, type CommentAt
 import type { ConversationPlan } from "./execution-mode.js";
 import type { TaskForwardingState } from "./task-forwarding.js";
 import type { TaskCheckoutState } from "./task-checkout.js";
-import { BranchLoss, ChangeComparison, type ChangePreview, type FileDiff, type RemovalImpact, type WorkspaceChanges } from "./workspace-changes.js";
+import { BranchLoss, type ChangePreview, type FileDiff, type RemovalImpact, type WorkspaceChanges, workspaceChangeRpcParams } from "./workspace-changes.js";
 import { claudeAccountRpcParams, ClaudeAccountId, type ClaudeAccountRpcResults } from "./claude-accounts.js";
 import { z } from "zod";
 import type { AgentUpdates } from "./agent-updates.js";
@@ -10,9 +10,10 @@ import { slackRpcParams, type SlackStatus } from "./slack.js";
 import { BranchName, pullRequestRpcParams, type PullRequestRpcResults } from "./pull-requests.js";
 import { orclingRpcParams, type OrclingRpcResults } from "./orclings.js";
 import { projectRpcParams, type ProjectRpcResults } from "./projects.js";
-import { fileRpcParams, FolderPath, type FileRpcResults } from "./files.js";
+import { fileRpcParams, type FileRpcResults } from "./files.js";
 import { remoteRpcParams, type RemoteRpcResults } from "./remote.js";
 import { devicePanelRpcParams, DevicePanelPush, type DevicePanelRpcResults } from "./devices.js";
+import { previewRpcParams, type PreviewRpcResults } from "./preview.js";
 import { HarnessId, type HarnessAvailability, type HarnessInfo } from "./harness.js";
 import { AgentEvent, AgentKind, ApprovalDecision, Frame } from "./events.js";
 import type { McpAppOpenResult } from "./mcp-apps.js";
@@ -75,6 +76,8 @@ export const rpcParams = {
   ...fileRpcParams,
   ...remoteRpcParams,
   ...devicePanelRpcParams,
+  ...previewRpcParams,
+  ...workspaceChangeRpcParams,
   "tasks.comments.list": z.object({ taskId: z.string() }),
   "tasks.comments.post": z
     .object({
@@ -365,10 +368,6 @@ export const rpcParams = {
   "review.pushProject": z.object({ projectId: z.string() }),
   /** What a thread changed in its workspace: the checkout against HEAD, or its worktree against its base. */
   "review.threadDiff": z.object({ threadId: z.string(), comparison: z.enum(["base", "head"]).optional() }),
-  /** The same changes as a capped list of files with line counts and true totals, without the patch. */
-  "review.threadChanges": z.object({ threadId: z.string(), comparison: ChangeComparison.optional() }),
-  /** One changed file's diff, capped. A path with no changes is refused. */
-  "review.threadFileDiff": z.object({ threadId: z.string(), comparison: ChangeComparison.optional(), path: FolderPath }),
   "review.commitThread": z.object({ threadId: z.string(), message: z.string().min(1) }),
   "review.pushThread": z.object({ threadId: z.string() }),
   /** Opens a pull request from the thread's branch into `base`. */
@@ -586,7 +585,7 @@ export interface ResolvedExtraction {
   viaApiKey: boolean;
 }
 
-export interface RpcResults extends PullRequestRpcResults, OrclingRpcResults, ProjectRpcResults, FileRpcResults, ClaudeAccountRpcResults, RemoteRpcResults, DevicePanelRpcResults {
+export interface RpcResults extends PullRequestRpcResults, OrclingRpcResults, ProjectRpcResults, FileRpcResults, ClaudeAccountRpcResults, RemoteRpcResults, DevicePanelRpcResults, PreviewRpcResults {
   "tasks.comments.list": TaskDiscussion;
   "tasks.comments.post": TaskComment;
   "tasks.comments.retry": CommentAttempt;

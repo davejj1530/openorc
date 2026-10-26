@@ -11,6 +11,7 @@ import {
   type DeviceRpcResults,
   type PairingOfferView,
   type PushEnvironment,
+  type PreviewHost,
   type PushSenderState,
   type RemoteListener,
   type RemotePushStatus,
@@ -19,6 +20,7 @@ import {
   type Route,
 } from "@openorc/protocol";
 import type { ProtectedSecretStore } from "../services/extraction-credentials.js";
+import { PREVIEW_THREAD_GONE, previewThreadLive } from "../services/preview.js";
 import type { Broadcast, Logger } from "../transport.js";
 import { readRemoteAsset } from "./assets.js";
 import { listen, type Listener } from "./listener.js";
@@ -27,6 +29,8 @@ import { remotePush } from "./policy.js";
 import { PushKeys } from "./push/keys.js";
 import { PushSender } from "./push/sender.js";
 import { currentRoutes, machineProbe, type MachineProbe } from "./routes.js";
+import { remoteError, type MacRoots } from "./phone-words.js";
+import { PreviewCasters } from "./preview-casters.js";
 import { RemoteSession, type Answer } from "./session.js";
 import { RemoteFrameShaper } from "./shaper.js";
 
@@ -56,6 +60,8 @@ export interface RemoteAccessOptions {
   pushSecrets?: ProtectedSecretStore;
   /** Whether someone is using the Mac. Without it, the Mac always reads as away. */
   presence?: () => Promise<boolean>;
+  /** The Mac's Preview, which a phone may watch. Without it, a watch reads as closed. */
+  preview?: PreviewHost;
 }
 
 interface AccessSetting {
@@ -95,6 +101,7 @@ export class RemoteAccess {
   private knownRoutes: Route[] = [];
   private readonly pushKeys: PushKeys;
   private readonly push: PushSender;
+  private readonly previews: PreviewCasters | null;
 
   constructor(private readonly options: RemoteAccessOptions) {
     this.network = options.network ?? { port: DEFAULT_PORT, machine: machineProbe() };
@@ -102,6 +109,18 @@ export class RemoteAccess {
     this.pushKeys = new PushKeys({ db, secrets: options.pushSecrets, log, ...(this.network.apns ? { origins: this.network.apns } : {}) });
     const presence = options.presence ?? (async () => false);
     this.push = new PushSender({ db, log, presence, route: () => this.pushKeys.current(), changed: (what) => options.invalidate(what === "sender" ? SENDER_CHANGED : ["remote"]) });
+    this.previews = options.preview ? new PreviewCasters({ host: options.preview, words: (message) => remoteError(message, this.macRoots()), roots: () => this.macRoots() }) : null;
+  }
+
+  /** The Mac's folders as they are now, which no error or reason a phone hears may name. */
+  private macRoots(): MacRoots {
+    const { dataDir, db } = this.options;
+    return { home: os.homedir(), dataDir, projects: projects.list(db, { includeRemoved: true }).map((project) => project.rootPath) };
+  }
+
+  /** A deleted thread's Preview: phones watching it hear the watch ended. */
+  previewGone(threadId: string): void {
+    this.previews?.end(threadId, PREVIEW_THREAD_GONE);
   }
 
   /** Called once by the host with the request path its windows use. Starts listening if the user left it on. */
@@ -322,9 +341,11 @@ export class RemoteAccess {
     const session = new RemoteSession(accepted.value.id, accepted.session, {
       answer,
       guard: { attachmentsDir: path.join(dataDir, "attachments"), thread: (id) => (threads.get(db, id) ? { team: Boolean(orchestration.getInstance(db, id)) } : null) },
-      roots: () => ({ home: os.homedir(), dataDir, projects: projects.list(db, { includeRemoved: true }).map((project) => project.rootPath) }),
+      roots: () => this.macRoots(),
       readAsset: (ref) => readRemoteAsset(ref, { dataDir, db, ledger }),
       device: (deviceId, method, params) => this.device(deviceId, method, params),
+      preview: this.previews,
+      watchable: (id) => previewThreadLive(db, id),
     });
     // Removing a phone ends the sessions it finds, and this one may have been admitted just before.
     if (remoteDevices.byKey(db, accepted.session.remoteStatic)?.id !== session.deviceId) {

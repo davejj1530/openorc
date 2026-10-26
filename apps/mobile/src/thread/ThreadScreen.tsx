@@ -24,7 +24,7 @@ import { ThreadTitle } from "./ThreadHeader";
 import { headerMenu } from "./ThreadMenu";
 import { Transcript } from "./Transcript";
 import { useChangesCount } from "./use-changes-count";
-import { usePreviewOpen } from "./use-preview-open";
+import { usePreviewPanel } from "./use-preview-panel";
 import { useThreadActions } from "./use-thread-actions";
 import { VoicesContext, type Voice } from "./voices";
 import { useWaitingApprovals } from "./waiting-approvals";
@@ -129,7 +129,7 @@ export function ThreadScreen() {
   const actions = useThreadActions(thread, { onUnread: goBack });
   const now = useSnoozeClock();
   const uncommitted = useChangesCount(thread);
-  const preview = usePreviewOpen(thread);
+  const preview = usePreviewPanel(thread);
   const menu = useMemo(() => thread && headerMenu(threadMenu(thread, "header", now, { uncommitted, preview }), actions.run), [thread, actions.run, now, uncommitted, preview]);
   const linkState = useLinkState();
   useThreadOnScreen(linkState.kind === "unpaired" ? null : linkState.mac.id, id);

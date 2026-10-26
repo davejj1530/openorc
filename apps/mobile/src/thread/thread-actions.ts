@@ -34,15 +34,21 @@ function snooze(thread: ThreadSummary, now: Date): ThreadAction {
 }
 
 /**
- * The side panel tools the header lists: `uncommitted` is the Changes file count, null without Git; `preview` is
- * whether the Mac shows a page for the thread, as an item that opens an empty screen would advertise.
+ * The side panel tools the header lists: `uncommitted` is the Changes file count, null without Git; `preview` names
+ * the page the Mac shows for the thread, `page: null` while it shows none, and is null for a Mac that cannot show one.
  */
 export interface ThreadPanels {
   uncommitted: number | null;
-  preview: boolean;
+  preview: { page: string | null } | null;
 }
 
-const NO_PANELS: ThreadPanels = { uncommitted: null, preview: false };
+const NO_PANELS: ThreadPanels = { uncommitted: null, preview: null };
+
+/** Preview, with the page the Mac shows beneath it when there is one. */
+function preview(page: string | null): ThreadAction {
+  const item: ThreadAction = { kind: "screen", label: panelToolLabels.browser, icon: "globe", pathname: "/preview" };
+  return page ? { ...item, subtitle: page } : item;
+}
 
 /** Changes, with the uncommitted file count beneath it when there is one. */
 function changes(files: number): ThreadAction {
@@ -59,8 +65,7 @@ function changes(files: number): ThreadAction {
 export function threadMenu(thread: ThreadSummary, place: MenuPlace, now: Date, panels: ThreadPanels = NO_PANELS): ThreadAction[][] {
   const team = Boolean(thread.teamInstanceId);
   const rename: ThreadAction = { kind: "rename", label: "Rename…", icon: "pencil" };
-  const preview: ThreadAction = { kind: "screen", label: panelToolLabels.browser, icon: "globe", pathname: "/preview" };
-  const screens: ThreadAction[] = [...(panels.uncommitted === null ? [] : [changes(panels.uncommitted)]), ...(panels.preview ? [preview] : [])];
+  const screens: ThreadAction[] = [...(panels.uncommitted === null ? [] : [changes(panels.uncommitted)]), ...(panels.preview ? [preview(panels.preview.page)] : [])];
   const organize: ThreadAction[] = [
     thread.pinnedAt ? { kind: "patch", label: "Unpin", icon: "pin.slash", patch: { pinned: false } } : { kind: "patch", label: "Pin", icon: "pin", patch: { pinned: true } },
     ...(team ? [] : [snooze(thread, now)]),

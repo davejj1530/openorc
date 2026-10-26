@@ -49,3 +49,18 @@ it("tells the client what the port pushes, with a core that starts again as a re
   ]);
   expect(core.ready).toEqual({ mcpPort: 10 });
 });
+
+it("hands the window's media port to device streams, including ones that start listening later", () => {
+  Object.defineProperty(window, "openorc", { configurable: true, value: { connectBridge: vi.fn() } });
+  core.connect();
+  const early = vi.fn();
+  const stop = core.onMediaPort(early);
+  const rpc = { start: vi.fn(), postMessage: vi.fn(), onmessage: null };
+  const media = { start: vi.fn(), postMessage: vi.fn(), onmessage: null };
+  window.dispatchEvent(new MessageEvent("message", { data: "openorc:port", source: window, ports: [rpc, media] as unknown as MessagePort[] }));
+  expect(early).toHaveBeenCalledWith(media);
+  const late = vi.fn();
+  core.onMediaPort(late);
+  expect(late).toHaveBeenCalledWith(media);
+  stop();
+});

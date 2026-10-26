@@ -1,7 +1,13 @@
 import type { CorePush, RpcMethod, RpcParams, RpcResults } from "@openorc/protocol";
 import type { ClientPush, CoreConnection } from "@openorc/client";
 
+export type DevicePanelPush = Extract<CorePush, { type: "device.panel" }>;
+
 type Listener<T> = (value: T) => void;
+
+function emit<T>(listeners: Set<Listener<T>>, value: T): void {
+  for (const listener of listeners) listener(value);
+}
 
 interface Pending {
   resolve: (value: unknown) => void;
@@ -24,6 +30,9 @@ class CoreClient implements CoreConnection {
   private readonly benchListeners = new Set<Listener<{ eventsSent: number; framesSent: number; durationMs: number }>>();
   private readonly readyListeners = new Set<Listener<{ mcpPort: number }>>();
   private readonly startupListeners = new Set<Listener<string | null>>();
+  private readonly devicePanelListeners = new Set<Listener<DevicePanelPush>>();
+  private readonly mediaListeners = new Set<Listener<MessagePort>>();
+  private media: MessagePort | null = null;
   ready: { mcpPort: number } | null = null;
   /** What the core is doing before it is ready, when that takes a while. */
   startup: string | null = null;
@@ -36,8 +45,24 @@ class CoreClient implements CoreConnection {
       port.onmessage = (m: MessageEvent<CorePush>) => this.receive(m.data);
       port.start();
       for (const q of this.queued.splice(0)) port.postMessage({ type: "rpc", ...q });
+      const media = e.ports[1];
+      if (media) {
+        this.media = media;
+        emit(this.mediaListeners, media);
+      }
     });
     window.openorc.connectBridge();
+  }
+
+  /** The port device streams travel on, beside the RPC port. A listener hears the current one and every later one. */
+  onMediaPort(fn: Listener<MessagePort>): () => void {
+    this.mediaListeners.add(fn);
+    if (this.media) fn(this.media);
+    return () => this.mediaListeners.delete(fn);
+  }
+  onDevicePanel(fn: Listener<DevicePanelPush>): () => void {
+    this.devicePanelListeners.add(fn);
+    return () => this.devicePanelListeners.delete(fn);
   }
 
   call<M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> {
@@ -76,7 +101,7 @@ class CoreClient implements CoreConnection {
   }
 
   private push(push: ClientPush): void {
-    for (const l of this.pushListeners) l(push);
+    emit(this.pushListeners, push);
   }
 
   private receive(msg: CorePush): void {
@@ -89,7 +114,7 @@ class CoreClient implements CoreConnection {
         const resumed = this.ready !== null;
         this.ready = { mcpPort: msg.mcpPort };
         this.setStartup(null);
-        for (const l of this.readyListeners) l(this.ready);
+        emit(this.readyListeners, this.ready);
         this.push({ type: "session", resumed });
         return;
       }
@@ -114,16 +139,19 @@ class CoreClient implements CoreConnection {
       case "invalidate":
         this.push({ type: "invalidate", keys: msg.keys });
         return;
+      case "device.panel":
+        emit(this.devicePanelListeners, msg);
+        return;
       case "notify": {
         const { type: _push, ...notice } = msg;
         this.push({ type: "notify", notice });
         return;
       }
       case "log":
-        for (const l of this.logListeners) l({ level: msg.level, message: msg.message });
+        emit(this.logListeners, { level: msg.level, message: msg.message });
         return;
       case "bench.done":
-        for (const l of this.benchListeners) l({ eventsSent: msg.eventsSent, framesSent: msg.framesSent, durationMs: msg.durationMs });
+        emit(this.benchListeners, { eventsSent: msg.eventsSent, framesSent: msg.framesSent, durationMs: msg.durationMs });
         return;
     }
   }

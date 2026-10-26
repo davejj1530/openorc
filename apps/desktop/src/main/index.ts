@@ -247,9 +247,11 @@ app.whenReady().then(async () => {
     if (event.senderFrame !== event.sender.mainFrame || !isAppOrigin(event.senderFrame.url)) return;
     if (preparingUpdate) return;
     if (!core) core = startCore();
-    const { port1, port2 } = new MessageChannelMain();
-    core.postMessage({ type: "port" }, [port1]);
-    event.sender.postMessage("bridge:port", null, [port2]);
+    // The second channel carries device video, so a stream never queues behind RPC replies.
+    const rpc = new MessageChannelMain();
+    const media = new MessageChannelMain();
+    core.postMessage({ type: "port" }, [rpc.port1, media.port1]);
+    event.sender.postMessage("bridge:port", null, [rpc.port2, media.port2]);
   });
 
   ipcMain.handle("metrics", () => ({

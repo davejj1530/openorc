@@ -1,5 +1,6 @@
 import type { TextEmbedder } from "@openorc/memory";
 import type { BrowserHost } from "@openorc/protocol";
+import type { DeviceSystem } from "./devices/system.js";
 import type { RemoteNetwork } from "./remote/remote-access.js";
 import type { ProtectedSecretStore } from "./services/extraction-credentials.js";
 import type { BundledFormatter } from "./services/file-format.js";
@@ -44,4 +45,6 @@ export interface OpenOrcOptions {
   shellProbe?: ShellProbe;
   /** Serves the bench.* methods, which stream synthetic events and write a synthetic thread into the ledger. Development and QA builds only. */
   benchmarks?: boolean;
+  /** How the Device panel's helpers run processes. Tests pass a fake, so no simulator tool or hub ever runs. */
+  deviceSystem?: DeviceSystem;
 }

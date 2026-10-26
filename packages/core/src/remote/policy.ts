@@ -203,6 +203,8 @@ const pushes: { [T in Broadcast["type"]]: (push: Extract<Broadcast, { type: T }>
   startup: () => null,
   log: () => null,
   "bench.done": () => null,
+  // The phone has no Device panel.
+  "device.panel": () => null,
 };
 
 export function remotePush(push: Broadcast): RemotePush | null {

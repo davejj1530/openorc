@@ -12,6 +12,7 @@ import { orclingRpcParams, type OrclingRpcResults } from "./orclings.js";
 import { projectRpcParams, type ProjectRpcResults } from "./projects.js";
 import { fileRpcParams, FolderPath, type FileRpcResults } from "./files.js";
 import { remoteRpcParams, type RemoteRpcResults } from "./remote.js";
+import { devicePanelRpcParams, DevicePanelPush, type DevicePanelRpcResults } from "./devices.js";
 import { HarnessId, type HarnessAvailability, type HarnessInfo } from "./harness.js";
 import { AgentEvent, AgentKind, ApprovalDecision, Frame } from "./events.js";
 import type { McpAppOpenResult } from "./mcp-apps.js";
@@ -73,6 +74,7 @@ export const rpcParams = {
   ...projectRpcParams,
   ...fileRpcParams,
   ...remoteRpcParams,
+  ...devicePanelRpcParams,
   "tasks.comments.list": z.object({ taskId: z.string() }),
   "tasks.comments.post": z
     .object({
@@ -584,7 +586,7 @@ export interface ResolvedExtraction {
   viaApiKey: boolean;
 }
 
-export interface RpcResults extends PullRequestRpcResults, OrclingRpcResults, ProjectRpcResults, FileRpcResults, ClaudeAccountRpcResults, RemoteRpcResults {
+export interface RpcResults extends PullRequestRpcResults, OrclingRpcResults, ProjectRpcResults, FileRpcResults, ClaudeAccountRpcResults, RemoteRpcResults, DevicePanelRpcResults {
   "tasks.comments.list": TaskDiscussion;
   "tasks.comments.post": TaskComment;
   "tasks.comments.retry": CommentAttempt;
@@ -777,6 +779,7 @@ export const CorePush = z.discriminatedUnion("type", [
   z.object({ type: z.literal("frame"), frame: Frame }),
   /** Cache keys whose data changed. The renderer refetches. */
   z.object({ type: z.literal("invalidate"), keys: z.array(z.string()) }),
+  DevicePanelPush,
   /** Something worth telling the user about when they are looking elsewhere. */
   z.object({
     type: z.literal("notify"),

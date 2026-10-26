@@ -4,7 +4,7 @@ import { useLayout } from "./layout";
 export type TaskTab = "chat" | "spec" | "files" | "commits" | "memory";
 
 /** The sections Settings is divided into, in the order it lists them. */
-export const SETTINGS_SECTIONS = ["usage", "connections", "slack", "phone", "skills", "appearance", "general", "memory", "data"] as const;
+export const SETTINGS_SECTIONS = ["usage", "connections", "slack", "phone", "skills", "devices", "appearance", "general", "memory", "data"] as const;
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
 const settingsSections: ReadonlySet<string> = new Set<SettingsSection>(SETTINGS_SECTIONS);
 

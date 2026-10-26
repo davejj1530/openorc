@@ -1,0 +1,238 @@
+/* The Device tool: a picker of rows grouped by OS like the New tab page, a first-run setup column, and the live
+   screen as a rounded frame inset in the card. */
+.device-page {
+  height: 100%;
+  overflow-y: auto;
+  padding: 10px 10px 20px;
+  scrollbar-width: none;
+}
+.device-group + .device-group,
+.device-group + .device-notes {
+  margin-top: 20px;
+}
+.device-group h2 {
+  padding: 0 10px 6px;
+  font-size: var(--text-base);
+  line-height: 16px;
+  letter-spacing: var(--text-base--letter-spacing);
+  color: var(--ink);
+}
+.device-rows {
+  display: grid;
+  gap: 2px;
+}
+.device-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  border-radius: var(--radius-md);
+  transition: background-color var(--duration-quick) var(--ease-out);
+}
+.device-row:hover {
+  background: var(--surface-2);
+}
+.device-row:has(.device-row-open:active) {
+  background: var(--surface-3);
+}
+.device-row-open {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: var(--radius-md);
+  text-align: left;
+  font-size: var(--text-base);
+  line-height: 16px;
+  letter-spacing: var(--text-base--letter-spacing);
+  color: var(--ink);
+}
+.device-row-open:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+.device-row-open > svg {
+  flex-shrink: 0;
+  color: var(--ink-3);
+}
+.device-row-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.device-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  font-size: var(--text-sm);
+  line-height: 16px;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+/* Start and Shut down wait at the row's end until the row is pointed at or focused. They show on the
+   row's hover fill, so they rest one step deeper. */
+.device-row-action {
+  --control-fill: var(--surface-3);
+  flex-shrink: 0;
+  margin-right: 4px;
+  opacity: 0;
+  transition: opacity var(--duration-quick) var(--ease-out);
+}
+.device-row:is(:hover, :focus-within) .device-row-action {
+  opacity: 1;
+}
+.device-notes {
+  display: grid;
+  gap: 6px;
+  padding: 0 10px;
+  font-size: var(--text-sm);
+  line-height: 18px;
+  color: var(--ink-3);
+}
+.device-notes[data-tone="bad"] {
+  color: var(--bad);
+}
+.device-setup .device-notes {
+  padding: 0;
+}
+
+/* First run: what this Mac can run, one switch, and the one ink action. */
+.device-setup {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 28px 20px 20px;
+}
+.device-setup-title {
+  font-size: var(--text-lg);
+  line-height: var(--text-lg--line-height);
+  letter-spacing: var(--text-lg--letter-spacing);
+  color: var(--ink);
+}
+.device-setup-card {
+  padding: 0 16px;
+  border-radius: var(--radius-2xl);
+  background: var(--bg);
+}
+.device-setup-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  padding: 12px 0;
+  font-size: var(--text-base);
+  color: var(--ink);
+}
+.device-setup-row + .device-setup-row {
+  border-top: var(--hairline) solid var(--line);
+}
+.device-setup-row > span:first-child {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.device-setup-reason {
+  font-size: var(--text-sm);
+  line-height: 16px;
+  color: var(--ink-3);
+}
+.device-setup-consent {
+  font-size: var(--text-sm);
+  line-height: 18px;
+  color: var(--ink-3);
+}
+.device-setup-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+}
+.device-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: var(--text-sm);
+  line-height: 16px;
+  color: var(--ink-3);
+}
+
+/* The screen: the frame keeps the device's shape in every state, and the live canvas fills it. */
+.device-screen {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.device-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  margin: 0 10px 10px;
+}
+.device-frame {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  overflow: hidden;
+  border-radius: var(--device-corner);
+  background: var(--surface-2);
+  touch-action: none;
+  user-select: none;
+  outline: none;
+}
+.device-frame:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.device-media {
+  position: absolute;
+  display: block;
+}
+.device-media[data-hidden] {
+  visibility: hidden;
+}
+.device-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
+  padding: 16px;
+  text-align: center;
+  font-size: var(--text-sm);
+  line-height: 18px;
+  color: var(--ink-3);
+}
+/* Only a drop that outlasts a quick reopen says so; most recover before the note would show. */
+.device-reconnecting {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  translate: -50% 0;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  font-size: var(--text-sm);
+  line-height: 16px;
+  color: var(--ink-2);
+  white-space: nowrap;
+  animation: device-note-arrive var(--duration-arrive) var(--ease-out) 1.2s both;
+}
+@keyframes device-note-arrive {
+  from {
+    opacity: 0;
+    filter: blur(var(--arrive-blur));
+  }
+}

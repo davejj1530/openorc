@@ -7,7 +7,11 @@ export type PanelPage =
   | { kind: "browser"; url: string; title: string }
   | { kind: "file"; selection: FileSelection | null }
   | { kind: "changes"; selection: ChangeSelection | null }
-  | { kind: "tool"; tool: Exclude<PanelTab, "newtab" | "browser" | "file" | "changes">; shell?: TerminalShell };
+  | DevicePage
+  | { kind: "tool"; tool: Exclude<PanelTab, "newtab" | "browser" | "file" | "changes" | "device">; shell?: TerminalShell };
+
+/** A simulator or emulator's screen. With no device it is the picker; `name` labels the tab before the list loads. */
+export type DevicePage = { kind: "device"; deviceId: string | null; name: string };
 
 /** A Terminal tab's own shell. The conversation's first Terminal has none and keeps the conversation's shell. */
 export type TerminalShell = { id: string; number: number };
@@ -46,9 +50,24 @@ function toFront(session: PanelSession, id: string): PanelSession {
 
 function samePage(left: PanelPage, right: PanelPage): boolean {
   if (left.kind === "file" && right.kind === "file") return left.selection?.path === right.selection?.path;
+  if (left.kind === "device" && right.kind === "device") return left.deviceId === right.deviceId;
   if (left.kind === "tool" && right.kind === "tool" && left.tool === "terminal") return right.tool === "terminal" && left.shell?.id === right.shell?.id;
   return pageType(left) === pageType(right);
 }
+
+/** The session without one tab: the tab before it takes over when it was active, and closing the last leaves a new tab. */
+function withoutTab(session: PanelSession, id: string, scope: string): PanelSession {
+  const index = session.tabs.findIndex((tab) => tab.id === id);
+  const [first, ...rest] = session.tabs.filter((tab) => tab.id !== id);
+  if (!first) return newPanelSession(scope);
+  const tabs: PanelSession["tabs"] = [first, ...rest];
+  return { tabs, activeId: session.activeId === id ? (tabs[Math.max(0, index - 1)] ?? first).id : session.activeId };
+}
+
+const showsDevice = (tab: WorkTab, deviceId: string) => {
+  const page = currentPage(tab);
+  return page.kind === "device" && page.deviceId === deviceId;
+};
 
 const terminalShells = (tab: WorkTab) => tab.entries.flatMap((page) => (page.kind === "tool" && page.tool === "terminal" ? [page.shell ?? null] : []));
 
@@ -73,6 +92,10 @@ interface PanelSessions {
   open: (scope: string, page: PanelPage, id?: string) => void;
   move: (scope: string, delta: number) => void;
   reportBrowser: (scope: string, id: string, url: string, title: string) => void;
+  /** A device chosen in a tab's picker: that tab shows it, unless another tab already does. */
+  pickDevice: (scope: string, tabId: string, page: DevicePage) => void;
+  /** Every tab showing this device leaves the conversation's panel. */
+  dropDevice: (scope: string, deviceId: string) => void;
 }
 
 /** Tabs belong to their conversation. Hiding the panel or visiting another thread preserves them. */
@@ -95,14 +118,7 @@ export const usePanelSessions = create<PanelSessions>()(
             return { tabs: [...session.tabs, tab], activeId: tab.id };
           }),
         select: (scope, id) => change(scope, (session) => ({ ...session, activeId: id })),
-        close: (scope, id) =>
-          change(scope, (session) => {
-            const index = session.tabs.findIndex((tab) => tab.id === id);
-            const [first, ...rest] = session.tabs.filter((tab) => tab.id !== id);
-            if (!first) return newPanelSession(scope);
-            const tabs: PanelSession["tabs"] = [first, ...rest];
-            return { tabs, activeId: session.activeId === id ? (tabs[Math.max(0, index - 1)] ?? first).id : session.activeId };
-          }),
+        close: (scope, id) => change(scope, (session) => withoutTab(session, id, scope)),
         navigate: (scope, page) => change(scope, (session) => updateTab(session, session.activeId, (tab) => navigateTab(tab, withOwnShell(session, tab.id, page)))),
         open: (scope, page, id) =>
           change(scope, (session) => {
@@ -125,6 +141,16 @@ export const usePanelSessions = create<PanelSessions>()(
               return replacePage(tab, { kind: "browser", url, title });
             }),
           ),
+        pickDevice: (scope, tabId, page) =>
+          change(scope, (session) => {
+            const existing = session.tabs.find((tab) => tab.id !== tabId && samePage(currentPage(tab), page));
+            if (existing) return { ...session, activeId: existing.id };
+            return { ...updateTab(session, tabId, (tab) => navigateTab(tab, page)), activeId: tabId };
+          }),
+        dropDevice: (scope, deviceId) => {
+          const showing = get().sessions[scope]?.tabs.filter((tab) => showsDevice(tab, deviceId)) ?? [];
+          if (showing.length > 0) change(scope, (session) => showing.reduce((next, tab) => withoutTab(next, tab.id, scope), session));
+        },
       };
     },
     { name: "openorc.panel-sessions", version: 1, partialize: (state) => ({ sessions: state.sessions }) },

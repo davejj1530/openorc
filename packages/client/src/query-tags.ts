@@ -87,6 +87,9 @@ const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
   "orclings.list": ["orclings"],
   "orclings.instructions": ["orclings"],
   "orclings.memories": ["orclings", "memory"],
+  // The Device panel's status and device list. The core invalidates "devices" whenever either changes.
+  "devices.status": ["devices"],
+  "devices.list": ["devices"],
 };
 
 /** Reads tagged by the ids in their parameters. */
@@ -151,6 +154,10 @@ const workspaceMutations = new Set<RpcMethod>(["threads.moveWorkspace", "threads
 
 /** Mutations whose effects never depend on their parameters. */
 const fixedInvalidations: Partial<Record<RpcMethod, readonly string[]>> = {
+  "devices.setup": ["devices"],
+  "devices.settings.set": ["devices"],
+  "devices.boot": ["devices"],
+  "devices.shutdown": ["devices"],
   "claude.accounts.list": ["claude-accounts", "system", "models", "provider-usage"],
   "claude.accounts.add": ["claude-accounts"],
   "claude.accounts.update": ["claude-accounts", "system", "models", "provider-usage"],

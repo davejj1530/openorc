@@ -1,9 +1,9 @@
 import { WORKSPACE_ID, type Project, type Task, type ThreadSummary } from "@openorc/protocol";
-import { panelToolLabels } from "@openorc/client";
+import { panelToolLabels, tabsFor as sharedTabsFor } from "@openorc/client";
 import type { FileSelection, PanelTab } from "../lib/layout";
 import { pageType, type PanelPage } from "../lib/panel-tabs";
 import { fileIcon } from "./FileGlyph";
-import { BookText, Brain, FileDiff, FileText, Folder, GitCommitHorizontal, Globe, History, ListTodo, Orcling, SlidersHorizontal, Terminal } from "./icons";
+import { BookText, Brain, FileDiff, FileText, Folder, GitCommitHorizontal, Globe, History, ListTodo, Orcling, SlidersHorizontal, Smartphone, Terminal } from "./icons";
 
 export type PanelContext =
   | { kind: "thread"; thread: ThreadSummary; project: Project; task?: Task }
@@ -25,6 +25,7 @@ export const panelTools = {
   memory: { label: panelToolLabels.memory, icon: Brain },
   instructions: { label: panelToolLabels.instructions, icon: BookText },
   orcling: { label: panelToolLabels.orcling, icon: Orcling },
+  device: { label: "Device", icon: Smartphone },
 } satisfies Record<PanelTab, { label: string; icon: typeof Globe }>;
 
 export function panelScope(context: PanelContext): string {
@@ -53,8 +54,11 @@ export function panelFileScope(context: PanelContext): FileSelection["scope"] {
   return { kind: "project", id: context.project.id };
 }
 
-/** Available tools are launchers, never tabs opened on the user's behalf. */
-export { tabsFor } from "@openorc/client";
+/** Available tools are launchers, never tabs opened on the user's behalf. The Device panel is the desktop's own. */
+export function tabsFor(context: PanelContext): PanelTab[] {
+  const tools: PanelTab[] = sharedTabsFor(context);
+  return context.kind === "thread" || context.kind === "task" ? [...tools, "device"] : tools;
+}
 
 export function pageHost(url: string): string {
   try {
@@ -68,6 +72,7 @@ export function pageLabel(page: PanelPage): string {
   if (page.kind === "browser") return page.title || (page.url ? pageHost(page.url) : "Preview");
   if (page.kind === "tool" && page.shell) return `${panelTools.terminal.label} ${page.shell.number}`;
   if (page.kind === "file" && page.selection) return page.selection.path.split(/[\\/]/).pop() ?? page.selection.path;
+  if (page.kind === "device" && page.deviceId) return page.name;
   return panelTools[page.kind === "tool" ? page.tool : page.kind].label;
 }
 

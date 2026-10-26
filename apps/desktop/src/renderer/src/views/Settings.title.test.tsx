@@ -21,7 +21,18 @@ it("names the open section, and lists the others from the title while the sideba
 
   act(() => useLayout.setState({ sidebarOpen: false }));
   fireEvent.click(screen.getByRole("button", { name: "Usage" }));
-  expect((await screen.findAllByRole("menuitem")).map((item) => item.textContent)).toEqual(["Usage", "Connections", "Slack", "Phone", "Skills", "Appearance", "General", "Memory & models", "Data"]);
+  expect((await screen.findAllByRole("menuitem")).map((item) => item.textContent)).toEqual([
+    "Usage",
+    "Connections",
+    "Slack",
+    "Phone",
+    "Skills",
+    "Devices",
+    "Appearance",
+    "General",
+    "Memory & models",
+    "Data",
+  ]);
   fireEvent.click(screen.getByRole("menuitem", { name: "Appearance" }));
   expect(useRouter.getState().route).toEqual({ view: "settings", section: "appearance" });
 });

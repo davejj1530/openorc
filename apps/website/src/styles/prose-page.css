@@ -1,41 +1,43 @@
-.privacy-page {
+/* Long-form text pages: the privacy policy and support. */
+.prose-page {
   max-width: 760px;
   padding-block: 80px var(--section-space);
 }
-.privacy-intro {
+.prose-intro {
   padding-bottom: 40px;
   border-bottom: var(--hairline) solid var(--rule);
 }
-.privacy-date {
+.prose-date {
   margin-top: 20px;
   font-size: var(--type-control);
 }
-.privacy-intro > p + p {
+.prose-intro > p + p,
+.prose-intro > h1 + p:not(.prose-date) {
   margin-top: 24px;
 }
-.privacy-article section {
+.prose-article section {
   margin-top: 48px;
 }
-.privacy-article h2 {
+.prose-article h2 {
   max-width: none;
   font-size: var(--type-title);
   margin-bottom: 16px;
 }
-.privacy-article p {
+.prose-article p {
   line-height: 1.8;
 }
-.privacy-article p + p {
+.prose-article p + p {
   margin-top: 16px;
 }
-.privacy-article a {
+.prose-article a {
   text-decoration: underline;
   text-underline-offset: 0.2em;
 }
 @media (max-width: 700px) {
-  .privacy-page {
+  .prose-page {
     padding-top: 56px;
   }
-  .privacy-article section {
+  .prose-article section {
     margin-top: 36px;
   }
 }

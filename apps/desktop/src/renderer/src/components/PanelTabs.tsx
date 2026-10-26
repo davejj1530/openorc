@@ -3,7 +3,7 @@ import type { FileSelection } from "../lib/layout";
 import { currentPage, type PanelPage, type PanelSession, type WorkTab } from "../lib/panel-tabs";
 import { useSlidingKnob } from "../lib/use-sliding-knob";
 import { useUnsavedFile } from "../lib/use-file-buffer";
-import { pageIcon, pageLabel } from "./panel-tools";
+import { pageIcon, tabLabel } from "./panel-tools";
 import { X } from "./icons";
 
 function nextTab(session: PanelSession, index: number, key: string): WorkTab | undefined {
@@ -28,7 +28,7 @@ interface TabProps {
  * edits) turns into the close control under the pointer or keyboard focus.
  */
 function PanelTab({ tab, page, active, unsaved, onSelect, onClose, onKeyDown }: TabProps & { unsaved: boolean }) {
-  const label = pageLabel(page);
+  const label = tabLabel(page);
   const Icon = pageIcon(page);
   return (
     <div role="presentation" className="panel-tab" data-active={active}>

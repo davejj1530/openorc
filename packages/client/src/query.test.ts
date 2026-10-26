@@ -166,6 +166,10 @@ describe("query cache tags", () => {
     }
   });
 
+  it("rereads a thread's Preview when the Mac opens, closes or switches its page, or the thread changes", () => {
+    expect(tagsFor("preview.state", { threadId: "t1" }).sort()).toEqual(["preview", "preview:t1", "thread:t1"]);
+  });
+
   it("rereads a phone's plan limits when usage, accounts or CLIs change, but not for a palette changed on the Mac", () => {
     expect(tagsFor("providers.limits", {}).sort()).toEqual(["claude-accounts", "provider-usage", "system"]);
   });

@@ -7,6 +7,9 @@ export function typedUrl(value: string): string | null {
   const text = value.trim();
   if (!text) return null;
   if (/^https?:\/\//i.test(text)) return text;
+  // A path or a file URL is no website: the pane refuses it in its own words, where a host lookup would carry the
+  // Mac's folders into the address as a hostname and path.
+  if (/^(?:file:|\/|~\/)/i.test(text)) return text;
   if (/\s/.test(text) || !/[.:/]/.test(text)) return `https://www.google.com/search?q=${encodeURIComponent(text)}`;
   return `http://${text}`;
 }

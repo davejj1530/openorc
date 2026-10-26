@@ -4,6 +4,7 @@ import {
   isDeviceMethod,
   isRemoteMethod,
   isSessionMethod,
+  PREVIEW_INPUT_WORDS,
   sessionRpcParams,
   type AssetRef,
   type DeviceMethod,
@@ -43,7 +44,7 @@ export interface SessionDeps {
   /** A method about the calling phone itself, for the session's own device. */
   device(deviceId: string, method: DeviceMethod, params: DeviceParams<DeviceMethod>): Promise<unknown>;
   /** The Mac's Preview, watched per session. Null on a Mac without one: a watch reads as closed, no frame is served. */
-  preview: Pick<PreviewCasters, "watch" | "unwatch" | "frame"> | null;
+  preview: Pick<PreviewCasters, "watch" | "unwatch" | "frame" | "input"> | null;
   /** Whether a thread's Preview may be watched: the thread exists and no team deletion hid it. */
   watchable(threadId: string): boolean;
 }
@@ -198,17 +199,24 @@ export class RemoteSession {
     return reply.type === "rpc.result" ? { ...reply, result: remoteReply(method, reply.result as never, { words: this.words, roots: this.deps.roots }) } : reply;
   }
 
-  /** A method about this session itself: its one watch of a thread's Preview. */
+  /** A method about this session itself: its one watch of a thread's Preview, and its input on what it watches. */
   private async ownSession(id: number, method: SessionMethod, params: unknown): Promise<RpcReply> {
     const parsed = sessionRpcParams[method].safeParse(params ?? {});
     if (!parsed.success) return { type: "rpc.error", id, message: invalidParamsMessage(method, parsed.error.message) };
-    if (method === "preview.unwatch") {
-      this.deps.preview?.unwatch(this);
-      return { type: "rpc.result", id, result: null };
+    const preview = this.deps.preview;
+    switch (method) {
+      case "preview.unwatch":
+        preview?.unwatch(this);
+        return { type: "rpc.result", id, result: null };
+      case "preview.input":
+        if (!preview) return { type: "rpc.error", id, message: PREVIEW_INPUT_WORDS.unwatched };
+        return { type: "rpc.result", id, result: await preview.input(this, parsed.data as SessionParams<"preview.input">) };
+      case "preview.watch": {
+        const watch = parsed.data as SessionParams<"preview.watch">;
+        if (!this.deps.watchable(watch.threadId)) return { type: "rpc.error", id, message: PREVIEW_THREAD_GONE };
+        return { type: "rpc.result", id, result: preview ? await preview.watch(this, watch) : { open: false } };
+      }
     }
-    const watch = parsed.data as SessionParams<"preview.watch">;
-    if (!this.deps.watchable(watch.threadId)) return { type: "rpc.error", id, message: PREVIEW_THREAD_GONE };
-    return { type: "rpc.result", id, result: this.deps.preview ? await this.deps.preview.watch(this, watch) : { open: false } };
   }
 
   /** The newest frame of the Preview this session watches. Never through readAsset: frames are not files. */

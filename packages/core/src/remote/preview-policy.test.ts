@@ -97,7 +97,38 @@ describe("what a phone may ask of the Preview", () => {
     expect(sessionRpcParams["preview.unwatch"].safeParse({ threadId: "t1" }).success).toBe(false);
   });
 
-  it("still cannot act on a page, nor see a task's or a project's preview", () => {
+  it("drives only the page it watches, through its own session, with every input inside its schema", () => {
+    const input = sessionRpcParams["preview.input"];
+    const base = { threadId: "t1", pane: "0123456789ab", frame: { width: 786, height: 566 } };
+    for (const kind of [
+      { kind: "tap", x: 0, y: 4096, count: 2 },
+      { kind: "scroll", x: 393, y: 283, dx: 0, dy: -480.5 },
+      { kind: "text", text: "Hello, world" },
+      { kind: "key", key: "Backspace", count: 3 },
+      { kind: "key", key: "Enter", count: 1 },
+      { kind: "key", key: "Tab", count: 1 },
+      { kind: "choose", index: 2 },
+    ])
+      expect(input.safeParse({ ...base, input: kind }).success, JSON.stringify(kind)).toBe(true);
+    for (const kind of [
+      { kind: "click", ref: "e1" },
+      { kind: "reload" },
+      { kind: "tap", x: 10, y: 10, count: 1, button: "right" },
+      { kind: "tap", x: 10, y: 10, count: 4 },
+      { kind: "scroll", x: 10, y: 10, dx: 0, dy: 30_000 },
+      { kind: "key", key: "Meta", count: 1 },
+      { kind: "text", text: "" },
+    ])
+      expect(input.safeParse({ ...base, input: kind }).success, JSON.stringify(kind)).toBe(false);
+    for (const params of [
+      { ...base, pane: "0123456789AB" },
+      { ...base, frame: { width: 0, height: 566 } },
+      { ...base, frame: { width: 786, height: 566, scale: 2 } },
+    ])
+      expect(input.safeParse({ ...params, input: { kind: "tap", x: 1, y: 1, count: 1 } }).success, JSON.stringify(params)).toBe(false);
+  });
+
+  it("still cannot reach the agent's browser, nor see a task's or a project's preview", () => {
     expect(REMOTE_METHODS.filter((method) => method.startsWith("browser"))).toEqual([]);
     expect(Object.keys(rpcParams).filter((method) => method.startsWith("browser"))).toEqual([]);
     for (const method of ["browser.command", "browser:navigate", "browser:reload", "browser:show", "browser:close", "browser:capture"])
@@ -108,6 +139,7 @@ describe("what a phone may ask of the Preview", () => {
     for (const threadId of ["task:t1", "thread:t1", "project:p1", "../t1"]) {
       expect(rpcParams["preview.state"].safeParse({ threadId }).success, threadId).toBe(false);
       expect(sessionRpcParams["preview.watch"].safeParse({ threadId, width: 786, pace: "lan" }).success, threadId).toBe(false);
+      expect(sessionRpcParams["preview.input"].safeParse({ threadId, pane: "0123456789ab", frame: { width: 1, height: 1 }, input: { kind: "text", text: "x" } }).success, threadId).toBe(false);
     }
   });
 });

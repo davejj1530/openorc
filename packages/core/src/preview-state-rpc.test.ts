@@ -16,6 +16,7 @@ let changed: (threadId: string, lifecycle: boolean) => void;
 const host: PreviewHost = {
   query: vi.fn(async (threadId: string) => pages.get(threadId) ?? null),
   capture: vi.fn(async () => null),
+  input: vi.fn(async () => null),
   onChange: (listener) => {
     changed = listener;
     return () => undefined;

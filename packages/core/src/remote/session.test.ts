@@ -72,6 +72,7 @@ function casters() {
     })),
     unwatch: vi.fn(),
     frame: vi.fn((_session: unknown, threadId: string, seq: number) => (threadId === "t1" && seq === 1 ? new Uint8Array([0xff, 0xd8, 0xff]) : null)),
+    input: vi.fn(async () => ({ focus: null })),
   };
 }
 
@@ -271,6 +272,42 @@ describe("a phone session", () => {
     const { link } = session();
     link.receive({ t: "rpc", id: 1, method: "preview.watch", params: { threadId: "t1", width: 786, pace: "lan" } });
     await vi.waitFor(() => expect(link.sent).toEqual([{ t: "rpc.result", id: 1, result: { open: false } }]));
+  });
+
+  it("answers an input for its own session through its casters, never the core", async () => {
+    const answer = vi.fn<Answer>(async (request) => ({ type: "rpc.result", id: request.id, result: null }));
+    const preview = casters();
+    const { link, remote } = session(answer, undefined, undefined, preview);
+    const params = { threadId: "t1", pane: "0123456789ab", frame: { width: 786, height: 566 }, input: { kind: "tap", x: 10.5, y: 20, count: 1 } };
+    link.receive({ t: "rpc", id: 1, method: "preview.input", params });
+    await vi.waitFor(() => expect(link.sent).toHaveLength(1));
+    expect(link.sent[0]).toEqual({ t: "rpc.result", id: 1, result: { focus: null } });
+    expect(preview.input).toHaveBeenCalledWith(remote, params);
+    expect(answer).not.toHaveBeenCalled();
+  });
+
+  it("refuses an input outside its schema, and any input on a Mac without a Preview host", async () => {
+    const preview = casters();
+    const { link } = session(undefined, undefined, undefined, preview);
+    const base = { threadId: "t1", pane: "0123456789ab", frame: { width: 786, height: 566 } };
+    const invalid = [
+      { ...base, input: { kind: "tap", x: 10, y: 20, count: 1 }, command: { action: "click", ref: "e1" } },
+      { ...base, input: { kind: "tap", x: 10, y: 20, count: 1 }, surface: "thread:t1" },
+      { ...base, pane: "thread:t1", input: { kind: "tap", x: 10, y: 20, count: 1 } },
+      { ...base, input: { kind: "navigate", url: "https://example.com" } },
+      { ...base, input: { kind: "tap", x: -1, y: 20, count: 1 } },
+      { ...base, input: { kind: "key", key: "Escape", count: 1 } },
+      { ...base, input: { kind: "text", text: "x".repeat(1001) } },
+      { ...base, input: { kind: "tap", x: 10, y: 20, count: 1, button: "right" } },
+      { ...base, threadId: "task:t1", input: { kind: "tap", x: 10, y: 20, count: 1 } },
+    ];
+    invalid.forEach((params, index) => link.receive({ t: "rpc", id: index + 1, method: "preview.input", params }));
+    await vi.waitFor(() => expect(link.sent).toHaveLength(invalid.length));
+    for (const message of link.sent) expect(message).toMatchObject({ t: "rpc.error", message: expect.stringContaining("invalid params for preview.input") });
+    expect(preview.input).not.toHaveBeenCalled();
+    const bare = session();
+    bare.link.receive({ t: "rpc", id: 1, method: "preview.input", params: { ...base, input: { kind: "text", text: "hi" } } });
+    await vi.waitFor(() => expect(bare.link.sent).toEqual([{ t: "rpc.error", id: 1, message: "This page is not being watched." }]));
   });
 
   it("serves a watched frame as JPEG bytes from the caster, and refuses any other", async () => {

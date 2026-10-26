@@ -1,8 +1,9 @@
-import { Db, runs, tasks, teamDeletedThreads, threads } from "@openorc/db";
+import type { Db } from "@openorc/db";
 import { type McpHost } from "@openorc/mcp";
 import type { BrowserCommand, BrowserHost } from "@openorc/protocol";
 import { RunService } from "../services/runs.js";
 import type { RunContext } from "./context.js";
+import { conversationSurface } from "./surface.js";
 type Dependencies = {
   db: Db;
   runService: Pick<RunService, "isBusy" | "authorizeAppAction">;
@@ -14,7 +15,7 @@ export function createBrowserHost({ db, runService, browser, assertTeamActor }: 
     ? ({
         browser: async (runId, command) => {
           assertTeamActor(runId);
-          const surface = browserSurface(db, runService, runId);
+          const surface = conversationSurface(db, runService, runId, "Browser");
           if (command.action === "click" || command.action === "fill" || command.action === "press")
             await runService.authorizeAppAction(runId, "browser_input", { toolName: `browser ${command.action}`, reason: browserInputReason(command), input: command });
           const result = await browser(surface, command);
@@ -33,15 +34,4 @@ function browserInputReason(command: Extract<BrowserCommand, { action: "click" |
   if (command.action === "click") return "Click an element in the Preview, which shares your signed-in sessions.";
   if (command.action === "press") return `Press ${command.key} in the Preview, which shares your signed-in sessions.`;
   return "Type into a field in the Preview, which shares your signed-in sessions.";
-}
-
-function browserSurface(db: Db, runService: Pick<RunService, "isBusy">, runId: string): `thread:${string}` | `task:${string}` {
-  const run = runs.get(db, runId);
-  if (!run || run.commentTurnId || !runService.isBusy(runId)) throw new Error("Browser access requires an active conversation turn.");
-  const task = run.taskId ? tasks.get(db, run.taskId) : null;
-  const threadId = run.threadId ?? task?.threadId;
-  if (threadId && (!threads.get(db, threadId) || teamDeletedThreads.has(db, threadId))) throw new Error("The browser's conversation no longer exists.");
-  if (threadId) return `thread:${threadId}`;
-  if (task) return `task:${task.id}`;
-  throw new Error("This run has no conversation preview.");
 }

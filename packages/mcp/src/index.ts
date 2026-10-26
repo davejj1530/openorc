@@ -5,8 +5,19 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { z } from "zod";
 import { UserInput, type UserInputResult } from "./questions.js";
 export { UserInput, validateUserAnswers, type UserInputResult } from "./questions.js";
-import { AgentKind, TaskStatus, CommentIntent, parseFileBoundary, type ApprovalDecision, type BrowserCommand, type BrowserResult } from "@openorc/protocol";
+import {
+  AgentKind,
+  TaskStatus,
+  CommentIntent,
+  parseFileBoundary,
+  type ApprovalDecision,
+  type BrowserCommand,
+  type BrowserResult,
+  type DeviceToolInput,
+  type DeviceToolResult,
+} from "@openorc/protocol";
 import { registerBrowserTool } from "./browser.js";
+import { registerDeviceTool } from "./device.js";
 import { registerVisualizationTool } from "./visualization.js";
 import { registerPullReviewTools, type PullReviewTools } from "./pull-review.js";
 export type { PullReviewComment, PullReviewTools } from "./pull-review.js";
@@ -49,6 +60,8 @@ export interface McpHost {
   /** Whether a run's process is still running. Calls for any other run are refused. Hosts without it accept every issued token. */
   live?(runId: string): boolean;
   browser?(runId: string, command: BrowserCommand): Promise<BrowserResult>;
+  /** The Device panel's simulators and emulators. The host refuses with a reason while device support or agent access is off. */
+  device?(runId: string, input: DeviceToolInput): Promise<DeviceToolResult>;
   commentTurn?: { isComment(runId: string): boolean; intent(runId: string, input: CommentIntent): Promise<unknown> };
   askUser?(runId: string, requestId: string, input: UserInput, signal: AbortSignal): Promise<UserInputResult>;
   /** The plan document of a Plan-mode run whose harness has no native one. */
@@ -262,6 +275,7 @@ async function answerFileBoundary(req: http.IncomingMessage, res: http.ServerRes
 /** App actions eligible for internal approval; the approval bridge itself is excluded. */
 export const internalToolNames = [
   "browser",
+  "device",
   "visualize",
   "ask_user",
   "plan_write",
@@ -311,9 +325,10 @@ function approvalPayload(toolName: string, input: Record<string, unknown>, resul
   return { behavior: "allow", updatedInput: { ...input, answers } };
 }
 
-/** Tools only some hosts or runs have: the shared browser, review tools for a conversation reviewing a pull request, and an Orcling's own tools. */
+/** Tools only some hosts or runs have: the shared browser, devices, review tools for a conversation reviewing a pull request, and an Orcling's own tools. */
 function registerOptionalTools(mcp: McpServer, host: McpHost, runId: string): void {
   if (host.browser) registerBrowserTool(mcp, (command) => host.browser!(runId, command));
+  if (host.device) registerDeviceTool(mcp, (input) => host.device!(runId, input));
   if (host.pullReview?.available(runId)) registerPullReviewTools(mcp, host.pullReview, runId);
   if (host.orcling?.available(runId)) registerOrclingTools(mcp, host.orcling, runId);
 }

@@ -30,11 +30,4 @@ describe("change drafts", () => {
     saved.set("pr.mac-1.t3", "{broken");
     expect(drafts.pullRequest("t3")).toEqual({});
   });
-
-  it("remembers the side panel's tool per thread, Changes by default", () => {
-    const { drafts } = setup();
-    expect(drafts.panelTool("t1")).toBe("changes");
-    drafts.setPanelTool("t1", "changes");
-    expect(drafts.panelTool("t1")).toBe("changes");
-  });
 });

@@ -29,6 +29,24 @@ describe("a thread's menu on the phone", () => {
     expect(outline(threadMenu(thread("t-settings"), "header", wednesday)).map((section) => section[0])).toEqual(["Rename…", "Pin", "Open Pull Request", "Archive"]);
   });
 
+  it("puts Changes first in the header of a thread with Git, the uncommitted files beneath it, and keeps the rest in order", () => {
+    const menu = threadMenu(thread("t-settings"), "header", wednesday, 3);
+    const [, ...rest] = outline(threadMenu(thread("t-settings"), "header", wednesday));
+    expect(outline(menu)).toEqual([["Changes", "Rename…"], ...rest]);
+    expect(menu[0]![0]).toEqual({ kind: "screen", label: "Changes", icon: expect.any(String), subtitle: "3 files", pathname: "/changes" });
+    expect(threadMenu(thread("t-settings"), "header", wednesday, 1)[0]![0]).toMatchObject({ label: "Changes", subtitle: "1 file" });
+  });
+
+  it("names no count under Changes when nothing waits to be committed", () => {
+    const changes = threadMenu(thread("t-settings"), "header", wednesday, 0)[0]![0]!;
+    expect(changes.label).toBe("Changes");
+    expect(changes).not.toHaveProperty("subtitle");
+  });
+
+  it("leaves Changes out of a Home row's menu", () => {
+    expect(outline(threadMenu(thread("t-settings"), "row", wednesday, 3)).flat()).not.toContain("Changes");
+  });
+
   it("leaves a team thread's snooze and archive to the team on the Mac", () => {
     expect(outline(threadMenu({ ...thread("t-plan"), teamInstanceId: "team-1" }, "row", wednesday))).toEqual([["Pin", "Mark as Unread"], ["Rename…"]]);
   });

@@ -1,5 +1,6 @@
 import { renamedTitle } from "@openorc/client";
 import type { ThreadSummary } from "@openorc/protocol";
+import { router } from "expo-router";
 import { useMemo } from "react";
 import { Alert } from "react-native";
 import { useRpcMutation } from "../client";
@@ -48,6 +49,7 @@ export function useThreadActions(thread: ThreadSummary | null, { onUnread }: { o
       } else if (action.kind === "snooze") save({ snoozedUntil: action.until(new Date()) });
       else if (action.kind === "rename") rename();
       else if (action.kind === "open") openInApp(action.url);
+      else if (action.kind === "screen") router.push({ pathname: action.pathname, params: { threadId: thread.id } });
     };
     return { run, save, rename };
   }, [thread, mutate, onUnread]);

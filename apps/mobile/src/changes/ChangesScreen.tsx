@@ -19,7 +19,6 @@ import { perfEnabled } from "../thread/perf-probe";
 import { ChangesPerf } from "./ChangesPerf";
 import { PanelTitle } from "./PanelTitle";
 import { PublishBar } from "./PublishBar";
-import { changeDrafts } from "./publishing";
 import { useChangesReads, type ChangesReads } from "./use-changes";
 import { usePublish } from "./use-publish";
 
@@ -123,7 +122,6 @@ export function ChangesScreen() {
   const dim = linkReason(useLinkState()) !== null;
   const [footer, setFooter] = useState(0);
   const list = useRef<LegendListRef>(null);
-  useEffect(() => changeDrafts.setPanelTool(threadId, "changes"), [threadId]);
   const totals = reads.changes.data?.totals;
   const choose = (next: ChangeComparison) => {
     if (next === comparison) return;

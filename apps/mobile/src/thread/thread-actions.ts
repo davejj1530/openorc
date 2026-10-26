@@ -8,8 +8,8 @@ export type OrganizePatch = Pick<RpcParams<"threads.update">["patch"], "pinned" 
 
 type Symbol = NonNullable<ComponentProps<typeof Link.MenuAction>["icon"]>;
 
-/** The screens a thread's menu opens over the thread. Preview and Files join Changes later. */
-export type ThreadScreenPath = "/changes";
+/** The screens a thread's menu opens over the thread: the desktop's side panel tools a phone has. */
+export type ThreadScreenPath = "/changes" | "/preview";
 
 /**
  * One item of a thread's menu: a change to save, a snooze (its time counted when it is chosen, as a row keeps its menu
@@ -33,6 +33,17 @@ function snooze(thread: ThreadSummary, now: Date): ThreadAction {
   return { kind: "menu", label: snoozed ? "Snoozed" : "Snooze", icon: "moon.zzz", actions: [...presets, ...wake] };
 }
 
+/**
+ * The side panel tools the header lists: `uncommitted` is the Changes file count, null without Git; `preview` is
+ * whether the Mac shows a page for the thread, as an item that opens an empty screen would advertise.
+ */
+export interface ThreadPanels {
+  uncommitted: number | null;
+  preview: boolean;
+}
+
+const NO_PANELS: ThreadPanels = { uncommitted: null, preview: false };
+
 /** Changes, with the uncommitted file count beneath it when there is one. */
 function changes(files: number): ThreadAction {
   const item: ThreadAction = { kind: "screen", label: panelToolLabels.changes, icon: "plus.forwardslash.minus", pathname: "/changes" };
@@ -42,13 +53,14 @@ function changes(files: number): ThreadAction {
 /**
  * What a paired phone may do to a thread, in the desktop menu's order and sections: pin, snooze, read state; rename and
  * the pull request; archive. A team thread's lifecycle (snooze, archive) stays with the team on the Mac. Deleting,
- * forking and moving stay on the Mac. The header leads with Changes for a thread with Git (`uncommitted` is its file
- * count, null without Git): every thread action lives in the More menu, so the title keeps the header's center.
+ * forking and moving stay on the Mac. The header leads with the thread's panels, Changes then Preview: every thread
+ * action lives in the More menu, so the title keeps the header's center.
  */
-export function threadMenu(thread: ThreadSummary, place: MenuPlace, now: Date, uncommitted: number | null = null): ThreadAction[][] {
+export function threadMenu(thread: ThreadSummary, place: MenuPlace, now: Date, panels: ThreadPanels = NO_PANELS): ThreadAction[][] {
   const team = Boolean(thread.teamInstanceId);
   const rename: ThreadAction = { kind: "rename", label: "Rename…", icon: "pencil" };
-  const screens: ThreadAction[] = uncommitted === null ? [] : [changes(uncommitted)];
+  const preview: ThreadAction = { kind: "screen", label: panelToolLabels.browser, icon: "globe", pathname: "/preview" };
+  const screens: ThreadAction[] = [...(panels.uncommitted === null ? [] : [changes(panels.uncommitted)]), ...(panels.preview ? [preview] : [])];
   const organize: ThreadAction[] = [
     thread.pinnedAt ? { kind: "patch", label: "Unpin", icon: "pin.slash", patch: { pinned: false } } : { kind: "patch", label: "Pin", icon: "pin", patch: { pinned: true } },
     ...(team ? [] : [snooze(thread, now)]),

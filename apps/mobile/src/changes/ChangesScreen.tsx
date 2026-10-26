@@ -4,7 +4,7 @@ import { LegendList, type LegendListRef } from "@legendapp/list/react-native";
 import { comparisons, panelToolLabels } from "@openorc/client";
 import type { ChangeComparison } from "@openorc/protocol";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useCallback, useMemo, useRef, useState, type RefObject } from "react";
 import { RefreshControl, View } from "react-native";
 import { useLinkState } from "../client";
 import { linkReason } from "../connection/link-reason";
@@ -12,6 +12,7 @@ import { cn } from "../ui/cn";
 import { haptic } from "../ui/haptics";
 import { useMode } from "../ui/mode";
 import { Spinner } from "../ui/Spinner";
+import { useLate } from "../ui/use-late";
 import { changesLine } from "./change-words";
 import { changesItems, ITEM_HEIGHTS, type ChangesItem } from "./changes-items";
 import { CleanBlock, CommitRow, CommitsHead, FailedBlock, FileRow, UnlistedRow } from "./ChangeRows";
@@ -24,15 +25,6 @@ import { usePublish } from "./use-publish";
 
 /** A first read quicker than this shows no spinner at all. */
 const SPINNER_DELAY_MS = 300;
-
-function useLate(ms: number): boolean {
-  const [late, setLate] = useState(false);
-  useEffect(() => {
-    const timer = setTimeout(() => setLate(true), ms);
-    return () => clearTimeout(timer);
-  }, [ms]);
-  return late;
-}
 
 /** Uncommitted or the whole branch, for a worktree's thread: iOS's segmented control at its own width. */
 function ComparePicker({ value, onChange }: { value: ChangeComparison; onChange: (next: ChangeComparison) => void }) {

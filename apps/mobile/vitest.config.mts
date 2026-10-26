@@ -17,6 +17,7 @@ export default defineConfig({
       "expo-web-browser": fixture("web-browser.ts"),
       "react-native-gesture-handler/ReanimatedSwipeable": fixture("swipeable.tsx"),
       "react-native-gesture-handler": fixture("gesture-handler.tsx"),
+      "react-native-quick-base64": fixture("quick-base64.ts"),
       "react-native-worklets": fixture("worklets.ts"),
       "react-native": fixture("react-native.tsx"),
       "react-native-reanimated": fixture("reanimated.tsx"),

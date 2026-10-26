@@ -57,6 +57,7 @@ export default function RootLayout() {
             <Stack.Screen name="index" options={{ title: "Threads" }} />
             <Stack.Screen name="thread/[id]" dangerouslySingular={onePerThread} options={pushed} />
             <Stack.Screen name="changes" dangerouslySingular={onePerPanel} options={pushed} />
+            <Stack.Screen name="preview" dangerouslySingular={onePerPanel} options={pushed} />
             <Stack.Screen name="diff" options={pushed} />
             <Stack.Screen name="pair" dangerouslySingular options={{ presentation: "modal" }} />
             <Stack.Screen name="new" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [1] }} />

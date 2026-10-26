@@ -121,6 +121,64 @@ describe("calls over the link", () => {
     expect(mac.heard).toContainEqual(expect.objectContaining({ t: "rpc", method: "push.register", params: { registration } }));
   });
 
+  it("asks about this session over the same rpc as calls, and hears the Mac's answer", async () => {
+    const mac = new FakeMac();
+    mac.behave(lan, { kind: "answer" });
+    const closed = { open: false } as const;
+    const answers: Record<string, unknown> = { "preview.watch": closed, "preview.unwatch": null };
+    mac.answer = (method) => answers[method];
+    const { connection } = connect(mac);
+    const watched = connection.session("preview.watch", { threadId: "t-1", width: 786, pace: "lan" });
+    await advance(10);
+    expect(await watched).toEqual(closed);
+    expect(await connection.session("preview.unwatch", {})).toBeNull();
+    expect(mac.heard).toContainEqual(expect.objectContaining({ t: "rpc", method: "preview.watch", params: { threadId: "t-1", width: 786, pace: "lan" } }));
+  });
+
+  it("hands a watched Preview's pushes to its own listeners, never to the client's caches", async () => {
+    const mac = new FakeMac();
+    mac.behave(lan, { kind: "answer" });
+    const { connection, pushes } = connect(mac);
+    const heard: unknown[] = [];
+    const stop = connection.onPreview((push) => heard.push(push));
+    await advance(10);
+    const state = { open: true, pane: "p1", address: "http://127.0.0.1:47831/", title: "QA Page", phase: "live", error: null, frame: { seq: 3, width: 786, height: 566 } } as const;
+    mac.send({ t: "push", push: { type: "preview", threadId: "t-1", state } });
+    mac.send({ t: "push", push: { type: "preview.ended", threadId: "t-1", message: "This thread is gone." } });
+    await advance(10);
+    stop();
+    mac.send({ t: "push", push: { type: "preview", threadId: "t-1", state: { open: false } } });
+    await advance(10);
+    expect(heard).toEqual([
+      { type: "preview", threadId: "t-1", state },
+      { type: "preview.ended", threadId: "t-1", message: "This thread is gone." },
+    ]);
+    expect(pushes.filter((push) => push.type !== "session")).toEqual([]);
+  });
+
+  it("keeps a copy of each chunk, made in one step and not byte by byte", async () => {
+    const mac = new FakeMac();
+    mac.behave(lan, { kind: "answer" });
+    const { connection } = connect(mac);
+    await advance(10);
+    const asset = connection.asset({ kind: "preview", threadId: "t-1", seq: 1 });
+    await advance(10);
+    const request = mac.heard.find((message) => message.t === "asset");
+    if (request?.t !== "asset") throw new Error("no asset request");
+    mac.send({ t: "asset.bytes", id: request.id, mime: "image/jpeg", size: 4 });
+    await advance(10);
+    const chunk = new Uint8Array([1, 2, 3, 4]);
+    // Walking it allocates an iterator result per byte: 768 KB of garbage for an 8 KB frame in Hermes.
+    Object.defineProperty(chunk, Symbol.iterator, {
+      value: () => {
+        throw new Error("walked byte by byte");
+      },
+    });
+    connection.receiveBytes(request.id, chunk, true);
+    chunk.set([9, 9, 9, 9]);
+    expect(await asset).toEqual({ mime: "image/jpeg", bytes: new Uint8Array([1, 2, 3, 4]) });
+  });
+
   it("hands over an image's bytes", async () => {
     const mac = new FakeMac();
     mac.behave(lan, { kind: "answer" });

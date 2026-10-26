@@ -107,10 +107,12 @@ it("opens the pull request in Safari over the app", () => {
   expect(mac.updates).toEqual([]);
 });
 
-it("opens the thread's Changes from the header's menu", () => {
+it("opens the thread's Changes and Preview from the header's menu", () => {
   const { result } = renderHook(() => useThreadActions(settings), { wrapper: mac.phone!.wrapper });
-  act(() => result.current.run(find(threadMenu(settings, "header", new Date(), 3), "Changes")));
-  expect(router.push).toHaveBeenCalledWith({ pathname: "/changes", params: { threadId: "t-settings" } });
+  const menu = threadMenu(settings, "header", new Date(), { uncommitted: 3, preview: true });
+  act(() => result.current.run(find(menu, "Changes")));
+  act(() => result.current.run(find(menu, "Preview")));
+  expect(vi.mocked(router.push).mock.calls).toEqual([[{ pathname: "/changes", params: { threadId: "t-settings" } }], [{ pathname: "/preview", params: { threadId: "t-settings" } }]]);
   expect(mac.updates).toEqual([]);
 });
 

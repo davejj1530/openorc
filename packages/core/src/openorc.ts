@@ -3,22 +3,7 @@ import { claudeRunAccount } from "./services/claude-run-account.js";
 import { createClaudeAccountHandlers } from "./handlers/claude-accounts.js";
 import { invalidParamsMessage, resultSummary } from "./handlers/diagnostics.js";
 import { captureLaunchEnvironment, recoverAgentProcesses } from "@openorc/agents";
-import {
-  Db,
-  LedgerWriter,
-  orchestration,
-  plans,
-  redact,
-  settings as storedSettings,
-  taskForwardings,
-  tasks,
-  teamDeletedThreads,
-  teamForks,
-  teamMoves,
-  teamRestores,
-  teamRuntime,
-  threads,
-} from "@openorc/db";
+import { Db, LedgerWriter, orchestration, plans, redact, settings as storedSettings, taskForwardings, tasks, teamDeletedThreads, teamRuntime, threads } from "@openorc/db";
 import { startMcpServer, type OpenOrcMcpServer } from "@openorc/mcp";
 import { harnessAvailability, harnessInfo, harnessInstalled, harnessLoggedIn, rpcParams, type HarnessId, type RpcMethod, type RpcRequest } from "@openorc/protocol";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -105,6 +90,7 @@ import { TeamMoveService } from "./services/team-moves.js";
 import { TeamNotificationService } from "./services/team-notifications.js";
 import { TeamOperationGuard } from "./services/team-operations.js";
 import { TeamRestoreService } from "./services/team-restores.js";
+import { teamActionAvailability } from "./services/team-action-availability.js";
 import { teamTaskExportAvailability } from "./services/team-task-export.js";
 import { TeamTaskService } from "./services/team-tasks.js";
 import { TeamWorkspaceService } from "./services/team-workspaces.js";
@@ -370,7 +356,7 @@ export class OpenOrc {
       this.settings,
       invalidate,
       (id) => this.teamOperations.reason(id),
-      (id) => this.teamActionAvailability(id),
+      (id) => teamActionAvailability(this, id),
       {
         workspaces: this.teamWorkspaces,
         available: (id) => {
@@ -485,27 +471,6 @@ export class OpenOrc {
       notify: (event) => {
         if (!event.threadId || !orchestration.getInstance(db, event.threadId)) notify(event);
       },
-    };
-  }
-
-  private teamActionAvailability(id: string) {
-    const availability = this.review.teamActionAvailability(id);
-    const pending = teamForks.pendingForThread(this.db, id)[0];
-    const restore = teamRestores.pendingForThread(this.db, id)[0];
-    const move = teamMoves.pendingForThread(this.db, id)[0];
-    const deleteRecovery = this.teamDeletions.recovery(id);
-    return {
-      commit: availability,
-      push: availability,
-      createPr: availability,
-      fork: this.teamForks.availability(id),
-      restore: this.teamRestores.availability(id),
-      move: this.teamMoves.availability(id),
-      delete: this.teamDeletions.availability(id),
-      ...(deleteRecovery ? { deleteRecovery } : {}),
-      ...(move ? { moveRecovery: { requestKey: move.requestKey, to: move.to, error: move.error, cancelRequested: move.cancelRequested } } : {}),
-      ...(restore ? { restoreRecovery: { requestKey: restore.requestKey, checkpointId: restore.checkpointId, error: restore.error } } : {}),
-      ...(pending ? { forkRecovery: { requestKey: pending.requestKey, upToRunId: pending.upToRunId, error: pending.error } } : {}),
     };
   }
 

@@ -52,3 +52,13 @@ it("tells main a deleted thread is gone, and expects no answer", () => {
   });
   expect(() => closed.host.threadGone("t1")).not.toThrow();
 });
+
+it("sends a phone's input to main as one request and resolves with main's answer", async () => {
+  const sent: unknown[] = [];
+  const client = new PreviewClient((message) => sent.push(message));
+  const request = { pane: "abc123abc123", frame: { width: 786, height: 566 }, input: { kind: "tap" as const, x: 393, y: 283, count: 1 } };
+  const applied = client.host.input("t1", request);
+  expect(sent).toEqual([{ type: "preview.input", id: 1, threadId: "t1", ...request }]);
+  client.receive({ type: "preview.result", id: 1, result: { kind: "refused", reason: "busy" } });
+  expect(await applied).toEqual({ kind: "refused", reason: "busy" });
+});

@@ -1,10 +1,10 @@
-import type { PreviewCaptureOptions, PreviewHost, PreviewHostCapture, PreviewHostPage } from "@openorc/protocol";
+import type { PreviewCaptureOptions, PreviewHost, PreviewHostCapture, PreviewHostInput, PreviewHostPage } from "@openorc/protocol";
 import type { PreviewBridgeGone, PreviewBridgeMessage, PreviewBridgeRequest } from "../shared/preview-bridge";
 
 const TIMEOUT_MS = 5_000;
-type Result = PreviewHostPage | PreviewHostCapture | null;
+type Result = PreviewHostPage | PreviewHostCapture | PreviewHostInput | null;
 
-/** The core's side of main's Preview, over the private utility channel the browser tool uses. Read-only by type. */
+/** The core's side of main's Preview, over the private utility channel the browser tool uses, apart from its commands. */
 export class PreviewClient {
   private nextId = 0;
   private readonly pending = new Map<number, { resolve(result: Result): void; reject(error: Error): void }>();
@@ -15,6 +15,7 @@ export class PreviewClient {
     query: (threadId) => this.request({ type: "preview.query", id: ++this.nextId, threadId }) as Promise<PreviewHostPage | null>,
     capture: (threadId, { width, quality, unless }: PreviewCaptureOptions) =>
       this.request({ type: "preview.capture", id: ++this.nextId, threadId, width, quality, unless }) as Promise<PreviewHostCapture | null>,
+    input: (threadId, { pane, frame, input }) => this.request({ type: "preview.input", id: ++this.nextId, threadId, pane, frame, input }) as Promise<PreviewHostInput | null>,
     onChange: (listener) => {
       this.listeners.add(listener);
       return () => this.listeners.delete(listener);

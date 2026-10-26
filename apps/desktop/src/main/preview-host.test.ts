@@ -187,10 +187,17 @@ const fake = vi.hoisted(() => {
 });
 
 vi.mock("electron", () => ({ BrowserWindow: fake.BrowserWindow, session: fake.session, WebContentsView: fake.FakeView, nativeImage: fake.nativeImage }));
+/** An agent command the test holds in flight: a click waits until `release` is called. */
+const agent = vi.hoisted(() => ({ hold: null as Promise<void> | null, log: [] as string[] }));
 vi.mock("./browser-command", () => ({
-  runBrowserAction: async ({ command, navigate }: { command: { action: string; url?: string }; navigate: (url: string) => Promise<void> }) =>
-    command.action === "open" ? navigate(command.url ?? "") : undefined,
+  runBrowserAction: async ({ command, navigate }: { command: { action: string; url?: string }; navigate: (url: string) => Promise<void> }) => {
+    agent.log.push(`agent ${command.action}`);
+    if (command.action === "click") await agent.hold;
+    return command.action === "open" ? navigate(command.url ?? "") : undefined;
+  },
 }));
+const applyInput = vi.hoisted(() => vi.fn(async (_link: unknown, _request: unknown, _late?: AbortSignal): Promise<unknown> => ({ kind: "applied", focus: null })));
+vi.mock("./preview-input", () => ({ applyInput, paneLink: (contents: unknown) => ({ contents }) }));
 
 const { closeAllPanes, executeBrowserCommand, installBrowserPane } = await import("./browser-pane");
 const { createPreviewHost } = await import("./preview-host");
@@ -482,5 +489,163 @@ describe("telling the core", () => {
     changes.length = 0;
     tab(window, "thread:a");
     expect(changes).toEqual([]);
+  });
+});
+
+describe("a phone's input", () => {
+  const request = (pane: string) => ({ pane, frame: { width: 786, height: 566 }, input: { kind: "tap" as const, x: 393, y: 283, count: 1 } });
+
+  beforeEach(() => {
+    applyInput.mockClear();
+    agent.log.length = 0;
+    agent.hold = null;
+  });
+
+  it("lands on the pane the thread shows, and is dropped for a pane it no longer shows", async () => {
+    const window = new fake.FakeWindow();
+    window.focus();
+    send("browser:context", window, "thread:a");
+    const first = tab(window, "thread:a", "http://127.0.0.1:47831/", "thread:a");
+    const shown = (await host().query("a"))!.pane;
+    expect(await host().input("a", request(shown))).toEqual({ kind: "applied", focus: null });
+    expect(applyInput).toHaveBeenCalledExactlyOnceWith({ contents: first }, request(shown), expect.any(AbortSignal));
+    tab(window, "thread:a:tab:2", "http://127.0.0.1:47831/idle", "thread:a");
+    expect(await host().input("a", request(shown))).toEqual({ kind: "refused", reason: "pane" });
+    expect(applyInput).toHaveBeenCalledTimes(1);
+    expect(await host().input("b", request(shown))).toBeNull();
+  });
+
+  it("waits for the agent's command in flight on that pane, then lands; refused once it waited 2 s", async () => {
+    vi.useFakeTimers();
+    const window = new fake.FakeWindow();
+    window.focus();
+    send("browser:context", window, "thread:a");
+    await executeBrowserCommand("thread:a", { action: "open", url: "http://127.0.0.1:47831/buttons" });
+    const pane = (await host().query("a"))!.pane;
+    let release!: () => void;
+    agent.hold = new Promise((resolve) => (release = resolve));
+    const clicking = executeBrowserCommand("thread:a", { action: "click", ref: "e1" });
+    const waited = host().input("a", request(pane));
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(applyInput).not.toHaveBeenCalled();
+    release();
+    await clicking;
+    expect(await waited).toEqual({ kind: "applied", focus: null });
+    agent.hold = new Promise(() => undefined);
+    void executeBrowserCommand("thread:a", { action: "click", ref: "e2" });
+    const refused = host().input("a", request(pane));
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(await refused).toEqual({ kind: "refused", reason: "busy" });
+    expect(applyInput).toHaveBeenCalledTimes(1);
+  });
+
+  it("holds the agent's next command until the phone's input in flight has landed", async () => {
+    const window = new fake.FakeWindow();
+    window.focus();
+    send("browser:context", window, "thread:a");
+    await executeBrowserCommand("thread:a", { action: "open", url: "http://127.0.0.1:47831/buttons" });
+    const pane = (await host().query("a"))!.pane;
+    let land!: () => void;
+    applyInput.mockImplementationOnce(() => new Promise((resolve) => (land = () => resolve({ kind: "applied", focus: null }))));
+    const typing = host().input("a", request(pane));
+    await vi.waitFor(() => expect(applyInput).toHaveBeenCalled());
+    agent.log.length = 0;
+    const snapshot = executeBrowserCommand("thread:a", { action: "snapshot" });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(agent.log).toEqual([]);
+    land();
+    await typing;
+    await snapshot;
+    expect(agent.log).toEqual(["agent snapshot"]);
+  });
+
+  /** A page that does not take the phone's input until `answer`: its script spins, or a dialog holds it. */
+  const stuckPage = () => {
+    let answer!: () => void;
+    applyInput.mockImplementationOnce(() => new Promise((resolve) => (answer = () => resolve({ kind: "applied", focus: null }))));
+    return () => answer();
+  };
+
+  it("answers in 2 s that the page is not responding when it has not taken the input, and drops what was not sent", async () => {
+    vi.useFakeTimers();
+    const window = new fake.FakeWindow();
+    window.focus();
+    send("browser:context", window, "thread:a");
+    await executeBrowserCommand("thread:a", { action: "open", url: "http://127.0.0.1:47831/buttons" });
+    const pane = (await host().query("a"))!.pane;
+    stuckPage();
+    const tapping = host().input("a", request(pane));
+    await vi.advanceTimersByTimeAsync(1_999);
+    expect(applyInput.mock.calls[0]![2]!.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await tapping).toEqual({ kind: "refused", reason: "stuck" });
+    expect(applyInput.mock.calls[0]![2]!.aborted).toBe(true);
+  });
+
+  it("keeps the pane until the page has taken what was sent: the agent's next command and the phone's next input wait for it, in turn", async () => {
+    vi.useFakeTimers();
+    const window = new fake.FakeWindow();
+    window.focus();
+    send("browser:context", window, "thread:a");
+    await executeBrowserCommand("thread:a", { action: "open", url: "http://127.0.0.1:47831/buttons" });
+    const pane = (await host().query("a"))!.pane;
+    const answer = stuckPage();
+    const first = host().input("a", request(pane));
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(await first).toEqual({ kind: "refused", reason: "stuck" });
+    agent.log.length = 0;
+    const snapshot = executeBrowserCommand("thread:a", { action: "snapshot" });
+    const next = host().input("a", request(pane));
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(agent.log).toEqual([]);
+    answer();
+    await snapshot;
+    expect(agent.log).toEqual(["agent snapshot"]);
+    expect(await next).toEqual({ kind: "applied", focus: null });
+    expect(applyInput).toHaveBeenCalledTimes(2);
+  });
+
+  it("refuses an input that waited out one still holding the pane as the page not responding, never blaming the agent", async () => {
+    vi.useFakeTimers();
+    const window = new fake.FakeWindow();
+    window.focus();
+    send("browser:context", window, "thread:a");
+    await executeBrowserCommand("thread:a", { action: "open", url: "http://127.0.0.1:47831/buttons" });
+    const pane = (await host().query("a"))!.pane;
+    stuckPage();
+    void host().input("a", request(pane));
+    await vi.advanceTimersByTimeAsync(100);
+    const next = host().input("a", request(pane));
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(await next).toEqual({ kind: "refused", reason: "stuck" });
+    expect(applyInput).toHaveBeenCalledTimes(1);
+  });
+
+  it("lets the pane go 4 s after a phone's input began however stuck its page, so an agent's command, which waits 5 s, still runs", async () => {
+    vi.useFakeTimers();
+    const window = new fake.FakeWindow();
+    window.focus();
+    send("browser:context", window, "thread:a");
+    await executeBrowserCommand("thread:a", { action: "open", url: "http://127.0.0.1:47831/buttons" });
+    const pane = (await host().query("a"))!.pane;
+    stuckPage();
+    void host().input("a", request(pane));
+    await vi.advanceTimersByTimeAsync(10);
+    agent.log.length = 0;
+    const snapshot = executeBrowserCommand("thread:a", { action: "snapshot" });
+    await vi.advanceTimersByTimeAsync(3_980);
+    expect(agent.log).toEqual([]);
+    await vi.advanceTimersByTimeAsync(20);
+    await snapshot;
+    expect(agent.log).toEqual(["agent snapshot"]);
+  });
+
+  it("is not applied to a pane whose page crashed", async () => {
+    const window = new fake.FakeWindow();
+    const contents = tab(window, "thread:a");
+    const pane = (await host().query("a"))!.pane;
+    contents.emit("render-process-gone", {}, { reason: "crashed" });
+    expect(await host().input("a", request(pane))).toBeNull();
+    expect(applyInput).not.toHaveBeenCalled();
   });
 });

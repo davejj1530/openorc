@@ -1,13 +1,34 @@
 import { createHash } from "node:crypto";
 import { BrowserWindow, nativeImage, type NativeImage, type WebContents } from "electron";
-import { PREVIEW_FRAME_BYTES, type PreviewCaptureOptions, type PreviewHost, type PreviewHostCapture, type PreviewHostPage } from "@openorc/protocol";
+import { PREVIEW_FRAME_BYTES, type PreviewCaptureOptions, type PreviewHost, type PreviewHostCapture, type PreviewHostInput, type PreviewHostPage, type PreviewInputRequest } from "@openorc/protocol";
 import { closeThreadPanes, keepPainting, onPaneChange, threadPanes, type Pane } from "./browser-pane";
+import { takeTurn } from "./pane-turns";
+import { applyInput, paneLink } from "./preview-input";
 
 /** A screenshot that has not come by then is a view that is not compositing; its last painted frame stands in. */
 const ANSWER_MS = 2_000;
 /** The screenshot's own quality, before it is resized and encoded at the phone's. */
 const SOURCE_QUALITY = 90;
 const THREAD_SURFACE = /^thread:([A-Za-z0-9_-]+)(?::tab:.*)?$/;
+/** How long a phone's input waits for what acts on its pane before it is refused. */
+const PHONE_WAITS_MS = 2_000;
+/** A page that has not taken an input by then (a script spinning, a dialog) is not responding, the phone is told. */
+const PHONE_ANSWERS_MS = 2_000;
+/** The longest an input keeps its pane while its page does not answer: under the 5 s an agent's command waits. */
+const PHONE_KEEPS_MS = 4_000;
+
+/** Resolves once `work` settles or `ms` has passed, whichever is first. */
+function settledOr(work: Promise<unknown>, ms: number): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<void>((resolve) => (timer = setTimeout(resolve, ms)));
+  return Promise.race([
+    work.then(
+      () => undefined,
+      () => undefined,
+    ),
+    late,
+  ]).finally(() => clearTimeout(timer));
+}
 
 interface Encoded {
   jpeg: Uint8Array;
@@ -129,7 +150,41 @@ async function capture(threadId: string, options: PreviewCaptureOptions): Promis
 }
 
 /**
- * Main's side of the Mac's Preview for phones: which page a thread shows, a frame of it, and a nudge when it changes.
+ * A phone's input on the pane a thread shows, in turn with the agent's commands on it. The pane is checked again once
+ * the turn comes, as a tab switch while it waited moves the thread to another pane. A wait that runs out names what
+ * held the pane: the agent, or the phone's own last input on a page that has not taken it.
+ */
+function input(threadId: string, request: PreviewInputRequest): Promise<PreviewHostInput | null> {
+  const pane = currentPane(threadId);
+  if (!pane || pane.crashed) return Promise.resolve(null);
+  if (paneId(pane) !== request.pane) return Promise.resolve({ kind: "refused", reason: "pane" });
+  return new Promise((answer, fail) => {
+    takeTurn(pane, () => land(threadId, pane, request, answer, fail), PHONE_WAITS_MS, "phone").then(
+      (turn) => turn.ok || answer({ kind: "refused", reason: turn.holder === "agent" ? "busy" : "stuck" }),
+      fail,
+    );
+  });
+}
+
+/**
+ * The input onto its pane, answered within 2 s: by then a page that has not taken it is not responding, and the steps
+ * not sent yet are dropped, so it never lands later on a page that may have changed. The turn is kept until the page
+ * has taken what was sent, so nothing else acts on the pane beside it, but never past 4 s.
+ */
+async function land(threadId: string, pane: Pane, request: PreviewInputRequest, answer: (result: PreviewHostInput) => void, fail: (error: unknown) => void): Promise<void> {
+  if (currentPane(threadId) !== pane || pane.view.webContents.isDestroyed()) return answer({ kind: "refused", reason: "pane" });
+  const late = new AbortController();
+  const timer = setTimeout(() => {
+    late.abort(new Error("The page did not take the input in time."));
+    answer({ kind: "refused", reason: "stuck" });
+  }, PHONE_ANSWERS_MS);
+  const applying = applyInput(paneLink(pane.view.webContents), request, late.signal).then(answer, fail);
+  await settledOr(applying, PHONE_KEEPS_MS).finally(() => clearTimeout(timer));
+}
+
+/**
+ * Main's side of the Mac's Preview for phones: which page a thread shows, a frame of it, a phone's input on it, and a
+ * nudge when it changes.
  * `lifecycle` marks a change in whether a page is open or which tab it is, so More's item updates only then.
  */
 export function createPreviewHost(): PreviewHost {
@@ -152,6 +207,7 @@ export function createPreviewHost(): PreviewHost {
       return Promise.resolve(pane ? readPage(pane) : null);
     },
     capture,
+    input,
     threadGone: closeThreadPanes,
     onChange: (listener) => {
       listeners.add(listener);

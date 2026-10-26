@@ -12,7 +12,7 @@ import { NewThreadProjectChoice } from "../components/NewThreadContext";
 import { NewThreadOptions } from "../components/NewThreadOptions";
 import { NewThreadRecent, useArrivalActivity } from "../components/NewThreadActivity";
 import { ComposerModelPicker, ModelPicker, type ModelChoice, type OrclingPickerChoices, type TeamPickerChoices } from "../components/ModelPicker";
-import { useOrclings } from "../lib/orclings";
+import { orclingById, useOrclings } from "../lib/orclings";
 import { pickerTeam } from "../lib/team-settings";
 import { TopBar } from "../components/TopBar";
 import { Button, TextButton } from "../components/ui";
@@ -74,7 +74,10 @@ function NewThreadProject({
   const git = useProjectGit(projectId);
   const [draft, setDraft] = useState(() => readNewThreadDraft(projectId));
   const accounts = useRpc("claude.accounts.list", {});
-  const claudeAccountId = draft.claudeAccountId ?? accounts.data?.defaultId ?? "claude-cli";
+  const orclings = useOrclings();
+  // An Orcling runs on its own account; the account chosen here is for models and teams.
+  const orcling = orclingById(orclings, draft.target.kind === "orcling" ? draft.target.orclingId : null);
+  const claudeAccountId = orcling?.claudeAccountId ?? draft.claudeAccountId ?? accounts.data?.defaultId ?? "claude-cli";
   const info = useRpc("system.info", { claudeAccountId });
   const models = useRpc("agents.models", { claudeAccountId }, { staleTime: 5 * 60_000 });
   const settings = useRpc("app.settings.get", {});
@@ -85,7 +88,6 @@ function NewThreadProject({
   const [storageError, setStorageError] = useState<string | null>(null);
   const { permission, select: setPermission, error: permissionError, ready: permissionReady } = usePermissionSelection();
   const start = useRpcMutation("threads.start");
-  const orclings = useOrclings();
   const mounted = useRef(true);
   const composer = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -269,7 +271,7 @@ function NewThreadProject({
                   onMode={(workspace) => changeDraft({ workspace })}
                   changes={composerChanges}
                   account={
-                    usesClaude ? (
+                    usesClaude && !orcling ? (
                       <ClaudeAccountPicker compact accounts={accounts.data} value={claudeAccountId} onChange={(claudeAccountId) => changeDraft({ claudeAccountId })} disabled={start.isPending} />
                     ) : null
                   }

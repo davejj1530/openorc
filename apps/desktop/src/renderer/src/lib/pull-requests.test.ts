@@ -10,6 +10,7 @@ describe("pull request presentation", () => {
       name: "Gloop",
       look: defaultOrclingLook,
       settings: { agent: "codex", model: "gpt-6-sol", effort: "low", fastMode: false },
+      claudeAccountId: "claude-cli",
       permission: "approve",
       threadId: "home",
       createdAt: 1,

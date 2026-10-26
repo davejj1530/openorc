@@ -2,16 +2,17 @@
 import type { ProjectGit, RpcMethod, RpcParams } from "@openorc/protocol";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { router } from "expo-router";
+import type { ReactNode } from "react";
 import { afterEach, beforeEach, expect, it, onTestFinished, vi } from "vitest";
 import { attachImage, pickImages } from "../composer/attachments";
 import type { DraftImage } from "../composer/drafts";
 import type { FakeMac } from "../test-fixtures/fake-mac";
 import { nativeProps } from "../test-fixtures/react-native";
-import { NewThreadSheet } from "./NewThreadSheet";
+import { NewThreadScreen } from "./NewThreadScreen";
 
 /**
  * A Mac with a repository, two folders without git (a test gives `later` its first commit while the Mac's project row
- * still names no default branch), and a start the test answers; `focused` is whether the sheet is on top.
+ * still names no default branch), and a start the test answers; `focused` is whether the screen is on top.
  */
 const mac = vi.hoisted(() => {
   const git: Record<string, ProjectGit> = {};
@@ -37,8 +38,9 @@ vi.mock("../client", async () => {
   });
   return mac.phone.module;
 });
+vi.mock("react-native-keyboard-controller", () => ({ KeyboardStickyView: ({ children }: { children: ReactNode }) => <>{children}</> }));
 vi.mock("expo-router", () => ({
-  router: { back: vi.fn(), push: vi.fn() },
+  router: { replace: vi.fn() },
   useLocalSearchParams: () => ({ projectId: "openorc" }),
   useNavigation: () => ({ isFocused: () => mac.focused }),
 }));
@@ -50,41 +52,38 @@ beforeEach(() => {
   mac.start.mockReset();
   mac.focused = true;
   Object.assign(mac.git, { openorc: "ready", notes: "none", later: "none" });
-  vi.mocked(router.back).mockClear();
-  vi.mocked(router.push).mockClear();
+  vi.mocked(router.replace).mockClear();
 });
 afterEach(cleanup);
 
 const button = (name: string) => screen.getByRole("button", { name }) as HTMLButtonElement;
 const project = (name: string) => screen.getByRole("radio", { name }) as HTMLButtonElement;
 
-/** Opens the sheet from the openorc heading's plus and writes the prompt once Start can go. */
+/** Opens the screen from the openorc heading's plus and writes the prompt once Start can go. */
 async function openAndWrite(prompt: string) {
-  render(<NewThreadSheet />, { wrapper: mac.phone!.wrapper });
+  render(<NewThreadScreen />, { wrapper: mac.phone!.wrapper });
   await waitFor(() => expect(project("notes")).toBeTruthy());
   act(() => (nativeProps.get(screen.getByLabelText("Message"))!.onChangeText as (text: string) => void)(prompt));
   await waitFor(() => expect(button("Start").getAttribute("aria-disabled")).toBe("false"));
 }
 
-it("opens the started thread over Home while the sheet is still showing", async () => {
+it("swaps itself for the started thread", async () => {
   await openAndWrite("Fix the build");
   mac.start.mockResolvedValue({ thread: { id: "thread-1" } });
   await act(async () => fireEvent.click(button("Start")));
-  await waitFor(() => expect(router.push).toHaveBeenCalledWith({ pathname: "/thread/[id]", params: { id: "thread-1" } }));
-  expect(router.back).toHaveBeenCalledTimes(1);
+  await waitFor(() => expect(router.replace).toHaveBeenCalledWith({ pathname: "/thread/[id]", params: { id: "thread-1" } }));
   expect(mac.start.mock.calls[0]![0]).toMatchObject({ projectId: "openorc", workspaceMode: "worktree" });
 });
 
-it("leaves the person where they went when the Mac answers after they closed the sheet", async () => {
+it("leaves the person where they went when the Mac answers after they left", async () => {
   await openAndWrite("Fix the build");
   let answer!: (result: { thread: { id: string } }) => void;
   mac.start.mockReturnValue(new Promise((resolve) => (answer = resolve)));
   await act(async () => fireEvent.click(button("Start")));
-  // The worktree and its setup take a while; the person swipes the sheet away and opens another thread.
+  // The worktree and its setup take a while; the person goes back and opens another thread.
   mac.focused = false;
   await act(async () => answer({ thread: { id: "thread-1" } }));
-  expect(router.back).not.toHaveBeenCalled();
-  expect(router.push).not.toHaveBeenCalled();
+  expect(router.replace).not.toHaveBeenCalled();
 });
 
 it("starts a plain folder's thread in the folder, as the desktop does", async () => {
@@ -96,7 +95,7 @@ it("starts a plain folder's thread in the folder, as the desktop does", async ()
   expect(mac.start.mock.calls[0]![0]).toMatchObject({ projectId: "notes", workspaceMode: "current", prompt: "Tidy the notes" });
 });
 
-it("starts a worktree in a project that got its first commit after the sheet showed it, as the desktop does", async () => {
+it("starts a worktree in a project that got its first commit after the screen showed it, as the desktop does", async () => {
   await openAndWrite("Fix the build");
   await act(async () => fireEvent.click(project("later")));
   act(() => (nativeProps.get(screen.getByLabelText("Message"))!.onChangeText as (text: string) => void)("Isolate the change"));
@@ -124,7 +123,7 @@ it("says why Start is dim when it is tapped, and starts nothing", async () => {
   const models = mac.reads["agents.models"];
   mac.reads["agents.models"] = [];
   onTestFinished(() => void (mac.reads["agents.models"] = models));
-  render(<NewThreadSheet />, { wrapper: mac.phone!.wrapper });
+  render(<NewThreadScreen />, { wrapper: mac.phone!.wrapper });
   await waitFor(() => expect(project("notes")).toBeTruthy());
   act(() => (nativeProps.get(screen.getByLabelText("Message"))!.onChangeText as (text: string) => void)("Fix it"));
   expect(screen.queryByRole("alert")).toBeNull();

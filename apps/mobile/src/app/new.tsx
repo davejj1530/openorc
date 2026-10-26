@@ -1,3 +1,3 @@
-import { NewThreadSheet } from "../new-thread/NewThreadSheet";
+import { NewThreadScreen } from "../new-thread/NewThreadScreen";
 
-export default NewThreadSheet;
+export default NewThreadScreen;

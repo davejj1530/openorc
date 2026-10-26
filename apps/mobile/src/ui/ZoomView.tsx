@@ -1,11 +1,13 @@
 import { useImperativeHandle, useRef, useState, type ReactNode, type Ref } from "react";
 import { ScrollView, View, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance } from "react-native";
-import { GestureDetector, useSimultaneousGestures, useTapGesture, type PanGesture } from "react-native-gesture-handler";
+import { GestureDetector, useSimultaneousGestures, useTapGesture, type PanGesture, type TapGesture } from "react-native-gesture-handler";
 import { doubleTapRect } from "./zoom";
 
-/** Zooms back to the whole content: for new content the old zoom does not fit. */
 export interface ZoomViewHandle {
+  /** Zooms back to the whole content: for new content the old zoom does not fit. */
   reset(): void;
+  /** A point on the view as a point on the content at its whole size, however far it is zoomed and scrolled. */
+  contentPoint(point: { x: number; y: number }): { x: number; y: number };
 }
 
 interface ZoomViewProps {
@@ -15,7 +17,9 @@ interface ZoomViewProps {
   /** Centered in the view, as a photo is; else at its top, as a page is. */
   centered?: boolean;
   /** Recognized alongside the double tap, such as a viewer's swipe down. */
-  gesture?: PanGesture;
+  gestures?: (PanGesture | TapGesture)[];
+  /** Whether a double tap zooms. Off where a tap acts on the content, so no tap waits to see if a second follows. */
+  doubleTap?: boolean;
   /** How far it zoomed; `settled` once a pinch or a double tap ends there. */
   onZoom?: (scale: number, settled: boolean) => void;
   ref?: Ref<ZoomViewHandle>;
@@ -27,9 +31,9 @@ const MAX_ZOOM = 4;
 /**
  * Content to pinch and pan, from its whole size up to four times, as Photos zooms: a double tap comes twice as close
  * around the tapped point, or goes back to the whole. Unzoomed, content no taller than the view does not scroll, so a
- * drag down stays with `gesture`.
+ * drag down stays with `gestures`.
  */
-export function ZoomView({ width, height, centered = false, gesture, onZoom, ref, children }: ZoomViewProps) {
+export function ZoomView({ width, height, centered = false, gestures = [], doubleTap: zoomsOnDoubleTap = true, onZoom, ref, children }: ZoomViewProps) {
   const scroll = useRef<ScrollViewInstance>(null);
   const [zoomed, setZoomed] = useState(false);
   const view = useRef({ width, height });
@@ -47,9 +51,14 @@ export function ZoomView({ width, height, centered = false, gesture, onZoom, ref
       setZoomed(false);
       onZoom?.(1, true);
     },
+    contentPoint: ({ x, y }) => {
+      const { scale, x: left, y: top } = at.current;
+      return { x: (x + left) / scale, y: (y + top) / scale };
+    },
   }));
   const doubleTap = useTapGesture({
     numberOfTaps: 2,
+    enabled: zoomsOnDoubleTap,
     runOnJS: true,
     onActivate: (event) => {
       const { scale, x, y } = at.current;
@@ -57,7 +66,7 @@ export function ZoomView({ width, height, centered = false, gesture, onZoom, ref
       zoomTo(doubleTapRect({ x: (event.x + x) / scale, y: (event.y + y) / scale }, { width, height }, zoomed, view.current), true);
     },
   });
-  const gestures = useSimultaneousGestures(doubleTap, ...(gesture ? [gesture] : []));
+  const recognized = useSimultaneousGestures(...(zoomsOnDoubleTap ? [doubleTap] : []), ...gestures);
   const read =
     (settled: boolean) =>
     ({ nativeEvent }: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -70,7 +79,7 @@ export function ZoomView({ width, height, centered = false, gesture, onZoom, ref
       toTop(true);
     };
   return (
-    <GestureDetector gesture={gestures}>
+    <GestureDetector gesture={recognized}>
       <View className="flex-1">
         <ScrollView
           ref={scroll}
@@ -82,6 +91,8 @@ export function ZoomView({ width, height, centered = false, gesture, onZoom, ref
           showsHorizontalScrollIndicator={false}
           showsVerticalScrollIndicator={false}
           bouncesZoom
+          // A tap while the keyboard is up reaches the content: on a page, it may land on another field.
+          keyboardShouldPersistTaps="always"
           scrollEventThrottle={32}
           onLayout={({ nativeEvent }) => (view.current = { width: nativeEvent.layout.width, height: nativeEvent.layout.height })}
           onScroll={read(false)}

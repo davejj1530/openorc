@@ -3,6 +3,7 @@ import * as Clipboard from "expo-clipboard";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useMemo, type ReactElement } from "react";
 import { View } from "react-native";
+import { PreviewPage } from "./PreviewPage";
 import { useLinkState, useRpc } from "../client";
 import { perfEnabled } from "../thread/perf-probe";
 import { PanelTitle } from "../changes/PanelTitle";
@@ -11,11 +12,11 @@ import { Spinner } from "../ui/Spinner";
 import { Text } from "../ui/Text";
 import { useLate } from "../ui/use-late";
 import { openInApp } from "../ui/web";
-import { FrameView } from "./FrameView";
 import { markFrameRender } from "./preview-perf";
 import { PreviewPerf } from "./PreviewPerf";
 import { previewLine, previewView, refusalWords, safariAddress, type PreviewView } from "./preview-view";
 import { usePreview, type PreviewImage } from "./use-preview";
+import { usePreviewInput } from "./use-preview-input";
 
 /** A first watch quicker than this shows no spinner at all. */
 const SPINNER_DELAY_MS = 300;
@@ -42,9 +43,10 @@ interface BodyProps {
   page: string;
   connected: boolean;
   onZoom: (scale: number, settled: boolean) => void;
+  input: ReturnType<typeof usePreviewInput>;
 }
 
-function Body({ view, frame, mac, page, connected, onZoom }: BodyProps) {
+function Body({ view, frame, mac, page, connected, onZoom, input }: BodyProps) {
   switch (view.kind) {
     case "opening":
       return <Opening connected={connected} />;
@@ -59,7 +61,7 @@ function Body({ view, frame, mac, page, connected, onZoom }: BodyProps) {
     case "stopped":
       return <Words title="The preview stopped" detail={`Reload it on ${mac}.`} />;
     case "page":
-      return frame ? <FrameView frame={frame} label={`${page}, on ${mac}`} dim={view.dim} onZoom={onZoom} /> : null;
+      return frame ? <PreviewPage frame={frame} label={`${page}, on ${mac}`} page={page} dim={view.dim} onZoom={onZoom} input={input} /> : null;
   }
 }
 
@@ -87,19 +89,21 @@ function pageMenu(address: string, safari: string | null): ReactElement {
 }
 
 /**
- * The Mac's Preview of a thread, live and read only: the tab the agent's browser acts on, as the Mac shows it, to
- * watch, pinch and pan. Taps, typing and tabs stay on the Mac.
+ * The Mac's Preview of a thread, live: the tab the agent's browser acts on, as the Mac shows it, to watch, pinch and
+ * pan, tap, scroll and type into. Tabs, reload and history stay on the Mac.
  */
 export function PreviewScreen() {
   const { threadId } = useLocalSearchParams<{ threadId: string }>();
   const preview = usePreview(threadId);
+  const input = usePreviewInput(threadId, preview.frame);
   markFrameRender();
   const read = useRpc("preview.state", { threadId });
   const linkState = useLinkState();
   const mac = linkState.kind === "unpaired" ? "your Mac" : linkState.mac.name;
   const { state, frame, connected, active } = preview;
   const view = previewView({ state, refused: preview.refused === null ? null : refusalWords(preview.refused, mac), shown: frame !== null, connected, active });
-  const line = previewLine(view, state, read.data);
+  // A refused input's words stand in the line for a moment.
+  const line = input.notice ?? previewLine(view, state, read.data);
   const page = state?.open ? pageLabel({ url: state.address, title: state.title }) : panelToolLabels.browser;
   // Frames arrive twice a second; the header changes only with its words.
   const options = useMemo(() => ({ headerTitle: () => <PanelTitle title={panelToolLabels.browser} line={line} /> }), [line]);
@@ -110,7 +114,7 @@ export function PreviewScreen() {
     <View className="flex-1 bg-bg">
       <Stack.Screen options={options} />
       {menu}
-      <Body view={view} frame={frame} mac={mac} page={page} connected={connected} onZoom={preview.onZoom} />
+      <Body view={view} frame={frame} mac={mac} page={page} connected={connected} onZoom={preview.onZoom} input={input} />
       {perfEnabled() ? <PreviewPerf shown={frame !== null} /> : null}
     </View>
   );

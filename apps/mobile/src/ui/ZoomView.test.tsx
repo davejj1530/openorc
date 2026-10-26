@@ -11,10 +11,10 @@ type Gesture = { kind: string; config: { onActivate?: (event: { x: number; y: nu
 type ScrollEvent = { nativeEvent: { zoomScale?: number; contentOffset?: { x: number; y: number } } };
 
 /** A page twice as tall as the view, zoomed as a person would: the scroll view's events, and its double tap. */
-function zoomed(props: { onZoom?: (scale: number, settled: boolean) => void; gesture?: object } = {}) {
+function zoomed(props: { onZoom?: (scale: number, settled: boolean) => void; gestures?: object[]; doubleTap?: boolean } = {}) {
   const handle = createRef<ZoomViewHandle>();
   render(
-    <ZoomView ref={handle} width={390} height={1688} onZoom={props.onZoom} gesture={props.gesture as never}>
+    <ZoomView ref={handle} width={390} height={1688} onZoom={props.onZoom} gestures={props.gestures as never} doubleTap={props.doubleTap}>
       <Text>Page</Text>
     </ZoomView>,
   );
@@ -91,11 +91,24 @@ it("puts a page back at its top once a double tap's zoom out settles, and leaves
   expect(view.scrollTo).toHaveBeenCalledTimes(1);
 });
 
-it("recognizes a gesture it is given alongside its double tap", () => {
+it("recognizes the gestures it is given alongside its double tap", () => {
   const swipe = { kind: "pan", config: {} };
   expect(
-    zoomed({ gesture: swipe })
+    zoomed({ gestures: [swipe] })
       .gestures()
       .map((gesture) => gesture.kind),
   ).toEqual(["tap", "pan"]);
+});
+
+it("leaves the double tap out when its content takes taps of its own, so no tap waits on a timer", () => {
+  const click = { kind: "tap", config: { numberOfTaps: 1 } };
+  const view = zoomed({ gestures: [click], doubleTap: false });
+  expect(view.gestures()).toEqual([click]);
+});
+
+it("reads a point on the view as a point on its content, however far it zoomed and scrolled", () => {
+  const view = zoomed();
+  expect(view.handle.current!.contentPoint({ x: 100, y: 50 })).toEqual({ x: 100, y: 50 });
+  view.fire("onScroll", { zoomScale: 2, contentOffset: { x: 200, y: 100 } });
+  expect(view.handle.current!.contentPoint({ x: 100, y: 50 })).toEqual({ x: 150, y: 75 });
 });

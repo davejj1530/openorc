@@ -101,8 +101,9 @@ process.parentPort.on("message", (e) => {
     void shutdown();
     return;
   }
-  const port = e.ports[0];
+  const [port, media] = e.ports;
   if (port && !closing) attach(port);
+  if (media && !closing) void corePromise.then((core) => core.devices.attachMedia(media));
 });
 
 async function prepareUpdate(id: string): Promise<void> {

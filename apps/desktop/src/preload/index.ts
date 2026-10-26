@@ -179,8 +179,8 @@ const api: OpenOrcApi = {
 contextBridge.exposeInMainWorld("openorc", api);
 
 // MessagePorts cannot cross the context bridge, so forward them to the page
-// with a transfer. The renderer listens for the "openorc:port" message.
+// with a transfer. The renderer listens for the "openorc:port" message: the
+// RPC port first, then the device media port.
 ipcRenderer.on("bridge:port", (event) => {
-  const port = event.ports[0];
-  if (port) window.postMessage("openorc:port", "*", [port]);
+  if (event.ports[0]) window.postMessage("openorc:port", "*", event.ports);
 });

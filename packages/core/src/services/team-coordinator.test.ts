@@ -7,6 +7,7 @@ import { RunHandle } from "@openorc/agents";
 import { Db, LedgerWriter, audit, checkpoints, orchestration, orclings, plans, projects, runs, snapshots, tasks, teamContextParts, teamContexts, teamRoom, teamRuntime, threads } from "@openorc/db";
 import { commitAll, git } from "@openorc/git";
 import {
+  DEFAULT_CLAUDE_ACCOUNT,
   defaultOrclingLook,
   MAX_TEAM_CONTEXT_BYTES,
   type Project,
@@ -899,7 +900,13 @@ describe("durable team coordination with real run capture", () => {
     const gloop = orclings.insert(db, {
       id: "gloop",
       threadId: newThread().id,
-      draft: { name: "Gloop", look: defaultOrclingLook, settings: { agent: "claude", model: "fixture-fable", effort: "low", fastMode: false }, permission: "allow" },
+      draft: {
+        name: "Gloop",
+        look: defaultOrclingLook,
+        settings: { agent: "claude", model: "fixture-fable", effort: "low", fastMode: false },
+        permission: "allow",
+        claudeAccountId: DEFAULT_CLAUDE_ACCOUNT,
+      },
     });
     const draft = roster(1);
     draft.members[0]!.orclingId = gloop.id;

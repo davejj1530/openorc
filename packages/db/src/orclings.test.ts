@@ -3,11 +3,12 @@ import { DatabaseSync } from "node:sqlite";
 import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { defaultOrclingLook, WORKSPACE_ID, type OrclingDraft, type TeamDraft } from "@openorc/protocol";
+import { DEFAULT_CLAUDE_ACCOUNT, defaultOrclingLook, WORKSPACE_ID, type OrclingDraft, type TeamDraft } from "@openorc/protocol";
+import { claudeAccounts } from "./claude-accounts.js";
 import { Db } from "./database.js";
 import { memories } from "./memories.js";
 import { orchestration } from "./orchestration.js";
-import { orclingMigration } from "./orcling-schema.js";
+import { orclingAccountMigration, orclingMigration } from "./orcling-schema.js";
 import { orclings } from "./orclings.js";
 import { pullReviews } from "./pull-reviews.js";
 import { projects, runs, threads } from "./repos.js";
@@ -20,7 +21,13 @@ afterEach(() => {
   for (const folder of folders.splice(0)) rmSync(folder, { recursive: true, force: true });
 });
 
-const draft: OrclingDraft = { name: "Gloop", look: defaultOrclingLook, settings: { agent: "claude", model: "fixture", effort: null, fastMode: false }, permission: "approve" };
+const draft = {
+  name: "Gloop",
+  look: defaultOrclingLook,
+  settings: { agent: "claude", model: "fixture", effort: null, fastMode: false },
+  permission: "approve",
+  claudeAccountId: DEFAULT_CLAUDE_ACCOUNT,
+} satisfies OrclingDraft;
 
 function withOrcling() {
   const db = Db.memory();
@@ -57,6 +64,26 @@ it("upgrades a ledger from before Orclings with its threads, runs and memories u
   expect(db.stmt("PRAGMA foreign_key_check").all()).toEqual([]);
 });
 
+it("upgrades each Orcling to run on the Claude account of its own conversation", () => {
+  const folder = mkdtempSync(path.join(os.tmpdir(), "openorc-orcling-account-migration-"));
+  folders.push(folder);
+  const file = path.join(folder, "ledger.sqlite");
+  const raw = new DatabaseSync(file);
+  const before = migrations.indexOf(orclingAccountMigration);
+  for (const migration of migrations.slice(0, before)) typeof migration === "string" ? raw.exec(migration) : migration(raw);
+  raw.exec(`PRAGMA user_version=${before}`);
+  raw.exec(`INSERT INTO projects (id,name,root_path,settings,created_at,updated_at) VALUES ('p','App','/tmp/app','{}',1,1)`);
+  raw.exec(`INSERT INTO claude_accounts (id,name,kind,enabled,created_at) VALUES ('work','Work','managed',1,1)`);
+  raw.exec(`INSERT INTO threads (id,project_id,title,agent,model,claude_account_id,created_at,updated_at,last_activity_at) VALUES ('home','p','Gloop','claude','fixture','work',1,1,1)`);
+  raw.exec(`INSERT INTO orclings (id,name,look,agent,model,permission,thread_id,created_at,updated_at) VALUES ('gloop','Gloop','{}','claude','fixture','allow','home',1,1)`);
+  raw.close();
+
+  const db = Db.open(file);
+  opened.push(db);
+  expect(db.version).toBe(migrations.length);
+  expect(orclings.get(db, "gloop")?.claudeAccountId).toBe("work");
+});
+
 it("keeps every version of an Orcling's instructions, newest first", () => {
   const { db, orcling } = withOrcling();
   orclings.appendInstructions(db, orcling.id, { body: "Be brief.", author: "user", note: null });
@@ -78,7 +105,7 @@ it("resumes a thread's own session, never an Orcling guest's", () => {
   expect(runs.lastSession(db, { threadId: thread.id }, "claude", orcling.id)).toBe("guest-session");
 });
 
-it("seats an Orcling under its own current name and model, and gives the seat back to what was saved once it is deleted", () => {
+it("seats an Orcling under its own current name, model and Claude account, and gives the seat back to what was saved once it is deleted", () => {
   const { db, orcling } = withOrcling();
   const project = projects.insert(db, { name: "App", rootPath: "/tmp/app", gitRemote: null, defaultBranch: "main", settings: {} });
   const team: TeamDraft = {
@@ -93,8 +120,13 @@ it("seats an Orcling under its own current name and model, and gives the seat ba
   const seat = () => orchestration.getRevision(db, saved.revision.id)!.members[1]!;
   expect(orchestration.getRevision(db, saved.revision.id)?.members.map((member) => member.orclingId ?? null)).toEqual([null, orcling.id]);
 
+  const work = claudeAccounts.add(db, "Work");
+  orclings.update(db, orcling.id, { ...draft, claudeAccountId: work.id });
+  expect(seat().claudeAccountId).toBe(work.id);
+
   orclings.update(db, orcling.id, { ...draft, name: "Glorp", settings: { agent: "codex", model: "smarter", effort: "high", fastMode: true } });
   expect(seat()).toMatchObject({ name: "Glorp", orclingId: orcling.id, settings: { agent: "codex", model: "smarter", effort: "high", fastMode: true } });
+  expect(seat().claudeAccountId).toBeUndefined();
 
   orclings.delete(db, orcling.id);
   expect(seat().orclingId).toBeUndefined();

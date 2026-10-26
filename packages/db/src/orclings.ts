@@ -1,4 +1,4 @@
-import { defaultOrclingLook, isHarnessId, OrclingLook, type Orcling, type OrclingDraft, type OrclingInstructionsVersion } from "@openorc/protocol";
+import { DEFAULT_CLAUDE_ACCOUNT, defaultOrclingLook, isHarnessId, OrclingLook, type Orcling, type OrclingDraft, type OrclingInstructionsVersion } from "@openorc/protocol";
 import type { Db } from "./database.js";
 
 interface OrclingRow {
@@ -10,6 +10,7 @@ interface OrclingRow {
   effort: string | null;
   fast_mode: number;
   permission: "allow" | "approve";
+  claude_account_id: string | null;
   thread_id: string;
   created_at: number;
   updated_at: number;
@@ -37,6 +38,7 @@ const toOrcling = (row: OrclingRow): Orcling => ({
   look: parseLook(row.look),
   settings: { agent: isHarnessId(row.agent) ? row.agent : "claude", model: row.model, effort: row.effort, fastMode: row.fast_mode === 1 },
   permission: row.permission,
+  claudeAccountId: row.claude_account_id ?? DEFAULT_CLAUDE_ACCOUNT,
   threadId: row.thread_id,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
@@ -46,7 +48,7 @@ const toVersion = (row: InstructionsRow): OrclingInstructionsVersion => ({ versi
 
 export interface OrclingInsert {
   id: string;
-  draft: OrclingDraft;
+  draft: OrclingDraft & { claudeAccountId: string };
   threadId: string;
 }
 
@@ -64,8 +66,8 @@ export const orclings = {
     return row ? toOrcling(row) : null;
   },
   insert(db: Db, input: OrclingInsert, now = Date.now()): Orcling {
-    const { name, look, settings, permission } = input.draft;
-    db.stmt("INSERT INTO orclings (id, name, look, agent, model, effort, fast_mode, permission, thread_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
+    const { name, look, settings, permission, claudeAccountId } = input.draft;
+    db.stmt("INSERT INTO orclings (id, name, look, agent, model, effort, fast_mode, permission, claude_account_id, thread_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
       input.id,
       name,
       JSON.stringify(look),
@@ -74,15 +76,16 @@ export const orclings = {
       settings.effort,
       settings.fastMode ? 1 : 0,
       permission,
+      claudeAccountId,
       input.threadId,
       now,
       now,
     );
     return orclings.get(db, input.id)!;
   },
-  update(db: Db, id: string, draft: OrclingDraft, now = Date.now()): Orcling | null {
-    const { name, look, settings, permission } = draft;
-    db.stmt("UPDATE orclings SET name = ?, look = ?, agent = ?, model = ?, effort = ?, fast_mode = ?, permission = ?, updated_at = ? WHERE id = ?").run(
+  update(db: Db, id: string, draft: OrclingDraft & { claudeAccountId: string }, now = Date.now()): Orcling | null {
+    const { name, look, settings, permission, claudeAccountId } = draft;
+    db.stmt("UPDATE orclings SET name = ?, look = ?, agent = ?, model = ?, effort = ?, fast_mode = ?, permission = ?, claude_account_id = ?, updated_at = ? WHERE id = ?").run(
       name,
       JSON.stringify(look),
       settings.agent,
@@ -90,6 +93,7 @@ export const orclings = {
       settings.effort,
       settings.fastMode ? 1 : 0,
       permission,
+      claudeAccountId,
       now,
       id,
     );

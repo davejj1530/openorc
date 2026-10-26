@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { audit, orchestration, orclings, runs as runRepo, tasks, threads, type Db } from "@openorc/db";
+import { audit, claudeAccounts, orchestration, orclings, runs as runRepo, tasks, threads, type Db } from "@openorc/db";
 import {
   isHarnessId,
   orclingExecution,
@@ -74,6 +74,7 @@ export class OrclingService {
     const { db } = this.deps;
     this.assertNameFree(draft.name, null);
     const id = randomUUID();
+    const claudeAccountId = this.account(draft.claudeAccountId, null);
     const folder = await this.folders.create(draft.name);
     const execution = orclingExecution(draft);
     const orcling = db.transaction(() => {
@@ -86,10 +87,11 @@ export class OrclingService {
         model: draft.settings.model,
         effort: draft.settings.effort,
         fastMode: draft.settings.fastMode,
+        claudeAccountId,
         ...execution,
       });
       threads.update(db, home.id, { workingDirectory: folder });
-      const created = orclings.insert(db, { id, draft, threadId: home.id });
+      const created = orclings.insert(db, { id, draft: { ...draft, claudeAccountId }, threadId: home.id });
       threads.update(db, home.id, { orclingId: id });
       orclings.appendInstructions(db, id, { body: STARTER_INSTRUCTIONS, author: "user", note: "Starter instructions" });
       audit.record(db, { actor: "user", action: "orcling.create", resourceType: "orcling", resourceId: id, metadata: { agent: draft.settings.agent, threadId: home.id } });
@@ -103,9 +105,13 @@ export class OrclingService {
     const { db } = this.deps;
     const current = this.get(id);
     this.assertNameFree(draft.name, id);
+    const claudeAccountId = this.account(draft.claudeAccountId, current.claudeAccountId);
+    const moving = claudeAccountId === current.claudeAccountId ? [] : this.conversations(current);
+    if (moving.some((threadId) => this.deps.runs().threadActivity(threadId) !== "idle")) throw new Error(`Wait for ${current.name} to finish before changing its Claude account.`);
     const folder = await this.renameFolder(current, draft.name);
     const orcling = db.transaction(() => {
-      const updated = orclings.update(db, id, draft)!;
+      const updated = orclings.update(db, id, { ...draft, claudeAccountId })!;
+      for (const threadId of moving) threads.update(db, threadId, { claudeAccountId });
       threads.update(db, updated.threadId, {
         ...(folder ? { workingDirectory: folder } : {}),
         title: updated.name,
@@ -119,8 +125,32 @@ export class OrclingService {
       audit.record(db, { actor: "user", action: "orcling.update", resourceType: "orcling", resourceId: id, metadata: { agent: updated.settings.agent, permission: updated.permission } });
       return updated;
     });
+    await this.closeSessions(moving);
     this.changed(orcling);
+    this.deps.invalidate(moving.map((threadId) => `thread:${threadId}`));
     return orcling;
+  }
+
+  /** The Claude account an Orcling runs on: the one asked for, else the one it has, else the default. A new choice must be switched on. */
+  private account(wanted: string | undefined, current: string | null): string {
+    const id = wanted ?? current ?? claudeAccounts.defaultId(this.deps.db);
+    if (id === current) return id;
+    const account = claudeAccounts.get(this.deps.db, id);
+    if (!account.enabled) throw new Error(`${account.name} is disabled. Choose another account, or enable it in Settings → Connections.`);
+    return id;
+  }
+
+  /** The conversations an Orcling speaks in as itself: its own, and the project conversations given to it. */
+  private conversations(orcling: Orcling): string[] {
+    return (this.deps.db.stmt("SELECT id FROM threads WHERE orcling_id = ?").all(orcling.id) as { id: string }[]).map((row) => row.id);
+  }
+
+  /** A session belongs to the account that began it, so the next message in each conversation starts one on the new account. */
+  private async closeSessions(threadIds: readonly string[]): Promise<void> {
+    for (const threadId of threadIds) {
+      const live = this.deps.runs().liveRunForThread(threadId);
+      if (live) await this.deps.runs().closeAndWait(live.id);
+    }
   }
 
   /** Its folder follows a new name, between turns. Returns where it moved, or null when it stays. */
@@ -177,6 +207,7 @@ export class OrclingService {
     return this.deps.threads().start(
       {
         ...input,
+        claudeAccountId: orcling.claudeAccountId,
         agent,
         model,
         effort: effort ?? undefined,
@@ -202,7 +233,7 @@ export class OrclingService {
     const ceiling = orclingExecution(orcling);
     const { agent, model, effort, fastMode } = orcling.settings;
     const thread = this.deps.threads().taskThreadForStart(taskId, { agent, model, effort });
-    if (thread.orclingId !== id) threads.update(db, thread.id, { orclingId: id });
+    if (thread.orclingId !== id || thread.claudeAccountId !== orcling.claudeAccountId) threads.update(db, thread.id, { orclingId: id, claudeAccountId: orcling.claudeAccountId });
     const images = await new AttachmentService(this.deps.dataDir).forTask(task.spec ?? "");
     return this.deps.threads().startTaskInThread(taskId, undefined, images, {
       agent,
@@ -248,7 +279,7 @@ export class OrclingService {
     return thread;
   }
 
-  /** Gives a project conversation to an Orcling, which takes over its model, or with null returns it to a plain model. */
+  /** Gives a project conversation to an Orcling, which takes over its model and Claude account, or with null returns it to a plain model. */
   assign(threadId: string, orclingId: string | null): void {
     const thread = threads.get(this.deps.db, threadId);
     if (!thread) throw new Error("This conversation no longer exists.");
@@ -268,7 +299,7 @@ export class OrclingService {
         permissionMode: stricterPermission(thread.permissionMode, ceiling.permissionMode),
       });
     }
-    threads.update(this.deps.db, threadId, { orclingId });
+    threads.update(this.deps.db, threadId, orcling ? { orclingId, claudeAccountId: orcling.claudeAccountId } : { orclingId });
     this.deps.invalidate(["threads", `thread:${threadId}`]);
   }
 

@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { afterEach, expect, it, vi } from "vitest";
 import { memories, projects, runs, settings, summaries, tasks, threads } from "@openorc/db";
-import { CodexAdapter, RunHandle } from "@openorc/agents";
+import { ClaudeAdapter, CodexAdapter, RunHandle } from "@openorc/agents";
 import { WORKSPACE_ID, defaultOrclingLook, orclingExecution, type OrclingDraft, type RunSpec } from "@openorc/protocol";
 import { createOrclingHost } from "../mcp-host/orcling.js";
 import { OpenOrc } from "../openorc.js";
@@ -23,24 +23,30 @@ const draft = (overrides: Partial<OrclingDraft> = {}): OrclingDraft => ({
   ...overrides,
 });
 const turn = { agent: "codex" as const, model: "fixture", effort: undefined, attachments: undefined };
+const claude = { agent: "claude" as const, model: "fixture", effort: null, fastMode: false };
 
-/** A core whose Codex runs answer at once, recording what each launch was given. */
+/** A core whose Codex and Claude runs answer at once, recording what each launch was given. */
 async function fixture() {
   root = await mkdtemp(join(tmpdir(), "openorc-orclings-"));
   const specs: RunSpec[] = [];
-  vi.spyOn(CodexAdapter.prototype, "start").mockImplementation((spec) => {
+  const scripted = (agent: "codex" | "claude") => (spec: RunSpec) => {
     let finish!: (code: number) => void;
     const done = new Promise<number>((resolve) => (finish = resolve));
     const handle = new RunHandle(spec.runId, { send: async () => {}, interrupt() {}, close: () => finish(0), done });
     specs.push(spec);
     setTimeout(() => {
-      handle.emit("event", { type: "session.started", runId: spec.runId, ts: Date.now(), agent: "codex", externalSessionId: `session-${specs.length}`, model: "fixture" });
+      handle.emit("event", { type: "session.started", runId: spec.runId, ts: Date.now(), agent, externalSessionId: `session-${specs.length}`, model: "fixture" });
       handle.emit("event", { type: "message.completed", runId: spec.runId, ts: Date.now(), messageId: `reply-${specs.length}`, role: "assistant", text: `Reply ${specs.length}` });
       handle.emit("event", { type: "turn.completed", runId: spec.runId, ts: Date.now(), turnId: "turn", status: "success", durationMs: 1 });
     }, 0);
     return handle;
-  });
+  };
+  vi.spyOn(CodexAdapter.prototype, "start").mockImplementation(scripted("codex"));
+  vi.spyOn(ClaudeAdapter.prototype, "start").mockImplementation(scripted("claude"));
   const core = await OpenOrc.create({ dataDir: join(root, "data"), ephemeral: true, transport: { push() {} } });
+  // Scripted adapters still pass through real launch admission; the fixture needs no installed CLIs.
+  const environment = core.environment.current();
+  vi.spyOn(core.environment, "current").mockReturnValue({ ...environment, binaries: { ...environment.binaries, codex: "/fixture/codex", claude: "/fixture/claude" } });
   vi.spyOn(core.memory, "onRunFinished").mockImplementation(() => {});
   vi.spyOn(core.textGeneration, "title").mockResolvedValue(null);
   const idle = (threadId: string) => vi.waitFor(() => expect(core.threads.get(threadId)?.activity).toBe("idle"));
@@ -289,6 +295,53 @@ it("answers as a guest in another agent's thread, and the thread's agent hears t
     expect(specs[2]!.systemPromptAppendix).toContain("Since your last turn in this conversation, others spoke here");
     expect(specs[2]!.systemPromptAppendix).toContain("Gloop: Reply 2");
     expect(specs[2]!.systemPromptAppendix).not.toContain("# You are Gloop");
+  } finally {
+    await core.close();
+  }
+});
+
+it("runs a Claude Orcling on its own account wherever it speaks, and moves its conversations to another with a brief", async () => {
+  const { core, specs, idle } = await fixture();
+  try {
+    const project = projects.insert(core.db, { name: "Site", rootPath: root!, gitRemote: null, defaultBranch: null, settings: {} });
+    const work = core.claudeAccounts.add("Work");
+    const personal = core.claudeAccounts.add("Personal");
+    const rini = await core.orclings.create(draft({ name: "Rini", settings: claude, claudeAccountId: work.id }));
+    const send = async (threadId: string, prompt: string) => {
+      await core.threads.continueThread(threadId, { ...turn, agent: "claude", mode: "act", permissionMode: "autonomous", prompt });
+      await idle(threadId);
+    };
+    const accounts = (threadId: string) => runs.listForThread(core.db, threadId).flatMap((run) => (run.orclingId === rini.id ? [run.claudeAccountId] : []));
+
+    await send(rini.threadId, "Remember the deploy checklist");
+    const { thread: page } = await core.orclings.startThread(rini.id, {
+      projectId: project.id,
+      mode: "act",
+      permissionMode: "autonomous",
+      prompt: "Build the page",
+      attachments: undefined,
+      title: "Page",
+    });
+    await idle(page.id);
+    const { thread: theirs } = await core.threads.start({ ...turn, mode: "act", permissionMode: "autonomous", prompt: "Fix the header", projectId: project.id, title: "Header" });
+    await idle(theirs.id);
+    await core.orclings.ask(rini.id, theirs.id, "@Rini what do you think?", undefined);
+    await idle(theirs.id);
+    expect([accounts(rini.threadId), accounts(page.id), accounts(theirs.id)]).toEqual([[work.id], [work.id], [work.id]]);
+
+    await core.orclings.update(rini.id, draft({ name: "Rini", settings: claude, claudeAccountId: personal.id }));
+    expect([rini.threadId, page.id, theirs.id].map((id) => threads.get(core.db, id)!.claudeAccountId)).toEqual([personal.id, personal.id, core.claudeAccounts.defaultId()]);
+    expect(core.runs.liveRunForThread(rini.threadId)).toBeFalsy();
+
+    // Its session belongs to the old account, so the next turn starts one on the new account from a brief.
+    await send(rini.threadId, "What was on the checklist?");
+    expect(accounts(rini.threadId)).toEqual([work.id, personal.id]);
+    expect(specs.at(-1)!.resumeSessionId).toBeUndefined();
+    expect(specs.at(-1)!.systemPromptAppendix).toContain("- Remember the deploy checklist");
+
+    const spare = core.claudeAccounts.add("Spare");
+    core.claudeAccounts.update({ id: spare.id, enabled: false });
+    await expect(core.orclings.update(rini.id, draft({ name: "Rini", settings: claude, claudeAccountId: spare.id }))).rejects.toThrow("Spare is disabled.");
   } finally {
     await core.close();
   }

@@ -416,14 +416,15 @@ function orclingSeats(db: Db, saved: string | null | undefined): Map<string, Orc
 }
 
 /**
- * An Orcling brings its own name and model to its seat, whatever the team saved when it sat down. The seat's Claude
- * account stays with it while the seat runs on Claude.
+ * An Orcling brings its own name, model and Claude account to its seat, whatever the team saved when it sat down.
+ * Any other seat keeps the Claude account saved with it while it runs on Claude.
  */
 function seatSettings(member: MemberRow, orcling: Orcling | undefined): Pick<TeamMember, "name" | "settings" | "orclingId" | "claudeAccountId"> {
   const seat: Pick<TeamMember, "name" | "settings" | "orclingId"> = orcling
     ? { name: orcling.name, settings: { ...orcling.settings }, orclingId: orcling.id }
     : { name: member.name, settings: { agent: member.agent, model: member.model, effort: member.effort, fastMode: Boolean(member.fast_mode) } };
-  return seat.settings.agent === "claude" && member.claude_account_id ? { ...seat, claudeAccountId: member.claude_account_id } : seat;
+  const account = orcling ? orcling.claudeAccountId : member.claude_account_id;
+  return seat.settings.agent === "claude" && account ? { ...seat, claudeAccountId: account } : seat;
 }
 
 /** Records the Claude accounts members run on, before the revision is sealed. A team without any records nothing. */

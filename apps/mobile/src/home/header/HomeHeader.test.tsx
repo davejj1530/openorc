@@ -9,7 +9,11 @@ import { HomeBar } from "./HomeBar";
 import { LostLine, MacLine } from "./MacLine";
 
 vi.mock("expo-router", () => ({ Link: ({ children }: { children: ReactNode }) => <>{children}</> }));
-vi.mock("../../client", () => ({ storage: { getString: () => undefined, set: () => undefined, remove: () => undefined } }));
+const demo = vi.hoisted(() => ({ ended: 0 }));
+vi.mock("../../client", async () => {
+  const { ScratchStore } = await import("../../scratch-store");
+  return { storage: new ScratchStore({ getString: () => undefined, set: () => undefined, remove: () => undefined }), endDemo: () => void demo.ended++ };
+});
 
 afterEach(cleanup);
 
@@ -84,4 +88,22 @@ it("offers only Settings in the bar with no Mac, with no pinned status and no ha
   expect(screen.queryByRole("button", { name: /^Show/ })).toBeNull();
   expect(screen.queryByTestId("link-dot")).toBeNull();
   expect(screen.queryByTestId("scroll-edge")).toBeNull();
+});
+
+const demoMac: LinkState = { kind: "connected", mac: { id: "demo", name: "Demo Mac" }, route: { kind: "demo" }, serial: 1 };
+
+it("puts Skip where Settings sits while the demo shows, and Skip leaves the demo", () => {
+  demo.ended = 0;
+  bar(demoMac, 0);
+  expect(screen.queryByRole("button", { name: "Settings" })).toBeNull();
+  expect(screen.getByRole("button", { name: /^Show/ })).toBeTruthy();
+  screen.getByRole("button", { name: "Skip" }).click();
+  expect(demo.ended).toBe(1);
+});
+
+it("names the demo Mac on the Mac line, with its dot and no route", () => {
+  render(<MacLine state={demoMac} {...scrolled(0)} />);
+  expect(screen.getByRole("button", { name: "Demo Mac, On this iPhone" })).toBeTruthy();
+  expect(screen.getByText("Demo Mac")).toBeTruthy();
+  expect(screen.queryByText(/·/)).toBeNull();
 });

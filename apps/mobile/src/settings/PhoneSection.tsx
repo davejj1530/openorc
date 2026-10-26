@@ -56,13 +56,17 @@ function AppearanceRow() {
 }
 
 /** What this phone keeps for itself. */
-export function PhoneSection() {
+export function PhoneSection({ notifications }: { notifications: boolean }) {
   return (
     <Section title="This iPhone">
       <Card>
         <AppearanceRow />
-        <Divider />
-        <NotificationsRow />
+        {notifications ? (
+          <>
+            <Divider />
+            <NotificationsRow />
+          </>
+        ) : null}
       </Card>
     </Section>
   );

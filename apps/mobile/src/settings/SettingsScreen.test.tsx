@@ -29,7 +29,7 @@ const phone = vi.hoisted(() => ({
   saved: new Map<string, string>(),
   alerts: { permission: "granted", prefs: { choice: "all", sound: true }, senders: new Map() },
 }));
-vi.mock("../client", () => ({
+vi.mock("../client", async () => ({
   link: { select: () => undefined, retry: () => Promise.resolve() },
   alerts: {
     subscribe: () => () => undefined,
@@ -38,11 +38,12 @@ vi.mock("../client", () => ({
   },
   useLinkState: () => phone.state,
   useSavedMacs: () => phone.macs,
-  storage: {
-    getString: (key: string) => phone.saved.get(key),
-    set: (key: string, value: string) => void phone.saved.set(key, value),
-    remove: (key: string) => void phone.saved.delete(key),
-  },
+  storage: new (await import("../scratch-store")).ScratchStore({
+    getString: (key) => phone.saved.get(key),
+    set: (key, value) => void phone.saved.set(key, value),
+    remove: (key) => void phone.saved.delete(key),
+  }),
+  endDemo: () => void phone.forgot.push("end demo"),
 }));
 
 const usage = vi.hoisted(() => ({ now: 0, current: null as Usage | null }));
@@ -82,18 +83,45 @@ it("shows the Mac, its usage and this iPhone in that order, and ends with forget
   const order = headings();
   expect(order[0]).toBe("Settings");
   expect(order.filter((heading) => ["Mac", "Usage", "This iPhone"].includes(heading!))).toEqual(["Mac", "Usage", "This iPhone"]);
+  expect(screen.getByRole("button", { name: /^Notifications/ })).toBeTruthy();
   expect(buttons().at(-1)).toBe("Forget Studio");
   expect(screen.queryByText(/^OpenOrc /)).toBeNull();
 });
 
-it("offers pairing and this iPhone, and nothing to forget, with no Mac", () => {
+it("offers pairing and this iPhone's appearance, with no notifications and nothing to forget, with no Mac", () => {
   phone.state = { kind: "unpaired", lost: null };
   phone.macs = [];
   render(<SettingsScreen />);
   expect(headings()).toEqual(["Settings", "Mac", "This iPhone"]);
+  expect(screen.getByRole("button", { name: "Appearance, System" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: /^Notifications/ })).toBeNull();
   act(() => screen.getByRole("button", { name: "Pair a Mac" }).click());
   expect(nav.calls).toEqual(["push /pair"]);
   expect(screen.queryByRole("button", { name: /^Forget/ })).toBeNull();
+});
+
+it("keeps notifications for a saved Mac it cannot reach", () => {
+  phone.state = { kind: "waiting", mac: studio, why: "unreachable", retryAt: null };
+  render(<SettingsScreen />);
+  expect(screen.getByRole("button", { name: /^Notifications/ })).toBeTruthy();
+});
+
+it("shows the demo Mac with pairing, its usage and the appearance, without notifications, and ends the demo last", () => {
+  phone.state = { kind: "connected", mac: { id: "demo", name: "Demo Mac" }, route: { kind: "demo" }, serial: 1 };
+  phone.macs = [];
+  render(<SettingsScreen />);
+  expect(headings().filter((heading) => ["Mac", "Usage", "This iPhone"].includes(heading!))).toEqual(["Mac", "Usage", "This iPhone"]);
+  expect(screen.getByText("Demo Mac")).toBeTruthy();
+  expect(screen.getByText("On this iPhone")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: /^Notifications/ })).toBeNull();
+  expect(screen.getByRole("button", { name: "Appearance, System" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: /^Forget/ })).toBeNull();
+  expect(buttons().at(-1)).toBe("End demo");
+  act(() => screen.getByRole("button", { name: "End demo" }).click());
+  expect(alerts).toEqual([]);
+  expect(phone.forgot).toEqual(["end demo"]);
+  act(() => screen.getByRole("button", { name: "Pair a Mac" }).click());
+  expect(nav.calls).toEqual(["push /pair"]);
 });
 
 it("forgets the shown Mac only once the person confirms", () => {

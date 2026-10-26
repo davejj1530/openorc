@@ -1,23 +1,23 @@
 import { AnimatedLegendList } from "@legendapp/list/reanimated";
-import { Link, router } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { router } from "expo-router";
+import { useEffect, useMemo, useState } from "react";
 import { Pressable, RefreshControl, View } from "react-native";
 import { useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { link, queryClient, useLinkState } from "../client";
-import type { LinkState, LostMac } from "../connection/manager";
+import type { LinkState } from "../connection/manager";
 import { Plus } from "../generated/icons";
 import { reportFirstFrame } from "../startup";
 import { usePerfAutoOpen } from "../thread/PerfProbe";
-import { haptic } from "../ui/haptics";
 import { swipes } from "../ui/swipe";
 import { Text } from "../ui/Text";
 import { HOME_BAR_HEIGHT, HomeBar } from "./header/HomeBar";
-import { LostLine, MacLine, lineOverRows, type HomeScroll } from "./header/MacLine";
+import { MacLine, lineOverRows, type HomeScroll } from "./header/MacLine";
 import { HomeHeading, RetryRow, SectionToggle, ShowMore } from "./HomeHeading";
 import type { HomeItem } from "./home-items";
 import { refreshHome } from "./refresh";
 import { ThreadRow } from "./ThreadRow";
+import { Unpaired } from "./Unpaired";
 import { useHomeItems } from "./use-home-items";
 
 type Paired = Exclude<LinkState, { kind: "unpaired" }>;
@@ -71,35 +71,6 @@ function Threads({ state, scrollY, lineBottom }: HomeScroll & { state: Paired })
       // The list lowers the spinner by its top padding, below the bar. Without a tint, iOS draws none.
       refreshControl={<RefreshControl refreshing={refresh.refreshing} onRefresh={refresh.onRefresh} tintColorClassName="accent-ink-3" />}
     />
-  );
-}
-
-/** No Mac yet: the bar, the line saying why the last Mac went when the person did not forget it, and one quiet way in. */
-function Unpaired({ state }: { state: Extract<LinkState, { kind: "unpaired" }> }) {
-  const insets = useSafeAreaInsets();
-  const told = useRef<LostMac | null>(null);
-  const { lost } = state;
-  useEffect(() => {
-    if (!lost || told.current === lost) return;
-    told.current = lost;
-    haptic.warn();
-  }, [lost]);
-  return (
-    <View className="flex-1 bg-bg" style={{ paddingTop: insets.top }}>
-      <HomeBar state={state} />
-      {lost ? <LostLine lost={lost} /> : null}
-      <View className="flex-1 items-center justify-center gap-2 px-10">
-        <Text accessibilityRole="header" className="text-xl">
-          Pair with your Mac
-        </Text>
-        <Text className="text-center text-ink-4">Scan the code OpenOrc shows on your Mac.</Text>
-        <Link href="/pair" asChild>
-          <Pressable accessibilityRole="button" className="mt-4 min-h-touch justify-center rounded-full bg-accent px-5 active:opacity-80">
-            <Text className="text-md text-accent-fg">Scan code</Text>
-          </Pressable>
-        </Link>
-      </View>
-    </View>
   );
 }
 

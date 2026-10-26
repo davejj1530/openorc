@@ -39,3 +39,9 @@ CREATE UNIQUE INDEX memories_orcling_topic ON memories(orcling_id, topic_key) WH
 CREATE INDEX runs_orcling ON runs(orcling_id, thread_id) WHERE orcling_id IS NOT NULL;
 ALTER TABLE orchestration_team_revisions ADD COLUMN orcling_seats TEXT;
 `;
+
+/** The Claude account an Orcling runs on, wherever it works. Each starts on its own conversation's. */
+export const orclingAccountMigration = `
+ALTER TABLE orclings ADD COLUMN claude_account_id TEXT REFERENCES claude_accounts(id);
+UPDATE orclings SET claude_account_id = (SELECT claude_account_id FROM threads WHERE threads.id = orclings.thread_id);
+`;

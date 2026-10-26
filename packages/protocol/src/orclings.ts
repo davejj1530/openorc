@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ClaudeAccountId } from "./claude-accounts.js";
 import type { Memory, PermissionPreset, Run, RunMode } from "./domain.js";
 import { executionModeAvailable, executionModeSettings } from "./execution-mode.js";
 import { ModelExecutionSettings } from "./orchestration.js";
@@ -57,6 +58,8 @@ export const OrclingDraft = z
     look: OrclingLook,
     settings: ModelExecutionSettings,
     permission: OrclingPermission,
+    /** The Claude account it runs on whenever its model is Claude's. Without one, a new Orcling takes the default account and a saved one keeps its own. */
+    claudeAccountId: ClaudeAccountId.optional(),
   })
   .strict();
 export type OrclingDraft = z.infer<typeof OrclingDraft>;
@@ -64,6 +67,7 @@ export type OrclingDraft = z.infer<typeof OrclingDraft>;
 /** A saved identity: the same Orcling in its own thread and wherever it is asked to help. */
 export interface Orcling extends OrclingDraft {
   id: string;
+  claudeAccountId: string;
   /** Its one personal conversation. */
   threadId: string;
   createdAt: number;

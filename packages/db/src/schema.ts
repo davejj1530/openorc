@@ -20,7 +20,7 @@ import { taskExecutionMigration } from "./task-execution-schema.js";
 import { conversationReviewCommentsMigration } from "./review-comments-schema.js";
 import { teamCancellationMigration } from "./team-cancellation-schema.js";
 import { pullRequestReviewMigration } from "./pull-review-schema.js";
-import { orclingMigration } from "./orcling-schema.js";
+import { orclingAccountMigration, orclingMigration } from "./orcling-schema.js";
 import { remoteDeviceMigration } from "./remote-device-schema.js";
 import { remotePushTargetMigration } from "./remote-push-target-schema.js";
 /**
@@ -780,4 +780,5 @@ export const migrations: Migration[] = [
   `ALTER TABLE orchestration_team_members ADD COLUMN claude_account_id TEXT REFERENCES claude_accounts(id);`,
   remoteDeviceMigration,
   remotePushTargetMigration,
+  orclingAccountMigration,
 ];

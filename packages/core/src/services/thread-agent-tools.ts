@@ -1,6 +1,7 @@
 import { audit, listEvents, orchestration, projects, runs as runRepo, taskForwardings, tasks, teamDeletedThreads, teamRuntime, threads, type Db } from "@openorc/db";
 import type { TaskCard, ThreadCard } from "@openorc/mcp";
 import {
+  DEFAULT_CLAUDE_ACCOUNT,
   WORKSPACE_ID,
   executionMode,
   executionModeLabel,
@@ -124,6 +125,14 @@ export class ThreadAgentTools {
     if (!threads.get(this.db, id)) throw new Error(`thread ${id} not found`);
     const rows = this.db.stmt("SELECT id, role, text, created_at AS createdAt, attachments FROM thread_messages WHERE thread_id = ? ORDER BY created_at, rowid").all(id);
     return rows.map((row) => ({ ...row, ...(row.attachments ? { attachments: JSON.parse(String(row.attachments)) as string[] } : { attachments: undefined }) })) as ThreadMessage[];
+  }
+
+  /** A fresh start, or a provider or Claude account that cannot read any earlier session here, gets a brief instead of the session. */
+  handoffFor(thread: Thread, own: Run[], agent: AgentKind, fresh: boolean | undefined): string | undefined {
+    if (own.length === 0) return undefined;
+    const account = thread.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT;
+    const resumable = own.some((run) => run.agent === agent && (agent !== "claude" || (run.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT) === account));
+    return fresh || !resumable ? this.handoffBrief(thread, own) : undefined;
   }
 
   /** What the previous agent and the user said, clipped, for an agent that joins the thread cold. */

@@ -13,7 +13,8 @@
       "appleTeamId": "8VR6L6XPS9",
       "supportsTablet": false,
       "infoPlist": {
-        "NSLocalNetworkUsageDescription": "OpenOrc connects to your Mac on this network."
+        "NSLocalNetworkUsageDescription": "OpenOrc connects to your Mac on this network.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "plugins": [

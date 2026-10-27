@@ -19,6 +19,8 @@ beforeEach(async () => {
   await git(root, ["init", "-q", "-b", "main"]);
   await git(root, ["config", "user.email", "test@example.com"]);
   await git(root, ["config", "user.name", "Test"]);
+  // A commit of thousands of files starts background maintenance, which writes into .git while the folder is removed.
+  await git(root, ["config", "maintenance.auto", "false"]);
   await writeFile(path.join(root, "README.md"), "one\ntwo\nthree\n");
   await writeFile(path.join(root, "bin.dat"), Buffer.from([0, 1, 2, 0, 3]));
   baseSha = await commitAll(root, "init");

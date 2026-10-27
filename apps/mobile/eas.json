@@ -1,15 +1,28 @@
 {
-  "cli": { "version": ">= 23.2.0", "appVersionSource": "remote" },
+  "cli": {
+    "version": ">= 23.2.0",
+    "appVersionSource": "remote"
+  },
   "build": {
     "production": {
       "node": "24.20.0",
       "pnpm": "11.21.0",
       "autoIncrement": true,
-      "env": { "ELECTRON_SKIP_BINARY_DOWNLOAD": "1", "HUSKY": "0" },
-      "ios": { "image": "latest" }
+      "env": {
+        "ELECTRON_SKIP_BINARY_DOWNLOAD": "1",
+        "HUSKY": "0"
+      },
+      "ios": {
+        "image": "latest"
+      }
     }
   },
   "submit": {
-    "production": { "ios": { "appleTeamId": "8VR6L6XPS9" } }
+    "production": {
+      "ios": {
+        "appleTeamId": "8VR6L6XPS9",
+        "ascAppId": "6827221510"
+      }
+    }
   }
 }

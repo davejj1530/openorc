@@ -126,7 +126,8 @@ export function ApprovalCard({ block, runId }: { block: ApprovalBlock; runId: st
   if (block.decision) return <DeniedLine block={block} />;
   const detail = approvalDetail(block);
   const Icon = typeof detail === "string" ? Terminal : Hammer;
-  const stacked = width < 420;
+  // Three answers cut "Allow for this run" short in a row at any phone's width; two fit side by side from 420 pt.
+  const stacked = !block.onceOnly || width < 420;
   return (
     <View className="gap-3 rounded-2xl bg-surface p-4">
       <View className="flex-row items-start gap-3">

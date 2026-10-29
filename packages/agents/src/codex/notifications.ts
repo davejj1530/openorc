@@ -138,7 +138,7 @@ function mapActivityNotice({ runId, method, p, ts }: NotificationContext): Agent
         activityId: `hook-${String(hook["id"])}`,
         label: `Hook: ${String(hook["eventName"] ?? "running")}`,
         status: method.endsWith("started") ? "running" : terminalStatus(hook["status"]),
-        text: String(hook["statusMessage"] ?? ""),
+        text: String(hook["statusMessage"] ?? hookOutcome(hook["entries"])),
         detail: hook["entries"],
       },
     ];
@@ -533,4 +533,13 @@ function terminalStatus(status: unknown): ActivityStatus {
   if (["failed", "declined", "denied", "blocked", "timedOut", "error"].includes(String(status))) return "error";
   if (["interrupted", "cancelled", "aborted", "stopped"].includes(String(status))) return "cancelled";
   return "success";
+}
+
+/** Codex often leaves statusMessage empty and puts why a hook failed or stopped in its entries; context is for the model. */
+function hookOutcome(entries: unknown): string {
+  if (!Array.isArray(entries)) return "";
+  return entries
+    .filter((entry): entry is Record<string, unknown> => isRecord(entry) && entry["kind"] !== "context" && typeof entry["text"] === "string")
+    .map((entry) => entry["text"])
+    .join("\n");
 }

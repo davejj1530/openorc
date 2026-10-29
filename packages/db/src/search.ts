@@ -6,6 +6,8 @@ interface HitRow {
   thread_title: string;
   project_id: string;
   run_id: string;
+  message_id: string;
+  turn: number;
   role: "user" | "assistant";
   snippet: string;
   ts: number;
@@ -46,9 +48,12 @@ export const messages = {
       args.push(options.orclingId, options.orclingId);
     }
     args.push(options.limit ?? 30);
+    // A message's turn is the turns its run completed before it. One that ended in the same millisecond is not
+    // counted, which can only start the load a turn early.
     const rows = db
       .stmt(
-        `SELECT t.id AS thread_id, t.title AS thread_title, t.project_id, f.run_id, f.role, snippet(messages_fts, 0, '', '', '…', 18) AS snippet, f.ts,
+        `SELECT t.id AS thread_id, t.title AS thread_title, t.project_id, f.run_id, f.message_id, f.role, snippet(messages_fts, 0, '', '', '…', 18) AS snippet, f.ts,
+                (SELECT COUNT(*) FROM events d WHERE d.run_id = f.run_id AND d.kind = 'turn.completed' AND d.ts < f.ts) AS turn,
                 k.id AS task_id, k.title AS task_title, m.member_key, m.name AS member_name
          FROM messages_fts f
          JOIN runs r ON r.id = f.run_id
@@ -71,6 +76,8 @@ export const messages = {
       threadTitle: r.thread_title,
       projectId: r.project_id,
       runId: r.run_id,
+      messageId: r.message_id,
+      turn: r.turn,
       role: r.role,
       snippet: r.snippet,
       ts: r.ts,

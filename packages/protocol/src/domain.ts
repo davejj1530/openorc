@@ -227,6 +227,9 @@ export const ThreadSearchHit = z.object({
   threadTitle: z.string(),
   projectId: z.string(),
   runId: z.string(),
+  messageId: z.string(),
+  /** The turn of its run the message falls in, counted from 0, so a conversation can load back to it. */
+  turn: z.number().int().nonnegative(),
   role: z.enum(["user", "assistant"]),
   snippet: z.string(),
   ts: z.number(),

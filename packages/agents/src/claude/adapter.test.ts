@@ -677,6 +677,7 @@ describe("enforced execution modes", () => {
       expect(args).toContain("--strict-mcp-config");
       const tools = args[args.indexOf("--tools") + 1]!.split(",");
       expect(tools).not.toContain("Agent");
+      expect(tools).toContain("Skill");
       if (mode === "plan") {
         expect(args[args.indexOf("--permission-mode") + 1]).toBe("plan");
         expect(settings.permissions.deny).toEqual(expect.arrayContaining(["Bash", "NotebookEdit"]));

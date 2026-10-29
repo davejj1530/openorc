@@ -186,7 +186,8 @@ function prepareClaudeLaunch(spec: RunSpec, launch: AgentLaunchEnvironment, opti
     const restricted = spec.mode === "plan" || spec.permissionMode !== "autonomous";
     // Restrict mutation entry points to the tools covered by our explicit rules.
     // Native subagents have independent policies; use OpenOrc's inherited-policy delegation instead.
-    if (restricted) args.push("--tools", "Read,Grep,Glob,Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch,AskUserQuestion,ExitPlanMode");
+    // Skill stays: the ask and deny rules still bind a skill's allowed-tools, its !`command` lines and its forked agent.
+    if (restricted) args.push("--tools", "Read,Grep,Glob,Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch,AskUserQuestion,ExitPlanMode,Skill");
     args.push(...isolationArgs(spec, restricted, Boolean(connection) && (spec.strictMcp ?? options.strictMcp) === true));
     args.push(...sharedPluginArgs(shared));
     if (spec.model) args.push("--model", spec.model);

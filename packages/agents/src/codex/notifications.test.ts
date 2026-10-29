@@ -59,4 +59,22 @@ describe("Codex notification input", () => {
     expect(events[4]).toMatchObject({ messageId: "thought", text: "First\n\nSecond" });
     expect(mapperState.summaryIndex.has("thought")).toBe(false);
   });
+
+  it("says why a hook failed when Codex reports the reason only as an entry", () => {
+    const run = {
+      id: "session-start:8",
+      eventName: "sessionStart",
+      status: "failed",
+      statusMessage: null,
+      entries: [
+        { kind: "context", text: "You have pstack." },
+        { kind: "error", text: "plugin contents changed; hook approval required" },
+      ],
+    };
+
+    expect(mapNotification("hook", "hook/completed", { run }, state())).toEqual([
+      expect.objectContaining({ type: "activity.updated", label: "Hook: sessionStart", status: "error", text: "plugin contents changed; hook approval required" }),
+    ]);
+    expect(mapNotification("hook", "hook/completed", { run: { ...run, statusMessage: "Blocked by policy" } }, state())).toEqual([expect.objectContaining({ text: "Blocked by policy" })]);
+  });
 });

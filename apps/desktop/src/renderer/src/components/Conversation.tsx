@@ -16,7 +16,7 @@ import { useProjectGit } from "../lib/project-git";
 import { Button, Empty } from "./ui";
 import { useConversationSettings, useConversationTranscript, useRpc, useRpcMutation, useSubmit } from "../lib/client";
 import { useConversationDraft } from "../lib/conversation-draft";
-import { openThread } from "../lib/router";
+import { openThread, useRouter, type MessageTarget } from "../lib/router";
 import { useSkillCommands } from "../lib/skill-commands";
 import { useTurnFooters } from "../lib/turn-footers";
 import { TeamConversation, TeamTaskConversation } from "./TeamConversation";
@@ -129,6 +129,15 @@ function useCheckout(thread: ThreadSummary | null, project: Project) {
   return { checkout, changes, git };
 }
 
+/** The message the route opened this conversation at, such as a search result; only the focused conversation has one. */
+function useMessageTarget(scope: ConversationScope): MessageTarget | undefined {
+  return useRouter(({ route }) => {
+    if (route.view === "thread" && scope.kind === "thread" && route.threadId === scope.thread.id) return route.message;
+    if (route.view === "task" && scope.kind === "task" && route.taskId === scope.task.id) return route.message;
+    return undefined;
+  });
+}
+
 function IndividualConversation({ scope, project }: { scope: ConversationScope; project: Project }) {
   const runsQuery = useRpc(scope.kind === "task" ? "runs.listForTask" : "runs.listForThread", scope.kind === "task" ? { taskId: scope.task.id } : { threadId: scope.thread.id });
   const runs = runsQuery.data ?? [];
@@ -143,7 +152,8 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
 
   const activeRun: Run | undefined = runs[runs.length - 1];
   const basePath = (scope.kind === "task" ? scope.task.worktreePath : (scope.thread.workingDirectory ?? scope.thread.worktreePath)) ?? project.rootPath;
-  const { merged, transcripts, liveTranscript, hasOlder, loadOlder } = useConversationTranscript({ runs, threadId: thread?.id ?? null });
+  const target = useMessageTarget(scope);
+  const { merged, transcripts, liveTranscript, hasOlder, loadOlder } = useConversationTranscript({ runs, threadId: thread?.id ?? null, target });
   const footers = useTurnFooters({ threadId: thread?.id ?? null, transcripts, blocks: merged?.blocks, basePath });
 
   const settings = useConversationSettings({ thread, activeRun });
@@ -227,6 +237,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
             onFork={thread ? forkConversation : undefined}
             hasOlder={hasOlder}
             onLoadOlder={loadOlder}
+            reveal={target}
             trailing={turnFooter}
           />
         </ConversationVoice.Provider>

@@ -68,6 +68,29 @@ it("opens on the newest run's last four turns, then pages four at a time, then i
   ]);
 });
 
+it("opens at a target in an earlier run: that run from the turn before the target's, every later run whole", async () => {
+  serve();
+  const target = { runId: "older", turn: 1 };
+  const { result } = renderHook(() => client.useConversationTranscript({ runs: [run("older"), run("newer")], threadId: "t", target }), { wrapper });
+  await waitFor(() => expect(replies(result.current.merged?.blocks)).toEqual(["reply 0", "reply 1", "reply 0", "reply 1", "reply 2", "reply 3", "reply 4", "reply 5"]));
+  expect(result.current.hasOlder).toBe(false);
+  expect(pageRequests()).toEqual(
+    expect.arrayContaining([
+      { runId: "older", fromTurn: 0 },
+      { runId: "newer", fromTurn: 0 },
+    ]),
+  );
+  expect(pageRequests()).not.toContainEqual({ runId: "older", turns: 4 });
+});
+
+it("opens at a target in the newest run from the turn before it, further back than the first page", async () => {
+  serve();
+  const target = { runId: "newer", turn: 2 };
+  const { result } = renderHook(() => client.useConversationTranscript({ runs: [run("older"), run("newer")], threadId: "t", target }), { wrapper });
+  await waitFor(() => expect(replies(result.current.merged?.blocks)).toEqual(["reply 1", "reply 2", "reply 3", "reply 4", "reply 5"]));
+  expect(result.current.hasOlder).toBe(true);
+});
+
 it("names the newest run's transcript as the live one, and the whole conversation after the active run", async () => {
   serve();
   const { result } = renderHook(() => client.useConversationTranscript({ runs: [run("newer")], threadId: "t" }), { wrapper });

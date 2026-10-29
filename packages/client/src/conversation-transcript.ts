@@ -9,14 +9,18 @@ type Runs = ReturnType<typeof createRunStore>;
 /** Turns a conversation opens with, and how many more each approach to the top brings in. */
 const PAGE_TURNS = 4;
 
+/** A place in a conversation to load back to: a run, and the turn of it to load from. */
+export type ConversationTarget = { runId: string; turn: number };
+
 /**
  * A thread's runs read as one conversation: their loaded turns in run order, with the thread's own messages placed by
- * time. Paging and the live run follow the same loaded window, whose runs `shown` names, oldest first.
+ * time. Paging and the live run follow the same loaded window, whose runs `shown` names, oldest first. A `target`
+ * extends the window back to it.
  */
-export function useConversationTranscriptWith(queries: ClientQueries, store: Runs, { runs, threadId }: { runs: Run[]; threadId: string | null }) {
+export function useConversationTranscriptWith(queries: ClientQueries, store: Runs, { runs, threadId, target }: { runs: Run[]; threadId: string | null; target?: ConversationTarget | undefined }) {
   const activeRun = runs.at(-1);
   const conversationMessages = queries.useRpc("threads.messages", { id: threadId ?? "" }, { enabled: Boolean(threadId) });
-  const { shown, transcripts, hasOlder, loadOlder } = useRecentRuns(store, runs);
+  const { shown, transcripts, hasOlder, loadOlder } = useRecentRuns(store, runs, target);
   const messages = useMemo(
     () =>
       (conversationMessages.data ?? []).map((m): Block => ({
@@ -64,7 +68,7 @@ function inTimeOrder(blocks: Block[]): boolean {
  * The runs a conversation shows, newest first: the newest run's latest turns to begin with, then older turns and
  * older runs as the reader scrolls toward them. Returning within a few minutes shows as much as was loaded before.
  */
-function useRecentRuns(store: Runs, runs: Run[]) {
+function useRecentRuns(store: Runs, runs: Run[], target: ConversationTarget | undefined) {
   const runStore = store.runs;
   const ids = useMemo(() => runs.map((run) => run.id), [runs]);
   const [shownFrom, setShownFrom] = useState<string | null>(null);
@@ -77,6 +81,18 @@ function useRecentRuns(store: Runs, runs: Run[]) {
   // load shows what arrived live instead.
   const loading = shown[0] !== undefined && !first?.hydrated && !failed.has(shown[0]);
   const hasOlder = start > 0 || loading || Boolean(first?.hydrated && first.fromTurn > 0);
+
+  // A target's run loads from the turn before it, so what led there shows above it, and every later run loads whole,
+  // so nothing is missing between it and the newest turn. Ahead of the usual first page, which then finds these
+  // loads covering it.
+  const targetIndex = target ? ids.indexOf(target.runId) : -1;
+  useEffect(() => {
+    if (!target || targetIndex < 0) return;
+    if (targetIndex < start) setShownFrom(target.runId);
+    ids.slice(targetIndex).forEach((id, i) => {
+      runStore.hydrate(id, { fromTurn: i === 0 ? Math.max(0, target.turn - 1) : 0 }).catch(() => undefined);
+    });
+  }, [target, targetIndex, start, ids, runStore]);
 
   // Where the view begins stays put once its first run is here: a run that starts later joins the end instead of
   // taking the view over, and only the reader scrolling up moves the start back.

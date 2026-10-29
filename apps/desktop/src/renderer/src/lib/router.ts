@@ -3,6 +3,9 @@ import { useLayout } from "./layout";
 
 export type TaskTab = "chat" | "spec" | "files" | "commits" | "memory";
 
+/** A message to bring into view: its run, the turn of that run it falls in, and its id. */
+export type MessageTarget = { runId: string; turn: number; messageId: string };
+
 /** The sections Settings is divided into, in the order it lists them. */
 export const SETTINGS_SECTIONS = ["usage", "connections", "slack", "phone", "skills", "devices", "appearance", "general", "memory", "data"] as const;
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
@@ -12,13 +15,14 @@ export type Route =
   | { view: "onboarding"; mode?: "first_run" | "recovery"; preview?: boolean }
   | { view: "newthread"; projectId?: string }
   | { view: "newtask"; projectId?: string; threadId?: string }
-  | { view: "thread"; threadId: string }
+  /** A conversation, optionally with a message to bring into view there, such as a search result. */
+  | { view: "thread"; threadId: string; message?: MessageTarget }
   | { view: "inbox" }
   | { view: "tasks" }
   | { view: "pulls" }
   | { view: "pull"; projectId: string; number: number }
   | { view: "project"; projectId: string }
-  | { view: "task"; taskId: string; tab: TaskTab }
+  | { view: "task"; taskId: string; tab: TaskTab; message?: MessageTarget }
   | { view: "memory" }
   | { view: "scheduled" }
   | { view: "orchestration"; projectId?: string; teamId?: string }
@@ -114,16 +118,16 @@ export const useRouter = create<RouterState>((set, get) => {
   };
 });
 
-export function openTask(taskId: string, tab: TaskTab = "spec"): void {
-  useRouter.getState().navigate({ view: "task", taskId, tab });
+export function openTask(taskId: string, tab: TaskTab = "spec", message?: MessageTarget): void {
+  useRouter.getState().navigate({ view: "task", taskId, tab, ...(message ? { message } : {}) });
 }
 
 export function openPullRequest(projectId: string, number: number): void {
   useRouter.getState().navigate({ view: "pull", projectId, number });
 }
 
-export function openThread(threadId: string): void {
-  useRouter.getState().navigate({ view: "thread", threadId });
+export function openThread(threadId: string, message?: MessageTarget): void {
+  useRouter.getState().navigate({ view: "thread", threadId, ...(message ? { message } : {}) });
 }
 
 /** Screens a spec names without an id. */

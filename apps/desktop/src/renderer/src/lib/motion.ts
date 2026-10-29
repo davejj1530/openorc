@@ -14,7 +14,7 @@ function subscribeToReducedMotion(onChange: () => void): () => void {
   return () => preference.removeEventListener("change", onChange);
 }
 
-function prefersReducedMotion(): boolean {
+export function prefersReducedMotion(): boolean {
   return window.matchMedia(REDUCED_MOTION_QUERY).matches;
 }
 

@@ -39,6 +39,7 @@ export function WorkSteps({
   live,
   taskCards = true,
   pinned,
+  reveal,
   renderBlocks,
 }: {
   blocks: Block[];
@@ -46,6 +47,8 @@ export function WorkSteps({
   live: boolean;
   taskCards?: boolean | undefined;
   pinned?: string | undefined;
+  /** A message to bring into view: the phase it names opens. */
+  reveal?: string | undefined;
   renderBlocks: RenderBlocks;
 }) {
   const entries = useMemo(() => workEntries(blocks, taskCards, pinned), [blocks, taskCards, pinned]);
@@ -55,7 +58,7 @@ export function WorkSteps({
       <StepsHead entries={entries} />
       <ol className="work-rail">
         {entries.map((entry) => (
-          <EntryView key={entryId(entry)} entry={entry} headline={headline} live={live} renderBlocks={renderBlocks} />
+          <EntryView key={entryId(entry)} entry={entry} headline={headline} live={live} reveal={reveal} renderBlocks={renderBlocks} />
         ))}
         {headline && !headline.entryId ? (
           <li className="work-rail-item" data-state="running">
@@ -117,10 +120,11 @@ function entryId(entry: WorkEntry): string {
   return entry.kind === "phase" ? entry.phase.id : entry.id;
 }
 
-function EntryView({ entry, headline, live, renderBlocks }: { entry: WorkEntry; headline: LiveHeadline | null; live: boolean; renderBlocks: RenderBlocks }) {
+function EntryView({ entry, headline, live, reveal, renderBlocks }: { entry: WorkEntry; headline: LiveHeadline | null; live: boolean; reveal: string | undefined; renderBlocks: RenderBlocks }) {
   if (entry.kind === "phase") {
     const current = headline?.entryId === entry.phase.id ? headline : null;
-    return <PhaseView phase={entry.phase} headline={current} renderBlocks={renderBlocks} />;
+    const message = entry.phase.origin === "narration" ? entry.phase.source?.id : undefined;
+    return <PhaseView phase={entry.phase} headline={current} message={message} revealed={message !== undefined && message === reveal} renderBlocks={renderBlocks} />;
   }
   if (entry.kind === "plan") return <PlanView items={entry.items} live={live} />;
   return (
@@ -180,7 +184,8 @@ function phaseMeta(phase: WorkPhase): string {
   return [files ? plural(files, "file") : "", searches ? plural(searches, "search", "searches") : "", commands ? plural(commands, "command") : ""].filter(Boolean).slice(0, 2).join(" · ");
 }
 
-type PhaseProps = { phase: WorkPhase; headline: LiveHeadline | null; renderBlocks: RenderBlocks };
+/** `message` is the narration the phase is named after; `revealed`, that it was asked for. */
+type PhaseProps = { phase: WorkPhase; headline: LiveHeadline | null; message?: string | undefined; revealed?: boolean; renderBlocks: RenderBlocks };
 
 /** A finished phase whose blocks are all the same objects has nothing new to show while another streams. */
 const samePhase = (a: PhaseProps, b: PhaseProps) =>
@@ -188,19 +193,28 @@ const samePhase = (a: PhaseProps, b: PhaseProps) =>
   a.phase.title === b.phase.title &&
   a.headline?.label === b.headline?.label &&
   a.headline?.since === b.headline?.since &&
+  a.revealed === b.revealed &&
   a.phase.blocks.length === b.phase.blocks.length &&
   a.phase.blocks.every((block, i) => block === b.phase.blocks[i]);
 
-/** Open while it is the live phase, folded once it is done, unless the reader chose. */
-const PhaseView = memo(function PhaseView({ phase, headline, renderBlocks }: PhaseProps) {
-  const live = headline !== null;
+/**
+ * Open while it is the live phase, folded once it is done, unless the reader chose. Asking for the message it names
+ * opens it as if the reader had, so it stays open once the view moves on.
+ */
+function usePhaseOpen(live: boolean, revealed: boolean) {
   const [choice, setChoice] = useState<boolean | null>(null);
-  const open = choice ?? live;
+  if (revealed && choice === null) setChoice(true);
+  return { open: choice ?? live, setChoice };
+}
+
+const PhaseView = memo(function PhaseView({ phase, headline, message, revealed = false, renderBlocks }: PhaseProps) {
+  const live = headline !== null;
+  const { open, setChoice } = usePhaseOpen(live, revealed);
   const visited = useVisited(open);
   const bodyId = useId();
   const expandable = phase.sections.length > 0 || phase.extras.length > 0 || phase.thoughts.length > 0 || Boolean(phase.detail || phase.narration);
   return (
-    <li className="work-rail-item" data-state={live ? "running" : "done"}>
+    <li className="work-rail-item" data-state={live ? "running" : "done"} data-message={message}>
       <StepMark state={live ? "running" : "done"} />
       <button
         type="button"

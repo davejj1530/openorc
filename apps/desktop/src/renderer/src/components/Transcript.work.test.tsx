@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, expect, it, vi } from "vitest";
 import type { AgentEvent, ProviderUsage } from "@openorc/protocol";
 import { runs } from "../lib/client";
-import { type Block } from "@openorc/client";
+import { emptyRun, type Block } from "@openorc/client";
 import { core } from "../lib/rpc";
 import { TeamWorkTranscript } from "./TeamWorkTranscript";
 import { Transcript, WorkTranscript, groupBlocks, groupSummary, AgentPresence } from "./Transcript";
@@ -400,4 +400,29 @@ it("shows a manual compaction between turns as finished work, not a turn under w
   // The next prompt opens a turn before core's busy flag reaches the view.
   rerender(<Transcript run={runs.get(runId)!} working={false} />);
   expect(heads()).toEqual(["done", "done", "working"]);
+});
+
+it("opens the folded work that holds a message asked for, with its whole narration, and marks that message", () => {
+  const animate = vi.fn();
+  HTMLElement.prototype.animate = animate;
+  const prompt: Block = { id: "ask", kind: "message", role: "user", text: "Fix the export", streaming: false, at: 900 };
+  const narration: Block = {
+    id: "narration",
+    kind: "message",
+    role: "assistant",
+    text: "Checking the export path first. Then tracing how the cursor is built across both handlers and the shared helper.",
+    streaming: false,
+    at: 950,
+  };
+  const run = { ...emptyRun("run-reveal"), hydrated: true, blocks: [prompt, narration, { ...tool, done: true }, reply, end] };
+  const { rerender } = render(<Transcript run={run} />);
+  expect(receipt().getAttribute("aria-expanded")).toBe("false");
+
+  rerender(<Transcript run={run} reveal={{ messageId: "narration" }} />);
+  expect(receipt().getAttribute("aria-expanded")).toBe("true");
+  const found = document.querySelector<HTMLElement>('[data-message="narration"]')!;
+  expect(found.closest("[hidden]")).toBeNull();
+  expect(screen.getByText(/tracing how the cursor is built/)).toBeTruthy();
+  expect(animate.mock.contexts).toEqual([found]);
+  delete (HTMLElement.prototype as { animate?: unknown }).animate;
 });

@@ -2,7 +2,7 @@ import type { Run } from "@openorc/protocol";
 import type { ClientPush, CoreConnection, Notice } from "./connection.js";
 import { useConversationSettingsWith, type SavedThreadSettings } from "./conversation-settings.js";
 import { useSubmitWith } from "./conversation-submit.js";
-import { useConversationTranscriptWith } from "./conversation-transcript.js";
+import { useConversationTranscriptWith, type ConversationTarget } from "./conversation-transcript.js";
 import { createPermissionDefault } from "./permission-default.js";
 import { createQueries } from "./query.js";
 import { createRunStore } from "./run-store.js";
@@ -46,7 +46,7 @@ export function createClientState(connection: CoreConnection, options: ClientSta
     ...store,
     ...permissions,
     useSubmit: () => useSubmitWith(queries.useRpcMutation, options.randomId),
-    useConversationTranscript: (input: { runs: Run[]; threadId: string | null }) => useConversationTranscriptWith(queries, store, input),
+    useConversationTranscript: (input: { runs: Run[]; threadId: string | null; target?: ConversationTarget | undefined }) => useConversationTranscriptWith(queries, store, input),
     useConversationSettings: (input: { thread: SavedThreadSettings | null; activeRun: Run | undefined }) => useConversationSettingsWith(queries, permissions, input),
     onNotify(listener: (notice: Notice) => void): () => void {
       notices.add(listener);

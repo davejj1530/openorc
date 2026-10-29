@@ -40,6 +40,7 @@ import { IconButton, TextButton } from "./ui";
 import { ImageGenerationRow, ImageViewRow, ThreadImage, ThreadMedia, ThreadRichText } from "./ThreadImages";
 import { isImagePath } from "../../../shared/image-paths";
 import { CopyMessage, MessageTime, TurnActions } from "./MessageActions";
+import { useMessageReveal, type Reveal } from "../lib/message-reveal";
 
 const InlineDiff = lazy(() => import("./InlineDiff").then((m) => ({ default: m.InlineDiff })));
 const diffLoading = (
@@ -67,6 +68,7 @@ export function Transcript({
   hasOlder = false,
   onLoadOlder,
   followKey,
+  reveal,
 }: {
   basePath?: string;
   fileScope?: FileSelection["scope"];
@@ -83,6 +85,8 @@ export function Transcript({
   onLoadOlder?: () => void;
   /** Changes when the user sends a message, which returns the view to the newest turn to follow it. */
   followKey?: number;
+  /** A message to bring into view once it has loaded, such as a search result. Each new object asks again. */
+  reveal?: Reveal | undefined;
 }) {
   const parentRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -92,19 +96,15 @@ export function Transcript({
   const anchor = useRef<Anchor | null>(null);
   const firstTurn = useRef<string | undefined>(undefined);
   const olderRef = useRef<HTMLDivElement>(null);
-  const olderInView = useRef(false);
-  const loadOlder = useRef(onLoadOlder);
-  loadOlder.current = onLoadOlder;
   // Opening a conversation waits, unseen, until its newest turns fill the view or nothing older is left, so they
   // first appear at the bottom where they belong instead of sliding down as earlier turns arrive above them.
   const [filledKey, setFilledKey] = useState<string | null>(null);
   const waiting = hasOlder && filledKey !== scrollKey;
-  const reveal = useRef(() => {});
-  reveal.current = () => {
+  const showFilled = useRef(() => {});
+  showFilled.current = () => {
     const el = parentRef.current;
     if (el && waiting && el.scrollHeight > el.clientHeight) setFilledKey(scrollKey);
   };
-
   useEffect(() => {
     const el = parentRef.current;
     if (!el) return;
@@ -146,7 +146,7 @@ export function Transcript({
     // layout too, including wrapping when the window or composer changes size.
     const observer = new ResizeObserver(() => {
       if (pinned.current) scrollToTail(el, lastScrollTop);
-      reveal.current();
+      showFilled.current();
     });
     observer.observe(el, { box: "border-box" });
     if (contentRef.current) observer.observe(contentRef.current, { box: "border-box" });
@@ -177,10 +177,57 @@ export function Transcript({
     }
     lastScrollTop.current = el.scrollTop;
     anchor.current = firstTurnInView(el);
-    reveal.current();
+    showFilled.current();
   }, [run.blocks]);
 
-  // Older turns load a screen before the reader reaches them, and keep loading while the top stays in reach.
+  useLoadOlder(parentRef, olderRef, { hasOlder, blocks: run.blocks, onLoadOlder });
+  useLayoutEffect(() => {
+    pinned.current = true;
+    if (parentRef.current) scrollToTail(parentRef.current, lastScrollTop);
+  }, [scrollKey, followKey]);
+  // After the tail, so a conversation opened at a message goes to it instead.
+  useMessageReveal(parentRef, contentRef, {
+    reveal,
+    blocks: run.blocks,
+    tailKey: `${scrollKey}:${followKey}`,
+    onPlace: (el) => {
+      pinned.current = false;
+      lastScrollTop.current = el.scrollTop;
+      anchor.current = firstTurnInView(el);
+      setFilledKey(scrollKey);
+    },
+  });
+  // Loading that stalls must not keep the conversation hidden; after a moment it shows what it has.
+  useEffect(() => {
+    const timer = setTimeout(() => setFilledKey(scrollKey), 1500);
+    return () => clearTimeout(timer);
+  }, [scrollKey]);
+  const arrivals = useArrivals(waiting, scrollKey) && (working || run.live);
+
+  return (
+    <ThreadMedia scopeKey={scrollKey} basePath={basePath} fileScope={fileScope} mentionNames={mentionNames}>
+      <div ref={parentRef} data-transcript data-arrivals={arrivals || undefined} className={cn("h-full overflow-y-auto", waiting && "invisible")}>
+        <div ref={contentRef} className="max-w-chat mx-auto px-6 py-5">
+          {hasOlder ? <div ref={olderRef} aria-hidden /> : null}
+          {children ?? <WorkTranscript runId={run.runId} blocks={run.blocks} live={working || run.turnOpen} onFork={onFork} trailing={trailing} reveal={reveal} />}
+          {run.blocks.length > 0 ? <AgentPresence working={working} /> : null}
+        </div>
+      </div>
+    </ThreadMedia>
+  );
+}
+
+type Anchor = { id: string; offset: number; scrollTop: number };
+
+/** Older turns load a screen before the reader reaches them, and keep loading while the top stays in reach. */
+function useLoadOlder(
+  parentRef: RefObject<HTMLElement | null>,
+  olderRef: RefObject<HTMLElement | null>,
+  { hasOlder, blocks, onLoadOlder }: { hasOlder: boolean; blocks: Block[]; onLoadOlder: (() => void) | undefined },
+) {
+  const olderInView = useRef(false);
+  const loadOlder = useRef(onLoadOlder);
+  loadOlder.current = onLoadOlder;
   useEffect(() => {
     const el = parentRef.current;
     const older = olderRef.current;
@@ -194,35 +241,11 @@ export function Transcript({
     );
     observer.observe(older);
     return () => observer.disconnect();
-  }, [hasOlder]);
+  }, [parentRef, olderRef, hasOlder]);
   useEffect(() => {
     if (hasOlder && olderInView.current) loadOlder.current?.();
-  }, [run.blocks, hasOlder]);
-  useLayoutEffect(() => {
-    pinned.current = true;
-    if (parentRef.current) scrollToTail(parentRef.current, lastScrollTop);
-  }, [scrollKey, followKey]);
-  // Loading that stalls must not keep the conversation hidden; after a moment it shows what it has.
-  useEffect(() => {
-    const timer = setTimeout(() => setFilledKey(scrollKey), 1500);
-    return () => clearTimeout(timer);
-  }, [scrollKey]);
-  const arrivals = useArrivals(waiting, scrollKey) && (working || run.live);
-
-  return (
-    <ThreadMedia scopeKey={scrollKey} basePath={basePath} fileScope={fileScope} mentionNames={mentionNames}>
-      <div ref={parentRef} data-transcript data-arrivals={arrivals || undefined} className={cn("h-full overflow-y-auto", waiting && "invisible")}>
-        <div ref={contentRef} className="max-w-chat mx-auto px-6 py-5">
-          {hasOlder ? <div ref={olderRef} aria-hidden /> : null}
-          {children ?? <WorkTranscript runId={run.runId} blocks={run.blocks} live={working || run.turnOpen} onFork={onFork} trailing={trailing} />}
-          {run.blocks.length > 0 ? <AgentPresence working={working} /> : null}
-        </div>
-      </div>
-    </ThreadMedia>
-  );
+  }, [blocks, hasOlder]);
 }
-
-type Anchor = { id: string; offset: number; scrollTop: number };
 
 /** Shows the newest turn, and remembers where so the scroll event this causes is not taken for the reader leaving. */
 function scrollToTail(el: HTMLElement, lastScrollTop: RefObject<number>) {
@@ -351,11 +374,13 @@ type WorkTranscriptProps = ComponentProps<typeof TranscriptContents> & {
   showActivity?: boolean;
   /** Each turn opens with its head: the agent, its model and where it stands. Team turns carry their own author line. */
   head?: boolean;
+  /** A message to bring into view; the turn that holds it opens its work when the message is there. */
+  reveal?: Reveal | undefined;
 };
 type WorkTurnProps = WorkTranscriptProps & { id?: string; latest?: boolean };
 
 /** The same disclosure hierarchy serves solo turns, warm sessions, and team members. */
-export function WorkTranscript({ blocks, live = false, onFork, ...props }: WorkTranscriptProps) {
+export function WorkTranscript({ blocks, live = false, onFork, reveal, ...props }: WorkTranscriptProps) {
   const turns = useSteadyTurns(blocks);
   // A fork carries the whole conversation and the agent's latest session, so it is offered only at the latest message.
   const forkTurn = onFork ? turns.findLastIndex((turn) => turn.blocks.some((block) => block.kind === "message" && block.role === "user")) : -1;
@@ -367,6 +392,7 @@ export function WorkTranscript({ blocks, live = false, onFork, ...props }: WorkT
           id={turn.id}
           {...props}
           onFork={index === forkTurn ? onFork : undefined}
+          reveal={reveal && turn.blocks.some((block) => block.id === reveal.messageId) ? reveal : undefined}
           blocks={turn.blocks}
           live={live && index === turns.length - 1}
           latest={index === turns.length - 1}
@@ -397,20 +423,42 @@ function useSteadyTurns(blocks: Block[]): { id: string; blocks: Block[] }[] {
   }, [blocks]);
 }
 
-/** Open while the turn runs, folded once it is done, unless the reader chose; a choice resets when activity shows or hides. */
-function useWorkOpen(showActivity: boolean, live: boolean) {
+/**
+ * Open while the turn runs, folded once it is done, unless the reader chose; a choice resets when activity shows or
+ * hides. A message asked for inside the work opens it, in the same render, so the message is there to scroll to.
+ */
+function useWorkOpen(showActivity: boolean, live: boolean, reveal: Reveal | undefined) {
   const [choice, setChoice] = useState<{ mode: boolean; open: boolean | null }>({ mode: showActivity, open: null });
+  const [revealed, setRevealed] = useState<Reveal | undefined>(undefined);
   if (choice.mode !== showActivity) setChoice({ mode: showActivity, open: null });
+  if (reveal !== revealed) {
+    setRevealed(reveal);
+    if (reveal) setChoice({ mode: showActivity, open: true });
+  }
   const open = (choice.mode === showActivity ? choice.open : null) ?? (showActivity && live);
   const visited = useVisited(open);
   return { open, visited, choose: (next: boolean) => setChoice({ mode: showActivity, open: next }) };
 }
 
-const WorkTurn = memo(function WorkTurn({ id, blocks, live = false, ambient = false, author: named, trailing, showActivity = true, head = true, latest = false, onFork, ...props }: WorkTurnProps) {
+const WorkTurn = memo(function WorkTurn({
+  id,
+  blocks,
+  live = false,
+  ambient = false,
+  author: named,
+  trailing,
+  showActivity = true,
+  head = true,
+  latest = false,
+  onFork,
+  reveal,
+  ...props
+}: WorkTurnProps) {
   props = { ...props, runId: blocks.find((b) => b.runId)?.runId ?? props.runId };
   const turn = useTurnModel(blocks, live, props.taskCards, ambient, props.replyAction?.blockId);
   const { before, work, after } = turn.parts;
-  const { open, visited, choose } = useWorkOpen(showActivity, turn.live);
+  const revealWork = reveal && work.some((block) => block.id === reveal.messageId) ? reveal : undefined;
+  const { open, visited, choose } = useWorkOpen(showActivity, turn.live, revealWork);
   const contentId = useId();
   const ended = turn.status.kind === "failed" || turn.status.kind === "stopped";
   const footer = trailing?.(blocks);
@@ -443,6 +491,7 @@ const WorkTurn = memo(function WorkTurn({ id, blocks, live = false, ambient = fa
                 live={turn.live}
                 taskCards={props.taskCards}
                 pinned={props.replyAction?.blockId}
+                reveal={revealWork?.messageId}
                 renderBlocks={(items, openTools) => <TranscriptContents {...props} blocks={items} groupTools={false} openTools={openTools} />}
               />
             ) : null}
@@ -505,7 +554,11 @@ export function TranscriptContents({
             {trailing?.(item.blocks)}
           </div>
         ) : (
-          <div key={item.block.id} className={cn("transcript-block", isCompact(item.block) && compact(items[i - 1]) ? "mt-0" : "mt-3")}>
+          <div
+            key={item.block.id}
+            data-message={item.block.kind === "message" ? item.block.id : undefined}
+            className={cn("transcript-block", isCompact(item.block) && compact(items[i - 1]) ? "mt-0" : "mt-3")}
+          >
             {item.block.kind === "approval" && !item.block.decision && pendingApproval ? (
               pendingApproval(item.block)
             ) : (

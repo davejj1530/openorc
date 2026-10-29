@@ -73,9 +73,12 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
               <Command.Group heading="Messages" className="command-palette-group">
                 {(hits.data ?? []).map((h) => (
                   <Command.Item
-                    key={`${h.runId}-${h.ts}`}
+                    key={`${h.runId}-${h.messageId}`}
                     value={`message ${h.threadTitle} ${h.snippet} ${h.ts}`}
-                    onSelect={() => go(() => (h.taskId ? openTask(h.taskId, "chat") : openThread(h.threadId)))}
+                    onSelect={() => {
+                      const message = { runId: h.runId, turn: h.turn, messageId: h.messageId };
+                      go(() => (h.taskId ? openTask(h.taskId, "chat", message) : openThread(h.threadId, message)));
+                    }}
                     className="command-palette-item command-palette-hit"
                   >
                     <span className="flex items-center gap-2.5 min-w-0">

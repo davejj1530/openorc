@@ -10,6 +10,7 @@ import { checkpoints } from "./checkpoints.js";
 import { insertLegacyCheckpoint } from "./fixtures/legacy-checkpoint.js";
 import { audit, projects, runs, tasks, threads } from "./repos.js";
 import { schedules } from "./schedules.js";
+import { transcriptPage } from "./transcript-page.js";
 import { messages } from "./search.js";
 import { migrations } from "./schema.js";
 
@@ -136,6 +137,30 @@ describe("search and checkpoints", () => {
     expect(hits[0]?.threadTitle).toBe("Export work");
     expect(messages.search(db, "paginat", { projectId: "other" })).toEqual([]);
     expect(messages.search(db, "nothing here")).toEqual([]);
+  });
+
+  it("says which message a hit is and the turn of its run it falls in, which the transcript page starts from", () => {
+    const { db, project } = fixture();
+    const thread = threads.insert(db, { projectId: project.id, title: "Export work", agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
+    const run = runs.insert(db, { id: "run-turns", taskId: null, threadId: thread.id, agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
+    const writer = new LedgerWriter(db, { flushMs: 1000 });
+    const turn = (n: number, ts: number) => {
+      writer.push({ type: "message.completed", runId: run.id, ts, messageId: `u${n}`, role: "user", text: `Question ${n} about kumquats` });
+      writer.push({ type: "message.completed", runId: run.id, ts: ts + 1, messageId: `a${n}`, role: "assistant", text: `Answer ${n} about kumquats` });
+      writer.push({ type: "turn.completed", runId: run.id, ts: ts + 2, turnId: `t${n}`, status: "success", durationMs: 2 });
+    };
+    turn(0, 10);
+    turn(1, 20);
+    turn(2, 30);
+    writer.flush();
+    const hits = messages.search(db, "kumquats", { limit: 10 });
+    const turnOf = new Map(hits.map((h) => [h.messageId, h.turn]));
+    expect(Object.fromEntries(turnOf)).toEqual({ u0: 0, a0: 0, u1: 1, a1: 1, u2: 2, a2: 2 });
+    // The page from that turn holds the message.
+    for (const hit of hits) {
+      const page = transcriptPage(db, run.id, { fromTurn: hit.turn });
+      expect(page.events.some((ev) => ev.type === "message.completed" && ev.messageId === hit.messageId)).toBe(true);
+    }
   });
 
   it("keeps one checkpoint per turn and reads them back in order", () => {

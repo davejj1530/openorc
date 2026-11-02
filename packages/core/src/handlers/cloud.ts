@@ -35,7 +35,9 @@ type CloudMethod =
   | "cloud.brain.wake"
   | "cloud.brain.pair"
   | "cloud.brain.handover"
-  | "cloud.brain.remove";
+  | "cloud.brain.remove"
+  | "cloud.brain.projects"
+  | "cloud.brain.project";
 
 interface Dependencies {
   settings: CloudSettings;
@@ -122,6 +124,11 @@ export function createCloudHandlers({ settings, tokens, checks, codex, sandboxes
     "cloud.brain.remove": async () => {
       await brain.remove();
       return brain.status();
+    },
+    "cloud.brain.projects": () => brain.projects(),
+    "cloud.brain.project": async ({ projectId, on }) => {
+      await brain.setProject(projectId, on);
+      return brain.projects();
     },
   };
 }

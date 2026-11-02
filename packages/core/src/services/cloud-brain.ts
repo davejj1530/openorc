@@ -1,24 +1,28 @@
 import {
   BrainMachine,
   BrainRefused,
+  BrainUnavailable,
   brainKeyFrom,
   brainKeyText,
   brainVersionNewer,
   newBrainKey,
   sealHandover,
   type BrainAccess,
+  type BrainControlResults,
   type BrainMachineStatus,
   type HandoverClaudeAccount,
 } from "@openorc/cloud";
-import { claudeAccounts, redact, type Db } from "@openorc/db";
-import type { BrainRegion, CloudBrainMachine, CloudBrainPairing, CloudBrainStatus, CloudBrainStep } from "@openorc/protocol";
+import { claudeAccounts, projects, redact, type Db } from "@openorc/db";
+import type { BrainRegion, CloudBrainMachine, CloudBrainPairing, CloudBrainProject, CloudBrainStatus, CloudBrainStep, Project } from "@openorc/protocol";
 import type { ClaudeCloudTokens } from "./claude-cloud-tokens.js";
+import { copyBranch, keptOwn, moved, seen, sendProject, switchedOn, type BrainProject } from "./cloud-brain-projects.js";
 import type { ProtectedSecretStore } from "./extraction-credentials.js";
 
 /** What phones show for the brain. */
 const BRAIN_NAME = "Cloud";
 const storageError = "Cannot access protected storage for the cloud brain. Unlock your OS keychain and retry.";
 const unavailable = "The cloud brain isn't available in this build.";
+const hasThreads = "It has threads on the cloud brain.";
 
 /** A brain this build can install. Read only when installing it, since it is tens of megabytes. */
 export interface BrainBundleSource {
@@ -27,7 +31,7 @@ export interface BrainBundleSource {
 }
 
 /** The parts of BrainMachine this uses; tests pass a stand-in. */
-export type BrainMachineLike = Pick<BrainMachine, "status" | "provision" | "wake" | "control" | "remove">;
+export type BrainMachineLike = Pick<BrainMachine, "status" | "provision" | "wake" | "control" | "importProject" | "remove">;
 
 /** The brain's machine on a team. Its project is made only when `create`; otherwise a team without one has none. */
 export type OpenBrainMachine = (access: BrainAccess, create: boolean) => Promise<BrainMachineLike | null>;
@@ -54,6 +58,8 @@ interface Stored {
   claude: Sent[];
   /** The brain installed on its machine, as this Mac last installed or found it. Records from before lack it. */
   version?: string;
+  /** The projects switched on for it. Records from before lack them. */
+  projects?: BrainProject[];
 }
 
 type Activity = { kind: "setting-up"; step: CloudBrainStep } | { kind: "removing" } | { kind: "waking" } | { kind: "sending" } | { kind: "updating" };
@@ -103,6 +109,10 @@ export class CloudBrain {
   /** The team a brain this Mac has no key for was found in, when setting up. */
   private elsewhere: string | null = null;
   private connected: { key: string; machine: BrainMachineLike } | null = null;
+  /** The Mac project whose copy is on its way to the brain. */
+  private sendingProject: string | null = null;
+  /** The version the brain ran when this Mac last woke it. */
+  private running: string | null = null;
 
   constructor(private readonly deps: CloudBrainDeps) {}
 
@@ -133,6 +143,49 @@ export class CloudBrain {
    */
   async region(): Promise<BrainRegion | null> {
     return (await this.read().catch(() => null))?.region ?? null;
+  }
+
+  /** This Mac's projects, Workspace aside, and which the brain has a copy of. Never wakes the brain. */
+  async projects(): Promise<CloudBrainProject[]> {
+    const records = new Map(((await this.read().catch(() => null))?.projects ?? []).map((record) => [record.id, record]));
+    const listed = projects.list(this.deps.db);
+    // A project removed from this Mac's list keeps its copy until switched off here.
+    const unlisted = [...records.keys()].filter((id) => !listed.some((project) => project.id === id)).flatMap((id) => projects.get(this.deps.db, id) ?? []);
+    return Promise.all(
+      [...listed, ...unlisted].map(async (project) => {
+        const record = records.get(project.id);
+        const shown = { on: record !== undefined, blocked: await blocked(project, record), sending: this.sendingProject === project.id, kept: record ? keptOwn(record) : false };
+        return { id: project.id, name: project.name, ...shown, error: record?.error ?? null };
+      }),
+    );
+  }
+
+  /**
+   * Switched on, the project is sent to the brain, woken for it, and kept fresh whenever this Mac wakes it after. Switched
+   * off, the brain removes its copy unless it has threads in it. A failure shows in the status.
+   */
+  async setProject(id: string, on: boolean): Promise<void> {
+    await this.run({ kind: "waking" }, async () => {
+      const stored = await this.stored();
+      const record = stored.projects?.find((project) => project.id === id);
+      if (on === (record !== undefined)) return;
+      if (on) {
+        const project = projects.get(this.deps.db, id);
+        const copy = project ? await copyBranch(project) : { blocked: "That project is not on this Mac." };
+        if ("blocked" in copy) throw new Error(copy.blocked);
+        await this.write({ ...stored, projects: [...(stored.projects ?? []), switchedOn(id, copy.branch)] });
+        await this.wakeUp(await this.machine());
+        return;
+      }
+      if (!record) return;
+      if (record.threads) throw new Error(hasThreads);
+      const machine = await this.machine();
+      await this.wakeUp(machine);
+      const { removed, threads } = await machine.control({ op: "remove-project", source: id });
+      if (!removed) return this.saveProjects([{ ...record, threads }]);
+      const now = await this.stored();
+      await this.write({ ...now, projects: now.projects?.filter((project) => project.id !== id) });
+    }).catch(() => undefined);
   }
 
   /**
@@ -228,6 +281,7 @@ export class CloudBrain {
     await this.startInstalled(machine);
     this.step("sign-ins");
     await this.send(machine);
+    this.refreshAfter();
   }
 
   private step(step: CloudBrainStep): void {
@@ -244,6 +298,72 @@ export class CloudBrain {
       this.error = `The cloud brain could not be updated. ${await this.scrub(error)}`;
     });
     await this.startInstalled(machine);
+    this.refreshAfter();
+  }
+
+  /** Once the operation that woke the brain ends, so the brain runs this build's version first and a pairing waits on nothing. */
+  private refreshAfter(): void {
+    void this.serialize(() => this.refreshProjects()).catch(() => undefined);
+  }
+
+  /**
+   * Hears which copies the brain has, then sends each project switched on whose branch moved since the brain's copy
+   * took it, one at a time. Never wakes the brain: one that went to sleep meanwhile is refreshed at its next wake.
+   */
+  private async refreshProjects(): Promise<void> {
+    const stored = await this.read();
+    if (!stored?.ready || !stored.projects?.length) return;
+    if (await this.behindUpdate(stored)) return;
+    const machine = await this.machine();
+    let copies: BrainControlResults["projects"]["copies"];
+    try {
+      ({ copies } = await machine.control({ op: "projects" }));
+    } catch (error) {
+      if (error instanceof BrainUnavailable) return;
+      const why = await this.scrub(error);
+      return this.saveProjects(stored.projects.map((record) => ({ ...record, error: why })));
+    }
+    const records = stored.projects.map((record) => seen(record, copies));
+    await this.saveProjects(records);
+    for (const record of records) {
+      const project = projects.get(this.deps.db, record.id);
+      if (!project || !(await moved(project, record))) continue;
+      const next = await this.sending(project, () => sendProject(machine, project, record)).catch(async (error: unknown) =>
+        error instanceof BrainUnavailable ? null : { ...record, error: await this.scrub(error) },
+      );
+      if (!next) return;
+      await this.saveProjects([next]);
+    }
+  }
+
+  /**
+   * The brain runs an older version than its machine has or this build carries, as one busy when this Mac updated it:
+   * it may not know the requests projects need. The build's version counts too, since a stop that went unanswered
+   * records what the brain ran as installed.
+   */
+  private async behindUpdate(stored: Stored): Promise<boolean> {
+    const running = this.running;
+    if (!running) return false;
+    const versions = [stored.version, (await this.deps.bundle?.())?.version];
+    return versions.some((version) => version !== undefined && brainVersionNewer(version, running));
+  }
+
+  /** Each record replaces the one with its id, unless switched off meanwhile. */
+  private async saveProjects(records: BrainProject[]): Promise<void> {
+    const stored = await this.stored();
+    await this.write({ ...stored, projects: stored.projects?.map((each) => records.find((record) => record.id === each.id) ?? each) });
+    this.changed();
+  }
+
+  private async sending<T>(project: Project, work: () => Promise<T>): Promise<T> {
+    this.sendingProject = project.id;
+    this.changed();
+    try {
+      return await work();
+    } finally {
+      this.sendingProject = null;
+      this.changed();
+    }
   }
 
   /**
@@ -304,6 +424,7 @@ export class CloudBrain {
     switch (result.state) {
       case "ready":
         if (!stored.ready || stored.address !== result.address) await this.write({ ...stored, ready: true, address: result.address });
+        this.running = result.version;
         return result.version;
       case "needs-provision":
         await this.write({ ...stored, ready: false });
@@ -465,6 +586,13 @@ export class CloudBrain {
     }
     this.cache = next;
   }
+}
+
+/** Why a project's switch cannot move now: on, the brain has threads in its copy; off, it cannot have a copy. */
+async function blocked(project: Project, record: BrainProject | undefined): Promise<string | null> {
+  if (record) return record.threads ? hasThreads : null;
+  const copy = await copyBranch(project);
+  return "blocked" in copy ? copy.blocked : null;
 }
 
 function sent({ id, name, default: isDefault, tokenAt }: Sent): Sent {

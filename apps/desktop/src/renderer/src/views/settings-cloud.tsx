@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import type { ClaudeAccountConnection, ClaudeCloudAccess, CloudStatus } from "@openorc/protocol";
 import { Button, Input, Select, TextButton } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/client";
+import { CloudCheckSection } from "./settings-cloud-check";
 import { Field, LoadError, Section, SettingRow, Status } from "./settings-shared";
 
 const TOKENS_URL = "https://vercel.com/account/settings/tokens";
@@ -196,6 +197,7 @@ export function CloudSettings({ active }: { active: boolean }) {
       ) : null}
       <VercelSettings status={status.data} />
       <ClaudeCloudAccounts status={status.data} active={active} />
+      <CloudCheckSection status={status.data} />
     </>
   );
 }

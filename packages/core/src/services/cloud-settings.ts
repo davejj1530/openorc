@@ -9,16 +9,18 @@ const storageError = "Cannot access protected storage for cloud credentials. Unl
 
 interface Stored {
   vercel?: { token: string; team?: CloudTeam; project?: { id: string; name: string }; vcpus?: number };
+  /** Working conversations move to the cloud when this Mac goes to sleep. */
+  takeover?: boolean;
 }
 
-/** The Vercel part of what Settings shows. */
-export type VercelStatus = Pick<CloudStatus, "vercel" | "error">;
+/** The part of what Settings shows that this keeps. */
+export type VercelStatus = Pick<CloudStatus, "vercel" | "error" | "takeover">;
 
 export type VercelRequest = (url: string, init: RequestInit) => Promise<Response>;
 
 function view(stored: Stored): VercelStatus {
   const vercel = stored.vercel;
-  return { vercel: vercel ? { team: vercel.team ?? null, project: vercel.project?.name ?? null, vcpus: vercel.vcpus ?? null } : null, error: null };
+  return { vercel: vercel ? { team: vercel.team ?? null, project: vercel.project?.name ?? null, vcpus: vercel.vcpus ?? null } : null, error: null, takeover: stored.takeover ?? false };
 }
 
 /** Vercel's own words about a refusal; never the request, which carries the token. */
@@ -102,7 +104,7 @@ export class CloudSettings {
       try {
         return view(await this.read());
       } catch (error) {
-        return { vercel: null, error: error instanceof Error ? error.message : storageError };
+        return { vercel: null, error: error instanceof Error ? error.message : storageError, takeover: false };
       }
     });
   }
@@ -114,6 +116,15 @@ export class CloudSettings {
       if (!vercel?.team || !vercel.project) return null;
       return { token: vercel.token, teamId: vercel.team.id, projectId: vercel.project.id, ...(vercel.vcpus ? { vcpus: vercel.vcpus } : {}) };
     });
+  }
+
+  /** Whether working conversations move to the cloud when this Mac goes to sleep. */
+  takeover(): Promise<boolean> {
+    return this.serialize(async () => (await this.read().catch(() => ({}) as Stored)).takeover ?? false);
+  }
+
+  setTakeover(enabled: boolean): Promise<VercelStatus> {
+    return this.serialize(async () => this.write({ ...(await this.read()), takeover: enabled }));
   }
 
   /** The size of sandboxes made from now on. Vercel refuses more than the team's plan allows when it makes one. */
@@ -155,7 +166,11 @@ export class CloudSettings {
     });
   }
 
+  /** Forgets Vercel; where sandboxes run on this Mac stays chosen. */
   disconnect(): Promise<VercelStatus> {
-    return this.serialize(async () => this.write({}));
+    return this.serialize(async () => {
+      const { vercel: _vercel, ...rest } = await this.read();
+      return this.write(rest);
+    });
   }
 }

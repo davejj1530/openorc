@@ -91,6 +91,8 @@ export interface CloudStatus {
   claude: Record<string, ClaudeCloudAccess>;
   /** The last cloud check since OpenOrc started; null before one ran. */
   check: CloudCheck | null;
+  /** Working conversations in a worktree move to the cloud when this Mac goes to sleep. */
+  takeover: boolean;
   /** Protected storage could not be read. */
   error: string | null;
 }
@@ -105,6 +107,7 @@ export const cloudRpcParams = {
   /** Chooses the team, and finds or makes the project its sandboxes belong to. */
   "cloud.vercel.team": z.object({ teamId: z.string().min(1).max(200) }).strict(),
   "cloud.vercel.disconnect": z.object({}),
+  "cloud.takeover": z.object({ enabled: z.boolean() }).strict(),
   /** The size of sandboxes made from now on. */
   "cloud.vercel.size": z.object({ vcpus: SandboxVcpus }).strict(),
   /** Runs `claude setup-token` for the account; its browser sign-in finishes it. */
@@ -129,6 +132,7 @@ export interface CloudRpcResults {
   "cloud.vercel.team": CloudStatus;
   "cloud.vercel.disconnect": CloudStatus;
   "cloud.vercel.size": CloudStatus;
+  "cloud.takeover": CloudStatus;
   "cloud.claude.create": CloudStatus;
   "cloud.claude.cancel": CloudStatus;
   "cloud.claude.save": CloudStatus;

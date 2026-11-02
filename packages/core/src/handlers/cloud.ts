@@ -13,6 +13,7 @@ type CloudMethod =
   | "cloud.vercel.team"
   | "cloud.vercel.disconnect"
   | "cloud.vercel.size"
+  | "cloud.takeover"
   | "cloud.claude.create"
   | "cloud.claude.cancel"
   | "cloud.claude.save"
@@ -57,6 +58,7 @@ export function createCloudHandlers({ settings, tokens, checks, sandboxes, hando
     "cloud.vercel.team": ({ teamId }) => changed(() => settings.chooseTeam(teamId)),
     "cloud.vercel.disconnect": () => changed(() => settings.disconnect()),
     "cloud.vercel.size": ({ vcpus }) => changed(() => settings.chooseSize(vcpus)),
+    "cloud.takeover": ({ enabled }) => changed(() => settings.setTakeover(enabled)),
     "cloud.claude.create": ({ accountId }) => changed(() => tokens.create(accountId)),
     "cloud.claude.cancel": ({ accountId }) => changed(() => tokens.cancel(accountId)),
     "cloud.claude.save": ({ accountId, token }) => changed(() => tokens.save(accountId, token)),

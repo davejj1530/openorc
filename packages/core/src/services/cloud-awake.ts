@@ -10,6 +10,7 @@ const KEEP_AWAKE_EVERY_MS = 60_000;
 const LINGER_MS = 60_000;
 
 interface Held {
+  sandbox: Sandbox;
   holds: number;
   timer: ReturnType<typeof setInterval>;
   linger: ReturnType<typeof setTimeout> | null;
@@ -44,6 +45,20 @@ export class CloudAwake {
     };
   }
 
+  /**
+   * This Mac is going away: every VM something holds stays up for `forMs` on its own, so a turn in flight can finish
+   * there. They were kept awake only for their away window so far.
+   */
+  async extendAll(forMs: number): Promise<void> {
+    await Promise.all(
+      [...this.held.values()].map((entry) =>
+        entry.sandbox.keepAwake(forMs).catch((error: unknown) => {
+          this.options.log.warn(`a cloud workspace could not stay up while this Mac is away: ${error instanceof Error ? error.message : String(error)}`);
+        }),
+      ),
+    );
+  }
+
   /** Stops keeping every VM awake, as OpenOrc closes. */
   close(): void {
     for (const entry of this.held.values()) {
@@ -65,7 +80,7 @@ export class CloudAwake {
     keep();
     const timer = setInterval(keep, Math.min(KEEP_AWAKE_EVERY_MS, sandbox.awayMs / 4));
     timer.unref();
-    const entry: Held = { holds: 0, timer, linger: null };
+    const entry: Held = { sandbox, holds: 0, timer, linger: null };
     this.held.set(threadId, entry);
     return entry;
   }

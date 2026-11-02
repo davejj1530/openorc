@@ -44,11 +44,11 @@ describe("cloud settings", () => {
 
     const { status, teams } = await settings.connect(TOKEN);
     expect(teams).toEqual([{ id: "team_a", name: "Acme" }]);
-    expect(status).toEqual({ vercel: { team: { id: "team_a", name: "Acme" }, project: SANDBOX_PROJECT, vcpus: null }, error: null });
+    expect(status).toEqual({ vercel: { team: { id: "team_a", name: "Acme" }, project: SANDBOX_PROJECT, vcpus: null }, error: null, takeover: false });
     expect(vercel.calls).toEqual(["GET /v2/teams", `GET /v9/projects/${SANDBOX_PROJECT}`, "POST /v11/projects"]);
 
     expect(await settings.credentials()).toEqual({ token: TOKEN, teamId: "team_a", projectId: "prj_team_a" });
-    expect(await new CloudSettings(store, vercel.request).status()).toEqual({ vercel: { team: { id: "team_a", name: "Acme" }, project: SANDBOX_PROJECT, vcpus: null }, error: null });
+    expect(await new CloudSettings(store, vercel.request).status()).toEqual({ vercel: { team: { id: "team_a", name: "Acme" }, project: SANDBOX_PROJECT, vcpus: null }, error: null, takeover: false });
   });
 
   it("waits for a team choice when the token reaches several, and reuses a project that exists", async () => {
@@ -86,6 +86,15 @@ describe("cloud settings", () => {
     expect(await settings.credentials()).toMatchObject({ teamId: "team_b", vcpus: 8 });
   });
 
+  it("keeps carrying working threads on in the cloud as a choice of its own, through disconnecting Vercel", async () => {
+    const settings = new CloudSettings(memoryStore(), fakeVercel([{ id: "team_a", name: "Acme", slug: "acme" }]).request);
+    expect(await settings.takeover()).toBe(false);
+    expect((await settings.setTakeover(true)).takeover).toBe(true);
+    await settings.connect(TOKEN);
+    expect((await settings.disconnect()).takeover).toBe(true);
+    expect(await settings.takeover()).toBe(true);
+  });
+
   it("refuses a token Vercel does not accept and saves nothing", async () => {
     const store = memoryStore();
     const settings = new CloudSettings(store, fakeVercel([]).request);
@@ -96,13 +105,13 @@ describe("cloud settings", () => {
   it("disconnects Vercel", async () => {
     const settings = new CloudSettings(memoryStore(), fakeVercel([{ id: "team_a", name: "Acme", slug: "acme" }]).request);
     await settings.connect(TOKEN);
-    expect(await settings.disconnect()).toEqual({ vercel: null, error: null });
+    expect(await settings.disconnect()).toEqual({ vercel: null, error: null, takeover: false });
     expect(await settings.credentials()).toBeNull();
   });
 
   it("reports storage it cannot open without exposing anything", async () => {
     const settings = new CloudSettings({ load: () => Promise.reject(new Error("keychain locked")), save: async () => {} }, fakeVercel([]).request);
-    expect(await settings.status()).toEqual({ vercel: null, error: expect.stringContaining("protected storage") });
+    expect(await settings.status()).toEqual({ vercel: null, error: expect.stringContaining("protected storage"), takeover: false });
     expect(await settings.credentials()).toBeNull();
   });
 });

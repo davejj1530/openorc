@@ -36,12 +36,7 @@ import { createSchedulesHandlers } from "./handlers/schedules.js";
 import { createSettingsHandlers } from "./handlers/settings.js";
 import { createSlackHandlers } from "./handlers/slack.js";
 import { createCloudHandlers } from "./handlers/cloud.js";
-import type { CloudSettings } from "./services/cloud-settings.js";
-import type { ClaudeCloudTokens } from "./services/claude-cloud-tokens.js";
-import type { CloudChecks } from "./services/cloud-check.js";
-import { CloudSandboxes } from "./services/cloud-sandboxes.js";
-import { createCloud } from "./services/cloud-setup.js";
-import { CloudHandoff } from "./services/cloud-handoff.js";
+import { createCloud, type ClaudeCloudTokens, type CloudChecks, type CloudHandoff, type CloudSandboxes, type CloudSettings, type CloudStandby } from "./services/cloud-setup.js";
 import { createSystemHandlers } from "./handlers/system.js";
 import { createTaskCreateHandlers } from "./handlers/task-create.js";
 import { createTaskDeleteHandlers } from "./handlers/task-delete.js";
@@ -144,6 +139,8 @@ export class OpenOrc {
   readonly cloudSandboxes: CloudSandboxes;
   /** Moves conversations from this Mac to the cloud. */
   readonly cloudHandoff: CloudHandoff;
+  /** Carries working conversations on in the cloud while this Mac sleeps. */
+  readonly cloudStandby: CloudStandby;
   readonly runs: RunService;
   readonly comments: TaskCommentService;
   readonly review: ReviewService;
@@ -258,11 +255,24 @@ export class OpenOrc {
       if (this.settings.get().notifications) options.transport.push(notice);
     };
     this.projects = new ProjectService(db);
-    const cloud = createCloud({ db, options, accounts: this.claudeAccounts, environment: () => this.environment.current(), invalidate, log: this.log });
+    const cloud = createCloud({
+      db,
+      ledger: this.ledger,
+      options,
+      accounts: this.claudeAccounts,
+      environment: () => this.environment.current(),
+      runs: () => this.runs,
+      threads: () => this.threads,
+      invalidate,
+      log: this.log,
+    });
     this.cloudSettings = cloud.settings;
     this.claudeCloudTokens = cloud.tokens;
     this.cloud = cloud.cloud;
     this.cloudChecks = cloud.checks;
+    this.cloudSandboxes = cloud.sandboxes;
+    this.cloudHandoff = cloud.handoff;
+    this.cloudStandby = cloud.standby;
     this.workspaces = new WorkspaceService(db, { dataDir: options.dataDir, cloud: this.cloud }, this.log, this.workspaceWriters);
     const backgroundProviders: ProviderInfo = {
       models: (agent, accountId) => this.runs.models(agent, undefined, undefined, accountId),
@@ -282,15 +292,6 @@ export class OpenOrc {
     this.orclings = new OrclingService({ db, dataDir: options.dataDir, memory: this.memory, runs: () => this.runs, threads: () => this.threads, invalidate });
     this.memory.extractionOwner = (run, thread) => this.orclings.memoryOwner(run, thread);
     this.runs = new RunService(db, this.ledger, this.frames, () => this.mcpServer(), invalidate, this.log, this.runHooks(notify), undefined, this.workspaceWriters);
-    this.cloudSandboxes = new CloudSandboxes(db, this.cloud, this.runs);
-    this.cloudHandoff = new CloudHandoff({
-      db,
-      cloud: this.cloud,
-      runs: this.runs,
-      toWorktree: (id) => this.threads.moveWorkspace(id, "worktree"),
-      changed: (id) => invalidate(["threads", `thread:${id}`]),
-      log: this.log,
-    });
     this.threads = new ThreadService(
       db,
       this.runs,
@@ -493,11 +494,14 @@ export class OpenOrc {
       threadContext: (thread) => this.pullRequests.brief(thread),
       untrustedCheckout: (thread) => inUnvettedCopy(db, thread),
       cloudHost: (thread, mcpOrigin, accountId) => this.cloud.host(thread, mcpOrigin, accountId),
-      syncCloud: (thread, sync) =>
-        this.cloud.sync(thread, sync).catch((error: unknown) => {
+      syncCloud: (thread, sync) => {
+        // A turn on this Mac keeps its standby sandbox current, for the cloud to take it over if the Mac sleeps.
+        this.cloudStandby.observe(thread, sync);
+        return this.cloud.sync(thread, sync).catch((error: unknown) => {
           this.log.warn(`could not bring thread ${thread.id}'s cloud changes to the Mac: ${error instanceof Error ? error.message : String(error)}`);
           return false;
-        }),
+        });
+      },
       memoryEnabled: () => this.memory.enabled(),
       environment: () => this.devices.launchEnvironment(this.environment.current()),
       claudeEnvironment: (snapshot, id) => this.claudeAccounts.environment(snapshot, id),
@@ -717,6 +721,7 @@ export class OpenOrc {
     await this.teamRestores.shutdown();
     await this.teams.shutdown();
     await this.workspaces.shutdown();
+    this.cloudStandby.close();
     await this.runs.closeAll();
     await this.cloud.close();
     await this.devices.close();

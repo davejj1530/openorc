@@ -65,6 +65,11 @@ const permissionModeFor: Record<RunSpec["permissionMode"], string> = {
   autonomous: "bypassPermissions",
 };
 
+/** Claude Code's `--permission-mode` for a run's mode and permissions. */
+export function claudePermissionMode(spec: Pick<RunSpec, "mode" | "permissionMode">): string {
+  return spec.mode === "plan" ? "plan" : permissionModeFor[spec.permissionMode];
+}
+
 /** How long an idle process gets to exit on its own after its input closes before it is stopped. */
 const IDLE_EXIT_GRACE_MS = 2000;
 /**
@@ -186,7 +191,7 @@ function prepareClaudeLaunch(spec: RunSpec, launch: AgentLaunchEnvironment, opti
         ...launchPermissionSettings(spec, plans, connection, place),
       }),
       "--permission-mode",
-      spec.mode === "plan" ? "plan" : permissionModeFor[spec.permissionMode],
+      claudePermissionMode(spec),
     ];
     const restricted = spec.mode === "plan" || spec.permissionMode !== "autonomous";
     // Restrict mutation entry points to the tools covered by our explicit rules.

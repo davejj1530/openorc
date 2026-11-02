@@ -11,6 +11,7 @@ import {
   seedWorkspace,
   VercelSandboxProvider,
   type RunnerFile,
+  type Sandbox,
   type SandboxInfo,
   type SandboxProvider,
   type VercelConnection,
@@ -75,6 +76,9 @@ export function cloudSandboxProviders(input: {
   return { providers, forNewThreads: async () => override ?? ((await credentials()) ? vercel : local) };
 }
 
+/** Which sandbox is a conversation's, on which service: its cloud workspace's, or its standby's before it has one. */
+export type SandboxRef = Pick<CloudWorkspaceRecord, "threadId" | "provider" | "sandbox">;
+
 /** A sandbox a service reports, with where it runs and the conversation it belongs to, if any. */
 export type ListedSandbox = SandboxInfo & { provider: CloudProviderId; threadId: string | null };
 
@@ -85,7 +89,7 @@ export interface CloudRunHost {
   env: Record<string, string>;
 }
 
-interface Connection {
+export interface Connection {
   location: WorkspaceLocation;
   client: RunnerClient;
 }
@@ -103,6 +107,8 @@ export class CloudWorkspaceService {
   private readonly awake: CloudAwake;
   /** VMs being stopped because nothing needs them; the next use waits for the stop. */
   private readonly stopping = new Map<string, Promise<void>>();
+  /** Conversations whose sandbox is finishing a turn it took over while this Mac slept. */
+  private readonly takeovers = new Set<string>();
   /** A conversation's sandbox being prepared; asking again waits for it instead of preparing twice. */
   private readonly preparing = new Map<string, Promise<void>>();
   /** The sync running for each conversation; the next one waits for it. */
@@ -158,7 +164,7 @@ export class CloudWorkspaceService {
   }
 
   /** Where the conversation's code lives in its sandbox and on the Mac. Waits for a stop in progress, then wakes the VM. */
-  async location(record: CloudWorkspaceRecord, mirror: string): Promise<WorkspaceLocation> {
+  async location(record: SandboxRef, mirror: string): Promise<WorkspaceLocation> {
     await this.stopping.get(record.threadId);
     const existing = this.locations.get(record.threadId);
     if (existing) return existing;
@@ -321,6 +327,7 @@ export class CloudWorkspaceService {
     const record = cloudWorkspaces.get(this.db, thread.id);
     if (!record) return null;
     if (record.state !== "ready" || !thread.worktreePath) throw new Error("This conversation's cloud workspace is not ready. Send again to set it up.");
+    if (this.takeovers.has(thread.id)) throw new Error("Claude is still finishing the turn it carried on in the cloud while this Mac slept. Send again once it is done.");
     // Each turn signs in as the account it runs on, so changing the thread's account takes effect at the next turn.
     const env = (await this.options.agentEnvironment?.(record.provider, claudeAccountId)) ?? {};
     const { sandbox } = (await this.location(record, thread.worktreePath)).install;
@@ -388,6 +395,33 @@ export class CloudWorkspaceService {
     this.log.info(`deleted cloud workspace ${record.sandbox}`);
   }
 
+  /** Marks a conversation whose sandbox is finishing a turn it took over; a new turn waits until it has. */
+  takingOver(threadId: string, running: boolean): void {
+    if (running) this.takeovers.add(threadId);
+    else this.takeovers.delete(threadId);
+    this.options.changed?.(threadId);
+  }
+
+  /** Keeps the conversation's VM awake until the returned function is called. */
+  holdAwake(threadId: string, sandbox: Sandbox): () => void {
+    return this.awake.hold(threadId, sandbox);
+  }
+
+  /** This Mac is going away: every VM in use keeps going on its own for `forMs`, so a turn in flight can finish. */
+  away(forMs: number): Promise<void> {
+    return this.awake.extendAll(forMs);
+  }
+
+  /**
+   * A conversation whose standby sandbox took over becomes a cloud conversation, its worktree on this Mac matching
+   * `mirror` in that sandbox. Its next sync brings what the sandbox did since.
+   */
+  adopt(ref: SandboxRef, mirror: CloudMirrorState): void {
+    cloudWorkspaces.insert(this.db, { threadId: ref.threadId, provider: ref.provider, sandbox: ref.sandbox });
+    cloudWorkspaces.ready(this.db, ref.threadId, mirror);
+    this.options.changed?.(ref.threadId);
+  }
+
   /** Disconnects from every sandbox. Processes in a cloud VM keep running there; sandboxes on this Mac stop. */
   async close(): Promise<void> {
     this.awake.close();
@@ -420,7 +454,8 @@ export class CloudWorkspaceService {
     void connection.then(({ client }) => client.close()).catch(() => undefined);
   }
 
-  private connect(record: CloudWorkspaceRecord, mirror: string): Promise<Connection> {
+  /** The conversation's runner connection, made once and kept while its VM is held awake. */
+  connect(record: SandboxRef, mirror: string): Promise<Connection> {
     const existing = this.connections.get(record.threadId);
     if (existing) return existing;
     const connection = (async () => {

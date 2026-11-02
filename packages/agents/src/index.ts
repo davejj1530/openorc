@@ -1,4 +1,4 @@
-export { ClaudeAdapter, type ClaudeAdapterOptions } from "./claude/adapter.js";
+export { ClaudeAdapter, claudePermissionMode, type ClaudeAdapterOptions } from "./claude/adapter.js";
 export { listClaudeModels, type ClaudeCatalog, type ClaudeModel } from "./claude/models.js";
 export { claudeFastModeReason } from "./claude/fast-mode.js";
 export { ClaudeStreamParser } from "./claude/stream-json.js";

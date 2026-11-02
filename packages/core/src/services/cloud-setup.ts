@@ -1,21 +1,41 @@
-import type { Db } from "@openorc/db";
+import type { Db, LedgerWriter } from "@openorc/db";
 import type { OpenOrcOptions } from "../options.js";
 import type { Logger } from "../transport.js";
 import type { ClaudeAccountService } from "./claude-accounts.js";
 import { ClaudeCloudTokens } from "./claude-cloud-tokens.js";
 import { cloudAgentEnvironment } from "./cloud-agent-env.js";
 import { CloudChecks } from "./cloud-check.js";
+import { CloudHandoff } from "./cloud-handoff.js";
+import { CloudSandboxes, type CloudSandboxRuns } from "./cloud-sandboxes.js";
 import { CloudSessions } from "./cloud-sessions.js";
+import { CloudStandby, type CloudStandbyDeps } from "./cloud-standby.js";
 import { CloudSettings } from "./cloud-settings.js";
 import { CloudWorkspaceService, cloudSandboxProviders } from "./cloud-workspaces.js";
+import type { RunService } from "./runs.js";
 import type { EnvSnapshot } from "./shell-environment.js";
+import type { ThreadService } from "./threads.js";
+import { executionProject } from "./workspace-home.js";
 
 /** The cloud's parts, made together: where sandboxes run, how agents sign in there, and the sandboxes themselves. */
-export function createCloud(input: { db: Db; options: OpenOrcOptions; accounts: ClaudeAccountService; environment: () => EnvSnapshot; invalidate: (keys: string[]) => void; log: Logger }): {
+export function createCloud(input: {
+  db: Db;
+  ledger: LedgerWriter;
+  options: OpenOrcOptions;
+  accounts: ClaudeAccountService;
+  environment: () => EnvSnapshot;
+  /** Made after the cloud's parts, so they are reached when used. */
+  runs: () => RunService;
+  threads: () => ThreadService;
+  invalidate: (keys: string[]) => void;
+  log: Logger;
+}): {
   settings: CloudSettings;
   tokens: ClaudeCloudTokens;
   cloud: CloudWorkspaceService;
   checks: CloudChecks;
+  sandboxes: CloudSandboxes;
+  handoff: CloudHandoff;
+  standby: CloudStandby;
 } {
   const { db, options, accounts, environment, invalidate, log } = input;
   const settings = new CloudSettings(options.cloudSecrets);
@@ -40,5 +60,29 @@ export function createCloud(input: { db: Db; options: OpenOrcOptions; accounts: 
     () => invalidate(["cloud"]),
     log,
   );
-  return { settings, tokens, cloud, checks };
+  const runs: CloudSandboxRuns & CloudStandbyDeps["runs"] = {
+    threadActivity: (id) => input.runs().threadActivity(id),
+    liveRunForThread: (id) => input.runs().liveRunForThread(id),
+    closeAndWait: (id) => input.runs().closeAndWait(id),
+    interrupt: (id) => input.runs().interrupt(id),
+  };
+  const list = new CloudSandboxes(db, cloud, runs);
+  const handoff = new CloudHandoff({ db, cloud, runs, toWorktree: (id) => input.threads().moveWorkspace(id, "worktree"), changed, log });
+  const standby = new CloudStandby({
+    db,
+    ledger: input.ledger,
+    cloud,
+    sessions,
+    enabled: () => settings.takeover(),
+    agentEnvironment: (provider, id) => agentEnvironment(provider, id),
+    defaultAccountId: () => accounts.defaultId(),
+    project: (thread) => executionProject(db, thread),
+    runs,
+    recordMessage: (id, message) => input.threads().recordMessage(id, message),
+    invalidate,
+    log,
+  });
+  return { settings, tokens, cloud, checks, sandboxes: list, handoff, standby };
 }
+
+export type { ClaudeCloudTokens, CloudChecks, CloudHandoff, CloudSandboxes, CloudSettings, CloudStandby };

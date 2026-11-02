@@ -228,6 +228,8 @@ export const rpcParams = {
       prUrl: z.string().nullable().optional(),
     }),
   }),
+  /** The conversation goes on with another Claude account from its next message, which resumes its session there. */
+  "threads.switchClaudeAccount": z.object({ id: z.string(), claudeAccountId: ClaudeAccountId }),
   /** A team conversation needs a request key so an interrupted delete can be retried without repeating cleanup. */
   "threads.delete": z.object({ id: z.string(), requestKey: z.string().min(1).max(200).optional() }),
   /** A new thread that continues this one's conversation, through the given run (the latest by default). */
@@ -627,6 +629,7 @@ export interface RpcResults
   "threads.exportPlan": { path: string };
   "threads.start": { thread: Thread; run: Run | null };
   "threads.update": Thread;
+  "threads.switchClaudeAccount": Thread;
   "threads.delete": null | { rejected: string };
   "threads.fork": Thread | { rejected: string };
   "threads.search": ThreadSearchHit[];

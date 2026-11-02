@@ -109,6 +109,8 @@ export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {
   "threads.start": (params, context) =>
     params.workingDirectory !== undefined ? "Choose a folder for this conversation on your Mac." : (phoneTitle(params.title) ?? storedImages(params.attachments, context)),
   "threads.update": threadUpdate,
+  // The core refuses an Orcling's or a team's conversation, a turn in progress and an account turned off, as on the Mac.
+  "threads.switchClaudeAccount": allow,
   "runs.start": (params, context) => storedImages(params.attachments, context),
   "runs.send": (params, context) => storedImages(params.attachments, context),
   "runs.interrupt": allow,
@@ -168,6 +170,7 @@ export const remoteReplies: { [M in RemoteMethod]: Reply<M> } = {
   "threads.movePreview": same,
   "threads.start": same,
   "threads.update": same,
+  "threads.switchClaudeAccount": same,
   "runs.start": same,
   "runs.send": same,
   "runs.interrupt": same,

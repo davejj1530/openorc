@@ -5,7 +5,7 @@ import { ThreadService } from "../services/threads.js";
 import type { OrclingService } from "../services/orclings.js";
 import type { Handlers } from "./types.js";
 type Dependencies = {
-  threadService: Pick<ThreadService, "implementPlan" | "exportPlan" | "start" | "update">;
+  threadService: Pick<ThreadService, "implementPlan" | "exportPlan" | "start" | "update" | "switchClaudeAccount">;
   teamConversations: Pick<TeamConversationService, "start">;
   orclings: Pick<OrclingService, "startThread" | "threadPatch">;
   imports: Pick<ImportService, "import">;
@@ -21,7 +21,7 @@ export function createThreadLaunchHandlers({
   teamConversations,
   orclings,
   imports,
-}: Dependencies): Pick<Handlers, "threads.implementPlan" | "threads.exportPlan" | "threads.start" | "threads.update" | "threads.import"> {
+}: Dependencies): Pick<Handlers, "threads.implementPlan" | "threads.exportPlan" | "threads.start" | "threads.update" | "threads.switchClaudeAccount" | "threads.import"> {
   return {
     "threads.implementPlan": ({ id, planId, permissionMode }) => threadService.implementPlan(id, planId, permissionMode),
     "threads.exportPlan": ({ id, planId, filename }) => threadService.exportPlan(id, planId, filename),
@@ -82,6 +82,7 @@ export function createThreadLaunchHandlers({
       });
     },
     "threads.update": ({ id, patch, taskId }) => threadService.update(id, orclings.threadPatch(id, patch), taskId ? { taskId } : {}),
+    "threads.switchClaudeAccount": ({ id, claudeAccountId }) => threadService.switchClaudeAccount(id, claudeAccountId),
     "threads.import": ({ projectId, sessions }) => imports.import(projectId, sessions),
   };
 }

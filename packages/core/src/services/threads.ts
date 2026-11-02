@@ -39,6 +39,7 @@ import { realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Logger } from "../transport.js";
 import { teamQuiescenceReason } from "./thread-team-quiescence.js";
+import { applyRequestedPolicy } from "./thread-policy-requests.js";
 import { titleFromPrompt, type StartThreadInput, type ThreadPatch, type ThreadTitler } from "./thread-inputs.js";
 import { switchedClaudeAccount, ThreadSessions, type ClaudeFolder } from "./thread-session.js";
 import { inUnvettedCopy } from "./review-copies.js";
@@ -538,30 +539,18 @@ export class ThreadService {
         metadata: { archived, done, pinned, snoozedUntil: patch.snoozedUntil },
       });
     }
-    if (patch.permissionMode !== undefined || patch.mode !== undefined) {
-      const policy = this.runs.applyThreadPermissions(t);
-      if (previousPermission !== null && previousPermission !== t.permissionMode)
-        audit.record(this.db, {
-          actor: "user",
-          action: "thread.permissions_requested",
-          resourceType: "thread",
-          resourceId: id,
-          metadata: { previous: previousPermission, requested: policy.requested, effective: policy.effective, pendingRestart: policy.pendingRestart, runs: policy.runs },
-        });
-      if (previousMode !== null && previousMode !== t.mode) {
-        audit.record(this.db, {
-          actor: "user",
-          action: "thread.mode_requested",
-          resourceType: "thread",
-          resourceId: id,
-          metadata: { previous: previousMode, requested: t.mode, effective: policy.mode?.effective, pending: policy.mode?.pending },
-        });
-        if (orchestration.getInstance(this.db, id)) this.onTeamModeChanged?.(id);
-      }
-    }
+    if (patch.permissionMode !== undefined || patch.mode !== undefined) applyRequestedPolicy(this.db, this.runs, t, { permission: previousPermission, mode: previousMode }, this.onTeamModeChanged);
     this.invalidate(["threads", `thread:${id}`]);
     if (archived === false) void this.messageQueue.drainQueue(id);
     return t;
+  }
+
+  /** The conversation goes on with another Claude account from its next message, which carries its session there. */
+  async switchClaudeAccount(id: string, claudeAccountId: string): Promise<Thread> {
+    this.rejectPinnedTeam(id);
+    const thread = await this.sessions.switchAccount(this.thread(id), claudeAccountId);
+    this.invalidate(["threads", `thread:${id}`]);
+    return thread;
   }
 
   async delete(id: string): Promise<void> {

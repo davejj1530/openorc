@@ -1,7 +1,7 @@
 import { realpath } from "node:fs/promises";
 import { checkpoints, listEvents, redact, runCosts, runs, snapshots, tasks, threads, type Db, type LedgerWriter } from "@openorc/db";
 import { diffStat, pinObject, treeHash, worktree } from "@openorc/git";
-import type { Project, Run, Task, Thread, ThreadSession } from "@openorc/protocol";
+import { DEFAULT_CLAUDE_ACCOUNT, type Project, type Run, type Task, type Thread, type ThreadSession } from "@openorc/protocol";
 import type { OpenOrcMcpServer } from "@openorc/mcp";
 import { checkpointRefs, snapshotRefs } from "./checkpoint-refs.js";
 import { noticeLine } from "./notice-text.js";
@@ -24,6 +24,13 @@ export function failedSession(db: Db, run: Run): ThreadSession {
   for (const event of listEvents(db, run.id, { kinds: ["activity.updated"], newest: true, limit: 20 }))
     if (event.type === "activity.updated" && event.recovery) return { status: "error", message: run.error, recovery: event.recovery };
   return { status: "error", message: run.error };
+}
+
+/** A Claude run on an account its conversation has since left. */
+export function onLeftClaudeAccount(db: Db, run: Run): boolean {
+  if (run.agent !== "claude" || run.orclingId || !run.threadId) return false;
+  const thread = threads.get(db, run.threadId);
+  return thread !== null && (thread.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT) !== (run.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT);
 }
 
 /** A reply as one line, short enough for a notification. */

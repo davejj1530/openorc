@@ -20,7 +20,7 @@ export function switchedClaudeAccount(db: Db, thread: Thread, agent: AgentKind, 
 
 interface ThreadSessionDependencies {
   db: Db;
-  runs: Pick<RunService, "liveRunForThread" | "threadActivity" | "closeAndWait">;
+  runs: Pick<RunService, "liveRunForThread" | "threadActivity" | "closeAndWait" | "validateFastMode">;
   workspaces: Pick<WorkspaceService, "cloudState">;
   handoffFor(thread: Thread, own: Run[], agent: AgentKind, fresh: boolean | undefined): string | undefined;
   log: Pick<Logger, "warn">;
@@ -31,24 +31,37 @@ interface ThreadSessionDependencies {
 export class ThreadSessions {
   constructor(private readonly deps: ThreadSessionDependencies) {}
 
+  /** The conversation goes on with another Claude account from its next message. Its idle process, on the old one, closes now. */
+  async switchAccount(thread: Thread, requested: string): Promise<Thread> {
+    const account = switchedClaudeAccount(this.deps.db, thread, thread.agent, requested);
+    if (!account) return thread;
+    await this.deps.runs.validateFastMode(thread.agent, thread.model ?? undefined, thread.fastMode, undefined, undefined, account);
+    await this.closeIdle(thread);
+    return threads.update(this.deps.db, thread.id, { claudeAccountId: account });
+  }
+
   /**
-   * Closes the conversation's idle process, then says how the next run picks up its session. A conversation going on
-   * with another Claude account moves there now: Claude resumes the session it carried along, or starts over with a
+   * Closes the conversation's idle process, then says how the next run picks up its session. A conversation that went
+   * on with another Claude account takes its newest session along: Claude resumes the copy, or starts over with a
    * handoff when there is none to carry, as in a cloud conversation, whose session lives in its sandbox.
    */
   async next(thread: Thread, own: Run[], agent: AgentKind, fresh: boolean | undefined, account: string | null): Promise<Pick<StartRunInput, "resume" | "resumeFrom" | "handoff">> {
-    const { db, runs: service } = this.deps;
-    const previous = service.liveRunForThread(thread.id);
-    if (previous) {
-      if (service.threadActivity(thread.id) !== "idle") throw new Error("Wait for the current turn to finish before changing its session settings.");
-      await service.closeAndWait(previous.id);
-    }
-    const carried = account && !fresh && !this.deps.workspaces.cloudState(thread.id) ? await this.carry(thread, account) : null;
-    if (account) thread = threads.update(db, thread.id, { claudeAccountId: account });
+    await this.closeIdle(thread);
+    if (account) thread = threads.update(this.deps.db, thread.id, { claudeAccountId: account });
+    const moved = agent === "claude" && !thread.orclingId ? movedSession(thread, own) : null;
+    const carried = moved && !fresh && !this.deps.workspaces.cloudState(thread.id) ? await this.carry(thread, moved) : null;
     if (carried) return { resume: false, resumeFrom: carried };
-    const restart = Boolean(fresh || account);
+    const restart = Boolean(fresh || moved);
     const handoff = this.deps.handoffFor(thread, own, agent, restart);
     return { resume: !restart, ...(restart ? {} : (this.forkSource(thread, agent) ?? {})), ...(handoff ? { handoff } : {}) };
+  }
+
+  private async closeIdle(thread: Thread): Promise<void> {
+    const service = this.deps.runs;
+    const previous = service.liveRunForThread(thread.id);
+    if (!previous) return;
+    if (service.threadActivity(thread.id) !== "idle") throw new Error("Wait for the current turn to finish before changing its session settings.");
+    await service.closeAndWait(previous.id);
   }
 
   /** A fork's first run continues its parent's session as a new one; the parent keeps its own history. */
@@ -59,19 +72,27 @@ export class ThreadSessions {
     return parentSession ? { resumeFrom: { sessionId: parentSession, fork: true } } : null;
   }
 
-  /** The conversation's last Claude session, copied into another account's folder to resume there as a fork. */
-  private async carry(thread: Thread, to: string): Promise<{ sessionId: string; fork: true } | null> {
-    const { db, claudeFolder } = this.deps;
-    const from = thread.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT;
-    const sessionId = runs.lastSession(db, { threadId: thread.id }, "claude", null, from);
-    if (!claudeFolder || !sessionId) return null;
+  /** The conversation's newest Claude session, copied into its account's folder to resume there as a fork. */
+  private async carry(thread: Thread, moved: MovedSession): Promise<{ sessionId: string; fork: true } | null> {
+    const { claudeFolder } = this.deps;
+    if (!claudeFolder) return null;
     try {
-      return (await copySession(claudeFolder(from), claudeFolder(to), sessionId)) ? { sessionId, fork: true } : null;
+      return (await copySession(claudeFolder(moved.from), claudeFolder(thread.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT), moved.sessionId)) ? { sessionId: moved.sessionId, fork: true } : null;
     } catch (e) {
       this.deps.log.warn(`thread ${thread.id}: its Claude session stayed with the previous account: ${e instanceof Error ? e.message : String(e)}`);
       return null;
     }
   }
+}
+
+type MovedSession = { sessionId: string; from: string };
+
+/** The conversation's newest Claude session when it ran on another account than the conversation's now. */
+function movedSession(thread: Thread, own: Run[]): MovedSession | null {
+  const newest = own.findLast((run) => run.agent === "claude" && run.externalSessionId);
+  const from = newest?.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT;
+  if (!newest?.externalSessionId || from === (thread.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT)) return null;
+  return { sessionId: newest.externalSessionId, from };
 }
 
 /** Claude Code keeps a session at `<folder>/projects/<the folder it ran in>/<id>.jsonl`; the copy goes to the same place. */

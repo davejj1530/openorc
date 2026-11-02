@@ -33,7 +33,7 @@ import { RunLive } from "./run-live.js";
 import { McpAppService } from "./mcp-apps.js";
 import { RunProcess } from "./run-process.js";
 import { RunProgress } from "./run-progress.js";
-import { failedSession, RunSettlement } from "./run-settlement.js";
+import { failedSession, onLeftClaudeAccount, RunSettlement } from "./run-settlement.js";
 import { matchesContinueSettings, RunTurns } from "./run-turns.js";
 import {
   occupied,
@@ -396,12 +396,16 @@ export class RunService {
     return [...this.live.values()].some((entry) => entry.commands.length > 0);
   }
 
-  /** The state of the provider session behind a thread, from the live process or the last run's fate. */
+  /**
+   * The state of the provider session behind a thread, from the live process or the last run's fate. A process whose
+   * turn failed stays open until it idles out, but the next message replaces it, so it reads as the failed run. A
+   * failure on a Claude account the conversation has since left stays behind with that account.
+   */
   threadSession(threadId: string): ThreadSession {
-    const live = this.liveRunForThread(threadId);
-    if (live) return { status: "live", message: null };
-    const last = runs.listForThread(this.db, threadId).at(-1);
-    if (!last || last.state !== "error") return { status: "idle", message: null };
+    const live = [...this.live.values()].find((entry) => entry.run.threadId === threadId);
+    if (live && (!live.failed || working(live))) return { status: "live", message: null };
+    const last = live ? { ...live.run, error: live.failed } : runs.listForThread(this.db, threadId).at(-1);
+    if (!last || (!live && last.state !== "error") || onLeftClaudeAccount(this.db, last)) return { status: "idle", message: null };
     return failedSession(this.db, last);
   }
 

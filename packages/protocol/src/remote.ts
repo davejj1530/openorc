@@ -27,6 +27,8 @@ export const REMOTE_METHODS = [
   "app.settings.get",
   "threads.start",
   "threads.update",
+  // Moves a thread to another of the Mac's Claude accounts between turns, as the thread header on the Mac does.
+  "threads.switchClaudeAccount",
   "runs.start",
   "runs.send",
   "runs.interrupt",

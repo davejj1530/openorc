@@ -23,6 +23,7 @@ describe("phone policy", () => {
     expect(admitRemoteRequest("agents.availability", {}, context)).toEqual({ ok: true });
     expect(admitRemoteRequest("projects.git", { id: "p" }, context)).toEqual({ ok: true });
     expect(admitRemoteRequest("providers.limits", {}, context)).toEqual({ ok: true });
+    expect(admitRemoteRequest("threads.switchClaudeAccount", { id: "t", claudeAccountId: "work" }, context)).toEqual({ ok: true });
   });
 
   it("keeps phone access and its push key out of a phone's reach", () => {

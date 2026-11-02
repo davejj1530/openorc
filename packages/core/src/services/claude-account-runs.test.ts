@@ -161,6 +161,53 @@ it("goes on with another account by carrying the conversation's session there, o
   expect(fresh.systemPromptAppendix).toContain("Handoff:");
 });
 
+it("switches a conversation's account between turns, and its next message resumes the newest session wherever it ran", async () => {
+  const [work, personal] = ["Work", "Personal"].map((name) => accounts.add(name).id) as [string, string];
+  const { thread, run } = await conversations.start({ ...input, projectId: project.id, claudeAccountId: work });
+  runs.update(db, run!.id, { externalSessionId: "work-session" });
+  await expect(conversations.switchClaudeAccount(thread.id, personal)).rejects.toThrow(/Wait for the current turn/);
+  start.mock.results[0]!.value.emit("event", { type: "turn.completed", runId: run!.id, ts: Date.now(), turnId: "fixture", status: "success", durationMs: 1 });
+  await vi.waitFor(() => expect(service.threadActivity(thread.id)).toBe("idle"));
+  const sessionFile = async (account: string, id: string) => {
+    const sessions = path.join(folder(account), "projects", "-fixture");
+    await mkdir(sessions, { recursive: true });
+    await writeFile(path.join(sessions, `${id}.jsonl`), `{"session":"${id}"}\n`);
+  };
+  await sessionFile(work, "work-session");
+
+  const switched = await conversations.switchClaudeAccount(thread.id, personal);
+  expect([switched.claudeAccountId, service.liveRunForThread(thread.id)]).toEqual([personal, null]);
+  const moved = await conversations.continueThread(thread.id, input);
+  const [spec, launch] = start.mock.lastCall!;
+  expect([moved.claudeAccountId, spec.resumeSessionId, spec.forkSession, path.basename(launch.env.CLAUDE_CONFIG_DIR!)]).toEqual([personal, "work-session", true, personal]);
+  expect(await readFile(path.join(folder(personal), "projects", "-fixture", "work-session.jsonl"), "utf8")).toBe('{"session":"work-session"}\n');
+
+  // Back on the first account, the conversation goes on from what it said on the second, not the older session there.
+  await service.closeAndWait(moved.id);
+  runs.update(db, moved.id, { externalSessionId: "personal-session", state: "success" });
+  await sessionFile(personal, "personal-session");
+  await conversations.switchClaudeAccount(thread.id, work);
+  await conversations.continueThread(thread.id, input);
+  const [back, backLaunch] = start.mock.lastCall!;
+  expect([back.resumeSessionId, back.forkSession, path.basename(backLaunch.env.CLAUDE_CONFIG_DIR!)]).toEqual(["personal-session", true, work]);
+  expect(back.systemPromptAppendix ?? "").not.toContain("Handoff:");
+});
+
+it("shows a turn stopped by the usage limit as failed while its process is still open, until the conversation leaves that account", async () => {
+  const [work, personal] = ["Work", "Personal"].map((name) => accounts.add(name).id) as [string, string];
+  const { thread, run } = await conversations.start({ ...input, projectId: project.id, claudeAccountId: work });
+  const handle = start.mock.results[0]!.value;
+  const ts = Date.now();
+  handle.emit("event", { type: "activity.updated", runId: run!.id, ts, activityId: "rate-limit", label: "Rate limit reached", status: "error", recovery: { kind: "usage", provider: "claude" } });
+  handle.emit("event", { type: "turn.completed", runId: run!.id, ts, turnId: "fixture", status: "error", resultText: "You've hit your 5-hour limit", durationMs: 1 });
+  await vi.waitFor(() => expect(service.threadActivity(thread.id)).toBe("idle"));
+  ledger.flush();
+  expect(service.liveRunForThread(thread.id)?.id).toBe(run!.id);
+  expect(service.threadSession(thread.id)).toEqual({ status: "error", message: "You've hit your 5-hour limit", recovery: { kind: "usage", provider: "claude" } });
+  await conversations.switchClaudeAccount(thread.id, personal);
+  expect([runs.get(db, run!.id)?.state, service.threadSession(thread.id).status]).toEqual(["error", "idle"]);
+});
+
 it("captures the default on new threads and records the account even if a launch fails", async () => {
   const account = accounts.add("Work");
   accounts.update({ id: account.id, makeDefault: true });

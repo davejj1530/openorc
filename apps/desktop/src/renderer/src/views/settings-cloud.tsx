@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { SANDBOX_VCPUS, type ClaudeAccountConnection, type ClaudeCloudAccess, type CloudStatus } from "@openorc/protocol";
 import { Button, Select, TextButton } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/client";
+import { CloudBrainSection } from "./settings-cloud-brain";
 import { CloudCheckSection } from "./settings-cloud-check";
 import { CloudSandboxesSection } from "./settings-cloud-sandboxes";
 import { Field, LoadError, Section, SettingRow, Status, Toggle } from "./settings-shared";
@@ -214,6 +215,7 @@ export function CloudSettings({ active }: { active: boolean }) {
       <VercelSettings status={status.data} />
       <ClaudeCloudAccounts status={status.data} active={active} />
       <CodexCloudSection codex={status.data.codex} />
+      {status.data.vercel?.team ? <CloudBrainSection active={active} /> : null}
       <TakeoverSection enabled={status.data.takeover} />
       <CloudSandboxesSection active={active} />
       <CloudCheckSection status={status.data} />

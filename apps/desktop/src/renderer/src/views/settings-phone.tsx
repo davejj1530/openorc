@@ -100,16 +100,31 @@ function presence(device: RemoteDevice): string {
   return device.lastSeenAt === null ? `Paired ${relativeTime(device.createdAt)}` : `Last seen ${relativeTime(device.lastSeenAt)}`;
 }
 
+/** What a pairing code shows, from this Mac or from the cloud brain. */
+type PairingCodeOffer = Pick<PairingOfferView, "url" | "expiresAt">;
+
 /** Where the pairing sheet is: waiting for its code, showing it, or past it. */
-export type PairingSheet =
+export type PairingSheet<O extends PairingCodeOffer = PairingOfferView> =
   | { kind: "starting" }
   | { kind: "failed"; reason: string }
-  | { kind: "live"; offer: PairingOfferView; secondsLeft: number }
-  | { kind: "expired"; offer: PairingOfferView }
+  | { kind: "live"; offer: O; secondsLeft: number }
+  | { kind: "expired"; offer: O }
   /** The status listed the offer and dropped it before it expired: a phone spent it, or another window replaced it. */
-  | { kind: "spent"; offer: PairingOfferView };
+  | { kind: "spent"; offer: O };
 
-export function pairingSheet({ offer, error, seen, listed, now }: { offer: PairingOfferView | undefined; error: Error | null; seen: boolean; listed: boolean; now: number }): PairingSheet {
+export function pairingSheet<O extends PairingCodeOffer>({
+  offer,
+  error,
+  seen,
+  listed,
+  now,
+}: {
+  offer: O | undefined;
+  error: Error | null;
+  seen: boolean;
+  listed: boolean;
+  now: number;
+}): PairingSheet<O> {
   if (error) return { kind: "failed", reason: error.message };
   if (!offer) return { kind: "starting" };
   if (now >= offer.expiresAt) return { kind: "expired", offer };
@@ -176,7 +191,7 @@ function usePairing(listedOfferId: string | undefined) {
 }
 
 /** Renders once a second while active, for a countdown read from the clock. */
-function useTicker(active: boolean) {
+export function useTicker(active: boolean) {
   const [, setTick] = useState(0);
   useEffect(() => {
     if (!active) return;
@@ -185,7 +200,7 @@ function useTicker(active: boolean) {
   }, [active]);
 }
 
-function PairingCode({ sheet, retry }: { sheet: PairingSheet; retry: () => void }) {
+export function PairingCode({ sheet, retry }: { sheet: PairingSheet<PairingCodeOffer>; retry: () => void }) {
   if (sheet.kind === "failed")
     return (
       <p role="alert" className="text-bad">

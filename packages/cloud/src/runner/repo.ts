@@ -13,6 +13,7 @@ const SNAPSHOT_IDENTITY = {
 };
 export const SNAPSHOT_REF = "refs/openorc/sync/snapshot";
 const SEED_REF = "refs/openorc/sync/seed";
+const INCOMING_REF = "refs/openorc/sync/incoming";
 
 function git(repo: string, args: string[], env: Record<string, string> = {}): string {
   return execFileSync("git", ["-c", "core.hooksPath=/dev/null", ...args], {
@@ -66,6 +67,28 @@ export interface SnapshotResult {
   branch: string | null;
   /** Null when the Mac already has the snapshot. */
   bundle: string | null;
+}
+
+export interface ApplyRequest {
+  bundle: string;
+  /** A commit in the bundle: its files are the Mac's, its parent is the Mac's HEAD. */
+  ref: string;
+  /** The files the Mac last saw here. When the checkout has moved on since, nothing is applied. */
+  expectTree: string;
+}
+
+/** Moves the checkout to the Mac's commit and files: commits, undos and edits made there between turns. */
+export function apply(repo: string, state: string, request: ApplyRequest): { applied: boolean; tree: string } {
+  const index = { GIT_INDEX_FILE: path.join(state, "sync.index") };
+  git(repo, ["add", "-A"], index);
+  const current = git(repo, ["write-tree"], index);
+  if (current !== request.expectTree) return { applied: false, tree: current };
+  git(repo, ["fetch", "-q", "--no-tags", request.bundle, `+${request.ref}:${INCOMING_REF}`]);
+  const tree = git(repo, ["rev-parse", `${INCOMING_REF}^{tree}`]);
+  // The private index holds exactly `current`, so Git moves the files the way a checkout would.
+  git(repo, ["read-tree", "-m", "-u", current, tree], index);
+  git(repo, ["reset", "-q", "--mixed", `${INCOMING_REF}^`]);
+  return { applied: true, tree };
 }
 
 /**

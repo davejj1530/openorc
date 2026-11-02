@@ -5,13 +5,14 @@
  *   bridge    joins this command's stdin and stdout to the daemon, one connection from the Mac
  *   seed      makes the checkout from a bundle the Mac sent
  *   snapshot  records the working tree and bundles what the Mac lacks
+ *   apply     moves the checkout to a commit and files the Mac sent
  */
 import { createHash } from "node:crypto";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { startDaemon } from "./daemon.ts";
-import { seed, snapshot } from "./repo.ts";
+import { apply, seed, snapshot } from "./repo.ts";
 
 function parse(args: string[]): Map<string, string[]> {
   const options = new Map<string, string[]>();
@@ -70,6 +71,7 @@ else if (command === "seed") {
   const origin = options.get("origin")?.[0];
   print(seed({ repo: one("repo"), bundle: one("bundle"), branch: one("branch"), ...(workRef ? { workRef } : {}), ...(origin ? { origin } : {}) }));
 } else if (command === "snapshot") print(snapshot(one("repo"), state, options.get("known") ?? []));
+else if (command === "apply") print(apply(one("repo"), state, { bundle: one("bundle"), ref: one("ref"), expectTree: one("expect-tree") }));
 else {
   process.stderr.write(`Unknown runner command: ${command}\n`);
   process.exit(2);

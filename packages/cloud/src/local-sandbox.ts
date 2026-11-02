@@ -104,6 +104,11 @@ export class LocalSandboxProvider implements SandboxProvider {
     private readonly env: () => NodeJS.ProcessEnv = () => process.env,
   ) {}
 
+  /** Its sandboxes are processes on this Mac, so they stop with the app that started them. */
+  async close(): Promise<void> {
+    await Promise.all([...this.sandboxes.values()].map((sandbox) => sandbox.stop()));
+  }
+
   async open(name: string): Promise<LocalSandbox> {
     const existing = this.sandboxes.get(name);
     if (existing) return existing;

@@ -6,7 +6,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { LocalSandboxProvider, type LocalSandbox } from "./local-sandbox.js";
 import { installRunner, runnerFiles } from "./runner-client.js";
-import { pullWorkspace, seedWorkspace, type WorkspaceLocation } from "./sync.js";
+import { pullWorkspace, pushWorkspace, seedWorkspace, type WorkspaceLocation } from "./sync.js";
 
 const IDENTITY = { GIT_AUTHOR_NAME: "Test", GIT_AUTHOR_EMAIL: "test@example.com", GIT_COMMITTER_NAME: "Test", GIT_COMMITTER_EMAIL: "test@example.com" };
 
@@ -135,5 +135,36 @@ describe("cloud workspace sync with commits made on the Mac", () => {
     expect(git(mirror, "rev-parse", "HEAD")).toBe(git(location.repo, "rev-parse", "HEAD"));
     expect(pulled.keptLocalCommit).toMatch(/^refs\/openorc\/cloud\/t1\/kept-commit\/\d+$/);
     expect(git(mirror, "rev-parse", pulled.keptLocalCommit!)).toBe(macCommit);
+  });
+});
+
+describe("sending the Mac's changes to the sandbox", () => {
+  it("brings a commit and an edit made on the Mac to the sandbox, so the next pull finds nothing to replace", async () => {
+    const seeded = await seedWorkspace(location, "main");
+    file(mirror, "committed.txt", "committed on the Mac\n");
+    git(mirror, "add", "committed.txt");
+    git(mirror, "commit", "-q", "-m", "mac commit");
+    file(mirror, "a.txt", "edited on the Mac\n");
+
+    const pushed = await pushWorkspace(location, seeded);
+    expect(pushed.pushed).toBe(true);
+    expect(git(location.repo, "rev-parse", "HEAD")).toBe(git(mirror, "rev-parse", "HEAD"));
+    expect(file(location.repo, "committed.txt")).toBe("committed on the Mac\n");
+    expect(file(location.repo, "a.txt")).toBe("edited on the Mac\n");
+    expect(git(location.repo, "status", "--porcelain")).toBe(" M a.txt");
+
+    const pulled = await pullWorkspace(location, pushed.state);
+    expect(pulled).toMatchObject({ changed: false, keptLocalEdits: null, keptLocalCommit: null });
+    expect(await pushWorkspace(location, pulled.state)).toMatchObject({ pushed: false });
+  });
+
+  it("sends nothing when the sandbox changed since the Mac last saw it", async () => {
+    const seeded = await seedWorkspace(location, "main");
+    file(location.repo, "a.txt", "changed in the cloud\n");
+    file(mirror, "b.txt", "changed on the Mac\n");
+    const pushed = await pushWorkspace(location, seeded);
+    expect(pushed).toEqual({ state: seeded, pushed: false });
+    expect(file(location.repo, "b.txt")).toBe("b1\n");
+    expect(file(location.repo, "a.txt")).toBe("changed in the cloud\n");
   });
 });

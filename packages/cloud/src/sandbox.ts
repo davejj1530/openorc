@@ -45,4 +45,6 @@ export interface SandboxProvider {
   readonly id: "local" | "vercel";
   /** Creates the named sandbox, or wakes it when it exists. */
   open(name: string): Promise<Sandbox>;
+  /** Called as OpenOrc closes. A cloud VM keeps running and sleeps on its own; a sandbox on this Mac stops here. */
+  close?(): Promise<void>;
 }

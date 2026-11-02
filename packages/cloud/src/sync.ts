@@ -16,8 +16,10 @@ const WORK_IDENTITY = {
 export interface MirrorState {
   /** The last snapshot applied, or null before the first pull. */
   snapshot: string | null;
-  /** The files the mirror held after the last seed or pull. */
+  /** The files the mirror held after the last sync. */
   tree: string;
+  /** The commit the mirror was on after the last sync. */
+  head: string | null;
   /** Commits the Mac has, so a pull sends only what is new. */
   known: string[];
 }
@@ -62,7 +64,7 @@ export async function seedWorkspace(location: WorkspaceLocation, branch: string,
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
-  return { snapshot: null, tree: await treeHash(mirror), known: work ? [work] : [head] };
+  return { snapshot: null, tree: await treeHash(mirror), head, known: work ? [work] : [head] };
 }
 
 export interface PullResult {
@@ -92,6 +94,32 @@ async function fetchSnapshot(location: WorkspaceLocation, result: SnapshotResult
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+}
+
+/**
+ * Sends what changed in the mirror since the last sync, such as a commit, an undo or an edit made on the Mac between
+ * turns, to the sandbox. Nothing is sent when the sandbox moved on meanwhile; the next pull keeps the Mac's edits aside.
+ */
+export async function pushWorkspace(location: WorkspaceLocation, state: MirrorState): Promise<{ state: MirrorState; pushed: boolean }> {
+  const { install, mirror, refPrefix, repo } = location;
+  const head = (await git(mirror, ["rev-parse", "HEAD"])).stdout.trim();
+  const tree = await treeHash(mirror);
+  if (tree === state.tree && head === state.head) return { state, pushed: false };
+  const work = (await git(mirror, ["commit-tree", tree, "-p", head, "-m", "OpenOrc work from the Mac"], { env: WORK_IDENTITY })).stdout.trim();
+  const ref = `${refPrefix}push`;
+  await pinObject(mirror, ref, work);
+  const dir = await mkdtemp(path.join(os.tmpdir(), "openorc-push-"));
+  let applied: boolean;
+  try {
+    const bundle = path.join(dir, "push.bundle");
+    await git(mirror, ["bundle", "create", "-q", bundle, ref, ...state.known.map((sha) => `^${sha}`)]);
+    const remoteBundle = path.posix.join(install.state, "push.bundle");
+    await install.sandbox.writeFile(remoteBundle, await readFile(bundle));
+    ({ applied } = await runRunner<{ applied: boolean }>(install, "apply", ["--repo", repo, "--bundle", remoteBundle, "--ref", ref, "--expect-tree", state.tree]));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+  return applied ? { state: { snapshot: state.snapshot, tree, head, known: [work] }, pushed: true } : { state, pushed: false };
 }
 
 /** Moves the mirror's branch to the sandbox's commit. A commit made on the Mac that the sandbox lacks is kept under a ref first. */
@@ -128,7 +156,7 @@ export async function pullWorkspace(location: WorkspaceLocation, state: MirrorSt
   if (current !== result.tree) await switchFiles(mirror, current, result.tree);
   const { moved, kept: keptLocalCommit } = await followHead(location, result.head);
   return {
-    state: { snapshot: result.snapshot, tree: result.tree, known: [result.snapshot] },
+    state: { snapshot: result.snapshot, tree: result.tree, head: result.head, known: [result.snapshot] },
     changed: moved || current !== result.tree,
     head: result.head,
     branch: result.branch,

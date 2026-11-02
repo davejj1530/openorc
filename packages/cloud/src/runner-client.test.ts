@@ -1,0 +1,138 @@
+import http from "node:http";
+import type { AddressInfo } from "node:net";
+import { mkdtemp, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { LocalSandboxProvider, type LocalSandbox } from "./local-sandbox.js";
+import { RemoteProcess } from "./remote-process.js";
+import { installRunner, RunnerClient, runnerFiles, type RunnerConnectionState } from "./runner-client.js";
+
+let base: string;
+let sandbox: LocalSandbox;
+let client: RunnerClient | null;
+const states: RunnerConnectionState[] = [];
+
+beforeEach(async () => {
+  base = await mkdtemp(path.join(os.tmpdir(), "openorc-cloud-"));
+  sandbox = await new LocalSandboxProvider(base).open("workspace");
+  states.length = 0;
+  client = await RunnerClient.open(await installRunner(sandbox, runnerFiles()), (state) => states.push(state));
+});
+
+afterEach(async () => {
+  client?.close();
+  await sandbox.stop();
+  await rm(base, { recursive: true, force: true });
+});
+
+function node(source: string): { cmd: string; args: string[]; cwd: string; env: Record<string, string> } {
+  return { cmd: "node", args: ["-e", source], cwd: sandbox.root, env: {} };
+}
+
+function collect(proc: RemoteProcess): { text: () => string; closed: Promise<[number | null, string | null]> } {
+  let text = "";
+  proc.stdout.on("data", (chunk: Buffer) => (text += chunk.toString("utf8")));
+  const closed = new Promise<[number | null, string | null]>((resolve) => proc.once("close", (code, signal) => resolve([code, signal])));
+  return { text: () => text, closed };
+}
+
+async function until(check: () => boolean, timeoutMs = 10_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!check()) {
+    if (Date.now() > deadline) throw new Error("timed out");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+}
+
+function write(proc: RemoteProcess, text: string): Promise<void> {
+  return new Promise((resolve, reject) => proc.stdin.write(text, (error) => (error ? reject(error) : resolve())));
+}
+
+describe("RunnerClient", () => {
+  it("runs a process in the sandbox with its input, output and exit code", async () => {
+    const proc = client!.spawn("echo", node(`process.stdin.on("data", (d) => process.stdout.write("echo:" + d)); process.stdin.on("end", () => process.exit(7));`));
+    const out = collect(proc);
+    await write(proc, "hello\n");
+    proc.stdin.end();
+    expect(await out.closed).toEqual([7, null]);
+    expect(out.text()).toBe("echo:hello\n");
+  });
+
+  it("keeps a process running through a dropped connection and delivers every byte once", async () => {
+    const proc = client!.spawn(
+      "ticks",
+      node(`let n = 0; const t = setInterval(() => { process.stdout.write("tick " + n++ + "\\n"); if (n === 40) { clearInterval(t); } }, 15);
+        process.stdin.on("data", (d) => process.stdout.write("got " + d)); process.stdin.on("end", () => setTimeout(() => process.exit(0), 700));`),
+    );
+    const out = collect(proc);
+    await until(() => out.text().includes("tick 5\n"));
+    sandbox.dropConnections();
+    await until(() => states.filter((state) => state === "connected").length >= 2);
+    await write(proc, "after-reconnect\n");
+    proc.stdin.end();
+    expect(await out.closed).toEqual([0, null]);
+    const lines = out.text().trim().split("\n");
+    expect(lines.filter((line) => line.startsWith("tick"))).toEqual(Array.from({ length: 40 }, (_, n) => `tick ${n}`));
+    expect(lines.filter((line) => line.startsWith("got"))).toEqual(["got after-reconnect"]);
+  });
+
+  it("writes input sent while disconnected exactly once after reconnecting", async () => {
+    const proc = client!.spawn("cat", node(`process.stdin.pipe(process.stdout);`));
+    const out = collect(proc);
+    await write(proc, "one\n");
+    sandbox.dropConnections();
+    const pending = write(proc, "two\n");
+    await until(() => states.includes("disconnected"));
+    await pending;
+    proc.stdin.end();
+    await out.closed;
+    expect(out.text()).toBe("one\ntwo\n");
+  });
+
+  it("reports a process the sandbox stopped as ended by the stop", async () => {
+    const proc = client!.spawn("forever", node(`setInterval(() => {}, 1000); process.stdout.write("up\\n");`));
+    const out = collect(proc);
+    await until(() => out.text() === "up\n");
+    await sandbox.stop();
+    expect(await out.closed).toEqual([null, "SIGKILL"]);
+  });
+
+  it("reports a command the sandbox cannot start", async () => {
+    const proc = client!.spawn("missing", { cmd: "openorc-no-such-binary", args: [], cwd: sandbox.root, env: {} });
+    const errors: Error[] = [];
+    proc.on("error", (error: Error) => errors.push(error));
+    const out = collect(proc);
+    expect((await out.closed)[0]).toBeNull();
+    expect(errors[0]?.message).toMatch(/ENOENT/);
+  });
+
+  it("relays requests from the sandbox's loopback to the Mac, and refuses them while the Mac is away", async () => {
+    const mac = http.createServer((request, response) => {
+      let body = "";
+      request.on("data", (chunk: Buffer) => (body += chunk.toString("utf8")));
+      request.on("end", () => {
+        response.writeHead(201, { "content-type": "text/plain", "x-seen-host": request.headers.host ?? "" });
+        response.end(`${request.method} ${request.url} ${body}`);
+      });
+    });
+    await new Promise<void>((resolve) => mac.listen(0, "127.0.0.1", resolve));
+    const target = `http://127.0.0.1:${(mac.address() as AddressInfo).port}`;
+    try {
+      const port = await client!.relay("mcp", target);
+      expect(await client!.relay("mcp", target)).toBe(port);
+      const fetchFromVm = `fetch("http://127.0.0.1:${port}/mcp/token?x=1", { method: "POST", body: "hi" }).then(async (r) => console.log(r.status, r.headers.get("x-seen-host"), await r.text()))`;
+      const proc = client!.spawn("fetch", node(fetchFromVm));
+      const out = collect(proc);
+      await out.closed;
+      expect(out.text().trim()).toBe(`201 ${target.replace("http://", "")} POST /mcp/token?x=1 hi`);
+
+      client!.close();
+      client = null;
+      const offline = await sandbox.exec("node", ["-e", `fetch("http://127.0.0.1:${port}/mcp/token").then((r) => console.log(r.status))`]);
+      expect(offline.stdout.toString().trim()).toBe("503");
+    } finally {
+      mac.close();
+    }
+  });
+});

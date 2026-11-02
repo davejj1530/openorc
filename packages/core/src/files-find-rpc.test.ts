@@ -50,8 +50,10 @@ async function workspaceThread(files: Record<string, string>): Promise<Thread> {
   return threads.update(core.db, notes.id, { workingDirectory: folder });
 }
 
-it("finds lines in the conversation's git folder, untracked files included, grouped by file", async () => {
+it("finds lines in the conversation's git folder, untracked files included, ignored env files not, grouped by file", async () => {
   await writeFile(path.join(checkout, "src", "draft.ts"), "// a needle\nconst x = 1;\n");
+  await writeFile(path.join(checkout, "src", ".gitignore"), ".env\n");
+  await writeFile(path.join(checkout, "src", ".env"), "NEEDLE=1\n");
   expect(await find(literal("NEEDLE"))).toEqual({
     kind: "matches",
     truncated: false,
@@ -63,8 +65,8 @@ it("finds lines in the conversation's git folder, untracked files included, grou
   expect(await find({ text: "NEEDLE", regex: false, caseSensitive: true })).toEqual({ kind: "matches", truncated: false, groups: [] });
 });
 
-it("walks a folder without git, skipping hidden folders and dependencies", async () => {
-  const notes = await workspaceThread({ "ideas.md": "# needle\n", ".cache/old.md": "needle\n", "node_modules/pkg/index.js": "needle\n", "logo.png": "needle\0" });
+it("walks a folder without git, skipping hidden folders, env files and dependencies", async () => {
+  const notes = await workspaceThread({ "ideas.md": "# needle\n", ".cache/old.md": "needle\n", ".env": "NEEDLE=1\n", "node_modules/pkg/index.js": "needle\n", "logo.png": "needle\0" });
   expect(await find(literal("needle"), notes.id)).toEqual({ kind: "matches", truncated: false, groups: [{ path: "ideas.md", lines: [{ line: 1, text: "# needle" }] }] });
 });
 

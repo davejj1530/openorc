@@ -32,7 +32,7 @@ export interface FileEntry {
   name: string;
   path: FolderPath;
   kind: "directory" | "file";
-  /** Hidden by default in Explorer: Git-ignored files, dependencies, and repository/OS metadata. */
+  /** Dimmed in Explorer: Git-ignored files and dependencies. */
   ignored: boolean;
 }
 

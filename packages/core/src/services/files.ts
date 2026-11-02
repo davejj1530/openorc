@@ -1,3 +1,4 @@
+import type { Dirent } from "node:fs";
 import { glob, open, realpath, type FileHandle } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { git } from "@openorc/git";
@@ -31,14 +32,28 @@ const SAVE_WAIT_MS = 5_000;
 /** A turn start reads the journal back only as far as the thread's last checkpoint, so each folder keeps a bounded tail. */
 const JOURNAL_LIMIT = 500;
 
-/** A folder's files without git: hidden entries and the folders above are skipped, as a .gitignore would. */
+/** `.env`, `.env.local` and the like: usually Git-ignored, yet opened all the time. Search lists them; find in files skips them. */
+const isEnvFile = (path: string) => /(^|\/)\.env(\.[^/]*)?$/.test(path);
+
+/** A folder's files without git: hidden entries other than env files, and the folders above, are skipped as a .gitignore would. */
 async function folderFiles(root: string): Promise<string[]> {
   const files: string[] = [];
-  for await (const entry of glob("**", { cwd: root, withFileTypes: true, exclude: (dirent) => dirent.name.startsWith(".") || UNLISTED.has(dirent.name) })) {
+  const skipped = (dirent: Dirent) => (dirent.name.startsWith(".") && !isEnvFile(dirent.name)) || UNLISTED.has(dirent.name);
+  // `**` never matches a dotfile, so env files are asked for by name.
+  for await (const entry of glob(["**", "**/.env", "**/.env.*"], { cwd: root, withFileTypes: true, exclude: skipped })) {
     if (entry.isFile()) files.push(relative(root, join(entry.parentPath, entry.name)));
     if (files.length >= MAX_FOLDER_FILES) break;
   }
   return files;
+}
+
+/** Tracked and untracked files, plus Git-ignored env files outside ignored folders. `--directory` keeps git out of node_modules. */
+async function gitFiles(root: string): Promise<string[]> {
+  const [listed, ignored] = await Promise.all([
+    git(root, ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], { maxBuffer: 256 * 1024 * 1024 }),
+    git(root, ["ls-files", "-z", "--others", "--ignored", "--exclude-standard", "--directory"], { maxBuffer: 256 * 1024 * 1024 }),
+  ]);
+  return [...listed.stdout.split("\0").filter(Boolean), ...ignored.stdout.split("\0").filter(isEnvFile)];
 }
 
 interface Listing {
@@ -247,7 +262,8 @@ export class FileService {
     try {
       const { root, project } = await folder;
       const git = (await projectGit({ id: project.id, rootPath: root })) !== "none";
-      const result = await findInFolder({ root, git, files: () => this.list({ root, project }) }, query, newer.signal);
+      const files = async () => (await this.list({ root, project })).filter((file) => !isEnvFile(file));
+      const result = await findInFolder({ root, git, files }, query, newer.signal);
       return newer.signal.aborted ? { kind: "superseded" } : result;
     } finally {
       if (this.finds.get(conversation) === newer) this.finds.delete(conversation);
@@ -257,10 +273,7 @@ export class FileService {
   private async list({ root, project }: Pick<ConversationFolder, "root" | "project">): Promise<string[]> {
     const hit = this.listings.get(root);
     if (hit && Date.now() - hit.at < 30_000) return hit.files;
-    const files =
-      (await projectGit({ id: project.id, rootPath: root })) === "none"
-        ? await folderFiles(root)
-        : (await git(root, ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], { maxBuffer: 256 * 1024 * 1024 })).stdout.split("\0").filter(Boolean);
+    const files = (await projectGit({ id: project.id, rootPath: root })) === "none" ? await folderFiles(root) : await gitFiles(root);
     this.listings.set(root, { at: Date.now(), files });
     return files;
   }

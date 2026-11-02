@@ -2,12 +2,13 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import { access, copyFile, glob, lstat, mkdir } from "node:fs/promises";
 import path from "node:path";
-import { audit, taskForwardings, tasks, threads, type CloudMirrorState, type Db } from "@openorc/db";
+import { audit, taskForwardings, tasks, threads, type CloudMirrorState, type CloudProviderId, type Db } from "@openorc/db";
 import { stopProcess, waitForProcessGroup } from "@openorc/agents";
 import { diskUsage, emptyTree, fetch, git, repoInfo, revParse, worktree } from "@openorc/git";
 import { WORKSPACE_ID, type BranchLoss, type Project, type RemovalImpact, type Task, type Thread, type WorkspaceMode } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
 import type { CloudWorkspaceService } from "./cloud-workspaces.js";
+import type { StartThreadInput } from "./thread-inputs.js";
 import { assertCanBranch, projectGit } from "./project-git.js";
 import { inUnvettedCopy } from "./review-copies.js";
 import { assertSafeParentPath } from "./safe-parent-path.js";
@@ -238,10 +239,16 @@ export class WorkspaceService {
     if (!adoptsCheckout) await assertCanBranch(project);
   }
 
-  /** Marks a conversation being admitted as one that runs in a cloud sandbox. Call inside the admitting transaction. */
-  admitCloud(threadId: string): void {
+  /** Checks a new cloud conversation and picks where it runs, before it is admitted. */
+  placeCloud(input: Pick<StartThreadInput, "agent" | "checkout">, project: Project): Promise<CloudProviderId> {
     if (!this.options.cloud) throw new Error("Cloud workspaces are not available.");
-    this.options.cloud.admit(threadId);
+    return this.options.cloud.place(input, project);
+  }
+
+  /** Marks a conversation being admitted as one that runs in a cloud sandbox. Call inside the admitting transaction. */
+  admitCloud(threadId: string, provider: CloudProviderId): void {
+    if (!this.options.cloud) throw new Error("Cloud workspaces are not available.");
+    this.options.cloud.admit(threadId, provider);
   }
 
   /**

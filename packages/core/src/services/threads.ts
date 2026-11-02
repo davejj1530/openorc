@@ -38,7 +38,6 @@ import { randomUUID } from "node:crypto";
 import { realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Logger } from "../transport.js";
-import { assertCloudStart } from "./cloud-workspaces.js";
 import { titleFromPrompt, type StartThreadInput, type ThreadPatch, type ThreadTitler } from "./thread-inputs.js";
 import { inUnvettedCopy } from "./review-copies.js";
 import type { RunService } from "./runs.js";
@@ -218,7 +217,7 @@ export class ThreadService {
     if (input.workingDirectory && input.projectId !== WORKSPACE_ID) throw new Error("Only Workspace conversations can choose a working folder.");
     const home = executionProject(this.db, { projectId: input.projectId });
     const project = input.projectId === WORKSPACE_ID ? { ...home, rootPath: await directory(input.workingDirectory ?? home.rootPath) } : home;
-    if (input.cloud) assertCloudStart(input, project);
+    const cloudProvider = input.cloud ? await this.workspaces.placeCloud(input, project) : null;
     const workspaceMode = input.checkout || input.cloud ? "worktree" : (input.workspaceMode ?? "current");
     await this.workspaces.assertNewThreadWorkspace(project, workspaceMode, Boolean(input.checkout));
     const id = randomUUID();
@@ -243,7 +242,7 @@ export class ThreadService {
             permissionMode: input.permissionMode,
             workspaceMode,
           });
-          if (input.cloud) this.workspaces.admitCloud(admitted.id);
+          if (cloudProvider) this.workspaces.admitCloud(admitted.id, cloudProvider);
           audit.record(this.db, {
             actor: "user",
             action: "thread.create",

@@ -1,4 +1,4 @@
-import type { RunnerFile, SandboxProvider } from "@openorc/cloud";
+import type { RunnerFile, SandboxProvider, VercelAccess } from "@openorc/cloud";
 import type { TextEmbedder } from "@openorc/memory";
 import type { BrowserHost, PreviewHost } from "@openorc/protocol";
 import type { DeviceSystem } from "./devices/system.js";
@@ -54,4 +54,6 @@ export interface OpenOrcOptions {
   cloudSandboxes?: SandboxProvider;
   /** The cloud runner's source files, for a bundled core that cannot read them beside its own code. */
   cloudRunnerFiles?: RunnerFile[];
+  /** Vercel credentials from Settings. While it resolves to null, new cloud conversations run in sandboxes on this Mac. */
+  cloudCredentials?: () => Promise<VercelAccess | null>;
 }

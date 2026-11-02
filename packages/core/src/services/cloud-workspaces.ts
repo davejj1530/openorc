@@ -1,7 +1,21 @@
 import path from "node:path";
 import type { AgentHost } from "@openorc/agents";
-import { installRunner, pullWorkspace, pushWorkspace, RunnerClient, runnerFiles, seedFromCommit, seedWorkspace, type RunnerFile, type SandboxProvider, type WorkspaceLocation } from "@openorc/cloud";
-import { cloudWorkspaces, type CloudMirrorState, type CloudWorkspaceRecord, type Db } from "@openorc/db";
+import {
+  installRunner,
+  LocalSandboxProvider,
+  pullWorkspace,
+  pushWorkspace,
+  RunnerClient,
+  runnerFiles,
+  seedFromCommit,
+  seedWorkspace,
+  VercelSandboxProvider,
+  type RunnerFile,
+  type SandboxProvider,
+  type VercelAccess,
+  type WorkspaceLocation,
+} from "@openorc/cloud";
+import { cloudWorkspaces, type CloudMirrorState, type CloudProviderId, type CloudWorkspaceRecord, type Db } from "@openorc/db";
 import { originUrl } from "@openorc/git";
 import { WORKSPACE_ID, type Project, type Thread } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
@@ -9,7 +23,10 @@ import { cloudAgentHost } from "./cloud-agent-host.js";
 import type { StartThreadInput } from "./thread-inputs.js";
 
 export interface CloudWorkspaceOptions {
-  provider: SandboxProvider;
+  /** Every sandbox service a workspace may have been made with. A workspace keeps using its own. */
+  providers: SandboxProvider[];
+  /** Where new cloud conversations run, decided as each is started. Defaults to the first provider. */
+  forNewThreads?: () => Promise<SandboxProvider>;
   /** Node in the sandbox, which runs OpenOrc's runner. */
   node?: string;
   files?: RunnerFile[];
@@ -23,6 +40,24 @@ export const CLOUD_AGENTS = "Only Claude runs in cloud workspaces so far.";
 export function assertCloudStart(input: Pick<StartThreadInput, "agent" | "checkout">, project: Project): void {
   if (input.checkout || project.id === WORKSPACE_ID) throw new Error("Cloud conversations start in a project, on a worktree of their own.");
   if (input.agent !== "claude") throw new Error(CLOUD_AGENTS);
+}
+
+/**
+ * The sandbox services the app offers: Vercel once it is connected, sandboxes simulated on this Mac otherwise. A
+ * provider passed in, as tests do, takes new conversations instead.
+ */
+export function cloudSandboxProviders(input: {
+  dataDir: string;
+  env: () => NodeJS.ProcessEnv;
+  credentials?: () => Promise<VercelAccess | null>;
+  override?: SandboxProvider;
+}): Pick<CloudWorkspaceOptions, "providers" | "forNewThreads"> {
+  const local = new LocalSandboxProvider(path.join(input.dataDir, "cloud-sandboxes"), input.env);
+  const credentials = input.credentials ?? (async () => null);
+  const vercel = new VercelSandboxProvider({ credentials });
+  const { override } = input;
+  const providers = override ? [override, ...[local, vercel].filter((provider) => provider.id !== override.id)] : [local, vercel];
+  return { providers, forNewThreads: async () => override ?? ((await credentials()) ? vercel : local) };
 }
 
 /** Where a cloud conversation's agent runs, and its working folder there. */
@@ -59,9 +94,23 @@ export class CloudWorkspaceService {
     this.files = options.files ?? null;
   }
 
+  /** Checks a new cloud conversation and picks where it runs. Call before admitting it. */
+  async place(input: Pick<StartThreadInput, "agent" | "checkout">, project: Project): Promise<CloudProviderId> {
+    assertCloudStart(input, project);
+    const provider = (await this.options.forNewThreads?.()) ?? this.options.providers[0];
+    if (!provider) throw new Error("Cloud workspaces are not available.");
+    return provider.id;
+  }
+
   /** Recorded in the transaction that admits the conversation, before its worktree exists. */
-  admit(threadId: string): CloudWorkspaceRecord {
-    return cloudWorkspaces.insert(this.db, { threadId, provider: this.options.provider.id, sandbox: `openorc-${threadId}` });
+  admit(threadId: string, provider: CloudProviderId): CloudWorkspaceRecord {
+    return cloudWorkspaces.insert(this.db, { threadId, provider, sandbox: `openorc-${threadId}` });
+  }
+
+  private provider(id: CloudProviderId): SandboxProvider {
+    const provider = this.options.providers.find((candidate) => candidate.id === id);
+    if (!provider) throw new Error(`This conversation's cloud workspace runs on ${id}, which this app is not set up for.`);
+    return provider;
   }
 
   get(threadId: string): CloudWorkspaceRecord | null {
@@ -73,7 +122,7 @@ export class CloudWorkspaceService {
     const existing = this.locations.get(record.threadId);
     if (existing) return existing;
     const location = (async () => {
-      const sandbox = await this.options.provider.open(record.sandbox);
+      const sandbox = await this.provider(record.provider).open(record.sandbox);
       this.files ??= runnerFiles();
       const install = await installRunner(sandbox, this.files, this.options.node);
       return { install, repo: path.posix.join(sandbox.root, "repo"), mirror, refPrefix: `refs/openorc/cloud/${record.threadId}/` };
@@ -191,7 +240,7 @@ export class CloudWorkspaceService {
     const connections = [...this.connections.values()];
     this.connections.clear();
     for (const connection of await Promise.allSettled(connections)) if (connection.status === "fulfilled") connection.value.client.close();
-    await this.options.provider.close?.();
+    await Promise.all(this.options.providers.map((provider) => provider.close?.()));
   }
 
   private connect(record: CloudWorkspaceRecord, mirror: string): Promise<Connection> {

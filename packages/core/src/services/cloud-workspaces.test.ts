@@ -8,7 +8,7 @@ import { LocalSandboxProvider } from "@openorc/cloud";
 import { cloudWorkspaces, Db, projects, threads } from "@openorc/db";
 import { git } from "@openorc/git";
 import type { Project, Thread } from "@openorc/protocol";
-import { CloudWorkspaceService } from "./cloud-workspaces.js";
+import { CloudWorkspaceService, cloudSandboxProviders } from "./cloud-workspaces.js";
 import { WorkspaceService } from "./workspace.js";
 import { WorkspaceWriters } from "./workspace-writers.js";
 
@@ -39,7 +39,7 @@ beforeEach(async () => {
     settings: { setupScript: 'printf "%s %s\\n" "$OPENORC_CLOUD" "$OPENORC_ROOT_PATH" >> setup-runs.txt', worktreeInclude: [] },
   });
   sandboxes = new LocalSandboxProvider(path.join(directory, "sandboxes"));
-  const cloud = new CloudWorkspaceService(db, { provider: sandboxes }, quiet);
+  const cloud = new CloudWorkspaceService(db, { providers: [sandboxes] }, quiet);
   service = new WorkspaceService(db, { dataDir: path.join(directory, "data"), cloud }, quiet, new WorkspaceWriters());
 });
 
@@ -52,7 +52,7 @@ afterEach(async () => {
 function cloudThread(): Thread {
   return db.transaction(() => {
     const thread = threads.insert(db, { projectId: project.id, title: "Cloud work", agent: "claude", model: null, mode: "act", permissionMode: "trusted", workspaceMode: "worktree" });
-    service.admitCloud(thread.id);
+    service.admitCloud(thread.id, "local");
     return thread;
   });
 }
@@ -108,5 +108,32 @@ describe("cloud workspace preparation", () => {
     expect(readFileSync(path.join(prepared.worktreePath!, "setup-runs.txt"), "utf8")).toBe(` ${root}\n`);
     expect(existsSync(path.join(directory, "sandboxes", `openorc-${prepared.id}`))).toBe(false);
     expect(cloudWorkspaces.get(db, prepared.id)).toBeNull();
+  });
+});
+
+describe("where cloud conversations run", () => {
+  it("puts new conversations on Vercel once it is connected, and on this Mac until then", async () => {
+    let access: { token: string; teamId: string; projectId: string } | null = null;
+    const cloud = new CloudWorkspaceService(db, cloudSandboxProviders({ dataDir: directory, env: () => process.env, credentials: async () => access }), quiet);
+    expect(await cloud.place({ agent: "claude" }, project)).toBe("local");
+    access = { token: "tok", teamId: "team", projectId: "proj" };
+    expect(await cloud.place({ agent: "claude" }, project)).toBe("vercel");
+    await expect(cloud.place({ agent: "codex" }, project)).rejects.toThrow("Only Claude runs in cloud workspaces so far.");
+  });
+
+  it("lets a provider passed in take new conversations, whatever is connected", async () => {
+    const cloud = new CloudWorkspaceService(
+      db,
+      cloudSandboxProviders({ dataDir: directory, env: () => process.env, credentials: async () => ({ token: "t", teamId: "t", projectId: "p" }), override: sandboxes }),
+      quiet,
+    );
+    expect(await cloud.place({ agent: "claude" }, project)).toBe("local");
+  });
+
+  it("opens a workspace on the service it was made with", async () => {
+    const cloud = new CloudWorkspaceService(db, cloudSandboxProviders({ dataDir: directory, env: () => process.env }), quiet);
+    const thread = threads.insert(db, { projectId: project.id, title: "On Vercel", agent: "claude", model: null, mode: "act", permissionMode: "trusted", workspaceMode: "worktree" });
+    const record = cloud.admit(thread.id, "vercel");
+    await expect(cloud.location(record, path.join(directory, "mirror"))).rejects.toThrow("Connect Vercel in Settings to run in the cloud.");
   });
 });

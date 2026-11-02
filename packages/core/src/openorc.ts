@@ -3,7 +3,6 @@ import { claudeRunAccount } from "./services/claude-run-account.js";
 import { createClaudeAccountHandlers } from "./handlers/claude-accounts.js";
 import { invalidParamsMessage, resultSummary } from "./handlers/diagnostics.js";
 import { captureLaunchEnvironment, recoverAgentProcesses } from "@openorc/agents";
-import { LocalSandboxProvider } from "@openorc/cloud";
 import { Db, LedgerWriter, orchestration, plans, redact, settings as storedSettings, taskForwardings, tasks, teamDeletedThreads, teamRuntime, threads } from "@openorc/db";
 import { startMcpServer, type OpenOrcMcpServer } from "@openorc/mcp";
 import { harnessAvailability, harnessInfo, harnessInstalled, harnessLoggedIn, rpcParams, type HarnessId, type RpcMethod, type RpcRequest } from "@openorc/protocol";
@@ -81,7 +80,7 @@ import { RunService, type Notification, type RunHooks } from "./services/runs.js
 import { ScheduleService } from "./services/schedules.js";
 import { AppSettingsService } from "./services/settings.js";
 import { ShellEnvironment, inheritedProbe } from "./services/shell-environment.js";
-import { CloudWorkspaceService } from "./services/cloud-workspaces.js";
+import { CloudWorkspaceService, cloudSandboxProviders } from "./services/cloud-workspaces.js";
 import { SlackService } from "./services/slack/service.js";
 import { SystemService } from "./services/system.js";
 import { TaskCheckoutService } from "./services/task-checkout.js";
@@ -242,8 +241,13 @@ export class OpenOrc {
       if (this.settings.get().notifications) options.transport.push(notice);
     };
     this.projects = new ProjectService(db);
-    const cloudSandboxes = options.cloudSandboxes ?? new LocalSandboxProvider(path.join(options.dataDir, "cloud-sandboxes"), () => this.environment.current().env);
-    this.cloud = new CloudWorkspaceService(db, { provider: cloudSandboxes, ...(options.cloudRunnerFiles ? { files: options.cloudRunnerFiles } : {}) }, this.log);
+    const sandboxes = cloudSandboxProviders({
+      dataDir: options.dataDir,
+      env: () => this.environment.current().env,
+      ...(options.cloudCredentials ? { credentials: options.cloudCredentials } : {}),
+      ...(options.cloudSandboxes ? { override: options.cloudSandboxes } : {}),
+    });
+    this.cloud = new CloudWorkspaceService(db, { ...sandboxes, ...(options.cloudRunnerFiles ? { files: options.cloudRunnerFiles } : {}) }, this.log);
     this.workspaces = new WorkspaceService(db, { dataDir: options.dataDir, cloud: this.cloud }, this.log, this.workspaceWriters);
     const backgroundProviders: ProviderInfo = {
       models: (agent, accountId) => this.runs.models(agent, undefined, undefined, accountId),

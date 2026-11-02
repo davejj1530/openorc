@@ -6,7 +6,7 @@ import { STATES, type VercelCredentials } from "../vercel-sandbox.js";
 import { ensureVercelProject, findVercelProject } from "../vercel-projects.js";
 import { BRAIN_AWAY_MS, BRAIN_EXIT, BRAIN_PORT, BRAIN_PROJECT, BRAIN_READY, BRAIN_SANDBOX, brainLayout, type BrainLayout } from "./layout.js";
 import { alreadyStopping } from "./self.js";
-import { brainKeyText, encodeLaunch, parseControlReply, type BrainControlRequest, type BrainControlResult, type BrainKey } from "./wire.js";
+import { brainKeyText, encodeLaunch, parseControlReply, type BrainControlRequest, type BrainControlResult, type BrainControlResults, type BrainKey } from "./wire.js";
 
 /** The brain's folder under its sandbox's working folder. */
 const ROOT_FOLDER = "openorc-brain";
@@ -23,6 +23,9 @@ export interface BrainAccess {
   /** BRAIN_PROJECT unless given, as for a QA brain kept apart from the person's own. */
   project?: string;
 }
+
+/** A Mac project's branch on its way to the brain: the import-project request with the bundle's bytes in place of its file. */
+export type ProjectBundle = Omit<Extract<BrainControlRequest, { op: "import-project" }>, "op" | "bundle"> & { bundle: Uint8Array };
 
 /** What apps/brain's build makes: an archive whose top level holds the entry points. */
 export interface BrainBundle {
@@ -476,12 +479,16 @@ export class BrainMachine {
     return this.whileRunning((vm, layout) => this.ask(vm, layout, request));
   }
 
-  /** Uploads a git bundle of a project to the running brain, which clones it, sets `origin` as its remote and imports it. */
-  importProject({ name, bundle, origin }: { name: string; bundle: Uint8Array; origin?: string }): Promise<{ projectId: string }> {
+  /**
+   * Uploads a git bundle of a Mac project's branch to the running brain, which imports the project the first time and
+   * brings its copy up to date after. Throws BrainRefused when the brain could not take it, as a bundle built on a commit
+   * it lacks.
+   */
+  importProject({ bundle, ...project }: ProjectBundle): Promise<BrainControlResults["import-project"]> {
     const file = `${randomUUID()}.bundle`;
     return this.whileRunning(async (vm, layout) => {
       await vm.writeFiles([{ path: path.posix.join(layout.inbox, file), content: bundle }]);
-      return this.ask(vm, layout, { op: "import-project", name, bundle: file, ...(origin ? { origin } : {}) });
+      return this.ask(vm, layout, { op: "import-project", ...project, bundle: file });
     });
   }
 

@@ -21,6 +21,7 @@ export { BRAIN_AWAY_MS, BRAIN_EXIT, BRAIN_PORT, BRAIN_PROJECT, BRAIN_READY, BRAI
 export {
   BrainWireError,
   brainKeyFrom,
+  brainTakesProject,
   brainKeyText,
   encodeControlReply,
   encodeLaunch,
@@ -43,6 +44,7 @@ export {
   type HandoverRequest,
   type HandoverClaudeAccount,
   type HandoverValues,
+  type ProjectCopy,
 } from "./brain/wire.js";
 export { SealedUnreadable, brainKeyCheck, keyCheckMatches, openSecret, sealSecret } from "./brain/sealed-file.js";
 export { brainSelf, type BrainSelf, type BrainSession, type OpenBrainSession } from "./brain/self.js";
@@ -60,6 +62,8 @@ export {
   type BrainOpenParams,
   type BrainSettings,
   type BrainVm,
+  type ProjectBundle,
   type ProvisionOptions,
   type WakeResult,
 } from "./brain/machine.js";
+export { branchHead, bundleBranch, copyHeads, takeBranch, type Taken } from "./brain/project-copy.js";

@@ -621,16 +621,18 @@ describe("asking and removing a brain", () => {
       if (request.op !== "import-project") return { code: 69 };
       const uploaded = machine.files.get(`${ROOT}/inbox/${request.bundle}`);
       if (uploaded?.toString() !== "git bundle bytes") return { code: 0, stdout: `${encodeControlReply<"import-project">({ ok: false, error: "No such bundle." })}\n` };
-      return { code: 0, stdout: `${encodeControlReply<"import-project">({ ok: true, result: { projectId: "project-1" } })}\n` };
+      return { code: 0, stdout: `${encodeControlReply<"import-project">({ ok: true, result: imported })}\n` };
     };
+    const imported = { projectId: "project-1", macHead: "a".repeat(40), head: "a".repeat(40) };
     const bundle = Buffer.from("git bundle bytes");
-    expect(await brain.importProject({ name: "throwaway", bundle, origin: "https://example.com/throwaway.git" })).toEqual({ projectId: "project-1" });
-    expect(heard).toEqual([{ op: "import-project", name: "throwaway", bundle: expect.stringMatching(/^\w[\w.-]*\.bundle$/), origin: "https://example.com/throwaway.git" }]);
+    const project = { source: "mac-project-1", name: "throwaway", branch: "main" };
+    expect(await brain.importProject({ ...project, bundle, origin: "https://example.com/throwaway.git" })).toEqual(imported);
+    expect(heard).toEqual([{ op: "import-project", ...project, bundle: expect.stringMatching(/^\w[\w.-]*\.bundle$/), origin: "https://example.com/throwaway.git" }]);
     expect(vercel.gets.every((get) => !get.resume)).toBe(true);
 
     vercel.sandboxes.get("brain")!.state = "stopped";
     machine.changes.length = 0;
-    await expect(brain.importProject({ name: "other", bundle })).rejects.toThrow(BrainUnavailable);
+    await expect(brain.importProject({ ...project, name: "other", bundle })).rejects.toThrow(BrainUnavailable);
     expect(machine.changes).toEqual([]);
     expect(vercel.sandboxes.get("brain")!.state).toBe("stopped");
   });

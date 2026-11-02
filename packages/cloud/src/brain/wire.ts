@@ -197,8 +197,16 @@ export type BrainControlRequest =
   | { op: "pair" }
   /** Each value is base64url of `sealSecret` under the channel `handover/<kind>`. */
   | { op: "handover"; sealed: { [K in HandoverKind]?: string } }
-  /** A git bundle already in the brain's inbox, by file name, cloned into its projects and imported. */
-  | { op: "import-project"; name: string; bundle: string; origin?: string }
+  /**
+   * A Mac project's branch as a git bundle already in the brain's inbox, by file name. The first one is cloned into the
+   * brain's projects under the Mac project's id and name, and imported; each later one fast-forwards the copy. Sending
+   * one again changes nothing.
+   */
+  | { op: "import-project"; source: string; name: string; branch: string; bundle: string; origin?: string }
+  /** Removes the copy of a Mac project, by the Mac project's id, unless the brain has threads in it. */
+  | { op: "remove-project"; source: string }
+  /** The Mac projects the brain has copies of. */
+  | { op: "projects" }
   /** Close gracefully and exit; the sandbox keeps running. */
   | { op: "stop" }
   /** A stop for an update, answered at once: refused, the brain running on, while closing would cut work short. */
@@ -217,12 +225,24 @@ export interface BrainStatus {
   busy: string | null;
 }
 
+/** A Mac project's copy on the brain. */
+export interface ProjectCopy {
+  projectId: string;
+  /** The Mac's commit it last took. */
+  macHead: string;
+  /** The copy's own commit on the branch: another than macHead once it kept commits the Mac's lacks. */
+  head: string;
+}
+
 export interface BrainControlResults {
   status: BrainStatus;
   wake: BrainStatus;
   pair: { url: string; expiresAt: number };
   handover: { applied: HandoverKind[] };
-  "import-project": { projectId: string };
+  /** `lacksBase`: the copy lacks the commit the bundle builds on, so it took nothing; a whole bundle will do. */
+  "import-project": ProjectCopy | { lacksBase: true };
+  "remove-project": { removed: boolean; threads: number };
+  projects: { copies: (ProjectCopy & { source: string; threads: number })[] };
   stop: { stopping: true };
   "stop-for-update": { stopping: true };
 }
@@ -230,24 +250,50 @@ export type BrainControlResult<R extends BrainControlRequest> = BrainControlResu
 export type BrainControlReply<Op extends BrainControlOp> = { ok: true; result: BrainControlResults[Op] } | { ok: false; error: string };
 
 const sealedText = text(131_072, /^[A-Za-z0-9_-]+$/);
+const projectSource = text(100, /^[A-Za-z0-9_-]+$/);
+/** One folder's name: no separator or control character, and not . or .. */
+const folderName: Parse<string> = (value, field) => {
+  const name = text(100)(value, field);
+  const unsafe = name === "." || name === ".." || [...name].some((char) => char === "/" || char === "\\" || char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127);
+  return unsafe ? bad(field) : name;
+};
+const branchName = text(255, /^\w[\w./+-]*$/);
+
+/** Whether the brain takes a project by this folder name and branch, as its import does. */
+export function brainTakesProject(name: string, branch: string): boolean {
+  try {
+    folderName(name, "name");
+    branchName(branch, "branch");
+    return true;
+  } catch {
+    return false;
+  }
+}
+const commit = text(64, /^[0-9a-f]{40,64}$/);
+const count = int(0, Number.MAX_SAFE_INTEGER);
 const REQUESTS = variants<BrainControlRequest>({
   status: object({ op: literal("status") }),
   wake: object({ op: literal("wake") }),
   pair: object({ op: literal("pair") }),
   handover: object({ op: literal("handover"), sealed: object({}, { claude: sealedText, codex: sealedText, push: sealedText } satisfies Record<HandoverKind, Parse<string>>) }),
-  "import-project": object({ op: literal("import-project"), name: text(100), bundle: text(255, /^\w[\w.-]*$/) }, { origin: text(2048) }),
+  "import-project": object({ op: literal("import-project"), source: projectSource, name: folderName, branch: branchName, bundle: text(255, /^\w[\w.-]*$/) }, { origin: text(2048) }),
+  "remove-project": object({ op: literal("remove-project"), source: projectSource }),
+  projects: object({ op: literal("projects") }),
   stop: object({ op: literal("stop") }),
   "stop-for-update": object({ op: literal("stop-for-update") }),
 });
 
 const timestamp = int(0, Number.MAX_SAFE_INTEGER);
+const projectCopy = object({ projectId: text(100), macHead: commit, head: commit });
 const status = object({ state: literal("starting", "ready", "closing"), version: text(64), pid: int(1, 2 ** 31), since: timestamp, busy: nullable(text(100)) });
 const RESULTS: { [K in BrainControlOp]: Parse<BrainControlResults[K]> } = {
   status,
   wake: status,
   pair: object({ url: text(4096), expiresAt: timestamp }),
   handover: object({ applied: list(literal("claude", "codex", "push"), 3) }),
-  "import-project": object({ projectId: text(100) }),
+  "import-project": (value, field) => (isRecord(value) && value["lacksBase"] === true ? object({ lacksBase: literal(true) }) : projectCopy)(value, field),
+  "remove-project": object({ removed: literal(true, false), threads: count }),
+  projects: object({ copies: list(object({ source: projectSource, projectId: text(100), macHead: commit, head: commit, threads: count }), 10_000) }),
   stop: object({ stopping: literal(true) }),
   "stop-for-update": object({ stopping: literal(true) }),
 };

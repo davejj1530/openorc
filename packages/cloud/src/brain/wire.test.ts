@@ -108,7 +108,10 @@ describe("control requests and replies", () => {
       { op: "wake" },
       { op: "pair" },
       { op: "handover", sealed: { claude: "AAAA" } },
-      { op: "import-project", name: "openorc", bundle: "openorc-1.bundle", origin: "git@github.com:me/openorc.git" },
+      { op: "import-project", source: "4c1f0a52-7a0e-4b44-9d7e-1f0c2a6b8e11", name: "My App (2)", branch: "main", bundle: "openorc-1.bundle", origin: "git@github.com:me/openorc.git" },
+      { op: "import-project", source: "p1", name: ".dotfiles", branch: "release/v2", bundle: "p1.bundle" },
+      { op: "remove-project", source: "4c1f0a52-7a0e-4b44-9d7e-1f0c2a6b8e11" },
+      { op: "projects" },
       { op: "stop" },
       { op: "stop-for-update" },
     ];
@@ -120,31 +123,39 @@ describe("control requests and replies", () => {
     const key = "A".repeat(43);
     const start = `{"v":1,"key":"${key}","name":"Cloud","address":"sb-abc123.vercel.run","port":47820,"vercel":{"connection":{"token":"vcp_x","teamId":"team_1","projectId":"prj_1"},"sandbox":"brain"}}`;
     expect(parseLaunch(start)).toMatchObject({ name: "Cloud", address: "sb-abc123.vercel.run", port: 47_820, vercel: { sandbox: "brain" } });
-    const requests = [
-      '{"op":"status"}',
-      '{"op":"wake"}',
-      '{"op":"pair"}',
-      '{"op":"handover","sealed":{"claude":"AAAA"}}',
-      '{"op":"import-project","name":"demo","bundle":"demo.bundle","origin":"https://github.com/me/demo.git"}',
-      '{"op":"stop"}',
-    ];
+    const requests = ['{"op":"status"}', '{"op":"wake"}', '{"op":"pair"}', '{"op":"handover","sealed":{"claude":"AAAA"}}', '{"op":"stop"}'];
     for (const line of requests) expect(parseControlRequest(line)).toEqual(JSON.parse(line));
     const replies: [BrainControlRequest["op"], string][] = [
       ["status", '{"ok":true,"result":{"state":"ready","version":"eed2a8309f9a","pid":7,"since":1,"busy":null}}'],
       ["wake", '{"ok":true,"result":{"state":"closing","version":"20261102120000-eed2a8309f9a","pid":7,"since":1,"busy":"agents"}}'],
       ["pair", '{"ok":true,"result":{"url":"openorc://pair#v1.x","expiresAt":5}}'],
       ["handover", '{"ok":true,"result":{"applied":["claude"]}}'],
-      ["import-project", '{"ok":true,"result":{"projectId":"p"}}'],
       ["stop", '{"ok":true,"result":{"stopping":true}}'],
       ["stop", `{"ok":false,"error":"The brain's control request is not valid: it has an unknown field."}`],
     ];
     for (const [op, line] of replies) expect(parseControlReply(op, line)).toEqual(JSON.parse(line));
   });
 
-  it("refuses an unknown op, an extra field, and a bundle outside the inbox", () => {
+  it("refuses an unknown op, an extra field, a bundle outside the inbox, and a project folder that is not one folder", () => {
     expect(refusal(() => parseControlRequest(`{"op":"shell"}`)).field).toBe("op");
     expect(refusal(() => parseControlRequest(`{"op":"pair","now":true}`)).message).toContain("it has an unknown field");
-    expect(refusal(() => parseControlRequest(`{"op":"import-project","name":"x","bundle":"../data/secrets/remote.sealed"}`)).field).toBe("bundle");
+    const project = { op: "import-project", source: "p1", name: "x", branch: "main", bundle: "x.bundle" };
+    expect(refusal(() => parseControlRequest(JSON.stringify({ ...project, bundle: "../data/secrets/remote.sealed" }))).field).toBe("bundle");
+    for (const name of ["..", ".", "a/b", "a\\b", "tab\there", ""]) expect([name, refusal(() => parseControlRequest(JSON.stringify({ ...project, name }))).field]).toEqual([name, "name"]);
+    for (const source of ["../p1", "p1/x", ""]) expect([source, refusal(() => parseControlRequest(JSON.stringify({ ...project, source }))).field]).toEqual([source, "source"]);
+    expect(refusal(() => parseControlRequest(JSON.stringify({ ...project, branch: "-main" }))).field).toBe("branch");
+  });
+
+  it("reads a project's import, the copies the brain has, and a removal, with the brain's own head when it kept commits", () => {
+    const [mac, own] = ["a".repeat(40), "b".repeat(40)];
+    const imported = { projectId: "p", macHead: mac, head: own };
+    expect(parseControlReply("import-project", encodeControlReply<"import-project">({ ok: true, result: imported }))).toEqual({ ok: true, result: imported });
+    expect(parseControlReply("import-project", '{"ok":true,"result":{"lacksBase":true}}')).toEqual({ ok: true, result: { lacksBase: true } });
+    expect(refusal(() => parseControlReply("import-project", '{"ok":true,"result":{"lacksBase":false}}')).field).toBe("result");
+    const copies = { copies: [{ ...imported, source: "mac-p", threads: 2 }] };
+    expect(parseControlReply("projects", encodeControlReply<"projects">({ ok: true, result: copies }))).toEqual({ ok: true, result: copies });
+    expect(parseControlReply("remove-project", '{"ok":true,"result":{"removed":false,"threads":1}}')).toEqual({ ok: true, result: { removed: false, threads: 1 } });
+    expect(refusal(() => parseControlReply("import-project", JSON.stringify({ ok: true, result: { ...imported, head: "main" } }))).field).toBe("result.head");
   });
 
   it("reads the brain's answer for the op it was asked, or its refusal", () => {

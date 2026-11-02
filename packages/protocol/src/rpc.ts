@@ -11,6 +11,7 @@ import { BranchName, pullRequestRpcParams, type PullRequestRpcResults } from "./
 import { orclingRpcParams, type OrclingRpcResults } from "./orclings.js";
 import { projectRpcParams, type ProjectRpcResults } from "./projects.js";
 import { fileRpcParams, type FileRpcResults } from "./files.js";
+import { editorRpcParams, type EditorRpcResults } from "./code-intelligence.js";
 import { remoteRpcParams, type RemoteRpcResults } from "./remote.js";
 import { devicePanelRpcParams, DevicePanelPush, type DevicePanelRpcResults } from "./devices.js";
 import { previewRpcParams, type PreviewRpcResults } from "./preview.js";
@@ -76,6 +77,7 @@ export const rpcParams = {
   ...orclingRpcParams,
   ...projectRpcParams,
   ...fileRpcParams,
+  ...editorRpcParams,
   ...remoteRpcParams,
   ...cloudRpcParams,
   ...devicePanelRpcParams,
@@ -565,7 +567,17 @@ export interface ResolvedExtraction {
 }
 
 export interface RpcResults
-  extends PullRequestRpcResults, OrclingRpcResults, ProjectRpcResults, FileRpcResults, ClaudeAccountRpcResults, RemoteRpcResults, DevicePanelRpcResults, PreviewRpcResults, CloudRpcResults {
+  extends
+    PullRequestRpcResults,
+    OrclingRpcResults,
+    ProjectRpcResults,
+    FileRpcResults,
+    EditorRpcResults,
+    ClaudeAccountRpcResults,
+    RemoteRpcResults,
+    DevicePanelRpcResults,
+    PreviewRpcResults,
+    CloudRpcResults {
   "tasks.comments.list": TaskDiscussion;
   "tasks.comments.post": TaskComment;
   "tasks.comments.retry": CommentAttempt;

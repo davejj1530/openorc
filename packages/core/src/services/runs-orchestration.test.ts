@@ -706,7 +706,7 @@ describe("coordinator run seams", () => {
     await expect(conversations.continueThread(first.thread.id, input)).rejects.toThrow(/current turn/);
 
     // Checkpoint both overlapping sessions without closing either provider or touching the real index.
-    for (const run of [first.run, forkRun]) emit(run.id, { type: "turn.completed", runId: run.id, ts: Date.now(), turnId: "done", status: "success", durationMs: 1 });
+    for (const run of [first.run, forkRun]) emit(run!.id, { type: "turn.completed", runId: run!.id, ts: Date.now(), turnId: "done", status: "success", durationMs: 1 });
     await vi.waitFor(() => {
       expect(service.threadActivity(first.thread.id)).toBe("idle");
       expect(service.threadActivity(fork.id)).toBe("idle");
@@ -715,7 +715,7 @@ describe("coordinator run seams", () => {
     });
     const resumed = await conversations.continueThread(first.thread.id, input);
     expect(service.isLive(resumed.id)).toBe(true);
-    expect(service.isLive(second.run.id)).toBe(true);
+    expect(service.isLive(second.run!.id)).toBe(true);
     expect(service.isLive(forkRun.id)).toBe(true);
     await service.send(forkRun.id, "Continue beside the other thread");
     expect(service.threadActivity(fork.id)).toBe("running");

@@ -3,13 +3,14 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { AgentHost } from "@openorc/agents";
-import type { RunnerClient, WorkspaceLocation } from "@openorc/cloud";
+import type { RemoteProcess, RunnerClient, WorkspaceLocation } from "@openorc/cloud";
 
 /**
  * A cloud workspace as the place a provider's CLI runs. Processes start through the runner, files the CLI reads go to
  * the runner's own folder in the VM, and addresses on the Mac are reached through the runner's relay on the VM's loopback.
+ * `spawned` sees each process as it starts.
  */
-export function cloudAgentHost(client: RunnerClient, location: WorkspaceLocation, relayPort: number): AgentHost {
+export function cloudAgentHost(client: RunnerClient, location: WorkspaceLocation, relayPort: number, spawned: (proc: RemoteProcess) => void = () => undefined): AgentHost {
   const { install } = location;
   return {
     home: client.home,
@@ -19,7 +20,11 @@ export function cloudAgentHost(client: RunnerClient, location: WorkspaceLocation
       return `http://127.0.0.1:${relayPort}${target.pathname}${target.search}`;
     },
     // The runner's process is shaped like a child process; the adapters use only that shape.
-    spawn: (binary, args, { runId, cwd, env, files, dirs }) => client.spawn(runId, { cmd: binary, args, cwd, env, files, dirs }) as unknown as ChildProcessWithoutNullStreams,
+    spawn: (binary, args, { runId, cwd, env, files, dirs }) => {
+      const proc = client.spawn(runId, { cmd: binary, args, cwd, env, files, dirs });
+      spawned(proc);
+      return proc as unknown as ChildProcessWithoutNullStreams;
+    },
     upload: (paths) =>
       Promise.all(
         paths.map(async (file) => {

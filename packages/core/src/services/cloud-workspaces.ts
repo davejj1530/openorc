@@ -17,9 +17,10 @@ import {
 } from "@openorc/cloud";
 import { cloudWorkspaces, type CloudMirrorState, type CloudProviderId, type CloudWorkspaceRecord, type Db } from "@openorc/db";
 import { originUrl } from "@openorc/git";
-import { WORKSPACE_ID, type Project, type Thread } from "@openorc/protocol";
+import { WORKSPACE_ID, type CloudStep, type CloudThreadState, type Project, type Thread } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
 import { cloudAgentHost } from "./cloud-agent-host.js";
+import { CloudAwake } from "./cloud-awake.js";
 import type { CloudAgentEnvironment } from "./cloud-agent-env.js";
 import type { StartThreadInput } from "./thread-inputs.js";
 
@@ -33,9 +34,15 @@ export interface CloudWorkspaceOptions {
   files?: RunnerFile[];
   /** How the thread's Claude account signs in to the sandbox. Without it, agents use the sandbox's own environment. */
   agentEnvironment?: CloudAgentEnvironment;
+  /** A conversation's cloud state changed, for the window to refresh it. */
+  changed?: (threadId: string) => void;
 }
 
 const SETUP_OUTPUT_TAIL = 2000;
+/** An idle agent keeps its VM awake, so in the cloud its process closes after this at the latest. */
+export const CLOUD_IDLE_PROCESS_MS = 10 * 60_000;
+/** A host made for a turn whose agent never starts lets its VM go after this. */
+const LAUNCH_HOLD_MS = 60_000;
 /** The adapters take a cloud host, but only Claude's has been tried in a sandbox. */
 export const CLOUD_AGENTS = "Only Claude runs in cloud workspaces so far.";
 
@@ -83,12 +90,17 @@ export class CloudWorkspaceService {
   private files: RunnerFile[] | null;
   /** Where each conversation's code lives, worked out once: opening the sandbox and installing the runner. */
   private readonly locations = new Map<string, Promise<WorkspaceLocation>>();
-  /** One runner connection per conversation, kept for the life of the core. */
+  /** One runner connection per conversation, kept while its VM is held awake. */
   private readonly connections = new Map<string, Promise<Connection>>();
+  private readonly awake: CloudAwake;
+  /** VMs being stopped because nothing needs them; the next use waits for the stop. */
+  private readonly stopping = new Map<string, Promise<void>>();
   /** The sync running for each conversation; the next one waits for it. */
   private readonly syncs = new Map<string, Promise<boolean>>();
   /** Conversations seeded since their last turn: nothing has changed on either side, so their first turn starts without a sync. */
   private readonly pristine = new Set<string>();
+  /** The preparing step each conversation is on. */
+  private readonly progress = new Map<string, { step: CloudStep; setup: boolean }>();
 
   constructor(
     private readonly db: Db,
@@ -96,16 +108,22 @@ export class CloudWorkspaceService {
     private readonly log: Logger,
   ) {
     this.files = options.files ?? null;
+    this.awake = new CloudAwake({ released: (threadId) => this.sleep(threadId), log });
   }
 
   /** Checks a new cloud conversation and picks where it runs. Call before admitting it. */
   /** The provider a new cloud conversation runs on. Refused before anything is made when its account cannot sign in there. */
   async place(input: Pick<StartThreadInput, "agent" | "checkout" | "claudeAccountId">, project: Project): Promise<CloudProviderId> {
     assertCloudStart(input, project);
-    const provider = (await this.options.forNewThreads?.()) ?? this.options.providers[0];
-    if (!provider) throw new Error("Cloud workspaces are not available.");
+    const provider = await this.forNewThreads();
     await this.options.agentEnvironment?.(provider.id, input.claudeAccountId);
     return provider.id;
+  }
+
+  private async forNewThreads(): Promise<SandboxProvider> {
+    const provider = (await this.options.forNewThreads?.()) ?? this.options.providers[0];
+    if (!provider) throw new Error("Cloud workspaces are not available.");
+    return provider;
   }
 
   /** Recorded in the transaction that admits the conversation, before its worktree exists. */
@@ -123,8 +141,9 @@ export class CloudWorkspaceService {
     return cloudWorkspaces.get(this.db, threadId);
   }
 
-  /** Where the conversation's code lives in its sandbox and on the Mac. */
-  location(record: CloudWorkspaceRecord, mirror: string): Promise<WorkspaceLocation> {
+  /** Where the conversation's code lives in its sandbox and on the Mac. Waits for a stop in progress, then wakes the VM. */
+  async location(record: CloudWorkspaceRecord, mirror: string): Promise<WorkspaceLocation> {
+    await this.stopping.get(record.threadId);
     const existing = this.locations.get(record.threadId);
     if (existing) return existing;
     const location = (async () => {
@@ -190,41 +209,66 @@ export class CloudWorkspaceService {
   async prepare(thread: Thread, project: Project): Promise<void> {
     const record = cloudWorkspaces.get(this.db, thread.id);
     if (!record || record.state === "ready") return;
-    if (!thread.worktreePath || !thread.branch) throw new Error("A cloud conversation needs its worktree before its sandbox.");
-    try {
-      const location = await this.location(record, thread.worktreePath);
-      const mirror = await seedWorkspace(location, thread.branch, (await originUrl(project.rootPath)) ?? undefined);
-      if (project.settings.setupScript) await this.runSetup(location, project.settings.setupScript, path.basename(thread.worktreePath));
-      this.ready(thread.id, mirror);
-    } catch (error) {
-      cloudWorkspaces.failed(this.db, thread.id, error instanceof Error ? error.message : String(error));
-      throw error;
-    }
+    const { worktreePath, branch } = thread;
+    if (!worktreePath || !branch) throw new Error("A cloud conversation needs its worktree before its sandbox.");
+    this.ready(thread.id, await this.build(thread.id, project, worktreePath, (location, origin) => seedWorkspace(location, branch, origin)));
   }
 
   /**
    * Seeds a new conversation's sandbox from the commit its worktree starts at and runs the project's setup there, while
    * the worktree is made. The workspace becomes ready with `ready` once the worktree exists too.
    */
-  async seedFresh(threadId: string, project: Project, start: { mirror: string; branch: string; commit: string }): Promise<CloudMirrorState> {
+  seedFresh(threadId: string, project: Project, start: { mirror: string; branch: string; commit: string }): Promise<CloudMirrorState> {
+    const { commit, branch } = start;
+    return this.build(threadId, project, start.mirror, (location, origin) => seedFromCommit(location, { source: project.rootPath, commit, branch, ...(origin ? { origin } : {}) }));
+  }
+
+  /** Opens the sandbox, gives it the code with `seed` and runs the project's setup there, reporting each step as it starts. */
+  private async build(threadId: string, project: Project, mirror: string, seed: (location: WorkspaceLocation, origin: string | undefined) => Promise<CloudMirrorState>): Promise<CloudMirrorState> {
     const record = cloudWorkspaces.get(this.db, threadId);
     if (!record) throw new Error(`Thread ${threadId} has no cloud workspace.`);
+    const script = project.settings.setupScript;
+    cloudWorkspaces.preparing(this.db, threadId);
+    let release: () => void = () => undefined;
     try {
-      const location = await this.location(record, start.mirror);
-      const origin = (await originUrl(project.rootPath)) ?? undefined;
-      const mirror = await seedFromCommit(location, { source: project.rootPath, commit: start.commit, branch: start.branch, ...(origin ? { origin } : {}) });
-      if (project.settings.setupScript) await this.runSetup(location, project.settings.setupScript, path.basename(start.mirror));
-      return mirror;
+      this.step(threadId, { step: "sandbox", setup: Boolean(script) });
+      const location = await this.location(record, mirror);
+      release = this.awake.hold(threadId, location.install.sandbox);
+      this.step(threadId, { step: "code", setup: Boolean(script) });
+      const state = await seed(location, (await originUrl(project.rootPath)) ?? undefined);
+      if (script) {
+        this.step(threadId, { step: "setup", setup: true });
+        await this.runSetup(location, script, path.basename(mirror));
+      }
+      return state;
     } catch (error) {
       cloudWorkspaces.failed(this.db, threadId, error instanceof Error ? error.message : String(error));
       throw error;
+    } finally {
+      release();
+      this.step(threadId, null);
     }
+  }
+
+  private step(threadId: string, progress: { step: CloudStep; setup: boolean } | null): void {
+    if (progress) this.progress.set(threadId, progress);
+    else this.progress.delete(threadId);
+    this.options.changed?.(threadId);
+  }
+
+  /** What a cloud thread's summary shows; null for a thread that runs on this Mac. */
+  state(threadId: string): CloudThreadState | null {
+    const record = cloudWorkspaces.get(this.db, threadId);
+    if (!record) return null;
+    const progress = this.progress.get(threadId);
+    return { provider: record.provider, state: record.state, step: progress?.step ?? null, setup: progress?.setup ?? false, error: record.error };
   }
 
   /** The sandbox has the code and the worktree on the Mac holds `mirror`. */
   ready(threadId: string, mirror: CloudMirrorState): void {
     cloudWorkspaces.ready(this.db, threadId, mirror);
     this.pristine.add(threadId);
+    this.options.changed?.(threadId);
     this.log.info(`cloud workspace for thread ${threadId} is ready`);
   }
 
@@ -238,17 +282,71 @@ export class CloudWorkspaceService {
     if (record.state !== "ready" || !thread.worktreePath) throw new Error("This conversation's cloud workspace is not ready. Send again to set it up.");
     // Each turn signs in as the account it runs on, so changing the thread's account takes effect at the next turn.
     const env = (await this.options.agentEnvironment?.(record.provider, claudeAccountId)) ?? {};
-    const { location, client } = await this.connect(record, thread.worktreePath);
-    const port = await client.relay("mcp", mcpOrigin);
-    return { host: cloudAgentHost(client, location, port), cwd: location.repo, env };
+    const { sandbox } = (await this.location(record, thread.worktreePath)).install;
+    // The VM stays awake from here until the agent's process has started, then for as long as each process runs.
+    const launching = this.awake.hold(thread.id, sandbox);
+    const unused = setTimeout(launching, LAUNCH_HOLD_MS);
+    unused.unref();
+    try {
+      const { location, client } = await this.connect(record, thread.worktreePath);
+      const port = await client.relay("mcp", mcpOrigin);
+      const host = cloudAgentHost(client, location, port, (proc) => {
+        proc.once("close", this.awake.hold(thread.id, sandbox));
+        clearTimeout(unused);
+        launching();
+      });
+      return { host, cwd: location.repo, env };
+    } catch (error) {
+      clearTimeout(unused);
+      launching();
+      throw error;
+    }
+  }
+
+  /**
+   * Deletes a conversation's sandbox for good, with its files. The worktree on the Mac keeps what was synced. Nothing
+   * for a conversation on this Mac.
+   */
+  async remove(threadId: string): Promise<void> {
+    const record = cloudWorkspaces.get(this.db, threadId);
+    if (!record) return;
+    this.disconnect(threadId);
+    this.locations.delete(threadId);
+    this.pristine.delete(threadId);
+    await this.provider(record.provider).remove(record.sandbox);
+    this.log.info(`deleted cloud workspace ${record.sandbox}`);
   }
 
   /** Disconnects from every sandbox. Processes in a cloud VM keep running there; sandboxes on this Mac stop. */
   async close(): Promise<void> {
+    this.awake.close();
     const connections = [...this.connections.values()];
     this.connections.clear();
     for (const connection of await Promise.allSettled(connections)) if (connection.status === "fulfilled") connection.value.client.close();
     await Promise.all(this.options.providers.map((provider) => provider.close?.()));
+  }
+
+  /**
+   * Nothing needs the conversation's VM: its runner connection goes, since reconnecting would wake it, and the VM stops
+   * with its files kept. The next turn starts it again.
+   */
+  private sleep(threadId: string): void {
+    this.disconnect(threadId);
+    const location = this.locations.get(threadId);
+    if (!location || this.stopping.has(threadId)) return;
+    const stop = location
+      .then(({ install }) => install.sandbox.stop())
+      .then(() => this.log.info(`cloud workspace of thread ${threadId} stopped; nothing runs there`))
+      .catch((error: unknown) => this.log.warn(`cloud workspace of thread ${threadId} did not stop, so it stops on its own later: ${error instanceof Error ? error.message : String(error)}`))
+      .finally(() => this.stopping.delete(threadId));
+    this.stopping.set(threadId, stop);
+  }
+
+  private disconnect(threadId: string): void {
+    const connection = this.connections.get(threadId);
+    if (!connection) return;
+    this.connections.delete(threadId);
+    void connection.then(({ client }) => client.close()).catch(() => undefined);
   }
 
   private connect(record: CloudWorkspaceRecord, mirror: string): Promise<Connection> {

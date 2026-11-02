@@ -19,6 +19,10 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import readline from "node:readline";
 const args = process.argv.slice(2);
+if (args[0] === "--version") {
+  console.log("2.1.316 (Claude Code)");
+  process.exit(0);
+}
 const log = { cwd: process.cwd(), args, oauth: process.env.CLAUDE_CODE_OAUTH_TOKEN ?? null };
 const config = JSON.parse(readFileSync(args[args.indexOf("--mcp-config") + 1], "utf8"));
 const url = Object.values(config.mcpServers)[0].url;
@@ -59,6 +63,7 @@ let checkout: string;
 let core: OpenOrc;
 let project: Project;
 let log: string;
+let sandboxes: LocalSandboxProvider;
 
 beforeEach(async () => {
   root = await realpath(await mkdtemp(path.join(os.tmpdir(), "openorc-cloud-runs-")));
@@ -75,7 +80,8 @@ beforeEach(async () => {
   await writeFile(path.join(bin, "claude"), FAKE_CLAUDE);
   await chmod(path.join(bin, "claude"), 0o755);
   log = path.join(root, "fake-claude.json");
-  const sandboxes = new LocalSandboxProvider(path.join(root, "sandboxes"), () => ({ ...process.env, PATH: `${bin}:${process.env["PATH"] ?? ""}`, FAKE_CLAUDE_LOG: log }));
+  // A short away window: a sandbox stops on its own whenever nothing keeps it awake for 1.5 s.
+  sandboxes = new LocalSandboxProvider(path.join(root, "sandboxes"), () => ({ ...process.env, PATH: `${bin}:${process.env["PATH"] ?? ""}`, FAKE_CLAUDE_LOG: log }), 1500);
   let saved: string | null = null;
   const tokenStore = { load: async () => saved, save: async (value: string) => void (saved = value) };
   core = await OpenOrc.create({ dataDir: path.join(root, "data"), ephemeral: true, transport: { push: () => {} }, cloudSandboxes: sandboxes, claudeCloudSecrets: tokenStore });
@@ -101,6 +107,12 @@ afterEach(async () => {
   vi.restoreAllMocks();
   await rm(root, { recursive: true, force: true });
 });
+
+/** A cloud thread's worktree on the Mac, which is made in the background after the thread opens. */
+async function worktreeOf(threadId: string): Promise<string> {
+  await until(() => Boolean(core.threads.get(threadId)?.worktreePath));
+  return core.threads.get(threadId)!.worktreePath!;
+}
 
 async function until(check: () => boolean, timeoutMs = 20_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
@@ -143,7 +155,7 @@ it("runs a cloud conversation's agent in its sandbox, with OpenOrc's tools and f
 
   expect(existsSync(path.join(repo, "made-in-cloud.txt"))).toBe(true);
   // The turn's end brings the sandbox's files to the worktree on the Mac before its checkpoint.
-  const mirror = core.threads.get(thread.id)!.worktreePath!;
+  const mirror = await worktreeOf(thread.id);
   const checkpointed = () => {
     const last = checkpoints.listForThread(core.db, thread.id).at(-1);
     return Boolean(last) && execFileSync("git", ["ls-tree", "--name-only", last!.treeSha], { cwd: mirror, encoding: "utf8" }).includes("made-in-cloud.txt");
@@ -167,11 +179,89 @@ it("brings the sandbox's changes to the Mac while the agent is still working", a
     prompt: "Work slowly",
     cloud: true,
   });
-  const mirror = core.threads.get(thread.id)!.worktreePath!;
+  const mirror = await worktreeOf(thread.id);
   await until(() => existsSync(path.join(mirror, "progress.txt")), 15_000);
   expect(existsSync(log)).toBe(false);
   await until(() => existsSync(path.join(mirror, "made-in-cloud.txt")), 15_000);
 }, 40_000);
+
+it("keeps the sandbox awake while its agent runs, stops it once the agent has closed, and wakes it for the next message", async () => {
+  const { thread } = await core.threads.start({
+    agent: "claude",
+    model: "fixture",
+    effort: undefined,
+    mode: "act",
+    permissionMode: "autonomous",
+    attachments: undefined,
+    title: undefined,
+    projectId: project.id,
+    prompt: "Work in the cloud",
+    cloud: true,
+  });
+  await until(() => existsSync(log));
+  const mirror = await worktreeOf(thread.id);
+  await new Promise((resolve) => setTimeout(resolve, 2500));
+  const live = core.runs.liveRunForThread(thread.id);
+  expect(live).toBeTruthy();
+
+  await core.runs.closeAndWait(live!.id);
+  await until(() => processesUnder(path.join(root, "sandboxes")).length === 0, 5000);
+
+  await rm(log, { force: true });
+  await core.threads.continueThread(thread.id, { agent: "claude", model: "fixture", effort: undefined, mode: "act", permissionMode: "autonomous", prompt: "Keep going", attachments: undefined });
+  await until(() => existsSync(log));
+  await until(() => existsSync(path.join(mirror, "second.txt")));
+}, 40_000);
+
+it("deletes the sandbox with its thread", async () => {
+  const { thread } = await core.threads.start({
+    agent: "claude",
+    model: "fixture",
+    effort: undefined,
+    mode: "act",
+    permissionMode: "autonomous",
+    attachments: undefined,
+    title: undefined,
+    projectId: project.id,
+    prompt: "Work in the cloud",
+    cloud: true,
+  });
+  await until(() => existsSync(log));
+  const sandbox = path.join(root, "sandboxes", `openorc-${thread.id}`);
+  expect(existsSync(sandbox)).toBe(true);
+  await core.threads.delete(thread.id);
+  expect(existsSync(sandbox)).toBe(false);
+  expect(processesUnder(sandbox)).toEqual([]);
+});
+
+it("finishes a turn the agent kept working on while the Mac lost its connection to the sandbox", async () => {
+  const { thread } = await core.threads.start({
+    agent: "claude",
+    model: "fixture",
+    effort: undefined,
+    mode: "act",
+    permissionMode: "autonomous",
+    attachments: undefined,
+    title: undefined,
+    projectId: project.id,
+    prompt: "Work slowly",
+    cloud: true,
+  });
+  const repo = path.join(root, "sandboxes", `openorc-${thread.id}`, "repo");
+  await until(() => existsSync(path.join(repo, "progress.txt")), 15_000);
+  // Every connection into the VM drops, as when the Mac sleeps; the agent's process in the VM keeps going.
+  const sandbox = await sandboxes.open(`openorc-${thread.id}`);
+  sandbox.dropConnections();
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  sandbox.dropConnections();
+  const mirror = await worktreeOf(thread.id);
+  await until(() => {
+    const last = checkpoints.listForThread(core.db, thread.id).at(-1);
+    return Boolean(last) && execFileSync("git", ["ls-tree", "--name-only", last!.treeSha], { cwd: mirror, encoding: "utf8" }).includes("made-in-cloud.txt");
+  }, 25_000);
+  expect(existsSync(log)).toBe(true);
+  expect(core.runs.liveRunForThread(thread.id)).toBeTruthy();
+}, 45_000);
 
 it("refuses a cloud conversation for an agent that has not run in a sandbox, before making one", async () => {
   await expect(
@@ -192,7 +282,7 @@ it("refuses a cloud conversation for an agent that has not run in a sandbox, bef
 });
 
 it("sends a commit made on the Mac between turns to the sandbox, and keeps it on the branch", async () => {
-  const { thread, run } = await core.threads.start({
+  const { thread } = await core.threads.start({
     agent: "claude",
     model: "fixture",
     effort: undefined,
@@ -204,7 +294,7 @@ it("sends a commit made on the Mac between turns to the sandbox, and keeps it on
     prompt: "Work in the cloud",
     cloud: true,
   });
-  const mirror = core.threads.get(thread.id)!.worktreePath!;
+  const mirror = await worktreeOf(thread.id);
   const repo = path.join(root, "sandboxes", `openorc-${thread.id}`, "repo");
   await until(() => {
     const last = checkpoints.listForThread(core.db, thread.id).at(-1);
@@ -215,7 +305,7 @@ it("sends a commit made on the Mac between turns to the sandbox, and keeps it on
   const committed = (await git(mirror, ["rev-parse", "HEAD"])).stdout.trim();
 
   await rm(log, { force: true });
-  await core.runs.send(run!.id, "Keep going");
+  await core.runs.send(core.runs.liveRunForThread(thread.id)!.id, "Keep going");
   await until(() => existsSync(log));
   expect(execFileSync("git", ["rev-parse", "HEAD"], { cwd: repo, encoding: "utf8" }).trim()).toBe(committed);
   await until(() => existsSync(path.join(mirror, "second.txt")));
@@ -251,4 +341,56 @@ it("signs the agent in to its sandbox with the thread's account token, and with 
   await start("With a token");
   await until(() => existsSync(log));
   expect(JSON.parse(readFileSync(log, "utf8")).oauth).toBe("sk-ant-oat01-Thread_account_token-0123456789");
+});
+
+it("opens a cloud thread at once and sends its first message when the sandbox is ready", async () => {
+  const started = await core.threads.start({
+    agent: "claude",
+    model: "fixture",
+    effort: undefined,
+    mode: "act",
+    permissionMode: "autonomous",
+    attachments: undefined,
+    title: undefined,
+    projectId: project.id,
+    prompt: "Work in the cloud",
+    cloud: true,
+  });
+  expect(started.run).toBeNull();
+  const opened = core.threads.get(started.thread.id)!;
+  expect(opened.queued.map((message) => message.text)).toEqual(["Work in the cloud"]);
+  expect(opened.cloud).toMatchObject({ provider: "local", state: "preparing" });
+
+  await until(() => existsSync(log));
+  await until(() => core.threads.get(started.thread.id)!.queued.length === 0);
+  expect(core.threads.get(started.thread.id)!.cloud).toEqual({ provider: "local", state: "ready", step: null, setup: false, error: null });
+});
+
+it("shows a failed setup on the thread and finishes it when the message is sent again", async () => {
+  core.projects.updateSettings(project.id, { setupScript: "echo 'pnpm: command not found' >&2; exit 127" });
+  const { thread } = await core.threads.start({
+    agent: "claude",
+    model: "fixture",
+    effort: undefined,
+    mode: "act",
+    permissionMode: "autonomous",
+    attachments: undefined,
+    title: undefined,
+    projectId: project.id,
+    prompt: "Work in the cloud",
+    cloud: true,
+  });
+  await until(() => core.threads.get(thread.id)!.queued[0]?.interrupted === true);
+  const failed = core.threads.get(thread.id)!;
+  expect(failed.cloud).toMatchObject({ state: "failed", step: null, error: expect.stringContaining("pnpm: command not found") });
+  expect(failed.queued[0]?.error).toContain("The setup script failed in the cloud workspace (exit 127).");
+  expect(existsSync(log)).toBe(false);
+
+  core.projects.updateSettings(project.id, { setupScript: "sleep 0.5" });
+  const sent = core.threads.sendQueued(thread.id, failed.queued[0]!.id);
+  await until(() => core.threads.get(thread.id)!.cloud?.step === "setup");
+  expect(core.threads.get(thread.id)!.cloud).toMatchObject({ state: "preparing", error: null });
+  await sent;
+  await until(() => existsSync(log));
+  expect(core.threads.get(thread.id)!.cloud).toMatchObject({ state: "ready", error: null });
 });

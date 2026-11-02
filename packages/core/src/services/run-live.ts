@@ -102,7 +102,7 @@ export class RunLive {
   armIdle(entry: LiveRun): void {
     const runId = entry.run.id;
     this.disarmIdle(runId);
-    const timeout = this.deps.hooks.idleTimeoutMs?.() ?? null;
+    const timeout = this.deps.hooks.idleTimeoutMs?.(entry.scope.thread ?? null) ?? null;
     if (!timeout || entry.scope.task || this.deps.isClosing() || occupied(entry)) return;
     const timer = setTimeout(() => {
       this.idleTimers.delete(runId);

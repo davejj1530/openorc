@@ -298,20 +298,20 @@ describe("tasks stay in conversations", () => {
       workspaceMode: "current",
     });
     core.settings.set({ defaultWorkspaceMode: "worktree" });
-    const captured = await mcp(run.id, "task_create", { title: "Implement export", spec: "Preserve the current dirty files", execution: "delegate" });
+    const captured = await mcp(run!.id, "task_create", { title: "Implement export", spec: "Preserve the current dirty files", execution: "delegate" });
     expect(captured).toMatchObject({ started: false, task: { status: "backlog" } });
     expect(tasks.get(core.db, captured.task.id)).toMatchObject({ threadId: thread.id, workspaceMode: "current", worktreePath: null });
-    const started = await mcp(run.id, "task_start", { id: captured.task.id });
+    const started = await mcp(run!.id, "task_start", { id: captured.task.id });
     expect(started).toMatchObject({ status: "in_progress", spec: "Preserve the current dirty files" });
     expect(started.message).toContain("in this conversation");
     expect(specs).toHaveLength(1);
     expect(runs.listForTask(core.db, captured.task.id)).toEqual([]);
-    expect(core.runs.liveRunForThread(thread.id)?.id).toBe(run.id);
+    expect(core.runs.liveRunForThread(thread.id)?.id).toBe(run!.id);
     expect((await call("tasks.openThread", { taskId: captured.task.id })).id).toBe(thread.id);
-    await expect(mcp(run.id, "task_start", { id: captured.task.id, workspace_mode: "worktree" })).rejects.toThrow(/Move the thread/);
+    await expect(mcp(run!.id, "task_start", { id: captured.task.id, workspace_mode: "worktree" })).rejects.toThrow(/Move the thread/);
     expect(await readFile(path.join(root, "tracked.txt"), "utf8")).toBe("user dirty\n");
     expect(await readFile(path.join(root, "new.txt"), "utf8")).toBe("user new\n");
-    await mcp(run.id, "task_update", { id: captured.task.id, status: "done" });
+    await mcp(run!.id, "task_update", { id: captured.task.id, status: "done" });
     expect(tasks.get(core.db, captured.task.id)?.status).toBe("done");
     expect(threads.get(core.db, thread.id)?.doneAt).toBeNull();
   });

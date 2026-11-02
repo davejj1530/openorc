@@ -66,7 +66,7 @@ async function harness(root: string, duringTurn: () => Promise<void> = async () 
   const turn = async (projectId: string) => {
     const { thread, run } = await core.threads.start({ ...input, projectId, prompt: "Work on it" });
     await vi.waitFor(() => expect(core.threads.get(thread.id)?.activity).toBe("idle"));
-    await core.runs.closeAndWait(run.id);
+    await core.runs.closeAndWait(run!.id);
     return core.threads.get(thread.id)!;
   };
   return { core, logs, input, turn, call };

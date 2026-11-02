@@ -84,7 +84,7 @@ import { RunService, type Notification, type RunHooks } from "./services/runs.js
 import { ScheduleService } from "./services/schedules.js";
 import { AppSettingsService } from "./services/settings.js";
 import { ShellEnvironment, inheritedProbe } from "./services/shell-environment.js";
-import { CloudWorkspaceService, cloudSandboxProviders } from "./services/cloud-workspaces.js";
+import { CLOUD_IDLE_PROCESS_MS, CloudWorkspaceService, cloudSandboxProviders } from "./services/cloud-workspaces.js";
 import { SlackService } from "./services/slack/service.js";
 import { SystemService } from "./services/system.js";
 import { TaskCheckoutService } from "./services/task-checkout.js";
@@ -258,7 +258,8 @@ export class OpenOrc {
     });
     this.claudeCloudTokens = new ClaudeCloudTokens(options.claudeCloudSecrets, this.claudeAccounts, () => invalidate(["cloud"]));
     const agentEnvironment = cloudAgentEnvironment({ accounts: this.claudeAccounts, tokens: this.claudeCloudTokens, snapshot: () => this.environment.current() });
-    this.cloud = new CloudWorkspaceService(db, { ...sandboxes, agentEnvironment, ...(options.cloudRunnerFiles ? { files: options.cloudRunnerFiles } : {}) }, this.log);
+    const cloudChanged = (id: string) => invalidate(["threads", `thread:${id}`]);
+    this.cloud = new CloudWorkspaceService(db, { ...sandboxes, agentEnvironment, changed: cloudChanged, ...(options.cloudRunnerFiles ? { files: options.cloudRunnerFiles } : {}) }, this.log);
     this.workspaces = new WorkspaceService(db, { dataDir: options.dataDir, cloud: this.cloud }, this.log, this.workspaceWriters);
     const backgroundProviders: ProviderInfo = {
       models: (agent, accountId) => this.runs.models(agent, undefined, undefined, accountId),
@@ -466,9 +467,10 @@ export class OpenOrc {
       captureTeamTree: (runId, cwd, lease) => this.teamWorkspaces.captureRunCheckpoint(runId, cwd, lease),
       assertStart: (input) => this.teams.assertLaunch(input),
       assertSend: (runId, teamAttemptId) => this.teams.assertSend(runId, teamAttemptId),
-      idleTimeoutMs: () => {
+      idleTimeoutMs: (thread) => {
         const minutes = this.settings.get().idleProcessMinutes;
-        return minutes ? minutes * 60_000 : null;
+        const setting = minutes ? minutes * 60_000 : null;
+        return thread && this.cloud.get(thread.id) ? Math.min(setting ?? CLOUD_IDLE_PROCESS_MS, CLOUD_IDLE_PROCESS_MS) : setting;
       },
       claudeUserMcpServers: () => this.settings.get().claudeUserMcpServers,
       orclings: this.orclings.runHooks,

@@ -254,8 +254,8 @@ export interface RunHooks {
   notify(n: Omit<Notification, "type">): void;
   /** The installed Claude Code version string, or null when it is missing. */
   claudeVersion(environment?: EnvSnapshot, env?: Readonly<NodeJS.ProcessEnv>): Promise<string | null>;
-  /** How long a thread process may wait idle between turns before it is closed; null keeps it. Read when a turn ends. */
-  idleTimeoutMs?(): number | null;
+  /** How long a thread's process may wait idle between turns before it is closed; null keeps it. Read when a turn ends. */
+  idleTimeoutMs?(thread: Thread | null): number | null;
   /** Whether Claude Code should also connect the user's own MCP servers; each one adds to its start-up time. */
   claudeUserMcpServers?(): boolean;
   orclings?: OrclingRunHooks;

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { threads, type Db } from "@openorc/db";
+import { cloudWorkspaces, threads, type Db } from "@openorc/db";
 import { git, pinObject, switchFiles, teamTransfer, treeHash, unpinAll, worktree, type TreeDeltaEntry } from "@openorc/git";
 import type { ChangePreview, FileChange, Project, Thread } from "@openorc/protocol";
 import { checkoutBranch } from "./checkout-branch.js";
@@ -24,6 +24,9 @@ async function assertNothingPartlyStaged(cwd: string): Promise<void> {
   if (partly.length > 0) throw new Error(`${listed(partly)} ${partly.length === 1 ? "has" : "have"} staged changes that differ from the file on disk. Commit or unstage them, then move again.`);
 }
 
+/** Its worktree mirrors a sandbox, so moving its files would split them from the agent's. */
+const CLOUD_STAYS = "It runs in the cloud, and its worktree on this Mac follows its sandbox.";
+
 export interface MoveResult {
   thread: Thread;
   /** How many files moved. */
@@ -43,8 +46,13 @@ export class ThreadMoves {
     private readonly workspaces: WorkspaceService,
   ) {}
 
+  private assertLocal(thread: Thread): void {
+    if (cloudWorkspaces.get(this.db, thread.id)) throw new Error(`This conversation cannot move. ${CLOUD_STAYS}`);
+  }
+
   /** The files a move would carry, or why it cannot run. */
   async preview(thread: Thread, project: Project): Promise<ChangePreview> {
+    if (cloudWorkspaces.get(this.db, thread.id)) return { files: [], blocked: `This conversation cannot move. ${CLOUD_STAYS}` };
     const source = thread.workspaceMode === "current" ? project.rootPath : thread.worktreePath;
     if (!source) return { files: [], blocked: null };
     try {
@@ -64,6 +72,7 @@ export class ThreadMoves {
    * before that removes only what the move created.
    */
   async toWorktree(thread: Thread, project: Project, lease: WorkspaceLease): Promise<MoveResult> {
+    this.assertLocal(thread);
     await assertCanBranch(project);
     const root = project.rootPath;
     const pins = `${REFS}/${thread.id}/${randomUUID()}/`;
@@ -112,6 +121,7 @@ export class ThreadMoves {
    * moved, and its branch stays with any commits made on it.
    */
   async toCheckout(thread: Thread, project: Project, lease: WorkspaceLease, shared: boolean): Promise<MoveResult> {
+    this.assertLocal(thread);
     const root = project.rootPath;
     const home = async () => threads.update(this.db, thread.id, { workspaceMode: "current", worktreePath: null, baseSha: null, branch: await checkoutBranch(root) });
     // An unstarted worktree conversation still points at the checkout; there is nothing to carry.

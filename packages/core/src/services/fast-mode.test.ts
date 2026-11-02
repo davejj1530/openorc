@@ -233,12 +233,12 @@ describe("Fast mode persistence and delivery", () => {
       attachments: undefined,
       title: "Queue fixture",
     });
-    handles[0]!.emit("event", { type: "session.started", runId: run.id, ts: Date.now(), agent: "codex", externalSessionId: "existing", model: "fixture-fast" });
+    handles[0]!.emit("event", { type: "session.started", runId: run!.id, ts: Date.now(), agent: "codex", externalSessionId: "existing", model: "fixture-fast" });
     await call("threads.update", { id: thread.id, patch: { fastMode: true } });
     core.threads.queue(thread.id, "Faster next turn");
     expect(adapter).toHaveBeenCalledTimes(1);
-    expect(runs.get(core.db, run.id)?.fastMode).toBe(false);
-    handles[0]!.emit("event", { type: "turn.completed", runId: run.id, ts: Date.now(), turnId: "first", status: "success", durationMs: 0 });
+    expect(runs.get(core.db, run!.id)?.fastMode).toBe(false);
+    handles[0]!.emit("event", { type: "turn.completed", runId: run!.id, ts: Date.now(), turnId: "first", status: "success", durationMs: 0 });
     await vi.waitFor(() => expect(adapter).toHaveBeenCalledTimes(2));
     expect(adapter.mock.lastCall?.[0]).toMatchObject({ fastMode: true, resumeSessionId: "existing", prompt: "Faster next turn", effort: "medium" });
     await vi.waitFor(() => expect(core.threads.get(thread.id)?.queued).toHaveLength(0));

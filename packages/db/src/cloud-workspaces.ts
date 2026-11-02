@@ -71,6 +71,10 @@ export const cloudWorkspaces = {
     if (!row) throw new Error(`No cloud workspace for thread ${threadId}`);
     return record(row);
   },
+  /** A failed workspace is being prepared again; its old error no longer applies. */
+  preparing(db: Db, threadId: string, at = Date.now()): void {
+    db.stmt("UPDATE cloud_workspaces SET state = 'preparing', error = NULL, updated_at = ? WHERE thread_id = ? AND state = 'failed'").run(at, threadId);
+  },
   /** Preparation failed before the sandbox had the code; preparing again retries it. */
   failed(db: Db, threadId: string, error: string, at = Date.now()): void {
     db.stmt("UPDATE cloud_workspaces SET state = 'failed', error = ?, updated_at = ? WHERE thread_id = ? AND state != 'ready'").run(error, at, threadId);

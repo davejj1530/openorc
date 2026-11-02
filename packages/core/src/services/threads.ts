@@ -10,9 +10,9 @@ import {
   tasks,
   teamDeletedThreads,
   teamRuntime,
-  teamWorkspaces,
   threads,
   threadQueue,
+  type CloudProviderId,
   type Db,
   type ThreadListFilter,
 } from "@openorc/db";
@@ -38,6 +38,7 @@ import { randomUUID } from "node:crypto";
 import { realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Logger } from "../transport.js";
+import { teamQuiescenceReason } from "./thread-team-quiescence.js";
 import { titleFromPrompt, type StartThreadInput, type ThreadPatch, type ThreadTitler } from "./thread-inputs.js";
 import { inUnvettedCopy } from "./review-copies.js";
 import type { RunService } from "./runs.js";
@@ -62,6 +63,8 @@ export { titleFromPrompt, type SpawnTaskInput, type StartThreadInput, type Threa
  * agent records tasks and works on them here. Task documents have their own
  * status; the conversation remains available after any task finishes.
  */
+type ThreadAdmission = { assertCanAdmit(): void; onAdmitted(thread: Thread): void };
+
 export class ThreadService {
   private readonly messageQueue: ThreadMessageQueue;
   private readonly taskExecution: ThreadTaskExecution;
@@ -102,7 +105,7 @@ export class ThreadService {
       send: (id, text, from, attribution, options) => this.send(id, text, from, attribution, options),
       messages: (id) => this.messages(id),
       withCheckoutBranches: (rows) => this.withCheckoutBranches(rows),
-      start: (input, internal) => this.start(input, internal),
+      start: (input, internal) => this.start({ ...input, cloud: false }, internal),
     });
   }
 
@@ -159,6 +162,7 @@ export class ThreadService {
       session: this.runs.threadSession(t.id),
       context: this.runs.threadContext(t.id),
       queued: threadQueue.list(this.db, t.id),
+      cloud: this.workspaces.cloudState(t.id),
       lastAgentEventAt,
       liveRunId,
       taskCount: own.filter((x) => x.status !== "archived").length,
@@ -191,26 +195,11 @@ export class ThreadService {
 
   /** Organization never hides unfinished team work. */
   teamQuiescenceReason(threadId: string): string | null {
-    if (!orchestration.getInstance(this.db, threadId) && !teamRuntime.activeForThread(this.db, threadId)) return null;
-    const rows = this.db.stmt("SELECT id FROM team_executions WHERE thread_id = ?").all(threadId) as { id: string }[];
-    const executions = rows.map((row) => teamRuntime.get(this.db, row.id)!);
-    if (executions.some((execution) => !["completed", "stopped"].includes(execution.state))) return "Finish or stop the team's unfinished execution before this action.";
-    if (executions.some((execution) => execution.attempts.some((attempt) => ["starting", "running"].includes(attempt.state) || (attempt.state === "attention" && attempt.endedAt === null))))
-      return "Wait for every team writer to finish closing before this action.";
-    const owned = tasks.list(this.db, { threadId });
-    if (this.runs.liveRunForThread(threadId) || owned.some((task) => this.runs.liveRunForTask(task.id))) return "Wait for every team writer to finish closing before this action.";
-    const runIds = new Set([
-      ...runRepo.listForThread(this.db, threadId).map((run) => run.id),
-      ...owned.flatMap((task) => runRepo.listForTask(this.db, task.id).map((run) => run.id)),
-      ...executions.flatMap((execution) => execution.attempts.flatMap((attempt) => (attempt.runId ? [attempt.runId] : []))),
-    ]);
-    if (this.runs.pending().some((approval) => runIds.has(approval.runId))) return "Resolve the team's pending requests before this action.";
-    if (executions.some((execution) => teamWorkspaces.publications(this.db, execution.id).some((publication) => publication.state !== "applied")))
-      return "Resolve the team's retained publication before this action.";
-    return null;
+    return teamQuiescenceReason(this.db, this.runs, threadId);
   }
 
-  async start(input: StartThreadInput, internal?: { assertCanAdmit(): void; onAdmitted(thread: Thread): void }): Promise<{ thread: Thread; run: Run }> {
+  /** A cloud thread returns at once with no run: its first message waits in the queue while its sandbox gets ready. */
+  async start(input: StartThreadInput, internal?: ThreadAdmission): Promise<{ thread: Thread; run: Run | null }> {
     input = { ...normalizeModelSettings(input), claudeAccountId: input.claudeAccountId ?? claudeAccounts.defaultId(this.db) };
     await this.runs.validateFastMode(input.agent, input.model, input.fastMode, undefined, undefined, input.claudeAccountId);
     internal?.assertCanAdmit();
@@ -223,7 +212,7 @@ export class ThreadService {
     const id = randomUUID();
     const title = input.title?.trim() || titleFromPrompt(input.prompt);
     const destination = this.workspaces.threadPath({ id, title, workspaceMode, worktreePath: input.checkout?.path ?? null }, project);
-    return this.writers.withLease(
+    const started = await this.writers.withLease(
       destination,
       `starting thread ${id}`,
       async (workspaceLease) => {
@@ -242,7 +231,7 @@ export class ThreadService {
             permissionMode: input.permissionMode,
             workspaceMode,
           });
-          if (cloudProvider) this.workspaces.admitCloud(admitted.id, cloudProvider);
+          if (cloudProvider) this.admitCloud(admitted.id, cloudProvider, input);
           audit.record(this.db, {
             actor: "user",
             action: "thread.create",
@@ -256,6 +245,7 @@ export class ThreadService {
           return adopted;
         });
         this.invalidate(["threads", `thread:${thread.id}`]);
+        if (cloudProvider) return { thread, run: null };
         try {
           thread = await this.workspaces.prepareThread(thread, project, input.baseRef, workspaceLease);
           const run = await this.runs.start({
@@ -285,6 +275,16 @@ export class ThreadService {
       undefined,
       { shared: true },
     );
+    // Delivery takes its own lease on the worktree, so it starts once this one is released.
+    if (!started.run) void this.messageQueue.drainQueue(started.thread.id);
+    return started;
+  }
+
+  /** In the admitting transaction: the sandbox record, the base the worktree will start from, and the queued first message. */
+  private admitCloud(threadId: string, provider: CloudProviderId, input: StartThreadInput): void {
+    this.workspaces.admitCloud(threadId, provider);
+    if (input.baseRef) threads.update(this.db, threadId, { baseBranch: input.baseRef });
+    threadQueue.enqueue(this.db, { threadId, text: input.prompt, attachments: input.attachments ?? [], requestKey: randomUUID() });
   }
 
   /** Admit a conversation without starting a provider: routing questions are real conversation turns. */
@@ -581,6 +581,8 @@ export class ThreadService {
         await this.workspaces.cleanupThread(thread, project, { save: !inUnvettedCopy(this.db, thread) }, lease);
       }
 
+      // Best effort: a sandbox the service could not delete now is not worth keeping the thread for.
+      await this.workspaces.removeCloud(id).catch((e: unknown) => this.log.warn(`the cloud workspace of thread ${id} was not deleted: ${e instanceof Error ? e.message : String(e)}`));
       threads.delete(this.db, id);
       // Its checkpoints go with it; nothing else keeps their trees.
       await unpinProjectRefs(project, checkpointRefs(id)).catch((e: unknown) => this.log.warn(`checkpoint refs of thread ${id} were kept: ${e instanceof Error ? e.message : String(e)}`));
@@ -808,6 +810,8 @@ export class ThreadService {
    */
   private worktreeBase(thread: Thread, requested: string | undefined): string | undefined {
     if (requested) return requested;
+    // A thread admitted without its worktree, as a cloud thread is, starts from the base it was admitted with.
+    if (!thread.worktreePath && thread.baseBranch) return thread.baseBranch;
     const taskId = thread.importedFrom?.startsWith("task:") ? thread.importedFrom.slice("task:".length) : null;
     const task = taskId ? tasks.get(this.db, taskId) : null;
     return task?.executionThreadId === thread.id ? (task.baseRef ?? undefined) : undefined;

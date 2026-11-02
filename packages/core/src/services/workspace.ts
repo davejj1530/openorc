@@ -5,7 +5,7 @@ import path from "node:path";
 import { audit, taskForwardings, tasks, threads, type CloudMirrorState, type CloudProviderId, type Db } from "@openorc/db";
 import { stopProcess, waitForProcessGroup } from "@openorc/agents";
 import { diskUsage, emptyTree, fetch, git, repoInfo, revParse, worktree } from "@openorc/git";
-import { WORKSPACE_ID, type BranchLoss, type Project, type RemovalImpact, type Task, type Thread, type WorkspaceMode } from "@openorc/protocol";
+import { WORKSPACE_ID, type BranchLoss, type CloudThreadState, type Project, type RemovalImpact, type Task, type Thread, type WorkspaceMode } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
 import type { CloudWorkspaceService } from "./cloud-workspaces.js";
 import type { StartThreadInput } from "./thread-inputs.js";
@@ -243,6 +243,16 @@ export class WorkspaceService {
   placeCloud(input: Pick<StartThreadInput, "agent" | "checkout" | "claudeAccountId">, project: Project): Promise<CloudProviderId> {
     if (!this.options.cloud) throw new Error("Cloud workspaces are not available.");
     return this.options.cloud.place(input, project);
+  }
+
+  /** Deletes a cloud conversation's sandbox for good; nothing for a conversation on this Mac. */
+  async removeCloud(threadId: string): Promise<void> {
+    await this.options.cloud?.remove(threadId);
+  }
+
+  /** Where a cloud thread's sandbox stands; null for a thread on this Mac. */
+  cloudState(threadId: string): CloudThreadState | null {
+    return this.options.cloud?.state(threadId) ?? null;
   }
 
   /** Marks a conversation being admitted as one that runs in a cloud sandbox. Call inside the admitting transaction. */

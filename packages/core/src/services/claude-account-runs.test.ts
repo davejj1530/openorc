@@ -115,10 +115,10 @@ it("launches three accounts independently and keeps the saved account when resum
   const launched = [];
   for (const id of ids) launched.push(await conversations.start({ ...input, projectId: project.id, claudeAccountId: id }));
   expect(start.mock.calls.map(([, env]) => path.basename(env.env.CLAUDE_CONFIG_DIR!))).toEqual(ids);
-  expect(launched.map(({ thread, run }) => [thread.claudeAccountId, run.claudeAccountId])).toEqual(ids.map((id) => [id, id]));
-  for (const { run } of launched) await service.closeAndWait(run.id);
+  expect(launched.map(({ thread, run }) => [thread.claudeAccountId, run!.claudeAccountId])).toEqual(ids.map((id) => [id, id]));
+  for (const { run } of launched) await service.closeAndWait(run!.id);
   const first = launched[0]!;
-  runs.update(db, first.run.id, { externalSessionId: "work-session", state: "success" });
+  runs.update(db, first.run!.id, { externalSessionId: "work-session", state: "success" });
   accounts.update({ id: ids[2]!, makeDefault: true });
   const resumed = await conversations.continueThread(first.thread.id, input);
   expect(resumed.claudeAccountId).toBe(ids[0]);
@@ -150,7 +150,7 @@ it("retires idle sessions for sign-in while leaving other accounts running", asy
   const first = await conversations.start({ ...input, projectId: project.id, claudeAccountId: work.id });
   const handle = start.mock.results[0]!.value;
   await conversations.start({ ...input, projectId: project.id, claudeAccountId: personal.id });
-  handle.emit("event", { type: "turn.completed", runId: first.run.id, ts: Date.now(), turnId: "fixture", status: "success", durationMs: 1 });
+  handle.emit("event", { type: "turn.completed", runId: first.run!.id, ts: Date.now(), turnId: "fixture", status: "success", durationMs: 1 });
   await vi.waitFor(() => expect(service.threadActivity(first.thread.id)).toBe("idle"));
   await service.retireIdleClaudeSessions(work.id);
   expect(service.hasClaudeSessions(work.id)).toBe(false);

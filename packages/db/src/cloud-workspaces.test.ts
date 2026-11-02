@@ -40,6 +40,17 @@ describe("cloudWorkspaces", () => {
     expect(cloudWorkspaces.get(db, threadId)).toMatchObject({ state: "ready", error: null });
   });
 
+  it("forgets the mirror when the sandbox is removed, and prepares again from there", () => {
+    cloudWorkspaces.insert(db, { threadId, provider: "vercel", sandbox: "openorc-a" });
+    cloudWorkspaces.ready(db, threadId, { snapshot: "s".repeat(40), tree: "t".repeat(40), head: "c".repeat(40), known: ["c".repeat(40)] });
+    cloudWorkspaces.removed(db, threadId);
+    expect(cloudWorkspaces.get(db, threadId)).toMatchObject({ state: "removed", error: null, mirror: null });
+    expect(cloudWorkspaces.listByProvider(db, "vercel").map((record) => record.sandbox)).toEqual(["openorc-a"]);
+    expect(cloudWorkspaces.listByProvider(db, "local")).toEqual([]);
+    cloudWorkspaces.preparing(db, threadId);
+    expect(cloudWorkspaces.get(db, threadId)).toMatchObject({ state: "preparing" });
+  });
+
   it("refuses a ready workspace without a mirror and goes with its thread", () => {
     cloudWorkspaces.insert(db, { threadId, provider: "local", sandbox: "openorc-a" });
     expect(() => db.stmt("UPDATE cloud_workspaces SET state = 'ready' WHERE thread_id = ?").run(threadId)).toThrow(/CHECK constraint/);

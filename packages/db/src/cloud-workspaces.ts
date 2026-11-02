@@ -1,7 +1,8 @@
 import type { Db } from "./database.js";
 
 export type CloudProviderId = "local" | "vercel";
-export type CloudWorkspaceState = "preparing" | "ready" | "failed";
+/** `removed`: its sandbox was deleted; the next turn sets up a new one from the worktree on the Mac. */
+export type CloudWorkspaceState = "preparing" | "ready" | "failed" | "removed";
 
 /** What the Mac's worktree last matched in the sandbox. */
 export interface CloudMirrorState {
@@ -71,9 +72,20 @@ export const cloudWorkspaces = {
     if (!row) throw new Error(`No cloud workspace for thread ${threadId}`);
     return record(row);
   },
-  /** A failed workspace is being prepared again; its old error no longer applies. */
+  /** A failed or removed workspace is being prepared again; its old error no longer applies. */
   preparing(db: Db, threadId: string, at = Date.now()): void {
-    db.stmt("UPDATE cloud_workspaces SET state = 'preparing', error = NULL, updated_at = ? WHERE thread_id = ? AND state = 'failed'").run(at, threadId);
+    db.stmt("UPDATE cloud_workspaces SET state = 'preparing', error = NULL, updated_at = ? WHERE thread_id = ? AND state IN ('failed', 'removed')").run(at, threadId);
+  },
+  /** Its sandbox was deleted. What the sandbox had synced stays in the worktree, which the next sandbox starts from. */
+  removed(db: Db, threadId: string, at = Date.now()): void {
+    db.stmt("UPDATE cloud_workspaces SET state = 'removed', error = NULL, mirror_snapshot = NULL, mirror_tree = NULL, mirror_head = NULL, mirror_known = '[]', updated_at = ? WHERE thread_id = ?").run(
+      at,
+      threadId,
+    );
+  },
+  /** Every conversation's workspace on one service, by sandbox name. */
+  listByProvider(db: Db, provider: CloudProviderId): CloudWorkspaceRecord[] {
+    return (db.stmt(`SELECT ${columns} FROM cloud_workspaces WHERE provider = ?`).all(provider) as unknown as Row[]).map(record);
   },
   /** Preparation failed before the sandbox had the code; preparing again retries it. */
   failed(db: Db, threadId: string, error: string, at = Date.now()): void {

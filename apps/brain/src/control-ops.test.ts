@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { brainKeyText, brainLayout, newBrainKey, sealHandover, type BrainLayout, type BrainStart } from "@openorc/cloud";
 import { OpenOrc } from "@openorc/core";
 import { DEFAULT_CLAUDE_ACCOUNT } from "@openorc/protocol";
@@ -23,6 +23,7 @@ let layout: BrainLayout;
 let start: BrainStart;
 let core: OpenOrc;
 let stops = 0;
+let answering = false;
 
 beforeEach(async () => {
   root = await realpath(await mkdtemp(path.join(os.tmpdir(), "openorc-brain-ops-")));
@@ -31,6 +32,7 @@ beforeEach(async () => {
   const secrets = await SealedSecrets.open(layout.secrets, start.key);
   core = await OpenOrc.create({ ...brainOptions({ layout, appDir: path.join(root, "app", "v1"), start, self: NO_SANDBOX, secrets, transport: { push() {} }, runnerFiles: [] }), ephemeral: true });
   stops = 0;
+  answering = false;
 });
 
 afterEach(async () => {
@@ -38,7 +40,7 @@ afterEach(async () => {
   await rm(root, { recursive: true, force: true });
 });
 
-const ops = () => controlHandlers({ core, key: start.key, layout, stop: () => stops++ });
+const ops = () => controlHandlers({ core, key: start.key, layout, stop: () => stops++, answering: () => answering });
 
 async function sealedBytes(): Promise<string> {
   const names = await readdir(layout.secrets);
@@ -133,6 +135,21 @@ describe("control requests on the brain's core", () => {
   it("answers stop before it closes the brain", async () => {
     expect(await ops()({ op: "stop" })).toEqual({ stopping: true });
     expect(stops).toBe(0);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(stops).toBe(1);
+  });
+
+  it("stops for an update only as the core's update check allows, which takes no new turn from then on", async () => {
+    const refusal = "Wait for agent work, approvals, and context maintenance to finish before restarting to update.";
+    vi.spyOn(core, "prepareForUpdate").mockReturnValueOnce(refusal);
+    await expect(ops()({ op: "stop-for-update" })).rejects.toThrow(refusal);
+    answering = true;
+    await expect(ops()({ op: "stop-for-update" })).rejects.toThrow("answering another request");
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(stops).toBe(0);
+    answering = false;
+    expect(await ops()({ op: "stop-for-update" })).toEqual({ stopping: true });
+    expect(core.prepareForUpdate()).toBe(refusal);
     await new Promise((resolve) => setImmediate(resolve));
     expect(stops).toBe(1);
   });

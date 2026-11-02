@@ -12,6 +12,8 @@ export interface ControlContext {
   layout: BrainLayout;
   /** Closes the brain once the reply is on its way. */
   stop(): void;
+  /** A control request is at work or waiting its turn. */
+  answering(): boolean;
 }
 
 /** Every request but the status reads, which the host answers itself, starting and closing included. */
@@ -84,7 +86,7 @@ async function importProject(core: OpenOrc, layout: BrainLayout, { name, bundle,
 }
 
 /** Each control request onto services the core already has. Handed-over values are never logged or repeated. */
-export function controlHandlers({ core, key, layout, stop }: ControlContext): (request: Extract<BrainControlRequest, { op: CoreOp }>) => Promise<unknown> {
+export function controlHandlers({ core, key, layout, stop, answering }: ControlContext): (request: Extract<BrainControlRequest, { op: CoreOp }>) => Promise<unknown> {
   const handlers: Handlers = {
     pair: async () => {
       const { url, expiresAt } = await core.remote.beginPairing();
@@ -100,6 +102,14 @@ export function controlHandlers({ core, key, layout, stop }: ControlContext): (r
     },
     "import-project": (request) => importProject(core, layout, request),
     stop: async () => {
+      setImmediate(stop);
+      return { stopping: true };
+    },
+    "stop-for-update": async () => {
+      // The desktop's own check before it restarts to update: it fences new turns in the same step, so none starts
+      // between the check and the close.
+      const refusal = answering() ? "The cloud brain is answering another request." : core.prepareForUpdate();
+      if (refusal) throw new Error(refusal);
       setImmediate(stop);
       return { stopping: true };
     },

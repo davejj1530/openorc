@@ -150,7 +150,7 @@ export async function serve(appDir: string): Promise<void> {
     await core.remote.attach(host.answer);
     const { listener } = await core.remote.configure(true);
     if (listener.state !== "on") throw new Error(`Phone access did not start: ${listener.state === "failed" ? listener.reason : "it is off"}.`);
-    host.ops = controlHandlers({ core, key: start.key, layout, stop: () => void host.shutdown("stop") });
+    host.ops = controlHandlers({ core, key: start.key, layout, stop: () => void host.shutdown("stop"), answering: () => host.control?.busy === "control" });
     host.awake = new BrainAwake({ busy: () => host.busy(), self, sleep: (why) => host.shutdown(why), warn: (text) => log.write("warn", text) });
     host.phase = "ready";
     host.awake.start();

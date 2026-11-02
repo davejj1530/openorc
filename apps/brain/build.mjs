@@ -101,7 +101,9 @@ function digest(dir, hash = createHash("sha256"), prefix = "") {
   }
   return hash;
 }
-const version = digest(app).digest("hex").slice(0, 12);
+// Dated, so a Mac can tell a newer brain from an older one; the digest says whether two builds hold the same.
+const built = new Date().toISOString().replace(/\D/g, "").slice(0, 14);
+const version = `${built}-${digest(app).digest("hex").slice(0, 12)}`;
 writeFileSync(path.join(app, "manifest.json"), `${JSON.stringify({ version, node: 24, platform: `${TARGET.os}-${TARGET.cpu}-${TARGET.libc}` }, null, 2)}\n`);
 
 const archive = path.join(dist, `brain-${version}.tgz`);

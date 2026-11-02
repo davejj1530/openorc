@@ -58,14 +58,15 @@ describe("the control socket", () => {
     const pair = ctl(JSON.stringify({ op: "pair" }));
     const stop = ctl(JSON.stringify({ op: "stop" }));
     await new Promise((resolve) => setTimeout(resolve, 50));
+    expect((await ctl(JSON.stringify({ op: "stop-for-update" }))).code).toBe(0);
     const status = await ctl(JSON.stringify({ op: "status" }));
     expect(parseControlReply("status", status.reply)).toMatchObject({ ok: true, result: { busy: "control" } });
     expect(parseControlReply("wake", (await ctl(JSON.stringify({ op: "wake" }))).reply)).toMatchObject({ ok: true, result: { busy: "control" } });
-    expect(order).toEqual(["start pair"]);
+    expect(order).toEqual(["start pair", "start stop-for-update", "end stop-for-update"]);
     first.open();
     expect(parseControlReply("pair", (await pair).reply)).toEqual({ ok: true, result: { url: "openorc://pair", expiresAt: 1 } });
     expect((await stop).code).toBe(0);
-    expect(order).toEqual(["start pair", "end pair", "start stop", "end stop"]);
+    expect(order).toEqual(["start pair", "start stop-for-update", "end stop-for-update", "end pair", "start stop", "end stop"]);
     expect(server.busy).toBeNull();
   });
 
@@ -88,6 +89,7 @@ describe("the control socket", () => {
       handover: { op: "handover", sealed: {} },
       "import-project": { op: "import-project", name: "demo", bundle: "demo.bundle" },
       stop: { op: "stop" },
+      "stop-for-update": { op: "stop-for-update" },
     } satisfies { [K in BrainControlOp]: Extract<BrainControlRequest, { op: K }> };
     let uses = 0;
     server = await serveControl(

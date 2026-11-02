@@ -1,4 +1,5 @@
 import path from "node:path";
+import { APIError } from "@vercel/sandbox";
 import { describe, expect, it } from "vitest";
 import type { SandboxInfo } from "../sandbox.js";
 import { BRAIN_AWAY_MS, BRAIN_PORT } from "./layout.js";
@@ -17,40 +18,43 @@ type Output = { stdout?: string; stderr?: string };
 
 const aborted = (signal?: AbortSignal) => new Promise<never>((_, reject) => signal?.addEventListener("abort", () => reject(new Error("aborted"))));
 
-/** A command that exits when told to, streams the lines it is given, and counts the readers still waiting on it. */
+/**
+ * A command that exits when told to and counts the readers still waiting on it. Its output streams to every reader from
+ * the start, as Vercel's logs do. Like the brain's scripts it acts on its one line, not on the close of its input.
+ */
 class FakeCommand implements BrainCommand {
   stdin = "";
+  closed = false;
+  /** When set, closing the input waits for it, as a slow round trip would. */
+  closing: Promise<void> | null = null;
   waiting = 0;
   private readonly lines: Line[] = [];
-  private wakeReader: (() => void) | null = null;
+  private readonly readers = new Set<() => void>();
   private code: number | null = null;
   private readonly exited: Promise<number>;
   private exit!: (code: number) => void;
 
-  constructor(
-    private readonly output: Output = {},
-    private readonly onInput?: (command: FakeCommand) => void,
-  ) {
+  constructor(private readonly onLine?: (command: FakeCommand) => void) {
     this.exited = new Promise((resolve) => (this.exit = resolve));
   }
 
   emit(stream: Line["stream"], data: string): void {
     this.lines.push({ stream, data });
-    this.wakeReader?.();
+    this.wakeReaders();
   }
 
   finish(code: number, output: Output = {}): void {
-    Object.assign(this.output, output);
+    for (const stream of ["stdout", "stderr"] as const) if (output[stream]) this.lines.push({ stream, data: output[stream] });
     this.code = code;
     this.exit(code);
-    this.wakeReader?.();
+    this.wakeReaders();
   }
 
   async wait(options: { signal?: AbortSignal } = {}) {
     this.waiting += 1;
     try {
       const exitCode = await Promise.race([this.exited, aborted(options.signal)]);
-      return { exitCode, stdout: async () => this.output.stdout ?? "", stderr: async () => this.output.stderr ?? "" };
+      return { exitCode, stdout: async () => this.text("stdout"), stderr: async () => this.text("stderr") };
     } finally {
       this.waiting -= 1;
     }
@@ -58,14 +62,16 @@ class FakeCommand implements BrainCommand {
 
   async *logs(options: { signal?: AbortSignal } = {}): AsyncIterable<Line> {
     this.waiting += 1;
-    options.signal?.addEventListener("abort", () => this.wakeReader?.());
+    options.signal?.addEventListener("abort", () => this.wakeReaders());
     try {
-      for (;;) {
+      for (let next = 0; ;) {
         if (options.signal?.aborted) return;
-        const line = this.lines.shift();
-        if (line) yield line;
-        else if (this.code !== null) return;
-        else await new Promise<void>((resolve) => (this.wakeReader = resolve));
+        const line = this.lines[next];
+        if (line) {
+          next += 1;
+          yield line;
+        } else if (this.code !== null) return;
+        else await new Promise<void>((resolve) => this.readers.add(resolve));
       }
     } finally {
       this.waiting -= 1;
@@ -73,11 +79,26 @@ class FakeCommand implements BrainCommand {
   }
 
   async writeStdin(data: string): Promise<void> {
+    const before = this.stdin;
     this.stdin += data;
+    if (!before.includes("\n") && this.stdin.includes("\n")) this.onLine?.(this);
   }
 
   async closeStdin(): Promise<void> {
-    this.onInput?.(this);
+    this.closed = true;
+    await this.closing;
+  }
+
+  private text(stream: Line["stream"]): string {
+    return this.lines
+      .filter((line) => line.stream === stream)
+      .map((line) => line.data)
+      .join("");
+  }
+
+  private wakeReaders(): void {
+    for (const resolve of this.readers) resolve();
+    this.readers.clear();
   }
 }
 
@@ -101,15 +122,23 @@ class FakeMachine {
   readonly changes: string[] = [];
   readonly runs: Run[] = [];
   readonly starts: FakeCommand[] = [];
+  /** Every command handed a line on its input: starts and control requests. */
+  readonly fed: FakeCommand[] = [];
+  /** When set, closing any command's input waits for it. */
+  closing: Promise<void> | null = null;
   /** How a running brain answers status, one per ask, the last repeating; "gone" is no brain answering. */
   statuses: (BrainStatus["state"] | "gone")[] = [];
+  /** Which status read each ask was: a poll, or a waker's that counts as use. */
+  readonly reads: BrainControlRequest["op"][] = [];
   runningVersion = "brain-v1";
   answer: (request: BrainControlRequest) => Output & { code: number } = (request) => this.status(request);
   onStart: (command: FakeCommand) => void = () => undefined;
 
   private status(request: BrainControlRequest): Output & { code: number } {
     const state = (this.statuses.length > 1 ? this.statuses.shift() : this.statuses[0]) ?? "gone";
-    if (request.op !== "status" || state === "gone") return { code: 69 };
+    if (request.op !== "status" && request.op !== "wake") return { code: 69 };
+    this.reads.push(request.op);
+    if (state === "gone") return { code: 69 };
     return { code: 0, stdout: `${encodeControlReply<"status">({ ok: true, result: { state, version: this.runningVersion, pid: 7, since: 1, busy: null } })}\n` };
   }
 
@@ -120,6 +149,11 @@ class FakeMachine {
 
   run(params: Run): FakeCommand {
     this.runs.push(params);
+    const fed = (command: FakeCommand) => {
+      command.closing = this.closing;
+      this.fed.push(command);
+      return command;
+    };
     const [, , label = "", ...args] = params.args;
     const steps: Record<string, () => FakeCommand> = {
       "brain-survey": () => {
@@ -157,15 +191,17 @@ class FakeMachine {
         return this.change(`switch ${version}`);
       },
       "brain-start": () => {
-        const command = new FakeCommand({}, (started) => this.onStart(started));
+        const command = fed(new FakeCommand((started) => this.onStart(started)));
         this.starts.push(command);
         return command;
       },
       "brain-ctl": () =>
-        new FakeCommand({}, (command) => {
-          const { code, ...output } = this.answer(JSON.parse(command.stdin) as BrainControlRequest);
-          command.finish(code, output);
-        }),
+        fed(
+          new FakeCommand((command) => {
+            const { code, ...output } = this.answer(JSON.parse(command.stdin) as BrainControlRequest);
+            command.finish(code, output);
+          }),
+        ),
     };
     return steps[label]?.() ?? finished(127, { stderr: `unknown step ${label}` });
   }
@@ -180,6 +216,8 @@ class FakeVercel implements BrainApi {
   readonly gets: { name: string; resume: boolean; projectId: string }[] = [];
   readonly deleted: { name: string; options: unknown }[] = [];
   readonly projects: string[] = [];
+  /** The next command finds the sandbox stopped, though the look before it saw it running, as when it stops between. */
+  stopsUnder = false;
 
   constructor(readonly machine = new FakeMachine()) {}
 
@@ -224,11 +262,19 @@ class FakeVercel implements BrainApi {
     return found ?? this.add(params.name, { ports, timeout, snapshotExpiration, keepLastSnapshots });
   }
 
+  /** Its commands run in the session it found, and fail as Vercel's do once that has stopped. */
   async get({ name, resume, projectId }: { name: string; resume: boolean; projectId: string }) {
     this.gets.push({ name, resume, projectId });
     const vm = this.sandboxes.get(name) ?? null;
-    if (vm && resume) vm.state = "running";
-    return vm;
+    if (!vm) return null;
+    if (resume) vm.state = "running";
+    const runCommand: BrainVm["runCommand"] = async (params) => {
+      if (this.stopsUnder) vm.state = "stopped";
+      this.stopsUnder = false;
+      if (vm.state !== "running") throw new APIError(new Response(null, { status: 410 }));
+      return vm.runCommand(params);
+    };
+    return Object.create(vm, { runCommand: { value: runCommand } }) as FakeVm;
   }
 
   async list() {
@@ -245,6 +291,8 @@ async function provisioned() {
   const brain = await connect(vercel);
   await brain.provision(bundle("brain-v1"));
   vercel.machine.runs.length = 0;
+  vercel.machine.reads.length = 0;
+  vercel.machine.fed.length = 0;
   return { vercel, brain, machine: vercel.machine };
 }
 
@@ -360,13 +408,24 @@ describe("waking a brain", () => {
     expect(started!.waiting).toBe(0);
   });
 
-  it("reports a brain already running as ready, by its own status", async () => {
+  it("acts on the brain's answer without waiting for a command's input to close, and still closes it", async () => {
+    const { brain, machine } = await provisioned();
+    machine.closing = new Promise<void>(() => undefined);
+    machine.onStart = (command) => command.emit("stdout", "openorc-brain ready brain-v1\n");
+    expect(await brain.wake({ key: newBrainKey(), name: "Cloud" })).toEqual({ state: "ready", address: ADDRESS, version: "brain-v1" });
+    machine.statuses = ["ready"];
+    expect(await brain.control({ op: "status" })).toMatchObject({ state: "ready", version: "brain-v1" });
+    expect(machine.fed.map((command) => command.closed)).toEqual([true, true]);
+  });
+
+  it("reports a brain already running as ready, by its own status asked as use, so it stays up for the caller", async () => {
     const { brain, machine } = await provisioned();
     machine.onStart = (command) => command.finish(75);
     machine.statuses = ["ready"];
     machine.runningVersion = "brain-v0";
     expect(await brain.wake({ key: newBrainKey(), name: "Cloud" })).toEqual({ state: "ready", address: ADDRESS, version: "brain-v0" });
     expect(machine.starts).toHaveLength(1);
+    expect(machine.reads).toEqual(["wake"]);
   });
 
   it("waits for a brain that is starting until it is ready", async () => {
@@ -383,6 +442,47 @@ describe("waking a brain", () => {
     machine.statuses = ["closing", "closing", "gone"];
     expect(await brain.wake({ key: newBrainKey(), name: "Cloud" })).toEqual({ state: "ready", address: ADDRESS, version: "brain-v1" });
     expect(machine.starts).toHaveLength(2);
+  });
+
+  it("resumes and starts again when a brain sleeping as the wake lands stops its sandbox under a step", async () => {
+    const { vercel, brain, machine } = await provisioned();
+    const vm = vercel.sandboxes.get("brain")!;
+    const stopping = () => {
+      vm.state = "stopped";
+      return new APIError(new Response(null, { status: 422 }), { json: { error: { code: "sandbox_stopping" } } });
+    };
+    const ready = (command: FakeCommand) => command.emit("stdout", "openorc-brain ready brain-v1\n");
+    const sleeps: Record<string, () => void> = {
+      "the start went down with its sandbox": () => {
+        machine.onStart = (command) => {
+          machine.onStart = ready;
+          stopping();
+          command.finish(143);
+        };
+      },
+      "the start's line was refused": () => {
+        machine.onStart = () => {
+          machine.onStart = ready;
+          throw stopping();
+        };
+      },
+      "the waker's status was refused while the brain closed": () => {
+        machine.onStart = (command) => {
+          machine.onStart = ready;
+          command.finish(75);
+        };
+        machine.answer = () => {
+          machine.answer = () => ({ code: 69 });
+          throw stopping();
+        };
+      },
+    };
+    for (const [sleep, arrange] of Object.entries(sleeps)) {
+      arrange();
+      const resumes = vercel.gets.filter((get) => get.resume).length;
+      expect([sleep, await brain.wake({ key: newBrainKey(), name: "Cloud" })]).toEqual([sleep, { state: "ready", address: ADDRESS, version: "brain-v1" }]);
+      expect(vercel.gets.filter((get) => get.resume).length - resumes).toBe(2);
+    }
   });
 
   it("maps the brain's exits: a wrong key, a missing install, and anything else with its redacted error", async () => {
@@ -441,6 +541,19 @@ describe("asking and removing a brain", () => {
     expect(await brain.status()).toEqual({ state: "stopped", address: ADDRESS, expiresAt: expect.any(Number) });
     expect(vercel.gets.slice(-2).map((get) => get.resume)).toEqual([false, false]);
     expect(vercel.sandboxes.get("brain")!.state).toBe("stopped");
+  });
+
+  it("never wakes a brain that stops as it is asked, and says it is not running", async () => {
+    const { vercel, brain, machine } = await provisioned();
+    vercel.stopsUnder = true;
+    await expect(brain.control({ op: "status" })).rejects.toThrow(BrainUnavailable);
+    expect(vercel.sandboxes.get("brain")!.state).toBe("stopped");
+    expect(machine.runs).toEqual([]);
+
+    vercel.sandboxes.get("brain")!.state = "running";
+    vercel.stopsUnder = true;
+    machine.onStart = (command) => command.emit("stdout", "openorc-brain ready brain-v1\n");
+    expect(await brain.wake({ key: newBrainKey(), name: "Cloud" })).toEqual({ state: "ready", address: ADDRESS, version: "brain-v1" });
   });
 
   it("reports a missing brain without making one", async () => {

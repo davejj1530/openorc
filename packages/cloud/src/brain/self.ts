@@ -34,13 +34,24 @@ const sdkSession: OpenBrainSession = async ({ token, teamId, projectId }, name) 
   };
 };
 
-/** Vercel's answers to a session that is stopping or stopped already. */
-function alreadyStopping(error: unknown): boolean {
-  if (!(error instanceof APIError)) return false;
+/** Vercel's status and error code for a refused call, or null for anything that is not Vercel's answer. */
+function refusal(error: unknown): { status: number; code: unknown } | null {
+  if (!(error instanceof APIError)) return null;
   const body: unknown = error.json;
   const inner: unknown = typeof body === "object" && body !== null && "error" in body ? body.error : null;
-  const code: unknown = typeof inner === "object" && inner !== null && "code" in inner ? inner.code : null;
-  return error.response.status === 410 || (error.response.status === 422 && (code === "sandbox_stopping" || code === "sandbox_snapshotting"));
+  return { status: error.response.status, code: typeof inner === "object" && inner !== null && "code" in inner ? inner.code : null };
+}
+
+/** Vercel's answers to a call on a session that is stopping or stopped already. */
+export function alreadyStopping(error: unknown): boolean {
+  const refused = refusal(error);
+  return refused !== null && (refused.status === 410 || (refused.status === 422 && (refused.code === "sandbox_stopping" || refused.code === "sandbox_snapshotting")));
+}
+
+/** Vercel refuses, rather than shortens, an extension past the plan's longest session ("would exceed maximum execution timeout"). */
+function pastLongestSession(error: unknown): boolean {
+  const refused = refusal(error);
+  return refused !== null && refused.status === 400 && refused.code === "sandbox_timeout_invalid";
 }
 
 export function brainSelf(connection: VercelCredentials, sandbox: string, open: OpenBrainSession = sdkSession): BrainSelf {
@@ -56,7 +67,12 @@ export function brainSelf(connection: VercelCredentials, sandbox: string, open: 
       const before = handle.expiresAt?.getTime() ?? Date.now();
       const wanted = Date.now() + forMs;
       if (before >= wanted) return { expiresAt: before, capped: false };
-      await handle.extendTimeout(wanted - before);
+      try {
+        await handle.extendTimeout(wanted - before);
+      } catch (error) {
+        if (pastLongestSession(error)) return { expiresAt: before, capped: true };
+        throw error;
+      }
       const after = handle.expiresAt?.getTime() ?? before;
       return { expiresAt: after, capped: after <= before };
     },

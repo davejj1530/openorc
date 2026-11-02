@@ -5,6 +5,7 @@ import type { SandboxInfo } from "../sandbox.js";
 import { STATES, type VercelCredentials } from "../vercel-sandbox.js";
 import { ensureVercelProject } from "../vercel-projects.js";
 import { BRAIN_AWAY_MS, BRAIN_EXIT, BRAIN_PORT, BRAIN_PROJECT, BRAIN_READY, BRAIN_SANDBOX, brainLayout, type BrainLayout } from "./layout.js";
+import { alreadyStopping } from "./self.js";
 import { brainKeyText, encodeLaunch, parseControlReply, type BrainControlRequest, type BrainControlResult, type BrainKey } from "./wire.js";
 
 /** The brain's folder under its sandbox's working folder. */
@@ -96,13 +97,16 @@ export interface BrainApi {
   project(token: string, teamId: string, name: string): Promise<{ id: string }>;
   /** Makes the sandbox when it is missing; either way it runs when this returns. */
   open(params: BrainOpenParams): Promise<BrainVm>;
-  /** Null when the sandbox does not exist. Wakes it only when asked to. */
+  /**
+   * Null when the sandbox does not exist. Wakes it only when asked to. Its commands run in the session it found, and fail
+   * once that stops: asking never wakes a sleeping brain, and a wake that a sleep races resumes again itself.
+   */
   get(params: VercelCredentials & { name: string; resume: boolean }): Promise<BrainVm | null>;
   /** The names of every sandbox in the project. */
   list(params: VercelCredentials): Promise<string[]>;
 }
 
-function brainVm(sandbox: SdkSandbox): BrainVm {
+function brainVm(sandbox: SdkSandbox, resumes: boolean): BrainVm {
   return {
     get cwd() {
       return sandbox.cwd;
@@ -124,7 +128,8 @@ function brainVm(sandbox: SdkSandbox): BrainVm {
     },
     domain: (port) => (sandbox.routes.some((route) => route.port === port) ? sandbox.domain(port) : null),
     update: (changes) => sandbox.update(changes),
-    runCommand: (params) => sandbox.runCommand(params),
+    // The sandbox's own runCommand resumes it once stopped, as when it stops between a look and a command.
+    runCommand: (params) => (resumes ? sandbox.runCommand(params) : sandbox.currentSession().runCommand(params)),
     writeFiles: (files) => sandbox.writeFiles(files),
     delete: (options) => sandbox.delete(options),
   };
@@ -132,10 +137,10 @@ function brainVm(sandbox: SdkSandbox): BrainVm {
 
 const sdk: BrainApi = {
   project: ensureVercelProject,
-  open: async (params) => brainVm(await SdkSandbox.getOrCreate({ ...params, resume: true })),
+  open: async (params) => brainVm(await SdkSandbox.getOrCreate({ ...params, resume: true }), true),
   get: async ({ name, resume, token, teamId, projectId }) => {
     try {
-      return brainVm(await SdkSandbox.get({ name, resume, token, teamId, projectId }));
+      return brainVm(await SdkSandbox.get({ name, resume, token, teamId, projectId }), false);
     } catch (error) {
       if (error instanceof APIError && error.response.status === 404) return null;
       throw error;
@@ -274,8 +279,26 @@ function drift(current: BrainSettings): Partial<BrainSettings> {
 const hostOf = (domain: string | null) => (domain ? new URL(domain).host : null);
 const tail = (text: string) => text.trim().split("\n").slice(-20).join("\n").slice(-1500);
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-/** After its one line a command may have exited already, such as on finding another brain running; its exit says why. */
-const closeInput = (command: BrainCommand) => command.closeStdin().catch(() => undefined);
+/**
+ * Hands a started command its one line, then closes its input without waiting on that: the command acts on the line,
+ * and every request here is a round trip through Vercel's API. After its line a command may have exited already, such
+ * as on finding another brain running, so the close may fail; its exit says why. Rejects when the line was not written.
+ */
+function send(command: BrainCommand, line: string): Promise<void> {
+  const written = command.writeStdin(`${line}\n`);
+  void written.then(
+    () => command.closeStdin().catch(() => undefined),
+    () => undefined,
+  );
+  return written;
+}
+
+/** A command's whole output, read as it runs, so it is there when the command exits without another request. */
+async function output(command: BrainCommand, signal: AbortSignal): Promise<{ stdout: string; stderr: string }> {
+  const text = { stdout: "", stderr: "" };
+  for await (const entry of command.logs({ signal })) text[entry.stream] += entry.data;
+  return text;
+}
 
 /** The brain's sandbox is not running, or no brain answers in it. */
 export class BrainUnavailable extends Error {
@@ -284,10 +307,12 @@ export class BrainUnavailable extends Error {
   }
 }
 
-type Started = { kind: "ready"; version: string } | { kind: "exit"; code: number; stderr: string } | { kind: "timeout" };
+type Started = { kind: "ready"; version: string } | { kind: "exit"; code: number; stderr: () => Promise<string> } | { kind: "timeout" };
 type Waited = { kind: "ready"; version: string } | { kind: "gone" } | { kind: "timeout" };
 
 const TIMED_OUT: WakeResult = { state: "failed", detail: "The brain did not start in time." };
+/** A brain sleeping as the wake landed stopped its sandbox under one of the wake's steps. */
+const STOPPED_UNDER = "stopped-under";
 const EXITS: Partial<Record<number, (detail: string) => WakeResult>> = {
   [BRAIN_EXIT.wrongKey]: () => ({ state: "wrong-key" }),
   [BRAIN_EXIT.needsProvision]: (detail) => ({ state: "needs-provision", detail: detail || "No brain is installed on its sandbox." }),
@@ -360,9 +385,18 @@ export class BrainMachine {
 
   /**
    * Ensures the brain runs: wakes the sandbox, starts the brain unless one runs, and waits until it is ready. A brain
-   * that crashed starts again. The key travels on the start command's stdin only.
+   * that crashed starts again, and so does one that slept as the wake landed, stopping its sandbox under it. The key
+   * travels on the start command's stdin only.
    */
   async wake(input: { key: BrainKey; name: string; threadVcpus?: number }): Promise<WakeResult> {
+    const first = await this.wakeOnce(input);
+    if (first !== STOPPED_UNDER) return first;
+    // Once: the brain this wake starts does not sleep under it.
+    const again = await this.wakeOnce(input);
+    return again === STOPPED_UNDER ? { state: "failed", detail: "The brain's sandbox stopped as the brain was started." } : again;
+  }
+
+  private async wakeOnce(input: { key: BrainKey; name: string; threadVcpus?: number }): Promise<WakeResult | typeof STOPPED_UNDER> {
     const vm = await this.api.get({ ...this.credentials, name: this.name, resume: true });
     if (!vm) return { state: "needs-provision", detail: "The brain's sandbox does not exist." };
     const address = hostOf(vm.domain(BRAIN_PORT));
@@ -372,27 +406,42 @@ export class BrainMachine {
     const line = encodeLaunch({ key: input.key, name: input.name, address, port: BRAIN_PORT, vercel: { connection, sandbox: this.name } });
     const secrets = [this.credentials.token, brainKeyText(input.key)];
     const deadline = Date.now() + this.timing.startMs;
-    // A second try only after the first met a brain that was closing and has since exited.
-    for (let tries = 0; tries < 2; tries++) {
-      const started = await this.start(vm, layout, line, deadline);
-      if (started.kind === "ready") return { state: "ready", address, version: started.version };
-      if (started.kind === "timeout") return TIMED_OUT;
-      if (started.code !== BRAIN_EXIT.alreadyRunning) {
-        const detail = tail(scrub(started.stderr, secrets));
-        return EXITS[started.code]?.(detail) ?? { state: "failed", detail: detail || `The brain exited with ${started.code}.` };
+    try {
+      // A second try only after the first met a brain that was closing and has since exited.
+      for (let tries = 0; tries < 2; tries++) {
+        const started = await this.start(vm, layout, line, deadline);
+        if (started.kind === "ready") return { state: "ready", address, version: started.version };
+        if (started.kind === "timeout") return TIMED_OUT;
+        if (started.code !== BRAIN_EXIT.alreadyRunning) return await this.exited(started, secrets);
+        const running = await this.waitForBrain(vm, layout, deadline);
+        if (running.kind === "ready") return { state: "ready", address, version: running.version };
+        if (running.kind === "timeout") return TIMED_OUT;
       }
-      const running = await this.waitForBrain(vm, layout, deadline);
-      if (running.kind === "ready") return { state: "ready", address, version: running.version };
-      if (running.kind === "timeout") return TIMED_OUT;
+      return { state: "failed", detail: "The brain kept closing as it was started." };
+    } catch (error) {
+      if (alreadyStopping(error)) return STOPPED_UNDER;
+      throw error;
     }
-    return { state: "failed", detail: "The brain kept closing as it was started." };
+  }
+
+  /** What a start's exit means, other than another brain holding the lock. */
+  private async exited(started: Extract<Started, { kind: "exit" }>, secrets: string[]): Promise<WakeResult | typeof STOPPED_UNDER> {
+    const known = EXITS[started.code];
+    // An exit the brain did not choose may be its start going down with the sandbox.
+    if (!known && (await this.api.get({ ...this.credentials, name: this.name, resume: false }))?.state !== "running") return STOPPED_UNDER;
+    const detail = tail(scrub(await started.stderr(), secrets));
+    return known?.(detail) ?? { state: "failed", detail: detail || `The brain exited with ${started.code}.` };
   }
 
   /** One request to the running brain, without waking its sandbox. Throws BrainUnavailable when no brain answers. */
   async control<R extends BrainControlRequest>(request: R): Promise<BrainControlResult<R>> {
     const vm = await this.api.get({ ...this.credentials, name: this.name, resume: false });
     if (vm?.state !== "running") throw new BrainUnavailable();
-    const result = await this.ask(vm, brainLayout(path.posix.join(vm.cwd, ROOT_FOLDER)), request);
+    const result = await this.ask(vm, brainLayout(path.posix.join(vm.cwd, ROOT_FOLDER)), request).catch((error: unknown) => {
+      // It stopped between the look and the request, and asking did not wake it.
+      if (alreadyStopping(error)) return null;
+      throw error;
+    });
     if (!result) throw new BrainUnavailable();
     return result;
   }
@@ -456,12 +505,11 @@ export class BrainMachine {
   /** One control request through `ctl`: the request on stdin, the reply on its last stdout line. Null when no brain answers. */
   private async ask<R extends BrainControlRequest>(vm: BrainVm, layout: BrainLayout, request: R): Promise<BrainControlResult<R> | null> {
     const command = await vm.runCommand({ cmd: "sh", args: ["-c", STEPS.ctl.script, STEPS.ctl.label, layout.ctl], cwd: vm.cwd, detached: true, stdin: true });
-    await command.writeStdin(`${JSON.stringify(request)}\n`);
-    await closeInput(command);
-    const done = await command.wait();
+    const stop = new AbortController();
+    const [done, text] = await Promise.all([command.wait({ signal: stop.signal }), output(command, stop.signal), send(command, JSON.stringify(request))]).finally(() => stop.abort());
     if (done.exitCode === BRAIN_EXIT.unavailable) return null;
-    const line = (await done.stdout()).trim().split("\n").pop() ?? "";
-    if (!line) throw new Error(`The brain did not answer ${request.op}: ${tail(scrub(await done.stderr(), [this.credentials.token])) || `exit ${done.exitCode}`}`);
+    const line = text.stdout.trim().split("\n").pop() ?? "";
+    if (!line) throw new Error(`The brain did not answer ${request.op}: ${tail(scrub(text.stderr, [this.credentials.token])) || `exit ${done.exitCode}`}`);
     const reply = parseControlReply<R["op"]>(request.op, line);
     if (!reply.ok) throw new Error(reply.error);
     return reply.result;
@@ -470,20 +518,20 @@ export class BrainMachine {
   /** One start: the first of its ready line, its exit, or the deadline. A brain that is ready keeps running. */
   private async start(vm: BrainVm, layout: BrainLayout, line: string, deadline: number): Promise<Started> {
     const command = await vm.runCommand({ cmd: "sh", args: ["-c", STEPS.start.script, STEPS.start.label, layout.root, layout.serve, layout.lock], cwd: vm.cwd, detached: true, stdin: true });
-    await command.writeStdin(`${line}\n`);
-    await closeInput(command);
     const stop = new AbortController();
     try {
-      return await new Promise<Started>((resolve) => {
+      return await new Promise<Started>((resolve, reject) => {
         const timer = setTimeout(() => resolve({ kind: "timeout" }), Math.max(0, deadline - Date.now()));
         stop.signal.addEventListener("abort", () => clearTimeout(timer));
         void readyVersion(command, stop.signal)
           .then((version) => version && resolve({ kind: "ready", version }))
           .catch(() => undefined);
-        void command
-          .wait({ signal: stop.signal })
-          .then(async (done) => resolve({ kind: "exit", code: done.exitCode, stderr: await done.stderr() }))
-          .catch(() => undefined);
+        void command.wait({ signal: stop.signal }).then(
+          (done) => resolve({ kind: "exit", code: done.exitCode, stderr: () => done.stderr() }),
+          // Anything else may pass while the ready line still comes; a stopping sandbox will not send it.
+          (error: unknown) => alreadyStopping(error) && reject(error),
+        );
+        send(command, line).catch(reject);
       });
     } finally {
       stop.abort();
@@ -493,7 +541,7 @@ export class BrainMachine {
   /** Asks a brain that holds the lock how it is, until it is ready, has exited, or the deadline passes. */
   private async waitForBrain(vm: BrainVm, layout: BrainLayout, deadline: number): Promise<Waited> {
     for (;;) {
-      const status = await this.ask(vm, layout, { op: "status" });
+      const status = await this.ask(vm, layout, { op: "wake" });
       if (!status) return { kind: "gone" };
       if (status.state === "ready") return { kind: "ready", version: status.version };
       if (Date.now() + this.timing.pollMs >= deadline) return { kind: "timeout" };

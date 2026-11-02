@@ -173,6 +173,8 @@ const HANDOVER: { [K in HandoverKind]: Parse<HandoverValues[K]> } = {
 
 export type BrainControlRequest =
   | { op: "status" }
+  /** Status, asked by a waker that found the brain running: it counts as use, so the brain stays up for the caller. */
+  | { op: "wake" }
   | { op: "pair" }
   /** Each value is base64url of `sealSecret` under the channel `handover/<kind>`. */
   | { op: "handover"; sealed: { [K in HandoverKind]?: string } }
@@ -196,6 +198,7 @@ export interface BrainStatus {
 
 export interface BrainControlResults {
   status: BrainStatus;
+  wake: BrainStatus;
   pair: { url: string; expiresAt: number };
   handover: { applied: HandoverKind[] };
   "import-project": { projectId: string };
@@ -207,6 +210,7 @@ export type BrainControlReply<Op extends BrainControlOp> = { ok: true; result: B
 const sealedText = text(131_072, /^[A-Za-z0-9_-]+$/);
 const REQUESTS = variants<BrainControlRequest>({
   status: object({ op: literal("status") }),
+  wake: object({ op: literal("wake") }),
   pair: object({ op: literal("pair") }),
   handover: object({ op: literal("handover"), sealed: object({}, { claude: sealedText, codex: sealedText, push: sealedText } satisfies Record<HandoverKind, Parse<string>>) }),
   "import-project": object({ op: literal("import-project"), name: text(100), bundle: text(255, /^\w[\w.-]*$/) }, { origin: text(2048) }),
@@ -214,8 +218,10 @@ const REQUESTS = variants<BrainControlRequest>({
 });
 
 const timestamp = int(0, Number.MAX_SAFE_INTEGER);
+const status = object({ state: literal("starting", "ready", "closing"), version: text(64), pid: int(1, 2 ** 31), since: timestamp, busy: nullable(text(100)) });
 const RESULTS: { [K in BrainControlOp]: Parse<BrainControlResults[K]> } = {
-  status: object({ state: literal("starting", "ready", "closing"), version: text(64), pid: int(1, 2 ** 31), since: timestamp, busy: nullable(text(100)) }),
+  status,
+  wake: status,
   pair: object({ url: text(4096), expiresAt: timestamp }),
   handover: object({ applied: list(literal("claude", "codex", "push"), 3) }),
   "import-project": object({ projectId: text(100) }),

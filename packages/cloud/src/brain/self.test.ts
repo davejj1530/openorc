@@ -49,6 +49,17 @@ describe("the brain's handle on its own sandbox", () => {
     expect(await self.extend(10 * 60_000)).toEqual({ expiresAt: limit, capped: true });
   });
 
+  it("reports capped when Vercel refuses an extension past the plan's longest session, and throws any other refusal", async () => {
+    const stop = Date.now() + 9 * 60_000;
+    const past = new APIError(new Response(null, { status: 400 }), {
+      json: { error: { code: "sandbox_timeout_invalid", message: "Failed to extend timeout: extension would exceed maximum execution timeout" } },
+    });
+    const refusing = (answer: unknown) => brainSelf(connection, "brain", async () => ({ ...session(stop).handle, extendTimeout: () => Promise.reject(answer) }));
+    expect(await refusing(past).extend(10 * 60_000)).toEqual({ expiresAt: stop, capped: true });
+    const others = [new APIError(new Response(null, { status: 400 }), { json: { error: { code: "bad_request" } } }), new APIError(new Response(null, { status: 500 })), new Error("socket hang up")];
+    for (const answer of others) await expect(refusing(answer).extend(10 * 60_000)).rejects.toBe(answer);
+  });
+
   it("stops its sandbox, and stopping again while it stops is not an error", async () => {
     const running = session(Date.now() + 60_000);
     await brainSelf(connection, "brain", running.open).stop();

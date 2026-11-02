@@ -105,6 +105,7 @@ describe("control requests and replies", () => {
   it("parses every request the waker can send", () => {
     const requests: BrainControlRequest[] = [
       { op: "status" },
+      { op: "wake" },
       { op: "pair" },
       { op: "handover", sealed: { claude: "AAAA" } },
       { op: "import-project", name: "openorc", bundle: "openorc-1.bundle", origin: "git@github.com:me/openorc.git" },
@@ -122,6 +123,7 @@ describe("control requests and replies", () => {
   it("reads the brain's answer for the op it was asked, or its refusal", () => {
     const status = { state: "ready", version: "brain-3f2a9c1d00ab", pid: 41, since: 1_700_000_000_000, busy: null } as const;
     expect(parseControlReply("status", encodeControlReply({ ok: true, result: status }))).toEqual({ ok: true, result: status });
+    expect(parseControlReply("wake", encodeControlReply({ ok: true, result: status }))).toEqual({ ok: true, result: status });
     expect(parseControlReply("pair", encodeControlReply({ ok: false, error: "Phone access is off." }))).toEqual({ ok: false, error: "Phone access is off." });
     expect(refusal(() => parseControlReply("status", JSON.stringify({ ok: true, result: { ...status, state: "asleep" } }))).field).toBe("result.state");
     expect(refusal(() => parseControlReply("stop", JSON.stringify({ ok: true, result: status }))).message).toContain("result has an unknown field");

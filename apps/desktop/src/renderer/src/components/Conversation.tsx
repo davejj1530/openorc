@@ -2,9 +2,10 @@ import { CloudStart, queueAfterStart } from "./CloudStart";
 import { conversationWorkspaceMode, conversationLocation, conversationEmptyHint, conversationEmptyTitle, workspaceDestination } from "../lib/conversation-status-presentation";
 import { WORKSPACE_ID } from "@openorc/protocol";
 import { TaskForwarding } from "./TaskForwarding";
+import { SessionRecovery } from "./SessionRecovery";
 import { useCallback, useMemo, useState } from "react";
-import { defaultHarnessId, harnessShortName, type AgentKind, type Project, type Run, type Task, type ThreadSummary, type WorkspaceMode } from "@openorc/protocol";
-import { AlertCircle, GitBranch, Laptop } from "./icons";
+import { defaultHarnessId, harnessShortName, type Project, type Run, type Task, type ThreadSummary, type WorkspaceMode } from "@openorc/protocol";
+import { GitBranch, Laptop } from "./icons";
 import { Composer, type SlashCommand } from "./Composer";
 import { ComposerChoice } from "./ComposerChoice";
 import { Transcript } from "./Transcript";
@@ -205,6 +206,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
     clearDraft();
   };
   const restart = () => submitter.submit({ ...request, now: false, restart: true }, { text: "Continue where you left off. Check the working tree first.", attachments: [] }).then(clearDraft);
+  const continueWith = (claudeAccountId: string) => submitter.submit({ ...request, now: false, claudeAccountId }, { text: "Continue where you left off.", attachments: [] }).then(clearDraft);
 
   const skills = useSkillCommands(project.id, choice?.agent, thread?.workingDirectory);
   const commands: SlashCommand[] = [
@@ -221,7 +223,6 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
 
   const location = conversationLocation({ scope, project, mode: workspaceMode, basePath, checkoutBranch: checkout.data?.branch, plainFolder: git.state === "none" });
   const emptyHint = conversationEmptyHint({ task: scope.kind === "task", workspace: project.id === WORKSPACE_ID });
-  const session = thread?.session;
   const placeholder = conversationPlaceholder({ firstTaskRun, working, canSteer, agent: choice?.agent });
 
   function renderTranscript() {
@@ -270,7 +271,9 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
             />
           ) : null}
           {thread ? <BackgroundCommands commands={thread.backgroundCommands ?? []} pending={stopCommand.isPending} onStop={(commandId) => stopCommand.mutate({ id: thread.id, commandId })} /> : null}
-          {session && !working ? <SessionRecovery session={session} agent={thread?.agent ?? defaultHarnessId} disabled={!choice || busy} onRestart={() => void restart().catch(() => {})} /> : null}
+          {thread?.session && !working ? (
+            <SessionRecovery thread={thread} disabled={!choice || busy} onRestart={() => void restart().catch(() => {})} onContinueWith={(id) => void continueWith(id).catch(() => {})} />
+          ) : null}
           {switching && choice ? (
             <div className="text-xs text-ink-3 px-1">Switching to {harnessShortName(choice.agent)} starts a fresh session. It gets a brief of this conversation, not the other agent's session.</div>
           ) : null}
@@ -362,26 +365,4 @@ function useRunVoices(voice: ConversationVoice, runs: readonly Run[], thread: Th
       agent: thread ? named(thread.agent, thread.model) : undefined,
     };
   }, [voice, runs, thread, models.data]);
-}
-
-/** A lost session or a failed last turn, with a fresh start that hands the conversation over. */
-function SessionRecovery({ session, agent, disabled, onRestart }: { session: NonNullable<ThreadSummary["session"]>; agent: AgentKind; disabled: boolean; onRestart: () => void }) {
-  if (session.status !== "lost" && session.status !== "error") return null;
-  return (
-    <div data-blocking="true" className="rounded-xl bg-bad-soft px-4 py-3 text-base">
-      <div className="flex items-start gap-2.5">
-        <AlertCircle size={16} className="text-bad mt-0.5 shrink-0" />
-        <div className="min-w-0 flex-1 grid gap-2">
-          <div className="text-ink">{session.status === "lost" ? `${harnessShortName(agent)} no longer has this session.` : "The last turn failed."}</div>
-          {session.message ? <div className="text-ink-2 whitespace-pre-wrap break-words max-h-24 overflow-auto">{session.message}</div> : null}
-          <div className="flex items-center gap-2">
-            <Button size="sm" variant="primary" disabled={disabled} onClick={onRestart}>
-              {session.status === "lost" ? "Start a fresh session with a handoff" : "Retry with a fresh session"}
-            </Button>
-            {session.status === "error" ? <span className="text-xs text-ink-2">Or send a message to resume.</span> : null}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
 }

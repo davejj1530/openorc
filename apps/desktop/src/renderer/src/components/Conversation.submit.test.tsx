@@ -1,4 +1,4 @@
-import { act, cleanup, render } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { AgentEvent, AgentKind, PermissionPreset, Project, Run, RunMode, ThreadSummary } from "@openorc/protocol";
@@ -57,8 +57,8 @@ const thread = (overrides: Partial<ThreadSummary>) =>
     ...overrides,
   }) as unknown as ThreadSummary;
 
-/** Opens the conversation over the given runs and submits through the composer the way a person would. */
-async function submit(options: { thread?: Partial<ThreadSummary>; runs?: RunSpec[]; text?: string; attachments?: string[]; now?: boolean }) {
+/** Opens the conversation over the given runs, settled. */
+async function open(options: { thread?: Partial<ThreadSummary>; runs?: RunSpec[] }) {
   const runs = options.runs ?? [];
   for (const spec of runs) live.set(spec.id, spec.live);
   queries.set("runs.listForThread", runs.map(run));
@@ -69,6 +69,11 @@ async function submit(options: { thread?: Partial<ThreadSummary>; runs?: RunSpec
   );
   for (let i = 0; i < 6; i++) await act(async () => void (await new Promise((resolve) => setTimeout(resolve, 0))));
   act(() => runStore.flush());
+}
+
+/** Opens the conversation over the given runs and submits through the composer the way a person would. */
+async function submit(options: { thread?: Partial<ThreadSummary>; runs?: RunSpec[]; text?: string; attachments?: string[]; now?: boolean }) {
+  await open(options);
   try {
     await act(async () => composer.props!.onSubmit(options.text ?? "hello", options.attachments ?? [], options.now ?? false));
   } catch (error) {
@@ -149,4 +154,16 @@ it.each([
   { name: "refuses to send without a model", thread: { model: null }, expected: { error: "Choose a model first." } },
 ] as Array<{ name: string; thread?: Partial<ThreadSummary>; runs?: RunSpec[]; text?: string; attachments?: string[]; now?: boolean; expected: unknown }>)("$name", async ({ expected, ...options }) => {
   expect(await submit(options)).toEqual(expected);
+});
+
+it("offers the other signed-in Claude accounts after a usage limit, and goes on with the one chosen", async () => {
+  const account = (id: string, name: string, status: string) => ({ id, name, kind: "managed", enabled: true, createdAt: 1, status, email: null, organization: null, message: null });
+  queries.set("claude.accounts.list", { defaultId: "work", accounts: [account("work", "Work", "ready"), account("personal", "Personal", "ready"), account("old", "Old", "signed_out")] });
+  const session = { status: "error", message: "You've hit your 5-hour limit", recovery: { kind: "usage", provider: "claude" } } as const;
+  await open({ thread: { agent: "claude", model: "opus", claudeAccountId: "work", session }, runs: [{ id: "A", agent: "claude", live: false }] });
+  expect(screen.queryByRole("button", { name: /Old/ })).toBeNull();
+  await act(async () => void fireEvent.click(screen.getByRole("button", { name: "Continue with Personal" })));
+  expect(vi.mocked(core.call).mock.calls.filter(([method]) => sends.has(method))).toEqual(
+    start(true, { agent: "claude", model: "opus", prompt: "Continue where you left off.", claudeAccountId: "personal" }),
+  );
 });

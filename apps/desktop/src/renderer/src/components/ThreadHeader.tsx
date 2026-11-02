@@ -2,7 +2,7 @@ import { snoozeWakeLabel } from "@openorc/client";
 import type { CloudThreadState, Project, ThreadSummary as Thread } from "@openorc/protocol";
 import { Menu } from "@base-ui/react/menu";
 import { AlarmClock, ArrowLeft, Cloud, GitFork, GitPullRequest, MoreHorizontal, X } from "./icons";
-import { ThreadClaudeAccount } from "./ClaudeAccountPicker";
+import { ThreadClaudeAccount } from "./ThreadClaudeAccount";
 import { ThreadMenuItems } from "./ThreadActions";
 import { ThreadOrcling } from "./OrclingAvatar";
 import { ThreadTitle } from "./ThreadTitle";
@@ -107,7 +107,7 @@ export function ThreadHeader({
         <span className="thread-header-project" title={p.rootPath}>
           {p.name}
         </span>
-        {t.agent === "claude" ? <ThreadClaudeAccount /> : null}
+        {t.agent === "claude" ? <ThreadClaudeAccount thread={t} /> : null}
         <ThreadFacts thread={t} />
       </span>
     </TopBar>

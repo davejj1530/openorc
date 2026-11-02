@@ -3,10 +3,13 @@ import type { ClaudeAccountConnection, ModelOption, RpcMethod, RpcParams } from 
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { client } from "../client";
 import { NewThreadScreen } from "../new-thread/NewThreadScreen";
 import type { FakeMac } from "../test-fixtures/fake-mac";
 import { nativeProps } from "../test-fixtures/react-native";
+import { ComposerChips } from "./ComposerChips";
 import { ModelSheet } from "./ModelSheet";
+import { useShareSettings } from "./settings-bridge";
 
 /** A Mac with Claude signed in on its CLI login and a Work account, one account turned off, and a start the test answers. */
 const mac = vi.hoisted(() => {
@@ -56,6 +59,7 @@ function macState({ harness = "claude", accounts }: { harness?: "claude" | "code
   ];
   mac.reads["app.settings.get"] = { defaultWorkspaceMode: "worktree", defaultPermissionMode: "review", defaultHarness: harness };
   mac.reads["claude.accounts.list"] = { defaultId: "claude-cli", accounts };
+  mac.reads["cloud.offer"] = { offered: false, provider: null };
 }
 
 beforeEach(() => {
@@ -75,7 +79,7 @@ async function open() {
     </>,
     { wrapper: mac.phone!.wrapper },
   );
-  await waitFor(() => expect(screen.getByRole("button", { name: /^Model, / })).toBeTruthy());
+  await waitFor(() => expect(screen.getByRole("button", { name: /^Model, (?!Model$)/ })).toBeTruthy());
 }
 
 const write = (prompt: string) => act(() => (nativeProps.get(screen.getByLabelText("Message"))!.onChangeText as (text: string) => void)(prompt));
@@ -128,4 +132,119 @@ it.each([
   await waitFor(() => expect(mac.calls.some((call) => call.method === "claude.accounts.list")).toBe(true));
   await act(async () => undefined);
   expect(screen.queryByRole("button", { name: /^Claude account/ })).toBeNull();
+});
+
+it.each(["claude", "codex"] as const)("starts a %s thread with Fast requested from the model sheet", async (harness) => {
+  macState({ harness, accounts: [mac.account("claude-cli", "Claude")] });
+  mac.reads["agents.models"] = [mac.claude, mac.codex].map((model) => ({ ...model, fastMode: { supported: true } }));
+  await open();
+  const toggle = screen.getByRole("switch", { name: "Fast mode" });
+  expect(toggle.getAttribute("aria-checked")).toBe("false");
+  expect(toggle.hasAttribute("disabled")).toBe(false);
+  fireEvent.click(toggle);
+  await screen.findByRole("button", { name: /Fast mode requested/ });
+  expect(toggle.getAttribute("aria-checked")).toBe("true");
+
+  write("Fix the build");
+  mac.start.mockResolvedValue({ thread: { id: "thread-1" } });
+  await waitFor(() => expect(screen.getByRole("button", { name: "Start" }).hasAttribute("disabled")).toBe(false));
+  await start();
+  expect(mac.start.mock.calls[0]![0]).toMatchObject({ agent: harness, fastMode: true });
+});
+
+it.each([
+  { capability: { supported: false, reason: "Usage credits are off for this account." }, reason: "Usage credits are off for this account." },
+  { capability: undefined, reason: "Fast mode availability was not reported. Try Refresh models." },
+])("keeps Fast off and explains why when the catalog says $reason", async ({ capability, reason }) => {
+  macState({ accounts: [mac.account("claude-cli", "Claude")] });
+  mac.reads["agents.models"] = [{ ...mac.claude, fastMode: capability }];
+  await open();
+  expect(screen.getByRole("switch", { name: "Fast mode" }).hasAttribute("disabled")).toBe(true);
+  expect(screen.getByText(reason)).toBeTruthy();
+  fireEvent.click(screen.getByRole("switch", { name: "Fast mode" }));
+  expect(screen.queryByRole("button", { name: /Fast mode requested/ })).toBeNull();
+});
+
+it("clears Fast when choosing a model that cannot run it", async () => {
+  macState({ accounts: [mac.account("claude-cli", "Claude")] });
+  mac.reads["agents.models"] = [
+    { ...mac.claude, fastMode: { supported: true } },
+    { ...mac.claude, id: "standard", label: "Standard", isDefault: false, fastMode: { supported: false, reason: "Standard does not support Fast mode." } },
+  ];
+  await open();
+  fireEvent.click(screen.getByRole("switch", { name: "Fast mode" }));
+  await screen.findByRole("button", { name: /Fast mode requested/ });
+  fireEvent.click(screen.getByRole("radio", { name: "Standard" }));
+  await screen.findByRole("button", { name: "Model, Standard" });
+  expect(screen.getByRole("switch", { name: "Fast mode" }).getAttribute("aria-checked")).toBe("false");
+  expect(screen.getByRole("switch", { name: "Fast mode" }).hasAttribute("disabled")).toBe(true);
+});
+
+it("waits for the chosen account's Fast eligibility instead of using the previous account's", async () => {
+  macState({ accounts: [mac.account("claude-cli", "Claude"), mac.account("work", "Work")] });
+  mac.reads["agents.models"] = [{ ...mac.claude, fastMode: { supported: true } }];
+  await open();
+  expect(screen.getByRole("switch", { name: "Fast mode" }).hasAttribute("disabled")).toBe(false);
+  const work = Promise.withResolvers<ModelOption[]>();
+  mac.reads["agents.models"] = work.promise;
+  fireEvent.click(screen.getByRole("button", { name: "Claude account, Claude" }));
+  fireEvent.click(screen.getByRole("menuitemradio", { name: "Work" }));
+  await screen.findByText("Loading Fast mode availability…");
+  expect(screen.getByRole("switch", { name: "Fast mode" }).hasAttribute("disabled")).toBe(true);
+  await act(async () => work.resolve([{ ...mac.claude, fastMode: { supported: false, reason: "Fast is turned off for Work." } }]));
+  await screen.findByText("Fast is turned off for Work.");
+  expect(screen.getByRole("switch", { name: "Fast mode" }).hasAttribute("disabled")).toBe(true);
+});
+
+/** An existing thread uses the same settings hook as ThreadScreen, keeping its own account. */
+function SavedThread() {
+  const settings = {
+    ...client.useConversationSettings({
+      thread: { id: "saved", agent: "claude", model: "opus", effort: "high", fastMode: true, mode: "act", permissionMode: "trusted" },
+      activeRun: undefined,
+    }),
+    claudeAccountId: "work",
+  };
+  useShareSettings("new-thread", settings);
+  return <ComposerChips composerId="new-thread" settings={settings} />;
+}
+
+it("keeps Fast configurable for a saved legacy model even though it is omitted from the model list", async () => {
+  mac.reads["agents.models"] = [{ ...mac.claude, legacy: true, fastMode: { supported: true } }];
+  render(
+    <>
+      <SavedThread />
+      <ModelSheet />
+    </>,
+    { wrapper: mac.phone!.wrapper },
+  );
+  await screen.findByRole("button", { name: "Model, Opus, Fast mode requested" });
+  expect(screen.queryByRole("radio", { name: "Opus" })).toBeNull();
+  const toggle = screen.getByRole("switch", { name: "Fast mode" });
+  fireEvent.click(toggle);
+  await screen.findByRole("button", { name: "Model, Opus" });
+  expect(toggle.hasAttribute("disabled")).toBe(false);
+  fireEvent.click(toggle);
+  await screen.findByRole("button", { name: "Model, Opus, Fast mode requested" });
+});
+
+it("uses an existing thread's account and lets its saved Fast request be turned off after eligibility is lost", async () => {
+  mac.reads["agents.models"] = [{ ...mac.claude, fastMode: { supported: false, reason: "Work has no Fast credits." } }];
+  render(
+    <>
+      <SavedThread />
+      <ModelSheet />
+    </>,
+    { wrapper: mac.phone!.wrapper },
+  );
+  await screen.findByRole("button", { name: "Model, Opus, Fast mode unavailable" });
+  expect(mac.calls).toContainEqual({ method: "agents.models", params: { claudeAccountId: "work" } });
+  expect(screen.queryByRole("button", { name: /^Claude account/ })).toBeNull();
+  const toggle = screen.getByRole("switch", { name: "Fast mode" });
+  expect(toggle.getAttribute("aria-checked")).toBe("true");
+  expect(toggle.hasAttribute("disabled")).toBe(false);
+  fireEvent.click(toggle);
+  await screen.findByRole("button", { name: "Model, Opus" });
+  await waitFor(() => expect(mac.calls).toContainEqual({ method: "threads.update", params: { id: "saved", patch: { agent: "claude", model: "opus", effort: "high", fastMode: false } } }));
+  expect(toggle.hasAttribute("disabled")).toBe(true);
 });

@@ -1,20 +1,50 @@
 import { modelChoiceFor, pickerCatalog, pickerSettings, providerGroups, catalogModel } from "@openorc/client";
 import { effortLabel, harnessShortName, isHarnessId, type ModelOption } from "@openorc/protocol";
 import { router, useLocalSearchParams } from "expo-router";
-import { Pressable, ScrollView, View } from "react-native";
+import { Pressable, ScrollView, Switch, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Check } from "../generated/icons";
+import { Check, Zap } from "../generated/icons";
 import { cn } from "../ui/cn";
 import { haptic } from "../ui/haptics";
 import { HarnessLogo } from "../ui/HarnessLogo";
+import { useColors } from "../ui/mode";
 import { Text } from "../ui/Text";
 import { useClaudeAccountChoice, useComposerModels } from "./claude-account";
 import { ClaudeAccountMenu } from "./ClaudeAccountMenu";
-import { useSharedSettings } from "./settings-bridge";
+import { useSharedSettings, type ComposerSettings } from "./settings-bridge";
+
+function FastModeControl({ settings, state }: { settings: ComposerSettings | undefined; state: ReturnType<typeof pickerSettings> }) {
+  const colors = useColors();
+  const choice = settings?.choice;
+  const { fast, fastAvailable, fastHint } = state;
+  return (
+    <View className="gap-1">
+      <View className="min-h-touch flex-row items-center gap-3">
+        <Zap size={16} className="text-ink-3" />
+        <Text className="flex-1 text-md">Fast mode</Text>
+        <Switch
+          accessibilityLabel="Fast mode"
+          accessibilityHint={fastHint}
+          value={fast}
+          disabled={!settings || !choice || (!fastAvailable && !fast)}
+          trackColor={{ false: colors["surface-3"], true: colors.ink }}
+          thumbColor={fast ? colors.bg : colors["ink-4"]}
+          ios_backgroundColor={colors["surface-3"]}
+          onValueChange={(enabled) => {
+            if (!settings || !choice || (enabled && !fastAvailable)) return;
+            haptic.select();
+            settings.selectModel({ ...choice, fastMode: enabled });
+          }}
+        />
+      </View>
+      {!fastAvailable ? <Text className="text-sm text-ink-4">{fastHint}</Text> : null}
+    </View>
+  );
+}
 
 /**
- * The models a composer can run, by harness: the current one checked, its effort levels as a segmented row below, and
- * on a new Claude thread the account it runs on, once the Mac has more than one.
+ * The models a composer can run, their effort and Fast mode, and on a new Claude thread the account it runs on,
+ * once the Mac has more than one.
  */
 export function ModelSheet() {
   const { composerId } = useLocalSearchParams<{ composerId: string }>();
@@ -24,8 +54,14 @@ export function ModelSheet() {
   const account = useClaudeAccountChoice(settings);
   const catalog = pickerCatalog(models.data ?? []).filter((model) => !model.legacy);
   const choice = settings?.choice ?? null;
-  const current = catalogModel(catalog, choice);
-  const { efforts, effort } = pickerSettings({ model: current, value: choice, loading: models.isLoading, failed: Boolean(models.error) });
+  const current = catalogModel(models.data, choice);
+  const state = pickerSettings({
+    model: models.isPlaceholderData ? undefined : current,
+    value: choice,
+    loading: models.isLoading || models.isPlaceholderData,
+    failed: Boolean(models.error),
+  });
+  const { efforts, effort } = state;
   const agents = [...new Set(catalog.map((model) => model.agent))];
   const pick = (model: ModelOption) => {
     if (!settings || model.unavailable) return;
@@ -60,6 +96,7 @@ export function ModelSheet() {
           </View>
         </View>
       ) : null}
+      <FastModeControl settings={settings} state={state} />
       {agents.map((agent) => (
         <View key={agent} className="gap-1">
           <View className="flex-row items-center gap-2 pb-1">

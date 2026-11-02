@@ -20,9 +20,9 @@ export function claudeAccountUnavailable(account: ClaudeAccountConnection): stri
   return null;
 }
 
-/** The models a composer offers: the chosen Claude account's catalog, else the Mac's default account's. */
+/** The models a composer offers: its thread's or draft's Claude account, else the Mac's default account. */
 export function useComposerModels(settings: ComposerSettings | undefined) {
-  const claudeAccountId = settings?.claudeAccount?.chosen;
+  const claudeAccountId = settings?.claudeAccount?.chosen ?? settings?.claudeAccountId;
   // The last account's list holds while the next one's loads, so the chip keeps its name.
   return useRpc("agents.models", claudeAccountId ? { claudeAccountId } : {}, { staleTime: 5 * 60_000, placeholderData: (previous) => previous });
 }

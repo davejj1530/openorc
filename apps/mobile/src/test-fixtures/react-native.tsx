@@ -79,6 +79,11 @@ export const Image = host("img");
 export const Modal = host("div");
 export const TextInput = host("input");
 
+/** iOS's switch, keeping its checked state and refusing changes while disabled. */
+export function Switch({ value, disabled, onValueChange, accessibilityLabel }: { value?: boolean; disabled?: boolean; onValueChange?: (value: boolean) => void; accessibilityLabel?: string }) {
+  return createElement("button", { role: "switch", "aria-label": accessibilityLabel, "aria-checked": Boolean(value), disabled, onClick: () => onValueChange?.(!value) });
+}
+
 type AlertButton = { text?: string; style?: string; onPress?: (value?: string) => void };
 /** Alerts and prompts the app showed, newest last; a test presses their buttons. */
 export const alerts: { title: string; message?: string; buttons?: AlertButton[]; defaultValue?: string }[] = [];

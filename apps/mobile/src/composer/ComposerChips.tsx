@@ -3,7 +3,7 @@ import { effortLabel, executionMode, executionModePresentation } from "@openorc/
 import { router } from "expo-router";
 import type { ReactNode } from "react";
 import { Keyboard, Pressable } from "react-native";
-import { Cloud, Laptop, Lightbulb, Pencil, ShieldCheck, Wand } from "../generated/icons";
+import { Cloud, Laptop, Lightbulb, Pencil, ShieldCheck, Wand, Zap } from "../generated/icons";
 import { cn } from "../ui/cn";
 import { HarnessLogo } from "../ui/HarnessLogo";
 import { Text } from "../ui/Text";
@@ -48,19 +48,26 @@ export function ComposerChips({ composerId, settings }: { composerId: string; se
   const models = useComposerModels(settings);
   const { choice } = settings;
   const model = catalogModel(models.data, choice);
-  const { effort } = pickerSettings({ model, value: choice, loading: models.isLoading, failed: Boolean(models.error) });
+  const { effort, fast, fastBlocked } = pickerSettings({
+    model: models.isPlaceholderData ? undefined : model,
+    value: choice,
+    loading: models.isLoading || models.isPlaceholderData,
+    failed: Boolean(models.error),
+  });
   const name = model?.label ?? choice?.model ?? "Model";
+  const fastLabel = fastBlocked ? "Fast mode unavailable" : "Fast mode requested";
   const mode = executionMode(settings.mode, settings.permission);
   const modeLabel = executionModePresentation(choice?.agent, mode).label;
   const ModeIcon = modeIcons[mode];
   return (
     <>
-      <Chip label={`Model, ${name}`} onPress={() => router.push({ pathname: "/model", params: { composerId } })}>
+      <Chip label={`Model, ${name}${fast ? `, ${fastLabel}` : ""}`} onPress={() => router.push({ pathname: "/model", params: { composerId } })}>
         {choice ? <HarnessLogo agent={choice.agent} size={13} /> : null}
         <Text numberOfLines={1} className="min-w-0 flex-shrink text-sm text-ink-2">
           {name}
         </Text>
         {effort ? <Text className="text-sm text-ink-4">{effortLabel(effort)}</Text> : null}
+        {fast ? <Zap size={13} className={fastBlocked ? "text-warn" : "text-ink-3"} /> : null}
       </Chip>
       <Chip label={`Mode, ${modeLabel}`} onPress={() => router.push({ pathname: "/mode", params: { composerId } })}>
         <ModeIcon size={13} className="text-ink-4" />

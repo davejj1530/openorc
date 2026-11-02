@@ -121,7 +121,7 @@ export function ThreadScreen() {
   const runsQuery = useRpc("runs.listForThread", { threadId: id });
   const runs = runsQuery.data ?? NO_RUNS;
   const activeRun = runs.at(-1);
-  const settings = client.useConversationSettings({ thread, activeRun });
+  const settings = { ...client.useConversationSettings({ thread, activeRun }), claudeAccountId: thread?.claudeAccountId ?? undefined };
   useShareSettings(id, settings);
   useMarkSeen(thread);
   useCoverHome();

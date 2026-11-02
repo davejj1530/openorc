@@ -112,6 +112,11 @@
       "name": "lazy-val",
       "version": "1.0.5",
       "distribution": "desktop"
+    },
+    {
+      "name": "typescript",
+      "version": "5.9.3",
+      "distribution": "desktop"
     }
   ],
   "files": [
@@ -646,6 +651,20 @@
       "desktop": {
         "resource": "licenses/vendor/lazy-val-1.0.5.package.json"
       }
+    },
+    {
+      "id": "typescript-Apache",
+      "input": "apps/desktop/node_modules/typescript/LICENSE.txt",
+      "source": { "package": "typescript", "version": "5.9.3", "path": "LICENSE.txt" },
+      "sha256": "a7d00bfd54525bc694b6e32f64c7ebcf5e6b7ae3657be5cc12767bce74654a47",
+      "desktop": { "asar": "node_modules/typescript/LICENSE.txt" }
+    },
+    {
+      "id": "typescript-third-party",
+      "input": "apps/desktop/node_modules/typescript/ThirdPartyNoticeText.txt",
+      "source": { "package": "typescript", "version": "5.9.3", "path": "ThirdPartyNoticeText.txt" },
+      "sha256": "1af3c68039c57e539422da82a4faada506ce6d0ea6f90e0b699d02dbcdb7a90c",
+      "desktop": { "asar": "node_modules/typescript/ThirdPartyNoticeText.txt" }
     },
     {
       "id": "devicon-MIT",

@@ -7,7 +7,7 @@ import { windowPorts } from "./reply";
 import { basename, join } from "node:path";
 import { Worker } from "node:worker_threads";
 import type { MessagePortMain } from "electron";
-import { OpenOrc, WorkerEmbedder, WorkerFormatter, type Broadcast, type EnvSnapshot, type RequestOrigin, type RpcReply, type SpawnTerminal, type Transport } from "@openorc/core";
+import { OpenOrc, WorkerEmbedder, WorkerFormatter, WorkerIntelligence, type Broadcast, type EnvSnapshot, type RequestOrigin, type RpcReply, type SpawnTerminal, type Transport } from "@openorc/core";
 import type { RpcRequest } from "@openorc/protocol";
 
 /**
@@ -80,6 +80,7 @@ const corePromise = OpenOrc.create({
   embedder: new WorkerEmbedder(() => new Worker(join(import.meta.dirname, "embedder-worker.mjs"), { workerData: { cacheDir: dataDir } })),
   // Prettier formats in its own thread too, so a large file never stalls the core.
   formatter: new WorkerFormatter(() => new Worker(join(import.meta.dirname, "formatter-worker.mjs"))),
+  intelligence: new WorkerIntelligence(() => new Worker(join(import.meta.dirname, "intelligence-worker.mjs"), { resourceLimits: { maxOldGenerationSizeMb: 1024 } })),
   benchmarks: __OPENORC_QA__,
   // As the window's own menus offer them: development and QA builds, until cloud threads ship.
   cloudOffered: __OPENORC_QA__,

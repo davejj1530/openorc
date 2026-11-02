@@ -40,6 +40,8 @@ The installed dependency graph is broader than the shipped application. Website 
 
 Electron's MIT license and Chromium notice collection accompany the app under `licenses/electron/`. Supplemental sqlite-vec, ONNX Runtime, Rive, and JavaScript dependency notices are preserved under `licenses/vendor/`, including MIT sections otherwise stripped with package READMEs. [The manifest](licenses/manifest.json) records pinned sources, reviewed versions, hashes, and artifact destinations.
 
+The desktop editor uses the unmodified TypeScript 5.9.3 language service under Apache-2.0. Its original `LICENSE.txt` and `ThirdPartyNoticeText.txt` accompany the runtime in `app.asar/node_modules/typescript/` and are checked by the distribution manifest.
+
 Additional Rive notices preserve borrowed Skia source, libhydrogen, Microsoft and Unicode shaping data, and Emscripten runtime collections. Historical tokenizer notices preserve 68 sections for 34 crate versions evidenced in the former Darwin binary. [Native notice evidence](docs/native-notice-evidence.md) and the source inventories under `licenses/` distinguish reviewed texts from complete binary inventories.
 
 The native `@anush008/tokenizers` dependency has been replaced by **`@huggingface/tokenizers@0.2.0`**, an Apache-2.0 JavaScript implementation. Its original license is preserved at `licenses/vendor/huggingface-tokenizers-Apache.txt`. The [MiniLM adaptation](docs/tokenizer-replacement.md) preserves the existing model and inference behavior. The old native notices remain historical evidence; they do not imply that those binaries are still distributed or that their complete compiled inventory was established.

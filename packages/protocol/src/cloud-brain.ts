@@ -100,7 +100,8 @@ export type CloudBrainStatus =
       claude: string[];
       /** The Claude sign-ins changed on this Mac since they were last sent. */
       behind: boolean;
-      working: "waking" | "sending" | null;
+      /** Updating: installing this build's brain, or restarting it onto the one installed. */
+      working: "waking" | "sending" | "updating" | null;
       error: string | null;
     }
   | { state: "removing" };

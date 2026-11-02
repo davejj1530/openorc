@@ -3,8 +3,10 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  BrainRefused,
   BrainUnavailable,
   brainKeyText,
+  brainVersionNewer,
   openHandover,
   type BrainAccess,
   type BrainControlRequest,
@@ -35,6 +37,15 @@ class FakeBrain implements BrainMachineLike {
   key: BrainKey | null = null;
   handovers: HandoverClaudeAccount[][] = [];
   wakes: WakeResult = { state: "ready", address: "sb-fixture.vercel.run", version: "v1" };
+  /** The bundle on its machine, and the one its brain runs; null while no brain runs. */
+  installed: string | null = null;
+  running: string | null = null;
+  /** Why the brain will not stop for an update: work running, or a brain from before such stops. */
+  refusesUpdate: string | null = null;
+  /** It stops for an update, but its answer never arrives. */
+  losesStopReply = false;
+  upload: () => Promise<void> = async () => undefined;
+  beforeWake: () => Promise<void> = async () => undefined;
 
   async status() {
     this.calls.push("status");
@@ -42,20 +53,30 @@ class FakeBrain implements BrainMachineLike {
   }
   async provision(bundle: { version: string; archive: Buffer }, options: { region?: string } = {}) {
     this.calls.push(`provision ${bundle.version} ${bundle.archive.toString()} ${options.region}`);
+    await this.upload();
     if (this.state === "missing") this.state = "stopped";
-    return { installed: bundle.version, running: null };
+    if (!this.installed || !brainVersionNewer(this.installed, bundle.version)) this.installed = bundle.version;
+    return { installed: this.installed, running: this.running };
   }
   async wake(input: { key: BrainKey; name: string }) {
     this.calls.push("wake");
-    if (this.wakes.state === "ready") {
-      this.key = input.key;
-      this.state = "running";
-    }
-    return this.wakes;
+    await this.beforeWake();
+    if (this.wakes.state !== "ready") return this.wakes;
+    if (this.state !== "running") this.running = null;
+    this.key = input.key;
+    this.state = "running";
+    this.running ??= this.installed;
+    return { ...this.wakes, version: this.running ?? this.wakes.version };
   }
   async control(request: BrainControlRequest): Promise<never> {
     this.calls.push(`control ${request.op}`);
-    if (this.state !== "running" || !this.key) throw new BrainUnavailable();
+    if (this.state !== "running" || !this.key || !this.running) throw new BrainUnavailable();
+    if (request.op === "stop-for-update") {
+      if (this.refusesUpdate) throw new BrainRefused(this.refusesUpdate);
+      this.running = null;
+      if (this.losesStopReply) throw new Error("The brain did not answer stop-for-update.");
+      return { stopping: true } as never;
+    }
     if (request.op === "handover") {
       this.handovers.push(openHandover(this.key, request).claude!.accounts);
       return { applied: ["claude"] } as never;
@@ -80,6 +101,8 @@ let brain: FakeBrain;
 let record: ReturnType<typeof memoryStore>;
 let invalidated: string[];
 let teamId: string;
+/** The brain this Mac's build carries. */
+let carried: string;
 const rpc = rpcClient(() => core);
 
 async function open(options: Partial<OpenOrcOptions> = {}): Promise<void> {
@@ -90,7 +113,7 @@ async function open(options: Partial<OpenOrcOptions> = {}): Promise<void> {
     claudeCloudSecrets: memoryStore(),
     cloudBrainSecrets: record,
     cloudCredentials: async () => ({ token: VERCEL_TOKEN, teamId, projectId: "prj_sandboxes" }),
-    cloudBrainBundle: async () => ({ version: "v1", read: async () => Buffer.from("archive") }),
+    cloudBrainBundle: async () => ({ version: carried, read: async () => Buffer.from("archive") }),
     cloudBrainMachine: async (access, create) => {
       brain.access.push(access);
       brain.opens.push({ create, saved: record.saved.length });
@@ -114,6 +137,7 @@ beforeEach(async () => {
   record = memoryStore();
   invalidated = [];
   teamId = "team_fixture";
+  carried = "v1";
   await open();
 });
 
@@ -268,6 +292,154 @@ describe("the cloud brain from the Mac", () => {
     record.saved.push('{"key": SECRETKEYTEXT-0123456789}');
     const shown = await status();
     expect(shown).toEqual({ state: "none", error: "Cannot access protected storage for the cloud brain. Unlock your OS keychain and retry." });
+  });
+
+  describe("updating it", () => {
+    const OLD = "20261101120000-aaaaaaaaaaaa";
+    const NEW = "20261102120000-bbbbbbbbbbbb";
+    const BUSY = "Wait for agent work, approvals, and context maintenance to finish before restarting to update.";
+    /** A brain set up from a build carrying OLD, asleep unless `awake`, now woken from a build carrying `now`. */
+    async function setUpOn(now: string, { awake = false } = {}): Promise<void> {
+      carried = OLD;
+      await setUp();
+      if (!awake) brain.state = "stopped";
+      brain.calls = [];
+      carried = now;
+    }
+
+    it("installs this build's newer brain before waking it, so the brain starts on it, then nothing more", async () => {
+      await setUpOn(NEW);
+      await rpc("cloud.brain.wake", {});
+      expect(brain.calls).toEqual(["status", `provision ${NEW} archive sin1`, "wake", "status"]);
+      expect(brain.running).toBe(NEW);
+      expect(stored()).toMatchObject({ version: NEW });
+      brain.state = "stopped";
+      brain.calls = [];
+      await rpc("cloud.brain.pair", {});
+      expect(brain.calls).toEqual(["wake", "control pair"]);
+    });
+
+    it("never puts an older brain on its machine: a build carrying one leaves a newer brain alone, and still uses it", async () => {
+      carried = NEW;
+      await setUp();
+      brain.state = "stopped";
+      brain.calls = [];
+      carried = OLD;
+      expect((await rpc("cloud.brain.pair", {})).url).toBe("openorc://pair#v1.fixture");
+      expect(brain.calls).toEqual(["wake", "control pair"]);
+      expect([brain.installed, brain.running]).toEqual([NEW, NEW]);
+
+      // A record from before versions were kept asks the machine, which keeps its newer brain, and is told so.
+      record.saved.push(JSON.stringify({ ...stored(), version: undefined }));
+      await core.close();
+      await open();
+      await rpc("cloud.brain.wake", {});
+      expect([brain.installed, brain.running, stored()]).toEqual([NEW, NEW, expect.objectContaining({ version: NEW })]);
+      brain.calls = [];
+      await rpc("cloud.brain.wake", {});
+      expect(brain.calls).toEqual(["wake", "status"]);
+    });
+
+    it("restarts a brain running an older one onto the new one only once nothing would be cut short", async () => {
+      await setUpOn(NEW, { awake: true });
+      brain.refusesUpdate = BUSY;
+      expect((await rpc("cloud.brain.pair", {})).url).toBe("openorc://pair#v1.fixture");
+      expect(brain.calls).toEqual(["status", `provision ${NEW} archive sin1`, "wake", "control stop-for-update", "control pair"]);
+      expect(brain.running).toBe(OLD);
+      expect(await status()).toMatchObject({ working: null, error: null });
+
+      brain.refusesUpdate = null;
+      brain.calls = [];
+      await rpc("cloud.brain.wake", {});
+      expect(brain.calls).toEqual(["wake", "control stop-for-update", "wake", "status"]);
+      expect(brain.running).toBe(NEW);
+    });
+
+    it("starts the brain again when a stop for an update goes unanswered, since it may have stopped", async () => {
+      await setUpOn(NEW, { awake: true });
+      brain.losesStopReply = true;
+      expect((await rpc("cloud.brain.pair", {})).url).toBe("openorc://pair#v1.fixture");
+      expect(brain.calls).toEqual(["status", `provision ${NEW} archive sin1`, "wake", "control stop-for-update", "wake", "control pair"]);
+      expect(brain.running).toBe(NEW);
+    });
+
+    it("installs this build's brain again once the machine went back to an older one, rather than restarting onto it forever", async () => {
+      await setUpOn(NEW);
+      await rpc("cloud.brain.wake", {});
+      brain.installed = OLD;
+      brain.running = OLD;
+      brain.calls = [];
+      await rpc("cloud.brain.wake", {});
+      expect(brain.calls).toEqual(["wake", "control stop-for-update", "wake", "status"]);
+      expect(stored()).toMatchObject({ version: OLD });
+      brain.calls = [];
+      await rpc("cloud.brain.wake", {});
+      expect(brain.calls).toEqual(["status", `provision ${NEW} archive sin1`, "wake", "control stop-for-update", "wake", "status"]);
+      expect(brain.running).toBe(NEW);
+      brain.calls = [];
+      await rpc("cloud.brain.wake", {});
+      expect(brain.calls).toEqual(["wake", "status"]);
+    });
+
+    it("restarts an idle brain running an older one when set up again, showing the setup's own steps meanwhile", async () => {
+      await setUpOn(NEW, { awake: true });
+      let restart: (() => void) | undefined;
+      brain.beforeWake = async () => {
+        if (brain.calls.filter((call) => call === "wake").length === 2) await new Promise<void>((resolve) => (restart = resolve));
+      };
+      await rpc("cloud.brain.create", { region: "sin1" });
+      await vi.waitFor(() => expect(restart).toBeDefined());
+      expect(await status()).toEqual({ state: "setting-up", region: "sin1", step: "start" });
+      restart!();
+      await vi.waitFor(async () => expect((await status()).state).toBe("ready"));
+      expect(brain.calls.filter((call) => call !== "status")).toEqual([`provision ${NEW} archive sin1`, "wake", "control stop-for-update", "wake", "control handover"]);
+      expect(brain.running).toBe(NEW);
+    });
+
+    it("keeps a brain from before stops for an update running, and hands it the sign-ins all the same", async () => {
+      await core.claudeCloudTokens.save(DEFAULT_CLAUDE_ACCOUNT, PERSONAL);
+      await setUpOn(NEW, { awake: true });
+      brain.refusesUpdate = "The brain's control request is not valid: op is missing or wrong.";
+      const work = core.claudeAccounts.add("Work");
+      await core.claudeCloudTokens.save(work.id, WORK);
+      await vi.waitFor(() => expect(brain.handovers).toHaveLength(2));
+      expect(brain.running).toBe(OLD);
+      await vi.waitFor(async () => expect(await status()).toMatchObject({ claude: ["Existing CLI login", "Work"], behind: false, working: null, error: null }));
+    });
+
+    it("shows it updating while it installs, without the status waking the brain", async () => {
+      await setUpOn(NEW);
+      let uploaded!: () => void;
+      brain.upload = () => new Promise((resolve) => (uploaded = resolve));
+      const woken = rpc("cloud.brain.wake", {});
+      await vi.waitFor(async () => expect(await status()).toMatchObject({ working: "updating" }));
+      expect(brain.calls).not.toContain("wake");
+      uploaded();
+      expect(await woken).toMatchObject({ machine: "awake", working: null, error: null });
+    });
+
+    it("starts the brain on what it has when the update fails, says why, and updates it the next time", async () => {
+      await setUpOn(NEW);
+      brain.upload = async () => {
+        throw new Error(`Upload refused for ${VERCEL_TOKEN}.`);
+      };
+      expect((await rpc("cloud.brain.pair", {})).url).toBe("openorc://pair#v1.fixture");
+      expect(brain.running).toBe(OLD);
+      expect(await status()).toMatchObject({ error: "The cloud brain could not be updated. Upload refused for [redacted]." });
+
+      brain.upload = async () => undefined;
+      expect(await rpc("cloud.brain.wake", {})).toMatchObject({ working: null, error: null });
+      expect(brain.running).toBe(NEW);
+    });
+
+    it("leaves a brain whose machine is gone to be set up again, instead of installing on an empty one", async () => {
+      await setUpOn(NEW);
+      brain.state = "missing";
+      brain.wakes = { state: "needs-provision", detail: "The brain's sandbox does not exist." };
+      await rpc("cloud.brain.wake", {});
+      expect(brain.calls.filter((call) => call.startsWith("provision"))).toEqual([]);
+      expect(await status()).toMatchObject({ state: "incomplete", error: expect.stringContaining("needs setting up again") });
+    });
   });
 
   it("offers no brain in a build without one", async () => {

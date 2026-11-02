@@ -1,4 +1,15 @@
-import { BrainMachine, brainKeyFrom, brainKeyText, newBrainKey, sealHandover, type BrainAccess, type BrainMachineStatus, type HandoverClaudeAccount } from "@openorc/cloud";
+import {
+  BrainMachine,
+  BrainRefused,
+  brainKeyFrom,
+  brainKeyText,
+  brainVersionNewer,
+  newBrainKey,
+  sealHandover,
+  type BrainAccess,
+  type BrainMachineStatus,
+  type HandoverClaudeAccount,
+} from "@openorc/cloud";
 import { claudeAccounts, redact, type Db } from "@openorc/db";
 import type { BrainRegion, CloudBrainMachine, CloudBrainPairing, CloudBrainStatus, CloudBrainStep } from "@openorc/protocol";
 import type { ClaudeCloudTokens } from "./claude-cloud-tokens.js";
@@ -9,7 +20,7 @@ const BRAIN_NAME = "Cloud";
 const storageError = "Cannot access protected storage for the cloud brain. Unlock your OS keychain and retry.";
 const unavailable = "The cloud brain isn't available in this build.";
 
-/** A brain this build can install. Read only when setting one up, since it is tens of megabytes. */
+/** A brain this build can install. Read only when installing it, since it is tens of megabytes. */
 export interface BrainBundleSource {
   version: string;
   read(): Promise<Buffer>;
@@ -41,9 +52,20 @@ interface Stored {
   /** The brain has started once; until then setting up again keeps this key and region. */
   ready: boolean;
   claude: Sent[];
+  /** The brain installed on its machine, as this Mac last installed or found it. Records from before lack it. */
+  version?: string;
 }
 
-type Activity = { kind: "setting-up"; step: CloudBrainStep } | { kind: "removing" } | { kind: "waking" } | { kind: "sending" };
+type Activity = { kind: "setting-up"; step: CloudBrainStep } | { kind: "removing" } | { kind: "waking" } | { kind: "sending" } | { kind: "updating" };
+
+/** What a ready brain shows it is at while each operation runs. */
+const WORKING: Record<Activity["kind"], Extract<CloudBrainStatus, { state: "ready" }>["working"]> = {
+  "setting-up": null,
+  removing: null,
+  waking: "waking",
+  sending: "sending",
+  updating: "updating",
+};
 
 const MACHINE: Record<BrainMachineStatus["state"], CloudBrainMachine | "missing"> = {
   running: "awake",
@@ -68,9 +90,9 @@ export interface CloudBrainDeps {
 }
 
 /**
- * The cloud brain as this Mac sets it up and hands it sign-ins: its key, team, region and what it was last sent, in
- * protected storage; the machine itself through BrainMachine. One operation runs at a time; the status answers
- * between them and never wakes the brain.
+ * The cloud brain as this Mac sets it up, keeps it on this build's brain and hands it sign-ins: its key, team, region,
+ * installed version and what it was last sent, in protected storage; the machine itself through BrainMachine. One
+ * operation runs at a time; the status answers between them and never wakes the brain.
  */
 export class CloudBrain {
   private pending: Promise<unknown> = Promise.resolve();
@@ -100,7 +122,7 @@ export class CloudBrain {
     if (!stored.ready) return { state: "incomplete", region: stored.region, error: this.error };
     const { machine, error } = await this.look(stored);
     if (machine === "missing") return { state: "incomplete", region: stored.region, error: this.error ?? "The cloud brain's machine is gone." };
-    const working = this.activity?.kind === "waking" || this.activity?.kind === "sending" ? this.activity.kind : null;
+    const working = this.activity ? WORKING[this.activity.kind] : null;
     const behind = !sameSent((await this.claude().catch(() => [])).map(sent), stored.claude);
     return { state: "ready", region: stored.region, machine, claude: stored.claude.map((account) => account.name), behind, working, error: this.error ?? error };
   }
@@ -115,7 +137,8 @@ export class CloudBrain {
 
   /**
    * Makes the brain in the region and sets it up in the background, its progress in the status. Again after a failure,
-   * or on a brain that is set up, it keeps the key and region it has and installs this build's brain.
+   * or on a brain that is set up, it keeps the key and region it has and installs this build's brain, unless the
+   * machine has a newer one.
    */
   async create(region: BrainRegion): Promise<void> {
     const source = await this.serialize(() => this.prepare(region)).catch(async (error: unknown) => {
@@ -199,9 +222,10 @@ export class CloudBrain {
 
   private async setUp(source: BrainBundleSource): Promise<void> {
     const machine = await this.machine(true);
-    await machine.provision({ version: source.version, archive: await source.read() }, { region: (await this.stored()).region });
+    const { installed } = await machine.provision({ version: source.version, archive: await source.read() }, { region: (await this.stored()).region });
+    await this.write({ ...(await this.stored()), version: installed });
     this.step("start");
-    await this.wakeUp(machine);
+    await this.startInstalled(machine);
     this.step("sign-ins");
     await this.send(machine);
   }
@@ -211,14 +235,76 @@ export class CloudBrain {
     this.changed();
   }
 
+  /**
+   * Starts the brain unless it runs, on this build's brain when that is newer than the one its machine has: installed
+   * first, so the brain starts on it. Never installs an older one; a failed update leaves the brain on what it has.
+   */
   private async wakeUp(machine: BrainMachineLike): Promise<void> {
+    await this.update(machine).catch(async (error: unknown) => {
+      this.error = `The cloud brain could not be updated. ${await this.scrub(error)}`;
+    });
+    await this.startInstalled(machine);
+  }
+
+  /**
+   * Starts the brain unless it runs. A brain running an older one than its machine has restarts onto it unless that
+   * would cut work short, else at its next start.
+   */
+  private async startInstalled(machine: BrainMachineLike): Promise<void> {
+    const running = await this.start(machine);
+    const installed = (await this.stored()).version;
+    if (!installed || !brainVersionNewer(installed, running)) return;
+    await this.updating(async () => {
+      try {
+        await machine.control({ op: "stop-for-update" });
+      } catch (error) {
+        // Work runs, or a brain from before such stops: it starts on the new one next time. Any other failure may have
+        // stopped it, so it starts again.
+        if (error instanceof BrainRefused) return;
+      }
+      const restarted = await this.start(machine);
+      // What a fresh start runs is what the machine has, behind the record once its disk went back to an older
+      // snapshot. Recorded, the next wake installs this build's brain again.
+      if (restarted !== installed) await this.write({ ...(await this.stored()), version: restarted });
+    });
+  }
+
+  /** Installs this build's brain when it was built after the one on the brain's machine. */
+  private async update(machine: BrainMachineLike): Promise<void> {
+    const stored = await this.stored();
+    const source = await this.deps.bundle?.();
+    if (!source || (stored.version !== undefined && !brainVersionNewer(source.version, stored.version))) return;
+    // Installing makes a machine that is gone, empty; waking it says it needs setting up again instead.
+    if ((await machine.status()).state === "missing") return;
+    await this.updating(async () => {
+      const { installed } = await machine.provision({ version: source.version, archive: await source.read() }, { region: stored.region });
+      await this.write({ ...(await this.stored()), version: installed });
+    });
+  }
+
+  /** Shows the brain updating while `work` runs, then what the operation showed before. Setup shows its own steps. */
+  private async updating(work: () => Promise<void>): Promise<void> {
+    const before = this.activity;
+    if (before?.kind === "setting-up") return work();
+    this.activity = { kind: "updating" };
+    this.changed();
+    try {
+      await work();
+    } finally {
+      this.activity = before;
+      this.changed();
+    }
+  }
+
+  /** Starts the brain unless it runs, and says which version runs. */
+  private async start(machine: BrainMachineLike): Promise<string> {
     const stored = await this.stored();
     const vcpus = (await this.deps.vercel())?.vcpus;
     const result = await machine.wake({ key: brainKeyFrom(stored.key), name: BRAIN_NAME, ...(vcpus ? { threadVcpus: vcpus } : {}) });
     switch (result.state) {
       case "ready":
         if (!stored.ready || stored.address !== result.address) await this.write({ ...stored, ready: true, address: result.address });
-        return;
+        return result.version;
       case "needs-provision":
         await this.write({ ...stored, ready: false });
         throw new Error(`The cloud brain needs setting up again. ${result.detail}`);

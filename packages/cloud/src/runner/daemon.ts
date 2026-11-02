@@ -3,7 +3,9 @@ import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSyn
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import net from "node:net";
+import os from "node:os";
 import path from "node:path";
+import { fileBoundaryAnswer } from "./file-boundary.ts";
 import { encodeFrame, frameReader, RUNNER_VERSION, type ClientFrame, type OutputStream, type ProcessExit, type ProcessState, type RunnerFrame } from "./wire.ts";
 
 const STREAMS: OutputStream[] = ["stdout", "stderr"];
@@ -45,7 +47,7 @@ export class RunnerDaemon {
   private readonly requests = new Map<string, http.ServerResponse>();
   private nextRequest = 0;
   private readonly handlers: Handlers = {
-    hello: () => this.send({ op: "welcome", version: RUNNER_VERSION, processes: [...this.processes.values()].map(processState) }),
+    hello: () => this.send({ op: "welcome", version: RUNNER_VERSION, home: os.homedir(), processes: [...this.processes.values()].map(processState) }),
     spawn: (frame) => this.spawn(frame),
     attach: (frame) => this.attach(frame),
     stdin: (frame) => this.input(frame),
@@ -136,6 +138,11 @@ export class RunnerDaemon {
     this.processes.set(frame.id, managed);
     let child: ChildProcess;
     try {
+      for (const dir of frame.dirs ?? []) mkdirSync(dir, { recursive: true });
+      for (const file of frame.files ?? []) {
+        mkdirSync(path.dirname(file.path), { recursive: true, mode: 0o700 });
+        writeFileSync(file.path, file.content, { mode: 0o600 });
+      }
       // Its own process group, so a signal reaches whatever the agent started too.
       child = spawn(frame.cmd, frame.args, { cwd: frame.cwd, env: { ...process.env, ...frame.env }, stdio: "pipe", detached: true });
     } catch (error) {
@@ -249,6 +256,12 @@ export class RunnerDaemon {
     const body: Buffer[] = [];
     request.on("data", (chunk: Buffer) => body.push(chunk));
     request.on("end", () => {
+      // The check needs this VM's files, so it is answered here, and works while the Mac is away.
+      const boundary = /\/file-boundary$/.test(new URL(request.url ?? "/", "http://runner").pathname);
+      if (boundary && request.method === "POST") {
+        answerBoundary(request.url ?? "/", Buffer.concat(body), response);
+        return;
+      }
       if (!this.client) {
         response.writeHead(503, { "content-type": "application/json" }).end(JSON.stringify({ error: "OpenOrc on the Mac is not connected." }));
         return;
@@ -261,6 +274,15 @@ export class RunnerDaemon {
       const headers = flattenHeaders(request.headers);
       this.send({ op: "http", req, name, method: request.method ?? "GET", url: request.url ?? "/", headers, body: Buffer.concat(body).toString("base64") });
     });
+  }
+}
+
+function answerBoundary(url: string, body: Buffer, response: http.ServerResponse): void {
+  try {
+    const answer = fileBoundaryAnswer(new URL(url, "http://runner").searchParams, JSON.parse(body.toString("utf8")));
+    response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(answer));
+  } catch (error) {
+    response.writeHead(400, { "content-type": "application/json" }).end(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }));
   }
 }
 

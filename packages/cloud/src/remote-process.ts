@@ -13,6 +13,9 @@ export interface RemoteCommand {
   args: string[];
   cwd: string;
   env: Record<string, string>;
+  /** Written in the VM, readable only by its user, before the command starts. */
+  files?: { path: string; content: string }[];
+  dirs?: string[];
 }
 
 /** How a remote process reaches its runner. Each call is a no-op while disconnected; the reconnect resends. */
@@ -109,7 +112,8 @@ export class RemoteProcess extends EventEmitter {
   finish(exit: ProcessExit): void {
     if (this.exit) return;
     this.exit = exit;
-    this.exitCode = exit.code;
+    // A command that never started has no exit code; 127 is what a shell reports for one it cannot find.
+    this.exitCode = exit.code ?? (exit.error ? 127 : null);
     this.signalCode = (exit.signal ?? (exit.lost ? "SIGKILL" : null)) as NodeJS.Signals | null;
     for (const input of this.unacked.splice(0)) input.done(new Error("The process has exited."));
     if (exit.error && this.listenerCount("error") > 0) this.emit("error", new Error(exit.error));

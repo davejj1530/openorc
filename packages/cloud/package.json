@@ -16,6 +16,8 @@
     "@openorc/git": "workspace:*"
   },
   "devDependencies": {
+    "@openorc/mcp": "workspace:*",
+    "@openorc/protocol": "workspace:*",
     "@types/node": "^24.0.0",
     "typescript": "^5.9.0",
     "vitest": "^4.1.11"

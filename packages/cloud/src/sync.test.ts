@@ -119,3 +119,21 @@ describe("cloud workspace sync", () => {
     expect(result.changed).toBe(true);
   });
 });
+
+describe("cloud workspace sync with commits made on the Mac", () => {
+  it("keeps a Mac commit the sandbox lacks under a ref when the branch follows the sandbox", async () => {
+    const state = await seedWorkspace(location, "main");
+    file(mirror, "mac.txt", "committed on the Mac\n");
+    git(mirror, "add", "mac.txt");
+    git(mirror, "commit", "-q", "-m", "mac commit");
+    const macCommit = git(mirror, "rev-parse", "HEAD");
+    file(location.repo, "cloud.txt", "cloud\n");
+    git(location.repo, "add", "cloud.txt");
+    git(location.repo, "commit", "-q", "-m", "cloud commit");
+
+    const pulled = await pullWorkspace(location, state);
+    expect(git(mirror, "rev-parse", "HEAD")).toBe(git(location.repo, "rev-parse", "HEAD"));
+    expect(pulled.keptLocalCommit).toMatch(/^refs\/openorc\/cloud\/t1\/kept-commit\/\d+$/);
+    expect(git(mirror, "rev-parse", pulled.keptLocalCommit!)).toBe(macCommit);
+  });
+});

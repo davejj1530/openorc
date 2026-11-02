@@ -103,7 +103,7 @@ describe("RunnerClient", () => {
     const errors: Error[] = [];
     proc.on("error", (error: Error) => errors.push(error));
     const out = collect(proc);
-    expect((await out.closed)[0]).toBeNull();
+    expect((await out.closed)[0]).toBe(127);
     expect(errors[0]?.message).toMatch(/ENOENT/);
   });
 

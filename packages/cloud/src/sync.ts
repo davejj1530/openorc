@@ -72,6 +72,8 @@ export interface PullResult {
   branch: string | null;
   /** Edits made in the mirror since the last pull. The pull replaced them; this ref keeps them. */
   keptLocalEdits: string | null;
+  /** A commit made in the mirror that the sandbox's branch does not contain. The pull moved the branch; this ref keeps it. */
+  keptLocalCommit: string | null;
 }
 
 async function fetchSnapshot(location: WorkspaceLocation, result: SnapshotResult): Promise<void> {
@@ -92,6 +94,19 @@ async function fetchSnapshot(location: WorkspaceLocation, result: SnapshotResult
   }
 }
 
+/** Moves the mirror's branch to the sandbox's commit. A commit made on the Mac that the sandbox lacks is kept under a ref first. */
+async function followHead({ mirror, refPrefix }: WorkspaceLocation, head: string | null): Promise<{ moved: boolean; kept: string | null }> {
+  const local = (await git(mirror, ["rev-parse", "HEAD"])).stdout.trim();
+  if (head === null || local === head) return { moved: false, kept: null };
+  let kept: string | null = null;
+  if ((await git(mirror, ["merge-base", "--is-ancestor", local, head], { okCodes: [0, 1] })).code === 1) {
+    kept = `${refPrefix}kept-commit/${Date.now()}`;
+    await pinObject(mirror, kept, local);
+  }
+  await git(mirror, ["reset", "-q", "--mixed", head]);
+  return { moved: true, kept };
+}
+
 /**
  * Brings the VM's files and commits to the mirror. Sync runs one way: the VM is the only writer. Edits made in the
  * mirror since the last pull are kept under a ref before they are replaced, never discarded. Ignored files such as
@@ -100,7 +115,7 @@ async function fetchSnapshot(location: WorkspaceLocation, result: SnapshotResult
 export async function pullWorkspace(location: WorkspaceLocation, state: MirrorState): Promise<PullResult> {
   const { install, mirror, refPrefix, repo } = location;
   const result = await runRunner<SnapshotResult>(install, "snapshot", ["--repo", repo, ...state.known.flatMap((sha) => ["--known", sha])]);
-  if (result.snapshot === state.snapshot) return { state, changed: false, head: result.head, branch: result.branch, keptLocalEdits: null };
+  if (result.snapshot === state.snapshot) return { state, changed: false, head: result.head, branch: result.branch, keptLocalEdits: null, keptLocalCommit: null };
   await fetchSnapshot(location, result);
   const current = await treeHash(mirror);
   let keptLocalEdits: string | null = null;
@@ -111,13 +126,13 @@ export async function pullWorkspace(location: WorkspaceLocation, state: MirrorSt
     await pinObject(mirror, keptLocalEdits, kept);
   }
   if (current !== result.tree) await switchFiles(mirror, current, result.tree);
-  const moved = result.head !== null && (await git(mirror, ["rev-parse", "HEAD"])).stdout.trim() !== result.head;
-  if (moved) await git(mirror, ["reset", "-q", "--mixed", result.head!]);
+  const { moved, kept: keptLocalCommit } = await followHead(location, result.head);
   return {
     state: { snapshot: result.snapshot, tree: result.tree, known: [result.snapshot] },
     changed: moved || current !== result.tree,
     head: result.head,
     branch: result.branch,
     keptLocalEdits,
+    keptLocalCommit,
   };
 }

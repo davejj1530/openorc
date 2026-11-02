@@ -23,9 +23,15 @@ export interface ProcessState {
   exit: ProcessExit | null;
 }
 
+/** Written before the process starts, readable only by the VM's user. */
+export interface SpawnFile {
+  path: string;
+  content: string;
+}
+
 export type ClientFrame =
   | { op: "hello" }
-  | { op: "spawn"; id: string; cmd: string; args: string[]; cwd: string; env: Record<string, string> }
+  | { op: "spawn"; id: string; cmd: string; args: string[]; cwd: string; env: Record<string, string>; files?: SpawnFile[]; dirs?: string[] }
   | { op: "attach"; id: string; stdout: number; stderr: number }
   | { op: "stdin"; id: string; at: number; data: string }
   | { op: "stdin-end"; id: string; at: number }
@@ -37,7 +43,7 @@ export type ClientFrame =
   | { op: "http-end"; req: string };
 
 export type RunnerFrame =
-  | { op: "welcome"; version: number; processes: ProcessState[] }
+  | { op: "welcome"; version: number; home: string; processes: ProcessState[] }
   | { op: "spawned"; id: string }
   | { op: "out"; id: string; stream: OutputStream; at: number; data: string }
   | { op: "exit"; id: string; exit: ProcessExit }

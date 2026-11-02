@@ -63,13 +63,14 @@ type FrameHandlers = { [K in RunnerFrame["op"]]: (frame: Extract<RunnerFrame, { 
 export class RunnerClient {
   private stream: SandboxStream | null = null;
   private closed = false;
-  private welcome: ((processes: ProcessState[]) => void) | null = null;
+  private welcome: ((frame: Extract<RunnerFrame, { op: "welcome" }>) => void) | null = null;
+  private vmHome = "";
   private readonly processes = new Map<string, RemoteProcess>();
   private readonly signals = new Map<string, string>();
   private readonly relays = new Map<string, Relay>();
   private readonly requests = new Map<string, AbortController>();
   private readonly handlers: FrameHandlers = {
-    welcome: (frame) => this.welcome?.(frame.processes),
+    welcome: (frame) => this.welcome?.(frame),
     spawned: (frame) => this.processes.get(frame.id)?.markStarted(),
     out: (frame) => this.processes.get(frame.id)?.receive(frame.stream, frame.at, Buffer.from(frame.data, "base64")),
     exit: (frame) => this.processes.get(frame.id)?.finish(frame.exit),
@@ -101,6 +102,11 @@ export class RunnerClient {
 
   get connected(): boolean {
     return this.stream !== null;
+  }
+
+  /** The home folder of the VM's user. */
+  get home(): string {
+    return this.vmHome;
   }
 
   /** Starts a process in the VM. It keeps running while the Mac is away. */
@@ -149,7 +155,7 @@ export class RunnerClient {
     stream.output.on("data", (chunk: Buffer) => read(chunk));
     void stream.ended.then(() => this.lost(stream));
     try {
-      const processes = await new Promise<ProcessState[]>((resolve, reject) => {
+      const welcome = await new Promise<Extract<RunnerFrame, { op: "welcome" }>>((resolve, reject) => {
         const timer = setTimeout(() => reject(new Error("The cloud workspace's runner did not answer.")), WELCOME_TIMEOUT_MS);
         this.welcome = (value) => {
           clearTimeout(timer);
@@ -159,7 +165,8 @@ export class RunnerClient {
         stream.input.write(encodeFrame({ op: "hello" }));
       });
       this.stream = stream;
-      this.resume(processes);
+      this.vmHome = welcome.home;
+      this.resume(welcome.processes);
       this.onState("connected");
       return stream;
     } catch (error) {
@@ -232,9 +239,14 @@ export class RunnerClient {
       const headers = Object.fromEntries(Object.entries(frame.headers).filter(([name]) => !HOP_HEADERS.has(name)));
       const body = frame.method === "GET" || frame.method === "HEAD" ? undefined : Buffer.from(frame.body, "base64");
       const response = await fetch(new URL(frame.url, relay.target), { method: frame.method, headers, body: body ?? null, signal: controller.signal });
-      this.send({ op: "http-head", req: frame.req, status: response.status, headers: Object.fromEntries([...response.headers].filter(([name]) => !HOP_HEADERS.has(name))) });
+      const answer: Record<string, string> = {};
+      response.headers.forEach((value, name) => {
+        if (!HOP_HEADERS.has(name)) answer[name] = value;
+      });
+      this.send({ op: "http-head", req: frame.req, status: response.status, headers: answer });
       answered = true;
-      if (response.body) for await (const chunk of response.body) this.send({ op: "http-data", req: frame.req, data: Buffer.from(chunk).toString("base64") });
+      const reader = response.body?.getReader();
+      for (let chunk = await reader?.read(); chunk && !chunk.done; chunk = await reader?.read()) this.send({ op: "http-data", req: frame.req, data: Buffer.from(chunk.value).toString("base64") });
     } catch {
       if (controller.signal.aborted) return;
       if (!answered) this.send({ op: "http-head", req: frame.req, status: 502, headers: {} });

@@ -134,6 +134,11 @@ export class CloudWorkspaceService {
     this.codex = options.codex ?? new CloudCodex(undefined);
   }
 
+  /** A sandbox being built, synced or stopped, or held awake for an agent's process, an idle one included. */
+  get busy(): boolean {
+    return this.progress.size > 0 || this.syncs.size > 0 || this.stopping.size > 0 || this.awake.holding;
+  }
+
   /** Checks a new cloud conversation and picks where it runs. Call before admitting it. */
   /** The provider a new cloud conversation runs on. Refused before anything is made when its account cannot sign in there. */
   async place(input: Pick<StartThreadInput, "agent" | "checkout" | "claudeAccountId">, project: Project): Promise<CloudProviderId> {

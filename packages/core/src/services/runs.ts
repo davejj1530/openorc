@@ -618,14 +618,6 @@ export class RunService {
     }
   }
 
-  /** The thread asks for something its process was spawned with: agent, mode or permissions. Only a new process can serve it. */
-
-  /**
-   * Bring an idle process up to the thread's model, effort and speed without replacing it. Resolves false when the
-   * provider cannot take the change, or effort is being reset, so the caller restarts with the new settings.
-   * Fast is checked against the account and model first, as a restart would check it.
-   */
-
   async interrupt(runId: string): Promise<void> {
     const entry = this.live.get(runId);
     if (entry) entry.questionsInterrupted = true;
@@ -710,11 +702,15 @@ export class RunService {
     return matchesContinueSettings(entry, desired);
   }
 
+  /** Agent work that closing would cut short: a start, a turn or a command left running, an exit, finalizing, compacting or an approval. */
+  get busy(): boolean {
+    if (this.starting.size || this.startOperations.size || this.finalizations.size || this.compactions.size || this.approvals.pendingCount) return true;
+    return [...this.live.values()].some((entry) => occupied(entry) || entry.exiting || entry.closingRequested);
+  }
+
   /** Atomically refuse a restart or fence new turns before the caller begins shutdown. */
   prepareForUpdate(): boolean {
-    if (this.agentUpdateReserved) return false;
-    if (this.closing || this.starting.size || this.startOperations.size || this.finalizations.size || this.compactions.size || this.approvals.pendingCount) return false;
-    if ([...this.live.values()].some((entry) => occupied(entry) || entry.exiting || entry.closingRequested)) return false;
+    if (this.agentUpdateReserved || this.closing || this.busy) return false;
     this.closing = true;
     return true;
   }

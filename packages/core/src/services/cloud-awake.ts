@@ -31,6 +31,11 @@ export class CloudAwake {
     },
   ) {}
 
+  /** Some VM is held, or lingers before it is let go. */
+  get holding(): boolean {
+    return this.held.size > 0;
+  }
+
   /** Keeps the conversation's VM awake until the returned function is called. Calling it again does nothing. */
   hold(threadId: string, sandbox: Sandbox): () => void {
     const entry = this.held.get(threadId) ?? this.start(threadId, sandbox);

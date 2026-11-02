@@ -497,6 +497,20 @@ describe("coordinator live direction transport", () => {
     expect(service.isLive(run.id)).toBe(false);
     expect(runs.get(db, run.id)?.state).toBe("success");
   });
+
+  it("reads as busy from a start until its turn settles, without fencing new work", async () => {
+    const input = permissionLead(permissionTeam());
+    const starting = service.start(input);
+    expect(service.busy).toBe(true);
+    const run = await starting;
+    expect(service.busy).toBe(true);
+    emit(run.id, { type: "turn.completed", runId: run.id, ts: Date.now(), turnId: "done", durationMs: 1, status: "success" });
+    await vi.waitFor(() => expect(hooks.onTurnSettled).toHaveBeenCalled());
+    expect(service.isLive(run.id)).toBe(true);
+    expect(service.busy).toBe(false);
+    await service.send(run.id, "The next turn");
+    expect(service.busy).toBe(true);
+  });
 });
 
 describe("live team permissions", () => {

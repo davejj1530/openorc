@@ -9,6 +9,7 @@ import { harnessAvailability, harnessInfo, harnessInstalled, harnessLoggedIn, rp
 import { randomBytes, randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
+import { busyReason, fenceForUpdate, type BusyReason } from "./activity.js";
 import { BenchGenerator } from "./bench.js";
 import { FrameCoalescer } from "./frames.js";
 import { createAttachmentsHandlers } from "./handlers/attachments.js";
@@ -686,17 +687,16 @@ export class OpenOrc {
     if (blocked) throw new Error("This team-owned operation is not available in the team execution preview. Its work and history are preserved; use team direction or Stop.");
   }
 
+  /** Why closing now would cut something short, or null when nothing would. */
+  busy(): BusyReason | null {
+    return busyReason(this);
+  }
+
   /** Called without yielding after the desktop has fenced incoming RPCs. A successful reservation is followed by close(). */
   prepareForUpdate(): string | null {
-    if (this.agentUpdates.get().updating) return "Wait for agent updates to finish before restarting.";
-    if (this.memory.hasPendingWork) return "Wait for memory processing to finish before restarting to update.";
-    if (teamRuntime.openIds(this.db).length) return "Finish or stop your active teams before restarting to update.";
-    if (this.schedules.hasPendingWork) return "A schedule is starting a thread. Try again when it has started.";
-    if (this.runs.backgroundCommandsRunning) return "Stop the background commands running in your conversations before restarting to update.";
-    if (!this.runs.prepareForUpdate()) return "Wait for agent work, approvals, and context maintenance to finish before restarting to update.";
-    this.schedules.stopAccepting();
-    this.closingForUpdate = true;
-    return null;
+    const refusal = fenceForUpdate(this);
+    if (refusal === null) this.closingForUpdate = true;
+    return refusal;
   }
 
   async close(): Promise<void> {

@@ -138,3 +138,22 @@ describe("where cloud conversations run", () => {
     await expect(cloud.location(record, path.join(directory, "mirror"))).rejects.toThrow("Connect Vercel in Settings to run in the cloud.");
   });
 });
+describe("a cloud workspace's busy signal", () => {
+  it("reads busy while a new conversation's sandbox is built and held, and idle once it has stopped", async () => {
+    const quick = new LocalSandboxProvider(path.join(directory, "quick"), () => process.env, 400);
+    const cloud = new CloudWorkspaceService(db, { providers: [quick] }, quiet);
+    const workspaces = new WorkspaceService(db, { dataDir: path.join(directory, "quick-data"), cloud }, quiet, new WorkspaceWriters());
+    const thread = db.transaction(() => {
+      const row = threads.insert(db, { projectId: project.id, title: "Busy", agent: "claude", model: null, mode: "act", permissionMode: "trusted", workspaceMode: "worktree" });
+      workspaces.admitCloud(row.id, "local");
+      return row;
+    });
+    expect(cloud.busy).toBe(false);
+    const preparing = workspaces.prepareThread(thread, project, "HEAD");
+    await vi.waitFor(() => expect(cloud.busy).toBe(true));
+    await preparing;
+    await vi.waitFor(() => expect(cloud.busy).toBe(false), { timeout: 5_000 });
+    await workspaces.shutdown();
+    await cloud.close();
+  });
+});

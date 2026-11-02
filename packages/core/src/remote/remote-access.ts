@@ -135,6 +135,11 @@ export class RemoteAccess {
     return this.converge();
   }
 
+  /** A phone is connected, as Settings counts one: someone is looking at this host. */
+  get busy(): boolean {
+    return [...this.sessions].some((session) => session.live);
+  }
+
   async status(): Promise<RemoteStatus> {
     await this.work;
     const connected = new Set([...this.sessions].filter((session) => session.live).map((session) => session.deviceId));

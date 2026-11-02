@@ -22,9 +22,10 @@ export function createRunsHandlers({
   dataDir,
 }: Dependencies): Pick<Handlers, "runs.start" | "runs.send" | "runs.interrupt" | "runs.close" | "runs.listForTask" | "runs.listForThread"> {
   return {
-    "runs.start": async ({ taskId, threadId, workspaceMode, agent, model, effort, fastMode, attachments, mode, permissionMode, prompt, resume }) => {
-      if (threadId) return threadService.continueThread(threadId, { agent, model, effort, fastMode, attachments, mode, permissionMode, prompt, fresh: resume === false });
+    "runs.start": async ({ taskId, threadId, workspaceMode, agent, model, effort, fastMode, attachments, mode, permissionMode, prompt, resume, claudeAccountId }) => {
+      if (threadId) return threadService.continueThread(threadId, { agent, model, effort, fastMode, attachments, mode, permissionMode, prompt, fresh: resume === false, claudeAccountId });
       if (!taskId) throw new Error("runs.start needs a taskId or a threadId");
+      if (claudeAccountId) throw new Error("A task goes on with the Claude account it ran on.");
       const { task } = taskAndProject(db, taskId);
       const images = await new AttachmentService(dataDir).forTask(task.spec ?? "");
       return threadService.startTaskInThread(taskId, workspaceMode, images, { agent, model, effort, fastMode, attachments, mode, permissionMode, prompt, fresh: resume === false });

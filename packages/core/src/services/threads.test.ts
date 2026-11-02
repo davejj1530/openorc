@@ -1128,6 +1128,11 @@ describe("thread lifecycle", () => {
     expect(core.threads.get(t.id)?.session.status).toBe("lost");
     core.db.stmt("UPDATE runs SET error = ? WHERE id = ?").run("API Error: 500", "run-lost");
     expect(core.threads.get(t.id)?.session.status).toBe("error");
+    core.db.stmt("UPDATE runs SET error = ? WHERE id = ?").run("You've hit your 5-hour limit", "run-lost");
+    const limited = { kind: "usage", provider: "claude" } as const;
+    core.ledger.push({ type: "activity.updated", runId: "run-lost", ts: Date.now(), activityId: "rate-limit", label: "Rate limit reached", status: "error", recovery: limited });
+    core.ledger.flush();
+    expect(core.threads.get(t.id)?.session).toEqual({ status: "error", message: "You've hit your 5-hour limit", recovery: limited });
   });
 
   it("marks runs the previous instance left open as interrupted", () => {

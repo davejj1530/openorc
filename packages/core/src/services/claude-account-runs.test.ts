@@ -1,8 +1,8 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { RunHandle, type AgentLaunchEnvironment } from "@openorc/agents";
+import { claudeConfigDir, RunHandle, type AgentLaunchEnvironment } from "@openorc/agents";
 import { Db, LedgerWriter, projects, runs, threads } from "@openorc/db";
 import { git } from "@openorc/git";
 import type { Project, RunSpec } from "@openorc/protocol";
@@ -23,6 +23,7 @@ let service: RunService;
 let workspace: WorkspaceService;
 let conversations: ThreadService;
 let project: Project;
+let folder: (accountId: string) => string;
 const quiet = { info() {}, warn() {}, error() {} };
 const start = vi.fn((_spec: RunSpec, _launch: AgentLaunchEnvironment): RunHandle => {
   throw new Error("Fixture not ready");
@@ -36,6 +37,7 @@ beforeEach(async () => {
   project = projects.insert(db, { name: "Fixture", rootPath: root, gitRemote: null, defaultBranch: "main", settings: {} });
   const writers = new WorkspaceWriters();
   const environment = new ShellEnvironment({ env: process.env });
+  folder = (id) => claudeConfigDir(undefined, accounts.environment(environment.current(), id).env);
   accounts = new ClaudeAccountService(
     db,
     root,
@@ -88,6 +90,9 @@ beforeEach(async () => {
     quiet,
     async () => null,
     writers,
+    undefined,
+    undefined,
+    folder,
   );
 });
 afterEach(async () => {
@@ -130,6 +135,30 @@ it("launches three accounts independently and keeps the saved account when resum
   const calls = start.mock.calls.length;
   await expect(conversations.continueThread(first.thread.id, input)).rejects.toThrow(/disabled/);
   expect(start).toHaveBeenCalledTimes(calls);
+});
+
+it("goes on with another account by carrying the conversation's session there, or hands off without it", async () => {
+  const [work, personal] = ["Work", "Personal"].map((name) => accounts.add(name).id) as [string, string];
+  const { thread, run } = await conversations.start({ ...input, projectId: project.id, claudeAccountId: work });
+  await service.closeAndWait(run!.id);
+  runs.update(db, run!.id, { externalSessionId: "work-session", state: "error", error: "You've hit your 5-hour limit" });
+  const sessions = path.join(folder(work), "projects", "-fixture");
+  await mkdir(sessions, { recursive: true });
+  await writeFile(path.join(sessions, "work-session.jsonl"), '{"type":"user"}\n');
+
+  const moved = await conversations.continueThread(thread.id, { ...input, prompt: "Continue where you left off.", claudeAccountId: personal });
+  const [spec, launch] = start.mock.lastCall!;
+  expect([spec.resumeSessionId, spec.forkSession, path.basename(launch.env.CLAUDE_CONFIG_DIR!)]).toEqual(["work-session", true, personal]);
+  expect(spec.systemPromptAppendix ?? "").not.toContain("Handoff:");
+  expect(await readFile(path.join(folder(personal), "projects", "-fixture", "work-session.jsonl"), "utf8")).toBe('{"type":"user"}\n');
+  expect([moved.claudeAccountId, threads.get(db, thread.id)?.claudeAccountId]).toEqual([personal, personal]);
+
+  await service.closeAndWait(moved.id);
+  runs.update(db, moved.id, { externalSessionId: "personal-session", state: "success" });
+  const back = await conversations.continueThread(thread.id, { ...input, claudeAccountId: work });
+  const [fresh] = start.mock.lastCall!;
+  expect([back.claudeAccountId, fresh.resumeSessionId]).toEqual([work, undefined]);
+  expect(fresh.systemPromptAppendix).toContain("Handoff:");
 });
 
 it("captures the default on new threads and records the account even if a launch fails", async () => {

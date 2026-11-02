@@ -33,7 +33,7 @@ import { RunLive } from "./run-live.js";
 import { McpAppService } from "./mcp-apps.js";
 import { RunProcess } from "./run-process.js";
 import { RunProgress } from "./run-progress.js";
-import { isSessionLost, RunSettlement } from "./run-settlement.js";
+import { failedSession, RunSettlement } from "./run-settlement.js";
 import { matchesContinueSettings, RunTurns } from "./run-turns.js";
 import {
   occupied,
@@ -402,7 +402,7 @@ export class RunService {
     if (live) return { status: "live", message: null };
     const last = runs.listForThread(this.db, threadId).at(-1);
     if (!last || last.state !== "error") return { status: "idle", message: null };
-    return { status: isSessionLost(last.error) ? "lost" : "error", message: last.error };
+    return failedSession(this.db, last);
   }
 
   /**

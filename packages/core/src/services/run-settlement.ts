@@ -1,7 +1,7 @@
 import { realpath } from "node:fs/promises";
-import { checkpoints, redact, runCosts, runs, snapshots, tasks, threads, type Db, type LedgerWriter } from "@openorc/db";
+import { checkpoints, listEvents, redact, runCosts, runs, snapshots, tasks, threads, type Db, type LedgerWriter } from "@openorc/db";
 import { diffStat, pinObject, treeHash, worktree } from "@openorc/git";
-import type { Project, Run, Task, Thread } from "@openorc/protocol";
+import type { Project, Run, Task, Thread, ThreadSession } from "@openorc/protocol";
 import type { OpenOrcMcpServer } from "@openorc/mcp";
 import { checkpointRefs, snapshotRefs } from "./checkpoint-refs.js";
 import { noticeLine } from "./notice-text.js";
@@ -16,6 +16,14 @@ export function isSessionLost(message: string | null): boolean {
   return /no conversation found|\b(session|thread|rollout)\b.*\b(not found|does not exist|unknown|missing|could not be (found|loaded))|\b(not found|unknown|missing)\b.*\b(session|thread)\b/i.test(
     message,
   );
+}
+
+/** The session behind a failed run: lost when the provider forgot it, else failed, with the way back its error named. */
+export function failedSession(db: Db, run: Run): ThreadSession {
+  if (isSessionLost(run.error)) return { status: "lost", message: run.error };
+  for (const event of listEvents(db, run.id, { kinds: ["activity.updated"], newest: true, limit: 20 }))
+    if (event.type === "activity.updated" && event.recovery) return { status: "error", message: run.error, recovery: event.recovery };
+  return { status: "error", message: run.error };
 }
 
 /** A reply as one line, short enough for a notification. */

@@ -1,6 +1,6 @@
 import { CloudThreadState } from "./cloud.js";
 import { z } from "zod";
-import { AgentKind, BackgroundCommand, Usage } from "./events.js";
+import { ActivityRecovery, AgentKind, BackgroundCommand, Usage } from "./events.js";
 import { HarnessId } from "./harness.js";
 import { ExecutionTarget, TeamRevision } from "./orchestration.js";
 
@@ -152,6 +152,8 @@ export type ThreadActivity = z.infer<typeof ThreadActivity>;
 export const ThreadSession = z.object({
   status: z.enum(["live", "idle", "lost", "error"]),
   message: z.string().nullable(),
+  /** The way back the failed run named, such as a usage limit. */
+  recovery: ActivityRecovery.optional(),
 });
 export type ThreadSession = z.infer<typeof ThreadSession>;
 

@@ -2,7 +2,7 @@ import { ClaudeAccountService } from "./services/claude-accounts.js";
 import { claudeRunAccount } from "./services/claude-run-account.js";
 import { createClaudeAccountHandlers } from "./handlers/claude-accounts.js";
 import { invalidParamsMessage, resultSummary } from "./handlers/diagnostics.js";
-import { captureLaunchEnvironment, recoverAgentProcesses } from "@openorc/agents";
+import { captureLaunchEnvironment, claudeConfigDir, recoverAgentProcesses } from "@openorc/agents";
 import { Db, LedgerWriter, orchestration, plans, redact, settings as storedSettings, taskForwardings, tasks, teamDeletedThreads, teamRuntime, threads } from "@openorc/db";
 import { startMcpServer, type OpenOrcMcpServer } from "@openorc/mcp";
 import { harnessAvailability, harnessInfo, harnessInstalled, harnessLoggedIn, rpcParams, type HarnessId, type RpcMethod, type RpcRequest } from "@openorc/protocol";
@@ -300,6 +300,7 @@ export class OpenOrc {
       this.workspaceWriters,
       (id) => this.teams.modeChanged(id),
       (id) => this.previewGone(id),
+      (id) => claudeConfigDir(undefined, this.claudeAccounts.environment(this.environment.current(), id).env),
     );
     this.comments = new TaskCommentService(db, this.runs, this.threads, invalidate, options.dataDir);
     this.orchestration = new OrchestrationService(

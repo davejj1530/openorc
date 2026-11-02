@@ -312,6 +312,8 @@ export const rpcParams = {
     permissionMode: PermissionPreset,
     prompt: z.string().min(1),
     resume: z.boolean().optional(),
+    /** A conversation goes on with another Claude account: this turn and the next ones run there, resuming its session. */
+    claudeAccountId: ClaudeAccountId.optional(),
   }),
   "runs.send": z.object({ runId: z.string(), text: z.string().min(1), attachments: z.array(z.string()).optional() }),
   "runs.interrupt": z.object({ runId: z.string() }),

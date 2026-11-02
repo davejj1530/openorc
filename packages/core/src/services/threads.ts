@@ -40,6 +40,7 @@ import path from "node:path";
 import type { Logger } from "../transport.js";
 import { teamQuiescenceReason } from "./thread-team-quiescence.js";
 import { titleFromPrompt, type StartThreadInput, type ThreadPatch, type ThreadTitler } from "./thread-inputs.js";
+import { switchedClaudeAccount, ThreadSessions, type ClaudeFolder } from "./thread-session.js";
 import { inUnvettedCopy } from "./review-copies.js";
 import type { RunService } from "./runs.js";
 import type { WorkspaceService } from "./workspace.js";
@@ -69,6 +70,7 @@ export class ThreadService {
   private readonly messageQueue: ThreadMessageQueue;
   private readonly taskExecution: ThreadTaskExecution;
   private readonly agentTools: ThreadAgentTools;
+  private readonly sessions: ThreadSessions;
 
   constructor(
     private readonly db: Db,
@@ -80,6 +82,7 @@ export class ThreadService {
     private readonly writers: WorkspaceWriters = workspaceWriters,
     private readonly onTeamModeChanged?: (threadId: string) => void,
     private readonly onDeleted?: (threadId: string) => void,
+    claudeFolder?: ClaudeFolder,
   ) {
     this.messageQueue = new ThreadMessageQueue(
       db,
@@ -107,6 +110,7 @@ export class ThreadService {
       withCheckoutBranches: (rows) => this.withCheckoutBranches(rows),
       start: (input, internal) => this.start({ ...input, cloud: false }, internal),
     });
+    this.sessions = new ThreadSessions({ db, runs, workspaces, log, claudeFolder, handoffFor: (...args) => this.agentTools.handoffFor(...args) });
   }
 
   list(filter: { projectId?: string; projectsOnly?: boolean; filter?: ThreadListFilter; limit?: number; offset?: number } = {}): ThreadSummary[] {
@@ -385,6 +389,8 @@ export class ThreadService {
       promptRole?: "user" | "system";
       recordPrompt?: boolean;
       fresh?: boolean;
+      /** Another Claude account the conversation goes on with from this turn. */
+      claudeAccountId?: string | undefined;
       workingDirectory?: string;
       baseRef?: string;
       onCreated?: (run: Run) => void;
@@ -402,13 +408,9 @@ export class ThreadService {
     if (folderChanged) input = { ...input, fresh: true };
     const own = runRepo.listForThread(this.db, thread.id).filter((run) => (run.orclingId ?? null) === (thread.orclingId ?? null));
     if (thread.projectId === WORKSPACE_ID && own.length && own.at(-1)?.agent !== input.agent) input = { ...input, fresh: true };
-    const handoff = this.agentTools.handoffFor(thread, own, input.agent, input.fresh);
-    await this.runs.validateFastMode(input.agent, input.model, input.fastMode, undefined, undefined, thread.claudeAccountId);
-    const previous = this.runs.liveRunForThread(id);
-    if (previous) {
-      if (this.runs.threadActivity(id) !== "idle") throw new Error("Wait for the current turn to finish before changing its session settings.");
-      await this.runs.closeAndWait(previous.id);
-    }
+    const account = switchedClaudeAccount(this.db, thread, input.agent, input.claudeAccountId);
+    await this.runs.validateFastMode(input.agent, input.model, input.fastMode, undefined, undefined, account ?? thread.claudeAccountId);
+    const session = await this.sessions.next(thread, own, input.agent, input.fresh, account);
     return this.writers.withLease(
       this.workspaces.threadPath(thread, project),
       `continuing thread ${id}`,
@@ -451,9 +453,7 @@ export class ThreadService {
           onCreated: input.onCreated,
           assertCanStart: input.assertCanStart,
           ...(input.promptRole ? { promptRole: input.promptRole } : {}),
-          resume: !input.fresh,
-          ...(input.fresh ? {} : (this.resumeSourceFor(fresh, input.agent) ?? {})),
-          ...(handoff ? { handoff } : {}),
+          ...session,
           workspaceLease,
         });
         if (input.promptRole !== "system") threads.update(this.db, thread.id, { seenAt: Date.now() });
@@ -463,13 +463,6 @@ export class ThreadService {
       undefined,
       { shared: true },
     );
-  }
-
-  /** A fork's first run continues its parent's session as a new one; the parent keeps its own history. */
-  private resumeSourceFor(thread: Thread, agent: AgentKind): { resumeFrom: { sessionId: string; fork: boolean } } | null {
-    if (!thread.forkedFromId || runRepo.lastSession(this.db, { threadId: thread.id }, agent, null, thread.claudeAccountId ?? undefined)) return null;
-    const parentSession = runRepo.lastSession(this.db, { threadId: thread.forkedFromId }, agent, null, thread.claudeAccountId ?? undefined);
-    return parentSession ? { resumeFrom: { sessionId: parentSession, fork: true } } : null;
   }
 
   /**

@@ -48,7 +48,7 @@ export function PhoneSettings({ active }: { active: boolean }) {
   );
 }
 
-const routeKinds: Record<Route["kind"], string> = { lan: "Same network", tailnet: "Tailscale" };
+const routeKinds: Record<Route["kind"], string> = { lan: "Same network", tailnet: "Tailscale", public: "Internet" };
 
 /** Where a phone can reach this Mac, closed until asked for. */
 function Addresses({ routes }: { routes: Route[] }) {

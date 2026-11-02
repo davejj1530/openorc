@@ -13,7 +13,7 @@ export interface LinkWords {
   detail: string;
 }
 
-const routeNames: Record<Exclude<LinkRoute["kind"], "demo">, string> = { lan: "Wi-Fi", tailnet: "Tailscale" };
+const routeNames: Record<Exclude<LinkRoute["kind"], "demo">, string> = { lan: "Wi-Fi", tailnet: "Tailscale", public: "Internet" };
 
 /** The demo Mac lives in the app: its name says what it is, and Settings says where. */
 const demoWords: LinkWords = { tone: "ok", status: null, spoken: "On this iPhone", detail: "On this iPhone" };

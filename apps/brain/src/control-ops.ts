@@ -18,9 +18,42 @@ export interface ControlContext {
 export type CoreOp = Exclude<BrainControlOp, "status" | "wake">;
 type Handlers = { [K in CoreOp]: (request: Extract<BrainControlRequest, { op: K }>) => Promise<BrainControlResults[K]> };
 
+/**
+ * The brain's Claude accounts follow the Mac's list: each account in it is made or renamed under the Mac's id and signs
+ * in with its token, and the Mac's default (else the first) is the brain's. Every other account loses its token.
+ */
+async function takeClaudeAccounts(core: OpenOrc, { accounts }: HandoverValues["claude"]): Promise<void> {
+  const tokens = core.claudeCloudTokens;
+  for (const { id, name, token } of accounts) {
+    core.claudeAccounts.put({ id, name });
+    if ((await tokens.token(id)) !== token) await tokens.save(id, token);
+  }
+  const chosen = accounts.find((account) => account.default) ?? accounts[0];
+  if (chosen && core.claudeAccounts.defaultId() !== chosen.id) core.claudeAccounts.update({ id: chosen.id, makeDefault: true });
+  const handed = new Set(accounts.map((account) => account.id));
+  for (const { id } of claudeAccounts.list(core.db).filter((account) => !handed.has(account.id))) if (await tokens.token(id)) await tokens.remove(id);
+  await retireSignedOut(core);
+}
+
+/**
+ * On the brain an account signs in only with its cloud token, so one without a token is disabled, unless it is the
+ * default; never deleted, since threads and runs keep naming it. One at work stays enabled until its sessions end, and
+ * the brain runs this again every time it starts.
+ */
+export async function retireSignedOut(core: OpenOrc): Promise<void> {
+  for (const account of claudeAccounts.list(core.db)) {
+    if (!account.enabled || account.id === core.claudeAccounts.defaultId() || (await core.claudeCloudTokens.token(account.id))) continue;
+    try {
+      core.claudeAccounts.update({ id: account.id, enabled: false });
+    } catch {
+      // At work: the next start disables it.
+    }
+  }
+}
+
 /** Where each handed-over sign-in goes on the brain: through the core service that owns it, as on the Mac. Null: not taken. */
 const HANDOVER: { [K in HandoverKind]: ((core: OpenOrc, value: HandoverValues[K]) => Promise<unknown>) | null } = {
-  claude: (core, { token }) => core.claudeCloudTokens.save(claudeAccounts.defaultId(core.db), token),
+  claude: takeClaudeAccounts,
   // A ChatGPT login's refresh token works once, so the brain and the Mac cannot both keep one; which does is open.
   codex: null,
   push: (core, { keyId, pem }) => core.remote.setPushKey(keyId, pem),

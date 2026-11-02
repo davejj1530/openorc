@@ -17,7 +17,7 @@ import { OpenOrc, type RequestOrigin, type RpcReply } from "@openorc/core";
 import type { RpcRequest } from "@openorc/protocol";
 import { BrainAwake, NO_SANDBOX, type SleepReason } from "./awake.js";
 import { serveControl, type ControlServer } from "./control.js";
-import { controlHandlers, type CoreOp } from "./control-ops.js";
+import { controlHandlers, retireSignedOut, type CoreOp } from "./control-ops.js";
 import { readLine } from "./line.js";
 import { BrainLog } from "./log.js";
 import { brainPath, missingTools } from "./machine-check.js";
@@ -146,6 +146,7 @@ export async function serve(appDir: string): Promise<void> {
     process.env["NPM_CONFIG_PREFIX"] = layout.npm;
     const core = await OpenOrc.create(brainOptions({ layout, appDir, start, secrets, transport: log.transport(), runnerFiles: await runnerFiles(appDir) }));
     host.core = core;
+    await retireSignedOut(core);
     await core.remote.attach(host.answer);
     const { listener } = await core.remote.configure(true);
     if (listener.state !== "on") throw new Error(`Phone access did not start: ${listener.state === "failed" ? listener.reason : "it is off"}.`);

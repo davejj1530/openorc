@@ -108,7 +108,9 @@ function NewThreadProject({
   // The landing composer has no thread, so no thread action applies to it. The
   // skills do: they belong to the project, or the Workspace folder, chosen on this screen.
   const skillCommands = useSkillCommands(projectId, choice?.agent, draft.workingDirectory, claudeAccountId);
-  const workspaceMode = newThreadWorkspaceMode({ canBranch: !isWorkspace && !git.cannotBranch, chosen: draft.workspace, preferred: settings.data?.defaultWorkspaceMode });
+  // Cloud runs only Claude so far, and only in development and QA builds until a real sandbox provider is set up.
+  const canCloud = (import.meta.env.DEV || __OPENORC_QA__) && target.kind === "model" && choice?.agent === "claude";
+  const workspaceMode = newThreadWorkspaceMode({ canBranch: !isWorkspace && !git.cannotBranch, canCloud, chosen: draft.workspace, preferred: settings.data?.defaultWorkspaceMode });
 
   useEffect(() => {
     if (target.kind !== "model" || target.choice || !models.data || !info.data || defaultHarness === undefined) return;
@@ -264,6 +266,7 @@ function NewThreadProject({
                 <NewThreadOptions
                   projectId={projectId}
                   mode={workspaceMode}
+                  cloud={canCloud}
                   location={location}
                   blocked={branchingReason(git.state, "Worktrees")}
                   disabled={start.isPending}

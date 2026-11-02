@@ -1,5 +1,5 @@
-import { newThreadStartInput, type NewThreadDraft } from "@openorc/client";
-import type { Project, RpcParams, RpcResults, WorkspaceMode } from "@openorc/protocol";
+import { newThreadStartInput, type NewThreadDraft, type NewThreadPlace } from "@openorc/client";
+import type { Project, RpcParams, RpcResults } from "@openorc/protocol";
 import { readDraft, writeDraft } from "../lib/drafts";
 import { readNewThreadDraft, teamLaunchRequest, writeNewThreadDraft } from "../lib/new-thread-draft";
 
@@ -7,7 +7,7 @@ interface StartNewThreadInput {
   draft: NewThreadDraft;
   project: Project;
   isWorkspace: boolean;
-  workspaceMode: WorkspaceMode;
+  workspaceMode: NewThreadPlace;
   permissionMode: RpcParams<"threads.start">["permissionMode"];
   text: string;
   attachments: string[];

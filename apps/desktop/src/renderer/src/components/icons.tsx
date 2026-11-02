@@ -281,6 +281,7 @@ export const Monitor = icon(
   </>,
 );
 export const Laptop = icon("Laptop", <path d="M5 16V5.5A1.5 1.5 0 0 1 6.5 4h11A1.5 1.5 0 0 1 19 5.5V16 M5 16h14l3 4H2Z" />);
+export const Cloud = icon("Cloud", <path d="M7.5 19h10a4.5 4.5 0 0 0 .5-8.97A6.5 6.5 0 0 0 5.6 11.3 4 4 0 0 0 7.5 19Z" />);
 export const Smartphone = icon(
   "Smartphone",
   <>

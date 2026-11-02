@@ -39,6 +39,7 @@ import { createCloudHandlers } from "./handlers/cloud.js";
 import { CloudSettings } from "./services/cloud-settings.js";
 import { ClaudeCloudTokens } from "./services/claude-cloud-tokens.js";
 import { cloudAgentEnvironment } from "./services/cloud-agent-env.js";
+import { CloudChecks } from "./services/cloud-check.js";
 import { createSystemHandlers } from "./handlers/system.js";
 import { createTaskCreateHandlers } from "./handlers/task-create.js";
 import { createTaskDeleteHandlers } from "./handlers/task-delete.js";
@@ -135,6 +136,8 @@ export class OpenOrc {
   readonly cloudSettings: CloudSettings;
   /** How each Claude account's agents sign in to cloud sandboxes. */
   readonly claudeCloudTokens: ClaudeCloudTokens;
+  /** Tries everything a cloud thread needs where new ones would run. */
+  readonly cloudChecks: CloudChecks;
   readonly runs: RunService;
   readonly comments: TaskCommentService;
   readonly review: ReviewService;
@@ -260,6 +263,11 @@ export class OpenOrc {
     const agentEnvironment = cloudAgentEnvironment({ accounts: this.claudeAccounts, tokens: this.claudeCloudTokens, snapshot: () => this.environment.current() });
     const cloudChanged = (id: string) => invalidate(["threads", `thread:${id}`]);
     this.cloud = new CloudWorkspaceService(db, { ...sandboxes, agentEnvironment, changed: cloudChanged, ...(options.cloudRunnerFiles ? { files: options.cloudRunnerFiles } : {}) }, this.log);
+    this.cloudChecks = new CloudChecks(
+      () => this.cloud.checkTarget(),
+      () => invalidate(["cloud"]),
+      this.log,
+    );
     this.workspaces = new WorkspaceService(db, { dataDir: options.dataDir, cloud: this.cloud }, this.log, this.workspaceWriters);
     const backgroundProviders: ProviderInfo = {
       models: (agent, accountId) => this.runs.models(agent, undefined, undefined, accountId),
@@ -726,7 +734,7 @@ export class OpenOrc {
   private buildHandlers(invalidate: (keys: string[]) => void): Handlers {
     return composeHandlers(
       createSlackHandlers({ slack: this.slack, invalidate }),
-      createCloudHandlers({ settings: this.cloudSettings, tokens: this.claudeCloudTokens, invalidate }),
+      createCloudHandlers({ settings: this.cloudSettings, tokens: this.claudeCloudTokens, checks: this.cloudChecks, invalidate }),
       createClaudeAccountHandlers(this.claudeAccounts),
       createSystemHandlers({
         system: this.system,

@@ -234,6 +234,23 @@ it("deletes the sandbox with its thread", async () => {
   expect(processesUnder(sandbox)).toEqual([]);
 });
 
+it("checks where new cloud threads run in a throwaway sandbox, and shows each step in the cloud status", async () => {
+  await core.cloudChecks.start();
+  await until(() => core.cloudChecks.status()?.passed !== null, 30_000);
+  const check = core.cloudChecks.status()!;
+  expect(check).toMatchObject({ provider: "local", passed: true });
+  expect(check.steps.map((step) => [step.step, step.state])).toEqual([
+    ["sandbox", "done"],
+    ["tools", "done"],
+    ["runner", "done"],
+    ["relay", "done"],
+    ["sync", "done"],
+    ["remove", "done"],
+  ]);
+  expect(check.steps[1]?.detail).toContain("Claude Code 2.1.316");
+  expect(processesUnder(path.join(root, "sandboxes"))).toEqual([]);
+}, 40_000);
+
 it("finishes a turn the agent kept working on while the Mac lost its connection to the sandbox", async () => {
   const { thread } = await core.threads.start({
     agent: "claude",

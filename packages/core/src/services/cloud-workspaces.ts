@@ -21,6 +21,7 @@ import { WORKSPACE_ID, type CloudStep, type CloudThreadState, type Project, type
 import type { Logger } from "../transport.js";
 import { cloudAgentHost } from "./cloud-agent-host.js";
 import { CloudAwake } from "./cloud-awake.js";
+import type { CloudCheckTarget } from "./cloud-check.js";
 import type { CloudAgentEnvironment } from "./cloud-agent-env.js";
 import type { StartThreadInput } from "./thread-inputs.js";
 
@@ -118,6 +119,12 @@ export class CloudWorkspaceService {
     const provider = await this.forNewThreads();
     await this.options.agentEnvironment?.(provider.id, input.claudeAccountId);
     return provider.id;
+  }
+
+  /** Where a new cloud conversation would run, and what its runner needs there, for the cloud check. */
+  async checkTarget(): Promise<CloudCheckTarget> {
+    this.files ??= runnerFiles();
+    return { provider: await this.forNewThreads(), files: this.files, ...(this.options.node ? { node: this.options.node } : {}) };
   }
 
   private async forNewThreads(): Promise<SandboxProvider> {

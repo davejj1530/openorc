@@ -1,5 +1,6 @@
 import type { CloudStatus } from "@openorc/protocol";
 import type { ClaudeCloudTokens } from "../services/claude-cloud-tokens.js";
+import type { CloudChecks } from "../services/cloud-check.js";
 import type { CloudSettings } from "../services/cloud-settings.js";
 import type { Handlers } from "./types.js";
 
@@ -12,21 +13,24 @@ type CloudMethod =
   | "cloud.claude.create"
   | "cloud.claude.cancel"
   | "cloud.claude.save"
-  | "cloud.claude.remove";
+  | "cloud.claude.remove"
+  | "cloud.check";
 
 interface Dependencies {
   settings: CloudSettings;
   tokens: ClaudeCloudTokens;
+  checks: CloudChecks;
   invalidate: (keys: string[]) => void;
 }
 
-export function createCloudHandlers({ settings, tokens, invalidate }: Dependencies): Pick<Handlers, CloudMethod> {
+export function createCloudHandlers({ settings, tokens, checks, invalidate }: Dependencies): Pick<Handlers, CloudMethod> {
   const status = async (): Promise<CloudStatus> => {
     const vercel = await settings.status();
+    const check = checks.status();
     try {
-      return { ...vercel, claude: await tokens.status() };
+      return { ...vercel, claude: await tokens.status(), check };
     } catch (error) {
-      return { ...vercel, claude: {}, error: vercel.error ?? (error instanceof Error ? error.message : String(error)) };
+      return { ...vercel, claude: {}, check, error: vercel.error ?? (error instanceof Error ? error.message : String(error)) };
     }
   };
   /** Every change refreshes Settings and answers with the whole status. */
@@ -48,5 +52,6 @@ export function createCloudHandlers({ settings, tokens, invalidate }: Dependenci
     "cloud.claude.cancel": ({ accountId }) => changed(() => tokens.cancel(accountId)),
     "cloud.claude.save": ({ accountId, token }) => changed(() => tokens.save(accountId, token)),
     "cloud.claude.remove": ({ accountId }) => changed(() => tokens.remove(accountId)),
+    "cloud.check": () => changed(() => checks.start()),
   };
 }

@@ -63,10 +63,18 @@ export const isRemoteMethod = (method: string): method is RemoteMethod => remote
 /** The largest image a phone may attach, before base64. */
 export const REMOTE_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
-/** How a phone reaches the Mac: the same network (a `.local` name or a private address), or Tailscale. */
+/** Every way a phone can reach a host. Route's kind and both link validators read this one list. */
+export const ROUTE_KINDS = ["lan", "tailnet", "public"] as const;
+
+/**
+ * How a phone reaches a host: the same network (a `.local` name or a private address), Tailscale, or the internet
+ * through a TLS proxy at a public name (a cloud host's address). Only a host with a public address emits `public`, and
+ * its pairing code always carries one, so phones in the field, whose exact validators refuse the kind, never save it.
+ */
 export interface Route {
-  kind: "lan" | "tailnet";
+  kind: (typeof ROUTE_KINDS)[number];
   host: string;
+  /** The port phones dial: the listener's for lan and tailnet, the proxy's for public. */
   port: number;
 }
 

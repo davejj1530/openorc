@@ -21,6 +21,8 @@ const OPS: Record<BrainControlOp, { answerMs: number; use: boolean; inTurn: bool
   pair: { answerMs: 15_000, use: true, inTurn: true },
   handover: { answerMs: 30_000, use: true, inTurn: true },
   "import-project": { answerMs: 300_000, use: true, inTurn: true },
+  "remove-project": { answerMs: 30_000, use: true, inTurn: true },
+  projects: { answerMs: 30_000, use: true, inTurn: true },
   stop: { answerMs: 15_000, use: false, inTurn: true },
   // At once, so it never closes the brain after its waker gave up waiting behind a long request.
   "stop-for-update": { answerMs: 5_000, use: false, inTurn: false },

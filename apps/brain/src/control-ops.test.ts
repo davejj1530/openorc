@@ -1,11 +1,12 @@
-import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { brainKeyText, brainLayout, newBrainKey, sealHandover, type BrainLayout, type BrainStart } from "@openorc/cloud";
+import { brainKeyText, brainLayout, bundleBranch, newBrainKey, sealHandover, type BrainControlResults, type BrainLayout, type BrainStart, type ProjectCopy } from "@openorc/cloud";
 import { OpenOrc } from "@openorc/core";
 import { DEFAULT_CLAUDE_ACCOUNT } from "@openorc/protocol";
-import { claudeAccounts } from "@openorc/db";
+import { claudeAccounts, threads } from "@openorc/db";
 import { commitAll, git } from "@openorc/git";
 import { NO_SANDBOX } from "./awake.js";
 import { controlHandlers, retireSignedOut } from "./control-ops.js";
@@ -113,23 +114,108 @@ describe("control requests on the brain's core", () => {
     expect(claudeAccounts.get(core.db, DEFAULT_CLAUDE_ACCOUNT).enabled).toBe(true);
   });
 
-  it("imports a project from a git bundle in the inbox, with the origin it was given", async () => {
-    const source = path.join(root, "source");
-    await mkdir(source);
-    await git(source, ["init", "-q", "-b", "main"]);
-    await git(source, ["config", "user.email", "fixture@example.com"]);
-    await git(source, ["config", "user.name", "Fixture"]);
-    await writeFile(path.join(source, "README.md"), "# Demo\n");
-    await commitAll(source, "Fixture baseline");
-    await mkdir(layout.inbox, { recursive: true });
-    await git(source, ["bundle", "create", path.join(layout.inbox, "demo.bundle"), "--all"]);
-    const imported = (await ops()({ op: "import-project", name: "demo", bundle: "demo.bundle", origin: "https://github.com/example/demo.git" })) as { projectId: string };
-    const project = core.projects.list().find((candidate) => candidate.id === imported.projectId);
-    expect(project?.rootPath).toBe(path.join(layout.data, "projects", "demo"));
-    expect((await git(project!.rootPath, ["remote", "get-url", "origin"])).stdout.trim()).toBe("https://github.com/example/demo.git");
-    expect(await readdir(layout.inbox)).toEqual([]);
-    await expect(ops()({ op: "import-project", name: "demo", bundle: "demo.bundle" })).rejects.toThrow("already has a project named demo");
-    await expect(ops()({ op: "import-project", name: "..", bundle: "demo.bundle" })).rejects.toThrow("letters, digits");
+  describe("a Mac project's copy", () => {
+    const SOURCE = "6f2b8c1e-0d4a-4f7b-9a53-2c8e1b7d4f90";
+    const ORIGIN = "https://github.com/example/my-app.git";
+    let mac: string;
+
+    beforeEach(async () => {
+      mac = path.join(root, "mac", "My App");
+      await mkdir(mac, { recursive: true });
+      await git(mac, ["init", "-q", "-b", "main"]);
+      await git(mac, ["config", "user.email", "fixture@example.com"]);
+      await git(mac, ["config", "user.name", "Fixture"]);
+      await commitOn(mac, "README.md", "# Demo\n");
+    });
+
+    async function commitOn(folder: string, name: string, content: string): Promise<string> {
+      await writeFile(path.join(folder, name), content);
+      await commitAll(folder, `${name}: ${content.trim()}`);
+      return (await git(folder, ["rev-parse", "HEAD"])).stdout.trim();
+    }
+
+    /** The Mac's main from `since`, uploaded to the inbox, then the op the Mac asks. */
+    async function upload(since: string | null, project: { source?: string; name?: string } = {}) {
+      const { bytes } = await bundleBranch(mac, "main", since);
+      const bundle = `${randomUUID()}.bundle`;
+      await mkdir(layout.inbox, { recursive: true });
+      await writeFile(path.join(layout.inbox, bundle), bytes);
+      return (await ops()({ op: "import-project", source: SOURCE, name: "My App", branch: "main", bundle, origin: ORIGIN, ...project })) as BrainControlResults["import-project"];
+    }
+
+    /** As `upload`, for a bundle the copy can take. */
+    async function send(since: string | null, project: { source?: string; name?: string } = {}): Promise<ProjectCopy> {
+      const taken = await upload(since, project);
+      if ("lacksBase" in taken) throw new Error("the copy lacks the bundle's base");
+      return taken;
+    }
+
+    it("is imported under the Mac project's id and name, fast-forwards from what is new, and takes a bundle again without change", async () => {
+      const first = (await git(mac, ["rev-parse", "HEAD"])).stdout.trim();
+      const imported = await send(null);
+      expect(imported).toEqual({ projectId: expect.any(String), macHead: first, head: first });
+      const project = core.projects.get(imported.projectId)!;
+      expect(project).toMatchObject({ name: "My App", rootPath: path.join(layout.data, "projects", SOURCE, "My App"), gitRemote: ORIGIN, defaultBranch: "main" });
+      expect(await readdir(layout.inbox)).toEqual([]);
+
+      const second = await commitOn(mac, "b.txt", "b1\n");
+      expect(await send(first)).toEqual({ ...imported, macHead: second, head: second });
+      expect(await readFile(path.join(project.rootPath, "b.txt"), "utf8")).toBe("b1\n");
+      expect(await send(first)).toEqual({ ...imported, macHead: second, head: second });
+      expect(core.projects.list().map((listed) => listed.id)).toEqual([imported.projectId]);
+      expect(await readdir(layout.inbox)).toEqual([]);
+
+      const other = await send(null, { source: "another-mac-project" });
+      expect(other.projectId).not.toBe(imported.projectId);
+      expect(core.projects.get(other.projectId)?.name).toBe("My App");
+      expect(await ops()({ op: "projects" })).toEqual({
+        copies: expect.arrayContaining([
+          { source: SOURCE, projectId: imported.projectId, macHead: second, head: second, threads: 0 },
+          { source: "another-mac-project", projectId: other.projectId, macHead: second, head: second, threads: 0 },
+        ]),
+      });
+    });
+
+    it("keeps commits made on the brain's copy, saying so with its own head", async () => {
+      const first = (await git(mac, ["rev-parse", "HEAD"])).stdout.trim();
+      const { projectId } = await send(null);
+      const copy = core.projects.get(projectId)!.rootPath;
+      await git(copy, ["config", "user.email", "brain@example.com"]);
+      await git(copy, ["config", "user.name", "Brain"]);
+      const own = await commitOn(copy, "brain.txt", "made on the brain\n");
+      const second = await commitOn(mac, "b.txt", "b1\n");
+      expect(await send(first)).toEqual({ projectId, macHead: second, head: own });
+      expect((await git(copy, ["rev-parse", "main"])).stdout.trim()).toBe(own);
+      expect(await ops()({ op: "projects" })).toEqual({ copies: [{ source: SOURCE, projectId, macHead: second, head: own, threads: 0 }] });
+    });
+
+    it("says it lacks the commit a bundle builds on, taking nothing and leaving no upload behind", async () => {
+      const first = (await git(mac, ["rev-parse", "HEAD"])).stdout.trim();
+      await commitOn(mac, "b.txt", "b1\n");
+      expect(await upload(first)).toEqual({ lacksBase: true });
+      expect(core.projects.list()).toEqual([]);
+      expect(await stat(path.join(layout.data, "projects", SOURCE, "My App")).catch(() => null)).toBeNull();
+      expect(await readdir(layout.inbox)).toEqual([]);
+    });
+
+    it("is removed only while the brain has no thread in it, and removing it again changes nothing", async () => {
+      const { projectId } = await send(null);
+      const folder = path.join(layout.data, "projects", SOURCE);
+      const thread = threads.insert(core.db, { projectId, title: "On the phone", agent: "claude", model: null, mode: "act", permissionMode: "trusted" });
+      expect(await ops()({ op: "projects" })).toMatchObject({ copies: [{ source: SOURCE, threads: 1 }] });
+      expect(await ops()({ op: "remove-project", source: SOURCE })).toEqual({ removed: false, threads: 1 });
+      expect(core.projects.list().map((listed) => listed.id)).toEqual([projectId]);
+      expect(await stat(folder).catch(() => null)).not.toBeNull();
+
+      core.db.stmt("DELETE FROM threads WHERE id = ?").run(thread.id);
+      expect(await ops()({ op: "remove-project", source: SOURCE })).toEqual({ removed: true, threads: 0 });
+      expect(core.projects.list()).toEqual([]);
+      expect(await stat(folder).catch(() => null)).toBeNull();
+      expect(await ops()({ op: "projects" })).toEqual({ copies: [] });
+      expect(await ops()({ op: "remove-project", source: SOURCE })).toEqual({ removed: true, threads: 0 });
+
+      expect((await send(null)).projectId).toBe(projectId);
+    });
   });
 
   it("answers stop before it closes the brain", async () => {

@@ -1,9 +1,19 @@
-import { mkdir, rm, stat } from "node:fs/promises";
+import { rm } from "node:fs/promises";
 import path from "node:path";
-import { openHandover, type BrainControlOp, type BrainControlRequest, type BrainControlResults, type BrainKey, type BrainLayout, type HandoverKind, type HandoverValues } from "@openorc/cloud";
+import {
+  copyHeads,
+  openHandover,
+  takeBranch,
+  type BrainControlOp,
+  type BrainControlRequest,
+  type BrainControlResults,
+  type BrainKey,
+  type BrainLayout,
+  type HandoverKind,
+  type HandoverValues,
+} from "@openorc/cloud";
 import type { OpenOrc } from "@openorc/core";
-import { claudeAccounts, redact } from "@openorc/db";
-import { git } from "@openorc/git";
+import { claudeAccounts, projects, redact, threads } from "@openorc/db";
 import type { Project } from "@openorc/protocol";
 
 export interface ControlContext {
@@ -62,27 +72,62 @@ const HANDOVER: { [K in HandoverKind]: ((core: OpenOrc, value: HandoverValues[K]
 };
 const HANDOVER_KINDS = Object.keys(HANDOVER) as HandoverKind[];
 
-/** A project's folder name under the brain's projects. */
-const PROJECT_NAME = /^[A-Za-z0-9_][\w.-]*$/;
+/** Every Mac project's copies, under a folder named for the Mac project's id. */
+const projectsFolder = (layout: BrainLayout) => path.join(layout.data, "projects");
+/** The copies of one Mac project: each in a folder with the Mac project's name, so two of one name both fit. */
+const copiesOf = (layout: BrainLayout, source: string) => path.join(projectsFolder(layout), source);
 
-async function importProject(core: OpenOrc, layout: BrainLayout, { name, bundle, origin }: Extract<BrainControlRequest, { op: "import-project" }>): Promise<{ projectId: string }> {
-  if (!PROJECT_NAME.test(name)) throw new Error("A project's name must be letters, digits, ., - or _.");
-  const projects = path.join(layout.data, "projects");
-  const folder = path.join(projects, name);
-  if (await stat(folder).catch(() => null)) throw new Error(`The brain already has a project named ${name}.`);
-  const source = path.join(layout.inbox, bundle);
-  await mkdir(projects, { recursive: true });
-  try {
-    await git(projects, ["clone", "--quiet", source, folder]);
-    if (origin) await git(folder, ["remote", "set-url", "origin", origin]);
-  } catch (error) {
-    await rm(folder, { recursive: true, force: true });
-    throw error;
-  }
-  await rm(source, { force: true });
-  const reply = await core.handle({ type: "rpc", id: 0, method: "projects.import", params: { rootPath: folder } });
+/** Archived threads count too: they keep their history. */
+const threadsIn = (core: OpenOrc, projectId: string) => threads.list(core.db, { projectId, filter: "all" }).length;
+
+/** Through the core's own handlers, which tell the brain's phones the project list changed. */
+async function rpc(core: OpenOrc, method: "projects.import" | "projects.remove", params: { rootPath: string } | { id: string }): Promise<unknown> {
+  const reply = await core.handle({ type: "rpc", id: 0, method, params });
   if (reply.type === "rpc.error") throw new Error(reply.message);
-  return { projectId: (reply.result as Project).id };
+  return reply.result;
+}
+
+async function importProject(
+  core: OpenOrc,
+  layout: BrainLayout,
+  { source, name, branch, bundle, origin }: Extract<BrainControlRequest, { op: "import-project" }>,
+): Promise<BrainControlResults["import-project"]> {
+  const file = path.join(layout.inbox, bundle);
+  try {
+    const folder = path.join(copiesOf(layout, source), name);
+    const taken = await takeBranch(folder, file, branch, origin ?? null);
+    if ("lacksBase" in taken) return taken;
+    const { id } = (await rpc(core, "projects.import", { rootPath: folder })) as Project;
+    return { projectId: id, ...taken };
+  } finally {
+    await rm(file, { force: true });
+  }
+}
+
+/** Each listed project in a Mac project's copy. A copy whose folder lost its git is left out, so the Mac sends it whole. */
+async function listCopies(core: OpenOrc, layout: BrainLayout): Promise<BrainControlResults["projects"]> {
+  const folder = `${projectsFolder(layout)}${path.sep}`;
+  const copies = await Promise.all(
+    core.projects
+      .list()
+      .filter((project) => project.rootPath.startsWith(folder))
+      .map(async ({ id, rootPath }) => {
+        const heads = await copyHeads(rootPath);
+        return heads && { source: path.basename(path.dirname(rootPath)), projectId: id, ...heads, threads: threadsIn(core, id) };
+      }),
+  );
+  return { copies: copies.filter((copy) => copy !== null) };
+}
+
+/** A Mac project's copy goes, unlisted as the core removes a project, only while the brain has no thread in it. */
+async function removeProject(core: OpenOrc, layout: BrainLayout, { source }: Extract<BrainControlRequest, { op: "remove-project" }>): Promise<BrainControlResults["remove-project"]> {
+  const folder = copiesOf(layout, source);
+  const copies = projects.list(core.db, { includeRemoved: true }).filter((project) => project.rootPath.startsWith(`${folder}${path.sep}`));
+  const count = copies.reduce((sum, project) => sum + threadsIn(core, project.id), 0);
+  if (count) return { removed: false, threads: count };
+  for (const { id } of copies) await rpc(core, "projects.remove", { id });
+  await rm(folder, { recursive: true, force: true });
+  return { removed: true, threads: 0 };
 }
 
 /** Each control request onto services the core already has. Handed-over values are never logged or repeated. */
@@ -101,6 +146,8 @@ export function controlHandlers({ core, key, layout, stop, answering }: ControlC
       return { applied: kinds };
     },
     "import-project": (request) => importProject(core, layout, request),
+    "remove-project": (request) => removeProject(core, layout, request),
+    projects: () => listCopies(core, layout),
     stop: async () => {
       setImmediate(stop);
       return { stopping: true };

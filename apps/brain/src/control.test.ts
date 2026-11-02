@@ -87,7 +87,9 @@ describe("the control socket", () => {
       wake: { op: "wake" },
       pair: { op: "pair" },
       handover: { op: "handover", sealed: {} },
-      "import-project": { op: "import-project", name: "demo", bundle: "demo.bundle" },
+      "import-project": { op: "import-project", source: "p1", name: "demo", branch: "main", bundle: "demo.bundle" },
+      "remove-project": { op: "remove-project", source: "p1" },
+      projects: { op: "projects" },
       stop: { op: "stop" },
       "stop-for-update": { op: "stop-for-update" },
     } satisfies { [K in BrainControlOp]: Extract<BrainControlRequest, { op: K }> };
@@ -103,7 +105,7 @@ describe("the control socket", () => {
       expect((await ctl(JSON.stringify(request))).code).toBe(0);
       if (uses > before) used.push(op);
     }
-    expect(used).toEqual(["wake", "pair", "handover", "import-project"]);
+    expect(used).toEqual(["wake", "pair", "handover", "import-project", "remove-project", "projects"]);
   });
 
   it("names a bad field without repeating what was sent", async () => {
@@ -112,7 +114,7 @@ describe("the control socket", () => {
       async () => ({}),
       () => undefined,
     );
-    const { code, reply } = await ctl(JSON.stringify({ op: "import-project", name: "demo", bundle: "../secret-token-value" }));
+    const { code, reply } = await ctl(JSON.stringify({ op: "import-project", source: "p1", name: "demo", branch: "main", bundle: "../secret-token-value" }));
     expect(code).toBe(BRAIN_EXIT.badStart);
     expect(reply).toContain("bundle");
     expect(reply).not.toContain("secret-token-value");

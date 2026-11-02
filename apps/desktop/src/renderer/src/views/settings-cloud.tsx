@@ -4,7 +4,7 @@ import { Button, Input, Select, TextButton } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { CloudCheckSection } from "./settings-cloud-check";
 import { CloudSandboxesSection } from "./settings-cloud-sandboxes";
-import { Field, LoadError, Section, SettingRow, Status } from "./settings-shared";
+import { Field, LoadError, Section, SettingRow, Status, Toggle } from "./settings-shared";
 
 const TOKENS_URL = "https://vercel.com/account/settings/tokens";
 
@@ -207,6 +207,23 @@ function ClaudeCloudAccounts({ status, active }: { status: CloudStatus; active: 
   );
 }
 
+/** Whether a thread working on this Mac carries on in the cloud when the Mac goes to sleep. */
+function TakeoverSection({ enabled }: { enabled: boolean }) {
+  const takeover = useRpcMutation("cloud.takeover");
+  return (
+    <Section title="When this Mac sleeps">
+      <Toggle
+        label="Carry working threads on in the cloud"
+        hint="A thread in a worktree keeps working in its sandbox while this Mac sleeps, and its turn shows here when the Mac wakes."
+        checked={takeover.isPending && takeover.variables ? takeover.variables.enabled : enabled}
+        disabled={takeover.isPending}
+        onChange={(next) => takeover.mutate({ enabled: next })}
+      />
+      <Failure error={takeover.error} />
+    </Section>
+  );
+}
+
 /** Where cloud threads run and how their agents sign in. Tokens go to the core and stay in protected storage. */
 export function CloudSettings({ active }: { active: boolean }) {
   const status = useRpc("cloud.status", {}, { enabled: active });
@@ -221,6 +238,7 @@ export function CloudSettings({ active }: { active: boolean }) {
       ) : null}
       <VercelSettings status={status.data} />
       <ClaudeCloudAccounts status={status.data} active={active} />
+      <TakeoverSection enabled={status.data.takeover} />
       <CloudSandboxesSection active={active} />
       <CloudCheckSection status={status.data} />
     </>

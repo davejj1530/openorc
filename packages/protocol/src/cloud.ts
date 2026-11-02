@@ -17,6 +17,24 @@ export const CloudThreadState = z.object({
 });
 export type CloudThreadState = z.infer<typeof CloudThreadState>;
 
+/** The steps of a cloud check, in order. */
+export const CloudCheckStep = z.enum(["sandbox", "tools", "runner", "relay", "sync", "remove"]);
+export type CloudCheckStep = z.infer<typeof CloudCheckStep>;
+
+/** A run of the cloud check: everything a cloud thread needs, tried in a throwaway sandbox. */
+export interface CloudCheck {
+  provider: "local" | "vercel";
+  /** Null while it runs; whether every step passed once it ends. */
+  passed: boolean | null;
+  steps: {
+    step: CloudCheckStep;
+    state: "pending" | "running" | "done" | "failed";
+    ms: number | null;
+    detail: string | null;
+    error: string | null;
+  }[];
+}
+
 /** A Vercel team cloud threads can run on. */
 export interface CloudTeam {
   id: string;
@@ -44,6 +62,8 @@ export interface CloudStatus {
   } | null;
   /** By Claude account id. */
   claude: Record<string, ClaudeCloudAccess>;
+  /** The last cloud check since OpenOrc started; null before one ran. */
+  check: CloudCheck | null;
   /** Protected storage could not be read. */
   error: string | null;
 }
@@ -64,6 +84,8 @@ export const cloudRpcParams = {
   /** A token made elsewhere with `claude setup-token`. */
   "cloud.claude.save": z.object({ accountId: ClaudeAccountId, token: Token }).strict(),
   "cloud.claude.remove": z.object({ accountId: ClaudeAccountId }).strict(),
+  /** Starts a cloud check where new cloud threads would run; its progress arrives in `cloud.status`. */
+  "cloud.check": z.object({}),
 };
 
 export interface CloudRpcResults {
@@ -76,4 +98,5 @@ export interface CloudRpcResults {
   "cloud.claude.cancel": CloudStatus;
   "cloud.claude.save": CloudStatus;
   "cloud.claude.remove": CloudStatus;
+  "cloud.check": CloudStatus;
 }

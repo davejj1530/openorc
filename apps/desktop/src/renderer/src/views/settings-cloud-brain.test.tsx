@@ -28,6 +28,7 @@ function show(status: CloudBrainStatus, timeZone = "Asia/Manila") {
   vi.spyOn(Intl.DateTimeFormat.prototype, "resolvedOptions").mockReturnValue({ timeZone } as Intl.ResolvedDateTimeFormatOptions);
   vi.mocked(core.call).mockImplementation(async (method: string) => {
     if (method === "cloud.brain.pair") return { url: "openorc://pair#v1.brain-fixture", expiresAt: Date.now() + 120_000 } as never;
+    if (method === "cloud.brain.projects") return [] as never;
     return status as never;
   });
   render(

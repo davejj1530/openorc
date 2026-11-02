@@ -61,6 +61,7 @@ const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
   "cloud.offer": ["cloud"],
   // Asks Vercel, so not "cloud", which a running check or sandbox sends often.
   "cloud.brain.status": ["cloud-brain"],
+  "cloud.brain.projects": ["cloud-brain", "projects"],
   "remote.status": ["remote"],
   "system.info": ["system"],
   "system.gh": ["system"],

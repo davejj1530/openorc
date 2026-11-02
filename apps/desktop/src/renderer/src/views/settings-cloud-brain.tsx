@@ -3,6 +3,7 @@ import { BRAIN_REGIONS, brainRegionFor, type BrainRegion, type CloudBrainMachine
 import { Button, Dialog, Select, TextButton, Tooltip } from "../components/ui";
 import { StepMark } from "../components/WorkSteps";
 import { useRpc, useRpcMutation } from "../lib/client";
+import { CloudBrainProjects } from "./settings-cloud-brain-projects";
 import { PairingCode, pairingSheet, useTicker } from "./settings-phone";
 import { Failure } from "./settings-secret-field";
 import { Section, SettingRow, Status } from "./settings-shared";
@@ -149,7 +150,7 @@ function PairBrainPhone({ disabled }: { disabled: boolean }) {
   );
 }
 
-function Ready({ brain }: { brain: Extract<CloudBrainStatus, { state: "ready" }> }) {
+function Ready({ brain, active }: { brain: Extract<CloudBrainStatus, { state: "ready" }>; active: boolean }) {
   const wake = useRpcMutation("cloud.brain.wake");
   const handover = useRpcMutation("cloud.brain.handover");
   const busy = brain.working !== null || wake.isPending || handover.isPending;
@@ -174,12 +175,13 @@ function Ready({ brain }: { brain: Extract<CloudBrainStatus, { state: "ready" }>
           </TextButton>
         ) : null}
       </SettingRow>
+      <CloudBrainProjects active={active} />
       <Alert error={brain.error} />
     </>
   );
 }
 
-function BrainState({ brain }: { brain: CloudBrainStatus }) {
+function BrainState({ brain, active }: { brain: CloudBrainStatus; active: boolean }) {
   const create = useRpcMutation("cloud.brain.create");
   switch (brain.state) {
     case "unavailable":
@@ -217,7 +219,7 @@ function BrainState({ brain }: { brain: CloudBrainStatus }) {
         </>
       );
     case "ready":
-      return <Ready brain={brain} />;
+      return <Ready brain={brain} active={active} />;
     case "removing":
       return (
         <SettingRow label="Cloud brain">
@@ -227,12 +229,12 @@ function BrainState({ brain }: { brain: CloudBrainStatus }) {
   }
 }
 
-/** OpenOrc in the user's own Vercel team: set up from here, handed this Mac's Claude sign-ins, paired with a phone. */
+/** OpenOrc in the user's own Vercel team: set up from here, handed this Mac's Claude sign-ins and projects, paired with a phone. */
 export function CloudBrainSection({ active }: { active: boolean }) {
   const status = useRpc("cloud.brain.status", {}, { enabled: active, refetchInterval: active ? REFRESH_MS : false });
   return (
     <Section title="Cloud brain" description="A copy of OpenOrc in your Vercel team, for your phone while this Mac sleeps.">
-      {status.data ? <BrainState brain={status.data} /> : null}
+      {status.data ? <BrainState brain={status.data} active={active} /> : null}
       <Failure error={status.error} />
     </Section>
   );

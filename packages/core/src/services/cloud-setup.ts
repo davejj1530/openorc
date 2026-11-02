@@ -1,3 +1,5 @@
+import os from "node:os";
+import path from "node:path";
 import type { Db, LedgerWriter } from "@openorc/db";
 import type { OpenOrcOptions } from "../options.js";
 import type { Logger } from "../transport.js";
@@ -5,7 +7,10 @@ import type { ClaudeAccountService } from "./claude-accounts.js";
 import { ClaudeCloudTokens } from "./claude-cloud-tokens.js";
 import { cloudAgentEnvironment } from "./cloud-agent-env.js";
 import { CloudChecks } from "./cloud-check.js";
+import { CloudCodex } from "./cloud-codex.js";
 import { CloudHandoff } from "./cloud-handoff.js";
+import { CodexCloudLogin } from "./codex-cloud-login.js";
+import { spawnWithPipes } from "./terminal-process.js";
 import { CloudSandboxes, type CloudSandboxRuns } from "./cloud-sandboxes.js";
 import { CloudSessions } from "./cloud-sessions.js";
 import { CloudStandby, type CloudStandbyDeps } from "./cloud-standby.js";
@@ -31,6 +36,7 @@ export function createCloud(input: {
 }): {
   settings: CloudSettings;
   tokens: ClaudeCloudTokens;
+  codex: CodexCloudLogin;
   cloud: CloudWorkspaceService;
   checks: CloudChecks;
   sandboxes: CloudSandboxes;
@@ -47,14 +53,23 @@ export function createCloud(input: {
   });
   const tokens = new ClaudeCloudTokens(options.claudeCloudSecrets, accounts, () => invalidate(["cloud"]), options.terminal);
   const agentEnvironment = cloudAgentEnvironment({ accounts, tokens, snapshot: environment });
+  const codexLogin = new CodexCloudLogin(options.codexCloudSecrets, {
+    binary: () => environment().binaries.codex ?? null,
+    env: () => environment().env,
+    terminal: options.terminal ?? spawnWithPipes,
+    changed: () => invalidate(["cloud"]),
+  });
+  const codex = new CloudCodex(codexLogin);
   const sessions = new CloudSessions({
     db,
     configDirectory: (id) => accounts.configDirectory(id),
     defaultAccountId: () => accounts.defaultId(),
     agentEnvironment: (provider, id) => agentEnvironment(provider, id),
+    codexHomeIn: (location, provider) => codex.home(location, provider),
+    codexHomeOnMac: () => environment().env["CODEX_HOME"] || path.join(os.homedir(), ".codex"),
   });
   const changed = (id: string) => invalidate(["threads", `thread:${id}`]);
-  const cloud = new CloudWorkspaceService(db, { ...sandboxes, agentEnvironment, sessions, changed, ...(options.cloudRunnerFiles ? { files: options.cloudRunnerFiles } : {}) }, log);
+  const cloud = new CloudWorkspaceService(db, { ...sandboxes, agentEnvironment, sessions, codex, changed, ...(options.cloudRunnerFiles ? { files: options.cloudRunnerFiles } : {}) }, log);
   const checks = new CloudChecks(
     () => cloud.checkTarget(),
     () => invalidate(["cloud"]),
@@ -82,7 +97,7 @@ export function createCloud(input: {
     invalidate,
     log,
   });
-  return { settings, tokens, cloud, checks, sandboxes: list, handoff, standby };
+  return { settings, tokens, codex: codexLogin, cloud, checks, sandboxes: list, handoff, standby };
 }
 
-export type { ClaudeCloudTokens, CloudChecks, CloudHandoff, CloudSandboxes, CloudSettings, CloudStandby };
+export type { ClaudeCloudTokens, CloudChecks, CloudHandoff, CloudSandboxes, CloudSettings, CloudStandby, CodexCloudLogin };

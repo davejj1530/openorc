@@ -23,7 +23,7 @@ import {
 import type { AgentLaunchEnvironment } from "@openorc/agents";
 import type { Logger } from "../transport.js";
 import type { EnvSnapshot } from "./shell-environment.js";
-import { CLOUD_AGENTS, type CloudRunHost } from "./cloud-workspaces.js";
+import { CLOUD_AGENTS, CLOUD_HARNESSES, type CloudRunHost } from "./cloud-workspaces.js";
 import { executionFolder } from "./conversation-folder.js";
 import { withOutsideNote, type OutsideChanges, type TurnStartCapture } from "./turn-start-checkpoint.js";
 import {
@@ -194,7 +194,7 @@ export class RunLaunch {
     // Captured before the spec is built, so the prompt the provider receives can carry the outside-changes note.
     const outside = await this.captureTurnStart(input, lease);
     const cloud = await connecting;
-    if (cloud && input.agent !== "claude") throw new Error(CLOUD_AGENTS);
+    if (cloud && !CLOUD_HARNESSES.has(input.agent)) throw new Error(CLOUD_AGENTS);
     phase("cloud");
     const spec = this.runSpec(prepared, lease, internalMcp, outside, cloud?.cwd);
     assertAdmission();
@@ -274,7 +274,7 @@ export class RunLaunch {
   /** Where a cloud conversation's agent runs, connected while the turn's starting point is captured; null on this Mac. */
   private connectCloud(input: StartRunInput, mcpUrl: string): Promise<CloudRunHost | null> {
     const thread = input.scope.thread;
-    const connecting = (thread && this.deps.hooks.cloudHost?.(thread, new URL(mcpUrl).origin, input.claudeAccountId)) || Promise.resolve(null);
+    const connecting = (thread && this.deps.hooks.cloudHost?.(thread, new URL(mcpUrl).origin, { agent: input.agent, claudeAccountId: input.claudeAccountId })) || Promise.resolve(null);
     // Awaited after the capture; a failure before then must not go unhandled.
     void connecting.catch(() => undefined);
     return connecting;

@@ -130,7 +130,7 @@ export interface VercelProviderOptions {
   api?: VercelApi;
 }
 
-async function run(vm: VercelVm, cmd: string, args: string[], options: SandboxCommandOptions & { sudo?: boolean } = {}): Promise<SandboxExecResult> {
+async function run(vm: VercelVm, cmd: string, args: string[], options: SandboxCommandOptions = {}): Promise<SandboxExecResult> {
   const command = await vm.runCommand({ cmd, args, cwd: options.cwd ?? vm.cwd, ...(options.env ? { env: options.env } : {}), ...(options.sudo ? { sudo: true } : {}), detached: true });
   const done = await command.wait();
   return { code: done.exitCode, stdout: Buffer.from(await done.stdout(), "utf8"), stderr: await done.stderr() };

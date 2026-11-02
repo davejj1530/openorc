@@ -118,7 +118,8 @@ describe("where cloud conversations run", () => {
     expect(await cloud.place({ agent: "claude" }, project)).toBe("local");
     access = { token: "tok", teamId: "team", projectId: "proj" };
     expect(await cloud.place({ agent: "claude" }, project)).toBe("vercel");
-    await expect(cloud.place({ agent: "codex" }, project)).rejects.toThrow("Only Claude runs in cloud workspaces so far.");
+    await expect(cloud.place({ agent: "codex" }, project)).rejects.toThrow("Codex has no sign-in for the cloud.");
+    await expect(cloud.place({ agent: "opencode" }, project)).rejects.toThrow("Only Claude and Codex run in cloud workspaces so far.");
   });
 
   it("lets a provider passed in take new conversations, whatever is connected", async () => {

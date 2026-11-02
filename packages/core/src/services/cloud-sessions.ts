@@ -9,19 +9,30 @@ export function claudeSessionFile(configDir: string, cwd: string, sessionId: str
   return path.posix.join(configDir, "projects", cwd.replace(/[^A-Za-z0-9]/g, "-"), `${sessionId}.jsonl`);
 }
 
-/** Every folder a session ran in, as its lines record them. */
+/** Every folder a session ran in, as its lines record them: on the line itself for Claude, inside its payload for Codex. */
 function sessionFolders(text: string): string[] {
   const folders = new Set<string>();
-  for (const line of text.split("\n")) {
-    if (!line.includes('"cwd"')) continue;
+  for (const match of text.matchAll(/"cwd":\s*"((?:[^"\\]|\\.)*)"/g)) {
     try {
-      const cwd: unknown = (JSON.parse(line) as { cwd?: unknown }).cwd;
-      if (typeof cwd === "string" && cwd.length > 1) folders.add(cwd);
+      const cwd = JSON.parse(`"${match[1]}"`) as string;
+      if (cwd.length > 1) folders.add(cwd);
     } catch {
-      // A line the CLI was still writing.
+      // Part of a line the CLI was still writing.
     }
   }
   return [...folders];
+}
+
+/** Where Codex keeps a session: `sessions/<yyyy>/<mm>/<dd>/rollout-<time>-<id>.jsonl` under its folder. */
+async function codexSessionOnMac(home: string, sessionId: string): Promise<string | null> {
+  const root = path.join(home, "sessions");
+  for (const year of (await readdir(root).catch(() => [] as string[])).sort().reverse())
+    for (const month of (await readdir(path.join(root, year)).catch(() => [] as string[])).sort().reverse())
+      for (const day of (await readdir(path.join(root, year, month)).catch(() => [] as string[])).sort().reverse()) {
+        const name = (await readdir(path.join(root, year, month, day)).catch(() => [] as string[])).find((file) => file.endsWith(`-${sessionId}.jsonl`));
+        if (name) return path.join(root, year, month, day, name);
+      }
+  return null;
 }
 
 /** The session with every folder it ran in named as `cwd`, so it resumes there as if it had always run there. */
@@ -40,6 +51,10 @@ export interface CloudSessionDeps {
   defaultAccountId(): string;
   /** What the account's agent gets in the sandbox; Claude keeps sessions in its CLAUDE_CONFIG_DIR when that is set. */
   agentEnvironment(provider: CloudProviderId, accountId: string): Promise<Record<string, string>>;
+  /** Codex's folder in the sandbox; null when the sandbox uses this Mac's own. */
+  codexHomeIn(location: WorkspaceLocation, provider: CloudProviderId): Promise<string | null>;
+  /** Codex's folder on this Mac. */
+  codexHomeOnMac(): string;
 }
 
 /**
@@ -81,6 +96,7 @@ export class CloudSessions {
 
   /** Gives the sandbox the conversation's session, when this Mac has one. */
   async send(thread: Thread, location: WorkspaceLocation, provider: CloudProviderId): Promise<void> {
+    if (thread.agent === "codex") return this.sendCodex(thread, location, provider);
     const latest = this.latest(thread);
     if (!latest || !thread.worktreePath) return;
     const file = await this.onMac(this.deps.configDirectory(latest.accountId), thread.worktreePath, latest.sessionId);
@@ -89,8 +105,34 @@ export class CloudSessions {
     await location.install.sandbox.writeFile(target, Buffer.from(sessionMovedTo(await readFile(file, "utf8"), location.repo)));
   }
 
+  private async sendCodex(thread: Thread, location: WorkspaceLocation, provider: CloudProviderId): Promise<void> {
+    const sessionId = runs.lastSession(this.deps.db, { threadId: thread.id }, "codex");
+    const home = await this.deps.codexHomeIn(location, provider);
+    if (!sessionId || !home) return;
+    const macHome = this.deps.codexHomeOnMac();
+    const file = await codexSessionOnMac(macHome, sessionId);
+    if (!file) return;
+    const target = path.posix.join(home, path.relative(macHome, file).split(path.sep).join("/"));
+    await location.install.sandbox.writeFile(target, Buffer.from(sessionMovedTo(await readFile(file, "utf8"), location.repo)));
+  }
+
+  private async keepCodex(thread: Thread, location: WorkspaceLocation, provider: CloudProviderId): Promise<void> {
+    const sessionId = runs.lastSession(this.deps.db, { threadId: thread.id }, "codex");
+    const home = await this.deps.codexHomeIn(location, provider);
+    if (!sessionId || !home || !thread.worktreePath) return;
+    const { sandbox } = location.install;
+    const found = await sandbox.exec("sh", ["-c", 'ls "$1"/sessions/*/*/*/rollout-*-"$2".jsonl 2>/dev/null | head -1', "sh", home, sessionId]);
+    const file = found.stdout.toString("utf8").trim();
+    const data = file ? await sandbox.readFile(file) : null;
+    if (!data) return;
+    const target = path.join(this.deps.codexHomeOnMac(), path.posix.relative(home, file));
+    await mkdir(path.dirname(target), { recursive: true, mode: 0o700 });
+    await writeFile(target, sessionMovedTo(data.toString("utf8"), thread.worktreePath), { mode: 0o600 });
+  }
+
   /** Brings the conversation's session from the sandbox to the account's folder on this Mac. */
   async keep(thread: Thread, location: WorkspaceLocation, provider: CloudProviderId): Promise<void> {
+    if (thread.agent === "codex") return this.keepCodex(thread, location, provider);
     const latest = this.latest(thread);
     if (!latest || !thread.worktreePath) return;
     const data = await location.install.sandbox.readFile(await this.inSandbox(location, provider, latest.accountId, latest.sessionId));

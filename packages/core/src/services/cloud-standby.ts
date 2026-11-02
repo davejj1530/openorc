@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { ClaudeStreamParser, claudePermissionMode } from "@openorc/agents";
+import { ClaudeStreamParser, CodexExecParser, claudePermissionMode } from "@openorc/agents";
 import { pushWorkspace, SANDBOX_PREFIX, seedWorkspace, type MirrorState, type RemoteProcess, type RunnerClient, type TakeoverStarted, type WorkspaceLocation } from "@openorc/cloud";
 import { realpath } from "node:fs/promises";
 import { checkpoints, cloudWorkspaces, orchestration, runs, threads, type CloudProviderId, type Db, type LedgerWriter } from "@openorc/db";
@@ -8,7 +8,7 @@ import { WORKSPACE_ID, type AgentEvent, type Project, type Thread, type ThreadMe
 import type { Logger } from "../transport.js";
 import { checkpointRefs } from "./checkpoint-refs.js";
 import type { CloudSessions } from "./cloud-sessions.js";
-import type { CloudWorkspaceService, SandboxRef } from "./cloud-workspaces.js";
+import { CLOUD_HARNESSES, type CloudWorkspaceService, type SandboxRef } from "./cloud-workspaces.js";
 
 /** What the agent is told when its sandbox takes over the turn. */
 const TAKEOVER_PROMPT =
@@ -58,7 +58,7 @@ const within = <T>(ms: number, work: Promise<T>) => Promise.race([work, new Prom
 
 /**
  * Lets a conversation working on this Mac carry on in the cloud when the Mac goes to sleep. While a turn works, a
- * sandbox of its own keeps the worktree's files and Claude's session, with the agent's command armed in its runner.
+ * sandbox of its own keeps the worktree's files and the agent's session, with its command armed in the runner.
  * Going to sleep tells the runner to start it and stops the turn here; waking up takes the conversation to the cloud and
  * writes what the sandbox did into it as a turn of its own.
  */
@@ -70,7 +70,7 @@ export class CloudStandby {
 
   /** Claude, in a worktree of a project, on this Mac, not a team's: what a sandbox can carry on with. */
   private eligible(thread: Thread): boolean {
-    if (thread.agent !== "claude" || thread.workspaceMode !== "worktree" || !thread.worktreePath || !thread.branch) return false;
+    if (!CLOUD_HARNESSES.has(thread.agent) || thread.workspaceMode !== "worktree" || !thread.worktreePath || !thread.branch) return false;
     if (thread.projectId === WORKSPACE_ID || cloudWorkspaces.get(this.deps.db, thread.id)) return false;
     return !orchestration.getInstance(this.deps.db, thread.id);
   }
@@ -127,7 +127,7 @@ export class CloudStandby {
 
   private async seed(thread: Thread): Promise<Standby | null> {
     const project = this.deps.project(thread);
-    const provider = await this.deps.cloud.place({ agent: "claude", claudeAccountId: thread.claudeAccountId ?? undefined }, project).catch((error: unknown) => {
+    const provider = await this.deps.cloud.place({ agent: thread.agent, claudeAccountId: thread.claudeAccountId ?? undefined }, project).catch((error: unknown) => {
       this.deps.log.info(`thread ${thread.id} has no standby sandbox: ${message(error)}`);
       return null;
     });
@@ -162,30 +162,12 @@ export class CloudStandby {
     }
     const { thread } = standby;
     const accountId = thread.claudeAccountId ?? this.deps.defaultAccountId();
-    const sessionId = runs.lastSession(this.deps.db, { threadId: thread.id }, "claude", null, accountId);
-    // A first turn's session is known once Claude starts it; a later tick arms it then.
+    const codex = thread.agent === "codex";
+    const sessionId = runs.lastSession(this.deps.db, { threadId: thread.id }, codex ? "codex" : "claude", null, accountId);
+    // A first turn's session is known once the agent starts it; a later tick arms it then.
     if (!sessionId || sessionId === turn.sessionId) return;
-    const effort = thread.effort ? ["--effort", thread.effort] : [];
-    turn.client.standby({
-      id: `takeover-${randomUUID()}`,
-      cmd: "claude",
-      args: [
-        "-p",
-        TAKEOVER_PROMPT,
-        "--output-format",
-        "stream-json",
-        "--verbose",
-        "--resume",
-        sessionId,
-        "--permission-mode",
-        claudePermissionMode(thread),
-        ...(thread.model ? ["--model", thread.model] : []),
-        ...effort,
-      ],
-      cwd: standby.location.repo,
-      env: await this.deps.agentEnvironment(standby.ref.provider, accountId),
-      afterMs: TAKEOVER_AFTER_MS,
-    });
+    const env = codex ? await this.deps.cloud.codex.prepare(standby.location, standby.ref.provider) : await this.deps.agentEnvironment(standby.ref.provider, accountId);
+    turn.client.standby({ id: `takeover-${randomUUID()}`, ...takeoverCommand(thread, sessionId), cwd: standby.location.repo, env, afterMs: TAKEOVER_AFTER_MS });
     turn.sessionId = sessionId;
   }
 
@@ -273,14 +255,14 @@ export class CloudStandby {
       id: runId,
       taskId: null,
       threadId: thread.id,
-      agent: "claude",
+      agent: thread.agent,
       model: thread.model,
       effort: thread.effort,
       mode: thread.mode,
       permissionMode: thread.permissionMode,
       claudeAccountId: thread.claudeAccountId ?? null,
     });
-    const parser = new ClaudeStreamParser(runId);
+    const parser = thread.agent === "codex" ? new CodexExecParser(runId) : new ClaudeStreamParser(runId);
     let pending = "";
     let sessionId: string | null = null;
     let resultText: string | null = null;
@@ -310,6 +292,29 @@ export class CloudStandby {
     });
     return runId;
   }
+}
+
+/** How codex exec's sandbox stands in for the conversation's permissions: nothing can ask, so review only reads. */
+const codexExecPermission: Record<Thread["permissionMode"], string[]> = {
+  review: ["-c", 'sandbox_mode="read-only"'],
+  trusted: ["-c", 'sandbox_mode="workspace-write"'],
+  autonomous: ["--dangerously-bypass-approvals-and-sandbox"],
+};
+
+/** The agent resuming its session in one go, its prompt in its arguments, its events on stdout as JSON lines. */
+function takeoverCommand(thread: Thread, sessionId: string): { cmd: string; args: string[] } {
+  if (thread.agent === "codex") {
+    const permission = thread.mode === "plan" ? codexExecPermission.review : codexExecPermission[thread.permissionMode];
+    const model = thread.model ? ["-m", thread.model] : [];
+    const effort = thread.effort ? ["-c", `model_reasoning_effort="${thread.effort}"`] : [];
+    return { cmd: "codex", args: ["exec", "resume", "--json", ...permission, ...model, ...effort, sessionId, TAKEOVER_PROMPT] };
+  }
+  const model = thread.model ? ["--model", thread.model] : [];
+  const effort = thread.effort ? ["--effort", thread.effort] : [];
+  return {
+    cmd: "claude",
+    args: ["-p", TAKEOVER_PROMPT, "--output-format", "stream-json", "--verbose", "--resume", sessionId, "--permission-mode", claudePermissionMode(thread), ...model, ...effort],
+  };
 }
 
 async function waitFor(check: () => boolean, ms: number): Promise<void> {

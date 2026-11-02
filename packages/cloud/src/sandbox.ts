@@ -9,6 +9,8 @@ export const SANDBOX_AWAY_MS = 30 * 60_000;
 export interface SandboxCommandOptions {
   cwd?: string;
   env?: Record<string, string>;
+  /** As the VM's root, such as to install a tool. A sandbox simulated on this Mac never runs anything as root. */
+  sudo?: boolean;
 }
 
 export interface SandboxExecResult {

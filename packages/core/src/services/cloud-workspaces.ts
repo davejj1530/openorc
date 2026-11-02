@@ -25,6 +25,7 @@ import { cloudAgentHost } from "./cloud-agent-host.js";
 import { CloudAwake } from "./cloud-awake.js";
 import type { CloudCheckTarget } from "./cloud-check.js";
 import type { CloudSessions } from "./cloud-sessions.js";
+import { CloudCodex } from "./cloud-codex.js";
 import type { CloudAgentEnvironment } from "./cloud-agent-env.js";
 import type { StartThreadInput } from "./thread-inputs.js";
 
@@ -40,8 +41,10 @@ export interface CloudWorkspaceOptions {
   agentEnvironment?: CloudAgentEnvironment;
   /** A conversation's cloud state changed, for the window to refresh it. */
   changed?: (threadId: string) => void;
-  /** Keeps each conversation's Claude session on both sides. */
+  /** Keeps each conversation's session on both sides. */
   sessions?: CloudSessions;
+  /** Codex's login and folder in sandboxes. Without it, Codex runs only in sandboxes simulated on this Mac. */
+  codex?: CloudCodex;
 }
 
 const SETUP_OUTPUT_TAIL = 2000;
@@ -50,12 +53,14 @@ export const CLOUD_IDLE_PROCESS_MS = 10 * 60_000;
 /** A host made for a turn whose agent never starts lets its VM go after this. */
 const LAUNCH_HOLD_MS = 60_000;
 /** The adapters take a cloud host, but only Claude's has been tried in a sandbox. */
-export const CLOUD_AGENTS = "Only Claude runs in cloud workspaces so far.";
+export const CLOUD_AGENTS = "Only Claude and Codex run in cloud workspaces so far.";
+/** The agents whose adapters run in a sandbox. */
+export const CLOUD_HARNESSES: ReadonlySet<string> = new Set(["claude", "codex"]);
 
 /** A cloud conversation runs in a project, on a worktree of its own, with an agent that runs in a sandbox. */
 export function assertCloudStart(input: Pick<StartThreadInput, "agent" | "checkout">, project: Project): void {
   if (input.checkout || project.id === WORKSPACE_ID) throw new Error("Cloud conversations start in a project, on a worktree of their own.");
-  if (input.agent !== "claude") throw new Error(CLOUD_AGENTS);
+  if (!CLOUD_HARNESSES.has(input.agent)) throw new Error(CLOUD_AGENTS);
 }
 
 /**
@@ -105,6 +110,7 @@ export class CloudWorkspaceService {
   /** One runner connection per conversation, kept while its VM is held awake. */
   private readonly connections = new Map<string, Promise<Connection>>();
   private readonly awake: CloudAwake;
+  readonly codex: CloudCodex;
   /** VMs being stopped because nothing needs them; the next use waits for the stop. */
   private readonly stopping = new Map<string, Promise<void>>();
   /** Conversations whose sandbox is finishing a turn it took over while this Mac slept. */
@@ -125,6 +131,7 @@ export class CloudWorkspaceService {
   ) {
     this.files = options.files ?? null;
     this.awake = new CloudAwake({ released: (threadId) => this.sleep(threadId), log });
+    this.codex = options.codex ?? new CloudCodex(undefined);
   }
 
   /** Checks a new cloud conversation and picks where it runs. Call before admitting it. */
@@ -132,7 +139,8 @@ export class CloudWorkspaceService {
   async place(input: Pick<StartThreadInput, "agent" | "checkout" | "claudeAccountId">, project: Project): Promise<CloudProviderId> {
     assertCloudStart(input, project);
     const provider = await this.forNewThreads();
-    await this.options.agentEnvironment?.(provider.id, input.claudeAccountId);
+    if (input.agent === "codex") await this.codex.assertCanRun(provider.id);
+    else await this.options.agentEnvironment?.(provider.id, input.claudeAccountId);
     return provider.id;
   }
 
@@ -253,12 +261,15 @@ export class CloudWorkspaceService {
   }
 
   /** Brings the conversation's Claude session to this Mac. A session not kept now is kept after the next turn. */
+  /** After a turn: the conversation's session comes to this Mac, and a Codex login refreshed in the sandbox comes back. */
   private async keepSession(thread: Thread, mirror: string): Promise<void> {
     const record = cloudWorkspaces.get(this.db, thread.id);
-    if (!record || !this.options.sessions) return;
-    await this.options.sessions.keep(thread, await this.location(record, mirror), record.provider).catch((error: unknown) => {
-      this.log.warn(`could not bring thread ${thread.id}'s Claude session to the Mac: ${error instanceof Error ? error.message : String(error)}`);
-    });
+    if (!record) return;
+    const location = await this.location(record, mirror);
+    const kept = [this.options.sessions?.keep(thread, location, record.provider), thread.agent === "codex" ? this.codex.keep(location, record.provider) : undefined];
+    for (const result of await Promise.allSettled(kept))
+      if (result.status === "rejected")
+        this.log.warn(`could not bring thread ${thread.id}'s session or login to the Mac: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`);
   }
 
   /**
@@ -323,14 +334,15 @@ export class CloudWorkspaceService {
    * Where the conversation's next turn runs, or null when it runs on this Mac. MCP requests from the sandbox reach
    * `mcpOrigin` on the Mac through the runner.
    */
-  async host(thread: Thread, mcpOrigin: string, claudeAccountId?: string | null): Promise<CloudRunHost | null> {
+  async host(thread: Thread, mcpOrigin: string, run: { agent: string; claudeAccountId?: string | null | undefined }): Promise<CloudRunHost | null> {
     const record = cloudWorkspaces.get(this.db, thread.id);
     if (!record) return null;
     if (record.state !== "ready" || !thread.worktreePath) throw new Error("This conversation's cloud workspace is not ready. Send again to set it up.");
-    if (this.takeovers.has(thread.id)) throw new Error("Claude is still finishing the turn it carried on in the cloud while this Mac slept. Send again once it is done.");
+    if (this.takeovers.has(thread.id)) throw new Error("The agent is still finishing the turn it carried on in the cloud while this Mac slept. Send again once it is done.");
+    const placed = await this.location(record, thread.worktreePath);
+    const { sandbox } = placed.install;
     // Each turn signs in as the account it runs on, so changing the thread's account takes effect at the next turn.
-    const env = (await this.options.agentEnvironment?.(record.provider, claudeAccountId)) ?? {};
-    const { sandbox } = (await this.location(record, thread.worktreePath)).install;
+    const env = run.agent === "codex" ? await this.codex.prepare(placed, record.provider) : ((await this.options.agentEnvironment?.(record.provider, run.claudeAccountId)) ?? {});
     // The VM stays awake from here until the agent's process has started, then for as long as each process runs.
     const launching = this.awake.hold(thread.id, sandbox);
     const unused = setTimeout(launching, LAUNCH_HOLD_MS);

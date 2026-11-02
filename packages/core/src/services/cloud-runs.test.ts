@@ -319,7 +319,7 @@ it("lists a conversation's sandbox, removes it once its agent is idle, and sets 
 it("refuses a cloud conversation for an agent that has not run in a sandbox, before making one", async () => {
   await expect(
     core.threads.start({
-      agent: "codex",
+      agent: "opencode",
       model: "fixture",
       effort: undefined,
       mode: "act",
@@ -330,7 +330,7 @@ it("refuses a cloud conversation for an agent that has not run in a sandbox, bef
       prompt: "Work in the cloud",
       cloud: true,
     }),
-  ).rejects.toThrow("Only Claude runs in cloud workspaces so far.");
+  ).rejects.toThrow("Only Claude and Codex run in cloud workspaces so far.");
   expect(existsSync(path.join(root, "sandboxes"))).toBe(false);
 });
 

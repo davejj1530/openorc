@@ -2,7 +2,7 @@ import { cloudWorkspaces, orchestration, threads, type Db } from "@openorc/db";
 import { WORKSPACE_ID, type Thread } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
 import type { CloudSandboxRuns } from "./cloud-sandboxes.js";
-import { CLOUD_AGENTS, type CloudWorkspaceService } from "./cloud-workspaces.js";
+import { CLOUD_AGENTS, CLOUD_HARNESSES, type CloudWorkspaceService } from "./cloud-workspaces.js";
 import { executionProject } from "./workspace-home.js";
 
 export interface CloudHandoffDeps {
@@ -26,7 +26,7 @@ export class CloudHandoff {
   private assertMovable(thread: Thread): void {
     if (cloudWorkspaces.get(this.deps.db, thread.id)) throw new Error("This conversation already runs in the cloud.");
     if (thread.projectId === WORKSPACE_ID) throw new Error("Only a project's conversations can move to the cloud.");
-    if (thread.agent !== "claude") throw new Error(CLOUD_AGENTS);
+    if (!CLOUD_HARNESSES.has(thread.agent)) throw new Error(CLOUD_AGENTS);
     if (orchestration.getInstance(this.deps.db, thread.id)) throw new Error("A team's conversations stay where the team runs.");
     if (this.deps.runs.threadActivity(thread.id) !== "idle") throw new Error("Its agent is at work. Stop the turn, then move it.");
   }
@@ -42,7 +42,7 @@ export class CloudHandoff {
     this.assertMovable(thread);
     const project = executionProject(this.deps.db, thread);
     // Before anything changes: an account that cannot sign in to the sandbox's service is refused here.
-    const provider = await this.deps.cloud.place({ agent: "claude", claudeAccountId: thread.claudeAccountId ?? undefined }, project);
+    const provider = await this.deps.cloud.place({ agent: thread.agent, claudeAccountId: thread.claudeAccountId ?? undefined }, project);
     const live = this.deps.runs.liveRunForThread(threadId);
     if (live) await this.deps.runs.closeAndWait(live.id);
     if (thread.workspaceMode === "current") thread = await this.deps.toWorktree(threadId);

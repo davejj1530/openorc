@@ -36,7 +36,7 @@ import { createSchedulesHandlers } from "./handlers/schedules.js";
 import { createSettingsHandlers } from "./handlers/settings.js";
 import { createSlackHandlers } from "./handlers/slack.js";
 import { createCloudHandlers } from "./handlers/cloud.js";
-import { createCloud, type ClaudeCloudTokens, type CloudChecks, type CloudHandoff, type CloudSandboxes, type CloudSettings, type CloudStandby } from "./services/cloud-setup.js";
+import { createCloud, type ClaudeCloudTokens, type CloudChecks, type CloudHandoff, type CloudSandboxes, type CloudSettings, type CloudStandby, type CodexCloudLogin } from "./services/cloud-setup.js";
 import { createSystemHandlers } from "./handlers/system.js";
 import { createTaskCreateHandlers } from "./handlers/task-create.js";
 import { createTaskDeleteHandlers } from "./handlers/task-delete.js";
@@ -127,20 +127,16 @@ export class OpenOrc {
   readonly frames: FrameCoalescer;
   readonly projects: ProjectService;
   readonly workspaces: WorkspaceService;
-  /** Sandboxes for cloud conversations and the connections to them. */
+  /** Cloud conversations, their sandboxes, Settings and sign-ins, moving and carrying them on: see `createCloud`. */
   readonly cloud: CloudWorkspaceService;
-  /** Where cloud threads run, as Settings keeps it. */
   readonly cloudSettings: CloudSettings;
-  /** How each Claude account's agents sign in to cloud sandboxes. */
   readonly claudeCloudTokens: ClaudeCloudTokens;
-  /** Tries everything a cloud thread needs where new ones would run. */
+  readonly codexCloudLogin: CodexCloudLogin;
   readonly cloudChecks: CloudChecks;
-  /** OpenOrc's sandboxes, for Settings to list and remove. */
   readonly cloudSandboxes: CloudSandboxes;
-  /** Moves conversations from this Mac to the cloud. */
   readonly cloudHandoff: CloudHandoff;
-  /** Carries working conversations on in the cloud while this Mac sleeps. */
   readonly cloudStandby: CloudStandby;
+  private readonly cloudParts: ReturnType<typeof createCloud>;
   readonly runs: RunService;
   readonly comments: TaskCommentService;
   readonly review: ReviewService;
@@ -266,8 +262,10 @@ export class OpenOrc {
       invalidate,
       log: this.log,
     });
+    this.cloudParts = cloud;
     this.cloudSettings = cloud.settings;
     this.claudeCloudTokens = cloud.tokens;
+    this.codexCloudLogin = cloud.codex;
     this.cloud = cloud.cloud;
     this.cloudChecks = cloud.checks;
     this.cloudSandboxes = cloud.sandboxes;
@@ -493,7 +491,7 @@ export class OpenOrc {
       brief: (project) => this.memory.brief(project),
       threadContext: (thread) => this.pullRequests.brief(thread),
       untrustedCheckout: (thread) => inUnvettedCopy(db, thread),
-      cloudHost: (thread, mcpOrigin, accountId) => this.cloud.host(thread, mcpOrigin, accountId),
+      cloudHost: (thread, mcpOrigin, run) => this.cloud.host(thread, mcpOrigin, run),
       syncCloud: (thread, sync) => {
         // A turn on this Mac keeps its standby sandbox current, for the cloud to take it over if the Mac sleeps.
         this.cloudStandby.observe(thread, sync);
@@ -743,7 +741,7 @@ export class OpenOrc {
   private buildHandlers(invalidate: (keys: string[]) => void): Handlers {
     return composeHandlers(
       createSlackHandlers({ slack: this.slack, invalidate }),
-      createCloudHandlers({ settings: this.cloudSettings, tokens: this.claudeCloudTokens, checks: this.cloudChecks, sandboxes: this.cloudSandboxes, handoff: this.cloudHandoff, invalidate }),
+      createCloudHandlers({ ...this.cloudParts, invalidate }),
       createClaudeAccountHandlers(this.claudeAccounts),
       createSystemHandlers({
         system: this.system,

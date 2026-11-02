@@ -1,0 +1,29 @@
+{
+  "name": "@openorc/brain",
+  "version": "0.0.0",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "description": "The cloud brain: the OpenOrc core headless on a Linux sandbox, so phones work while the Mac sleeps.",
+  "scripts": {
+    "bundle": "node build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "fastembed": "2.1.0",
+    "onnxruntime-node": "1.21.0",
+    "sqlite-vec": "0.1.9"
+  },
+  "devDependencies": {
+    "@openorc/cloud": "workspace:*",
+    "@openorc/core": "workspace:*",
+    "@openorc/db": "workspace:*",
+    "@openorc/git": "workspace:*",
+    "@openorc/protocol": "workspace:*",
+    "@types/node": "^24.0.0",
+    "esbuild": "0.28.2",
+    "typescript": "^5.9.0",
+    "vitest": "^4.1.11"
+  }
+}

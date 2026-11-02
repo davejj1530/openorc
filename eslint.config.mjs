@@ -2,7 +2,7 @@ import tseslint from "typescript-eslint";
 import reactHooks from "eslint-plugin-react-hooks";
 
 const typescriptFiles = ["**/*.{ts,tsx,mts,cts}"];
-const applicationTypeScript = ["packages/*/src/**/*.{ts,tsx}", "apps/desktop/src/**/*.{ts,tsx}", "apps/mobile/src/**/*.{ts,tsx}", "apps/website/src/**/*.ts"];
+const applicationTypeScript = ["packages/*/src/**/*.{ts,tsx}", "apps/brain/src/**/*.ts", "apps/desktop/src/**/*.{ts,tsx}", "apps/mobile/src/**/*.{ts,tsx}", "apps/website/src/**/*.ts"];
 // The editor engine stays behind one folder, so swapping or upgrading it touches nothing else.
 const codeEditorFolder = "apps/desktop/src/renderer/src/components/code-editor";
 const codeEditorFence = {
@@ -52,7 +52,14 @@ export default [
     files: applicationTypeScript,
     languageOptions: {
       parserOptions: {
-        project: ["packages/*/tsconfig.json", "apps/desktop/tsconfig.node.json", "apps/desktop/tsconfig.web.json", "apps/mobile/tsconfig.json", "apps/website/tsconfig.json"],
+        project: [
+          "packages/*/tsconfig.json",
+          "apps/brain/tsconfig.json",
+          "apps/desktop/tsconfig.node.json",
+          "apps/desktop/tsconfig.web.json",
+          "apps/mobile/tsconfig.json",
+          "apps/website/tsconfig.json",
+        ],
         tsconfigRootDir: import.meta.dirname,
       },
     },

@@ -58,6 +58,7 @@ const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
   "slack.status": ["slack"],
   "cloud.status": ["cloud"],
   "cloud.sandboxes": ["cloud"],
+  "cloud.offer": ["cloud"],
   "remote.status": ["remote"],
   "system.info": ["system"],
   "system.gh": ["system"],

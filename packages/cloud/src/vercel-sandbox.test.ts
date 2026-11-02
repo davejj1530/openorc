@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { SANDBOX_AWAY_MS } from "./sandbox.js";
-import { VercelSandbox, VercelSandboxProvider, type VercelApi, type VercelCommand, type VercelVm } from "./vercel-sandbox.js";
+import { VercelSandbox, VercelSandboxProvider, type VercelApi, type VercelCommand, type VercelListed, type VercelVm } from "./vercel-sandbox.js";
 
 type Line = { stream: "stdout" | "stderr"; data: string };
 
@@ -177,13 +177,18 @@ describe("the Vercel sandbox provider", () => {
   const settings = { credentials: async () => ({ token: "tok", teamId: "team", projectId: "proj" }) };
 
   /** An API whose sandboxes exist after their first open, with `claude` on PATH when `hasClaude` says so. */
-  function api(hasClaude: () => boolean) {
+  function api(hasClaude: () => boolean, listed: VercelListed[] = []) {
     const created = new Set<string>();
     const vm = fakeVm((run) => finished(run.cmd === "sh" && !hasClaude() ? 1 : 0));
     const calls: Parameters<VercelApi["getOrCreate"]>[0][] = [];
     const removed: string[] = [];
+    const prefixes: string[] = [];
     const fake: VercelApi = {
       remove: async ({ name }) => void removed.push(name),
+      list: async ({ prefix }) => {
+        prefixes.push(prefix);
+        return listed;
+      },
       getOrCreate: async (params) => {
         calls.push(params);
         if (!created.has(params.name)) {
@@ -193,7 +198,7 @@ describe("the Vercel sandbox provider", () => {
         return vm;
       },
     };
-    return { fake, vm, calls, removed };
+    return { fake, vm, calls, removed, prefixes };
   }
 
   const installs = (vm: { runs: Run[] }) => vm.runs.filter((run) => run.cmd === "npm");
@@ -217,6 +222,39 @@ describe("the Vercel sandbox provider", () => {
     const missing = api(() => false);
     await new VercelSandboxProvider({ ...settings, api: missing.fake }).open("openorc-b");
     expect(installs(missing.vm)).toEqual([expect.objectContaining({ args: ["install", "-g", "@anthropic-ai/claude-code"], sudo: true })]);
+  });
+
+  it("makes new sandboxes the size Settings asks for, and leaves Vercel's default otherwise", async () => {
+    const sized = api(() => true);
+    await new VercelSandboxProvider({ credentials: async () => ({ token: "tok", teamId: "team", projectId: "proj", vcpus: 8 }), api: sized.fake }).open("openorc-e");
+    expect(sized.calls[0]?.resources).toEqual({ vcpus: 8 });
+    const plain = api(() => true);
+    await new VercelSandboxProvider({ ...settings, api: plain.fake }).open("openorc-f");
+    expect(plain.calls[0]).not.toHaveProperty("resources");
+  });
+
+  it("lists OpenOrc's sandboxes with their state, size, time awake and cost at list prices", async () => {
+    const now = Date.now();
+    const { fake, prefixes } = api(
+      () => true,
+      [
+        { name: "openorc-a", status: "running", createdAt: now - 7_200_000, statusUpdatedAt: now - 600_000, vcpus: 8, memory: 16_384, totalActiveCpuDurationMs: 360_000, totalDurationMs: 3_600_000 },
+        { name: "openorc-b", status: "snapshotting", createdAt: now - 60_000, vcpus: 2, memory: 4096 },
+      ],
+    );
+    const sandboxes = await new VercelSandboxProvider({ ...settings, api: fake }).list();
+    expect(prefixes).toEqual(["openorc-"]);
+    expect(sandboxes[0]).toEqual({
+      name: "openorc-a",
+      state: "running",
+      createdAt: now - 7_200_000,
+      awakeSince: now - 600_000,
+      awakeMs: 3_600_000,
+      vcpus: 8,
+      memoryMb: 16_384,
+      costUsd: expect.closeTo(0.1 * 0.128 + 16 * 0.0212, 6),
+    });
+    expect(sandboxes[1]).toMatchObject({ state: "stopping", awakeSince: null, awakeMs: 0, costUsd: 0 });
   });
 
   it("checks a sandbox it did not create once, the first time this app opens it", async () => {

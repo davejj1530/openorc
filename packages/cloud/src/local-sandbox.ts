@@ -1,8 +1,8 @@
 import { spawn, type ChildProcess, type StdioOptions } from "node:child_process";
 import { once } from "node:events";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { SANDBOX_AWAY_MS, type Sandbox, type SandboxCommandOptions, type SandboxExecResult, type SandboxProvider, type SandboxStream } from "./sandbox.js";
+import { SANDBOX_AWAY_MS, type Sandbox, type SandboxCommandOptions, type SandboxExecResult, type SandboxInfo, type SandboxProvider, type SandboxStream } from "./sandbox.js";
 
 function signalGroup(child: ChildProcess, signal: NodeJS.Signals): void {
   if (!child.pid) return;
@@ -22,7 +22,9 @@ function signalGroup(child: ChildProcess, signal: NodeJS.Signals): void {
 export class LocalSandbox implements Sandbox {
   private readonly running = new Set<ChildProcess>();
   private readonly streams = new Set<ChildProcess>();
-  private session: { timer: ReturnType<typeof setTimeout>; endsAt: number } | null = null;
+  private session: { timer: ReturnType<typeof setTimeout>; startedAt: number; endsAt: number } | null = null;
+  /** How long it ran in the sessions that ended since the app started. */
+  private pastMs = 0;
 
   constructor(
     readonly name: string,
@@ -40,7 +42,13 @@ export class LocalSandbox implements Sandbox {
     if (this.session) clearTimeout(this.session.timer);
     const timer = setTimeout(() => void this.stop(), ms);
     timer.unref();
-    this.session = { timer, endsAt: Date.now() + ms };
+    this.session = { timer, startedAt: this.session?.startedAt ?? Date.now(), endsAt: Date.now() + ms };
+  }
+
+  /** When the running session began, and how long it has run in all, as far as this app has seen. */
+  awake(): { since: number | null; ms: number } {
+    const since = this.session?.startedAt ?? null;
+    return { since, ms: this.pastMs + (since === null ? 0 : Date.now() - since) };
   }
 
   async keepAwake(): Promise<void> {
@@ -108,7 +116,10 @@ export class LocalSandbox implements Sandbox {
   }
 
   async stop(): Promise<void> {
-    if (this.session) clearTimeout(this.session.timer);
+    if (this.session) {
+      clearTimeout(this.session.timer);
+      this.pastMs += Date.now() - this.session.startedAt;
+    }
     this.session = null;
     const running = [...this.running];
     const closed = running.map((child) => (child.exitCode === null && child.signalCode === null ? once(child, "close") : Promise.resolve()));
@@ -143,6 +154,27 @@ export class LocalSandboxProvider implements SandboxProvider {
     const sandbox = new LocalSandbox(name, root, this.env, this.awayMs);
     this.sandboxes.set(name, sandbox);
     return sandbox;
+  }
+
+  /** Its sandboxes' folders; how long each ran is known only for this app's lifetime, and a simulated one costs nothing. */
+  async list(): Promise<SandboxInfo[]> {
+    const names = await readdir(this.base).catch(() => [] as string[]);
+    return Promise.all(
+      names.map(async (name) => {
+        const awake = this.sandboxes.get(name)?.awake() ?? { since: null, ms: 0 };
+        const created = (await stat(path.join(this.base, name))).birthtimeMs;
+        return {
+          name,
+          state: awake.since === null ? "stopped" : "running",
+          createdAt: created,
+          awakeSince: awake.since,
+          awakeMs: awake.ms,
+          vcpus: null,
+          memoryMb: null,
+          costUsd: null,
+        } satisfies SandboxInfo;
+      }),
+    );
   }
 
   async remove(name: string): Promise<void> {

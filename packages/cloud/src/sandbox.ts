@@ -51,12 +51,32 @@ export interface Sandbox {
   stop(): Promise<void>;
 }
 
+/** Every sandbox OpenOrc makes is named with this, so a list leaves out a team's other sandboxes. */
+export const SANDBOX_PREFIX = "openorc-";
+
+/** What a sandbox service reports about one of OpenOrc's sandboxes. */
+export interface SandboxInfo {
+  name: string;
+  state: "starting" | "running" | "stopping" | "stopped" | "failed";
+  createdAt: number;
+  /** When its running session began; null while it does not run. */
+  awakeSince: number | null;
+  /** How long it has run, all sessions together, as the service last counted. */
+  awakeMs: number;
+  vcpus: number | null;
+  memoryMb: number | null;
+  /** Estimated at the service's list prices; null where nothing is billed. */
+  costUsd: number | null;
+}
+
 export interface SandboxProvider {
   readonly id: "local" | "vercel";
   /** Creates the named sandbox, or wakes it when it exists. */
   open(name: string): Promise<Sandbox>;
   /** Deletes the named sandbox and its files for good. */
   remove(name: string): Promise<void>;
+  /** Every sandbox OpenOrc made on this service: its conversations' own, and any no conversation has anymore. */
+  list(): Promise<SandboxInfo[]>;
   /** Called as OpenOrc closes. A cloud VM keeps running and sleeps on its own; a sandbox on this Mac stops here. */
   close?(): Promise<void>;
 }

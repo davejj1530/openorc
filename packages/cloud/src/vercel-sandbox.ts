@@ -1,6 +1,6 @@
 import { PassThrough, Writable } from "node:stream";
 import { APIError, Sandbox as SdkSandbox } from "@vercel/sandbox";
-import { SANDBOX_AWAY_MS, type Sandbox, type SandboxCommandOptions, type SandboxExecResult, type SandboxProvider, type SandboxStream } from "./sandbox.js";
+import { SANDBOX_AWAY_MS, SANDBOX_PREFIX, type Sandbox, type SandboxCommandOptions, type SandboxExecResult, type SandboxInfo, type SandboxProvider, type SandboxStream } from "./sandbox.js";
 
 /** After the command exits, how long its remaining output gets to arrive before the stream ends anyway. */
 const LOG_DRAIN_MS = 2000;
@@ -9,6 +9,59 @@ export interface VercelCredentials {
   token: string;
   teamId: string;
   projectId: string;
+}
+
+/** The connection Settings keeps: where sandboxes go, and how big new ones are. */
+export interface VercelConnection extends VercelCredentials {
+  /** vCPUs for new sandboxes, with 2 GB of memory each; Vercel's default when absent. */
+  vcpus?: number;
+}
+
+/** Vercel's list prices for Sandbox on Pro, in its default region iad1 (vercel.com/docs/sandbox/pricing, 2026-11-02). */
+const PRICE = { activeCpuHour: 0.128, memoryGbHour: 0.0212 } as const;
+const HOUR_MS = 3_600_000;
+
+/** A sandbox's cost at list prices: CPU only while it computes, memory for as long as it runs. Pro's monthly credit pays first. */
+export function vercelSandboxCost(usage: { activeCpuMs: number; durationMs: number; memoryMb: number }): number {
+  return (usage.activeCpuMs / HOUR_MS) * PRICE.activeCpuHour + (usage.memoryMb / 1024) * (usage.durationMs / HOUR_MS) * PRICE.memoryGbHour;
+}
+
+/** The parts of a listed Vercel sandbox the provider reports. */
+export interface VercelListed {
+  name: string;
+  status: "pending" | "running" | "stopping" | "stopped" | "failed" | "aborted" | "snapshotting";
+  createdAt: number;
+  statusUpdatedAt?: number | undefined;
+  vcpus?: number | undefined;
+  memory?: number | undefined;
+  totalActiveCpuDurationMs?: number | undefined;
+  totalDurationMs?: number | undefined;
+}
+
+const STATES: Record<VercelListed["status"], SandboxInfo["state"]> = {
+  pending: "starting",
+  running: "running",
+  stopping: "stopping",
+  snapshotting: "stopping",
+  stopped: "stopped",
+  failed: "failed",
+  aborted: "failed",
+};
+
+function info(listed: VercelListed): SandboxInfo {
+  const running = listed.status === "running";
+  const memoryMb = listed.memory ?? null;
+  const awakeMs = listed.totalDurationMs ?? 0;
+  return {
+    name: listed.name,
+    state: STATES[listed.status],
+    createdAt: listed.createdAt,
+    awakeSince: running ? (listed.statusUpdatedAt ?? null) : null,
+    awakeMs,
+    vcpus: listed.vcpus ?? null,
+    memoryMb,
+    costUsd: vercelSandboxCost({ activeCpuMs: listed.totalActiveCpuDurationMs ?? 0, durationMs: awakeMs, memoryMb: memoryMb ?? 0 }),
+  };
 }
 
 /** The parts of a Vercel command this provider uses. */
@@ -38,6 +91,7 @@ export interface VercelOpenParams extends VercelCredentials {
   name: string;
   persistent: true;
   timeout: number;
+  resources?: { vcpus: number };
   env?: Record<string, string>;
   onCreate: (vm: VercelVm) => Promise<void>;
 }
@@ -47,6 +101,8 @@ export interface VercelApi {
   getOrCreate(params: VercelOpenParams): Promise<VercelVm>;
   /** Deletes the sandbox, its files and the snapshots only it used. */
   remove(params: VercelCredentials & { name: string }): Promise<void>;
+  /** The project's sandboxes whose names start with `prefix`. */
+  list(params: VercelCredentials & { prefix: string }): Promise<VercelListed[]>;
 }
 
 const sdk: VercelApi = {
@@ -64,11 +120,13 @@ const sdk: VercelApi = {
       throw error;
     }
   },
+  // Vercel takes a name prefix only when the list is sorted by name.
+  list: async ({ prefix, token, teamId, projectId }) => (await SdkSandbox.list({ projectId, token, teamId, namePrefix: prefix, sortBy: "name" })).toArray(),
 };
 
 export interface VercelProviderOptions {
   /** Null until Vercel is connected. Read on every open, so a change in Settings applies to the next sandbox. */
-  credentials: () => Promise<VercelCredentials | null>;
+  credentials: () => Promise<VercelConnection | null>;
   api?: VercelApi;
 }
 
@@ -159,7 +217,7 @@ export class VercelSandboxProvider implements SandboxProvider {
     this.api = options.api ?? sdk;
   }
 
-  private async access(): Promise<VercelCredentials> {
+  private async access(): Promise<VercelConnection> {
     const access = await this.options.credentials();
     if (!access?.token || !access.teamId || !access.projectId) throw new Error("Connect Vercel in Settings to run in the cloud.");
     return access;
@@ -172,12 +230,22 @@ export class VercelSandboxProvider implements SandboxProvider {
     this.checked.delete(name);
   }
 
+  /** None until Vercel is connected. */
+  async list(): Promise<SandboxInfo[]> {
+    const access = await this.options.credentials();
+    if (!access) return [];
+    const { token, teamId, projectId } = access;
+    return (await this.api.list({ token, teamId, projectId, prefix: SANDBOX_PREFIX })).map(info);
+  }
+
   async open(name: string): Promise<VercelSandbox> {
     const access = await this.access();
     let created = false;
     const vm = await this.api.getOrCreate({
       name,
       persistent: true,
+      // Applies when the sandbox is made; one that exists keeps the size it was made with.
+      ...(access.vcpus ? { resources: { vcpus: access.vcpus } } : {}),
       // OpenOrc keeps the session awake while an agent works and stops it once none does; this is for when the Mac is away.
       timeout: SANDBOX_AWAY_MS,
       token: access.token,

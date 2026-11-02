@@ -8,7 +8,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import type { RemoteProcess } from "./remote-process.js";
 import { installRunner, RunnerClient, type RunnerFile, type RunnerInstall } from "./runner-client.js";
-import type { Sandbox, SandboxProvider } from "./sandbox.js";
+import { SANDBOX_PREFIX, type Sandbox, type SandboxProvider } from "./sandbox.js";
 import { pullWorkspace, seedWorkspace } from "./sync.js";
 
 const run = promisify(execFile);
@@ -126,7 +126,7 @@ async function sync(install: RunnerInstall): Promise<void> {
  */
 export async function checkSandbox(provider: SandboxProvider, options: { files: RunnerFile[]; node?: string; report: (progress: CheckProgress) => void }): Promise<boolean> {
   const node = options.node ?? "node";
-  const name = `openorc-check-${randomUUID().slice(0, 8)}`;
+  const name = `${SANDBOX_PREFIX}check-${randomUUID().slice(0, 8)}`;
   let sandbox: Sandbox | null = null;
   let client: RunnerClient | null = null;
   let install: RunnerInstall | null = null;

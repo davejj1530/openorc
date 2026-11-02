@@ -45,6 +45,18 @@ it("stops on its own once nobody keeps it awake, keeps its files, and starts aga
   expect((await sandbox.exec("cat", ["note.txt"])).stdout.toString()).toBe("kept");
 });
 
+it("lists its sandboxes, running or stopped, with how long they ran", async () => {
+  const sandbox = await provider.open("listed");
+  await sandbox.exec("true", []);
+  await sleep(50);
+  const running = (await provider.list()).find((entry) => entry.name === "listed");
+  expect(running).toMatchObject({ state: "running", awakeSince: expect.any(Number), vcpus: null, costUsd: null });
+  await sandbox.stop();
+  const stopped = (await provider.list()).find((entry) => entry.name === "listed");
+  expect(stopped).toMatchObject({ state: "stopped", awakeSince: null });
+  expect(stopped!.awakeMs).toBeGreaterThanOrEqual(50);
+});
+
 it("deletes a sandbox and its files, stopping what runs there", async () => {
   const sandbox = await provider.open("doomed");
   const pidFile = path.join(sandbox.root, "pid");

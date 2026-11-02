@@ -1,6 +1,6 @@
 import path from "node:path";
 import type { AgentHost } from "@openorc/agents";
-import { installRunner, pullWorkspace, RunnerClient, runnerFiles, seedWorkspace, type RunnerFile, type SandboxProvider, type WorkspaceLocation } from "@openorc/cloud";
+import { installRunner, pullWorkspace, pushWorkspace, RunnerClient, runnerFiles, seedWorkspace, type RunnerFile, type SandboxProvider, type WorkspaceLocation } from "@openorc/cloud";
 import { cloudWorkspaces, type CloudWorkspaceRecord, type Db } from "@openorc/db";
 import { originUrl } from "@openorc/git";
 import { WORKSPACE_ID, type Project, type Thread } from "@openorc/protocol";
@@ -46,8 +46,8 @@ export class CloudWorkspaceService {
   private readonly locations = new Map<string, Promise<WorkspaceLocation>>();
   /** One runner connection per conversation, kept for the life of the core. */
   private readonly connections = new Map<string, Promise<Connection>>();
-  /** The pull running for each conversation; the next one waits for it. */
-  private readonly pulls = new Map<string, Promise<boolean>>();
+  /** The sync running for each conversation; the next one waits for it. */
+  private readonly syncs = new Map<string, Promise<boolean>>();
 
   constructor(
     private readonly db: Db,
@@ -82,26 +82,40 @@ export class CloudWorkspaceService {
   }
 
   /**
-   * Brings the sandbox's changes to the conversation's worktree on the Mac. Pulls for one conversation run one after
-   * another. False when nothing changed, or the conversation does not run in the cloud.
+   * Brings the sandbox's changes to the conversation's worktree on the Mac. With `push`, what changed in the worktree
+   * first goes to the sandbox: between turns the Mac may commit, undo or edit, while during a turn only the sandbox
+   * writes. Syncs for one conversation run one after another. False when the worktree did not change, or the
+   * conversation does not run in the cloud.
    */
-  pull(thread: Thread): Promise<boolean> {
+  sync(thread: Thread, options: { push?: boolean } = {}): Promise<boolean> {
     const record = cloudWorkspaces.get(this.db, thread.id);
     const mirror = thread.worktreePath;
     if (record?.state !== "ready" || !mirror) return Promise.resolve(false);
-    const previous = this.pulls.get(thread.id) ?? Promise.resolve(false);
-    const next = previous.catch(() => false).then(() => this.pullOnce(thread.id, mirror));
-    this.pulls.set(thread.id, next);
+    const previous = this.syncs.get(thread.id) ?? Promise.resolve(false);
+    const next = previous
+      .catch(() => false)
+      .then(async () => {
+        if (options.push) await this.pushOnce(thread.id, mirror);
+        return this.pullOnce(thread.id, mirror);
+      });
+    this.syncs.set(thread.id, next);
     void next
       .finally(() => {
-        if (this.pulls.get(thread.id) === next) this.pulls.delete(thread.id);
+        if (this.syncs.get(thread.id) === next) this.syncs.delete(thread.id);
       })
       .catch(() => undefined);
     return next;
   }
 
+  private async pushOnce(threadId: string, mirror: string): Promise<void> {
+    const record = cloudWorkspaces.get(this.db, threadId);
+    if (record?.state !== "ready" || !record.mirror) return;
+    const result = await pushWorkspace(await this.location(record, mirror), record.mirror);
+    if (result.pushed) cloudWorkspaces.ready(this.db, threadId, result.state);
+  }
+
   private async pullOnce(threadId: string, mirror: string): Promise<boolean> {
-    // Read again: the pull before this one moved the state on.
+    // Read again: the sync before this one moved the state on.
     const record = cloudWorkspaces.get(this.db, threadId);
     if (record?.state !== "ready" || !record.mirror) return false;
     const result = await pullWorkspace(await this.location(record, mirror), record.mirror);
@@ -144,11 +158,12 @@ export class CloudWorkspaceService {
     return { host: cloudAgentHost(client, location, port), cwd: location.repo };
   }
 
-  /** Disconnects from every sandbox. Their processes keep running there. */
+  /** Disconnects from every sandbox. Processes in a cloud VM keep running there; sandboxes on this Mac stop. */
   async close(): Promise<void> {
     const connections = [...this.connections.values()];
     this.connections.clear();
     for (const connection of await Promise.allSettled(connections)) if (connection.status === "fulfilled") connection.value.client.close();
+    await this.options.provider.close?.();
   }
 
   private connect(record: CloudWorkspaceRecord, mirror: string): Promise<Connection> {

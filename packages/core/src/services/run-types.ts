@@ -237,8 +237,11 @@ export interface RunHooks {
   untrustedCheckout?(thread: Thread): boolean;
   /** Where a cloud conversation's agent runs, or null when it runs on this Mac. MCP requests from there reach `mcpOrigin`. */
   cloudHost?(thread: Thread, mcpOrigin: string): Promise<CloudRunHost | null>;
-  /** Brings a cloud conversation's changes to its worktree on the Mac; false when nothing changed or it runs on the Mac. Never rejects. */
-  syncCloud?(thread: Thread): Promise<boolean>;
+  /**
+   * Brings a cloud conversation's changes to its worktree on the Mac, after sending the worktree's own changes up when
+   * `push` is set; false when nothing changed or it runs on the Mac. Never rejects.
+   */
+  syncCloud?(thread: Thread, options?: { push?: boolean }): Promise<boolean>;
   memoryEnabled?(): boolean;
   onRunFinished(run: Run, scope: RunScope, project: Project): void;
   /** Synchronous notification after capture; consumers queue follow-up work instead of awaiting it here. */

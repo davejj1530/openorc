@@ -45,6 +45,7 @@ lines.on("line", async (line) => {
   log.inside = ask("notes.txt");
   log.outside = ask("/etc/hosts");
   writeFileSync("made-in-cloud.txt", "hello\\n");
+  if (log.prompt.includes("Keep going")) writeFileSync("second.txt", "again\\n");
   writeFileSync(process.env.FAKE_CLAUDE_LOG, JSON.stringify(log));
   emit({ type: "system", subtype: "init", session_id: "cloud-session", model: "fixture", tools: [] });
   emit({ type: "assistant", message: { id: "m1", role: "assistant", content: [{ type: "text", text: "Done in the cloud" }], usage: { input_tokens: 1, output_tokens: 1 } } });
@@ -82,8 +83,19 @@ beforeEach(async () => {
   project = await core.projects.import(checkout);
 });
 
+/** Processes whose command line names `folder`, such as a simulated sandbox's runner. */
+function processesUnder(folder: string): string[] {
+  try {
+    return execFileSync("pgrep", ["-f", folder], { encoding: "utf8" }).split("\n").filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
 afterEach(async () => {
   await core.close();
+  // Sandboxes simulated on this Mac stop with the core that started them.
+  expect(processesUnder(path.join(root, "sandboxes"))).toEqual([]);
   vi.restoreAllMocks();
   await rm(root, { recursive: true, force: true });
 });
@@ -175,4 +187,41 @@ it("refuses a cloud conversation for an agent that has not run in a sandbox, bef
     }),
   ).rejects.toThrow("Only Claude runs in cloud workspaces so far.");
   expect(existsSync(path.join(root, "sandboxes"))).toBe(false);
+});
+
+it("sends a commit made on the Mac between turns to the sandbox, and keeps it on the branch", async () => {
+  const { thread, run } = await core.threads.start({
+    agent: "claude",
+    model: "fixture",
+    effort: undefined,
+    mode: "act",
+    permissionMode: "autonomous",
+    attachments: undefined,
+    title: undefined,
+    projectId: project.id,
+    prompt: "Work in the cloud",
+    cloud: true,
+  });
+  const mirror = core.threads.get(thread.id)!.worktreePath!;
+  const repo = path.join(root, "sandboxes", `openorc-${thread.id}`, "repo");
+  await until(() => {
+    const last = checkpoints.listForThread(core.db, thread.id).at(-1);
+    return Boolean(last) && execFileSync("git", ["ls-tree", "--name-only", last!.treeSha], { cwd: mirror, encoding: "utf8" }).includes("made-in-cloud.txt");
+  });
+  await git(mirror, ["add", "-A"]);
+  await git(mirror, ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.com", "commit", "-qm", "Committed on the Mac"]);
+  const committed = (await git(mirror, ["rev-parse", "HEAD"])).stdout.trim();
+
+  await rm(log, { force: true });
+  await core.runs.send(run!.id, "Keep going");
+  await until(() => existsSync(log));
+  expect(execFileSync("git", ["rev-parse", "HEAD"], { cwd: repo, encoding: "utf8" }).trim()).toBe(committed);
+  await until(() => existsSync(path.join(mirror, "second.txt")));
+  await until(() => {
+    const last = checkpoints.listForThread(core.db, thread.id).at(-1);
+    return Boolean(last) && execFileSync("git", ["ls-tree", "--name-only", last!.treeSha], { cwd: mirror, encoding: "utf8" }).includes("second.txt");
+  });
+  expect((await git(mirror, ["rev-parse", "HEAD"])).stdout.trim()).toBe(committed);
+  expect((await git(mirror, ["status", "--porcelain"])).stdout).toBe("?? second.txt\n");
+  expect((await git(mirror, ["for-each-ref", `refs/openorc/cloud/${thread.id}/kept-commit/`])).stdout).toBe("");
 });

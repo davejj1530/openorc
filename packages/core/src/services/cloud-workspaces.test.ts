@@ -71,7 +71,12 @@ describe("cloud workspace preparation", () => {
     expect(existsSync(path.join(prepared.worktreePath!, "setup-runs.txt"))).toBe(false);
     const record = cloudWorkspaces.get(db, prepared.id)!;
     expect(record.state).toBe("ready");
-    expect(record.mirror).toEqual({ snapshot: null, tree: expect.stringMatching(/^[0-9a-f]{40}$/), known: [expect.stringMatching(/^[0-9a-f]{40}$/)] });
+    expect(record.mirror).toEqual({
+      snapshot: null,
+      tree: expect.stringMatching(/^[0-9a-f]{40}$/),
+      head: expect.stringMatching(/^[0-9a-f]{40}$/),
+      known: [expect.stringMatching(/^[0-9a-f]{40}$/)],
+    });
   });
 
   it("leaves a ready workspace alone when the conversation continues", async () => {

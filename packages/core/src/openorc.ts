@@ -464,8 +464,8 @@ export class OpenOrc {
       threadContext: (thread) => this.pullRequests.brief(thread),
       untrustedCheckout: (thread) => inUnvettedCopy(db, thread),
       cloudHost: (thread, mcpOrigin) => this.cloud.host(thread, mcpOrigin),
-      syncCloud: (thread) =>
-        this.cloud.pull(thread).catch((error: unknown) => {
+      syncCloud: (thread, sync) =>
+        this.cloud.sync(thread, sync).catch((error: unknown) => {
           this.log.warn(`could not bring thread ${thread.id}'s cloud changes to the Mac: ${error instanceof Error ? error.message : String(error)}`);
           return false;
         }),

@@ -274,8 +274,9 @@ export class RunLaunch {
   private async captureTurnStart(input: StartRunInput, lease: WorkspaceLease): Promise<OutsideChanges | null> {
     const thread = input.scope.thread;
     if (!thread) return null;
-    // A cloud conversation's worktree mirrors its sandbox, so it catches up before the turn's starting point is saved.
-    await this.deps.hooks.syncCloud?.(thread);
+    // Between turns the Mac may have committed or edited in a cloud conversation's worktree: that goes to the sandbox,
+    // then the worktree catches up with the sandbox before the turn's starting point is saved.
+    await this.deps.hooks.syncCloud?.(thread, { push: true });
     return this.deps.turnStarts.capture({ thread, project: input.project, cwd: lease.paths[0]!, team: Boolean(input.teamAttemptId) });
   }
 

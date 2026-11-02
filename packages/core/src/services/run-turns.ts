@@ -25,7 +25,7 @@ interface RunTurnsDependencies {
   live: ReadonlyMap<string, LiveRun>;
   compactions: ReadonlyMap<string, Promise<void>>;
   isClosing: () => boolean;
-  hooks: Pick<RunHooks, "assertSend" | "orclings">;
+  hooks: Pick<RunHooks, "assertSend" | "orclings" | "syncCloud">;
   turnStarts: Pick<TurnStartCapture, "capture">;
   resetAgentChain: (threadId: string) => void;
   disarmIdle: (runId: string) => void;
@@ -133,9 +133,11 @@ export class RunTurns {
   }
 
   /** The folder as this thread's turn begins, before the provider can touch it. The transcript records the message alone. */
-  private captureTurnStart(entry: LiveRun): Promise<OutsideChanges | null> {
+  private async captureTurnStart(entry: LiveRun): Promise<OutsideChanges | null> {
     const thread = entry.scope.thread ? threads.get(this.deps.db, entry.scope.thread.id) : null;
-    if (!thread) return Promise.resolve(null);
+    if (!thread) return null;
+    // A cloud conversation's worktree sends the Mac's changes up and catches up with its sandbox first.
+    await this.deps.hooks.syncCloud?.(thread, { push: true });
     return this.deps.turnStarts.capture({ thread, project: executionProject(this.deps.db, thread), cwd: entry.workspaceLease.paths[0]!, team: entry.team });
   }
 

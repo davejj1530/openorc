@@ -140,7 +140,7 @@ describe("a sandbox on Vercel", () => {
 });
 
 describe("the Vercel sandbox provider", () => {
-  const settings = { credentials: async () => ({ token: "tok", teamId: "team", projectId: "proj", claudeToken: "claude-tok" }) };
+  const settings = { credentials: async () => ({ token: "tok", teamId: "team", projectId: "proj" }) };
 
   /** An API whose sandboxes exist after their first open, with `claude` on PATH when `hasClaude` says so. */
   function api(hasClaude: () => boolean) {
@@ -165,7 +165,7 @@ describe("the Vercel sandbox provider", () => {
   const installs = (vm: { runs: Run[] }) => vm.runs.filter((run) => run.cmd === "npm");
   const checks = (vm: { runs: Run[] }) => vm.runs.filter((run) => run.cmd === "sh");
 
-  it("passes the credentials and the Claude token, and installs Claude Code only when it is missing", async () => {
+  it("passes the credentials, keeps every account's Claude token out of the sandbox, and installs Claude Code only when it is missing", async () => {
     const present = api(() => true);
     await new VercelSandboxProvider({ ...settings, api: present.fake }).open("openorc-a");
     expect(present.calls[0]).toMatchObject({
@@ -175,8 +175,8 @@ describe("the Vercel sandbox provider", () => {
       token: "tok",
       teamId: "team",
       projectId: "proj",
-      env: { CLAUDE_CODE_OAUTH_TOKEN: "claude-tok" },
     });
+    expect(present.calls[0]).not.toHaveProperty("env");
     expect(checks(present.vm)).toHaveLength(1);
     expect(installs(present.vm)).toHaveLength(0);
 

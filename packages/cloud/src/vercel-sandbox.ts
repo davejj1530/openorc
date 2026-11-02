@@ -14,12 +14,6 @@ export interface VercelCredentials {
   projectId: string;
 }
 
-/** What the app keeps to run sandboxes on Vercel: the account's credentials and a Claude token for the agents there. */
-export interface VercelAccess extends VercelCredentials {
-  /** A long-lived Claude token from `claude setup-token`, given to every command in the VM. */
-  claudeToken?: string;
-}
-
 /** The parts of a Vercel command this provider uses. */
 export interface VercelCommand {
   wait(): Promise<{ exitCode: number; stdout(): Promise<string>; stderr(): Promise<string> }>;
@@ -65,7 +59,7 @@ const sdk: VercelApi = {
 
 export interface VercelProviderOptions {
   /** Null until Vercel is connected. Read on every open, so a change in Settings applies to the next sandbox. */
-  credentials: () => Promise<VercelAccess | null>;
+  credentials: () => Promise<VercelCredentials | null>;
   api?: VercelApi;
 }
 
@@ -144,7 +138,7 @@ export class VercelSandboxProvider implements SandboxProvider {
     this.api = options.api ?? sdk;
   }
 
-  private async access(): Promise<VercelAccess> {
+  private async access(): Promise<VercelCredentials> {
     const access = await this.options.credentials();
     if (!access?.token || !access.teamId || !access.projectId) throw new Error("Connect Vercel in Settings to run in the cloud.");
     return access;
@@ -167,7 +161,6 @@ export class VercelSandboxProvider implements SandboxProvider {
       token: access.token,
       teamId: access.teamId,
       projectId: access.projectId,
-      ...(access.claudeToken ? { env: { CLAUDE_CODE_OAUTH_TOKEN: access.claudeToken } } : {}),
       onCreate: async (fresh) => {
         created = true;
         await ensureClaude(fresh);

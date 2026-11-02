@@ -1,6 +1,7 @@
 import type { CloudStatus } from "@openorc/protocol";
 import type { ClaudeCloudTokens } from "../services/claude-cloud-tokens.js";
 import type { CloudChecks } from "../services/cloud-check.js";
+import type { CloudSandboxes } from "../services/cloud-sandboxes.js";
 import type { CloudSettings } from "../services/cloud-settings.js";
 import type { Handlers } from "./types.js";
 
@@ -10,20 +11,24 @@ type CloudMethod =
   | "cloud.vercel.teams"
   | "cloud.vercel.team"
   | "cloud.vercel.disconnect"
+  | "cloud.vercel.size"
   | "cloud.claude.create"
   | "cloud.claude.cancel"
   | "cloud.claude.save"
   | "cloud.claude.remove"
-  | "cloud.check";
+  | "cloud.check"
+  | "cloud.sandboxes"
+  | "cloud.sandboxes.remove";
 
 interface Dependencies {
   settings: CloudSettings;
   tokens: ClaudeCloudTokens;
   checks: CloudChecks;
+  sandboxes: CloudSandboxes;
   invalidate: (keys: string[]) => void;
 }
 
-export function createCloudHandlers({ settings, tokens, checks, invalidate }: Dependencies): Pick<Handlers, CloudMethod> {
+export function createCloudHandlers({ settings, tokens, checks, sandboxes, invalidate }: Dependencies): Pick<Handlers, CloudMethod> {
   const status = async (): Promise<CloudStatus> => {
     const vercel = await settings.status();
     const check = checks.status();
@@ -48,10 +53,17 @@ export function createCloudHandlers({ settings, tokens, checks, invalidate }: De
     "cloud.vercel.teams": () => settings.teams(),
     "cloud.vercel.team": ({ teamId }) => changed(() => settings.chooseTeam(teamId)),
     "cloud.vercel.disconnect": () => changed(() => settings.disconnect()),
+    "cloud.vercel.size": ({ vcpus }) => changed(() => settings.chooseSize(vcpus)),
     "cloud.claude.create": ({ accountId }) => changed(() => tokens.create(accountId)),
     "cloud.claude.cancel": ({ accountId }) => changed(() => tokens.cancel(accountId)),
     "cloud.claude.save": ({ accountId, token }) => changed(() => tokens.save(accountId, token)),
     "cloud.claude.remove": ({ accountId }) => changed(() => tokens.remove(accountId)),
     "cloud.check": () => changed(() => checks.start()),
+    "cloud.sandboxes": () => sandboxes.list(),
+    "cloud.sandboxes.remove": async ({ name }) => {
+      await sandboxes.remove(name);
+      invalidate(["cloud"]);
+      return sandboxes.list();
+    },
   };
 }

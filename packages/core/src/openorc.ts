@@ -40,6 +40,7 @@ import { CloudSettings } from "./services/cloud-settings.js";
 import { ClaudeCloudTokens } from "./services/claude-cloud-tokens.js";
 import { cloudAgentEnvironment } from "./services/cloud-agent-env.js";
 import { CloudChecks } from "./services/cloud-check.js";
+import { CloudSandboxes } from "./services/cloud-sandboxes.js";
 import { createSystemHandlers } from "./handlers/system.js";
 import { createTaskCreateHandlers } from "./handlers/task-create.js";
 import { createTaskDeleteHandlers } from "./handlers/task-delete.js";
@@ -138,6 +139,8 @@ export class OpenOrc {
   readonly claudeCloudTokens: ClaudeCloudTokens;
   /** Tries everything a cloud thread needs where new ones would run. */
   readonly cloudChecks: CloudChecks;
+  /** OpenOrc's sandboxes, for Settings to list and remove. */
+  readonly cloudSandboxes: CloudSandboxes;
   readonly runs: RunService;
   readonly comments: TaskCommentService;
   readonly review: ReviewService;
@@ -287,6 +290,7 @@ export class OpenOrc {
     this.orclings = new OrclingService({ db, dataDir: options.dataDir, memory: this.memory, runs: () => this.runs, threads: () => this.threads, invalidate });
     this.memory.extractionOwner = (run, thread) => this.orclings.memoryOwner(run, thread);
     this.runs = new RunService(db, this.ledger, this.frames, () => this.mcpServer(), invalidate, this.log, this.runHooks(notify), undefined, this.workspaceWriters);
+    this.cloudSandboxes = new CloudSandboxes(db, this.cloud, this.runs);
     this.threads = new ThreadService(
       db,
       this.runs,
@@ -734,7 +738,7 @@ export class OpenOrc {
   private buildHandlers(invalidate: (keys: string[]) => void): Handlers {
     return composeHandlers(
       createSlackHandlers({ slack: this.slack, invalidate }),
-      createCloudHandlers({ settings: this.cloudSettings, tokens: this.claudeCloudTokens, checks: this.cloudChecks, invalidate }),
+      createCloudHandlers({ settings: this.cloudSettings, tokens: this.claudeCloudTokens, checks: this.cloudChecks, sandboxes: this.cloudSandboxes, invalidate }),
       createClaudeAccountHandlers(this.claudeAccounts),
       createSystemHandlers({
         system: this.system,

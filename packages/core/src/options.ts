@@ -1,4 +1,4 @@
-import type { RunnerFile, SandboxProvider, VercelCredentials } from "@openorc/cloud";
+import type { RunnerFile, SandboxProvider, VercelConnection } from "@openorc/cloud";
 import type { TextEmbedder } from "@openorc/memory";
 import type { BrowserHost, PreviewHost } from "@openorc/protocol";
 import type { DeviceSystem } from "./devices/system.js";
@@ -62,5 +62,5 @@ export interface OpenOrcOptions {
   /** Starts a command in a terminal of its own, for CLIs whose sign-in screens need one. Without it they get pipes. */
   terminal?: SpawnTerminal;
   /** Overrides the credentials Settings keeps, for tests and smoke scripts. While it resolves to null, new cloud conversations run in sandboxes on this Mac. */
-  cloudCredentials?: () => Promise<VercelCredentials | null>;
+  cloudCredentials?: () => Promise<VercelConnection | null>;
 }

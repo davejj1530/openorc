@@ -1,4 +1,4 @@
-import type { VercelCredentials } from "@openorc/cloud";
+import type { VercelConnection } from "@openorc/cloud";
 import type { CloudStatus, CloudTeam } from "@openorc/protocol";
 import type { ProtectedSecretStore } from "./extraction-credentials.js";
 
@@ -8,7 +8,7 @@ const API = "https://api.vercel.com";
 const storageError = "Cannot access protected storage for cloud credentials. Unlock your OS keychain and retry.";
 
 interface Stored {
-  vercel?: { token: string; team?: CloudTeam; project?: { id: string; name: string } };
+  vercel?: { token: string; team?: CloudTeam; project?: { id: string; name: string }; vcpus?: number };
 }
 
 /** The Vercel part of what Settings shows. */
@@ -18,7 +18,7 @@ export type VercelRequest = (url: string, init: RequestInit) => Promise<Response
 
 function view(stored: Stored): VercelStatus {
   const vercel = stored.vercel;
-  return { vercel: vercel ? { team: vercel.team ?? null, project: vercel.project?.name ?? null } : null, error: null };
+  return { vercel: vercel ? { team: vercel.team ?? null, project: vercel.project?.name ?? null, vcpus: vercel.vcpus ?? null } : null, error: null };
 }
 
 /** Vercel's own words about a refusal; never the request, which carries the token. */
@@ -108,11 +108,20 @@ export class CloudSettings {
   }
 
   /** What a Vercel sandbox needs, or null until Vercel is connected and a team is chosen. */
-  credentials(): Promise<VercelCredentials | null> {
+  credentials(): Promise<VercelConnection | null> {
     return this.serialize(async () => {
       const vercel = (await this.read().catch(() => ({}) as Stored)).vercel;
       if (!vercel?.team || !vercel.project) return null;
-      return { token: vercel.token, teamId: vercel.team.id, projectId: vercel.project.id };
+      return { token: vercel.token, teamId: vercel.team.id, projectId: vercel.project.id, ...(vercel.vcpus ? { vcpus: vercel.vcpus } : {}) };
+    });
+  }
+
+  /** The size of sandboxes made from now on. Vercel refuses more than the team's plan allows when it makes one. */
+  chooseSize(vcpus: number): Promise<VercelStatus> {
+    return this.serialize(async () => {
+      const stored = await this.read();
+      if (!stored.vercel) throw new Error("Connect Vercel first.");
+      return this.write({ ...stored, vercel: { ...stored.vercel, vcpus } });
     });
   }
 
@@ -142,7 +151,7 @@ export class CloudSettings {
       if (!token) throw new Error("Connect Vercel first.");
       const team = (await this.teamsFor(token)).find((candidate) => candidate.id === teamId);
       if (!team) throw new Error("That team is not on this Vercel account.");
-      return this.write({ ...stored, vercel: { token, team, project: await this.projectOn(token, team) } });
+      return this.write({ ...stored, vercel: { ...stored.vercel, token, team, project: await this.projectOn(token, team) } });
     });
   }
 

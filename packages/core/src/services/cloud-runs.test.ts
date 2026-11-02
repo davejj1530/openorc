@@ -280,6 +280,42 @@ it("finishes a turn the agent kept working on while the Mac lost its connection 
   expect(core.runs.liveRunForThread(thread.id)).toBeTruthy();
 }, 45_000);
 
+it("lists a conversation's sandbox, removes it once its agent is idle, and sets up a new one from the worktree", async () => {
+  const { thread } = await core.threads.start({
+    agent: "claude",
+    model: "fixture",
+    effort: undefined,
+    mode: "act",
+    permissionMode: "autonomous",
+    attachments: undefined,
+    title: "Footer",
+    projectId: project.id,
+    prompt: "Work slowly",
+    cloud: true,
+  });
+  const name = `openorc-${thread.id}`;
+  const repo = path.join(root, "sandboxes", name, "repo");
+  await until(() => existsSync(path.join(repo, "progress.txt")), 15_000);
+  expect(await core.cloudSandboxes.list()).toEqual([expect.objectContaining({ name, provider: "local", thread: { id: thread.id, title: "Footer" }, state: "running", working: true, costUsd: null })]);
+  await expect(core.cloudSandboxes.remove(name)).rejects.toThrow("Its conversation's agent is at work there.");
+
+  const mirror = await worktreeOf(thread.id);
+  await until(() => existsSync(log) && core.runs.threadActivity(thread.id) === "idle", 25_000);
+  await until(() => existsSync(path.join(mirror, "made-in-cloud.txt")));
+  await core.cloudSandboxes.remove(name);
+  expect(existsSync(path.join(root, "sandboxes", name))).toBe(false);
+  expect(core.runs.liveRunForThread(thread.id)).toBeNull();
+  expect(core.threads.get(thread.id)!.cloud).toMatchObject({ state: "removed" });
+  expect(await core.cloudSandboxes.list()).toEqual([]);
+
+  await rm(log, { force: true });
+  await core.threads.continueThread(thread.id, { agent: "claude", model: "fixture", effort: undefined, mode: "act", permissionMode: "autonomous", prompt: "Keep going", attachments: undefined });
+  await until(() => existsSync(log));
+  // The new sandbox starts from the worktree, which holds what the removed one had synced.
+  expect(readFileSync(path.join(repo, "made-in-cloud.txt"), "utf8")).toBe("hello\n");
+  expect(core.threads.get(thread.id)!.cloud).toMatchObject({ state: "ready" });
+}, 60_000);
+
 it("refuses a cloud conversation for an agent that has not run in a sandbox, before making one", async () => {
   await expect(
     core.threads.start({

@@ -44,11 +44,11 @@ describe("cloud settings", () => {
 
     const { status, teams } = await settings.connect(TOKEN);
     expect(teams).toEqual([{ id: "team_a", name: "Acme" }]);
-    expect(status).toEqual({ vercel: { team: { id: "team_a", name: "Acme" }, project: SANDBOX_PROJECT }, error: null });
+    expect(status).toEqual({ vercel: { team: { id: "team_a", name: "Acme" }, project: SANDBOX_PROJECT, vcpus: null }, error: null });
     expect(vercel.calls).toEqual(["GET /v2/teams", `GET /v9/projects/${SANDBOX_PROJECT}`, "POST /v11/projects"]);
 
     expect(await settings.credentials()).toEqual({ token: TOKEN, teamId: "team_a", projectId: "prj_team_a" });
-    expect(await new CloudSettings(store, vercel.request).status()).toEqual({ vercel: { team: { id: "team_a", name: "Acme" }, project: SANDBOX_PROJECT }, error: null });
+    expect(await new CloudSettings(store, vercel.request).status()).toEqual({ vercel: { team: { id: "team_a", name: "Acme" }, project: SANDBOX_PROJECT, vcpus: null }, error: null });
   });
 
   it("waits for a team choice when the token reaches several, and reuses a project that exists", async () => {
@@ -61,7 +61,7 @@ describe("cloud settings", () => {
     );
     const settings = new CloudSettings(memoryStore(), vercel.request);
     const { status, teams } = await settings.connect(TOKEN);
-    expect(status.vercel).toEqual({ team: null, project: null });
+    expect(status.vercel).toEqual({ team: null, project: null, vcpus: null });
     expect(teams.map((team) => team.name)).toEqual(["Acme", "side-project"]);
     expect(await settings.credentials()).toBeNull();
 
@@ -69,6 +69,21 @@ describe("cloud settings", () => {
     expect(vercel.calls.filter((call) => call.startsWith("POST"))).toEqual([]);
     expect(await settings.credentials()).toMatchObject({ teamId: "team_b", projectId: "prj_existing" });
     await expect(settings.chooseTeam("team_z")).rejects.toThrow("That team is not on this Vercel account.");
+  });
+
+  it("keeps the size of new sandboxes with the connection, through a change of team", async () => {
+    const vercel = fakeVercel([
+      { id: "team_a", name: "Acme", slug: "acme" },
+      { id: "team_b", name: "Beta", slug: "beta" },
+    ]);
+    const settings = new CloudSettings(memoryStore(), vercel.request);
+    await expect(settings.chooseSize(8)).rejects.toThrow("Connect Vercel first.");
+    await settings.connect(TOKEN);
+    await settings.chooseTeam("team_a");
+    expect((await settings.chooseSize(8)).vercel?.vcpus).toBe(8);
+    expect(await settings.credentials()).toMatchObject({ teamId: "team_a", vcpus: 8 });
+    await settings.chooseTeam("team_b");
+    expect(await settings.credentials()).toMatchObject({ teamId: "team_b", vcpus: 8 });
   });
 
   it("refuses a token Vercel does not accept and saves nothing", async () => {

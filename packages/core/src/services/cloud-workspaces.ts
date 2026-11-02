@@ -11,8 +11,9 @@ import {
   seedWorkspace,
   VercelSandboxProvider,
   type RunnerFile,
+  type SandboxInfo,
   type SandboxProvider,
-  type VercelCredentials,
+  type VercelConnection,
   type WorkspaceLocation,
 } from "@openorc/cloud";
 import { cloudWorkspaces, type CloudMirrorState, type CloudProviderId, type CloudWorkspaceRecord, type Db } from "@openorc/db";
@@ -60,7 +61,7 @@ export function assertCloudStart(input: Pick<StartThreadInput, "agent" | "checko
 export function cloudSandboxProviders(input: {
   dataDir: string;
   env: () => NodeJS.ProcessEnv;
-  credentials?: () => Promise<VercelCredentials | null>;
+  credentials?: () => Promise<VercelConnection | null>;
   override?: SandboxProvider;
 }): Pick<CloudWorkspaceOptions, "providers" | "forNewThreads"> {
   const local = new LocalSandboxProvider(path.join(input.dataDir, "cloud-sandboxes"), input.env);
@@ -70,6 +71,9 @@ export function cloudSandboxProviders(input: {
   const providers = override ? [override, ...[local, vercel].filter((provider) => provider.id !== override.id)] : [local, vercel];
   return { providers, forNewThreads: async () => override ?? ((await credentials()) ? vercel : local) };
 }
+
+/** A sandbox a service reports, with where it runs and the conversation it belongs to, if any. */
+export type ListedSandbox = SandboxInfo & { provider: CloudProviderId; threadId: string | null };
 
 /** Where a cloud conversation's agent runs, its working folder there, and how its account signs in. */
 export interface CloudRunHost {
@@ -316,10 +320,40 @@ export class CloudWorkspaceService {
    */
   async remove(threadId: string): Promise<void> {
     const record = cloudWorkspaces.get(this.db, threadId);
-    if (!record) return;
-    this.disconnect(threadId);
-    this.locations.delete(threadId);
-    this.pristine.delete(threadId);
+    if (record) await this.deleteSandbox(record);
+  }
+
+  /** OpenOrc's sandboxes on every service set up now, with the conversation each belongs to. */
+  async sandboxes(): Promise<ListedSandbox[]> {
+    const listed = await Promise.all(
+      this.options.providers.map(async (provider) => {
+        const owners = new Map(cloudWorkspaces.listByProvider(this.db, provider.id).map((record) => [record.sandbox, record.threadId]));
+        return (await provider.list()).map((info) => ({ ...info, provider: provider.id, threadId: owners.get(info.name) ?? null }));
+      }),
+    );
+    return listed.flat();
+  }
+
+  /**
+   * Deletes one sandbox for good. A conversation's worktree keeps what was synced, and its next turn sets up a new
+   * sandbox from there. Stop the conversation's agent first: deleting the VM would end it mid-turn.
+   */
+  async removeSandbox(providerId: CloudProviderId, name: string): Promise<void> {
+    const record = cloudWorkspaces.listByProvider(this.db, providerId).find((candidate) => candidate.sandbox === name);
+    if (!record) {
+      await this.provider(providerId).remove(name);
+      this.log.info(`deleted sandbox ${name}, which no conversation had`);
+      return;
+    }
+    await this.deleteSandbox(record);
+    cloudWorkspaces.removed(this.db, record.threadId);
+    this.options.changed?.(record.threadId);
+  }
+
+  private async deleteSandbox(record: CloudWorkspaceRecord): Promise<void> {
+    this.disconnect(record.threadId);
+    this.locations.delete(record.threadId);
+    this.pristine.delete(record.threadId);
     await this.provider(record.provider).remove(record.sandbox);
     this.log.info(`deleted cloud workspace ${record.sandbox}`);
   }

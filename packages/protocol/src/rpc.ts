@@ -14,6 +14,8 @@ import { fileRpcParams, type FileRpcResults } from "./files.js";
 import { remoteRpcParams, type RemoteRpcResults } from "./remote.js";
 import { devicePanelRpcParams, DevicePanelPush, type DevicePanelRpcResults } from "./devices.js";
 import { previewRpcParams, type PreviewRpcResults } from "./preview.js";
+import { ThreadStartParams } from "./thread-start.js";
+import { cloudRpcParams, type CloudRpcResults } from "./cloud.js";
 import { HarnessId, type HarnessAvailability, type HarnessInfo } from "./harness.js";
 import { AgentEvent, AgentKind, ApprovalDecision, Frame } from "./events.js";
 import type { McpAppOpenResult } from "./mcp-apps.js";
@@ -75,6 +77,7 @@ export const rpcParams = {
   ...projectRpcParams,
   ...fileRpcParams,
   ...remoteRpcParams,
+  ...cloudRpcParams,
   ...devicePanelRpcParams,
   ...previewRpcParams,
   ...workspaceChangeRpcParams,
@@ -200,36 +203,7 @@ export const rpcParams = {
       .regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]*\.md$/)
       .max(120),
   }),
-  /** Creates the thread and starts its first turn in one step. */
-  "threads.start": z
-    .object({
-      claudeAccountId: ClaudeAccountId.optional(),
-      projectId: z.string(),
-      workingDirectory: z.string().min(1).max(4096).optional(),
-      /** Team-only idempotency key for retrying an uncertain launch response. */
-      requestKey: z.string().min(1).max(200).optional(),
-      agent: AgentKind.optional(),
-      executionTarget: ExecutionTarget.optional(),
-      model: z.string().optional(),
-      effort: z.string().optional(),
-      fastMode: z.boolean().optional(),
-      mode: RunMode,
-      permissionMode: PermissionPreset,
-      workspaceMode: WorkspaceMode.optional(),
-      cloud: z.boolean().optional(),
-      baseRef: z.string().optional(),
-      prompt: z.string().min(1),
-      attachments: z.array(z.string()).optional(),
-      title: z.string().optional(),
-    })
-    .strict()
-    .superRefine((input, ctx) => {
-      if (input.requestKey !== undefined && input.executionTarget?.kind !== "team") ctx.addIssue({ code: "custom", message: "Launch request keys apply only to saved teams.", path: ["requestKey"] });
-      if (!input.executionTarget && !input.agent) ctx.addIssue({ code: "custom", message: "Choose a model or a team.", path: ["executionTarget"] });
-      if (input.executionTarget && [input.agent, input.model, input.effort, input.fastMode].some((value) => value !== undefined)) {
-        ctx.addIssue({ code: "custom", message: "Supply an execution target or legacy model settings, not both.", path: ["executionTarget"] });
-      }
-    }),
+  "threads.start": ThreadStartParams,
   "threads.update": z.object({
     id: z.string(),
     /** Through a surviving task of a deleted conversation, only mode, permissions and the draft can change. */
@@ -586,7 +560,8 @@ export interface ResolvedExtraction {
   viaApiKey: boolean;
 }
 
-export interface RpcResults extends PullRequestRpcResults, OrclingRpcResults, ProjectRpcResults, FileRpcResults, ClaudeAccountRpcResults, RemoteRpcResults, DevicePanelRpcResults, PreviewRpcResults {
+export interface RpcResults
+  extends PullRequestRpcResults, OrclingRpcResults, ProjectRpcResults, FileRpcResults, ClaudeAccountRpcResults, RemoteRpcResults, DevicePanelRpcResults, PreviewRpcResults, CloudRpcResults {
   "tasks.comments.list": TaskDiscussion;
   "tasks.comments.post": TaskComment;
   "tasks.comments.retry": CommentAttempt;

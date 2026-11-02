@@ -35,5 +35,7 @@ export * from "./tool-images.js";
 export * from "./agent-updates.js";
 export * from "./agent-citations.js";
 export * from "./remote.js";
+export * from "./cloud.js";
+export * from "./thread-start.js";
 export * from "./push.js";
 export * from "./preview.js";

@@ -65,10 +65,11 @@ type Run = Parameters<VercelVm["runCommand"]>[0];
 /** A VM whose commands answer through `answer`, which records each one. */
 type FakeVm = Omit<VercelVm, "expiresAt"> & { expiresAt: Date | undefined; runs: Run[]; extended: number[] };
 
-function fakeVm(answer: (run: Run) => FakeCommand, files: Record<string, Buffer> = {}): FakeVm {
+function fakeVm(answer: (run: Run) => FakeCommand, files: Record<string, Buffer> = {}, cwd = "/vercel/sandbox"): FakeVm {
   const runs: Run[] = [];
   const extended: number[] = [];
   return {
+    cwd,
     runs,
     extended,
     expiresAt: undefined,
@@ -116,6 +117,15 @@ describe("a sandbox on Vercel", () => {
     expect(command.stdinClosed).toBe(true);
     expect(output).toBe("first second");
     await new Promise((resolve) => (stream.output.readableEnded ? resolve(undefined) : stream.output.once("end", resolve)));
+  });
+
+  it("works in the folder its image starts sessions in", async () => {
+    const vm = fakeVm(() => finished(0), {}, "/home/vercel-sandbox");
+    const sandbox = new VercelSandbox("s", vm);
+    expect(sandbox.root).toBe("/home/vercel-sandbox");
+    await sandbox.exec("git", ["--version"]);
+    await sandbox.launch("node", ["runner.ts", "daemon"]);
+    expect(vm.runs.map((run) => run.cwd)).toEqual(["/home/vercel-sandbox", "/home/vercel-sandbox"]);
   });
 
   it("kills the command when the stream is closed", async () => {

@@ -2,7 +2,6 @@ import { PassThrough, Writable } from "node:stream";
 import { APIError, Sandbox as SdkSandbox } from "@vercel/sandbox";
 import { SANDBOX_AWAY_MS, type Sandbox, type SandboxCommandOptions, type SandboxExecResult, type SandboxProvider, type SandboxStream } from "./sandbox.js";
 
-const ROOT = "/vercel/sandbox";
 /** After the command exits, how long its remaining output gets to arrive before the stream ends anyway. */
 const LOG_DRAIN_MS = 2000;
 
@@ -26,6 +25,8 @@ export interface VercelVm {
   runCommand(params: { cmd: string; args: string[]; cwd: string; env?: Record<string, string>; sudo?: boolean; detached: true; stdin?: boolean }): Promise<VercelCommand>;
   writeFiles(files: { path: string; content: Uint8Array }[]): Promise<void>;
   readFileToBuffer(file: { path: string }): Promise<Buffer | null>;
+  /** Where the session's commands start, which depends on the sandbox's image. */
+  readonly cwd: string;
   /** When the running session times out; undefined while none runs. */
   readonly expiresAt: Date | undefined;
   /** Moves the running session's timeout later by `duration`, up to the plan's longest session. */
@@ -72,7 +73,7 @@ export interface VercelProviderOptions {
 }
 
 async function run(vm: VercelVm, cmd: string, args: string[], options: SandboxCommandOptions & { sudo?: boolean } = {}): Promise<SandboxExecResult> {
-  const command = await vm.runCommand({ cmd, args, cwd: options.cwd ?? ROOT, ...(options.env ? { env: options.env } : {}), ...(options.sudo ? { sudo: true } : {}), detached: true });
+  const command = await vm.runCommand({ cmd, args, cwd: options.cwd ?? vm.cwd, ...(options.env ? { env: options.env } : {}), ...(options.sudo ? { sudo: true } : {}), detached: true });
   const done = await command.wait();
   return { code: done.exitCode, stdout: Buffer.from(await done.stdout(), "utf8"), stderr: await done.stderr() };
 }
@@ -88,25 +89,28 @@ export async function ensureClaude(vm: VercelVm): Promise<void> {
 
 /** A VM on Vercel. Its files persist between sessions; its processes do not. */
 export class VercelSandbox implements Sandbox {
-  readonly root = ROOT;
+  /** The folder the image starts its sessions in, such as /vercel/sandbox; read once, since a stopped VM has none. */
+  readonly root: string;
   /** The session timeout each sandbox is made with. */
   readonly awayMs = SANDBOX_AWAY_MS;
 
   constructor(
     readonly name: string,
     private readonly vm: VercelVm,
-  ) {}
+  ) {
+    this.root = vm.cwd;
+  }
 
   exec(cmd: string, args: string[], options: SandboxCommandOptions = {}): Promise<SandboxExecResult> {
-    return run(this.vm, cmd, args, options);
+    return run(this.vm, cmd, args, { ...options, cwd: options.cwd ?? this.root });
   }
 
   async launch(cmd: string, args: string[], options: SandboxCommandOptions = {}): Promise<void> {
-    await this.vm.runCommand({ cmd, args, cwd: options.cwd ?? ROOT, ...(options.env ? { env: options.env } : {}), detached: true });
+    await this.vm.runCommand({ cmd, args, cwd: options.cwd ?? this.root, ...(options.env ? { env: options.env } : {}), detached: true });
   }
 
   async stream(cmd: string, args: string[], options: SandboxCommandOptions = {}): Promise<SandboxStream> {
-    const command = await this.vm.runCommand({ cmd, args, cwd: options.cwd ?? ROOT, ...(options.env ? { env: options.env } : {}), detached: true, stdin: true });
+    const command = await this.vm.runCommand({ cmd, args, cwd: options.cwd ?? this.root, ...(options.env ? { env: options.env } : {}), detached: true, stdin: true });
     const output = new PassThrough();
     const pump = (async () => {
       for await (const line of command.logs()) if (line.stream === "stdout") output.write(Buffer.from(line.data, "utf8"));

@@ -126,6 +126,8 @@ export class OpenOrc {
   readonly frames: FrameCoalescer;
   readonly projects: ProjectService;
   readonly workspaces: WorkspaceService;
+  /** Sandboxes for cloud conversations and the connections to them. */
+  readonly cloud: CloudWorkspaceService;
   readonly runs: RunService;
   readonly comments: TaskCommentService;
   readonly review: ReviewService;
@@ -241,8 +243,8 @@ export class OpenOrc {
     };
     this.projects = new ProjectService(db);
     const cloudSandboxes = options.cloudSandboxes ?? new LocalSandboxProvider(path.join(options.dataDir, "cloud-sandboxes"), () => this.environment.current().env);
-    const cloud = new CloudWorkspaceService(db, { provider: cloudSandboxes }, this.log);
-    this.workspaces = new WorkspaceService(db, { dataDir: options.dataDir, cloud }, this.log, this.workspaceWriters);
+    this.cloud = new CloudWorkspaceService(db, { provider: cloudSandboxes, ...(options.cloudRunnerFiles ? { files: options.cloudRunnerFiles } : {}) }, this.log);
+    this.workspaces = new WorkspaceService(db, { dataDir: options.dataDir, cloud: this.cloud }, this.log, this.workspaceWriters);
     const backgroundProviders: ProviderInfo = {
       models: (agent, accountId) => this.runs.models(agent, undefined, undefined, accountId),
       loggedIn: (accountId) => this.claudeSystemInfo(accountId).then((info) => Object.fromEntries(info.harnesses.map((row) => [row.id, harnessLoggedIn(row)])) as Record<HarnessId, boolean>),
@@ -461,6 +463,12 @@ export class OpenOrc {
       brief: (project) => this.memory.brief(project),
       threadContext: (thread) => this.pullRequests.brief(thread),
       untrustedCheckout: (thread) => inUnvettedCopy(db, thread),
+      cloudHost: (thread, mcpOrigin) => this.cloud.host(thread, mcpOrigin),
+      syncCloud: (thread) =>
+        this.cloud.pull(thread).catch((error: unknown) => {
+          this.log.warn(`could not bring thread ${thread.id}'s cloud changes to the Mac: ${error instanceof Error ? error.message : String(error)}`);
+          return false;
+        }),
       memoryEnabled: () => this.memory.enabled(),
       environment: () => this.devices.launchEnvironment(this.environment.current()),
       claudeEnvironment: (snapshot, id) => this.claudeAccounts.environment(snapshot, id),
@@ -680,6 +688,7 @@ export class OpenOrc {
     await this.teams.shutdown();
     await this.workspaces.shutdown();
     await this.runs.closeAll();
+    await this.cloud.close();
     await this.devices.close();
     await this.threads.shutdown();
     await this.teamWorkspaces.shutdown();

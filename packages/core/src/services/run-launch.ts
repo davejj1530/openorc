@@ -23,6 +23,7 @@ import {
 import type { AgentLaunchEnvironment } from "@openorc/agents";
 import type { Logger } from "../transport.js";
 import type { EnvSnapshot } from "./shell-environment.js";
+import { CLOUD_AGENTS } from "./cloud-workspaces.js";
 import { executionFolder } from "./conversation-folder.js";
 import { withOutsideNote, type OutsideChanges, type TurnStartCapture } from "./turn-start-checkpoint.js";
 import {
@@ -58,7 +59,7 @@ interface RunLaunchDependencies {
   writers: WorkspaceWriters;
   turnStarts: Pick<TurnStartCapture, "capture">;
   adapters: RunAdapterRegistry;
-  hooks: Pick<RunHooks, "assertStart" | "taskImages" | "browserAvailable" | "claudeUserMcpServers" | "processRegistry" | "untrustedCheckout" | "orclings">;
+  hooks: Pick<RunHooks, "assertStart" | "taskImages" | "browserAvailable" | "claudeUserMcpServers" | "processRegistry" | "untrustedCheckout" | "orclings" | "cloudHost" | "syncCloud">;
   log: Logger;
   isClosing: () => boolean;
   live: ReadonlyMap<string, LiveRun>;
@@ -191,14 +192,19 @@ export class RunLaunch {
     await this.lockTaskWorkspace(attempt);
     // Captured before the spec is built, so the prompt the provider receives can carry the outside-changes note.
     const outside = await this.captureTurnStart(input, lease);
-    const spec = this.runSpec(prepared, lease, internalMcp, outside);
+    const cloud = input.scope.thread ? await this.deps.hooks.cloudHost?.(input.scope.thread, new URL(internalMcp.url).origin) : null;
+    if (cloud && input.agent !== "claude") throw new Error(CLOUD_AGENTS);
+    phase("cloud");
+    const spec = this.runSpec(prepared, lease, internalMcp, outside, cloud?.cwd);
     assertAdmission();
     const orclingCeiling = input.orclingId ? this.deps.hooks.orclings?.ceiling(input.orclingId) : undefined;
     // No await occurs between this permission read and the provider launch.
     const teamPermission = this.adoptTeamPermission(run, input, spec, orclingCeiling);
     phase("prepare");
     if (!isHarnessId(input.agent)) throw new Error(`Provider ${input.agent} has no executable adapter.`);
-    const handle = this.deps.adapters[input.agent].start(spec, { ...launch, processRegistry: this.deps.hooks.processRegistry });
+    // In a cloud workspace the CLI is the sandbox's own, found on its PATH, with the sandbox's environment.
+    const placed = cloud ? { revision: launch.revision, binary: input.agent, env: {}, host: cloud.host } : { ...launch, processRegistry: this.deps.hooks.processRegistry };
+    const handle = this.deps.adapters[input.agent].start(spec, placed);
     phase("spawn");
     this.deps.emit({ type: "activity.updated", runId, ts: Date.now(), activityId: "startup", label: `Starting ${harnessName(input.agent)}`, status: "running" });
     const startTotal = timing.reduce((sum, [, ms]) => sum + ms, 0);
@@ -265,20 +271,23 @@ export class RunLaunch {
   }
 
   /** The folder as this thread's turn begins. Tasks and comment runs keep their own capture at the end of the turn. */
-  private captureTurnStart(input: StartRunInput, lease: WorkspaceLease): Promise<OutsideChanges | null> {
+  private async captureTurnStart(input: StartRunInput, lease: WorkspaceLease): Promise<OutsideChanges | null> {
     const thread = input.scope.thread;
-    if (!thread) return Promise.resolve(null);
+    if (!thread) return null;
+    // A cloud conversation's worktree mirrors its sandbox, so it catches up before the turn's starting point is saved.
+    await this.deps.hooks.syncCloud?.(thread);
     return this.deps.turnStarts.capture({ thread, project: input.project, cwd: lease.paths[0]!, team: Boolean(input.teamAttemptId) });
   }
 
-  private runSpec(prepared: PreparedSession, lease: WorkspaceLease, internalMcp: NonNullable<RunSpec["internalMcp"]>, outside: OutsideChanges | null): RunSpec {
+  /** `cwd` is the sandbox's checkout for a cloud conversation; otherwise the run works in its leased folder. */
+  private runSpec(prepared: PreparedSession, lease: WorkspaceLease, internalMcp: NonNullable<RunSpec["internalMcp"]>, outside: OutsideChanges | null, cwd?: string): RunSpec {
     const { input, runId, model, taskImages, resumeSessionId, forkSession } = prepared;
     return {
       mode: input.mode,
       runId,
       agent: input.agent,
       fastMode: input.fastMode ?? false,
-      cwd: lease.paths[0]!,
+      cwd: cwd ?? lease.paths[0]!,
       prompt: withOutsideNote(input.prompt, outside),
       permissionMode: input.mode === "plan" ? "review" : input.permissionMode,
       systemPromptAppendix: this.systemPrompt(input, taskImages),

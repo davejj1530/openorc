@@ -26,7 +26,7 @@ interface RunSettlementDependencies {
   db: Db;
   ledger: LedgerWriter;
   log: Logger;
-  hooks: Pick<RunHooks, "captureTeamTree" | "onThreadTurn" | "onRunFinished">;
+  hooks: Pick<RunHooks, "captureTeamTree" | "onThreadTurn" | "onRunFinished" | "syncCloud">;
   mcp: () => Promise<OpenOrcMcpServer>;
   mcpApps: McpAppService;
   detach: (runId: string) => void;
@@ -91,6 +91,8 @@ export class RunSettlement {
   }
 
   private async completeThreadTurn(entry: LiveRun, project: Project, turn: CompletedTurn, thread: Thread): Promise<void> {
+    // The turn's checkpoint is of the worktree, so a cloud conversation's worktree catches up with its sandbox first.
+    await this.deps.hooks.syncCloud?.(thread);
     const capture = await this.checkpoint(entry, project, thread, entry.workspaceLease.paths[0]!);
     entry.busy = false;
     this.deps.armIdle(entry);

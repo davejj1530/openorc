@@ -38,6 +38,7 @@ import { randomUUID } from "node:crypto";
 import { realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Logger } from "../transport.js";
+import { assertCloudStart } from "./cloud-workspaces.js";
 import { titleFromPrompt, type StartThreadInput, type ThreadPatch, type ThreadTitler } from "./thread-inputs.js";
 import { inUnvettedCopy } from "./review-copies.js";
 import type { RunService } from "./runs.js";
@@ -217,7 +218,7 @@ export class ThreadService {
     if (input.workingDirectory && input.projectId !== WORKSPACE_ID) throw new Error("Only Workspace conversations can choose a working folder.");
     const home = executionProject(this.db, { projectId: input.projectId });
     const project = input.projectId === WORKSPACE_ID ? { ...home, rootPath: await directory(input.workingDirectory ?? home.rootPath) } : home;
-    if (input.cloud && (input.checkout || project.id === WORKSPACE_ID)) throw new Error("Cloud conversations start in a project, on a worktree of their own.");
+    if (input.cloud) assertCloudStart(input, project);
     const workspaceMode = input.checkout || input.cloud ? "worktree" : (input.workspaceMode ?? "current");
     await this.workspaces.assertNewThreadWorkspace(project, workspaceMode, Boolean(input.checkout));
     const id = randomUUID();

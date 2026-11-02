@@ -19,9 +19,10 @@ import { useOrclings } from "../lib/orclings";
 import { useRpc, useRpcs } from "../lib/client";
 import { useRouter } from "../lib/router";
 import { useUi } from "../lib/ui";
-import { Check, ChevronDown, ChevronRight, Funnel, Pin } from "./icons";
+import { Check, ChevronDown, ChevronRight, Funnel, Pin, SlidersHorizontal } from "./icons";
 import { OpenOrcMark } from "./OpenOrcMark";
 import { SidebarProjectGroup } from "./SidebarProjectGroup";
+import { SidebarProjectVisibility } from "./SidebarProjectVisibility";
 import { ThreadRow } from "./ThreadLibraryRow";
 import { menuItem, menuPopup, menuSeparator } from "./menu";
 import { IconButton } from "./ui";
@@ -35,12 +36,14 @@ function emptyMessage(search: string, pinned: boolean): string {
 
 function useSidebarProjects() {
   const projects = useRpc("projects.list", {});
+  const hidden = useLayout((s) => s.hiddenProjects);
+  const visible = [{ id: WORKSPACE_ID, name: "Workspace", rootPath: undefined }, ...(projects.data ?? [])].filter((project) => !hidden.includes(project.id));
   useEffect(() => {
     if (!projects.data) return;
     const { projectId, setProject } = useLayout.getState();
     if (projectId && projectId !== WORKSPACE_ID && !projects.data.some((p) => p.id === projectId)) setProject(WORKSPACE_ID);
   }, [projects.data]);
-  return projects;
+  return { query: projects, visible, allHidden: Boolean(projects.data) && visible.length === 0 };
 }
 
 /** Each project owns a page. The task/new-thread scope never hides another project's work. */
@@ -52,13 +55,12 @@ function useThreadGroups(search: string) {
   const filter = listedThreads(chosen);
   const collapsed = useLayout((s) => s.collapsed);
   const [limits, setLimits] = useState<Record<string, number>>({});
-  const projects = useSidebarProjects();
-  const groups = [{ id: WORKSPACE_ID, name: "Workspace", rootPath: undefined }, ...(projects.data ?? [])];
+  const { query: projects, visible: groups, allHidden } = useSidebarProjects();
   const orclings = useOrclings();
   const homes = new Set(orclings.map((orcling) => orcling.threadId));
   const activeId = useRouter((s) => (s.route.view === "thread" ? s.route.threadId : null));
   const active = useRpc("threads.get", { id: activeId ?? "" }, { enabled: Boolean(activeId) });
-  const activeProject = activeId && !homes.has(activeId) ? active.data?.projectId : undefined;
+  const activeProject = activeId && !homes.has(activeId) && groups.some((group) => group.id === active.data?.projectId) ? active.data?.projectId : undefined;
   const queries = useRpcs(
     "threads.list",
     groups.map((group) => threadListParams(group.id, chosen, limits[`${filter}:${group.id}`])),
@@ -88,7 +90,7 @@ function useThreadGroups(search: string) {
     useUi.getState().setThreadOrder(JSON.parse(orderKey) as string[]);
   }, [orderKey]);
   const loadMore = (id: string) => setLimits((old) => ({ ...old, [`${filter}:${id}`]: (old[`${filter}:${id}`] ?? THREAD_PAGE) + THREAD_PAGE }));
-  return { visible, activeId, loadMore, projects, orc: view === "orc", pinnedOnly };
+  return { visible, activeId, loadMore, projects, allHidden, orc: view === "orc", pinnedOnly };
 }
 
 type ThreadGroup = ReturnType<typeof useThreadGroups>["visible"][number];
@@ -121,7 +123,7 @@ export function SidebarThreadBrowser({ search }: { search: string }) {
 }
 
 function GroupedThreadBrowser({ search }: { search: string }) {
-  const { visible, activeId, loadMore, projects, orc, pinnedOnly } = useThreadGroups(search);
+  const { visible, activeId, loadMore, projects, allHidden, orc, pinnedOnly } = useThreadGroups(search);
   const shown = orc ? orcGroups(visible) : visible;
   const row = (thread: ThreadSummary) => <ThreadRow key={thread.id} thread={thread} active={activeId === thread.id} />;
   return (
@@ -132,6 +134,7 @@ function GroupedThreadBrowser({ search }: { search: string }) {
             Couldn’t load projects. Retry
           </button>
         ) : null}
+        {allHidden ? <p className="browser-empty">All projects are hidden.</p> : null}
         {shown.map((group) => (
           <SidebarProjectGroup key={group.id} id={group.id} name={group.name} rootPath={group.rootPath} meta={projectMeta(group.list, { loaded: group.query.isSuccess, more: group.hasMore })}>
             {group.pinned.length > 0 ? (
@@ -159,7 +162,7 @@ function GroupedThreadBrowser({ search }: { search: string }) {
             ) : null}
           </SidebarProjectGroup>
         ))}
-        {orc ? (
+        {orc && !allHidden ? (
           <OrcModeEnd
             leftOut={visible.reduce((sum, group) => sum + group.leftOut, 0)}
             more={visible.some((group) => group.hasMore)}
@@ -181,8 +184,8 @@ function useFlatThreadPages(search: string) {
   const collapsed = useLayout((s) => s.collapsed);
   const [limit, setLimit] = useState(THREAD_PAGE);
   const view = chosen === "orc" && search ? "active" : chosen;
-  const projects = useSidebarProjects();
-  const projectIds = [WORKSPACE_ID, ...(projects.data ?? []).map((project) => project.id)].sort();
+  const { query: projects, visible, allHidden } = useSidebarProjects();
+  const projectIds = visible.map((project) => project.id).sort();
   const homes = new Set(useOrclings().map((orcling) => orcling.threadId));
   const activeId = useRouter((s) => (s.route.view === "thread" ? s.route.threadId : null));
   const active = useRpc("threads.get", { id: activeId ?? "" }, { enabled: Boolean(activeId) });
@@ -203,12 +206,13 @@ function useFlatThreadPages(search: string) {
       hidden: homes,
     }),
   );
-  return { projects, queries, pages, activeId, pinnedOnly, view, collapsed, loadMore: () => setLimit((old) => old + THREAD_PAGE) };
+  return { projects, queries, pages, activeId, pinnedOnly, view, collapsed, allHidden, loadMore: () => setLimit((old) => old + THREAD_PAGE) };
 }
 
 function FlatThreadFeedback({ state, shown, snoozed, search }: { state: ReturnType<typeof useFlatThreadPages>; shown: number; snoozed: number; search: string }) {
-  const { projects, queries, pages, view, pinnedOnly } = state;
+  const { projects, queries, pages, view, pinnedOnly, allHidden } = state;
   if (projects.isError) return null;
+  if (allHidden) return <p className="browser-empty">All projects are hidden.</p>;
   const hasMore = pages.some((page) => page.hasMore);
   const pending = queries.some((query) => query.isPending);
   const failed = queries.filter((query) => query.isError);
@@ -305,47 +309,56 @@ export function ThreadFilter() {
   const projectId = useLayout((s) => s.projectId);
   const ungrouped = useLayout((s) => s.ungroupByProjects);
   const setUngrouped = useLayout((s) => s.setUngroupByProjects);
+  const hiddenProjects = useLayout((s) => s.hiddenProjects);
+  const [editingProjects, setEditingProjects] = useState(false);
   const selection = pinned ? "pinned" : filter;
-  const narrowed = selection !== "active" || ungrouped;
+  const narrowed = selection !== "active" || ungrouped || hiddenProjects.length > 0;
   return (
-    <Menu.Root>
-      <Menu.Trigger
-        render={
-          <IconButton
-            aria-label={`Filter threads${selection === "active" ? "" : `: ${FILTER_NAMES[selection]}`}${ungrouped ? ": ungrouped by projects" : ""}`}
-            size="xs"
-            className={cn("no-drag", narrowed ? "text-accent-ink" : "text-ink-4")}
-          />
-        }
-      >
-        <FilterMark selection={selection} />
-      </Menu.Trigger>
-      <Menu.Portal>
-        <CoversPreview />
-        <Menu.Positioner sideOffset={6} align="end" className="z-40" collisionPadding={8}>
-          <Menu.Popup ref={floatingGround} className={menuPopup}>
-            {(["orc", "active", "archived"] as const).map((value) => (
-              <Menu.Item key={value} className={menuItem} onClick={() => setFilter(value)}>
-                <Check size={13} className={filter === value && !pinned ? "text-accent-ink" : "text-transparent"} />
-                {FILTER_NAMES[value]}
+    <>
+      <Menu.Root>
+        <Menu.Trigger
+          render={
+            <IconButton
+              aria-label={`Filter threads${selection === "active" ? "" : `: ${FILTER_NAMES[selection]}`}${ungrouped ? ": ungrouped by projects" : ""}${hiddenProjects.length ? ": projects filtered" : ""}`}
+              size="xs"
+              className={cn("no-drag", narrowed ? "text-accent-ink" : "text-ink-4")}
+            />
+          }
+        >
+          <FilterMark selection={selection} />
+        </Menu.Trigger>
+        <Menu.Portal>
+          <CoversPreview />
+          <Menu.Positioner sideOffset={6} align="end" className="z-40" collisionPadding={8}>
+            <Menu.Popup ref={floatingGround} className={menuPopup}>
+              {(["orc", "active", "archived"] as const).map((value) => (
+                <Menu.Item key={value} className={menuItem} onClick={() => setFilter(value)}>
+                  <Check size={13} className={filter === value && !pinned ? "text-accent-ink" : "text-transparent"} />
+                  {FILTER_NAMES[value]}
+                </Menu.Item>
+              ))}
+              <Menu.Item className={menuItem} onClick={() => setFilter("active", !pinned)}>
+                <Check size={13} className={pinned ? "text-accent-ink" : "text-transparent"} />
+                Pinned threads
               </Menu.Item>
-            ))}
-            <Menu.Item className={menuItem} onClick={() => setFilter("active", !pinned)}>
-              <Check size={13} className={pinned ? "text-accent-ink" : "text-transparent"} />
-              Pinned threads
-            </Menu.Item>
-            <Menu.Separator className={menuSeparator} />
-            <Menu.CheckboxItem className={menuItem} checked={ungrouped} onCheckedChange={setUngrouped}>
-              <Check size={13} className={ungrouped ? "text-accent-ink" : "text-transparent"} />
-              Ungroup by projects
-            </Menu.CheckboxItem>
-            <Menu.Separator className={menuSeparator} />
-            <Menu.Item className={menuItem} onClick={() => useUi.getState().setImportSessions(true, projectId ?? undefined)}>
-              Import terminal sessions…
-            </Menu.Item>
-          </Menu.Popup>
-        </Menu.Positioner>
-      </Menu.Portal>
-    </Menu.Root>
+              <Menu.Separator className={menuSeparator} />
+              <Menu.CheckboxItem className={menuItem} checked={ungrouped} onCheckedChange={setUngrouped}>
+                <Check size={13} className={ungrouped ? "text-accent-ink" : "text-transparent"} />
+                Ungroup by projects
+              </Menu.CheckboxItem>
+              <Menu.Item className={menuItem} onClick={() => setEditingProjects(true)}>
+                <SlidersHorizontal size={13} className="text-ink-4" />
+                Edit projects
+              </Menu.Item>
+              <Menu.Separator className={menuSeparator} />
+              <Menu.Item className={menuItem} onClick={() => useUi.getState().setImportSessions(true, projectId ?? undefined)}>
+                Import terminal sessions…
+              </Menu.Item>
+            </Menu.Popup>
+          </Menu.Positioner>
+        </Menu.Portal>
+      </Menu.Root>
+      <SidebarProjectVisibility open={editingProjects} onOpenChange={setEditingProjects} />
+    </>
   );
 }

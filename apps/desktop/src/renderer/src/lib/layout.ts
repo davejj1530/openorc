@@ -48,6 +48,8 @@ interface LayoutState {
   pinnedOnly: boolean;
   /** Screens the sidebar leaves under More. */
   hiddenScreens: SidebarScreen[];
+  /** Projects omitted from the sidebar's thread lists, independently of the thread filter. */
+  hiddenProjects: string[];
   /** Sidebar sections the user folded: namespaced project/pinned keys, plus opt-in snoozed-open keys. */
   collapsed: string[];
   /**
@@ -69,6 +71,9 @@ interface LayoutState {
   toggleOrcMode: () => void;
   setUngroupByProjects: (ungrouped: boolean) => void;
   setScreenShown: (screen: SidebarScreen, shown: boolean) => void;
+  setProjectShown: (id: string, shown: boolean) => void;
+  setProjectsShown: (ids: readonly string[], shown: boolean) => void;
+  showOnlyProject: (id: string, listedIds: readonly string[]) => void;
   toggleCollapsed: (key: string) => void;
   rememberPreviewUrl: (key: string, url: string) => void;
   setPanelExpanded: (expanded: boolean) => void;
@@ -82,7 +87,10 @@ export const limits = {
 const KEY = "openorc.layout";
 
 function read(): Partial<
-  Pick<LayoutState, "sidebarOpen" | "sidebarWidth" | "panelOpen" | "panelWidth" | "projectId" | "sidebarFilter" | "ungroupByProjects" | "hiddenScreens" | "collapsed" | "previewUrls">
+  Pick<
+    LayoutState,
+    "sidebarOpen" | "sidebarWidth" | "panelOpen" | "panelWidth" | "projectId" | "sidebarFilter" | "ungroupByProjects" | "hiddenScreens" | "hiddenProjects" | "collapsed" | "previewUrls"
+  >
 > {
   try {
     return JSON.parse(localStorage.getItem(KEY) ?? "{}") as Partial<LayoutState>;
@@ -104,6 +112,7 @@ function persist(s: LayoutState): void {
         sidebarFilter: s.sidebarFilter,
         ungroupByProjects: s.ungroupByProjects,
         hiddenScreens: s.hiddenScreens,
+        hiddenProjects: s.hiddenProjects,
         collapsed: s.collapsed,
         previewUrls: s.previewUrls,
       }),
@@ -121,6 +130,16 @@ export function applyWidths(sidebar: number, panel: number): void {
 }
 
 const clamp = (v: number, { min, max }: { min: number; max: number }) => Math.min(max, Math.max(min, v));
+
+function withProjectsShown(hidden: readonly string[], ids: readonly string[], shown: boolean): string[] {
+  const others = hidden.filter((id) => !ids.includes(id));
+  return shown ? others : [...others, ...new Set(ids)];
+}
+
+function withOnlyProject(hidden: readonly string[], id: string, listedIds: readonly string[]): string[] {
+  const others = hidden.filter((hiddenId) => !listedIds.includes(hiddenId) && hiddenId !== id);
+  return [...others, ...listedIds.filter((listed) => listed !== id)];
+}
 
 /** The three-column frame: sidebar, main, and an optional panel. Sizes persist across launches. */
 export const useLayout = create<LayoutState>((set, get) => {
@@ -141,6 +160,7 @@ export const useLayout = create<LayoutState>((set, get) => {
     ungroupByProjects: saved.ungroupByProjects === true,
     pinnedOnly: false,
     hiddenScreens: saved.hiddenScreens ?? DEFAULT_HIDDEN_SCREENS,
+    hiddenProjects: saved.hiddenProjects ?? [],
     collapsed: saved.collapsed ?? ["snoozed"],
     previewUrls: saved.previewUrls ?? {},
     panelExpanded: false,
@@ -200,6 +220,9 @@ export const useLayout = create<LayoutState>((set, get) => {
       const others = get().hiddenScreens.filter((hidden) => hidden !== screen);
       commit({ hiddenScreens: shown ? others : [...others, screen] });
     },
+    setProjectShown: (id, shown) => commit({ hiddenProjects: withProjectsShown(get().hiddenProjects, [id], shown) }),
+    setProjectsShown: (ids, shown) => commit({ hiddenProjects: withProjectsShown(get().hiddenProjects, ids, shown) }),
+    showOnlyProject: (id, listedIds) => commit({ hiddenProjects: withOnlyProject(get().hiddenProjects, id, listedIds) }),
     toggleCollapsed: (key) => commit({ collapsed: toggleSidebarFold(get().collapsed, key) }),
     // Bounded because the key is a surface id and threads are unbounded; the
     // oldest entries are the ones whose thread the reader has stopped opening.

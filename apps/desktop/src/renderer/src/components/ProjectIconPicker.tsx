@@ -21,6 +21,12 @@ function IconImage({ source, fallback, expanded }: { source: string | undefined;
   return <img src={source} alt="" width={16} height={16} className="size-4 shrink-0 object-contain" onError={() => setFailed(source)} />;
 }
 
+/** The same project artwork as the sidebar, without opening the icon chooser. */
+export function ProjectIcon({ rootPath }: { rootPath: string }) {
+  const { data: state } = useProjectIcon(rootPath);
+  return <IconImage source={state?.selected?.dataUrl} fallback={state?.mode === "auto" ? state.fallback : null} />;
+}
+
 function DiscoveryStatus({ loading, state }: { loading: boolean; state: ProjectIconState | undefined }) {
   if (loading)
     return (

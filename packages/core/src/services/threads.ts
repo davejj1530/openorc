@@ -715,6 +715,9 @@ export class ThreadService {
   }
 
   /* Queue */
+  get deliveringQueued(): boolean {
+    return this.messageQueue.delivering;
+  }
   queueFollowUp(...args: Parameters<ThreadMessageQueue["queueFollowUp"]>) {
     return this.messageQueue.queueFollowUp(...args);
   }

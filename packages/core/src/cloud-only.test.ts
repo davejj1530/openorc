@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { ClaudeAdapter } from "@openorc/agents";
 import type { SandboxProvider } from "@openorc/cloud";
 import { runs, tasks, threadQueue, threads } from "@openorc/db";
@@ -112,6 +112,23 @@ describe("a cloud-only core", () => {
     await vi.waitFor(() => expect(core.cloud.state(thread.id)?.state).toBe("failed"), { timeout: 10_000 });
     expect(opened).toEqual([`openorc-${thread.id}`]);
     expect(local).not.toHaveBeenCalled();
+  });
+
+  it("stays busy from a conversation's start until its first message has been delivered", async () => {
+    await open(cloudOnly);
+    let release = () => {};
+    const held = new Promise<void>((resolve) => (release = resolve));
+    onTestFinished(() => release());
+    const continueThread = core.threads.continueThread.bind(core.threads);
+    vi.spyOn(core.threads, "continueThread").mockImplementation(async (...args) => {
+      await held;
+      return continueThread(...args);
+    });
+    const { thread } = await core.threads.start({ ...start, projectId: project.id });
+    expect(core.busy()).toBe("queued-messages");
+    release();
+    await vi.waitFor(() => expect(core.cloud.state(thread.id)?.state).toBe("failed"), { timeout: 10_000 });
+    await vi.waitFor(() => expect(core.busy()).toBeNull());
   });
 
   it("refuses Workspace and checkout conversations, admitting nothing", async () => {

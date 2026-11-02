@@ -14,6 +14,7 @@ function idle() {
   return {
     db,
     runs: { busy: false, backgroundCommandsRunning: false, prepareForUpdate: vi.fn(() => true) },
+    threads: { deliveringQueued: false },
     cloud: { busy: false },
     memory: { hasPendingWork: false },
     textGeneration: { hasPendingWork: false },
@@ -34,6 +35,7 @@ const busySource: Record<BusyReason, (sources: Sources) => void> = {
   schedules: (s) => void (s.schedules.hasPendingWork = true),
   "background-commands": (s) => void (s.runs.backgroundCommandsRunning = true),
   agents: (s) => void (s.runs.busy = true),
+  "queued-messages": (s) => void (s.threads.deliveringQueued = true),
   "cloud-sandboxes": (s) => void (s.cloud.busy = true),
   "text-generation": (s) => void (s.textGeneration.hasPendingWork = true),
   "claude-sign-in": (s) => void (s.claudeAccounts.hasPendingWork = true),
@@ -47,6 +49,7 @@ const refusals: Record<BusyReason, RegExp | null> = {
   schedules: /A schedule is starting a thread/,
   "background-commands": /background commands/,
   agents: /agent work, approvals, and context maintenance/,
+  "queued-messages": null,
   "cloud-sandboxes": null,
   "text-generation": null,
   "claude-sign-in": null,

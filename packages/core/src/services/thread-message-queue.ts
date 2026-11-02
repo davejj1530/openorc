@@ -30,6 +30,11 @@ export class ThreadMessageQueue {
     return thread;
   }
 
+  /** A queued message is on its way into its thread. A cloud thread's first one waits here until its sandbox is built. */
+  get delivering(): boolean {
+    return this.draining.size > 0;
+  }
+
   hasTaskThreadReservation(id: string): boolean {
     return this.reservedTaskThreads.has(id);
   }

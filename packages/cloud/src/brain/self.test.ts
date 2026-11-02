@@ -9,6 +9,7 @@ function session(expiresAt: number, limit = Infinity) {
   const calls = { extended: [] as number[], stopped: 0, opened: 0 };
   const handle: BrainSession & { expiresAt: Date } = {
     expiresAt: new Date(expiresAt),
+    region: "sin1",
     async extendTimeout(duration) {
       calls.extended.push(duration);
       this.expiresAt = new Date(Math.min(this.expiresAt.getTime() + duration, limit));
@@ -72,6 +73,14 @@ describe("the brain's handle on its own sandbox", () => {
     }
     const refused = brainSelf(connection, "brain", async () => ({ ...running.handle, stop: () => Promise.reject(new APIError(new Response(null, { status: 403 }))) }));
     await expect(refused.stop()).rejects.toThrow(APIError);
+  });
+
+  it("tells the region its sandbox was made in, from the session it extends", async () => {
+    const running = session(Date.now() + 20 * 60_000);
+    const self = brainSelf(connection, "brain", running.open);
+    await self.extend(10 * 60_000);
+    expect(await self.region()).toBe("sin1");
+    expect(running.calls.opened).toBe(1);
   });
 
   it("opens the session again after a failed open", async () => {

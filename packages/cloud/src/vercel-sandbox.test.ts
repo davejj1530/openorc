@@ -176,9 +176,10 @@ describe("a sandbox on Vercel", () => {
 describe("the Vercel sandbox provider", () => {
   const settings = { credentials: async () => ({ token: "tok", teamId: "team", projectId: "proj" }) };
 
-  /** An API whose sandboxes exist after their first open, with `claude` on PATH when `hasClaude` says so. */
+  /** An API whose sandboxes exist after their first open, in the region they were made in, with `claude` on PATH when `hasClaude` says so. */
   function api(hasClaude: () => boolean, listed: VercelListed[] = []) {
     const created = new Set<string>();
+    const regions: Record<string, string | undefined> = {};
     const vm = fakeVm((run) => finished(run.cmd === "sh" && !hasClaude() ? 1 : 0));
     const calls: Parameters<VercelApi["getOrCreate"]>[0][] = [];
     const removed: string[] = [];
@@ -193,12 +194,13 @@ describe("the Vercel sandbox provider", () => {
         calls.push(params);
         if (!created.has(params.name)) {
           created.add(params.name);
+          regions[params.name] = params.region;
           await params.onCreate(vm);
         }
         return vm;
       },
     };
-    return { fake, vm, calls, removed, prefixes };
+    return { fake, vm, calls, removed, prefixes, regions };
   }
 
   const installs = (vm: { runs: Run[] }) => vm.runs.filter((run) => run.cmd === "npm");
@@ -231,6 +233,20 @@ describe("the Vercel sandbox provider", () => {
     const plain = api(() => true);
     await new VercelSandboxProvider({ ...settings, api: plain.fake }).open("openorc-f");
     expect(plain.calls[0]).not.toHaveProperty("resources");
+  });
+
+  it("makes each new sandbox in the region asked for when it is made, and leaves Vercel's default otherwise", async () => {
+    let region: string | undefined = "sin1";
+    const placed = api(() => true);
+    const provider = new VercelSandboxProvider({ credentials: async () => ({ token: "tok", teamId: "team", projectId: "proj", ...(region ? { region } : {}) }), api: placed.fake });
+    await provider.open("openorc-g");
+    region = "fra1";
+    await provider.open("openorc-g");
+    await provider.open("openorc-h");
+    expect(placed.regions).toEqual({ "openorc-g": "sin1", "openorc-h": "fra1" });
+    region = undefined;
+    await provider.open("openorc-i");
+    expect(placed.calls.at(-1)).not.toHaveProperty("region");
   });
 
   it("lists OpenOrc's sandboxes with their state, size, time awake and cost at list prices", async () => {

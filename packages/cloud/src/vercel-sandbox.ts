@@ -15,6 +15,8 @@ export interface VercelCredentials {
 export interface VercelConnection extends VercelCredentials {
   /** vCPUs for new sandboxes, with 2 GB of memory each; Vercel's default when absent. */
   vcpus?: number;
+  /** Where new sandboxes run, such as sin1; Vercel's default, iad1, when absent. */
+  region?: string;
 }
 
 /** Vercel's list prices for Sandbox on Pro, in its default region iad1 (vercel.com/docs/sandbox/pricing, 2026-11-02). */
@@ -92,6 +94,7 @@ export interface VercelOpenParams extends VercelCredentials {
   persistent: true;
   timeout: number;
   resources?: { vcpus: number };
+  region?: string;
   env?: Record<string, string>;
   onCreate: (vm: VercelVm) => Promise<void>;
 }
@@ -244,8 +247,9 @@ export class VercelSandboxProvider implements SandboxProvider {
     const vm = await this.api.getOrCreate({
       name,
       persistent: true,
-      // Applies when the sandbox is made; one that exists keeps the size it was made with.
+      // Apply when the sandbox is made; one that exists keeps the size and region it was made with.
       ...(access.vcpus ? { resources: { vcpus: access.vcpus } } : {}),
+      ...(access.region ? { region: access.region } : {}),
       // OpenOrc keeps the session awake while an agent works and stops it once none does; this is for when the Mac is away.
       timeout: SANDBOX_AWAY_MS,
       token: access.token,

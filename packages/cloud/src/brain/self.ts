@@ -10,11 +10,14 @@ export interface BrainSelf {
   extend(forMs: number): Promise<{ expiresAt: number; capped: boolean }>;
   /** Stops this sandbox; its disk becomes a snapshot. Again while stopping changes nothing. */
   stop(): Promise<void>;
+  /** The region this sandbox was made in, where the brain makes its thread sandboxes too. */
+  region(): Promise<string>;
 }
 
 /** The running session of the brain's own sandbox. Tests pass a stand-in; the brain passes the SDK's. */
 export interface BrainSession {
   readonly expiresAt: Date | undefined;
+  readonly region: string;
   extendTimeout(duration: number): Promise<void>;
   stop(): Promise<unknown>;
 }
@@ -29,6 +32,7 @@ const sdkSession: OpenBrainSession = async ({ token, teamId, projectId }, name) 
     get expiresAt() {
       return sandbox.expiresAt;
     },
+    region: sandbox.region,
     extendTimeout: (duration) => session.extendTimeout(duration),
     stop: () => session.stop(),
   };
@@ -83,5 +87,6 @@ export function brainSelf(connection: VercelCredentials, sandbox: string, open: 
         if (!alreadyStopping(error)) throw error;
       }
     },
+    region: async () => (await current()).region,
   };
 }

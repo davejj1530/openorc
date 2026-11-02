@@ -197,6 +197,13 @@ export class ClaudeAccountService {
     return account;
   }
 
+  /** The account under the id the Mac gave it, made or renamed and enabled. */
+  put(input: { id: string; name: string }): ClaudeAccount {
+    const account = claudeAccounts.put(this.db, input);
+    this.invalidate(input.id);
+    return account;
+  }
+
   update(input: { id: string; name?: string; enabled?: boolean; makeDefault?: true }): ClaudeAccount {
     if (input.enabled === false && (this.busy(input.id) || this.signingIn(input.id))) throw new Error("Finish this account's active sessions and sign-in before disabling it.");
     const account = claudeAccounts.update(this.db, input);

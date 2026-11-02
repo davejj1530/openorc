@@ -1,5 +1,6 @@
 import type { CloudStatus } from "@openorc/protocol";
 import type { ClaudeCloudTokens } from "../services/claude-cloud-tokens.js";
+import type { CloudBrain } from "../services/cloud-brain.js";
 import type { CloudChecks } from "../services/cloud-check.js";
 import type { CodexCloudLogin } from "../services/codex-cloud-login.js";
 import type { CloudHandoff } from "../services/cloud-handoff.js";
@@ -27,7 +28,13 @@ type CloudMethod =
   | "cloud.sandboxes"
   | "cloud.offer"
   | "cloud.move"
-  | "cloud.sandboxes.remove";
+  | "cloud.sandboxes.remove"
+  | "cloud.brain.status"
+  | "cloud.brain.create"
+  | "cloud.brain.wake"
+  | "cloud.brain.pair"
+  | "cloud.brain.handover"
+  | "cloud.brain.remove";
 
 interface Dependencies {
   settings: CloudSettings;
@@ -36,6 +43,7 @@ interface Dependencies {
   codex: CodexCloudLogin;
   sandboxes: CloudSandboxes;
   handoff: CloudHandoff;
+  brain: CloudBrain;
   /** Cloud threads are offered in this build. */
   offered: boolean;
   invalidate: (keys: string[]) => void;
@@ -43,7 +51,7 @@ interface Dependencies {
 
 const noCodex = (error: string | null) => ({ mode: null, email: null, plan: null, refreshedAt: null, signingIn: false, error });
 
-export function createCloudHandlers({ settings, tokens, checks, codex, sandboxes, handoff, offered, invalidate }: Dependencies): Pick<Handlers, CloudMethod> {
+export function createCloudHandlers({ settings, tokens, checks, codex, sandboxes, handoff, brain, offered, invalidate }: Dependencies): Pick<Handlers, CloudMethod> {
   const status = async (): Promise<CloudStatus> => {
     const vercel = await settings.status();
     const check = checks.status();
@@ -94,6 +102,24 @@ export function createCloudHandlers({ settings, tokens, checks, codex, sandboxes
       await sandboxes.remove(name);
       invalidate(["cloud"]);
       return sandboxes.list();
+    },
+    "cloud.brain.status": () => brain.status(),
+    "cloud.brain.create": async ({ region }) => {
+      await brain.create(region);
+      return brain.status();
+    },
+    "cloud.brain.wake": async () => {
+      await brain.wake();
+      return brain.status();
+    },
+    "cloud.brain.pair": () => brain.pair(),
+    "cloud.brain.handover": async () => {
+      await brain.handover();
+      return brain.status();
+    },
+    "cloud.brain.remove": async () => {
+      await brain.remove();
+      return brain.status();
     },
   };
 }

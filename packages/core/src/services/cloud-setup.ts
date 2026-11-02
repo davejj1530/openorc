@@ -5,6 +5,7 @@ import type { OpenOrcOptions } from "../options.js";
 import type { Logger } from "../transport.js";
 import type { ClaudeAccountService } from "./claude-accounts.js";
 import { ClaudeCloudTokens } from "./claude-cloud-tokens.js";
+import { CloudBrain } from "./cloud-brain.js";
 import { cloudAgentEnvironment } from "./cloud-agent-env.js";
 import { CloudChecks } from "./cloud-check.js";
 import { CloudCodex } from "./cloud-codex.js";
@@ -42,6 +43,7 @@ export function createCloud(input: {
   sandboxes: CloudSandboxes;
   handoff: CloudHandoff;
   standby: CloudStandby;
+  brain: CloudBrain;
 } {
   const { db, options, accounts, environment, invalidate, log } = input;
   const settings = new CloudSettings(options.cloudSecrets);
@@ -52,7 +54,23 @@ export function createCloud(input: {
     ...(options.cloudSandboxes ? { override: options.cloudSandboxes } : {}),
     cloudOnly: options.cloudOnly,
   });
-  const tokens = new ClaudeCloudTokens(options.claudeCloudSecrets, accounts, () => invalidate(["cloud"]), options.terminal);
+  const signIn = {
+    signInLaunch: (id: string) => accounts.signInLaunch(id),
+    cloudTokenChanged: (id: string) => {
+      accounts.cloudTokenChanged(id);
+      brain.claudeChanged();
+    },
+  };
+  const tokens = new ClaudeCloudTokens(options.claudeCloudSecrets, signIn, () => invalidate(["cloud"]), options.terminal);
+  const brain = new CloudBrain({
+    db,
+    store: options.cloudBrainSecrets,
+    tokens,
+    vercel: options.cloudCredentials ?? (() => settings.credentials()),
+    bundle: options.cloudBrainBundle,
+    changed: () => invalidate(["cloud-brain"]),
+    ...(options.cloudBrainMachine ? { open: options.cloudBrainMachine } : {}),
+  });
   const agentEnvironment = cloudAgentEnvironment({ accounts, tokens, snapshot: environment });
   const codexLogin = new CodexCloudLogin(options.codexCloudSecrets, {
     binary: () => environment().binaries.codex ?? null,
@@ -102,7 +120,7 @@ export function createCloud(input: {
     invalidate,
     log,
   });
-  return { settings, tokens, codex: codexLogin, cloud, checks, sandboxes: list, handoff, standby };
+  return { settings, tokens, codex: codexLogin, cloud, checks, sandboxes: list, handoff, standby, brain };
 }
 
-export type { ClaudeCloudTokens, CloudChecks, CloudHandoff, CloudSandboxes, CloudSettings, CloudStandby, CodexCloudLogin };
+export type { ClaudeCloudTokens, CloudBrain, CloudChecks, CloudHandoff, CloudSandboxes, CloudSettings, CloudStandby, CodexCloudLogin };

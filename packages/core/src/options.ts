@@ -3,6 +3,7 @@ import type { TextEmbedder } from "@openorc/memory";
 import type { BrowserHost, PreviewHost } from "@openorc/protocol";
 import type { DeviceSystem } from "./devices/system.js";
 import type { RemoteNetwork } from "./remote/remote-access.js";
+import type { BrainBundleSource, OpenBrainMachine } from "./services/cloud-brain.js";
 import type { ProtectedSecretStore } from "./services/extraction-credentials.js";
 import type { BundledFormatter } from "./services/file-format.js";
 import type { ShellProbe } from "./services/shell-environment.js";
@@ -77,4 +78,10 @@ export interface OpenOrcOptions {
   terminal?: SpawnTerminal;
   /** Overrides the credentials Settings keeps, for tests and smoke scripts. While it resolves to null, new cloud conversations run in sandboxes on this Mac. */
   cloudCredentials?: () => Promise<VercelConnection | null>;
+  /** Keeps the cloud brain's key, team and region. Losing it loses the brain: only its key opens the brain's secrets. */
+  cloudBrainSecrets?: ProtectedSecretStore;
+  /** The cloud brain this build installs, looked up when Settings asks. Without one, no brain can be set up. */
+  cloudBrainBundle?: () => Promise<BrainBundleSource | null>;
+  /** Reaches the cloud brain's machine in place of Vercel, for tests. */
+  cloudBrainMachine?: OpenBrainMachine;
 }

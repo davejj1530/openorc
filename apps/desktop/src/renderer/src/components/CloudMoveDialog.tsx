@@ -61,8 +61,8 @@ export function CloudMoveDialog({ threadId }: { threadId: string }) {
         {thread.data ? <p className="text-sm text-ink-3 mb-3 break-words">{thread.data.title}</p> : null}
         <p className="text-base text-ink-2 mb-3">
           {fromCheckout
-            ? "Every uncommitted change in the checkout first moves into a new worktree on its own branch, including changes you or other conversations made. That worktree and Claude’s session then go to a sandbox of its own, where its next message runs."
-            : "Its worktree, uncommitted changes and Claude’s session go to a sandbox of its own, where its next message runs. The worktree stays on this Mac and follows the sandbox."}
+            ? "Every uncommitted change in the checkout first moves into a new worktree on its own branch, including changes you or other conversations made. That worktree and the conversation’s session then go to a sandbox of its own, where its next message runs."
+            : "Its worktree, uncommitted changes and session go to a sandbox of its own, where its next message runs. The worktree stays on this Mac and follows the sandbox."}
         </p>
         {preview.contents}
         {problem ? (

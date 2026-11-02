@@ -110,7 +110,7 @@ function NewThreadProject({
   // skills do: they belong to the project, or the Workspace folder, chosen on this screen.
   const skillCommands = useSkillCommands(projectId, choice?.agent, draft.workingDirectory, claudeAccountId);
   // Cloud runs only Claude so far, and only in development and QA builds until a real sandbox provider is set up.
-  const canCloud = cloudOffered && target.kind === "model" && choice?.agent === "claude";
+  const canCloud = cloudOffered && target.kind === "model" && (choice?.agent === "claude" || choice?.agent === "codex");
   const workspaceMode = newThreadWorkspaceMode({ canBranch: !isWorkspace && !git.cannotBranch, canCloud, chosen: draft.workspace, preferred: settings.data?.defaultWorkspaceMode });
 
   useEffect(() => {

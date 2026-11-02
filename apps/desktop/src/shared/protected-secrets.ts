@@ -14,6 +14,7 @@ export const PROTECTED_SECRET_FILES = {
   "cloud.secrets": "cloud-credentials.enc",
   /** Each Claude account's token for signing in to cloud sandboxes. */
   "claude-cloud.secrets": "claude-cloud-tokens.enc",
+  "codex-cloud.secrets": "codex-cloud-login.enc",
 } as const;
 
 export type ProtectedSecretChannel = keyof typeof PROTECTED_SECRET_FILES;

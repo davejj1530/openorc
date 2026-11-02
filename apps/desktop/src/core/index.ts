@@ -71,6 +71,7 @@ const corePromise = OpenOrc.create({
   pushSecrets: secrets.store("push.secrets"),
   cloudSecrets: secrets.store("cloud.secrets"),
   claudeCloudSecrets: secrets.store("claude-cloud.secrets"),
+  codexCloudSecrets: secrets.store("codex-cloud.secrets"),
   terminal,
   presence: presence.inUse,
   // The embedding model runs in its own thread, so loading it and embedding memories never stall the core.

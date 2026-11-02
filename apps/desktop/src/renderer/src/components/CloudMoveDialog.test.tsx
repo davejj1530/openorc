@@ -74,7 +74,7 @@ function show(mode: "current" | "worktree", move: () => Promise<unknown> = async
 it("moves a worktree conversation to the cloud and closes", async () => {
   show("worktree");
   await screen.findByText("Add a footer");
-  expect(screen.getByText(/Its worktree, uncommitted changes and Claude’s session go to a sandbox of its own/)).toBeTruthy();
+  expect(screen.getByText(/Its worktree, uncommitted changes and session go to a sandbox of its own/)).toBeTruthy();
   expect(core.call).not.toHaveBeenCalledWith("threads.movePreview", expect.anything());
   fireEvent.click(screen.getByRole("button", { name: "Move" }));
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.move", { threadId: "thread" }));

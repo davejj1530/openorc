@@ -1,39 +1,14 @@
 import { useState, type ReactNode } from "react";
 import { SANDBOX_VCPUS, type ClaudeAccountConnection, type ClaudeCloudAccess, type CloudStatus } from "@openorc/protocol";
-import { Button, Input, Select, TextButton } from "../components/ui";
+import { Button, Select, TextButton } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { CloudCheckSection } from "./settings-cloud-check";
 import { CloudSandboxesSection } from "./settings-cloud-sandboxes";
 import { Field, LoadError, Section, SettingRow, Status, Toggle } from "./settings-shared";
+import { CodexCloudSection } from "./settings-cloud-codex";
+import { Failure, TokenField } from "./settings-secret-field";
 
 const TOKENS_URL = "https://vercel.com/account/settings/tokens";
-
-function Failure({ error }: { error: Error | null | undefined }) {
-  return error ? (
-    <p role="alert" className="text-bad mt-2">
-      {error.message}
-    </p>
-  ) : null;
-}
-
-/** A secret typed once: it goes to the core and the field empties. */
-function TokenField({ label, hint, action, busy, onSave }: { label: string; hint: ReactNode; action: string; busy: boolean; onSave: (token: string) => void }) {
-  const [token, setToken] = useState("");
-  return (
-    <SettingRow label={label} hint={hint}>
-      <Input type="password" autoComplete="off" spellCheck={false} value={token} disabled={busy} placeholder="Paste token" onChange={(e) => setToken(e.target.value)} />
-      <Button
-        disabled={busy || !token.trim()}
-        onClick={() => {
-          onSave(token.trim());
-          setToken("");
-        }}
-      >
-        {action}
-      </Button>
-    </SettingRow>
-  );
-}
 
 /** Vercel's default when none is chosen. */
 const DEFAULT_VCPUS = 2;
@@ -238,6 +213,7 @@ export function CloudSettings({ active }: { active: boolean }) {
       ) : null}
       <VercelSettings status={status.data} />
       <ClaudeCloudAccounts status={status.data} active={active} />
+      <CodexCloudSection codex={status.data.codex} />
       <TakeoverSection enabled={status.data.takeover} />
       <CloudSandboxesSection active={active} />
       <CloudCheckSection status={status.data} />

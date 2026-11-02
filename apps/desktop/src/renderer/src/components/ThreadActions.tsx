@@ -172,7 +172,7 @@ function ThreadMenuContent({ thread, parts: M }: { thread: ThreadSummary; parts:
           {threadMoveLabel({ cancelling: pendingMove?.phase === "cancel", pending: Boolean(pendingMove), mode: thread.workspaceMode })}
         </M.Item>
       ) : null}
-      {cloudOffered && !team && !thread.cloud && thread.agent === "claude" && thread.projectId !== WORKSPACE_ID ? (
+      {cloudOffered && !team && !thread.cloud && (thread.agent === "claude" || thread.agent === "codex") && thread.projectId !== WORKSPACE_ID ? (
         <M.Item className={menuItem} disabled={busy} onClick={() => useUi.getState().setMoveThread(thread.id, "cloud")}>
           <Cloud size={13} /> Move to cloud
         </M.Item>

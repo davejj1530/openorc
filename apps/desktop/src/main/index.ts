@@ -95,7 +95,7 @@ const mcpAppSandbox = new McpAppSandbox();
  * tool may inherit an odd one. Either way the user's terminal is the truth,
  * and the core is the process that asks it: the core launches the agents, so
  * Ready has to mean launchable there. Main hears every snapshot the core
- * adopts and keeps the PATH for the Terminal panels it hosts.
+ * adopts and keeps the PATH for the Terminal panels it hosts outside macOS.
  */
 function startCore(): UtilityProcess {
   const child = utilityProcess.fork(join(here, "core.mjs"), [], {

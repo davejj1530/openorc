@@ -1,9 +1,11 @@
+import { execFile } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { promisify } from "node:util";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { COMMAND_SETTLE_MS } from "../shared/command-settle";
-import { PtyHost, Scrollback, clampSize, ptyEnv, terminalShell, validateCwd, type PtyProcess, type SpawnPty } from "./pty-host";
+import { PtyHost, Scrollback, clampSize, ptyEnv, shellLaunch, terminalShell, validateCwd, type PtyProcess, type SpawnPty } from "./pty-host";
 
 /** A shell that never existed. Every test here asserts on the host's bookkeeping, which is the half that has to be right before a real one is worth spawning. */
 class FakePty implements PtyProcess {
@@ -151,6 +153,46 @@ describe("pty environment", () => {
 
   it("keeps this process's PATH when the login shell could not be read", () => {
     expect(ptyEnv({ PATH: "/usr/bin" }, null)["PATH"]).toBe("/usr/bin");
+  });
+
+  it("leaves behind what the package script that started the app added", () => {
+    const env = ptyEnv(
+      {
+        HOME: "/Users/d",
+        PNPM_HOME: "/Users/d/Library/pnpm",
+        NODE_ENV: "development",
+        NODE_PATH: "/repo/node_modules/.pnpm/node_modules",
+        INIT_CWD: "/repo",
+        npm_lifecycle_event: "dev",
+        npm_config_user_agent: "pnpm/11.21.0",
+        pnpm_config_verify_deps_before_run: "false",
+        ELECTRON_RENDERER_URL: "http://localhost:5173",
+        VSCODE_INJECTION: "1",
+        TERM_PROGRAM_VERSION: "1.143.1",
+        SHLVL: "7",
+      },
+      null,
+    );
+    expect(Object.keys(env).sort()).toEqual(["COLORTERM", "HOME", "PNPM_HOME", "TERM", "TERM_PROGRAM"]);
+  });
+});
+
+describe.skipIf(process.platform !== "darwin")("a panel's shell on macOS", () => {
+  let home: string;
+  beforeEach(async () => {
+    home = await mkdtemp(join(tmpdir(), "openorc-pty-home-"));
+  });
+  afterEach(() => rm(home, { recursive: true, force: true }));
+
+  it("builds PATH once from the profile, in the order a terminal opened from the Dock gets", async () => {
+    // The rc file prepends one manager and then, as nvm does, leaves another where it is once it is on PATH.
+    await writeFile(join(home, ".zprofile"), 'export PATH="/brew/bin:$PATH"\n');
+    await writeFile(join(home, ".zshrc"), 'export PATH="/volta/bin:$PATH"\n[[ ":$PATH:" == *":/nvm/bin:"* ]] || export PATH="/nvm/bin:$PATH"\n');
+    const { args, path } = await shellLaunch();
+    const adopted = "/nvm/bin:/volta/bin:/brew/bin:/usr/bin:/bin";
+    const env = ptyEnv({ HOME: home, PATH: adopted }, path);
+    const { stdout } = await promisify(execFile)("/bin/zsh", [...args, "-i", "-c", 'print -r -- "$PATH"'], { env });
+    expect(stdout.trim()).toMatch(/^\/nvm\/bin:\/volta\/bin:\/brew\/bin:/);
   });
 });
 

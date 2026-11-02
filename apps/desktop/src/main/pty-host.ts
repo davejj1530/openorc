@@ -424,20 +424,55 @@ function currentAccountShell(): string | null {
   }
 }
 
+/** Where a macOS login shell starts before /etc/zprofile and the user's profile build on it, as the core's probe does. */
+const SYSTEM_PATH = "/usr/bin:/bin:/usr/sbin:/sbin";
+
 /**
- * This process's environment minus what a shell should not inherit. The shell
- * runs interactive but not as a login shell: shell-env has already paid for
- * the profile once, and paying again per panel would also print the profile's
- * banner into every new terminal.
+ * How a panel's shell starts. Every macOS terminal runs the login shell from
+ * the system PATH and lets the profile build the rest, so the panel does too.
+ * Starting from a PATH a profile already built would run the rc file over it a
+ * second time: its prepends land in front of entries meant to win, and nvm,
+ * finding itself on PATH, stays behind them. Elsewhere a terminal is not a
+ * login shell, so the panel starts from the PATH the core adopted.
  */
+export async function shellLaunch(platform: NodeJS.Platform = process.platform): Promise<{ args: string[]; path: string | null }> {
+  if (platform === "darwin") return { args: ["-l"], path: SYSTEM_PATH };
+  return { args: [], path: (await loginShellEnv())?.path ?? null };
+}
+
+/**
+ * What starting OpenOrc from a package script adds to its environment: the
+ * script's npm and pnpm variables, the NODE_ENV and NODE_PATH it runs under,
+ * Electron's and electron-vite's own, and the identity of the terminal the
+ * script was typed into. None of it is the user's session. A shell that kept
+ * it would run pnpm with the script's config, build in development mode, and,
+ * with the ELECTRON_RUN_AS_NODE the core runs under, turn every `node` into
+ * Electron.
+ */
+const LAUNCHER_PREFIXES = ["npm_", "pnpm_config_", "ELECTRON_", "VSCODE_"];
+const LAUNCHER_VARIABLES = new Set([
+  "INIT_CWD",
+  "NODE_ENV",
+  "NODE_ENV_ELECTRON_VITE",
+  "NODE_PATH",
+  "COREPACK_ROOT",
+  "PNPM_SCRIPT_SRC_DIR",
+  "PNPM_PACKAGE_NAME",
+  "TERM_PROGRAM_VERSION",
+  "TERM_SESSION_ID",
+  "SHLVL",
+]);
+
+function fromLauncher(key: string): boolean {
+  return LAUNCHER_VARIABLES.has(key) || LAUNCHER_PREFIXES.some((prefix) => key.startsWith(prefix));
+}
+
+/** This process's environment minus what a shell should not inherit, with the PATH the shell starts from. */
 export function ptyEnv(base: NodeJS.ProcessEnv, path: string | null): Record<string, string> {
   const env: Record<string, string> = {};
   for (const [key, value] of Object.entries(base)) {
-    if (value !== undefined) env[key] = value;
+    if (value !== undefined && !fromLauncher(key)) env[key] = value;
   }
-  // Set on the environment the core's utility process runs with. A shell that
-  // inherits it turns every `node` the user types into Electron.
-  delete env["ELECTRON_RUN_AS_NODE"];
   if (path) env["PATH"] = path;
   env["TERM"] = "xterm-256color";
   env["COLORTERM"] = "truecolor";
@@ -449,15 +484,11 @@ export function ptyEnv(base: NodeJS.ProcessEnv, path: string | null): Record<str
  * node-pty carries a native binding, so it loads on first use rather than at
  * startup: a missing prebuild then fails one panel with a message the panel
  * can show, instead of the main process before a window exists.
- *
- * The PATH is the login shell's rather than this process's, so a shell the
- * user types into resolves tools in the order their terminal does. It is the
- * snapshot the core adopted for agents, not a second probe.
  */
 const spawnShell: SpawnPty = async ({ cwd, cols, rows }) => {
   const { spawn } = await import("node-pty");
-  const shell = await loginShellEnv();
-  return spawn(terminalShell(), [], { name: "xterm-256color", cwd, cols, rows, env: ptyEnv(process.env, shell?.path ?? null) });
+  const { args, path } = await shellLaunch();
+  return spawn(terminalShell(), args, { name: "xterm-256color", cwd, cols, rows, env: ptyEnv(process.env, path) });
 };
 
 /** The renderer is the only caller and still the untrusted side of the bridge, so the payload is checked rather than trusted. */

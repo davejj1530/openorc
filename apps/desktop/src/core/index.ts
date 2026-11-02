@@ -6,7 +6,7 @@ import { windowPorts } from "./reply";
 import { basename, join } from "node:path";
 import { Worker } from "node:worker_threads";
 import type { MessagePortMain } from "electron";
-import { OpenOrc, WorkerEmbedder, WorkerFormatter, type Broadcast, type EnvSnapshot, type RequestOrigin, type RpcReply, type Transport } from "@openorc/core";
+import { OpenOrc, WorkerEmbedder, WorkerFormatter, type Broadcast, type EnvSnapshot, type RequestOrigin, type RpcReply, type SpawnTerminal, type Transport } from "@openorc/core";
 import type { RpcRequest } from "@openorc/protocol";
 
 /**
@@ -45,6 +45,19 @@ const cloudRunner = import.meta.glob<string>(["../../../../packages/cloud/src/ru
   import: "default",
   eager: true,
 });
+/**
+ * A terminal for CLIs whose sign-in screens need one, such as `claude setup-token`. Wide, so a token is never wrapped
+ * across lines. node-pty carries a native binding, so it loads on first use.
+ */
+const terminal: SpawnTerminal = async (binary, args, { cwd, env }) => {
+  const { spawn } = await import("node-pty");
+  const pty = spawn(binary, args, { name: "xterm-256color", cols: 400, rows: 40, cwd, env: env as Record<string, string> });
+  return {
+    onData: (listener) => void pty.onData(listener),
+    onExit: (listener) => void pty.onExit(({ exitCode }) => listener(exitCode)),
+    kill: () => pty.kill(),
+  };
+};
 const corePromise = OpenOrc.create({
   browser: browser.execute,
   preview: preview.host,
@@ -58,6 +71,7 @@ const corePromise = OpenOrc.create({
   pushSecrets: secrets.store("push.secrets"),
   cloudSecrets: secrets.store("cloud.secrets"),
   claudeCloudSecrets: secrets.store("claude-cloud.secrets"),
+  terminal,
   presence: presence.inUse,
   // The embedding model runs in its own thread, so loading it and embedding memories never stall the core.
   embedder: new WorkerEmbedder(() => new Worker(join(import.meta.dirname, "embedder-worker.mjs"), { workerData: { cacheDir: dataDir } })),

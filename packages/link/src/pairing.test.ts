@@ -47,6 +47,13 @@ describe("pairing codes", () => {
     expect(decodePairingUrl(code(body))).toEqual(offer);
   });
 
+  it("read a cloud host's public route, and skip routes of kinds this build does not know", () => {
+    const publicRoute = { kind: "public", host: "sb-abc.vercel.run", port: 443 } as const;
+    expect(decodePairingUrl(code({ ...body, routes: [publicRoute] })).routes).toEqual([publicRoute]);
+    const future = [{ kind: "relay", host: "relay.example.com", port: 1, path: "/r" }, { kind: "carrier-pigeon" }, offer.routes[1]];
+    expect(decodePairingUrl(code({ ...body, routes: future }))).toEqual({ ...offer, routes: [offer.routes[1]] });
+  });
+
   it.each<[string, string]>([
     ["another scheme", "https://example.com/#v1.abc"],
     ["another version", code(body).replace("#v1.", "#v2.")],
@@ -58,7 +65,11 @@ describe("pairing codes", () => {
     ["a short key", code({ ...body, key: toBase64Url(new Uint8Array(31)) })],
     ["a short secret", code({ ...body, secret: toBase64Url(new Uint8Array(16)) })],
     ["no routes", code({ ...body, routes: [] })],
-    ["a route of another kind", code({ ...body, routes: [{ kind: "relay", host: "x", port: 1 }] })],
+    ["only routes of kinds this build does not know", code({ ...body, routes: [{ kind: "relay", host: "x", port: 1 }, { kind: "pigeon" }] })],
+    ["a route without a kind", code({ ...body, routes: [offer.routes[0], { host: "x", port: 1 }] })],
+    ["a route that is not an object", code({ ...body, routes: [offer.routes[0], "studio.local"] })],
+    ["more than 32 routes", code({ ...body, routes: Array.from({ length: 33 }, () => offer.routes[0]) })],
+    ["a public route on no port", code({ ...body, routes: [{ kind: "public", host: "sb-abc.vercel.run", port: 0 }] })],
     ["a route without a port", code({ ...body, routes: [{ kind: "lan", host: "x", port: 0 }] })],
     ["a route with extra fields", code({ ...body, routes: [{ kind: "lan", host: "x", port: 1, path: "/" }] })],
     ["an expiry that is not a number", code({ ...body, expires: "soon" })],

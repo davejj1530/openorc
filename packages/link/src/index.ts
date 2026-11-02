@@ -6,4 +6,5 @@ export { decodePairingUrl, encodePairingUrl, PAIRING_SECRET_BYTES, PairingCodeEr
 export { createNodeStyleCrypto, type NodeStyleCrypto } from "./node-style.js";
 export { collapseId, openPush, PUSH_VERSION, pushKeys, sealPush, type PushEnvelope, type PushNotice } from "./push.js";
 export { MAX_MESSAGE_BYTES } from "./records.js";
+export { LINK_PATH, linkPath, linkUrl } from "./routes.js";
 export { LinkCloseCode, LinkSession, type LinkSocket } from "./session.js";

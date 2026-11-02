@@ -1,5 +1,6 @@
 import type { AssetRef, RemotePush, Route } from "@openorc/protocol";
 import { anyText, count, isRecord, list, oneOf, present, shape, text, variants, type Check, type Fields } from "./checks.js";
+import { readRoutes } from "./routes.js";
 
 /** Bumped when either end would misread the other. The Mac refuses a phone that speaks another version. */
 export const LINK_VERSION = 1;
@@ -45,10 +46,8 @@ export class LinkProtocolError extends Error {}
 
 /** An asset's id doubles as the u32 stream id of its byte records. */
 const streamId: Check = (value) => count(value) && (value as number) <= 0xffff_ffff;
-const port: Check = (value) => Number.isInteger(value) && (value as number) >= 1 && (value as number) <= 65_535;
 
 const message = (fields: Fields, optional?: Fields) => shape({ t: present, ...fields }, optional);
-const route = shape({ kind: oneOf("lan", "tailnet"), host: text(253), port });
 const assetRef = variants("kind", {
   attachment: shape({ kind: present, name: text(255) }),
   "tool-image": shape({ kind: present, url: text(512) }),
@@ -63,7 +62,8 @@ const phoneHello = variants("t", {
   hello: message({ version: count, device: shape({ name: text(80) }) }, { pair: shape({ offerId: text(64), secret: text(64) }) }),
 } satisfies Record<PhoneHello["t"], Check>);
 const macHello = variants("t", {
-  hello: message({ version: count, mac: shape({ name: text(255) }), deviceId: text(64), routes: list(route, 32) }),
+  // Read on their own below: a route of a kind this build does not know is dropped, not refused.
+  hello: message({ version: count, mac: shape({ name: text(255) }), deviceId: text(64), routes: present }),
   refused: message({ reason: oneOf("unpaired", "offer-invalid", "incompatible", "busy") }),
 } satisfies Record<MacHello["t"], Check>);
 
@@ -93,6 +93,19 @@ function parser<T>(check: Check, what: string): (value: unknown) => T {
 }
 
 export const parsePhoneHello = parser<PhoneHello>(phoneHello, "phone hello");
-export const parseMacHello = parser<MacHello>(macHello, "Mac hello");
+const exactMacHello = parser<MacHello>(macHello, "Mac hello");
+
+/**
+ * Exact, except for routes: those of kinds this build does not know are dropped. A hello left with none, like one that
+ * listed none, teaches the phone nothing and leaves the routes it saved.
+ */
+export function parseMacHello(value: unknown): MacHello {
+  const hello = exactMacHello(value);
+  if (hello.t === "refused") return hello;
+  const routes = readRoutes(hello.routes);
+  if (!routes) throw new LinkProtocolError("not a Mac hello");
+  return { ...hello, routes };
+}
+
 export const parsePhoneMessage = parser<PhoneMessage>(phoneMessage, "phone message");
 export const parseMacMessage = parser<MacMessage>(macMessage, "Mac message");

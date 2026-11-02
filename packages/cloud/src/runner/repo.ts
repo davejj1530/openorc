@@ -54,7 +54,8 @@ export function seed(request: SeedRequest): { seeded: true } {
   rmSync(building, { recursive: true, force: true });
   mkdirSync(building, { recursive: true });
   git(building, ["init", "-q"]);
-  git(building, ["fetch", "-q", bundle, `${request.ref ?? `refs/heads/${branch}`}:refs/heads/${branch}`, ...(workRef ? [`${workRef}:${SEED_REF}`] : [])]);
+  // The new repository's unborn HEAD may already name the branch, as it does wherever Git starts on that name.
+  git(building, ["fetch", "-q", "--update-head-ok", bundle, `${request.ref ?? `refs/heads/${branch}`}:refs/heads/${branch}`, ...(workRef ? [`${workRef}:${SEED_REF}`] : [])]);
   git(building, ["symbolic-ref", "HEAD", `refs/heads/${branch}`]);
   git(building, ["read-tree", "-u", "--reset", workRef ? SEED_REF : "HEAD"]);
   // The index goes back to the branch, so the Mac's uncommitted work stays uncommitted here too.

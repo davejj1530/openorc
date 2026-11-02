@@ -13,7 +13,7 @@ import {
   type HandoverClaudeAccount,
   type WakeResult,
 } from "@openorc/cloud";
-import { DEFAULT_CLAUDE_ACCOUNT } from "@openorc/protocol";
+import { DEFAULT_CLAUDE_ACCOUNT, brainRegionFor } from "@openorc/protocol";
 import { OpenOrc } from "../openorc.js";
 import type { OpenOrcOptions } from "../options.js";
 import { rpcClient } from "../rpc-test-client.js";
@@ -193,6 +193,25 @@ describe("the cloud brain from the Mac", () => {
     expect(await rpc("cloud.brain.remove", {})).toEqual({ state: "none", error: null });
     expect(brain.calls.at(-1)).toBe("remove");
     expect(stored()).toBeNull();
+  });
+
+  it("is where this Mac's cloud threads run while it is set up, unless Settings chooses another region", async () => {
+    const vercel = memoryStore();
+    await vercel.save(JSON.stringify({ vercel: { token: VERCEL_TOKEN, team: { id: teamId, name: "Team" }, project: { id: "prj_sandboxes", name: "openorc-sandboxes" } } }));
+    await core.close();
+    await open({ cloudSecrets: vercel });
+    const threads = async () => (await rpc("cloud.status", {})).vercel?.region;
+    expect(await threads()).toBe(brainRegionFor(Intl.DateTimeFormat().resolvedOptions().timeZone));
+
+    invalidated = [];
+    expect((await rpc("cloud.brain.create", { region: "cpt1" })).state).toBe("setting-up");
+    await vi.waitFor(async () => expect((await status()).state).toBe("ready"));
+    expect(invalidated).toContain("cloud");
+    expect(await threads()).toBe("cpt1");
+
+    expect((await rpc("cloud.vercel.region", { region: "syd1" })).vercel?.region).toBe("syd1");
+    await rpc("cloud.brain.remove", {});
+    expect(await threads()).toBe("syd1");
   });
 
   it("makes nothing in a team that has a brain this Mac has no key for, and can remove that one", async () => {

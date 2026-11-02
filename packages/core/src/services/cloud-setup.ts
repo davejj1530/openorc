@@ -46,7 +46,7 @@ export function createCloud(input: {
   brain: CloudBrain;
 } {
   const { db, options, accounts, environment, invalidate, log } = input;
-  const settings = new CloudSettings(options.cloudSecrets);
+  const settings = new CloudSettings(options.cloudSecrets, { brainRegion: () => brain.region() });
   const sandboxes = cloudSandboxProviders({
     dataDir: options.dataDir,
     env: () => environment().env,
@@ -62,13 +62,14 @@ export function createCloud(input: {
     },
   };
   const tokens = new ClaudeCloudTokens(options.claudeCloudSecrets, signIn, () => invalidate(["cloud"]), options.terminal);
-  const brain = new CloudBrain({
+  const brain: CloudBrain = new CloudBrain({
     db,
     store: options.cloudBrainSecrets,
     tokens,
     vercel: options.cloudCredentials ?? (() => settings.credentials()),
     bundle: options.cloudBrainBundle,
-    changed: () => invalidate(["cloud-brain"]),
+    // "cloud" too: the brain's region is where this Mac's sandboxes run unless another is chosen.
+    changed: () => invalidate(["cloud-brain", "cloud"]),
     ...(options.cloudBrainMachine ? { open: options.cloudBrainMachine } : {}),
   });
   const agentEnvironment = cloudAgentEnvironment({ accounts, tokens, snapshot: environment });

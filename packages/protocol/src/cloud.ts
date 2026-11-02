@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ClaudeAccountId } from "./claude-accounts.js";
-import { cloudBrainRpcParams, type CloudBrainRpcResults } from "./cloud-brain.js";
+import { BrainRegion, cloudBrainRpcParams, type CloudBrainRpcResults } from "./cloud-brain.js";
 import type { Thread } from "./domain.js";
 
 /** What a cloud thread's sandbox is doing before its first turn can start. */
@@ -106,6 +106,8 @@ export interface CloudStatus {
     project: string | null;
     /** vCPUs for new sandboxes; null for Vercel's default of 2. */
     vcpus: number | null;
+    /** Where new sandboxes run: the region chosen, else the cloud brain's, else the nearest by this Mac's time zone. */
+    region: BrainRegion;
   } | null;
   /** By Claude account id. */
   claude: Record<string, ClaudeCloudAccess>;
@@ -131,6 +133,8 @@ export const cloudRpcParams = {
   "cloud.takeover": z.object({ enabled: z.boolean() }).strict(),
   /** The size of sandboxes made from now on. */
   "cloud.vercel.size": z.object({ vcpus: SandboxVcpus }).strict(),
+  /** The region of sandboxes made from now on. */
+  "cloud.vercel.region": z.object({ region: BrainRegion }).strict(),
   /** Runs `claude setup-token` for the account; its browser sign-in finishes it. */
   "cloud.claude.create": z.object({ accountId: ClaudeAccountId }).strict(),
   "cloud.claude.cancel": z.object({ accountId: ClaudeAccountId }).strict(),
@@ -160,6 +164,7 @@ export interface CloudRpcResults extends CloudBrainRpcResults {
   "cloud.vercel.team": CloudStatus;
   "cloud.vercel.disconnect": CloudStatus;
   "cloud.vercel.size": CloudStatus;
+  "cloud.vercel.region": CloudStatus;
   "cloud.takeover": CloudStatus;
   "cloud.claude.create": CloudStatus;
   "cloud.claude.cancel": CloudStatus;

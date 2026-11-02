@@ -106,6 +106,14 @@ export class CloudBrain {
   }
 
   /**
+   * The region of the brain this Mac set up, null without one. Never waits for an operation: one running asks the
+   * Vercel connection, which asks this.
+   */
+  async region(): Promise<BrainRegion | null> {
+    return (await this.read().catch(() => null))?.region ?? null;
+  }
+
+  /**
    * Makes the brain in the region and sets it up in the background, its progress in the status. Again after a failure,
    * or on a brain that is set up, it keeps the key and region it has and installs this build's brain.
    */

@@ -1,5 +1,5 @@
 import type { VercelConnection } from "@openorc/cloud";
-import type { CloudStatus, CloudTeam } from "@openorc/protocol";
+import { brainRegionFor, type BrainRegion, type CloudStatus, type CloudTeam } from "@openorc/protocol";
 import type { ProtectedSecretStore } from "./extraction-credentials.js";
 
 /** The project on the chosen team that cloud threads' sandboxes belong to. */
@@ -8,7 +8,7 @@ const API = "https://api.vercel.com";
 const storageError = "Cannot access protected storage for cloud credentials. Unlock your OS keychain and retry.";
 
 interface Stored {
-  vercel?: { token: string; team?: CloudTeam; project?: { id: string; name: string }; vcpus?: number };
+  vercel?: { token: string; team?: CloudTeam; project?: { id: string; name: string }; vcpus?: number; region?: BrainRegion };
   /** Working conversations move to the cloud when this Mac goes to sleep. */
   takeover?: boolean;
 }
@@ -18,9 +18,12 @@ export type VercelStatus = Pick<CloudStatus, "vercel" | "error" | "takeover">;
 
 export type VercelRequest = (url: string, init: RequestInit) => Promise<Response>;
 
-function view(stored: Stored): VercelStatus {
-  const vercel = stored.vercel;
-  return { vercel: vercel ? { team: vercel.team ?? null, project: vercel.project?.name ?? null, vcpus: vercel.vcpus ?? null } : null, error: null, takeover: stored.takeover ?? false };
+export interface CloudSettingsOptions {
+  request?: VercelRequest;
+  /** The cloud brain's region, null without one. Unless another is chosen, this Mac's sandboxes run beside it. */
+  brainRegion?: () => Promise<BrainRegion | null>;
+  /** This Mac's time zone, an IANA name, which picks the region when nothing else does. */
+  timeZone?: () => string;
 }
 
 /** Vercel's own words about a refusal; never the request, which carries the token. */
@@ -36,11 +39,32 @@ async function refusal(response: Response): Promise<string> {
 export class CloudSettings {
   private pending: Promise<unknown> = Promise.resolve();
   private cache: Stored | null = null;
+  private readonly request: VercelRequest;
+  private readonly brainRegion: () => Promise<BrainRegion | null>;
+  private readonly timeZone: () => string;
 
   constructor(
     private readonly store: ProtectedSecretStore | undefined,
-    private readonly request: VercelRequest = (url, init) => fetch(url, init),
-  ) {}
+    options: CloudSettingsOptions = {},
+  ) {
+    this.request = options.request ?? ((url, init) => fetch(url, init));
+    this.brainRegion = options.brainRegion ?? (async () => null);
+    this.timeZone = options.timeZone ?? (() => Intl.DateTimeFormat().resolvedOptions().timeZone);
+  }
+
+  /** Where new sandboxes run: the region chosen, else the cloud brain's, else the nearest by this Mac's time zone. */
+  private async region(vercel: NonNullable<Stored["vercel"]>): Promise<BrainRegion> {
+    return vercel.region ?? (await this.brainRegion()) ?? brainRegionFor(this.timeZone());
+  }
+
+  private async view(stored: Stored): Promise<VercelStatus> {
+    const vercel = stored.vercel;
+    return {
+      vercel: vercel ? { team: vercel.team ?? null, project: vercel.project?.name ?? null, vcpus: vercel.vcpus ?? null, region: await this.region(vercel) } : null,
+      error: null,
+      takeover: stored.takeover ?? false,
+    };
+  }
 
   private serialize<T>(operation: () => Promise<T>): Promise<T> {
     const next = this.pending.then(operation, operation);
@@ -69,7 +93,7 @@ export class CloudSettings {
       throw new Error(storageError);
     }
     this.cache = next;
-    return view(next);
+    return this.view(next);
   }
 
   private async call<T>(token: string, path: string, init: { method?: string; body?: unknown } = {}): Promise<{ response: Response; body: T | null }> {
@@ -102,7 +126,7 @@ export class CloudSettings {
   status(): Promise<VercelStatus> {
     return this.serialize(async () => {
       try {
-        return view(await this.read());
+        return await this.view(await this.read());
       } catch (error) {
         return { vercel: null, error: error instanceof Error ? error.message : storageError, takeover: false };
       }
@@ -114,7 +138,7 @@ export class CloudSettings {
     return this.serialize(async () => {
       const vercel = (await this.read().catch(() => ({}) as Stored)).vercel;
       if (!vercel?.team || !vercel.project) return null;
-      return { token: vercel.token, teamId: vercel.team.id, projectId: vercel.project.id, ...(vercel.vcpus ? { vcpus: vercel.vcpus } : {}) };
+      return { token: vercel.token, teamId: vercel.team.id, projectId: vercel.project.id, region: await this.region(vercel), ...(vercel.vcpus ? { vcpus: vercel.vcpus } : {}) };
     });
   }
 
@@ -133,6 +157,15 @@ export class CloudSettings {
       const stored = await this.read();
       if (!stored.vercel) throw new Error("Connect Vercel first.");
       return this.write({ ...stored, vercel: { ...stored.vercel, vcpus } });
+    });
+  }
+
+  /** The region of sandboxes made from now on. One that exists stays where it was made. */
+  chooseRegion(region: BrainRegion): Promise<VercelStatus> {
+    return this.serialize(async () => {
+      const stored = await this.read();
+      if (!stored.vercel) throw new Error("Connect Vercel first.");
+      return this.write({ ...stored, vercel: { ...stored.vercel, region } });
     });
   }
 

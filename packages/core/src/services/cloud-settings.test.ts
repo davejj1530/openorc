@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CloudSettings, SANDBOX_PROJECT, type VercelRequest } from "./cloud-settings.js";
+import { CloudSettings, SANDBOX_PROJECT, type CloudSettingsOptions, type VercelRequest } from "./cloud-settings.js";
 
 const TOKEN = "vercel-token-123";
 
@@ -35,20 +35,29 @@ function memoryStore() {
   };
 }
 
+/** Settings on a Mac in Berlin with no cloud brain, unless a test says otherwise. */
+function cloudSettings(store: ConstructorParameters<typeof CloudSettings>[0], request: VercelRequest, options: CloudSettingsOptions = {}) {
+  return new CloudSettings(store, { request, timeZone: () => "Europe/Berlin", ...options });
+}
+
 describe("cloud settings", () => {
   it("connects with one team, makes its sandbox project, and gives sandboxes its credentials", async () => {
     const vercel = fakeVercel([{ id: "team_a", name: "Acme", slug: "acme" }]);
     const store = memoryStore();
-    const settings = new CloudSettings(store, vercel.request);
+    const settings = cloudSettings(store, vercel.request);
     expect(await settings.credentials()).toBeNull();
 
     const { status, teams } = await settings.connect(TOKEN);
     expect(teams).toEqual([{ id: "team_a", name: "Acme" }]);
-    expect(status).toEqual({ vercel: { team: { id: "team_a", name: "Acme" }, project: SANDBOX_PROJECT, vcpus: null }, error: null, takeover: false });
+    expect(status).toEqual({ vercel: { team: { id: "team_a", name: "Acme" }, project: SANDBOX_PROJECT, vcpus: null, region: "fra1" }, error: null, takeover: false });
     expect(vercel.calls).toEqual(["GET /v2/teams", `GET /v9/projects/${SANDBOX_PROJECT}`, "POST /v11/projects"]);
 
-    expect(await settings.credentials()).toEqual({ token: TOKEN, teamId: "team_a", projectId: "prj_team_a" });
-    expect(await new CloudSettings(store, vercel.request).status()).toEqual({ vercel: { team: { id: "team_a", name: "Acme" }, project: SANDBOX_PROJECT, vcpus: null }, error: null, takeover: false });
+    expect(await settings.credentials()).toEqual({ token: TOKEN, teamId: "team_a", projectId: "prj_team_a", region: "fra1" });
+    expect(await cloudSettings(store, vercel.request).status()).toEqual({
+      vercel: { team: { id: "team_a", name: "Acme" }, project: SANDBOX_PROJECT, vcpus: null, region: "fra1" },
+      error: null,
+      takeover: false,
+    });
   });
 
   it("waits for a team choice when the token reaches several, and reuses a project that exists", async () => {
@@ -59,9 +68,9 @@ describe("cloud settings", () => {
       ],
       { team_b: "prj_existing" },
     );
-    const settings = new CloudSettings(memoryStore(), vercel.request);
+    const settings = cloudSettings(memoryStore(), vercel.request);
     const { status, teams } = await settings.connect(TOKEN);
-    expect(status.vercel).toEqual({ team: null, project: null, vcpus: null });
+    expect(status.vercel).toEqual({ team: null, project: null, vcpus: null, region: "fra1" });
     expect(teams.map((team) => team.name)).toEqual(["Acme", "side-project"]);
     expect(await settings.credentials()).toBeNull();
 
@@ -76,7 +85,7 @@ describe("cloud settings", () => {
       { id: "team_a", name: "Acme", slug: "acme" },
       { id: "team_b", name: "Beta", slug: "beta" },
     ]);
-    const settings = new CloudSettings(memoryStore(), vercel.request);
+    const settings = cloudSettings(memoryStore(), vercel.request);
     await expect(settings.chooseSize(8)).rejects.toThrow("Connect Vercel first.");
     await settings.connect(TOKEN);
     await settings.chooseTeam("team_a");
@@ -86,8 +95,33 @@ describe("cloud settings", () => {
     expect(await settings.credentials()).toMatchObject({ teamId: "team_b", vcpus: 8 });
   });
 
+  it("runs new sandboxes in the region nearest this Mac's time zone, or beside the cloud brain while there is one", async () => {
+    let brain: "sin1" | null = null;
+    const settings = cloudSettings(memoryStore(), fakeVercel([{ id: "team_a", name: "Acme", slug: "acme" }]).request, { timeZone: () => "Asia/Tokyo", brainRegion: async () => brain });
+    expect((await settings.connect(TOKEN)).status.vercel?.region).toBe("hnd1");
+    expect(await settings.credentials()).toMatchObject({ region: "hnd1" });
+    brain = "sin1";
+    expect((await settings.status()).vercel?.region).toBe("sin1");
+    expect(await settings.credentials()).toMatchObject({ region: "sin1" });
+  });
+
+  it("keeps the region chosen over the brain's for sandboxes made from now on, through a change of team", async () => {
+    const vercel = fakeVercel([
+      { id: "team_a", name: "Acme", slug: "acme" },
+      { id: "team_b", name: "Beta", slug: "beta" },
+    ]);
+    const settings = cloudSettings(memoryStore(), vercel.request, { brainRegion: async () => "sin1" });
+    await expect(settings.chooseRegion("syd1")).rejects.toThrow("Connect Vercel first.");
+    await settings.connect(TOKEN);
+    await settings.chooseTeam("team_a");
+    expect((await settings.chooseRegion("syd1")).vercel?.region).toBe("syd1");
+    expect(await settings.credentials()).toMatchObject({ teamId: "team_a", region: "syd1" });
+    await settings.chooseTeam("team_b");
+    expect(await settings.credentials()).toMatchObject({ teamId: "team_b", region: "syd1" });
+  });
+
   it("keeps carrying working threads on in the cloud as a choice of its own, through disconnecting Vercel", async () => {
-    const settings = new CloudSettings(memoryStore(), fakeVercel([{ id: "team_a", name: "Acme", slug: "acme" }]).request);
+    const settings = cloudSettings(memoryStore(), fakeVercel([{ id: "team_a", name: "Acme", slug: "acme" }]).request);
     expect(await settings.takeover()).toBe(false);
     expect((await settings.setTakeover(true)).takeover).toBe(true);
     await settings.connect(TOKEN);
@@ -97,20 +131,20 @@ describe("cloud settings", () => {
 
   it("refuses a token Vercel does not accept and saves nothing", async () => {
     const store = memoryStore();
-    const settings = new CloudSettings(store, fakeVercel([]).request);
+    const settings = cloudSettings(store, fakeVercel([]).request);
     await expect(settings.connect("wrong-token")).rejects.toThrow("Vercel did not accept that token.");
     expect(store.peek()).toBeNull();
   });
 
   it("disconnects Vercel", async () => {
-    const settings = new CloudSettings(memoryStore(), fakeVercel([{ id: "team_a", name: "Acme", slug: "acme" }]).request);
+    const settings = cloudSettings(memoryStore(), fakeVercel([{ id: "team_a", name: "Acme", slug: "acme" }]).request);
     await settings.connect(TOKEN);
     expect(await settings.disconnect()).toEqual({ vercel: null, error: null, takeover: false });
     expect(await settings.credentials()).toBeNull();
   });
 
   it("reports storage it cannot open without exposing anything", async () => {
-    const settings = new CloudSettings({ load: () => Promise.reject(new Error("keychain locked")), save: async () => {} }, fakeVercel([]).request);
+    const settings = cloudSettings({ load: () => Promise.reject(new Error("keychain locked")), save: async () => {} }, fakeVercel([]).request);
     expect(await settings.status()).toEqual({ vercel: null, error: expect.stringContaining("protected storage"), takeover: false });
     expect(await settings.credentials()).toBeNull();
   });

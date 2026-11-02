@@ -35,6 +35,8 @@ import { createRunsHandlers } from "./handlers/runs.js";
 import { createSchedulesHandlers } from "./handlers/schedules.js";
 import { createSettingsHandlers } from "./handlers/settings.js";
 import { createSlackHandlers } from "./handlers/slack.js";
+import { createCloudHandlers } from "./handlers/cloud.js";
+import { CloudSettings } from "./services/cloud-settings.js";
 import { createSystemHandlers } from "./handlers/system.js";
 import { createTaskCreateHandlers } from "./handlers/task-create.js";
 import { createTaskDeleteHandlers } from "./handlers/task-delete.js";
@@ -127,6 +129,8 @@ export class OpenOrc {
   readonly workspaces: WorkspaceService;
   /** Sandboxes for cloud conversations and the connections to them. */
   readonly cloud: CloudWorkspaceService;
+  /** Where cloud threads run and how their agents sign in, as Settings keeps them. */
+  readonly cloudSettings: CloudSettings;
   readonly runs: RunService;
   readonly comments: TaskCommentService;
   readonly review: ReviewService;
@@ -241,10 +245,11 @@ export class OpenOrc {
       if (this.settings.get().notifications) options.transport.push(notice);
     };
     this.projects = new ProjectService(db);
+    this.cloudSettings = new CloudSettings(options.cloudSecrets);
     const sandboxes = cloudSandboxProviders({
       dataDir: options.dataDir,
       env: () => this.environment.current().env,
-      ...(options.cloudCredentials ? { credentials: options.cloudCredentials } : {}),
+      credentials: options.cloudCredentials ?? (() => this.cloudSettings.credentials()),
       ...(options.cloudSandboxes ? { override: options.cloudSandboxes } : {}),
     });
     this.cloud = new CloudWorkspaceService(db, { ...sandboxes, ...(options.cloudRunnerFiles ? { files: options.cloudRunnerFiles } : {}) }, this.log);
@@ -712,6 +717,7 @@ export class OpenOrc {
   private buildHandlers(invalidate: (keys: string[]) => void): Handlers {
     return composeHandlers(
       createSlackHandlers({ slack: this.slack, invalidate }),
+      createCloudHandlers({ settings: this.cloudSettings, invalidate }),
       createClaudeAccountHandlers(this.claudeAccounts),
       createSystemHandlers({
         system: this.system,

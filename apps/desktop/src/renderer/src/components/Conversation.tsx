@@ -1,3 +1,4 @@
+import { CloudStart, queueAfterStart } from "./CloudStart";
 import { conversationWorkspaceMode, conversationLocation, conversationEmptyHint, conversationEmptyTitle, workspaceDestination } from "../lib/conversation-status-presentation";
 import { WORKSPACE_ID } from "@openorc/protocol";
 import { TaskForwarding } from "./TaskForwarding";
@@ -243,7 +244,11 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
         </ConversationVoice.Provider>
       );
     if (runsQuery.isLoading) return null;
-    return orclings.empty ?? <Empty title={conversationEmptyTitle({ count: runs.length, firstTaskRun })}>{runs.length === 0 ? emptyHint : ""}</Empty>;
+    return (
+      orclings.empty ?? (
+        <CloudStart thread={thread} runs={runs.length} fallback={<Empty title={conversationEmptyTitle({ count: runs.length, firstTaskRun })}>{runs.length === 0 ? emptyHint : ""}</Empty>} />
+      )
+    );
   }
   return (
     <div className="h-full min-w-0 flex flex-col min-h-0">
@@ -252,7 +257,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
         <div className="max-w-chat w-full min-w-0 mx-auto grid grid-cols-1 gap-2">
           {thread ? (
             <MessageQueue
-              messages={thread.queued}
+              messages={queueAfterStart(thread, runs.length)}
               canSend={canSteer}
               pending={sendQueued.isPending || unqueue.isPending}
               sendReason={steerReason}

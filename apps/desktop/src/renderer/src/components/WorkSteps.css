@@ -108,6 +108,9 @@
     opacity var(--duration-confirm) var(--ease-out),
     scale var(--duration-confirm) var(--ease-overshoot);
 }
+.step-check[data-failed] {
+  background: var(--bad);
+}
 /* A step checked while the turn runs lands with one overshoot; checks already there don't replay. */
 @starting-style {
   [data-arrivals] .step-check {

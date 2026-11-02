@@ -17,7 +17,7 @@ import {
   useTicking,
 } from "@openorc/client";
 import { cn } from "../lib/cn";
-import { Brain, Check, ChevronRight, Folder, Globe, Hammer, Loader2, Search, Terminal, WorkDelegate } from "./icons";
+import { Brain, Check, ChevronRight, Folder, Globe, Hammer, Loader2, Search, Terminal, WorkDelegate, X } from "./icons";
 import { FileGlyph } from "./FileGlyph";
 import { useVisited } from "../lib/use-visited";
 import { ThreadLink } from "./ThreadImages";
@@ -156,16 +156,24 @@ function LiveWords({ headline, elapsed = false }: { headline: LiveHeadline; elap
   );
 }
 
-type StepState = "pending" | "running" | "done";
+export type StepState = "pending" | "running" | "done" | "failed";
 
-/** A step's mark: an empty ring, a loader while it runs, an ink check once done. The check lands with one overshoot. */
-function StepMark({ state }: { state: StepState }) {
+/**
+ * A step's mark: an empty ring, a loader while it runs, an ink check once done, a cross once it failed. Checks and
+ * crosses land with one overshoot.
+ */
+export function StepMark({ state }: { state: StepState }) {
   return (
     <span className="step-mark" data-state={state} aria-hidden="true">
       {state === "running" ? <Loader2 size={16} className="tool-row-live" /> : null}
       {state === "done" ? (
         <span className="step-check">
           <Check size={11} strokeWidth={2.25} />
+        </span>
+      ) : null}
+      {state === "failed" ? (
+        <span className="step-check" data-failed="">
+          <X size={11} strokeWidth={2.25} />
         </span>
       ) : null}
       {state === "pending" ? <span className="step-ring" /> : null}

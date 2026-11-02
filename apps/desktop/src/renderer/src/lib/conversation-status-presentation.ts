@@ -26,6 +26,7 @@ export function conversationLocation({
   if (project.id === WORKSPACE_ID || plainFolder) return { label: null, branch: null, directory: basePath };
   if (scope.kind === "task")
     return { label: mode === "worktree" ? "Worktree" : "Local checkout", branch: mode === "current" ? (scope.task.branch ?? project.defaultBranch) : scope.task.branch, directory: basePath };
+  if (scope.thread.cloud) return { label: "Cloud", branch: scope.thread.branch, directory: basePath, cloud: true };
   if (scope.thread.workspaceMode === "worktree") return { label: "Worktree", branch: scope.thread.branch, directory: basePath };
   return { label: "Local checkout", branch: checkoutBranch ?? null, directory: basePath };
 }

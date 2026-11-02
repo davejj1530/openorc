@@ -11,7 +11,7 @@ import {
   type RunMode,
   type FileScope,
 } from "@openorc/protocol";
-import { FileText, Laptop, Lightbulb, Pencil, Plus, ShieldCheck, Square, Wand, X } from "./icons";
+import { Cloud, FileText, Laptop, Lightbulb, Pencil, Plus, ShieldCheck, Square, Wand, X } from "./icons";
 import { ComposerInput } from "./ComposerInput";
 import { ComposerChoice } from "./ComposerChoice";
 import { ComposerSendButton } from "./ComposerSendButton";
@@ -38,7 +38,7 @@ function composerDestination(props: ComposerProps): ReactNode {
   if (!props.location.label) return null;
   return (
     <span className="composer-location">
-      <Laptop size={14} />
+      {props.location.cloud ? <Cloud size={14} /> : <Laptop size={14} />}
       <span>{props.location.label}</span>
     </span>
   );
@@ -95,7 +95,8 @@ export interface ComposerProps {
   attachmentsDisabledReason?: string | null;
   /** Where the agent runs: the working folder and Git context share the footer below the input. */
   /** A caller supplying its own destination control may omit the static label. */
-  location: { label: string | null; branch: string | null; directory?: string };
+  /** `cloud` when the agent works in a sandbox and `directory` is the worktree its changes arrive in. */
+  location: { label: string | null; branch: string | null; directory?: string; cloud?: boolean };
   /** Initial execution location is chosen before the conversation starts. */
   hasStarted?: boolean;
   /** Uncommitted changes and actions beside the working folder. */

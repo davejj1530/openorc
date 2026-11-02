@@ -1,7 +1,7 @@
 import { snoozeWakeLabel } from "@openorc/client";
-import type { Project, ThreadSummary as Thread } from "@openorc/protocol";
+import type { CloudThreadState, Project, ThreadSummary as Thread } from "@openorc/protocol";
 import { Menu } from "@base-ui/react/menu";
-import { AlarmClock, ArrowLeft, GitFork, GitPullRequest, MoreHorizontal, X } from "./icons";
+import { AlarmClock, ArrowLeft, Cloud, GitFork, GitPullRequest, MoreHorizontal, X } from "./icons";
 import { ThreadClaudeAccount } from "./ClaudeAccountPicker";
 import { ThreadMenuItems } from "./ThreadActions";
 import { ThreadOrcling } from "./OrclingAvatar";
@@ -114,11 +114,34 @@ export function ThreadHeader({
   );
 }
 
-/** Activity, the pull request and snooze, as faint words with small marks. */
+const cloudDot = { preparing: "live", failed: "bad", ready: null } as const;
+
+const cloudPlaces = {
+  vercel: { label: "Vercel", tip: "Runs in Vercel Sandbox" },
+  local: { label: "Simulated", tip: "Runs in a sandbox simulated on this Mac" },
+} as const;
+
+/** Where a cloud thread runs, with a dot while its sandbox is set up or after that failed. */
+function ThreadCloud({ cloud }: { cloud: CloudThreadState }) {
+  const place = cloudPlaces[cloud.provider];
+  const dot = cloudDot[cloud.state];
+  return (
+    <Tooltip label={cloud.state === "failed" && cloud.error ? cloud.error : place.tip}>
+      <span className="thread-header-fact">
+        <Cloud size={12} />
+        {dot ? <StatusDot tone={dot} /> : null}
+        {place.label}
+      </span>
+    </Tooltip>
+  );
+}
+
+/** Where a cloud thread runs, activity, the pull request and snooze, as faint words with small marks. */
 function ThreadFacts({ thread: t }: { thread: Thread }) {
   const snoozed = t.snoozedUntil && t.snoozedUntil > Date.now();
   return (
     <>
+      {t.cloud ? <ThreadCloud cloud={t.cloud} /> : null}
       {!t.teamInstanceId && t.activity !== "idle" ? (
         <span className="thread-header-fact">
           <StatusDot tone={t.activity === "waiting" ? "attention" : "live"} />

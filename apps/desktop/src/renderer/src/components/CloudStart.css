@@ -1,0 +1,48 @@
+/* A starting cloud thread's card: its setup steps, then the message waiting for the agent. Plan items' type and marks. */
+.cloud-start {
+  display: grid;
+  width: min(100%, 22rem);
+  gap: 8px;
+}
+.cloud-start-steps {
+  display: grid;
+  margin-top: 4px;
+}
+.cloud-start-steps > li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 30px;
+  font-size: var(--text-base);
+  line-height: 16px;
+  color: var(--ink-3);
+  transition: color var(--duration-arrive) var(--ease-out);
+}
+.cloud-start-steps > li[data-state="running"] {
+  color: var(--ink);
+}
+.cloud-start-steps > li[data-state="done"] {
+  color: var(--ink-2);
+}
+.cloud-start-steps .step-mark {
+  flex-shrink: 0;
+}
+.cloud-start-error {
+  font-size: var(--text-base);
+  line-height: 18px;
+  color: var(--bad);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 12rem;
+  overflow: auto;
+}
+.cloud-start-message {
+  margin-top: 8px;
+  font-size: var(--text-sm);
+  line-height: 16px;
+  color: var(--ink-3);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

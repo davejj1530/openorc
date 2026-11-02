@@ -49,8 +49,11 @@ export interface OpenOrcOptions {
   shellProbe?: ShellProbe;
   /** Serves the bench.* methods, which stream synthetic events and write a synthetic thread into the ledger. Development and QA builds only. */
   benchmarks?: boolean;
-  /** How the Device panel's helpers run processes. Tests pass a fake, so no simulator tool or hub ever runs. */
-  deviceSystem?: DeviceSystem;
+  /**
+   * How the Device panel's helpers run processes. Tests pass a fake, so no simulator tool or hub ever runs. Null on a
+   * machine with no simulators or emulators: nothing runs and agents have no device tool.
+   */
+  deviceSystem?: DeviceSystem | null;
   /** Where cloud conversations run. Defaults to sandboxes simulated in folders under `dataDir` on this Mac. */
   cloudSandboxes?: SandboxProvider;
   /** The cloud runner's source files, for a bundled core that cannot read them beside its own code. */
@@ -61,6 +64,13 @@ export interface OpenOrcOptions {
   claudeCloudSecrets?: ProtectedSecretStore;
   /** Cloud threads are offered in this build; a paired phone offers them when the Mac does. */
   cloudOffered?: boolean;
+  /**
+   * Every conversation runs in a cloud sandbox and no agent starts on this machine, as on the cloud brain, whose process
+   * holds the key to its secrets. Project conversations start in the cloud whatever the request says, Workspace and
+   * checkout conversations are refused, there are no sandboxes simulated in folders, and nothing is offered: there is no
+   * place to choose. An account's cloud token is its sign-in here. Background text generation still runs here.
+   */
+  cloudOnly?: boolean;
   /** Keeps the Codex login cloud sandboxes use, separate from this Mac's own. */
   codexCloudSecrets?: ProtectedSecretStore;
   /** Starts a command in a terminal of its own, for CLIs whose sign-in screens need one. Without it they get pipes. */

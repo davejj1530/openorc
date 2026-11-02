@@ -125,6 +125,11 @@ export class ClaudeAccountService {
     private readonly changed: (credentialsChanged?: string) => void,
     private readonly busy: (id: string) => boolean,
     private readonly retireIdle: (id: string) => Promise<void> = async () => {},
+    /**
+     * On a cloud-only host, an account's cloud token, which is how it signs in there: every Claude process for the account
+     * here, the sign-in check, model list and background text generation, runs with it.
+     */
+    private readonly cloudToken?: (id: string) => string | null,
   ) {}
 
   get hasPendingWork(): boolean {
@@ -157,7 +162,14 @@ export class ClaudeAccountService {
       linkSharedSkills(shared, env["CLAUDE_CONFIG_DIR"]);
       moveAccountMemory(shared, env["CLAUDE_CONFIG_DIR"]);
     }
+    const token = this.cloudToken?.(id);
+    if (token) env["CLAUDE_CODE_OAUTH_TOKEN"] = token;
     return { ...snapshot, env: Object.freeze(env), claudeAccountId: id, scope: `${id}:${this.generations.get(id) ?? 0}` };
+  }
+
+  /** A cloud token was saved or removed. Where it is the account's sign-in, everything read about the account is read again. */
+  cloudTokenChanged(id: string): void {
+    if (this.cloudToken) this.invalidate(id, true);
   }
 
   /** An unavailable Claude account must not hide the other installed providers. */

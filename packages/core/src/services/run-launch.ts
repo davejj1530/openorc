@@ -273,8 +273,7 @@ export class RunLaunch {
 
   /** Where a cloud conversation's agent runs, connected while the turn's starting point is captured; null on this Mac. */
   private connectCloud(input: StartRunInput, mcpUrl: string): Promise<CloudRunHost | null> {
-    const thread = input.scope.thread;
-    const connecting = (thread && this.deps.hooks.cloudHost?.(thread, new URL(mcpUrl).origin, { agent: input.agent, claudeAccountId: input.claudeAccountId })) || Promise.resolve(null);
+    const connecting = this.deps.hooks.cloudHost?.(input.scope.thread, new URL(mcpUrl).origin, { agent: input.agent, claudeAccountId: input.claudeAccountId }) ?? Promise.resolve(null);
     // Awaited after the capture; a failure before then must not go unhandled.
     void connecting.catch(() => undefined);
     return connecting;

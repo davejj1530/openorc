@@ -239,6 +239,11 @@ export class WorkspaceService {
     if (!adoptsCheckout) await assertCanBranch(project);
   }
 
+  /** Every conversation here runs in a cloud sandbox, whatever its start asked for. */
+  get cloudOnly(): boolean {
+    return this.options.cloud?.cloudOnly ?? false;
+  }
+
   /** Checks a new cloud conversation and picks where it runs, before it is admitted. */
   placeCloud(input: Pick<StartThreadInput, "agent" | "checkout" | "claudeAccountId">, project: Project): Promise<CloudProviderId> {
     if (!this.options.cloud) throw new Error("Cloud workspaces are not available.");

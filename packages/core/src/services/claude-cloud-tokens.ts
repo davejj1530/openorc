@@ -21,9 +21,10 @@ interface Saved {
   createdAt: number;
 }
 
-/** What token creation needs from the Claude accounts. */
+/** What token creation needs from the Claude accounts, and what they hear of a token saved or removed. */
 export interface ClaudeSignIn {
   signInLaunch(id: string): { binary: string; env: NodeJS.ProcessEnv; directory: string };
+  cloudTokenChanged?(id: string): void;
 }
 
 /**
@@ -89,12 +90,23 @@ export class ClaudeCloudTokens {
     return this.serialize(async () => (await this.read())[id]?.token ?? null);
   }
 
+  /** Reads the tokens once, so `known` can answer without waiting. */
+  async load(): Promise<void> {
+    await this.serialize(() => this.read());
+  }
+
+  /** The account's token from the tokens already read; null for an account without one, or before `load`. */
+  known(id: string): string | null {
+    return this.cache?.[id]?.token ?? null;
+  }
+
   /** Saves a token made elsewhere. A pasted `export CLAUDE_CODE_OAUTH_TOKEN=…` line keeps just the token. */
   save(id: string, pasted: string): Promise<void> {
     const token = TOKEN.exec(pasted)?.[0] ?? pasted.trim();
     return this.serialize(async () => {
       await this.write({ ...(await this.read()), [id]: { token, createdAt: Date.now() } });
       this.errors.delete(id);
+      this.accounts.cloudTokenChanged?.(id);
     });
   }
 
@@ -103,6 +115,7 @@ export class ClaudeCloudTokens {
       const { [id]: _removed, ...rest } = await this.read();
       await this.write(rest);
       this.errors.delete(id);
+      this.accounts.cloudTokenChanged?.(id);
     });
   }
 

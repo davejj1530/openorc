@@ -50,6 +50,7 @@ export function createCloud(input: {
     env: () => environment().env,
     credentials: options.cloudCredentials ?? (() => settings.credentials()),
     ...(options.cloudSandboxes ? { override: options.cloudSandboxes } : {}),
+    cloudOnly: options.cloudOnly,
   });
   const tokens = new ClaudeCloudTokens(options.claudeCloudSecrets, accounts, () => invalidate(["cloud"]), options.terminal);
   const agentEnvironment = cloudAgentEnvironment({ accounts, tokens, snapshot: environment });
@@ -69,7 +70,11 @@ export function createCloud(input: {
     codexHomeOnMac: () => environment().env["CODEX_HOME"] || path.join(os.homedir(), ".codex"),
   });
   const changed = (id: string) => invalidate(["threads", `thread:${id}`]);
-  const cloud = new CloudWorkspaceService(db, { ...sandboxes, agentEnvironment, sessions, codex, changed, ...(options.cloudRunnerFiles ? { files: options.cloudRunnerFiles } : {}) }, log);
+  const cloud = new CloudWorkspaceService(
+    db,
+    { ...sandboxes, agentEnvironment, sessions, codex, changed, cloudOnly: options.cloudOnly, ...(options.cloudRunnerFiles ? { files: options.cloudRunnerFiles } : {}) },
+    log,
+  );
   const checks = new CloudChecks(
     () => cloud.checkTarget(),
     () => invalidate(["cloud"]),

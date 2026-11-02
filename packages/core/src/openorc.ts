@@ -229,6 +229,7 @@ export class OpenOrc {
       },
       (id) => Boolean(this.agentUpdates?.get().updating || this.memory?.hasPendingWork || this.textGeneration?.hasPendingWork || this.runs?.hasClaudeSessions(id)),
       (id) => this.runs.retireIdleClaudeSessions(id),
+      options.cloudOnly ? (id) => this.claudeCloudTokens.known(id) : undefined,
     );
     this.agentUpdates = new AgentUpdateService({
       info: (refresh) => this.system.info(refresh),
@@ -567,6 +568,7 @@ export class OpenOrc {
     // Ready means launchable: nothing may be admitted before the login shell has answered once.
     const shell = await core.environment.refresh();
     if (!shell.ok) core.log.warn(`could not read the login shell environment, launching with the app's own: ${shell.error}`);
+    if (options.cloudOnly) await core.claudeCloudTokens.load();
     const mcp = await core.mcpServer();
     options.transport.push({ type: "ready", pid: process.pid, mcpPort: mcp.port });
     core.lifecycle.start();
@@ -742,7 +744,7 @@ export class OpenOrc {
   private buildHandlers(invalidate: (keys: string[]) => void): Handlers {
     return composeHandlers(
       createSlackHandlers({ slack: this.slack, invalidate }),
-      createCloudHandlers({ ...this.cloudParts, offered: Boolean(this.options.cloudOffered), invalidate }),
+      createCloudHandlers({ ...this.cloudParts, offered: Boolean(this.options.cloudOffered && !this.options.cloudOnly), invalidate }),
       createClaudeAccountHandlers(this.claudeAccounts),
       createSystemHandlers({
         system: this.system,

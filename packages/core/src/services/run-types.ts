@@ -235,8 +235,11 @@ export interface RunHooks {
   threadContext?(thread: Thread): string | null;
   /** Whether a conversation works in a checkout of code the user hasn't vetted, such as a pull request it reviews. */
   untrustedCheckout?(thread: Thread): boolean;
-  /** Where a cloud conversation's agent runs, or null when it runs on this Mac. MCP requests from there reach `mcpOrigin`. */
-  cloudHost?(thread: Thread, mcpOrigin: string, run: { agent: string; claudeAccountId?: string | null | undefined }): Promise<CloudRunHost | null>;
+  /**
+   * Where a run's agent runs, or null when it runs on this Mac; asked for runs without a conversation too, which a
+   * cloud-only host refuses. MCP requests from there reach `mcpOrigin`.
+   */
+  cloudHost?(thread: Thread | null, mcpOrigin: string, run: { agent: string; claudeAccountId?: string | null | undefined }): Promise<CloudRunHost | null>;
   /**
    * Brings a cloud conversation's changes to its worktree on the Mac, after sending the worktree's own changes up when
    * `push` is set; false when nothing changed or it runs on the Mac. Never rejects.

@@ -45,9 +45,12 @@ export interface CloudWorkspaceOptions {
   sessions?: CloudSessions;
   /** Codex's login and folder in sandboxes. Without it, Codex runs only in sandboxes simulated on this Mac. */
   codex?: CloudCodex;
+  /** Every conversation runs in a cloud sandbox: any agent launch that would run on this machine is refused. */
+  cloudOnly?: boolean;
 }
 
 const SETUP_OUTPUT_TAIL = 2000;
+export const LOCAL_LAUNCH_REFUSED = "This machine runs agents only in cloud sandboxes.";
 /** An idle agent keeps its VM awake, so in the cloud its process closes after this at the latest. */
 export const CLOUD_IDLE_PROCESS_MS = 10 * 60_000;
 /** A host made for a turn whose agent never starts lets its VM go after this. */
@@ -65,20 +68,23 @@ export function assertCloudStart(input: Pick<StartThreadInput, "agent" | "checko
 
 /**
  * The sandbox services the app offers: Vercel once it is connected, sandboxes simulated on this Mac otherwise. A
- * provider passed in, as tests do, takes new conversations instead.
+ * provider passed in, as tests do, takes new conversations instead. A cloud-only host has no simulated sandboxes, so
+ * without a connection Vercel refuses rather than agents running in folders there.
  */
 export function cloudSandboxProviders(input: {
   dataDir: string;
   env: () => NodeJS.ProcessEnv;
   credentials?: () => Promise<VercelConnection | null>;
   override?: SandboxProvider;
+  cloudOnly?: boolean;
 }): Pick<CloudWorkspaceOptions, "providers" | "forNewThreads"> {
-  const local = new LocalSandboxProvider(path.join(input.dataDir, "cloud-sandboxes"), input.env);
+  const local = input.cloudOnly ? null : new LocalSandboxProvider(path.join(input.dataDir, "cloud-sandboxes"), input.env);
   const credentials = input.credentials ?? (async () => null);
   const vercel = new VercelSandboxProvider({ credentials });
+  const builtIn = local ? [local, vercel] : [vercel];
   const { override } = input;
-  const providers = override ? [override, ...[local, vercel].filter((provider) => provider.id !== override.id)] : [local, vercel];
-  return { providers, forNewThreads: async () => override ?? ((await credentials()) ? vercel : local) };
+  const providers = override ? [override, ...builtIn.filter((provider) => provider.id !== override.id)] : builtIn;
+  return { providers, forNewThreads: async () => override ?? (local && !(await credentials()) ? local : vercel) };
 }
 
 /** Which sandbox is a conversation's, on which service: its cloud workspace's, or its standby's before it has one. */
@@ -132,6 +138,11 @@ export class CloudWorkspaceService {
     this.files = options.files ?? null;
     this.awake = new CloudAwake({ released: (threadId) => this.sleep(threadId), log });
     this.codex = options.codex ?? new CloudCodex(undefined);
+  }
+
+  /** Every conversation here runs in a cloud sandbox, whatever its start asked for. */
+  get cloudOnly(): boolean {
+    return Boolean(this.options.cloudOnly);
   }
 
   /** A sandbox being built, synced or stopped, or held awake for an agent's process, an idle one included. */
@@ -336,12 +347,16 @@ export class CloudWorkspaceService {
   }
 
   /**
-   * Where the conversation's next turn runs, or null when it runs on this Mac. MCP requests from the sandbox reach
+   * Where the next turn runs, or null when it runs on this Mac. Asked for every launch, a task's or comment's without a
+   * conversation too, so a cloud-only host refuses each local one here. MCP requests from the sandbox reach
    * `mcpOrigin` on the Mac through the runner.
    */
-  async host(thread: Thread, mcpOrigin: string, run: { agent: string; claudeAccountId?: string | null | undefined }): Promise<CloudRunHost | null> {
-    const record = cloudWorkspaces.get(this.db, thread.id);
-    if (!record) return null;
+  async host(thread: Thread | null, mcpOrigin: string, run: { agent: string; claudeAccountId?: string | null | undefined }): Promise<CloudRunHost | null> {
+    const record = thread ? cloudWorkspaces.get(this.db, thread.id) : null;
+    if (!thread || !record) {
+      if (this.options.cloudOnly) throw new Error(LOCAL_LAUNCH_REFUSED);
+      return null;
+    }
     if (record.state !== "ready" || !thread.worktreePath) throw new Error("This conversation's cloud workspace is not ready. Send again to set it up.");
     if (this.takeovers.has(thread.id)) throw new Error("The agent is still finishing the turn it carried on in the cloud while this Mac slept. Send again once it is done.");
     const placed = await this.location(record, thread.worktreePath);

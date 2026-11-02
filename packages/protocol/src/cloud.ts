@@ -60,6 +60,13 @@ export interface CloudSandbox {
   createdAt: number;
 }
 
+/** Whether this Mac offers cloud threads, and where a new one would run: what a phone needs to offer them too. */
+export interface CloudOffer {
+  offered: boolean;
+  /** Null when cloud threads are not offered. */
+  provider: "vercel" | "local" | null;
+}
+
 /** A Vercel team cloud threads can run on. */
 export interface CloudTeam {
   id: string;
@@ -137,6 +144,7 @@ export const cloudRpcParams = {
   /** Starts a cloud check where new cloud threads would run; its progress arrives in `cloud.status`. */
   "cloud.check": z.object({}),
   "cloud.sandboxes": z.object({}),
+  "cloud.offer": z.object({}),
   /** Moves a conversation from this Mac to a sandbox of its own; its sandbox is set up in the background. */
   "cloud.move": z.object({ threadId: z.string().min(1).max(200) }).strict(),
   /** Deletes a sandbox for good. A conversation's next message sets up a new one from its worktree on the Mac. */
@@ -161,6 +169,7 @@ export interface CloudRpcResults {
   "cloud.codex.remove": CloudStatus;
   "cloud.check": CloudStatus;
   "cloud.sandboxes": CloudSandbox[];
+  "cloud.offer": CloudOffer;
   "cloud.move": Thread;
   "cloud.sandboxes.remove": CloudSandbox[];
 }

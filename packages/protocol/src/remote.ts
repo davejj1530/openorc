@@ -49,6 +49,11 @@ export const REMOTE_METHODS = [
   "review.createThreadPr",
   // Whether the Mac shows a page for a thread, its address and title shaped. Frames come only to a session watching it.
   "preview.state",
+  // Whether the Mac offers cloud threads, and moving a thread to the cloud after the phone's confirm, with the files a
+  // move from the checkout would take. Starting one is `threads.start` with `cloud`.
+  "cloud.offer",
+  "cloud.move",
+  "threads.movePreview",
 ] as const satisfies readonly RpcMethod[];
 export type RemoteMethod = (typeof REMOTE_METHODS)[number];
 

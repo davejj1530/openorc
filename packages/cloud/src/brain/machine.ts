@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";
 import { APIError, Sandbox as SdkSandbox } from "@vercel/sandbox";
 import type { SandboxInfo } from "../sandbox.js";
@@ -20,6 +20,8 @@ export interface BrainAccess {
   teamId: string;
   /** BRAIN_SANDBOX unless given. */
   sandbox?: string;
+  /** BRAIN_PROJECT unless given, as for a QA brain kept apart from the person's own. */
+  project?: string;
 }
 
 /** What apps/brain's build makes: an archive whose top level holds the entry points. */
@@ -130,9 +132,9 @@ function brainVm(sandbox: SdkSandbox, resumes: boolean): BrainVm {
     },
     domain: (port) => (sandbox.routes.some((route) => route.port === port) ? sandbox.domain(port) : null),
     update: (changes) => sandbox.update(changes),
-    // The sandbox's own runCommand resumes it once stopped, as when it stops between a look and a command.
+    // The sandbox's own runCommand and writeFiles resume it once stopped, as when it stops between a look and a command.
     runCommand: (params) => (resumes ? sandbox.runCommand(params) : sandbox.currentSession().runCommand(params)),
-    writeFiles: (files) => sandbox.writeFiles(files),
+    writeFiles: (files) => (resumes ? sandbox.writeFiles(files) : sandbox.currentSession().writeFiles(files)),
     delete: (options) => sandbox.delete(options),
   };
 }
@@ -355,13 +357,13 @@ export class BrainMachine {
   /** Finds or makes the brain's project. Wakes nothing. */
   static async connect(access: BrainAccess, options: BrainMachineOptions = {}): Promise<BrainMachine> {
     const api = options.api ?? sdk;
-    return BrainMachine.at(access, await api.project(access.token, access.teamId, BRAIN_PROJECT), api, options);
+    return BrainMachine.at(access, await api.project(access.token, access.teamId, access.project ?? BRAIN_PROJECT), api, options);
   }
 
   /** As connect, but never makes the project: null when the team has none, and so no brain. */
   static async find(access: BrainAccess, options: BrainMachineOptions = {}): Promise<BrainMachine | null> {
     const api = options.api ?? sdk;
-    const project = await api.findProject(access.token, access.teamId, BRAIN_PROJECT);
+    const project = await api.findProject(access.token, access.teamId, access.project ?? BRAIN_PROJECT);
     return project && BrainMachine.at(access, project, api, options);
   }
 
@@ -447,15 +449,29 @@ export class BrainMachine {
   }
 
   /** One request to the running brain, without waking its sandbox. Throws BrainUnavailable when no brain answers. */
-  async control<R extends BrainControlRequest>(request: R): Promise<BrainControlResult<R>> {
+  control<R extends BrainControlRequest>(request: R): Promise<BrainControlResult<R>> {
+    return this.whileRunning((vm, layout) => this.ask(vm, layout, request));
+  }
+
+  /** Uploads a git bundle of a project to the running brain, which clones it, sets `origin` as its remote and imports it. */
+  importProject({ name, bundle, origin }: { name: string; bundle: Uint8Array; origin?: string }): Promise<{ projectId: string }> {
+    const file = `${randomUUID()}.bundle`;
+    return this.whileRunning(async (vm, layout) => {
+      await vm.writeFiles([{ path: path.posix.join(layout.inbox, file), content: bundle }]);
+      return this.ask(vm, layout, { op: "import-project", name, bundle: file, ...(origin ? { origin } : {}) });
+    });
+  }
+
+  /** `work` on the brain's sandbox while it runs, never waking it. Throws BrainUnavailable when no brain answers. */
+  private async whileRunning<T>(work: (vm: BrainVm, layout: BrainLayout) => Promise<T | null>): Promise<T> {
     const vm = await this.api.get({ ...this.credentials, name: this.name, resume: false });
     if (vm?.state !== "running") throw new BrainUnavailable();
-    const result = await this.ask(vm, brainLayout(path.posix.join(vm.cwd, ROOT_FOLDER)), request).catch((error: unknown) => {
-      // It stopped between the look and the request, and asking did not wake it.
+    const result = await work(vm, brainLayout(path.posix.join(vm.cwd, ROOT_FOLDER))).catch((error: unknown) => {
+      // It stopped between the look and the work, and the work did not wake it.
       if (alreadyStopping(error)) return null;
       throw error;
     });
-    if (!result) throw new BrainUnavailable();
+    if (result === null) throw new BrainUnavailable();
     return result;
   }
 

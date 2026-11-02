@@ -207,6 +207,8 @@ class FakeMachine {
   }
 }
 
+const projectId = (name: string) => (name === "openorc-brain" ? "prj_brain" : `prj_${name}`);
+
 type FakeVm = Omit<BrainVm, "state"> & { state: SandboxInfo["state"]; updates: Partial<BrainSettings>[] };
 
 /** Vercel with one team and project: sandboxes by name, all on one machine. */
@@ -251,11 +253,11 @@ class FakeVercel implements BrainApi {
 
   async project(_token: string, _teamId: string, name: string) {
     this.projects.push(name);
-    return { id: "prj_brain" };
+    return { id: projectId(name) };
   }
 
   async findProject(_token: string, _teamId: string, name: string) {
-    return this.projects.includes(name) ? { id: "prj_brain" } : null;
+    return this.projects.includes(name) ? { id: projectId(name) } : null;
   }
 
   async open(params: BrainOpenParams) {
@@ -574,6 +576,43 @@ describe("asking and removing a brain", () => {
     await connect(vercel);
     expect(await (await find())!.status()).toEqual({ state: "missing", address: null, expiresAt: null });
     expect(vercel.projects).toEqual(["openorc-brain"]);
+  });
+
+  it("uploads a project's bundle to the running brain's inbox and has it imported there, never waking a sleeping one", async () => {
+    const { vercel, brain, machine } = await provisioned();
+    const heard: BrainControlRequest[] = [];
+    machine.answer = (request) => {
+      heard.push(request);
+      if (request.op !== "import-project") return { code: 69 };
+      const uploaded = machine.files.get(`${ROOT}/inbox/${request.bundle}`);
+      if (uploaded?.toString() !== "git bundle bytes") return { code: 0, stdout: `${encodeControlReply<"import-project">({ ok: false, error: "No such bundle." })}\n` };
+      return { code: 0, stdout: `${encodeControlReply<"import-project">({ ok: true, result: { projectId: "project-1" } })}\n` };
+    };
+    const bundle = Buffer.from("git bundle bytes");
+    expect(await brain.importProject({ name: "throwaway", bundle, origin: "https://example.com/throwaway.git" })).toEqual({ projectId: "project-1" });
+    expect(heard).toEqual([{ op: "import-project", name: "throwaway", bundle: expect.stringMatching(/^\w[\w.-]*\.bundle$/), origin: "https://example.com/throwaway.git" }]);
+    expect(vercel.gets.every((get) => !get.resume)).toBe(true);
+
+    vercel.sandboxes.get("brain")!.state = "stopped";
+    machine.changes.length = 0;
+    await expect(brain.importProject({ name: "other", bundle })).rejects.toThrow(BrainUnavailable);
+    expect(machine.changes).toEqual([]);
+    expect(vercel.sandboxes.get("brain")!.state).toBe("stopped");
+  });
+
+  it("keeps a brain made in another project there, and makes its thread sandboxes there too", async () => {
+    const vercel = new FakeVercel();
+    const access = { token: TOKEN, teamId: "team_1", project: "openorc-brain-qa" };
+    const brain = await BrainMachine.connect(access, { api: vercel, startMs: 2000, pollMs: 1 });
+    await brain.provision(bundle("brain-v1"));
+    vercel.machine.onStart = (command) => command.emit("stdout", "openorc-brain ready brain-v1\n");
+    await brain.wake({ key: newBrainKey(), name: "Cloud QA" });
+    expect(vercel.projects).toEqual(["openorc-brain-qa"]);
+    expect(vercel.opened.map((opened) => opened.projectId)).toEqual(["prj_openorc-brain-qa"]);
+    expect(new Set(vercel.gets.map((get) => get.projectId))).toEqual(new Set(["prj_openorc-brain-qa"]));
+    expect(parseLaunch(vercel.machine.starts[0]!.stdin.trim()).vercel?.connection.projectId).toBe("prj_openorc-brain-qa");
+    expect(await (await BrainMachine.find(access, { api: vercel }))?.status()).toMatchObject({ state: "running" });
+    expect(await BrainMachine.find({ token: TOKEN, teamId: "team_1" }, { api: vercel })).toBeNull();
   });
 
   it("deletes every sandbox in the brain's project, the brain first, with their orphan snapshots", async () => {

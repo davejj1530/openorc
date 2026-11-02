@@ -128,6 +128,11 @@ process.parentPort.on("message", (e) => {
     void shutdown();
     return;
   }
+  if (e.data?.type === "power") {
+    const asleep = e.data.state === "suspend";
+    void corePromise.then((core) => (asleep ? core.cloudStandby.away() : core.cloudStandby.back())).catch((error: unknown) => console.error("[core] cloud takeover", error));
+    return;
+  }
   const [port, media] = e.ports;
   if (port && !closing) attach(port);
   if (media && !closing) void corePromise.then((core) => core.devices.attachMedia(media));

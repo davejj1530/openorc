@@ -1,4 +1,4 @@
-import { createNodeStyleCrypto, fromBase64Url, LinkCloseCode, toBase64Url, type LinkSocket } from "@openorc/link";
+import { createNodeStyleCrypto, fromBase64Url, LinkCloseCode, linkUrl, toBase64Url, type LinkSocket } from "@openorc/link";
 import type { Route } from "@openorc/protocol";
 import * as SecureStore from "expo-secure-store";
 import type { MMKV } from "react-native-mmkv";
@@ -38,10 +38,9 @@ export async function reachesInternet(signal: AbortSignal): Promise<boolean> {
   }
 }
 
-/** A React Native WebSocket to the Mac's link endpoint, as a session uses it. */
-export function openSocket(route: Route): OpeningSocket {
-  const host = route.host.includes(":") ? `[${route.host}]` : route.host;
-  const ws = new WebSocket(`ws://${host}:${route.port}/link/1`);
+/** A React Native WebSocket to the host's link endpoint, as a session uses it. */
+export function openSocket(route: Route, hostKey: Uint8Array): OpeningSocket {
+  const ws = new WebSocket(linkUrl(route, hostKey, phoneCrypto));
   ws.binaryType = "arraybuffer";
   let onMessage: (data: Uint8Array) => void = () => undefined;
   let onClose: (code: number, reason: string) => void = () => undefined;

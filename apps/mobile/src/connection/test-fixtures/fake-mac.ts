@@ -2,6 +2,7 @@ import {
   acceptLink,
   encodePairingUrl,
   LinkCloseCode,
+  linkPath,
   toBase64Url,
   type Admission,
   type ClosingReason,
@@ -23,15 +24,17 @@ export type Behavior = { kind: "answer"; delayMs?: number } | { kind: "refuse"; 
 export const lan: Route = { kind: "lan", host: "studio.local", port: 47820 };
 export const lanAddress: Route = { kind: "lan", host: "192.168.1.20", port: 47820 };
 export const tailnet: Route = { kind: "tailnet", host: "100.64.0.7", port: 47820 };
+/** A cloud brain's address behind Vercel's proxy. */
+export const publicRoute: Route = { kind: "public", host: "sb-brain.vercel.run", port: 443 };
 
 /**
  * A Mac for the phone's connection tests: the real handshake over in-memory sockets, with each address set to
- * answer, decline or stay silent. It answers pings unless `mute`, and records what it hears and every dial.
+ * answer, decline or stay silent. It answers pings unless `mute`, and records what it hears and every dial. Behind a
+ * public route, as a cloud brain, it answers only on the path its own key names, as its proxied listener does.
  */
 export class FakeMac {
   readonly keys = nobleCrypto.generateKeyPair();
   readonly id = toBase64Url(this.keys.publicKey);
-  readonly name = "Studio";
   routes: Route[] = [lan, tailnet];
   readonly behaviors = new Map<string, Behavior>();
   readonly dials: Array<{ host: string; at: number }> = [];
@@ -45,6 +48,8 @@ export class FakeMac {
   internetChecks = 0;
   /** Answers a call, or holds it when this returns undefined. */
   answer: (method: string, params: unknown) => unknown = () => undefined;
+
+  constructor(readonly name = "Studio") {}
 
   behave(route: Route, behavior: Behavior): void {
     this.behaviors.set(route.host, behavior);
@@ -78,9 +83,10 @@ export class FakeMac {
     return Promise.resolve(this.internet === "up");
   }
 
-  openSocket(route: Route): OpeningSocket {
+  openSocket(route: Route, hostKey: Uint8Array): OpeningSocket {
     this.dials.push({ host: route.host, at: Date.now() });
-    const behavior = this.behaviors.get(route.host) ?? { kind: "down" };
+    const ownPath = linkPath(route.kind, hostKey, nobleCrypto) === linkPath(route.kind, this.keys.publicKey, nobleCrypto);
+    const behavior = (ownPath && this.behaviors.get(route.host)) || { kind: "down" };
     if (behavior.kind === "down") return { opened: Promise.reject(new Error("connection refused")), close: () => undefined };
     if (behavior.kind === "silent") return { opened: new Promise(() => undefined), close: () => undefined };
     const { phone, mac } = socketPair();
@@ -143,7 +149,7 @@ export function effectsFor(
 ): ConnectionEffects & { macs: ReturnType<typeof memoryMacs>; keys: ReturnType<typeof memoryKeys>; forgotten: string[] } {
   const forgotten: string[] = [];
   return {
-    openSocket: (route) => mac.openSocket(route),
+    openSocket: (route, hostKey) => mac.openSocket(route, hostKey),
     crypto: nobleCrypto,
     clock: { now: () => Date.now(), setTimeout: (callback, ms) => setTimeout(callback, ms), clearTimeout: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>) },
     random: () => 0.5,

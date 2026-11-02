@@ -34,16 +34,21 @@ const MAX_ROUTES = 8;
 export const sameRoute = (a: Route, b: Route) => a.kind === b.kind && a.host === b.host && a.port === b.port;
 
 /**
- * The routes worth trying on this network, in order. LAN addresses only answer on the Mac's own network, so on
- * cellular only the tailnet is tried; elsewhere LAN goes first, as it is faster. The last route that worked leads its
- * kind.
+ * The kinds of route that can answer on each network, fastest first. LAN addresses answer only on the host's own
+ * network, so cellular leaves them out; a public route answers wherever the internet does, and is the slowest.
  */
+const KINDS: Record<Exclude<NetworkKind, "none">, readonly Route["kind"][]> = {
+  wifi: ["lan", "tailnet", "public"],
+  other: ["lan", "tailnet", "public"],
+  cellular: ["tailnet", "public"],
+};
+
+/** The routes worth trying on this network, in order. The last route that worked leads its kind. */
 export function routesFor(mac: Pick<SavedMac, "routes" | "lastRoute">, network: NetworkKind): Route[] {
   if (network === "none") return [];
   const last = mac.lastRoute;
   const ordered = last && mac.routes.some((route) => sameRoute(route, last)) ? [last, ...mac.routes.filter((route) => !sameRoute(route, last))] : mac.routes;
-  const tailnet = ordered.filter((route) => route.kind === "tailnet");
-  return network === "cellular" ? tailnet : [...ordered.filter((route) => route.kind === "lan"), ...tailnet];
+  return KINDS[network].flatMap((kind) => ordered.filter((route) => route.kind === kind));
 }
 
 /** What the Mac listed in its hello, which reflects its addresses now, then saved routes it left out. */

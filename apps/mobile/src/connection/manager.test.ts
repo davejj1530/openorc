@@ -2,7 +2,7 @@ import { LinkCloseCode } from "@openorc/link";
 import type { ClientPush } from "@openorc/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ConnectionManager, type LinkState } from "./manager";
-import { effectsFor, FakeMac, lan, lanAddress, pairedWith, tailnet } from "./test-fixtures/fake-mac";
+import { effectsFor, FakeMac, lan, lanAddress, pairedWith, publicRoute, tailnet } from "./test-fixtures/fake-mac";
 import type { NetworkKind } from "./saved-macs";
 
 beforeEach(() => {
@@ -349,7 +349,7 @@ describe("a Mac that stays silent", () => {
       const laptopKeys = pairedWith(laptop);
       effects.macs.save(laptopKeys.macs.saved.get(laptop.id)!);
       effects.keys.stored.set(laptop.id, laptopKeys.keys.stored.get(laptop.id)!);
-      effects.openSocket = (route) => (route.host === "laptop.local" ? laptop : studio).openSocket(route);
+      effects.openSocket = (route, hostKey) => (route.host === "laptop.local" ? laptop : studio).openSocket(route, hostKey);
       const { manager } = start(studio, "wifi", effects);
       await advance(70_000);
       expect(manager.getState(), how).toMatchObject({ mac: { name: "Studio" }, why: "silent" });
@@ -646,5 +646,96 @@ describe("pairing", () => {
     const again = manager.pair(url);
     await advance(10);
     expect(await again).toMatchObject({ ok: true });
+  });
+});
+
+describe("a cloud brain", () => {
+  function brain() {
+    const cloud = new FakeMac("Cloud");
+    cloud.routes = [publicRoute];
+    cloud.behave(publicRoute, { kind: "answer" });
+    return cloud;
+  }
+
+  it("is reached from every network with internet, over the path its key names", async () => {
+    for (const network of ["wifi", "cellular", "other"] as const) {
+      const cloud = brain();
+      const { manager } = start(cloud, network, pairedWith(cloud));
+      await advance(10);
+      expect(manager.getState(), network).toMatchObject({ kind: "connected", route: publicRoute, mac: { name: "Cloud" } });
+    }
+    const cloud = brain();
+    const { manager } = start(cloud, "none", pairedWith(cloud));
+    await advance(10);
+    expect(manager.getState()).toMatchObject({ kind: "waiting", why: "offline", retryAt: null });
+    expect(cloud.dials).toHaveLength(0);
+  });
+
+  it("tries a public route last: after the LAN and the tailnet, or after the tailnet on cellular", async () => {
+    for (const [network, order] of [
+      ["wifi", ["studio.local@0", "100.64.0.7@250", "sb-brain.vercel.run@500"]],
+      ["cellular", ["100.64.0.7@0", "sb-brain.vercel.run@250"]],
+    ] as const) {
+      const host = new FakeMac();
+      host.routes = [publicRoute, tailnet, lan];
+      for (const route of host.routes) host.behave(route, { kind: "silent" });
+      const from = Date.now();
+      start(host, network, pairedWith(host));
+      await advance(600);
+      expect(
+        host.dials.map(({ host: dialedHost, at }) => `${dialedHost}@${at - from}`),
+        network,
+      ).toEqual(order);
+    }
+  });
+
+  it("reads asleep as a Mac that is away does: Reconnecting, then Not reachable, backing off, until it answers", async () => {
+    const cloud = brain();
+    // An asleep brain's address answers 502, so its socket never opens.
+    cloud.behave(publicRoute, { kind: "down" });
+    const { manager, states } = start(cloud, "cellular", pairedWith(cloud));
+    await advance(10);
+    expect(manager.getState()).toMatchObject({ kind: "waiting", why: "unreachable" });
+    await advance(65_000);
+    expect(manager.getState()).toMatchObject({ kind: "waiting", why: "silent" });
+    expect(new Set(states.flatMap((state) => ("why" in state && state.why ? [state.why] : [])))).toEqual(new Set(["unreachable", "silent"]));
+    expect(cloud.dials.length).toBeLessThanOrEqual(9);
+    cloud.behave(publicRoute, { kind: "answer" });
+    await advance(15_000);
+    expect(manager.getState()).toMatchObject({ kind: "connected", route: publicRoute });
+  });
+
+  it("blames Tailscale on cellular only when every route tried was a tailnet route", async () => {
+    const host = new FakeMac();
+    host.routes = [tailnet, publicRoute];
+    host.behave(tailnet, { kind: "down" });
+    host.behave(publicRoute, { kind: "down" });
+    const { manager } = start(host, "cellular", pairedWith(host));
+    await advance(10);
+    expect(manager.getState()).toMatchObject({ kind: "waiting", why: "unreachable" });
+  });
+
+  it("pairs beside the Mac without losing it, and switches between the two", async () => {
+    const studio = new FakeMac();
+    studio.behave(lan, { kind: "answer" });
+    const cloud = brain();
+    const effects = pairedWith(studio);
+    effects.openSocket = (route, hostKey) => (route.kind === "public" ? cloud : studio).openSocket(route, hostKey);
+    const { manager } = start(studio, "wifi", effects);
+    await advance(10);
+    const pairing = manager.pair(cloud.pairingUrl());
+    await advance(10);
+    expect(await pairing).toEqual({ ok: true, mac: { id: cloud.id, name: "Cloud" } });
+    expect(manager.getState()).toMatchObject({ kind: "connected", route: publicRoute, mac: { id: cloud.id, name: "Cloud" } });
+    expect(manager.getMacs().map((saved) => saved.name)).toEqual(["Studio", "Cloud"]);
+    expect([...effects.keys.stored.keys()]).toEqual([studio.id, cloud.id]);
+    manager.select(studio.id);
+    await advance(10);
+    expect(manager.getState()).toMatchObject({ kind: "connected", route: lan, mac: { id: studio.id } });
+    manager.select(cloud.id);
+    await advance(10);
+    expect(manager.getState()).toMatchObject({ kind: "connected", route: publicRoute, mac: { id: cloud.id } });
+    expect(cloud.paired.size).toBe(1);
+    expect(studio.paired.size).toBe(1);
   });
 });

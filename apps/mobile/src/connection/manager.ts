@@ -23,8 +23,8 @@ import { learnRoutes, routesFor, type DeviceKeys, type MacStore, type NetworkKin
 /**
  * Why the phone is not connected to the Mac it shows, as far as it knows. `unreachable`: no route answered, or the
  * session dropped. `silent`: the Mac has not answered for a minute, so it is likely asleep or on another network.
- * `tailnet`: on cellular, where only the Mac's tailnet addresses can answer, none did, though the internet answers.
- * `no-route`: this network has no way to the Mac (cellular, and the Mac has no tailnet address). `offline`: nothing
+ * `tailnet`: on cellular, where only the Mac's tailnet addresses could answer, none did, though the internet answers.
+ * `no-route`: this network has no way to the Mac (cellular, and it has no tailnet or public address). `offline`: nothing
  * gets out, with no network at all or one that reaches nowhere.
  */
 export type DownReason = "unreachable" | "silent" | "tailnet" | "no-route" | "offline" | "restarting" | "disabled" | "busy";
@@ -89,7 +89,8 @@ export interface OpeningSocket {
 }
 
 export interface ConnectionEffects {
-  openSocket(route: Route): OpeningSocket;
+  /** `hostKey` names the host's path behind a proxy; a direct route does not use it. */
+  openSocket(route: Route, hostKey: Uint8Array): OpeningSocket;
   crypto: LinkCrypto;
   clock: Clock;
   random(): number;
@@ -351,7 +352,7 @@ export class ConnectionManager {
   }
 
   private dial(route: Route, macKey: Uint8Array, device: KeyPair, pair?: PhoneHello["pair"]): Attempt<Linked> {
-    const socket = this.effects.openSocket(route);
+    const socket = this.effects.openSocket(route, macKey);
     const hello = { device: { name: this.effects.deviceName.slice(0, 80) || "iPhone" }, ...(pair ? { pair } : {}) };
     const answer = socket.opened.then(
       (opened) => connectLink({ socket: opened, crypto: this.effects.crypto, device, macKey, hello, timeoutMs: ROUTE_TIMEOUT_MS }),
@@ -381,7 +382,7 @@ export class ConnectionManager {
       // Off Wi-Fi every route runs over the internet, so with none nothing could have answered, Tailscale included.
       const online = result.ok || result.refused !== null || this.network === "wifi" || (await this.online());
       if (epoch !== this.epoch) return;
-      this.settleRace(mac, result, why, online);
+      this.settleRace(mac, result, why, online, routes);
     });
   }
 
@@ -403,7 +404,7 @@ export class ConnectionManager {
     });
   }
 
-  private settleRace(mac: SavedMac, result: RaceResult<Linked>, why: DownReason | null, online: boolean): void {
+  private settleRace(mac: SavedMac, result: RaceResult<Linked>, why: DownReason | null, online: boolean, tried: readonly Route[]): void {
     if (result.ok) return this.adopt(mac, result.route, result.value);
     switch (result.refused) {
       case "unpaired":
@@ -413,18 +414,19 @@ export class ConnectionManager {
       case "busy":
         return this.retryLater("busy");
       default:
-        return this.retryLater(this.unanswered(why, online));
+        return this.retryLater(this.unanswered(why, online, tried));
     }
   }
 
   /**
-   * Why no route answered: nothing gets out, or a reason the Mac gave still stands; otherwise the network says which
-   * routes were tried, and a minute without hearing the Mac makes it not reachable rather than reconnecting.
+   * Why no route answered: nothing gets out, or a reason the Mac gave still stands; on cellular with only tailnet
+   * routes to try, Tailscale is the way in; otherwise a minute without hearing the Mac makes it not reachable rather
+   * than reconnecting. A host asleep behind its proxy fails like a Mac that is away.
    */
-  private unanswered(why: DownReason | null, online: boolean): DownReason {
+  private unanswered(why: DownReason | null, online: boolean, tried: readonly Route[]): DownReason {
     if (!online) return "offline";
     if (why && macReasons.has(why)) return why;
-    if (this.network === "cellular") return "tailnet";
+    if (this.network === "cellular" && tried.every((route) => route.kind === "tailnet")) return "tailnet";
     const since = this.unheardSince;
     return since !== null && this.effects.clock.now() - since >= SILENT_AFTER_MS ? "silent" : "unreachable";
   }

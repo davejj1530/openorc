@@ -679,7 +679,7 @@ button.browser-empty:hover,
 }
 .sidebar-add-project {
   display: flex;
-  flex: 1;
+  flex: none;
   align-items: center;
   gap: 10px;
   min-width: 0;

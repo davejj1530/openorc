@@ -59,6 +59,8 @@ export interface OpenOrcOptions {
   cloudSecrets?: ProtectedSecretStore;
   /** Keeps each Claude account's token for signing in to cloud sandboxes. */
   claudeCloudSecrets?: ProtectedSecretStore;
+  /** Cloud threads are offered in this build; a paired phone offers them when the Mac does. */
+  cloudOffered?: boolean;
   /** Keeps the Codex login cloud sandboxes use, separate from this Mac's own. */
   codexCloudSecrets?: ProtectedSecretStore;
   /** Starts a command in a terminal of its own, for CLIs whose sign-in screens need one. Without it they get pipes. */

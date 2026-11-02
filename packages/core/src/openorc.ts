@@ -741,7 +741,7 @@ export class OpenOrc {
   private buildHandlers(invalidate: (keys: string[]) => void): Handlers {
     return composeHandlers(
       createSlackHandlers({ slack: this.slack, invalidate }),
-      createCloudHandlers({ ...this.cloudParts, invalidate }),
+      createCloudHandlers({ ...this.cloudParts, offered: Boolean(this.options.cloudOffered), invalidate }),
       createClaudeAccountHandlers(this.claudeAccounts),
       createSystemHandlers({
         system: this.system,

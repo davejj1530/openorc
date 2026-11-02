@@ -25,6 +25,7 @@ type CloudMethod =
   | "cloud.codex.remove"
   | "cloud.check"
   | "cloud.sandboxes"
+  | "cloud.offer"
   | "cloud.move"
   | "cloud.sandboxes.remove";
 
@@ -35,12 +36,14 @@ interface Dependencies {
   codex: CodexCloudLogin;
   sandboxes: CloudSandboxes;
   handoff: CloudHandoff;
+  /** Cloud threads are offered in this build. */
+  offered: boolean;
   invalidate: (keys: string[]) => void;
 }
 
 const noCodex = (error: string | null) => ({ mode: null, email: null, plan: null, refreshedAt: null, signingIn: false, error });
 
-export function createCloudHandlers({ settings, tokens, checks, codex, sandboxes, handoff, invalidate }: Dependencies): Pick<Handlers, CloudMethod> {
+export function createCloudHandlers({ settings, tokens, checks, codex, sandboxes, handoff, offered, invalidate }: Dependencies): Pick<Handlers, CloudMethod> {
   const status = async (): Promise<CloudStatus> => {
     const vercel = await settings.status();
     const check = checks.status();
@@ -78,6 +81,10 @@ export function createCloudHandlers({ settings, tokens, checks, codex, sandboxes
     "cloud.codex.remove": () => changed(() => codex.remove()),
     "cloud.check": () => changed(() => checks.start()),
     "cloud.sandboxes": () => sandboxes.list(),
+    "cloud.offer": async () => {
+      if (!offered) return { offered: false, provider: null };
+      return { offered: true, provider: (await settings.credentials()) ? "vercel" : "local" };
+    },
     "cloud.move": async ({ threadId }) => {
       const thread = await handoff.move(threadId);
       invalidate(["threads", `thread:${threadId}`, "cloud"]);

@@ -100,6 +100,12 @@ export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {
   // Takes nothing and answers the shares and plans alone, shaped by the core: no email, token, path or CLI text.
   "providers.limits": allow,
   "app.settings.get": allow,
+  // Whether the Mac offers cloud threads and where they would run; nothing about its accounts or tokens.
+  "cloud.offer": allow,
+  // Moves the conversation's work to a sandbox of its own, as the Mac's thread menu does, after the phone's confirm.
+  "cloud.move": allow,
+  // The files a move from the checkout would take with it, for that confirm.
+  "threads.movePreview": allow,
   "threads.start": (params, context) =>
     params.workingDirectory !== undefined ? "Choose a folder for this conversation on your Mac." : (phoneTitle(params.title) ?? storedImages(params.attachments, context)),
   "threads.update": threadUpdate,
@@ -157,6 +163,9 @@ export const remoteReplies: { [M in RemoteMethod]: Reply<M> } = {
   "claude.accounts.list": ({ accounts, defaultId }) => ({ defaultId, accounts: accounts.map((account) => ({ ...account, email: null, organization: null, message: null })) }),
   "providers.limits": same,
   "app.settings.get": same,
+  "cloud.offer": same,
+  "cloud.move": same,
+  "threads.movePreview": same,
   "threads.start": same,
   "threads.update": same,
   "runs.start": same,

@@ -1,8 +1,44 @@
+import type { EditorFix, EditorLocation, EditorQuery, EditorResult, EditorSymbol } from "@openorc/protocol";
+
 /** 1-based, inclusive lines to select and scroll into view. */
 export interface LineRange {
   start: number;
   end: number;
+  column?: number;
+  endColumn?: number;
 }
+
+export interface EditorPoint {
+  line: number;
+  column: number;
+}
+
+export interface CodeEditorActions {
+  definition: () => void;
+  references: () => void;
+  outline: () => void;
+  problems: () => void;
+  quickFixes: () => void;
+  focus: () => void;
+  refresh: () => void;
+  point: () => EditorPoint;
+}
+
+/** The host owns files, drafts and navigation. CodeMirror owns positions, interaction and presentation inside the editor. */
+export interface EditorIntelligence {
+  query: (query: EditorQuery, text: string) => Promise<EditorResult>;
+  navigate: (location: EditorLocation, origin: EditorPoint) => void;
+  locations: (title: "Definitions" | "References", locations: EditorLocation[], truncated: boolean, origin: EditorPoint) => void;
+  analysis: (result: Extract<EditorResult, { kind: "analysis" }>) => void;
+  fixes: (fixes: EditorFix[]) => void;
+  outline: () => void;
+  problems: () => void;
+  error: (message: string | null) => void;
+  back: () => boolean;
+  forward: () => boolean;
+}
+
+export type { EditorSymbol };
 
 export interface CodeEditorProps {
   /**
@@ -34,4 +70,8 @@ export interface CodeEditorProps {
   onFormat?: () => void;
   /** A new object moves keyboard focus into the editor once, as after the user answers the conflict banner. */
   focusRequest?: object | null;
+  intelligence?: EditorIntelligence;
+  /** Changes in another unsaved buffer or on disk also refresh this file's analysis. */
+  analysisKey?: unknown;
+  onReady?: (actions: CodeEditorActions | null) => void;
 }

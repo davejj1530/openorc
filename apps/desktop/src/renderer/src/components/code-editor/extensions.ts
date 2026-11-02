@@ -1,6 +1,8 @@
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
-import { bracketMatching, indentOnInput, LanguageDescription, type LanguageSupport } from "@codemirror/language";
+import { bracketMatching, codeFolding, foldGutter, foldKeymap, indentOnInput, LanguageDescription, type LanguageSupport } from "@codemirror/language";
+import { lintGutter, lintKeymap } from "@codemirror/lint";
+import { editorLanguage } from "@openorc/protocol";
 import { languages } from "@codemirror/language-data";
 import { highlightSelectionMatches, search, searchKeymap } from "@codemirror/search";
 import { Compartment, EditorState } from "@codemirror/state";
@@ -20,6 +22,7 @@ import {
 import { lineSeparatorOf } from "./replacement";
 import { appearance } from "./theme";
 import type { CodeEditorProps } from "./types";
+import { intelligenceExtensions } from "./intelligence";
 
 type CallerKeys = Pick<CodeEditorProps, "onSave" | "onFormat">;
 
@@ -70,6 +73,9 @@ export function createState(text: string, path: string, readOnly: boolean): Edit
       EditorState.allowMultipleSelections.of(true),
       indentOnInput(),
       bracketMatching(),
+      codeFolding(),
+      prose.test(path) ? [] : foldGutter(),
+      editorLanguage(path) ? [lintGutter(), intelligenceExtensions] : [],
       closeBrackets(),
       rectangularSelection(),
       crosshairCursor(),
@@ -77,7 +83,7 @@ export function createState(text: string, path: string, readOnly: boolean): Edit
       highlightSelectionMatches(),
       search({ top: true }),
       prose.test(path) ? EditorView.lineWrapping : [],
-      keymap.of([...callerKeys, ...closeBracketsKeymap, ...defaultKeymap, ...searchKeymap, ...historyKeymap, indentWithTab]),
+      keymap.of([...callerKeys, ...closeBracketsKeymap, ...defaultKeymap, ...searchKeymap, ...historyKeymap, ...foldKeymap, ...lintKeymap, indentWithTab]),
       language.of([]),
       editability.of(EditorState.readOnly.of(readOnly)),
       appearance,

@@ -6,4 +6,4 @@ import { lazy } from "react";
  */
 export const CodeEditor = lazy(() => import("./CodeEditor").then((m) => ({ default: m.CodeEditor })));
 export { closeEditorSession } from "./sessions";
-export type { CodeEditorProps, LineRange } from "./types";
+export type { CodeEditorProps, CodeEditorActions, EditorIntelligence, EditorPoint, LineRange } from "./types";

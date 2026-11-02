@@ -23,6 +23,7 @@ import { pullRequestReviewMigration } from "./pull-review-schema.js";
 import { orclingAccountMigration, orclingMigration } from "./orcling-schema.js";
 import { remoteDeviceMigration } from "./remote-device-schema.js";
 import { remotePushTargetMigration } from "./remote-push-target-schema.js";
+import { cloudWorkspaceMigration } from "./cloud-workspace-schema.js";
 /**
  * Migrations run in order; `PRAGMA user_version` records how many applied.
  * Never edit a shipped migration. Append a new one.
@@ -781,4 +782,5 @@ export const migrations: Migration[] = [
   remoteDeviceMigration,
   remotePushTargetMigration,
   orclingAccountMigration,
+  cloudWorkspaceMigration,
 ];

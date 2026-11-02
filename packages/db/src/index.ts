@@ -43,5 +43,6 @@ export { taskForwardings } from "./task-forwardings.js";
 export { plans } from "./plans.js";
 export { orclings, type OrclingInsert } from "./orclings.js";
 export { remoteDevices, type RemoteDeviceRecord } from "./remote-devices.js";
+export { cloudWorkspaces, type CloudMirrorState, type CloudProviderId, type CloudWorkspaceRecord, type CloudWorkspaceState } from "./cloud-workspaces.js";
 export { remotePushTargets, type PushRecipient } from "./remote-push-targets.js";
 export { pullReviews, type PullReviewKey, type PullReviewPatch, type DraftCommentInsert } from "./pull-reviews.js";

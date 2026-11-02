@@ -18,23 +18,31 @@ afterEach(async () => {
   await rm(root, { recursive: true, force: true });
 });
 
-async function options(vercel: BrainStart["vercel"]) {
+async function options(vercel: BrainStart["vercel"], region = async () => "sin1") {
   const layout = brainLayout(root);
   const start: BrainStart = { key: newBrainKey(), name: "Cloud", address: "sb-fixture.vercel.run", port: 47_820, vercel };
   const secrets = await SealedSecrets.open(layout.secrets, start.key);
   const runnerFiles = [{ name: "runner.ts", content: Buffer.from("export {};\n") }];
-  return { layout, options: brainOptions({ layout, appDir: path.join(root, "app", "v1"), start, secrets, transport: { push() {} }, runnerFiles }), runnerFiles };
+  return { layout, options: brainOptions({ layout, appDir: path.join(root, "app", "v1"), start, self: { region }, secrets, transport: { push() {} }, runnerFiles }), runnerFiles };
 }
 
 describe("brainOptions", () => {
   it("runs every conversation in the cloud, on the Vercel connection from the start, with no device tool", async () => {
     const { layout, options: brain, runnerFiles } = await options({ connection, sandbox: "brain" });
     expect(brain).toMatchObject({ dataDir: layout.data, cloudOnly: true, deviceSystem: null, cloudRunnerFiles: runnerFiles });
-    expect(await brain.cloudCredentials?.()).toEqual(connection);
+    expect(await brain.cloudCredentials?.()).toMatchObject(connection);
   });
 
-  it("has no Vercel connection in a local container", async () => {
-    expect(await (await options(null)).options.cloudCredentials?.()).toBeNull();
+  it("makes thread sandboxes in the region of the brain's own sandbox", async () => {
+    const { options: brain } = await options({ connection: { ...connection, vcpus: 4 }, sandbox: "brain" }, async () => "hnd1");
+    expect(await brain.cloudCredentials?.()).toEqual({ ...connection, vcpus: 4, region: "hnd1" });
+  });
+
+  it("has no Vercel connection in a local container, and asks no sandbox for a region", async () => {
+    const region = async (): Promise<string> => {
+      throw new Error("A brain in a local container has no sandbox.");
+    };
+    expect(await (await options(null, region)).options.cloudCredentials?.()).toBeNull();
   });
 
   it("is reached only through the proxy at its public address, on the port the sandbox declared", async () => {

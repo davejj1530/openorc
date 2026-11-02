@@ -7,6 +7,7 @@ import { OpenOrc } from "@openorc/core";
 import { DEFAULT_CLAUDE_ACCOUNT } from "@openorc/protocol";
 import { claudeAccounts } from "@openorc/db";
 import { commitAll, git } from "@openorc/git";
+import { NO_SANDBOX } from "./awake.js";
 import { controlHandlers, retireSignedOut } from "./control-ops.js";
 import { brainOptions } from "./options.js";
 import { SealedSecrets } from "./secrets.js";
@@ -28,7 +29,7 @@ beforeEach(async () => {
   layout = brainLayout(root);
   start = { key: newBrainKey(), name: "Cloud", address: "localhost", port: 0, vercel: null };
   const secrets = await SealedSecrets.open(layout.secrets, start.key);
-  core = await OpenOrc.create({ ...brainOptions({ layout, appDir: path.join(root, "app", "v1"), start, secrets, transport: { push() {} }, runnerFiles: [] }), ephemeral: true });
+  core = await OpenOrc.create({ ...brainOptions({ layout, appDir: path.join(root, "app", "v1"), start, self: NO_SANDBOX, secrets, transport: { push() {} }, runnerFiles: [] }), ephemeral: true });
   stops = 0;
 });
 

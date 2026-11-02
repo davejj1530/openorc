@@ -82,6 +82,7 @@ describe("BrainAwake", () => {
           return { expiresAt: Date.now() + forMs, capped: false };
         }),
       stop: async () => undefined,
+      region: async () => "sin1",
     };
     const brain = new BrainAwake({
       busy: options.busy ?? (() => null),

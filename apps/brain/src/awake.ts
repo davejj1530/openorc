@@ -50,6 +50,7 @@ export function decide(state: AwakeState, seen: { now: number; busy: string | nu
 export const NO_SANDBOX: BrainSelf = {
   extend: async (forMs) => ({ expiresAt: Date.now() + forMs, capped: false }),
   stop: async () => undefined,
+  region: () => Promise.reject(new Error("A brain in a local container has no sandbox.")),
 };
 
 export interface BrainAwakeDeps {

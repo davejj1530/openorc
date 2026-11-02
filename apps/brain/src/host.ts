@@ -144,7 +144,7 @@ export async function serve(appDir: string): Promise<void> {
     host.control = await serveControl(layout.socket, host.request, () => host.awake?.touch());
     // Agent updates install where machine setup did, as the same user and never with sudo.
     process.env["NPM_CONFIG_PREFIX"] = layout.npm;
-    const core = await OpenOrc.create(brainOptions({ layout, appDir, start, secrets, transport: log.transport(), runnerFiles: await runnerFiles(appDir) }));
+    const core = await OpenOrc.create(brainOptions({ layout, appDir, start, self, secrets, transport: log.transport(), runnerFiles: await runnerFiles(appDir) }));
     host.core = core;
     await retireSignedOut(core);
     await core.remote.attach(host.answer);

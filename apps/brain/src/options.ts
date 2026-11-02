@@ -1,7 +1,7 @@
 import path from "node:path";
 import { Worker } from "node:worker_threads";
 import { WorkerEmbedder, pathProbe, type OpenOrcOptions, type Transport } from "@openorc/core";
-import type { BrainLayout, BrainStart, RunnerFile } from "@openorc/cloud";
+import type { BrainLayout, BrainSelf, BrainStart, RunnerFile } from "@openorc/cloud";
 import { brainPath } from "./machine-check.js";
 import type { SealedSecrets } from "./secrets.js";
 
@@ -10,6 +10,8 @@ export interface BrainOptionsInput {
   /** The real folder of the running version, where the embedder's worker sits. */
   appDir: string;
   start: BrainStart;
+  /** The brain's own sandbox: thread sandboxes are made in its region, beside it. */
+  self: Pick<BrainSelf, "region">;
   secrets: SealedSecrets;
   transport: Transport;
   runnerFiles: RunnerFile[];
@@ -23,7 +25,7 @@ export interface BrainOptionsInput {
  * phones); a terminal (sign-ins arrive by handover, so no node-pty and no compiler); the bundled formatter; cloudOffered
  * (every conversation is cloud, so there is no place to choose); a file key; benchmarks.
  */
-export function brainOptions({ layout, appDir, start, secrets, transport, runnerFiles }: BrainOptionsInput): OpenOrcOptions {
+export function brainOptions({ layout, appDir, start, self, secrets, transport, runnerFiles }: BrainOptionsInput): OpenOrcOptions {
   return {
     dataDir: layout.data,
     transport,
@@ -34,7 +36,7 @@ export function brainOptions({ layout, appDir, start, secrets, transport, runner
     embedder: new WorkerEmbedder(() => new Worker(path.join(appDir, "embedder-worker.mjs"), { workerData: { cacheDir: layout.data } })),
     cloudOnly: true,
     deviceSystem: null,
-    cloudCredentials: async () => start.vercel?.connection ?? null,
+    cloudCredentials: async () => (start.vercel ? { ...start.vercel.connection, region: await self.region() } : null),
     cloudRunnerFiles: runnerFiles,
   };
 }

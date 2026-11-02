@@ -219,7 +219,7 @@ The window has one navigation column, a conversation or destination, and an opti
 
 The conversation column is at most 800px with 32px reading gutters; the composer uses 24px. Both shrink to 12px at 520px and below and in narrow panes. Each column owns its scrolling. Split conversations keep their own header and panel ownership.
 
-The sidebar paints nothing and has no seam. Its header holds Inbox (with its count), Search, and the sidebar toggle as 32px round buttons by the window controls. New thread, Tasks, Schedules, and More sit above the Threads/Orclings track; Add project and a round Settings button sit in the footer. While Settings is open, the sidebar lists its sections under Back to app.
+The sidebar paints nothing and has no seam. Its header holds Inbox (with its count), Search, and the sidebar toggle as 32px round buttons by the window controls. New thread and More sit above the Threads/Orclings track; Add project and a round Settings button sit in the footer. All optional screens start under More, with every Edit sidebar switch off. Saved sidebar choices take precedence. While Settings is open, the sidebar lists its sections under Back to app.
 
 Responsive rules:
 

@@ -15,8 +15,8 @@ export type WorkspaceChangesRequest = WorkspaceChangesTarget & { comparison: "ba
 /** A screen the sidebar can list. The ones the user hides wait under More; Inbox sits in the window's header instead. */
 export type SidebarScreen = "tasks" | "pulls" | "scheduled" | "orchestration" | "memory";
 
-/** Screens most people open rarely start under More, until the user lists them. */
-const DEFAULT_HIDDEN_SCREENS: SidebarScreen[] = ["pulls", "orchestration", "memory"];
+/** Every optional screen starts under More, until the user lists it. */
+const DEFAULT_HIDDEN_SCREENS: SidebarScreen[] = ["tasks", "pulls", "scheduled", "orchestration", "memory"];
 
 interface LayoutState {
   sidebarOpen: boolean;

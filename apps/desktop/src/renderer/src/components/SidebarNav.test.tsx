@@ -23,18 +23,18 @@ const listed = () =>
     .map((button) => button.querySelector(".sidebar-nav-label")?.textContent);
 const show = () => render(<SidebarNav route={useRouter.getState().route} projectId={null} />);
 
-it("lists New thread, Tasks and Schedules with their counts, and keeps other screens folded under More", () => {
-  expect(useLayout.getState().hiddenScreens).toEqual(["pulls", "orchestration", "memory"]);
+it("starts with New thread and More, keeping every optional screen folded under More", () => {
+  expect(useLayout.getState().hiddenScreens).toEqual(["tasks", "pulls", "scheduled", "orchestration", "memory"]);
   show();
-  expect(listed()).toEqual(["New thread", "Tasks", "Schedules", "More"]);
-  expect(screen.getByRole("button", { name: /^Tasks/ }).querySelector(".sidebar-nav-count")?.textContent).toBe("3");
-  expect(screen.getByRole("button", { name: /^Schedules/ }).querySelector(".sidebar-nav-count")?.textContent).toBe("1");
+  expect(listed()).toEqual(["New thread", "More"]);
 
   const more = screen.getByRole("button", { name: "More" });
   expect(more.getAttribute("aria-expanded")).toBe("false");
   fireEvent.click(more);
   expect(more.getAttribute("aria-expanded")).toBe("true");
-  expect(listed()).toEqual(["New thread", "Tasks", "Schedules", "More", "Pull requests", "Teams", "Memory", "Edit sidebar"]);
+  expect(listed()).toEqual(["New thread", "More", "Tasks", "Pull requests", "Schedules", "Teams", "Memory", "Edit sidebar"]);
+  expect(screen.getByRole("button", { name: /^Tasks/ }).querySelector(".sidebar-nav-count")?.textContent).toBe("3");
+  expect(screen.getByRole("button", { name: /^Schedules/ }).querySelector(".sidebar-nav-count")?.textContent).toBe("1");
   fireEvent.click(screen.getByRole("button", { name: "Memory" }));
   expect(useRouter.getState().route).toEqual({ view: "memory" });
 });
@@ -60,19 +60,19 @@ it("edits which screens the sidebar lists in a dialog of switches, and remembers
       .getAllByRole("switch")
       .map((toggle) => [toggle.getAttribute("aria-label") ?? toggle.closest("label")?.textContent, (toggle as HTMLInputElement).checked]),
   ).toEqual([
-    ["Tasks", true],
+    ["Tasks", false],
     ["Pull requests", false],
-    ["Schedules", true],
+    ["Schedules", false],
     ["Teams", false],
     ["Memory", false],
   ]);
   fireEvent.click(within(dialog).getByRole("switch", { name: "Memory" }));
   fireEvent.click(within(dialog).getByRole("switch", { name: "Pull requests" }));
-  fireEvent.click(within(dialog).getByRole("switch", { name: "Schedules" }));
+  fireEvent.click(within(dialog).getByRole("switch", { name: "Tasks" }));
   fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 
-  // More stays unfolded, now listing the screens just hidden.
+  // More stays unfolded, listing the screens that remain hidden.
   expect(listed()).toEqual(["New thread", "Tasks", "Pull requests", "Memory", "More", "Schedules", "Teams", "Edit sidebar"]);
-  expect(JSON.parse(localStorage.getItem("openorc.layout") ?? "{}").hiddenScreens).toEqual(["orchestration", "scheduled"]);
+  expect(JSON.parse(localStorage.getItem("openorc.layout") ?? "{}").hiddenScreens).toEqual(["scheduled", "orchestration"]);
 });

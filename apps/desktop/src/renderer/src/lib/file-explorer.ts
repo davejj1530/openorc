@@ -3,11 +3,9 @@ import { persist } from "zustand/middleware";
 
 interface ExplorerState {
   visible: boolean;
-  showIgnored: boolean;
   width: number;
   folders: Record<string, string[]>;
   setVisible: (visible: boolean) => void;
-  setShowIgnored: (showIgnored: boolean) => void;
   setWidth: (width: number) => void;
   setFolders: (scope: string, folders: string[]) => void;
   reveal: (scope: string, path: string) => void;
@@ -22,11 +20,9 @@ export const useFileExplorer = create<ExplorerState>()(
   persist(
     (set, get) => ({
       visible: true,
-      showIgnored: false,
       width: explorerWidth.default,
       folders: {},
       setVisible: (visible) => set({ visible }),
-      setShowIgnored: (showIgnored) => set({ showIgnored }),
       setWidth: (width) => set({ width: clampExplorerWidth(width) }),
       setFolders: (scope, folders) => {
         const kept = Object.entries(get().folders)
@@ -42,7 +38,7 @@ export const useFileExplorer = create<ExplorerState>()(
         get().setFolders(scope, [...new Set([...(get().folders[scope] ?? ROOT_FOLDERS), "", ...parents])]);
       },
     }),
-    { name: "openorc.file-explorer", version: 1, partialize: ({ visible, showIgnored, width, folders }) => ({ visible, showIgnored, width, folders }) },
+    { name: "openorc.file-explorer", version: 1, partialize: ({ visible, width, folders }) => ({ visible, width, folders }) },
   ),
 );
 

@@ -75,7 +75,7 @@ beforeEach(() => {
   });
   usePanelSessions.setState({ sessions: {} });
   useFilesTool.setState({ host: null, focus: null, tools: {} });
-  useFileExplorer.setState({ visible: true, showIgnored: false, width: 240, folders: {} });
+  useFileExplorer.setState({ visible: true, width: 240, folders: {} });
   useRouter.setState({ route: { view: "thread", threadId: thread.id }, threadIds: [thread.id] });
   useLayout.setState({ panelOpen: false, panelTab: "newtab", panelRequest: null, panelThreadId: thread.id, selectedFile: null, selectedChanges: null, panelExpanded: false, previewUrls: {} });
 });
@@ -444,28 +444,15 @@ it("remembers the tree width and visibility, refreshes directory entries, and fi
   expect(await screen.findByRole("treeitem", { name: "cart.ts" })).toBeTruthy();
 });
 
-it("hides ignored entries until requested, remembers the choice, and keeps a directly opened file visible", async () => {
-  for (const path of [".git/HEAD", "node_modules/library/index.js", ".DS_Store", "output/result.txt", ".github/workflows/ci.yml"]) disk.set(path, "fixture\n");
-  for (const path of [".git", "node_modules", ".DS_Store", "output"]) disk.ignored.add(path);
+it("shows ignored entries dimmed, beside the rest", async () => {
+  for (const path of ["node_modules/library/index.js", "output/result.txt", ".env", ".github/workflows/ci.yml"]) disk.set(path, "fixture\n");
+  for (const path of ["node_modules", "output", ".env"]) disk.ignored.add(path);
   render(<Window />);
   act(() => useLayout.getState().openFile({ path: "src/cart.ts", scope }));
   await editor();
-  expect(await screen.findByRole("treeitem", { name: ".github" })).toBeTruthy();
-  for (const name of disk.ignored) expect(screen.queryByRole("treeitem", { name })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Explorer options" }));
-  const toggle = await screen.findByRole("menuitemcheckbox", { name: "Show ignored files" });
-  expect(toggle.getAttribute("aria-checked")).toBe("false");
-  fireEvent.click(toggle);
-  expect(toggle.getAttribute("aria-checked")).toBe("true");
-  fireEvent.keyDown(toggle, { key: "Escape" });
-  for (const name of disk.ignored) expect(await screen.findByRole("treeitem", { name })).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "Hide file explorer" }));
-  fireEvent.click(screen.getByRole("button", { name: "Show file explorer" }));
-  expect(await screen.findByRole("treeitem", { name: "node_modules" })).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "Explorer options" }));
-  fireEvent.click(await screen.findByRole("menuitemcheckbox", { name: "Show ignored files" }));
-  fireEvent.keyDown(screen.getByRole("menuitemcheckbox"), { key: "Escape" });
-  act(() => useLayout.getState().openFile({ path: "output/result.txt", scope }));
-  expect(await screen.findByRole("treeitem", { name: "result.txt" })).toBeTruthy();
-  expect(screen.queryByRole("treeitem", { name: "node_modules" })).toBeNull();
+  const row = async (name: string) => (await screen.findByRole("treeitem", { name })).querySelector(".file-tree-row")!;
+  for (const name of disk.ignored) expect((await row(name)).classList.contains("file-tree-ignored")).toBe(true);
+  expect((await row(".github")).classList.contains("file-tree-ignored")).toBe(false);
+  fireEvent.click(await screen.findByRole("treeitem", { name: ".env" }));
+  expect(await screen.findByRole("treeitem", { name: ".env", selected: true })).toBeTruthy();
 });

@@ -71,12 +71,11 @@ export function FileViewer() {
   disk.set("src/styles/app.css", ".file-viewer { display: flex; height: 100%; }\n");
   disk.set("packages/core/index.ts", "export const version = '1.0.0';\n");
   disk.set(".github/workflows/ci.yml", "name: CI\non: [push]\n");
-  disk.set(".git/HEAD", "ref: refs/heads/main\n");
   disk.set("node_modules/react/index.js", "export {};\n");
-  disk.set(".DS_Store", "metadata");
   disk.set("dist/index.js", "// Generated output\n");
-  for (const path of [".git", "node_modules", ".DS_Store", "dist"]) disk.ignored.add(path);
-  disk.set(".gitignore", "node_modules\ndist\n");
+  disk.set(".env", "API_URL=http://localhost:3000\n");
+  for (const path of ["node_modules", "dist", ".env"]) disk.ignored.add(path);
+  disk.set(".gitignore", "node_modules\ndist\n.env\n");
   disk.set(".gitattributes", "# Keep text files consistent\n* text=auto eol=lf\n");
   disk.set("README.md", "# OpenOrc\n\nA desktop workspace for your coding agents.\n\n## Files\n\nBrowse the project tree and keep your editor beside the conversation.\n");
   disk.set("package.json", '{\n  "name": "openorc",\n  "private": true\n}\n');

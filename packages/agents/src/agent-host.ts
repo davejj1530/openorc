@@ -40,6 +40,11 @@ export interface LaunchPlace {
   remove(dir: string): void;
 }
 
+/** A host takes only variables with values. */
+export function definedEnv(env: NodeJS.ProcessEnv): Record<string, string> {
+  return Object.fromEntries(Object.entries(env).filter((entry): entry is [string, string] => entry[1] !== undefined));
+}
+
 export function launchPlace(host: AgentHost | undefined): LaunchPlace {
   if (!host)
     return {

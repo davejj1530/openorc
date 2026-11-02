@@ -12,7 +12,7 @@ import { installedClaudePlugins } from "./plugins.js";
 import { RunHandle, type RunControls } from "../run-handle.js";
 import { withAttachedFiles } from "../attachments.js";
 import type { AgentLaunchEnvironment } from "../launch-environment.js";
-import { launchPlace, type LaunchPlace } from "../agent-host.js";
+import { definedEnv, launchPlace, type LaunchPlace } from "../agent-host.js";
 import { stripAnsi } from "../jsonrpc.js";
 
 export interface ClaudeAdapterOptions {
@@ -85,11 +85,6 @@ const IDLE_EXIT_GRACE_MS = 2000;
 const FOLLOW_UP_GRACE_MS = 750;
 /** How long a settings change waits for the CLI's answer before the caller gives up and restarts. */
 const CONTROL_REPLY_TIMEOUT_MS = 10_000;
-
-/** A host takes only variables with values. */
-function definedEnv(env: NodeJS.ProcessEnv): Record<string, string> {
-  return Object.fromEntries(Object.entries(env).filter((entry): entry is [string, string] => entry[1] !== undefined));
-}
 
 /** One control request line. Claude Code answers each with a control_response carrying the same id. */
 function controlRequest(request: Record<string, unknown>, requestId = randomUUID()): string {

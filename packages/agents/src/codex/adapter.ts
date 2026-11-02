@@ -10,6 +10,7 @@ import { RunHandle } from "../run-handle.js";
 import { stopProcess, waitForProcessGroup } from "../process-lifetime.js";
 import { partitionAttachments, withAttachedFiles } from "../attachments.js";
 import type { AgentLaunchEnvironment } from "../launch-environment.js";
+import { definedEnv } from "../agent-host.js";
 
 /**
  * A turn's input items. Codex has one attachment slot and it takes pictures,
@@ -169,8 +170,11 @@ export class CodexAdapter {
       for (const feature of ["multi_agent", "browser_use", "computer_use", "apps", "plugins"]) args.push("-c", `features.${feature}=false`);
     }
     if (spec.fastMode) args.push("-c", "features.fast_mode=true");
-    // OpenOrc's MCP address carries a secret, so it travels in the thread's settings over stdin, never in argv.
-    const mcpUrl = spec.internalMcp?.url ?? spec.mcpUrl;
+    // OpenOrc's MCP address carries a secret, so it travels in the thread's settings over stdin, never in argv. On a
+    // host, such as a cloud sandbox, it is the host's address that reaches it.
+    const host = launch.host;
+    const ownUrl = spec.internalMcp?.url ?? spec.mcpUrl;
+    const mcpUrl = ownUrl && host ? host.localUrl(ownUrl) : ownUrl;
     const mcpConfig: Record<string, unknown> = mcpUrl
       ? {
           [`mcp_servers.${serverName}.url`]: mcpUrl,
@@ -180,7 +184,11 @@ export class CodexAdapter {
     if (spec.effort) args.push("-c", `model_reasoning_effort="${spec.effort}"`);
     const env: NodeJS.ProcessEnv = { ...launch.env, ...this.options.env };
     const startedAt = Date.now();
-    const proc = spawnAgentProcess(binary, args, { cwd: spec.cwd, env, registry: launch.processRegistry });
+    const proc = host
+      ? host.spawn(binary, args, { runId: spec.runId, cwd: spec.cwd, env: definedEnv(env), files: [], dirs: [] })
+      : spawnAgentProcess(binary, args, { cwd: spec.cwd, env, registry: launch.processRegistry });
+    /** Attachments are files on this Mac; a host gets copies, and the input names those. */
+    const turnInput = async (text: string, attachments?: string[]): Promise<unknown[]> => attachmentInput(text, host && attachments?.length ? await host.upload(attachments) : attachments);
     const rpc = new StdioJsonRpc(proc);
 
     let handle: RunHandle;
@@ -266,7 +274,7 @@ export class CodexAdapter {
       // A compact turn cannot accept steering. Wait for its terminal event,
       // including the gap between accepting compact/start and item/started.
       while (compaction) await compaction.promise;
-      const input: unknown[] = attachmentInput(text, attachments);
+      const input = await turnInput(text, attachments);
       // A message during a turn steers it, the way Enter does in the Codex app; between turns it starts the next one.
       if (activeTurnId) {
         // A timeout cannot prove the input was rejected. Keep this send pending
@@ -323,7 +331,7 @@ export class CodexAdapter {
         // convert a late correction into an unreserved follow-up turn.
         const expectedTurnId = activeTurnId;
         if (!threadId || !expectedTurnId || compaction) return "unavailable";
-        const input: unknown[] = attachmentInput(text, attachments);
+        const input = await turnInput(text, attachments);
         await rpc.request("turn/steer", { threadId, input, expectedTurnId }, 15_000);
         return "accepted";
       },

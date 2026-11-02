@@ -2,6 +2,8 @@ export { ClaudeAdapter, claudePermissionMode, type ClaudeAdapterOptions } from "
 export { listClaudeModels, type ClaudeCatalog, type ClaudeModel } from "./claude/models.js";
 export { claudeFastModeReason } from "./claude/fast-mode.js";
 export { ClaudeStreamParser } from "./claude/stream-json.js";
+export { CodexExecParser } from "./codex/exec-json.js";
+export { withCodexConnection } from "./codex/connection.js";
 export { CodexAdapter, type CodexAdapterOptions, type CodexApprovalRequest, type CodexModel } from "./codex/adapter.js";
 export { AcpAdapter, type AcpAdapterOptions, type AcpApprovalRequest, type AcpModel } from "./acp/adapter.js";
 export { AcpUpdateMapper } from "./acp/updates.js";

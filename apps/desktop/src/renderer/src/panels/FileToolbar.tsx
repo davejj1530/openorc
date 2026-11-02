@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Menu } from "@base-ui/react/menu";
-import { ChevronRight, Copy, ExternalLink, Folder, FolderOpen, MoreHorizontal, RefreshCw } from "../components/icons";
+import { ArrowLeft, ArrowRight, ChevronRight, Copy, ExternalLink, Folder, FolderOpen, List, MoreHorizontal, RefreshCw } from "../components/icons";
+import type { CodeEditorActions } from "../components/code-editor";
 import { Button, IconButton, Segmented, Tooltip } from "../components/ui";
 import { menuItem, menuPopup, menuSeparator } from "../components/menu";
 import { floatingGround } from "../lib/use-anchor-ground";
@@ -27,9 +28,11 @@ interface Props {
   onView: (view: FileView) => void;
   treeVisible: boolean;
   onTree: (show: boolean) => void;
+  editorActions?: CodeEditorActions | null;
+  navigation?: { canBack: boolean; canForward: boolean; back: () => boolean; forward: () => boolean };
 }
 
-export function FileToolbar({ selection, buffer, directory, view, markdown, onView, treeVisible, onTree }: Props) {
+export function FileToolbar({ selection, buffer, directory, view, markdown, onView, treeVisible, onTree, editorActions, navigation }: Props) {
   const path = relativeFilePath(selection.path, directory);
   const parts = path.split("/");
   const root = directory.split(/[\\/]/).filter(Boolean).at(-1) ?? "Workspace";
@@ -50,7 +53,7 @@ export function FileToolbar({ selection, buffer, directory, view, markdown, onVi
               {index === parts.length - 1 ? (
                 <span aria-current="page">
                   {part}
-                  {selection.line ? `:${selection.line}${selection.endLine ? `–${selection.endLine}` : ""}` : ""}
+                  {selection.line ? `:${selection.line}${selection.endLine && selection.endLine !== selection.line ? `–${selection.endLine}` : ""}` : ""}
                 </span>
               ) : (
                 <button onClick={() => reveal(parts.slice(0, index + 1).join("/"))}>{part}</button>
@@ -60,6 +63,20 @@ export function FileToolbar({ selection, buffer, directory, view, markdown, onVi
         </ol>
       </nav>
       <div className="file-toolbar-actions">
+        {navigation && (navigation.canBack || navigation.canForward) ? (
+          <>
+            <Tooltip label="Go back">
+              <IconButton size="xs" aria-label="Go back in code" disabled={!navigation.canBack} onClick={navigation.back}>
+                <ArrowLeft size={15} />
+              </IconButton>
+            </Tooltip>
+            <Tooltip label="Go forward">
+              <IconButton size="xs" aria-label="Go forward in code" disabled={!navigation.canForward} onClick={navigation.forward}>
+                <ArrowRight size={15} />
+              </IconButton>
+            </Tooltip>
+          </>
+        ) : null}
         {buffer.readOnly ? (
           <Tooltip label={buffer.readOnly}>
             <span tabIndex={0} className="text-xs text-ink-3">
@@ -78,13 +95,20 @@ export function FileToolbar({ selection, buffer, directory, view, markdown, onVi
             <Folder size={15} />
           </IconButton>
         </Tooltip>
-        <FileMenu path={path} buffer={buffer} />
+        {editorActions ? (
+          <Tooltip label="Outline">
+            <IconButton size="xs" aria-label="Outline" onClick={editorActions.outline}>
+              <List size={15} />
+            </IconButton>
+          </Tooltip>
+        ) : null}
+        <FileMenu path={path} buffer={buffer} editorActions={editorActions} />
       </div>
     </header>
   );
 }
 
-function FileMenu({ path, buffer }: { path: string; buffer: FileBuffer }) {
+function FileMenu({ path, buffer, editorActions }: { path: string; buffer: FileBuffer; editorActions?: CodeEditorActions | null }) {
   const [notice, setNotice] = useState("");
   const binary = buffer.view.kind === "binary" ? buffer.view.file : null;
   return (
@@ -97,6 +121,28 @@ function FileMenu({ path, buffer }: { path: string; buffer: FileBuffer }) {
           <CoversPreview />
           <Menu.Positioner sideOffset={6} align="end" className="z-40" collisionPadding={8}>
             <Menu.Popup ref={floatingGround} className={menuPopup}>
+              {editorActions ? (
+                <>
+                  <Menu.Item className={menuItem} onClick={editorActions.definition}>
+                    Go to definition
+                  </Menu.Item>
+                  <Menu.Item className={menuItem} onClick={editorActions.references}>
+                    Find references
+                  </Menu.Item>
+                  <Menu.Item className={menuItem} onClick={editorActions.problems}>
+                    Problems
+                  </Menu.Item>
+                  <Menu.Item className={menuItem} disabled={buffer.readOnly !== null} onClick={editorActions.quickFixes}>
+                    Quick fixes
+                  </Menu.Item>
+                  <Menu.Separator className={menuSeparator} />
+                </>
+              ) : null}
+              {buffer.text !== null ? (
+                <Menu.Item className={menuItem} disabled={buffer.readOnly !== null} onClick={buffer.format}>
+                  Format document
+                </Menu.Item>
+              ) : null}
               {binary ? (
                 <>
                   <Menu.Item className={menuItem} onClick={() => void openBinaryFile(binary)}>
@@ -110,7 +156,14 @@ function FileMenu({ path, buffer }: { path: string; buffer: FileBuffer }) {
                   <Menu.Separator className={menuSeparator} />
                 </>
               ) : null}
-              <Menu.Item className={menuItem} disabled={buffer.read.refreshing} onClick={buffer.read.refresh}>
+              <Menu.Item
+                className={menuItem}
+                disabled={buffer.read.refreshing}
+                onClick={() => {
+                  buffer.read.refresh();
+                  editorActions?.refresh();
+                }}
+              >
                 <RefreshCw size={14} />
                 Refresh
               </Menu.Item>

@@ -1,5 +1,6 @@
-import { Suspense, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { CodeEditor, type LineRange } from "../components/code-editor";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { editorLanguage } from "@openorc/protocol";
+import type { CodeEditorActions } from "../components/code-editor";
 import { Button } from "../components/ui";
 import { ThreadMedia, ThreadRichText } from "../components/ThreadImages";
 import { hasUnsavedEdits } from "../lib/file-buffer";
@@ -11,21 +12,16 @@ import { BinaryView } from "./BinaryView";
 import { FileExplorer } from "./FileExplorer";
 import { ExplorerResizeHandle } from "./ExplorerResizeHandle";
 import { FileToolbar, type FileView } from "./FileToolbar";
+import { SourceEditor } from "./SourceEditor";
+import { editorCaret, editorNavigationKey, moveInEditor, useEditorNavigation } from "../lib/editor-navigation";
 
 const isMarkdown = (path: string) => /\.(md|markdown)$/i.test(path);
 const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
 
-/** One range per cited selection, so the editor reveals it once however often the page renders. */
-const reveals = new WeakMap<FileSelection, LineRange>();
-function revealOf(selection: FileSelection): LineRange | null {
-  if (!selection.line) return null;
-  if (!reveals.has(selection)) reveals.set(selection, { start: selection.line, end: selection.endLine ?? selection.line });
-  return reveals.get(selection) ?? null;
-}
-
 /** A file in the conversation's folder, edited in place. Markdown also renders, and a cited line opens the source there. */
 export function FilePanel({ selection, directory }: { selection: FileSelection; directory: string }) {
   const buffer = useFileBuffer(selection);
+  const [editorActions, setEditorActions] = useState<CodeEditorActions | null>(null);
   const markdown = isMarkdown(selection.path);
   const [chosen, choose] = useState<{ selection: FileSelection; view: FileView } | null>(null);
   let view: FileView = selection.line ? "source" : "preview";
@@ -39,6 +35,9 @@ export function FilePanel({ selection, directory }: { selection: FileSelection; 
   const explorerStyle: CSSProperties & { "--file-explorer-width": string } = { "--file-explorer-width": `${width}px` };
   const onTree = (show: boolean) => (compact ? setOverlayFor(show ? selection.path : null) : useFileExplorer.getState().setVisible(show));
   const root = "file" in buffer.view ? buffer.view.file.root : directory;
+  const navigationKey = editorNavigationKey(selection.scope, root);
+  const history = useEditorNavigation((state) => state.histories[navigationKey]);
+  const move = (direction: "back" | "forward") => moveInEditor(navigationKey, direction, editorCaret(selection, editorActions?.point()));
   useEffect(() => {
     if (!frame.current || typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(([entry]) => {
@@ -73,10 +72,12 @@ export function FilePanel({ selection, directory }: { selection: FileSelection; 
         onView={(next) => choose({ selection, view: next })}
         treeVisible={treeVisible}
         onTree={onTree}
+        editorActions={editorLanguage(selection.path) ? editorActions : null}
+        navigation={{ canBack: Boolean(history?.back.length), canForward: Boolean(history?.forward.length), back: () => move("back"), forward: () => move("forward") }}
       />
       <div className="file-editor">
         <FileNotices buffer={buffer} name={fileName(selection.path)} />
-        <FileBody buffer={buffer} selection={selection} preview={markdown && view === "preview"} />
+        <FileBody buffer={buffer} selection={selection} root={root} onReady={setEditorActions} preview={markdown && view === "preview"} />
       </div>
       {treeVisible ? (
         <>
@@ -141,7 +142,19 @@ function status(text: string): ReactNode {
   );
 }
 
-function FileBody({ buffer, selection, preview }: { buffer: FileBuffer; selection: FileSelection; preview: boolean }) {
+function FileBody({
+  buffer,
+  selection,
+  preview,
+  root,
+  onReady,
+}: {
+  buffer: FileBuffer;
+  selection: FileSelection;
+  preview: boolean;
+  root: string;
+  onReady: (actions: CodeEditorActions | null) => void;
+}) {
   const { view, read } = buffer;
   if (read.error && view.kind === "loading") {
     return (
@@ -159,39 +172,17 @@ function FileBody({ buffer, selection, preview }: { buffer: FileBuffer; selectio
   if (view.kind === "binary") return <BinaryView key={view.file.url} file={view.file} />;
   const text = buffer.text ?? "";
   if (preview && view.kind !== "deleted") return <MarkdownPreview content={text} path={view.file.absolutePath} scope={selection.scope} />;
-  return <SourceEditor buffer={buffer} sessionKey={buffer.key} selection={selection} text={text} path={view.kind === "deleted" ? view.path : view.file.path} />;
-}
-
-interface SourceEditorProps {
-  buffer: FileBuffer;
-  sessionKey: string;
-  selection: FileSelection;
-  text: string;
-  path: string;
-}
-
-function SourceEditor({ buffer, sessionKey, selection, text, path }: SourceEditorProps) {
-  const lines = useMemo(() => Math.max(1, text.split("\n").length - (text.endsWith("\n") ? 1 : 0)), [text]);
   return (
-    <>
-      {selection.line && selection.line > lines ? status(`Line ${selection.line} is past the end of this file. Showing line ${lines}.`) : null}
-      <div className="flex-1 min-h-0" onBlur={() => void flushDrafts()}>
-        <Suspense fallback={status("Loading editor…")}>
-          <CodeEditor
-            key={sessionKey}
-            sessionKey={sessionKey}
-            path={path}
-            text={text}
-            readOnly={buffer.readOnly !== null}
-            reveal={revealOf(selection)}
-            focusRequest={buffer.focusRequest}
-            onChange={buffer.edit}
-            onSave={buffer.save}
-            onFormat={buffer.format}
-          />
-        </Suspense>
-      </div>
-    </>
+    <SourceEditor
+      key={buffer.key}
+      buffer={buffer}
+      sessionKey={buffer.key}
+      selection={selection}
+      root={root}
+      onReady={onReady}
+      text={text}
+      path={view.kind === "deleted" ? view.path : view.file.path}
+    />
   );
 }
 

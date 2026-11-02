@@ -1,0 +1,117 @@
+.file-source {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.file-code-canvas {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.file-problems-status,
+.file-intelligence-note {
+  flex-shrink: 0;
+  padding: 4px 12px;
+  font-size: var(--text-sm);
+  color: var(--ink-4);
+  text-align: left;
+}
+.file-problems-status {
+  align-self: flex-end;
+  border-radius: var(--radius-sm);
+  margin: 0 8px 4px;
+}
+.file-problems-status:hover {
+  color: var(--ink);
+  background: var(--surface-2);
+}
+.file-insights {
+  display: flex;
+  flex-direction: column;
+  flex: 0 1 220px;
+  min-height: 72px;
+  max-height: 40%;
+  margin: 0 8px 8px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  overflow: hidden;
+  animation: editor-insights-enter var(--duration-arrive) var(--ease-out);
+}
+.file-insights > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px 4px 12px;
+  flex-shrink: 0;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+.file-insights-list {
+  overflow: auto;
+  min-height: 0;
+  padding: 4px;
+  scrollbar-width: none;
+}
+.file-insights-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
+  text-align: left;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+.file-insights-row:hover {
+  color: var(--ink);
+  background: var(--surface-2);
+}
+.file-insights-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.file-insights-row > code {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-4);
+}
+.file-insights-empty {
+  padding: 10px;
+  color: var(--ink-4);
+  font-size: var(--text-sm);
+}
+@keyframes editor-insights-enter {
+  from {
+    opacity: 0;
+    filter: blur(4px);
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .file-insights {
+    animation: none;
+  }
+}
+@media (max-width: 520px) {
+  .file-insights-row {
+    flex-wrap: wrap;
+  }
+  .file-insights-row > code {
+    flex-basis: 100%;
+  }
+}

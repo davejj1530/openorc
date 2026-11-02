@@ -8,7 +8,7 @@ import { toggleSidebarFold, type PanelTool, type SidebarFilter } from "@openorc/
 export type PanelTab = PanelTool | "device";
 /** One turn's saved diff, opened from its change card: a team attempt's checkpoint or a thread turn's. */
 export type ChangeSelection = ({ kind: "team" } & Omit<RpcParams<"orchestration.turnChanges">, "includePatch">) | ({ kind: "thread" } & Omit<RpcParams<"threads.turnChanges">, "includePatch">);
-export type FileSelection = FileReference & { scope: RpcParams<"files.read">["scope"] };
+export type FileSelection = FileReference & { scope: RpcParams<"files.read">["scope"]; column?: number; endColumn?: number };
 export type WorkspaceChangesTarget = { kind: "thread" | "project"; id: string };
 export type WorkspaceChangesRequest = WorkspaceChangesTarget & { comparison: "base" | "head"; commit: boolean; requestId: number };
 

@@ -6,7 +6,7 @@ import { captureLaunchEnvironment, claudeConfigDir, recoverAgentProcesses } from
 import { Db, LedgerWriter, orchestration, plans, redact, settings as storedSettings, taskForwardings, tasks, teamDeletedThreads, teamRuntime, threads } from "@openorc/db";
 import { startMcpServer, type OpenOrcMcpServer } from "@openorc/mcp";
 import { harnessAvailability, harnessInfo, harnessInstalled, harnessLoggedIn, rpcParams, type HarnessId, type RpcMethod, type RpcRequest } from "@openorc/protocol";
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { busyReason, fenceForUpdate, type BusyReason } from "./activity.js";
@@ -63,8 +63,8 @@ import { createThreadsHost } from "./mcp-host/threads.js";
 import { createOrclingHost } from "./mcp-host/orcling.js";
 import { AgentUpdateService } from "./services/agent-updates.js";
 import { AttachmentService } from "./services/attachments.js";
-import { FileFormatter } from "./services/file-format.js";
-import { FileService } from "./services/files.js";
+import type { FileService } from "./services/files.js";
+import { createFileService } from "./services/file-service-setup.js";
 import { ImportService } from "./services/imports.js";
 import { LedgerUpkeep } from "./services/ledger-upkeep.js";
 import { LifecycleService } from "./services/lifecycle.js";
@@ -444,12 +444,7 @@ export class OpenOrc {
       teams: this.teamConversations,
       teamQuiescenceReason: (id) => this.teamOperations.reason(id),
     });
-    this.files = new FileService({
-      writers: this.workspaceWriters,
-      invalidate,
-      formatter: new FileFormatter({ bundled: options.formatter ?? null, environment: () => this.environment.current() }),
-      fileKey: options.fileKey ?? randomBytes(32).toString("hex"),
-    });
+    this.files = createFileService({ options, writers: this.workspaceWriters, invalidate, environment: () => this.environment.current() });
     this.imports = new ImportService(db, this.ledger, invalidate, this.log, this.toolImages);
     this.reviewerApp = new ReviewerAppService(db, { secrets: options.githubSecrets, invalidate });
     this.pullRequests = new PullRequestService(db, {
@@ -703,6 +698,7 @@ export class OpenOrc {
 
   async close(): Promise<void> {
     await this.remote.close(this.closingForUpdate ? "update" : "shutdown");
+    await this.files.intelligence.close();
     this.threads.stopAccepting();
     await this.claudeCloudTokens.close();
     await this.claudeAccounts.close();

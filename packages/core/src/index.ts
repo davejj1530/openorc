@@ -10,4 +10,5 @@ export type { SlackSecretStore } from "./services/slack/service.js";
 export type { ProtectedSecretStore } from "./services/extraction-credentials.js";
 export { WorkerEmbedder, type EmbedWorker } from "@openorc/memory";
 export { WorkerFormatter, type FormatWorker } from "./worker-formatter.js";
+export { WorkerIntelligence, type IntelligenceEngine, type IntelligenceWorker } from "./editor/worker-intelligence.js";
 export type { SpawnTerminal, TerminalProcess } from "./services/terminal-process.js";

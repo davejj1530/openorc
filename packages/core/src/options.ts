@@ -10,6 +10,7 @@ import type { ShellProbe } from "./services/shell-environment.js";
 import type { SlackSecretStore } from "./services/slack/service.js";
 import type { SpawnTerminal } from "./services/terminal-process.js";
 import type { Transport } from "./transport.js";
+import type { IntelligenceEngine } from "./editor/worker-intelligence.js";
 
 /** What the host gives the core. */
 export interface OpenOrcOptions {
@@ -32,6 +33,8 @@ export interface OpenOrcOptions {
   embedder?: TextEmbedder;
   /** The bundled Prettier, run off the core's thread. Without it, files format only with the project's own formatter. */
   formatter?: BundledFormatter;
+  /** TypeScript/JavaScript analysis, isolated from the core's event loop. Starts only when the file editor asks. */
+  intelligence?: IntelligenceEngine;
   dataDir: string;
   /**
    * Signs the file panel's viewer URLs; the app verifies them with the same key before serving a file. A core

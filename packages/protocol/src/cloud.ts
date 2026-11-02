@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ClaudeAccountId } from "./claude-accounts.js";
+import { cloudBrainRpcParams, type CloudBrainRpcResults } from "./cloud-brain.js";
 import type { Thread } from "./domain.js";
 
 /** What a cloud thread's sandbox is doing before its first turn can start. */
@@ -149,9 +150,10 @@ export const cloudRpcParams = {
   "cloud.move": z.object({ threadId: z.string().min(1).max(200) }).strict(),
   /** Deletes a sandbox for good. A conversation's next message sets up a new one from its worktree on the Mac. */
   "cloud.sandboxes.remove": z.object({ name: z.string().min(1).max(200) }).strict(),
+  ...cloudBrainRpcParams,
 };
 
-export interface CloudRpcResults {
+export interface CloudRpcResults extends CloudBrainRpcResults {
   "cloud.status": CloudStatus;
   "cloud.vercel.connect": { status: CloudStatus; teams: CloudTeam[] };
   "cloud.vercel.teams": CloudTeam[];

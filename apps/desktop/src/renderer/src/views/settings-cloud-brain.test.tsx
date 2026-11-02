@@ -126,6 +126,16 @@ it("hides waking and sending while the brain is at either", async () => {
   expect((screen.getByRole("button", { name: "Pair phone" }) as HTMLButtonElement).disabled).toBe(true);
 });
 
+it("says it is updating, quietly, with nothing to click meanwhile", async () => {
+  show({ ...ready, machine: "awake", working: "updating", behind: true });
+  expect((await screen.findByText("Updating")).getAttribute("data-ok")).toBeNull();
+  expect(screen.queryByText("Awake")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Wake" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+  expect((screen.getByRole("button", { name: "Pair phone" }) as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.queryByRole("alert")).toBeNull();
+});
+
 it("offers to remove a brain this Mac has no key for", async () => {
   show({ state: "elsewhere", error: null });
   expect(await screen.findByText("Already in this team")).toBeTruthy();

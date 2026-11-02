@@ -35,6 +35,13 @@ const STEPS = Object.keys(stepLabels) as CloudBrainStep[];
 
 const machineLabels: Record<CloudBrainMachine, string> = { awake: "Awake", asleep: "Asleep", starting: "Waking", stopping: "Going to sleep", failed: "Failed" };
 
+/** What the brain's machine is doing, an update or a wake under way first; null while Vercel cannot be asked. */
+function machineStatus(brain: Extract<CloudBrainStatus, { state: "ready" }>, waking: boolean): { label: string; ok: boolean } | null {
+  if (brain.working === "updating") return { label: "Updating", ok: false };
+  if (waking) return { label: "Waking", ok: false };
+  return brain.machine && { label: machineLabels[brain.machine], ok: brain.machine === "awake" };
+}
+
 function Alert({ error }: { error: string | null }) {
   return error ? (
     <p role="alert" className="text-bad mt-2">
@@ -146,12 +153,11 @@ function Ready({ brain }: { brain: Extract<CloudBrainStatus, { state: "ready" }>
   const wake = useRpcMutation("cloud.brain.wake");
   const handover = useRpcMutation("cloud.brain.handover");
   const busy = brain.working !== null || wake.isPending || handover.isPending;
-  const waking = brain.working === "waking" || wake.isPending;
-  const machine = waking ? "Waking" : brain.machine && machineLabels[brain.machine];
+  const machine = machineStatus(brain, brain.working === "waking" || wake.isPending);
   return (
     <>
       <SettingRow label={regionName(brain.region)}>
-        {machine ? <Status ok={!waking && brain.machine === "awake"}>{machine}</Status> : null}
+        {machine ? <Status ok={machine.ok}>{machine.label}</Status> : null}
         {brain.machine === "asleep" && !busy ? (
           <TextButton tone="muted" onClick={() => wake.mutate({})}>
             Wake

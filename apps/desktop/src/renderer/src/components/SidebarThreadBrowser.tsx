@@ -228,6 +228,8 @@ function FlatThreadFeedback({ state, shown, snoozed, search }: { state: ReturnTy
 function FlatThreadBrowser({ search }: { search: string }) {
   const state = useFlatThreadPages(search);
   const { projects, pages, activeId, pinnedOnly, view, collapsed, loadMore } = state;
+  const projectNames = new Map((projects.data ?? []).map((project) => [project.id, project.name]));
+  projectNames.set(WORKSPACE_ID, "Workspace");
   const hasMore = pages.some((page) => page.hasMore);
   const matches = (thread: ThreadSummary) => thread.title.toLowerCase().includes(search.toLowerCase());
   const latestFirst = (a: ThreadSummary, b: ThreadSummary) => b.lastActivityAt - a.lastActivityAt || b.id.localeCompare(a.id);
@@ -245,7 +247,7 @@ function FlatThreadBrowser({ search }: { search: string }) {
   useEffect(() => {
     useUi.getState().setThreadOrder(order);
   }, [order]);
-  const row = (thread: ThreadSummary) => <ThreadRow key={thread.id} thread={thread} active={activeId === thread.id} />;
+  const row = (thread: ThreadSummary) => <ThreadRow key={thread.id} thread={thread} active={activeId === thread.id} projectName={projectNames.get(thread.projectId)} />;
   return (
     <section className="conversation-browser" aria-label="Thread browser">
       <div className="browser-threads">

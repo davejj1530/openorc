@@ -378,12 +378,12 @@ it("toggles to one recently-active list, remembers the choice, and restores save
   await toggleProjectGrouping();
   await waitFor(() => expect(useUi.getState().threadOrder).toEqual(["pinned", "regular", "other"]));
   expect(document.querySelectorAll(".sidebar-project")).toHaveLength(0);
-  expect(screen.queryByText("First project")).toBeNull();
-  expect(screen.queryByText("Second project")).toBeNull();
+  expect(Array.from(document.querySelectorAll(".thread-preview-project"), (label) => label.textContent)).toEqual(["First project", "First project", "Second project"]);
   expect(useLayout.getState().collapsed).toEqual(["project:one"]);
   expect(JSON.parse(localStorage.getItem("openorc.layout") ?? "{}").ungroupByProjects).toBe(true);
   await toggleProjectGrouping();
   await screen.findByRole("button", { name: "Expand First project threads" });
+  expect(document.querySelectorAll(".thread-preview-project")).toHaveLength(0);
   await waitFor(() => expect(useUi.getState().threadOrder).toEqual(["other"]));
   expect(useLayout.getState().ungroupByProjects).toBe(false);
 });

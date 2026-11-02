@@ -47,7 +47,7 @@ function PullRequestMark({ thread }: { thread: ThreadSummary }) {
  * A thread row: what the thread needs from you before its title, then the title. ⌘-click opens it in the split;
  * right-click gives every action.
  */
-export function ThreadRow({ thread, active }: { thread: ThreadSummary; active: boolean }) {
+export function ThreadRow({ thread, active, projectName }: { thread: ThreadSummary; active: boolean; projectName?: string }) {
   const navigate = useRouter((s) => s.navigate);
   const addPane = useRouter((s) => s.addThreadPane);
   // Every thread open in a pane is marked alike; aria-current names only the focused one.
@@ -82,6 +82,11 @@ export function ThreadRow({ thread, active }: { thread: ThreadSummary; active: b
           />
         }
       >
+        {projectName ? (
+          <span className="thread-preview-project" title={projectName}>
+            {projectName}
+          </span>
+        ) : null}
         <span className="thread-preview-heading">
           <span className="thread-preview-status">
             <ThreadStatusIndicator thread={thread} idle={<PullRequestMark thread={thread} />} />

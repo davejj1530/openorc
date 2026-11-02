@@ -498,6 +498,15 @@ button.sidebar-nav-row:hover {
 .app-shell .sidebar-shell .thread-preview[data-open]:not(:focus-visible) {
   background-color: var(--current-row-fill);
 }
+.thread-preview-project {
+  margin-left: calc(16px + 8px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-xs);
+  line-height: 16px;
+  color: var(--ink-4);
+}
 .thread-preview-heading {
   display: flex;
   align-items: center;

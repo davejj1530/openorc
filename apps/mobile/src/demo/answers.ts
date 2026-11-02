@@ -105,6 +105,7 @@ const answers: Answers = {
     return { thread: core.thread(id), run };
   },
   "threads.update": patch,
+  "threads.switchClaudeAccount": (core, { id, claudeAccountId }) => core.update(id, { claudeAccountId }),
   "runs.start": (core, { threadId, prompt, attachments }) => {
     if (!threadId) throw new Error("Start a run from its thread.");
     return core.startRun(threadId, prompt, attachments);

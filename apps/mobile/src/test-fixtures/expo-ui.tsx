@@ -28,10 +28,11 @@ function spoken(modifiers: Modifier[] | undefined): string | undefined {
 
 export function Menu({ label, modifiers, children }: Modified & { label: ReactNode }) {
   const [open, setOpen] = useState(false);
+  const disabled = read(modifiers, "disabled") === true;
   return createElement(
     "div",
     null,
-    createElement("button", { "aria-label": spoken(modifiers), "aria-expanded": open, onClick: () => setOpen(!open) }, label),
+    createElement("button", { "aria-label": spoken(modifiers), "aria-expanded": open, disabled, onClick: () => setOpen(!open) }, label),
     open ? createElement("div", { role: "menu" }, children) : null,
   );
 }

@@ -3,6 +3,7 @@ import { accessibilityLabel, accessibilityValue, disabled, pickerStyle, tag } fr
 import type { ClaudeAccountConnection } from "@openorc/protocol";
 import { View } from "react-native";
 import { ChevronsUpDown } from "../generated/icons";
+import { cn } from "../ui/cn";
 import { haptic } from "../ui/haptics";
 import { useMode } from "../ui/mode";
 import { Text } from "../ui/Text";
@@ -11,8 +12,9 @@ import { claudeAccountUnavailable, type useClaudeAccountChoice } from "./claude-
 type Choice = NonNullable<ReturnType<typeof useClaudeAccountChoice>>;
 
 /**
- * Which of the Mac's Claude accounts a new thread runs on, as a native menu with a check on the current one. An account
- * the Mac cannot run follows, dimmed with why: kept out of the picker, whose check would otherwise move to it.
+ * Which of the Mac's Claude accounts a thread runs on, as a native menu with a check on the current one. An account
+ * the Mac cannot run follows, dimmed with why: kept out of the picker, whose check would otherwise move to it. While
+ * the choice is held, as during an open thread's turn, the menu stays shut and says why.
  */
 export function ClaudeAccountMenu({ choice }: { choice: Choice }) {
   const mode = useMode();
@@ -23,11 +25,11 @@ export function ClaudeAccountMenu({ choice }: { choice: Choice }) {
       <Text className="text-sm text-ink-4">Claude account</Text>
       <Host matchContents={{ vertical: true }} colorScheme={mode}>
         <Menu
-          modifiers={[accessibilityLabel("Claude account"), accessibilityValue(name)]}
+          modifiers={[accessibilityLabel("Claude account"), accessibilityValue(name), disabled(Boolean(choice.held))]}
           label={
             <RNHostView matchContents={{ vertical: true }}>
               <View pointerEvents="none" className="min-h-touch flex-row items-center gap-2 rounded-full bg-surface-2 pl-4 pr-3.5">
-                <Text numberOfLines={1} className="min-w-0 flex-1 text-sm">
+                <Text numberOfLines={1} className={cn("min-w-0 flex-1 text-sm", choice.held && "text-ink-4")}>
                   {name}
                 </Text>
                 <ChevronsUpDown size={14} className="text-ink-4" />
@@ -57,6 +59,12 @@ export function ClaudeAccountMenu({ choice }: { choice: Choice }) {
           ))}
         </Menu>
       </Host>
+      {choice.held ? <Text className="text-sm text-ink-4">{choice.held}</Text> : null}
+      {choice.failed ? (
+        <Text accessibilityRole="alert" className="text-sm text-bad">
+          {choice.failed}
+        </Text>
+      ) : null}
     </View>
   );
 }

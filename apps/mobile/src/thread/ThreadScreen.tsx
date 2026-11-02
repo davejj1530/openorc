@@ -8,6 +8,7 @@ import { Pressable, View } from "react-native";
 import type { SharedValue } from "react-native-reanimated";
 import { client, useLinkState, useRpc } from "../client";
 import { linkReason } from "../connection/link-reason";
+import { useThreadClaudeAccount } from "../composer/claude-account";
 import { Composer } from "../composer/Composer";
 import { useShareSettings } from "../composer/settings-bridge";
 import { useCoverHome } from "../home/home-cover";
@@ -121,7 +122,7 @@ export function ThreadScreen() {
   const runsQuery = useRpc("runs.listForThread", { threadId: id });
   const runs = runsQuery.data ?? NO_RUNS;
   const activeRun = runs.at(-1);
-  const settings = { ...client.useConversationSettings({ thread, activeRun }), claudeAccountId: thread?.claudeAccountId ?? undefined };
+  const settings = { ...client.useConversationSettings({ thread, activeRun }), claudeAccountId: thread?.claudeAccountId ?? undefined, claudeAccount: useThreadClaudeAccount(thread) };
   useShareSettings(id, settings);
   useMarkSeen(thread);
   useCoverHome();

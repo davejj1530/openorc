@@ -43,8 +43,8 @@ function FastModeControl({ settings, state }: { settings: ComposerSettings | und
 }
 
 /**
- * The models a composer can run, their effort and Fast mode, and on a new Claude thread the account it runs on,
- * once the Mac has more than one.
+ * The models a composer can run, their effort and Fast mode, and on a Claude thread the account it runs on, once the
+ * Mac has more than one.
  */
 export function ModelSheet() {
   const { composerId } = useLocalSearchParams<{ composerId: string }>();

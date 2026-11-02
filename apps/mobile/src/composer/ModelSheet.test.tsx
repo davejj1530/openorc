@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { ClaudeAccountConnection, ModelOption, RpcMethod, RpcParams } from "@openorc/protocol";
+import type { ClaudeAccountConnection, ModelOption, RpcMethod, RpcParams, ThreadSummary } from "@openorc/protocol";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -7,6 +7,7 @@ import { client } from "../client";
 import { NewThreadScreen } from "../new-thread/NewThreadScreen";
 import type { FakeMac } from "../test-fixtures/fake-mac";
 import { nativeProps } from "../test-fixtures/react-native";
+import { useThreadClaudeAccount } from "./claude-account";
 import { ComposerChips } from "./ComposerChips";
 import { ModelSheet } from "./ModelSheet";
 import { useShareSettings } from "./settings-bridge";
@@ -29,7 +30,16 @@ const mac = vi.hoisted(() => {
   const codex: ModelOption = { id: "gpt-main", label: "GPT", agent: "codex", isDefault: true, efforts: ["high"], defaultEffort: "high" };
   const reads: Partial<Record<RpcMethod, unknown>> = {};
   const calls: { method: RpcMethod; params: unknown }[] = [];
-  return { account, claude, codex, reads, calls, phone: null as FakeMac | null, start: vi.fn<(params: RpcParams<"threads.start">) => Promise<{ thread: { id: string } }>>() };
+  return {
+    account,
+    claude,
+    codex,
+    reads,
+    calls,
+    phone: null as FakeMac | null,
+    start: vi.fn<(params: RpcParams<"threads.start">) => Promise<{ thread: { id: string } }>>(),
+    switchAccount: vi.fn<(params: RpcParams<"threads.switchClaudeAccount">) => Promise<unknown>>(),
+  };
 });
 
 vi.mock("../client", async () => {
@@ -37,6 +47,7 @@ vi.mock("../client", async () => {
   mac.phone = fakeMac((method, params) => {
     mac.calls.push({ method, params });
     if (method === "threads.start") return mac.start(params as RpcParams<"threads.start">);
+    if (method === "threads.switchClaudeAccount") return mac.switchAccount(params as RpcParams<"threads.switchClaudeAccount">);
     if (method === "projects.git") return Promise.resolve("ready");
     return Promise.resolve(mac.reads[method]);
   });
@@ -66,6 +77,7 @@ beforeEach(() => {
   mac.phone!.saved.clear();
   mac.phone!.module.queryClient.clear();
   mac.start.mockReset();
+  mac.switchAccount.mockReset().mockResolvedValue({});
   mac.calls.length = 0;
 });
 afterEach(cleanup);
@@ -247,4 +259,53 @@ it("uses an existing thread's account and lets its saved Fast request be turned 
   await screen.findByRole("button", { name: "Model, Opus" });
   await waitFor(() => expect(mac.calls).toContainEqual({ method: "threads.update", params: { id: "saved", patch: { agent: "claude", model: "opus", effort: "high", fastMode: false } } }));
   expect(toggle.hasAttribute("disabled")).toBe(true);
+});
+
+/** An open Claude thread on Work, its settings built as ThreadScreen builds them. */
+function OpenThread({ activity = "idle" }: { activity?: ThreadSummary["activity"] }) {
+  const thread = { id: "open", agent: "claude", model: "opus", effort: "high", fastMode: false, mode: "act", permissionMode: "trusted", claudeAccountId: "work", activity } as ThreadSummary;
+  const settings = { ...client.useConversationSettings({ thread, activeRun: undefined }), claudeAccountId: "work", claudeAccount: useThreadClaudeAccount(thread) };
+  useShareSettings("new-thread", settings);
+  return <ComposerChips composerId="new-thread" settings={settings} />;
+}
+
+const accounts = () => [mac.account("claude-cli", "Existing CLI login"), mac.account("work", "Work"), mac.account("q6", "Q6", { status: "signed_out" })];
+
+it("moves an open Claude thread to another signed-in account from its Model sheet, and says when that fails", async () => {
+  macState({ accounts: accounts() });
+  mac.switchAccount.mockRejectedValueOnce(new Error("Fast is turned off for Existing CLI login."));
+  render(
+    <>
+      <OpenThread />
+      <ModelSheet />
+    </>,
+    { wrapper: mac.phone!.wrapper },
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "Claude account, Work" }));
+  expect(screen.getAllByRole("menuitemradio").map((item) => item.textContent)).toEqual(["Existing CLI login", "Work"]);
+  expect((screen.getByRole("button", { name: "Q6 · Signed out" }) as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.click(screen.getByRole("menuitemradio", { name: "Existing CLI login" }));
+  expect((await screen.findByRole("alert")).textContent).toBe("Couldn’t switch accounts. Fast is turned off for Existing CLI login.");
+  fireEvent.click(screen.getByRole("menuitemradio", { name: "Existing CLI login" }));
+  await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+  expect(mac.switchAccount.mock.calls.map(([params]) => params)).toEqual([
+    { id: "open", claudeAccountId: "claude-cli" },
+    { id: "open", claudeAccountId: "claude-cli" },
+  ]);
+});
+
+it("holds an open thread's account while its turn runs", async () => {
+  macState({ accounts: accounts() });
+  render(
+    <>
+      <OpenThread activity="running" />
+      <ModelSheet />
+    </>,
+    { wrapper: mac.phone!.wrapper },
+  );
+  const menu = (await screen.findByRole("button", { name: "Claude account, Work" })) as HTMLButtonElement;
+  expect([menu.disabled, screen.getByText("Switch accounts when this turn ends.").tagName]).toEqual([true, expect.any(String)]);
+  fireEvent.click(menu);
+  expect(screen.queryByRole("menuitemradio")).toBeNull();
+  expect(mac.switchAccount).not.toHaveBeenCalled();
 });

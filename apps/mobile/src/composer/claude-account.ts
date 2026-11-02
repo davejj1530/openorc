@@ -1,16 +1,33 @@
-import type { ClaudeAccountConnection } from "@openorc/protocol";
-import { useRpc } from "../client";
+import { DEFAULT_CLAUDE_ACCOUNT, type ClaudeAccountConnection, type ThreadSummary } from "@openorc/protocol";
+import { useRpc, useRpcMutation } from "../client";
 import type { ComposerSettings } from "./settings-bridge";
 
 /**
- * A new thread's Claude account choice: the Mac's accounts, and the one the thread would run on (the chosen one, else
- * the Mac's default). Null on a thread, with a single account, and until the Mac lists them.
+ * A composer's Claude account choice: the Mac's accounts, and the one its thread runs on, or a new thread would (the
+ * chosen one, else the Mac's default). Null with a single account, until the Mac lists them, and where the account
+ * cannot change.
  */
 export function useClaudeAccountChoice(settings: ComposerSettings | undefined) {
   const list = useRpc("claude.accounts.list", {}, { enabled: Boolean(settings?.claudeAccount) });
   if (!settings?.claudeAccount || !list.data || list.data.accounts.length < 2) return null;
-  const id = settings.claudeAccount.chosen ?? list.data.defaultId;
-  return { accounts: list.data.accounts, id, current: list.data.accounts.find((account) => account.id === id), select: settings.claudeAccount.select };
+  const { chosen, select, held = null, failed = null } = settings.claudeAccount;
+  const id = chosen ?? list.data.defaultId;
+  return { accounts: list.data.accounts, id, current: list.data.accounts.find((account) => account.id === id), select, held, failed };
+}
+
+/**
+ * An open Claude thread's account, which it leaves for another between turns: its next message resumes the
+ * conversation there. An Orcling's or a team's conversation keeps its own, as on the Mac.
+ */
+export function useThreadClaudeAccount(thread: ThreadSummary | null): ComposerSettings["claudeAccount"] {
+  const switching = useRpcMutation("threads.switchClaudeAccount");
+  if (!thread || thread.agent !== "claude" || thread.orclingId || thread.teamInstanceId) return undefined;
+  return {
+    chosen: thread.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT,
+    select: (claudeAccountId) => switching.mutate({ id: thread.id, claudeAccountId }),
+    held: thread.activity === "idle" ? null : "Switch accounts when this turn ends.",
+    failed: switching.error ? `Couldn’t switch accounts. ${switching.error.message}` : null,
+  };
 }
 
 /** Why a thread cannot start on this account, or null: both are put right on the Mac. */

@@ -114,19 +114,24 @@ export function ThreadHeader({
   );
 }
 
-const cloudDot = { preparing: "live", failed: "bad", ready: null } as const;
+const cloudDot = { preparing: "live", failed: "bad", ready: null, removed: null } as const;
 
 const cloudPlaces = {
   vercel: { label: "Vercel", tip: "Runs in Vercel Sandbox" },
   local: { label: "Simulated", tip: "Runs in a sandbox simulated on this Mac" },
 } as const;
 
+function cloudTip(cloud: CloudThreadState, where: string): string {
+  if (cloud.state === "failed" && cloud.error) return cloud.error;
+  return cloud.state === "removed" ? "Its sandbox was removed; the next message sets up a new one" : where;
+}
+
 /** Where a cloud thread runs, with a dot while its sandbox is set up or after that failed. */
 function ThreadCloud({ cloud }: { cloud: CloudThreadState }) {
   const place = cloudPlaces[cloud.provider];
   const dot = cloudDot[cloud.state];
   return (
-    <Tooltip label={cloud.state === "failed" && cloud.error ? cloud.error : place.tip}>
+    <Tooltip label={cloudTip(cloud, place.tip)}>
       <span className="thread-header-fact">
         <Cloud size={12} />
         {dot ? <StatusDot tone={dot} /> : null}

@@ -1,8 +1,9 @@
 import { useState, type ReactNode } from "react";
-import type { ClaudeAccountConnection, ClaudeCloudAccess, CloudStatus } from "@openorc/protocol";
+import { SANDBOX_VCPUS, type ClaudeAccountConnection, type ClaudeCloudAccess, type CloudStatus } from "@openorc/protocol";
 import { Button, Input, Select, TextButton } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { CloudCheckSection } from "./settings-cloud-check";
+import { CloudSandboxesSection } from "./settings-cloud-sandboxes";
 import { Field, LoadError, Section, SettingRow, Status } from "./settings-shared";
 
 const TOKENS_URL = "https://vercel.com/account/settings/tokens";
@@ -34,6 +35,28 @@ function TokenField({ label, hint, action, busy, onSave }: { label: string; hint
   );
 }
 
+/** Vercel's default when none is chosen. */
+const DEFAULT_VCPUS = 2;
+
+/** How big new sandboxes are. Vercel refuses more than the team's plan allows when it makes one. */
+function SandboxSize({ vcpus, disabled }: { vcpus: number | null; disabled: boolean }) {
+  const size = useRpcMutation("cloud.vercel.size");
+  return (
+    <>
+      <Field label="Sandbox size" hint="New sandboxes get this size.">
+        <Select value={String(vcpus ?? DEFAULT_VCPUS)} disabled={disabled || size.isPending} onChange={(e) => size.mutate({ vcpus: Number(e.target.value) as (typeof SANDBOX_VCPUS)[number] })}>
+          {SANDBOX_VCPUS.map((count) => (
+            <option key={count} value={count}>
+              {count} vCPUs · {count * 2} GB
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <Failure error={size.error} />
+    </>
+  );
+}
+
 function VercelTeam({ vercel }: { vercel: NonNullable<CloudStatus["vercel"]> }) {
   const teams = useRpc("cloud.vercel.teams", {});
   const choose = useRpcMutation("cloud.vercel.team");
@@ -51,6 +74,7 @@ function VercelTeam({ vercel }: { vercel: NonNullable<CloudStatus["vercel"]> }) 
           ))}
         </Select>
       </Field>
+      <SandboxSize vcpus={vercel.vcpus} disabled={busy || !vercel.team} />
       <SettingRow label="Account">
         <Status ok={Boolean(vercel.team)}>{vercel.team ? "Connected" : "Choose a team"}</Status>
         <Button variant="ghost" disabled={busy} onClick={() => disconnect.mutate({})}>
@@ -197,6 +221,7 @@ export function CloudSettings({ active }: { active: boolean }) {
       ) : null}
       <VercelSettings status={status.data} />
       <ClaudeCloudAccounts status={status.data} active={active} />
+      <CloudSandboxesSection active={active} />
       <CloudCheckSection status={status.data} />
     </>
   );

@@ -25,7 +25,7 @@ function show(check: CloudCheck | null, vercel: CloudStatus["vercel"] = null) {
 
 it("starts a check where new cloud threads run", async () => {
   vi.mocked(core.call).mockResolvedValue(null);
-  show(null, { team: { id: "t", name: "Team" }, project: "openorc-sandboxes" });
+  show(null, { team: { id: "t", name: "Team" }, project: "openorc-sandboxes", vcpus: null });
   expect(screen.getByText("On Vercel")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Run check" }));
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.check", {}));

@@ -76,6 +76,18 @@ export interface ClaudeCloudAccess {
   error: string | null;
 }
 
+/** How Codex signs in to cloud sandboxes: a ChatGPT sign-in of its own, separate from this Mac's, or an API key. */
+export interface CodexCloudAccess {
+  mode: "chatgpt" | "apiKey" | null;
+  email: string | null;
+  plan: string | null;
+  /** When the ChatGPT login was last refreshed. */
+  refreshedAt: number | null;
+  /** The browser sign-in is open. */
+  signingIn: boolean;
+  error: string | null;
+}
+
 /** What Settings shows about where cloud threads run. Tokens never leave the core. */
 export interface CloudStatus {
   /** Null until a Vercel token is saved. */
@@ -89,6 +101,7 @@ export interface CloudStatus {
   } | null;
   /** By Claude account id. */
   claude: Record<string, ClaudeCloudAccess>;
+  codex: CodexCloudAccess;
   /** The last cloud check since OpenOrc started; null before one ran. */
   check: CloudCheck | null;
   /** Working conversations in a worktree move to the cloud when this Mac goes to sleep. */
@@ -116,6 +129,11 @@ export const cloudRpcParams = {
   /** A token made elsewhere with `claude setup-token`. */
   "cloud.claude.save": z.object({ accountId: ClaudeAccountId, token: Token }).strict(),
   "cloud.claude.remove": z.object({ accountId: ClaudeAccountId }).strict(),
+  /** Runs `codex login` in a folder of OpenOrc's own; its browser sign-in finishes it. */
+  "cloud.codex.signIn": z.object({}),
+  "cloud.codex.cancel": z.object({}),
+  "cloud.codex.apiKey": z.object({ key: Token }).strict(),
+  "cloud.codex.remove": z.object({}),
   /** Starts a cloud check where new cloud threads would run; its progress arrives in `cloud.status`. */
   "cloud.check": z.object({}),
   "cloud.sandboxes": z.object({}),
@@ -137,6 +155,10 @@ export interface CloudRpcResults {
   "cloud.claude.cancel": CloudStatus;
   "cloud.claude.save": CloudStatus;
   "cloud.claude.remove": CloudStatus;
+  "cloud.codex.signIn": CloudStatus;
+  "cloud.codex.cancel": CloudStatus;
+  "cloud.codex.apiKey": CloudStatus;
+  "cloud.codex.remove": CloudStatus;
   "cloud.check": CloudStatus;
   "cloud.sandboxes": CloudSandbox[];
   "cloud.move": Thread;

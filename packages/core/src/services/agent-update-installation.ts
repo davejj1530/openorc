@@ -144,7 +144,8 @@ async function detectNativeInstallation(id: HarnessId, binary: string, env: Node
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") return { ...manual, message: "Claude’s release channel could not be read. Use claude update in a terminal." };
     }
-    return { ...manual, method: `Native · ${channel}`, releaseUrl: registry(id, channel), command: { binary, args: ["update"] }, message: null };
+    // claude update reads this channel, which can trail npm by days.
+    return { ...manual, method: `Native · ${channel}`, releaseUrl: `https://downloads.claude.ai/claude-code-releases/${channel}`, command: { binary, args: ["update"] }, message: null };
   }
   if (id === "opencode" && target === path.join(home, ".opencode/bin/opencode")) {
     return { ...manual, method: "Native", command: { binary, args: ["upgrade", "--method", "curl"] }, message: null };
@@ -183,7 +184,9 @@ export function newerRelease(latest: string, installed: string): boolean {
 export async function fetchAgentRelease(url: string): Promise<string> {
   const response = await fetch(url, { signal: AbortSignal.timeout(10_000), headers: { Accept: "application/json" }, credentials: "omit" });
   if (!response.ok) throw new Error("The release service could not be reached. Try checking again later.");
-  const data: unknown = await response.json();
+  // npm and Homebrew answer with JSON metadata; Claude's native channel answers with a bare version.
+  const body = (await response.text()).trim();
+  const data: unknown = body.startsWith("{") ? JSON.parse(body) : { version: body };
   const raw = typeof data === "object" && data !== null && "version" in data ? data.version : null;
   const version = typeof raw === "string" ? releaseVersion(raw) : null;
   if (!version || raw !== version) throw new Error("The release service returned an unrecognized version. Try checking again later.");

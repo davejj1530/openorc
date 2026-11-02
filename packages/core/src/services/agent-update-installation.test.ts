@@ -110,7 +110,7 @@ it("preserves Claude’s selected stable channel for native installations", asyn
   vi.mocked(readFile).mockResolvedValue('{"autoUpdatesChannel":"stable"}');
   expect(await detectAgentInstallation("claude", "/home/test/.local/bin/claude", snapshot)).toMatchObject({
     method: "Native · stable",
-    releaseUrl: "https://registry.npmjs.org/@anthropic-ai/claude-code/stable",
+    releaseUrl: "https://downloads.claude.ai/claude-code-releases/stable",
     command: { binary: "/home/test/.local/bin/claude", args: ["update"] },
     // A broken native binary cannot run its own updater.
     repair: null,

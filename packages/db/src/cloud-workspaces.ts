@@ -7,6 +7,7 @@ export type CloudWorkspaceState = "preparing" | "ready" | "failed";
 export interface CloudMirrorState {
   snapshot: string | null;
   tree: string;
+  head: string | null;
   known: string[];
 }
 
@@ -30,19 +31,20 @@ interface Row {
   error: string | null;
   mirror_snapshot: string | null;
   mirror_tree: string | null;
+  mirror_head: string | null;
   mirror_known: string;
   created_at: number;
   updated_at: number;
 }
 
-const columns = "thread_id, provider, sandbox, state, error, mirror_snapshot, mirror_tree, mirror_known, created_at, updated_at";
+const columns = "thread_id, provider, sandbox, state, error, mirror_snapshot, mirror_tree, mirror_head, mirror_known, created_at, updated_at";
 const record = (row: Row): CloudWorkspaceRecord => ({
   threadId: row.thread_id,
   provider: row.provider,
   sandbox: row.sandbox,
   state: row.state,
   error: row.error,
-  mirror: row.mirror_tree === null ? null : { snapshot: row.mirror_snapshot, tree: row.mirror_tree, known: JSON.parse(row.mirror_known) as string[] },
+  mirror: row.mirror_tree === null ? null : { snapshot: row.mirror_snapshot, tree: row.mirror_tree, head: row.mirror_head, known: JSON.parse(row.mirror_known) as string[] },
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
@@ -62,8 +64,10 @@ export const cloudWorkspaces = {
   /** The sandbox has the code and the worktree matches `mirror`. */
   ready(db: Db, threadId: string, mirror: CloudMirrorState, at = Date.now()): CloudWorkspaceRecord {
     const row = db
-      .stmt(`UPDATE cloud_workspaces SET state = 'ready', error = NULL, mirror_snapshot = ?, mirror_tree = ?, mirror_known = ?, updated_at = ? WHERE thread_id = ? RETURNING ${columns}`)
-      .get(mirror.snapshot, mirror.tree, JSON.stringify(mirror.known), at, threadId) as unknown as Row | undefined;
+      .stmt(
+        `UPDATE cloud_workspaces SET state = 'ready', error = NULL, mirror_snapshot = ?, mirror_tree = ?, mirror_head = ?, mirror_known = ?, updated_at = ? WHERE thread_id = ? RETURNING ${columns}`,
+      )
+      .get(mirror.snapshot, mirror.tree, mirror.head, JSON.stringify(mirror.known), at, threadId) as unknown as Row | undefined;
     if (!row) throw new Error(`No cloud workspace for thread ${threadId}`);
     return record(row);
   },

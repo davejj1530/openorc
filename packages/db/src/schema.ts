@@ -783,4 +783,6 @@ export const migrations: Migration[] = [
   remotePushTargetMigration,
   orclingAccountMigration,
   cloudWorkspaceMigration,
+  /** The commit a cloud conversation's worktree was on after its last sync, so commits made on the Mac reach the sandbox. */
+  `ALTER TABLE cloud_workspaces ADD COLUMN mirror_head TEXT;`,
 ];

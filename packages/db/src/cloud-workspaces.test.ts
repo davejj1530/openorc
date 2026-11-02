@@ -26,7 +26,7 @@ describe("cloudWorkspaces", () => {
       createdAt: 1,
       updatedAt: 1,
     });
-    const mirror = { snapshot: null, tree: "t".repeat(40), known: ["c".repeat(40)] };
+    const mirror = { snapshot: null, tree: "t".repeat(40), head: "c".repeat(40), known: ["c".repeat(40)] };
     expect(cloudWorkspaces.ready(db, threadId, mirror, 2)).toMatchObject({ state: "ready", mirror, updatedAt: 2 });
     expect(cloudWorkspaces.get(db, threadId)?.mirror).toEqual(mirror);
   });
@@ -35,7 +35,7 @@ describe("cloudWorkspaces", () => {
     cloudWorkspaces.insert(db, { threadId, provider: "local", sandbox: "openorc-a" });
     cloudWorkspaces.failed(db, threadId, "setup failed");
     expect(cloudWorkspaces.get(db, threadId)).toMatchObject({ state: "failed", error: "setup failed" });
-    cloudWorkspaces.ready(db, threadId, { snapshot: null, tree: "t".repeat(40), known: [] });
+    cloudWorkspaces.ready(db, threadId, { snapshot: null, tree: "t".repeat(40), head: null, known: [] });
     cloudWorkspaces.failed(db, threadId, "late failure");
     expect(cloudWorkspaces.get(db, threadId)).toMatchObject({ state: "ready", error: null });
   });

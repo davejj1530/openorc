@@ -350,14 +350,21 @@ const VISIBLE = "NOT EXISTS (SELECT 1 FROM team_deleted_threads hidden WHERE hid
 export const threads = {
   /**
    * Active includes every unarchived conversation, including legacy done rows.
-   * Pinned first, then most recent activity.
+   * Pinned first, then most recent activity, unless activity order is requested without pin priority.
    */
-  list(db: Db, filter: { projectId?: string; projectsOnly?: boolean; filter?: ThreadListFilter; limit?: number; offset?: number } = {}): Thread[] {
+  list(
+    db: Db,
+    filter: { projectId?: string; projectIds?: string[]; projectsOnly?: boolean; filter?: ThreadListFilter; orderBy?: "activity"; pinnedOnly?: boolean; limit?: number; offset?: number } = {},
+  ): Thread[] {
     const where: string[] = [];
     const args: (string | number)[] = [];
     if (filter.projectId) {
       where.push("project_id = ?");
       args.push(filter.projectId);
+    }
+    if (filter.projectIds) {
+      where.push(filter.projectIds.length ? `project_id IN (${filter.projectIds.map(() => "?").join(",")})` : "0");
+      args.push(...filter.projectIds);
     }
     if (filter.projectsOnly) {
       where.push("project_id != ?");
@@ -365,12 +372,13 @@ export const threads = {
     }
     // A deleted team conversation keeps its row for its saved tasks; it is never listed, including with filter=all.
     where.push(VISIBLE);
+    if (filter.pinnedOnly) where.push("pinned_at IS NOT NULL");
     const kind = filter.filter ?? "active";
     if (kind === "active") where.push("archived_at IS NULL");
     else if (kind === "done") where.push("archived_at IS NULL AND done_at IS NOT NULL");
     else if (kind === "archived") where.push("archived_at IS NOT NULL");
     const limit = filter.limit ? ` LIMIT ${Math.floor(filter.limit)}${filter.offset ? ` OFFSET ${Math.floor(filter.offset)}` : ""}` : "";
-    const sql = `SELECT * FROM threads WHERE ${where.join(" AND ")} ORDER BY ${threadListOrder(kind)}${limit}`;
+    const sql = `SELECT * FROM threads WHERE ${where.join(" AND ")} ORDER BY ${threadListOrder(kind, filter.orderBy)}${limit}`;
     return (db.stmt(sql).all(...args) as unknown as ThreadRow[]).map(threadFromRow);
   },
   get(db: Db, id: string): Thread | null {

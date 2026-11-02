@@ -14,7 +14,6 @@ import {
   threadQueue,
   type CloudProviderId,
   type Db,
-  type ThreadListFilter,
 } from "@openorc/db";
 import { diffStat, git, pinObject, switchFiles, teamTransfer, treeHash } from "@openorc/git";
 import {
@@ -31,6 +30,7 @@ import {
   type ThreadCheckpoint,
   type ThreadSearchHit,
   type ThreadSummary,
+  type RpcParams,
   type ThreadMessage,
   type WorkspaceMode,
 } from "@openorc/protocol";
@@ -114,7 +114,7 @@ export class ThreadService {
     this.sessions = new ThreadSessions({ db, runs, workspaces, log, claudeFolder, handoffFor: (...args) => this.agentTools.handoffFor(...args) });
   }
 
-  list(filter: { projectId?: string; projectsOnly?: boolean; filter?: ThreadListFilter; limit?: number; offset?: number } = {}): ThreadSummary[] {
+  list(filter: RpcParams<"threads.list"> = {}): ThreadSummary[] {
     return threads.list(this.db, filter).map((t) => this.summarize(t));
   }
 

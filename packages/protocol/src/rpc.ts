@@ -186,8 +186,12 @@ export const rpcParams = {
   /** Active threads by default; every project when none is named. Offset pages older threads in. */
   "threads.list": z.object({
     projectId: z.string().optional(),
+    projectIds: z.array(z.string()).optional(),
     projectsOnly: z.boolean().optional(),
     filter: ThreadFilter.optional(),
+    /** Most recent activity across projects, without pin priority. */
+    orderBy: z.literal("activity").optional(),
+    pinnedOnly: z.boolean().optional(),
     limit: z.number().int().positive().optional(),
     offset: z.number().int().nonnegative().optional(),
   }),

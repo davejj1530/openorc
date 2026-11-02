@@ -1,8 +1,8 @@
 import { useState, type ReactNode } from "react";
-import { SANDBOX_VCPUS, type ClaudeAccountConnection, type ClaudeCloudAccess, type CloudStatus } from "@openorc/protocol";
+import { SANDBOX_VCPUS, type BrainRegion, type ClaudeAccountConnection, type ClaudeCloudAccess, type CloudStatus } from "@openorc/protocol";
 import { Button, Select, TextButton } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/client";
-import { CloudBrainSection } from "./settings-cloud-brain";
+import { CloudBrainSection, RegionSelect } from "./settings-cloud-brain";
 import { CloudCheckSection } from "./settings-cloud-check";
 import { CloudSandboxesSection } from "./settings-cloud-sandboxes";
 import { Field, LoadError, Section, SettingRow, Status, Toggle } from "./settings-shared";
@@ -33,6 +33,19 @@ function SandboxSize({ vcpus, disabled }: { vcpus: number | null; disabled: bool
   );
 }
 
+/** Where new sandboxes run. One that exists stays in the region it was made in. */
+function SandboxRegion({ region, disabled }: { region: BrainRegion; disabled: boolean }) {
+  const choose = useRpcMutation("cloud.vercel.region");
+  return (
+    <>
+      <Field label="Sandbox region" hint="New sandboxes run here.">
+        <RegionSelect value={region} disabled={disabled || choose.isPending} onChange={(next) => choose.mutate({ region: next })} />
+      </Field>
+      <Failure error={choose.error} />
+    </>
+  );
+}
+
 function VercelTeam({ vercel }: { vercel: NonNullable<CloudStatus["vercel"]> }) {
   const teams = useRpc("cloud.vercel.teams", {});
   const choose = useRpcMutation("cloud.vercel.team");
@@ -51,6 +64,7 @@ function VercelTeam({ vercel }: { vercel: NonNullable<CloudStatus["vercel"]> }) 
         </Select>
       </Field>
       <SandboxSize vcpus={vercel.vcpus} disabled={busy || !vercel.team} />
+      <SandboxRegion region={vercel.region} disabled={busy || !vercel.team} />
       <SettingRow label="Account">
         <Status ok={Boolean(vercel.team)}>{vercel.team ? "Connected" : "Choose a team"}</Status>
         <Button variant="ghost" disabled={busy} onClick={() => disconnect.mutate({})}>

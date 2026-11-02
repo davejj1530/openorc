@@ -13,6 +13,19 @@ const REFRESH_MS = 30_000;
 
 const regionName = (region: BrainRegion) => `${BRAIN_REGIONS[region]} · ${region}`;
 
+/** Every region Vercel runs sandboxes in, by city: where the brain is set up, and where new sandboxes run. */
+export function RegionSelect({ label, value, disabled, onChange }: { label?: string; value: BrainRegion; disabled: boolean; onChange: (region: BrainRegion) => void }) {
+  return (
+    <Select aria-label={label} value={value} disabled={disabled} onChange={(e) => onChange(e.target.value as BrainRegion)}>
+      {(Object.keys(BRAIN_REGIONS) as BrainRegion[]).map((option) => (
+        <option key={option} value={option}>
+          {regionName(option)}
+        </option>
+      ))}
+    </Select>
+  );
+}
+
 const stepLabels: Record<CloudBrainStep, string> = {
   machine: "Make its machine and install it",
   start: "Start it",
@@ -41,13 +54,7 @@ function NotSetUp({ available }: { available: boolean }) {
   return (
     <>
       <SettingRow label="Region" hint="Fixed once it is set up.">
-        <Select aria-label="Region" value={region} disabled={!available || create.isPending} onChange={(e) => setRegion(e.target.value as BrainRegion)}>
-          {(Object.keys(BRAIN_REGIONS) as BrainRegion[]).map((option) => (
-            <option key={option} value={option}>
-              {regionName(option)}
-            </option>
-          ))}
-        </Select>
+        <RegionSelect label="Region" value={region} disabled={!available || create.isPending} onChange={setRegion} />
         {available ? setUp : <Tooltip label="The cloud brain isn't available in this build.">{setUp}</Tooltip>}
       </SettingRow>
       <Failure error={create.error} />

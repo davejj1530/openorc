@@ -62,8 +62,13 @@ export function machineProbe(): MachineProbe {
   };
 }
 
-/** Same network first, then the tailnet, all on the listening port. */
-export async function currentRoutes(machine: MachineProbe, port: number): Promise<Route[]> {
+/**
+ * Where phones can reach this host now. A host behind a TLS proxy at a public address is reached only there, on the
+ * proxy's 443. Without one, as on every Mac, the same network first, then the tailnet, all on the listening port: so no
+ * Mac hands a phone in the field a kind it cannot read.
+ */
+export async function currentRoutes(machine: MachineProbe, port: number, publicAddress?: string): Promise<Route[]> {
+  if (publicAddress) return [{ kind: "public", host: publicAddress, port: 443 }];
   const lan = machine.lanHosts().map((host): Route => ({ kind: "lan", host, port }));
   const tailnet = (await machine.tailnetHosts()).map((host): Route => ({ kind: "tailnet", host, port }));
   return [...lan, ...tailnet];

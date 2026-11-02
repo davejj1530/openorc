@@ -1,7 +1,7 @@
 import os from "node:os";
 import path from "node:path";
 import { orchestration, projects, remoteDevices, remotePushTargets, settings, threads, type Db, type LedgerWriter, type RemoteDeviceRecord } from "@openorc/db";
-import { acceptLink, encodePairingUrl, fromBase64Url, LinkCloseCode, toBase64Url, type Admission, type ClosingReason, type KeyPair, type LinkSocket, type PhoneHello } from "@openorc/link";
+import { acceptLink, encodePairingUrl, fromBase64Url, LinkCloseCode, linkPath, toBase64Url, type Admission, type ClosingReason, type KeyPair, type LinkSocket, type PhoneHello } from "@openorc/link";
 import { nodeCrypto } from "@openorc/link/node";
 import {
   PUSH_SENDER_TAG,
@@ -44,6 +44,12 @@ const SENDER_CHANGED = ["remote", PUSH_SENDER_TAG];
 export interface RemoteNetwork {
   port: number;
   machine: MachineProbe;
+  /**
+   * The name a TLS proxy answers for this host on 443, such as a cloud sandbox's address. A host with one is reached only
+   * there: phones hear one public route, and the listener sits behind the proxy on exactly `port`, the one the proxy
+   * forwards to, which is neither read from nor saved to the database. A Mac has none.
+   */
+  publicAddress?: string;
   apns?: Record<PushEnvironment, string>;
 }
 
@@ -255,15 +261,24 @@ export class RemoteAccess {
   private async start(): Promise<void> {
     try {
       const keys = await this.loadKeys();
-      const setting = readSetting(this.options.db);
-      const listener = await listen({ port: setting.port ?? this.network.port, handshake: (socket) => this.handshake(socket) });
-      if (listener.port !== setting.port) settings.set(this.options.db, SETTING, JSON.stringify({ ...setting, port: listener.port }));
+      const listener = await this.openListener(keys);
       this.state = { state: "on", listener, keys };
       await this.routes();
     } catch (error) {
       this.state = { state: "failed", reason: error instanceof Error ? error.message : String(error) };
     }
     this.options.invalidate(["remote"]);
+  }
+
+  /** A Mac listens on the port it saved, or on one it then saves; a host behind a proxy on exactly the one it forwards to. */
+  private async openListener(keys: KeyPair): Promise<Listener> {
+    const handshake = (socket: LinkSocket) => this.handshake(socket);
+    const { port, publicAddress } = this.network;
+    if (publicAddress) return listen({ port, exposure: { kind: "proxied", path: linkPath("public", keys.publicKey, nodeCrypto) }, handshake });
+    const setting = readSetting(this.options.db);
+    const listener = await listen({ port: setting.port ?? port, handshake });
+    if (listener.port !== setting.port) settings.set(this.options.db, SETTING, JSON.stringify({ ...setting, port: listener.port }));
+    return listener;
   }
 
   private async stop(reason: ClosingReason): Promise<void> {
@@ -320,7 +335,7 @@ export class RemoteAccess {
 
   private async routes(): Promise<Route[]> {
     if (this.state.state !== "on") return [];
-    this.knownRoutes = await currentRoutes(this.network.machine, this.state.listener.port);
+    this.knownRoutes = await currentRoutes(this.network.machine, this.state.listener.port, this.network.publicAddress);
     return this.knownRoutes;
   }
 

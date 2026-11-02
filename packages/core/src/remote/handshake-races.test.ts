@@ -5,11 +5,10 @@ import os from "node:os";
 import path from "node:path";
 import { expect, it } from "vitest";
 import { WebSocket } from "ws";
-import { connectLink, decodePairingUrl, toBase64Url, type LinkSocket } from "@openorc/link";
+import { connectLink, decodePairingUrl, LINK_PATH, toBase64Url, type LinkSocket } from "@openorc/link";
 import { nodeCrypto } from "@openorc/link/node";
 import { OpenOrc } from "../openorc.js";
 import type { MachineProbe } from "./routes.js";
-import { LINK_PATH } from "./listener.js";
 import { RemoteTestClient } from "./test-client.js";
 import { linkSocket } from "./ws-socket.js";
 

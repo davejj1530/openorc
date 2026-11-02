@@ -1,6 +1,22 @@
 import { z } from "zod";
 import { ClaudeAccountId } from "./claude-accounts.js";
 
+/** What a cloud thread's sandbox is doing before its first turn can start. */
+export const CloudStep = z.enum(["sandbox", "code", "setup"]);
+export type CloudStep = z.infer<typeof CloudStep>;
+
+/** Where a cloud thread's sandbox stands. */
+export const CloudThreadState = z.object({
+  provider: z.enum(["local", "vercel"]),
+  state: z.enum(["preparing", "ready", "failed"]),
+  /** The step running now while preparing. */
+  step: CloudStep.nullable(),
+  /** Whether preparing includes the project's setup script. */
+  setup: z.boolean(),
+  error: z.string().nullable(),
+});
+export type CloudThreadState = z.infer<typeof CloudThreadState>;
+
 /** A Vercel team cloud threads can run on. */
 export interface CloudTeam {
   id: string;

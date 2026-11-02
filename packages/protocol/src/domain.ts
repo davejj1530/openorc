@@ -1,3 +1,4 @@
+import { CloudThreadState } from "./cloud.js";
 import { z } from "zod";
 import { AgentKind, BackgroundCommand, Usage } from "./events.js";
 import { HarnessId } from "./harness.js";
@@ -188,6 +189,8 @@ export const ThreadSummary = Thread.extend({
   /** Context use on the latest turn, when the agent reported it. */
   context: z.object({ used: z.number().int(), window: z.number().int().nullable() }).nullable(),
   queued: z.array(QueuedMessage),
+  /** Where a cloud thread's sandbox stands; absent for threads that run on this Mac. */
+  cloud: CloudThreadState.nullable().optional(),
   /**
    * When the agent on this thread's active run last produced an event, epoch ms.
    * Null when no run is live, because a thread that is not running cannot stall.

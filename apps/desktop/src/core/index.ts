@@ -3,7 +3,7 @@ import { BrowserClient } from "./browser-client";
 import { PreviewClient } from "./preview-client";
 import { PresenceClient } from "./presence";
 import { windowPorts } from "./reply";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { Worker } from "node:worker_threads";
 import type { MessagePortMain } from "electron";
 import { OpenOrc, WorkerEmbedder, WorkerFormatter, type Broadcast, type EnvSnapshot, type RequestOrigin, type RpcReply, type Transport } from "@openorc/core";
@@ -39,6 +39,12 @@ const secrets = new ProtectedSecretsClient((message) => process.parentPort.postM
 const browser = new BrowserClient((message) => process.parentPort.postMessage(message));
 const preview = new PreviewClient((message) => process.parentPort.postMessage(message));
 const presence = new PresenceClient((message) => process.parentPort.postMessage(message));
+// The runner a cloud workspace runs is uploaded as source, so the bundle carries its files as text.
+const cloudRunner = import.meta.glob<string>(["../../../../packages/cloud/src/runner/*.ts", "!../../../../packages/cloud/src/runner/*.test.ts"], {
+  query: "?raw",
+  import: "default",
+  eager: true,
+});
 const corePromise = OpenOrc.create({
   browser: browser.execute,
   preview: preview.host,
@@ -56,6 +62,7 @@ const corePromise = OpenOrc.create({
   // Prettier formats in its own thread too, so a large file never stalls the core.
   formatter: new WorkerFormatter(() => new Worker(join(import.meta.dirname, "formatter-worker.mjs"))),
   benchmarks: __OPENORC_QA__,
+  cloudRunnerFiles: Object.entries(cloudRunner).map(([file, content]) => ({ name: basename(file), content: Buffer.from(content) })),
 });
 
 // Main hosts the Terminal panels and wants the login PATH the core adopted.

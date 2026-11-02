@@ -27,6 +27,9 @@ export type NewThreadTarget =
   | { kind: "orcling"; orclingId: string; name: string; settings: ModelExecutionSettings }
   | { kind: "unavailable"; label: string; reason: string };
 
+/** Where a new thread works: the checkout, a worktree, or a cloud sandbox mirrored by a worktree. */
+export type NewThreadPlace = WorkspaceMode | "cloud";
+
 export interface NewThreadDraft {
   claudeAccountId?: string;
   projectId: string;
@@ -34,7 +37,7 @@ export interface NewThreadDraft {
   prompt: string;
   target: NewThreadTarget;
   mode: RunMode;
-  workspace: WorkspaceMode | null;
+  workspace: NewThreadPlace | null;
   launchRequest: { key: string; fingerprint: string } | null;
 }
 
@@ -54,10 +57,13 @@ export function decodeNewThreadDraft(projectId: string, value: unknown, legacyPr
     prompt: typeof raw.prompt === "string" ? raw.prompt : legacyPrompt,
     target: object(raw.target) ? decodeTarget(projectId, raw.projectId, raw.target) : { kind: "model", choice: null },
     mode: raw.mode === "plan" ? "plan" : "act",
-    workspace: raw.workspace === "current" || raw.workspace === "worktree" ? raw.workspace : null,
+    workspace: decodePlace(raw.workspace),
     launchRequest,
   };
 }
+
+const places: readonly NewThreadPlace[] = ["current", "worktree", "cloud"];
+const decodePlace = (value: unknown): NewThreadPlace | null => places.find((place) => place === value) ?? null;
 
 /** A saved target that no longer reads as one keeps the message and asks for the choice again. */
 function decodeTarget(projectId: string, savedProjectId: unknown, raw: Record<string, unknown>): NewThreadTarget {
@@ -113,23 +119,29 @@ export function newThreadChoice(models: ModelOption[], input: { preferred: Harne
   return defaultChoice(models, signedIn ?? null);
 }
 
-/** Where a new thread works. Workspace, and a project that can't branch yet, always use the folder itself. */
-export function newThreadWorkspaceMode(input: { canBranch: boolean; chosen: WorkspaceMode | null; preferred: WorkspaceMode | undefined }): WorkspaceMode {
+/**
+ * Where a new thread works. Workspace, and a project that can't branch yet, always use the folder itself. A cloud
+ * choice the thread can't take, because of its target or this app, works in a worktree instead.
+ */
+export function newThreadWorkspaceMode(input: { canBranch: boolean; canCloud?: boolean; chosen: NewThreadPlace | null; preferred: WorkspaceMode | undefined }): NewThreadPlace {
   if (!input.canBranch) return "current";
+  if (input.chosen === "cloud" && !input.canCloud) return "worktree";
   return input.chosen ?? input.preferred ?? "current";
 }
 
 /** Every execution target uses the workspace selected in the composer. Images sent without words still need a prompt. */
 export function newThreadStartInput(
   draft: NewThreadDraft,
-  input: Pick<RpcParams<"threads.start">, "permissionMode" | "prompt" | "attachments"> & { workspaceMode: WorkspaceMode },
+  input: Pick<RpcParams<"threads.start">, "permissionMode" | "prompt" | "attachments"> & { workspaceMode: NewThreadPlace },
 ): RpcParams<"threads.start"> {
   const choice = targetModel(draft.target);
   if (!choice || draft.target.kind === "unavailable") throw new Error("Choose an execution target first.");
+  const { workspaceMode: place, ...rest } = input;
   return {
     projectId: draft.projectId,
     mode: draft.mode,
-    ...input,
+    ...rest,
+    ...(place === "cloud" ? { workspaceMode: "worktree", cloud: true } : { workspaceMode: place }),
     prompt: input.prompt || "See the attached image.",
     ...startTarget(draft.target, choice),
     ...(draft.claudeAccountId ? { claudeAccountId: draft.claudeAccountId } : {}),

@@ -449,3 +449,28 @@ describe("new thread drafts", () => {
     expect(targetModel(draft.target)).toBeNull();
   });
 });
+
+describe("a new thread in the cloud", () => {
+  const draft = decodeNewThreadDraft("p-repo", {
+    projectId: "p-repo",
+    prompt: "Work up there",
+    target: { kind: "model", choice: { agent: "claude", model: "sonnet", effort: "low" } },
+    workspace: "cloud",
+  });
+
+  it("keeps the cloud choice in a saved draft", () => {
+    expect(draft.workspace).toBe("cloud");
+  });
+
+  it("starts on a worktree marked for the cloud", () => {
+    const place = newThreadWorkspaceMode({ canBranch: true, canCloud: true, chosen: draft.workspace, preferred: "current" });
+    expect(newThreadStartInput(draft, { workspaceMode: place, permissionMode: "trusted", prompt: "Work up there" })).toMatchObject({ workspaceMode: "worktree", cloud: true });
+  });
+
+  it("works in a worktree when the cloud can't take the thread, and in the folder when nothing can branch", () => {
+    const place = newThreadWorkspaceMode({ canBranch: true, canCloud: false, chosen: "cloud", preferred: "current" });
+    expect(place).toBe("worktree");
+    expect(newThreadStartInput(draft, { workspaceMode: place, permissionMode: "trusted", prompt: "Work here" })).not.toHaveProperty("cloud");
+    expect(newThreadWorkspaceMode({ canBranch: false, canCloud: true, chosen: "cloud", preferred: "current" })).toBe("current");
+  });
+});

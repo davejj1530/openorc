@@ -1,4 +1,4 @@
-import { ExecutableAgent, WORKSPACE_ID } from "@openorc/protocol";
+import { ExecutableAgent, WORKSPACE_ID, type RpcParams } from "@openorc/protocol";
 import { ImportService } from "../services/imports.js";
 import { TeamConversationService } from "../services/team-conversation.js";
 import { ThreadService } from "../services/threads.js";
@@ -10,6 +10,11 @@ type Dependencies = {
   orclings: Pick<OrclingService, "startThread" | "threadPatch">;
   imports: Pick<ImportService, "import">;
 };
+
+/** A cloud conversation runs one model; teams and Orclings start on this Mac. */
+function assertCloudTarget(cloud: boolean | undefined, target: RpcParams<"threads.start">["executionTarget"]): void {
+  if (cloud && target && target.kind !== "model") throw new Error("Cloud conversations run one model.");
+}
 
 export function createThreadLaunchHandlers({
   threadService,
@@ -33,12 +38,14 @@ export function createThreadLaunchHandlers({
       mode,
       permissionMode,
       workspaceMode,
+      cloud,
       baseRef,
       prompt,
       attachments,
       title,
     }) => {
       if (projectId === WORKSPACE_ID && executionTarget?.kind === "team") throw new Error("Saved teams belong to projects. Select a model for Workspace.");
+      assertCloudTarget(cloud, executionTarget);
       if (executionTarget?.kind === "team")
         return teamConversations.start({ projectId, claudeAccountId, requestKey, executionTarget, mode, permissionMode, workspaceMode, baseRef, prompt, attachments, title });
       if (executionTarget?.kind === "orcling") {
@@ -67,6 +74,7 @@ export function createThreadLaunchHandlers({
         mode,
         permissionMode,
         ...(workspaceMode ? { workspaceMode } : {}),
+        cloud,
         ...(baseRef ? { baseRef } : {}),
         prompt,
         attachments,

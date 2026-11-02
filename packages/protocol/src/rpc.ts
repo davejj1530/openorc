@@ -216,6 +216,7 @@ export const rpcParams = {
       mode: RunMode,
       permissionMode: PermissionPreset,
       workspaceMode: WorkspaceMode.optional(),
+      cloud: z.boolean().optional(),
       baseRef: z.string().optional(),
       prompt: z.string().min(1),
       attachments: z.array(z.string()).optional(),

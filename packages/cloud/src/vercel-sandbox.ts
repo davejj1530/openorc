@@ -1,10 +1,8 @@
 import { PassThrough, Writable } from "node:stream";
-import { Sandbox as SdkSandbox } from "@vercel/sandbox";
-import type { Sandbox, SandboxCommandOptions, SandboxExecResult, SandboxProvider, SandboxStream } from "./sandbox.js";
+import { APIError, Sandbox as SdkSandbox } from "@vercel/sandbox";
+import { SANDBOX_AWAY_MS, type Sandbox, type SandboxCommandOptions, type SandboxExecResult, type SandboxProvider, type SandboxStream } from "./sandbox.js";
 
 const ROOT = "/vercel/sandbox";
-/** The longest session the Hobby plan allows. A persistent sandbox resumes into a new session after it. */
-const SESSION_MS = 45 * 60_000;
 /** After the command exits, how long its remaining output gets to arrive before the stream ends anyway. */
 const LOG_DRAIN_MS = 2000;
 
@@ -28,6 +26,10 @@ export interface VercelVm {
   runCommand(params: { cmd: string; args: string[]; cwd: string; env?: Record<string, string>; sudo?: boolean; detached: true; stdin?: boolean }): Promise<VercelCommand>;
   writeFiles(files: { path: string; content: Uint8Array }[]): Promise<void>;
   readFileToBuffer(file: { path: string }): Promise<Buffer | null>;
+  /** When the running session times out; undefined while none runs. */
+  readonly expiresAt: Date | undefined;
+  /** Moves the running session's timeout later by `duration`, up to the plan's longest session. */
+  extendTimeout(duration: number): Promise<void>;
   stop(): Promise<unknown>;
 }
 
@@ -52,8 +54,14 @@ const sdk: VercelApi = {
     return vm;
   },
   remove: async ({ name, token, teamId, projectId }) => {
-    const sandbox = await SdkSandbox.get({ name, token, teamId, projectId });
-    await sandbox.delete({ deleteOrphanSnapshots: true });
+    try {
+      const sandbox = await SdkSandbox.get({ name, token, teamId, projectId });
+      await sandbox.delete({ deleteOrphanSnapshots: true });
+    } catch (error) {
+      // Already gone, or never made: either way there is nothing left to delete.
+      if (error instanceof APIError && error.response.status === 404) return;
+      throw error;
+    }
   },
 };
 
@@ -81,6 +89,8 @@ export async function ensureClaude(vm: VercelVm): Promise<void> {
 /** A VM on Vercel. Its files persist between sessions; its processes do not. */
 export class VercelSandbox implements Sandbox {
   readonly root = ROOT;
+  /** The session timeout each sandbox is made with. */
+  readonly awayMs = SANDBOX_AWAY_MS;
 
   constructor(
     readonly name: string,
@@ -123,6 +133,13 @@ export class VercelSandbox implements Sandbox {
     return this.vm.readFileToBuffer({ path: file });
   }
 
+  async keepAwake(): Promise<void> {
+    const expires = this.vm.expiresAt?.getTime();
+    const wanted = Date.now() + this.awayMs;
+    if (expires !== undefined && expires >= wanted) return;
+    await this.vm.extendTimeout(expires === undefined ? this.awayMs : wanted - expires);
+  }
+
   async stop(): Promise<void> {
     await this.vm.stop();
   }
@@ -157,7 +174,8 @@ export class VercelSandboxProvider implements SandboxProvider {
     const vm = await this.api.getOrCreate({
       name,
       persistent: true,
-      timeout: SESSION_MS,
+      // OpenOrc keeps the session awake while an agent works and stops it once none does; this is for when the Mac is away.
+      timeout: SANDBOX_AWAY_MS,
       token: access.token,
       teamId: access.teamId,
       projectId: access.projectId,

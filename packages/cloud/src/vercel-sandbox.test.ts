@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { SANDBOX_AWAY_MS } from "./sandbox.js";
 import { VercelSandbox, VercelSandboxProvider, type VercelApi, type VercelCommand, type VercelVm } from "./vercel-sandbox.js";
 
 type Line = { stream: "stdout" | "stderr"; data: string };
@@ -62,10 +63,19 @@ class FakeCommand implements VercelCommand {
 type Run = Parameters<VercelVm["runCommand"]>[0];
 
 /** A VM whose commands answer through `answer`, which records each one. */
-function fakeVm(answer: (run: Run) => FakeCommand, files: Record<string, Buffer> = {}): VercelVm & { runs: Run[] } {
+type FakeVm = Omit<VercelVm, "expiresAt"> & { expiresAt: Date | undefined; runs: Run[]; extended: number[] };
+
+function fakeVm(answer: (run: Run) => FakeCommand, files: Record<string, Buffer> = {}): FakeVm {
   const runs: Run[] = [];
+  const extended: number[] = [];
   return {
     runs,
+    extended,
+    expiresAt: undefined,
+    async extendTimeout(duration) {
+      extended.push(duration);
+      this.expiresAt = new Date((this.expiresAt?.getTime() ?? Date.now()) + duration);
+    },
     runCommand: async (params) => {
       runs.push(params);
       return answer(params);
@@ -128,6 +138,20 @@ describe("a sandbox on Vercel", () => {
     expect(result).toEqual({ code: 3, stdout: Buffer.from("partial"), stderr: "it broke" });
   });
 
+  it("moves the session's timeout to its away window from now, only when it would end sooner", async () => {
+    const vm = fakeVm(() => finished(0));
+    const sandbox = new VercelSandbox("s", vm);
+    vm.expiresAt = new Date(Date.now() + SANDBOX_AWAY_MS + 60_000);
+    await sandbox.keepAwake();
+    expect(vm.extended).toEqual([]);
+    vm.expiresAt = new Date(Date.now() + 60_000);
+    await sandbox.keepAwake();
+    expect(vm.extended).toHaveLength(1);
+    expect(vm.extended[0]).toBeGreaterThan(SANDBOX_AWAY_MS - 60_000 - 1000);
+    expect(vm.extended[0]).toBeLessThanOrEqual(SANDBOX_AWAY_MS - 60_000);
+    expect(vm.expiresAt!.getTime()).toBeGreaterThanOrEqual(Date.now() + SANDBOX_AWAY_MS - 1000);
+  });
+
   it("reads a file it wrote, and null for one that is missing", async () => {
     const sandbox = new VercelSandbox(
       "s",
@@ -171,7 +195,7 @@ describe("the Vercel sandbox provider", () => {
     expect(present.calls[0]).toMatchObject({
       name: "openorc-a",
       persistent: true,
-      timeout: 45 * 60_000,
+      timeout: SANDBOX_AWAY_MS,
       token: "tok",
       teamId: "team",
       projectId: "proj",

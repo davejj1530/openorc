@@ -1,5 +1,11 @@
 import type { Readable, Writable } from "node:stream";
 
+/**
+ * How long a VM keeps going on its own once nothing keeps it awake: while the Mac sleeps, is offline or OpenOrc has
+ * quit, an agent's turn carries on this long. Then the VM stops, and its files stay for the next session.
+ */
+export const SANDBOX_AWAY_MS = 30 * 60_000;
+
 export interface SandboxCommandOptions {
   cwd?: string;
   env?: Record<string, string>;
@@ -28,6 +34,8 @@ export interface Sandbox {
   readonly name: string;
   /** Where the workspace's files live in the VM, such as /vercel/sandbox. */
   readonly root: string;
+  /** How long the VM runs on its own once nothing keeps it awake. The next command starts a new session. */
+  readonly awayMs: number;
   /** Runs a command to completion. A non-zero exit is a result, not an error. */
   exec(cmd: string, args: string[], options?: SandboxCommandOptions): Promise<SandboxExecResult>;
   /** Starts a command that outlives this call and runs until it exits or the VM stops. */
@@ -37,6 +45,8 @@ export interface Sandbox {
   writeFile(file: string, content: Buffer): Promise<void>;
   /** Null when the file does not exist. */
   readFile(file: string): Promise<Buffer | null>;
+  /** Moves the VM's own stop to `awayMs` from now, unless it is later already. */
+  keepAwake(): Promise<void>;
   /** Ends every process. The files stay for the next `open`. */
   stop(): Promise<void>;
 }
@@ -45,6 +55,8 @@ export interface SandboxProvider {
   readonly id: "local" | "vercel";
   /** Creates the named sandbox, or wakes it when it exists. */
   open(name: string): Promise<Sandbox>;
+  /** Deletes the named sandbox and its files for good. */
+  remove(name: string): Promise<void>;
   /** Called as OpenOrc closes. A cloud VM keeps running and sleeps on its own; a sandbox on this Mac stops here. */
   close?(): Promise<void>;
 }

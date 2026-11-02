@@ -254,6 +254,10 @@ class FakeVercel implements BrainApi {
     return { id: "prj_brain" };
   }
 
+  async findProject(_token: string, _teamId: string, name: string) {
+    return this.projects.includes(name) ? { id: "prj_brain" } : null;
+  }
+
   async open(params: BrainOpenParams) {
     this.opened.push(params);
     const { ports, timeout, snapshotExpiration, keepLastSnapshots } = params;
@@ -560,6 +564,16 @@ describe("asking and removing a brain", () => {
     const vercel = new FakeVercel();
     expect(await (await connect(vercel)).status()).toEqual({ state: "missing", address: null, expiresAt: null });
     expect(vercel.sandboxes.size).toBe(0);
+  });
+
+  it("finds no brain in a team without its project, and makes none", async () => {
+    const vercel = new FakeVercel();
+    const find = () => BrainMachine.find({ token: TOKEN, teamId: "team_1" }, { api: vercel });
+    expect(await find()).toBeNull();
+    expect(vercel.projects).toEqual([]);
+    await connect(vercel);
+    expect(await (await find())!.status()).toEqual({ state: "missing", address: null, expiresAt: null });
+    expect(vercel.projects).toEqual(["openorc-brain"]);
   });
 
   it("deletes every sandbox in the brain's project, the brain first, with their orphan snapshots", async () => {

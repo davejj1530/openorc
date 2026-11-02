@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ensureVercelProject, type VercelRequest } from "./vercel-projects.js";
+import { ensureVercelProject, findVercelProject, type VercelRequest } from "./vercel-projects.js";
 
 const TOKEN = "vcp_secret_token_value";
 
@@ -40,5 +40,11 @@ describe("finding or making a Vercel project", () => {
     const error = await ensureVercelProject(TOKEN, "team_1", "openorc-brain", unmade.request).catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(Error);
     expect((error as Error).message).toBe("Could not make the openorc-brain project: Vercel answered 400.");
+  });
+
+  it("only looks when asked to find one: null for a team without it", async () => {
+    const { calls, request } = vercel(json({ error: { message: "Project not found." } }, 404));
+    expect(await findVercelProject(TOKEN, "team_1", "openorc-brain", request)).toBeNull();
+    expect(calls.map((call) => call.init.method)).toEqual(["GET"]);
   });
 });

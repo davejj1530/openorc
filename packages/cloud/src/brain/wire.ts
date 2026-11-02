@@ -156,17 +156,36 @@ export function parseLaunch(line: string): BrainStart {
   return { key, name, address, port, vercel };
 }
 
+/** A Claude account as the Mac has it, with the cloud token it signs in with. */
+export interface HandoverClaudeAccount {
+  id: string;
+  name: string;
+  /** The Mac's default account. */
+  default: boolean;
+  token: string;
+}
+
 /** Sign-ins the brain cannot make itself, by kind. They cross the wire only sealed under the brain key. */
 export interface HandoverValues {
-  claude: { token: string };
+  /** Every Claude account that has a cloud token on the Mac, so an account missing here loses its sign-in on the brain. */
+  claude: { accounts: HandoverClaudeAccount[] };
   codex: { auth: string };
   push: { keyId: string; pem: string };
 }
 export type HandoverKind = keyof HandoverValues;
 export type BrainHandover = Partial<HandoverValues>;
 
+const claudeAccounts: Parse<HandoverValues["claude"]> = (value, field) => {
+  const account = object({ id: text(100), name: text(80), default: literal(true, false), token: text(4096) });
+  const parsed = object({ accounts: list(account, 64) })(value, field);
+  const ids = new Set(parsed.accounts.map((entry) => entry.id));
+  if (ids.size !== parsed.accounts.length) bad(join(field, "accounts"), "two accounts share an id");
+  if (parsed.accounts.filter((entry) => entry.default).length > 1) bad(join(field, "accounts"), "more than one account is the default");
+  return parsed;
+};
+
 const HANDOVER: { [K in HandoverKind]: Parse<HandoverValues[K]> } = {
-  claude: object({ token: text(4096) }),
+  claude: claudeAccounts,
   codex: object({ auth: text(65_536) }),
   push: object({ keyId: text(64), pem: text(8192) }),
 };

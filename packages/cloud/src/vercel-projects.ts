@@ -19,14 +19,23 @@ async function project(response: Response): Promise<VercelProject> {
   throw new Error("Vercel answered without a project.");
 }
 
-/** The team's project with this name, made when missing. Errors carry Vercel's refusal, never the token. */
-export async function ensureVercelProject(token: string, teamId: string, name: string, request: VercelRequest = (url, init) => fetch(url, init)): Promise<VercelProject> {
-  const query = `?teamId=${encodeURIComponent(teamId)}`;
-  const headers = { authorization: `Bearer ${token}` };
-  const found = await request(`${API}/v9/projects/${encodeURIComponent(name)}${query}`, { method: "GET", headers });
+/** The team's project with this name, or null when it has none. Never makes one. */
+export async function findVercelProject(token: string, teamId: string, name: string, request: VercelRequest = (url, init) => fetch(url, init)): Promise<VercelProject | null> {
+  const found = await request(`${API}/v9/projects/${encodeURIComponent(name)}?teamId=${encodeURIComponent(teamId)}`, { method: "GET", headers: { authorization: `Bearer ${token}` } });
   if (found.ok) return project(found);
   if (found.status !== 404) throw new Error(await refusal(found));
-  const made = await request(`${API}/v11/projects${query}`, { method: "POST", headers: { ...headers, "content-type": "application/json" }, body: JSON.stringify({ name }) });
+  return null;
+}
+
+/** The team's project with this name, made when missing. Errors carry Vercel's refusal, never the token. */
+export async function ensureVercelProject(token: string, teamId: string, name: string, request: VercelRequest = (url, init) => fetch(url, init)): Promise<VercelProject> {
+  const found = await findVercelProject(token, teamId, name, request);
+  if (found) return found;
+  const made = await request(`${API}/v11/projects?teamId=${encodeURIComponent(teamId)}`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
   if (!made.ok) throw new Error(`Could not make the ${name} project: ${await refusal(made)}`);
   return project(made);
 }

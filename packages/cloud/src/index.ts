@@ -41,6 +41,7 @@ export {
   type BrainStatus,
   type HandoverKind,
   type HandoverRequest,
+  type HandoverClaudeAccount,
   type HandoverValues,
 } from "./brain/wire.js";
 export { SealedUnreadable, brainKeyCheck, keyCheckMatches, openSecret, sealSecret } from "./brain/sealed-file.js";

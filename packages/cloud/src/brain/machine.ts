@@ -3,7 +3,7 @@ import path from "node:path";
 import { APIError, Sandbox as SdkSandbox } from "@vercel/sandbox";
 import type { SandboxInfo } from "../sandbox.js";
 import { STATES, type VercelCredentials } from "../vercel-sandbox.js";
-import { ensureVercelProject } from "../vercel-projects.js";
+import { ensureVercelProject, findVercelProject } from "../vercel-projects.js";
 import { BRAIN_AWAY_MS, BRAIN_EXIT, BRAIN_PORT, BRAIN_PROJECT, BRAIN_READY, BRAIN_SANDBOX, brainLayout, type BrainLayout } from "./layout.js";
 import { alreadyStopping } from "./self.js";
 import { brainKeyText, encodeLaunch, parseControlReply, type BrainControlRequest, type BrainControlResult, type BrainKey } from "./wire.js";
@@ -95,6 +95,8 @@ export interface BrainOpenParams extends VercelCredentials {
 /** How a brain machine reaches Vercel. Tests pass a stand-in; everyone else the SDK. */
 export interface BrainApi {
   project(token: string, teamId: string, name: string): Promise<{ id: string }>;
+  /** The project without making it; null when the team has none. */
+  findProject(token: string, teamId: string, name: string): Promise<{ id: string } | null>;
   /** Makes the sandbox when it is missing; either way it runs when this returns. */
   open(params: BrainOpenParams): Promise<BrainVm>;
   /**
@@ -137,6 +139,7 @@ function brainVm(sandbox: SdkSandbox, resumes: boolean): BrainVm {
 
 const sdk: BrainApi = {
   project: ensureVercelProject,
+  findProject: findVercelProject,
   open: async (params) => brainVm(await SdkSandbox.getOrCreate({ ...params, resume: true }), true),
   get: async ({ name, resume, token, teamId, projectId }) => {
     try {
@@ -352,7 +355,17 @@ export class BrainMachine {
   /** Finds or makes the brain's project. Wakes nothing. */
   static async connect(access: BrainAccess, options: BrainMachineOptions = {}): Promise<BrainMachine> {
     const api = options.api ?? sdk;
-    const project = await api.project(access.token, access.teamId, BRAIN_PROJECT);
+    return BrainMachine.at(access, await api.project(access.token, access.teamId, BRAIN_PROJECT), api, options);
+  }
+
+  /** As connect, but never makes the project: null when the team has none, and so no brain. */
+  static async find(access: BrainAccess, options: BrainMachineOptions = {}): Promise<BrainMachine | null> {
+    const api = options.api ?? sdk;
+    const project = await api.findProject(access.token, access.teamId, BRAIN_PROJECT);
+    return project && BrainMachine.at(access, project, api, options);
+  }
+
+  private static at(access: BrainAccess, project: { id: string }, api: BrainApi, options: BrainMachineOptions): BrainMachine {
     const credentials = { token: access.token, teamId: access.teamId, projectId: project.id };
     return new BrainMachine(credentials, access.sandbox ?? BRAIN_SANDBOX, api, { startMs: options.startMs ?? START_MS, pollMs: options.pollMs ?? POLL_MS });
   }

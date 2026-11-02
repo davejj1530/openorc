@@ -130,10 +130,13 @@ describe("control requests and replies", () => {
   });
 });
 
+const work = { id: "4c1f0a52-7a0e-4b44-9d7e-1f0c2a6b8e11", name: "Work", default: false, token: "sk-ant-oat01-work-abcdefghijklmnopqrstuvwxyz" };
+const personal = { id: "claude-cli", name: "Personal", default: true, token: "sk-ant-oat01-personal-abcdefghijklmnopqrstuvwxyz" };
+
 describe("handovers", () => {
   it("carry each sign-in sealed under the brain key, never in the clear", () => {
     const key = newBrainKey();
-    const handover = { claude: { token: "sk-ant-oat01-abcdefghijklmnopqrstuvwxyz" }, push: { keyId: "ABC123DEFG", pem: "-----BEGIN PRIVATE KEY-----\nMIG\n-----END PRIVATE KEY-----" } };
+    const handover = { claude: { accounts: [personal, work] }, push: { keyId: "ABC123DEFG", pem: "-----BEGIN PRIVATE KEY-----\nMIG\n-----END PRIVATE KEY-----" } };
     const line = JSON.stringify(sealHandover(key, handover));
     expect(line).not.toContain("sk-ant-oat01");
     expect(line).not.toContain("PRIVATE KEY");
@@ -146,7 +149,24 @@ describe("handovers", () => {
 
   it("will not open one kind's sealed value as another's", () => {
     const key = newBrainKey();
-    const sealed = sealHandover(key, { claude: { token: "sk-ant-oat01-abcdefghijklmnopqrstuvwxyz" } }).sealed.claude!;
+    const sealed = sealHandover(key, { claude: { accounts: [personal] } }).sealed.claude!;
     expect(() => openHandover(key, { op: "handover", sealed: { codex: sealed } })).toThrow(SealedUnreadable);
+  });
+
+  it("carry an empty Claude list, which signs every account out on the brain", () => {
+    const key = newBrainKey();
+    expect(openHandover(key, sealHandover(key, { claude: { accounts: [] } })).claude).toEqual({ accounts: [] });
+  });
+
+  it("refuse a Claude list with one id twice or two defaults, without repeating a token", () => {
+    const key = newBrainKey();
+    for (const accounts of [
+      [work, { ...work, name: "Work again" }],
+      [personal, { ...work, default: true }],
+    ]) {
+      const error = refusal(() => openHandover(key, sealHandover(key, { claude: { accounts } })));
+      expect(error.field).toBe("accounts");
+      expect(error.message).not.toContain("sk-ant-oat01");
+    }
   });
 });

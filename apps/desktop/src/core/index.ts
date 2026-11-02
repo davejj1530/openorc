@@ -79,6 +79,8 @@ const corePromise = OpenOrc.create({
   // Prettier formats in its own thread too, so a large file never stalls the core.
   formatter: new WorkerFormatter(() => new Worker(join(import.meta.dirname, "formatter-worker.mjs"))),
   benchmarks: __OPENORC_QA__,
+  // As the window's own menus offer them: development and QA builds, until cloud threads ship.
+  cloudOffered: __OPENORC_QA__,
   cloudRunnerFiles: Object.entries(cloudRunner).map(([file, content]) => ({ name: basename(file), content: Buffer.from(content) })),
 });
 

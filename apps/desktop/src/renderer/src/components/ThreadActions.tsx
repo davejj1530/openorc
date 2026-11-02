@@ -1,6 +1,6 @@
 import { cloudOffered } from "../lib/cloud-offered";
 import { threadForkLabel, threadMoveLabel, threadDeletionDescription, threadDeleteBlockedReason, deleteButtonLabel } from "../lib/team-action-presentation";
-import { snoozePresets } from "@openorc/client";
+import { canMoveToCloud, snoozePresets } from "@openorc/client";
 import { WORKSPACE_ID } from "@openorc/protocol";
 import { useRef, useState } from "react";
 import { Menu } from "@base-ui/react/menu";
@@ -172,7 +172,7 @@ function ThreadMenuContent({ thread, parts: M }: { thread: ThreadSummary; parts:
           {threadMoveLabel({ cancelling: pendingMove?.phase === "cancel", pending: Boolean(pendingMove), mode: thread.workspaceMode })}
         </M.Item>
       ) : null}
-      {cloudOffered && !team && !thread.cloud && (thread.agent === "claude" || thread.agent === "codex") && thread.projectId !== WORKSPACE_ID ? (
+      {cloudOffered && canMoveToCloud(thread) ? (
         <M.Item className={menuItem} disabled={busy} onClick={() => useUi.getState().setMoveThread(thread.id, "cloud")}>
           <Cloud size={13} /> Move to cloud
         </M.Item>

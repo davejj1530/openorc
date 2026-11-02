@@ -2,7 +2,7 @@ import { cloudOffered } from "../lib/cloud-offered";
 import { ClaudeAccountPicker } from "../components/ClaudeAccountPicker";
 import { ClaudeAccountScope } from "../lib/claude-account";
 import { useEffect, useRef, useState } from "react";
-import { newThreadChoice, newThreadWorkspaceMode, targetModel, type NewThreadDraft, type NewThreadTarget } from "@openorc/client";
+import { newThreadChoice, newThreadWorkspaceMode, runsInCloud, targetModel, type NewThreadDraft, type NewThreadTarget } from "@openorc/client";
 import { WORKSPACE_ID, type Project, type TeamDetail } from "@openorc/protocol";
 import { FolderGit2 } from "../components/icons";
 import { Composer } from "../components/Composer";
@@ -110,7 +110,7 @@ function NewThreadProject({
   // skills do: they belong to the project, or the Workspace folder, chosen on this screen.
   const skillCommands = useSkillCommands(projectId, choice?.agent, draft.workingDirectory, claudeAccountId);
   // Cloud runs only Claude so far, and only in development and QA builds until a real sandbox provider is set up.
-  const canCloud = cloudOffered && target.kind === "model" && (choice?.agent === "claude" || choice?.agent === "codex");
+  const canCloud = cloudOffered && target.kind === "model" && runsInCloud(choice?.agent);
   const workspaceMode = newThreadWorkspaceMode({ canBranch: !isWorkspace && !git.cannotBranch, canCloud, chosen: draft.workspace, preferred: settings.data?.defaultWorkspaceMode });
 
   useEffect(() => {

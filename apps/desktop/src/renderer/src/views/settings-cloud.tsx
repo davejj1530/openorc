@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import type { CloudStatus } from "@openorc/protocol";
+import type { ClaudeAccountConnection, ClaudeCloudAccess, CloudStatus } from "@openorc/protocol";
 import { Button, Input, Select, TextButton } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { Field, LoadError, Section, SettingRow, Status } from "./settings-shared";
@@ -91,32 +91,93 @@ function VercelSettings({ status }: { status: CloudStatus }) {
   );
 }
 
-function ClaudeTokenSettings({ status }: { status: CloudStatus }) {
+function accountDetail(account: ClaudeAccountConnection): string {
+  return [account.email, account.organization].filter(Boolean).join(" · ") || (account.kind === "cli" ? "Your Claude Code login" : "Added account");
+}
+
+/** Where the browser sign-in opens, and which login to use there, since a token cannot say whose it is. */
+function signInHint(account: ClaudeAccountConnection): string {
+  const who = account.email ? `as ${account.email}` : "with this account";
+  return account.kind === "managed" ? `Sign in ${who} in the private window that opened.` : `Sign in ${who} in your browser.`;
+}
+
+function ClaudeCloudAccount({ account, access }: { account: ClaudeAccountConnection; access: ClaudeCloudAccess | undefined }) {
+  const create = useRpcMutation("cloud.claude.create");
+  const cancel = useRpcMutation("cloud.claude.cancel");
   const save = useRpcMutation("cloud.claude.save");
   const remove = useRpcMutation("cloud.claude.remove");
+  const [pasting, setPasting] = useState(false);
+  const busy = create.isPending || cancel.isPending || save.isPending || remove.isPending;
+  const accountId = account.id;
+  const ready = access?.createdAt != null;
+  const make = () => create.mutate({ accountId });
+  let controls: ReactNode;
+  if (access?.creating)
+    controls = (
+      <>
+        <Status>Waiting for sign-in</Status>
+        <Button variant="ghost" disabled={busy} onClick={() => cancel.mutate({ accountId })}>
+          Cancel
+        </Button>
+      </>
+    );
+  else if (ready)
+    controls = (
+      <>
+        <Status ok>Ready</Status>
+        <TextButton tone="muted" disabled={busy} onClick={make}>
+          Replace
+        </TextButton>
+        <TextButton tone="muted" disabled={busy} onClick={() => remove.mutate({ accountId })}>
+          Remove
+        </TextButton>
+      </>
+    );
+  else
+    controls = (
+      <>
+        <Button disabled={busy} onClick={make}>
+          Create token
+        </Button>
+        <TextButton tone="muted" disabled={busy} onClick={() => setPasting(!pasting)}>
+          Paste token
+        </TextButton>
+      </>
+    );
   return (
-    <Section title="Claude" description="Claude signs in to each sandbox with a token from your subscription.">
-      {status.claude ? (
-        <SettingRow label="Token">
-          <Status ok>Saved</Status>
-          <Button variant="ghost" disabled={remove.isPending} onClick={() => remove.mutate({})}>
-            Remove
-          </Button>
-        </SettingRow>
-      ) : (
+    <>
+      <SettingRow label={account.name} hint={access?.creating ? signInHint(account) : accountDetail(account)}>
+        {controls}
+      </SettingRow>
+      {pasting && !ready && !access?.creating ? (
         <TokenField
           label="Token"
           hint={
             <>
-              Run <code>claude setup-token</code> in Terminal and paste what it prints.
+              From <code>claude setup-token</code>, signed in as this account.
             </>
           }
           action="Save"
-          busy={save.isPending}
-          onSave={(token) => save.mutate({ token })}
+          busy={busy}
+          onSave={(token) => save.mutate({ accountId, token }, { onSuccess: () => setPasting(false) })}
         />
-      )}
-      <Failure error={save.error ?? remove.error} />
+      ) : null}
+      <Failure error={create.error ?? cancel.error ?? save.error ?? remove.error ?? (access?.error ? new Error(access.error) : null)} />
+    </>
+  );
+}
+
+/** One row per enabled Claude account: each signs in to sandboxes with its own token, on its own subscription. */
+function ClaudeCloudAccounts({ status, active }: { status: CloudStatus; active: boolean }) {
+  const accounts = useRpc("claude.accounts.list", {}, { enabled: active });
+  return (
+    <Section title="Claude accounts" description="Each account signs in to sandboxes with a token from its own subscription.">
+      {accounts.data?.accounts
+        .filter((account) => account.enabled)
+        .map((account) => (
+          <ClaudeCloudAccount key={account.id} account={account} access={status.claude[account.id]} />
+        ))}
+      <Failure error={accounts.error} />
     </Section>
   );
 }
@@ -134,7 +195,7 @@ export function CloudSettings({ active }: { active: boolean }) {
         </p>
       ) : null}
       <VercelSettings status={status.data} />
-      <ClaudeTokenSettings status={status.data} />
+      <ClaudeCloudAccounts status={status.data} active={active} />
     </>
   );
 }

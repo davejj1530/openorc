@@ -57,6 +57,7 @@ const corePromise = OpenOrc.create({
   remoteSecrets: secrets.store("remote.secrets"),
   pushSecrets: secrets.store("push.secrets"),
   cloudSecrets: secrets.store("cloud.secrets"),
+  claudeCloudSecrets: secrets.store("claude-cloud.secrets"),
   presence: presence.inUse,
   // The embedding model runs in its own thread, so loading it and embedding memories never stall the core.
   embedder: new WorkerEmbedder(() => new Worker(join(import.meta.dirname, "embedder-worker.mjs"), { workerData: { cacheDir: dataDir } })),

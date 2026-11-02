@@ -10,8 +10,10 @@ export const PROTECTED_SECRET_FILES = {
   "remote.secrets": "remote-access-key.enc",
   /** The Apple push key phone alerts are signed with, as the user added it. */
   "push.secrets": "apns-key.enc",
-  /** The Vercel and Claude tokens cloud threads use. */
+  /** The Vercel connection cloud threads run on. */
   "cloud.secrets": "cloud-credentials.enc",
+  /** Each Claude account's token for signing in to cloud sandboxes. */
+  "claude-cloud.secrets": "claude-cloud-tokens.enc",
 } as const;
 
 export type ProtectedSecretChannel = keyof typeof PROTECTED_SECRET_FILES;

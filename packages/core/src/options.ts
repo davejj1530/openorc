@@ -1,3 +1,4 @@
+import type { SandboxProvider } from "@openorc/cloud";
 import type { TextEmbedder } from "@openorc/memory";
 import type { BrowserHost, PreviewHost } from "@openorc/protocol";
 import type { DeviceSystem } from "./devices/system.js";
@@ -49,4 +50,6 @@ export interface OpenOrcOptions {
   benchmarks?: boolean;
   /** How the Device panel's helpers run processes. Tests pass a fake, so no simulator tool or hub ever runs. */
   deviceSystem?: DeviceSystem;
+  /** Where cloud conversations run. Defaults to sandboxes simulated in folders under `dataDir` on this Mac. */
+  cloudSandboxes?: SandboxProvider;
 }

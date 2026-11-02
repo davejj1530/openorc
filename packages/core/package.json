@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@openorc/agents": "workspace:*",
+    "@openorc/cloud": "workspace:*",
     "@openorc/db": "workspace:*",
     "@openorc/git": "workspace:*",
     "@openorc/link": "workspace:*",

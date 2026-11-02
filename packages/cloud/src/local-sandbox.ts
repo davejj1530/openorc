@@ -25,11 +25,11 @@ export class LocalSandbox implements Sandbox {
   constructor(
     readonly name: string,
     readonly root: string,
-    private readonly env: NodeJS.ProcessEnv,
+    private readonly env: () => NodeJS.ProcessEnv,
   ) {}
 
   private start(cmd: string, args: string[], options: SandboxCommandOptions, stdio: StdioOptions): ChildProcess {
-    const child = spawn(cmd, args, { cwd: options.cwd ?? this.root, env: { ...this.env, ...options.env }, stdio, detached: true });
+    const child = spawn(cmd, args, { cwd: options.cwd ?? this.root, env: { ...this.env(), ...options.env }, stdio, detached: true });
     this.running.add(child);
     child.once("close", () => this.running.delete(child));
     child.once("error", () => this.running.delete(child));
@@ -98,9 +98,10 @@ export class LocalSandboxProvider implements SandboxProvider {
   readonly id = "local";
   private readonly sandboxes = new Map<string, LocalSandbox>();
 
+  /** `env` is read for every command, so a later PATH reaches the processes started after it. */
   constructor(
     private readonly base: string,
-    private readonly env: NodeJS.ProcessEnv = process.env,
+    private readonly env: () => NodeJS.ProcessEnv = () => process.env,
   ) {}
 
   async open(name: string): Promise<LocalSandbox> {

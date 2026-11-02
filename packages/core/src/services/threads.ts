@@ -217,7 +217,8 @@ export class ThreadService {
     if (input.workingDirectory && input.projectId !== WORKSPACE_ID) throw new Error("Only Workspace conversations can choose a working folder.");
     const home = executionProject(this.db, { projectId: input.projectId });
     const project = input.projectId === WORKSPACE_ID ? { ...home, rootPath: await directory(input.workingDirectory ?? home.rootPath) } : home;
-    const workspaceMode = input.checkout ? "worktree" : (input.workspaceMode ?? "current");
+    if (input.cloud && (input.checkout || project.id === WORKSPACE_ID)) throw new Error("Cloud conversations start in a project, on a worktree of their own.");
+    const workspaceMode = input.checkout || input.cloud ? "worktree" : (input.workspaceMode ?? "current");
     await this.workspaces.assertNewThreadWorkspace(project, workspaceMode, Boolean(input.checkout));
     const id = randomUUID();
     const title = input.title?.trim() || titleFromPrompt(input.prompt);
@@ -241,6 +242,7 @@ export class ThreadService {
             permissionMode: input.permissionMode,
             workspaceMode,
           });
+          if (input.cloud) this.workspaces.admitCloud(admitted.id);
           audit.record(this.db, {
             actor: "user",
             action: "thread.create",

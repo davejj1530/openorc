@@ -7,6 +7,7 @@ import { stopProcess, waitForProcessGroup } from "@openorc/agents";
 import { diskUsage, emptyTree, fetch, git, repoInfo, revParse, worktree } from "@openorc/git";
 import { WORKSPACE_ID, type BranchLoss, type Project, type RemovalImpact, type Task, type Thread, type WorkspaceMode } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
+import type { CloudWorkspaceService } from "./cloud-workspaces.js";
 import { assertCanBranch, projectGit } from "./project-git.js";
 import { inUnvettedCopy } from "./review-copies.js";
 import { assertSafeParentPath } from "./safe-parent-path.js";
@@ -15,6 +16,8 @@ import { workspaceWriters, type WorkspaceLease, type WorkspaceWriters } from "./
 export interface WorkspaceOptions {
   /** Where worktrees live: `<dataDir>/worktrees/<project>/<task>`. Outside the repo on purpose. */
   dataDir: string;
+  /** Sandboxes for cloud conversations. Without it, conversations run only on this Mac. */
+  cloud?: CloudWorkspaceService;
 }
 
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
@@ -235,9 +238,16 @@ export class WorkspaceService {
     if (!adoptsCheckout) await assertCanBranch(project);
   }
 
+  /** Marks a conversation being admitted as one that runs in a cloud sandbox. Call inside the admitting transaction. */
+  admitCloud(threadId: string): void {
+    if (!this.options.cloud) throw new Error("Cloud workspaces are not available.");
+    this.options.cloud.admit(threadId);
+  }
+
   /**
    * A worktree of a thread's own, so two threads on one project never step
    * on each other. Same recipe as a task's: fresh base, includes, setup.
+   * A cloud conversation's worktree is the Mac's copy of its sandbox, which gets the code and runs the setup instead.
    */
   async prepareThread(thread: Thread, project: Project, baseRef?: string, lease?: WorkspaceLease): Promise<Thread> {
     this.assertOpen();
@@ -257,6 +267,7 @@ export class WorkspaceService {
     if (thread.workspaceMode === "current" && thread.baseSha) return thread;
     if (thread.workspaceMode === "worktree" && thread.worktreePath && (await exists(thread.worktreePath))) {
       this.assertOpen();
+      await this.options.cloud?.prepare(thread, project);
       return thread;
     }
     // Only reviewing again rebuilds a pull request's copy, on no branch. An ordinary worktree here would take a branch
@@ -293,7 +304,9 @@ export class WorkspaceService {
         this.assertOpen();
         const updated = threads.update(this.db, thread.id, { worktreePath, branch, baseSha: thread.baseSha ?? startPoint, baseBranch, workspaceMode: "worktree" });
         audit.record(this.db, { actor: "openorc", action: "workspace.create", resourceType: "thread", resourceId: thread.id, metadata: { worktreePath, branch, baseSha: startPoint } });
-        if (project.settings.setupScript) await this.runSetup(project, { worktreePath, id: thread.id });
+        const cloud = this.options.cloud?.get(thread.id) ? this.options.cloud : null;
+        if (cloud) await cloud.prepare(updated, project);
+        else if (project.settings.setupScript) await this.runSetup(project, { worktreePath, id: thread.id });
         this.assertOpen();
         return updated;
       },

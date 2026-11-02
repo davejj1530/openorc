@@ -583,6 +583,9 @@ importers:
       '@openorc/agents':
         specifier: workspace:*
         version: link:../agents
+      '@openorc/cloud':
+        specifier: workspace:*
+        version: link:../cloud
       '@openorc/db':
         specifier: workspace:*
         version: link:../db

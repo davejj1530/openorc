@@ -3,6 +3,7 @@ import { claudeRunAccount } from "./services/claude-run-account.js";
 import { createClaudeAccountHandlers } from "./handlers/claude-accounts.js";
 import { invalidParamsMessage, resultSummary } from "./handlers/diagnostics.js";
 import { captureLaunchEnvironment, recoverAgentProcesses } from "@openorc/agents";
+import { LocalSandboxProvider } from "@openorc/cloud";
 import { Db, LedgerWriter, orchestration, plans, redact, settings as storedSettings, taskForwardings, tasks, teamDeletedThreads, teamRuntime, threads } from "@openorc/db";
 import { startMcpServer, type OpenOrcMcpServer } from "@openorc/mcp";
 import { harnessAvailability, harnessInfo, harnessInstalled, harnessLoggedIn, rpcParams, type HarnessId, type RpcMethod, type RpcRequest } from "@openorc/protocol";
@@ -80,6 +81,7 @@ import { RunService, type Notification, type RunHooks } from "./services/runs.js
 import { ScheduleService } from "./services/schedules.js";
 import { AppSettingsService } from "./services/settings.js";
 import { ShellEnvironment, inheritedProbe } from "./services/shell-environment.js";
+import { CloudWorkspaceService } from "./services/cloud-workspaces.js";
 import { SlackService } from "./services/slack/service.js";
 import { SystemService } from "./services/system.js";
 import { TaskCheckoutService } from "./services/task-checkout.js";
@@ -238,7 +240,9 @@ export class OpenOrc {
       if (this.settings.get().notifications) options.transport.push(notice);
     };
     this.projects = new ProjectService(db);
-    this.workspaces = new WorkspaceService(db, { dataDir: options.dataDir }, this.log, this.workspaceWriters);
+    const cloudSandboxes = options.cloudSandboxes ?? new LocalSandboxProvider(path.join(options.dataDir, "cloud-sandboxes"), () => this.environment.current().env);
+    const cloud = new CloudWorkspaceService(db, { provider: cloudSandboxes }, this.log);
+    this.workspaces = new WorkspaceService(db, { dataDir: options.dataDir, cloud }, this.log, this.workspaceWriters);
     const backgroundProviders: ProviderInfo = {
       models: (agent, accountId) => this.runs.models(agent, undefined, undefined, accountId),
       loggedIn: (accountId) => this.claudeSystemInfo(accountId).then((info) => Object.fromEntries(info.harnesses.map((row) => [row.id, harnessLoggedIn(row)])) as Record<HarnessId, boolean>),

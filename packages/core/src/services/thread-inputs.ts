@@ -21,6 +21,8 @@ export interface StartThreadInput {
   promptRole?: "user" | "system";
   /** A worktree prepared elsewhere that the conversation adopts, such as a pull request checked out detached. */
   checkout?: { path: string; baseSha: string };
+  /** Runs the agent in a cloud sandbox; the conversation's worktree on the Mac mirrors it. */
+  cloud?: boolean;
 }
 
 /** Names a thread from its first exchange; null when no model is available. */

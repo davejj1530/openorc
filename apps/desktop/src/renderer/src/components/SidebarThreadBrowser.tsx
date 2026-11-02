@@ -33,6 +33,16 @@ function emptyMessage(search: string, pinned: boolean): string {
   return pinned ? "No pinned threads." : "No threads yet.";
 }
 
+function useSidebarProjects() {
+  const projects = useRpc("projects.list", {});
+  useEffect(() => {
+    if (!projects.data) return;
+    const { projectId, setProject } = useLayout.getState();
+    if (projectId && projectId !== WORKSPACE_ID && !projects.data.some((p) => p.id === projectId)) setProject(WORKSPACE_ID);
+  }, [projects.data]);
+  return projects;
+}
+
 /** Each project owns a page. The task/new-thread scope never hides another project's work. */
 function useThreadGroups(search: string) {
   const chosen = useLayout((s) => s.sidebarFilter);
@@ -42,7 +52,7 @@ function useThreadGroups(search: string) {
   const filter = listedThreads(chosen);
   const collapsed = useLayout((s) => s.collapsed);
   const [limits, setLimits] = useState<Record<string, number>>({});
-  const projects = useRpc("projects.list", {});
+  const projects = useSidebarProjects();
   const groups = [{ id: WORKSPACE_ID, name: "Workspace", rootPath: undefined }, ...(projects.data ?? [])];
   const orclings = useOrclings();
   const homes = new Set(orclings.map((orcling) => orcling.threadId));
@@ -59,11 +69,6 @@ function useThreadGroups(search: string) {
     const layout = useLayout.getState();
     if (!sidebarSectionOpen(layout.collapsed, "project", activeProject)) layout.toggleCollapsed(sidebarFoldKey.project(activeProject));
   }, [activeId, activeProject]);
-  useEffect(() => {
-    if (!projects.data) return;
-    const { projectId, setProject } = useLayout.getState();
-    if (projectId && projectId !== WORKSPACE_ID && !projects.data.some((p) => p.id === projectId)) setProject(WORKSPACE_ID);
-  }, [projects.data]);
   const matches = (thread: ThreadSummary) => thread.title.toLowerCase().includes(search.toLowerCase());
   const visible = groups.map((group, index) => {
     const query = queries[index]!;
@@ -94,11 +99,9 @@ function orcGroups(groups: ThreadGroup[]): ThreadGroup[] {
 }
 
 /** Orcmode's way out: the threads it leaves out, one click from the full list. */
-function OrcModeEnd({ groups, shown }: { groups: ThreadGroup[]; shown: number }) {
+function OrcModeEnd({ leftOut, more, pending, shown }: { leftOut: number; more: boolean; pending: boolean; shown: number }) {
   const setFilter = useLayout((s) => s.setSidebarFilter);
-  const leftOut = groups.reduce((sum, group) => sum + group.leftOut, 0);
-  const more = groups.some((group) => group.hasMore);
-  if (groups.some((group) => group.query.isPending) && !shown) return <p className="browser-empty">Loading threads…</p>;
+  if (pending && !shown) return <p className="browser-empty">Loading threads…</p>;
   return (
     <>
       {shown ? null : <p className="browser-empty">Nothing needs you today.</p>}
@@ -113,6 +116,11 @@ function OrcModeEnd({ groups, shown }: { groups: ThreadGroup[]; shown: number })
 
 /** The project list stays mounted across app destinations, keeping filters and loaded pages. */
 export function SidebarThreadBrowser({ search }: { search: string }) {
+  const ungrouped = useLayout((s) => s.ungroupByProjects);
+  return ungrouped ? <FlatThreadBrowser search={search} /> : <GroupedThreadBrowser search={search} />;
+}
+
+function GroupedThreadBrowser({ search }: { search: string }) {
   const { visible, activeId, loadMore, projects, orc, pinnedOnly } = useThreadGroups(search);
   const shown = orc ? orcGroups(visible) : visible;
   const row = (thread: ThreadSummary) => <ThreadRow key={thread.id} thread={thread} active={activeId === thread.id} />;
@@ -151,7 +159,113 @@ export function SidebarThreadBrowser({ search }: { search: string }) {
             ) : null}
           </SidebarProjectGroup>
         ))}
-        {orc ? <OrcModeEnd groups={visible} shown={shown.length} /> : null}
+        {orc ? (
+          <OrcModeEnd
+            leftOut={visible.reduce((sum, group) => sum + group.leftOut, 0)}
+            more={visible.some((group) => group.hasMore)}
+            pending={visible.some((group) => group.query.isPending)}
+            shown={shown.length}
+          />
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+const UNGROUPED_LIST = "ungrouped";
+
+/** Orcmode keeps each project's working set; other filters page one list across projects. */
+function useFlatThreadPages(search: string) {
+  const chosen = useLayout((s) => s.sidebarFilter);
+  const pinnedOnly = useLayout((s) => s.pinnedOnly);
+  const collapsed = useLayout((s) => s.collapsed);
+  const [limit, setLimit] = useState(THREAD_PAGE);
+  const view = chosen === "orc" && search ? "active" : chosen;
+  const projects = useSidebarProjects();
+  const projectIds = [WORKSPACE_ID, ...(projects.data ?? []).map((project) => project.id)].sort();
+  const homes = new Set(useOrclings().map((orcling) => orcling.threadId));
+  const activeId = useRouter((s) => (s.route.view === "thread" ? s.route.threadId : null));
+  const active = useRpc("threads.get", { id: activeId ?? "" }, { enabled: Boolean(activeId) });
+  const queries = useRpcs(
+    "threads.list",
+    view === "orc" ? projectIds.map((id) => threadListParams(id, chosen)) : [{ projectIds, filter: listedThreads(chosen), orderBy: "activity", pinnedOnly, limit: limit + 1 }],
+    { enabled: Boolean(projects.data), refetchInterval: 60_000 },
+  );
+  const selected = active.data && projectIds.includes(active.data.projectId) && (!pinnedOnly || active.data.pinnedAt) ? active.data : null;
+  const pages = queries.map((query, index) =>
+    sidebarThreadPage({
+      projectId: view === "orc" ? projectIds[index]! : (selected?.projectId ?? WORKSPACE_ID),
+      fetched: query.data,
+      selected,
+      filter: view,
+      limit: view === "orc" ? THREAD_PAGE : limit,
+      now: Date.now(),
+      hidden: homes,
+    }),
+  );
+  return { projects, queries, pages, activeId, pinnedOnly, view, collapsed, loadMore: () => setLimit((old) => old + THREAD_PAGE) };
+}
+
+function FlatThreadFeedback({ state, shown, snoozed, search }: { state: ReturnType<typeof useFlatThreadPages>; shown: number; snoozed: number; search: string }) {
+  const { projects, queries, pages, view, pinnedOnly } = state;
+  if (projects.isError) return null;
+  const hasMore = pages.some((page) => page.hasMore);
+  const pending = queries.some((query) => query.isPending);
+  const failed = queries.filter((query) => query.isError);
+  if (failed.length)
+    return (
+      <button className="browser-empty" onClick={() => failed.forEach((query) => void query.refetch())}>
+        Couldn’t load threads. Retry
+      </button>
+    );
+  if (view === "orc") return <OrcModeEnd leftOut={pages.reduce((sum, page) => sum + page.leftOut, 0)} more={hasMore} pending={pending} shown={shown} />;
+  if (pending) return <p className="browser-empty">Loading threads…</p>;
+  if (shown || snoozed || hasMore) return null;
+  return <p className="browser-empty">{emptyMessage(search, pinnedOnly)}</p>;
+}
+
+/** One list across projects, ordered by recent activity rather than project or pin priority. */
+function FlatThreadBrowser({ search }: { search: string }) {
+  const state = useFlatThreadPages(search);
+  const { projects, pages, activeId, pinnedOnly, view, collapsed, loadMore } = state;
+  const hasMore = pages.some((page) => page.hasMore);
+  const matches = (thread: ThreadSummary) => thread.title.toLowerCase().includes(search.toLowerCase());
+  const latestFirst = (a: ThreadSummary, b: ThreadSummary) => b.lastActivityAt - a.lastActivityAt || b.id.localeCompare(a.id);
+  const rows = pages
+    .flatMap((page) => [...page.pinned, ...(pinnedOnly ? [] : page.rest)])
+    .filter(matches)
+    .sort(latestFirst);
+  const snoozed = pinnedOnly
+    ? []
+    : pages
+        .flatMap((page) => page.snoozed)
+        .filter(matches)
+        .sort(latestFirst);
+  const order = visibleSidebarThreadIds([{ id: UNGROUPED_LIST, pinned: [], rest: rows, snoozed }], collapsed, UNGROUPED_LIST);
+  useEffect(() => {
+    useUi.getState().setThreadOrder(order);
+  }, [order]);
+  const row = (thread: ThreadSummary) => <ThreadRow key={thread.id} thread={thread} active={activeId === thread.id} />;
+  return (
+    <section className="conversation-browser" aria-label="Thread browser">
+      <div className="browser-threads">
+        {projects.isError ? (
+          <button className="browser-empty" onClick={() => void projects.refetch()}>
+            Couldn’t load projects. Retry
+          </button>
+        ) : null}
+        <div className="sidebar-thread-list">{rows.map(row)}</div>
+        <FlatThreadFeedback state={state} shown={rows.length} snoozed={snoozed.length} search={search} />
+        {hasMore && view !== "orc" ? (
+          <button className="browser-load-more" onClick={loadMore}>
+            Load more threads
+          </button>
+        ) : null}
+        {snoozed.length ? (
+          <Section fold="snoozed" projectId={UNGROUPED_LIST} label="Snoozed" count={snoozed.length}>
+            {snoozed.map(row)}
+          </Section>
+        ) : null}
       </div>
     </section>
   );
@@ -187,15 +301,18 @@ export function ThreadFilter() {
   const pinned = useLayout((s) => s.pinnedOnly);
   const setFilter = useLayout((s) => s.setSidebarFilter);
   const projectId = useLayout((s) => s.projectId);
+  const ungrouped = useLayout((s) => s.ungroupByProjects);
+  const setUngrouped = useLayout((s) => s.setUngroupByProjects);
   const selection = pinned ? "pinned" : filter;
+  const narrowed = selection !== "active" || ungrouped;
   return (
     <Menu.Root>
       <Menu.Trigger
         render={
           <IconButton
-            aria-label={`Filter threads${selection === "active" ? "" : `: ${FILTER_NAMES[selection]}`}`}
+            aria-label={`Filter threads${selection === "active" ? "" : `: ${FILTER_NAMES[selection]}`}${ungrouped ? ": ungrouped by projects" : ""}`}
             size="xs"
-            className={cn("no-drag", selection === "active" ? "text-ink-4" : "text-accent-ink")}
+            className={cn("no-drag", narrowed ? "text-accent-ink" : "text-ink-4")}
           />
         }
       >
@@ -215,6 +332,11 @@ export function ThreadFilter() {
               <Check size={13} className={pinned ? "text-accent-ink" : "text-transparent"} />
               Pinned threads
             </Menu.Item>
+            <Menu.Separator className={menuSeparator} />
+            <Menu.CheckboxItem className={menuItem} checked={ungrouped} onCheckedChange={setUngrouped}>
+              <Check size={13} className={ungrouped ? "text-accent-ink" : "text-transparent"} />
+              Ungroup by projects
+            </Menu.CheckboxItem>
             <Menu.Separator className={menuSeparator} />
             <Menu.Item className={menuItem} onClick={() => useUi.getState().setImportSessions(true, projectId ?? undefined)}>
               Import terminal sessions…

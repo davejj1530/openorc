@@ -42,6 +42,8 @@ interface LayoutState {
   toggleThreadPanel: (id: string) => void;
   openThreadPanel: (id: string, tab: PanelTab) => void;
   sidebarFilter: SidebarFilter;
+  /** One list of threads, most recently active first, instead of project groups. */
+  ungroupByProjects: boolean;
   /** Only the pinned active threads. Never persisted: a relaunch lists them all again. */
   pinnedOnly: boolean;
   /** Screens the sidebar leaves under More. */
@@ -65,6 +67,7 @@ interface LayoutState {
   setSidebarFilter: (filter: SidebarFilter, pinnedOnly?: boolean) => void;
   /** Orcmode on, or back to every active thread. */
   toggleOrcMode: () => void;
+  setUngroupByProjects: (ungrouped: boolean) => void;
   setScreenShown: (screen: SidebarScreen, shown: boolean) => void;
   toggleCollapsed: (key: string) => void;
   rememberPreviewUrl: (key: string, url: string) => void;
@@ -78,7 +81,9 @@ export const limits = {
 
 const KEY = "openorc.layout";
 
-function read(): Partial<Pick<LayoutState, "sidebarOpen" | "sidebarWidth" | "panelOpen" | "panelWidth" | "projectId" | "sidebarFilter" | "hiddenScreens" | "collapsed" | "previewUrls">> {
+function read(): Partial<
+  Pick<LayoutState, "sidebarOpen" | "sidebarWidth" | "panelOpen" | "panelWidth" | "projectId" | "sidebarFilter" | "ungroupByProjects" | "hiddenScreens" | "collapsed" | "previewUrls">
+> {
   try {
     return JSON.parse(localStorage.getItem(KEY) ?? "{}") as Partial<LayoutState>;
   } catch {
@@ -97,6 +102,7 @@ function persist(s: LayoutState): void {
         panelWidth: s.panelWidth,
         projectId: s.projectId,
         sidebarFilter: s.sidebarFilter,
+        ungroupByProjects: s.ungroupByProjects,
         hiddenScreens: s.hiddenScreens,
         collapsed: s.collapsed,
         previewUrls: s.previewUrls,
@@ -132,6 +138,7 @@ export const useLayout = create<LayoutState>((set, get) => {
     projectId: saved.projectId === undefined ? WORKSPACE_ID : saved.projectId,
     panelThreadId: null,
     sidebarFilter: (["orc", "archived"] as const).find((filter) => filter === saved.sidebarFilter) ?? ("active" as const),
+    ungroupByProjects: saved.ungroupByProjects === true,
     pinnedOnly: false,
     hiddenScreens: saved.hiddenScreens ?? DEFAULT_HIDDEN_SCREENS,
     collapsed: saved.collapsed ?? ["snoozed"],
@@ -188,6 +195,7 @@ export const useLayout = create<LayoutState>((set, get) => {
     },
     setSidebarFilter: (sidebarFilter, pinnedOnly = false) => commit({ sidebarFilter, pinnedOnly }),
     toggleOrcMode: () => commit({ sidebarFilter: get().sidebarFilter === "orc" ? "active" : "orc", pinnedOnly: false }),
+    setUngroupByProjects: (ungroupByProjects) => commit({ ungroupByProjects }),
     setScreenShown: (screen, shown) => {
       const others = get().hiddenScreens.filter((hidden) => hidden !== screen);
       commit({ hiddenScreens: shown ? others : [...others, screen] });

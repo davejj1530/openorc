@@ -1,7 +1,7 @@
 /** Production sidebar with deterministic projects and threads; never starts a provider. */
 import { createRoot } from "react-dom/client";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { WORKSPACE_ID } from "../../packages/protocol/src/index";
+import { WORKSPACE_ID, type ProviderUsage } from "../../packages/protocol/src/index";
 import type { ProjectIconsApi, ProjectIconState } from "../../apps/desktop/src/shared/project-icons";
 import mark from "../../apps/desktop/src/renderer/src/assets/openorc-mark.png";
 import { PROJECT_STACK_LABELS, type ProjectStackIconId } from "../../apps/desktop/src/shared/project-stack-icons";
@@ -85,7 +85,19 @@ async function main() {
     { id: "site-1", projectId: "site", title: "Refresh the landing page", activity: "waiting" },
     { id: "site-2", projectId: "site", title: "Review homepage copy", unread: true },
     { id: "archived", projectId: "site", title: "An archived conversation", archivedAt: 1 },
-  ].map((thread) => ({ agent: "codex", branch: null, activity: "idle", session: { status: "idle" }, archivedAt: null, unread: false, ...thread }));
+  ].map((thread, index) => ({
+    agent: "codex",
+    branch: null,
+    activity: "idle",
+    session: { status: "idle" },
+    archivedAt: null,
+    pinnedAt: null,
+    snoozedUntil: null,
+    unread: false,
+    createdAt: Date.now() - index * 3_600_000,
+    lastActivityAt: Date.now() - index * 60_000,
+    ...thread,
+  }));
   let failProject: string | null = null;
   const removed = new Set<string>();
   core.call = (async (method: string, params: Record<string, unknown>) => {
@@ -95,9 +107,33 @@ async function main() {
       return { ok: true };
     }
     if (method === "tasks.list") return [{ id: "review", projectId: "site", status: "review" }];
+    if (method === "providers.usage")
+      return {
+        provider: "codex",
+        status: "available",
+        source: "fixture",
+        context: "Preview account",
+        plan: null,
+        checkedAt: Date.now(),
+        refreshedAt: null,
+        message: null,
+        windows: [{ id: "weekly", label: "Weekly limit", usedPercent: 45, remainingPercent: 55, resetsAt: Date.now() + 86_400_000, observedAt: Date.now(), exhausted: false }],
+        credits: [],
+        accountUrl: "",
+        localRuns: 0,
+      } satisfies ProviderUsage;
     if (method === "threads.list") {
-      if (params.projectId === failProject) throw Error("Offline");
-      return threads.filter((t) => t.projectId === params.projectId && (params.filter === "archived") === !!t.archivedAt).slice(0, Number(params.limit));
+      if (params.projectId === failProject || (Array.isArray(params.projectIds) && params.projectIds.includes(failProject))) throw Error("Offline");
+      const projectIds = Array.isArray(params.projectIds) ? params.projectIds : null;
+      const rows = threads.filter(
+        (t) =>
+          (!params.projectId || t.projectId === params.projectId) &&
+          (!projectIds || projectIds.includes(t.projectId)) &&
+          (!params.pinnedOnly || t.pinnedAt) &&
+          (params.filter === "archived") === !!t.archivedAt,
+      );
+      if (params.orderBy === "activity") rows.sort((a, b) => b.lastActivityAt - a.lastActivityAt || b.id.localeCompare(a.id));
+      return rows.slice(0, Number(params.limit));
     }
     if (method === "threads.get") return threads.find((t) => t.id === params.id) ?? null;
     return [];
@@ -115,6 +151,11 @@ async function main() {
       filter: (filter: "active" | "archived") => useLayout.getState().setSidebarFilter(filter),
       width: (width: number) => useLayout.getState().setSidebarWidth(width),
       navigate: (id: string) => useRouter.getState().navigate({ view: "thread", threadId: id }),
+      touch: async (id: string) => {
+        const thread = threads.find((thread) => thread.id === id);
+        if (thread) thread.lastActivityAt = Date.now();
+        await queryClient.invalidateQueries({ queryKey: ["threads.list"] });
+      },
       fail: async (id: string | null) => {
         failProject = id;
         await queryClient.invalidateQueries({ queryKey: ["threads.list"] });

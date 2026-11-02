@@ -2,13 +2,14 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
-import { defaultOrclingLook, WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
+import { defaultOrclingLook, WORKSPACE_ID, type RpcParams, type ThreadSummary } from "@openorc/protocol";
 
 vi.hoisted(() => Object.assign(window, { openorc: { platform: "darwin" } }));
 
 const fixture: {
   projects: { id: string; name: string; rootPath: string }[];
-  threads: Pick<ThreadSummary, "id" | "title" | "projectId" | "agent" | "activity" | "unread" | "session" | "pinnedAt" | "snoozedUntil" | "lastActivityAt">[];
+  threads: (Pick<ThreadSummary, "id" | "title" | "projectId" | "agent" | "activity" | "unread" | "session" | "pinnedAt" | "snoozedUntil" | "lastActivityAt"> &
+    Partial<Pick<ThreadSummary, "createdAt" | "archivedAt">>)[];
 } = vi.hoisted(() => ({ projects: [], threads: [] }));
 
 vi.mock("../lib/client", async (original) => {
@@ -34,9 +35,18 @@ vi.mock("../lib/client", async (original) => {
 });
 vi.mock("../lib/rpc", () => ({
   core: {
-    call: vi.fn(async (method: string, params: { projectId?: string; limit?: number }) =>
-      method === "threads.list" ? fixture.threads.filter((thread) => thread.projectId === params.projectId).slice(0, params.limit) : [],
-    ),
+    call: vi.fn(async (method: string, params: RpcParams<"threads.list">) => {
+      if (method !== "threads.list") return [];
+      const rows = fixture.threads.filter(
+        (thread) =>
+          (!params.projectId || thread.projectId === params.projectId) &&
+          (!params.projectIds || params.projectIds.includes(thread.projectId)) &&
+          (!params.pinnedOnly || thread.pinnedAt) &&
+          (params.filter === "archived") === Boolean(thread.archivedAt),
+      );
+      if (params.orderBy === "activity") rows.sort((a, b) => b.lastActivityAt - a.lastActivityAt || b.id.localeCompare(a.id));
+      return rows.slice(0, params.limit);
+    }),
     onPush: () => () => {},
   },
 }));
@@ -58,7 +68,7 @@ beforeEach(() => {
   fixture.threads = [];
   localStorage.clear();
   useWindow.setState({ fullscreen: false });
-  useLayout.setState({ collapsed: [], projectId: null, sidebarOpen: true, sidebarFilter: "active", pinnedOnly: false });
+  useLayout.setState({ collapsed: [], projectId: null, sidebarOpen: true, sidebarFilter: "active", pinnedOnly: false, ungroupByProjects: false });
   useRouter.setState({ route: { view: "newthread" }, history: [], future: [], threadIds: [] });
 });
 
@@ -349,4 +359,115 @@ it("says a folded project needs you before anything else", async () => {
   mountSidebar();
   const region = await screen.findByRole("region", { name: "First project threads" });
   await waitFor(() => expect(region.querySelector(".project-group-activity")?.textContent).toBe("Needs you"));
+});
+
+async function toggleProjectGrouping() {
+  fireEvent.click(screen.getByRole("button", { name: /^Filter threads/ }));
+  const toggle = await screen.findByRole("menuitemcheckbox", { name: "Ungroup by projects" });
+  fireEvent.click(toggle);
+  fireEvent.keyDown(toggle, { key: "Escape" });
+  await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+}
+
+it("toggles to one recently-active list, remembers the choice, and restores saved project folds", async () => {
+  projectThreads();
+  fixture.threads = fixture.threads.map((thread, index) => ({ ...thread, createdAt: index + 1, lastActivityAt: 100 - index }));
+  useLayout.setState({ collapsed: ["project:one"] });
+  mountSidebar();
+  await waitFor(() => expect(useUi.getState().threadOrder).toEqual(["other"]));
+  await toggleProjectGrouping();
+  await waitFor(() => expect(useUi.getState().threadOrder).toEqual(["pinned", "regular", "other"]));
+  expect(document.querySelectorAll(".sidebar-project")).toHaveLength(0);
+  expect(screen.queryByText("First project")).toBeNull();
+  expect(screen.queryByText("Second project")).toBeNull();
+  expect(useLayout.getState().collapsed).toEqual(["project:one"]);
+  expect(JSON.parse(localStorage.getItem("openorc.layout") ?? "{}").ungroupByProjects).toBe(true);
+  await toggleProjectGrouping();
+  await screen.findByRole("button", { name: "Expand First project threads" });
+  await waitFor(() => expect(useUi.getState().threadOrder).toEqual(["other"]));
+  expect(useLayout.getState().ungroupByProjects).toBe(false);
+});
+
+it("pages one activity-ordered list across projects without promoting pins or newer creation dates", async () => {
+  projectThreads();
+  const base = fixture.threads[0]!;
+  fixture.threads = Array.from({ length: 28 }, (_, index) => ({
+    ...base,
+    id: `row-${index}`,
+    title: `Thread ${index}`,
+    projectId: index % 2 ? "one" : "two",
+    createdAt: index + 1,
+    lastActivityAt: 100 - index,
+    pinnedAt: index === 27 ? 1 : null,
+  }));
+  useLayout.setState({ ungroupByProjects: true });
+  mountSidebar();
+  await waitFor(() => expect(useUi.getState().threadOrder).toEqual(Array.from({ length: 12 }, (_, index) => `row-${index}`)));
+  fireEvent.click(screen.getByRole("button", { name: "Load more threads" }));
+  await waitFor(() => expect(useUi.getState().threadOrder).toEqual(Array.from({ length: 24 }, (_, index) => `row-${index}`)));
+  fireEvent.click(screen.getByRole("button", { name: "Load more threads" }));
+  await waitFor(() => expect(useUi.getState().threadOrder).toEqual(Array.from({ length: 28 }, (_, index) => `row-${index}`)));
+  expect(screen.queryByRole("button", { name: "Load more threads" })).toBeNull();
+});
+
+it("keeps pinned, archived and title filters available while projects are ungrouped", async () => {
+  projectThreads();
+  const base = fixture.threads[0]!;
+  fixture.threads = [
+    ...Array.from({ length: 14 }, (_, index) => ({ ...base, id: `new-${index}`, title: `New ${index}`, createdAt: index + 2, lastActivityAt: index + 2, pinnedAt: null })),
+    { ...base, createdAt: 1, lastActivityAt: 1 },
+    { ...base, id: "archived", title: "Archived notes", archivedAt: 20, createdAt: 16, pinnedAt: null },
+    { ...base, id: "home", title: "Removed project notes", projectId: "removed", createdAt: 100 },
+    { ...base, id: "rini-home", title: "Private companion", projectId: WORKSPACE_ID, createdAt: 101 },
+  ];
+  useLayout.setState({ ungroupByProjects: true });
+  mountSidebar();
+  await screen.findByRole("button", { name: /New 13/ });
+  expect(screen.queryByRole("button", { name: /Removed project notes|Private companion/ })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: /^Filter threads/ }));
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Pinned threads" }));
+  await waitFor(() => expect(useUi.getState().threadOrder).toEqual(["pinned"]));
+  fireEvent.click(screen.getByRole("button", { name: /^Filter threads/ }));
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Archived threads" }));
+  await waitFor(() => expect(useUi.getState().threadOrder).toEqual(["archived"]));
+  fireEvent.change(screen.getByRole("textbox", { name: "Filter loaded threads" }), { target: { value: "no match" } });
+  expect(screen.getByText("No matches in loaded threads.")).toBeTruthy();
+  expect(useUi.getState().threadOrder).toEqual([]);
+  expect(useLayout.getState().ungroupByProjects).toBe(true);
+});
+
+it("keeps orcmode's working set and a shared snoozed section in the flat list", async () => {
+  projectThreads();
+  const base = fixture.threads[0]!;
+  fixture.threads = [
+    { ...base, id: "running", title: "Older running thread", createdAt: 1, lastActivityAt: Date.now() - 1000, pinnedAt: null, activity: "running" },
+    { ...base, id: "recent", title: "Newer recent thread", projectId: "two", createdAt: 3, pinnedAt: null },
+    { ...base, id: "quiet", title: "Older quiet thread", createdAt: 2, pinnedAt: null, lastActivityAt: Date.now() - 3 * 86_400_000 },
+    { ...base, id: "snoozed", title: "Snoozed thread", createdAt: 4, pinnedAt: null, snoozedUntil: Date.now() + 60_000 },
+  ];
+  useLayout.setState({ ungroupByProjects: true });
+  mountSidebar();
+  await waitFor(() => expect(useUi.getState().threadOrder).toEqual(["recent", "running", "quiet"]));
+  fireEvent.click(screen.getByRole("button", { name: "Snoozed 1" }));
+  expect(useUi.getState().threadOrder).toEqual(["recent", "running", "quiet", "snoozed"]);
+  fireEvent.click(screen.getByRole("button", { name: /^Filter threads/ }));
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Orcmode" }));
+  await waitFor(() => expect(useUi.getState().threadOrder).toEqual(["recent", "running"]));
+  expect(screen.queryByRole("button", { name: /Older quiet thread|Snoozed thread/ })).toBeNull();
+  expect(screen.getByRole("button", { name: "Show 2 more" })).toBeTruthy();
+  expect(useLayout.getState().ungroupByProjects).toBe(true);
+});
+
+it("retains orcmode work from every project even when another project fills a page", async () => {
+  projectThreads();
+  const base = fixture.threads[0]!;
+  fixture.threads = [
+    ...Array.from({ length: 14 }, (_, index) => ({ ...base, id: `new-${index}`, title: `New ${index}`, createdAt: index + 2, pinnedAt: null })),
+    { ...base, id: "working", title: "Older work in another project", projectId: "two", createdAt: 1, pinnedAt: null, activity: "running" },
+  ];
+  useLayout.setState({ ungroupByProjects: true, sidebarFilter: "orc" });
+  mountSidebar();
+  expect(await screen.findByRole("button", { name: /Older work in another project/ })).toBeTruthy();
+  await waitFor(() => expect(useUi.getState().threadOrder).toContain("working"));
+  expect(document.querySelectorAll(".sidebar-project")).toHaveLength(0);
 });

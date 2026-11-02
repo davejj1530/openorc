@@ -268,7 +268,7 @@ Menus are r16 with 36px r10 rows, muted glyphs, and hairline separators. Grown m
 
 ### Sidebar
 
-Threads/Orclings is a segmented track at natural width. A round search button grows into a capsule over the tabs, and the list's tool (filter, or New Orcling) follows it. More opens inline; Edit sidebar shows every screen with an eye switch. Project headings are 34px with a faint folder that opens while its threads show, and a faint meta ("Needs you", "2 running", "12 threads") that swaps with the plus on hover. Thread rows are 34px with muted titles; the open row takes `--current-row-fill` and `--navigation-ink`. A 16px status lead shows a question for needs you, a spinner, a failure, a 7px attention dot for unread, or the pull request mark. Running threads keep their faint second line.
+Threads/Orclings is a segmented track at natural width. A round search button grows into a capsule over the tabs, and the list's tool (filter, or New Orcling) follows it. More opens inline; Edit sidebar shows every screen with an eye switch. The filter menu's Ungroup by projects toggle shows one list ordered by most recent thread activity, and remembers the choice independently of the thread filter. Project headings are 34px with a faint folder that opens while its threads show, and a faint meta ("Needs you", "2 running", "12 threads") that swaps with the plus on hover. Thread rows are 34px with muted titles; the open row takes `--current-row-fill` and `--navigation-ink`. A 16px status lead shows a question for needs you, a spinner, a failure, a 7px attention dot for unread, or the pull request mark. Running threads keep their faint second line.
 
 ### Conversation
 

@@ -23,6 +23,7 @@ import type { Logger } from "../transport.js";
 import { cloudAgentHost } from "./cloud-agent-host.js";
 import { CloudAwake } from "./cloud-awake.js";
 import type { CloudCheckTarget } from "./cloud-check.js";
+import type { CloudSessions } from "./cloud-sessions.js";
 import type { CloudAgentEnvironment } from "./cloud-agent-env.js";
 import type { StartThreadInput } from "./thread-inputs.js";
 
@@ -38,6 +39,8 @@ export interface CloudWorkspaceOptions {
   agentEnvironment?: CloudAgentEnvironment;
   /** A conversation's cloud state changed, for the window to refresh it. */
   changed?: (threadId: string) => void;
+  /** Keeps each conversation's Claude session on both sides. */
+  sessions?: CloudSessions;
 }
 
 const SETUP_OUTPUT_TAIL = 2000;
@@ -100,6 +103,8 @@ export class CloudWorkspaceService {
   private readonly awake: CloudAwake;
   /** VMs being stopped because nothing needs them; the next use waits for the stop. */
   private readonly stopping = new Map<string, Promise<void>>();
+  /** A conversation's sandbox being prepared; asking again waits for it instead of preparing twice. */
+  private readonly preparing = new Map<string, Promise<void>>();
   /** The sync running for each conversation; the next one waits for it. */
   private readonly syncs = new Map<string, Promise<boolean>>();
   /** Conversations seeded since their last turn: nothing has changed on either side, so their first turn starts without a sync. */
@@ -174,7 +179,7 @@ export class CloudWorkspaceService {
    * writes. Syncs for one conversation run one after another. False when the worktree did not change, or the
    * conversation does not run in the cloud.
    */
-  sync(thread: Thread, options: { push?: boolean } = {}): Promise<boolean> {
+  sync(thread: Thread, options: { push?: boolean; turnEnded?: boolean } = {}): Promise<boolean> {
     const record = cloudWorkspaces.get(this.db, thread.id);
     const mirror = thread.worktreePath;
     if (record?.state !== "ready" || !mirror) return Promise.resolve(false);
@@ -184,7 +189,9 @@ export class CloudWorkspaceService {
       .catch(() => false)
       .then(async () => {
         if (options.push) await this.pushOnce(thread.id, mirror);
-        return this.pullOnce(thread.id, mirror);
+        const changed = await this.pullOnce(thread.id, mirror);
+        if (options.turnEnded) await this.keepSession(thread, mirror);
+        return changed;
       });
     this.syncs.set(thread.id, next);
     void next
@@ -218,11 +225,34 @@ export class CloudWorkspaceService {
    * of on the Mac. A workspace that is ready is left alone; one that failed is tried again.
    */
   async prepare(thread: Thread, project: Project): Promise<void> {
+    const existing = this.preparing.get(thread.id);
+    if (existing) return existing;
+    const preparation = this.prepareOnce(thread, project).finally(() => this.preparing.delete(thread.id));
+    this.preparing.set(thread.id, preparation);
+    return preparation;
+  }
+
+  private async prepareOnce(thread: Thread, project: Project): Promise<void> {
     const record = cloudWorkspaces.get(this.db, thread.id);
     if (!record || record.state === "ready") return;
     const { worktreePath, branch } = thread;
     if (!worktreePath || !branch) throw new Error("A cloud conversation needs its worktree before its sandbox.");
-    this.ready(thread.id, await this.build(thread.id, project, worktreePath, (location, origin) => seedWorkspace(location, branch, origin)));
+    // The conversation may have run on this Mac, or in a sandbox since replaced: its session goes up with the code.
+    const seed = async (location: WorkspaceLocation, origin: string | undefined) => {
+      const state = await seedWorkspace(location, branch, origin);
+      await this.options.sessions?.send(thread, location, record.provider);
+      return state;
+    };
+    this.ready(thread.id, await this.build(thread.id, project, worktreePath, seed));
+  }
+
+  /** Brings the conversation's Claude session to this Mac. A session not kept now is kept after the next turn. */
+  private async keepSession(thread: Thread, mirror: string): Promise<void> {
+    const record = cloudWorkspaces.get(this.db, thread.id);
+    if (!record || !this.options.sessions) return;
+    await this.options.sessions.keep(thread, await this.location(record, mirror), record.provider).catch((error: unknown) => {
+      this.log.warn(`could not bring thread ${thread.id}'s Claude session to the Mac: ${error instanceof Error ? error.message : String(error)}`);
+    });
   }
 
   /**

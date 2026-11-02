@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ClaudeAccountId } from "./claude-accounts.js";
+import type { Thread } from "./domain.js";
 
 /** What a cloud thread's sandbox is doing before its first turn can start. */
 export const CloudStep = z.enum(["sandbox", "code", "setup"]);
@@ -115,6 +116,8 @@ export const cloudRpcParams = {
   /** Starts a cloud check where new cloud threads would run; its progress arrives in `cloud.status`. */
   "cloud.check": z.object({}),
   "cloud.sandboxes": z.object({}),
+  /** Moves a conversation from this Mac to a sandbox of its own; its sandbox is set up in the background. */
+  "cloud.move": z.object({ threadId: z.string().min(1).max(200) }).strict(),
   /** Deletes a sandbox for good. A conversation's next message sets up a new one from its worktree on the Mac. */
   "cloud.sandboxes.remove": z.object({ name: z.string().min(1).max(200) }).strict(),
 };
@@ -132,5 +135,6 @@ export interface CloudRpcResults {
   "cloud.claude.remove": CloudStatus;
   "cloud.check": CloudStatus;
   "cloud.sandboxes": CloudSandbox[];
+  "cloud.move": Thread;
   "cloud.sandboxes.remove": CloudSandbox[];
 }

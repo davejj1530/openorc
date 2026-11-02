@@ -241,7 +241,7 @@ export interface RunHooks {
    * Brings a cloud conversation's changes to its worktree on the Mac, after sending the worktree's own changes up when
    * `push` is set; false when nothing changed or it runs on the Mac. Never rejects.
    */
-  syncCloud?(thread: Thread, options?: { push?: boolean }): Promise<boolean>;
+  syncCloud?(thread: Thread, options?: { push?: boolean; turnEnded?: boolean }): Promise<boolean>;
   memoryEnabled?(): boolean;
   onRunFinished(run: Run, scope: RunScope, project: Project): void;
   /** Synchronous notification after capture; consumers queue follow-up work instead of awaiting it here. */

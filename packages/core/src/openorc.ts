@@ -36,11 +36,12 @@ import { createSchedulesHandlers } from "./handlers/schedules.js";
 import { createSettingsHandlers } from "./handlers/settings.js";
 import { createSlackHandlers } from "./handlers/slack.js";
 import { createCloudHandlers } from "./handlers/cloud.js";
-import { CloudSettings } from "./services/cloud-settings.js";
-import { ClaudeCloudTokens } from "./services/claude-cloud-tokens.js";
-import { cloudAgentEnvironment } from "./services/cloud-agent-env.js";
-import { CloudChecks } from "./services/cloud-check.js";
+import type { CloudSettings } from "./services/cloud-settings.js";
+import type { ClaudeCloudTokens } from "./services/claude-cloud-tokens.js";
+import type { CloudChecks } from "./services/cloud-check.js";
 import { CloudSandboxes } from "./services/cloud-sandboxes.js";
+import { createCloud } from "./services/cloud-setup.js";
+import { CloudHandoff } from "./services/cloud-handoff.js";
 import { createSystemHandlers } from "./handlers/system.js";
 import { createTaskCreateHandlers } from "./handlers/task-create.js";
 import { createTaskDeleteHandlers } from "./handlers/task-delete.js";
@@ -86,7 +87,7 @@ import { RunService, type Notification, type RunHooks } from "./services/runs.js
 import { ScheduleService } from "./services/schedules.js";
 import { AppSettingsService } from "./services/settings.js";
 import { ShellEnvironment, inheritedProbe } from "./services/shell-environment.js";
-import { CLOUD_IDLE_PROCESS_MS, CloudWorkspaceService, cloudSandboxProviders } from "./services/cloud-workspaces.js";
+import { CLOUD_IDLE_PROCESS_MS, type CloudWorkspaceService } from "./services/cloud-workspaces.js";
 import { SlackService } from "./services/slack/service.js";
 import { SystemService } from "./services/system.js";
 import { TaskCheckoutService } from "./services/task-checkout.js";
@@ -141,6 +142,8 @@ export class OpenOrc {
   readonly cloudChecks: CloudChecks;
   /** OpenOrc's sandboxes, for Settings to list and remove. */
   readonly cloudSandboxes: CloudSandboxes;
+  /** Moves conversations from this Mac to the cloud. */
+  readonly cloudHandoff: CloudHandoff;
   readonly runs: RunService;
   readonly comments: TaskCommentService;
   readonly review: ReviewService;
@@ -255,22 +258,11 @@ export class OpenOrc {
       if (this.settings.get().notifications) options.transport.push(notice);
     };
     this.projects = new ProjectService(db);
-    this.cloudSettings = new CloudSettings(options.cloudSecrets);
-    const sandboxes = cloudSandboxProviders({
-      dataDir: options.dataDir,
-      env: () => this.environment.current().env,
-      credentials: options.cloudCredentials ?? (() => this.cloudSettings.credentials()),
-      ...(options.cloudSandboxes ? { override: options.cloudSandboxes } : {}),
-    });
-    this.claudeCloudTokens = new ClaudeCloudTokens(options.claudeCloudSecrets, this.claudeAccounts, () => invalidate(["cloud"]), options.terminal);
-    const agentEnvironment = cloudAgentEnvironment({ accounts: this.claudeAccounts, tokens: this.claudeCloudTokens, snapshot: () => this.environment.current() });
-    const cloudChanged = (id: string) => invalidate(["threads", `thread:${id}`]);
-    this.cloud = new CloudWorkspaceService(db, { ...sandboxes, agentEnvironment, changed: cloudChanged, ...(options.cloudRunnerFiles ? { files: options.cloudRunnerFiles } : {}) }, this.log);
-    this.cloudChecks = new CloudChecks(
-      () => this.cloud.checkTarget(),
-      () => invalidate(["cloud"]),
-      this.log,
-    );
+    const cloud = createCloud({ db, options, accounts: this.claudeAccounts, environment: () => this.environment.current(), invalidate, log: this.log });
+    this.cloudSettings = cloud.settings;
+    this.claudeCloudTokens = cloud.tokens;
+    this.cloud = cloud.cloud;
+    this.cloudChecks = cloud.checks;
     this.workspaces = new WorkspaceService(db, { dataDir: options.dataDir, cloud: this.cloud }, this.log, this.workspaceWriters);
     const backgroundProviders: ProviderInfo = {
       models: (agent, accountId) => this.runs.models(agent, undefined, undefined, accountId),
@@ -291,6 +283,14 @@ export class OpenOrc {
     this.memory.extractionOwner = (run, thread) => this.orclings.memoryOwner(run, thread);
     this.runs = new RunService(db, this.ledger, this.frames, () => this.mcpServer(), invalidate, this.log, this.runHooks(notify), undefined, this.workspaceWriters);
     this.cloudSandboxes = new CloudSandboxes(db, this.cloud, this.runs);
+    this.cloudHandoff = new CloudHandoff({
+      db,
+      cloud: this.cloud,
+      runs: this.runs,
+      toWorktree: (id) => this.threads.moveWorkspace(id, "worktree"),
+      changed: (id) => invalidate(["threads", `thread:${id}`]),
+      log: this.log,
+    });
     this.threads = new ThreadService(
       db,
       this.runs,
@@ -738,7 +738,7 @@ export class OpenOrc {
   private buildHandlers(invalidate: (keys: string[]) => void): Handlers {
     return composeHandlers(
       createSlackHandlers({ slack: this.slack, invalidate }),
-      createCloudHandlers({ settings: this.cloudSettings, tokens: this.claudeCloudTokens, checks: this.cloudChecks, sandboxes: this.cloudSandboxes, invalidate }),
+      createCloudHandlers({ settings: this.cloudSettings, tokens: this.claudeCloudTokens, checks: this.cloudChecks, sandboxes: this.cloudSandboxes, handoff: this.cloudHandoff, invalidate }),
       createClaudeAccountHandlers(this.claudeAccounts),
       createSystemHandlers({
         system: this.system,

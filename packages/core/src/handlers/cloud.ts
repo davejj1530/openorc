@@ -1,6 +1,7 @@
 import type { CloudStatus } from "@openorc/protocol";
 import type { ClaudeCloudTokens } from "../services/claude-cloud-tokens.js";
 import type { CloudChecks } from "../services/cloud-check.js";
+import type { CloudHandoff } from "../services/cloud-handoff.js";
 import type { CloudSandboxes } from "../services/cloud-sandboxes.js";
 import type { CloudSettings } from "../services/cloud-settings.js";
 import type { Handlers } from "./types.js";
@@ -18,6 +19,7 @@ type CloudMethod =
   | "cloud.claude.remove"
   | "cloud.check"
   | "cloud.sandboxes"
+  | "cloud.move"
   | "cloud.sandboxes.remove";
 
 interface Dependencies {
@@ -25,10 +27,11 @@ interface Dependencies {
   tokens: ClaudeCloudTokens;
   checks: CloudChecks;
   sandboxes: CloudSandboxes;
+  handoff: CloudHandoff;
   invalidate: (keys: string[]) => void;
 }
 
-export function createCloudHandlers({ settings, tokens, checks, sandboxes, invalidate }: Dependencies): Pick<Handlers, CloudMethod> {
+export function createCloudHandlers({ settings, tokens, checks, sandboxes, handoff, invalidate }: Dependencies): Pick<Handlers, CloudMethod> {
   const status = async (): Promise<CloudStatus> => {
     const vercel = await settings.status();
     const check = checks.status();
@@ -60,6 +63,11 @@ export function createCloudHandlers({ settings, tokens, checks, sandboxes, inval
     "cloud.claude.remove": ({ accountId }) => changed(() => tokens.remove(accountId)),
     "cloud.check": () => changed(() => checks.start()),
     "cloud.sandboxes": () => sandboxes.list(),
+    "cloud.move": async ({ threadId }) => {
+      const thread = await handoff.move(threadId);
+      invalidate(["threads", `thread:${threadId}`, "cloud"]);
+      return thread;
+    },
     "cloud.sandboxes.remove": async ({ name }) => {
       await sandboxes.remove(name);
       invalidate(["cloud"]);

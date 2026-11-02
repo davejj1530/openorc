@@ -265,6 +265,11 @@ export class ClaudeAccountService {
     return { BROWSER: script, OPENORC_CHROME: chrome };
   }
 
+  /** The account's Claude folder on this Mac, where Claude Code keeps its login, settings and sessions. */
+  configDirectory(id: string): string {
+    return this.directory(claudeAccounts.get(this.db, id));
+  }
+
   private directory(account: ClaudeAccount): string {
     return account.kind === "managed" ? path.join(this.dataDir, "claude-accounts", account.id) : this.snapshot().env["CLAUDE_CONFIG_DIR"] || path.join(os.homedir(), ".claude");
   }

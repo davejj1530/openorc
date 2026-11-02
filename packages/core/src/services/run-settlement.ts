@@ -92,7 +92,7 @@ export class RunSettlement {
 
   private async completeThreadTurn(entry: LiveRun, project: Project, turn: CompletedTurn, thread: Thread): Promise<void> {
     // The turn's checkpoint is of the worktree, so a cloud conversation's worktree catches up with its sandbox first.
-    await this.deps.hooks.syncCloud?.(thread);
+    await this.deps.hooks.syncCloud?.(thread, { turnEnded: true });
     const capture = await this.checkpoint(entry, project, thread, entry.workspaceLease.paths[0]!);
     entry.busy = false;
     this.deps.armIdle(entry);

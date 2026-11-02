@@ -77,6 +77,19 @@ export function Field({ label, children, hint }: { label: string; children: Reac
   );
 }
 
+/** A setting whose controls are buttons, so its label is not a form label. */
+export function SettingRow({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
+  return (
+    <div className="settings-field">
+      <span>
+        <span>{label}</span>
+        {hint ? <span className="settings-hint">{hint}</span> : null}
+      </span>
+      <span className="flex shrink-0 flex-wrap items-center justify-end gap-2">{children}</span>
+    </div>
+  );
+}
+
 /** A state in a word, with a dot that turns the success ink only when the state is good. */
 export function Status({ ok, children }: { ok?: boolean; children: ReactNode }) {
   return (

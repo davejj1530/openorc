@@ -26,6 +26,7 @@ import { PairPhone, PhoneSettings } from "./settings-phone";
 import { ProviderUsageOverview } from "./settings-usage";
 import { TextGenerationSettings } from "./settings-text-generation";
 import { UpdateSettingsSection } from "./settings-updates";
+import { CloudSettings } from "./settings-cloud";
 import { floatingGround } from "../lib/use-anchor-ground";
 
 type SettingsRoute = Extract<Route, { view: "settings" }>;
@@ -126,6 +127,8 @@ function SectionSettings({ id, active, info }: { id: SettingsSection; active: bo
           <GitHubSettings info={info.data} />
         </>
       );
+    case "cloud":
+      return <CloudSettings active={active} />;
     case "slack":
       return <SlackSettings active={active} />;
     case "phone":

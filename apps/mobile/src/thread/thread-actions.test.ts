@@ -66,6 +66,15 @@ describe("a thread's menu on the phone", () => {
     expect(row).not.toContain("Preview");
   });
 
+  it("offers Move to Cloud in the header after the pull request when the thread can move there, and never on a Home row", () => {
+    const menu = outline(threadMenu(thread("t-settings"), "header", wednesday, { uncommitted: null, preview: null, toCloud: true }));
+    expect(menu[2]).toEqual(["Open Pull Request", "Move to Cloud"]);
+    const move = { kind: "screen", label: "Move to Cloud", icon: "icloud.and.arrow.up", pathname: "/move-to-cloud" };
+    expect(threadMenu(thread("t-plan"), "header", wednesday, { uncommitted: null, preview: null, toCloud: true }).flat()).toContainEqual(move);
+    expect(outline(threadMenu(thread("t-settings"), "header", wednesday)).flat()).not.toContain("Move to Cloud");
+    expect(outline(threadMenu(thread("t-settings"), "row", wednesday, { uncommitted: null, preview: null, toCloud: true })).flat()).not.toContain("Move to Cloud");
+  });
+
   it("leaves a team thread's snooze and archive to the team on the Mac", () => {
     expect(outline(threadMenu({ ...thread("t-plan"), teamInstanceId: "team-1" }, "row", wednesday))).toEqual([["Pin", "Mark as Unread"], ["Rename…"]]);
   });

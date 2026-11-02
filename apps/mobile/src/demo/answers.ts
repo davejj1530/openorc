@@ -90,6 +90,12 @@ const answers: Answers = {
   "claude.accounts.list": (core) => demoAccounts(core.started),
   "providers.limits": (core) => demoLimits(core.clock.now()),
   "app.settings.get": () => demoSettings,
+  // The demo Mac runs every thread itself, so the phone never offers the cloud.
+  "cloud.offer": () => ({ offered: false, provider: null }),
+  "cloud.move": () => {
+    throw new Error("Cloud threads are not available on this Mac.");
+  },
+  "threads.movePreview": () => ({ files: [], blocked: null }),
   "threads.start": (core, params) => {
     const id = core.id("demo-thread");
     const title = params.title ?? params.prompt.split("\n")[0]!.slice(0, 60);

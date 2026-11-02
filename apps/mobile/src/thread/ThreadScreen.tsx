@@ -1,6 +1,6 @@
 import type { LegendListRef } from "@legendapp/list/react-native";
 import { useKeyboardChatComposerInset } from "@legendapp/list/keyboard";
-import { conversationActivity, conversationSendDisabledReason, processFit, type SubmitRequest } from "@openorc/client";
+import { canMoveToCloud, conversationActivity, conversationSendDisabledReason, processFit, queueAfterStart, startingInCloud, type SubmitRequest } from "@openorc/client";
 import type { Run, ThreadSummary } from "@openorc/protocol";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
@@ -14,6 +14,7 @@ import { useCoverHome } from "../home/home-cover";
 import { useThreadOnScreen } from "../notifications/on-screen";
 import { Spinner } from "../ui/Spinner";
 import { Text } from "../ui/Text";
+import { CloudStart } from "./CloudStart";
 import { holdTranscriptList, perfEnabled, reportThreadOpened } from "./perf-probe";
 import { PerfProbe } from "./PerfProbe";
 import { createDisclosure, DisclosureContext } from "./disclosure";
@@ -85,6 +86,7 @@ function TranscriptPane({ threadId, thread, runs, loading, failed, retry, onActi
   useEffect(() => {
     if (blocks?.length) reportThreadOpened(threadId, blocks.length);
   }, [threadId, blocks?.length]);
+  if (startingInCloud(thread, runs.length)) return <CloudStart thread={thread} />;
   if (failed && !blocks?.length) return <LoadFailed retry={retry} />;
   if (!merged || !blocks?.length) return <View className="flex-1 items-center justify-center">{loading || runs.length ? <Spinner /> : <Text className="text-ink-4">Nothing yet</Text>}</View>;
   return (
@@ -130,7 +132,9 @@ export function ThreadScreen() {
   const now = useSnoozeClock();
   const uncommitted = useChangesCount(thread);
   const preview = usePreviewPanel(thread);
-  const menu = useMemo(() => thread && headerMenu(threadMenu(thread, "header", now, { uncommitted, preview }), actions.run), [thread, actions.run, now, uncommitted, preview]);
+  const cloudOffer = useRpc("cloud.offer", {});
+  const toCloud = Boolean(cloudOffer.data?.offered && thread && canMoveToCloud(thread));
+  const menu = useMemo(() => thread && headerMenu(threadMenu(thread, "header", now, { uncommitted, preview, toCloud }), actions.run), [thread, actions.run, now, uncommitted, preview, toCloud]);
   const linkState = useLinkState();
   useThreadOnScreen(linkState.kind === "unpaired" ? null : linkState.mac.id, id);
 
@@ -190,6 +194,7 @@ export function ThreadScreen() {
         <View className="absolute inset-x-0 bottom-0">
           <Composer
             thread={thread}
+            queued={queueAfterStart(thread, runs.length)}
             settings={settings}
             request={request}
             live={live && activeRun ? { runId: activeRun.id } : null}

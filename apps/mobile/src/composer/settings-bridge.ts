@@ -1,13 +1,18 @@
 import type { ClientState } from "@openorc/client";
 import { useEffect, useSyncExternalStore } from "react";
 
+/** Where a new thread runs: on the Mac, as threads started there do, or in a sandbox of its own. */
+export type ThreadPlace = "mac" | "cloud";
+
 /**
- * What the model, mode and account sheets read and change: an open thread's settings, or a new thread's choices. Only a
- * new thread has `claudeAccount`: a thread keeps the account it started on.
+ * What the model, mode, account and place sheets read and change: an open thread's settings, or a new thread's
+ * choices. Only a new thread has `claudeAccount`, since a thread keeps the account it started on, and `place`, which
+ * it has only while the Mac offers cloud threads and the chosen agent runs there.
  */
 export type ComposerSettings = Pick<ReturnType<ClientState["useConversationSettings"]>, "choice" | "mode" | "permission" | "selectModel" | "selectExecutionMode"> & {
   /** The account chosen here, undefined until one is: then the Mac's default runs. */
   claudeAccount?: { chosen: string | undefined; select: (id: string) => void };
+  place?: { chosen: ThreadPlace; provider: "vercel" | "local"; select: (place: ThreadPlace) => void };
 };
 
 /**

@@ -1,4 +1,4 @@
-import { newThreadChoice, newThreadStartInput, newThreadWorkspaceMode, projectGitView, targetModel } from "@openorc/client";
+import { newThreadChoice, newThreadStartInput, newThreadWorkspaceMode, projectGitView, runsInCloud, targetModel } from "@openorc/client";
 import { WORKSPACE_ID } from "@openorc/protocol";
 import { useEffect, useRef, useState } from "react";
 import { link, useRpc, useRpcMutation } from "../client";
@@ -16,8 +16,8 @@ import { startBlocker, unstarted, type SheetDraft } from "./new-thread-state";
 /**
  * A new thread in one project, with the desktop's defaults: the model for the Mac's default harness or its first
  * signed-in one, mode act, the Mac's default permission and Claude account until one is chosen here, and the Mac's
- * default workspace where the project can branch. The phone never names a folder: Workspace runs where the Mac's Workspace does. A start
- * the Mac refuses keeps the draft and says why.
+ * default workspace where the project can branch, or a cloud sandbox when chosen. The phone never names a folder:
+ * Workspace runs where the Mac's Workspace does. A start the Mac refuses keeps the draft and says why.
  */
 export function useNewThread(projectId: string) {
   const [draft, setDraft] = useSheetDraft(projectId);
@@ -38,6 +38,7 @@ export function useNewThread(projectId: string) {
   };
   const { uploading, chooseImages } = useImageAttach({ onImage: (image) => setDraft((current) => ({ ...current, images: [...current.images, image] })), onError: setError });
 
+  const cloud = useCloudPlace(projectId, draft, change);
   const settings: ComposerSettings = {
     choice: targetModel(draft.target),
     mode: draft.mode,
@@ -48,6 +49,7 @@ export function useNewThread(projectId: string) {
       permission.select(next.permissionMode);
     },
     claudeAccount: { chosen: draft.claudeAccountId, select: (claudeAccountId) => change({ claudeAccountId }) },
+    ...cloud,
   };
   const blocker = startBlocker(draft, { permissionReady: permission.ready });
   const controls = composerControls({
@@ -75,7 +77,10 @@ export function useNewThread(projectId: string) {
     field.emptied();
     setError(null);
     try {
-      const workspaceMode = newThreadWorkspaceMode({ canBranch: await canBranch(projectId), chosen: draft.workspace, preferred: appSettings?.defaultWorkspaceMode });
+      const branchable = await canBranch(projectId);
+      const toCloud = cloud.place?.chosen === "cloud";
+      if (toCloud && !branchable) throw new Error("A cloud thread starts on a branch of its own, and this project has no commit to branch from yet.");
+      const workspaceMode = toCloud ? "cloud" : newThreadWorkspaceMode({ canBranch: branchable, chosen: null, preferred: appSettings?.defaultWorkspaceMode });
       const { thread } = await start.mutateAsync(newThreadStartInput(draft, { workspaceMode, permissionMode: permission.permission, ...sent }));
       haptic.confirm();
       unfoldProject(projectId);
@@ -109,6 +114,17 @@ export function useNewThread(projectId: string) {
     explainDim: dim.ask,
     submit,
   };
+}
+
+/**
+ * Where the thread runs, a choice only while the Mac offers cloud threads, for a project, to an agent that runs in a
+ * sandbox. Any other thread runs on the Mac, whatever was chosen before.
+ */
+function useCloudPlace(projectId: string, draft: SheetDraft, change: (patch: Partial<SheetDraft>) => void): Pick<ComposerSettings, "place"> {
+  const offer = useRpc("cloud.offer", {});
+  const provider = offer.data?.provider;
+  if (!provider || projectId === WORKSPACE_ID || draft.target.kind !== "model" || !runsInCloud(draft.target.choice?.agent)) return {};
+  return { place: { chosen: draft.workspace === "cloud" ? "cloud" : "mac", provider, select: (place) => change({ workspace: place === "cloud" ? "cloud" : null }) } };
 }
 
 /** The desktop's first choice, made from the same reads once they are in and kept with the draft. Returns the Mac's settings. */

@@ -98,6 +98,7 @@ export const Clock = icon(
     <Path d="M12 7v5l3.5 2.5" />
   </>,
 );
+export const Cloud = icon("Cloud", <Path d="M7.5 19h10a4.5 4.5 0 0 0 .5-8.97A6.5 6.5 0 0 0 5.6 11.3 4 4 0 0 0 7.5 19Z" />);
 export const Code2 = icon("Code2", <Path d="m7 7-5 5 5 5 M17 7l5 5-5 5 M14 4l-4 16" />);
 export const Columns2 = icon(
   "Columns2",

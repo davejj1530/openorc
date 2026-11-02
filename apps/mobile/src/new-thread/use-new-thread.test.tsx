@@ -39,6 +39,7 @@ function macState({ signedIn = ["codex", "claude"], defaultHarness = null }: { s
   mac.reads["agents.models"] = mac.models;
   mac.reads["agents.availability"] = harnessIds.map((id) => ({ id, state: signedIn.includes(id) ? "ready" : "sign_in" }));
   mac.reads["app.settings.get"] = { defaultWorkspaceMode: "worktree", defaultPermissionMode: "review", defaultHarness };
+  mac.reads["cloud.offer"] = { offered: false, provider: null };
 }
 
 beforeEach(() => {
@@ -124,6 +125,50 @@ it.each([
   mac.start.mockResolvedValue({ thread: { id: "thread-1" } });
   await submit(plain);
   expect(sent()).toMatchObject({ projectId: "notes", workspaceMode: "current" });
+});
+
+it("offers the cloud where the Mac does, for a project, and starts there when chosen", async () => {
+  mac.reads["cloud.offer"] = { offered: true, provider: "vercel" };
+  const sheet = open("openorc");
+  await write(sheet, "Fix the build");
+  await waitFor(() => expect(sheet.result.current.settings.place).toMatchObject({ chosen: "mac", provider: "vercel" }));
+  act(() => sheet.result.current.settings.place!.select("cloud"));
+  expect(sheet.result.current.settings.place?.chosen).toBe("cloud");
+  mac.start.mockResolvedValue({ thread: { id: "thread-1" } });
+  await submit(sheet);
+  expect(sent()).toMatchObject({ projectId: "openorc", workspaceMode: "worktree", cloud: true });
+
+  const workspace = open(WORKSPACE_ID);
+  await write(workspace, "Plan the week");
+  expect(workspace.result.current.settings.place).toBeUndefined();
+});
+
+it("starts on the Mac once the Mac stops offering the cloud, whatever was chosen", async () => {
+  mac.reads["cloud.offer"] = { offered: true, provider: "local" };
+  const sheet = open("openorc");
+  await write(sheet, "Fix the build");
+  await waitFor(() => expect(sheet.result.current.settings.place).toBeDefined());
+  act(() => sheet.result.current.settings.place!.select("cloud"));
+  mac.reads["cloud.offer"] = { offered: false, provider: null };
+  await act(() => mac.phone!.module.queryClient.invalidateQueries());
+  await waitFor(() => expect(sheet.result.current.settings.place).toBeUndefined());
+  mac.start.mockResolvedValue({ thread: { id: "thread-1" } });
+  await submit(sheet);
+  expect(sent()).toMatchObject({ workspaceMode: "worktree" });
+  expect(sent()).not.toHaveProperty("cloud");
+});
+
+it("says why a project with nothing to branch from cannot start in the cloud, and keeps the prompt", async () => {
+  mac.reads["cloud.offer"] = { offered: true, provider: "vercel" };
+  mac.git["notes"] = "no_commits";
+  const sheet = open("notes");
+  await write(sheet, "Tidy the notes folder");
+  await waitFor(() => expect(sheet.result.current.settings.place).toBeDefined());
+  act(() => sheet.result.current.settings.place!.select("cloud"));
+  expect(await submit(sheet)).toBeNull();
+  expect(mac.start).not.toHaveBeenCalled();
+  expect(sheet.result.current.error).toBe("A cloud thread starts on a branch of its own, and this project has no commit to branch from yet.");
+  expect(sheet.result.current.draft.prompt).toBe("Tidy the notes folder");
 });
 
 it("asks the Mac's git when Start is tapped, holding the start meanwhile, then branches where it can", async () => {

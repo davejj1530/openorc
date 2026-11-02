@@ -8,8 +8,8 @@ export type OrganizePatch = Pick<RpcParams<"threads.update">["patch"], "pinned" 
 
 type Symbol = NonNullable<ComponentProps<typeof Link.MenuAction>["icon"]>;
 
-/** The screens a thread's menu opens over the thread: the desktop's side panel tools a phone has. */
-export type ThreadScreenPath = "/changes" | "/preview";
+/** The screens a thread's menu opens over the thread: the desktop's side panel tools a phone has, and the move to the cloud. */
+export type ThreadScreenPath = "/changes" | "/preview" | "/move-to-cloud";
 
 /**
  * One item of a thread's menu: a change to save, a snooze (its time counted when it is chosen, as a row keeps its menu
@@ -36,10 +36,12 @@ function snooze(thread: ThreadSummary, now: Date): ThreadAction {
 /**
  * The side panel tools the header lists: `uncommitted` is the Changes file count, null without Git; `preview` names
  * the page the Mac shows for the thread, `page: null` while it shows none, and is null for a Mac that cannot show one.
+ * `toCloud` offers to move the thread to a sandbox of its own.
  */
 export interface ThreadPanels {
   uncommitted: number | null;
   preview: { page: string | null } | null;
+  toCloud?: boolean;
 }
 
 const NO_PANELS: ThreadPanels = { uncommitted: null, preview: null };
@@ -58,8 +60,8 @@ function changes(files: number): ThreadAction {
 
 /**
  * What a paired phone may do to a thread, in the desktop menu's order and sections: pin, snooze, read state; rename and
- * the pull request; archive. A team thread's lifecycle (snooze, archive) stays with the team on the Mac. Deleting,
- * forking and moving stay on the Mac. The header leads with the thread's panels, Changes then Preview: every thread
+ * the pull request and the move to the cloud; archive. A team thread's lifecycle (snooze, archive) stays with the team
+ * on the Mac. Deleting, forking and moving within the Mac stay there. The header leads with the thread's panels, Changes then Preview: every thread
  * action lives in the More menu, so the title keeps the header's center.
  */
 export function threadMenu(thread: ThreadSummary, place: MenuPlace, now: Date, panels: ThreadPanels = NO_PANELS): ThreadAction[][] {
@@ -72,6 +74,7 @@ export function threadMenu(thread: ThreadSummary, place: MenuPlace, now: Date, p
     thread.unread ? { kind: "patch", label: "Mark as Read", icon: "envelope.open", patch: { seen: true } } : { kind: "patch", label: "Mark as Unread", icon: "envelope.badge", patch: { seen: false } },
   ];
   const pull: ThreadAction[] = thread.prUrl ? [{ kind: "open", label: "Open Pull Request", icon: "arrow.up.right.square", url: thread.prUrl }] : [];
+  const move: ThreadAction[] = panels.toCloud ? [{ kind: "screen", label: "Move to Cloud", icon: "icloud.and.arrow.up", pathname: "/move-to-cloud" }] : [];
   const archive: ThreadAction[] = team
     ? []
     : [
@@ -79,7 +82,7 @@ export function threadMenu(thread: ThreadSummary, place: MenuPlace, now: Date, p
           ? { kind: "patch", label: "Unarchive", icon: "tray.and.arrow.up", patch: { archived: false } }
           : { kind: "patch", label: "Archive", icon: "archivebox", patch: { archived: true } },
       ];
-  const sections = place === "header" ? [[...screens, rename], organize, [...pull], archive] : [organize, [rename, ...pull], archive];
+  const sections = place === "header" ? [[...screens, rename], organize, [...pull, ...move], archive] : [organize, [rename, ...pull], archive];
   return sections.filter((section) => section.length > 0);
 }
 

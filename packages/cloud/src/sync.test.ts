@@ -6,7 +6,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { LocalSandboxProvider, type LocalSandbox } from "./local-sandbox.js";
 import { installRunner, runnerFiles } from "./runner-client.js";
-import { pullWorkspace, pushWorkspace, seedWorkspace, type WorkspaceLocation } from "./sync.js";
+import { pullWorkspace, pushWorkspace, seedFromCommit, seedWorkspace, type WorkspaceLocation } from "./sync.js";
 
 const IDENTITY = { GIT_AUTHOR_NAME: "Test", GIT_AUTHOR_EMAIL: "test@example.com", GIT_COMMITTER_NAME: "Test", GIT_COMMITTER_EMAIL: "test@example.com" };
 
@@ -166,5 +166,24 @@ describe("sending the Mac's changes to the sandbox", () => {
     expect(pushed).toEqual({ state: seeded, pushed: false });
     expect(file(location.repo, "b.txt")).toBe("b1\n");
     expect(file(location.repo, "a.txt")).toBe("changed in the cloud\n");
+  });
+});
+
+describe("seeding a new conversation from the commit its worktree starts at", () => {
+  it("checks out that commit on the conversation's branch, and replaces a checkout an earlier attempt left", async () => {
+    const commit = git(mirror, "rev-parse", "HEAD");
+    file(mirror, "a.txt", "uncommitted on the Mac\n");
+    const start = { source: mirror, commit, branch: "openorc/new-thread", origin: "https://github.com/example/repo.git" };
+    await seedFromCommit(location, start);
+    file(location.repo, "left-by-a-failed-setup.txt", "x\n");
+
+    const state = await seedFromCommit(location, start);
+    expect(state).toEqual({ snapshot: null, tree: git(mirror, "rev-parse", "HEAD^{tree}"), head: commit, known: [commit] });
+    expect(git(location.repo, "symbolic-ref", "--short", "HEAD")).toBe("openorc/new-thread");
+    expect(git(location.repo, "rev-parse", "HEAD")).toBe(commit);
+    expect(git(location.repo, "status", "--porcelain")).toBe("");
+    expect(file(location.repo, "a.txt")).toBe("a1\n");
+    expect(file(location.repo, "left-by-a-failed-setup.txt")).toBeNull();
+    expect(git(location.repo, "remote", "get-url", "origin")).toBe("https://github.com/example/repo.git");
   });
 });

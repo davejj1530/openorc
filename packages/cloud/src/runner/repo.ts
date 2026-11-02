@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, renameSync, rmSync } from "node:fs";
+import { mkdirSync, renameSync, rmSync } from "node:fs";
 import path from "node:path";
 
 /** Snapshot commits carry fixed metadata, so the same files on the same commit always make the same snapshot. */
@@ -37,25 +37,30 @@ export interface SeedRequest {
   repo: string;
   bundle: string;
   branch: string;
+  /** The bundle's ref for the branch, when it is not the branch itself. */
+  ref?: string;
   /** A commit whose files are the Mac's uncommitted work, on top of the branch. */
   workRef?: string;
   origin?: string;
 }
 
-/** Makes the workspace's checkout from a bundle the Mac sent. A checkout that already exists is kept. */
-export function seed(request: SeedRequest): { seeded: boolean } {
+/**
+ * Makes the workspace's checkout from a bundle the Mac sent. Only a workspace that never became ready is seeded, so no
+ * agent has worked in a checkout already here: a seed that is tried again replaces it.
+ */
+export function seed(request: SeedRequest): { seeded: true } {
   const { repo, bundle, branch, workRef, origin } = request;
-  if (existsSync(path.join(repo, ".git"))) return { seeded: false };
   const building = `${repo}.seeding`;
   rmSync(building, { recursive: true, force: true });
   mkdirSync(building, { recursive: true });
   git(building, ["init", "-q"]);
-  git(building, ["fetch", "-q", bundle, `refs/heads/${branch}:refs/heads/${branch}`, ...(workRef ? [`${workRef}:${SEED_REF}`] : [])]);
+  git(building, ["fetch", "-q", bundle, `${request.ref ?? `refs/heads/${branch}`}:refs/heads/${branch}`, ...(workRef ? [`${workRef}:${SEED_REF}`] : [])]);
   git(building, ["symbolic-ref", "HEAD", `refs/heads/${branch}`]);
   git(building, ["read-tree", "-u", "--reset", workRef ? SEED_REF : "HEAD"]);
   // The index goes back to the branch, so the Mac's uncommitted work stays uncommitted here too.
-  git(building, ["reset", "-q", "--mixed"]);
+  if (workRef) git(building, ["reset", "-q", "--mixed"]);
   if (origin) git(building, ["remote", "add", "origin", origin]);
+  rmSync(repo, { recursive: true, force: true });
   renameSync(building, repo);
   return { seeded: true };
 }

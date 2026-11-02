@@ -67,9 +67,8 @@ const print = (value: unknown) => process.stdout.write(`${JSON.stringify(value)}
 if (command === "daemon") await startDaemon(state, socketPath);
 else if (command === "bridge") await bridge(socketPath);
 else if (command === "seed") {
-  const workRef = options.get("work-ref")?.[0];
-  const origin = options.get("origin")?.[0];
-  print(seed({ repo: one("repo"), bundle: one("bundle"), branch: one("branch"), ...(workRef ? { workRef } : {}), ...(origin ? { origin } : {}) }));
+  const [workRef, origin, ref] = ["work-ref", "origin", "ref"].map((name) => options.get(name)?.[0]);
+  print(seed({ repo: one("repo"), bundle: one("bundle"), branch: one("branch"), ...(workRef ? { workRef } : {}), ...(origin ? { origin } : {}), ...(ref ? { ref } : {}) }));
 } else if (command === "snapshot") print(snapshot(one("repo"), state, options.get("known") ?? []));
 else if (command === "apply") print(apply(one("repo"), state, { bundle: one("bundle"), ref: one("ref"), expectTree: one("expect-tree") }));
 else {

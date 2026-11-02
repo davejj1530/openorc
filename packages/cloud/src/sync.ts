@@ -34,8 +34,7 @@ export interface WorkspaceLocation {
   refPrefix: string;
 }
 
-async function workingTreeCommit(cwd: string, parent: string): Promise<string | null> {
-  const tree = await treeHash(cwd);
+async function workingTreeCommit(cwd: string, parent: string, tree: string): Promise<string | null> {
   const parentTree = (await git(cwd, ["rev-parse", `${parent}^{tree}`])).stdout.trim();
   if (tree === parentTree) return null;
   return (await git(cwd, ["commit-tree", tree, "-p", parent, "-m", "OpenOrc work in progress"], { env: WORK_IDENTITY })).stdout.trim();
@@ -50,7 +49,8 @@ export async function seedWorkspace(location: WorkspaceLocation, branch: string,
   const current = (await git(mirror, ["symbolic-ref", "-q", "--short", "HEAD"], { okCodes: [0, 1] })).stdout.trim();
   if (current !== branch) throw new Error(`The folder for this cloud workspace is not on ${branch}.`);
   const head = (await git(mirror, ["rev-parse", "HEAD"])).stdout.trim();
-  const work = await workingTreeCommit(mirror, head);
+  const tree = await treeHash(mirror);
+  const work = await workingTreeCommit(mirror, head, tree);
   const workRef = `${refPrefix}seed`;
   if (work) await pinObject(mirror, workRef, work);
   const dir = await mkdtemp(path.join(os.tmpdir(), "openorc-seed-"));
@@ -64,7 +64,29 @@ export async function seedWorkspace(location: WorkspaceLocation, branch: string,
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
-  return { snapshot: null, tree: await treeHash(mirror), head, known: work ? [work] : [head] };
+  return { snapshot: null, tree, head, known: work ? [work] : [head] };
+}
+
+/**
+ * Makes the VM's checkout for a new conversation from the commit its worktree starts at, without waiting for the
+ * worktree: a new worktree holds exactly that commit's files. `source` is the repository the worktree belongs to.
+ */
+export async function seedFromCommit(location: WorkspaceLocation, start: { source: string; commit: string; branch: string; origin?: string }): Promise<MirrorState> {
+  const { install, refPrefix, repo } = location;
+  const ref = `${refPrefix}start`;
+  await pinObject(start.source, ref, start.commit);
+  const dir = await mkdtemp(path.join(os.tmpdir(), "openorc-seed-"));
+  try {
+    const bundle = path.join(dir, "seed.bundle");
+    await git(start.source, ["bundle", "create", "-q", bundle, ref]);
+    const remoteBundle = path.posix.join(install.state, "seed.bundle");
+    await install.sandbox.writeFile(remoteBundle, await readFile(bundle));
+    await runRunner(install, "seed", ["--repo", repo, "--bundle", remoteBundle, "--branch", start.branch, "--ref", ref, ...(start.origin ? ["--origin", start.origin] : [])]);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+  const tree = (await git(start.source, ["rev-parse", `${start.commit}^{tree}`])).stdout.trim();
+  return { snapshot: null, tree, head: start.commit, known: [start.commit] };
 }
 
 export interface PullResult {

@@ -14,8 +14,8 @@ export interface ControlContext {
   stop(): void;
 }
 
-/** Every request but status, which the host answers itself, starting and closing included. */
-export type CoreOp = Exclude<BrainControlOp, "status">;
+/** Every request but the status reads, which the host answers itself, starting and closing included. */
+export type CoreOp = Exclude<BrainControlOp, "status" | "wake">;
 type Handlers = { [K in CoreOp]: (request: Extract<BrainControlRequest, { op: K }>) => Promise<BrainControlResults[K]> };
 
 /** Where each handed-over sign-in goes on the brain: through the core service that owns it, as on the Mac. Null: not taken. */

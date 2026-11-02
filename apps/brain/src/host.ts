@@ -91,9 +91,9 @@ class Host {
     return this.core.handle(request, origin);
   };
 
-  /** `ctl`'s requests: status whatever the phase, the rest only when ready. */
+  /** `ctl`'s requests: the status reads whatever the phase, the rest only when ready. */
   readonly request = async (request: BrainControlRequest): Promise<unknown> => {
-    if (request.op === "status") return this.status();
+    if (request.op === "status" || request.op === "wake") return this.status();
     if (this.phase === "closing") throw new Error(NOT_READY.closing);
     if (!this.ops) throw new Error(NOT_READY.starting);
     return this.ops(request);

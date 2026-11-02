@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { BRAIN_EXIT, parseControlReply, type BrainControlRequest } from "@openorc/cloud";
+import { BRAIN_EXIT, parseControlReply, type BrainControlOp, type BrainControlRequest } from "@openorc/cloud";
 import { askControl, serveControl, type ControlServer } from "./control.js";
 
 let dir: string;
@@ -40,13 +40,13 @@ const gate = () => {
 };
 
 describe("the control socket", () => {
-  it("answers status while another request runs, and runs the others one at a time", async () => {
+  it("answers the status reads while another request runs, and runs the others one at a time", async () => {
     const first = gate();
     const order: string[] = [];
     server = await serveControl(
       socket,
       async (request: BrainControlRequest) => {
-        if (request.op === "status") return { state: "ready", version: "v1", pid: 1, since: 0, busy: server?.busy ?? null };
+        if (request.op === "status" || request.op === "wake") return { state: "ready", version: "v1", pid: 1, since: 0, busy: server?.busy ?? null };
         order.push(`start ${request.op}`);
         if (request.op === "pair") await first.opened;
         order.push(`end ${request.op}`);
@@ -60,6 +60,7 @@ describe("the control socket", () => {
     await new Promise((resolve) => setTimeout(resolve, 50));
     const status = await ctl(JSON.stringify({ op: "status" }));
     expect(parseControlReply("status", status.reply)).toMatchObject({ ok: true, result: { busy: "control" } });
+    expect(parseControlReply("wake", (await ctl(JSON.stringify({ op: "wake" }))).reply)).toMatchObject({ ok: true, result: { busy: "control" } });
     expect(order).toEqual(["start pair"]);
     first.open();
     expect(parseControlReply("pair", (await pair).reply)).toEqual({ ok: true, result: { url: "openorc://pair", expiresAt: 1 } });
@@ -68,17 +69,39 @@ describe("the control socket", () => {
     expect(server.busy).toBeNull();
   });
 
-  it("counts every request it hears, and answers a failure in the handler's words", async () => {
-    let heard = 0;
+  it("answers a failure in the handler's words", async () => {
     server = await serveControl(
       socket,
       async () => {
         throw new Error("Turn on phone access first.");
       },
-      () => heard++,
+      () => undefined,
     );
     expect(parseControlReply("pair", (await ctl(JSON.stringify({ op: "pair" }))).reply)).toEqual({ ok: false, error: "Turn on phone access first." });
-    expect(heard).toBe(1);
+  });
+
+  it("starts the idle clock again for use and a waker's status, never for a status poll or a stop", async () => {
+    const requests = {
+      status: { op: "status" },
+      wake: { op: "wake" },
+      pair: { op: "pair" },
+      handover: { op: "handover", sealed: {} },
+      "import-project": { op: "import-project", name: "demo", bundle: "demo.bundle" },
+      stop: { op: "stop" },
+    } satisfies { [K in BrainControlOp]: Extract<BrainControlRequest, { op: K }> };
+    let uses = 0;
+    server = await serveControl(
+      socket,
+      async () => ({}),
+      () => uses++,
+    );
+    const used: string[] = [];
+    for (const [op, request] of Object.entries(requests)) {
+      const before = uses;
+      expect((await ctl(JSON.stringify(request))).code).toBe(0);
+      if (uses > before) used.push(op);
+    }
+    expect(used).toEqual(["wake", "pair", "handover", "import-project"]);
   });
 
   it("names a bad field without repeating what was sent", async () => {

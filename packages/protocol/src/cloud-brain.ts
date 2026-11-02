@@ -106,6 +106,23 @@ export type CloudBrainStatus =
     }
   | { state: "removing" };
 
+/** A project on this Mac, and whether the cloud brain has a copy of it. */
+export interface CloudBrainProject {
+  /** The Mac project. */
+  id: string;
+  name: string;
+  /** Switched on: the brain has, or is getting, a copy of its default branch, kept fresh whenever the Mac wakes it. */
+  on: boolean;
+  /** Why it cannot be switched now; null when it can. */
+  blocked: string | null;
+  /** Its copy is on its way to the brain. */
+  sending: boolean;
+  /** The brain's copy has commits on the default branch this Mac lacks, so it kept them instead of this Mac's. */
+  kept: boolean;
+  /** Why the last send failed. */
+  error: string | null;
+}
+
 export interface CloudBrainPairing {
   /** `openorc://pair#…`, drawn as a QR code. Holds a one-time secret. */
   url: string;
@@ -125,6 +142,10 @@ export const cloudBrainRpcParams = {
   "cloud.brain.handover": z.object({}),
   /** Deletes the brain with its disk and its thread sandboxes, and forgets its key. */
   "cloud.brain.remove": z.object({}),
+  /** This Mac's projects, and which the brain has. Never wakes the brain. */
+  "cloud.brain.projects": z.object({}),
+  /** Sends a project to the brain, or removes its copy there, waking the brain. */
+  "cloud.brain.project": z.object({ projectId: z.string().min(1), on: z.boolean() }).strict(),
 };
 
 export interface CloudBrainRpcResults {
@@ -134,4 +155,6 @@ export interface CloudBrainRpcResults {
   "cloud.brain.pair": CloudBrainPairing;
   "cloud.brain.handover": CloudBrainStatus;
   "cloud.brain.remove": CloudBrainStatus;
+  "cloud.brain.projects": CloudBrainProject[];
+  "cloud.brain.project": CloudBrainProject[];
 }

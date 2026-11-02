@@ -240,7 +240,7 @@ export class WorkspaceService {
   }
 
   /** Checks a new cloud conversation and picks where it runs, before it is admitted. */
-  placeCloud(input: Pick<StartThreadInput, "agent" | "checkout">, project: Project): Promise<CloudProviderId> {
+  placeCloud(input: Pick<StartThreadInput, "agent" | "checkout" | "claudeAccountId">, project: Project): Promise<CloudProviderId> {
     if (!this.options.cloud) throw new Error("Cloud workspaces are not available.");
     return this.options.cloud.place(input, project);
   }

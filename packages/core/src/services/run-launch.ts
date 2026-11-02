@@ -204,7 +204,7 @@ export class RunLaunch {
     phase("prepare");
     if (!isHarnessId(input.agent)) throw new Error(`Provider ${input.agent} has no executable adapter.`);
     // In a cloud workspace the CLI is the sandbox's own, found on its PATH, with the sandbox's environment.
-    const placed = cloud ? { revision: launch.revision, binary: input.agent, env: {}, host: cloud.host } : { ...launch, processRegistry: this.deps.hooks.processRegistry };
+    const placed = cloud ? { revision: launch.revision, binary: input.agent, env: cloud.env, host: cloud.host } : { ...launch, processRegistry: this.deps.hooks.processRegistry };
     const handle = this.deps.adapters[input.agent].start(spec, placed);
     phase("spawn");
     this.deps.emit({ type: "activity.updated", runId, ts: Date.now(), activityId: "startup", label: `Starting ${harnessName(input.agent)}`, status: "running" });
@@ -274,7 +274,7 @@ export class RunLaunch {
   /** Where a cloud conversation's agent runs, connected while the turn's starting point is captured; null on this Mac. */
   private connectCloud(input: StartRunInput, mcpUrl: string): Promise<CloudRunHost | null> {
     const thread = input.scope.thread;
-    const connecting = (thread && this.deps.hooks.cloudHost?.(thread, new URL(mcpUrl).origin)) || Promise.resolve(null);
+    const connecting = (thread && this.deps.hooks.cloudHost?.(thread, new URL(mcpUrl).origin, input.claudeAccountId)) || Promise.resolve(null);
     // Awaited after the capture; a failure before then must not go unhandled.
     void connecting.catch(() => undefined);
     return connecting;

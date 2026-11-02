@@ -12,7 +12,7 @@ import {
   VercelSandboxProvider,
   type RunnerFile,
   type SandboxProvider,
-  type VercelAccess,
+  type VercelCredentials,
   type WorkspaceLocation,
 } from "@openorc/cloud";
 import { cloudWorkspaces, type CloudMirrorState, type CloudProviderId, type CloudWorkspaceRecord, type Db } from "@openorc/db";
@@ -20,6 +20,7 @@ import { originUrl } from "@openorc/git";
 import { WORKSPACE_ID, type Project, type Thread } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
 import { cloudAgentHost } from "./cloud-agent-host.js";
+import type { CloudAgentEnvironment } from "./cloud-agent-env.js";
 import type { StartThreadInput } from "./thread-inputs.js";
 
 export interface CloudWorkspaceOptions {
@@ -30,6 +31,8 @@ export interface CloudWorkspaceOptions {
   /** Node in the sandbox, which runs OpenOrc's runner. */
   node?: string;
   files?: RunnerFile[];
+  /** How the thread's Claude account signs in to the sandbox. Without it, agents use the sandbox's own environment. */
+  agentEnvironment?: CloudAgentEnvironment;
 }
 
 const SETUP_OUTPUT_TAIL = 2000;
@@ -49,7 +52,7 @@ export function assertCloudStart(input: Pick<StartThreadInput, "agent" | "checko
 export function cloudSandboxProviders(input: {
   dataDir: string;
   env: () => NodeJS.ProcessEnv;
-  credentials?: () => Promise<VercelAccess | null>;
+  credentials?: () => Promise<VercelCredentials | null>;
   override?: SandboxProvider;
 }): Pick<CloudWorkspaceOptions, "providers" | "forNewThreads"> {
   const local = new LocalSandboxProvider(path.join(input.dataDir, "cloud-sandboxes"), input.env);
@@ -60,10 +63,11 @@ export function cloudSandboxProviders(input: {
   return { providers, forNewThreads: async () => override ?? ((await credentials()) ? vercel : local) };
 }
 
-/** Where a cloud conversation's agent runs, and its working folder there. */
+/** Where a cloud conversation's agent runs, its working folder there, and how its account signs in. */
 export interface CloudRunHost {
   host: AgentHost;
   cwd: string;
+  env: Record<string, string>;
 }
 
 interface Connection {
@@ -95,10 +99,12 @@ export class CloudWorkspaceService {
   }
 
   /** Checks a new cloud conversation and picks where it runs. Call before admitting it. */
-  async place(input: Pick<StartThreadInput, "agent" | "checkout">, project: Project): Promise<CloudProviderId> {
+  /** The provider a new cloud conversation runs on. Refused before anything is made when its account cannot sign in there. */
+  async place(input: Pick<StartThreadInput, "agent" | "checkout" | "claudeAccountId">, project: Project): Promise<CloudProviderId> {
     assertCloudStart(input, project);
     const provider = (await this.options.forNewThreads?.()) ?? this.options.providers[0];
     if (!provider) throw new Error("Cloud workspaces are not available.");
+    await this.options.agentEnvironment?.(provider.id, input.claudeAccountId);
     return provider.id;
   }
 
@@ -226,13 +232,15 @@ export class CloudWorkspaceService {
    * Where the conversation's next turn runs, or null when it runs on this Mac. MCP requests from the sandbox reach
    * `mcpOrigin` on the Mac through the runner.
    */
-  async host(thread: Thread, mcpOrigin: string): Promise<CloudRunHost | null> {
+  async host(thread: Thread, mcpOrigin: string, claudeAccountId?: string | null): Promise<CloudRunHost | null> {
     const record = cloudWorkspaces.get(this.db, thread.id);
     if (!record) return null;
     if (record.state !== "ready" || !thread.worktreePath) throw new Error("This conversation's cloud workspace is not ready. Send again to set it up.");
+    // Each turn signs in as the account it runs on, so changing the thread's account takes effect at the next turn.
+    const env = (await this.options.agentEnvironment?.(record.provider, claudeAccountId)) ?? {};
     const { location, client } = await this.connect(record, thread.worktreePath);
     const port = await client.relay("mcp", mcpOrigin);
-    return { host: cloudAgentHost(client, location, port), cwd: location.repo };
+    return { host: cloudAgentHost(client, location, port), cwd: location.repo, env };
   }
 
   /** Disconnects from every sandbox. Processes in a cloud VM keep running there; sandboxes on this Mac stop. */

@@ -19,7 +19,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import readline from "node:readline";
 const args = process.argv.slice(2);
-const log = { cwd: process.cwd(), args };
+const log = { cwd: process.cwd(), args, oauth: process.env.CLAUDE_CODE_OAUTH_TOKEN ?? null };
 const config = JSON.parse(readFileSync(args[args.indexOf("--mcp-config") + 1], "utf8"));
 const url = Object.values(config.mcpServers)[0].url;
 const settings = JSON.parse(args[args.indexOf("--settings") + 1]);
@@ -76,7 +76,9 @@ beforeEach(async () => {
   await chmod(path.join(bin, "claude"), 0o755);
   log = path.join(root, "fake-claude.json");
   const sandboxes = new LocalSandboxProvider(path.join(root, "sandboxes"), () => ({ ...process.env, PATH: `${bin}:${process.env["PATH"] ?? ""}`, FAKE_CLAUDE_LOG: log }));
-  core = await OpenOrc.create({ dataDir: path.join(root, "data"), ephemeral: true, transport: { push: () => {} }, cloudSandboxes: sandboxes });
+  let saved: string | null = null;
+  const tokenStore = { load: async () => saved, save: async (value: string) => void (saved = value) };
+  core = await OpenOrc.create({ dataDir: path.join(root, "data"), ephemeral: true, transport: { push: () => {} }, cloudSandboxes: sandboxes, claudeCloudSecrets: tokenStore });
   settings.set(core.db, "extraction.provider", "off");
   vi.spyOn(core.textGeneration, "title").mockResolvedValue(null);
   vi.spyOn(core.runs, "models").mockResolvedValue([{ id: "fixture", label: "Fixture", agent: "claude", isDefault: true, efforts: ["high"], defaultEffort: "high", fastMode: { supported: false } }]);
@@ -224,4 +226,29 @@ it("sends a commit made on the Mac between turns to the sandbox, and keeps it on
   expect((await git(mirror, ["rev-parse", "HEAD"])).stdout.trim()).toBe(committed);
   expect((await git(mirror, ["status", "--porcelain"])).stdout).toBe("?? second.txt\n");
   expect((await git(mirror, ["for-each-ref", `refs/openorc/cloud/${thread.id}/kept-commit/`])).stdout).toBe("");
+});
+
+it("signs the agent in to its sandbox with the thread's account token, and with none when the account has no token", async () => {
+  const start = (prompt: string) =>
+    core.threads.start({
+      agent: "claude",
+      model: "fixture",
+      effort: undefined,
+      mode: "act",
+      permissionMode: "autonomous",
+      attachments: undefined,
+      title: undefined,
+      projectId: project.id,
+      prompt,
+      cloud: true,
+    });
+  await start("Without a token");
+  await until(() => existsSync(log));
+  expect(JSON.parse(readFileSync(log, "utf8")).oauth).toBeNull();
+
+  await rm(log, { force: true });
+  await core.claudeCloudTokens.save(core.claudeAccounts.defaultId(), "sk-ant-oat01-Thread_account_token-0123456789");
+  await start("With a token");
+  await until(() => existsSync(log));
+  expect(JSON.parse(readFileSync(log, "utf8")).oauth).toBe("sk-ant-oat01-Thread_account_token-0123456789");
 });

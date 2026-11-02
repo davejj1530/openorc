@@ -37,6 +37,8 @@ import { createSettingsHandlers } from "./handlers/settings.js";
 import { createSlackHandlers } from "./handlers/slack.js";
 import { createCloudHandlers } from "./handlers/cloud.js";
 import { CloudSettings } from "./services/cloud-settings.js";
+import { ClaudeCloudTokens } from "./services/claude-cloud-tokens.js";
+import { cloudAgentEnvironment } from "./services/cloud-agent-env.js";
 import { createSystemHandlers } from "./handlers/system.js";
 import { createTaskCreateHandlers } from "./handlers/task-create.js";
 import { createTaskDeleteHandlers } from "./handlers/task-delete.js";
@@ -129,8 +131,10 @@ export class OpenOrc {
   readonly workspaces: WorkspaceService;
   /** Sandboxes for cloud conversations and the connections to them. */
   readonly cloud: CloudWorkspaceService;
-  /** Where cloud threads run and how their agents sign in, as Settings keeps them. */
+  /** Where cloud threads run, as Settings keeps it. */
   readonly cloudSettings: CloudSettings;
+  /** How each Claude account's agents sign in to cloud sandboxes. */
+  readonly claudeCloudTokens: ClaudeCloudTokens;
   readonly runs: RunService;
   readonly comments: TaskCommentService;
   readonly review: ReviewService;
@@ -252,7 +256,9 @@ export class OpenOrc {
       credentials: options.cloudCredentials ?? (() => this.cloudSettings.credentials()),
       ...(options.cloudSandboxes ? { override: options.cloudSandboxes } : {}),
     });
-    this.cloud = new CloudWorkspaceService(db, { ...sandboxes, ...(options.cloudRunnerFiles ? { files: options.cloudRunnerFiles } : {}) }, this.log);
+    this.claudeCloudTokens = new ClaudeCloudTokens(options.claudeCloudSecrets, this.claudeAccounts, () => invalidate(["cloud"]));
+    const agentEnvironment = cloudAgentEnvironment({ accounts: this.claudeAccounts, tokens: this.claudeCloudTokens, snapshot: () => this.environment.current() });
+    this.cloud = new CloudWorkspaceService(db, { ...sandboxes, agentEnvironment, ...(options.cloudRunnerFiles ? { files: options.cloudRunnerFiles } : {}) }, this.log);
     this.workspaces = new WorkspaceService(db, { dataDir: options.dataDir, cloud: this.cloud }, this.log, this.workspaceWriters);
     const backgroundProviders: ProviderInfo = {
       models: (agent, accountId) => this.runs.models(agent, undefined, undefined, accountId),
@@ -472,7 +478,7 @@ export class OpenOrc {
       brief: (project) => this.memory.brief(project),
       threadContext: (thread) => this.pullRequests.brief(thread),
       untrustedCheckout: (thread) => inUnvettedCopy(db, thread),
-      cloudHost: (thread, mcpOrigin) => this.cloud.host(thread, mcpOrigin),
+      cloudHost: (thread, mcpOrigin, accountId) => this.cloud.host(thread, mcpOrigin, accountId),
       syncCloud: (thread, sync) =>
         this.cloud.sync(thread, sync).catch((error: unknown) => {
           this.log.warn(`could not bring thread ${thread.id}'s cloud changes to the Mac: ${error instanceof Error ? error.message : String(error)}`);
@@ -679,6 +685,7 @@ export class OpenOrc {
   async close(): Promise<void> {
     await this.remote.close(this.closingForUpdate ? "update" : "shutdown");
     this.threads.stopAccepting();
+    await this.claudeCloudTokens.close();
     await this.claudeAccounts.close();
     await this.agentUpdates.close();
     await this.comments.close();
@@ -717,7 +724,7 @@ export class OpenOrc {
   private buildHandlers(invalidate: (keys: string[]) => void): Handlers {
     return composeHandlers(
       createSlackHandlers({ slack: this.slack, invalidate }),
-      createCloudHandlers({ settings: this.cloudSettings, invalidate }),
+      createCloudHandlers({ settings: this.cloudSettings, tokens: this.claudeCloudTokens, invalidate }),
       createClaudeAccountHandlers(this.claudeAccounts),
       createSystemHandlers({
         system: this.system,

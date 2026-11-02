@@ -1,4 +1,4 @@
-import type { VercelAccess } from "@openorc/cloud";
+import type { VercelCredentials } from "@openorc/cloud";
 import type { CloudStatus, CloudTeam } from "@openorc/protocol";
 import type { ProtectedSecretStore } from "./extraction-credentials.js";
 
@@ -9,14 +9,16 @@ const storageError = "Cannot access protected storage for cloud credentials. Unl
 
 interface Stored {
   vercel?: { token: string; team?: CloudTeam; project?: { id: string; name: string } };
-  claudeToken?: string;
 }
+
+/** The Vercel part of what Settings shows. */
+export type VercelStatus = Pick<CloudStatus, "vercel" | "error">;
 
 export type VercelRequest = (url: string, init: RequestInit) => Promise<Response>;
 
-function view(stored: Stored): CloudStatus {
+function view(stored: Stored): VercelStatus {
   const vercel = stored.vercel;
-  return { vercel: vercel ? { team: vercel.team ?? null, project: vercel.project?.name ?? null } : null, claude: Boolean(stored.claudeToken), error: null };
+  return { vercel: vercel ? { team: vercel.team ?? null, project: vercel.project?.name ?? null } : null, error: null };
 }
 
 /** Vercel's own words about a refusal; never the request, which carries the token. */
@@ -26,8 +28,8 @@ async function refusal(response: Response): Promise<string> {
 }
 
 /**
- * Where cloud threads run and how their agents sign in: a Vercel token with the team and project its sandboxes use, and
- * a Claude token from `claude setup-token`. Kept only in main's protected store, read and written one operation at a time.
+ * Where cloud threads run: a Vercel token with the team and project its sandboxes use. Kept only in main's protected
+ * store, read and written one operation at a time. How each Claude account signs in there is `ClaudeCloudTokens`.
  */
 export class CloudSettings {
   private pending: Promise<unknown> = Promise.resolve();
@@ -57,7 +59,7 @@ export class CloudSettings {
     return this.cache;
   }
 
-  private async write(next: Stored): Promise<CloudStatus> {
+  private async write(next: Stored): Promise<VercelStatus> {
     try {
       if (!this.store) throw new Error(storageError);
       await this.store.save(JSON.stringify(next));
@@ -95,28 +97,27 @@ export class CloudSettings {
     return { id: made.body.id, name: made.body.name };
   }
 
-  status(): Promise<CloudStatus> {
+  status(): Promise<VercelStatus> {
     return this.serialize(async () => {
       try {
         return view(await this.read());
       } catch (error) {
-        return { vercel: null, claude: false, error: error instanceof Error ? error.message : storageError };
+        return { vercel: null, error: error instanceof Error ? error.message : storageError };
       }
     });
   }
 
   /** What a Vercel sandbox needs, or null until Vercel is connected and a team is chosen. */
-  credentials(): Promise<VercelAccess | null> {
+  credentials(): Promise<VercelCredentials | null> {
     return this.serialize(async () => {
-      const stored = await this.read().catch(() => ({}) as Stored);
-      const vercel = stored.vercel;
+      const vercel = (await this.read().catch(() => ({}) as Stored)).vercel;
       if (!vercel?.team || !vercel.project) return null;
-      return { token: vercel.token, teamId: vercel.team.id, projectId: vercel.project.id, ...(stored.claudeToken ? { claudeToken: stored.claudeToken } : {}) };
+      return { token: vercel.token, teamId: vercel.team.id, projectId: vercel.project.id };
     });
   }
 
   /** Saves a token Vercel accepts. With one team, that team is chosen too. */
-  connect(token: string): Promise<{ status: CloudStatus; teams: CloudTeam[] }> {
+  connect(token: string): Promise<{ status: VercelStatus; teams: CloudTeam[] }> {
     return this.serialize(async () => {
       const teams = await this.teamsFor(token);
       const stored = await this.read();
@@ -134,7 +135,7 @@ export class CloudSettings {
     });
   }
 
-  chooseTeam(teamId: string): Promise<CloudStatus> {
+  chooseTeam(teamId: string): Promise<VercelStatus> {
     return this.serialize(async () => {
       const stored = await this.read();
       const token = stored.vercel?.token;
@@ -145,21 +146,7 @@ export class CloudSettings {
     });
   }
 
-  disconnect(): Promise<CloudStatus> {
-    return this.serialize(async () => {
-      const { claudeToken } = await this.read();
-      return this.write(claudeToken ? { claudeToken } : {});
-    });
-  }
-
-  saveClaudeToken(token: string): Promise<CloudStatus> {
-    return this.serialize(async () => this.write({ ...(await this.read()), claudeToken: token }));
-  }
-
-  removeClaudeToken(): Promise<CloudStatus> {
-    return this.serialize(async () => {
-      const { vercel } = await this.read();
-      return this.write(vercel ? { vercel } : {});
-    });
+  disconnect(): Promise<VercelStatus> {
+    return this.serialize(async () => this.write({}));
   }
 }

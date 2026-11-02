@@ -203,20 +203,27 @@ export class ClaudeAccountService {
     return starting;
   }
 
+  /**
+   * The account's CLI, environment and Claude folder for a browser sign-in, as `claude auth login` and `claude setup-token`
+   * use them. An added account signs in from a private browser window, so the browser's own Claude login stays put.
+   */
+  signInLaunch(id: string): { binary: string; env: NodeJS.ProcessEnv; directory: string } {
+    const account = this.require(id);
+    const launch = captureLaunchEnvironment("claude", this.environment(this.snapshot(), id));
+    const directory = launch.env["CLAUDE_CONFIG_DIR"] || path.join(os.homedir(), ".claude");
+    return { binary: launch.binary, env: { ...launch.env, ...(account.kind === "managed" ? this.privateBrowser() : {}) }, directory };
+  }
+
   private async startLogin(id: string): Promise<{ started: boolean }> {
     if (this.closing) throw new Error("OpenOrc is closing.");
-    const account = this.require(id);
-    const snapshot = this.environment(this.snapshot(), id);
-    const launch = captureLaunchEnvironment("claude", snapshot);
-    const directory = snapshot.env["CLAUDE_CONFIG_DIR"] || path.join(os.homedir(), ".claude");
+    const { binary, env, directory } = this.signInLaunch(id);
     await this.retireIdle(id);
     if (this.closing) throw new Error("OpenOrc is closing.");
     this.require(id);
     if (this.busy(id)) throw new Error("Finish this account's active sessions before signing in again.");
     mkdirSync(directory, { recursive: true, mode: 0o700 });
-    const command = launchCommand(launch.binary, ["--setting-sources", "user", "auth", "login", "--claudeai"]);
-    const browser = account.kind === "managed" ? this.privateBrowser() : {};
-    const process = spawn(command.file, command.args, { ...command.options, env: { ...launch.env, ...browser }, cwd: directory, stdio: "ignore", detached: globalThis.process.platform !== "win32" });
+    const command = launchCommand(binary, ["--setting-sources", "user", "auth", "login", "--claudeai"]);
+    const process = spawn(command.file, command.args, { ...command.options, env, cwd: directory, stdio: "ignore", detached: globalThis.process.platform !== "win32" });
     this.errors.delete(id);
     const timer = setTimeout(() => stopProcess(process), 5 * 60_000);
     const done = new Promise<void>((resolve) => {
@@ -253,6 +260,7 @@ export class ClaudeAccountService {
     const chrome = globalThis.process.platform === "win32" ? null : chromeExecutable();
     if (!chrome) return {};
     const script = path.join(this.dataDir, "claude-accounts", "open-chrome-incognito");
+    mkdirSync(path.dirname(script), { recursive: true, mode: 0o700 });
     writeFileSync(script, `#!/bin/sh\nexec "$OPENORC_CHROME" ${chromeIncognitoFlags.join(" ")} "$1"\n`, { mode: 0o700 });
     return { BROWSER: script, OPENORC_CHROME: chrome };
   }

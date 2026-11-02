@@ -1,4 +1,4 @@
-import type { RunnerFile, SandboxProvider, VercelAccess } from "@openorc/cloud";
+import type { RunnerFile, SandboxProvider, VercelCredentials } from "@openorc/cloud";
 import type { TextEmbedder } from "@openorc/memory";
 import type { BrowserHost, PreviewHost } from "@openorc/protocol";
 import type { DeviceSystem } from "./devices/system.js";
@@ -54,8 +54,10 @@ export interface OpenOrcOptions {
   cloudSandboxes?: SandboxProvider;
   /** The cloud runner's source files, for a bundled core that cannot read them beside its own code. */
   cloudRunnerFiles?: RunnerFile[];
-  /** Keeps the Vercel and Claude tokens cloud threads use. Without it, cloud threads run only in sandboxes on this Mac. */
+  /** Keeps the Vercel connection cloud threads run on. Without it, cloud threads run only in sandboxes on this Mac. */
   cloudSecrets?: ProtectedSecretStore;
+  /** Keeps each Claude account's token for signing in to cloud sandboxes. */
+  claudeCloudSecrets?: ProtectedSecretStore;
   /** Overrides the credentials Settings keeps, for tests and smoke scripts. While it resolves to null, new cloud conversations run in sandboxes on this Mac. */
-  cloudCredentials?: () => Promise<VercelAccess | null>;
+  cloudCredentials?: () => Promise<VercelCredentials | null>;
 }

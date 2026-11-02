@@ -36,7 +36,7 @@ function memoryStore() {
 }
 
 describe("cloud settings", () => {
-  it("connects with one team, makes its sandbox project, and gives sandboxes both tokens", async () => {
+  it("connects with one team, makes its sandbox project, and gives sandboxes its credentials", async () => {
     const vercel = fakeVercel([{ id: "team_a", name: "Acme", slug: "acme" }]);
     const store = memoryStore();
     const settings = new CloudSettings(store, vercel.request);
@@ -44,12 +44,11 @@ describe("cloud settings", () => {
 
     const { status, teams } = await settings.connect(TOKEN);
     expect(teams).toEqual([{ id: "team_a", name: "Acme" }]);
-    expect(status).toEqual({ vercel: { team: { id: "team_a", name: "Acme" }, project: SANDBOX_PROJECT }, claude: false, error: null });
+    expect(status).toEqual({ vercel: { team: { id: "team_a", name: "Acme" }, project: SANDBOX_PROJECT }, error: null });
     expect(vercel.calls).toEqual(["GET /v2/teams", `GET /v9/projects/${SANDBOX_PROJECT}`, "POST /v11/projects"]);
 
-    await settings.saveClaudeToken("sk-ant-oat-claude");
-    expect(await settings.credentials()).toEqual({ token: TOKEN, teamId: "team_a", projectId: "prj_team_a", claudeToken: "sk-ant-oat-claude" });
-    expect(await new CloudSettings(store, vercel.request).status()).toEqual({ vercel: { team: { id: "team_a", name: "Acme" }, project: SANDBOX_PROJECT }, claude: true, error: null });
+    expect(await settings.credentials()).toEqual({ token: TOKEN, teamId: "team_a", projectId: "prj_team_a" });
+    expect(await new CloudSettings(store, vercel.request).status()).toEqual({ vercel: { team: { id: "team_a", name: "Acme" }, project: SANDBOX_PROJECT }, error: null });
   });
 
   it("waits for a team choice when the token reaches several, and reuses a project that exists", async () => {
@@ -79,18 +78,16 @@ describe("cloud settings", () => {
     expect(store.peek()).toBeNull();
   });
 
-  it("disconnects Vercel and removes the Claude token separately", async () => {
+  it("disconnects Vercel", async () => {
     const settings = new CloudSettings(memoryStore(), fakeVercel([{ id: "team_a", name: "Acme", slug: "acme" }]).request);
     await settings.connect(TOKEN);
-    await settings.saveClaudeToken("sk-ant-oat-claude");
-    expect(await settings.disconnect()).toEqual({ vercel: null, claude: true, error: null });
+    expect(await settings.disconnect()).toEqual({ vercel: null, error: null });
     expect(await settings.credentials()).toBeNull();
-    expect(await settings.removeClaudeToken()).toEqual({ vercel: null, claude: false, error: null });
   });
 
   it("reports storage it cannot open without exposing anything", async () => {
     const settings = new CloudSettings({ load: () => Promise.reject(new Error("keychain locked")), save: async () => {} }, fakeVercel([]).request);
-    expect(await settings.status()).toEqual({ vercel: null, claude: false, error: expect.stringContaining("protected storage") });
+    expect(await settings.status()).toEqual({ vercel: null, error: expect.stringContaining("protected storage") });
     expect(await settings.credentials()).toBeNull();
   });
 });

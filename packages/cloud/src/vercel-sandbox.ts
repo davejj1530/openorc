@@ -38,7 +38,7 @@ export interface VercelListed {
   totalDurationMs?: number | undefined;
 }
 
-const STATES: Record<VercelListed["status"], SandboxInfo["state"]> = {
+export const STATES: Record<VercelListed["status"], SandboxInfo["state"]> = {
   pending: "starting",
   running: "running",
   stopping: "stopping",

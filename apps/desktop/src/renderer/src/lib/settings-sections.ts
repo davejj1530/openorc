@@ -1,3 +1,4 @@
+import { cloudOffered } from "./cloud-offered";
 import { BookText, Brain, Cloud, Laptop, Link2, MessageSquare, Signal, SlidersHorizontal, Smartphone, SunMoon, Tablet } from "../components/icons";
 import { SETTINGS_SECTIONS, type Route, type SettingsSection } from "./router";
 
@@ -16,7 +17,7 @@ const presentation: Record<SettingsSection, { label: string; description: string
 };
 
 /** Cloud threads are offered only in development and QA builds until they run on a real provider by default. */
-const offered = (id: SettingsSection) => id !== "cloud" || import.meta.env.DEV || __OPENORC_QA__;
+const offered = (id: SettingsSection) => id !== "cloud" || cloudOffered;
 
 /** Settings' sections, in the order the sidebar lists them. */
 export const settingsSections = SETTINGS_SECTIONS.filter(offered).map((id) => ({ id, ...presentation[id] }));

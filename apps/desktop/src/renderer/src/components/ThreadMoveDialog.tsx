@@ -2,13 +2,16 @@ import { useRef, useState, type ReactNode } from "react";
 import type { WorkspaceMode } from "@openorc/protocol";
 import { FileRows } from "../panels/FileRows";
 import { Button, Dialog } from "./ui";
+import { CloudMoveDialog } from "./CloudMoveDialog";
 import { useUi } from "../lib/ui";
 import { useRpc, useRpcMutation } from "../lib/client";
 
 /** One confirm for moving a conversation, listing the files that go with it. Team conversations use TeamMoveDialog. */
 export function ThreadMoveDialog() {
   const id = useUi((state) => state.moveThreadId);
-  return id ? <MoveDialog key={id} threadId={id} /> : null;
+  const toCloud = useUi((state) => state.moveThreadToCloud);
+  if (!id) return null;
+  return toCloud ? <CloudMoveDialog key={`cloud:${id}`} threadId={id} /> : <MoveDialog key={id} threadId={id} />;
 }
 
 function MoveDialog({ threadId }: { threadId: string }) {

@@ -1,10 +1,11 @@
+import { cloudOffered } from "../lib/cloud-offered";
 import { threadForkLabel, threadMoveLabel, threadDeletionDescription, threadDeleteBlockedReason, deleteButtonLabel } from "../lib/team-action-presentation";
 import { snoozePresets } from "@openorc/client";
 import { WORKSPACE_ID } from "@openorc/protocol";
 import { useRef, useState } from "react";
 import { Menu } from "@base-ui/react/menu";
 import type { ThreadSummary } from "@openorc/protocol";
-import { AlarmClock, AppWindow, Archive, ArchiveRestore, ChevronRight, Columns2, GitBranch, GitFork, Laptop, MailOpen, Pencil, Pin, PinOff, Trash2 } from "./icons";
+import { AlarmClock, AppWindow, Archive, ArchiveRestore, ChevronRight, Cloud, Columns2, GitBranch, GitFork, Laptop, MailOpen, Pencil, Pin, PinOff, Trash2 } from "./icons";
 import { orclingHome, useOrclings } from "../lib/orclings";
 import { Button, Dialog } from "./ui";
 import { useRpc, useRpcMutation } from "../lib/client";
@@ -169,6 +170,11 @@ function ThreadMenuContent({ thread, parts: M }: { thread: ThreadSummary; parts:
         >
           {(pendingMove?.to ?? (thread.workspaceMode === "worktree" ? "current" : "worktree")) === "current" ? <Laptop size={13} /> : <GitBranch size={13} />}{" "}
           {threadMoveLabel({ cancelling: pendingMove?.phase === "cancel", pending: Boolean(pendingMove), mode: thread.workspaceMode })}
+        </M.Item>
+      ) : null}
+      {cloudOffered && !team && !thread.cloud && thread.agent === "claude" && thread.projectId !== WORKSPACE_ID ? (
+        <M.Item className={menuItem} disabled={busy} onClick={() => useUi.getState().setMoveThread(thread.id, "cloud")}>
+          <Cloud size={13} /> Move to cloud
         </M.Item>
       ) : null}
       <M.Separator className={menuSeparator} />

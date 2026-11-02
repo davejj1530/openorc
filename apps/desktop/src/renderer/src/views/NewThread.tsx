@@ -1,3 +1,4 @@
+import { cloudOffered } from "../lib/cloud-offered";
 import { ClaudeAccountPicker } from "../components/ClaudeAccountPicker";
 import { ClaudeAccountScope } from "../lib/claude-account";
 import { useEffect, useRef, useState } from "react";
@@ -109,7 +110,7 @@ function NewThreadProject({
   // skills do: they belong to the project, or the Workspace folder, chosen on this screen.
   const skillCommands = useSkillCommands(projectId, choice?.agent, draft.workingDirectory, claudeAccountId);
   // Cloud runs only Claude so far, and only in development and QA builds until a real sandbox provider is set up.
-  const canCloud = (import.meta.env.DEV || __OPENORC_QA__) && target.kind === "model" && choice?.agent === "claude";
+  const canCloud = cloudOffered && target.kind === "model" && choice?.agent === "claude";
   const workspaceMode = newThreadWorkspaceMode({ canBranch: !isWorkspace && !git.cannotBranch, canCloud, chosen: draft.workspace, preferred: settings.data?.defaultWorkspaceMode });
 
   useEffect(() => {

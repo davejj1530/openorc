@@ -1,4 +1,5 @@
 import { ProtectedSecretsClient } from "./protected-secrets";
+import { newestBrainBundle } from "./brain-bundle";
 import { BrowserClient } from "./browser-client";
 import { PreviewClient } from "./preview-client";
 import { PresenceClient } from "./presence";
@@ -72,6 +73,7 @@ const corePromise = OpenOrc.create({
   cloudSecrets: secrets.store("cloud.secrets"),
   claudeCloudSecrets: secrets.store("claude-cloud.secrets"),
   codexCloudSecrets: secrets.store("codex-cloud.secrets"),
+  cloudBrainSecrets: secrets.store("cloud-brain.secrets"),
   terminal,
   presence: presence.inUse,
   // The embedding model runs in its own thread, so loading it and embedding memories never stall the core.
@@ -82,6 +84,8 @@ const corePromise = OpenOrc.create({
   // As the window's own menus offer them: development and QA builds, until cloud threads ship.
   cloudOffered: __OPENORC_QA__,
   cloudRunnerFiles: Object.entries(cloudRunner).map(([file, content]) => ({ name: basename(file), content: Buffer.from(content) })),
+  // These builds run from the repository's apps/desktop/out/main, so the brain is the one built beside them. A release carries none yet.
+  ...(__OPENORC_QA__ ? { cloudBrainBundle: () => newestBrainBundle(join(import.meta.dirname, "../../../brain/dist")) } : {}),
 });
 
 // Main hosts the Terminal panels and wants the login PATH the core adopted.

@@ -200,7 +200,9 @@ export type BrainControlRequest =
   /** A git bundle already in the brain's inbox, by file name, cloned into its projects and imported. */
   | { op: "import-project"; name: string; bundle: string; origin?: string }
   /** Close gracefully and exit; the sandbox keeps running. */
-  | { op: "stop" };
+  | { op: "stop" }
+  /** A stop for an update, answered at once: refused, the brain running on, while closing would cut work short. */
+  | { op: "stop-for-update" };
 export type BrainControlOp = BrainControlRequest["op"];
 export type HandoverRequest = Extract<BrainControlRequest, { op: "handover" }>;
 
@@ -222,6 +224,7 @@ export interface BrainControlResults {
   handover: { applied: HandoverKind[] };
   "import-project": { projectId: string };
   stop: { stopping: true };
+  "stop-for-update": { stopping: true };
 }
 export type BrainControlResult<R extends BrainControlRequest> = BrainControlResults[R["op"]];
 export type BrainControlReply<Op extends BrainControlOp> = { ok: true; result: BrainControlResults[Op] } | { ok: false; error: string };
@@ -234,6 +237,7 @@ const REQUESTS = variants<BrainControlRequest>({
   handover: object({ op: literal("handover"), sealed: object({}, { claude: sealedText, codex: sealedText, push: sealedText } satisfies Record<HandoverKind, Parse<string>>) }),
   "import-project": object({ op: literal("import-project"), name: text(100), bundle: text(255, /^\w[\w.-]*$/) }, { origin: text(2048) }),
   stop: object({ op: literal("stop") }),
+  "stop-for-update": object({ op: literal("stop-for-update") }),
 });
 
 const timestamp = int(0, Number.MAX_SAFE_INTEGER);
@@ -245,6 +249,7 @@ const RESULTS: { [K in BrainControlOp]: Parse<BrainControlResults[K]> } = {
   handover: object({ applied: list(literal("claude", "codex", "push"), 3) }),
   "import-project": object({ projectId: text(100) }),
   stop: object({ stopping: literal(true) }),
+  "stop-for-update": object({ stopping: literal(true) }),
 };
 
 export function parseControlRequest(line: string): BrainControlRequest {

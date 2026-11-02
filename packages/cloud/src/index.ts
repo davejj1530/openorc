@@ -48,7 +48,9 @@ export { SealedUnreadable, brainKeyCheck, keyCheckMatches, openSecret, sealSecre
 export { brainSelf, type BrainSelf, type BrainSession, type OpenBrainSession } from "./brain/self.js";
 export {
   BrainMachine,
+  BrainRefused,
   BrainUnavailable,
+  brainVersionNewer,
   type BrainAccess,
   type BrainApi,
   type BrainBundle,

@@ -110,8 +110,35 @@ describe("control requests and replies", () => {
       { op: "handover", sealed: { claude: "AAAA" } },
       { op: "import-project", name: "openorc", bundle: "openorc-1.bundle", origin: "git@github.com:me/openorc.git" },
       { op: "stop" },
+      { op: "stop-for-update" },
     ];
     for (const request of requests) expect(parseControlRequest(JSON.stringify(request))).toEqual(request);
+  });
+
+  it("reads what a Mac and a brain one version apart write, in either direction", () => {
+    // As the version before dated brains wrote them, and as a newer one writes every line whose shape stayed.
+    const key = "A".repeat(43);
+    const start = `{"v":1,"key":"${key}","name":"Cloud","address":"sb-abc123.vercel.run","port":47820,"vercel":{"connection":{"token":"vcp_x","teamId":"team_1","projectId":"prj_1"},"sandbox":"brain"}}`;
+    expect(parseLaunch(start)).toMatchObject({ name: "Cloud", address: "sb-abc123.vercel.run", port: 47_820, vercel: { sandbox: "brain" } });
+    const requests = [
+      '{"op":"status"}',
+      '{"op":"wake"}',
+      '{"op":"pair"}',
+      '{"op":"handover","sealed":{"claude":"AAAA"}}',
+      '{"op":"import-project","name":"demo","bundle":"demo.bundle","origin":"https://github.com/me/demo.git"}',
+      '{"op":"stop"}',
+    ];
+    for (const line of requests) expect(parseControlRequest(line)).toEqual(JSON.parse(line));
+    const replies: [BrainControlRequest["op"], string][] = [
+      ["status", '{"ok":true,"result":{"state":"ready","version":"eed2a8309f9a","pid":7,"since":1,"busy":null}}'],
+      ["wake", '{"ok":true,"result":{"state":"closing","version":"20261102120000-eed2a8309f9a","pid":7,"since":1,"busy":"agents"}}'],
+      ["pair", '{"ok":true,"result":{"url":"openorc://pair#v1.x","expiresAt":5}}'],
+      ["handover", '{"ok":true,"result":{"applied":["claude"]}}'],
+      ["import-project", '{"ok":true,"result":{"projectId":"p"}}'],
+      ["stop", '{"ok":true,"result":{"stopping":true}}'],
+      ["stop", `{"ok":false,"error":"The brain's control request is not valid: it has an unknown field."}`],
+    ];
+    for (const [op, line] of replies) expect(parseControlReply(op, line)).toEqual(JSON.parse(line));
   });
 
   it("refuses an unknown op, an extra field, and a bundle outside the inbox", () => {

@@ -30,6 +30,23 @@ export interface BrainBundle {
   archive: Buffer;
 }
 
+/** A version as apps/brain's build names it: when it was built, in UTC as yyyymmddhhmmss, then a digest of what it holds. */
+const DATED = /^(\d{14})-(.+)$/;
+
+function dated(version: string): { built: string; digest: string } {
+  const match = DATED.exec(version);
+  return match ? { built: match[1]!, digest: match[2]! } : { built: "", digest: version };
+}
+
+/**
+ * Whether `version` holds something other than `than` and was built after it. A version from before builds were dated
+ * is a digest alone and comes before every dated one; two of those, or two built in the same second, are never newer.
+ */
+export function brainVersionNewer(version: string, than: string): boolean {
+  const [a, b] = [dated(version), dated(than)];
+  return a.digest !== b.digest && a.built > b.built;
+}
+
 export interface ProvisionOptions {
   /** Applies when the sandbox is made, as does the size. */
   region?: string;
@@ -312,6 +329,9 @@ export class BrainUnavailable extends Error {
   }
 }
 
+/** The brain answered a request by refusing it, in its own words, and did nothing. */
+export class BrainRefused extends Error {}
+
 type Started = { kind: "ready"; version: string } | { kind: "exit"; code: number; stderr: () => Promise<string> } | { kind: "timeout" };
 type Waited = { kind: "ready"; version: string } | { kind: "gone" } | { kind: "timeout" };
 
@@ -374,7 +394,8 @@ export class BrainMachine {
 
   /**
    * Makes the sandbox if missing, sets up the machine and installs the bundle. A second run with the same bundle writes
-   * nothing. A running brain keeps its version until its next start, so `running` may differ from `installed`.
+   * nothing, and a bundle built before the installed one installs nothing: `installed` says which the machine keeps. A
+   * running brain keeps its version until its next start, so `running` may differ from `installed`.
    */
   async provision(bundle: BrainBundle, options: ProvisionOptions = {}): Promise<{ installed: string; running: string | null }> {
     if (!VERSION.test(bundle.version) || bundle.version === "current") throw new Error("A brain bundle's version must be letters, digits, - or _, and not current.");
@@ -393,7 +414,9 @@ export class BrainMachine {
     if (Object.keys(changes).length) await vm.update(changes);
     const layout = brainLayout(path.posix.join(vm.cwd, ROOT_FOLDER));
     const survey = await this.setup(vm, layout, bundle.version);
-    const running = (await this.ask(vm, layout, { op: "status" }))?.version ?? null;
+    // Asked as use, so a brain near its idle sleep stays up through the upload.
+    const running = (await this.ask(vm, layout, { op: "wake" }))?.version ?? null;
+    if (survey.current && brainVersionNewer(survey.current, bundle.version)) return { installed: survey.current, running };
     await this.install(vm, layout, bundle, survey, running);
     return { installed: bundle.version, running };
   }
@@ -540,7 +563,8 @@ export class BrainMachine {
     const line = text.stdout.trim().split("\n").pop() ?? "";
     if (!line) throw new Error(`The brain did not answer ${request.op}: ${tail(scrub(text.stderr, [this.credentials.token])) || `exit ${done.exitCode}`}`);
     const reply = parseControlReply<R["op"]>(request.op, line);
-    if (!reply.ok) throw new Error(reply.error);
+    // ctl itself refuses, exiting otherwise, a request it could not read or the brain did not answer in time.
+    if (!reply.ok) throw done.exitCode === 0 ? new BrainRefused(reply.error) : new Error(reply.error);
     return reply.result;
   }
 

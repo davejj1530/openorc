@@ -3,7 +3,7 @@ import { APIError } from "@vercel/sandbox";
 import { describe, expect, it } from "vitest";
 import type { SandboxInfo } from "../sandbox.js";
 import { BRAIN_AWAY_MS, BRAIN_PORT } from "./layout.js";
-import { BrainMachine, BrainUnavailable, type BrainApi, type BrainCommand, type BrainOpenParams, type BrainSettings, type BrainVm } from "./machine.js";
+import { BrainMachine, BrainRefused, BrainUnavailable, brainVersionNewer, type BrainApi, type BrainCommand, type BrainOpenParams, type BrainSettings, type BrainVm } from "./machine.js";
 import { brainKeyText, encodeControlReply, newBrainKey, parseLaunch, type BrainControlRequest, type BrainStatus } from "./wire.js";
 
 const TOKEN = "vcp_brain_token_SECRET_value";
@@ -359,6 +359,8 @@ describe("provisioning a brain", () => {
     expect(machine.current).toBe("brain-v4");
     expect([...machine.versions.keys()].sort()).toEqual(["brain-v1", "brain-v3", "brain-v4"]);
     expect(vercel.opened).toHaveLength(4);
+    // Asked as use, so a running brain does not fall asleep under the upload.
+    expect(machine.reads).toEqual(["wake", "wake", "wake"]);
   });
 
   it("points current at an installed version again without uploading it", async () => {
@@ -370,6 +372,19 @@ describe("provisioning a brain", () => {
     expect(machine.changes.slice(before)).toEqual(["switch brain-v2"]);
   });
 
+  it("never installs a bundle built before the installed one, and says which one the machine keeps", async () => {
+    const vercel = new FakeVercel();
+    const brain = await connect(vercel);
+    await brain.provision(bundle("20261102120000-bbbbbbbbbbbb"));
+    const before = [...vercel.machine.changes];
+    expect(await brain.provision(bundle("20261101120000-aaaaaaaaaaaa"))).toEqual({ installed: "20261102120000-bbbbbbbbbbbb", running: null });
+    expect(await brain.provision(bundle("3f2a9c1d00ab"))).toEqual({ installed: "20261102120000-bbbbbbbbbbbb", running: null });
+    expect(vercel.machine.changes).toEqual(before);
+    expect(vercel.machine.current).toBe("20261102120000-bbbbbbbbbbbb");
+    expect(await brain.provision(bundle("20261103120000-cccccccccccc"))).toEqual({ installed: "20261103120000-cccccccccccc", running: null });
+    expect(vercel.machine.current).toBe("20261103120000-cccccccccccc");
+  });
+
   it("stops before changing anything when the image has no Node 24, and refuses a version that is not a folder name", async () => {
     const vercel = new FakeVercel();
     vercel.machine.has.delete("node24");
@@ -378,6 +393,22 @@ describe("provisioning a brain", () => {
     expect(vercel.machine.changes).toEqual([]);
     for (const version of ["current", "../escape", "1.0.partial", ""]) await expect(brain.provision(bundle(version))).rejects.toThrow("A brain bundle's version");
     expect(vercel.opened).toHaveLength(1);
+  });
+});
+
+describe("brain versions", () => {
+  it("are newer when built later from other contents, and one from before builds were dated comes first", () => {
+    const cases: [string, string, boolean][] = [
+      ["20261102120000-bbbbbbbbbbbb", "20261101120000-aaaaaaaaaaaa", true],
+      ["20261101120000-aaaaaaaaaaaa", "20261102120000-bbbbbbbbbbbb", false],
+      ["20261101120000-aaaaaaaaaaaa", "eed2a8309f9a", true],
+      ["eed2a8309f9a", "20261101120000-aaaaaaaaaaaa", false],
+      // A rebuild of the same contents is no update, and two undated ones cannot be told apart.
+      ["20261103120000-aaaaaaaaaaaa", "20261101120000-aaaaaaaaaaaa", false],
+      ["eed2a8309f9a", "3f2a9c1d00ab", false],
+      ["3f2a9c1d00ab", "eed2a8309f9a", false],
+    ];
+    for (const [version, than, newer] of cases) expect([version, than, brainVersionNewer(version, than)]).toEqual([version, than, newer]);
   });
 });
 
@@ -537,8 +568,12 @@ describe("asking and removing a brain", () => {
     expect(ctl.args.slice(3)).toEqual([`${ROOT}/app/current/ctl.mjs`]);
 
     await expect(brain.control({ op: "stop" })).rejects.toThrow(BrainUnavailable);
-    machine.answer = () => ({ code: 0, stdout: `${encodeControlReply<"pair">({ ok: false, error: "Phone access is off." })}\n` });
-    await expect(brain.control({ op: "pair" })).rejects.toThrow("Phone access is off.");
+    const refusal = (error: string) => `${encodeControlReply<"pair">({ ok: false, error })}\n`;
+    const failure = () => brain.control({ op: "pair" }).then(null, (error: Error) => [error instanceof BrainRefused, error.message]);
+    machine.answer = () => ({ code: 0, stdout: refusal("Phone access is off.") });
+    expect(await failure()).toEqual([true, "Phone access is off."]);
+    machine.answer = () => ({ code: 1, stdout: refusal("The brain did not answer pair.") });
+    expect(await failure()).toEqual([false, "The brain did not answer pair."]);
 
     vercel.sandboxes.get("brain")!.state = "stopped";
     machine.runs.length = 0;

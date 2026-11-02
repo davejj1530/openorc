@@ -6,7 +6,8 @@
   "type": "module",
   "description": "Run-scoped local MCP server with tools for approvals, questions, plans, memory, tasks, threads, teams, and the browser.",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./file-boundary": "./src/file-boundary.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

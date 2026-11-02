@@ -1,4 +1,5 @@
 import { harnessCatalog, type HarnessId } from "@openorc/protocol";
+import type { AgentHost } from "./agent-host.js";
 
 /**
  * The complete process environment admitted for one provider operation.
@@ -11,6 +12,8 @@ export interface AgentLaunchEnvironment {
   readonly binary: string;
   readonly env: Readonly<NodeJS.ProcessEnv>;
   readonly processRegistry?: string;
+  /** Where the CLI runs when not on this Mac. `binary`, `env` and the run's paths are then the host's. */
+  readonly host?: AgentHost;
 }
 
 export interface ResolvedHarnessEnvironment {

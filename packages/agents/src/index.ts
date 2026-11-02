@@ -8,6 +8,7 @@ export { AcpUpdateMapper } from "./acp/updates.js";
 export { RunHandle, type RunControls, type LiveSettings } from "./run-handle.js";
 export { captureLaunchEnvironment, captureProcessEnvironment, type AgentLaunchEnvironment, type ResolvedHarnessEnvironment } from "./launch-environment.js";
 export { stopProcess, waitForProcessGroup } from "./process-lifetime.js";
+export type { AgentHost, AgentHostFile } from "./agent-host.js";
 export { recoverAgentProcesses } from "./process-recovery.js";
 export { agentBinary } from "./bin.js";
 export { launchCommand, type CommandLaunch } from "./command-launch.js";

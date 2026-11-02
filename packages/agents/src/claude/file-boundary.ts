@@ -12,12 +12,16 @@ const quote = (value: string) => `'${value.replaceAll("'", `'\\''`)}'`;
  * proxy, so the request stays on this machine. Any failure, such as OpenOrc not answering, exits 2, which blocks the
  * tool. Without an address, every edit is blocked.
  */
-export function fileBoundaryHook(boundary: FileBoundary, connection: { mcpUrl: string; dir: string } | null): string {
+export function fileBoundaryHook(
+  boundary: FileBoundary,
+  connection: { mcpUrl: string; dir: string } | null,
+  write: (file: string, content: string) => void = (file, content) => writeFileSync(file, content, { mode: 0o600 }),
+): string {
   const blocked = "{ echo 'OpenOrc could not check this file path, so the tool is blocked.' >&2; exit 2; }";
   if (!connection) return blocked;
   const config = path.join(connection.dir, "file-boundary.curlrc");
   const options = [`url = "${fileBoundaryUrl(connection.mcpUrl, boundary)}"`, 'header = "content-type: application/json"', 'noproxy = "*"', "max-time = 10", "silent", "fail"];
-  writeFileSync(config, `${options.join("\n")}\n`, { mode: 0o600 });
+  write(config, `${options.join("\n")}\n`);
   // -q must come first: it keeps the user's .curlrc out.
   return `curl -q -K ${quote(config)} --data-binary @- || ${blocked}`;
 }

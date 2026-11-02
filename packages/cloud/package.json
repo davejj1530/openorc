@@ -13,7 +13,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@openorc/git": "workspace:*"
+    "@openorc/git": "workspace:*",
+    "@vercel/sandbox": "3.9.1"
   },
   "devDependencies": {
     "@openorc/mcp": "workspace:*",

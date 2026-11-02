@@ -23,7 +23,7 @@ import {
 import type { AgentLaunchEnvironment } from "@openorc/agents";
 import type { Logger } from "../transport.js";
 import type { EnvSnapshot } from "./shell-environment.js";
-import { CLOUD_AGENTS } from "./cloud-workspaces.js";
+import { CLOUD_AGENTS, type CloudRunHost } from "./cloud-workspaces.js";
 import { executionFolder } from "./conversation-folder.js";
 import { withOutsideNote, type OutsideChanges, type TurnStartCapture } from "./turn-start-checkpoint.js";
 import {
@@ -190,9 +190,10 @@ export class RunLaunch {
     phase("mcp");
     const internalMcp = this.internalMcp(input, runId, mcp);
     await this.lockTaskWorkspace(attempt);
+    const connecting = this.connectCloud(input, internalMcp.url);
     // Captured before the spec is built, so the prompt the provider receives can carry the outside-changes note.
     const outside = await this.captureTurnStart(input, lease);
-    const cloud = input.scope.thread ? await this.deps.hooks.cloudHost?.(input.scope.thread, new URL(internalMcp.url).origin) : null;
+    const cloud = await connecting;
     if (cloud && input.agent !== "claude") throw new Error(CLOUD_AGENTS);
     phase("cloud");
     const spec = this.runSpec(prepared, lease, internalMcp, outside, cloud?.cwd);
@@ -268,6 +269,15 @@ export class RunLaunch {
       url: mcp.urlForRun(runId),
       toolNames: input.scope.comment ? ["ask_user", "approve", "task_comment_intent"] : [...internalToolNames],
     };
+  }
+
+  /** Where a cloud conversation's agent runs, connected while the turn's starting point is captured; null on this Mac. */
+  private connectCloud(input: StartRunInput, mcpUrl: string): Promise<CloudRunHost | null> {
+    const thread = input.scope.thread;
+    const connecting = (thread && this.deps.hooks.cloudHost?.(thread, new URL(mcpUrl).origin)) || Promise.resolve(null);
+    // Awaited after the capture; a failure before then must not go unhandled.
+    void connecting.catch(() => undefined);
+    return connecting;
   }
 
   /** The folder as this thread's turn begins. Tasks and comment runs keep their own capture at the end of the turn. */

@@ -1,7 +1,7 @@
 import path from "node:path";
 import type { AgentHost } from "@openorc/agents";
-import { installRunner, pullWorkspace, pushWorkspace, RunnerClient, runnerFiles, seedWorkspace, type RunnerFile, type SandboxProvider, type WorkspaceLocation } from "@openorc/cloud";
-import { cloudWorkspaces, type CloudWorkspaceRecord, type Db } from "@openorc/db";
+import { installRunner, pullWorkspace, pushWorkspace, RunnerClient, runnerFiles, seedFromCommit, seedWorkspace, type RunnerFile, type SandboxProvider, type WorkspaceLocation } from "@openorc/cloud";
+import { cloudWorkspaces, type CloudMirrorState, type CloudWorkspaceRecord, type Db } from "@openorc/db";
 import { originUrl } from "@openorc/git";
 import { WORKSPACE_ID, type Project, type Thread } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
@@ -48,6 +48,8 @@ export class CloudWorkspaceService {
   private readonly connections = new Map<string, Promise<Connection>>();
   /** The sync running for each conversation; the next one waits for it. */
   private readonly syncs = new Map<string, Promise<boolean>>();
+  /** Conversations seeded since their last turn: nothing has changed on either side, so their first turn starts without a sync. */
+  private readonly pristine = new Set<string>();
 
   constructor(
     private readonly db: Db,
@@ -91,6 +93,7 @@ export class CloudWorkspaceService {
     const record = cloudWorkspaces.get(this.db, thread.id);
     const mirror = thread.worktreePath;
     if (record?.state !== "ready" || !mirror) return Promise.resolve(false);
+    if (options.push && this.pristine.delete(thread.id)) return Promise.resolve(false);
     const previous = this.syncs.get(thread.id) ?? Promise.resolve(false);
     const next = previous
       .catch(() => false)
@@ -137,12 +140,37 @@ export class CloudWorkspaceService {
       const location = await this.location(record, thread.worktreePath);
       const mirror = await seedWorkspace(location, thread.branch, (await originUrl(project.rootPath)) ?? undefined);
       if (project.settings.setupScript) await this.runSetup(location, project.settings.setupScript, path.basename(thread.worktreePath));
-      cloudWorkspaces.ready(this.db, thread.id, mirror);
-      this.log.info(`cloud workspace ${record.sandbox} ready for thread ${thread.id}`);
+      this.ready(thread.id, mirror);
     } catch (error) {
       cloudWorkspaces.failed(this.db, thread.id, error instanceof Error ? error.message : String(error));
       throw error;
     }
+  }
+
+  /**
+   * Seeds a new conversation's sandbox from the commit its worktree starts at and runs the project's setup there, while
+   * the worktree is made. The workspace becomes ready with `ready` once the worktree exists too.
+   */
+  async seedFresh(threadId: string, project: Project, start: { mirror: string; branch: string; commit: string }): Promise<CloudMirrorState> {
+    const record = cloudWorkspaces.get(this.db, threadId);
+    if (!record) throw new Error(`Thread ${threadId} has no cloud workspace.`);
+    try {
+      const location = await this.location(record, start.mirror);
+      const origin = (await originUrl(project.rootPath)) ?? undefined;
+      const mirror = await seedFromCommit(location, { source: project.rootPath, commit: start.commit, branch: start.branch, ...(origin ? { origin } : {}) });
+      if (project.settings.setupScript) await this.runSetup(location, project.settings.setupScript, path.basename(start.mirror));
+      return mirror;
+    } catch (error) {
+      cloudWorkspaces.failed(this.db, threadId, error instanceof Error ? error.message : String(error));
+      throw error;
+    }
+  }
+
+  /** The sandbox has the code and the worktree on the Mac holds `mirror`. */
+  ready(threadId: string, mirror: CloudMirrorState): void {
+    cloudWorkspaces.ready(this.db, threadId, mirror);
+    this.pristine.add(threadId);
+    this.log.info(`cloud workspace for thread ${threadId} is ready`);
   }
 
   /**

@@ -2,7 +2,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import { access, copyFile, glob, lstat, mkdir } from "node:fs/promises";
 import path from "node:path";
-import { audit, taskForwardings, tasks, threads, type Db } from "@openorc/db";
+import { audit, taskForwardings, tasks, threads, type CloudMirrorState, type Db } from "@openorc/db";
 import { stopProcess, waitForProcessGroup } from "@openorc/agents";
 import { diskUsage, emptyTree, fetch, git, repoInfo, revParse, worktree } from "@openorc/git";
 import { WORKSPACE_ID, type BranchLoss, type Project, type RemovalImpact, type Task, type Thread, type WorkspaceMode } from "@openorc/protocol";
@@ -292,26 +292,45 @@ export class WorkspaceService {
         const startPoint = await this.resolveStartPoint(project, base);
         this.assertOpen();
         this.log.info(`worktree for thread "${thread.title}" at ${worktreePath} on ${branch} from ${base} (${startPoint.slice(0, 8)})`);
-        await worktree.add(project.rootPath, { path: worktreePath, branch, startPoint });
-        this.assertOpen();
-        await this.copyIncludes(project, worktreePath);
-        this.assertOpen();
-        await this.initSubmodules(worktreePath);
-        this.assertOpen();
-        await this.warnAboutHusky(worktreePath, project);
-        this.assertOpen();
+        // A cloud conversation's sandbox gets the same commit while the worktree is made.
+        const seeding = this.seedCloud(thread.id, project, { mirror: worktreePath, branch, commit: startPoint });
+        await this.makeWorktree(project, worktreePath, branch, startPoint).catch(async (error: unknown) => {
+          await seeding?.catch(() => undefined);
+          throw error;
+        });
         const baseBranch = thread.baseBranch ?? (await this.startBranch(project, base));
         this.assertOpen();
         const updated = threads.update(this.db, thread.id, { worktreePath, branch, baseSha: thread.baseSha ?? startPoint, baseBranch, workspaceMode: "worktree" });
         audit.record(this.db, { actor: "openorc", action: "workspace.create", resourceType: "thread", resourceId: thread.id, metadata: { worktreePath, branch, baseSha: startPoint } });
-        const cloud = this.options.cloud?.get(thread.id) ? this.options.cloud : null;
-        if (cloud) await cloud.prepare(updated, project);
+        if (seeding) this.options.cloud?.ready(thread.id, await seeding);
         else if (project.settings.setupScript) await this.runSetup(project, { worktreePath, id: thread.id });
         this.assertOpen();
         return updated;
       },
       inherited,
     );
+  }
+
+  /** A new worktree with the project's included files, submodules and a hooks check. */
+  private async makeWorktree(project: Project, worktreePath: string, branch: string, startPoint: string): Promise<void> {
+    await worktree.add(project.rootPath, { path: worktreePath, branch, startPoint });
+    this.assertOpen();
+    await this.copyIncludes(project, worktreePath);
+    this.assertOpen();
+    await this.initSubmodules(worktreePath);
+    this.assertOpen();
+    await this.warnAboutHusky(worktreePath, project);
+    this.assertOpen();
+  }
+
+  /** Starts seeding a cloud conversation's sandbox; null for a conversation that runs on this Mac. */
+  private seedCloud(threadId: string, project: Project, start: { mirror: string; branch: string; commit: string }): Promise<CloudMirrorState> | null {
+    const cloud = this.options.cloud;
+    if (!cloud?.get(threadId)) return null;
+    const seeding = cloud.seedFresh(threadId, project, start);
+    // Awaited later; a failure before then must not go unhandled.
+    void seeding.catch(() => undefined);
+    return seeding;
   }
 
   /**

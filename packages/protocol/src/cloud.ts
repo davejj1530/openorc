@@ -5,10 +5,10 @@ import { ClaudeAccountId } from "./claude-accounts.js";
 export const CloudStep = z.enum(["sandbox", "code", "setup"]);
 export type CloudStep = z.infer<typeof CloudStep>;
 
-/** Where a cloud thread's sandbox stands. */
+/** Where a cloud thread's sandbox stands. `removed`: deleted from Settings; the next message sets up a new one. */
 export const CloudThreadState = z.object({
   provider: z.enum(["local", "vercel"]),
-  state: z.enum(["preparing", "ready", "failed"]),
+  state: z.enum(["preparing", "ready", "failed", "removed"]),
   /** The step running now while preparing. */
   step: CloudStep.nullable(),
   /** Whether preparing includes the project's setup script. */
@@ -35,6 +35,30 @@ export interface CloudCheck {
   }[];
 }
 
+/** vCPUs a Vercel sandbox can have; each comes with 2 GB of memory. How many a team may use depends on its plan. */
+export const SandboxVcpus = z.union([z.literal(2), z.literal(4), z.literal(8), z.literal(16), z.literal(32)]);
+export const SANDBOX_VCPUS = SandboxVcpus.options.map((option) => option.value);
+
+/** One of OpenOrc's sandboxes, as Settings lists them. */
+export interface CloudSandbox {
+  name: string;
+  provider: "local" | "vercel";
+  /** The conversation it belongs to; null for one no conversation has, such as a check's that was not deleted. */
+  thread: { id: string; title: string } | null;
+  state: "starting" | "running" | "stopping" | "stopped" | "failed";
+  /** When its running session began; null while it does not run. */
+  awakeSince: number | null;
+  /** How long it has run, all sessions together, as the service last counted. */
+  awakeMs: number;
+  vcpus: number | null;
+  memoryMb: number | null;
+  /** Estimated at the service's list prices; null where nothing is billed. */
+  costUsd: number | null;
+  /** Its conversation's agent is at work there, so it cannot be removed now. */
+  working: boolean;
+  createdAt: number;
+}
+
 /** A Vercel team cloud threads can run on. */
 export interface CloudTeam {
   id: string;
@@ -59,6 +83,8 @@ export interface CloudStatus {
     team: CloudTeam | null;
     /** The project on that team the sandboxes belong to. */
     project: string | null;
+    /** vCPUs for new sandboxes; null for Vercel's default of 2. */
+    vcpus: number | null;
   } | null;
   /** By Claude account id. */
   claude: Record<string, ClaudeCloudAccess>;
@@ -78,6 +104,8 @@ export const cloudRpcParams = {
   /** Chooses the team, and finds or makes the project its sandboxes belong to. */
   "cloud.vercel.team": z.object({ teamId: z.string().min(1).max(200) }).strict(),
   "cloud.vercel.disconnect": z.object({}),
+  /** The size of sandboxes made from now on. */
+  "cloud.vercel.size": z.object({ vcpus: SandboxVcpus }).strict(),
   /** Runs `claude setup-token` for the account; its browser sign-in finishes it. */
   "cloud.claude.create": z.object({ accountId: ClaudeAccountId }).strict(),
   "cloud.claude.cancel": z.object({ accountId: ClaudeAccountId }).strict(),
@@ -86,6 +114,9 @@ export const cloudRpcParams = {
   "cloud.claude.remove": z.object({ accountId: ClaudeAccountId }).strict(),
   /** Starts a cloud check where new cloud threads would run; its progress arrives in `cloud.status`. */
   "cloud.check": z.object({}),
+  "cloud.sandboxes": z.object({}),
+  /** Deletes a sandbox for good. A conversation's next message sets up a new one from its worktree on the Mac. */
+  "cloud.sandboxes.remove": z.object({ name: z.string().min(1).max(200) }).strict(),
 };
 
 export interface CloudRpcResults {
@@ -94,9 +125,12 @@ export interface CloudRpcResults {
   "cloud.vercel.teams": CloudTeam[];
   "cloud.vercel.team": CloudStatus;
   "cloud.vercel.disconnect": CloudStatus;
+  "cloud.vercel.size": CloudStatus;
   "cloud.claude.create": CloudStatus;
   "cloud.claude.cancel": CloudStatus;
   "cloud.claude.save": CloudStatus;
   "cloud.claude.remove": CloudStatus;
   "cloud.check": CloudStatus;
+  "cloud.sandboxes": CloudSandbox[];
+  "cloud.sandboxes.remove": CloudSandbox[];
 }

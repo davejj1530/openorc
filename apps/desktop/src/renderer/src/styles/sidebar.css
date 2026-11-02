@@ -219,7 +219,7 @@ button.sidebar-nav-row:hover {
   display: grid;
   align-items: center;
   height: var(--control-row);
-  margin: 22px 10px 0;
+  margin: 10px 10px 0;
   flex-shrink: 0;
 }
 .sidebar-list-head > * {

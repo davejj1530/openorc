@@ -29,7 +29,31 @@ export interface SpawnFile {
   content: string;
 }
 
+/**
+ * What the sandbox starts on its own when the Mac goes away in the middle of a turn: the agent resuming its session.
+ * It carries the account's token, so the daemon keeps it in memory only.
+ */
+export interface Takeover {
+  id: string;
+  cmd: string;
+  args: string[];
+  cwd: string;
+  env: Record<string, string>;
+  /** How long the Mac may be gone before it starts without being told to. */
+  afterMs: number;
+}
+
+/** A takeover the sandbox started, until the Mac has seen it. */
+export interface TakeoverStarted {
+  id: string;
+  at: number;
+}
+
 export type ClientFrame =
+  | { op: "standby"; takeover: Takeover }
+  | { op: "standby-off" }
+  | { op: "away" }
+  | { op: "takeover-seen" }
   | { op: "hello" }
   | { op: "spawn"; id: string; cmd: string; args: string[]; cwd: string; env: Record<string, string>; files?: SpawnFile[]; dirs?: string[] }
   | { op: "attach"; id: string; stdout: number; stderr: number }
@@ -43,12 +67,14 @@ export type ClientFrame =
   | { op: "http-end"; req: string };
 
 export type RunnerFrame =
-  | { op: "welcome"; version: number; home: string; processes: ProcessState[] }
+  | { op: "welcome"; version: number; home: string; processes: ProcessState[]; takeover?: TakeoverStarted | null }
   | { op: "spawned"; id: string }
   | { op: "out"; id: string; stream: OutputStream; at: number; data: string }
   | { op: "exit"; id: string; exit: ProcessExit }
   | { op: "stdin-ack"; id: string; at: number }
   | { op: "relay-ready"; name: string; port: number }
+  /** Answers `away`: the takeover that started, or null when none was armed. */
+  | { op: "took-over"; takeover: TakeoverStarted | null }
   | { op: "http"; req: string; name: string; method: string; url: string; headers: Record<string, string>; body: string }
   | { op: "http-abort"; req: string };
 

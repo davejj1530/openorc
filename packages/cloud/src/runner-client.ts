@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { RemoteProcess, type PendingInput, type RemoteCommand } from "./remote-process.js";
 import type { Sandbox, SandboxStream } from "./sandbox.js";
-import { encodeFrame, frameReader, type ClientFrame, type ProcessState, type RunnerFrame } from "./runner/wire.js";
+import { encodeFrame, frameReader, type ClientFrame, type ProcessState, type RunnerFrame, type Takeover, type TakeoverStarted } from "./runner/wire.js";
 
 export interface RunnerFile {
   name: string;
@@ -69,6 +69,12 @@ export class RunnerClient {
   private readonly signals = new Map<string, string>();
   private readonly relays = new Map<string, Relay>();
   private readonly requests = new Map<string, AbortController>();
+  /** Processes the runner started on its own, which a reconnect attaches to again but never starts. */
+  private readonly adopted = new Set<string>();
+  /** The takeover armed now, sent again after a reconnect. */
+  private armed: Takeover | null = null;
+  private started: TakeoverStarted | null = null;
+  private readonly awayWaiters: Array<(started: TakeoverStarted | null) => void> = [];
   private readonly handlers: FrameHandlers = {
     welcome: (frame) => this.welcome?.(frame),
     spawned: (frame) => this.processes.get(frame.id)?.markStarted(),
@@ -76,6 +82,10 @@ export class RunnerClient {
     exit: (frame) => this.processes.get(frame.id)?.finish(frame.exit),
     "stdin-ack": (frame) => this.processes.get(frame.id)?.acknowledge(frame.at),
     "relay-ready": (frame) => this.relayReady(frame.name, frame.port),
+    "took-over": (frame) => {
+      this.started = frame.takeover;
+      for (const waiter of this.awayWaiters.splice(0)) waiter(frame.takeover);
+    },
     http: (frame) => void this.forward(frame),
     "http-abort": (frame) => this.requests.get(frame.req)?.abort(),
   };
@@ -136,6 +146,62 @@ export class RunnerClient {
     return new Promise((resolve) => pending.waiters.push(resolve));
   }
 
+  /**
+   * Arms what the sandbox starts on its own if this Mac goes away mid-turn: when told so with `away`, or once nothing
+   * has been connected for the takeover's wait. Replaces one armed before.
+   */
+  standby(takeover: Takeover): void {
+    this.armed = takeover;
+    this.send({ op: "standby", takeover });
+  }
+
+  standbyOff(): void {
+    this.armed = null;
+    this.send({ op: "standby-off" });
+  }
+
+  /**
+   * This Mac is going away now: an armed takeover starts. Resolves with it once the runner says so, or with null when
+   * none was armed or no answer came within `timeoutMs`, as when the network is already gone.
+   */
+  away(timeoutMs = 3000): Promise<TakeoverStarted | null> {
+    if (!this.stream) return Promise.resolve(null);
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => resolve(null), timeoutMs);
+      this.awayWaiters.push((started) => {
+        clearTimeout(timer);
+        resolve(started);
+      });
+      this.send({ op: "away" });
+    });
+  }
+
+  /** The takeover the sandbox started while this Mac was away, as of the last connection; null when none did. */
+  get takeover(): TakeoverStarted | null {
+    return this.started;
+  }
+
+  /** The Mac has taken the takeover in: the runner forgets it, and a new standby can be armed. */
+  takeoverSeen(): void {
+    this.started = null;
+    this.send({ op: "takeover-seen" });
+  }
+
+  /** A process the runner started on its own, such as a takeover: its output from the start, then live. */
+  adopt(id: string): RemoteProcess {
+    const existing = this.processes.get(id);
+    if (existing) return existing;
+    const proc = new RemoteProcess(id, { cmd: "", args: [], cwd: "", env: {} }, this.link);
+    this.processes.set(id, proc);
+    this.adopted.add(id);
+    proc.once("close", () => {
+      this.processes.delete(id);
+      this.adopted.delete(id);
+    });
+    this.send({ op: "attach", id, stdout: 0, stderr: 0 });
+    return proc;
+  }
+
   /** Disconnects. Processes in the VM keep running. */
   close(): void {
     this.closed = true;
@@ -166,6 +232,10 @@ export class RunnerClient {
       });
       this.stream = stream;
       this.vmHome = welcome.home;
+      this.started = welcome.takeover ?? null;
+      // A takeover that started used up the standby; one still armed in the runner's memory is gone after a restart.
+      if (this.started) this.armed = null;
+      else if (this.armed) this.send({ op: "standby", takeover: this.armed });
       this.resume(welcome.processes);
       this.onState("connected");
       return stream;
@@ -183,7 +253,11 @@ export class RunnerClient {
     for (const proc of this.processes.values()) {
       const state = known.get(proc.id);
       if (state) proc.acknowledge(state.stdinAt);
-      else this.send({ op: "spawn", id: proc.id, ...proc.command });
+      else if (this.adopted.has(proc.id)) {
+        // The runner lost what it started on its own, as when its VM restarted.
+        proc.finish({ code: null, signal: null, lost: true });
+        continue;
+      } else this.send({ op: "spawn", id: proc.id, ...proc.command });
       this.send({ op: "attach", id: proc.id, stdout: proc.received.stdout, stderr: proc.received.stderr });
       for (const input of proc.unacked) this.link.sendInput(proc.id, input);
       if (proc.inputEnd !== null) this.link.endInput(proc.id, proc.inputEnd);

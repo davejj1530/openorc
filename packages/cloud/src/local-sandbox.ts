@@ -51,9 +51,9 @@ export class LocalSandbox implements Sandbox {
     return { since, ms: this.pastMs + (since === null ? 0 : Date.now() - since) };
   }
 
-  async keepAwake(): Promise<void> {
+  async keepAwake(forMs = this.awayMs): Promise<void> {
     this.wake();
-    if (this.session && this.session.endsAt < Date.now() + this.awayMs) this.endSessionIn(this.awayMs);
+    if (this.session && this.session.endsAt < Date.now() + forMs) this.endSessionIn(forMs);
   }
 
   private start(cmd: string, args: string[], options: SandboxCommandOptions, stdio: StdioOptions): ChildProcess {

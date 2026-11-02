@@ -195,11 +195,11 @@ export class VercelSandbox implements Sandbox {
     return this.vm.readFileToBuffer({ path: file });
   }
 
-  async keepAwake(): Promise<void> {
+  async keepAwake(forMs = this.awayMs): Promise<void> {
     const expires = this.vm.expiresAt?.getTime();
-    const wanted = Date.now() + this.awayMs;
+    const wanted = Date.now() + forMs;
     if (expires !== undefined && expires >= wanted) return;
-    await this.vm.extendTimeout(expires === undefined ? this.awayMs : wanted - expires);
+    await this.vm.extendTimeout(expires === undefined ? forMs : wanted - expires);
   }
 
   async stop(): Promise<void> {

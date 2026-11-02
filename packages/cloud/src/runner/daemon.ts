@@ -6,10 +6,11 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { fileBoundaryAnswer } from "./file-boundary.ts";
-import { encodeFrame, frameReader, RUNNER_VERSION, type ClientFrame, type OutputStream, type ProcessExit, type ProcessState, type RunnerFrame } from "./wire.ts";
+import { encodeFrame, frameReader, RUNNER_VERSION, type ClientFrame, type OutputStream, type ProcessExit, type ProcessState, type RunnerFrame, type Takeover, type TakeoverStarted } from "./wire.ts";
 
 const STREAMS: OutputStream[] = ["stdout", "stderr"];
 const REPLAY_CHUNK = 64 * 1024;
+const TAKEOVER_FILE = "takeover.json";
 
 interface Managed {
   id: string;
@@ -46,8 +47,22 @@ export class RunnerDaemon {
   private readonly servers: http.Server[] = [];
   private readonly requests = new Map<string, http.ServerResponse>();
   private nextRequest = 0;
+  /** What to start if the Mac goes away mid-turn, with the timer that starts it while the Mac is gone. */
+  private standby: { takeover: Takeover; timer: ReturnType<typeof setTimeout> | null } | null = null;
+  /** The takeover started here, kept on disk until the Mac has seen it. */
+  private started: TakeoverStarted | null = null;
   private readonly handlers: Handlers = {
-    hello: () => this.send({ op: "welcome", version: RUNNER_VERSION, home: os.homedir(), processes: [...this.processes.values()].map(processState) }),
+    hello: () => this.send({ op: "welcome", version: RUNNER_VERSION, home: os.homedir(), processes: [...this.processes.values()].map(processState), takeover: this.started }),
+    standby: (frame) => this.arm(frame.takeover),
+    "standby-off": () => this.disarm(),
+    away: () => {
+      this.takeOver();
+      this.send({ op: "took-over", takeover: this.started });
+    },
+    "takeover-seen": () => {
+      this.started = null;
+      rmSync(path.join(this.state, TAKEOVER_FILE), { force: true });
+    },
     spawn: (frame) => this.spawn(frame),
     attach: (frame) => this.attach(frame),
     stdin: (frame) => this.input(frame),
@@ -76,6 +91,8 @@ export class RunnerDaemon {
 
   /** Processes an earlier daemon started. One with no exit record was running when the workspace stopped. */
   private load(): void {
+    const takeover = path.join(this.state, TAKEOVER_FILE);
+    if (existsSync(takeover)) this.started = JSON.parse(readFileSync(takeover, "utf8")) as TakeoverStarted;
     const root = path.join(this.state, "processes");
     mkdirSync(root, { recursive: true });
     for (const id of readdirSync(root)) {
@@ -88,11 +105,16 @@ export class RunnerDaemon {
     }
   }
 
+  /**
+   * A connection becomes the Mac's once it says hello, and the one before it closes then. Until then it is ignored: a
+   * daemon starting up checks this one is running by connecting, and that check must not cut the Mac off.
+   */
   accept(socket: net.Socket): void {
-    this.client?.destroy();
-    this.detach();
-    this.client = socket;
-    const read = frameReader<ClientFrame>((frame) => (this.handlers[frame.op] as (frame: ClientFrame) => void)(frame));
+    // A frame a newer Mac sends that this runner does not know is ignored, not a reason to drop the Mac.
+    const read = frameReader<ClientFrame>((frame) => {
+      if (frame.op === "hello") this.take(socket);
+      if (this.client === socket) (this.handlers[frame.op] as ((frame: ClientFrame) => void) | undefined)?.(frame);
+    });
     socket.on("data", (chunk: Buffer) => {
       try {
         read(chunk);
@@ -105,7 +127,49 @@ export class RunnerDaemon {
       if (this.client !== socket) return;
       this.client = null;
       this.detach();
+      this.awaitMac();
     });
+  }
+
+  private take(socket: net.Socket): void {
+    if (this.client === socket) return;
+    this.client?.destroy();
+    this.detach();
+    this.client = socket;
+    // The Mac is back: a takeover waiting on its absence waits on.
+    if (this.standby?.timer) clearTimeout(this.standby.timer);
+    if (this.standby) this.standby.timer = null;
+  }
+
+  private arm(takeover: Takeover): void {
+    if (this.standby?.timer) clearTimeout(this.standby.timer);
+    this.standby = { takeover, timer: null };
+    if (!this.client) this.awaitMac();
+  }
+
+  private disarm(): void {
+    if (this.standby?.timer) clearTimeout(this.standby.timer);
+    this.standby = null;
+  }
+
+  /** Starts the takeover once the Mac has been gone for its wait, unless it comes back first. */
+  private awaitMac(): void {
+    const standby = this.standby;
+    if (!standby || standby.timer) return;
+    standby.timer = setTimeout(() => this.takeOver(), standby.takeover.afterMs);
+    standby.timer.unref();
+  }
+
+  /** The agent carries on here. Its prompt is in its arguments, so its input closes at once. */
+  private takeOver(): void {
+    const standby = this.standby;
+    if (!standby) return;
+    this.disarm();
+    const { id, cmd, args, cwd, env } = standby.takeover;
+    this.started = { id, at: Date.now() };
+    writeFileSync(path.join(this.state, TAKEOVER_FILE), JSON.stringify(this.started));
+    this.spawn({ op: "spawn", id, cmd, args, cwd, env });
+    this.endInput({ op: "stdin-end", id, at: 0 });
   }
 
   /** Ends every process, as the VM stopping would. */

@@ -90,6 +90,43 @@ describe("RunnerClient", () => {
     expect(out.text()).toBe("one\ntwo\n");
   });
 
+  it("starts the armed takeover when the Mac says it is going away, and the next connection reads it from the start", async () => {
+    const install = client!.install;
+    client!.standby({ id: "takeover", cmd: "node", args: ["-e", `console.log("carried on")`], cwd: sandbox.root, env: {}, afterMs: 60_000 });
+    expect((await client!.away())?.id).toBe("takeover");
+    expect((await client!.away())?.id).toBe("takeover");
+    client!.close();
+    client = await RunnerClient.open(install);
+    expect(client!.takeover?.id).toBe("takeover");
+    const out = collect(client!.adopt("takeover"));
+    expect(await out.closed).toEqual([0, null]);
+    expect(out.text()).toBe("carried on\n");
+    client!.takeoverSeen();
+    expect(await client!.away()).toBeNull();
+    client!.close();
+    client = await RunnerClient.open(install);
+    expect(client!.takeover).toBeNull();
+  });
+
+  it("starts the takeover on its own once the Mac has been gone for its wait, and never while the Mac is connected", async () => {
+    const install = client!.install;
+    const takeover = { id: "late", cmd: "node", args: ["-e", `console.log("on my own")`], cwd: sandbox.root, env: {}, afterMs: 300 };
+    client!.standby(takeover);
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    client!.close();
+    client = await RunnerClient.open(install);
+    expect(client!.takeover).toBeNull();
+
+    client!.standby(takeover);
+    client!.close();
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    client = await RunnerClient.open(install);
+    expect(client!.takeover?.id).toBe("late");
+    const out = collect(client!.adopt("late"));
+    await out.closed;
+    expect(out.text()).toBe("on my own\n");
+  });
+
   it("reports a process the sandbox stopped as ended by the stop", async () => {
     const proc = client!.spawn("forever", node(`setInterval(() => {}, 1000); process.stdout.write("up\\n");`));
     const out = collect(proc);

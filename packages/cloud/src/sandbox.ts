@@ -45,8 +45,8 @@ export interface Sandbox {
   writeFile(file: string, content: Buffer): Promise<void>;
   /** Null when the file does not exist. */
   readFile(file: string): Promise<Buffer | null>;
-  /** Moves the VM's own stop to `awayMs` from now, unless it is later already. */
-  keepAwake(): Promise<void>;
+  /** Moves the VM's own stop to `forMs` from now (its away window unless given), unless it is later already. */
+  keepAwake(forMs?: number): Promise<void>;
   /** Ends every process. The files stay for the next `open`. */
   stop(): Promise<void>;
 }

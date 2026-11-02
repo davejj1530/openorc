@@ -1,4 +1,4 @@
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -6,10 +6,31 @@ import { ClaudeCloudTokens } from "./claude-cloud-tokens.js";
 
 const MINTED = "sk-ant-oat01-Minted_token-for-the-cloud-0123456789";
 
-/** Stands in for `claude setup-token`: it prints the token the way the CLI does, styled, or fails as FAKE_SETUP says. */
+/**
+ * Stands in for `claude setup-token`: it prints the token the way the CLI does, styled, or fails as FAKE_SETUP says.
+ * Like the real screen, some modes then wait for a key that never comes.
+ */
 const FAKE_CLAUDE = `#!/usr/bin/env node
 if (process.argv[4] !== "setup-token") process.exit(64);
+require("node:fs").writeFileSync(process.env.FAKE_PID, String(process.pid));
 const mode = process.env.FAKE_SETUP;
+const waitForKey = () => setInterval(() => {}, 1000);
+if (mode === "shown") {
+  process.stdout.write("Your OAuth token (valid for 1 year):\\n\\u001b[33m${MINTED}\\u001b[39m\\n");
+  waitForKey();
+}
+if (mode === "refused") {
+  process.stdout.write("\\u001b[31mOAuth error: Invalid code. Please make sure the full code was copied\\u001b[39m\\n\\nPress Enter to retry. \\n");
+  waitForKey();
+}
+if (mode === "verbatim") {
+  process.stdout.write("\\u001b[31mThis organization does not allow long-lived tokens.\\u001b[39m\\n\\n\\u001b[2K\\u001b[1GPress \\u001b[1mEnter\\u001b[22m to retry. \\n");
+  waitForKey();
+}
+if (mode === "paste") {
+  process.stdout.write("The browser can't return the sign-in to Claude Code automatically. After you sign in, paste the code shown.\\nPaste code here > ");
+  waitForKey();
+}
 if (mode === "ok")
   setTimeout(() => {
     process.stdout.write("\\u001b[32m✓ Long-lived authentication token created successfully!\\u001b[0m\\n\\nYour OAuth token (valid for 1 year):\\n\\n");
@@ -35,8 +56,17 @@ function tokens(mode: string, store = memoryStore()) {
   const binary = path.join(dir, "claude");
   writeFileSync(binary, FAKE_CLAUDE);
   chmodSync(binary, 0o755);
-  const accounts = { signInLaunch: () => ({ binary, env: { ...process.env, FAKE_SETUP: mode }, directory: path.join(dir, "config") }) };
+  const accounts = { signInLaunch: () => ({ binary, env: { ...process.env, FAKE_SETUP: mode, FAKE_PID: path.join(dir, "pid") }, directory: path.join(dir, "config") }) };
   return { service: new ClaudeCloudTokens(store, accounts, () => void changes++), store };
+}
+
+function running(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function settled(service: ClaudeCloudTokens, id: string): Promise<void> {
@@ -56,7 +86,7 @@ afterEach(() => rmSync(dir, { recursive: true, force: true }));
 describe("Claude cloud tokens", () => {
   it("saves the token setup-token prints for the account, without its styling", async () => {
     const { service } = tokens("ok");
-    service.create("work");
+    void service.create("work");
     expect((await service.status())["work"]).toEqual({ createdAt: null, creating: true, error: null });
     await settled(service, "work");
     expect(await service.token("work")).toBe(MINTED);
@@ -68,19 +98,42 @@ describe("Claude cloud tokens", () => {
   it("says what went wrong without repeating anything the command printed", async () => {
     for (const [mode, message] of [
       ["none", "Claude finished without a token. Paste one from claude setup-token instead."],
-      ["fail", "Making the token did not finish. Retry and complete the browser sign-in."],
+      ["fail", "The sign-in failed: access denied"],
     ] as const) {
       const { service } = tokens(mode);
-      service.create("work");
+      void service.create("work");
       await settled(service, "work");
       expect(await service.status()).toEqual({ work: { createdAt: null, creating: false, error: message } });
       expect(await service.token("work")).toBeNull();
     }
   });
 
+  it("saves the token as soon as the screen shows it, and closes setup-token instead of leaving it waiting for a key", async () => {
+    const { service } = tokens("shown");
+    void service.create("work");
+    await settled(service, "work");
+    expect(await service.token("work")).toBe(MINTED);
+    expect((await service.status())["work"]).toEqual({ createdAt: expect.any(Number), creating: false, error: null });
+    expect(running(Number(readFileSync(path.join(dir, "pid"), "utf8")))).toBe(false);
+  });
+
+  it("shows why the sign-in failed in the screen's own words, and closes setup-token instead of waiting to retry", async () => {
+    for (const [mode, message] of [
+      ["refused", "The sign-in failed: Invalid code. Please make sure the full code was copied"],
+      ["verbatim", "The sign-in failed: This organization does not allow long-lived tokens."],
+      ["paste", "The browser could not hand the sign-in back to Claude. Run claude setup-token in Terminal and paste the token."],
+    ] as const) {
+      const { service } = tokens(mode);
+      void service.create("work");
+      await settled(service, "work");
+      expect(await service.status()).toEqual({ work: { createdAt: null, creating: false, error: message } });
+      expect(running(Number(readFileSync(path.join(dir, "pid"), "utf8")))).toBe(false);
+    }
+  });
+
   it("stops quietly when the sign-in is cancelled", async () => {
     const { service } = tokens("wait");
-    service.create("work");
+    void service.create("work");
     service.cancel("work");
     await settled(service, "work");
     expect(await service.status()).toEqual({});

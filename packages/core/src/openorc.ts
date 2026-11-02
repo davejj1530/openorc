@@ -259,7 +259,7 @@ export class OpenOrc {
       credentials: options.cloudCredentials ?? (() => this.cloudSettings.credentials()),
       ...(options.cloudSandboxes ? { override: options.cloudSandboxes } : {}),
     });
-    this.claudeCloudTokens = new ClaudeCloudTokens(options.claudeCloudSecrets, this.claudeAccounts, () => invalidate(["cloud"]));
+    this.claudeCloudTokens = new ClaudeCloudTokens(options.claudeCloudSecrets, this.claudeAccounts, () => invalidate(["cloud"]), options.terminal);
     const agentEnvironment = cloudAgentEnvironment({ accounts: this.claudeAccounts, tokens: this.claudeCloudTokens, snapshot: () => this.environment.current() });
     const cloudChanged = (id: string) => invalidate(["threads", `thread:${id}`]);
     this.cloud = new CloudWorkspaceService(db, { ...sandboxes, agentEnvironment, changed: cloudChanged, ...(options.cloudRunnerFiles ? { files: options.cloudRunnerFiles } : {}) }, this.log);

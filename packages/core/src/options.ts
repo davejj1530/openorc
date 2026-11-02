@@ -7,6 +7,7 @@ import type { ProtectedSecretStore } from "./services/extraction-credentials.js"
 import type { BundledFormatter } from "./services/file-format.js";
 import type { ShellProbe } from "./services/shell-environment.js";
 import type { SlackSecretStore } from "./services/slack/service.js";
+import type { SpawnTerminal } from "./services/terminal-process.js";
 import type { Transport } from "./transport.js";
 
 /** What the host gives the core. */
@@ -58,6 +59,8 @@ export interface OpenOrcOptions {
   cloudSecrets?: ProtectedSecretStore;
   /** Keeps each Claude account's token for signing in to cloud sandboxes. */
   claudeCloudSecrets?: ProtectedSecretStore;
+  /** Starts a command in a terminal of its own, for CLIs whose sign-in screens need one. Without it they get pipes. */
+  terminal?: SpawnTerminal;
   /** Overrides the credentials Settings keeps, for tests and smoke scripts. While it resolves to null, new cloud conversations run in sandboxes on this Mac. */
   cloudCredentials?: () => Promise<VercelCredentials | null>;
 }

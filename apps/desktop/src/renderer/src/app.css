@@ -1117,7 +1117,8 @@ span.property-chip {
     display: none;
   }
 }
-/* Settings is a surface sheet (r20) beside the settings sidebar. Its toolbar is the window chrome
+/* Settings is a surface sheet beside the settings sidebar. Its r12 corners follow the window's
+   r20 corners at an 8px inset. Its toolbar is the window chrome
    inside the sheet; the open section heads a left-aligned 860px column. Cards inside it are tile
    cards (--bg) on the sheet. */
 .settings-sheet {
@@ -1128,7 +1129,7 @@ span.property-chip {
   min-width: 0;
   /* The well gutter. --spacing-well is an inline theme value, so it has no runtime variable. */
   margin: 8px 8px 8px 0;
-  border-radius: var(--radius-3xl);
+  border-radius: var(--radius-lg);
   background: var(--surface);
 }
 .settings-sheet[data-sidebar="closed"] {
@@ -1158,7 +1159,7 @@ span.property-chip {
   min-width: 0;
   overflow: hidden;
   /* The sheet leaves its toolbar unclipped, so the scroller rounds its own bottom corners. */
-  border-radius: 0 0 var(--radius-3xl) var(--radius-3xl);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
 }
 .settings-page-head {
   display: flex;

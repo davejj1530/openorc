@@ -70,7 +70,7 @@ beforeEach(() => {
   window.openorc = { ...window.openorc, openExternal: vi.fn() };
   vi.stubGlobal("CSS", { escape: (value: string) => value });
   useRouter.setState({ route: { view: "thread", threadId: "a" }, threadIds: ["a"], history: [], future: [] });
-  useLayout.setState({ sidebarOpen: true, panelOpen: false, panelThreadId: "a", panelTab: "changes", projectId: null });
+  useLayout.setState({ sidebarOpen: true, panelOpen: false, panelSide: "right", panelThreadId: "a", panelTab: "changes", projectId: null });
 });
 
 const active = () => useRouter.getState().route;
@@ -127,6 +127,28 @@ it.each([true])("waits for an emitted plan and preserves manual sidebar choices 
   documents.set("b", [document("revision-2"), document("proposal")]);
   view.rerender(<ThreadWorkspace />);
   expect(useLayout.getState()).toMatchObject({ panelThreadId: "b", panelOpen: true, panelTab: "plan" });
+});
+
+it("swaps the open panel's side from the thread header, handing the window navigation to whichever column comes first", () => {
+  useLayout.setState({ sidebarOpen: false });
+  const { container } = render(<ThreadWorkspace />);
+  const header = () => container.querySelector<HTMLElement>('[data-thread-pane="a"] header')!;
+  expect(within(header()).queryByRole("button", { name: "Move panel left" })).toBeNull();
+
+  act(() => useLayout.getState().toggleThreadPanel("a"));
+  fireEvent.click(within(header()).getByRole("button", { name: "Move panel left" }));
+  expect(useLayout.getState().panelSide).toBe("left");
+  expect(header().hasAttribute("data-window-navigation")).toBe(false);
+
+  fireEvent.click(within(header()).getByRole("button", { name: "Move panel right" }));
+  expect(useLayout.getState().panelSide).toBe("right");
+  expect(header().hasAttribute("data-window-navigation")).toBe(true);
+});
+
+it("keeps the window navigation in the thread header while the left panel belongs to a thread off screen", () => {
+  useLayout.setState({ sidebarOpen: false, panelOpen: true, panelSide: "left", panelThreadId: "elsewhere" });
+  const { container } = render(<ThreadWorkspace />);
+  expect(container.querySelector('[data-thread-pane="a"] header')!.hasAttribute("data-window-navigation")).toBe(true);
 });
 
 describe.each([{ ids: ["a", "b"] }, { ids: ["a", "b", "c"] }])("header focus boundaries in $ids", ({ ids }) => {

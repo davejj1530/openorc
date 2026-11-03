@@ -13,10 +13,10 @@ import { TopBar } from "./TopBar";
 import { menuItem, menuPopup } from "./menu";
 import { IconButton, StatusDot, Tooltip } from "./ui";
 import { CoversPreview } from "../lib/browser-preview";
-import { useLayout } from "../lib/layout";
 import { openThread, useRouter } from "../lib/router";
 import { floatingGround } from "../lib/use-anchor-ground";
 
+/** Whether the header starts or ends the work row, which decides who clears the native window controls. */
 type Placement = { first: boolean; last: boolean; onClose?: () => void };
 
 const prDot = { open: "muted", merged: "ok", closed: "bad" } as const;
@@ -35,10 +35,9 @@ function ClosePane({ onClose }: { onClose?: () => void }) {
 
 /** While a thread loads or can't be found, its header still offers the way back. */
 export function ThreadHeaderPlaceholder({ loading, first, last, onClose }: Placement & { loading: boolean }) {
-  const panelOpen = useLayout((s) => s.panelOpen);
   const back = useRouter((s) => s.back);
   return (
-    <TopBar windowDragSurface showProject={false} inSplit={!first} rightmost={last && !panelOpen} actions={<ClosePane onClose={onClose} />}>
+    <TopBar windowDragSurface showProject={false} inSplit={!first} rightmost={last} actions={<ClosePane onClose={onClose} />}>
       <Tooltip label="Back">
         <IconButton onClick={back} aria-label="Back">
           <ArrowLeft size={16} />
@@ -71,13 +70,12 @@ export function ThreadHeader({
   onRename: (title: string) => void;
   onTeamToolbar: (element: HTMLSpanElement | null) => void;
 }) {
-  const panelOpen = useLayout((s) => s.panelOpen);
   return (
     <TopBar
       windowDragSurface
       showProject={false}
       inSplit={!first}
-      rightmost={last && !panelOpen}
+      rightmost={last}
       actions={
         <>
           {t.teamInstanceId ? <span ref={onTeamToolbar} className="thread-team-toolbar" /> : null}

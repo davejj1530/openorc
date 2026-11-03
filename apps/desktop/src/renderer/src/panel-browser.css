@@ -13,6 +13,14 @@
 .panel-shell[data-expanded="true"] .panel-card {
   margin-left: 8px;
 }
+/* Docked on the left, the card keeps its gutter on the window's side instead. */
+.panel-shell[data-side="left"] .panel-card {
+  margin-right: 0;
+  margin-left: 8px;
+}
+.panel-shell[data-side="left"][data-expanded="true"] .panel-card {
+  margin-right: 8px;
+}
 /* The header shares the window's chrome line with the thread header, on the tile above the card. */
 .panel-header {
   display: flex;
@@ -281,7 +289,8 @@
   .panel-shell {
     --panel-traffic-overlap: max(0px, calc(var(--spacing-traffic) - (100cqw - var(--panel-pane) - var(--spacing-well))));
   }
-  .panel-header[data-traffic-clearance="true"] {
+  /* Docked on the left, the header already starts past the traffic lights. */
+  .panel-shell:not([data-side="left"]) .panel-header[data-traffic-clearance="true"] {
     padding-left: var(--panel-traffic-overlap);
   }
   .panel-header > :has(> .panel-hide) {

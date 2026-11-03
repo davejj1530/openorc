@@ -102,6 +102,7 @@ export const ArrowRight = icon("ArrowRight", <path d="M4 12h16m-6-6 6 6-6 6" />)
 export const ArrowLeft = icon("ArrowLeft", <path d="M20 12H4m6-6-6 6 6 6" />);
 export const ArrowUp = icon("ArrowUp", <path d="M12 20V4m-6 6 6-6 6 6" />);
 export const ArrowDown = icon("ArrowDown", <path d="M12 4v16m-6-6 6 6 6-6" />);
+export const ArrowLeftRight = icon("ArrowLeftRight", <path d="M4 8h16m-4-4 4 4-4 4 M20 16H4m4-4-4 4 4 4" />);
 export const ArrowUpRight = icon("ArrowUpRight", <path d="M6 18 18 6 M7 6h11v11" />);
 export const ExternalLink = icon(
   "ExternalLink",
@@ -258,6 +259,10 @@ export const PanelRight = icon(
     <path d="M15 3.5v17" />
   </>,
 );
+/** The panel toggle's mark, drawn on the side the panel docks. */
+export function PanelIcon({ side, ...props }: IconProps & { side: "left" | "right" }) {
+  return side === "left" ? <PanelLeft {...props} /> : <PanelRight {...props} />;
+}
 export const PanelRightClose = icon(
   "PanelRightClose",
   <>

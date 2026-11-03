@@ -11,6 +11,7 @@ import { useRouter } from "../lib/router";
 /**
  * A stable, thread-scoped conversation. The workspace owns the shared panel.
  */
+/** `first` and `last` say whether this pane's header starts or ends the work row, past any panel docked beside it. */
 export function ThreadView({ threadId, first, last, focused, onClose }: { threadId: string; first: boolean; last: boolean; focused: boolean; onClose?: () => void }) {
   const thread = useRpc("threads.get", { id: threadId });
   const project = useRpc("projects.get", { id: thread.data?.projectId ?? "" }, { enabled: Boolean(thread.data) });

@@ -8,9 +8,9 @@ function displayedProjectName(override: string | null | undefined, selectedId: s
   return projects?.find((project) => project.id === selectedId)?.name ?? "Project";
 }
 import { Menu } from "@base-ui/react/menu";
-import { Check, ChevronDown, PanelRight } from "./icons";
+import { Check, ChevronDown, PanelIcon } from "./icons";
 import { cn } from "../lib/cn";
-import { useLayout } from "../lib/layout";
+import { useLayout, type PanelSide } from "../lib/layout";
 import { WindowNav } from "./Sidebar";
 import { IconButton, Tooltip } from "./ui";
 import { useTrafficLights, useWindowsControls } from "../lib/window";
@@ -31,12 +31,21 @@ function headerInset({ leftmost, rightmost, besideColumn, thread }: { leftmost: 
 }
 
 /**
+ * Where the header sits in the work row. The first carries the window navigation; a panel docked
+ * on the left comes before it. The last clears the Windows controls unless a panel follows it.
+ */
+function headerEnds({ inSplit, panelShown, panelSide, rightmost }: { inSplit?: boolean; panelShown: boolean; panelSide: PanelSide; rightmost?: boolean }) {
+  return { first: !inSplit && !(panelShown && panelSide === "left"), last: rightmost ?? !(panelShown && panelSide === "right") };
+}
+
+/**
  * The main column's header: the screen's title with a quiet project switcher.
  * A plain-text title is the page's heading.
  * Window navigation stays here. With the sidebar hidden this is the window's
  * leftmost header, so it also clears the native window controls.
  * When a panel is available but closed, its toggle lives here so the third
- * column is one click away.
+ * column is one click away. A panel docked on the left takes the window
+ * navigation into its own header.
  */
 export function TopBar({
   children,
@@ -69,17 +78,18 @@ export function TopBar({
 }) {
   const sidebarOpen = useLayout((s) => s.sidebarOpen);
   const panelOpen = useLayout((s) => s.panelOpen);
+  const panelSide = useLayout((s) => s.panelSide);
   const setPanel = useLayout((s) => s.setPanel);
   const trafficLights = useTrafficLights();
   const windowsControls = useWindowsControls();
+  const { first, last: rightmost } = headerEnds({ inSplit, panelShown: Boolean(panel && panelOpen), panelSide, rightmost: isRightmost });
   // Only the window's leftmost header clears the traffic lights, and only its rightmost clears the Windows controls.
-  const leftmost = !sidebarOpen && !inSplit;
-  const rightmost = isRightmost ?? !(panel && panelOpen);
+  const leftmost = !sidebarOpen && first;
   const panelLabel = panelActive ? "Hide panel" : "Show panel";
   return (
     <header
-      data-window-navigation={!inSplit || undefined}
-      data-traffic-lights={(trafficLights && !inSplit) || undefined}
+      data-window-navigation={first || undefined}
+      data-traffic-lights={(trafficLights && first) || undefined}
       className={cn(
         "drag-region app-topbar h-topbar shrink-0 flex items-center justify-between",
         windowDragSurface ? "thread-header" : "gap-2",
@@ -90,11 +100,11 @@ export function TopBar({
       {/* Native regions follow declaration order: controls must follow this layer. */}
       {windowDragSurface ? <span className="thread-header-drag-surface" aria-hidden="true" /> : null}
       <div className="flex items-center gap-2 min-w-0 flex-1 text-base truncate">
-        {inSplit ? null : (
+        {first ? (
           <span className="workspace-window-nav flex items-center mr-1" data-sidebar-open={sidebarOpen}>
             <WindowNav open={sidebarOpen} />
           </span>
-        )}
+        ) : null}
         {typeof children === "string" ? <h1 className="inline-flex items-center h-7 px-1 truncate text-ink">{children}</h1> : children}
         {showProject && <HeaderProjectPicker projectId={projectId} projectName={projectName} onProjectChange={onProjectChange} />}
       </div>
@@ -106,7 +116,7 @@ export function TopBar({
         {panel && (onPanelToggle || !panelOpen) ? (
           <Tooltip label={panelLabel}>
             <IconButton onClick={onPanelToggle ?? (() => setPanel(true))} aria-label={panelLabel} aria-pressed={panelActive}>
-              <PanelRight size={16} />
+              <PanelIcon side={panelSide} size={16} />
             </IconButton>
           </Tooltip>
         ) : null}

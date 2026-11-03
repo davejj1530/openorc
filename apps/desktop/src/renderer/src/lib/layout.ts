@@ -13,6 +13,9 @@ export type FileSelection = FileReference & { scope: RpcParams<"files.read">["sc
 export type WorkspaceChangesTarget = { kind: "thread" | "project"; id: string };
 export type WorkspaceChangesRequest = WorkspaceChangesTarget & { comparison: "base" | "head"; commit: boolean; requestId: number };
 
+/** Which side of the conversation the shared panel docks on. */
+export type PanelSide = "left" | "right";
+
 /** A screen the sidebar can list. The ones the user hides wait under More; Inbox sits in the window's header instead. */
 export type SidebarScreen = "tasks" | "pulls" | "scheduled" | "orchestration" | "memory";
 
@@ -24,6 +27,7 @@ interface LayoutState {
   sidebarWidth: number;
   panelOpen: boolean;
   panelWidth: number;
+  panelSide: PanelSide;
   panelTab: PanelTab;
   panelRequest: { tab: PanelTab } | null;
   selectedChanges: ChangeSelection | null;
@@ -67,6 +71,7 @@ interface LayoutState {
   setSidebarWidth: (px: number) => void;
   setPanel: (open: boolean, tab?: PanelTab) => void;
   setPanelWidth: (px: number) => void;
+  togglePanelSide: () => void;
   setProject: (id: string | null) => void;
   /** Choosing a filter clears pinned-only unless it is asked for again. */
   setSidebarFilter: (filter: SidebarFilter, pinnedOnly?: boolean) => void;
@@ -93,7 +98,7 @@ const KEY = "openorc.layout";
 function read(): Partial<
   Pick<
     LayoutState,
-    "sidebarOpen" | "sidebarWidth" | "panelOpen" | "panelWidth" | "projectId" | "sidebarFilter" | "ungroupByProjects" | "hiddenScreens" | "hiddenProjects" | "collapsed" | "previewUrls"
+    "sidebarOpen" | "sidebarWidth" | "panelOpen" | "panelWidth" | "panelSide" | "projectId" | "sidebarFilter" | "ungroupByProjects" | "hiddenScreens" | "hiddenProjects" | "collapsed" | "previewUrls"
   >
 > {
   try {
@@ -112,6 +117,7 @@ function persist(s: LayoutState): void {
         sidebarWidth: s.sidebarWidth,
         panelOpen: s.panelOpen,
         panelWidth: s.panelWidth,
+        panelSide: s.panelSide,
         projectId: s.projectId,
         sidebarFilter: s.sidebarFilter,
         ungroupByProjects: s.ungroupByProjects,
@@ -145,6 +151,7 @@ function withOnlyProject(hidden: readonly string[], id: string, listedIds: reado
   return [...others, ...listedIds.filter((listed) => listed !== id)];
 }
 
+/** The three-column frame: sidebar, main, and an optional panel on either side of main. Sizes and the panel's side persist across launches. */
 function threadFoldActions(get: () => LayoutState, commit: (patch: Partial<LayoutState>) => void): Pick<LayoutState, "revealThreads" | "pruneThreadFolds"> {
   const save = (collapsed: string[]) => {
     if (collapsed.length !== get().collapsed.length) commit({ collapsed });
@@ -158,7 +165,6 @@ function threadFoldActions(get: () => LayoutState, commit: (patch: Partial<Layou
   };
 }
 
-/** The three-column frame: sidebar, main, and an optional panel. Sizes persist across launches. */
 export const useLayout = create<LayoutState>((set, get) => {
   const saved = read();
   const initial = {
@@ -166,6 +172,7 @@ export const useLayout = create<LayoutState>((set, get) => {
     sidebarWidth: clamp(saved.sidebarWidth ?? limits.sidebar.default, limits.sidebar),
     panelOpen: saved.panelOpen ?? false,
     panelWidth: clamp(saved.panelWidth ?? limits.panel.default, limits.panel),
+    panelSide: saved.panelSide === "left" ? ("left" as const) : ("right" as const),
     panelTab: "newtab" as PanelTab,
     panelRequest: null,
     selectedFile: null,
@@ -226,6 +233,7 @@ export const useLayout = create<LayoutState>((set, get) => {
       ),
     openFiles: (threadId) => commit({ selectedFile: null, panelOpen: true, panelTab: "file", panelRequest: { tab: "file" }, ...(threadId ? { panelThreadId: threadId } : {}) }),
     setPanelWidth: (px) => commit({ panelWidth: clamp(px, limits.panel) }),
+    togglePanelSide: () => commit({ panelSide: get().panelSide === "left" ? "right" : "left" }),
     setProject: (projectId) => commit({ projectId }),
     openThreadPanel: (id, tab) => commit({ panelThreadId: id, panelOpen: true, panelTab: tab, panelRequest: { tab } }),
     toggleThreadPanel: (id) => {

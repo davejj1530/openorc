@@ -654,6 +654,23 @@ body:has(.sidebar-shell[data-open="true"]) .work-row > .well:first-child {
 body[data-resizing] .panel-shell {
   transition: none;
 }
+/* Docked on the left, the panel and its grip come before the conversation. Only the visual order
+   changes, so a swap remounts nothing, and reading-flow keeps Tab in the order the eye reads.
+   The pane hangs from the seam rather than the window edge, so it slides in from the left. */
+.panel-shell[data-side="left"] {
+  order: -2;
+  display: flex;
+  justify-content: flex-end;
+}
+.panel-shell[data-side="left"] > .panel-pane {
+  flex-shrink: 0;
+}
+.resize-handle[data-edge="panel"][data-side="left"] {
+  order: -1;
+}
+.work-row:has(> .panel-shell[data-side="left"]) {
+  reading-flow: flex-visual;
+}
 /* An open panel shares the work plane's edge, like the sidebar on the left.
    Remove the well gutter so the resize grip sits on one visible seam. */
 .work-row:has(> .panel-shell[data-open="true"]) > .well,
@@ -1628,6 +1645,10 @@ body:has(.sidebar-shell[data-open="false"]) .thread-pane:first-child > .well {
     right: 0;
     bottom: 0;
     z-index: 20;
+  }
+  .panel-shell[data-side="left"][data-open="true"]:not([data-expanded="true"]) {
+    right: auto;
+    left: 0;
   }
   .resize-handle[data-edge="panel"] {
     display: none;

@@ -1,12 +1,12 @@
 import { EventEmitter } from "node:events";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { PassThrough } from "node:stream";
 import { spawn, type ChildProcess } from "node:child_process";
 import { describe, expect, it, vi } from "vitest";
 import type { AgentEvent, ApprovalDecision, PermissionPreset, RunSpec } from "@openorc/protocol";
-import { AcpAdapter, modelsFrom } from "./adapter.js";
+import { AcpAdapter, modelsFrom, type AcpApprovalRequest } from "./adapter.js";
 
 const launch = { revision: 0, binary: "opencode", env: process.env };
 
@@ -15,7 +15,7 @@ vi.mock("node:child_process", () => ({ spawn: vi.fn() }));
 type Request = { id: number; method: string; params: Record<string, unknown> };
 
 /** A scripted ACP agent on the far side of the pipes; the adapter and the SDK client run unchanged. */
-function agent(permissionMode: PermissionPreset = "autonomous", overrides: Partial<RunSpec> = {}, decide: () => Promise<ApprovalDecision> = async () => "allow") {
+function agent(permissionMode: PermissionPreset = "autonomous", overrides: Partial<RunSpec> = {}, decide: (request: AcpApprovalRequest) => Promise<ApprovalDecision> = async () => "allow") {
   const stdin = new PassThrough();
   const stdout = new PassThrough();
   const stderr = new PassThrough();
@@ -74,7 +74,7 @@ function agent(permissionMode: PermissionPreset = "autonomous", overrides: Parti
       const message = JSON.parse(line) as { id?: number; method?: string; params?: Record<string, unknown>; result?: unknown };
       if (message.method && message.id === undefined) {
         notifications.push({ method: message.method, params: message.params ?? {} });
-        if (message.method === "session/cancel") {
+        if (message.method === "session/cancel" && message.params?.["sessionId"] === "ses_1") {
           const id = prompts.shift();
           if (id !== undefined) write({ jsonrpc: "2.0", id, result: { stopReason: "cancelled" } });
         }
@@ -136,11 +136,12 @@ function agent(permissionMode: PermissionPreset = "autonomous", overrides: Parti
       { optionId: "always", kind: "allow_always", name: "Always allow" },
       { optionId: "reject", kind: "reject_once", name: "Reject" },
     ],
+    sessionId = "ses_1",
   ) =>
     new Promise<unknown>((resolve) => {
       const id = ++permissionId;
       permissions.push({ id, resolve });
-      write({ jsonrpc: "2.0", id, method: "session/request_permission", params: { sessionId: "ses_1", toolCall, options } });
+      write({ jsonrpc: "2.0", id, method: "session/request_permission", params: { sessionId, toolCall, options } });
     });
   const fail = (message: string) => {
     const id = prompts.shift();
@@ -148,12 +149,94 @@ function agent(permissionMode: PermissionPreset = "autonomous", overrides: Parti
     write({ jsonrpc: "2.0", id, error: { code: -32603, message } });
   };
   const promptCalls = () => calls.filter((call) => call.method === "session/prompt");
-  return { calls, notifications, events, handle, finish, fail, update, askPermission, promptCalls, proc };
+  return { calls, notifications, events, handle, finish, fail, update, write, askPermission, promptCalls, proc };
 }
 
 const eventTypes = (events: AgentEvent[]) => events.map((event) => event.type);
 
 describe("AcpAdapter", () => {
+  it("keeps child permissions separate from the parent's cancellation", async () => {
+    const requests: AcpApprovalRequest[] = [];
+    const s = agent("autonomous", {}, async (request) => {
+      requests.push(request);
+      return new Promise(() => {});
+    });
+    try {
+      await vi.waitFor(() => expect(s.promptCalls()).toHaveLength(1));
+      s.write({
+        jsonrpc: "2.0",
+        method: "opencode/session/child_update",
+        params: { rootSessionId: "ses_1", childSessionId: "a", parentSessionId: "ses_1", title: "A", type: "status", status: "created" },
+      });
+      let answered = false;
+      const pending = s.askPermission({ toolCallId: "read", title: "Read file", kind: "read" }, undefined, "a").then((answer) => {
+        answered = true;
+        return answer;
+      });
+      await vi.waitFor(() => expect(requests).toHaveLength(1));
+      expect(requests[0]).toMatchObject({ subagentId: "a" });
+      await s.handle.interrupt();
+      await vi.waitFor(() => expect(s.events.some((e) => e.type === "turn.completed")).toBe(true));
+      expect(answered).toBe(false);
+      await s.handle.stopSubagent("a");
+      await expect(pending).resolves.toEqual({ outcome: { outcome: "cancelled" } });
+    } finally {
+      s.handle.close();
+    }
+  });
+  it.each(["A", "B", "C", "D"])("routes recorded OpenCode child traffic %s into its own transcript", async (fixture) => {
+    const s = agent();
+    try {
+      await vi.waitFor(() => expect(s.promptCalls()).toHaveLength(1));
+      const frames = JSON.parse(readFileSync(new URL(`./test-fixtures/subagents-${fixture}.json`, import.meta.url), "utf8")) as { finish?: Record<string, unknown> }[];
+      for (const frame of frames) {
+        if (frame.finish) s.finish(frame.finish);
+        else s.write(frame);
+      }
+      await vi.waitFor(() => expect(s.events.some((e) => e.type === "subagent.updated" && e.status !== "running")).toBe(true));
+      const start = s.events.find((e) => e.type === "subagent.started");
+      expect(start).toMatchObject({ type: "subagent.started", title: expect.any(String), toolCallId: expect.any(String), prompt: expect.any(String), agentType: "explore" });
+      const childId = start!.subagentId;
+      const child = s.events.filter((e) => e.subagentId === childId);
+      expect(child.some((e) => e.type === "tool.started")).toBe(true);
+      expect(s.events.every((e) => e.type !== "tool.started" || e.subagentId || e.name === "subagent")).toBe(true);
+      expect(s.events.some((e) => e.type === "tool.completed" && typeof e.output === "object" && e.output !== null && "metadata" in e.output)).toBe(false);
+      expect(s.events.filter((e) => e.type === "subagent.started")).toHaveLength(1);
+      expect(s.calls[0]?.params).toMatchObject({ clientCapabilities: { _meta: { "opencode/child-session-updates": true } } });
+      if (fixture === "C") expect(child.at(-1)).toMatchObject({ type: "subagent.updated", status: "stopped" });
+      else expect(child.some((e) => e.type === "message.completed" && e.text.length > 0)).toBe(true);
+      if (fixture === "D") expect(s.events.findIndex((e) => e.type === "turn.completed")).toBeLessThan(s.events.findIndex((e) => e.type === "subagent.updated" && e.status === "completed"));
+    } finally {
+      s.handle.close();
+    }
+  });
+
+  it("keeps parallel and nested children separate and cancels only the selected child", async () => {
+    const s = agent();
+    try {
+      await vi.waitFor(() => expect(s.promptCalls()).toHaveLength(1));
+      const status = (id: string, parent: string, state: string) =>
+        s.write({
+          jsonrpc: "2.0",
+          method: "opencode/session/child_update",
+          params: { rootSessionId: "ses_1", childSessionId: id, parentSessionId: parent, depth: parent === "ses_1" ? 1 : 2, title: id, type: "status", status: state },
+        });
+      status("a", "ses_1", "created");
+      status("b", "ses_1", "created");
+      status("c", "a", "created");
+      await vi.waitFor(() => expect(s.events.filter((e) => e.type === "subagent.started")).toHaveLength(3));
+      expect(s.events.find((e) => e.type === "subagent.started" && e.subagentId === "c")).toMatchObject({ parentSubagentId: "a" });
+      await s.handle.stopSubagent("a");
+      await vi.waitFor(() => expect(s.notifications).toContainEqual({ method: "session/cancel", params: { sessionId: "a" } }));
+      expect(s.events.some((e) => e.type === "turn.completed")).toBe(false);
+      status("a", "ses_1", "interrupted");
+      await vi.waitFor(() => expect(s.handle.canStopSubagent("a")).toBe(false));
+      expect(s.handle.canStopSubagent("b")).toBe(true);
+      s.finish();
+    } finally {
+      s.handle.close();
+    }
+  });
   it("refuses an unvetted checkout that carries OpenCode settings, which older releases load regardless", () => {
     const cwd = mkdtempSync(path.join(os.tmpdir(), "openorc-opencode-copy-"));
     try {
@@ -303,7 +386,7 @@ describe("AcpAdapter", () => {
     await vi.waitFor(() => expect(s.promptCalls()).toHaveLength(1));
     const answer = s.askPermission({ toolCallId: "c1", title: "write", kind: "edit", status: "pending" });
     await vi.waitFor(() => expect(decide).toBeDefined());
-    s.handle.interrupt();
+    await s.handle.interrupt();
     await expect(answer).resolves.toEqual({ outcome: { outcome: "cancelled" } });
     await vi.waitFor(() => expect(s.notifications.map((n) => n.method)).toContain("session/cancel"));
     await vi.waitFor(() => expect(s.events.find((event) => event.type === "turn.completed")).toMatchObject({ status: "cancelled" }));
@@ -349,4 +432,27 @@ describe("modelsFrom", () => {
     expect(grouped).toEqual([{ id: "opencode/big", label: "Big", provider: { id: "opencode", label: "opencode" }, isDefault: true }]);
     expect(modelsFrom([{ id: "mode", name: "Mode", type: "select", currentValue: "build", options: [] }])).toEqual([]);
   });
+});
+
+it.each([true, false])("denies a dropped child's permission whether it arrives before the drop: %s", async (early) => {
+  const requests: AcpApprovalRequest[] = [];
+  const s = agent("autonomous", {}, async (request) => {
+    requests.push(request);
+    return new Promise(() => {});
+  });
+  try {
+    await vi.waitFor(() => expect(s.promptCalls()).toHaveLength(1));
+    const permission = () => s.askPermission({ toolCallId: "read", title: "Read file", kind: "read" }, undefined, "orphan");
+    const pending = early ? permission() : null;
+    if (early) await vi.waitFor(() => expect(requests).toHaveLength(1));
+    s.write({
+      jsonrpc: "2.0",
+      method: "opencode/session/child_update",
+      params: { rootSessionId: "ses_1", childSessionId: "orphan", parentSessionId: "missing", title: "Orphan", type: "status", status: "created" },
+    });
+    await expect(pending ?? permission()).resolves.toEqual({ outcome: { outcome: "cancelled" } });
+    expect(requests).toHaveLength(early ? 1 : 0);
+  } finally {
+    s.handle.close();
+  }
 });

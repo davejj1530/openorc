@@ -31,6 +31,7 @@ import { stopProcess, waitForProcessGroup } from "../process-lifetime.js";
 import { RunHandle } from "../run-handle.js";
 import { stripAnsi } from "../jsonrpc.js";
 import { AcpUpdateMapper, type ContextReport } from "./updates.js";
+import { AcpSubagents, childUpdate } from "./subagents.js";
 import { planConfig } from "./plan-config.js";
 import { questionConfig, questionInstructions } from "./questions.js";
 
@@ -44,6 +45,7 @@ export interface AcpApprovalRequest {
   input: unknown;
   /** The agent offered no option that keeps allowing this, so it can only be allowed once. */
   onceOnly: boolean;
+  subagentId?: string;
 }
 
 export interface AcpAdapterOptions {
@@ -85,7 +87,26 @@ const optionKindsFor: Record<ApprovalDecision, readonly PermissionOptionKind[]> 
   deny: ["reject_once", "reject_always"],
 };
 
+function observeProcess(proc: ReturnType<typeof spawnAgentProcess>, runId: string, emit: (event: AgentEvent) => void): void {
+  proc.once("exit", () => {
+    try {
+      stopProcess(proc);
+    } catch (error) {
+      emit({ type: "error", runId: runId, ts: Date.now(), message: `Process cleanup needs attention: ${error instanceof Error ? error.message : String(error)}`, fatal: false });
+    }
+  });
+  proc.on("error", (error) => {
+    emit({ type: "error", runId: runId, ts: Date.now(), message: error.message, fatal: true });
+    // A binary that could not be spawned never exits; end the run here so it does not stay live forever.
+    if (!proc.pid) proc.emit("exit", null, null);
+  });
+  readline.createInterface({ input: proc.stderr, crlfDelay: Infinity }).on("line", (line) => {
+    emit({ type: "error", runId: runId, ts: Date.now(), message: stripAnsi(line), fatal: false });
+  });
+}
+
 const cancelledOutcome: RequestPermissionResponse = { outcome: { outcome: "cancelled" } };
+type PendingPermission = { sessionId: string; respond: (response: RequestPermissionResponse) => void };
 
 const clientInfo = (version: string) => ({ name: "openorc", title: "OpenOrc", version });
 
@@ -181,25 +202,33 @@ export class AcpAdapter {
     let turns = 0;
     let compactions = 0;
     /** Permission requests the agent is waiting on; a cancelled turn answers them all. */
-    const pendingPermissions = new Map<string, (response: RequestPermissionResponse) => void>();
+    const pendingPermissions = new Map<string, PendingPermission>();
     const emit = (ev: AgentEvent) => handle.emit("event", ev);
     const now = () => Date.now();
     const exited = () => proc.exitCode !== null || proc.signalCode !== null;
+    const subagents = trackChildren(spec.runId, () => sessionId, emit, pendingPermissions);
 
     const app = client({ name: "openorc" })
       .onNotification("session/update", ({ params }) => {
         // Replayed history and child sessions belong to other transcripts.
         if (!sessionId || params.sessionId !== sessionId) return;
         emit({ type: "raw", runId: spec.runId, ts: now(), agent: "opencode", payload: params.update });
+        if (subagents.legacy(params.update, now())) return;
+        subagents.observe(sessionId, params.update, now());
         for (const ev of mapper.map(params.update, now())) emit(ev);
       })
-      .onRequest("session/request_permission", ({ params }) => this.requestPermission(spec.runId, params, pendingPermissions, emit));
+      .onNotification("opencode/session/child_update", childUpdate, ({ params }) => {
+        emit({ type: "raw", runId: spec.runId, ts: now(), agent: "opencode", payload: { method: "opencode/session/child_update", params } });
+        subagents.route(params, now());
+      })
+      .onRequest("session/request_permission", ({ params }) => this.requestPermission(spec.runId, params, pendingPermissions, emit, subagents.permissionSession(params.sessionId)));
     const connection = app.connect(streamOf(proc));
 
     const settle = (id: string, response: PromptResponse | null, error?: unknown): void => {
       if (!turn || turn.id !== id) return;
       const { startedAt: turnStartedAt, maintenance } = turn;
       turn = null;
+      subagents.endParentTurn(now());
       const ended = mapper.endTurn(now());
       for (const ev of ended.events) emit(ev);
       const message = error ? promptFailure(error, spec.model) : null;
@@ -260,29 +289,28 @@ export class AcpAdapter {
       proc.on("close", async (code) => {
         await waitForProcessGroup(proc);
         connection.close();
+        subagents.close(now());
         if (turn) settle(turn.id, null, new Error("OpenCode exited before the turn finished."));
         emit({ type: "session.completed", runId: spec.runId, ts: now(), status: code === 0 || code === null ? "success" : "error", durationMs: now() - startedAt, turns });
         handle.emit("exit", code);
         resolve(code);
       });
     });
-    proc.once("exit", () => {
-      try {
-        stopProcess(proc);
-      } catch (error) {
-        handle.emit("event", { type: "error", runId: spec.runId, ts: now(), message: `Process cleanup needs attention: ${error instanceof Error ? error.message : String(error)}`, fatal: false });
-      }
-    });
 
     handle = new RunHandle(spec.runId, {
       interrupt: () => {
         if (!sessionId || !turn || exited()) return;
         // The protocol requires every open permission request to be answered as cancelled first.
-        for (const respond of pendingPermissions.values()) respond(cancelledOutcome);
-        pendingPermissions.clear();
+        for (const pending of pendingPermissions.values()) if (pending.sessionId === sessionId) pending.respond(cancelledOutcome);
         void connection.agent.notify("session/cancel", { sessionId }).catch(() => undefined);
       },
       close: () => stopProcess(proc),
+      canStopSubagent: (id) => !exited() && subagents.canStop(id),
+      stopSubagent: async (id) => {
+        for (const pending of pendingPermissions.values()) if (pending.sessionId === id) pending.respond(cancelledOutcome);
+        await connection.agent.notify("session/cancel", { sessionId: id });
+        subagents.cancelled(id, now());
+      },
       send: (text, attachments) => prompt(text, attachments),
       // The same options the session was opened with, changed in place; the next prompt uses them.
       applySettings: async ({ model, effort, fastMode }) => {
@@ -309,20 +337,13 @@ export class AcpAdapter {
       done,
     });
 
-    proc.on("error", (error) => {
-      emit({ type: "error", runId: spec.runId, ts: now(), message: error.message, fatal: true });
-      // A binary that could not be spawned never exits; end the run here so it does not stay live forever.
-      if (!proc.pid) proc.emit("exit", null, null);
-    });
-    readline.createInterface({ input: proc.stderr, crlfDelay: Infinity }).on("line", (line) => {
-      emit({ type: "error", runId: spec.runId, ts: now(), message: stripAnsi(line), fatal: false });
-    });
+    observeProcess(proc, spec.runId, emit);
 
     void (async () => {
       try {
         await connection.agent.request("initialize", {
           protocolVersion: PROTOCOL_VERSION,
-          clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
+          clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false, _meta: { "opencode/child-session-updates": true } },
           clientInfo: clientInfo(this.version),
         });
         let options: SessionConfigOption[] | null | undefined;
@@ -361,9 +382,11 @@ export class AcpAdapter {
   private requestPermission(
     runId: string,
     params: RequestPermissionRequest,
-    pending: Map<string, (response: RequestPermissionResponse) => void>,
+    pending: Map<string, PendingPermission>,
     emit: (ev: AgentEvent) => void,
+    subagentId?: string | false,
   ): Promise<RequestPermissionResponse> {
+    if (subagentId === false) return Promise.resolve(cancelledOutcome);
     const approvalId = randomUUID();
     const kind = approvalKindFor(params.toolCall.kind ?? null);
     const toolName = params.toolCall.name ?? toolNameForKind(params.toolCall.kind ?? null);
@@ -374,10 +397,11 @@ export class AcpAdapter {
         pending.delete(approvalId);
         resolve(response);
       };
-      pending.set(approvalId, respond);
+      pending.set(approvalId, { sessionId: params.sessionId, respond });
       const onceOnly = !params.options.some((option) => option.kind === "allow_always");
-      void this.options.onApproval({ runId, approvalId, kind, toolName, detail, input, onceOnly }).then(
+      void this.options.onApproval({ runId, approvalId, kind, toolName, detail, input, onceOnly, ...(subagentId ? { subagentId } : {}) }).then(
         (answer) => {
+          if (!pending.has(approvalId)) return;
           const decision = typeof answer === "string" ? answer : answer.decision;
           const option = optionKindsFor[decision].map((kind) => params.options.find((candidate) => candidate.kind === kind)).find(Boolean);
           respond(option ? { outcome: { outcome: "selected", optionId: option.optionId } } : cancelledOutcome);
@@ -458,4 +482,14 @@ function usageFor(usage: AcpUsage | null | undefined, context: ContextReport | n
     ...(context?.costUsd !== undefined ? { costUsd: context.costUsd } : {}),
     ...(context ? { contextTokens: context.used, contextWindow: context.size } : {}),
   };
+}
+
+function trackChildren(runId: string, root: () => string | null, emit: (event: AgentEvent) => void, pending: Map<string, PendingPermission>): AcpSubagents {
+  return new AcpSubagents(runId, root, emit, (id) => {
+    for (const [approvalId, request] of pending)
+      if (request.sessionId === id) {
+        request.respond(cancelledOutcome);
+        emit({ type: "approval.resolved", runId, ts: Date.now(), approvalId, decision: "deny" });
+      }
+  });
 }

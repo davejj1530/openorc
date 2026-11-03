@@ -1,0 +1,319 @@
+[
+  {
+    "jsonrpc": "2.0",
+    "method": "session/update",
+    "params": {
+      "sessionId": "ses_1",
+      "update": {
+        "sessionUpdate": "available_commands_update",
+        "availableCommands": [
+          {
+            "name": "init",
+            "description": "guided AGENTS.md setup"
+          },
+          {
+            "name": "review",
+            "description": "review changes [commit|branch|pr], defaults to uncommitted"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "session/update",
+    "params": {
+      "sessionId": "ses_1",
+      "update": {
+        "sessionUpdate": "tool_call",
+        "toolCallId": "call_00_7p9epwo01q29umsnfpiuczjy",
+        "title": "subagent",
+        "kind": "think",
+        "status": "pending",
+        "locations": [],
+        "rawInput": {}
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "session/update",
+    "params": {
+      "sessionId": "ses_1",
+      "update": {
+        "sessionUpdate": "tool_call_update",
+        "toolCallId": "call_00_7p9epwo01q29umsnfpiuczjy",
+        "status": "in_progress",
+        "kind": "think",
+        "title": "subagent",
+        "locations": [],
+        "rawInput": {
+          "agent": "explore",
+          "description": "Read note one",
+          "prompt": "Read the file note1.txt in the current working directory (/repo/work-B) and return the secret word it contains. Thoroughness: quick. Reply with just the secret word."
+        }
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "opencode/session/child_update",
+    "params": {
+      "rootSessionId": "ses_1",
+      "childSessionId": "ses_e6055b85effe75S16IUr9Rlyou",
+      "parentSessionId": "ses_1",
+      "depth": 1,
+      "title": "Read note one",
+      "type": "status",
+      "status": "created"
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "session/update",
+    "params": {
+      "sessionId": "ses_1",
+      "update": {
+        "sessionUpdate": "tool_call_update",
+        "toolCallId": "call_00_7p9epwo01q29umsnfpiuczjy",
+        "status": "in_progress",
+        "kind": "think",
+        "title": "subagent",
+        "locations": [],
+        "rawInput": {
+          "agent": "explore",
+          "description": "Read note one",
+          "prompt": "Read the file note1.txt in the current working directory (/repo/work-B) and return the secret word it contains. Thoroughness: quick. Reply with just the secret word."
+        }
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "opencode/session/child_update",
+    "params": {
+      "rootSessionId": "ses_1",
+      "childSessionId": "ses_e6055b85effe75S16IUr9Rlyou",
+      "parentSessionId": "ses_1",
+      "depth": 1,
+      "title": "Read note one",
+      "type": "status",
+      "status": "running"
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "opencode/session/child_update",
+    "params": {
+      "rootSessionId": "ses_1",
+      "childSessionId": "ses_e6055b85effe75S16IUr9Rlyou",
+      "parentSessionId": "ses_1",
+      "depth": 1,
+      "title": "Read note one",
+      "type": "update",
+      "update": {
+        "sessionUpdate": "tool_call",
+        "toolCallId": "ses_e6055b85effe75S16IUr9Rlyou:call_00_nasozs9gl8yhgf4kkdvjoj71",
+        "title": "Read note one: read",
+        "kind": "read",
+        "status": "pending",
+        "locations": [],
+        "rawInput": {},
+        "_meta": {
+          "opencode/child-session": {
+            "id": "ses_e6055b85effe75S16IUr9Rlyou",
+            "parentID": "ses_1",
+            "depth": 1,
+            "title": "Read note one"
+          }
+        }
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "opencode/session/child_update",
+    "params": {
+      "rootSessionId": "ses_1",
+      "childSessionId": "ses_e6055b85effe75S16IUr9Rlyou",
+      "parentSessionId": "ses_1",
+      "depth": 1,
+      "title": "Read note one",
+      "type": "update",
+      "update": {
+        "sessionUpdate": "tool_call_update",
+        "toolCallId": "ses_e6055b85effe75S16IUr9Rlyou:call_00_nasozs9gl8yhgf4kkdvjoj71",
+        "status": "in_progress",
+        "kind": "read",
+        "title": "Read note one: read",
+        "locations": [
+          {
+            "path": "/repo/work-B/note1.txt"
+          }
+        ],
+        "rawInput": {
+          "path": "/repo/work-B/note1.txt"
+        },
+        "_meta": {
+          "opencode/child-session": {
+            "id": "ses_e6055b85effe75S16IUr9Rlyou",
+            "parentID": "ses_1",
+            "depth": 1,
+            "title": "Read note one"
+          }
+        }
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "opencode/session/child_update",
+    "params": {
+      "rootSessionId": "ses_1",
+      "childSessionId": "ses_e6055b85effe75S16IUr9Rlyou",
+      "parentSessionId": "ses_1",
+      "depth": 1,
+      "title": "Read note one",
+      "type": "update",
+      "update": {
+        "sessionUpdate": "tool_call_update",
+        "toolCallId": "ses_e6055b85effe75S16IUr9Rlyou:call_00_nasozs9gl8yhgf4kkdvjoj71",
+        "status": "completed",
+        "content": [
+          {
+            "type": "content",
+            "content": {
+              "type": "text",
+              "text": "Read file /repo/work-B/note1.txt, lines 1-1\n1: note 1: the secret word is apple"
+            }
+          }
+        ],
+        "rawOutput": {
+          "metadata": {
+            "truncated": false
+          }
+        },
+        "_meta": {
+          "opencode/child-session": {
+            "id": "ses_e6055b85effe75S16IUr9Rlyou",
+            "parentID": "ses_1",
+            "depth": 1,
+            "title": "Read note one"
+          }
+        }
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "opencode/session/child_update",
+    "params": {
+      "rootSessionId": "ses_1",
+      "childSessionId": "ses_e6055b85effe75S16IUr9Rlyou",
+      "parentSessionId": "ses_1",
+      "depth": 1,
+      "title": "Read note one",
+      "type": "update",
+      "update": {
+        "sessionUpdate": "agent_message_chunk",
+        "messageId": "msg_19faa4d49001xm6l9qwHvQKKts",
+        "content": {
+          "type": "text",
+          "text": "apple"
+        },
+        "_meta": {
+          "opencode/child-session": {
+            "id": "ses_e6055b85effe75S16IUr9Rlyou",
+            "parentID": "ses_1",
+            "depth": 1,
+            "title": "Read note one"
+          }
+        }
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "opencode/session/child_update",
+    "params": {
+      "rootSessionId": "ses_1",
+      "childSessionId": "ses_e6055b85effe75S16IUr9Rlyou",
+      "parentSessionId": "ses_1",
+      "depth": 1,
+      "title": "Read note one",
+      "type": "status",
+      "status": "completed"
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "session/update",
+    "params": {
+      "sessionId": "ses_1",
+      "update": {
+        "sessionUpdate": "tool_call_update",
+        "toolCallId": "call_00_7p9epwo01q29umsnfpiuczjy",
+        "status": "completed",
+        "content": [
+          {
+            "type": "content",
+            "content": {
+              "type": "text",
+              "text": "<subagent sessionID=\"ses_e6055b85effe75S16IUr9Rlyou\" state=\"completed\">\napple\n</subagent>"
+            }
+          }
+        ],
+        "rawOutput": {
+          "metadata": {
+            "sessionID": "ses_e6055b85effe75S16IUr9Rlyou",
+            "status": "completed",
+            "truncated": false
+          }
+        }
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "session/update",
+    "params": {
+      "sessionId": "ses_1",
+      "update": {
+        "sessionUpdate": "agent_message_chunk",
+        "messageId": "msg_19faa5230001CBxfV5B4TdVygE",
+        "content": {
+          "type": "text",
+          "text": "apple"
+        }
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "session/update",
+    "params": {
+      "sessionId": "ses_1",
+      "update": {
+        "sessionUpdate": "usage_update",
+        "used": 17285,
+        "size": 200000,
+        "cost": {
+          "amount": 0,
+          "currency": "USD"
+        }
+      }
+    }
+  },
+  {
+    "finish": {
+      "stopReason": "end_turn",
+      "usage": {
+        "inputTokens": 2819,
+        "outputTokens": 2,
+        "totalTokens": 17285,
+        "cachedReadTokens": 14464
+      },
+      "_meta": {}
+    }
+  }
+]

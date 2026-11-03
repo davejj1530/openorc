@@ -90,11 +90,6 @@
       "count": 1
     }
   },
-  "packages/agents/src/acp/adapter.test.ts": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 1
-    }
-  },
   "packages/agents/src/acp/adapter.ts": {
     "@typescript-eslint/no-misused-promises": {
       "count": 1

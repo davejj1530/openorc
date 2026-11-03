@@ -29,7 +29,7 @@ function promptRename(title: string, save: (title: string) => void): void {
 }
 
 /**
- * Runs a thread's menu actions against the Mac. A change the Mac refuses (a team still working, a thread gone) says
+ * Runs a thread's menu actions against the Mac. A change the Mac refuses (a thread still working, a thread gone) says
  * why in an alert. `onUnread` hears a thread marked unread, which an open thread would read again at once.
  */
 export function useThreadActions(thread: ThreadSummary | null, { onUnread }: { onUnread?: () => void } = {}) {

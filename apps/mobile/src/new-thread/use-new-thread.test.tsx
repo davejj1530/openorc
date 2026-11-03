@@ -232,10 +232,10 @@ it("keeps the draft, its mode and permission through a start the Mac refuses, an
     sheet.result.current.settings.selectModel({ agent: "codex", model: "gpt-mini", effort: "medium" });
     sheet.result.current.settings.selectExecutionMode({ mode: "act", permissionMode: "autonomous" });
   });
-  mac.start.mockRejectedValue(new Error("plain-folder isn't a git repository yet. Worktrees and teams need git and a first commit."));
+  mac.start.mockRejectedValue(new Error("plain-folder isn't a git repository yet. Worktrees need git and a first commit."));
   expect(await submit(sheet)).toBeNull();
   expect(sent()).toMatchObject({ permissionMode: "autonomous" });
-  expect(sheet.result.current.error).toBe("plain-folder isn't a git repository yet. Worktrees and teams need git and a first commit.");
+  expect(sheet.result.current.error).toBe("plain-folder isn't a git repository yet. Worktrees need git and a first commit.");
 
   // Closing the sheet and coming back finds the same draft, and Start would send the same permission.
   sheet.unmount();

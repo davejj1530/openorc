@@ -106,7 +106,7 @@ describe("noticeLine", () => {
       tone: "muted",
       details: null,
     });
-    expect(noticeLine({ ...base, team: true, bar: false })).toEqual({ text: "Publish a team's work on your Mac.", tone: "muted", details: null });
+    expect(noticeLine({ ...base, team: true, bar: false })).toEqual({ text: "This item is no longer available.", tone: "muted", details: null });
     expect(noticeLine({ ...base, publishing: notice("pr", "muted", "Opened pull request #2") })).toMatchObject({ text: "Opened pull request #2" });
   });
 

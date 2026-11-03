@@ -60,7 +60,7 @@ const isWaiting = (thread: ThreadSummary) => thread.activity === "waiting";
  */
 function needsYou(groups: readonly ProjectThreads[], all: readonly ThreadSummary[]) {
   const names = new Map(groups.map((group) => [group.id, group.name]));
-  const found = new Map(all.filter((thread) => isWaiting(thread) && !thread.archivedAt).map((thread) => [thread.id, thread]));
+  const found = new Map(all.filter((thread) => isWaiting(thread) && !thread.archivedAt && !thread.teamInstanceId).map((thread) => [thread.id, thread]));
   return [...found.values()].sort(newestFirst).map((thread) => ({ thread, project: names.get(thread.projectId) ?? null }));
 }
 

@@ -1,4 +1,4 @@
-import { publishView, teamGitActions, type PublishInput } from "@openorc/client";
+import { publishView, threadGitActions, type PublishInput } from "@openorc/client";
 import { useEffect, useRef, useState } from "react";
 import { useLinkState } from "../client";
 import { linkReason } from "../connection/link-reason";
@@ -7,7 +7,7 @@ import { changeDrafts, publishStore, usePublishing } from "./publishing";
 import type { ChangesReads } from "./use-changes";
 
 /** Outside a team every step is the person's own; a team's thread shows no bar on the phone. */
-const SOLO = teamGitActions(false, { isPending: false, isError: false });
+const SOLO = threadGitActions(false);
 
 function uncommittedOf(reads: ChangesReads): PublishInput["uncommitted"] {
   if (reads.uncommitted.data) return { files: reads.uncommitted.data.totals.files };

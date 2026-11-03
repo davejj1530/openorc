@@ -1,5 +1,5 @@
-import type { LegendListRef } from "@legendapp/list/react-native";
 import { useKeyboardChatComposerInset } from "@legendapp/list/keyboard";
+import type { LegendListRef } from "@legendapp/list/react-native";
 import { conversationActivity, conversationSendDisabledReason, processFit, queueAfterStart, startingInCloud, type SubmitRequest } from "@openorc/client";
 import { isSubagentThread, type Run, type ThreadSummary } from "@openorc/protocol";
 import { router, Stack, useLocalSearchParams } from "expo-router";
@@ -7,27 +7,27 @@ import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } fro
 import { Pressable, View } from "react-native";
 import type { SharedValue } from "react-native-reanimated";
 import { client, useLinkState, useRpc } from "../client";
-import { linkReason } from "../connection/link-reason";
 import { useThreadClaudeAccount } from "../composer/claude-account";
 import { Composer } from "../composer/Composer";
 import { useShareSettings } from "../composer/settings-bridge";
+import { linkReason } from "../connection/link-reason";
 import { useCoverHome } from "../home/home-cover";
 import { useThreadOnScreen } from "../notifications/on-screen";
 import { Spinner } from "../ui/Spinner";
 import { Text } from "../ui/Text";
 import { CloudStart } from "./CloudStart";
-import { holdTranscriptList, perfEnabled, reportThreadOpened } from "./perf-probe";
-import { PerfProbe } from "./PerfProbe";
 import { createDisclosure, DisclosureContext } from "./disclosure";
 import { useMarkSeen } from "./mark-seen";
+import { holdTranscriptList, perfEnabled, reportThreadOpened } from "./perf-probe";
+import { PerfProbe } from "./PerfProbe";
 import { useSnoozeClock } from "./snooze-clock";
+import { SubagentStatusBar } from "./SubagentStatusBar";
 import { ThreadTitle } from "./ThreadHeader";
 import { useThreadHeaderMenu } from "./ThreadMenu";
 import { Transcript } from "./Transcript";
 import { useThreadActions } from "./use-thread-actions";
 import { VoicesContext, type Voice } from "./voices";
 import { useWaitingApprovals } from "./waiting-approvals";
-import { SubagentStatusBar } from "./SubagentStatusBar";
 
 const NO_RUNS: Run[] = [];
 const goBack = () => router.back();
@@ -116,10 +116,9 @@ function TranscriptPane({ threadId, thread, runs, loading, failed, retry, onActi
 export function ThreadScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const threadQuery = useRpc("threads.get", { id });
-  const thread = threadQuery.data ?? null;
-  const hosted = isSubagentThread(thread);
+  const thread = threadQuery.data?.teamInstanceId ? null : (threadQuery.data ?? null);
   const runsQuery = useRpc("runs.listForThread", { threadId: id });
-  const runs = runsQuery.data ?? NO_RUNS;
+  const runs = thread ? (runsQuery.data ?? NO_RUNS) : NO_RUNS;
   const activeRun = runs.at(-1);
   const settings = { ...client.useConversationSettings({ thread, activeRun }), claudeAccountId: thread?.claudeAccountId ?? undefined, claudeAccount: useThreadClaudeAccount(thread) };
   useShareSettings(id, settings);
@@ -171,24 +170,28 @@ export function ThreadScreen() {
       {menu}
       <DisclosureContext.Provider value={disclosure}>
         <VoicesContext.Provider value={voices}>
-          <TranscriptPane
-            threadId={id}
-            thread={thread}
-            runs={runs}
-            loading={runsQuery.isLoading}
-            failed={Boolean(runsQuery.error)}
-            retry={() => void runsQuery.refetch()}
-            onActivity={setActivity}
-            composerInset={contentInsetEndAdjustment}
-            listRef={listRef}
-            followKey={sends}
-          />
+          {thread ? (
+            <TranscriptPane
+              threadId={id}
+              thread={thread}
+              runs={runs}
+              loading={runsQuery.isLoading}
+              failed={Boolean(runsQuery.error)}
+              retry={() => void runsQuery.refetch()}
+              onActivity={setActivity}
+              composerInset={contentInsetEndAdjustment}
+              listRef={listRef}
+              followKey={sends}
+            />
+          ) : (
+            <View className="flex-1 items-center justify-center">{threadQuery.isLoading ? <Spinner /> : <Text className="text-ink-4">Thread not found</Text>}</View>
+          )}
         </VoicesContext.Provider>
       </DisclosureContext.Provider>
       {perfEnabled() ? <PerfProbe /> : null}
       {thread ? (
         <View className="absolute inset-x-0 bottom-0">
-          {hosted ? (
+          {isSubagentThread(thread) ? (
             <SubagentStatusBar thread={thread} onLayout={onComposerLayout} />
           ) : (
             <Composer

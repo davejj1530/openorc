@@ -17,7 +17,7 @@ export function useClaudeAccountChoice(settings: ComposerSettings | undefined) {
 
 /**
  * An open Claude thread's account, which it leaves for another between turns: its next message resumes the
- * conversation there. An Orcling's or a team's conversation keeps its own, as on the Mac.
+ * conversation there. An Orcling's conversation keeps its own, as on the Mac.
  */
 export function useThreadClaudeAccount(thread: ThreadSummary | null): ComposerSettings["claudeAccount"] {
   const switching = useRpcMutation("threads.switchClaudeAccount");

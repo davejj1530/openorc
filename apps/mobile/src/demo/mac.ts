@@ -19,7 +19,6 @@ export const demoAccounts = (createdAt: number): ClaudeAccounts => ({
 });
 
 export const demoSettings: AppSettings = {
-  experimentalTeamExecution: true,
   notifications: true,
   sound: false,
   autoDoneDays: 3,

@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { create, type StoreApi, type UseBoundStore } from "zustand";
 import { useShallow } from "zustand/react/shallow";
-import type { Frame } from "@openorc/protocol";
+import type { AgentEvent, Frame } from "@openorc/protocol";
 import type { CoreConnection } from "./connection.js";
 import { applyEvents, emptyRun, type RunTranscript } from "./transcript.js";
 
@@ -28,6 +28,7 @@ interface Published {
 interface Store {
   readonly connection: CoreConnection;
   readonly scheduleFrame: (callback: () => void) => void;
+  readonly reportFrameError: (frame: Frame, error: unknown) => void;
   readonly published: UseBoundStore<StoreApi<Published>>;
   /** Runs as of the last event, ahead of what subscribers have been told by at most one animation frame. */
   current: Map<string, RunTranscript>;
@@ -81,11 +82,29 @@ function syncInterest(s: Store): void {
  * A fresh copy of a run for one frame's events. Whoever read the previous copy keeps it unchanged, so a memo keyed
  * on a run or its blocks sees every change. Blocks themselves are replaced, never changed, when an event updates them.
  */
-function edit(s: Store, runId: string): RunTranscript {
-  const existing = s.current.get(runId);
-  const run = existing ? { ...existing, blocks: existing.blocks.slice() } : emptyRun(runId);
-  replace(s, run);
-  return run;
+function copyRun(run: RunTranscript): RunTranscript {
+  return {
+    ...run,
+    blocks: run.blocks.slice(),
+    blockIndex: new Map(run.blockIndex),
+    turnOf: new Map(run.turnOf),
+    stderr: run.stderr.slice(),
+    ...(run.eventIds ? { eventIds: new Set(run.eventIds) } : {}),
+    ...(run.subagentCompletion ? { subagentCompletion: { ...run.subagentCompletion } } : {}),
+  };
+}
+
+/** Commit a whole frame or none of it. A bad projection must not poison the next frame's indexes or dedupe ids. */
+function projectFrame(previous: RunTranscript, frame: Frame, report: Store["reportFrameError"]): RunTranscript {
+  const run = copyRun(previous);
+  try {
+    applyEvents(run, frame.events);
+    run.eventCount += frame.events.length;
+    return run;
+  } catch (error) {
+    report(frame, error);
+    return previous;
+  }
 }
 
 function replace(s: Store, run: RunTranscript): void {
@@ -101,9 +120,10 @@ function applyFrame(s: Store, frame: Frame): void {
     buffered.push(frame);
     return;
   }
-  const run = edit(s, frame.runId);
-  applyEvents(run, frame.events);
-  run.eventCount += frame.events.length;
+  const previous = s.current.get(frame.runId) ?? emptyRun(frame.runId);
+  const run = projectFrame(previous, frame, s.reportFrameError);
+  if (run === previous) return;
+  replace(s, run);
   syncInterest(s);
 }
 
@@ -137,7 +157,7 @@ async function loadPage(s: Store, runId: string, request: LoadRequest): Promise<
   syncInterest(s);
   try {
     const page = await s.connection.call("events.page", { runId, ...request });
-    const run = emptyRun(runId);
+    let run = emptyRun(runId);
     run.hydrated = true;
     run.fromTurn = page.fromTurn;
     // Turns before the page still count, so turn numbers match checkpoints and team attempts.
@@ -148,11 +168,8 @@ async function loadPage(s: Store, runId: string, request: LoadRequest): Promise<
     if (!run.live) run.turnOpen = false;
     // The listing already reflects every buffered event up to the last one it holds, including streaming fragments
     // the ledger has since dropped because their completion replaced them. Only what came after is new.
-    const buffered = (s.hydrating.get(runId) ?? []).flatMap((frame) => frame.events);
-    const listed = new Set(page.events.map((ev) => ev.eventId));
-    const seen = buffered.findLastIndex((ev) => ev.eventId !== undefined && listed.has(ev.eventId));
-    applyEvents(run, buffered.slice(seen + 1));
-    run.eventCount = page.events.length + buffered.length - seen - 1;
+    run.eventCount = page.events.length;
+    run = replayBuffered(run, s.hydrating.get(runId) ?? [], page.events, s.reportFrameError);
     keepUnchanged(run, s.current.get(runId));
     replace(s, run);
     forgetFailures(s, [runId]);
@@ -164,6 +181,26 @@ async function loadPage(s: Store, runId: string, request: LoadRequest): Promise<
     syncInterest(s);
     flush(s);
   }
+}
+
+/** Keep frame boundaries while removing history overlap, so one broken buffered frame cannot discard its siblings. */
+function replayBuffered(run: RunTranscript, frames: readonly Frame[], events: readonly AgentEvent[], report: Store["reportFrameError"]): RunTranscript {
+  const listed = new Set(events.map((event) => event.eventId));
+  let fromFrame = 0;
+  let fromEvent = 0;
+  frames.forEach((frame, index) => {
+    const seen = Array.isArray(frame.events) ? frame.events.findLastIndex((event) => event?.eventId !== undefined && listed.has(event.eventId)) : -1;
+    if (seen >= 0) {
+      fromFrame = index;
+      fromEvent = seen + 1;
+    }
+  });
+  for (let index = fromFrame; index < frames.length; index++) {
+    const frame = frames[index]!;
+    const tail = index === fromFrame && fromEvent ? { ...frame, events: frame.events.slice(fromEvent) } : frame;
+    run = projectFrame(run, tail, report);
+  }
+  return run;
 }
 
 /**
@@ -317,10 +354,11 @@ function usePendingApprovalsOf(s: Store): number {
   });
 }
 
-export function createRunStore(connection: CoreConnection, scheduleFrame: (callback: () => void) => void) {
+export function createRunStore(connection: CoreConnection, scheduleFrame: (callback: () => void) => void, reportFrameError: Store["reportFrameError"]) {
   const s: Store = {
     connection,
     scheduleFrame,
+    reportFrameError,
     published: create<Published>(() => ({ runs: new Map(), failed: new Set() })),
     current: new Map(),
     scheduled: false,

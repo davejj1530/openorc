@@ -1,4 +1,5 @@
 import type { ActivityRecovery, ActivityStatus, AgentEvent, AgentEventType, McpToolSource } from "@openorc/protocol";
+import { replaceSubagentCompletionReply, subagentBlock, subagentCompletionReply, type SubagentCard } from "./transcript-subagents.js";
 
 /**
  * Transcript projection. Events fold into blocks. A change replaces only the blocks it touches and the arrays that
@@ -26,6 +27,7 @@ export type Block = { at?: number; turnKey?: string; runId?: string } & (
       status?: ActivityStatus;
       progress?: string;
       mcp?: McpToolSource;
+      subagent?: SubagentCard;
     }
   | {
       id: string;
@@ -51,7 +53,16 @@ export type Block = { at?: number; turnKey?: string; runId?: string } & (
       decision?: string;
       answers?: Record<string, string[]>;
     }
-  | { id: string; kind: "status"; text: string; tone: "muted" | "ok" | "bad"; boundary?: "turn" | "session"; durationMs?: number; outcome?: "success" | "error" | "cancelled" }
+  | {
+      id: string;
+      kind: "status";
+      text: string;
+      tone: "muted" | "ok" | "bad";
+      notice?: boolean;
+      boundary?: "turn" | "session";
+      durationMs?: number;
+      outcome?: "success" | "error" | "cancelled" | "no_updates";
+    }
 );
 
 export interface RunTranscript {
@@ -70,6 +81,8 @@ export interface RunTranscript {
   eventIds?: Set<string>;
   /** Turns finished before the newest block, counted from the run's start even when earlier turns are not loaded. */
   turnsCompleted: number;
+  /** Late file records still belong before this hosted child's closing boundary. Cleared when it starts again. */
+  subagentCompletion?: { turn: number; boundaryId: string; resultId?: string };
   /** Which turn of this process each block belongs to. A warm session's transcript holds several turns. */
   turnOf: Map<string, number>;
   pendingApprovals: number;
@@ -84,11 +97,14 @@ export function emptyRun(runId: string): RunTranscript {
 function upsert(run: RunTranscript, block: Block): void {
   const i = run.blockIndex.get(block.id);
   const previous = i === undefined ? undefined : run.blocks[i];
-  block = { ...block, runId: run.runId, at: previous?.at ?? block.at ?? run.eventAt, turnKey: previous?.turnKey ?? `${run.runId}:${run.turnsCompleted}` };
+  const turn = run.subagentCompletion?.turn ?? run.turnsCompleted;
+  block = { ...block, runId: run.runId, at: previous?.at ?? block.at ?? run.eventAt, turnKey: previous?.turnKey ?? `${run.runId}:${turn}` };
   if (i === undefined) {
-    run.turnOf.set(block.id, run.turnsCompleted);
-    run.blockIndex.set(block.id, run.blocks.length);
-    run.blocks.push(block);
+    run.turnOf.set(block.id, turn);
+    const boundary = run.subagentCompletion && block.kind !== "status" ? run.blockIndex.get(run.subagentCompletion.boundaryId) : undefined;
+    const index = boundary ?? run.blocks.length;
+    run.blocks.splice(index, 0, block);
+    for (let j = index; j < run.blocks.length; j++) run.blockIndex.set(run.blocks[j]!.id, j);
   } else {
     run.blocks[i] = block;
   }
@@ -110,7 +126,7 @@ function closeThinking(run: RunTranscript, ts: number): void {
 function closeActive(run: RunTranscript, ts: number, status: ActivityStatus): void {
   for (const block of run.blocks) {
     if (block.kind === "thinking" && block.endedAt === null) upsert(run, { ...block, endedAt: ts, status });
-    if (block.kind === "tool" && !block.done) upsert(run, { ...block, done: true, status, isError: status === "error" });
+    if (block.kind === "tool" && !block.done && !block.subagent) upsert(run, { ...block, done: true, status, isError: status === "error" });
     if (block.kind === "activity" && block.status === "running") upsert(run, { ...block, status });
     if (block.kind === "message" && block.streaming) upsert(run, { ...block, streaming: false });
     if (block.kind === "approval" && !block.decision) upsert(run, { ...block, decision: "expired" });
@@ -163,6 +179,7 @@ const handlers: { [T in AgentEventType]: Handler<T> } = {
     upsert(run, { id: ev.messageId, kind: "message", role: ev.role, text: (existing?.text ?? "") + ev.text, streaming: true, at: existing?.at ?? ev.ts });
   },
   "message.completed": (run, ev) => {
+    if (ev.role === "assistant" && ev.text.trim()) replaceSubagentCompletionReply(run);
     const existing = get(run, ev.messageId, "message");
     upsert(run, { id: ev.messageId, kind: "message", role: ev.role, text: ev.text, streaming: false, at: existing?.at ?? ev.ts, ...(ev.attachments ? { attachments: ev.attachments } : {}) });
   },
@@ -203,6 +220,7 @@ const handlers: { [T in AgentEventType]: Handler<T> } = {
     upsert(run, { ...existing, id, kind: "thinking", text: (existing?.text ?? "") + ev.text, startedAt: existing?.startedAt ?? ev.ts, endedAt: existing?.endedAt ?? null });
   },
   "tool.started": (run, ev) => {
+    if (get(run, ev.toolCallId, "tool")?.subagent) return;
     upsert(run, { id: ev.toolCallId, kind: "tool", name: ev.name, input: ev.input, done: false, ...(ev.mcp ? { mcp: ev.mcp } : {}) });
   },
   "tool.output.delta": (run, ev) => {
@@ -216,6 +234,7 @@ const handlers: { [T in AgentEventType]: Handler<T> } = {
   },
   "tool.completed": (run, ev) => {
     const existing = get(run, ev.toolCallId, "tool");
+    if (existing?.subagent) return;
     upsert(run, {
       id: ev.toolCallId,
       kind: "tool",
@@ -241,18 +260,22 @@ const handlers: { [T in AgentEventType]: Handler<T> } = {
   },
   "turn.started": (run) => {
     run.turnOpen = true;
+    delete run.subagentCompletion;
   },
   "turn.completed": (run, ev) => {
     run.turnOpen = false;
-    closeActive(run, ev.ts, completionOutcome(ev.status));
+    closeActive(run, ev.ts, ev.observationEnded ? "disconnected" : completionOutcome(ev.status));
+    const reply = subagentCompletionReply(run, ev);
+    if (reply) upsert(run, reply);
     upsert(run, {
-      id: `turn-${ev.turnId}`,
+      id: run.subagentCompletion?.boundaryId ?? `turn-${ev.turnId}`,
       boundary: "turn",
       durationMs: ev.durationMs,
-      outcome: completionOutcome(ev.status),
+      outcome: ev.observationEnded ? "no_updates" : completionOutcome(ev.status),
       kind: "status",
       tone: ev.status === "success" ? "ok" : "bad",
       text: `turn ${ev.status === "success" ? "finished" : ev.status} in ${(ev.durationMs / 1000).toFixed(1)}s${ev.usage ? `, ${ev.usage.inputTokens.toLocaleString()} in / ${ev.usage.outputTokens.toLocaleString()} out` : ""}`,
+      ...(ev.observationEnded ? { tone: "muted", text: "Updates stopped" } : {}),
     });
     run.turnsCompleted += 1;
   },
@@ -282,6 +305,15 @@ const handlers: { [T in AgentEventType]: Handler<T> } = {
   "file.changed": ignore,
   "usage.updated": ignore,
   "background.updated": ignore,
+  "subagent.started": (run, ev) => {
+    const block = subagentBlock(run, ev);
+    if (block) upsert(run, block);
+  },
+  "subagent.updated": (run, ev) => {
+    const block = subagentBlock(run, ev);
+    if (block) upsert(run, block);
+    if (ev.notice) upsert(run, { id: `subagent-notice:${ev.subagentId}:${ev.ts}`, kind: "status", tone: "muted", notice: true, text: ev.notice });
+  },
   raw: ignore,
   // Plans load through threads.plans, and how full the context is comes with the thread summary.
   "plan.updated": ignore,
@@ -321,7 +353,7 @@ const deltaItem: { [T in Delta["type"]]: (ev: Extract<Delta, { type: T }>) => st
 };
 
 function isDelta(ev: AgentEvent): ev is Delta {
-  return ev.type in deltaItem;
+  return Object.hasOwn(deltaItem, ev.type);
 }
 
 function itemOf(ev: Delta): string {
@@ -342,7 +374,7 @@ export function applyEvents(run: RunTranscript, events: readonly AgentEvent[]): 
     fold = undefined;
   };
   for (const ev of events) {
-    if (!admit(run, ev)) continue;
+    if (!Object.hasOwn(handlers, ev.type) || !admit(run, ev)) continue;
     if (!isDelta(ev)) {
       settle();
       project(run, ev);

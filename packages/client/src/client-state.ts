@@ -1,4 +1,4 @@
-import type { Run } from "@openorc/protocol";
+import type { Frame, Run } from "@openorc/protocol";
 import type { ClientPush, CoreConnection, Notice } from "./connection.js";
 import { useConversationSettingsWith, type SavedThreadSettings } from "./conversation-settings.js";
 import { useSubmitWith } from "./conversation-submit.js";
@@ -16,6 +16,8 @@ export interface ClientStateOptions {
   randomId(): string;
   /** Choosing a permission also makes it the default for new work. Off where this client may not change app settings. */
   savesDefaultPermission: boolean;
+  /** A malformed frame was discarded. Log only its identity and error class, never transcript contents. */
+  reportFrameError(frame: Frame, error: unknown): void;
 }
 
 /**
@@ -24,7 +26,7 @@ export interface ClientStateOptions {
  */
 export function createClientState(connection: CoreConnection, options: ClientStateOptions) {
   const queries = createQueries(connection, options.invalidationBatchMs);
-  const store = createRunStore(connection, options.scheduleFrame);
+  const store = createRunStore(connection, options.scheduleFrame, options.reportFrameError);
   const permissions = createPermissionDefault(connection, queries, options.savesDefaultPermission);
   const notices = new Set<(notice: Notice) => void>();
   const handlers: { [T in ClientPush["type"]]: (push: Extract<ClientPush, { type: T }>) => void } = {
@@ -40,7 +42,9 @@ export function createClientState(connection: CoreConnection, options: ClientSta
     },
     gap: ({ runIds }) => void store.runs.resync(runIds),
   };
-  connection.onPush((push) => (handlers[push.type] as (push: ClientPush) => void)(push));
+  connection.onPush((push) => {
+    if (Object.hasOwn(handlers, push.type)) (handlers[push.type] as (push: ClientPush) => void)(push);
+  });
   return {
     ...queries,
     ...store,

@@ -19,7 +19,7 @@ function tokens(text: string): string[] {
 
 const claudeReply = "I traced the timeout to the retry queue. The store publishes once per frame, so the assertion has to wait for a frame before it reads the run.";
 
-function claude(): AgentEvent[] {
+function claude(legacy = false): AgentEvent[] {
   const runId = "golden-claude";
   const longOutput = Array.from({ length: 40 }, (_, i) => `src/lib/module-${i}.ts:${i + 3}:  const value${i} = await load(${i});\n`);
   return stream(runId, [
@@ -62,9 +62,25 @@ function claude(): AgentEvent[] {
     { type: "message.completed", messageId: "user-2", role: "user", text: "Delegate the docs update." },
     { type: "thinking.delta", messageId: "th-2", text: "A subagent can write the docs" },
     { type: "tool.started", toolCallId: "tu-task", name: "Task", input: { description: "Update the docs", prompt: "Explain the retry rule" }, parentToolCallId: null },
-    { type: "tool.started", toolCallId: "tu-child", name: "Read", input: { file_path: "docs/retry.md" }, parentToolCallId: "tu-task" },
-    { type: "tool.completed", toolCallId: "tu-child", name: "Read", output: "# Retry", isError: false },
+    ...(legacy
+      ? [
+          { type: "tool.started" as const, toolCallId: "tu-child", parentToolCallId: "tu-task", name: "Read", input: { file_path: "docs/retry.md" } },
+          { type: "tool.completed" as const, toolCallId: "tu-child", name: "Read", output: "# Retry", isError: false },
+        ]
+      : [
+          {
+            type: "subagent.started" as const,
+            subagentId: "tu-task",
+            toolCallId: "tu-task",
+            threadId: "docs-child",
+            title: "Update the docs",
+            prompt: "Explain the retry rule",
+            agentType: "general-purpose",
+          },
+          { type: "subagent.updated" as const, subagentId: "tu-task", threadId: "docs-child", progress: "Reading docs/retry.md" },
+        ]),
     { type: "tool.completed", toolCallId: "tu-task", name: "Task", output: "Docs updated", isError: false, status: "success" },
+    ...(legacy ? [] : [{ type: "subagent.updated" as const, subagentId: "tu-task", threadId: "docs-child", status: "completed" as const, result: "Docs updated" }]),
     { type: "plan.updated", documentId: "plan-1", text: "1. Read docs\n2. Update", complete: true },
     { type: "context.updated", contextTokens: 50_000, contextWindow: 200_000 },
     { type: "turn.completed", turnId: "t2", status: "success", durationMs: 9_000 },
@@ -100,6 +116,7 @@ function failure(): AgentEvent[] {
 export const goldenStreams: Record<string, AgentEvent[]> = {
   codex: codexRecorded,
   claude: claude(),
+  claudeLegacy: claude(true),
   failure: failure(),
 };
 

@@ -28,6 +28,7 @@ const readRules: Rules = {
 };
 
 const mutationRules: Rules = {
+  "subagents.stop": ({ threadId }) => ["threads", `thread:${threadId}`, `runs:thread:${threadId}`],
   "review.comments.add": reviewCommentTags,
   "review.comments.remove": reviewCommentTags,
   "review.comments.send": ({ threadId, taskId }) => [...reviewCommentTags({ threadId, taskId }), "threads", `thread:${threadId}`, ...(taskId ? ["tasks", `task:${taskId}`] : [])],

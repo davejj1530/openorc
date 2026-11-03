@@ -74,6 +74,21 @@ export { toolResult, toolResultDetails, type ToolResultMedia } from "./tool-resu
 export { type ChangedFile, type ChangeStatus, languageFor, type MatchGroup, type MatchLine, type TestTally } from "./tool-text.js";
 export { type CommandStep, type Field, type InputView, joinPath, type OutputView, toolInputView, toolOutputView } from "./tool-view.js";
 export { activityBlockId, activityIdOf, type Block, emptyRun, type RunTranscript } from "./transcript.js";
+export {
+  threadChildren,
+  threadTreeRows,
+  threadTreeOpen,
+  threadTreeRoot,
+  visibleThreadForest,
+  threadTreeActivity,
+  threadTreeMatches,
+  threadBranchPath,
+  toggleThreadTree,
+  type ThreadTreeRow,
+} from "./thread-tree.js";
+export { threadAncestors, threadSearchFolds } from "./thread-tree.js";
+export { threadFoldIds, pruneThreadFolds } from "./thread-folds.js";
+export { subagentGroups, subagentStatusLabel, type SubagentCard } from "./transcript-subagents.js";
 export { visualizationFromTool } from "./visualization.js";
 export {
   type VisualizationColor,

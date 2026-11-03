@@ -209,6 +209,7 @@ function classify(block: Block, taskCards: boolean, pinned: string | undefined):
   if (isSignal(block)) return "signal";
   if (block.kind === "message") return block.role === "assistant" && block.text.trim() ? "narration" : "block";
   if (planItems(block).length) return "plan";
+  if (block.kind === "tool" && block.subagent) return "action";
   if (!foldable(block, taskCards)) return "block";
   return block.kind === "thinking" ? "reasoning" : "action";
 }

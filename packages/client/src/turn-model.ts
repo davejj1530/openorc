@@ -5,7 +5,7 @@ import { workEntries } from "./work-steps.js";
 import { workDuration, workParts, workTiming } from "./work-transcript.js";
 
 /** Where a turn stands, as its head says it: working with its clock, writing the reply, or done, failed or stopped. */
-export type TurnStatus = { kind: "working" | "writing" | "done" | "failed" | "stopped"; elapsed?: number | undefined };
+export type TurnStatus = { kind: "working" | "writing" | "done" | "failed" | "stopped" | "no_updates"; elapsed?: number | undefined };
 
 /** The head's words for a status: "working 12s", "Writing", "Failed after 3s", or how long a finished turn took. */
 export function turnStatusWords({ kind, elapsed }: TurnStatus): string {
@@ -14,6 +14,7 @@ export function turnStatusWords({ kind, elapsed }: TurnStatus): string {
   if (kind === "writing") return "Writing";
   if (kind === "failed") return time ? `Failed after ${time}` : "Failed";
   if (kind === "stopped") return time ? `Stopped after ${time}` : "Stopped";
+  if (kind === "no_updates") return "No updates";
   return time;
 }
 
@@ -33,6 +34,7 @@ function statusKind(live: boolean, writing: boolean, outcome: string | undefined
   if (live) return writing ? "writing" : "working";
   if (outcome === "error") return "failed";
   if (outcome === "cancelled") return "stopped";
+  if (outcome === "no_updates") return "no_updates";
   return "done";
 }
 
@@ -54,7 +56,15 @@ export function turnReply(after: Block[]): Extract<Block, { kind: "message" }> |
 export function useTurnModel(blocks: Block[], live: boolean, taskCards: boolean | undefined, ambient: boolean, pinned: string | undefined) {
   const timing = workTiming(blocks, live);
   const parts = useMemo(() => workParts(blocks, timing.live, taskCards, ambient), [blocks, timing.live, taskCards, ambient]);
-  const steps = useMemo(() => workEntries(parts.work, taskCards ?? true, pinned).length, [parts.work, taskCards, pinned]);
+  const steps = useMemo(
+    () =>
+      workEntries(
+        parts.work.filter((block) => block.kind !== "tool" || !block.subagent),
+        taskCards ?? true,
+        pinned,
+      ).length,
+    [parts.work, taskCards, pinned],
+  );
   const now = useTicking(timing.live);
   const writing = parts.after.some((block) => block.kind === "message" && block.role === "assistant" && block.streaming);
   const status = turnStatus({ ...timing, writing }, now);

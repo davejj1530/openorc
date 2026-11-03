@@ -449,32 +449,30 @@ exports[`transcript golden replay > loads the newest turns, then older ones, kee
         "input": {
           "description": "Update the docs",
           "prompt": "Explain the retry rule",
+          "subagent_type": "general-purpose",
         },
         "isError": false,
         "kind": "tool",
-        "name": "Task",
-        "output": "Docs updated",
+        "name": "Agent",
         "runId": "golden-claude",
         "status": "success",
-        "turnKey": "golden-claude:1",
-      },
-      {
-        "at": 1760000102484,
-        "done": true,
-        "id": "tu-child",
-        "input": {
-          "file_path": "docs/retry.md",
+        "subagent": {
+          "agentType": "general-purpose",
+          "endedAt": 1760000102553,
+          "nativeId": "tu-task",
+          "progress": "Reading docs/retry.md",
+          "prompt": "Explain the retry rule",
+          "result": "Docs updated",
+          "startedAt": 1760000102484,
+          "status": "completed",
+          "threadId": "docs-child",
+          "title": "Update the docs",
+          "toolCallId": "tu-task",
         },
-        "isError": false,
-        "kind": "tool",
-        "name": "Read",
-        "output": "# Retry",
-        "runId": "golden-claude",
-        "status": "success",
         "turnKey": "golden-claude:1",
       },
       {
-        "at": 1760000102599,
+        "at": 1760000102622,
         "boundary": "turn",
         "durationMs": 9000,
         "id": "turn-t2",
@@ -486,7 +484,7 @@ exports[`transcript golden replay > loads the newest turns, then older ones, kee
         "turnKey": "golden-claude:1",
       },
       {
-        "at": 1760000102622,
+        "at": 1760000102645,
         "boundary": "session",
         "id": "status-end",
         "kind": "status",
@@ -497,8 +495,8 @@ exports[`transcript golden replay > loads the newest turns, then older ones, kee
         "turnKey": "golden-claude:2",
       },
     ],
-    "eventAt": 1760000102622,
-    "eventCount": 11,
+    "eventAt": 1760000102645,
+    "eventCount": 12,
     "fromTurn": 1,
     "hydrated": true,
     "live": true,
@@ -515,10 +513,6 @@ exports[`transcript golden replay > loads the newest turns, then older ones, kee
       ],
       [
         "tu-task",
-        1,
-      ],
-      [
-        "tu-child",
         1,
       ],
       [
@@ -779,32 +773,30 @@ src/lib/module-39.ts:42:  const value39 = await load(39);
         "input": {
           "description": "Update the docs",
           "prompt": "Explain the retry rule",
+          "subagent_type": "general-purpose",
         },
         "isError": false,
         "kind": "tool",
-        "name": "Task",
-        "output": "Docs updated",
+        "name": "Agent",
         "runId": "golden-claude",
         "status": "success",
-        "turnKey": "golden-claude:1",
-      },
-      {
-        "at": 1760000102484,
-        "done": true,
-        "id": "tu-child",
-        "input": {
-          "file_path": "docs/retry.md",
+        "subagent": {
+          "agentType": "general-purpose",
+          "endedAt": 1760000102553,
+          "nativeId": "tu-task",
+          "progress": "Reading docs/retry.md",
+          "prompt": "Explain the retry rule",
+          "result": "Docs updated",
+          "startedAt": 1760000102484,
+          "status": "completed",
+          "threadId": "docs-child",
+          "title": "Update the docs",
+          "toolCallId": "tu-task",
         },
-        "isError": false,
-        "kind": "tool",
-        "name": "Read",
-        "output": "# Retry",
-        "runId": "golden-claude",
-        "status": "success",
         "turnKey": "golden-claude:1",
       },
       {
-        "at": 1760000102599,
+        "at": 1760000102622,
         "boundary": "turn",
         "durationMs": 9000,
         "id": "turn-t2",
@@ -816,7 +808,7 @@ src/lib/module-39.ts:42:  const value39 = await load(39);
         "turnKey": "golden-claude:1",
       },
       {
-        "at": 1760000102622,
+        "at": 1760000102645,
         "boundary": "session",
         "id": "status-end",
         "kind": "status",
@@ -827,8 +819,8 @@ src/lib/module-39.ts:42:  const value39 = await load(39);
         "turnKey": "golden-claude:2",
       },
     ],
-    "eventAt": 1760000102622,
-    "eventCount": 46,
+    "eventAt": 1760000102645,
+    "eventCount": 47,
     "fromTurn": 0,
     "hydrated": true,
     "live": false,
@@ -895,10 +887,6 @@ src/lib/module-39.ts:42:  const value39 = await load(39);
         1,
       ],
       [
-        "tu-child",
-        1,
-      ],
-      [
         "turn-t2",
         1,
       ],
@@ -914,6 +902,381 @@ src/lib/module-39.ts:42:  const value39 = await load(39);
 `;
 
 exports[`transcript golden replay > projects the claude stream the same however it is cut into frames 1`] = `
+{
+  "blocks": [
+    {
+      "at": 1760000100000,
+      "id": "status-start",
+      "kind": "status",
+      "runId": "golden-claude",
+      "text": "claude session started with claude-opus-5-5",
+      "tone": "muted",
+      "turnKey": "golden-claude:0",
+    },
+    {
+      "at": 1760000100046,
+      "attachments": [
+        "/Users/me/.openorc/attachments/a1.png",
+      ],
+      "id": "user-1",
+      "kind": "message",
+      "role": "user",
+      "runId": "golden-claude",
+      "streaming": false,
+      "text": "Why does the retry test time out?",
+      "turnKey": "golden-claude:0",
+    },
+    {
+      "at": 1760000100069,
+      "endedAt": 1760000100322,
+      "explicit": true,
+      "id": "think-th-1",
+      "kind": "thinking",
+      "runId": "golden-claude",
+      "startedAt": 1760000100069,
+      "status": "success",
+      "text": "Look at the queue drain first, then the publish schedule.",
+      "turnKey": "golden-claude:0",
+    },
+    {
+      "at": 1760000100345,
+      "id": "m-1",
+      "kind": "message",
+      "role": "assistant",
+      "runId": "golden-claude",
+      "streaming": false,
+      "text": "I traced the timeout to the retry queue. The store publishes once per frame, so the assertion has to wait for a frame before it reads the run.",
+      "turnKey": "golden-claude:0",
+    },
+    {
+      "at": 1760000101012,
+      "done": true,
+      "id": "tu-grep",
+      "input": {
+        "path": "src",
+        "pattern": "await load",
+      },
+      "isError": false,
+      "kind": "tool",
+      "name": "Grep",
+      "output": "src/lib/module-0.ts:3:  const value0 = await load(0);
+src/lib/module-1.ts:4:  const value1 = await load(1);
+src/lib/module-2.ts:5:  const value2 = await load(2);
+src/lib/module-3.ts:6:  const value3 = await load(3);
+src/lib/module-4.ts:7:  const value4 = await load(4);
+src/lib/module-5.ts:8:  const value5 = await load(5);
+src/lib/module-6.ts:9:  const value6 = await load(6);
+src/lib/module-7.ts:10:  const value7 = await load(7);
+src/lib/module-8.ts:11:  const value8 = await load(8);
+src/lib/module-9.ts:12:  const value9 = await load(9);
+src/lib/module-10.ts:13:  const value10 = await load(10);
+src/lib/module-11.ts:14:  const value11 = await load(11);
+src/lib/module-12.ts:15:  const value12 = await load(12);
+src/lib/module-13.ts:16:  const value13 = await load(13);
+src/lib/module-14.ts:17:  const value14 = await load(14);
+src/lib/module-15.ts:18:  const value15 = await load(15);
+src/lib/module-16.ts:19:  const value16 = await load(16);
+src/lib/module-17.ts:20:  const value17 = await load(17);
+src/lib/module-18.ts:21:  const value18 = await load(18);
+src/lib/module-19.ts:22:  const value19 = await load(19);
+src/lib/module-20.ts:23:  const value20 = await load(20);
+src/lib/module-21.ts:24:  const value21 = await load(21);
+src/lib/module-22.ts:25:  const value22 = await load(22);
+src/lib/module-23.ts:26:  const value23 = await load(23);
+src/lib/module-24.ts:27:  const value24 = await load(24);
+src/lib/module-25.ts:28:  const value25 = await load(25);
+src/lib/module-26.ts:29:  const value26 = await load(26);
+src/lib/module-27.ts:30:  const value27 = await load(27);
+src/lib/module-28.ts:31:  const value28 = await load(28);
+src/lib/module-29.ts:32:  const value29 = await load(29);
+src/lib/module-30.ts:33:  const value30 = await load(30);
+src/lib/module-31.ts:34:  const value31 = await load(31);
+src/lib/module-32.ts:35:  const value32 = await load(32);
+src/lib/module-33.ts:36:  const value33 = await load(33);
+src/lib/module-34.ts:37:  const value34 = await load(34);
+src/lib/module-35.ts:38:  const value35 = await load(35);
+src/lib/module-36.ts:39:  const value36 = await load(36);
+src/lib/module-37.ts:40:  const value37 = await load(37);
+src/lib/module-38.ts:41:  const value38 = await load(38);
+src/lib/module-39.ts:42:  const value39 = await load(39);
+",
+      "runId": "golden-claude",
+      "status": "success",
+      "turnKey": "golden-claude:0",
+    },
+    {
+      "at": 1760000101978,
+      "done": true,
+      "id": "tu-bash",
+      "input": {
+        "command": "rm -rf dist && pnpm build",
+        "description": "Rebuild the app",
+      },
+      "isError": false,
+      "kind": "tool",
+      "name": "Bash",
+      "output": "vite v8 building for production...
+",
+      "progress": "Building 3 of 7",
+      "runId": "golden-claude",
+      "status": "success",
+      "turnKey": "golden-claude:0",
+    },
+    {
+      "approvalId": "ap-bash",
+      "approvalKind": "command",
+      "at": 1760000102001,
+      "decision": "allow_for_run",
+      "id": "approval-ap-bash",
+      "input": {
+        "command": "rm -rf dist && pnpm build",
+      },
+      "kind": "approval",
+      "reason": "Deletes files",
+      "runId": "golden-claude",
+      "toolName": "Bash",
+      "turnKey": "golden-claude:0",
+    },
+    {
+      "answers": {
+        "Keep the fake clock?": [
+          "Yes",
+        ],
+      },
+      "approvalId": "ap-ask",
+      "approvalKind": "user_input",
+      "at": 1760000102162,
+      "decision": "allow",
+      "id": "approval-ap-ask",
+      "input": {
+        "questions": [
+          {
+            "options": [
+              {
+                "label": "Yes",
+              },
+              {
+                "label": "No",
+              },
+            ],
+            "question": "Keep the fake clock?",
+          },
+        ],
+      },
+      "kind": "approval",
+      "runId": "golden-claude",
+      "toolName": "AskUserQuestion",
+      "turnKey": "golden-claude:0",
+    },
+    {
+      "at": 1760000102208,
+      "done": true,
+      "id": "tu-mcp",
+      "input": {
+        "query": "retry",
+      },
+      "isError": false,
+      "kind": "tool",
+      "mcp": {
+        "resourceUri": "ui://screens/gallery",
+        "server": "screens",
+        "tool": "search",
+      },
+      "name": "mcp__screens__search",
+      "output": {
+        "content": [
+          {
+            "text": "2 screens",
+            "type": "text",
+          },
+        ],
+      },
+      "runId": "golden-claude",
+      "status": "success",
+      "turnKey": "golden-claude:0",
+    },
+    {
+      "approvalId": "ap-once",
+      "approvalKind": "tool",
+      "at": 1760000102346,
+      "decision": "expired",
+      "id": "approval-ap-once",
+      "input": {
+        "url": "https://example.com",
+      },
+      "kind": "approval",
+      "onceOnly": true,
+      "runId": "golden-claude",
+      "toolName": "WebFetch",
+      "turnKey": "golden-claude:0",
+    },
+    {
+      "at": 1760000102369,
+      "boundary": "turn",
+      "durationMs": 41250,
+      "id": "turn-t1",
+      "kind": "status",
+      "outcome": "cancelled",
+      "runId": "golden-claude",
+      "text": "turn cancelled in 41.3s, 12,345 in / 678 out",
+      "tone": "bad",
+      "turnKey": "golden-claude:0",
+    },
+    {
+      "at": 1760000102415,
+      "id": "user-2",
+      "kind": "message",
+      "role": "user",
+      "runId": "golden-claude",
+      "streaming": false,
+      "text": "Delegate the docs update.",
+      "turnKey": "golden-claude:1",
+    },
+    {
+      "at": 1760000102438,
+      "endedAt": 1760000102461,
+      "id": "think-th-2",
+      "kind": "thinking",
+      "runId": "golden-claude",
+      "startedAt": 1760000102438,
+      "text": "A subagent can write the docs",
+      "turnKey": "golden-claude:1",
+    },
+    {
+      "at": 1760000102461,
+      "done": true,
+      "id": "tu-task",
+      "input": {
+        "description": "Update the docs",
+        "prompt": "Explain the retry rule",
+        "subagent_type": "general-purpose",
+      },
+      "isError": false,
+      "kind": "tool",
+      "name": "Agent",
+      "runId": "golden-claude",
+      "status": "success",
+      "subagent": {
+        "agentType": "general-purpose",
+        "endedAt": 1760000102553,
+        "nativeId": "tu-task",
+        "progress": "Reading docs/retry.md",
+        "prompt": "Explain the retry rule",
+        "result": "Docs updated",
+        "startedAt": 1760000102484,
+        "status": "completed",
+        "threadId": "docs-child",
+        "title": "Update the docs",
+        "toolCallId": "tu-task",
+      },
+      "turnKey": "golden-claude:1",
+    },
+    {
+      "at": 1760000102622,
+      "boundary": "turn",
+      "durationMs": 9000,
+      "id": "turn-t2",
+      "kind": "status",
+      "outcome": "success",
+      "runId": "golden-claude",
+      "text": "turn finished in 9.0s",
+      "tone": "ok",
+      "turnKey": "golden-claude:1",
+    },
+    {
+      "at": 1760000102645,
+      "boundary": "session",
+      "id": "status-end",
+      "kind": "status",
+      "outcome": "success",
+      "runId": "golden-claude",
+      "text": "session closed",
+      "tone": "muted",
+      "turnKey": "golden-claude:2",
+    },
+  ],
+  "eventAt": 1760000102645,
+  "eventCount": 116,
+  "fromTurn": 0,
+  "hydrated": false,
+  "live": false,
+  "pendingApprovals": 0,
+  "stderr": [
+    "warning: deprecated flag --legacy",
+    "warning: cache miss",
+  ],
+  "turnOf": [
+    [
+      "status-start",
+      0,
+    ],
+    [
+      "user-1",
+      0,
+    ],
+    [
+      "think-th-1",
+      0,
+    ],
+    [
+      "m-1",
+      0,
+    ],
+    [
+      "tu-grep",
+      0,
+    ],
+    [
+      "tu-bash",
+      0,
+    ],
+    [
+      "approval-ap-bash",
+      0,
+    ],
+    [
+      "approval-ap-ask",
+      0,
+    ],
+    [
+      "tu-mcp",
+      0,
+    ],
+    [
+      "approval-ap-once",
+      0,
+    ],
+    [
+      "turn-t1",
+      0,
+    ],
+    [
+      "user-2",
+      1,
+    ],
+    [
+      "think-th-2",
+      1,
+    ],
+    [
+      "tu-task",
+      1,
+    ],
+    [
+      "turn-t2",
+      1,
+    ],
+    [
+      "status-end",
+      2,
+    ],
+  ],
+  "turnOpen": false,
+  "turnsCompleted": 2,
+}
+`;
+
+exports[`transcript golden replay > projects the claudeLegacy stream the same however it is cut into frames 1`] = `
 {
   "blocks": [
     {
@@ -2250,6 +2613,28 @@ exports[`transcript golden replay > projects the failure stream the same however
 `;
 
 exports[`transcript golden replay > publishes the same claude transcript after every frame 1`] = `
+[
+  "live idle 0 | status-start status claude session started with claude-opus-5-5",
+  "live turn 0 | status-start status claude session started with claude-opus-5-5 | user-1 message 33 | think-th-1 thinking 0~",
+  "live turn 0 | status-start status claude session started with claude-opus-5-5 | user-1 message 33 | think-th-1 thinking 40~",
+  "live turn 0 | status-start status claude session started with claude-opus-5-5 | user-1 message 33 | think-th-1 thinking 57~",
+  "live turn 0 | status-start status claude session started with claude-opus-5-5 | user-1 message 33 | think-th-1 thinking 57success | m-1 message 66~",
+  "live turn 0 | status-start status claude session started with claude-opus-5-5 | user-1 message 33 | think-th-1 thinking 57success | m-1 message 94~",
+  "live turn 0 | status-start status claude session started with claude-opus-5-5 | user-1 message 33 | think-th-1 thinking 57success | m-1 message 142 | tu-grep tool 433~",
+  "live turn 0 | status-start status claude session started with claude-opus-5-5 | user-1 message 33 | think-th-1 thinking 57success | m-1 message 142 | tu-grep tool 488~",
+  "live turn 0 | status-start status claude session started with claude-opus-5-5 | user-1 message 33 | think-th-1 thinking 57success | m-1 message 142 | tu-grep tool 659~",
+  "live turn 0 | status-start status claude session started with claude-opus-5-5 | user-1 message 33 | think-th-1 thinking 57success | m-1 message 142 | tu-grep tool 1123~",
+  "live turn 0 | status-start status claude session started with claude-opus-5-5 | user-1 message 33 | think-th-1 thinking 57success | m-1 message 142 | tu-grep tool 1239~",
+  "live turn 0 | status-start status claude session started with claude-opus-5-5 | user-1 message 33 | think-th-1 thinking 57success | m-1 message 142 | tu-grep tool 1993~",
+  "live turn 0 | status-start status claude session started with claude-opus-5-5 | user-1 message 33 | think-th-1 thinking 57success | m-1 message 142 | tu-grep tool 2283~",
+  "live turn 0 | status-start status claude session started with claude-opus-5-5 | user-1 message 33 | think-th-1 thinking 57success | m-1 message 142 | tu-grep tool 2283success | tu-bash tool 35success:Building 3 of 7 | approval-ap-bash approval allow_for_run | approval-ap-ask approval allow | tu-mcp tool objectsuccess | approval-ap-once approval expired | turn-t1 status turn cancelled in 41.3s, 12,345 in / 678 out | user-2 message 25",
+  "live turn 0 | status-start status claude session started with claude-opus-5-5 | user-1 message 33 | think-th-1 thinking 57success | m-1 message 142 | tu-grep tool 2283success | tu-bash tool 35success:Building 3 of 7 | approval-ap-bash approval allow_for_run | approval-ap-ask approval allow | tu-mcp tool objectsuccess | approval-ap-once approval expired | turn-t1 status turn cancelled in 41.3s, 12,345 in / 678 out | user-2 message 25 | think-th-2 thinking 29~",
+  "live turn 0 | status-start status claude session started with claude-opus-5-5 | user-1 message 33 | think-th-1 thinking 57success | m-1 message 142 | tu-grep tool 2283success | tu-bash tool 35success:Building 3 of 7 | approval-ap-bash approval allow_for_run | approval-ap-ask approval allow | tu-mcp tool objectsuccess | approval-ap-once approval expired | turn-t1 status turn cancelled in 41.3s, 12,345 in / 678 out | user-2 message 25 | think-th-2 thinking 29 | tu-task tool undefined~running",
+  "ended idle 0 | status-start status claude session started with claude-opus-5-5 | user-1 message 33 | think-th-1 thinking 57success | m-1 message 142 | tu-grep tool 2283success | tu-bash tool 35success:Building 3 of 7 | approval-ap-bash approval allow_for_run | approval-ap-ask approval allow | tu-mcp tool objectsuccess | approval-ap-once approval expired | turn-t1 status turn cancelled in 41.3s, 12,345 in / 678 out | user-2 message 25 | think-th-2 thinking 29 | tu-task tool undefinedsuccess | turn-t2 status turn finished in 9.0s | status-end status session closed",
+]
+`;
+
+exports[`transcript golden replay > publishes the same claudeLegacy transcript after every frame 1`] = `
 [
   "live idle 0 | status-start status claude session started with claude-opus-5-5",
   "live turn 0 | status-start status claude session started with claude-opus-5-5 | user-1 message 33 | think-th-1 thinking 0~",

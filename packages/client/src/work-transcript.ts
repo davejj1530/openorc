@@ -1,6 +1,7 @@
 import type { Block } from "./transcript.js";
 import { toolShowsCard } from "./task-progress.js";
 import { visualizationFromTool } from "./visualization.js";
+import { isSubagentBlock } from "./transcript-subagents.js";
 
 /** A status line that closes its turn: a turn or session boundary, or the outcome line older transcripts carry. */
 function endsTurn(block: Block): boolean {
@@ -75,6 +76,10 @@ function replyStart(blocks: Block[]): number {
   return start;
 }
 
+function statusAfterWork(block: Extract<Block, { kind: "status" }>): boolean {
+  return Boolean(block.notice) || (block.tone === "bad" && !/^(turn|session) /.test(block.text));
+}
+
 /** Blocks shown after the turn's work instead of inside it. */
 function showsAfterWork(b: Block, inReply: boolean, taskCards: boolean): boolean {
   switch (b.kind) {
@@ -89,7 +94,7 @@ function showsAfterWork(b: Block, inReply: boolean, taskCards: boolean): boolean
     case "activity":
       return b.activityKind === "image_generation";
     case "status":
-      return b.tone === "bad" && !/^(turn|session) /.test(b.text);
+      return statusAfterWork(b);
     case "thinking":
       return false;
   }
@@ -104,6 +109,10 @@ export function workParts(blocks: Block[], live: boolean, taskCards = true, ambi
     work: Block[] = [],
     after: Block[] = [];
   for (const [index, b] of blocks.entries()) {
+    if (isSubagentBlock(b) && taskCards) {
+      after.push(b);
+      continue;
+    }
     if (readsFirst(b, index)) before.push(b);
     else if (showsAfterWork(b, showReply && index >= finalStart, taskCards)) after.push(b);
     else if (b.kind !== "status" && !(b.kind === "approval" && b.decision)) work.push(b);

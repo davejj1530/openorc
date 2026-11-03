@@ -1,9 +1,9 @@
+import { RunNotifications, runScopeKeys, runScopeTitle } from "./run-notifications.js";
 import { randomUUID } from "node:crypto";
 import { AcpAdapter, captureLaunchEnvironment, ClaudeAdapter, CodexAdapter, type AgentLaunchEnvironment } from "@openorc/agents";
-import { completedToolCall, plans, runs, tasks, type Db, type LedgerWriter } from "@openorc/db";
+import { completedToolCall, plans, runs, subagents, tasks, type Db, type LedgerWriter } from "@openorc/db";
 import { UserInput, type OpenOrcMcpServer, type TaskCard, type UserInputResult } from "@openorc/mcp";
 import {
-  harnessShortName,
   isHarnessId,
   normalizeModelSettings,
   type AgentEvent,
@@ -40,7 +40,6 @@ import {
   working,
   type ContinueSettings,
   type LiveRun,
-  type Notification,
   type PendingApproval,
   type RunAdapterRegistry,
   type RunHooks,
@@ -52,6 +51,7 @@ import {
 } from "./run-types.js";
 import { deliverable, steerable, steerBlocker, takesQueued, type RunInput } from "./run-input.js";
 import { workspaceWriters, type WorkspaceWriters } from "./workspace-writers.js";
+import { SubagentService } from "./subagents.js";
 
 export type { ContinueSettings, Notification, PendingApproval, RunAdapterRegistry, RunHooks, RunScope, SendOptions, StartRunInput, ThreadPermissionState, TurnSettledOutcome } from "./run-types.js";
 
@@ -60,9 +60,8 @@ export { isSessionLost } from "./run-settlement.js";
 export { versionAtLeast } from "./run-catalog.js";
 
 /**
- * Owns live agent processes. Every event goes to the ledger and to the
- * renderer; approvals wait here for the user's answer; each finished turn on
- * a task snapshots the worktree so the review view can show what changed.
+ * Owns live processes and streams events to the ledger and renderer. Approvals wait here, and completed task
+ * turns snapshot the worktree for review.
  */
 export class RunService {
   private agentUpdateReserved = false;
@@ -167,11 +166,13 @@ export class RunService {
   private readonly liveView: RunLive;
   private readonly turnStarts: TurnStartCapture;
   private readonly events: RunEvents;
+  private readonly notifications: RunNotifications;
   private readonly settlement: RunSettlement;
   private readonly launcher: RunLaunch;
   private readonly process: RunProcess;
   private readonly turns: RunTurns;
   private readonly progress: RunProgress;
+  readonly subagents: SubagentService;
 
   constructor(
     private readonly db: Db,
@@ -205,7 +206,7 @@ export class RunService {
       hooks: this.hooks,
       emit: (event) => this.emit(event),
       invalidate: this.invalidate,
-      keysFor: (scope) => this.keysFor(scope),
+      keysFor: (scope) => runScopeKeys(scope),
       log: this.log,
     });
     this.approvals = new RunApprovals({
@@ -214,26 +215,26 @@ export class RunService {
       isClosing: () => this.closing,
       emit: (event) => this.emit(event),
       invalidate: this.invalidate,
-      keysFor: (scope) => this.keysFor(scope),
+      keysFor: (scope) => runScopeKeys(scope),
       log: this.log,
     });
+    this.notifications = new RunNotifications({ hooks: this.hooks, log: this.log, entry: (id) => this.live.get(id), pending: (id, approval) => this.approvals.hasPending(id, approval) });
     this.turnStarts = new TurnStartCapture({ db: this.db, log: this.log, invalidate: this.invalidate, live: this.live, editorSaves: (root, since) => this.hooks.editorSaves?.(root, since) ?? [] });
+    this.subagents = new SubagentService({
+      db,
+      flush: () => this.ledger.flush(),
+      ended: (runId, nativeId) => this.approvals.denyApprovals(runId, nativeId),
+      emit: (event) => this.emit(event),
+      tool: this.approvals.scopeTool.bind(this.approvals),
+      invalidate,
+      handle: (runId) => {
+        const entry = this.live.get(runId);
+        return entry && !entry.exiting && !entry.closingRequested ? entry.handle : undefined;
+      },
+    });
     this.settlement = this.createSettlement();
     this.launcher = this.createLauncher();
-    this.events = new RunEvents({
-      db: this.db,
-      log: this.log,
-      hooks: this.hooks,
-      emit: (event) => this.emit(event),
-      invalidate: this.invalidate,
-      keysFor: (scope) => this.keysFor(scope),
-      denyApprovals: (runId) => this.approvals.denyApprovals(runId),
-      canSteer: (runId) => this.canSteer(runId),
-      disarmIdle: (runId) => this.liveView.disarmIdle(runId),
-      armIdle: (entry) => this.liveView.armIdle(entry),
-      refreshDiffs: (entry, project) => this.liveView.refreshDiffs(entry, project),
-      completeTurn: (entry, project, turn) => this.settlement.completeTurn(entry, project, turn),
-    });
+    this.events = this.createEvents();
     this.process = new RunProcess({
       db: this.db,
       log: this.log,
@@ -243,7 +244,10 @@ export class RunService {
       watchDiffs: (entry, project) => this.liveView.watchDiffs(entry, project),
       publishProviderEvent: (entry, event) => this.events.publishProviderEvent(entry, event),
       onEvent: (entry, project, event) => this.events.onEvent(entry, project, event),
-      onExit: (entry, project) => this.settlement.onExit(entry, project),
+      onExit: (entry, project) => {
+        this.subagents.stopHost(entry.run.id);
+        return this.settlement.onExit(entry, project);
+      },
     });
     this.turns = new RunTurns({
       db: this.db,
@@ -256,13 +260,31 @@ export class RunService {
       disarmIdle: (runId) => this.liveView.disarmIdle(runId),
       armIdle: (entry) => this.liveView.armIdle(entry),
       invalidate: this.invalidate,
-      keysFor: (scope) => this.keysFor(scope),
+      keysFor: (scope) => runScopeKeys(scope),
       start: (input) => this.start(input),
       emit: (event) => this.emit(event),
       validateFastMode: (agent, model, fastMode, id) => this.validateFastMode(agent, model, fastMode, undefined, undefined, id),
       log: this.log,
     });
     this.progress = new RunProgress(this.db, this.ledger, this.live, () => this.pending());
+  }
+
+  private createEvents(): RunEvents {
+    return new RunEvents({
+      db: this.db,
+      subagents: this.subagents,
+      log: this.log,
+      hooks: this.hooks,
+      emit: (event) => this.emit(event),
+      invalidate: this.invalidate,
+      keysFor: (scope) => runScopeKeys(scope),
+      denyApprovals: (runId, subagentId) => this.approvals.denyApprovals(runId, subagentId),
+      canSteer: (runId) => this.canSteer(runId),
+      disarmIdle: (runId) => this.liveView.disarmIdle(runId),
+      armIdle: (entry) => this.liveView.armIdle(entry),
+      refreshDiffs: (entry, project) => this.liveView.refreshDiffs(entry, project),
+      completeTurn: (entry, project, turn) => this.settlement.completeTurn(entry, project, turn),
+    });
   }
 
   private createSettlement(): RunSettlement {
@@ -276,9 +298,9 @@ export class RunService {
       detach: (runId) => this.liveView.detach(runId),
       isClosing: () => this.closing,
       invalidate: this.invalidate,
-      keysFor: (scope) => this.keysFor(scope),
-      notifyFor: (scope, kind, title, body) => this.notifyFor(scope, kind, title, body),
-      scopeTitle: (scope) => this.scopeTitle(scope),
+      keysFor: (scope) => runScopeKeys(scope),
+      notifyFor: (scope, kind, title, body) => this.notifications.forScope(scope, kind, title, body),
+      scopeTitle: (scope) => runScopeTitle(scope),
       turnSettled: (run, scope, project, outcome) => this.turnSettled(run, scope, project, outcome),
       armIdle: (entry) => this.liveView.armIdle(entry),
       refreshDiffs: (entry, project) => this.liveView.refreshDiffs(entry, project),
@@ -302,8 +324,8 @@ export class RunService {
       live: this.live,
       emit: (event) => this.emit(event),
       invalidate: this.invalidate,
-      keysFor: (scope) => this.keysFor(scope),
-      notifyFor: (scope, kind, title, body) => this.notifyFor(scope, kind, title, body),
+      keysFor: (scope) => runScopeKeys(scope),
+      notifyFor: (scope, kind, title, body) => this.notifications.forScope(scope, kind, title, body),
       closeAndWait: (runId) => this.closeAndWait(runId),
       bindLiveProcess: (binding) => this.process.bindLiveProcess(binding),
       applyThreadPermissions: (thread) => this.applyThreadPermissions(thread),
@@ -373,10 +395,11 @@ export class RunService {
    * it ends; a command left running, such as a dev server, does not.
    */
   threadActivity(threadId: string): "idle" | "running" | "waiting" {
+    if (subagents.byThread(this.db, threadId)?.status === "running") return "running";
     const entry = [...this.live.values()].find((e) => e.run.threadId === threadId);
-    if (!entry) return "idle";
+    if (!entry) return subagents.hasWorkingDescendants(this.db, threadId) ? "running" : "idle";
     for (const p of this.approvals.pendingEntries) if (p.info.runId === entry.run.id) return "waiting";
-    return working(entry) ? "running" : "idle";
+    return working(entry) || subagents.hasWorkingDescendants(this.db, threadId) ? "running" : "idle";
   }
 
   /** Commands the thread's agent left running in the background, such as a dev server. */
@@ -402,6 +425,11 @@ export class RunService {
    * failure on a Claude account the conversation has since left stays behind with that account.
    */
   threadSession(threadId: string): ThreadSession {
+    const child = subagents.byThread(this.db, threadId);
+    if (child) {
+      const status = { running: "live", completed: "idle", stopped: "idle", failed: "error", no_updates: "idle" } as const;
+      return { status: status[child.status], message: child.status === "failed" ? child.result : null };
+    }
     const live = [...this.live.values()].find((entry) => entry.run.threadId === threadId);
     if (live && (!live.failed || working(live))) return { status: "live", message: null };
     const last = live ? { ...live.run, error: live.failed } : runs.listForThread(this.db, threadId).at(-1);
@@ -441,6 +469,7 @@ export class RunService {
    * so the thread shows what happened instead of a session that looks alive.
    */
   recoverInterrupted(): void {
+    this.subagents.recoverInterrupted();
     for (const run of runs.listUnfinished(this.db)) {
       this.emit({ type: "session.completed", runId: run.id, ts: Date.now(), status: "error", durationMs: Math.max(0, Date.now() - run.startedAt) });
       runs.update(this.db, run.id, { state: "error", endedAt: Date.now(), error: "OpenOrc closed while this session was open. Send a message to continue where you left off." });
@@ -457,6 +486,7 @@ export class RunService {
 
   /** Ask the live agent to summarise its context in place: Codex through app-server, Claude through its /compact command. */
   compact(runId: string): Promise<void> {
+    this.subagents.assertExecutable({ runId });
     return this.liveView.compact(runId);
   }
 
@@ -497,6 +527,7 @@ export class RunService {
 
   /** Keep an admitted thread recoverable when setup fails before a provider run exists. */
   recordStartFailure(thread: Thread, input: { prompt: string; attachments?: string[] | undefined; promptRole?: "user" | "system" }, error: unknown): void {
+    this.subagents.assertExecutable({ threadId: thread.id });
     this.launcher.recordStartFailure(thread, input, error);
   }
 
@@ -511,6 +542,7 @@ export class RunService {
   }
 
   async start(input: StartRunInput): Promise<Run> {
+    if (input.scope.thread) this.subagents.assertExecutable({ threadId: input.scope.thread.id });
     this.assertAgentUpdateIdle();
     input = normalizeModelSettings(input);
     // Team actors can start fresh provider sessions for agent-directed work. Only
@@ -587,6 +619,7 @@ export class RunService {
 
   /** Internal coordinator transport. Its durable mailbox owns admission and history. */
   steer(runId: string, text: string, attachments?: string[]): Promise<"accepted" | "unavailable"> {
+    this.subagents.assertExecutable({ runId });
     if (!this.canSteer(runId)) return Promise.resolve("unavailable");
     // No await before invocation: a turn ending here must never fall back to
     // send(), which can start work or replace an idle session's settings.
@@ -609,10 +642,11 @@ export class RunService {
       return;
     this.emit({ type: "message.completed", runId, ts: Date.now(), messageId, role: "user", text: input.text, ...(input.attachments?.length ? { attachments: input.attachments } : {}) });
     this.ledger.flush();
-    this.invalidate(this.keysFor(entry.scope));
+    this.invalidate(runScopeKeys(entry.scope));
   }
 
   async send(runId: string, text: string, options: SendOptions = {}): Promise<void> {
+    this.subagents.assertExecutable({ runId });
     this.assertAgentUpdateIdle();
     this.pendingSends++;
     try {
@@ -623,14 +657,16 @@ export class RunService {
   }
 
   async interrupt(runId: string): Promise<void> {
+    this.subagents.assertExecutable({ runId });
     const entry = this.live.get(runId);
     if (entry) entry.questionsInterrupted = true;
-    this.approvals.denyApprovals(runId);
-    await this.live.get(runId)?.handle.interrupt();
+    this.approvals.denyApprovals(runId, null);
+    await Promise.all([this.subagents.interruptHost(runId), this.live.get(runId)?.handle.interrupt()]);
   }
 
   /** Persist first so a report survives parent-provider failure or Plan mode. */
   postThreadNotice(threadId: string, messageId: string, text: string): boolean {
+    this.subagents.assertExecutable({ threadId });
     this.ledger.flush();
     const exists = this.db
       .stmt("SELECT 1 FROM events WHERE run_id IN (SELECT id FROM runs WHERE thread_id = ?) AND kind = 'message.completed' AND json_extract(payload, '$.messageId') = ? LIMIT 1")
@@ -649,6 +685,7 @@ export class RunService {
   }
 
   close(runId: string): void {
+    this.subagents.assertExecutable({ runId });
     const entry = this.live.get(runId);
     if (entry) entry.closingRequested = true;
     this.approvals.denyApprovals(runId);
@@ -657,6 +694,7 @@ export class RunService {
 
   /** Retain the live entry on timeout: a requested stop is not proof the process has exited. */
   async closeAndWait(runId: string, timeoutMs = 10_000): Promise<void> {
+    this.subagents.assertExecutable({ runId });
     const entry = this.live.get(runId);
     if (!entry) return;
     this.liveView.disarmIdle(runId);
@@ -747,45 +785,7 @@ export class RunService {
     } catch {
       this.log.warn("An event subscriber failed; the local agent continues.");
     }
-    if (ev.type === "approval.requested") this.notifyApprovalRequested(ev);
-  }
-
-  private notifyApprovalRequested(ev: Extract<AgentEvent, { type: "approval.requested" }>): void {
-    // Host permission requests enter here outside the provider event queue.
-    try {
-      this.hooks.onApprovalRequested?.(ev);
-      const entry = this.live.get(ev.runId);
-      if (!entry || !this.approvals.hasPending(ev.runId, ev.approvalId)) return;
-      const question = ev.kind === "user_input";
-      const input = (ev.input ?? {}) as Record<string, unknown>;
-      let what: string;
-      if (question) what = "has a question";
-      else if (typeof input["command"] === "string") what = `wants to run ${input["command"]}`;
-      else what = `wants to use ${ev.toolName ?? ev.kind}`;
-      this.notifyFor(entry.scope, question ? "question" : "approval", this.scopeTitle(entry.scope), `${harnessShortName(entry.run.agent)} ${what}`, { runId: ev.runId, approvalId: ev.approvalId });
-    } catch (error) {
-      this.log.warn(`approval notification failed: ${String(error)}`);
-    }
-  }
-
-  private keysFor(scope: RunScope): string[] {
-    if (scope.comment) return [`task-comments:${scope.comment.task.id}`];
-    if (scope.task) return ["tasks", "inbox", `task:${scope.task.id}`, `runs:${scope.task.id}`, ...(scope.task.threadId ? ["threads", `thread:${scope.task.threadId}`] : [])];
-    return ["threads", `thread:${scope.thread.id}`, `runs:thread:${scope.thread.id}`, "inbox"];
-  }
-
-  private notifyFor(scope: RunScope, kind: Notification["kind"], title: string, body: string, approval?: { runId: string; approvalId: string }): void {
-    let threadId: string | null;
-    if (scope.comment) threadId = null;
-    else if (scope.thread) threadId = scope.thread.id;
-    else threadId = scope.task.threadId;
-    this.hooks.notify({ kind, threadId, taskId: scope.comment?.task.id ?? scope.task?.id ?? null, title, body, ...approval });
-  }
-
-  private scopeTitle(scope: RunScope): string {
-    if (scope.comment) return scope.comment.task.title;
-    if (scope.task) return scope.task.title;
-    return scope.thread.title;
+    if (ev.type === "approval.requested") this.notifications.approval(ev);
   }
 
   private turnSettled(run: Run, scope: RunScope, project: Project, outcome: TurnSettledOutcome): void {

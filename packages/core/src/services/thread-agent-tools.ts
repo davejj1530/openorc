@@ -295,7 +295,7 @@ export class ThreadAgentTools {
   async toolThreadList(runId: string): Promise<ThreadCard[]> {
     const { thread } = this.scopeOf(runId);
     if (!thread) return [];
-    const rows = await this.context.withCheckoutBranches(threads.list(this.db, { projectId: thread.projectId, filter: "active", limit: 30 }));
+    const rows = await this.context.withCheckoutBranches(threads.list(this.db, { projectId: thread.projectId, filter: "active", excludeSubagents: true, limit: 30 }));
     return rows.map((t) => this.threadCard(t, thread.id));
   }
 
@@ -381,7 +381,7 @@ export class ThreadAgentTools {
   }
 
   private assertRoomForChild(parent: Thread): void {
-    const working = threads.children(this.db, parent.id).filter((child) => this.runs.threadActivity(child.id) !== "idle");
+    const working = threads.children(this.db, parent.id).filter((child) => child.parentRelation === "started" && this.runs.threadActivity(child.id) !== "idle");
     if (working.length < MAX_WORKING_CHILDREN) return;
     const names = working.map((child) => `"${child.title}"`).join(", ");
     throw new Error(`${working.length} threads this thread started are still working (${names}). Wait for one to finish, or give it more work with thread_send.`);

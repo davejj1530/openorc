@@ -77,6 +77,7 @@ interface RunApprovalsDependencies {
 }
 
 export class RunApprovals {
+  private readonly toolOwners = new Map<string, Map<string, string>>();
   private readonly pendingApprovals = new Map<
     string,
     { resolve: (r: ApprovalResolution) => void; info: PendingApproval; needsAnswer: boolean; own?: boolean; always?: boolean; userInput?: UserInput }
@@ -96,8 +97,20 @@ export class RunApprovals {
     return this.pendingApprovals.has(this.approvalKey(runId, approvalId));
   }
 
-  handleCodexApproval({ runId, approvalId, kind, params, onceOnly }: CodexApprovalRequest): Promise<ApprovalResolution> {
-    const { detail, reason, toolName, needsAnswer, serverName } = codexApprovalPresentation(kind, params);
+  /** Claude's permission MCP sends only a tool id; the stream supplies its child owner. Either may arrive first. */
+  scopeTool(runId: string, toolCallId: string, subagentId: string): void {
+    const owners = this.toolOwners.get(runId) ?? new Map<string, string>();
+    owners.set(toolCallId, subagentId);
+    this.toolOwners.set(runId, owners);
+    const pending = this.pendingApprovals.get(this.approvalKey(runId, toolCallId));
+    if (pending) pending.info.subagentId = subagentId;
+  }
+
+  handleCodexApproval({ runId, approvalId, kind, params, onceOnly, subagentTitle, subagentId }: CodexApprovalRequest): Promise<ApprovalResolution> {
+    const presentation = codexApprovalPresentation(kind, params);
+    const { toolName, needsAnswer, serverName } = presentation;
+    const detail = subagentTitle ? `${subagentTitle}: ${presentation.detail}` : presentation.detail;
+    const reason = subagentTitle ? `${subagentTitle}${presentation.reason ? `: ${presentation.reason}` : ""}` : presentation.reason;
     // serverName is supplied by the provider transport, not the MCP tool or its input.
     const integration = this.deps.live.get(runId)?.internalMcp;
     const category = kind === "tool" && integration && serverName === integration.serverName ? "internal_app" : "external";
@@ -119,10 +132,12 @@ export class RunApprovals {
         }),
       needsAnswer,
       category,
+      undefined,
+      subagentId,
     );
   }
 
-  handleOpenCodeApproval({ runId, approvalId, kind, toolName, detail, input, onceOnly }: AcpApprovalRequest): Promise<ApprovalResolution> {
+  handleOpenCodeApproval({ runId, approvalId, kind, toolName, detail, input, onceOnly, subagentId }: AcpApprovalRequest): Promise<ApprovalResolution> {
     // OpenCode names its MCP tools `<server>_<tool>`.
     const integration = this.deps.live.get(runId)?.internalMcp;
     const category = integration && toolName.startsWith(`${integration.serverName}_`) ? "internal_app" : "external";
@@ -133,10 +148,13 @@ export class RunApprovals {
       () => this.deps.emit({ type: "approval.requested", runId, ts: Date.now(), approvalId, kind, toolName, input, ...(onceOnly ? { onceOnly } : {}) }),
       false,
       category,
+      undefined,
+      subagentId,
     );
   }
 
   async requestApproval(runId: string, approvalId: string, toolName: string, input: unknown): Promise<ApprovalResolution> {
+    const subagentId = this.toolOwners.get(runId)?.get(approvalId);
     if (toolName === "ExitPlanMode") return this.presentPlan(runId, input);
     if (toolName === "AskUserQuestion") {
       const questions = Array.isArray((input as Record<string, unknown>)?.["questions"]) ? ((input as Record<string, unknown>)["questions"] as Record<string, unknown>[]) : [];
@@ -147,6 +165,9 @@ export class RunApprovals {
         detail,
         () => this.deps.emit({ type: "approval.requested", runId, ts: Date.now(), approvalId, kind: "user_input", toolName: "question", input }),
         true,
+        "external",
+        undefined,
+        subagentId,
       );
     }
     const entry = this.deps.live.get(runId);
@@ -165,6 +186,8 @@ export class RunApprovals {
       () => this.deps.emit({ type: "approval.requested", runId, ts: Date.now(), approvalId, kind: "tool", toolName, input }),
       false,
       category,
+      undefined,
+      subagentId,
     );
     if (result.decision === "allow_for_run" && entry) (entry.toolsAllowed ??= new Set()).add(allowance);
     return result;
@@ -263,6 +286,7 @@ export class RunApprovals {
     /** App tools are allowed; external requests follow the mode; `confirm` asks the user, and `confirm_always` also survives a switch to Autonomous. */
     category: "internal_app" | "external" | "confirm" | "confirm_always" = "external",
     userInput?: UserInput,
+    subagentId?: string,
   ): Promise<ApprovalResolution> {
     const entry = this.deps.live.get(runId);
     if (this.deps.isClosing() || entry?.closingRequested || entry?.exiting) return Promise.resolve({ decision: "deny" });
@@ -289,7 +313,7 @@ export class RunApprovals {
         ...(category === "confirm" || category === "confirm_always" ? { own: true } : {}),
         ...(category === "confirm_always" ? { always: true } : {}),
         ...(userInput ? { userInput } : {}),
-        info: { runId, taskId: run?.taskId ?? null, threadId: run?.threadId ?? null, approvalId, detail },
+        info: { runId, taskId: run?.taskId ?? null, threadId: run?.threadId ?? null, approvalId, detail, ...(subagentId ? { subagentId } : {}) },
       });
       announce();
       this.deps.invalidate(["inbox", "threads"]);
@@ -423,9 +447,11 @@ export class RunApprovals {
     return [...this.pendingApprovals.values()].map((p) => p.info);
   }
 
-  denyApprovals(runId: string): void {
+  denyApprovals(runId: string, subagentId?: string | null): void {
     for (const pending of [...this.pendingApprovals.values()]) {
-      if (pending.info.runId === runId) this.settleApproval(runId, pending.info.approvalId, { decision: "deny" }, "openorc");
+      if (pending.info.runId === runId && (subagentId === undefined || (pending.info.subagentId ?? null) === subagentId))
+        this.settleApproval(runId, pending.info.approvalId, { decision: "deny" }, "openorc");
     }
+    if (subagentId === undefined) this.toolOwners.delete(runId);
   }
 }

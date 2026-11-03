@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { audit, orchestration, runs, taskComments, taskForwardings, tasks, threads, type Db, type LedgerWriter } from "@openorc/db";
+import { audit, orchestration, runs, subagents, taskComments, taskForwardings, tasks, threads, type Db, type LedgerWriter } from "@openorc/db";
 import { worktree } from "@openorc/git";
 import { internalToolNames, type OpenOrcMcpServer } from "@openorc/mcp";
 import {
@@ -306,11 +306,22 @@ export class RunLaunch {
       ...(input.effort ? { effort: input.effort } : {}),
       ...(input.attachments?.length ? { attachments: input.attachments } : {}),
       ...(resumeSessionId ? { resumeSessionId } : {}),
+      resumedSubagents: this.resumedSubagents(prepared),
       ...(forkSession ? { forkSession: true } : {}),
       ...(input.agent === "claude" && this.deps.hooks.claudeUserMcpServers?.() === false ? { strictMcp: true } : {}),
       // Decided by the conversation, not its mode, so switching a review to Act keeps it.
       ...(input.scope.thread && this.deps.hooks.untrustedCheckout?.(input.scope.thread) ? { untrustedCheckout: true } : {}),
     };
+  }
+
+  private resumedSubagents({ input, resumeSessionId, forkSession }: PreparedSession): RunSpec["resumedSubagents"] {
+    if (!resumeSessionId || forkSession || input.agent !== "claude" || !input.scope.thread) return undefined;
+    return subagents.forRoot(this.deps.db, input.scope.thread.id).flatMap((row) => {
+      if (!row.taskId || row.agentType === "workflow") return [];
+      const thread = threads.get(this.deps.db, row.threadId)!;
+      const parent = thread.parentThreadId ? subagents.byThread(this.deps.db, thread.parentThreadId) : null;
+      return [{ nativeId: row.nativeId, taskId: row.taskId, title: thread.title, parentSubagentId: parent?.nativeId, endedAt: row.endedAt ?? row.startedAt }];
+    });
   }
 
   private systemPrompt(input: StartRunInput, taskImages: string[]): string {

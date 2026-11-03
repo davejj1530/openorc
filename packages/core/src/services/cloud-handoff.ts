@@ -4,6 +4,7 @@ import type { Logger } from "../transport.js";
 import type { CloudSandboxRuns } from "./cloud-sandboxes.js";
 import { CLOUD_AGENTS, CLOUD_HARNESSES, type CloudWorkspaceService } from "./cloud-workspaces.js";
 import { executionProject } from "./workspace-home.js";
+import { assertMutableThread } from "./thread-mutations.js";
 
 export interface CloudHandoffDeps {
   db: Db;
@@ -24,6 +25,7 @@ export class CloudHandoff {
 
   /** Refuses, changing nothing, when the conversation cannot move now. */
   private assertMovable(thread: Thread): void {
+    assertMutableThread(thread);
     if (cloudWorkspaces.get(this.deps.db, thread.id)) throw new Error("This conversation already runs in the cloud.");
     if (thread.projectId === WORKSPACE_ID) throw new Error("Only a project's conversations can move to the cloud.");
     if (!CLOUD_HARNESSES.has(thread.agent)) throw new Error(CLOUD_AGENTS);

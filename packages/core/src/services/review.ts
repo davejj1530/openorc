@@ -360,6 +360,7 @@ export class ReviewService {
     const thread = threads.get(this.db, input.id);
     const ownedProject = projects.get(this.db, project.id);
     if (!thread || !ownedProject || thread.projectId !== ownedProject.id) throw new Error("The conversation no longer belongs to this project.");
+    assertMutableThread(thread);
     const instance = orchestration.getInstance(this.db, thread.id);
     if (instance && !this.teamMutations) throw new Error("Team Git actions require the team's execution guard.");
     const reservation = instance ? this.teamMutations!.reserve(thread.id) : null;
@@ -739,3 +740,4 @@ export class ReviewService {
     });
   }
 }
+import { assertMutableThread } from "./thread-mutations.js";

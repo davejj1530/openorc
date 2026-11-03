@@ -142,6 +142,7 @@ export interface LiveRun {
   busy: boolean;
   /** Background work the agent started, such as a subagent or workflow. It outlives turns and reports back in a turn of its own. */
   background: number;
+  subagentCount?: number;
   /** Commands the agent left running in the background, such as a dev server. They run until they end or are stopped. */
   commands: BackgroundCommand[];
   /** Last advertised native control state, independent of transcript output. */
@@ -189,7 +190,7 @@ export interface LiveProcessBinding {
 
 /** A turn in flight, or background work that will report back: the agent is at work. */
 export function working(entry: LiveRun): boolean {
-  return entry.busy || entry.background > 0;
+  return entry.busy || entry.background > 0 || (entry.subagentCount ?? 0) > 0;
 }
 
 /** The agent is at work, or a command it left running in the background still runs. Closing the process would end them. */
@@ -199,6 +200,7 @@ export function occupied(entry: LiveRun): boolean {
 
 export interface PendingApproval {
   runId: string;
+  subagentId?: string;
   taskId: string | null;
   threadId: string | null;
   approvalId: string;

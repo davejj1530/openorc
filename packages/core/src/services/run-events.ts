@@ -1,7 +1,8 @@
-import { runs, type Db } from "@openorc/db";
+import { runs, threads, type Db } from "@openorc/db";
 import { harnessName, type AgentEvent, type Project } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
 import { occupied, working, type CompletedTurn, type LiveRun, type RunHooks, type RunScope } from "./run-types.js";
+import type { SubagentService } from "./subagents.js";
 
 /** Tools that only read. Any other tool, including one this list does not know, may have changed files. */
 const READ_ONLY_TOOLS = new Set([
@@ -27,12 +28,13 @@ const READ_ONLY_TOOLS = new Set([
 /** Provider events publish synchronously; state transitions and capture follow the ordered barrier. */
 interface RunEventsDependencies {
   db: Db;
+  subagents: SubagentService;
   log: Logger;
   hooks: Pick<RunHooks, "onProviderEvent" | "onSteerable" | "onThreadIdle">;
   emit: (event: AgentEvent) => void;
   invalidate: (keys: string[]) => void;
   keysFor: (scope: RunScope) => string[];
-  denyApprovals: (runId: string) => void;
+  denyApprovals: (runId: string, subagentId?: string | null) => void;
   canSteer: (runId: string) => boolean;
   disarmIdle: (runId: string) => void;
   armIdle: (entry: LiveRun) => void;
@@ -43,10 +45,19 @@ interface RunEventsDependencies {
 export class RunEvents {
   constructor(private readonly deps: RunEventsDependencies) {}
 
-  publishProviderEvent(entry: LiveRun, ev: AgentEvent): AgentEvent {
+  publishProviderEvent(entry: LiveRun, ev: AgentEvent): AgentEvent | null {
+    if (ev.type === "tool.started" || ev.type === "tool.completed") {
+      // Keep the per-process connection identity out of user-facing tool labels.
+      // Approval classification always uses the original provider identity instead.
+      const rawName = ev.name;
+      const tool = entry.internalMcp.toolNames.find((name) => rawName === `${entry.internalMcp.serverName}.${name}` || rawName === `mcp__${entry.internalMcp.serverName}__${name}`);
+      if (tool) ev = { ...ev, name: `openorc.${tool}` };
+    }
+    if (this.routeSubagent(entry, ev)) return null;
+    if (ev.type === "session.completed") this.deps.subagents.stopHost(entry.run.id, ev.ts);
     if (ev.type === "turn.completed" || ev.type === "session.completed") {
       entry.questionsInterrupted = true;
-      this.deps.denyApprovals(entry.run.id);
+      this.deps.denyApprovals(entry.run.id, ev.type === "turn.completed" ? null : undefined);
     }
     // Every provider event funnels through here, so this is the one place that
     // knows the agent is still producing output mid-turn.
@@ -58,15 +69,25 @@ export class RunEvents {
       if (steerable) this.deps.hooks.onSteerable?.(entry.run.id);
       this.deps.invalidate(this.deps.keysFor(entry.scope));
     }
-    if (ev.type === "tool.started" || ev.type === "tool.completed") {
-      // Keep the per-process connection identity out of user-facing tool labels.
-      // Approval classification always uses the original provider identity instead.
-      const rawName = ev.name;
-      const tool = entry.internalMcp.toolNames.find((name) => rawName === `${entry.internalMcp.serverName}.${name}` || rawName === `mcp__${entry.internalMcp.serverName}__${name}`);
-      if (tool) ev = { ...ev, name: `openorc.${tool}` };
-    }
     this.deps.emit(ev);
     return ev;
+  }
+
+  private routeSubagent(entry: LiveRun, event: AgentEvent): boolean {
+    if (event.type === "raw" || !event.subagentId) return false;
+    const threadId = entry.scope.task?.executionThreadId ?? entry.scope.comment?.task.executionThreadId;
+    const thread = entry.scope.thread ?? (threadId ? threads.get(this.deps.db, threadId) : null);
+    const wasWorking = working(entry);
+    if (!thread) return true;
+    this.deps.subagents.route({ run: entry.run, thread }, event);
+    entry.lastAgentEventAt = Date.now();
+    entry.subagentCount = this.deps.subagents.running(entry.run.id);
+    if (!wasWorking && working(entry)) this.deps.disarmIdle(entry.run.id);
+    if (wasWorking && !working(entry) && !entry.exiting && !entry.closingRequested) {
+      this.deps.armIdle(entry);
+      if (entry.scope.thread) this.deps.hooks.onThreadIdle?.(entry.scope.thread);
+    }
+    return true;
   }
 
   async onEvent(entry: LiveRun, project: Project, ev: AgentEvent): Promise<void> {

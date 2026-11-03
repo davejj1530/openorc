@@ -23,16 +23,7 @@ export function createThreadQueriesHandlers({
   "threads.list" | "threads.get" | "threads.messages" | "threads.lastMessage" | "threads.plans" | "threads.search" | "threads.checkpoints" | "threads.turnChanges" | "threads.importable"
 > {
   return {
-    "threads.list": ({ projectId, projectsOnly, filter, limit, offset }) =>
-      threadService.withCheckoutBranches(
-        threadService.list({
-          ...(projectId ? { projectId } : {}),
-          ...(projectsOnly ? { projectsOnly } : {}),
-          ...(filter ? { filter } : {}),
-          ...(limit ? { limit } : {}),
-          ...(offset ? { offset } : {}),
-        }),
-      ),
+    "threads.list": (filter) => threadService.withCheckoutBranches(threadService.list(filter)),
     "threads.get": async ({ id }) => {
       const thread = threadService.get(id);
       return thread ? (await threadService.withCheckoutBranches([thread]))[0]! : null;

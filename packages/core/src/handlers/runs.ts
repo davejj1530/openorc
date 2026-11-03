@@ -9,7 +9,7 @@ import type { Handlers } from "./types.js";
 type Dependencies = {
   threadService: Pick<ThreadService, "continueThread" | "startTaskInThread" | "conversationRuns">;
   teams: Pick<TeamCoordinator, "binding" | "steer" | "stop">;
-  runService: Pick<RunService, "send" | "interrupt" | "close">;
+  runService: Pick<RunService, "send" | "interrupt" | "close" | "subagents">;
   db: Db;
   dataDir: string;
 };
@@ -20,8 +20,12 @@ export function createRunsHandlers({
   runService,
   db,
   dataDir,
-}: Dependencies): Pick<Handlers, "runs.start" | "runs.send" | "runs.interrupt" | "runs.close" | "runs.listForTask" | "runs.listForThread"> {
+}: Dependencies): Pick<Handlers, "runs.start" | "runs.send" | "runs.interrupt" | "runs.close" | "runs.listForTask" | "runs.listForThread" | "subagents.stop"> {
   return {
+    "subagents.stop": async ({ threadId }) => {
+      await runService.subagents.stop(threadId);
+      return null;
+    },
     "runs.start": async ({ taskId, threadId, workspaceMode, agent, model, effort, fastMode, attachments, mode, permissionMode, prompt, resume, claudeAccountId }) => {
       if (threadId) return threadService.continueThread(threadId, { agent, model, effort, fastMode, attachments, mode, permissionMode, prompt, fresh: resume === false, claudeAccountId });
       if (!taskId) throw new Error("runs.start needs a taskId or a threadId");

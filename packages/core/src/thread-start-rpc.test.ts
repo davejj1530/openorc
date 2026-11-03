@@ -187,3 +187,34 @@ it(`keeps ${MAX_WORKING_CHILDREN} started threads working at once, none of their
   const planning = await parent({ mode: "plan", prompt: "Think it through" });
   await expect(startThread(planning.runId, { prompt: "Do it" })).rejects.toThrow(/Plan mode/);
 });
+
+it("counts only independently started threads toward the thread_start limit", async () => {
+  const { runId } = await parent();
+  for (let index = 0; index < MAX_WORKING_CHILDREN; index++)
+    turns.get(runId)!.handle.emit("event", { type: "subagent.started", runId, ts: Date.now(), subagentId: `agent-${index}`, title: "Explore" });
+  await expect(startThread(runId, { prompt: "Independent work" })).resolves.toMatchObject({ thread: { title: "Independent work" } });
+});
+
+it("rejects Git, cloud and workspace mutations of a subagent before any side effects", async () => {
+  const { runId, thread: home } = await parent();
+  turns.get(runId)!.handle.emit("event", { type: "subagent.started", runId, ts: Date.now(), subagentId: "child", title: "Explore" });
+  const child = threads.children(core.db, home.id)[0]!;
+  await expect(call("review.commitThread", { threadId: child.id, message: "Forbidden" })).rejects.toThrow(/read-only/);
+  await expect(call("review.pushThread", { threadId: child.id })).rejects.toThrow(/read-only/);
+  await expect(call("review.createThreadPr", { threadId: child.id, title: "Forbidden", body: "", base: "main" })).rejects.toThrow(/read-only/);
+  await expect(call("cloud.move", { threadId: child.id })).rejects.toThrow(/read-only/);
+  await expect(call("threads.moveWorkspace", { id: child.id, to: "current" })).rejects.toThrow(/read-only/);
+});
+
+it("lists messageable conversations before applying the agent's 30-thread limit", async () => {
+  const { thread: home, runId } = await parent();
+  const started = threads.insert(core.db, { projectId: project.id, title: "Started conversation", agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
+  threads.update(core.db, started.id, { parentThreadId: home.id, parentRelation: "started" });
+  for (let i = 0; i < 35; i++) {
+    const child = threads.insert(core.db, { projectId: project.id, title: `Child ${i}`, agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
+    threads.update(core.db, child.id, { parentThreadId: home.id, parentRelation: "subagent" });
+  }
+  expect((await core.threads.toolThreadList(runId)).map((thread) => thread.id).sort()).toEqual([home.id, started.id].sort());
+  expect((await call("threads.list", { projectId: project.id, excludeSubagents: true, limit: 1 })).length).toBe(1);
+  expect((await call("threads.list", { projectId: project.id, excludeSubagents: true })).map((thread) => thread.id).sort()).toEqual([home.id, started.id].sort());
+});

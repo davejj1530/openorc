@@ -3,6 +3,7 @@ import {
   claudeAccounts,
   plans,
   settings,
+  subagents,
   checkpoints,
   messages,
   orchestration,
@@ -52,6 +53,7 @@ import { checkpointRefs, unpinProjectRefs } from "./checkpoint-refs.js";
 import { ThreadMoves, fileChanges } from "./thread-moves.js";
 import { ThreadMessageQueue } from "./thread-message-queue.js";
 import { ThreadTaskExecution } from "./thread-task-execution.js";
+import { assertMutableThread } from "./thread-mutations.js";
 import { ThreadAgentTools } from "./thread-agent-tools.js";
 
 /** How many agent messages in a row may pass between conversations before a person has to write. */
@@ -157,6 +159,7 @@ export class ThreadService {
     const liveRunId = this.liveRunId(t.id, execution, executionRuns);
     return {
       ...t,
+      subagent: this.runs.subagents.summary(t.id),
       hasStarted: Boolean(this.db.stmt("SELECT 1 FROM runs WHERE thread_id = ? LIMIT 1").get(t.id) || this.db.stmt("SELECT 1 FROM team_executions WHERE thread_id = ? LIMIT 1").get(t.id)),
       teamInstanceId: instance?.id ?? null,
       agents: (instance ? orchestration.getRevision(this.db, instance.teamRevisionId)?.members.map((member) => member.settings.agent) : null) ?? [t.agent],
@@ -177,6 +180,8 @@ export class ThreadService {
 
   /** The run streaming for a thread now: its own live run, or the team attempt that spoke last, as its silence is measured. */
   private liveRunId(threadId: string, execution: unknown, executionRuns: Set<string>): string | null {
+    const child = subagents.byThread(this.db, threadId);
+    if (child?.status === "running") return child.runId;
     if (!execution) return this.runs.liveRunForThread(threadId)?.id ?? null;
     let latest: { runId: string; at: number } | null = null;
     for (const runId of executionRuns) {
@@ -193,6 +198,7 @@ export class ThreadService {
   }
 
   private rejectPinnedTeam(threadId: string | null): void {
+    if (threadId) this.runs.subagents.assertExecutable({ threadId });
     if (threadId && (orchestration.getInstance(this.db, threadId) || teamRuntime.activeForThread(this.db, threadId))) {
       throw new Error("This thread is managed by a saved team. Use its team execution controls.");
     }
@@ -499,6 +505,7 @@ export class ThreadService {
   }
 
   update(id: string, patch: ThreadPatch, scope: { taskId?: string } = {}): Thread {
+    if (Object.keys(patch).some((key) => key !== "seen")) this.runs.subagents.assertExecutable({ threadId: id });
     // Through a saved task of a deleted conversation only next-turn controls may change; nothing resurrects the owner.
     if (teamDeletedThreads.has(this.db, id)) {
       const allowed = new Set(["mode", "permissionMode", "draft"]);
@@ -555,6 +562,12 @@ export class ThreadService {
 
   async delete(id: string): Promise<void> {
     const thread = this.thread(id);
+    if (thread.parentRelation === "subagent") {
+      this.runs.subagents.deleteFinished(id);
+      this.invalidate(["threads", `thread:${id}`]);
+      this.onDeleted?.(id);
+      return;
+    }
     const live = this.runs.liveRunForThread(id);
     if (live) await this.runs.closeAndWait(live.id);
     const project = executionProject(this.db, thread);
@@ -582,6 +595,7 @@ export class ThreadService {
    * transcript leaves out.
    */
   fork(id: string): Thread {
+    this.runs.subagents.assertExecutable({ threadId: id });
     const parent = this.thread(id);
     const at = runRepo.listForThread(this.db, id).at(-1);
     const forked = threads.insert(this.db, {
@@ -635,6 +649,7 @@ export class ThreadService {
    */
   async moveWorkspace(id: string, to: WorkspaceMode): Promise<Thread> {
     const thread = this.thread(id);
+    assertMutableThread(thread);
     if (thread.projectId === WORKSPACE_ID) throw new Error("Workspace conversations use their selected folder. Open a project for Git worktree actions.");
     if (thread.workspaceMode === to) return thread;
     await this.closeIdleRun(id, "moving the thread");
@@ -790,10 +805,7 @@ export class ThreadService {
     await this.runs.closeAndWait(live.id);
   }
 
-  /**
-   * Where a new worktree for this thread starts: the base asked for, else, for a thread a task opened, the base the
-   * task names, the same as starting the task from its page.
-   */
+  /** New worktrees start at the requested base, or the base named by the task that opened this thread. */
   private worktreeBase(thread: Thread, requested: string | undefined): string | undefined {
     if (requested) return requested;
     // A thread admitted without its worktree, as a cloud thread is, starts from the base it was admitted with.

@@ -11,7 +11,7 @@ interface RunProcessDependencies {
   finalizations: Set<Promise<void>>;
   denyApprovals: (runId: string) => void;
   watchDiffs: (entry: LiveRun, project: Project) => void;
-  publishProviderEvent: (entry: LiveRun, event: AgentEvent) => AgentEvent;
+  publishProviderEvent: (entry: LiveRun, event: AgentEvent) => AgentEvent | null;
   onEvent: (entry: LiveRun, project: Project, event: AgentEvent) => Promise<void>;
   onExit: (entry: LiveRun, project: Project) => Promise<void>;
 }
@@ -65,7 +65,7 @@ export class RunProcess {
       if (entry.exiting) return;
       // Progress reads and renderer frames observe provider events immediately.
       // Only state transitions and asynchronous capture belong behind the barrier.
-      let published: AgentEvent;
+      let published: AgentEvent | null;
       try {
         published = this.deps.publishProviderEvent(entry, ev);
       } catch (error) {
@@ -74,6 +74,7 @@ export class RunProcess {
         this.deps.log.error(`run ${runId} event publication failed: ${entry.failed}`);
         return;
       }
+      if (!published) return;
       entry.events = entry.events
         .then(() => this.deps.onEvent(entry, project, published))
         .catch((error) => {

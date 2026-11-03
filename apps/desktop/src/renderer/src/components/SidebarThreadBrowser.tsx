@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Menu } from "@base-ui/react/menu";
-import { WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
+import { isSubagentThread, WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
 import { CoversPreview } from "../lib/browser-preview";
 import { useLayout } from "../lib/layout";
 import {
@@ -14,6 +14,10 @@ import {
   THREAD_PAGE,
   threadListParams,
   visibleSidebarThreadIds,
+  threadTreeActivity,
+  threadTreeMatches,
+  threadFoldIds,
+  threadSearchFolds,
 } from "@openorc/client";
 import { useOrclings } from "../lib/orclings";
 import { useRpc, useRpcs } from "../lib/client";
@@ -23,7 +27,7 @@ import { Check, ChevronDown, ChevronRight, Funnel, Pin, SlidersHorizontal } from
 import { OpenOrcMark } from "./OpenOrcMark";
 import { SidebarProjectGroup } from "./SidebarProjectGroup";
 import { SidebarProjectVisibility } from "./SidebarProjectVisibility";
-import { ThreadRow } from "./ThreadLibraryRow";
+import { ThreadTreeList } from "./ThreadTreeList";
 import { menuItem, menuPopup, menuSeparator } from "./menu";
 import { IconButton } from "./ui";
 import { floatingGround } from "../lib/use-anchor-ground";
@@ -46,6 +50,22 @@ function useSidebarProjects() {
   return { query: projects, visible, allHidden: Boolean(projects.data) && visible.length === 0 };
 }
 
+/** Loading an off-page selection must not replace the project's stable page query. */
+function useSelectedFamily(selected: ThreadSummary | null | undefined, filter: SidebarFilter, pages: readonly (readonly ThreadSummary[] | undefined)[]) {
+  return useRpc(
+    "threads.list",
+    { projectId: selected?.projectId, filter: listedThreads(filter), includeChildren: true, limit: 1, selectedId: selected?.id },
+    {
+      enabled: Boolean(selected && !pages.some((page) => page?.some((thread) => thread.id === selected.id))),
+    },
+  ).data;
+}
+
+function withFamily(page: ThreadSummary[] | undefined, family: ThreadSummary[] | undefined, projectIds: readonly string[]): ThreadSummary[] | undefined {
+  if (!page) return page;
+  return [...new Map([...page, ...(family ?? []).filter((thread) => projectIds.includes(thread.projectId))].map((thread) => [thread.id, thread])).values()];
+}
+
 /** Each project owns a page. The task/new-thread scope never hides another project's work. */
 function useThreadGroups(search: string) {
   const chosen = useLayout((s) => s.sidebarFilter);
@@ -66,6 +86,11 @@ function useThreadGroups(search: string) {
     groups.map((group) => threadListParams(group.id, chosen, limits[`${filter}:${group.id}`])),
     { refetchInterval: 60_000 },
   );
+  const family = useSelectedFamily(
+    active.data,
+    chosen,
+    queries.map((query) => query.data),
+  );
   useEffect(() => {
     if (!activeProject) return;
     const layout = useLayout.getState();
@@ -76,19 +101,33 @@ function useThreadGroups(search: string) {
     const query = queries[index]!;
     const page = sidebarThreadPage({
       projectId: group.id,
-      fetched: query.data,
+      fetched: withFamily(query.data, family, [group.id]),
       selected: active.data,
       filter: view,
       limit: limits[`${filter}:${group.id}`] ?? THREAD_PAGE,
       now: Date.now(),
       hidden: homes,
     });
-    return { ...group, query, ...page, pinned: page.pinned.filter(matches), rest: pinnedOnly ? [] : page.rest.filter(matches), snoozed: pinnedOnly ? [] : page.snoozed.filter(matches) };
+    const keep = (thread: ThreadSummary) => threadTreeMatches(thread, page.list, matches);
+    return { ...group, query, ...page, pinned: page.pinned.filter(keep), rest: pinnedOnly ? [] : page.rest.filter(keep), snoozed: pinnedOnly ? [] : page.snoozed.filter(keep) };
   });
-  const orderKey = JSON.stringify(visibleSidebarThreadIds(visible, collapsed));
+  const reveal = visible.flatMap((group) => group.list.filter((thread) => thread.id === activeId || (search && matches(thread))).map((thread) => thread.id));
+  const orderKey = JSON.stringify(
+    visibleSidebarThreadIds(
+      visible,
+      threadSearchFolds(
+        collapsed,
+        visible.flatMap((group) => group.list),
+        search,
+      ),
+      null,
+      reveal,
+    ),
+  );
+  const conversationKey = JSON.stringify(visible.flatMap((group) => group.list.filter((thread) => !isSubagentThread(thread)).map((thread) => thread.id)));
   useEffect(() => {
-    useUi.getState().setThreadOrder(JSON.parse(orderKey) as string[]);
-  }, [orderKey]);
+    useUi.getState().setThreadOrder(JSON.parse(orderKey) as string[], JSON.parse(conversationKey) as string[]);
+  }, [orderKey, conversationKey]);
   const loadMore = (id: string) => setLimits((old) => ({ ...old, [`${filter}:${id}`]: (old[`${filter}:${id}`] ?? THREAD_PAGE) + THREAD_PAGE }));
   return { visible, activeId, loadMore, projects, allHidden, orc: view === "orc", pinnedOnly };
 }
@@ -119,13 +158,22 @@ function OrcModeEnd({ leftOut, more, pending, shown }: { leftOut: number; more: 
 /** The project list stays mounted across app destinations, keeping filters and loaded pages. */
 export function SidebarThreadBrowser({ search }: { search: string }) {
   const ungrouped = useLayout((s) => s.ungroupByProjects);
+  const saved = useLayout((s) => s.collapsed);
+  const ids = threadFoldIds(saved);
+  const reads = useRpcs(
+    "threads.get",
+    ids.map((id) => ({ id })),
+  );
+  const missingKey = JSON.stringify(ids.filter((_, index) => reads[index]?.data === null));
+  useEffect(() => {
+    useLayout.getState().pruneThreadFolds(new Set(JSON.parse(missingKey) as string[]));
+  }, [missingKey]);
   return ungrouped ? <FlatThreadBrowser search={search} /> : <GroupedThreadBrowser search={search} />;
 }
 
 function GroupedThreadBrowser({ search }: { search: string }) {
   const { visible, activeId, loadMore, projects, allHidden, orc, pinnedOnly } = useThreadGroups(search);
   const shown = orc ? orcGroups(visible) : visible;
-  const row = (thread: ThreadSummary) => <ThreadRow key={thread.id} thread={thread} active={activeId === thread.id} />;
   return (
     <section className="conversation-browser" aria-label="Thread browser">
       <div className="browser-threads">
@@ -139,10 +187,10 @@ function GroupedThreadBrowser({ search }: { search: string }) {
           <SidebarProjectGroup key={group.id} id={group.id} name={group.name} rootPath={group.rootPath} meta={projectMeta(group.list, { loaded: group.query.isSuccess, more: group.hasMore })}>
             {group.pinned.length > 0 ? (
               <Section fold="pinned" projectId={group.id} label="Pinned" count={group.pinned.length}>
-                {group.pinned.map(row)}
+                <ThreadTreeList search={search} roots={group.pinned} all={group.list} activeId={activeId} />
               </Section>
             ) : null}
-            {group.rest.map(row)}
+            <ThreadTreeList search={search} roots={group.rest} all={group.list} activeId={activeId} />
             {group.query.isPending ? <p className="browser-empty">Loading threads…</p> : null}
             {group.query.isError ? (
               <button className="browser-empty" onClick={() => void group.query.refetch()}>
@@ -157,7 +205,7 @@ function GroupedThreadBrowser({ search }: { search: string }) {
             ) : null}
             {group.snoozed.length > 0 ? (
               <Section fold="snoozed" projectId={group.id} label="Snoozed" count={group.snoozed.length}>
-                {group.snoozed.map(row)}
+                <ThreadTreeList search={search} roots={group.snoozed} all={group.list} activeId={activeId} />
               </Section>
             ) : null}
           </SidebarProjectGroup>
@@ -191,14 +239,19 @@ function useFlatThreadPages(search: string) {
   const active = useRpc("threads.get", { id: activeId ?? "" }, { enabled: Boolean(activeId) });
   const queries = useRpcs(
     "threads.list",
-    view === "orc" ? projectIds.map((id) => threadListParams(id, chosen)) : [{ projectIds, filter: listedThreads(chosen), orderBy: "activity", pinnedOnly, limit: limit + 1 }],
+    view === "orc" ? projectIds.map((id) => threadListParams(id, chosen)) : [{ projectIds, filter: listedThreads(chosen), orderBy: "activity", pinnedOnly, limit: limit + 1, includeChildren: true }],
     { enabled: Boolean(projects.data), refetchInterval: 60_000 },
+  );
+  const family = useSelectedFamily(
+    active.data,
+    chosen,
+    queries.map((query) => query.data),
   );
   const selected = active.data && projectIds.includes(active.data.projectId) && (!pinnedOnly || active.data.pinnedAt) ? active.data : null;
   const pages = queries.map((query, index) =>
     sidebarThreadPage({
       projectId: view === "orc" ? projectIds[index]! : (selected?.projectId ?? WORKSPACE_ID),
-      fetched: query.data,
+      fetched: withFamily(query.data, family, view === "orc" ? [projectIds[index]!] : projectIds),
       selected,
       filter: view,
       limit: view === "orc" ? THREAD_PAGE : limit,
@@ -236,22 +289,25 @@ function FlatThreadBrowser({ search }: { search: string }) {
   projectNames.set(WORKSPACE_ID, "Workspace");
   const hasMore = pages.some((page) => page.hasMore);
   const matches = (thread: ThreadSummary) => thread.title.toLowerCase().includes(search.toLowerCase());
-  const latestFirst = (a: ThreadSummary, b: ThreadSummary) => b.lastActivityAt - a.lastActivityAt || b.id.localeCompare(a.id);
+  const all = pages.flatMap((page) => page.list);
+  const keep = (thread: ThreadSummary) => threadTreeMatches(thread, all, matches);
+  const latestFirst = (a: ThreadSummary, b: ThreadSummary) => threadTreeActivity(b, all) - threadTreeActivity(a, all) || b.id.localeCompare(a.id);
   const rows = pages
     .flatMap((page) => [...page.pinned, ...(pinnedOnly ? [] : page.rest)])
-    .filter(matches)
+    .filter(keep)
     .sort(latestFirst);
   const snoozed = pinnedOnly
     ? []
     : pages
         .flatMap((page) => page.snoozed)
-        .filter(matches)
+        .filter(keep)
         .sort(latestFirst);
-  const order = visibleSidebarThreadIds([{ id: UNGROUPED_LIST, pinned: [], rest: rows, snoozed }], collapsed, UNGROUPED_LIST);
+  const reveal = all.filter((thread) => thread.id === activeId || (search && matches(thread))).map((thread) => thread.id);
+  const order = visibleSidebarThreadIds([{ id: UNGROUPED_LIST, list: all, pinned: [], rest: rows, snoozed }], threadSearchFolds(collapsed, all, search), UNGROUPED_LIST, reveal);
+  const conversationIds = all.filter((thread) => !isSubagentThread(thread)).map((thread) => thread.id);
   useEffect(() => {
-    useUi.getState().setThreadOrder(order);
-  }, [order]);
-  const row = (thread: ThreadSummary) => <ThreadRow key={thread.id} thread={thread} active={activeId === thread.id} projectName={projectNames.get(thread.projectId)} />;
+    useUi.getState().setThreadOrder(order, conversationIds);
+  }, [order, conversationIds]);
   return (
     <section className="conversation-browser" aria-label="Thread browser">
       <div className="browser-threads">
@@ -260,7 +316,9 @@ function FlatThreadBrowser({ search }: { search: string }) {
             Couldn’t load projects. Retry
           </button>
         ) : null}
-        <div className="sidebar-thread-list">{rows.map(row)}</div>
+        <div className="sidebar-thread-list">
+          <ThreadTreeList search={search} roots={rows} all={all} activeId={activeId} projectNames={projectNames} />
+        </div>
         <FlatThreadFeedback state={state} shown={rows.length} snoozed={snoozed.length} search={search} />
         {hasMore && view !== "orc" ? (
           <button className="browser-load-more" onClick={loadMore}>
@@ -269,7 +327,7 @@ function FlatThreadBrowser({ search }: { search: string }) {
         ) : null}
         {snoozed.length ? (
           <Section fold="snoozed" projectId={UNGROUPED_LIST} label="Snoozed" count={snoozed.length}>
-            {snoozed.map(row)}
+            <ThreadTreeList search={search} roots={snoozed} all={all} activeId={activeId} projectNames={projectNames} />
           </Section>
         ) : null}
       </div>

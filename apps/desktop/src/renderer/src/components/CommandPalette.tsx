@@ -39,7 +39,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
   const mode = useUi((s) => s.paletteMode);
   const [query, setQuery] = useState("");
   const tasks = useRpc("tasks.list", {}, { enabled: open && mode === "all" });
-  const threads = useRpc("threads.list", { limit: 40 }, { enabled: open && mode === "all" });
+  const threads = useRpc("threads.list", { limit: 40, excludeSubagents: true }, { enabled: open && mode === "all" });
   const projects = useRpc("projects.list", {}, { enabled: open && mode === "all" });
   // Messages match by prefix from two characters on, across every thread's conversation.
   const hits = useRpc("threads.search", { query, limit: 20 }, { enabled: open && query.trim().length >= 2, staleTime: 5_000 });

@@ -1,7 +1,7 @@
 import { harnessShortName, isHarnessId, type ThreadSummary } from "@openorc/protocol";
 import { ContextMenu } from "@base-ui/react/context-menu";
 import type { ReactNode } from "react";
-import { Folder, GitBranch, GitPullRequest } from "./icons";
+import { CircleCheck, CircleDashed, Folder, GitBranch, GitPullRequest, X } from "./icons";
 import { HarnessLogo } from "./HarnessLogo";
 import { ThreadStatusIndicator } from "./ThreadStatusIndicator";
 import { ThreadRowHeadline } from "./ThreadHeadline";
@@ -12,7 +12,7 @@ import { useRouter } from "../lib/router";
 import { startThreadDrag, endThreadDrag } from "../lib/thread-drag";
 import { CoversPreview } from "../lib/browser-preview";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
-import { pullRequestMark, relativeTime, threadPlace, type ThreadPlace } from "@openorc/client";
+import { pullRequestMark, relativeTime, threadPlace, useTicking, workDuration, subagentStatusLabel, type ThreadPlace } from "@openorc/client";
 import { orclingById, useOrclings } from "../lib/orclings";
 import { OrclingAvatar } from "./OrclingAvatar";
 import { floatingGround } from "../lib/use-anchor-ground";
@@ -47,7 +47,7 @@ function PullRequestMark({ thread }: { thread: ThreadSummary }) {
  * A thread row: what the thread needs from you before its title, then the title. ⌘-click opens it in the split;
  * right-click gives every action.
  */
-export function ThreadRow({ thread, active, projectName }: { thread: ThreadSummary; active: boolean; projectName?: string }) {
+export function ThreadRow({ thread, active, projectName, compact = false }: { thread: ThreadSummary; active: boolean; projectName?: string; compact?: boolean }) {
   const navigate = useRouter((s) => s.navigate);
   const addPane = useRouter((s) => s.addThreadPane);
   // Every thread open in a pane is marked alike; aria-current names only the focused one.
@@ -77,7 +77,7 @@ export function ThreadRow({ thread, active, projectName }: { thread: ThreadSumma
             }}
             aria-current={active ? "page" : undefined}
             data-open={open || undefined}
-            className="sidebar-thread-row thread-preview no-drag"
+            className={`sidebar-thread-row thread-preview no-drag${compact ? " sidebar-thread-child" : ""}`}
             title={`${thread.title}\n${place.label} · ${agentLabel} · ${relativeTime(thread.lastActivityAt)}`}
           />
         }
@@ -89,11 +89,12 @@ export function ThreadRow({ thread, active, projectName }: { thread: ThreadSumma
         ) : null}
         <span className="thread-preview-heading">
           <span className="thread-preview-status">
-            <ThreadStatusIndicator thread={thread} idle={<PullRequestMark thread={thread} />} />
+            <SidebarThreadMark thread={thread} />
           </span>
           <span className="thread-preview-title">{thread.title}</span>
+          {compact && thread.subagent ? <SubagentRowMeta thread={thread} /> : null}
         </span>
-        <ThreadRowHeadline thread={thread} />
+        {!compact ? <ThreadRowHeadline thread={thread} /> : null}
         <span className="thread-preview-meta flex min-w-0 items-center gap-2 text-xs leading-4 text-ink-3">
           <span className="flex flex-1 min-w-0 items-center gap-1" title={title}>
             {placeIcons[place.kind]}
@@ -131,5 +132,34 @@ export function ThreadRow({ thread, active, projectName }: { thread: ThreadSumma
         </ContextMenu.Positioner>
       </ContextMenu.Portal>
     </ContextMenu.Root>
+  );
+}
+
+function SubagentRowMeta({ thread }: { thread: ThreadSummary }) {
+  const child = thread.subagent;
+  const now = useTicking(child?.status === "running");
+  return child ? (
+    <span className="sidebar-child-meta">
+      {child.agentType ? <span>{child.agentType}</span> : null}
+      {child.status === "running" ? <span className="tabular">{workDuration(now - child.startedAt)}</span> : null}
+    </span>
+  ) : null;
+}
+
+function SidebarThreadMark({ thread }: { thread: ThreadSummary }) {
+  let Icon = X;
+  if (thread.subagent?.status === "completed") Icon = CircleCheck;
+  if (thread.subagent?.status === "no_updates") Icon = CircleDashed;
+  return thread.subagent && thread.activity === "idle" ? (
+    <span
+      role="img"
+      aria-label={subagentStatusLabel[thread.subagent.status]}
+      title={subagentStatusLabel[thread.subagent.status]}
+      className={thread.subagent.status === "failed" ? "text-bad" : undefined}
+    >
+      <Icon size={13} />
+    </span>
+  ) : (
+    <ThreadStatusIndicator thread={thread} idle={<PullRequestMark thread={thread} />} />
   );
 }

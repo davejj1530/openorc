@@ -1,7 +1,7 @@
 import { cloudOffered } from "../lib/cloud-offered";
 import { threadForkLabel, threadMoveLabel, threadDeletionDescription, threadDeleteBlockedReason, deleteButtonLabel } from "../lib/team-action-presentation";
 import { canMoveToCloud, snoozePresets } from "@openorc/client";
-import { WORKSPACE_ID } from "@openorc/protocol";
+import { WORKSPACE_ID, isSubagentThread } from "@openorc/protocol";
 import { useRef, useState } from "react";
 import { Menu } from "@base-ui/react/menu";
 import type { ThreadSummary } from "@openorc/protocol";
@@ -30,6 +30,27 @@ export type MenuParts = Pick<typeof Menu, "Item" | "Separator" | "SubmenuRoot" |
 /** Every action a thread has, as menu items. The same list serves the header menu and the sidebar's context menu. */
 export function ThreadMenuItems({ thread, parts: M }: { thread: ThreadSummary; parts: MenuParts }) {
   const home = orclingHome(useOrclings(), thread.id);
+  if (isSubagentThread(thread))
+    return (
+      <>
+        <M.Item className={menuItem} onClick={() => useRouter.getState().addThreadPane(thread.id)}>
+          <Columns2 size={13} /> Open beside
+        </M.Item>
+        <M.Item className={menuItem} onClick={() => window.openorc.openWindow(`thread:${thread.id}`)}>
+          <AppWindow size={13} /> Open in new window
+        </M.Item>
+        {thread.parentThreadId ? (
+          <M.Item className={menuItem} onClick={() => openThread(thread.parentThreadId!)}>
+            Open parent
+          </M.Item>
+        ) : null}
+        {thread.subagent?.status !== "running" && thread.activity === "idle" ? (
+          <M.Item className={menuItemDanger} onClick={() => useUi.getState().setDeleteThread(thread.id)}>
+            <Trash2 size={13} /> Delete thread
+          </M.Item>
+        ) : null}
+      </>
+    );
   // An Orcling's own conversation lives and goes with the Orcling, which you change in its designer.
   if (home) {
     return (
@@ -280,7 +301,7 @@ function DeleteThreadContent({ id, close }: { id: string; close: () => void }) {
   const recovery = runtime.data?.actions?.deleteRecovery;
   const pending = recovery ?? saved.request;
   const tasks = thread.data?.taskCount ?? 0;
-  const copy = threadDeletionDescription({ team, tasks });
+  const copy = threadDeletionDescription({ team, tasks, subagent: isSubagentThread(thread.data) });
   const blocked = threadDeleteBlockedReason({ loading: thread.isPending, exists: Boolean(thread.data), teamLoading: team && runtime.isPending, savedError: team && !recovery ? saved.error : null });
   // A team delete carries one durable key: a lost reply is retried with the
   // same key, a rejection is final, and only a definite outcome clears it.

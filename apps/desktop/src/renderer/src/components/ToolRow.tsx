@@ -5,6 +5,7 @@ import { type Block, visualizationFromTool, liveVerb, stateLabel, toolCallPresen
 import { ChevronRight, CircleCheck, Loader2, Terminal, X } from "./icons";
 import { toolIcons } from "./tool-icons";
 import { ToolDetail } from "./ToolDetail";
+import { SubagentCards } from "./SubagentCards";
 
 const McpAppResult = lazy(() => import("./McpAppResult"));
 const VisualizationResult = lazy(() => import("./VisualizationResult"));
@@ -47,6 +48,7 @@ function toolState(block: ToolBlock): string {
 
 /** A tool call: a command as its own card, anything else as one quiet row. Click either for the call itself. */
 export function ToolRow({ block, defaultOpen = false }: { block: ToolBlock; defaultOpen?: boolean }) {
+  if (block.subagent) return <SubagentCards blocks={[block]} />;
   const visualization = visualizationFromTool(block);
   const presentation = toolCallPresentation(block.name, block.input);
   if (presentation.verb === "Ran" && !visualization) return <CommandCard block={block} command={presentation.object} defaultOpen={defaultOpen} />;

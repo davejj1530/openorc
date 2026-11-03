@@ -39,6 +39,15 @@ const thought: Block = { id: "think", kind: "thinking", text: "Available reasoni
 const reply: Block = { id: "reply", kind: "message", role: "assistant", text: "The final answer.", streaming: false };
 const end: Block = { id: "end", kind: "status", boundary: "turn", durationMs: 222000, outcome: "success", text: "turn finished", tone: "ok" };
 
+it("shows a quiet child Stop notice outside collapsed work", () => {
+  const notice: Block = { id: "stopped-child", kind: "status", tone: "muted", notice: true, text: "Stopped Checker" };
+  render(<WorkTranscript runId="run" blocks={[{ ...tool, done: true }, notice, reply, end]} />);
+  const line = screen.getByText("Stopped Checker");
+  expect(line.className).toContain("text-ink-4");
+  expect(line.closest(".journal-prompt")).toBeNull();
+  expect(receipt().getAttribute("aria-expanded")).toBe("false");
+});
+
 it("shows a lone startup status once without a duplicate disclosure", () => {
   const startup: Block = { id: "startup", kind: "activity", label: "Starting OpenCode", status: "success", text: "" };
   render(<WorkTranscript runId="run" blocks={[startup, { ...end, durationMs: 0, outcome: "error" }]} />);
@@ -425,4 +434,33 @@ it("opens the folded work that holds a message asked for, with its whole narrati
   expect(screen.getByText(/tracing how the cursor is built/)).toBeTruthy();
   expect(animate.mock.contexts).toEqual([found]);
   delete (HTMLElement.prototype as { animate?: unknown }).animate;
+});
+
+it("counts work steps without counting the separately displayed child cards again", () => {
+  const child = (id: string): Block => ({
+    id,
+    kind: "tool",
+    name: "Agent",
+    input: {},
+    done: true,
+    subagent: { nativeId: id, threadId: id, title: id, status: "completed", startedAt: 1, endedAt: 2 },
+  });
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <WorkTranscript
+        runId="run"
+        blocks={[
+          { ...tool, done: true },
+          { ...thought, text: "**Tracing the callers**\n\nReading the graph." },
+          { id: "mcp", kind: "tool", name: "mcp__codegraph__explore", input: {}, done: true },
+          child("a"),
+          child("b"),
+          reply,
+          end,
+        ]}
+      />
+    </QueryClientProvider>,
+  );
+  expect(receipt().textContent).toContain("2 steps");
+  expect(receipt().textContent).not.toContain("4 steps");
 });

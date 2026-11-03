@@ -18,6 +18,7 @@
 @import "./styles/motion.css";
 @import "./styles/destinations.css";
 @import "./styles/conversation.css";
+@import "./styles/subagents.css";
 @import "./styles/composer.css";
 @import "./styles/new-thread.css";
 @import "./components/MessageQueue.css";

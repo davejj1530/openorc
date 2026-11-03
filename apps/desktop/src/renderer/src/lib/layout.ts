@@ -1,8 +1,9 @@
 import { create } from "zustand";
+import { withFileScope } from "./file-scope";
 import { WORKSPACE_ID } from "@openorc/protocol";
 import type { RpcParams } from "@openorc/protocol";
 import type { FileReference } from "../../../shared/file-reference";
-import { toggleSidebarFold, type PanelTool, type SidebarFilter } from "@openorc/client";
+import { pruneThreadFolds, toggleSidebarFold, toggleThreadTree, type PanelTool, type SidebarFilter } from "@openorc/client";
 
 /** The shared panel tools, and the desktop's own Device panel. */
 export type PanelTab = PanelTool | "device";
@@ -52,6 +53,8 @@ interface LayoutState {
   hiddenProjects: string[];
   /** Sidebar sections the user folded: namespaced project/pinned keys, plus opt-in snoozed-open keys. */
   collapsed: string[];
+  revealThreads: (ancestors: readonly string[]) => void;
+  pruneThreadFolds: (missing: ReadonlySet<string>) => void;
   /**
    * Where each surface's preview was last pointed, keyed the way the panel
    * keys its panes. A dev server's port belongs to the project, not to us, so
@@ -75,6 +78,7 @@ interface LayoutState {
   setProjectsShown: (ids: readonly string[], shown: boolean) => void;
   showOnlyProject: (id: string, listedIds: readonly string[]) => void;
   toggleCollapsed: (key: string) => void;
+  toggleThreadChildren: (id: string, expanded: boolean) => void;
   rememberPreviewUrl: (key: string, url: string) => void;
   setPanelExpanded: (expanded: boolean) => void;
 }
@@ -141,6 +145,19 @@ function withOnlyProject(hidden: readonly string[], id: string, listedIds: reado
   return [...others, ...listedIds.filter((listed) => listed !== id)];
 }
 
+function threadFoldActions(get: () => LayoutState, commit: (patch: Partial<LayoutState>) => void): Pick<LayoutState, "revealThreads" | "pruneThreadFolds"> {
+  const save = (collapsed: string[]) => {
+    if (collapsed.length !== get().collapsed.length) commit({ collapsed });
+  };
+  return {
+    revealThreads: (ancestors) => {
+      const closed = new Set(ancestors.map((id) => `thread-closed:${id}`));
+      save(get().collapsed.filter((key) => !closed.has(key)));
+    },
+    pruneThreadFolds: (missing) => save(pruneThreadFolds(get().collapsed, missing)),
+  };
+}
+
 /** The three-column frame: sidebar, main, and an optional panel. Sizes persist across launches. */
 export const useLayout = create<LayoutState>((set, get) => {
   const saved = read();
@@ -204,7 +221,9 @@ export const useLayout = create<LayoutState>((set, get) => {
       if (request?.requestId === requestId) set({ workspaceChanges: { ...request, commit: false } });
     },
     openFile: (selectedFile) =>
-      commit({ selectedFile, panelOpen: true, panelTab: "file", panelRequest: { tab: "file" }, ...(selectedFile.scope.kind === "thread" ? { panelThreadId: selectedFile.scope.id } : {}) }),
+      withFileScope(selectedFile.scope, () =>
+        commit({ selectedFile, panelOpen: true, panelTab: "file", panelRequest: { tab: "file" }, ...(selectedFile.scope.kind === "thread" ? { panelThreadId: selectedFile.scope.id } : {}) }),
+      ),
     openFiles: (threadId) => commit({ selectedFile: null, panelOpen: true, panelTab: "file", panelRequest: { tab: "file" }, ...(threadId ? { panelThreadId: threadId } : {}) }),
     setPanelWidth: (px) => commit({ panelWidth: clamp(px, limits.panel) }),
     setProject: (projectId) => commit({ projectId }),
@@ -224,6 +243,8 @@ export const useLayout = create<LayoutState>((set, get) => {
     setProjectsShown: (ids, shown) => commit({ hiddenProjects: withProjectsShown(get().hiddenProjects, ids, shown) }),
     showOnlyProject: (id, listedIds) => commit({ hiddenProjects: withOnlyProject(get().hiddenProjects, id, listedIds) }),
     toggleCollapsed: (key) => commit({ collapsed: toggleSidebarFold(get().collapsed, key) }),
+    toggleThreadChildren: (id, expanded) => commit({ collapsed: toggleThreadTree(get().collapsed, id, expanded) }),
+    ...threadFoldActions(get, commit),
     // Bounded because the key is a surface id and threads are unbounded; the
     // oldest entries are the ones whose thread the reader has stopped opening.
     rememberPreviewUrl: (key, url) => {

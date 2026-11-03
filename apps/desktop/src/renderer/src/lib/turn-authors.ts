@@ -1,4 +1,6 @@
-import { createContext, useContext, type ReactNode } from "react";
+import type { Run, ThreadSummary } from "@openorc/protocol";
+import { useRpc } from "./client";
+import { createContext, useContext, useMemo, type ReactNode } from "react";
 
 /** The agent a run spoke with and the display name of its model, for a turn's head. */
 export interface RunVoice {
@@ -31,4 +33,17 @@ export function useTurnAuthor(named: string | undefined, runId: string): string 
 export function useRunVoice(runId: string): RunVoice | undefined {
   const { runs, agent } = useContext(ConversationVoice);
   return runs?.get(runId) ?? agent;
+}
+
+/** Each run's agent and model for the turn heads, with the thread's own for messages saved without a run. */
+export function useRunVoices(voice: ConversationVoice, runs: readonly Run[], thread: ThreadSummary | null): ConversationVoice {
+  const models = useRpc("agents.models", {}, { staleTime: 5 * 60_000 });
+  return useMemo(() => {
+    const named = (agent: string, model: string | null) => ({ agent, model: model ? (models.data?.find((option) => option.agent === agent && option.id === model)?.label ?? model) : null });
+    return {
+      ...voice,
+      runs: new Map(runs.map((run) => [run.id, named(run.agent, run.model)])),
+      agent: thread ? named(thread.agent, thread.model) : undefined,
+    };
+  }, [voice, runs, thread, models.data]);
 }

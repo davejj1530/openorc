@@ -1,3 +1,4 @@
+import { withFileScope } from "./file-scope";
 import { useMemo } from "react";
 import type { ComposerChanges } from "../components/Composer";
 import { patchStat, publishView, teamGitActions, type GitActions, type PublishInput } from "@openorc/client";
@@ -39,8 +40,8 @@ export function useComposerChanges(source: ComposerSource | null): ComposerChang
     onRetry: () => {
       void diff.refetch();
     },
-    onReview: () => useLayout.getState().openWorkspaceChanges({ kind: source.kind, id: source.id }),
-    onCommit: () => useLayout.getState().openWorkspaceChanges({ kind: source.kind, id: source.id }, "commit"),
+    onReview: () => withFileScope(source, () => useLayout.getState().openWorkspaceChanges({ kind: source.kind, id: source.id })),
+    onCommit: () => withFileScope(source, () => useLayout.getState().openWorkspaceChanges({ kind: source.kind, id: source.id }, "commit")),
     commitDisabledReason,
   };
 }

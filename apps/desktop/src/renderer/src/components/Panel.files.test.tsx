@@ -96,6 +96,7 @@ beforeEach(() => {
   disk = fakeFileDisk();
   disk.set("src/cart.ts", "export const total = 1;\n");
   queryClient.clear();
+  queryClient.setQueryData(["threads.get", { id: thread.id }], thread);
   queryClient.setDefaultOptions({ queries: { retry: false } });
   useDrafts.setState({ keys: new Set(), ready: true, loaded: new Map(), failed: false });
   vi.stubGlobal("openorc", { browser: { setContext: vi.fn(), onReveal: () => () => {}, close: vi.fn(), navigate: vi.fn() } });

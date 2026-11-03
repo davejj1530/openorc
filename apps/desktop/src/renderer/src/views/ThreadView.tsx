@@ -1,3 +1,4 @@
+import { isSubagentThread } from "@openorc/protocol";
 import { ClaudeAccountScope } from "../lib/claude-account";
 import { useEffect, useRef, useState } from "react";
 import { Conversation } from "../components/Conversation";
@@ -54,7 +55,7 @@ export function ThreadView({ threadId, first, last, focused, onClose }: { thread
 
   return (
     <ClaudeAccountScope id={t.claudeAccountId ?? "claude-cli"}>
-      <RevealEmittedPlan key={threadId} threadId={threadId} focused={focused} team={Boolean(t.teamInstanceId)} />
+      {!isSubagentThread(t) ? <RevealEmittedPlan key={threadId} threadId={threadId} focused={focused} team={Boolean(t.teamInstanceId)} /> : null}
       <main className="workspace-main well flex-1 min-w-0 flex flex-col">
         <ThreadHeader
           thread={t}

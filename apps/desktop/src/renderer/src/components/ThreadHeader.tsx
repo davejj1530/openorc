@@ -1,5 +1,7 @@
 import { snoozeWakeLabel } from "@openorc/client";
 import type { CloudThreadState, Project, ThreadSummary as Thread } from "@openorc/protocol";
+import { isSubagentThread } from "@openorc/protocol";
+import { SubagentParent } from "./SubagentConversation";
 import { Menu } from "@base-ui/react/menu";
 import { AlarmClock, ArrowLeft, Cloud, GitFork, GitPullRequest, MoreHorizontal, X } from "./icons";
 import { ThreadClaudeAccount } from "./ThreadClaudeAccount";
@@ -88,26 +90,28 @@ export function ThreadHeader({
               <CoversPreview />
               <Menu.Positioner sideOffset={6} align="end" className="z-40" collisionPadding={8}>
                 <Menu.Popup ref={floatingGround} className={menuPopup} finalFocus={renaming ? false : undefined}>
-                  <Menu.Item className={menuItem} onClick={() => onRenamingChange(true)}>
-                    Rename
-                  </Menu.Item>
+                  {!isSubagentThread(t) ? (
+                    <Menu.Item className={menuItem} onClick={() => onRenamingChange(true)}>
+                      Rename
+                    </Menu.Item>
+                  ) : null}
                   <ThreadMenuItems thread={t} parts={Menu} />
                 </Menu.Popup>
               </Menu.Positioner>
             </Menu.Portal>
           </Menu.Root>
-          <ThreadTools threadId={t.id} />
+          {!isSubagentThread(t) ? <ThreadTools threadId={t.id} /> : null}
         </>
       }
     >
-      <ForkParent parent={t.forkedFromId} />
+      {isSubagentThread(t) ? <SubagentParent id={t.parentThreadId} /> : <ForkParent parent={t.forkedFromId} />}
       <ThreadOrcling threadId={t.id} orclingId={t.orclingId} />
-      <ThreadTitle title={t.title} editing={renaming} onEditingChange={onRenamingChange} onSave={onRename} />
+      {isSubagentThread(t) ? <span className="truncate text-sm">{t.title}</span> : <ThreadTitle title={t.title} editing={renaming} onEditingChange={onRenamingChange} onSave={onRename} />}
       <span className="thread-header-facts">
         <span className="thread-header-project" title={p.rootPath}>
           {p.name}
         </span>
-        {t.agent === "claude" ? <ThreadClaudeAccount thread={t} /> : null}
+        {t.agent === "claude" && !isSubagentThread(t) ? <ThreadClaudeAccount thread={t} /> : null}
         <ThreadFacts thread={t} />
       </span>
     </TopBar>

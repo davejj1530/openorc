@@ -10,6 +10,7 @@ export const client = createClientState(core, {
   invalidationBatchMs: 50,
   randomId: () => crypto.randomUUID(),
   savesDefaultPermission: true,
+  reportFrameError: (frame, error) => console.warn("[OpenOrc] Dropped incoming frame", { runId: frame.runId, seq: frame.seq, error: error instanceof Error ? error.name : "Error" }),
 });
 
 export const {

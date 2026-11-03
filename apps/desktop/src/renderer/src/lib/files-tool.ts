@@ -3,6 +3,7 @@ import { create } from "zustand";
 import type { FileScope, FindQuery } from "@openorc/protocol";
 import { useLayout } from "./layout";
 import { useRouter } from "./router";
+import { withFileScope } from "./file-scope";
 
 /** Browse the tree, find file names (Cmd+P), or search their contents (Cmd+Shift+F). */
 export type FilesMode = "tree" | "names" | "contents";
@@ -87,8 +88,11 @@ export function fileTarget(focusedThreadId: string | null): FileScope | null {
 export function openFilesTool(mode: FilesMode, focusedThreadId: string | null): boolean {
   const target = fileTarget(focusedThreadId);
   if (!target) return false;
-  updateTool(filesKey(target), { mode });
-  requestFilesFocus();
-  useLayout.getState().openFiles(focusedThreadId ?? undefined);
+  withFileScope(target, () => {
+    if (focusedThreadId && focusedThread() !== focusedThreadId) return;
+    updateTool(filesKey(target), { mode });
+    requestFilesFocus();
+    useLayout.getState().openFiles(focusedThreadId ?? undefined);
+  });
   return true;
 }

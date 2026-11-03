@@ -18,6 +18,7 @@ import {
   isImageView,
   isUnifiedDiff,
   useTurnModel,
+  subagentGroups,
 } from "@openorc/client";
 import { cn } from "../lib/cn";
 import type { FileSelection } from "../lib/layout";
@@ -29,6 +30,7 @@ import { TurnHead } from "./TurnHead";
 import { TurnReceipt } from "./TurnReceipt";
 import { useTurnAuthor } from "../lib/turn-authors";
 import { ToolRow } from "./ToolRow";
+import { SubagentCards } from "./SubagentCards";
 import { ApprovalCard, pretty } from "./ApprovalCard";
 export { AgentPresence } from "./AgentPresence";
 import { StartedThreadCard } from "./StartedThreadCard";
@@ -544,11 +546,19 @@ export function TranscriptContents({
   replyActions?: boolean;
 }) {
   const items: Item[] = useMemo(() => groupBlocks(blocks, taskCards, replyAction?.blockId, groupTools), [blocks, taskCards, replyAction?.blockId, groupTools]);
+  const agents = subagentGroups(blocks);
   const compact = (item: Item | undefined) => Boolean(item && (item.kind === "group" || isCompact(item.block)));
   return (
     <>
-      {items.map((item, i) =>
-        item.kind === "group" ? (
+      {items.map((item, i) => {
+        if (item.kind === "block" && item.block.kind === "tool" && item.block.subagent) {
+          return agents.has(item.block.id) ? (
+            <div key={item.block.id} className="transcript-block mt-3">
+              <SubagentCards blocks={agents.get(item.block.id)!} />
+            </div>
+          ) : null;
+        }
+        return item.kind === "group" ? (
           <div key={item.id} className={cn("transcript-block", compact(items[i - 1]) ? "mt-0" : "mt-3")}>
             <GroupRow id={item.id} blocks={item.blocks} runId={runId} taskCards={taskCards} />
             {trailing?.(item.blocks)}
@@ -567,8 +577,8 @@ export function TranscriptContents({
             {replyAction?.blockId === item.block.id ? replyAction.content : null}
             {trailing?.([item.block])}
           </div>
-        ),
-      )}
+        );
+      })}
     </>
   );
 }
@@ -623,7 +633,7 @@ const BlockView = memo(function BlockView({
 }) {
   switch (block.kind) {
     case "message":
-      if (block.role === "user") return <UserMessage text={block.text} at={block.at} attachments={block.attachments} onFork={onFork} />;
+      if (block.role === "user") return block.text || block.attachments?.length ? <UserMessage text={block.text} at={block.at} attachments={block.attachments} onFork={onFork} /> : null;
       if (block.role === "system")
         return (
           <div>
@@ -649,6 +659,7 @@ const BlockView = memo(function BlockView({
         <ApprovalCard block={block} runId={runId} />
       );
     case "status":
+      if (block.notice) return <div className="text-sm text-ink-4">{block.text}</div>;
       // "turn error" and "session error" restate the error card above them.
       return block.tone === "bad" && !/^(turn|session) /.test(block.text) ? <TranscriptErrorCard text={block.text} /> : null;
   }

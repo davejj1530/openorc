@@ -1,9 +1,10 @@
 import { CloudStart, queueAfterStart } from "./CloudStart";
 import { conversationWorkspaceMode, conversationLocation, conversationEmptyHint, conversationEmptyTitle, workspaceDestination } from "../lib/conversation-status-presentation";
-import { WORKSPACE_ID } from "@openorc/protocol";
+import { WORKSPACE_ID, isSubagentThread } from "@openorc/protocol";
+import { SubagentConversation } from "./SubagentConversation";
 import { TaskForwarding } from "./TaskForwarding";
 import { SessionRecovery } from "./SessionRecovery";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { defaultHarnessId, harnessShortName, type Project, type Run, type Task, type ThreadSummary, type WorkspaceMode } from "@openorc/protocol";
 import { GitBranch, Laptop } from "./icons";
 import { Composer, type SlashCommand } from "./Composer";
@@ -23,7 +24,7 @@ import { useSkillCommands } from "../lib/skill-commands";
 import { useTurnFooters } from "../lib/turn-footers";
 import { TeamConversation, TeamTaskConversation } from "./TeamConversation";
 import { useOrclingConversation } from "./useOrclingConversation";
-import { ConversationVoice } from "../lib/turn-authors";
+import { ConversationVoice, useRunVoices } from "../lib/turn-authors";
 
 export type ConversationScope = { kind: "task"; task: Task } | { kind: "thread"; thread: ThreadSummary };
 
@@ -33,10 +34,24 @@ export type ConversationScope = { kind: "task"; task: Task } | { kind: "thread";
  * queues while the agent is busy, and otherwise starts a run that resumes
  * the agent's last session. Thread drafts survive leaving the screen.
  */
-export function Conversation({ scope, project, toolbarTarget }: { scope: ConversationScope; project: Project; toolbarTarget?: HTMLElement | null }) {
-  const pinned = scope.kind === "thread" && Boolean(scope.thread.teamInstanceId);
-  const runtime = useRpc("orchestration.runtime", { threadId: scope.kind === "thread" ? scope.thread.id : "" }, { enabled: pinned });
-  if (scope.kind === "task" && scope.task.threadId) return <OwnedTaskConversation task={scope.task} project={project} />;
+type ConversationProps = { scope: ConversationScope; project: Project; toolbarTarget?: HTMLElement | null };
+
+export function Conversation({ scope, project, toolbarTarget }: ConversationProps) {
+  if (scope.kind === "task") {
+    if (scope.task.threadId) return <OwnedTaskConversation task={scope.task} project={project} />;
+    return (
+      <TaskForwarding task={scope.task}>
+        <IndividualConversation scope={scope} project={project} />
+      </TaskForwarding>
+    );
+  }
+  if (isSubagentThread(scope.thread)) return <SubagentConversation thread={scope.thread} project={project} />;
+  return <ThreadConversation scope={scope} project={project} toolbarTarget={toolbarTarget} />;
+}
+
+function ThreadConversation({ scope, project, toolbarTarget }: Omit<ConversationProps, "scope"> & { scope: Extract<ConversationScope, { kind: "thread" }> }) {
+  const pinned = Boolean(scope.thread.teamInstanceId);
+  const runtime = useRpc("orchestration.runtime", { threadId: scope.thread.id }, { enabled: pinned });
   if (pinned && (runtime.isPending || !runtime.data))
     return (
       <div className="p-6 text-sm text-ink-3">
@@ -48,7 +63,7 @@ export function Conversation({ scope, project, toolbarTarget }: { scope: Convers
         ) : null}
       </div>
     );
-  if (runtime.data && pinned && scope.kind === "thread")
+  if (runtime.data && pinned)
     return (
       <TeamConversation
         thread={scope.thread}
@@ -59,13 +74,7 @@ export function Conversation({ scope, project, toolbarTarget }: { scope: Convers
         toolbarTarget={toolbarTarget}
       />
     );
-  return scope.kind === "task" ? (
-    <TaskForwarding task={scope.task}>
-      <IndividualConversation scope={scope} project={project} />
-    </TaskForwarding>
-  ) : (
-    <IndividualConversation scope={scope} project={project} />
-  );
+  return <IndividualConversation scope={scope} project={project} />;
 }
 
 /** Check saved-task ownership before choosing its activity endpoint. A hidden
@@ -352,17 +361,4 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
       </div>
     </div>
   );
-}
-
-/** Each run's agent and model for the turn heads, with the thread's own for messages saved without a run. */
-function useRunVoices(voice: ConversationVoice, runs: readonly Run[], thread: ThreadSummary | null): ConversationVoice {
-  const models = useRpc("agents.models", {}, { staleTime: 5 * 60_000 });
-  return useMemo(() => {
-    const named = (agent: string, model: string | null) => ({ agent, model: model ? (models.data?.find((option) => option.agent === agent && option.id === model)?.label ?? model) : null });
-    return {
-      ...voice,
-      runs: new Map(runs.map((run) => [run.id, named(run.agent, run.model)])),
-      agent: thread ? named(thread.agent, thread.model) : undefined,
-    };
-  }, [voice, runs, thread, models.data]);
 }

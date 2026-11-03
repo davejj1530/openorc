@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { RpcMethod, RpcParams, RpcResults } from "@openorc/protocol";
+import { queryClient } from "../lib/client";
 import { fakeFileDisk } from "../fixtures/file-disk";
 import { useLayout } from "../lib/layout";
 import { core } from "../lib/rpc";
@@ -11,6 +12,7 @@ const scope = { kind: "thread", id: "thread" } as const;
 let disk: ReturnType<typeof fakeFileDisk>;
 
 beforeEach(() => {
+  queryClient.setQueryData(["threads.get", { id: "thread" }], { id: "thread", parentRelation: null });
   disk = fakeFileDisk();
   disk.set("src/cart.ts", "export const total = 1;\n");
   vi.spyOn(core, "call").mockImplementation(async <M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> => {
@@ -22,6 +24,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  queryClient.clear();
   vi.restoreAllMocks();
 });
 

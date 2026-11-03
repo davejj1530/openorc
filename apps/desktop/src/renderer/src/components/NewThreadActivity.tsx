@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import type { ThreadSummary } from "@openorc/protocol";
+import { useEffect, useState, type ReactNode } from "react";
+import { WORKSPACE_ID, isSubagentThread, type ThreadSummary } from "@openorc/protocol";
 import { arrivalGroups, arrivalRows, type ArrivalActivity, type ArrivalRow } from "./arrival-groups";
 import { agentQuiet, formatQuiet, QUIET_TICK_MS } from "./agent-quiet";
 import { LoaderCircle } from "./icons";
@@ -7,22 +7,27 @@ import { StatusDot } from "./ui";
 import { StatusIcon, statusLabel } from "./status";
 import { cn } from "../lib/cn";
 import { useLayout } from "../lib/layout";
-import { useRpc } from "../lib/client";
-import { relativeTime } from "@openorc/client";
+import { useRpc, useRpcs } from "../lib/client";
+import { relativeTime, threadListParams } from "@openorc/client";
 import { openThread, useRouter } from "../lib/router";
 
 /**
- * What is already happening, read from the two lists the shell keeps warm. The
- * method and params match the sidebar's and the rail's exactly, so react-query
- * serves this from their cache entries rather than opening a third poll.
+ * Recent conversations that accept messages, alongside task activity. Native children belong in their parent's tree.
  */
 export function useArrivalActivity(): ArrivalActivity {
   const projectId = useLayout((s) => s.projectId);
-  const threads = useRpc("threads.list", { ...(projectId ? { projectId } : {}), filter: "active", limit: 80 });
+  const projects = useRpc("projects.list", {}, { enabled: !projectId });
+  const scopes = projectId ? [projectId] : [WORKSPACE_ID, ...(projects.data ?? []).map((project) => project.id)];
+  const threads = useRpcs(
+    "threads.list",
+    scopes.map((id) => threadListParams(id, "active")),
+  );
   const tasks = useRpc("tasks.list", {});
-  const threadList = threads.data;
-  const taskList = tasks.data;
-  return useMemo(() => arrivalGroups(threadList ?? [], taskList ?? [], projectId), [threadList, taskList, projectId]);
+  return arrivalGroups(
+    threads.flatMap((query) => query.data ?? []).filter((thread) => !isSubagentThread(thread)),
+    tasks.data ?? [],
+    projectId,
+  );
 }
 
 /**

@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from "react";
+import { isSubagentThread } from "@openorc/protocol";
 import { useLayout } from "../lib/layout";
 import { useRpc } from "../lib/client";
 import { MAX_THREAD_PANES, useRouter } from "../lib/router";
@@ -18,7 +19,9 @@ function dropPreviewReason(id: string, visibleThreadIds: readonly string[]): str
 export function ThreadWorkspace() {
   const ids = useRouter((s) => s.threadIds);
   const route = useRouter((s) => s.route);
-  const owner = useLayout((s) => s.panelThreadId);
+  const requested = useLayout((s) => s.panelThreadId);
+  const ownerThread = useRpc("threads.get", { id: requested ?? "" }, { enabled: Boolean(requested) });
+  const owner = ownerThread.data && !isSubagentThread(ownerThread.data) ? requested : null;
   const [preview, setPreview] = useState<string | null>(null);
   const [dropError, setDropError] = useState<string | null>(null);
   const [weights, setWeights] = useState<Record<string, number>>({});
@@ -126,5 +129,5 @@ export function ThreadWorkspace() {
 function SharedThreadPanel({ threadId }: { threadId: string }) {
   const thread = useRpc("threads.get", { id: threadId });
   const project = useRpc("projects.get", { id: thread.data?.projectId ?? "" }, { enabled: Boolean(thread.data) });
-  return thread.data && project.data ? <Panel context={{ kind: "thread", thread: thread.data, project: project.data }} /> : null;
+  return thread.data && !isSubagentThread(thread.data) && project.data ? <Panel context={{ kind: "thread", thread: thread.data, project: project.data }} /> : null;
 }

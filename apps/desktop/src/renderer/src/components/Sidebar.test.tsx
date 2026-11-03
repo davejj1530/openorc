@@ -9,7 +9,7 @@ vi.hoisted(() => Object.assign(window, { openorc: { platform: "darwin" } }));
 const fixture: {
   projects: { id: string; name: string; rootPath: string }[];
   threads: (Pick<ThreadSummary, "id" | "title" | "projectId" | "agent" | "activity" | "unread" | "session" | "pinnedAt" | "snoozedUntil" | "lastActivityAt"> &
-    Partial<Pick<ThreadSummary, "createdAt" | "archivedAt">>)[];
+    Partial<Pick<ThreadSummary, "createdAt" | "archivedAt" | "parentThreadId" | "parentRelation" | "subagent">>)[];
 } = vi.hoisted(() => ({ projects: [], threads: [] }));
 
 vi.mock("../lib/client", async (original) => {
@@ -36,6 +36,7 @@ vi.mock("../lib/client", async (original) => {
 vi.mock("../lib/rpc", () => ({
   core: {
     call: vi.fn(async (method: string, params: RpcParams<"threads.list">) => {
+      if (method === "threads.get") return fixture.threads.find((thread) => thread.id === (params as { id?: string }).id) ?? null;
       if (method !== "threads.list") return [];
       const rows = fixture.threads.filter(
         (thread) =>
@@ -61,9 +62,21 @@ import { useRouter } from "../lib/router";
 import { useUi } from "../lib/ui";
 import { useWindow } from "../lib/window";
 import { Sidebar } from "./Sidebar";
+import { core } from "../lib/rpc";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 beforeEach(() => {
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  );
   fixture.projects = [];
   fixture.threads = [];
   localStorage.clear();
@@ -80,11 +93,79 @@ const mountSidebar = () =>
   );
 
 const folded = `project:${WORKSPACE_ID}`;
+it("marks missing subagent updates with a neutral dashed circle", async () => {
+  fixture.threads = [
+    {
+      id: "legacy-child",
+      title: "Legacy child",
+      projectId: WORKSPACE_ID,
+      agent: "opencode",
+      activity: "idle",
+      unread: false,
+      session: { status: "idle", message: null },
+      pinnedAt: null,
+      snoozedUntil: null,
+      lastActivityAt: 1,
+      parentThreadId: "parent",
+      parentRelation: "subagent",
+      subagent: { status: "no_updates", agentType: null, toolCallId: null, startedAt: 1, endedAt: 2, stoppable: false },
+    },
+  ];
+  fixture.threads.unshift({ ...fixture.threads[0]!, id: "parent", title: "Parent", parentThreadId: null, parentRelation: null, subagent: undefined });
+  useRouter.setState({ route: { view: "thread", threadId: "legacy-child" } });
+  mountSidebar();
+  const mark = await screen.findByRole("img", { name: "No updates" });
+  expect(mark.querySelector("circle[stroke-dasharray]")).not.toBeNull();
+  expect(mark.className).not.toContain("text-bad");
+});
+
 const open = (threadId: string) => {
   useLayout.setState({ collapsed: [folded], sidebarOpen: true });
   useRouter.setState({ route: { view: "thread", threadId } });
   mountSidebar();
 };
+
+it.each([false, true])("keeps the sidebar and keyboard order visible during a thread switch (ungrouped=%s)", async (ungroupByProjects) => {
+  fixture.threads = [
+    {
+      id: "one",
+      title: "First",
+      projectId: WORKSPACE_ID,
+      agent: "codex",
+      activity: "idle",
+      unread: false,
+      session: { status: "idle", message: null },
+      pinnedAt: null,
+      snoozedUntil: null,
+      lastActivityAt: 2,
+    },
+    {
+      id: "two",
+      title: "Second",
+      projectId: WORKSPACE_ID,
+      agent: "codex",
+      activity: "idle",
+      unread: false,
+      session: { status: "idle", message: null },
+      pinnedAt: null,
+      snoozedUntil: null,
+      lastActivityAt: 1,
+    },
+  ];
+  useLayout.setState({ ungroupByProjects });
+  mountSidebar();
+  await waitFor(() => expect(useUi.getState().threadOrder).toEqual(["one", "two"]));
+  const implementation = vi.mocked(core.call).getMockImplementation()!;
+  vi.mocked(core.call).mockImplementation(() => new Promise(() => {}));
+  try {
+    act(() => useRouter.setState({ route: { view: "thread", threadId: "two" } }));
+    expect(screen.queryByText("Loading threads…")).toBeNull();
+    expect(useUi.getState().threadOrder).toEqual(["one", "two"]);
+    expect(screen.getByText("First")).toBeTruthy();
+  } finally {
+    vi.mocked(core.call).mockImplementation(implementation);
+  }
+});
 
 it("shows the OpenOrc wordmark only while fullscreen and keeps the header controls available", () => {
   mountSidebar();
@@ -582,4 +663,14 @@ it("finds projects, focuses one with Only, and changes visibility in bulk", asyn
   const reopened = await editProjects();
   expect(within(reopened).getByRole<HTMLInputElement>("textbox", { name: "Find a project" }).value).toBe("");
   expect(within(reopened).getByRole<HTMLInputElement>("switch", { name: "Second project" }).checked).toBe(true);
+});
+
+it("prunes deleted thread folds while keeping live and project folds", async () => {
+  projectThreads();
+  const kept = fixture.threads[0]!.id;
+  useLayout.setState({ collapsed: ["thread-open:deleted", `thread-closed:${kept}`, "project:kept"] });
+  mountSidebar();
+  await waitFor(() => expect(useLayout.getState().collapsed).not.toContain("thread-open:deleted"));
+  expect(useLayout.getState().collapsed).toContain(`thread-closed:${kept}`);
+  expect(useLayout.getState().collapsed).toContain("project:kept");
 });

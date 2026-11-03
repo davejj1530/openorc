@@ -3,11 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import type { ConversationPlan } from "@openorc/protocol";
 
-const { mutate, planThreads, documents, teamThreads } = vi.hoisted(() => ({
+const { mutate, planThreads, documents, teamThreads, subagentThreads } = vi.hoisted(() => ({
   mutate: vi.fn(),
   planThreads: new Set<string>(),
   documents: new Map<string, ConversationPlan[]>(),
   teamThreads: new Set<string>(),
+  subagentThreads: new Set<string>(),
 }));
 vi.mock("../lib/client", async (original) => {
   const rpcData = (method: string, params: { id?: string }) => {
@@ -19,6 +20,9 @@ vi.mock("../lib/client", async (original) => {
         projectId: "project",
         teamInstanceId: teamThreads.has(params.id ?? "") ? "team" : null,
         activity: "idle",
+        agent: "claude",
+        parentRelation: subagentThreads.has(params.id ?? "") ? "subagent" : null,
+        parentThreadId: subagentThreads.has(params.id ?? "") ? "parent" : null,
         mode: planThreads.has(params.id ?? "") ? "plan" : "act",
         prUrl: `https://example.com/${params.id}`,
       };
@@ -31,7 +35,9 @@ vi.mock("../lib/client", async (original) => {
 vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onPush: () => () => {} } }));
 vi.mock("../lib/window", () => ({ useTrafficLights: () => true, useWindowsControls: () => false }));
 vi.mock("./Sidebar", () => ({ WindowNav: () => null }));
-vi.mock("./Panel", () => ({ Panel: () => null }));
+vi.mock("./Panel", () => ({ Panel: () => <div data-testid="shared-panel" /> }));
+vi.mock("./ThreadClaudeAccount", () => ({ ThreadClaudeAccount: () => <button>Claude account</button> }));
+vi.mock("./SubagentConversation", () => ({ SubagentConversation: () => null, SubagentParent: () => null }));
 // Keep real headers and controls; tooltip positioning is exercised in the Electron smoke.
 vi.mock("./ui", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./ui")>()),
@@ -60,6 +66,7 @@ beforeEach(() => {
   planThreads.clear();
   documents.clear();
   teamThreads.clear();
+  subagentThreads.clear();
   window.openorc = { ...window.openorc, openExternal: vi.fn() };
   vi.stubGlobal("CSS", { escape: (value: string) => value });
   useRouter.setState({ route: { view: "thread", threadId: "a" }, threadIds: ["a"], history: [], future: [] });
@@ -69,6 +76,15 @@ beforeEach(() => {
 const active = () => useRouter.getState().route;
 const expectActive = (id: string) => expect(active()).toEqual({ view: "thread", threadId: id });
 const focusA = () => act(() => useRouter.getState().focusThreadPane("a"));
+
+it("omits the account switcher and refuses a saved panel owner that is a subagent", () => {
+  subagentThreads.add("a");
+  useLayout.setState({ panelOpen: true, panelThreadId: "a", panelSide: "left", sidebarOpen: false });
+  const { container } = render(<ThreadWorkspace />);
+  expect(screen.queryByRole("button", { name: "Claude account" })).toBeNull();
+  expect(screen.queryByTestId("shared-panel")).toBeNull();
+  expect(container.querySelector('[data-thread-pane="a"] header')!.hasAttribute("data-window-navigation")).toBe(true);
+});
 
 const document = (id: string, source: ConversationPlan["source"] = "native"): ConversationPlan => ({
   id,
@@ -183,4 +199,12 @@ describe.each([{ ids: ["a", "b"] }, { ids: ["a", "b", "c"] }])("header focus bou
       expectActive("a");
     }
   });
+});
+
+it("never opens a subagent workspace panel when a new native plan arrives", () => {
+  subagentThreads.add("a");
+  const view = render(<ThreadWorkspace />);
+  documents.set("a", [{ ...document("child-plan"), threadId: "a" }]);
+  view.rerender(<ThreadWorkspace />);
+  expect(useLayout.getState().panelOpen).toBe(false);
 });

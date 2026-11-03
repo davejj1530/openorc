@@ -44,7 +44,8 @@ export function threadMoveLabel({ cancelling, pending, mode }: { cancelling: boo
   return mode === "worktree" ? "Move to the checkout" : "Move to a worktree";
 }
 
-export function threadDeletionDescription({ team, tasks }: { team: boolean; tasks: number }): string {
+export function threadDeletionDescription({ team, tasks, subagent }: { team: boolean; tasks: number; subagent?: boolean }): string {
+  if (subagent) return "This subagent’s saved conversation and nested subagents are removed. The parent conversation and shared files stay.";
   if (!team) return "The conversation is removed, and its worktree with it. Tasks it created stay, with their worktrees and branches.";
   if (tasks > 0)
     return `This conversation disappears from your lists. Its ${tasks} saved task${tasks === 1 ? " keeps" : "s keep"} the team, ${tasks === 1 ? "its" : "their"} activity, history and workspaces. Continue from ${tasks === 1 ? "the task’s" : "a task’s"} Activity tab.`;

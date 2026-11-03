@@ -1,10 +1,12 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { ThreadLink, ThreadMedia } from "./ThreadImages";
+import { queryClient } from "../lib/client";
 import { useLayout } from "../lib/layout";
 
 afterEach(() => {
   cleanup();
+  queryClient.clear();
   vi.unstubAllGlobals();
 });
 
@@ -20,6 +22,7 @@ it("hands web links directly to native navigation without a confirmation", () =>
 });
 
 it("still opens local source citations in the file panel", () => {
+  queryClient.setQueryData(["threads.get", { id: "a" }], { id: "a", parentRelation: null });
   const revealFile = vi.fn();
   vi.stubGlobal("openorc", { revealFile });
   render(

@@ -49,4 +49,9 @@ describe("team action presentation priority", () => {
       "This conversation disappears from your lists. Its 1 saved task keeps the team, its activity, history and workspaces. Continue from the task’s Activity tab.",
     );
   });
+  it("describes child history deletion without promising to delete its shared workspace", () => {
+    expect(threadDeletionDescription({ team: false, tasks: 0, subagent: true })).toBe(
+      "This subagent’s saved conversation and nested subagents are removed. The parent conversation and shared files stay.",
+    );
+  });
 });

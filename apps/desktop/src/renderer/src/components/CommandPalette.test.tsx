@@ -45,10 +45,11 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it("opens on ⌘K", () => {
+it("opens on ⌘K and asks for messageable conversations", async () => {
   render(<PaletteHost />);
   fireEvent.keyDown(screen.getByRole("textbox", { name: "Notes" }), { key: "k", metaKey: true });
   expect(screen.getByRole("combobox")).toBeTruthy();
+  await vi.waitFor(() => expect(core.call).toHaveBeenCalledWith("threads.list", { limit: 40, excludeSubagents: true }));
 });
 
 it("stays closed when what had focus already handled ⌘K, as an editor's link command does", () => {

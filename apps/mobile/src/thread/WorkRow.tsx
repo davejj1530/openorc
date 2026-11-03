@@ -328,7 +328,11 @@ function StepsCard({ entries, headline, live, runId }: { entries: WorkEntry[]; h
 export const WorkRow = memo(function WorkRow({ row }: { row: WorkRowProps }) {
   const phases = useRef(new Map<string, WorkPhase>());
   const entries = useMemo(() => keepPhases(workEntries(row.work), phases.current), [row.work]);
-  const receipt = useMemo(() => receiptItems(row.work, entries.length, row.live), [row.work, entries.length, row.live]);
+  const steps = useMemo(
+    () => workEntries(row.work.filter((block) => block.kind !== "tool" || !block.subagent)).length + row.work.filter((block) => block.kind === "tool" && block.subagent).length,
+    [row.work],
+  );
+  const receipt = useMemo(() => receiptItems(row.work, steps, row.live), [row.work, steps, row.live]);
   const [open, setOpen] = useOpen(`work:${row.turnId}`, row.live);
   // A press inside the open work records the reader's choice, so the card stays open when the turn ends.
   const keepOpen = useCallback(() => setOpen(true), [setOpen]);

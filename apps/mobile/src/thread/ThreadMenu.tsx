@@ -1,6 +1,11 @@
+import { canMoveToCloud } from "@openorc/client";
+import { isSubagentThread, type ThreadSummary } from "@openorc/protocol";
+import { useRpc } from "../client";
+import { useChangesCount } from "./use-changes-count";
+import { usePreviewPanel } from "./use-preview-panel";
 import { Link, Stack } from "expo-router";
-import type { ReactElement } from "react";
-import type { ThreadAction } from "./thread-actions";
+import { useMemo, type ReactElement } from "react";
+import { threadMenu, type ThreadAction } from "./thread-actions";
 
 type Run = (action: ThreadAction) => void;
 
@@ -63,4 +68,13 @@ export function headerMenu(sections: ThreadAction[][], run: Run): ReactElement {
       </Stack.Toolbar.Menu>
     </Stack.Toolbar>
   );
+}
+
+export function useThreadHeaderMenu(thread: ThreadSummary | null, now: Date, run: Run): ReactElement | null {
+  const actionable = isSubagentThread(thread) ? null : thread;
+  const uncommitted = useChangesCount(actionable);
+  const preview = usePreviewPanel(actionable);
+  const cloudOffer = useRpc("cloud.offer", {});
+  const toCloud = Boolean(cloudOffer.data?.offered && actionable && canMoveToCloud(actionable));
+  return useMemo(() => thread && headerMenu(threadMenu(thread, "header", now, { uncommitted, preview, toCloud }), run), [thread, run, now, uncommitted, preview, toCloud]);
 }

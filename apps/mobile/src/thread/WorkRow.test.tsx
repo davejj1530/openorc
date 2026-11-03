@@ -147,3 +147,20 @@ it("gives the work's receipt a 44 pt row of its own, the space around its line i
   const below = view.container.firstElementChild!.lastElementChild!;
   expect(String(nativeProps.get(below)!.className).split(" ")).toContain("pb-3.5");
 });
+
+it("counts the same two work steps when child cards are displayed separately", () => {
+  const row = workRow(
+    { type: "turn.started", turnId: "delegating" },
+    { type: "tool.started", toolCallId: "read", name: "read_file", input: { path: "source.ts" }, parentToolCallId: null },
+    { type: "tool.completed", toolCallId: "read", name: "read_file", output: "source", isError: false },
+    { type: "thinking.delta", messageId: "graph-thinking", text: "**Tracing the callers**\n\nReading the graph." },
+    { type: "tool.started", toolCallId: "graph", name: "mcp__codegraph__explore", input: {}, parentToolCallId: null },
+    { type: "tool.completed", toolCallId: "graph", name: "mcp__codegraph__explore", output: "callers", isError: false },
+    { type: "subagent.started", subagentId: "a", threadId: "a", title: "A" },
+    { type: "subagent.started", subagentId: "b", threadId: "b", title: "B" },
+    { type: "turn.completed", turnId: "delegating", status: "success", durationMs: 2000 },
+  );
+  render(<WorkRow row={row} />);
+  expect(screen.getByText("2 steps")).toBeTruthy();
+  expect(screen.queryByText("4 steps")).toBeNull();
+});

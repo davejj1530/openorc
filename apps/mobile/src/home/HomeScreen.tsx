@@ -30,7 +30,7 @@ function HomeRow({ item, home }: { item: HomeItem; home: Home }) {
     case "section":
       return <SectionToggle section={item} onToggle={() => home.toggle(item.key, item.projectId)} />;
     case "thread":
-      return <ThreadRow thread={item.thread} project={item.project} arriving={item.arriving} />;
+      return <ThreadRow thread={item.thread} project={item.project} arriving={item.arriving} tree={item.tree} onToggle={() => home.toggleThread(item.thread.id, item.tree.expanded)} />;
     case "more":
       return <ShowMore project={item.project} onPress={() => home.showMore(item.projectId)} />;
     case "retry":

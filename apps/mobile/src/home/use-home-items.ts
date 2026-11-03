@@ -1,10 +1,10 @@
-import { listedThreads, sidebarFoldKey, sidebarSectionOpen, THREAD_PAGE, threadListParams, type SidebarFilter } from "@openorc/client";
+import { listedThreads, sidebarFoldKey, sidebarSectionOpen, THREAD_PAGE, threadFoldIds, threadListParams, type SidebarFilter } from "@openorc/client";
 import type { InboxList, ThreadSummary } from "@openorc/protocol";
 import { useEffect, useState } from "react";
 import { queryClient, useRpc, useRpcs } from "../client";
 import { projectChoices } from "../projects";
 import { useHomeFilter } from "./filter";
-import { toggleFold, useFolds } from "./folds";
+import { pruneMissingFolds, toggleFold, toggleThreadChildren, useFolds } from "./folds";
 import { homeItems, type ProjectThreads } from "./home-items";
 
 const listParams = (projectId: string, filter: SidebarFilter, limit: number) => threadListParams(projectId, filter, limit);
@@ -57,6 +57,16 @@ export function useHomeItems(connected: boolean) {
   const [limits, setLimits] = useState<Record<string, number>>({});
   const limitKey = (projectId: string) => `${listedThreads(filter)}:${projectId}`;
   const collapsed = useFolds();
+  const foldedIds = threadFoldIds(collapsed);
+  const folded = useRpcs(
+    "threads.get",
+    foldedIds.map((id) => ({ id })),
+    { enabled: connected },
+  );
+  const missingKey = JSON.stringify(foldedIds.filter((_, index) => folded[index]?.data === null));
+  useEffect(() => {
+    if (connected) pruneMissingFolds(new Set(JSON.parse(missingKey) as string[]));
+  }, [connected, missingKey]);
   const [opened, setOpened] = useOpening();
   const groups = projectChoices(projects.data).map(({ id, name }) => ({ id, name, limit: limits[limitKey(id)] ?? THREAD_PAGE }));
   const lists = useRpcs(
@@ -71,6 +81,7 @@ export function useHomeItems(connected: boolean) {
   return {
     items: homeItems(shown, { now: Date.now(), filter, pinnedOnly, collapsed, waiting, projectsFailed: connected && projects.isError, opened }),
     showMore: (projectId: string) => setLimits((current) => ({ ...current, [limitKey(projectId)]: (current[limitKey(projectId)] ?? THREAD_PAGE) + THREAD_PAGE })),
+    toggleThread: toggleThreadChildren,
     /** Folds or opens a section; a project the reader opens rises its rows in. */
     toggle: (key: string, projectId: string) => {
       if (key === sidebarFoldKey.project(projectId) && !sidebarSectionOpen(collapsed, "project", projectId)) setOpened(projectId);

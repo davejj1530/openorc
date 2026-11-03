@@ -23,6 +23,7 @@ import { VisualizationRow } from "./VisualizationRow";
 import { FrameWindowContext, useFramePlacement } from "./visualization-window";
 import type { WaitingApproval } from "./waiting-approvals";
 import { WorkRow } from "./WorkRow";
+import { SubagentCards } from "./SubagentCards";
 
 /** What a scroll event says about where the reader is. */
 type ScrollPosition = { contentOffset: { y: number }; layoutMeasurement: { height: number }; contentSize: { height: number }; contentInset?: { bottom?: number } };
@@ -46,6 +47,8 @@ function RowView({ row }: { row: Row }): ReactElement | null {
       return <Reply text={row.text} streaming={row.streaming} source={row.source} />;
     case "card":
       return <Card block={row.block} runId={row.runId} />;
+    case "subagents":
+      return <SubagentCards blocks={row.blocks} />;
     case "visualization":
       return <VisualizationRow row={row} />;
     case "actions":

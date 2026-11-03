@@ -140,3 +140,35 @@ describe("homeItems", () => {
     expect(orc).toHaveLength(1 + THREAD_PAGE);
   });
 });
+
+it("nests children and a grandchild in place, preserving continuation lanes and manual folds", () => {
+  const parent = { ...fixtureThreads[0]!, id: "parent", parentThreadId: null };
+  const child: ThreadSummary = { ...parent, id: "child", parentThreadId: parent.id, parentRelation: "subagent", createdAt: 1 };
+  const grandchild: ThreadSummary = { ...child, id: "grandchild", parentThreadId: child.id, activity: "running" };
+  const sibling = { ...child, id: "sibling", createdAt: 2 };
+  const listed = groups([sibling, grandchild, parent, child], []);
+  const rows = homeItems(listed, options()).filter((item) => item.kind === "thread");
+  expect(rows.map((item) => [item.thread.id, item.tree.depth])).toEqual([
+    ["parent", 0],
+    ["child", 1],
+    ["grandchild", 2],
+    ["sibling", 1],
+  ]);
+  expect(rows[2]!.tree.continuing).toEqual([1]);
+  expect(rows[1]!.tree.last).toBe(false);
+  expect(rows[3]!.tree.last).toBe(true);
+  expect(
+    homeItems(listed, options({ collapsed: ["thread-closed:parent"] }))
+      .filter((item) => item.kind === "thread")
+      .map((item) => item.thread.id),
+  ).toEqual(["parent"]);
+  const finished = groups([parent, child, sibling, { ...grandchild, activity: "idle" }], []);
+  expect(homeItems(finished, options()).filter((item) => item.kind === "thread")).toHaveLength(1);
+});
+
+it("lists the waiting child itself in Needs you even when its parent and project are folded", () => {
+  const parent = { ...fixtureThreads[0]!, id: "parent", parentThreadId: null };
+  const child: ThreadSummary = { ...parent, id: "child", parentThreadId: parent.id, parentRelation: "started", activity: "waiting" };
+  const listed = homeItems(groups([], []), options({ waiting: [child, parent], collapsed: [`project:${WORKSPACE_ID}`, "thread-closed:parent"] }));
+  expect(listed.filter((item) => item.kind === "thread").map((item) => [item.thread.id, item.tree.depth])).toEqual([["child", 0]]);
+});

@@ -393,7 +393,7 @@ export const Card = memo(function Card({ block, runId }: { block: Block; runId: 
     case "message":
       return <ErrorCard text={block.text} />;
     case "status":
-      return <ErrorCard text={block.text} />;
+      return block.notice ? <Text className="text-sm text-ink-4">{block.text}</Text> : <ErrorCard text={block.text} />;
     case "activity":
       return isImageGeneration(block) ? <ImageGeneration block={block} runId={runId} /> : <ActivityRow block={block} runId={runId} />;
     case "tool":

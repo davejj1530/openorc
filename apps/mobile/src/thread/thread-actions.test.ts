@@ -89,3 +89,15 @@ describe("a thread's menu on the phone", () => {
     expect(archive![0]).toMatchObject({ patch: { archived: true } });
   });
 });
+
+it("offers only parent navigation for a hosted child even when Git, cloud, and preview exist", () => {
+  const child = { ...thread("t-settings"), parentThreadId: "parent", parentRelation: "subagent" as const };
+  for (const place of ["row", "header"] as const) {
+    expect(outline(threadMenu(child, place, wednesday, { uncommitted: 3, preview: { page: "Docs" }, toCloud: true }))).toEqual([["Open parent"]]);
+  }
+  expect(
+    threadMenu({ ...child, parentRelation: "started" }, "header", wednesday)
+      .flat()
+      .some((item) => item.kind === "rename"),
+  ).toBe(true);
+});

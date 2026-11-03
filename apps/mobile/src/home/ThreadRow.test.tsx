@@ -7,6 +7,7 @@ import { fixtureThreads } from "./test-fixtures/threads";
 import { ThreadRow } from "./ThreadRow";
 
 const menus = vi.hoisted(() => ({ built: [] as ThreadAction[][][] }));
+vi.mock("../generated/icons", async (original) => ({ ...(await original<object>()), CircleDashed: () => <svg aria-label="Neutral status mark" /> }));
 
 vi.mock("expo-router", () => {
   const Link = ({ children }: { children: ReactNode }) => <>{children}</>;
@@ -41,4 +42,10 @@ it("rebuilds a row's menu on the shared snooze clock, so it stops offering This 
   expect(snoozeLabels(menus.built.at(-1))).toContain("This evening");
   act(() => void vi.advanceTimersByTime(50 * 60_000));
   expect(snoozeLabels(menus.built.at(-1))).not.toContain("This evening");
+});
+
+it("marks missing subagent updates with a neutral dashed circle", () => {
+  const thread = { ...fixtureThreads[0]!, subagent: { status: "no_updates" as const, agentType: null, toolCallId: null, startedAt: 1, endedAt: 2, stoppable: false } };
+  const view = render(<ThreadRow thread={thread} project="openorc" arriving={false} />);
+  expect(view.getByLabelText("No updates").contains(view.getByLabelText("Neutral status mark"))).toBe(true);
 });

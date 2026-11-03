@@ -396,3 +396,29 @@ describe("withWaitingApprovals", () => {
     expect(withWaitingApprovals(conversation, [])).toBe(conversation);
   });
 });
+
+it("shows parallel subagent cards once without duplicating them in the work receipt", () => {
+  const { frame } = runStore();
+  let run = frame(
+    { type: "message.completed", messageId: "ask", role: "user", text: "Review the code" },
+    { type: "turn.started", turnId: "t" },
+    { type: "subagent.started", subagentId: "a", threadId: "child-a", title: "Review tests", prompt: "Check the tests" },
+    { type: "subagent.started", subagentId: "b", threadId: "child-b", title: "Review types" },
+  );
+  const memo = emptyRowMemo();
+  const rows = transcriptRows(run.blocks, activity(run), "r", memo);
+  const group = rows.find((row) => row.kind === "subagents");
+  expect(group?.blocks.map((block) => block.subagent?.threadId)).toEqual(["child-a", "child-b"]);
+  expect(rows.filter((row) => row.kind === "subagents")).toHaveLength(1);
+  expect(rows.flatMap((row) => (row.kind === "work" ? row.work.filter((block) => block.kind === "tool") : []))).toEqual([]);
+  run = frame({ type: "subagent.updated", subagentId: "a", threadId: "child-a", status: "completed", result: "Tests pass" });
+  const changed = transcriptRows(run.blocks, activity(run), "r", memo).find((row) => row.kind === "subagents");
+  expect(changed).not.toBe(group);
+  expect(changed?.blocks[0]?.subagent).toMatchObject({ status: "completed", result: "Tests pass" });
+});
+
+it("omits a hosted child's unknown assignment placeholder", () => {
+  const { frame } = runStore();
+  const run = frame({ type: "message.completed", messageId: "prompt", role: "user", text: "" }, { type: "turn.started", turnId: "child" });
+  expect(transcriptRows(run.blocks, activity(run), "r", emptyRowMemo()).some((row) => row.kind === "prompt")).toBe(false);
+});

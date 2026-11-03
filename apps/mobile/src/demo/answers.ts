@@ -118,6 +118,13 @@ const answers: Answers = {
     core.demoRun(runId).player.interrupt();
     return null;
   },
+  "subagents.stop": (core, { threadId }) => {
+    const thread = core.thread(threadId);
+    if (!thread.subagent?.stoppable) throw new Error("This subagent cannot be stopped.");
+    core.liveRun(threadId)?.player.interrupt();
+    core.update(threadId, { subagent: { ...thread.subagent, status: "stopped", endedAt: core.clock.now(), stoppable: false }, activity: "idle" });
+    return null;
+  },
   "threads.queue": (core, { id, text, attachments }) => core.queue(id, text, attachments),
   "threads.unqueue": (core, { id, messageId }) => core.update(id, { queued: core.thread(id).queued.filter((queued) => queued.id !== messageId) }).queued,
   "threads.sendQueued": (core, { id, messageId }) => {

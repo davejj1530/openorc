@@ -1,4 +1,15 @@
-import { projectMeta, sidebarFoldKey, sidebarSectionOpen, sidebarThreadPage, type ProjectMeta, type SidebarFilter, type SidebarFold } from "@openorc/client";
+import {
+  projectMeta,
+  sidebarFoldKey,
+  sidebarSectionOpen,
+  sidebarThreadPage,
+  threadTreeRows,
+  visibleThreadForest,
+  type ProjectMeta,
+  type SidebarFilter,
+  type SidebarFold,
+  type ThreadTreeRow,
+} from "@openorc/client";
 import { WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
 
 /** One project as Home reads it: its pages of active threads so far, undefined until the Mac answers. */
@@ -19,7 +30,7 @@ export type HomeItem =
   /** A project's pinned or snoozed threads, behind a disclosure. */
   | { kind: "section"; key: string; fold: Exclude<SidebarFold, "project">; projectId: string; count: number; open: boolean }
   /** `project` names the thread's project where the section does not, as under Needs you. `arriving` rises it in. */
-  | { kind: "thread"; key: string; thread: ThreadSummary; project: string | null; arriving: boolean }
+  | { kind: "thread"; key: string; thread: ThreadSummary; tree: ThreadTreeRow; project: string | null; arriving: boolean }
   /** The foot of a project that lists more threads than it shows. */
   | { kind: "more"; key: string; projectId: string; project: string }
   /** A list the Mac could not give: a project's threads, or with no project, the projects themselves. */
@@ -47,11 +58,9 @@ const isWaiting = (thread: ThreadSummary) => thread.activity === "waiting";
  * Every thread waiting on you, once each, newest first: from every thread the lists read, the one past a page's end
  * included (the inbox's reads skip what a list already read), and from the inbox.
  */
-function needsYou(groups: readonly ProjectThreads[], waiting: readonly ThreadSummary[]) {
+function needsYou(groups: readonly ProjectThreads[], all: readonly ThreadSummary[]) {
   const names = new Map(groups.map((group) => [group.id, group.name]));
-  const found = new Map<string, ThreadSummary>();
-  for (const group of groups) for (const thread of group.threads?.filter(isWaiting) ?? []) found.set(thread.id, thread);
-  for (const thread of waiting) if (!found.has(thread.id) && !thread.archivedAt) found.set(thread.id, thread);
+  const found = new Map(all.filter((thread) => isWaiting(thread) && !thread.archivedAt).map((thread) => [thread.id, thread]));
   return [...found.values()].sort(newestFirst).map((thread) => ({ thread, project: names.get(thread.projectId) ?? null }));
 }
 
@@ -60,15 +69,21 @@ type Page = ReturnType<typeof sidebarThreadPage>;
 /** The archive lists every archived thread in its project; the other views leave waiting ones to Needs you. */
 const listsWaiting = (options: HomeOptions) => options.filter === "archived";
 
-function projectRows(group: ProjectThreads, page: Page, options: HomeOptions): HomeItem[] {
+function projectRows(group: ProjectThreads, page: Page, options: HomeOptions, waitingRoots: ReadonlySet<string>): HomeItem[] {
   const arriving = options.opened === group.id;
   const rows = (threads: readonly ThreadSummary[]) =>
-    threads.filter((thread) => listsWaiting(options) || !isWaiting(thread)).map((thread): HomeItem => ({ kind: "thread", key: thread.id, thread, project: null, arriving }));
+    threadTreeRows(
+      threads.filter((thread) => !waitingRoots.has(thread.id)),
+      page.list,
+      options.collapsed,
+    )
+      .filter((tree) => !waitingRoots.has(tree.thread.id))
+      .map((tree): HomeItem => ({ kind: "thread", key: tree.thread.id, thread: tree.thread, tree, project: null, arriving }));
   const section = (fold: "pinned" | "snoozed", threads: readonly ThreadSummary[]): HomeItem[] => {
     const shown = rows(threads);
     if (!shown.length) return [];
     const open = sidebarSectionOpen(options.collapsed, fold, group.id);
-    return [{ kind: "section", key: sidebarFoldKey[fold](group.id), fold, projectId: group.id, count: shown.length, open }, ...(open ? shown : [])];
+    return [{ kind: "section", key: sidebarFoldKey[fold](group.id), fold, projectId: group.id, count: threads.filter((thread) => !waitingRoots.has(thread.id)).length, open }, ...(open ? shown : [])];
   };
   const pinnedOnly = options.pinnedOnly;
   return [
@@ -94,18 +109,26 @@ export function homeItems(groups: readonly ProjectThreads[], options: HomeOption
     group,
     page: sidebarThreadPage({ projectId: group.id, fetched: group.threads, selected: null, filter: options.filter, limit: group.limit, now: options.now }),
   }));
-  const waiting = listsWaiting(options) ? [] : needsYou(groups, options.waiting);
+  const all = visibleThreadForest(
+    [...new Map([...options.waiting, ...groups.flatMap((group) => group.threads ?? [])].map((thread) => [thread.id, thread])).values()],
+    options.filter === "archived",
+    options.now,
+  );
+  const waiting = listsWaiting(options) ? [] : needsYou(groups, all);
+  const waitingRoots = new Set(waiting.map(({ thread }) => thread.id));
   const items: HomeItem[] = [];
   if (waiting.length) {
     items.push({ kind: "heading", key: "needs-you", group: "needs-you", projectId: null, title: "Needs you", meta: { text: String(waiting.length), tone: "attention" }, open: true });
-    for (const { thread, project } of waiting) items.push({ kind: "thread", key: thread.id, thread, project, arriving: false });
+    for (const { thread, project } of waiting) {
+      for (const tree of threadTreeRows([thread], [thread], [])) items.push({ kind: "thread", key: tree.thread.id, thread: tree.thread, tree, project: tree.depth ? null : project, arriving: false });
+    }
   }
   if (options.projectsFailed) items.push({ kind: "retry", key: "retry:projects", projectId: null });
   for (const { group, page } of options.filter === "orc" ? pages.filter(shownInOrcmode) : pages) {
     const open = sidebarSectionOpen(options.collapsed, "project", group.id);
     const meta = projectMeta(page.list, { loaded: group.threads !== undefined, more: page.hasMore });
     items.push({ kind: "heading", key: sidebarFoldKey.project(group.id), group: group.id === WORKSPACE_ID ? "workspace" : "project", projectId: group.id, title: group.name, meta, open });
-    if (open) items.push(...projectRows(group, page, options));
+    if (open) items.push(...projectRows(group, page, options, waitingRoots));
   }
   return items;
 }

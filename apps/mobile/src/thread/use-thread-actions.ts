@@ -49,6 +49,7 @@ export function useThreadActions(thread: ThreadSummary | null, { onUnread }: { o
       } else if (action.kind === "snooze") save({ snoozedUntil: action.until(new Date()) });
       else if (action.kind === "rename") rename();
       else if (action.kind === "open") openInApp(action.url);
+      else if (action.kind === "parent") router.push({ pathname: "/thread/[id]", params: { id: action.threadId } });
       else if (action.kind === "screen") router.push({ pathname: action.pathname, params: { threadId: thread.id } });
     };
     return { run, save, rename };

@@ -44,6 +44,7 @@ export const toolIcons = { Check, FileText, Globe, Hammer, Search, WorkCommand, 
  */
 export function openTool(block: ToolBlock, runId: string) {
   Keyboard.dismiss();
+  if (block.subagent) return router.push({ pathname: "/thread/[id]", params: { id: block.subagent.threadId } });
   router.push({ pathname: "/tool", params: { runId: block.runId ?? runId, id: block.id } });
 }
 

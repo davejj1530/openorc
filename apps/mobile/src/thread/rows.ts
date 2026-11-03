@@ -1,4 +1,4 @@
-import { isLive, reasoningSections, turnReply, visualizationFromTool, workParts, workTiming, workTurns, type Block } from "@openorc/client";
+import { isLive, reasoningSections, subagentGroups, turnReply, visualizationFromTool, workParts, workTiming, workTurns, type Block } from "@openorc/client";
 import type { Visualization } from "@openorc/protocol";
 import { height } from "../generated/tokens";
 import { messagePieces } from "./markdown-chunks";
@@ -27,6 +27,7 @@ export type Row = { key: string; gap: number } & (
    */
   | { kind: "reply"; text: string; streaming: boolean; source: PieceSource }
   | { kind: "card"; runId: string; block: Block }
+  | { kind: "subagents"; blocks: ToolBlock[] }
   /** The run that asks what the cards after it ask, outside the loaded conversation: its task's title, or its agent's. */
   | { kind: "waiting"; runId: string; title: string | null }
   /** An explanation the agent drew with the visualize tool, in a web view of its own. */
@@ -106,6 +107,7 @@ const sameAs: { [K in RowKind]: (a: RowOf<K>, b: RowOf<K>) => boolean } = {
   prompt: sameBlock,
   notice: sameBlock,
   card: sameBlock,
+  subagents: (a, b) => sameItems(a.blocks, b.blocks),
   waiting: (a, b) => a.runId === b.runId && a.title === b.title,
   visualization: sameBlock,
   actions: (a, b) => a.text === b.text,
@@ -150,12 +152,33 @@ function afterRows(block: Block, runId: string): Unspaced[] {
   return [{ kind: "card", key: `card:${block.id}`, runId, block }];
 }
 
+function beforeRows(block: Block, runId: string): Unspaced[] {
+  if (block.kind !== "message" || block.role !== "user") return afterRows(block, runId);
+  return block.text || block.attachments?.length ? [{ kind: "prompt", key: `prompt:${block.id}`, block }] : [];
+}
+
+function afterTurnRows(after: Block[], runId: string): Unspaced[] {
+  const rows: Unspaced[] = [];
+  const groups = subagentGroups(after);
+  for (const block of after) {
+    if (block.kind === "tool" && block.subagent) {
+      const group = groups.get(block.id);
+      if (group) rows.push({ kind: "subagents", key: `subagents:${block.id}`, blocks: group });
+      continue;
+    }
+    // "turn error" and "session error" restate the error card above them.
+    if (block.kind === "status" && /^(turn|session) /.test(block.text)) continue;
+    rows.push(...afterRows(block, runId));
+  }
+  return rows;
+}
+
 /** A turn's rows, in the desktop's order: before the work, the head and the work, then what follows it. */
 function turnParts(turn: { id: string; blocks: Block[] }, live: boolean, fallbackRunId: string): Unspaced[] {
   const runId = runOf(turn.blocks, fallbackRunId);
   const timing = workTiming(turn.blocks, live);
   const { before, work, after } = workParts(turn.blocks, timing.live);
-  const rows: Unspaced[] = before.flatMap((block) => (block.kind === "message" && block.role === "user" ? [{ kind: "prompt", key: `prompt:${block.id}`, block } as const] : afterRows(block, runId)));
+  const rows: Unspaced[] = before.flatMap((block) => beforeRows(block, runId));
   const ended = timing.outcome === "error" || timing.outcome === "cancelled";
   const spoke = Boolean(work.length || after.length || timing.live || ended);
   if (spoke) {
@@ -167,11 +190,7 @@ function turnParts(turn: { id: string; blocks: Block[] }, live: boolean, fallbac
     const now: WorkNow = current?.kind === "message" ? "reply" : (current ?? null);
     rows.push({ kind: "work", key: `work:${turn.id}`, turnId: turn.id, runId, work, live: timing.live, now });
   }
-  for (const block of after) {
-    // "turn error" and "session error" restate the error card above them.
-    if (block.kind === "status" && /^(turn|session) /.test(block.text)) continue;
-    rows.push(...afterRows(block, runId));
-  }
+  rows.push(...afterTurnRows(after, runId));
   const reply = turnReply(after);
   if (spoke && !timing.live && reply) rows.push({ kind: "actions", key: `actions:${turn.id}`, text: reply.text });
   return rows;

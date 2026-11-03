@@ -1,5 +1,6 @@
 import { cloudPlaceLabel, snoozeWakeLabel, threadMark } from "@openorc/client";
-import { WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
+import { isSubagentThread, WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
+import { router } from "expo-router";
 import { Pressable } from "react-native";
 import { useLinkState, useRpc } from "../client";
 import { useLinkWords } from "../connection/use-link-words";
@@ -23,12 +24,21 @@ export function statusLine(thread: ThreadSummary, project: string | undefined, n
 /** The thread's title over a faint line of where it lives and what it is doing, or how the link is. Tapping the title renames it. */
 export function ThreadTitle({ thread, onRename }: { thread: ThreadSummary | null; onRename: () => void }) {
   const projects = useRpc("projects.list", {});
+  const parentId = isSubagentThread(thread) ? thread?.parentThreadId : null;
+  const parent = useRpc("threads.get", { id: parentId ?? "" }, { enabled: Boolean(parentId) });
   const link = useLinkWords(useLinkState());
   const project = projects.data?.find((item) => item.id === thread?.projectId)?.name;
   if (!thread) return null;
-  const line = link.tone !== "ok" && link.status ? link.status : statusLine(thread, project);
+  const place = parentId ? parent.data?.title : statusLine(thread, project);
+  const line = link.tone !== "ok" && link.status ? link.status : place;
+  const rename = isSubagentThread(thread) ? undefined : onRename;
   return (
-    <Pressable accessibilityRole="header" accessibilityLabel={[thread.title, line].filter(Boolean).join(", ")} onPress={onRename} className="max-w-60 items-center active:opacity-60">
+    <Pressable
+      accessibilityRole="header"
+      accessibilityLabel={[thread.title, line].filter(Boolean).join(", ")}
+      onPress={parentId ? () => router.push({ pathname: "/thread/[id]", params: { id: parentId } }) : rename}
+      className="max-w-60 items-center active:opacity-60"
+    >
       <Text numberOfLines={1} className="text-md leading-5">
         {thread.title}
       </Text>

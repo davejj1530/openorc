@@ -1,7 +1,7 @@
 import type { LegendListRef } from "@legendapp/list/react-native";
 import { useKeyboardChatComposerInset } from "@legendapp/list/keyboard";
-import { canMoveToCloud, conversationActivity, conversationSendDisabledReason, processFit, queueAfterStart, startingInCloud, type SubmitRequest } from "@openorc/client";
-import type { Run, ThreadSummary } from "@openorc/protocol";
+import { conversationActivity, conversationSendDisabledReason, processFit, queueAfterStart, startingInCloud, type SubmitRequest } from "@openorc/client";
+import { isSubagentThread, type Run, type ThreadSummary } from "@openorc/protocol";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { Pressable, View } from "react-native";
@@ -21,15 +21,13 @@ import { PerfProbe } from "./PerfProbe";
 import { createDisclosure, DisclosureContext } from "./disclosure";
 import { useMarkSeen } from "./mark-seen";
 import { useSnoozeClock } from "./snooze-clock";
-import { threadMenu } from "./thread-actions";
 import { ThreadTitle } from "./ThreadHeader";
-import { headerMenu } from "./ThreadMenu";
+import { useThreadHeaderMenu } from "./ThreadMenu";
 import { Transcript } from "./Transcript";
-import { useChangesCount } from "./use-changes-count";
-import { usePreviewPanel } from "./use-preview-panel";
 import { useThreadActions } from "./use-thread-actions";
 import { VoicesContext, type Voice } from "./voices";
 import { useWaitingApprovals } from "./waiting-approvals";
+import { SubagentStatusBar } from "./SubagentStatusBar";
 
 const NO_RUNS: Run[] = [];
 const goBack = () => router.back();
@@ -119,6 +117,7 @@ export function ThreadScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const threadQuery = useRpc("threads.get", { id });
   const thread = threadQuery.data ?? null;
+  const hosted = isSubagentThread(thread);
   const runsQuery = useRpc("runs.listForThread", { threadId: id });
   const runs = runsQuery.data ?? NO_RUNS;
   const activeRun = runs.at(-1);
@@ -131,11 +130,7 @@ export function ThreadScreen() {
   const [{ live, working, generatingImage }, setActivity] = useState(IDLE);
   const actions = useThreadActions(thread, { onUnread: goBack });
   const now = useSnoozeClock();
-  const uncommitted = useChangesCount(thread);
-  const preview = usePreviewPanel(thread);
-  const cloudOffer = useRpc("cloud.offer", {});
-  const toCloud = Boolean(cloudOffer.data?.offered && thread && canMoveToCloud(thread));
-  const menu = useMemo(() => thread && headerMenu(threadMenu(thread, "header", now, { uncommitted, preview, toCloud }), actions.run), [thread, actions.run, now, uncommitted, preview, toCloud]);
+  const menu = useThreadHeaderMenu(thread, now, actions.run);
   const linkState = useLinkState();
   useThreadOnScreen(linkState.kind === "unpaired" ? null : linkState.mac.id, id);
 
@@ -193,19 +188,23 @@ export function ThreadScreen() {
       {perfEnabled() ? <PerfProbe /> : null}
       {thread ? (
         <View className="absolute inset-x-0 bottom-0">
-          <Composer
-            thread={thread}
-            queued={queueAfterStart(thread, runs.length)}
-            settings={settings}
-            request={request}
-            live={live && activeRun ? { runId: activeRun.id } : null}
-            working={working}
-            generatingImage={generatingImage}
-            canSteer={canSteer}
-            disabledReason={disabledReason}
-            onLayout={onComposerLayout}
-            onSent={follow}
-          />
+          {hosted ? (
+            <SubagentStatusBar thread={thread} onLayout={onComposerLayout} />
+          ) : (
+            <Composer
+              thread={thread}
+              queued={queueAfterStart(thread, runs.length)}
+              settings={settings}
+              request={request}
+              live={live && activeRun ? { runId: activeRun.id } : null}
+              working={working}
+              generatingImage={generatingImage}
+              canSteer={canSteer}
+              disabledReason={disabledReason}
+              onLayout={onComposerLayout}
+              onSent={follow}
+            />
+          )}
         </View>
       ) : null}
     </View>

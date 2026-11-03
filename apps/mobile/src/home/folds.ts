@@ -1,4 +1,4 @@
-import { sidebarFoldKey, sidebarSectionOpen, toggleSidebarFold } from "@openorc/client";
+import { pruneThreadFolds, sidebarFoldKey, sidebarSectionOpen, toggleSidebarFold, toggleThreadTree } from "@openorc/client";
 import { useSyncExternalStore } from "react";
 import { shownMacId, storage } from "../client";
 import { foldsKey } from "./fold-keys";
@@ -36,6 +36,22 @@ export function toggleFold(key: string): void {
   const macId = shownMacId();
   if (!macId) return;
   storage.set(foldsKey(macId), JSON.stringify(toggleSidebarFold(savedFolds(), key)));
+  listeners.forEach((listener) => listener());
+}
+
+export function toggleThreadChildren(id: string, expanded: boolean): void {
+  const macId = shownMacId();
+  if (!macId) return;
+  storage.set(foldsKey(macId), JSON.stringify(toggleThreadTree(savedFolds(), id, expanded)));
+  listeners.forEach((listener) => listener());
+}
+
+export function pruneMissingFolds(missing: ReadonlySet<string>): void {
+  const macId = shownMacId();
+  const saved = savedFolds();
+  const next = pruneThreadFolds(saved, missing);
+  if (!macId || saved.length === next.length) return;
+  storage.set(foldsKey(macId), JSON.stringify(next));
   listeners.forEach((listener) => listener());
 }
 

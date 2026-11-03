@@ -1,5 +1,5 @@
 import { fileCount, panelToolLabels, snoozePresets } from "@openorc/client";
-import type { RpcParams, ThreadSummary } from "@openorc/protocol";
+import { isSubagentThread, type RpcParams, type ThreadSummary } from "@openorc/protocol";
 import type { Link } from "expo-router";
 import type { ComponentProps } from "react";
 
@@ -21,6 +21,7 @@ export type ThreadAction =
   | { kind: "menu"; label: string; icon: Symbol; actions: ThreadAction[] }
   | { kind: "rename"; label: string; icon: Symbol }
   | { kind: "open"; label: string; icon: Symbol; url: string }
+  | { kind: "parent"; label: string; icon: Symbol; threadId: string }
   | { kind: "screen"; label: string; icon: Symbol; subtitle?: string; pathname: ThreadScreenPath };
 
 /** Where the menu opens: a Home row (long press), or the open thread's header, where Rename leads after Changes. */
@@ -65,6 +66,7 @@ function changes(files: number): ThreadAction {
  * action lives in the More menu, so the title keeps the header's center.
  */
 export function threadMenu(thread: ThreadSummary, place: MenuPlace, now: Date, panels: ThreadPanels = NO_PANELS): ThreadAction[][] {
+  if (isSubagentThread(thread)) return thread.parentThreadId ? [[{ kind: "parent", label: "Open parent", icon: "arrow.turn.up.left", threadId: thread.parentThreadId }]] : [];
   const team = Boolean(thread.teamInstanceId);
   const rename: ThreadAction = { kind: "rename", label: "Rename…", icon: "pencil" };
   const screens: ThreadAction[] = [...(panels.uncommitted === null ? [] : [changes(panels.uncommitted)]), ...(panels.preview ? [preview(panels.preview.page)] : [])];
@@ -91,6 +93,6 @@ type Swipe = { label: string; patch: OrganizePatch };
 /** A Home row's two swipes, as Mail's: leading marks read or unread, trailing archives (not a team's thread). */
 export function threadSwipes(thread: ThreadSummary): { leading: Swipe; trailing: Swipe | null } {
   const leading: Swipe = thread.unread ? { label: "Read", patch: { seen: true } } : { label: "Unread", patch: { seen: false } };
-  if (thread.teamInstanceId) return { leading, trailing: null };
+  if (thread.teamInstanceId || isSubagentThread(thread)) return { leading, trailing: null };
   return { leading, trailing: thread.archivedAt ? { label: "Unarchive", patch: { archived: false } } : { label: "Archive", patch: { archived: true } } };
 }

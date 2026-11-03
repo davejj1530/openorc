@@ -360,7 +360,13 @@ export class RemoteAccess {
     const { dataDir, db, ledger } = this.options;
     const session = new RemoteSession(accepted.value.id, accepted.session, {
       answer,
-      guard: { attachmentsDir: path.join(dataDir, "attachments"), thread: (id) => (threads.get(db, id) ? { team: Boolean(orchestration.getInstance(db, id)) } : null) },
+      guard: {
+        attachmentsDir: path.join(dataDir, "attachments"),
+        thread: (id) => {
+          const thread = threads.get(db, id);
+          return thread ? { team: Boolean(orchestration.getInstance(db, id)), parentRelation: thread.parentRelation } : null;
+        },
+      },
       roots: () => this.macRoots(),
       readAsset: (ref) => readRemoteAsset(ref, { dataDir, db, ledger }),
       device: (deviceId, method, params) => this.device(deviceId, method, params),

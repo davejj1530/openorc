@@ -183,6 +183,7 @@ export function answerDemo<M extends RemoteMethod>(core: DemoCore, method: M, pa
 /** Preview's session methods: the one page the demo shows, which input never changes. */
 export function answerSession<M extends SessionMethod>(core: DemoCore, method: M, params: SessionParams<M>): SessionRpcResults[M] {
   const results: { [K in SessionMethod]: (params: SessionParams<K>) => SessionRpcResults[K] } = {
+    "session.negotiate": () => ({ capabilities: ["subagent-threads"] }),
     "preview.watch": ({ threadId }) => core.previews.get(threadId) ?? { open: false },
     "preview.unwatch": () => null,
     "preview.input": () => ({ focus: null }),

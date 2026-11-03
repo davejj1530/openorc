@@ -4,8 +4,11 @@ import {
   isDeviceMethod,
   isRemoteMethod,
   isSessionMethod,
+  PHONE_CAPABILITIES,
+  phoneEvents,
   PREVIEW_INPUT_WORDS,
   sessionRpcParams,
+  supportsSubagents,
   type AssetRef,
   type DeviceMethod,
   type DeviceParams,
@@ -20,7 +23,7 @@ import { PREVIEW_THREAD_GONE } from "../services/preview.js";
 import type { ImageFileRead } from "../services/profile-assets.js";
 import type { RpcReply } from "../transport.js";
 import { remoteError, type MacRoots } from "./phone-words.js";
-import { admitRemoteRequest, remoteReply, type GuardContext } from "./policy.js";
+import { admitRemoteRequest, remoteParams, remoteReply, type GuardContext } from "./policy.js";
 import type { PreviewCasters } from "./preview-casters.js";
 
 /** The request path the windows use: counted while in flight and refused while the app restarts. A phone's request names its origin. */
@@ -55,6 +58,7 @@ export interface SessionDeps {
  * reload. A reply leaves after every push queued before it, so it never overtakes a frame made before the answer.
  */
 export class RemoteSession {
+  private capabilities: string[] = [];
   private interest: ReadonlySet<string> = new Set();
   private queue: MacMessage[] = [];
   private queuedBytes = 0;
@@ -112,9 +116,15 @@ export class RemoteSession {
   /** One push; a frame comes shaped, with its size. */
   push(push: RemotePush, bytes = 0): void {
     if (this.link.closed) return;
+    if (push.type === "notify" && push.threadId && !supportsSubagents(this.capabilities) && this.deps.guard.thread(push.threadId)?.parentRelation === "subagent") return;
     if (push.type === "frame") {
       const { runId } = push.frame;
       if (!this.interest.has(runId) || this.shed.has(runId)) return;
+      const events = phoneEvents(push.frame.events, this.capabilities);
+      if (events !== push.frame.events) {
+        push = { ...push, frame: { ...push.frame, events } };
+        bytes = JSON.stringify(push.frame).length;
+      }
       if (this.link.bufferedAmount() + this.queuedBytes + bytes > SHED_ABOVE) {
         this.shed.add(runId);
         this.schedule();
@@ -195,8 +205,8 @@ export class RemoteSession {
     if (isSessionMethod(method)) return this.ownSession(id, method, params);
     const admission = admitRemoteRequest(method, params, this.deps.guard);
     if (!admission.ok || !isRemoteMethod(method)) return { type: "rpc.error", id, message: admission.ok ? "This is not available from a phone." : admission.message };
-    const reply = await this.deps.answer({ type: "rpc", id, method, params }, { kind: "phone", deviceId: this.deviceId });
-    return reply.type === "rpc.result" ? { ...reply, result: remoteReply(method, reply.result as never, { words: this.words, roots: this.deps.roots }) } : reply;
+    const reply = await this.deps.answer({ type: "rpc", id, method, params: remoteParams(method, params, this.capabilities) }, { kind: "phone", deviceId: this.deviceId });
+    return reply.type === "rpc.result" ? { ...reply, result: remoteReply(method, reply.result as never, { words: this.words, roots: this.deps.roots, capabilities: this.capabilities }) } : reply;
   }
 
   /** A method about this session itself: its one watch of a thread's Preview, and its input on what it watches. */
@@ -205,6 +215,11 @@ export class RemoteSession {
     if (!parsed.success) return { type: "rpc.error", id, message: invalidParamsMessage(method, parsed.error.message) };
     const preview = this.deps.preview;
     switch (method) {
+      case "session.negotiate": {
+        const { capabilities } = parsed.data as SessionParams<"session.negotiate">;
+        this.capabilities = PHONE_CAPABILITIES.filter((capability) => capabilities.includes(capability));
+        return { type: "rpc.result", id, result: { capabilities: this.capabilities } };
+      }
       case "preview.unwatch":
         preview?.unwatch(this);
         return { type: "rpc.result", id, result: null };

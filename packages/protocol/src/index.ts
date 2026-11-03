@@ -35,6 +35,7 @@ export * from "./tool-images.js";
 export * from "./agent-updates.js";
 export * from "./agent-citations.js";
 export * from "./remote.js";
+export * from "./phone-compatibility.js";
 export * from "./cloud.js";
 export * from "./cloud-brain.js";
 export * from "./thread-start.js";

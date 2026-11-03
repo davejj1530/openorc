@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Db, remoteDevices, remotePushTargets } from "@openorc/db";
+import { Db, projects, threads, remoteDevices, remotePushTargets } from "@openorc/db";
 import { collapseId, openPush, pushKeys, type KeyPair, type PushEnvelope } from "@openorc/link";
 import { nodeCrypto } from "@openorc/link/node";
 import type { PushAlerts, PushEnvironment, RemotePush } from "@openorc/protocol";
@@ -290,4 +290,17 @@ describe("the push sender", () => {
     keyAdded = false;
     expect(await sender.test(mac, "Studio")).toEqual({ sent: 0, failed: 0, problem: null });
   });
+});
+
+it("links offline phone alerts for nested subagents to their visible owning thread", async () => {
+  const project = projects.insert(db, { name: "Alerts", rootPath: "/qa-alerts", gitRemote: null, defaultBranch: "main", settings: {} });
+  const root = threads.insert(db, { projectId: project.id, title: "Parent", agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
+  const child = threads.insert(db, { projectId: project.id, title: "Child", agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
+  const grandchild = threads.insert(db, { projectId: project.id, title: "Grandchild", agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
+  threads.update(db, child.id, { parentThreadId: root.id, parentRelation: "subagent" });
+  threads.update(db, grandchild.id, { parentThreadId: child.id, parentRelation: "subagent" });
+  const to = phone();
+  await send(notice({ threadId: grandchild.id, kind: "approval", runId: "child-run", approvalId: "child-approval" }));
+  expect(open(sentTo(to)[0]!, to)).toMatchObject({ threadId: root.id, approval: { runId: "child-run", approvalId: "child-approval" } });
+  expect(sentTo(to)[0]!.collapseId).toBe(collapseId(nodeCrypto, pushKeys(nodeCrypto, mac, to.keys.publicKey, "mac").collapse, root.id));
 });

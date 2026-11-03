@@ -19,7 +19,15 @@ export function fakeMac(answer: (method: RpcMethod, params: unknown) => Promise<
     onPush: () => () => undefined,
     setFrameInterest: () => undefined,
   };
-  const client = createClientState(connection, { scheduleFrame: () => undefined, invalidationBatchMs: 0, randomId: () => "id", savesDefaultPermission: false });
+  const client = createClientState(connection, {
+    scheduleFrame: () => undefined,
+    invalidationBatchMs: 0,
+    randomId: () => "id",
+    savesDefaultPermission: false,
+    reportFrameError: (_frame, error) => {
+      throw error;
+    },
+  });
   const saved = new Map<string, string>();
   const storage = new ScratchStore({ getString: (key) => saved.get(key), set: (key, value) => void saved.set(key, value), remove: (key) => void saved.delete(key) });
   const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: client.queryClient }, children);

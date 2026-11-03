@@ -126,10 +126,11 @@ export interface PreviewRpcResults {
 
 /**
  * Methods about the calling session itself. RemoteSession answers them for its own session; no core handler sees them,
- * and they are not RpcMethods, so no window can call them and no phone can name another session. One watch per session,
- * and input only for what it watches.
+ * and they are not RpcMethods, so no window can call them and no phone can name another session.
  */
 export const sessionRpcParams = {
+  /** An RPC keeps the exact v1 handshake readable by older Macs, which simply refuse this unknown method. */
+  "session.negotiate": z.object({ capabilities: z.array(z.string().min(1).max(64)).max(32) }).strict(),
   "preview.watch": z.object({ threadId: previewThreadId, width: z.number().int().min(320).max(1600), pace: PreviewPace }).strict(),
   "preview.unwatch": z.object({}).strict(),
   /** Only for the thread this session watches, and the pane its frame shows. */
@@ -138,6 +139,7 @@ export const sessionRpcParams = {
 export type SessionMethod = keyof typeof sessionRpcParams;
 export type SessionParams<M extends SessionMethod> = z.infer<(typeof sessionRpcParams)[M]>;
 export interface SessionRpcResults {
+  "session.negotiate": { capabilities: string[] };
   "preview.watch": PreviewState;
   "preview.unwatch": null;
   "preview.input": { focus: PreviewFocus | null };

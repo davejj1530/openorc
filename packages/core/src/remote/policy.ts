@@ -1,6 +1,17 @@
 import path from "node:path";
 import { redact, redactValue } from "@openorc/db";
-import { isRemoteMethod, REMOTE_ATTACHMENT_BYTES, rpcParams, type RemoteMethod, type RemotePush, type RpcParams, type RpcResults } from "@openorc/protocol";
+import {
+  isRemoteMethod,
+  phoneEvents,
+  REMOTE_ATTACHMENT_BYTES,
+  rpcParams,
+  supportsSubagents,
+  type RemoteMethod,
+  type RemotePush,
+  type RpcParams,
+  type RpcResults,
+  type Thread,
+} from "@openorc/protocol";
 import type { Broadcast } from "../transport.js";
 import { previewReply, type PhoneShaping } from "./phone-words.js";
 
@@ -14,7 +25,7 @@ export interface GuardContext {
   /** The only folder a phone's attachment paths may name. */
   attachmentsDir: string;
   /** A thread as the guards need it, read synchronously; null when there is no such thread. */
-  thread(id: string): { team: boolean } | null;
+  thread(id: string): { team: boolean; parentRelation?: Thread["parentRelation"] } | null;
 }
 
 /** Null admits; a string refuses with that message. Guards see params already parsed by the method's schema. */
@@ -139,7 +150,7 @@ export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {
 };
 
 /** What a reply's shaping needs besides the result: how an error or a reason reads on a phone, and the Mac's folders. */
-export type ReplyContext = PhoneShaping;
+export type ReplyContext = PhoneShaping & { capabilities?: readonly string[] };
 type Reply<M extends RemoteMethod> = (result: RpcResults[M], context: ReplyContext) => RpcResults[M];
 const same = <T>(result: T): T => result;
 
@@ -152,14 +163,17 @@ export const remoteReplies: { [M in RemoteMethod]: Reply<M> } = {
   "projects.list": same,
   "projects.get": same,
   "projects.git": same,
-  "threads.list": same,
-  "threads.get": same,
+  "threads.list": (rows, { capabilities }) => (supportsSubagents(capabilities) ? rows : rows.filter((row) => row.parentRelation !== "subagent")),
+  "threads.get": (row, { capabilities }) => (!supportsSubagents(capabilities) && row?.parentRelation === "subagent" ? null : row),
   "threads.messages": same,
   "threads.lastMessage": same,
   "runs.listForThread": same,
-  "events.page": same,
+  "events.page": (page, { capabilities }) => ({ ...page, events: phoneEvents(page.events, capabilities) }),
   "events.toolOutput": same,
-  "inbox.list": same,
+  "inbox.list": (inbox, { capabilities }) => ({
+    ...inbox,
+    items: supportsSubagents(capabilities) ? inbox.items : inbox.items.filter((item) => item.kind !== "thread" || item.thread.parentRelation !== "subagent"),
+  }),
   "agents.models": same,
   "agents.availability": same,
   // A sign-in's email and organization, and the CLI's own words, stay on the Mac.
@@ -198,6 +212,13 @@ export const remoteReplies: { [M in RemoteMethod]: Reply<M> } = {
 /** One result shaped for a phone by its method's entry in remoteReplies. */
 export function remoteReply<M extends RemoteMethod>(method: M, result: RpcResults[M], context: ReplyContext): RpcResults[M] {
   return (remoteReplies[method] as Reply<M>)(result, context);
+}
+
+/** Exclude children before pagination as well as shaping the result, so legacy pages still fill with conversations. */
+export function remoteParams(method: RemoteMethod, params: unknown, capabilities: readonly string[]): unknown {
+  if (method !== "threads.list" || supportsSubagents(capabilities)) return params;
+  const parsed = rpcParams[method].safeParse(params ?? {});
+  return parsed.success ? { ...parsed.data, excludeSubagents: true, includeChildren: false } : params;
 }
 
 export type RemoteAdmission = { ok: true } | { ok: false; message: string };

@@ -2,6 +2,7 @@ import type { ClientPush, CoreConnection } from "@openorc/client";
 import type { MacMessage, PhoneSession } from "@openorc/link";
 import type { AssetRef, DeviceMethod, DeviceParams, DeviceRpcResults, RemotePush, RpcMethod, RpcParams, RpcResults, SessionMethod, SessionParams, SessionRpcResults } from "@openorc/protocol";
 import type { Clock } from "./route-race";
+import { PHONE_CAPABILITIES } from "@openorc/protocol";
 
 /** A watched Preview's newest state, or the end of the watch, which only its screen hears. */
 export type PreviewPush = Extract<RemotePush, { type: "preview" | "preview.ended" }>;
@@ -65,7 +66,7 @@ function clientPush(push: RemotePush): ClientPush | null {
 /**
  * The phone's line to the core for `@openorc/client`, over whichever session is current. Calls made while the phone
  * connects wait for a session; a call in flight when its session drops fails and is never sent again, since the Mac
- * may already have acted on it. Every new session hears the phone's interest before anything else.
+ * may already have acted on it. Every new session hears capabilities, then interest, before any queued calls.
  */
 export class LinkConnection implements CoreConnection {
   readonly delivery = "interest";
@@ -132,6 +133,8 @@ export class LinkConnection implements CoreConnection {
   attach(session: PhoneLine): void {
     this.current = session;
     session.onClose(() => this.lost(session));
+    // Best effort: older Macs refuse this RPC. No pending call may hold up a handover or reconnect waiting for it.
+    session.send({ t: "rpc", id: this.id(), method: "session.negotiate", params: { capabilities: PHONE_CAPABILITIES } });
     session.send({ t: "interest", runIds: this.interest });
     this.emit({ type: "session", resumed: this.resumable });
     this.resumable = true;
@@ -273,7 +276,15 @@ export class LinkConnection implements CoreConnection {
   }
 
   private emit(push: ClientPush): void {
-    for (const listener of this.listeners) listener(push);
+    for (const listener of this.listeners) {
+      try {
+        listener(push);
+      } catch (error) {
+        if (push.type !== "frame") throw error;
+        console.warn("[OpenOrc] Dropped incoming frame", { runId: push.frame?.runId, seq: push.frame?.seq, error: error instanceof Error ? error.name : "Error" });
+        return;
+      }
+    }
   }
 }
 

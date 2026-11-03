@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { remotePushTargets, type Db, type PushRecipient } from "@openorc/db";
+import { remotePushTargets, threads, type Db, type PushRecipient } from "@openorc/db";
 import { collapseId, pushKeys, sealPush, type KeyPair, type PushNotice } from "@openorc/link";
 import { nodeCrypto } from "@openorc/link/node";
 import type { PushEnvironment, PushRefusal, RemotePush, RemoteRpcResults } from "@openorc/protocol";
@@ -85,6 +85,16 @@ export class PushSender {
   /** Resolves once this notice was sent or dropped, after every notice handed over before it. Never rejects. */
   send(notice: Notice, mac: KeyPair): Promise<void> {
     if (!notice.threadId) return Promise.resolve();
+    // APNs can reach an offline or older phone without a negotiated session. Link to the owning conversation.
+    const seen = new Set<string>();
+    let thread = threads.get(this.deps.db, notice.threadId);
+    while (thread?.parentRelation === "subagent") {
+      if (!thread.parentThreadId || seen.has(thread.id)) return Promise.resolve();
+      seen.add(thread.id);
+      notice = { ...notice, threadId: thread.parentThreadId };
+      thread = threads.get(this.deps.db, thread.parentThreadId);
+      if (!thread) return Promise.resolve();
+    }
     const epoch = this.epoch;
     // queue logs a failure, so nothing is left to handle here.
     return this.queue(() => this.deliver(noticeOf(notice), mac, epoch)).catch(() => undefined);

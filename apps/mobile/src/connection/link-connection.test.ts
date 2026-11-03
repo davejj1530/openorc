@@ -31,6 +31,43 @@ const wire = (mac: FakeMac) =>
   });
 
 describe("calls over the link", () => {
+  it("declares its capabilities before interest or queued RPCs and tolerates an older Mac's refusal", async () => {
+    const mac = new FakeMac();
+    mac.behave(lan, { kind: "answer" });
+    const { connection } = connect(mac);
+    await advance(10);
+    const declaration = mac.heard.find((message) => message.t !== "ping");
+    expect(declaration).toMatchObject({ t: "rpc", method: "session.negotiate", params: { capabilities: ["subagent-threads"] } });
+    if (declaration?.t !== "rpc") throw new Error("no capability declaration");
+    mac.send({ t: "rpc.error", id: declaration.id, message: "This is not available from a phone." });
+    mac.answer = (method) => (method === "projects.list" ? [] : undefined);
+    const reply = connection.call("projects.list", {});
+    await advance(10);
+    expect(await reply).toEqual([]);
+  });
+
+  it("drops and logs a failed frame application at the link boundary, then handles the next frame", async () => {
+    const log = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const mac = new FakeMac();
+    mac.behave(lan, { kind: "answer" });
+    const { connection } = connect(mac);
+    const applied: number[] = [];
+    connection.onPush((push) => {
+      if (push.type !== "frame") return;
+      if (push.frame.seq === 1) throw new Error("bad frame");
+      applied.push(push.frame.seq);
+    });
+    try {
+      await advance(10);
+      for (const seq of [1, 2]) mac.send({ t: "push", push: { type: "frame", frame: { runId: "run", seq, events: [] } } });
+      await advance(10);
+      expect(applied).toEqual([2]);
+      expect(log).toHaveBeenCalledOnce();
+    } finally {
+      log.mockRestore();
+    }
+  });
+
   it("holds calls made while connecting and sends them after the interest", async () => {
     const mac = new FakeMac();
     mac.behave(lan, { kind: "answer", delayMs: 1_000 });
@@ -40,7 +77,7 @@ describe("calls over the link", () => {
     const projects = connection.call("projects.list", {});
     await advance(1_010);
     expect(await projects).toEqual([]);
-    expect(wire(mac)).toEqual(["interest run-1", "rpc projects.list"]);
+    expect(wire(mac)).toEqual(["rpc session.negotiate", "interest run-1", "rpc projects.list"]);
   });
 
   it("gives up on a call after 8 s without a session", async () => {
@@ -84,7 +121,7 @@ describe("calls over the link", () => {
     await advance(10);
     mac.live[0]!.close(LinkCloseCode.normal);
     await advance(1_000);
-    expect(wire(mac)).toEqual(["interest ", "interest run-1,run-2", "interest run-1,run-2"]);
+    expect(wire(mac)).toEqual(["rpc session.negotiate", "interest ", "interest run-1,run-2", "rpc session.negotiate", "interest run-1,run-2"]);
     expect(pushes.filter((push) => push.type === "session")).toEqual([
       { type: "session", resumed: false },
       { type: "session", resumed: true },

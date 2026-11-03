@@ -54,6 +54,7 @@ export const client = createClientState(link.connection, {
   randomId: () => randomUUID(),
   // A phone may not change the Mac's app settings: a permission chosen here stays with its thread.
   savesDefaultPermission: false,
+  reportFrameError: (frame, error) => console.warn("[OpenOrc] Dropped incoming frame", { runId: frame.runId, seq: frame.seq, error: error instanceof Error ? error.name : "Error" }),
 });
 
 /** Which alerts this phone wants from each Mac, told to the shown one on every session and at once on a change. */

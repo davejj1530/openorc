@@ -108,8 +108,12 @@ async function fakeGit() {
     "#!/bin/sh",
     'for arg in "$@"; do',
     '  if [ "$arg" = grep ]; then',
+    `    if [ -e "${bin}/hang" ]; then`,
+    `      rm "${bin}/hang"`,
+    `      echo $$ >> "${bin}/greps"`,
+    "      exec sleep 30",
+    "    fi",
     `    echo $$ >> "${bin}/greps"`,
-    `    if [ -e "${bin}/hang" ]; then rm "${bin}/hang"; exec sleep 30; fi`,
     "  fi",
     "done",
     `exec "${realGit}" "$@"`,
@@ -133,11 +137,14 @@ it("stops a find when a newer one for the same conversation starts, ending its g
   try {
     await git.hangNextGrep();
     const first = find(literal("needle"));
-    const [pid] = await vi.waitFor(async () => {
-      const greps = await git.greps();
-      if (!greps.length) throw new Error("no grep yet");
-      return greps;
-    });
+    const [pid] = await vi.waitFor(
+      async () => {
+        const greps = await git.greps();
+        if (!greps.length) throw new Error("no grep yet");
+        return greps;
+      },
+      { timeout: 5_000 },
+    );
     const second = await find(literal("needle"));
     expect(await first).toEqual({ kind: "superseded" });
     expect(second).toMatchObject({ kind: "matches", groups: [{ path: "src/cart.ts" }] });

@@ -35,13 +35,13 @@ Both create a temporary HOME, profile and Git repository through [one shared fix
 
 ## Release check
 
-| Check         | Assertion                                                                                                                                                                        |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Fuses         | Running as Node, `NODE_OPTIONS` and `--inspect` are off; cookie encryption, asar integrity validation and loading only from the archive are on.                                  |
-| Native code   | No `.node`, `.dylib`, `.so`, `.dll` or `.exe` is packed inside `app.asar`. On a signed Mac package, every Mach-O file carries the app's team, which library validation requires. |
-| Native target | Dependency binaries match the runner's OS and processor. Required database, embedding, and terminal bindings/helpers are present; unused Node WebGPU bindings are absent.        |
-| Startup       | The window loads, the core opens its ledger with `sqlite-vec`, and `--inspect` is ignored.                                                                                       |
-| Take-over     | A launch with `ELECTRON_RUN_AS_NODE` runs no code, and a launch with `--remote-debugging-port` exits with an error before any window or debugging port opens.                    |
+| Check         | Assertion                                                                                                                                                                                    |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Fuses         | Running as Node, `NODE_OPTIONS` and `--inspect` are off; cookie encryption, asar integrity validation and loading only from the archive are on.                                              |
+| Native code   | No `.node`, `.dylib`, `.so`, `.dll` or `.exe` is packed inside `app.asar`. On a signed Mac package, every Mach-O file carries the app's signing identity, which library validation requires. |
+| Native target | Dependency binaries match the runner's OS and processor. Required database, embedding, and terminal bindings/helpers are present; unused Node WebGPU bindings are absent.                    |
+| Startup       | The window loads, the core opens its ledger with `sqlite-vec`, and `--inspect` is ignored.                                                                                                   |
+| Take-over     | A launch with `ELECTRON_RUN_AS_NODE` runs no code, and a launch with `--remote-debugging-port` exits with an error before any window or debugging port opens.                                |
 
 The release workflow runs it on the signed macOS app, the installed Windows app, and on Linux both the installed deb and the AppImage's contents, then builds the smoke package from the same bundles. On Windows and Linux it runs the full smoke there; on macOS it runs only the [updater checks](#updater-only).
 

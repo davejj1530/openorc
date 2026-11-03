@@ -8,7 +8,7 @@ OpenOrc supports any number of named Claude Code accounts. Add them in **Setting
 2. Select **Add account and sign in**.
 3. Complete Claude's sign-in in the Chrome Incognito window that opens, so your browser's own Claude login stays as it is. Without Chrome, or on Windows, sign-in opens in your default browser. The account row shows the signed-in email and organization when Claude reports them.
 
-Use **Make default** for new conversations. An explicitly selected account stays with a saved draft. Existing conversations, forks, child threads, and schedules retain their saved account when the default changes. Claude members of a team use the conversation's selected Claude account.
+Use **Make default** for new conversations. An explicitly selected account stays with a saved draft. Existing conversations, forks, child threads, and schedules retain their saved account when the default changes.
 
 **Settings → Usage** shows each enabled Claude account separately. Model availability, Fast mode access, live allowances, and limits observed during runs are kept separate too. Two entries signed in to the same provider account still share that provider's allowance.
 

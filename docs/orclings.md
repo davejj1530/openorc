@@ -20,7 +20,6 @@ Every run records who spoke in `runs.orcling_id`; a thread records the Orcling w
 | Any other conversation | `@Name` in a message asks it as a guest. It answers in that thread; the thread's own agent keeps its session and hears the answer next turn.             |
 | Task comments          | Mentioned by name. It replies read-only like any comment reply; work it agrees to runs as the Orcling in a thread made for the task.                     |
 | Pull request reviews   | Chosen as the reviewer. Its draft comments are named after it and the model it ran on (`author_orcling_id`).                                             |
-| Teams                  | A member seat can be an Orcling, recorded in `orcling_seats`. The seat always carries the Orcling's current name, face, model, effort and Fast mode.     |
 | Slack                  | The Slack conversation can hand itself to an Orcling with `execution_switch` and `orclingId`; later replies in that Slack thread stay with it.           |
 
 Sessions are keyed by thread, harness and speaker, so a guest never resumes the thread agent's session or the other way round. Anyone who starts a process in a thread where others spoke since hears what they said.
@@ -35,11 +34,11 @@ An Orcling's permission is **Approve** (Review everything: it asks before every 
 
 ## Its model is part of who it is
 
-An Orcling brings its own model, effort and Fast mode wherever it works, including a team seat or the team lead, where its name and face stand in for the member's. A team cannot change any of them; edit the Orcling to change them everywhere at once.
+An Orcling brings its own model, effort and Fast mode wherever it works. Edit the Orcling to change these settings everywhere at once.
 
 ## Its own conversation is a private chat
 
-Its own conversation lives in the Workspace but is not Workspace work. Its prompt carries its brief and a line about its folder, and no project's memory or task rules: anything they held would read as its own history. The general task, thread and memory tools are left out there too (`ownConversation` in `orcling-tools.ts`), since they point at the Workspace; its own tools stand in for them. Summaries of its conversation feed its own fresh sessions and never appear in the Workspace's memory, and the Workspace's recent threads leave Orclings' conversations out. In a project thread, as a guest, or on a team, it works on that project, so that project's memory comes with it as it does for any agent.
+Its own conversation lives in the Workspace but is not Workspace work. Its prompt carries its brief and a line about its folder, and no project's memory or task rules: anything they held would read as its own history. The general task, thread and memory tools are left out there too (`ownConversation` in `orcling-tools.ts`), since they point at the Workspace; its own tools stand in for them. Summaries of its conversation feed its own fresh sessions and never appear in the Workspace's memory, and the Workspace's recent threads leave Orclings' conversations out. In a project thread or as a guest, it works on that project, so that project's memory comes with it as it does for any agent.
 
 ## Reaching your projects
 

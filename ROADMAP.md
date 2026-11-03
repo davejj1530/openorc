@@ -1,6 +1,6 @@
 # Roadmap
 
-OpenOrc is under active development. The desktop supports conversations, task documents, provider integrations, local memory, and Git review. Team execution is in Beta and enabled for new profiles (**Team execution (Beta)** in Settings); existing choices are preserved. See the [README](README.md) for setup and the [product model](PRODUCT.md) for behavior.
+OpenOrc is under active development. The desktop supports conversations, task documents, provider integrations, local memory, and Git review. See the [README](README.md) for setup and the [product model](PRODUCT.md) for behavior.
 
 ## Reliability and platform support
 

@@ -19,7 +19,6 @@ Task descriptions are stored as Markdown. Every description opens in rich text, 
 Before a task run starts, OpenOrc checks every image in its description, including reference-style Markdown images but not images inside code examples. A missing, invalid, or still-saving image stops the run before it is created.
 
 - **Ordinary task runs:** the task's images are listed as file paths, in document order, in the prompt. This works the same way for every provider. Images you attach in the composer are sent separately as attachments.
-- **Team runs:** the task's images are attached to the member's turn.
 
 Images on the web are not loaded, so opening a description never contacts their server. They show where they point, with an action to open them in the browser. They are not downloaded or sent to the agent.
 

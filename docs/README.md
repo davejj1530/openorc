@@ -18,8 +18,6 @@
 - [Orclings](orclings.md)
 - [Credential storage](credential-storage.md)
 - [Coding-agent updates](agent-updates.md)
-- [Team corrections during active work](team-live-steering.md) (Beta)
-- [OpenRouter in teams](openrouter-teams.md) (Beta)
 
 ## Contributing and internals
 

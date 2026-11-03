@@ -38,7 +38,7 @@ Everything else is allowed in every mode, because it changes nothing outside Ope
 
 An Orcling's tools exist only in runs where an Orcling speaks. Its permission caps the mode it works in anywhere: Approve runs as Review everything (Plan on OpenCode, which cannot ask first), Allow as Autonomous, and the stricter of the Orcling's and the conversation's rule wins. `orcling_thread_send` follows the `thread_send` rules below and can reach threads in any project. `orcling_thread_start` sets the Orcling working in a new project thread, or on a saved task that has no conversation of someone else's; that thread works as freely as the conversation that started it, within the Orcling's permission. See [Orclings](orclings.md).
 
-`task_start` is refused in Plan. It marks the task in progress so the calling conversation can work on it; it does not start another agent. `execution_switch` changes a Slack request's model or folder, never its permissions. Team tools follow the team's own rules.
+`task_start` is refused in Plan. It marks the task in progress so the calling conversation can work on it; it does not start another agent. `execution_switch` changes a Slack request's model or folder, never its permissions.
 
 ## Messages to other conversations
 
@@ -48,8 +48,6 @@ An Orcling's tools exist only in runs where an Orcling speaks. Its permission ca
 - A chain of agent messages stops after 4 messages in a row with no one writing in between. The count is per conversation and kept in memory. A message from a person, in the app, Slack or a schedule, resets it.
 - A retried call with the same `request_key` is delivered once. Without a key, the same text to the same conversation from the same run counts as a retry.
 
-Messages to team conversations follow the same permission and 4-message chain checks. After admission, a message is queued for the team's lead while its execution is running. Starting a team member's provider session does not reset the chain; human direction does (`packages/core/src/services/thread-agent-tools.ts`).
-
 ## Memory and passwords
 
 An agent cannot take over the topic key of a memory you wrote, or mark it wrong or stale. `memory_record` limits titles to 120 characters and bodies to 800. The project brief labels each memory with who saved it.
@@ -58,7 +56,7 @@ The Preview shares your signed-in sessions (see [agent access to the sidebar pre
 
 ## Nothing starts work on its own
 
-`task_create` saves to the backlog by default. Delegating work to other agents exists only in team runs: in Plan it only proposes the work, and team members work under the team conversation's mode. External commands from any agent go through the ordinary approval rules.
+`task_create` saves to the backlog by default. External commands from any agent go through the ordinary approval rules.
 
 ## Default mode for new work
 

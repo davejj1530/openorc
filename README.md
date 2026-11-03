@@ -15,7 +15,7 @@
 
 OpenOrc is a **desktop workspace for Codex, Claude Code, and OpenCode**. Bring your existing agents and accounts to plan work, build features, and review changes in one place.
 
-Work with a single agent or assemble a team across providers. Agents can share context between threads and carry project decisions into the next task, so you spend less time repeating yourself.
+Work with Codex, Claude Code, and OpenCode in one workspace. Agents can share context between threads and carry project decisions into the next task, so you spend less time repeating yourself.
 
 ## Why OpenOrc
 
@@ -26,12 +26,6 @@ Choose an agent for each job while keeping the work connected through shared con
 Let a Claude Code thread building your interface ask a Codex thread about an API decision. Agents can find, read, and message other OpenOrc threads in the same project, and start a helper thread in the same folder when you ask, saving you from copying context between conversations.
 
 An idle thread starts a new turn to read a message; a busy thread receives it during its current turn. Agents can send up to 20 messages in a row across threads, and an exchange ends when one agent doesn't reply. After 20, a person has to write before they can send more.
-
-### Give each agent a role
-
-Have Codex coordinate, Claude Code build, and another agent review. Save the team with a role, provider, and model for each member. Follow their contributions in one conversation and address a member directly when you need their input.
-
-Team execution is in Beta and enabled for new profiles. Manage **Team execution (Beta)** in **Settings → General → Orchestration**; saved on/off choices are preserved. See [team recovery and limitations](https://openorc.app/docs/teams/#recovery).
 
 ### Keep what your project learns
 
@@ -44,8 +38,6 @@ Memory is optional. Turn it off or configure automatic extraction in Settings.
 Capture an idea as a task, ask multiple models for input, then start implementation when you're ready. Work in your local checkout or an isolated worktree, and review changes beside the conversation.
 
 ![OpenOrc with project threads and weekly usage in the sidebar, a Codex conversation ending in the OpenOrc cube, and a source diff in the Changes panel](docs/images/readme/workspace.png)
-
-![OpenOrc team conversation showing the lead, builder, and reviewer with their models, contributions, and shared composer](docs/images/readme/teams.png)
 
 _Screenshots use sample projects and conversations._
 
@@ -110,7 +102,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for native dependency troubleshooting, ve
 
 Conversations, task records, and project memory are stored on your machine. Each agent's requests go to its own provider, and a small model from the conversation's own agent names the conversation. Memory is off until you turn it on. While it is on, the agent that ran each finished run summarizes it, unless you choose one provider for every run, and the first search by meaning downloads a 91 MB embedding model from Hugging Face, each file checked against a pinned SHA-256. Installed macOS and Windows releases check GitHub Releases for new stable versions, without an installation identifier; Settings → General turns automatic checks off. Betas are published as prereleases, which the updater never offers, so install betas manually. [Network connections](https://openorc.app/docs/network/) lists every connection the app makes.
 
-The desktop stores its SQLite ledger, attachments, images tools return, and managed workspaces in the application data directory: `~/Library/Application Support/OpenOrc` on macOS, `%APPDATA%\OpenOrc` on Windows, and `~/.config/OpenOrc` on Linux. `OPENORC_USER_DATA` selects a different profile. Treat this directory as private: it can contain prompts, source snippets, terminal output, and project history. Native provider output goes to a debug log in `logs/provider` there, kept for 14 days or 512 MB; deleting a thread does not remove its lines from that log before they expire. Redaction of the ledger, its search index, run results, memories, and logs is a best-effort filter, not a guarantee that all sensitive content is removed. Plans, task comments, and team messages are stored as written because agents receive them later.
+The desktop stores its SQLite ledger, attachments, images tools return, and managed workspaces in the application data directory: `~/Library/Application Support/OpenOrc` on macOS, `%APPDATA%\OpenOrc` on Windows, and `~/.config/OpenOrc` on Linux. `OPENORC_USER_DATA` selects a different profile. Treat this directory as private: it can contain prompts, source snippets, terminal output, and project history. Native provider output goes to a debug log in `logs/provider` there, kept for 14 days or 512 MB; deleting a thread does not remove its lines from that log before they expire. Redaction of the ledger, its search index, run results, memories, and logs is a best-effort filter, not a guarantee that all sensitive content is removed. Plans and task comments are stored as written because agents receive them later.
 
 Agent execution uses the installed CLIs and their existing login flows. The Claude usage display asks the installed Claude Code CLI for its plan usage; OpenOrc never reads the credential Claude Code stores. Direct Slack credentials and the optional memory-extraction API key use Electron's OS-backed protected storage. See [credential storage](docs/credential-storage.md) for recovery and backup considerations.
 

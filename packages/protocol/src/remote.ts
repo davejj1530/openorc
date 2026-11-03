@@ -32,6 +32,7 @@ export const REMOTE_METHODS = [
   "runs.start",
   "runs.send",
   "runs.interrupt",
+  "subagents.stop",
   "threads.queue",
   "threads.unqueue",
   "threads.sendQueued",

@@ -24,6 +24,7 @@ import { orclingAccountMigration, orclingMigration } from "./orcling-schema.js";
 import { remoteDeviceMigration } from "./remote-device-schema.js";
 import { remotePushTargetMigration } from "./remote-push-target-schema.js";
 import { cloudWorkspaceMigration, cloudWorkspaceRemovedMigration } from "./cloud-workspace-schema.js";
+import { subagentMigration, subagentIdentityMigration, subagentObservationMigration } from "./subagent-schema.js";
 /**
  * Migrations run in order; `PRAGMA user_version` records how many applied.
  * Never edit a shipped migration. Append a new one.
@@ -786,4 +787,7 @@ export const migrations: Migration[] = [
   /** The commit a cloud conversation's worktree was on after its last sync, so commits made on the Mac reach the sandbox. */
   `ALTER TABLE cloud_workspaces ADD COLUMN mirror_head TEXT;`,
   cloudWorkspaceRemovedMigration,
+  subagentMigration,
+  subagentIdentityMigration,
+  subagentObservationMigration,
 ];

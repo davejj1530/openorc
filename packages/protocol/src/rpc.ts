@@ -16,6 +16,7 @@ import { remoteRpcParams, type RemoteRpcResults } from "./remote.js";
 import { devicePanelRpcParams, DevicePanelPush, type DevicePanelRpcResults } from "./devices.js";
 import { previewRpcParams, type PreviewRpcResults } from "./preview.js";
 import { ThreadStartParams } from "./thread-start.js";
+import { ThreadListParams } from "./thread-list.js";
 import { cloudRpcParams, type CloudRpcResults } from "./cloud.js";
 import { HarnessId, type HarnessAvailability, type HarnessInfo } from "./harness.js";
 import { AgentEvent, AgentKind, ApprovalDecision, Frame } from "./events.js";
@@ -50,7 +51,6 @@ import {
   TeamMemberAvatarChoice,
   Thread,
   ThreadCheckpoint,
-  ThreadFilter,
   ThreadSearchHit,
   ThreadSummary,
   ThreadMessage,
@@ -184,17 +184,7 @@ export const rpcParams = {
     .object({ threadId: z.string().min(1), executionId: z.string().min(1), publicationId: z.string().min(1), requestKey: z.string().min(1).max(200), taskId: TaskScope })
     .strict(),
   /** Active threads by default; every project when none is named. Offset pages older threads in. */
-  "threads.list": z.object({
-    projectId: z.string().optional(),
-    projectIds: z.array(z.string()).optional(),
-    projectsOnly: z.boolean().optional(),
-    filter: ThreadFilter.optional(),
-    /** Most recent activity across projects, without pin priority. */
-    orderBy: z.literal("activity").optional(),
-    pinnedOnly: z.boolean().optional(),
-    limit: z.number().int().positive().optional(),
-    offset: z.number().int().nonnegative().optional(),
-  }),
+  "threads.list": ThreadListParams,
   "threads.get": z.object({ id: z.string() }),
   "threads.messages": z.object({ id: z.string() }),
   /** The newest thing the person or an agent said in the conversation, its text clipped for a preview. */
@@ -256,6 +246,7 @@ export const rpcParams = {
   "threads.sendQueued": z.object({ id: z.string(), messageId: z.string().min(1) }),
   /** Stop a command the agent left running in the background, such as a dev server. */
   "threads.stopCommand": z.object({ id: z.string(), commandId: z.string().min(1) }),
+  "subagents.stop": z.object({ threadId: z.string() }),
   "threads.checkpoints": z.object({ id: z.string() }),
   /** What the turn that saved a checkpoint changed, against the checkpoint before it. */
   "threads.turnChanges": z.object({ id: z.string(), checkpointId: z.string(), includePatch: z.boolean().optional(), paths: z.array(z.string().min(1)).min(1).max(500).optional() }).strict(),
@@ -658,6 +649,7 @@ export interface RpcResults
   "threads.unqueue": QueuedMessage[];
   "threads.sendQueued": QueuedMessage[];
   "threads.stopCommand": null;
+  "subagents.stop": null;
   "threads.checkpoints": ThreadCheckpoint[];
   "threads.turnChanges": TurnFileChanges;
   "threads.restore": null | { rejected: string };

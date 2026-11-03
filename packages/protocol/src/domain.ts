@@ -1,6 +1,6 @@
 import { CloudThreadState } from "./cloud.js";
 import { z } from "zod";
-import { ActivityRecovery, AgentKind, BackgroundCommand, Usage } from "./events.js";
+import { ActivityRecovery, AgentKind, BackgroundCommand, SubagentStatus, Usage } from "./events.js";
 import { HarnessId } from "./harness.js";
 import { ExecutionTarget, TeamRevision } from "./orchestration.js";
 
@@ -134,12 +134,17 @@ export const Thread = z.object({
   orclingId: z.string().nullable().optional(),
   /** The thread that started this one with thread_start, working in the same folder. */
   parentThreadId: z.string().nullable().optional(),
+  parentRelation: z.enum(["started", "subagent"]).nullable().optional(),
   createdAt: z.number(),
   updatedAt: z.number(),
   lastActivityAt: z.number(),
   archivedAt: z.number().nullable(),
 });
 export type Thread = z.infer<typeof Thread>;
+
+export function isSubagentThread(thread: Pick<Thread, "parentRelation"> | null | undefined): boolean {
+  return thread?.parentRelation === "subagent";
+}
 
 export const ThreadActivity = z.enum(["idle", "running", "waiting"]);
 export type ThreadActivity = z.infer<typeof ThreadActivity>;
@@ -177,6 +182,16 @@ export function isDetachedCopy(thread: Pick<Thread, "worktreePath" | "branch">):
 }
 
 export const ThreadSummary = Thread.extend({
+  subagent: z
+    .object({
+      status: SubagentStatus,
+      agentType: z.string().nullable(),
+      toolCallId: z.string().nullable(),
+      startedAt: z.number(),
+      endedAt: z.number().nullable(),
+      stoppable: z.boolean(),
+    })
+    .optional(),
   /** Whether any execution has started; absent in older cached summaries. */
   hasStarted: z.boolean().optional(),
   /** Saved team ownership; absent in older cached summaries. */

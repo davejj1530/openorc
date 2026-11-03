@@ -1,6 +1,7 @@
 import { claudeAccounts } from "./claude-accounts.js";
 import { DEFAULT_CLAUDE_ACCOUNT } from "@openorc/protocol";
-import { threadListOrder } from "./thread-list-order.js";
+import { threadListLimit, threadListOrder } from "./thread-list-order.js";
+import { threadTreeSql } from "./thread-list-tree.js";
 import { randomUUID } from "node:crypto";
 import { WORKSPACE_ID } from "@openorc/protocol";
 import type { Run, RunState, Snapshot, Task, TaskStatus, Thread, Usage } from "@openorc/protocol";
@@ -225,6 +226,7 @@ interface ThreadRow {
   imported_from: string | null;
   orcling_id?: string | null;
   parent_thread_id?: string | null;
+  parent_relation?: Thread["parentRelation"];
   created_at: number;
   updated_at: number;
   last_activity_at: number;
@@ -261,6 +263,7 @@ function threadFromRow(r: ThreadRow): Thread {
     importedFrom: r.imported_from,
     orclingId: r.orcling_id ?? null,
     parentThreadId: r.parent_thread_id ?? null,
+    parentRelation: r.parent_relation ?? null,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     lastActivityAt: r.last_activity_at,
@@ -293,6 +296,7 @@ export interface ThreadPatch {
   archivedAt?: number | null;
   orclingId?: string | null;
   parentThreadId?: string | null;
+  parentRelation?: Thread["parentRelation"];
 }
 
 const threadColumns: Record<keyof ThreadPatch, string> = {
@@ -320,6 +324,7 @@ const threadColumns: Record<keyof ThreadPatch, string> = {
   archivedAt: "archived_at",
   orclingId: "orcling_id",
   parentThreadId: "parent_thread_id",
+  parentRelation: "parent_relation",
 };
 
 export type ThreadListFilter = "active" | "done" | "archived" | "all";
@@ -354,7 +359,19 @@ export const threads = {
    */
   list(
     db: Db,
-    filter: { projectId?: string; projectIds?: string[]; projectsOnly?: boolean; filter?: ThreadListFilter; orderBy?: "activity"; pinnedOnly?: boolean; limit?: number; offset?: number } = {},
+    filter: {
+      projectId?: string;
+      projectIds?: string[];
+      projectsOnly?: boolean;
+      filter?: ThreadListFilter;
+      orderBy?: "activity";
+      pinnedOnly?: boolean;
+      limit?: number;
+      offset?: number;
+      includeChildren?: boolean;
+      excludeSubagents?: boolean;
+      selectedId?: string;
+    } = {},
   ): Thread[] {
     const where: string[] = [];
     const args: (string | number)[] = [];
@@ -372,13 +389,16 @@ export const threads = {
     }
     // A deleted team conversation keeps its row for its saved tasks; it is never listed, including with filter=all.
     where.push(VISIBLE);
+    if (filter.excludeSubagents) where.push("COALESCE(parent_relation, '') != 'subagent'");
     if (filter.pinnedOnly) where.push("pinned_at IS NOT NULL");
     const kind = filter.filter ?? "active";
     if (kind === "active") where.push("archived_at IS NULL");
     else if (kind === "done") where.push("archived_at IS NULL AND done_at IS NOT NULL");
     else if (kind === "archived") where.push("archived_at IS NOT NULL");
-    const limit = filter.limit ? ` LIMIT ${Math.floor(filter.limit)}${filter.offset ? ` OFFSET ${Math.floor(filter.offset)}` : ""}` : "";
-    const sql = `SELECT * FROM threads WHERE ${where.join(" AND ")} ORDER BY ${threadListOrder(kind, filter.orderBy)}${limit}`;
+    const limit = threadListLimit(filter);
+    const order = threadListOrder(kind, filter.orderBy);
+    const sql = filter.includeChildren ? threadTreeSql(where.join(" AND "), order, limit) : `SELECT * FROM threads WHERE ${where.join(" AND ")} ORDER BY ${order}${limit}`;
+    if (filter.includeChildren) args.unshift(filter.selectedId ?? "");
     return (db.stmt(sql).all(...args) as unknown as ThreadRow[]).map(threadFromRow);
   },
   get(db: Db, id: string): Thread | null {
@@ -435,6 +455,7 @@ export const threads = {
     return (db.stmt(`SELECT * FROM threads WHERE ${VISIBLE} AND snoozed_until IS NOT NULL AND snoozed_until <= ?`).all(at) as unknown as ThreadRow[]).map(threadFromRow);
   },
   update(db: Db, id: string, patch: ThreadPatch): Thread {
+    if (patch.parentThreadId !== undefined && patch.parentRelation === undefined) patch = { ...patch, parentRelation: patch.parentThreadId ? "started" : null };
     const sets: string[] = [];
     const args: (string | number | null)[] = [];
     for (const [key, value] of Object.entries(patch) as [keyof ThreadPatch, string | number | boolean | null | undefined][]) {
@@ -454,6 +475,8 @@ export const threads = {
   },
   delete(db: Db, id: string): void {
     db.transaction(() => {
+      const children = db.stmt("SELECT id FROM threads WHERE parent_thread_id = ? AND parent_relation = 'subagent'").all(id);
+      for (const child of children) threads.delete(db, String(child.id));
       db.stmt("UPDATE tasks SET execution_thread_id = NULL WHERE execution_thread_id = ?").run(id);
       db.stmt("DELETE FROM threads WHERE id = ?").run(id);
     });

@@ -81,14 +81,6 @@ import { docHref } from "../../data/docs";
             <td><code>task-checkout/</code></td>
             <td>Scratch copies made while applying a task to your checkout</td>
           </tr>
-          <tr>
-            <td><code>task-forwardings/</code></td>
-            <td>The worktrees of team tasks you hand off as independent tasks</td>
-          </tr>
-          <tr>
-            <td><code>team-workspaces/</code> and the other <code>team-*</code> folders</td>
-            <td>Workspaces, merges, forks, restores, moves, and avatars for <a href={docHref("teams")}>agent teams</a></td>
-          </tr>
         </tbody>
       </table>
     </div>
@@ -104,7 +96,7 @@ import { docHref } from "../../data/docs";
     <h2 id="outside">Outside the data folder</h2>
     <ul>
       <li>
-        <strong>Your repositories.</strong> Worktree branches, and refs under <code>refs/openorc/</code> that keep each turn's checkpoint, task snapshots, and team operations. See <a href={docHref("git")}>Git and worktrees</a>.
+        <strong>Your repositories.</strong> Worktree branches, and refs under <code>refs/openorc/</code> that keep each turn's checkpoint and task snapshots. See <a href={docHref("git")}>Git and worktrees</a>.
       </li>
       <li>
         <strong>Your project's files</strong>, only when you ask: exporting a plan, adding a memory to <code>CLAUDE.md</code> or <code>AGENTS.md</code>, saving a file in a thread's Instructions tab, or a Git action such as committing,
@@ -174,10 +166,6 @@ import { docHref } from "../../data/docs";
             <td>Search</td>
             <td><code>messages_fts</code> and <code>memories_fts</code> (SQLite full-text search), <code>memory_vec</code> (vectors for memory search)</td>
           </tr>
-          <tr>
-            <td>Teams (Beta)</td>
-            <td>About 40 tables named <code>orchestration_*</code> and <code>team_*</code>: team definitions, executions, messages, workspaces, and the records that make team operations safe to retry</td>
-          </tr>
         </tbody>
       </table>
     </div>
@@ -220,7 +208,7 @@ import { docHref } from "../../data/docs";
     </p>
     <p>Some text is stored as written:</p>
     <ul>
-      <li>Text an agent reads later, such as plans, task comments, review comments, team messages, and messages you queue, which stay stored after they are sent. Redacting it would change what the agent gets.</li>
+      <li>Text an agent reads later, such as plans, task comments, review comments and messages you queue, which stay stored after they are sent. Redacting it would change what the agent gets.</li>
       <li>Text you write and edit: drafts, task descriptions, schedule prompts, pull request review drafts, and Orcling instructions.</li>
       <li>Everything outside OpenOrc's records, such as your project, its Git history, and the agents' own transcripts.</li>
     </ul>
@@ -343,11 +331,11 @@ import { docHref } from "../../data/docs";
       <li>Its worktree, unless another thread still uses it, as forks and threads it started do. Uncommitted changes are committed to the worktree's branch first, and the branch stays. A pull request copy's changes are discarded instead.</li>
     </ul>
     <p>These stay: tasks the thread created, threads it started, its attachments and memories, audit log entries, its lines in the provider log until they expire, and the agents' own session files.</p>
-    <p>An Orcling's own conversation goes only with the Orcling. A team conversation is deleted through the team's own steps; see <a href={docHref("teams")}>Agent teams</a>.</p>
+    <p>An Orcling's own conversation goes only with the Orcling.</p>
     <h3>A task</h3>
     <p>
-      <strong>Delete task</strong> is at the bottom of a task's page, or in the Task panel for a team task. It removes the task, its discussion, its own runs, and its own worktree unless a thread uses it. Uncommitted changes in that
-      worktree are committed to its branch first, and the branch stays, unless you tick <strong>Also delete branch</strong> where the Task panel offers it. The thread that worked on the task keeps its messages and changes.
+      <strong>Delete task</strong> is at the bottom of a task's page. It removes the task, its discussion, its own runs, and its own worktree unless a thread uses it. Uncommitted changes in that
+      worktree are committed to its branch first, and the branch stays. The thread that worked on the task keeps its messages and changes.
     </p>
     <h3>A project</h3>
     <p>

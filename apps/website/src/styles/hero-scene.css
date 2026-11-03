@@ -457,7 +457,6 @@
 /* The open thread or page takes the current-row fill, and so does every thread open in a split pane. */
 .hero-scene[data-view="a"] .hs-row[data-row="a"],
 .hero-scene[data-view="b"] .hs-row[data-row="b"],
-.hero-scene[data-view="team"] .hs-row[data-row="team"],
 .hero-scene[data-view="task"] .hs-nav-row[data-nav="Tasks"],
 .hero-scene:has(.hs-panes[data-split]) .hs-row[data-row="b"],
 .hs-nav-row[data-current],
@@ -1460,105 +1459,6 @@
 .hs-task-card-branch .hs-icon {
   width: calc(11 * var(--u));
   height: calc(11 * var(--u));
-}
-
-/* Team conversation (TeamConversation.tsx): the team's status in a header pill; members speak under a portrait. */
-.hs-team-status {
-  display: inline-flex;
-  align-items: center;
-  gap: calc(6 * var(--u));
-  height: calc(30 * var(--u));
-  margin-right: calc(2 * var(--u));
-  padding: 0 calc(10 * var(--u)) 0 calc(9 * var(--u));
-  border-radius: 999px;
-  background: var(--hs-plane);
-  color: var(--hs-muted);
-  font-size: calc(12 * var(--u));
-  line-height: calc(20 * var(--u));
-  white-space: nowrap;
-}
-.hs-team-status .hs-icon {
-  width: calc(14 * var(--u));
-  height: calc(14 * var(--u));
-}
-.hs-team-status .hs-team-chevron {
-  width: calc(12 * var(--u));
-  height: calc(12 * var(--u));
-  color: var(--hs-faint);
-}
-.hs-team-empty {
-  color: var(--hs-muted);
-  font-size: calc(12 * var(--u));
-  line-height: calc(16 * var(--u));
-}
-.hs-seen {
-  margin-top: calc(4 * var(--u));
-  color: var(--hs-faint);
-  font-size: calc(12 * var(--u));
-  line-height: calc(18 * var(--u));
-  text-align: right;
-}
-/* Each member's turn keeps the room of its reply actions, which show on hover. */
-.hs-column > .hs-member-turn {
-  margin-top: calc(16 * var(--u));
-  padding-bottom: calc(44 * var(--u));
-}
-.hs-member {
-  display: flex;
-  align-items: center;
-  gap: calc(8 * var(--u));
-  min-height: calc(16 * var(--u));
-  margin-bottom: calc(12 * var(--u));
-  color: var(--hs-faint);
-  font-size: calc(12 * var(--u));
-  line-height: calc(16 * var(--u));
-}
-.hs-avatar {
-  flex: none;
-  width: calc(24 * var(--u));
-  height: calc(24 * var(--u));
-  object-fit: contain;
-}
-.hs-member-name {
-  flex: none;
-  color: var(--hs-ink);
-  font-size: calc(13 * var(--u));
-}
-.hs-member-model {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.hs-member time {
-  margin-left: auto;
-  white-space: nowrap;
-}
-.hs-writing {
-  display: flex;
-  align-items: center;
-  gap: calc(8 * var(--u));
-  min-height: calc(22 * var(--u));
-  color: var(--hs-muted);
-}
-.hs-writing i {
-  flex: none;
-  width: calc(8 * var(--u));
-  height: calc(8 * var(--u));
-  border-radius: 999px;
-  background: var(--hs-ink);
-  animation: hs-reply-pulse 1.4s var(--hs-ease) infinite alternate;
-}
-.hs-member-turn > .hs-change {
-  margin-top: calc(14 * var(--u));
-}
-.hs-hint {
-  max-width: calc(752 * var(--u));
-  margin: 0 auto calc(8 * var(--u));
-  padding: 0 calc(2 * var(--u));
-  color: var(--hs-faint);
-  font-size: calc(12 * var(--u));
-  line-height: calc(18 * var(--u));
 }
 
 /* The task view (TaskView.tsx, TaskDocument.tsx): breadcrumb, tab track, a reading column, and the footer. */

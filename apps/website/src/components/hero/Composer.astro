@@ -14,7 +14,7 @@ interface Props {
   /** The scene's journey; stills pass none. */
   journey?: Journey;
   placeholder: string;
-  model: { label: string; effort: string; harness?: string; icon?: "team" };
+  model: { label: string; effort: string; harness?: string };
   permission: string;
   branch?: string;
   /** Window during which uncommitted changes show beside the branch, with their counts; `true` for the whole scene. */
@@ -22,7 +22,7 @@ interface Props {
   changeStat?: { added: number; removed: number };
   /** The prompt this composer types, if any. */
   prompt?: { text: string; typo: { at: number; key: string }; window: string; typed: string };
-  /** How much of the context window the conversation uses, as the ring shows it. Teams have none. */
+  /** How much of the context window the conversation uses, as the ring shows it. */
   context?: number | null;
   layout?: "thread" | "new";
 }
@@ -43,7 +43,7 @@ const ring = 2 * Math.PI * 6;
       <span class="hs-attach"><ProductIcon name="plus" /></span>
       {fresh ? <span class="hs-pill"><ProductIcon name="folder" />{project.name}<ProductIcon name="chevronDown" class="hs-pill-chevron" /></span> : null}
       <span class="hs-pill hs-model">
-        {model.icon ? <ProductIcon name={model.icon} /> : <svg class="hs-logo" data-provider={model.harness} aria-hidden="true"><use href={`#hs-logo-${model.harness}`} /></svg>}
+        <svg class="hs-logo" data-provider={model.harness} aria-hidden="true"><use href={`#hs-logo-${model.harness}`} /></svg>
         <span class="hs-model-name">{model.label}</span>
         <span class="hs-model-effort">{model.effort}</span>
       </span>

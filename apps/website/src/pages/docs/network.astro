@@ -23,7 +23,7 @@ import { docHref } from "../../data/docs";
           <tr>
             <td>Agent turns</td>
             <td>The agent's own service: Anthropic for Claude Code, OpenAI for Codex, the providers you set up in OpenCode</td>
-            <td>Each message you send, and each turn a schedule, Slack request, pull request review, team, or another thread's agent starts</td>
+            <td>Each message you send, and each turn a schedule, Slack request, pull request review, or another thread's agent starts</td>
             <td>Pause schedules, disconnect Slack</td>
           </tr>
           <tr>
@@ -82,9 +82,9 @@ import { docHref } from "../../data/docs";
           </tr>
           <tr>
             <td>Slack</td>
-            <td>Slack, or your team's relay</td>
+            <td>Slack, or your shared relay</td>
             <td>While Slack is connected</td>
-            <td><strong>Disconnect Slack</strong>, or <strong>Disconnect desktop</strong> and <strong>Disconnect relay</strong> for a team relay</td>
+            <td><strong>Disconnect Slack</strong>, or <strong>Disconnect desktop</strong> and <strong>Disconnect relay</strong> for a shared relay</td>
           </tr>
           <tr>
             <td>Browser preview</td>
@@ -176,15 +176,13 @@ import { docHref } from "../../data/docs";
     <h2 id="git">Git and GitHub</h2>
     <p>OpenOrc runs your own <code>git</code> and <code>gh</code>, so they use your credentials and configuration. Three things use the network without you pressing a Git button:</p>
     <ul>
-      <li>Creating a worktree from a branch fetches that branch from <code>origin</code> first, so the work starts from what your team sees. If the fetch fails, the local branch is used. Work in the Local checkout never fetches.</li>
+      <li>Creating a worktree from a branch fetches that branch from <code>origin</code> first, so the work starts from the remote branch. If the fetch fails, the local branch is used. Work in the Local checkout never fetches.</li>
       <li>A new worktree of a repository with submodules runs <code>git submodule update --init --recursive</code>, which can clone each submodule from its own remote.</li>
       <li>For each thread with an open pull request, OpenOrc runs <code>gh pr view &lt;url&gt; --json state</code> every 5 minutes to show when it is merged or closed.</li>
     </ul>
     <p>
       Everything else happens when you ask: pushing, creating a pull request, listing and reading pull requests on the <a href={docHref("pull-requests")}>Pull requests</a> pages, fetching a pull request to review it, and posting a review.
-      Before creating a pull request from a thread, OpenOrc checks that your branch is pushed using the remote branches Git already knows about, without going online. For a team's branch, OpenOrc asks <code>origin</code> with
-      <code>git ls-remote</code> instead.
-    </p>
+      Before creating a pull request from a thread, OpenOrc checks that your branch is pushed using the remote branches Git already knows about, without going online.</p>
     <p class="docs-source">Source: <code>packages/core/src/services/workspace.ts</code>, <code>lifecycle.ts</code>, <code>review.ts</code>, <code>packages/git/src/github.ts</code>, <code>github-app.ts</code></p>
   </section>
 
@@ -197,7 +195,7 @@ import { docHref } from "../../data/docs";
         The MCP Apps sandbox, which serves interactive tool results in isolated frames, on a random port. An app can load files from, and connect to, the <code>https</code> domains its MCP server declares, except <code>localhost</code>,
         <code>.local</code> names, and IP addresses.
       </li>
-      <li>The Slack team relay, on the computer that hosts it, at the port you set (47831 by default). Teammates reach it through an SSH tunnel.</li>
+      <li>The Slack shared relay, on the computer that hosts it, at the port you set (47831 by default). Other users reach it through an SSH tunnel.</li>
       <li>The reviewer app's setup page, on a random port, only while you set the app up, for at most 15 minutes.</li>
       <li>OpenCode's own server, <code>opencode serve</code>, which OpenOrc starts briefly to list OpenCode's skills. It is protected by a password OpenCode makes up.</li>
       <li>On macOS, the update library's handoff to the system installer, on a random port behind a random password, while a downloaded update waits to install.</li>

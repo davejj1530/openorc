@@ -79,7 +79,6 @@ const notice = `Message from the thread "API work" (id …):`;
       <li>A thread can have up to three helpers working at once. Helpers that are idle or archived don't count.</li>
       <li>A helper can't start helpers of its own. OpenOrc tells it to ask the thread that started it instead.</li>
       <li>A thread in Plan can't start helpers until you switch it to another mode.</li>
-      <li>Team conversations can't start helpers. A team divides work among its own members.</li>
       <li>Starting a helper doesn't ask for your approval.</li>
     </ul>
     <Callout tone="warning" title="Helpers share the folder">
@@ -94,7 +93,6 @@ const notice = `Message from the thread "API work" (id …):`;
     <pre><code set:text={notice} /></pre>
     <p>Click <strong>Show details</strong> to read the message. In the sending thread, the agent's work shows a <strong>Sent message</strong> row.</p>
     <p>The receiving agent acts on a message with its own thread's permissions, which can be more than the sender has. So a message to a thread in the same or a stricter mode goes straight through. A message to a more permissive thread, such as from Review everything to Autonomous, asks you first. From Plan, an agent can message only threads that are also in Plan. See <a href={docHref("permissions") + "#openorc-tools"}>Modes and permissions</a>.</p>
-    <p>A message to a <a href={docHref("teams")}>team conversation</a> goes to the team's lead, which reads it on its next turn. In the team's conversation it's labeled <strong>From thread</strong> and the sender's title. A team receives these messages only while it's running.</p>
   </section>
 
   <section aria-labelledby="limits">
@@ -106,6 +104,6 @@ const notice = `Message from the thread "API work" (id …):`;
 
   <section aria-labelledby="next-steps">
     <h2 id="next-steps">Next steps</h2>
-    <LinkCards cards={[{ slug: "permissions" }, { slug: "work" }, { slug: "teams" }, { slug: "orclings" }]} />
+    <LinkCards cards={[{ slug: "permissions" }, { slug: "work" }, { slug: "orclings" }]} />
   </section>
 </DocsLayout>

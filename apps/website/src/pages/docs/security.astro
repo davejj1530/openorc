@@ -53,7 +53,7 @@ const address = "http://127.0.0.1:<port>/mcp/<random UUID without dashes>";
       <li>
         The MCP Apps sandbox has a port of its own, so apps run apart from the app window. It serves each app at its own random path, in a sandboxed frame, and answers only <code>GET</code> requests that name its own address as the host.
       </li>
-      <li>The <a href={docHref("slack")}>Slack team relay</a> accepts only POST requests with a device key, and refuses any request with an <code>Origin</code> header. It keeps only a hash of each key.</li>
+      <li>The <a href={docHref("slack")}>Slack shared relay</a> accepts only POST requests with a device key, and refuses any request with an <code>Origin</code> header. It keeps only a hash of each key.</li>
       <li>The reviewer app's setup page runs only while you set the app up, for at most 15 minutes. It answers only requests that carry a random value from the link OpenOrc opened, and its form can post only to <code>github.com</code>.</li>
       <li>On macOS, while a downloaded update waits to install, the update library serves it to the system installer behind a random password.</li>
     </ul>
@@ -122,7 +122,7 @@ const address = "http://127.0.0.1:<port>/mcp/<random UUID without dashes>";
     </p>
     <p>
       Before a release is published, a check runs on the signed macOS app, the installed Windows app, and the installed Linux app. It reads the fuses, looks for native code inside the archive and, on macOS, for any executable not signed by
-      the same team, then starts the app and confirms that <code>ELECTRON_RUN_AS_NODE</code>, <code>--inspect</code>, and <code>--remote-debugging-port</code> do nothing.
+      the same Apple developer account, then starts the app and confirms that <code>ELECTRON_RUN_AS_NODE</code>, <code>--inspect</code>, and <code>--remote-debugging-port</code> do nothing.
     </p>
     <p class="docs-source">Source: <code>apps/desktop/electron-builder.yml</code>, <code>apps/desktop/build/entitlements.mac.plist</code>, <code>scripts/desktop-release.cjs</code>, <code>scripts/packaged-release-check.cjs</code></p>
   </section>

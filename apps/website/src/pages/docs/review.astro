@@ -66,7 +66,7 @@ import { docHref } from "../../data/docs";
       <li>Add as many comments as you need. Each shows on the diff, marked <strong>not sent yet</strong>, and in a list under it.</li>
       <li>Choose <strong>Send 2 to the conversation</strong> (the number counts your unsent comments).</li>
     </ol>
-    <p>OpenOrc sends them as one message that quotes each comment's lines and asks the agent to address every comment, or to say why one is wrong. If the agent is busy, the message waits in the queue; removing it from the queue returns the comments to the review. A comment whose lines change later is marked <strong>Outdated</strong>. Agent team conversations don't take line comments.</p>
+    <p>OpenOrc sends them as one message that quotes each comment's lines and asks the agent to address every comment, or to say why one is wrong. If the agent is busy, the message waits in the queue; removing it from the queue returns the comments to the review. A comment whose lines change later is marked <strong>Outdated</strong>.</p>
   </section>
 
   <section aria-labelledby="commit">
@@ -94,7 +94,6 @@ import { docHref } from "../../data/docs";
   <section aria-labelledby="tasks">
     <h2 id="tasks">Changes in a task</h2>
     <p>A task's <strong>Changes</strong> tab shows the Changes panel of the task's thread beside the task, and <strong>Commits</strong> shows that thread's commits. Line comments you write from a task are labeled with it, and sending them moves the task back to <strong>In progress</strong>.</p>
-    <p>A task that belongs to an <a href={docHref("teams")}>agent team</a> shows a review of its assignment's workspace instead. <strong>Since last review</strong> shows only what changed since you chose <strong>Mark reviewed</strong>. <strong>Export patch</strong> writes the changes to a patch file in OpenOrc's data folder and shows it in your file manager. Its <strong>Commit</strong>, <strong>Push</strong> and <strong>PR</strong> buttons work on the assignment's own branch, when the team allows it.</p>
   </section>
 
   <section aria-labelledby="requirements">

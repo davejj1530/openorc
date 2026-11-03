@@ -9,7 +9,7 @@ interface Props extends Record<string, unknown> {
   files: number;
   added: number;
   removed: number;
-  /** A thread's own turn can be undone; a team's shared checkpoint cannot. */
+  /** Whether this turn can be undone. */
   undo?: boolean;
   note?: string;
 }

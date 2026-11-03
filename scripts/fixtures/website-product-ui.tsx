@@ -1,11 +1,11 @@
 /** Marketing captures use the production app and deterministic sample data.
  * No live RPC, account, project files, or provider calls are available here. */
-import { defaultOrclingLook } from "../../packages/protocol/src/index";
-import { createRoot } from "react-dom/client";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { createDesignSettingsRpc } from "./design-settings";
+import { createRoot } from "react-dom/client";
 import { useRouter } from "../../apps/desktop/src/renderer/src/lib/router";
 import type { Block, RunTranscript } from "../../packages/client/src/index";
+import { defaultOrclingLook } from "../../packages/protocol/src/index";
+import { createDesignSettingsRpc } from "./design-settings";
 // main.tsx stamps the saved typefaces on <html>; the panel crops render without App, which would otherwise skip them.
 import "../../apps/desktop/src/renderer/src/lib/app-font";
 import "../../apps/desktop/src/renderer/src/lib/code-font";
@@ -100,7 +100,7 @@ async function main() {
   };
   const threads = [
     { ...base, id: "onboarding", title: "Make the first five minutes count" },
-    { ...base, id: "team", title: "Build a thoughtful onboarding", teamInstanceId: "instance", agents: ["codex", "claude", "codex"] },
+    { ...base, id: "onboarding-branch", title: "Build a thoughtful onboarding" },
     { ...base, id: "search", title: "A faster command menu", agent: "claude", model: "claude-opus-5-5[1m]", activity: "running" },
     { ...base, id: "tokens", title: "Simplify the design tokens" },
     { ...base, id: "welcome", projectId: "website", title: "Tell the product story" },
@@ -148,39 +148,6 @@ async function main() {
       createdAt: now - 45000,
     },
   ];
-  const members = [
-    {
-      key: "lead",
-      name: "Lead",
-      managerKey: null,
-      responsibility: "Coordinate the work and keep the direction clear",
-      settings: { agent: "codex", model: "gpt-6-astra", effort: "high", fastMode: false },
-    },
-    { key: "builder", name: "Builder", managerKey: "lead", responsibility: "Implement the interface", settings: { agent: "claude", model: "claude-opus-5-5[1m]", effort: "high", fastMode: false } },
-    { key: "reviewer", name: "Reviewer", managerKey: "lead", responsibility: "Review behavior and accessibility", settings: { agent: "codex", model: "gpt-6-astra", effort: "high", fastMode: false } },
-  ];
-  const replies = [
-    "I’ll keep the first run focused. @Builder, take the welcome flow. @Reviewer, check the keyboard path and empty states.",
-    "The welcome flow is ready. I reused the project picker and shared controls, and kept the primary action in the same place on every step.",
-    "Keyboard navigation and focus order look good. The empty state now explains what to do next. Ready for your review.",
-  ];
-  const actors = members.map((m, i) => ({
-    id: i === 0 ? "lead" : `member:${m.key}`,
-    memberKey: m.key,
-    taskId: null,
-    parentId: i === 0 ? null : "lead",
-    title: m.name,
-    createdAt: now - 90000,
-    state: "completed",
-    settings: m.settings,
-    runIds: [m.key],
-    runs: [{ id: m.key, turnId: `${m.key}-turn`, turn: 0, startedAt: now - 85000 + i * 10000, completedAt: now - 80000 + i * 10000, reason: "addressed", silent: false, changedFiles: [] }],
-    activeRunId: null,
-    error: null,
-    result: null,
-    retry: { allowed: false, reason: null },
-    workspace: null,
-  }));
   /** Holds a run's transcript as the app does once it has loaded, for the rows and views that read it. */
   const seedTranscript: Seed = (runId, blocks, state) =>
     runs.seed({
@@ -192,39 +159,8 @@ async function main() {
       eventCount: blocks.length,
       ...state,
     });
-  for (const [i, { key }] of members.entries()) {
-    seedTranscript(key, [{ kind: "message", role: "assistant", id: `reply-${key}`, text: replies[i]!, streaming: false, at: now - 80000 + i * 10000 }], { turnsCompleted: 1 });
-  }
   const shell = mode === "shell" || mode === "inbox" ? addShellStates({ base, projects, threads, tasks, seed: seedTranscript }) : null;
   const working = mode === "working" ? addWorkingStates({ base, threads, now, response: messages[1]!.text, seed: seedTranscript }) : null;
-  const team = {
-    instance: { id: "instance", threadId: "team", teamRevisionId: "revision", leadOverrides: {} },
-    revision: { id: "revision", teamId: "team-config", name: "Product team", number: 1, members },
-    executions: [
-      {
-        id: "execution",
-        state: "completed",
-        activity: "idle",
-        generation: 1,
-        createdAt: now - 90000,
-        updatedAt: now,
-        error: null,
-        initialPrompt: {
-          text: "Let’s build a thoughtful onboarding experience. Work together on the implementation and review.",
-          attachments: [],
-          createdAt: now - 90000,
-          seenBy: actors.map((a, i) => ({ actorId: a.id, name: members[i].name })),
-        },
-        actors,
-        userDirections: [],
-        publications: [],
-        chat: [],
-      },
-    ],
-    actions: { fork: { allowed: true, reason: null } },
-    context: { compact: { allowed: true, reason: null }, checkpoints: [] },
-    policy: { requested: "review", effective: "review", pendingRestart: false, runs: [], mode: { requested: "act", effective: "act", pending: false } },
-  };
   const models = [
     { agent: "codex", id: "gpt-6-astra", label: "GPT-6-Astra", efforts: ["high"], defaultEffort: "high", isDefault: true },
     { agent: "claude", id: "claude-opus-5-5[1m]", label: "Opus 5.5 (1M context)", efforts: ["high"], defaultEffort: "high" },
@@ -300,7 +236,7 @@ async function main() {
     if (method === "workspace.get") return { ...project, id: "openorc-workspace", name: "Workspace" };
     if (method === "threads.list") return threads.filter((t) => (!params.projectId || t.projectId === params.projectId) && (params.filter === "archived" ? Boolean(t.archivedAt) : !t.archivedAt));
     if (method === "threads.get") return threads.find((t) => t.id === params.id) ?? threads[0];
-    if (method === "threads.messages") return params.id === "team" || working ? [] : messages;
+    if (method === "threads.messages") return working ? [] : messages;
     if (working && method === "runs.listForThread") return params.threadId === "onboarding" ? working.runs : [];
     if (working && method === "threads.checkpoints") return params.id === "onboarding" ? working.checkpoints : [];
     if (working && method === "threads.turnChanges") return working.turnChanges;
@@ -309,16 +245,13 @@ async function main() {
       if (index >= 0) threads[index] = { ...threads[index], ...params.patch };
       return threads[index] ?? threads[0];
     }
-    if (method === "threads.permissions") return team.policy;
+    if (method === "threads.permissions") return { requested: "review", effective: "review", pendingRestart: false, runs: [], mode: { requested: "act", effective: "act", pending: false } };
     if (method === "tasks.list" || method === "tasks.listForThread") return tasks.filter((task) => !params.projectId || task.projectId === params.projectId);
     if (method === "tasks.get") return tasks.find((t) => t.id === params.id) ?? tasks[0];
     if (method === "tasks.update") return Object.assign(tasks.find((t) => t.id === params.id) ?? tasks[0], params.patch, { updatedAt: Date.now() });
     if (method === "tasks.executionThread") return null;
-    if (method === "orchestration.taskState") return null;
     if (method === "review.threadDiff" || method === "review.projectDiff" || method === "review.diff") return String(params.threadId).startsWith("orcling-") ? { ...diff, files: [], patch: "" } : diff;
     if (method === "git.threadPushState") return { branch: "main", blocked: null, published: true, unpushedCount: 0, unpushed: [], busy: false };
-    if (method === "orchestration.runtime") return team;
-    if (method === "orchestration.availability") return { enabled: true, maxHierarchyDepth: 3 };
     if (method === "agents.models") return models;
     if (method === "agents.modelCatalog") return { models, providers: [] };
     if (method === "agents.updates.get") return { agents: [], automatic: false, checking: false, updating: false };
@@ -386,7 +319,7 @@ async function main() {
   } else if (mode === "new") useRouter.getState().navigate({ view: "newthread", projectId: "studio" });
   else if (mode === "orclings") useRouter.getState().navigate({ view: "thread", threadId: "orcling-rini" });
   else if (mode === "document") useRouter.getState().navigate({ view: "task", taskId: "welcome", tab: "spec" });
-  else useRouter.getState().navigate({ view: "thread", threadId: mode === "teams" ? "team" : "onboarding" });
+  else useRouter.getState().navigate({ view: "thread", threadId: "onboarding" });
   if (mode === "review") useLayout.getState().openWorkspaceChanges({ kind: "thread", id: "onboarding" });
   if (query.get("panel")) await openPanelTabs(query.get("panel")!, mode === "orclings" ? "thread:orcling-rini" : "thread:onboarding");
   const { App } = await import("../../apps/desktop/src/renderer/src/App");
@@ -414,7 +347,7 @@ function DesignPreviewBar() {
   const threadId = useRouter((state) => (state.route.view === "thread" ? state.route.threadId : null));
   let previewView = ["connections", "slack", "phone", "skills", "general", "memory", "data"].includes(query.get("view") ?? "") ? "usage" : (query.get("view") ?? "workspace");
   if (threadId?.startsWith("orcling-")) previewView = "orclings";
-  else if (threadId && previewView === "orclings") previewView = threadId === "team" ? "teams" : "workspace";
+  else if (threadId && previewView === "orclings") previewView = "workspace";
   return (
     <nav
       aria-label="Design preview"
@@ -447,7 +380,6 @@ function DesignPreviewBar() {
           <option value="shell">Sidebar states</option>
           <option value="working">Agent working</option>
           <option value="inbox">Inbox</option>
-          <option value="teams">Team conversation</option>
           <option value="orclings">Orclings</option>
           <option value="new">New thread</option>
           <option value="tasks">Tasks</option>
@@ -489,7 +421,7 @@ type Seed = (runId: string, blocks: Block[], state?: Partial<RunTranscript>) => 
 function addShellStates({ base, projects, threads, tasks, seed }: { base: Record<string, unknown>; projects: Row[]; threads: Row[]; tasks: Row[]; seed: Seed }) {
   projects.push({ ...projects[0]!, id: "billing", name: "customer-billing-and-payments-reconciliation", rootPath: "/Projects/customer-billing-and-payments-reconciliation" });
   const thread = (id: string) => threads.find((row) => row.id === id)!;
-  Object.assign(thread("team"), { prUrl: "https://github.com/acme/studio/pull/482", prState: "merged" });
+  Object.assign(thread("onboarding-branch"), { prUrl: "https://github.com/acme/studio/pull/482", prState: "merged" });
   Object.assign(thread("search"), { liveRunId: "search-run" });
   Object.assign(thread("tokens"), { unread: true, liveRunId: "tokens-run" });
   Object.assign(thread("welcome"), { activity: "waiting", liveRunId: "welcome-run" });
@@ -667,10 +599,10 @@ function addWorkingStates({ base, threads, now, response, seed }: { base: Row; t
  * Unit 9.0: the pages the redesign restyles that no other view reaches. project is the Project view (its Settings tab
  * reads the real settings shape), orcling and orcling-edit are the Orcling designer new and editing Rini, onboarding is
  * first-run setup with one agent in each scan state, pulls and pull are the pull request list and one pull request,
- * memory-page is the Memory page and team-config the Teams page. notices is the conversation with both update toasts:
+ * memory-page is the Memory page. notices is the conversation with both update toasts:
  * an app update downloading and an agent update available.
  */
-const pageViews = new Set(["project", "orcling", "orcling-edit", "onboarding", "pulls", "pull", "memory-page", "team-config", "notices"]);
+const pageViews = new Set(["project", "orcling", "orcling-edit", "onboarding", "pulls", "pull", "memory-page", "notices"]);
 
 function pageRoute(mode: string): Parameters<ReturnType<typeof useRouter.getState>["navigate"]>[0] {
   if (mode === "project") return { view: "project", projectId: "studio" };
@@ -681,7 +613,7 @@ function pageRoute(mode: string): Parameters<ReturnType<typeof useRouter.getStat
   if (mode === "pull") return { view: "pull", projectId: "studio", number: 482 };
   if (mode === "memory-page") return { view: "memory" };
   if (mode === "notices") return { view: "thread", threadId: "onboarding" };
-  return { view: "orchestration" };
+  return { view: "thread", threadId: "onboarding" };
 }
 
 function pageStates({ mode, now, project, orclings, patch }: { mode: string; now: number; project: Row; orclings: Row[]; patch: string }) {

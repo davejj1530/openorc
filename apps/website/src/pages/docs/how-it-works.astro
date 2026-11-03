@@ -335,7 +335,7 @@ const envelope = `{ "type": "rpc", "id": 42, "method": "runs.start", "params": {
       <li>It opens the database and applies any pending migrations.</li>
       <li>
         It recovers from the last session: runs that were still open are marked as failed with <strong>OpenOrc closed while this session was open. Send a message to continue where you left off.</strong> Interrupted discussion replies and
-        plans are marked as such, and team turns that were running wait for you.
+        plans are marked as such.
       </li>
       <li>On macOS and Linux, it asks your login shell for <code>PATH</code> and the agents. Then it starts the MCP server and tells every window it is ready.</li>
       <li>It starts its timers and sends messages still waiting in a thread's queue, which can start an agent right after launch.</li>

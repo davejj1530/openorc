@@ -117,17 +117,17 @@ import { docHref } from "../../data/docs";
     <ol class="docs-steps">
       <li>Make sure OpenOrc is open and your computer is awake. Slack can't reach an agent on a computer that is asleep or a closed app.</li>
       <li>
-        Open <strong>Settings</strong>, then <strong>Slack</strong>. After OpenOrc restarts, Slack isn't connected: press <strong>Connect and check</strong>. With a team relay, press <strong>Connect this computer</strong>, and the host
+        Open <strong>Settings</strong>, then <strong>Slack</strong>. After OpenOrc restarts, Slack isn't connected: press <strong>Connect and check</strong>. With a shared relay, press <strong>Connect this computer</strong>, and the host
         presses <strong>Save and connect relay</strong>.
       </li>
       <li>
         If the status says <strong>Needs attention</strong> or <strong>Delivery pending</strong>, read the error under it and fix it. Then press <strong>Connect and check</strong> again, or <strong>Check connection</strong> while Slack is
-        connected. A team relay offers <strong>Retry Slack delivery</strong> or <strong>Reconnect to send result</strong> instead.
+        connected. A shared relay offers <strong>Retry Slack delivery</strong> or <strong>Reconnect to send result</strong> instead.
       </li>
       <li>Mention the bot in a channel it was invited to, from the Slack member ID you entered. A personal bot ignores requests from anyone else.</li>
       <li>Check that your default agent is signed in under Connections.</li>
     </ol>
-    <p>If the bot stays silent, check that both tokens came from the same Slack app. Replies sent with "Also send to channel" are never picked up. With a team relay, OpenOrc also has to be open on the computer that hosts it.</p>
+    <p>If the bot stays silent, check that both tokens came from the same Slack app. Replies sent with "Also send to channel" are never picked up. With a shared relay, OpenOrc also has to be open on the computer that hosts it.</p>
   </section>
 
   <section aria-labelledby="git">
@@ -142,11 +142,11 @@ import { docHref } from "../../data/docs";
         </thead>
         <tbody>
           <tr>
-            <td>… isn't a git repository yet. Worktrees and teams need git and a first commit.</td>
+            <td>… isn't a git repository yet. Worktrees need git and a first commit.</td>
             <td>Make the project a Git repository with at least one commit, or work in the Local checkout.</td>
           </tr>
           <tr>
-            <td>… has no commits yet. Worktrees and teams need a first commit.</td>
+            <td>… has no commits yet. Worktrees need a first commit.</td>
             <td>Make a first commit.</td>
           </tr>
           <tr>
@@ -194,7 +194,6 @@ import { docHref } from "../../data/docs";
       <li>A terminal still has a shell running. Use End shell in each terminal, then restart to update.</li>
       <li>Wait for agent work, approvals, and context maintenance to finish before restarting to update.</li>
       <li>Stop the background commands running in your conversations before restarting to update.</li>
-      <li>Finish or stop your active teams before restarting to update.</li>
       <li>Wait for memory processing to finish before restarting to update.</li>
       <li>Wait for agent updates to finish before restarting.</li>
       <li>A schedule is starting a thread. Try again when it has started.</li>
@@ -207,7 +206,7 @@ import { docHref } from "../../data/docs";
     </p>
     <h3>Agent updates</h3>
     <p>
-      OpenOrc refuses to update an agent while agent work, approvals, background commands, teams, or background processing such as memory summaries are still running. Finish or stop them, then try again. Your conversations are kept. Some
+      OpenOrc refuses to update an agent while agent work, approvals, background commands, or background processing such as memory summaries are still running. Finish or stop them, then try again. Your conversations are kept. Some
       messages on an agent's row in Connections:
     </p>
     <div class="docs-table">

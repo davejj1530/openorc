@@ -118,9 +118,9 @@ import { docHref } from "../../data/docs";
   <section aria-labelledby="repository">
     <h2 id="repository">What OpenOrc adds to your repository</h2>
     <ul>
-      <li>Branches under <code>openorc/</code>, or your <strong>Branch prefix</strong>, one for each thread that used a worktree. Agent teams use branches named <code>openorc/team-…</code>.</li>
+      <li>Branches under <code>openorc/</code>, or your <strong>Branch prefix</strong>, one for each thread that used a worktree.</li>
       <li>Worktree registrations under <code>.git/worktrees/</code>. The folders themselves live in OpenOrc's data folder, never inside your repository.</li>
-      <li>Refs under <code>refs/openorc/</code> that keep saved file states from being cleaned up by Git: <code>checkpoints/</code> for each thread's turns, which Undo and the change cards use, and <code>snapshots/</code> for tasks that run on their own. They go when you delete the thread or task. Moves and patch exports hold a ref only while they run, and agent teams keep their own. These refs point at trees, so <code>git log --all</code> skips them and <code>git for-each-ref refs/openorc</code> lists them.</li>
+      <li>Refs under <code>refs/openorc/</code> that keep saved file states from being cleaned up by Git: <code>checkpoints/</code> for each thread's turns, which Undo and the change cards use, and <code>snapshots/</code> for tasks that run on their own. They go when you delete the thread or task. Moves and patch exports hold a ref only while they run. These refs point at trees, so <code>git log --all</code> skips them and <code>git for-each-ref refs/openorc</code> lists them.</li>
       <li>Commits you make from OpenOrc, and the commit that saves a worktree's work before it is removed.</li>
       <li>Remote-tracking refs from fetching a worktree's starting branch, and the upstream that pushing sets.</li>
       <li>For a pull request a model reviews, a worktree of the pull request on no branch, and the fetched commits.</li>
@@ -146,7 +146,7 @@ import { docHref } from "../../data/docs";
           </tr>
           <tr>
             <td>A repository without commits</td>
-            <td>Changes, change cards, Undo and commits work. Worktrees and agent teams need a first commit.</td>
+            <td>Changes, change cards, Undo and commits work. Worktrees need a first commit.</td>
           </tr>
           <tr>
             <td>A repository with commits</td>

@@ -140,7 +140,7 @@ import { docHref } from "../../data/docs";
     <h2 id="slack">Slack</h2>
     <p>
       Slack connects a Slack bot to this computer, so you can mention it in a channel and an agent here replies. <strong>Connect Slack</strong> picks the kind of connection: <strong>Personal bot · no server needed</strong> or <strong
-        >Team relay · advanced</strong
+        >Shared relay · advanced</strong
       >. The setup steps are on <a href={docHref("slack")}>Slack</a>.
     </p>
     <div class="docs-table">
@@ -176,7 +176,7 @@ import { docHref } from "../../data/docs";
       </table>
     </div>
     <p>
-      <strong>Connect and check</strong> saves these and connects. While Slack is connected, the fields are locked; <strong>Disconnect Slack</strong> unlocks them. The team relay has the same defaults under <strong>This computer</strong>, plus a
+      <strong>Connect and check</strong> saves these and connects. While Slack is connected, the fields are locked; <strong>Disconnect Slack</strong> unlocks them. The shared relay has the same defaults under <strong>This computer</strong>, plus a
       relay address and a device key from the person who hosts it.
     </p>
     <Callout>Slack requests reach your agents only while OpenOrc is open and your computer is awake. After OpenOrc restarts, open this section and connect again.</Callout>
@@ -295,11 +295,6 @@ import { docHref } from "../../data/docs";
           <tr>
             <td><strong>Your Claude Code MCP servers</strong></td>
             <td>Lets Claude Code connect the MCP servers from your own Claude Code configuration. They load only in Autonomous; the other modes connect only OpenOrc's tools. A slow server can miss the first message.</td>
-            <td>On</td>
-          </tr>
-          <tr>
-            <td><strong>Team execution (Beta)</strong></td>
-            <td>Lets a team lead coordinate managers and workers. Turning it off keeps existing team activity and <strong>Stop</strong> available.</td>
             <td>On</td>
           </tr>
         </tbody>

@@ -58,7 +58,7 @@ export const docGroups: DocGroup[] = [
           { id: "where", title: "Where agents work" },
           { id: "conversations", title: "Conversations" },
           { id: "planning", title: "Planning and context" },
-          { id: "companions", title: "Orclings and teams" },
+          { id: "companions", title: "Orclings" },
           { id: "next-steps", title: "Next steps" },
         ],
       },
@@ -298,29 +298,6 @@ export const docGroups: DocGroup[] = [
     ],
   },
   {
-    title: "Teams",
-    pages: [
-      {
-        slug: "teams",
-        title: "Agent teams",
-        label: "Agent teams (Beta)",
-        description: "Put several agents in one conversation: a lead that plans and hands out work, and members that report to it. Team execution is in Beta.",
-        sections: [
-          { id: "what-a-team-is", title: "What a team is" },
-          { id: "turn-on", title: "Turn on team execution" },
-          { id: "create", title: "Create a team" },
-          { id: "start", title: "Start a team conversation" },
-          { id: "talk", title: "Talk to the team" },
-          { id: "members", title: "How members work together" },
-          { id: "changes", title: "Review and combine changes" },
-          { id: "needs-you", title: "When the team needs you" },
-          { id: "limits", title: "Limits" },
-          { id: "next-steps", title: "Next steps" },
-        ],
-      },
-    ],
-  },
-  {
     title: "Integrations",
     pages: [
       {
@@ -490,7 +467,6 @@ export const docGroups: DocGroup[] = [
           { id: "storage", title: "Storage" },
           { id: "memory", title: "Memory" },
           { id: "slack", title: "Slack" },
-          { id: "teams", title: "Agent teams (Beta)" },
           { id: "windows-os", title: "Windows" },
           { id: "linux", title: "Linux" },
           { id: "next-steps", title: "Next steps" },

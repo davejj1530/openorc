@@ -2,6 +2,7 @@ import { spawnAgentProcess } from "../process-recovery.js";
 import { withCodexConnection } from "./connection.js";
 import { mapNotification } from "./notifications.js";
 import { codexMcpApps } from "./mcp-apps.js";
+import { CodexSubagents } from "./subagents.js";
 import { modelEfforts, normalizeModelEffort, normalizeModelSettings } from "@openorc/protocol";
 import type { AgentEvent, ApprovalDecision, ApprovalKind, ApprovalResolution, RunSpec } from "@openorc/protocol";
 import { agentBinary } from "../bin.js";
@@ -31,6 +32,8 @@ export interface CodexApprovalRequest {
   params: unknown;
   /** An MCP tool's confirmation form is answered once; OpenOrc has no way to have Codex remember it. */
   onceOnly: boolean;
+  subagentTitle?: string;
+  subagentId?: string;
 }
 
 export interface CodexAdapterOptions {
@@ -234,6 +237,14 @@ export class CodexAdapter {
     const notificationState = { summaryIndex: new Map<string, number>(), buffering: new Set<string>() };
     const emit = (ev: AgentEvent) => handle.emit("event", ev);
     const now = () => Date.now();
+    let interrupting = false;
+    const subagents = new CodexSubagents({
+      runId: spec.runId,
+      root: () => threadId,
+      activeTurn: () => (compaction || interrupting ? null : activeTurnId),
+      emit,
+      request: (method, params) => rpc.request(method, params, 15_000),
+    });
 
     const finishCompaction = (status: "success" | "error" | "cancelled" | "disconnected", text?: string) => {
       if (!compaction || compaction.finished) return;
@@ -243,6 +254,7 @@ export class CodexAdapter {
 
     const done = new Promise<number | null>((resolve) => {
       proc.on("close", async (code) => {
+        subagents.close();
         await waitForProcessGroup(proc);
         finishCompaction("disconnected");
         compaction?.reject(new Error("Codex exited before context compaction finished. Your draft has not been sent."));
@@ -259,16 +271,7 @@ export class CodexAdapter {
         resolve(code);
       });
     });
-    proc.once("exit", () => {
-      try {
-        stopProcess(proc);
-      } catch (error) {
-        // Keep waiting for descendant writers even when cleanup is denied;
-        // an exit event callback must never throw into the host process.
-        handle.emit("event", { type: "error", runId: spec.runId, ts: Date.now(), message: `Process cleanup needs attention: ${error instanceof Error ? error.message : String(error)}`, fatal: false });
-      }
-    });
-
+    stopDescendantsOnExit(proc, spec.runId, emit);
     const startTurn = async (text: string, attachments?: string[]): Promise<void> => {
       if (!threadId) throw new Error("thread not started");
       // A compact turn cannot accept steering. Wait for its terminal event,
@@ -307,12 +310,17 @@ export class CodexAdapter {
     handle = new RunHandle(spec.runId, {
       mcpApps: codexMcpApps(rpc, () => threadId),
       interrupt: async () => {
-        // Cancellation is scoped to a turn, including a manual compaction turn.
-        // Await the response so a rejected Stop is visible to the caller.
-        if (!threadId || !activeTurnId) return;
-        await rpc.request("turn/interrupt", { threadId, turnId: activeTurnId }, 15_000);
+        interrupting = true;
+        subagents.interrupt();
+        try {
+          if (threadId && activeTurnId) await rpc.request("turn/interrupt", { threadId, turnId: activeTurnId }, 15_000);
+        } finally {
+          interrupting = false;
+        }
       },
       close: () => stopProcess(proc),
+      canStopSubagent: (id) => subagents.canStop(id),
+      stopSubagent: (id, reason) => subagents.stop(id, reason),
       send: startTurn,
       applySettings: async ({ model, effort, fastMode }) => {
         if (!threadId) throw new Error("Codex has no thread yet.");
@@ -359,6 +367,8 @@ export class CodexAdapter {
     rpc.on("stderr", (line) => emit({ type: "error", runId: spec.runId, ts: now(), message: line, fatal: false }));
     rpc.on("parseError", (line) => emit({ type: "error", runId: spec.runId, ts: now(), message: `unparseable: ${line.slice(0, 200)}`, fatal: false }));
     rpc.on("notification", (n) => {
+      emit({ type: "raw", runId: spec.runId, ts: now(), agent: "codex", payload: { method: n.method, params: n.params } });
+      if (subagents.route(n.method, n.params)) return;
       const params = (n.params ?? {}) as {
         turn?: { id?: string; status?: string; error?: { message?: string } };
         turnId?: string;
@@ -367,12 +377,6 @@ export class CodexAdapter {
         error?: { message?: string };
         item?: { type?: string; id?: string };
       };
-      // Native subagents share this transport. Retain their raw events without
-      // changing the owning thread's turn, compaction, usage or transcript.
-      if (typeof params.threadId === "string" && params.threadId !== threadId) {
-        emit({ type: "raw", runId: spec.runId, ts: now(), agent: "codex", payload: { method: n.method, params: n.params } });
-        return;
-      }
       const turn = params.turn;
       let maintenance = false;
       if (n.method === "error" && params.willRetry === false && compaction) {
@@ -422,10 +426,9 @@ export class CodexAdapter {
       }
       // Publish after updating control state: completion callbacks can send the
       // next queued message synchronously. Manual maintenance isn't an agent reply.
-      emit({ type: "raw", runId: spec.runId, ts: now(), agent: "codex", payload: { method: n.method, params: n.params } });
       if (!maintenance) for (const ev of mapNotification(spec.runId, n.method, n.params, notificationState)) emit(ev);
     });
-    rpc.on("request", (req) => void this.handleServerRequest(spec.runId, rpc, req, emit));
+    rpc.on("request", (req) => void this.handleServerRequest(spec.runId, rpc, req, emit, subagents.title(req.params), subagents.nativeId(req.params)));
 
     void (async () => {
       try {
@@ -465,7 +468,7 @@ export class CodexAdapter {
    * Codex asks the client four different questions with four response shapes.
    * They all surface in OpenOrc as one approval card.
    */
-  private async handleServerRequest(runId: string, rpc: StdioJsonRpc, req: JsonRpcServerRequest, emit: (ev: AgentEvent) => void): Promise<void> {
+  private async handleServerRequest(runId: string, rpc: StdioJsonRpc, req: JsonRpcServerRequest, emit: (ev: AgentEvent) => void, subagentTitle?: string, subagentId?: string): Promise<void> {
     const kind = approvalKindFor[req.method];
     if (!kind) {
       rpc.respondError(req.id, -32601, `OpenOrc does not handle ${req.method}`);
@@ -487,7 +490,7 @@ export class CodexAdapter {
     // The host announces the request (it derives a better tool name and detail); the adapter reports how it was resolved.
     let answer: ApprovalDecision | ApprovalResolution;
     try {
-      answer = await this.options.onApproval({ runId, approvalId, kind, params: req.params, onceOnly: req.method === "mcpServer/elicitation/request" });
+      answer = await this.options.onApproval({ runId, approvalId, kind, params: req.params, onceOnly: req.method === "mcpServer/elicitation/request", subagentTitle, subagentId });
     } catch (error) {
       rpc.respondError(req.id, -32000, error instanceof Error ? error.message : String(error));
       return;
@@ -552,4 +555,16 @@ function fillElicitationForm(p: Record<string, unknown>): Record<string, unknown
     else content[name] = typeof def["default"] === "string" ? def["default"] : "";
   }
   return content;
+}
+
+function stopDescendantsOnExit(proc: ReturnType<typeof spawnAgentProcess>, runId: string, emit: (event: AgentEvent) => void): void {
+  proc.once("exit", () => {
+    try {
+      stopProcess(proc);
+    } catch (error) {
+      // Keep waiting for descendant writers even when cleanup is denied;
+      // an exit event callback must never throw into the host process.
+      emit({ type: "error", runId, ts: Date.now(), message: `Process cleanup needs attention: ${error instanceof Error ? error.message : String(error)}`, fatal: false });
+    }
+  });
 }

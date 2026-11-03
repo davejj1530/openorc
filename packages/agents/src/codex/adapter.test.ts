@@ -111,7 +111,7 @@ function server(permissionMode: PermissionPreset = "autonomous", overrides: Part
         const reply = () => {
           const error = typeof req.params.turnId !== "string" ? "Invalid request: missing field `turnId`" : interruption.error;
           stdout.write(JSON.stringify(error ? { id: req.id, error: { code: -32600, message: error } } : { id: req.id, result: {} }) + "\n");
-          if (!error) notify("turn/completed", { threadId: "thread-1", turn: { id: req.params.turnId, status: "interrupted" } });
+          if (!error) notify("turn/completed", { threadId: req.params.threadId, turn: { id: req.params.turnId, status: "interrupted" } });
         };
         if (interruption.hold) interruption.replies.push(reply);
         else reply();
@@ -148,6 +148,64 @@ it.each([false, true])("continues a paginated Codex thread without full-history 
     await vi.waitFor(() => expect(errors.length || s.calls.some((call) => call.method === "turn/start")).toBeTruthy());
     expect(errors).toEqual([]);
     expect(s.calls.some((call) => call.method === "turn/start")).toBe(true);
+  } finally {
+    s.handle.close();
+    await s.handle.wait();
+  }
+});
+
+it("routes registered children and approvals while preserving the parent's active turn", async () => {
+  const approvals: unknown[] = [];
+  const s = server("autonomous", {}, async (request) => {
+    approvals.push(request);
+    return "allow";
+  });
+  const events: AgentEvent[] = [];
+  s.handle.on("event", (event: AgentEvent) => events.push(event));
+  try {
+    await vi.waitFor(() => expect(s.calls.some((call) => call.method === "turn/start")).toBe(true));
+    s.notify("item/started", { threadId: "thread-1", item: { id: "launch", type: "subAgentActivity", kind: "started", agentThreadId: "child", agentPath: "/root/checker" } });
+    s.notify("turn/started", { threadId: "child", turn: { id: "child-turn" } });
+    s.notify("item/completed", { threadId: "child", item: { id: "answer", type: "agentMessage", text: "Child findings" } });
+    s.request(903, "item/commandExecution/requestApproval", { threadId: "child", command: "pwd" });
+    await vi.waitFor(() => expect(approvals).toContainEqual(expect.objectContaining({ runId: "run-1", subagentTitle: "/root/checker" })));
+    expect(events).toContainEqual(expect.objectContaining({ type: "message.completed", subagentId: "child", text: "Child findings" }));
+    expect(s.handle.canStopSubagent("child")).toBe(true);
+    await s.handle.stopSubagent("child");
+    expect(s.calls.find((call) => call.method === "turn/interrupt")?.params).toEqual({ threadId: "child", turnId: "child-turn" });
+    expect(s.calls.find((call) => call.method === "turn/steer")?.params).toEqual({
+      threadId: "thread-1",
+      expectedTurnId: "work-1",
+      input: [{ type: "text", text: "I stopped the sub-agent /root/checker. It will not report. Treat it as finished; do not wait for it or respawn it." }],
+    });
+    expect(events).toContainEqual(expect.objectContaining({ type: "subagent.updated", notice: "Stopped /root/checker" }));
+    expect(events.some((event) => event.type === "turn.completed")).toBe(false);
+    await s.handle.steer("Continue");
+    expect(s.calls.at(-1)).toMatchObject({ method: "turn/steer", params: { threadId: "thread-1", expectedTurnId: "work-1" } });
+    s.finish("work-1");
+    expect(events.filter((event) => event.type === "turn.completed")).toHaveLength(1);
+  } finally {
+    s.handle.close();
+    await s.handle.wait();
+  }
+});
+
+it("routes early notifications through the adapter after registration and keeps retry errors confined to the child", async () => {
+  const s = server("autonomous", { resumeSessionId: "persisted-root" });
+  const events: AgentEvent[] = [];
+  s.handle.on("event", (event: AgentEvent) => events.push(event));
+  try {
+    await vi.waitFor(() => expect(s.calls.some((call) => call.method === "turn/start")).toBe(true));
+    s.notify("turn/started", { threadId: "persisted-child", turn: { id: "child-turn" } });
+    s.notify("item/completed", { threadId: "persisted-child", item: { type: "agentMessage", id: "early", text: "Early reply" } });
+    s.notify("item/started", { threadId: "thread-1", item: { type: "collabAgentToolCall", tool: "sendInput", receiverThreadIds: ["persisted-child"] } });
+    s.notify("error", { threadId: "persisted-child", willRetry: true, error: { message: "Transient" } });
+    expect(events).toContainEqual(expect.objectContaining({ type: "message.completed", subagentId: "persisted-child", text: "Early reply" }));
+    expect(events).toContainEqual(expect.objectContaining({ type: "activity.updated", subagentId: "persisted-child", label: "Retrying", status: "running" }));
+    expect(events.some((e) => e.type === "error" && e.fatal)).toBe(false);
+    expect(s.handle.canStopSubagent("persisted-child")).toBe(true);
+    await s.handle.steer("Keep going");
+    expect(s.calls).toContainEqual(expect.objectContaining({ method: "turn/steer", params: expect.objectContaining({ threadId: "thread-1" }) }));
   } finally {
     s.handle.close();
     await s.handle.wait();
@@ -620,4 +678,114 @@ describe("Codex Fast mode", () => {
       s.handle.close();
     }
   });
+});
+
+it.each(["idle", "nested", "interrupting", "compaction"])("does not steer the root after stopping a child when %s", async (state) => {
+  const s = server("autonomous");
+  try {
+    await vi.waitFor(() => expect(s.calls.some((call) => call.method === "turn/start")).toBe(true));
+    s.notify("item/started", { threadId: "thread-1", item: { id: "launch-owner", type: "subAgentActivity", kind: "started", agentThreadId: "owner", agentPath: "/root/owner" } });
+    s.notify("item/started", {
+      threadId: state === "nested" ? "owner" : "thread-1",
+      item: { id: "launch-child", type: "subAgentActivity", kind: "started", agentThreadId: "child", agentPath: "/root/child" },
+    });
+    s.notify("turn/started", { threadId: "child", turn: { id: "child-turn" } });
+    if (state === "idle") s.finish("work-1");
+    if (state === "compaction") s.notify("item/started", { threadId: "thread-1", turnId: "work-1", item: { id: "compact-item", type: "contextCompaction" } });
+    if (state === "interrupting") {
+      s.interruption.hold = true;
+      const stopped = s.handle.stopSubagent("child");
+      const parentStopped = s.handle.interrupt();
+      await vi.waitFor(() => expect(s.interruption.replies).toHaveLength(2));
+      s.interruption.replies[0]!();
+      await stopped;
+      expect(s.calls.filter((call) => call.method === "turn/steer")).toEqual([]);
+      s.interruption.replies[1]!();
+      await parentStopped;
+    } else await s.handle.stopSubagent("child");
+    expect(s.calls.filter((call) => call.method === "turn/steer")).toEqual([]);
+  } finally {
+    s.handle.close();
+    await s.handle.wait();
+  }
+});
+
+it("keeps a late first child turn stopped after parent Stop", async () => {
+  const s = server("autonomous");
+  const events: AgentEvent[] = [];
+  s.handle.on("event", (event) => events.push(event));
+  try {
+    await vi.waitFor(() => expect(s.calls.some((call) => call.method === "turn/start")).toBe(true));
+    s.notify("item/started", { threadId: "thread-1", item: { id: "launch", type: "subAgentActivity", kind: "started", agentThreadId: "late", agentPath: "/root/late" } });
+    await s.handle.interrupt();
+    s.notify("turn/started", { threadId: "late", turn: { id: "late-turn" } });
+    expect(s.handle.canStopSubagent("late")).toBe(false);
+    expect(events.filter((event) => event.type === "subagent.updated").at(-1)).toMatchObject({ status: "stopped" });
+  } finally {
+    s.handle.close();
+    await s.handle.wait();
+  }
+});
+
+it.each(["rejected", "pending"])("finishes child Stop without waiting for a %s parent steer", async (state) => {
+  const s = server("autonomous");
+  try {
+    await vi.waitFor(() => expect(s.calls.some((call) => call.method === "turn/start")).toBe(true));
+    s.notify("item/started", { threadId: "thread-1", item: { id: "launch", type: "subAgentActivity", kind: "started", agentThreadId: "child", agentPath: "/root/child" } });
+    s.notify("turn/started", { threadId: "child", turn: { id: "child-turn" } });
+    s.steering.error = "no active turn to steer";
+    s.steering.hold = state === "pending";
+    const stopped = s.handle.stopSubagent("child");
+    let settled = false;
+    void stopped.then(
+      () => {
+        settled = true;
+      },
+      () => undefined,
+    );
+    await vi.waitFor(() => expect(settled).toBe(true), { timeout: 300 });
+    await expect(stopped).resolves.toBeUndefined();
+    expect(s.handle.canStopSubagent("child")).toBe(false);
+    expect(s.calls.filter((call) => call.method === "turn/steer")).toHaveLength(1);
+    for (const reply of s.steering.replies) reply();
+  } finally {
+    s.handle.close();
+    await s.handle.wait();
+  }
+});
+
+it("can notify the active parent again after a rejected parent interrupt settles", async () => {
+  const s = server("autonomous");
+  try {
+    await vi.waitFor(() => expect(s.calls.some((call) => call.method === "turn/start")).toBe(true));
+    s.notify("item/started", { threadId: "thread-1", item: { id: "launch", type: "subAgentActivity", kind: "started", agentThreadId: "child", agentPath: "/root/child" } });
+    s.notify("turn/started", { threadId: "child", turn: { id: "child-turn" } });
+    s.interruption.error = "interrupt refused";
+    await expect(s.handle.interrupt()).rejects.toThrow("interrupt refused");
+    s.interruption.error = null;
+    await s.handle.stopSubagent("child");
+    expect(s.calls.filter((call) => call.method === "turn/steer")).toMatchObject([{ params: { threadId: "thread-1", expectedTurnId: "work-1" } }]);
+  } finally {
+    s.handle.close();
+    await s.handle.wait();
+  }
+});
+
+it("adds no child-stop notices or parent steers when stopping the whole parent", async () => {
+  const s = server("autonomous");
+  const events: AgentEvent[] = [];
+  s.handle.on("event", (event) => events.push(event));
+  try {
+    await vi.waitFor(() => expect(s.calls.some((call) => call.method === "turn/start")).toBe(true));
+    for (const id of ["a", "b"]) {
+      s.notify("item/started", { threadId: "thread-1", item: { id: `launch-${id}`, type: "subAgentActivity", kind: "started", agentThreadId: id, agentPath: `/root/${id}` } });
+      s.notify("turn/started", { threadId: id, turn: { id: `${id}-turn` } });
+    }
+    await Promise.all([s.handle.stopSubagent("a", "parent-stop"), s.handle.stopSubagent("b", "parent-stop"), s.handle.interrupt()]);
+    expect(events.filter((event) => event.type === "subagent.updated" && event.notice)).toEqual([]);
+    expect(s.calls.filter((call) => call.method === "turn/steer")).toEqual([]);
+  } finally {
+    s.handle.close();
+    await s.handle.wait();
+  }
 });

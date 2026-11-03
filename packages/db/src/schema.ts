@@ -790,4 +790,9 @@ export const migrations: Migration[] = [
   subagentMigration,
   subagentIdentityMigration,
   subagentObservationMigration,
+  /** Retire automatic team execution without changing its saved configuration or workspaces. */
+  `UPDATE schedules SET enabled=0, version=version+1
+     WHERE json_valid(execution_target) AND json_extract(execution_target, '$.kind')='team';
+   UPDATE schedule_firings SET state='cancelled', reason='Teams are no longer supported.', finished_at=CAST(strftime('%s','now') AS INTEGER)*1000
+     WHERE state='pending' AND json_valid(snapshot) AND json_extract(snapshot, '$.executionTarget.kind')='team';`,
 ];

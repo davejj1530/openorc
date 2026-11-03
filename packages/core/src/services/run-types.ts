@@ -1,5 +1,5 @@
 import type { AgentLaunchEnvironment, RunHandle } from "@openorc/agents";
-import type { AgentEvent, AgentKind, BackgroundCommand, CorePush, HarnessId, PermissionPreset, Project, Run, RunMode, RunSpec, Task, TeamPermissionState, Thread, Usage } from "@openorc/protocol";
+import type { AgentEvent, AgentKind, BackgroundCommand, CorePush, HarnessId, PermissionPreset, Project, Run, RunMode, RunSpec, Task, Thread, Usage } from "@openorc/protocol";
 import type { AppAction } from "./app-actions.js";
 import type { CloudRunHost } from "./cloud-workspaces.js";
 import type { EnvSnapshot } from "./shell-environment.js";
@@ -16,8 +16,6 @@ export interface SendOptions {
   role?: "user" | "system";
   attachments?: string[];
   recordPrompt?: boolean;
-  /** A team turn the coordinator reserved. Sends to a team run are refused without one. */
-  teamAttemptId?: string;
   /** Called once the provider has taken the input, with the run and the process's turn index. Throwing closes the process. */
   onAccepted?: (run: Run, processTurn: number) => void;
 }
@@ -93,12 +91,8 @@ export interface StartRunInput {
   systemPromptAppendix?: string;
   /** Captured coordinator attachments can replace live task-document image discovery. */
   collectTaskImages?: boolean;
-  /** Internal coordination identity; never accepted from a renderer/model request. */
-  teamAttemptId?: string;
   /** Internal setup-to-run handoff, never supplied by a renderer or provider. */
   workspaceLease?: WorkspaceLease;
-  /** A team member talking in the conversation: runs beside the thread's other live members in a shared workspace lease. */
-  shared?: { key: string };
   /** The Orcling who speaks in this run; without it, the thread's own Orcling if it has one. */
   orclingId?: string;
 }
@@ -125,8 +119,6 @@ export interface LiveRun {
   internalMcp: NonNullable<RunSpec["internalMcp"]>;
   /** Native permissions remain fixed until resume; OpenOrc can allow requests immediately. */
   providerPermissionMode: PermissionPreset;
-  /** A stricter team request immediately closes the app gate, even if native bypass needs restart. */
-  permissionGate?: PermissionPreset;
   /** The loosest permission the Orcling speaking in this run may have, whatever its conversation allows. */
   orclingCeiling?: PermissionPreset;
   /** App actions the user allowed for the rest of this run. */
@@ -154,8 +146,6 @@ export interface LiveRun {
   reply: string | null;
   /** The provider announced its session. Without it, a run that exits early never had one. */
   started: boolean;
-  /** The coordinator owns a team attempt's process lifetime and workspace lease. */
-  team: boolean;
   stderr: string[];
   failed: string | null;
   events: Promise<void>;
@@ -184,7 +174,6 @@ export interface LiveProcessBinding {
   workspaceLease: WorkspaceLease;
   internalMcp: NonNullable<RunSpec["internalMcp"]>;
   providerPermissionMode: PermissionPreset;
-  permissionGate?: PermissionPreset;
   orclingCeiling?: PermissionPreset;
 }
 
@@ -207,7 +196,13 @@ export interface PendingApproval {
   detail: string;
 }
 
-export type ThreadPermissionState = TeamPermissionState;
+export interface ThreadPermissionState {
+  mode?: { requested: RunMode; effective: RunMode | null; pending: boolean };
+  requested: PermissionPreset;
+  effective: PermissionPreset | null;
+  pendingRestart: boolean;
+  runs: { runId: string; mode: RunMode; requested: PermissionPreset; effective: PermissionPreset; providerPermissionMode: PermissionPreset; pendingRestart: boolean }[];
+}
 export type Notification = Extract<CorePush, { type: "notify" }>;
 
 export interface RunHooks {
@@ -219,10 +214,6 @@ export interface RunHooks {
   onEvent?(event: AgentEvent): void;
   /** The environment a run is admitted with, captured synchronously at admission. Required: there is no other source. */
   environment(): EnvSnapshot;
-  /** Team checkpoints preserve retained inherited paths even after ignore rules change. */
-  captureTeamTree?(runId: string, cwd: string, lease: WorkspaceLease): Promise<string | null>;
-  assertStart?(input: StartRunInput): void;
-  assertSend?(runId: string, teamAttemptId: string | undefined): void;
   taskImages?(spec: string): Promise<string[]>;
   /** A tool output from the ledger with its stored images inlined again. */
   inlineToolImages?(output: unknown): unknown;

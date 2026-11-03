@@ -1,9 +1,9 @@
+import { projects, retiredTeams, threads } from "@openorc/db";
+import type { PreviewCaptureOptions, PreviewHost, PreviewHostCapture, PreviewHostPage, RemotePush } from "@openorc/protocol";
 import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
-import { projects, teamDeletedThreads, threads } from "@openorc/db";
-import type { PreviewCaptureOptions, PreviewHost, PreviewHostCapture, PreviewHostPage, RemotePush } from "@openorc/protocol";
 import { OpenOrc } from "../openorc.js";
 import type { ProtectedSecretStore } from "../services/extraction-credentials.js";
 import { RemoteTestClient } from "./test-client.js";
@@ -120,8 +120,8 @@ it("refuses a watch of a thread the Mac does not have", async () => {
   await expect(phone.sessionMethod("preview.watch", { threadId: "missing", width: 786, pace: "lan" })).rejects.toThrow("This thread is gone.");
 });
 
-it("refuses a watch of a thread a team deletion hid", async () => {
-  const hidden = vi.spyOn(teamDeletedThreads, "has").mockImplementation((_db, id) => id === otherId);
+it("refuses a watch of a retired thread", async () => {
+  const hidden = vi.spyOn(retiredTeams, "isHidden").mockImplementation((_db, id) => id === otherId);
   try {
     await expect(phone.sessionMethod("preview.watch", { threadId: otherId, width: 786, pace: "lan" })).rejects.toThrow("This thread is gone.");
   } finally {

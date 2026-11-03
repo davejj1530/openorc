@@ -1,5 +1,3 @@
-import { RunNotifications, runScopeKeys, runScopeTitle } from "./run-notifications.js";
-import { randomUUID } from "node:crypto";
 import { AcpAdapter, captureLaunchEnvironment, ClaudeAdapter, CodexAdapter, type AgentLaunchEnvironment } from "@openorc/agents";
 import { completedToolCall, plans, runs, subagents, tasks, type Db, type LedgerWriter } from "@openorc/db";
 import { UserInput, type OpenOrcMcpServer, type TaskCard, type UserInputResult } from "@openorc/mcp";
@@ -20,17 +18,19 @@ import {
   type Thread,
   type ThreadSession,
 } from "@openorc/protocol";
+import { randomUUID } from "node:crypto";
 import type { FrameCoalescer } from "../frames.js";
 import type { Logger } from "../transport.js";
 import type { AppAction } from "./app-actions.js";
+import { McpAppService } from "./mcp-apps.js";
 import { RunApprovals } from "./run-approvals.js";
 import { RunBriefs } from "./run-briefs.js";
 import { RunCatalog } from "./run-catalog.js";
 import { RunEvents } from "./run-events.js";
+import { deliverable, steerable, steerBlocker, takesQueued, type RunInput } from "./run-input.js";
 import { RunLaunch } from "./run-launch.js";
-import { TurnStartCapture } from "./turn-start-checkpoint.js";
 import { RunLive } from "./run-live.js";
-import { McpAppService } from "./mcp-apps.js";
+import { RunNotifications, runScopeKeys, runScopeTitle } from "./run-notifications.js";
 import { RunProcess } from "./run-process.js";
 import { RunProgress } from "./run-progress.js";
 import { failedSession, onLeftClaudeAccount, RunSettlement } from "./run-settlement.js";
@@ -49,9 +49,9 @@ import {
   type ThreadPermissionState,
   type TurnSettledOutcome,
 } from "./run-types.js";
-import { deliverable, steerable, steerBlocker, takesQueued, type RunInput } from "./run-input.js";
-import { workspaceWriters, type WorkspaceWriters } from "./workspace-writers.js";
 import { SubagentService } from "./subagents.js";
+import { TurnStartCapture } from "./turn-start-checkpoint.js";
+import { workspaceWriters, type WorkspaceWriters } from "./workspace-writers.js";
 
 export type { ContinueSettings, Notification, PendingApproval, RunAdapterRegistry, RunHooks, RunScope, SendOptions, StartRunInput, ThreadPermissionState, TurnSettledOutcome } from "./run-types.js";
 
@@ -190,7 +190,7 @@ export class RunService {
       (message) => this.log.info(message),
       (leaseId) =>
         [...this.live.values()].some(
-          (entry) => entry.workspaceLease.id === leaseId && entry.scope.thread && !entry.team && !occupied(entry) && !entry.exiting && !entry.closingRequested && !this.compactions.has(entry.run.id),
+          (entry) => entry.workspaceLease.id === leaseId && entry.scope.thread && !occupied(entry) && !entry.exiting && !entry.closingRequested && !this.compactions.has(entry.run.id),
         ),
     );
     this.codex = new CodexAdapter({ onApproval: (request) => this.approvals.handleCodexApproval(request) });
@@ -330,7 +330,7 @@ export class RunService {
       bindLiveProcess: (binding) => this.process.bindLiveProcess(binding),
       applyThreadPermissions: (thread) => this.applyThreadPermissions(thread),
       turnSettled: (run, scope, project, outcome) => this.turnSettled(run, scope, project, outcome),
-      taskBrief: (task, project, mode, teamManaged) => this.briefs.taskBrief(task, project, mode, teamManaged),
+      taskBrief: (task, project, mode) => this.briefs.taskBrief(task, project, mode),
       threadBrief: (thread, project, mode) => this.briefs.threadBrief(thread, project, mode),
       models: (agent, environment, launch) => this.models(agent, environment, launch),
       validateFastMode: (agent, model, fastMode, environment, launch) => this.validateFastMode(agent, model, fastMode, environment, launch),
@@ -545,11 +545,9 @@ export class RunService {
     if (input.scope.thread) this.subagents.assertExecutable({ threadId: input.scope.thread.id });
     this.assertAgentUpdateIdle();
     input = normalizeModelSettings(input);
-    // Team actors can start fresh provider sessions for agent-directed work. Only
-    // the team's human input boundary may reset its cross-conversation chain.
-    if (!input.teamAttemptId && (input.promptRole ?? "user") === "user" && input.scope.thread) this.agentHops.delete(input.scope.thread.id);
+    // Only user input resets the chain of messages sent between conversations.
+    if ((input.promptRole ?? "user") === "user" && input.scope.thread) this.agentHops.delete(input.scope.thread.id);
     if (this.closing) throw new Error("OpenOrc is closing.");
-    this.hooks.assertStart?.(input);
     input.assertCanStart?.();
     const captured = this.captureAccount(input);
     input = captured.input;
@@ -590,7 +588,7 @@ export class RunService {
 
   private startKey(input: StartRunInput): string {
     if (input.scope.comment) return `comment:${input.scope.comment.id}`;
-    if (input.scope.thread) return `thread:${input.scope.thread.id}${input.shared ? `:${input.shared.key}` : ""}`;
+    if (input.scope.thread) return `thread:${input.scope.thread.id}`;
     return `task:${input.scope.task.id}`;
   }
 
@@ -624,25 +622,6 @@ export class RunService {
     // No await before invocation: a turn ending here must never fall back to
     // send(), which can start work or replace an idle session's settings.
     return this.live.get(runId)!.handle.steer(text, attachments);
-  }
-
-  /** Position canonical mailbox direction among this run's streamed activity. */
-  recordTeamDirection(runId: string, input: { id: string; text: string; attachments?: string[] }): void {
-    const entry = this.live.get(runId);
-    if (!entry) throw new Error("The direction's provider run is no longer live.");
-    const messageId = `team-direction:${input.id}`;
-    this.ledger.flush();
-    if (
-      this.db
-        .stmt(
-          "SELECT 1 FROM events e LEFT JOIN artifacts a ON a.event_id = e.id AND a.kind = 'payload' WHERE e.run_id = ? AND e.kind = 'message.completed' AND json_extract(COALESCE(a.content, e.payload), '$.messageId') = ? LIMIT 1",
-        )
-        .get(runId, messageId)
-    )
-      return;
-    this.emit({ type: "message.completed", runId, ts: Date.now(), messageId, role: "user", text: input.text, ...(input.attachments?.length ? { attachments: input.attachments } : {}) });
-    this.ledger.flush();
-    this.invalidate(runScopeKeys(entry.scope));
   }
 
   async send(runId: string, text: string, options: SendOptions = {}): Promise<void> {

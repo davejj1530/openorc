@@ -1,4 +1,4 @@
-import { messages, orclings, projects, runs, tasks, teamDeletedThreads, threads, type Db } from "@openorc/db";
+import { messages, orclings, projects, retiredTeams, runs, tasks, threads, type Db } from "@openorc/db";
 import type { McpHost, OrclingTools } from "@openorc/mcp";
 import { WORKSPACE_ID, type MemoryType, type Orcling, type Project, type TaskStatus } from "@openorc/protocol";
 import type { MemoryService } from "../services/memory.js";
@@ -136,7 +136,7 @@ function projectTools(deps: Dependencies, speaker: Speaker): Pick<OrclingTools, 
       const chats = new Set(orclings.list(db).map((orcling) => orcling.threadId));
       const recent = threads
         .list(db, { projectId, filter: "active", limit: 10 })
-        .filter((t) => !teamDeletedThreads.has(db, t.id) && !chats.has(t.id))
+        .filter((t) => !retiredTeams.isHidden(db, t.id) && !chats.has(t.id))
         .map((t) => ({ id: t.id, title: t.title, agent: t.agent, active: age(t.lastActivityAt) }));
       const memory = query ? (await deps.memory.retrieve(projectId, query, 8)).map(({ memory: m }) => ({ title: m.title, body: m.body })) : deps.memory.brief(found);
       return json({ project: { id: found.id, name: found.name, folder: found.rootPath }, openTasks: open, threads: recent, memory });

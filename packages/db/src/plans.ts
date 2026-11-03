@@ -1,7 +1,7 @@
-import { randomUUID } from "node:crypto";
 import type { AgentEvent, ConversationPlan, Run } from "@openorc/protocol";
+import { randomUUID } from "node:crypto";
 import type { Db } from "./database.js";
-import { teamRuntime } from "./team-runtime.js";
+import { retiredTeams } from "./retired-teams.js";
 
 const columns = `id, thread_id AS threadId, run_id AS runId, revision, text, state, source, updated_at AS updatedAt`;
 const MAX_PLAN = 1_000_000;
@@ -23,11 +23,7 @@ export const plans = {
   },
   /** Only provider document events or the final response of a Plan turn become plan revisions. */
   capture(db: Db, run: Run, event: AgentEvent): boolean {
-    if (!run.threadId || run.mode !== "plan") return false;
-    const team = teamRuntime.binding(db, run.id);
-    // Member proposals remain in their attributed transcript; only the lead
-    // publishes the team's shared plan, through an explicit document event.
-    if (team && team.actorId !== "lead") return false;
+    if (!run.threadId || run.mode !== "plan" || retiredTeams.hasThread(db, run.threadId)) return false;
     if (event.type === "turn.started") {
       db.stmt("INSERT INTO conversation_plan_turns(run_id,started_at) VALUES(?,?) ON CONFLICT(run_id) DO UPDATE SET started_at=excluded.started_at, native_document=0").run(run.id, event.ts);
       return false;
@@ -37,7 +33,7 @@ export const plans = {
     const hasNative = () => Boolean(turn?.native_document) || Boolean(db.stmt("SELECT 1 FROM conversation_plans WHERE run_id=? AND source='native' AND updated_at>=?").get(run.id, since));
     if (event.type === "turn.completed" || event.type === "session.completed") {
       const success = event.type === "turn.completed" && event.status === "success";
-      if (event.type === "turn.completed" && run.agent !== "codex" && !team) {
+      if (event.type === "turn.completed" && run.agent !== "codex") {
         const native = hasNative();
         const preview = db.stmt(`SELECT ${columns} FROM conversation_plans WHERE run_id=? AND source='response' AND state='draft' ORDER BY revision DESC LIMIT 1`).get(run.id) as unknown as
           ConversationPlan | undefined;
@@ -51,7 +47,7 @@ export const plans = {
       return true;
     }
     if ((event.type === "message.delta" || event.type === "message.completed") && event.role === "assistant") {
-      if (run.agent === "codex" || team) return false;
+      if (run.agent === "codex") return false;
       if (hasNative()) return false;
       const documentId = `response:${event.messageId}`;
       const previous = db.stmt("SELECT text FROM conversation_plans WHERE run_id=? AND document_id=? AND state='draft'").get(run.id, documentId) as { text: string } | undefined;

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { ClaudeAccountId } from "./claude-accounts.js";
 import { PermissionPreset, RunMode, WorkspaceMode } from "./domain.js";
 import { AgentKind } from "./events.js";
-import { ExecutionTarget } from "./orchestration.js";
+import { ExecutionTarget } from "./execution-target.js";
 
 /** Creates the thread and starts its first turn in one step. */
 export const ThreadStartParams = z
@@ -10,8 +10,6 @@ export const ThreadStartParams = z
     claudeAccountId: ClaudeAccountId.optional(),
     projectId: z.string(),
     workingDirectory: z.string().min(1).max(4096).optional(),
-    /** Team-only idempotency key for retrying an uncertain launch response. */
-    requestKey: z.string().min(1).max(200).optional(),
     agent: AgentKind.optional(),
     executionTarget: ExecutionTarget.optional(),
     model: z.string().optional(),
@@ -29,8 +27,7 @@ export const ThreadStartParams = z
   })
   .strict()
   .superRefine((input, ctx) => {
-    if (input.requestKey !== undefined && input.executionTarget?.kind !== "team") ctx.addIssue({ code: "custom", message: "Launch request keys apply only to saved teams.", path: ["requestKey"] });
-    if (!input.executionTarget && !input.agent) ctx.addIssue({ code: "custom", message: "Choose a model or a team.", path: ["executionTarget"] });
+    if (!input.executionTarget && !input.agent) ctx.addIssue({ code: "custom", message: "Choose a model or an Orcling.", path: ["executionTarget"] });
     if (input.executionTarget && [input.agent, input.model, input.effort, input.fastMode].some((value) => value !== undefined)) {
       ctx.addIssue({ code: "custom", message: "Supply an execution target or legacy model settings, not both.", path: ["executionTarget"] });
     }

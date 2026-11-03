@@ -1,8 +1,8 @@
-import { CloudThreadState } from "./cloud.js";
 import { z } from "zod";
+import { CloudThreadState } from "./cloud.js";
 import { ActivityRecovery, AgentKind, BackgroundCommand, SubagentStatus, Usage } from "./events.js";
+import { ExecutionTarget } from "./execution-target.js";
 import { HarnessId } from "./harness.js";
-import { ExecutionTarget, TeamRevision } from "./orchestration.js";
 
 /** Domain records as the renderer sees them. Columns are nullable, not optional. */
 
@@ -52,6 +52,8 @@ export const WorkspaceMode = z.enum(["worktree", "current"]);
 export type WorkspaceMode = z.infer<typeof WorkspaceMode>;
 
 export const Task = z.object({
+  /** Saved work from the removed teams feature; execution and workspace writes are unavailable. */
+  retiredTeam: z.boolean().optional(),
   id: z.string(),
   projectId: z.string(),
   title: z.string(),
@@ -174,8 +176,8 @@ export type QueuedMessage = z.infer<typeof QueuedMessage>;
 
 /** A thread with what is happening on it right now, for lists and the sidebar. */
 /**
- * A conversation whose copy is on no branch, such as a pull request's copy under review. Outside a team, which
- * publishes through a branch of its own, nothing in it is committed, pushed or opened as a pull request.
+ * A conversation whose copy is on no branch, such as a pull request's copy under review.
+ * These copies cannot be committed, pushed or opened as a pull request.
  */
 export function isDetachedCopy(thread: Pick<Thread, "worktreePath" | "branch">): boolean {
   return thread.worktreePath !== null && thread.branch === null;
@@ -196,7 +198,7 @@ export const ThreadSummary = Thread.extend({
   hasStarted: z.boolean().optional(),
   /** Saved team ownership; absent in older cached summaries. */
   teamInstanceId: z.string().nullable().optional(),
-  /** One provider per saved team member, or the solo thread provider; absent in older summaries. */
+  /** The thread's provider; older cached summaries can include multiple saved team providers. */
   agents: z.array(AgentKind).optional(),
   activity: ThreadActivity,
   /** Commands the agent left running after its turn, such as a dev server; absent in older cached summaries. */
@@ -224,7 +226,7 @@ export const ThreadSummary = Thread.extend({
    */
   lastAgentEventAt: z.number().nullable(),
   /**
-   * The run whose events stream for this thread now: its own live run, or a team's most recently active attempt.
+   * The run whose events stream for this thread now.
    * The renderer already holds a live run's transcript, so a row can say what the agent is doing from it.
    * Absent in older cached summaries.
    */
@@ -339,6 +341,7 @@ export const ScheduleFiringRecord = ScheduleFiringView.extend({
 export type ScheduleFiringRecord = z.infer<typeof ScheduleFiringRecord>;
 
 export const Schedule = ScheduleLaunchSnapshot.extend({
+  retiredTeam: z.boolean().optional(),
   id: z.string(),
   version: z.number().int().positive(),
   enabled: z.boolean(),
@@ -348,7 +351,6 @@ export const Schedule = ScheduleLaunchSnapshot.extend({
   createdAt: z.number(),
   updatedAt: z.number(),
   /** Read-only projections; the persisted target always pins the original revision. */
-  team: z.object({ revision: TeamRevision, archived: z.boolean() }).nullable().optional(),
   lastFire: ScheduleFiringView.nullable().optional(),
 });
 export type Schedule = z.infer<typeof Schedule>;
@@ -370,8 +372,6 @@ export type AppLook = z.infer<typeof AppLook>;
  * default would also fill every partial `app.settings.set` and reset the setting it names.
  */
 export const AppSettings = z.object({
-  /** Persisted legacy key; team execution is now Beta and enabled for new profiles. */
-  experimentalTeamExecution: z.boolean(),
   notifications: z.boolean(),
   sound: z.boolean(),
   /** Idle days before a thread is marked done on its own; null keeps threads active. */
@@ -558,32 +558,6 @@ export const PushState = z.object({
   busy: z.boolean(),
 });
 export type PushState = z.infer<typeof PushState>;
-
-/** A member's effective saved choice; every current member has an allocation. */
-export const TeamMemberAvatarChoice = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("default"), index: z.number().int().nonnegative() }).strict(),
-  z
-    .object({
-      kind: z.literal("custom"),
-      path: z
-        .string()
-        .min(1)
-        .max(4096)
-        .refine((value) => !value.includes("\0"), "Avatar paths cannot contain null bytes."),
-    })
-    .strict(),
-]);
-export type TeamMemberAvatarChoice = z.infer<typeof TeamMemberAvatarChoice>;
-
-export const TeamMemberAvatar = z
-  .object({
-    teamId: z.string().min(1),
-    memberKey: z.string().min(1),
-    avatar: TeamMemberAvatarChoice,
-    updatedAt: z.number().int().nonnegative(),
-  })
-  .strict();
-export type TeamMemberAvatar = z.infer<typeof TeamMemberAvatar>;
 
 /** A skill discovered for one harness in one project. Its `name` is the harness's invocation ID. */
 export const AgentSkill = z.object({

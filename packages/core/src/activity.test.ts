@@ -3,16 +3,12 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Sandbox } from "@openorc/cloud";
-import { Db, teamRuntime } from "@openorc/db";
 import { busyReason, fenceForUpdate, type BusyReason } from "./activity.js";
 import { OpenOrc } from "./openorc.js";
 import { RemoteTestClient } from "./remote/test-client.js";
 
-const db = Db.memory();
-
 function idle() {
   return {
-    db,
     runs: { busy: false, backgroundCommandsRunning: false, prepareForUpdate: vi.fn(() => true) },
     threads: { deliveringQueued: false },
     cloud: { busy: false },
@@ -31,7 +27,6 @@ type Sources = ReturnType<typeof idle>;
 const busySource: Record<BusyReason, (sources: Sources) => void> = {
   "agent-updates": (s) => void (s.agentUpdates.get = () => ({ updating: true })),
   memory: (s) => void (s.memory.hasPendingWork = true),
-  teams: () => void vi.spyOn(teamRuntime, "openIds").mockReturnValue(["team"]),
   schedules: (s) => void (s.schedules.hasPendingWork = true),
   "background-commands": (s) => void (s.runs.backgroundCommandsRunning = true),
   agents: (s) => void (s.runs.busy = true),
@@ -45,7 +40,6 @@ const busySource: Record<BusyReason, (sources: Sources) => void> = {
 const refusals: Record<BusyReason, RegExp | null> = {
   "agent-updates": /agent updates/,
   memory: /memory processing/,
-  teams: /active teams/,
   schedules: /A schedule is starting a thread/,
   "background-commands": /background commands/,
   agents: /agent work, approvals, and context maintenance/,

@@ -1,17 +1,17 @@
+import { stopProcess, waitForProcessGroup } from "@openorc/agents";
+import { audit, retiredTeams, tasks, threads, type CloudMirrorState, type CloudProviderId, type Db } from "@openorc/db";
+import { diskUsage, emptyTree, fetch, git, repoInfo, revParse, worktree } from "@openorc/git";
+import { WORKSPACE_ID, type BranchLoss, type CloudThreadState, type Project, type RemovalImpact, type Task, type Thread, type WorkspaceMode } from "@openorc/protocol";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import { access, copyFile, glob, lstat, mkdir } from "node:fs/promises";
 import path from "node:path";
-import { audit, taskForwardings, tasks, threads, type CloudMirrorState, type CloudProviderId, type Db } from "@openorc/db";
-import { stopProcess, waitForProcessGroup } from "@openorc/agents";
-import { diskUsage, emptyTree, fetch, git, repoInfo, revParse, worktree } from "@openorc/git";
-import { WORKSPACE_ID, type BranchLoss, type CloudThreadState, type Project, type RemovalImpact, type Task, type Thread, type WorkspaceMode } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
 import type { CloudWorkspaceService } from "./cloud-workspaces.js";
-import type { StartThreadInput } from "./thread-inputs.js";
 import { assertCanBranch, projectGit } from "./project-git.js";
 import { inUnvettedCopy } from "./review-copies.js";
 import { assertSafeParentPath } from "./safe-parent-path.js";
+import type { StartThreadInput } from "./thread-inputs.js";
 import { workspaceWriters, type WorkspaceLease, type WorkspaceWriters } from "./workspace-writers.js";
 
 export interface WorkspaceOptions {
@@ -160,6 +160,7 @@ export class WorkspaceService {
 
   async prepare(task: Task, project: Project, lease?: WorkspaceLease): Promise<Task> {
     this.assertOpen();
+    if (retiredTeams.hasTask(this.db, task.id)) throw new Error("This item is no longer available.");
     // Review panels can request diffs and history together before either has
     // created the workspace. Share preparation through setup completion.
     const pending = this.preparingTasks.get(task.id);
@@ -171,7 +172,6 @@ export class WorkspaceService {
 
   private async prepareTask(task: Task, project: Project, inherited?: WorkspaceLease): Promise<Task> {
     this.assertOpen();
-    if (taskForwardings.target(this.db, task.id)?.state === "preparing") throw new Error("Finish this task’s saved handoff before preparing its workspace.");
     // A caller can retain the old row after an earlier preparation finishes.
     task = tasks.get(this.db, task.id) ?? task;
     if (project.id === WORKSPACE_ID) {
@@ -407,11 +407,10 @@ export class WorkspaceService {
 
   async cleanup(task: Task, project: Project, options: { deleteBranch?: boolean; force?: boolean; acceptLoss?: BranchLoss } = {}, inherited?: WorkspaceLease): Promise<Task> {
     this.assertOpen();
+    if (retiredTeams.hasTask(this.db, task.id)) throw new Error("This item is no longer available.");
     if (!(await ownsRepository(project))) return task;
     // Deleting/archiving a task record must not remove a conversation's workspace.
     if (task.worktreePath && threads.list(this.db, { projectId: project.id, filter: "all" }).some((thread) => thread.worktreePath === task.worktreePath)) return task;
-    if ((taskForwardings.target(this.db, task.id) ?? taskForwardings.source(this.db, task.id))?.state === "preparing")
-      throw new Error("Finish this task’s saved handoff before removing its workspace.");
     return this.track(
       this.writers.withLease(
         this.taskPath(task, project),
@@ -488,7 +487,7 @@ export class WorkspaceService {
     return (await git(project.rootPath, ["symbolic-ref", "--short", "-q", "HEAD"], { okCodes: [0, 1] })).stdout.trim() || null;
   }
 
-  /** Fetches the base from origin when it is a branch there, so tasks start from what the team sees. */
+  /** Fetches the base from origin when it is a branch there, so tasks start from the remote branch. */
   private async resolveStartPoint(project: Project, baseRef: string): Promise<string> {
     this.assertOpen();
     await assertCanBranch(project);

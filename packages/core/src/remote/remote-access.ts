@@ -1,6 +1,4 @@
-import os from "node:os";
-import path from "node:path";
-import { orchestration, projects, remoteDevices, remotePushTargets, settings, threads, type Db, type LedgerWriter, type RemoteDeviceRecord } from "@openorc/db";
+import { projects, remoteDevices, remotePushTargets, retiredTeams, settings, threads, type Db, type LedgerWriter, type RemoteDeviceRecord } from "@openorc/db";
 import { acceptLink, encodePairingUrl, fromBase64Url, LinkCloseCode, linkPath, toBase64Url, type Admission, type ClosingReason, type KeyPair, type LinkSocket, type PhoneHello } from "@openorc/link";
 import { nodeCrypto } from "@openorc/link/node";
 import {
@@ -10,8 +8,8 @@ import {
   type DeviceParams,
   type DeviceRpcResults,
   type PairingOfferView,
-  type PushEnvironment,
   type PreviewHost,
+  type PushEnvironment,
   type PushSenderState,
   type RemoteListener,
   type RemotePushStatus,
@@ -19,18 +17,20 @@ import {
   type RemoteStatus,
   type Route,
 } from "@openorc/protocol";
+import os from "node:os";
+import path from "node:path";
 import type { ProtectedSecretStore } from "../services/extraction-credentials.js";
 import { PREVIEW_THREAD_GONE, previewThreadLive } from "../services/preview.js";
 import type { Broadcast, Logger } from "../transport.js";
 import { readRemoteAsset } from "./assets.js";
 import { listen, type Listener } from "./listener.js";
 import { PairingOffers } from "./offers.js";
+import { remoteError, type MacRoots } from "./phone-words.js";
 import { remotePush } from "./policy.js";
+import { PreviewCasters } from "./preview-casters.js";
 import { PushKeys } from "./push/keys.js";
 import { PushSender } from "./push/sender.js";
 import { currentRoutes, machineProbe, type MachineProbe } from "./routes.js";
-import { remoteError, type MacRoots } from "./phone-words.js";
-import { PreviewCasters } from "./preview-casters.js";
 import { RemoteSession, type Answer } from "./session.js";
 import { RemoteFrameShaper } from "./shaper.js";
 
@@ -364,7 +364,7 @@ export class RemoteAccess {
         attachmentsDir: path.join(dataDir, "attachments"),
         thread: (id) => {
           const thread = threads.get(db, id);
-          return thread ? { team: Boolean(orchestration.getInstance(db, id)), parentRelation: thread.parentRelation } : null;
+          return thread ? { team: retiredTeams.isHidden(db, id), parentRelation: thread.parentRelation } : null;
         },
       },
       roots: () => this.macRoots(),

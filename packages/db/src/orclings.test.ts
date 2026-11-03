@@ -1,13 +1,11 @@
-import { afterEach, expect, it } from "vitest";
-import { DatabaseSync } from "node:sqlite";
+import { DEFAULT_CLAUDE_ACCOUNT, defaultOrclingLook, WORKSPACE_ID, type OrclingDraft } from "@openorc/protocol";
 import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { DEFAULT_CLAUDE_ACCOUNT, defaultOrclingLook, WORKSPACE_ID, type OrclingDraft, type TeamDraft } from "@openorc/protocol";
-import { claudeAccounts } from "./claude-accounts.js";
+import { DatabaseSync } from "node:sqlite";
+import { afterEach, expect, it } from "vitest";
 import { Db } from "./database.js";
 import { memories } from "./memories.js";
-import { orchestration } from "./orchestration.js";
 import { orclingAccountMigration, orclingMigration } from "./orcling-schema.js";
 import { orclings } from "./orclings.js";
 import { pullReviews } from "./pull-reviews.js";
@@ -103,34 +101,6 @@ it("resumes a thread's own session, never an Orcling guest's", () => {
   runs.update(db, "guest", { externalSessionId: "guest-session" });
   expect(runs.lastSession(db, { threadId: thread.id }, "claude")).toBe("own-session");
   expect(runs.lastSession(db, { threadId: thread.id }, "claude", orcling.id)).toBe("guest-session");
-});
-
-it("seats an Orcling under its own current name, model and Claude account, and gives the seat back to what was saved once it is deleted", () => {
-  const { db, orcling } = withOrcling();
-  const project = projects.insert(db, { name: "App", rootPath: "/tmp/app", gitRemote: null, defaultBranch: "main", settings: {} });
-  const team: TeamDraft = {
-    name: "Pair",
-    members: [
-      { key: "lead", name: "Lead", managerKey: null, responsibility: "Coordinate.", settings: { agent: "codex", model: "fixture", effort: null, fastMode: false } },
-      { key: "gloop", name: "Gloop", managerKey: "lead", responsibility: "Review the work.", settings: draft.settings, orclingId: orcling.id },
-    ],
-    limits: { maxConcurrentAgents: 2, maxAssignments: 4, maxExecutionMinutes: 30, maxAttemptsPerAssignment: 1 },
-  };
-  const saved = orchestration.save(db, { projectId: project.id, expectedRevisionId: null, draft: team });
-  const seat = () => orchestration.getRevision(db, saved.revision.id)!.members[1]!;
-  expect(orchestration.getRevision(db, saved.revision.id)?.members.map((member) => member.orclingId ?? null)).toEqual([null, orcling.id]);
-
-  const work = claudeAccounts.add(db, "Work");
-  orclings.update(db, orcling.id, { ...draft, claudeAccountId: work.id });
-  expect(seat().claudeAccountId).toBe(work.id);
-
-  orclings.update(db, orcling.id, { ...draft, name: "Glorp", settings: { agent: "codex", model: "smarter", effort: "high", fastMode: true } });
-  expect(seat()).toMatchObject({ name: "Glorp", orclingId: orcling.id, settings: { agent: "codex", model: "smarter", effort: "high", fastMode: true } });
-  expect(seat().claudeAccountId).toBeUndefined();
-
-  orclings.delete(db, orcling.id);
-  expect(seat().orclingId).toBeUndefined();
-  expect(seat()).toMatchObject({ name: "Gloop", settings: draft.settings });
 });
 
 it("remembers which Orcling drafted a pull request review comment, until the Orcling is deleted", () => {

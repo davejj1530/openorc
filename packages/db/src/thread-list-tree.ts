@@ -1,3 +1,5 @@
+import { retiredThreadIds } from "./retired-teams.js";
+
 /** Independent conversations obey filters; native children inherit their owner's visibility. */
 export function threadTreeSql(where: string, order: string, limit: string): string {
   return `WITH RECURSIVE
@@ -21,7 +23,7 @@ export function threadTreeSql(where: string, order: string, limit: string): stri
       SELECT id, id, last_activity_at FROM roots
       UNION ALL SELECT f.root_id, t.id, t.last_activity_at FROM threads t INDEXED BY threads_parent JOIN forest f ON t.parent_thread_id = f.id
         WHERE t.parent_thread_id IS NOT NULL AND (t.id IN (SELECT id FROM eligible)
-          OR (t.parent_relation = 'subagent' AND NOT EXISTS (SELECT 1 FROM team_deleted_threads hidden WHERE hidden.thread_id = t.id)))
+          OR (t.parent_relation = 'subagent' AND t.id NOT IN (${retiredThreadIds})))
     ),
     latest AS (
       SELECT root_id, MAX(last_activity_at) AS tree_activity FROM forest GROUP BY root_id

@@ -1,14 +1,15 @@
-import { insertLegacyThread } from "./fixtures/legacy-thread.js";
+import { randomUUID } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, expect, it } from "vitest";
 import { Db } from "./database.js";
+import { insertLegacyThread } from "./fixtures/legacy-thread.js";
 import { comments, projects, tasks, threads } from "./repos.js";
-import { threadQueue } from "./thread-queue.js";
 import { conversationReviewCommentsMigration } from "./review-comments-schema.js";
 import { migrations } from "./schema.js";
+import { threadQueue } from "./thread-queue.js";
 
 const folders: string[] = [];
 afterEach(() => {
@@ -32,9 +33,13 @@ it("moves a task's comments to the conversation it runs in and keeps everything 
   const { file, db, upgrade } = ledgerBeforeConversationComments();
   const project = projects.insert(db, { name: "Review", rootPath: "/tmp/review-migration", gitRemote: null, defaultBranch: "main", settings: {} });
   const conversation = insertLegacyThread(db, { projectId: project.id, title: "Works on it", agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
-  const task = (title: string) =>
-    tasks.insert(db, { projectId: project.id, title, spec: null, priority: "none", labels: [], workspaceMode: "current", baseRef: "main", parentTaskId: null, threadId: null, origin: "user" });
-  const running = tasks.update(db, task("Running").id, { executionThreadId: conversation.id });
+  const task = (title: string) => {
+    const id = randomUUID();
+    db.stmt("INSERT INTO tasks (id,project_id,title,workspace_mode,base_ref,created_at,updated_at) VALUES (?,?,?,'current','main',1,1)").run(id, project.id, title);
+    return { id };
+  };
+  const running = task("Running");
+  db.stmt("UPDATE tasks SET execution_thread_id=? WHERE id=?").run(conversation.id, running.id);
   const unassigned = task("Not started");
   const legacy = db.stmt("INSERT INTO review_comments (id, task_id, snapshot_id, path, line, side, body, sent_in_run_id, created_at) VALUES (?, ?, NULL, ?, ?, ?, ?, NULL, ?)");
   legacy.run("assigned-comment", running.id, "src/app.ts", 12, "old", "Keep the removed guard.", 1000);

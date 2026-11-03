@@ -1,39 +1,21 @@
-import { audit, Db, memories, orchestration, projects, tasks, teamRuntime, threads } from "@openorc/db";
-import { access } from "node:fs/promises";
+import { audit, Db, memories, projects, retiredTeams, tasks, threads } from "@openorc/db";
 import { FolderPath } from "@openorc/protocol";
 import { conversationFolder } from "../services/conversation-folder.js";
 import type { FileService } from "../services/files.js";
 import { executionProject } from "../services/workspace-home.js";
 
-async function pathExists(p: string): Promise<boolean> {
-  try {
-    await access(p);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 export function threadAndProject(db: Db, threadId: string) {
   const thread = threads.get(db, threadId);
-  if (!thread) throw new Error(`thread ${threadId} not found`);
+  if (!thread || retiredTeams.isHidden(db, threadId)) throw new Error(`thread ${threadId} not found`);
   const project = executionProject(db, thread);
   return { thread, project };
 }
 
 export function taskAndProject(db: Db, taskId: string) {
   const task = tasks.get(db, taskId);
-  if (!task) throw new Error(`task ${taskId} not found`);
+  if (!task || task.retiredTeam) throw new Error(`task ${taskId} not found`);
   const project = projects.get(db, task.projectId);
   if (!project) throw new Error(`project ${task.projectId} not found`);
-  return { task, project };
-}
-
-export async function reviewWorkspace(db: Db, taskId: string) {
-  const { task, project } = taskAndProject(db, taskId);
-  const unprepared = !task.baseSha || (task.workspaceMode === "worktree" && (!task.worktreePath || !(await pathExists(task.worktreePath))));
-  const teamOwned = teamRuntime.assignmentForTask(db, task.id) || (task.threadId && orchestration.getInstance(db, task.threadId));
-  if (unprepared && teamOwned) throw new Error("This team workspace is not ready for review. Wait for its assignment to start.");
   return { task, project };
 }
 

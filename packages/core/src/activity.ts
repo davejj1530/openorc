@@ -1,12 +1,8 @@
-import { teamRuntime, type Db } from "@openorc/db";
-
 /** Why closing the core now would cut something short. Each table below is a Record over it, so a new reason must be handled in both. */
-export type BusyReason =
-  "agent-updates" | "memory" | "teams" | "schedules" | "background-commands" | "agents" | "queued-messages" | "cloud-sandboxes" | "text-generation" | "claude-sign-in" | "phones";
+export type BusyReason = "agent-updates" | "memory" | "schedules" | "background-commands" | "agents" | "queued-messages" | "cloud-sandboxes" | "text-generation" | "claude-sign-in" | "phones";
 
 /** The state each reason is read from, kept by the service that owns it, as the core holds them. Nothing here is copied or stored. */
 export interface ActivitySources {
-  db: Db;
   runs: { readonly busy: boolean; readonly backgroundCommandsRunning: boolean; prepareForUpdate(): boolean };
   threads: { readonly deliveringQueued: boolean };
   cloud: { readonly busy: boolean };
@@ -22,7 +18,6 @@ export interface ActivitySources {
 const CHECKS: { readonly [R in BusyReason]: (sources: ActivitySources) => boolean } = {
   "agent-updates": (s) => s.agentUpdates.get().updating,
   memory: (s) => s.memory.hasPendingWork,
-  teams: (s) => teamRuntime.openIds(s.db).length > 0,
   schedules: (s) => s.schedules.hasPendingWork,
   "background-commands": (s) => s.runs.backgroundCommandsRunning,
   agents: (s) => s.runs.busy,
@@ -41,7 +36,6 @@ const CHECKS: { readonly [R in BusyReason]: (sources: ActivitySources) => boolea
 const UPDATE_WORDS: { readonly [R in BusyReason]: string | null } = {
   "agent-updates": "Wait for agent updates to finish before restarting.",
   memory: "Wait for memory processing to finish before restarting to update.",
-  teams: "Finish or stop your active teams before restarting to update.",
   schedules: "A schedule is starting a thread. Try again when it has started.",
   "background-commands": "Stop the background commands running in your conversations before restarting to update.",
   agents: "Wait for agent work, approvals, and context maintenance to finish before restarting to update.",

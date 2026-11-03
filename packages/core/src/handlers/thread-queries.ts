@@ -1,4 +1,4 @@
-import { Db, lastThreadMessage, type LedgerWriter } from "@openorc/db";
+import { Db, lastThreadMessage, retiredTeams, type LedgerWriter } from "@openorc/db";
 import { ImportService } from "../services/imports.js";
 import { threadTurnChanges } from "../services/thread-turn-changes.js";
 import { ThreadService } from "../services/threads.js";
@@ -32,7 +32,7 @@ export function createThreadQueriesHandlers({
     "threads.lastMessage": ({ id }) => {
       // A message sent a moment ago can still be waiting for the ledger's next write.
       ledger.flush();
-      return lastThreadMessage(db, id, PREVIEW_CHARS);
+      return retiredTeams.isHidden(db, id) ? null : lastThreadMessage(db, id, PREVIEW_CHARS);
     },
     "threads.plans": ({ id }) => threadService.plans(id),
     "threads.search": ({ query, projectId, limit }) => threadService.search(query, { ...(projectId ? { projectId } : {}), ...(limit ? { limit } : {}) }),

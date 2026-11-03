@@ -1,11 +1,11 @@
-import { realpath } from "node:fs/promises";
-import { projects, tasks, teamDeletedThreads, teamRuntime, threads, type Db } from "@openorc/db";
+import { projects, retiredTeams, tasks, threads, type Db } from "@openorc/db";
 import { WORKSPACE_ID, type ConversationScope, type Project, type Task, type Thread } from "@openorc/protocol";
+import { realpath } from "node:fs/promises";
 import { inUnvettedCopy } from "./review-copies.js";
 import { directory, executionProject, workspaceHome } from "./workspace-home.js";
 
 /** What kind of folder a conversation works in. It decides who may edit there. */
-export type FolderKind = "checkout" | "worktree" | "workspace" | "review" | "member";
+export type FolderKind = "checkout" | "worktree" | "workspace" | "review";
 
 export interface ConversationFolder {
   /** Real path, symlinks resolved. File paths are checked against it, and caches are keyed by it. */
@@ -42,18 +42,19 @@ export async function conversationFolder(db: Db, scope: FolderScope): Promise<Co
   if (scope.kind === "project") return projectFolder(db, scope.id, scope.workingDirectory);
   if (scope.kind === "thread") {
     const thread = threads.get(db, scope.id);
-    if (!thread) throw new Error(`thread ${scope.id} not found`);
+    if (!thread || retiredTeams.isHidden(db, thread.id)) throw new Error(`thread ${scope.id} not found`);
     return threadFolder(db, thread);
   }
   const task = tasks.get(db, scope.id);
-  if (!task) throw new Error(`task ${scope.id} not found`);
+  if (!task || task.retiredTeam) throw new Error(`task ${scope.id} not found`);
   return taskFolder(db, task);
 }
 
 async function threadFolder(db: Db, thread: Thread): Promise<ConversationFolder> {
   const project = executionProject(db, thread);
   const kind = threadKind(db, thread, project);
-  const readOnly = editBlocker(kind) ?? (teamDeletedThreads.has(db, thread.id) ? "This conversation was deleted." : null);
+  if (retiredTeams.isHidden(db, thread.id)) throw new Error("Thread not found.");
+  const readOnly = editBlocker(kind);
   return { root: await folderRoot(executionFolder({ thread, task: null }, project)), kind, project, readOnly };
 }
 
@@ -65,8 +66,7 @@ function threadKind(db: Db, thread: Thread, project: Project): FolderKind {
 
 /** Task runs launch with the raw project row, so a task resolves against it, not against executionProject. */
 async function taskFolder(db: Db, task: Task): Promise<ConversationFolder> {
-  const member = teamRuntime.assignmentForTask(db, task.id) !== null;
-  if (!member && task.executionThreadId) {
+  if (task.executionThreadId) {
     // A task started in a conversation runs there, as that conversation's own turn.
     const thread = threads.get(db, task.executionThreadId);
     if (!thread) throw new Error("This task's conversation was deleted.");
@@ -74,12 +74,11 @@ async function taskFolder(db: Db, task: Task): Promise<ConversationFolder> {
   }
   const project = projects.get(db, task.projectId);
   if (!project) throw new Error(`project ${task.projectId} not found`);
-  const kind = taskKind(task, project, member);
+  const kind = taskKind(task, project);
   return { root: await folderRoot(executionFolder({ task, thread: null }, project)), kind, project, readOnly: editBlocker(kind) };
 }
 
-function taskKind(task: Task, project: Project, member: boolean): FolderKind {
-  if (member) return "member";
+function taskKind(task: Task, project: Project): FolderKind {
   if (project.id === WORKSPACE_ID) return "workspace";
   return task.workspaceMode !== "current" && task.worktreePath ? "worktree" : "checkout";
 }
@@ -99,11 +98,7 @@ async function folderRoot(folder: string): Promise<string> {
   });
 }
 
-/**
- * A pull request copy is someone else's code under review, and a team member's copy is an agent's work in progress,
- * which reaches the user's folder only through integration.
- */
+/** A pull request copy contains someone else's code under review. */
 function editBlocker(kind: FolderKind): string | null {
-  if (kind === "review") return "Pull request copies are read-only.";
-  return kind === "member" ? "Team member copies are read-only." : null;
+  return kind === "review" ? "Pull request copies are read-only." : null;
 }

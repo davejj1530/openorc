@@ -1,19 +1,19 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { claudeConfigDir, RunHandle, type AgentLaunchEnvironment } from "@openorc/agents";
 import { Db, LedgerWriter, projects, runs, threads } from "@openorc/db";
 import { git } from "@openorc/git";
 import type { Project, RunSpec } from "@openorc/protocol";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { FrameCoalescer } from "../frames.js";
 import { ClaudeAccountService } from "./claude-accounts.js";
 import { claudeRunAccount } from "./claude-run-account.js";
 import { RunService } from "./runs.js";
 import { ShellEnvironment } from "./shell-environment.js";
 import { ThreadService } from "./threads.js";
-import { WorkspaceService } from "./workspace.js";
 import { WorkspaceWriters } from "./workspace-writers.js";
+import { WorkspaceService } from "./workspace.js";
 
 let root: string;
 let db: Db;
@@ -90,7 +90,6 @@ beforeEach(async () => {
     quiet,
     async () => null,
     writers,
-    undefined,
     undefined,
     folder,
   );
@@ -231,13 +230,4 @@ it("retires idle sessions for sign-in while leaving other accounts running", asy
   await service.retireIdleClaudeSessions(work.id);
   expect(service.hasClaudeSessions(work.id)).toBe(false);
   expect(service.hasClaudeSessions(personal.id)).toBe(true);
-});
-
-it("lets a team member that names its own account run on it, while the conversation's account wins otherwise", () => {
-  const [work, client] = ["Work", "Client"].map((name) => accounts.add(name).id) as [string, string];
-  const thread = threads.insert(db, { projectId: project.id, title: "Team", agent: "claude", model: "fixture", mode: "plan", permissionMode: "review", claudeAccountId: work });
-  const launch = { scope: { task: null, thread }, project, agent: "claude" as const, model: "fixture", mode: "plan" as const, permissionMode: "review" as const, prompt: "Review it", resume: false };
-  expect(claudeRunAccount(db, { ...launch, teamAttemptId: "attempt", claudeAccountId: client })).toBe(client);
-  expect(claudeRunAccount(db, { ...launch, teamAttemptId: "attempt" })).toBe(work);
-  expect(claudeRunAccount(db, { ...launch, claudeAccountId: client })).toBe(work);
 });

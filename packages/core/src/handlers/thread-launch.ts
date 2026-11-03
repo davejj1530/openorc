@@ -1,24 +1,21 @@
-import { ExecutableAgent, WORKSPACE_ID, type RpcParams } from "@openorc/protocol";
+import { ExecutableAgent, type RpcParams } from "@openorc/protocol";
 import { ImportService } from "../services/imports.js";
-import { TeamConversationService } from "../services/team-conversation.js";
-import { ThreadService } from "../services/threads.js";
 import type { OrclingService } from "../services/orclings.js";
+import { ThreadService } from "../services/threads.js";
 import type { Handlers } from "./types.js";
 type Dependencies = {
   threadService: Pick<ThreadService, "implementPlan" | "exportPlan" | "start" | "update" | "switchClaudeAccount">;
-  teamConversations: Pick<TeamConversationService, "start">;
   orclings: Pick<OrclingService, "startThread" | "threadPatch">;
   imports: Pick<ImportService, "import">;
 };
 
-/** A cloud conversation runs one model; teams and Orclings start on this Mac. */
+/** A cloud conversation runs one model; Orclings start on this Mac. */
 function assertCloudTarget(cloud: boolean | undefined, target: RpcParams<"threads.start">["executionTarget"]): void {
   if (cloud && target && target.kind !== "model") throw new Error("Cloud conversations run one model.");
 }
 
 export function createThreadLaunchHandlers({
   threadService,
-  teamConversations,
   orclings,
   imports,
 }: Dependencies): Pick<Handlers, "threads.implementPlan" | "threads.exportPlan" | "threads.start" | "threads.update" | "threads.switchClaudeAccount" | "threads.import"> {
@@ -28,7 +25,6 @@ export function createThreadLaunchHandlers({
     "threads.start": ({
       projectId,
       workingDirectory,
-      requestKey,
       agent,
       model,
       effort,
@@ -44,10 +40,7 @@ export function createThreadLaunchHandlers({
       attachments,
       title,
     }) => {
-      if (projectId === WORKSPACE_ID && executionTarget?.kind === "team") throw new Error("Saved teams belong to projects. Select a model for Workspace.");
       assertCloudTarget(cloud, executionTarget);
-      if (executionTarget?.kind === "team")
-        return teamConversations.start({ projectId, claudeAccountId, requestKey, executionTarget, mode, permissionMode, workspaceMode, baseRef, prompt, attachments, title });
       if (executionTarget?.kind === "orcling") {
         return orclings.startThread(executionTarget.orclingId, {
           projectId,
@@ -81,7 +74,7 @@ export function createThreadLaunchHandlers({
         title,
       });
     },
-    "threads.update": ({ id, patch, taskId }) => threadService.update(id, orclings.threadPatch(id, patch), taskId ? { taskId } : {}),
+    "threads.update": ({ id, patch }) => threadService.update(id, orclings.threadPatch(id, patch)),
     "threads.switchClaudeAccount": ({ id, claudeAccountId }) => threadService.switchClaudeAccount(id, claudeAccountId),
     "threads.import": ({ projectId, sessions }) => imports.import(projectId, sessions),
   };

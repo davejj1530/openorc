@@ -1,8 +1,8 @@
-import { taskComments, tasks, projects, threads, runs, orchestration, orclings, teamRuntime, type Db } from "@openorc/db";
+import { orclings, projects, retiredTeams, runs, taskComments, tasks, threads, type Db } from "@openorc/db";
 import {
   commentRecipientKey,
-  resolveCommentMentions,
   modelEfforts,
+  resolveCommentMentions,
   type AgentEvent,
   type CommentAttempt,
   type CommentIntent,
@@ -11,12 +11,13 @@ import {
   type Orcling,
   type RpcParams,
   type Run,
+  type Task,
   type TaskDiscussion,
   type Thread,
 } from "@openorc/protocol";
+import { AttachmentService } from "./attachments.js";
 import { isSessionLost, type RunService, type TurnSettledOutcome } from "./runs.js";
 import type { ThreadService } from "./threads.js";
-import { AttachmentService } from "./attachments.js";
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 const executionAccepted = (attempt: CommentAttempt) => Boolean(attempt.executionRunId || (attempt.threadId && attempt.state === "success"));
@@ -51,7 +52,7 @@ export class TaskCommentService {
   }
   private task(id: string) {
     const task = tasks.get(this.db, id);
-    if (!task) throw new Error("Task not found.");
+    if (!task || task.retiredTeam) throw new Error("Task not found.");
     return task;
   }
   private attempt(taskId: string, id: string) {
@@ -79,10 +80,15 @@ export class TaskCommentService {
     const results = await Promise.allSettled(["codex", "claude", "opencode"].map((agent) => this.runService.models(agent as CommentRecipient["agent"])));
     return results.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
   }
+  private writableTask(taskId: string): Task {
+    const task = this.task(taskId);
+    if (task.retiredTeam) throw new Error("This item is no longer available.");
+    return task;
+  }
   async post(input: RpcParams<"tasks.comments.post">) {
     const previous = taskComments.request(this.db, input.taskId, input.requestKey);
     if (previous) return previous;
-    const initialTask = this.task(input.taskId);
+    const initialTask = this.writableTask(input.taskId);
     const needsModels = input.recipients.length > 0 || /(?:^|\s)@/.test(input.source === "description" ? (initialTask.spec ?? "") : input.body);
     const catalog = needsModels ? await this.catalog() : [];
     if (this.closing) throw new Error("OpenOrc is closing.");
@@ -280,7 +286,7 @@ export class TaskCommentService {
       if (this.closing) throw new Error("OpenOrc is closing.");
       const task = this.task(taskId);
       if (task.status === "archived" || task.status === "done") throw new Error("Reopen this task before starting work.");
-      if (teamRuntime.assignmentForTask(this.db, taskId) || (task.threadId && orchestration.getInstance(this.db, task.threadId))) throw new Error("Use this task's saved-team execution controls.");
+      if (retiredTeams.hasTask(this.db, taskId) || (task.threadId && retiredTeams.isHidden(this.db, task.threadId))) throw new Error("This item is no longer available.");
       const assigned = this.threadService.executionThreadFor(taskId);
       const owner = assigned ?? (task.threadId ? threads.get(this.db, task.threadId) : null);
       if (owner?.mode === "plan") throw new Error("Switch the linked thread to an implementation mode before starting work.");
@@ -346,6 +352,7 @@ export class TaskCommentService {
       if (sibling.commentId === commentId && sibling.id !== selectedId && sibling.state === "choose_executor") taskComments.update(this.db, sibling.id, { state: "success" });
   }
   retry(taskId: string, id: string) {
+    this.writableTask(taskId);
     const item = this.attempt(taskId, id);
     if (item.executionRunId) throw new Error("Continue implementation in its linked thread; retry will not duplicate work.");
     if (item.state !== "error" && item.state !== "cancelled") return item;

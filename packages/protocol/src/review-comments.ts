@@ -15,7 +15,7 @@ export function reviewCommentLines(comment: CommentLines): string | null {
   return `${mark(comment.startSide)}${comment.startLine} to ${mark(comment.side)}${comment.line}`;
 }
 
-/** Sent to a conversation as a queued message, or to a team run through team review. */
+/** Sent to a conversation as a queued message. */
 export function reviewCommentSent(comment: Pick<ReviewComment, "sentInRunId" | "sentMessageId">): boolean {
   return comment.sentInRunId !== null || comment.sentMessageId !== null;
 }

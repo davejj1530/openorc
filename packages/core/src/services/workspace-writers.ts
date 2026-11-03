@@ -67,7 +67,7 @@ async function canonical(input: string): Promise<string> {
 export interface AcquireOptions {
   /** Agent sessions may work in the same directory concurrently; exclusive operations still conflict with them. */
   shared?: boolean;
-  /** Exclusive work on a shared team workspace waits for the members' turns to end instead of failing. The callback aborts the wait. */
+  /** Exclusive work on a shared workspace waits for active turns to end instead of failing. The callback aborts the wait. */
   waitForShared?: () => void;
   /**
    * The mirror image: a member joining a shared workspace waits for a short exclusive operation there (an output

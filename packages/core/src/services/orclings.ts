@@ -1,5 +1,4 @@
-import { randomUUID } from "node:crypto";
-import { audit, claudeAccounts, orchestration, orclings, runs as runRepo, tasks, threads, type Db } from "@openorc/db";
+import { audit, claudeAccounts, orclings, retiredTeams, runs as runRepo, tasks, threads, type Db } from "@openorc/db";
 import {
   isHarnessId,
   orclingExecution,
@@ -14,14 +13,15 @@ import {
   type RunMode,
   type Thread,
 } from "@openorc/protocol";
+import { randomUUID } from "node:crypto";
 import { AttachmentService } from "./attachments.js";
 import type { MemoryService } from "./memory.js";
 import { catchUp, orclingBrief, rolloverSeed, type OrclingPlace } from "./orcling-briefs.js";
 import { OrclingFolders } from "./orcling-folders.js";
 import type { OrclingRunHooks, StartRunInput } from "./run-types.js";
 import type { RunService } from "./runs.js";
-import type { ThreadService } from "./threads.js";
 import type { StartThreadInput, ThreadPatch } from "./thread-inputs.js";
+import type { ThreadService } from "./threads.js";
 import { executionProject } from "./workspace-home.js";
 
 /** A new session of an Orcling's own conversation starts after this long without a turn. */
@@ -274,7 +274,7 @@ export class OrclingService {
     const thread = threads.get(this.deps.db, threadId);
     if (!thread) throw new Error("This conversation no longer exists.");
     if (thread.orclingId === orcling.id) throw new Error(`${orcling.name} already works in this conversation. Message it without a mention.`);
-    if (orchestration.getInstance(this.deps.db, threadId)) throw new Error(`Team conversations speak with their members. Add ${orcling.name} to the team instead.`);
+    if (retiredTeams.isHidden(this.deps.db, threadId)) throw new Error("This item is no longer available.");
     if (orclings.forThread(this.deps.db, threadId)) throw new Error("Another Orcling's own conversation is only for that Orcling.");
     return thread;
   }
@@ -283,7 +283,7 @@ export class OrclingService {
   assign(threadId: string, orclingId: string | null): void {
     const thread = threads.get(this.deps.db, threadId);
     if (!thread) throw new Error("This conversation no longer exists.");
-    if (thread.projectId === WORKSPACE_ID || orclings.forThread(this.deps.db, threadId) || orchestration.getInstance(this.deps.db, threadId)) {
+    if (thread.projectId === WORKSPACE_ID || orclings.forThread(this.deps.db, threadId) || retiredTeams.isHidden(this.deps.db, threadId)) {
       throw new Error("Only a project conversation can be given to an Orcling.");
     }
     const orcling = orclingId ? this.get(orclingId) : null;
@@ -386,7 +386,7 @@ export class OrclingService {
 
   private place(orcling: Orcling, input: StartRunInput): OrclingPlace {
     const thread = input.scope.thread ? threads.get(this.deps.db, input.scope.thread.id) : null;
-    if (!thread || input.teamAttemptId) return "elsewhere";
+    if (!thread) return "elsewhere";
     if (thread.id === orcling.threadId) return "home";
     return thread.orclingId === orcling.id ? "thread" : "guest";
   }

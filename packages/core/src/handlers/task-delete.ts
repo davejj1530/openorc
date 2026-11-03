@@ -21,6 +21,7 @@ export function createTaskDeleteHandlers({ workspaces, comments, runService, db,
   return {
     "tasks.delete": async ({ id, deleteBranch, acceptLoss }) => {
       const { task, project } = taskAndProject(db, id);
+      if (task.retiredTeam) throw new Error("This item is no longer available.");
       // Refused before anything goes; the cleanup checks again under its workspace lease.
       if (deleteBranch) assertLossAccepted(await workspaces.removalImpact(task, project), acceptLoss);
       await comments.deleteTask(id);

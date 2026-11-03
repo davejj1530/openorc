@@ -1,18 +1,16 @@
-import { randomUUID } from "node:crypto";
-import { audit, orchestration, runs, subagents, taskComments, taskForwardings, tasks, threads, type Db, type LedgerWriter } from "@openorc/db";
+import type { AgentLaunchEnvironment } from "@openorc/agents";
+import { audit, retiredTeams, runs, subagents, taskComments, tasks, threads, type Db, type LedgerWriter } from "@openorc/db";
 import { worktree } from "@openorc/git";
 import { internalToolNames, type OpenOrcMcpServer } from "@openorc/mcp";
 import {
   browserInstructions,
-  visualizationInstructions,
   harnessName,
   isHarnessId,
   normalizeModelEffort,
-  stricterPermission,
+  visualizationInstructions,
   type AgentEvent,
   type AgentKind,
   type ModelOption,
-  type PermissionPreset,
   type Project,
   type Run,
   type RunMode,
@@ -20,12 +18,10 @@ import {
   type Task,
   type Thread,
 } from "@openorc/protocol";
-import type { AgentLaunchEnvironment } from "@openorc/agents";
+import { randomUUID } from "node:crypto";
 import type { Logger } from "../transport.js";
-import type { EnvSnapshot } from "./shell-environment.js";
 import { CLOUD_AGENTS, CLOUD_HARNESSES, type CloudRunHost } from "./cloud-workspaces.js";
 import { executionFolder } from "./conversation-folder.js";
-import { withOutsideNote, type OutsideChanges, type TurnStartCapture } from "./turn-start-checkpoint.js";
 import {
   working,
   type LiveProcessBinding,
@@ -38,6 +34,8 @@ import {
   type StartRunInput,
   type TurnSettledOutcome,
 } from "./run-types.js";
+import type { EnvSnapshot } from "./shell-environment.js";
+import { withOutsideNote, type OutsideChanges, type TurnStartCapture } from "./turn-start-checkpoint.js";
 import type { WorkspaceLease, WorkspaceWriters } from "./workspace-writers.js";
 
 type LaunchAttempt = {
@@ -59,7 +57,7 @@ interface RunLaunchDependencies {
   writers: WorkspaceWriters;
   turnStarts: Pick<TurnStartCapture, "capture">;
   adapters: RunAdapterRegistry;
-  hooks: Pick<RunHooks, "assertStart" | "taskImages" | "browserAvailable" | "claudeUserMcpServers" | "processRegistry" | "untrustedCheckout" | "orclings" | "cloudHost" | "syncCloud">;
+  hooks: Pick<RunHooks, "taskImages" | "browserAvailable" | "claudeUserMcpServers" | "processRegistry" | "untrustedCheckout" | "orclings" | "cloudHost" | "syncCloud">;
   log: Logger;
   isClosing: () => boolean;
   live: ReadonlyMap<string, LiveRun>;
@@ -71,7 +69,7 @@ interface RunLaunchDependencies {
   bindLiveProcess: (binding: LiveProcessBinding) => void;
   applyThreadPermissions: (thread: Thread) => void;
   turnSettled: (run: Run, scope: RunScope, project: Project, outcome: TurnSettledOutcome) => void;
-  taskBrief: (task: Task, project: Project, mode: RunMode, teamManaged: boolean) => string;
+  taskBrief: (task: Task, project: Project, mode: RunMode) => string;
   threadBrief: (thread: Thread, project: Project, mode: RunMode) => string;
   models: (agent: AgentKind, environment: EnvSnapshot, launch: AgentLaunchEnvironment) => Promise<ModelOption[]>;
   validateFastMode: (agent: AgentKind, model: string | undefined, fastMode: boolean | undefined, environment: EnvSnapshot, launch: AgentLaunchEnvironment) => Promise<void>;
@@ -123,7 +121,6 @@ export class RunLaunch {
     let admitted = input;
     const assertAdmission = () => {
       if (this.deps.isClosing()) throw new Error("OpenOrc is closing.");
-      this.deps.hooks.assertStart?.(admitted);
       admitted.assertCanStart?.();
     };
     const timing: [string, number][] = [];
@@ -138,10 +135,8 @@ export class RunLaunch {
     admitted = prepared.input;
     if (!isHarnessId(admitted.agent)) throw new Error(`Provider ${admitted.agent} has no executable adapter.`);
     assertAdmission();
-    // Shared team members recheck admission while waiting for an exclusive coordinator operation.
     const lease = await this.deps.writers.acquire(prepared.cwd, `run ${prepared.runId}`, admitted.workspaceLease, {
       shared: true,
-      ...(admitted.shared ? { waitForExclusive: assertAdmission, maxWaitMs: 60_000 } : {}),
     });
     phase("lease");
     const run = this.recordRun(prepared, lease, assertAdmission);
@@ -200,7 +195,6 @@ export class RunLaunch {
     assertAdmission();
     const orclingCeiling = input.orclingId ? this.deps.hooks.orclings?.ceiling(input.orclingId) : undefined;
     // No await occurs between this permission read and the provider launch.
-    const teamPermission = this.adoptTeamPermission(run, input, spec, orclingCeiling);
     phase("prepare");
     if (!isHarnessId(input.agent)) throw new Error(`Provider ${input.agent} has no executable adapter.`);
     // In a cloud workspace the CLI is the sandbox's own, found on its PATH, with the sandbox's environment.
@@ -217,7 +211,6 @@ export class RunLaunch {
       workspaceLease: lease,
       internalMcp,
       providerPermissionMode: spec.permissionMode,
-      ...(teamPermission ? { permissionGate: teamPermission } : {}),
       ...(orclingCeiling ? { orclingCeiling } : {}),
     });
     // The picker can change while catalog discovery or MCP startup is awaiting.
@@ -286,7 +279,7 @@ export class RunLaunch {
     // Between turns the Mac may have committed or edited in a cloud conversation's worktree: that goes to the sandbox,
     // then the worktree catches up with the sandbox before the turn's starting point is saved.
     await this.deps.hooks.syncCloud?.(thread, { push: true });
-    return this.deps.turnStarts.capture({ thread, project: input.project, cwd: lease.paths[0]!, team: Boolean(input.teamAttemptId) });
+    return this.deps.turnStarts.capture({ thread, project: input.project, cwd: lease.paths[0]! });
   }
 
   /** `cwd` is the sandbox's checkout for a cloud conversation; otherwise the run works in its leased folder. */
@@ -332,7 +325,6 @@ export class RunLaunch {
       this.scopeBrief(input),
       taskImages.length ? `Task images in document order (open them from these paths):\n${taskImages.map((file, index) => `${index + 1}. ${file}`).join("\n")}` : "",
       input.handoff ?? "",
-      input.scope.task ? (taskForwardings.target(this.deps.db, input.scope.task.id)?.context ?? "") : "",
       input.systemPromptAppendix ?? "",
     ]
       .filter(Boolean)
@@ -342,7 +334,7 @@ export class RunLaunch {
   private scopeBrief(input: StartRunInput): string {
     const { scope, project } = input;
     if (scope.comment) return "You are responding in task comments. This is read-only discussion, not task execution. Reply to the user in comments. No task or thread mutation tools are available.";
-    if (scope.task) return this.deps.taskBrief(scope.task, project, input.mode, Boolean(input.teamAttemptId));
+    if (scope.task) return this.deps.taskBrief(scope.task, project, input.mode);
     return this.deps.threadBrief(scope.thread, project, input.mode);
   }
 
@@ -356,38 +348,6 @@ export class RunLaunch {
         attempt.locked = true;
       })
       .catch((error: unknown) => this.deps.log.warn(String(error)));
-  }
-
-  /** A team member works with the team conversation's current permission, never looser than its Orcling's. Returns the app gate. */
-  private adoptTeamPermission(run: Run, input: StartRunInput, spec: RunSpec, orclingCeiling: PermissionPreset | undefined): PermissionPreset | null {
-    if (!input.teamAttemptId) return null;
-    const { task, thread } = input.scope;
-    const teamThreadId = thread?.id ?? task?.threadId;
-    const latest = teamThreadId ? threads.get(this.deps.db, teamThreadId) : null;
-    const currentTask = task ? tasks.get(this.deps.db, task.id) : null;
-    if (
-      !latest ||
-      latest.projectId !== input.project.id ||
-      !orchestration.getInstance(this.deps.db, latest.id) ||
-      (task && (currentTask?.threadId !== latest.id || currentTask.projectId !== input.project.id))
-    ) {
-      throw new Error("Team permission ownership changed during startup.");
-    }
-    const allowed = orclingCeiling ? stricterPermission(latest.permissionMode, orclingCeiling) : latest.permissionMode;
-    const gate = latest.mode === "plan" ? "review" : allowed;
-    spec.permissionMode = input.mode === "plan" ? "review" : allowed;
-    if (run.permissionMode === allowed) return gate;
-    const previous = run.permissionMode;
-    run.permissionMode = allowed;
-    runs.update(this.deps.db, run.id, { permissionMode: run.permissionMode });
-    audit.record(this.deps.db, {
-      actor: "openorc",
-      action: "run.permissions_adopted",
-      resourceType: "run",
-      resourceId: run.id,
-      metadata: { previous, permissionMode: run.permissionMode, providerPermissionMode: spec.permissionMode, reason: "team_startup" },
-    });
-    return gate;
   }
 
   private async failStartup(attempt: LaunchAttempt, error: unknown): Promise<void> {
@@ -415,6 +375,7 @@ export class RunLaunch {
   /** Resolve launch inputs before taking a writer; callers still fence admission after every later wait. */
   private async prepareSession(input: StartRunInput, environment: EnvSnapshot, launch: AgentLaunchEnvironment, assertAdmission: () => void, phase: (name: string) => void): Promise<PreparedSession> {
     const { scope, agent } = input;
+    if ((scope.thread && retiredTeams.isHidden(this.deps.db, scope.thread.id)) || (scope.task ?? scope.comment?.task)?.retiredTeam) throw new Error("This item is no longer available.");
     assertAdmission();
     if (scope.comment && (input.mode !== "plan" || input.permissionMode !== "review" || input.resumeFrom)) throw new Error("Comment turns require a read-only discussion session.");
     // Task images belong to the brief, not the user's message.
@@ -435,7 +396,7 @@ export class RunLaunch {
 
   private async closePrevious(input: StartRunInput): Promise<void> {
     const { scope } = input;
-    if (scope.comment || input.shared) return;
+    if (scope.comment) return;
     const previous = scope.thread ? this.deps.liveRunForThread(scope.thread.id) : this.deps.liveRunForTask(scope.task!.id);
     if (!previous) return;
     const entry = this.deps.live.get(previous.id)!;

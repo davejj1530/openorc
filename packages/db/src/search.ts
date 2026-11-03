@@ -1,5 +1,6 @@
 import type { ThreadSearchHit } from "@openorc/protocol";
 import type { Db } from "./database.js";
+import { retiredTaskIds, retiredThreadIds } from "./retired-teams.js";
 
 interface HitRow {
   thread_id: string;
@@ -13,8 +14,6 @@ interface HitRow {
   ts: number;
   task_id: string | null;
   task_title: string | null;
-  member_key: string | null;
-  member_name: string | null;
 }
 
 /** Turns free text into an FTS5 query: every word a prefix, all of them required. */
@@ -54,23 +53,18 @@ export const messages = {
       .stmt(
         `SELECT t.id AS thread_id, t.title AS thread_title, t.project_id, f.run_id, f.message_id, f.role, snippet(messages_fts, 0, '', '', '…', 18) AS snippet, f.ts,
                 (SELECT COUNT(*) FROM events d WHERE d.run_id = f.run_id AND d.kind = 'turn.completed' AND d.ts < f.ts) AS turn,
-                k.id AS task_id, k.title AS task_title, m.member_key, m.name AS member_name
+                k.id AS task_id, k.title AS task_title
          FROM messages_fts f
          JOIN runs r ON r.id = f.run_id
          LEFT JOIN tasks k ON k.id = r.task_id
          JOIN threads t ON t.id = COALESCE(r.thread_id, k.thread_id)
-         LEFT JOIN team_run_bindings b ON b.run_id = r.id
-         LEFT JOIN team_executions e ON e.id = b.execution_id
-         LEFT JOIN team_actors a ON a.execution_id = b.execution_id AND a.id = b.actor_id
-         LEFT JOIN orchestration_team_instances i ON i.id = e.instance_id
-         LEFT JOIN orchestration_team_members m ON m.revision_id = i.team_revision_id AND m.member_key = a.member_key
          WHERE messages_fts MATCH ? ${where}
-           AND NOT EXISTS (SELECT 1 FROM team_deleted_threads hidden WHERE hidden.thread_id = t.id)
+           AND t.id NOT IN (${retiredThreadIds})
+           AND (k.id IS NULL OR k.id NOT IN (${retiredTaskIds}))
          ORDER BY bm25(messages_fts), f.ts DESC
          LIMIT ?`,
       )
       .all(...args) as unknown as HitRow[];
-    // Team assignment runs belong to their task; the task's thread is the conversation the user knows.
     return rows.map((r) => ({
       threadId: r.thread_id,
       threadTitle: r.thread_title,
@@ -83,7 +77,7 @@ export const messages = {
       ts: r.ts,
       taskId: r.task_id,
       taskTitle: r.task_title,
-      member: r.member_key !== null && r.member_name !== null ? { key: r.member_key, name: r.member_name } : null,
+      member: null,
     }));
   },
 };

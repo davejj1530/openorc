@@ -1,4 +1,4 @@
-import { cloudWorkspaces, orchestration, threads, type Db } from "@openorc/db";
+import { cloudWorkspaces, retiredTeams, threads, type Db } from "@openorc/db";
 import { WORKSPACE_ID, type Thread } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
 import type { CloudSandboxRuns } from "./cloud-sandboxes.js";
@@ -29,7 +29,7 @@ export class CloudHandoff {
     if (cloudWorkspaces.get(this.deps.db, thread.id)) throw new Error("This conversation already runs in the cloud.");
     if (thread.projectId === WORKSPACE_ID) throw new Error("Only a project's conversations can move to the cloud.");
     if (!CLOUD_HARNESSES.has(thread.agent)) throw new Error(CLOUD_AGENTS);
-    if (orchestration.getInstance(this.deps.db, thread.id)) throw new Error("A team's conversations stay where the team runs.");
+    if (retiredTeams.isHidden(this.deps.db, thread.id)) throw new Error("This conversation is no longer available.");
     if (this.deps.runs.threadActivity(thread.id) !== "idle") throw new Error("Its agent is at work. Stop the turn, then move it.");
   }
 

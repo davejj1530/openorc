@@ -1,4 +1,4 @@
-import { audit, listEvents, orchestration, projects, runs as runRepo, taskForwardings, tasks, teamDeletedThreads, teamRuntime, threads, type Db } from "@openorc/db";
+import { audit, listEvents, projects, retiredTeams, runs as runRepo, tasks, threads, type Db } from "@openorc/db";
 import type { TaskCard, ThreadCard } from "@openorc/mcp";
 import {
   DEFAULT_CLAUDE_ACCOUNT,
@@ -15,9 +15,9 @@ import {
   type WorkspaceMode,
 } from "@openorc/protocol";
 import { createHash } from "node:crypto";
-import type { RunService } from "./runs.js";
 import { checkoutBranch } from "./checkout-branch.js";
 import { projectGit } from "./project-git.js";
+import type { RunService } from "./runs.js";
 import { titleFromPrompt, type StartThreadInput } from "./thread-inputs.js";
 import type { SpawnTaskInput, ThreadService } from "./threads.js";
 
@@ -80,11 +80,10 @@ export function reachesThread(db: Db, runId: string, source: Thread, target: Thr
 
 type MessageResult = { delivered: boolean; message: string };
 type MessageScope = { thread: Thread; target: Thread };
-type MessageRelay = (source: Thread, target: Thread) => string;
 
 interface AgentToolContext {
   spawnTask(thread: Thread, input: SpawnTaskInput, origin: "user" | "agent"): Promise<{ task: Task; duplicate: boolean; started: boolean }>;
-  rejectPinnedTeam(id: string | null): void;
+  rejectRetiredThread(id: string | null): void;
   send: ThreadService["send"];
   messages: ThreadService["messages"];
   withCheckoutBranches: ThreadService["withCheckoutBranches"];
@@ -183,7 +182,7 @@ export class ThreadAgentTools {
     };
   }
 
-  /** Task board access follows the project, not the team or thread that created it. */
+  /** Task board access follows the project, not the thread that created it. */
   private taskScope(runId: string): { projectId: string; currentTaskId: string | null } | null {
     const { thread, task } = this.scopeOf(runId);
     if (task && thread && task.projectId !== thread.projectId) return null;
@@ -194,7 +193,7 @@ export class ThreadAgentTools {
   private taskInScope(runId: string, id: string): { task: Task; currentTaskId: string | null } | null {
     const scope = this.taskScope(runId);
     const task = tasks.get(this.db, id);
-    if (!scope || !task || task.projectId !== scope.projectId) return null;
+    if (!scope || !task || task.retiredTeam || task.projectId !== scope.projectId) return null;
     return { task, currentTaskId: scope.currentTaskId };
   }
 
@@ -234,9 +233,8 @@ export class ThreadAgentTools {
   private assertTaskStartAllowed(task: Task, mode: Run["mode"] | undefined): void {
     if (mode !== "act") throw new Error("Plan mode cannot start tasks. Switch to Act or approve the task in OpenOrc.");
     if (task.status === "done" || task.status === "archived") throw new Error("This task is finished. Reopen it in OpenOrc before starting it.");
-    this.context.rejectPinnedTeam(task.threadId);
-    if (teamRuntime.assignmentForTask(this.db, task.id)) throw new Error("This task is managed by a saved team. Use its team execution controls.");
-    if (taskForwardings.target(this.db, task.id)?.state === "preparing") throw new Error("Finish this task’s saved handoff before starting work.");
+    this.context.rejectRetiredThread(task.threadId);
+    if (retiredTeams.hasTask(this.db, task.id)) throw new Error("This item is no longer available.");
     if (this.runs.liveRunForTask(task.id)) throw new Error("This task still has a running legacy agent. Stop or finish it before continuing here.");
   }
 
@@ -264,6 +262,7 @@ export class ThreadAgentTools {
     const scoped = this.taskInScope(runId, id);
     if (!scoped) return null;
     const { task: t, currentTaskId } = scoped;
+    if (t.retiredTeam) throw new Error("This item is no longer available.");
     const changes: { spec?: string; status?: TaskStatus; completedAt?: number | null } = {};
     if (patch.spec) changes.spec = patch.spec;
     if (patch.status) {
@@ -302,7 +301,7 @@ export class ThreadAgentTools {
   async toolThreadRead(runId: string, id: string, limit = 10): Promise<{ thread: ThreadCard; messages: { role: "user" | "assistant" | "system"; text: string }[] } | null> {
     const { thread } = this.scopeOf(runId);
     const target = threads.get(this.db, id);
-    if (!thread || !target || !reachesThread(this.db, runId, thread, target) || teamDeletedThreads.has(this.db, id)) return null;
+    if (!thread || !target || !reachesThread(this.db, runId, thread, target) || retiredTeams.isHidden(this.db, id)) return null;
     const out = this.context.messages(id);
     for (const run of runRepo.listForThread(this.db, id).slice(-4)) {
       for (const ev of listEvents(this.db, run.id, { kinds: ["message.completed"], newest: true, limit: 2000 })) {
@@ -365,7 +364,7 @@ export class ThreadAgentTools {
       const title = threads.get(this.db, thread.parentThreadId)?.title ?? "the thread that started this one";
       throw new Error(`A thread started by another thread can't start its own. Ask "${title}" with thread_send.`);
     }
-    if (orchestration.getInstance(this.db, thread.id)) throw new Error("A team starts work through its own tools.");
+    if (retiredTeams.isHidden(this.db, thread.id)) throw new Error("This item is no longer available.");
     return { parent: thread, run };
   }
 
@@ -397,7 +396,7 @@ export class ThreadAgentTools {
    * conversation asks the user first, or is refused from Plan (see app-actions.ts). A chain of agent messages stops at
    * MAX_AGENT_HOPS until a person writes, and a retried call with the same request key is delivered once.
    */
-  async toolThreadSend(runId: string, id: string, text: string, attribution?: { member: string; team: string }, requestKey?: string, relay?: MessageRelay): Promise<MessageResult> {
+  async toolThreadSend(runId: string, id: string, text: string, requestKey?: string): Promise<MessageResult> {
     const scope = this.messageScope(runId, id);
     if ("message" in scope) return { delivered: false, message: scope.message };
     // Include the target: a request key cannot accidentally replay another recipient's result.
@@ -411,7 +410,7 @@ export class ThreadAgentTools {
     } catch (error) {
       return { delivered: false, message: error instanceof Error ? error.message : String(error) };
     }
-    const result = await this.deliverMessage(latest, text, attribution, relay);
+    const result = await this.deliverMessage(latest, text);
     if (result.delivered) this.sentMessages.set(key, { fingerprint, result });
     if (this.sentMessages.size > 500) this.sentMessages.delete(this.sentMessages.keys().next().value!);
     return result;
@@ -444,23 +443,15 @@ export class ThreadAgentTools {
     return latest;
   }
 
-  private async deliverMessage({ thread, target }: MessageScope, text: string, attribution?: { member: string; team: string }, relay?: MessageRelay): Promise<MessageResult> {
+  private async deliverMessage({ thread, target }: MessageScope, text: string): Promise<MessageResult> {
     const hops = this.assertMessageChain(thread.id);
     const live = this.runs.liveRunForThread(target.id);
     const midTurn = Boolean(live && live.agent === target.agent && this.runs.isBusy(live.id));
-    let relayed: string | undefined;
-    try {
-      if (relay) relayed = relay(thread, target);
-      else await this.context.send(target.id, text, thread, attribution, { liveOnly: Boolean(attribution) });
-    } catch (error) {
-      if (attribution || relay) return { delivered: false, message: error instanceof Error ? error.message : String(error) };
-      throw error;
-    }
+    await this.context.send(target.id, text, thread);
     this.runs.noteAgentMessage(target.id, hops);
     return {
       delivered: true,
-      message:
-        relayed ?? (midTurn ? `Delivered to the running turn of "${target.title}". Its agent reads it while it works.` : `Delivered to "${target.title}". Its agent starts a new turn to read it.`),
+      message: midTurn ? `Delivered to the running turn of "${target.title}". Its agent reads it while it works.` : `Delivered to "${target.title}". Its agent starts a new turn to read it.`,
     };
   }
 
@@ -468,7 +459,7 @@ export class ThreadAgentTools {
     const { thread } = this.scopeOf(runId);
     const target = threads.get(this.db, id);
     if (!thread) return { message: "Only a thread can message other threads." };
-    if (!target || !reachesThread(this.db, runId, thread, target) || teamDeletedThreads.has(this.db, id)) return { message: "No such thread in this project." };
+    if (!target || !reachesThread(this.db, runId, thread, target) || retiredTeams.isHidden(this.db, id)) return { message: "No such thread in this project." };
     if (target.id === thread.id) return { message: "That is this thread." };
     return { thread, target };
   }

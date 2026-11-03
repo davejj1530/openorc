@@ -1,21 +1,21 @@
+import { audit, projects, retiredTeams, runs, settings, tasks, type Db } from "@openorc/db";
+import { git, workspaceTransfer } from "@openorc/git";
+import { FilePublication, WorkspaceTreeCapture, type TaskCheckoutPreview, type TaskCheckoutState } from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
 import { lstat, realpath } from "node:fs/promises";
 import path from "node:path";
-import { audit, orchestration, projects, runs, settings, tasks, teamRuntime, type Db } from "@openorc/db";
-import { git, teamTransfer } from "@openorc/git";
-import { TeamPublicationRecord, TeamTreeCapture, type TaskCheckoutPreview, type TaskCheckoutState } from "@openorc/protocol";
 import { z } from "zod";
-import { checkPublication, publishTeamFiles, type TeamFilePublicationHook } from "./team-file-publication.js";
+import { checkPublication, publishWorkspaceFiles, type FilePublicationHook } from "./workspace-file-publication.js";
 import type { WorkspaceWriters } from "./workspace-writers.js";
 
 const Receipt = z.object({
   id: z.string().uuid(),
   taskId: z.string(),
-  source: TeamTreeCapture,
+  source: WorkspaceTreeCapture,
   baseSha: z.string(),
   destinationPath: z.string(),
-  before: TeamTreeCapture,
-  entries: TeamPublicationRecord.shape.entries,
+  before: WorkspaceTreeCapture,
+  entries: FilePublication.shape.entries,
   sourceBaseTree: z.string(),
   afterTree: z.string().nullable(),
   scratchPath: z.string(),
@@ -34,15 +34,14 @@ export class TaskCheckoutService {
     private readonly db: Db,
     private readonly writers: WorkspaceWriters,
     private readonly dataDir: string,
-    private readonly fault?: TeamFilePublicationHook,
+    private readonly fault?: FilePublicationHook,
   ) {}
 
   private context(taskId: string) {
     const task = tasks.get(this.db, taskId);
     const project = task && projects.get(this.db, task.projectId);
     if (!task || !project) throw new Error("Task or project no longer exists.");
-    if ((task.threadId && orchestration.getInstance(this.db, task.threadId)) || teamRuntime.assignmentsForTask(this.db, taskId).length)
-      throw new Error("Apply integrated team changes from the team conversation. This assignment cannot apply directly to the checkout.");
+    if ((task.threadId && retiredTeams.isHidden(this.db, task.threadId)) || retiredTeams.hasTask(this.db, taskId)) throw new Error("This item is no longer available.");
     if (task.workspaceMode !== "worktree" || !task.worktreePath || !task.baseSha) throw new Error("This task has no retained worktree to apply.");
     const history = runs.listForTask(this.db, taskId);
     if (history.some((run) => !run.endedAt) || (!history.at(-1)?.endedAt && !["review", "done"].includes(task.status))) throw new Error("Finish or stop the task’s agent before applying its changes.");
@@ -93,8 +92,8 @@ export class TaskCheckoutService {
       const id = randomUUID();
       const prefix = `refs/openorc/task-checkout/${taskId}/${id}`;
       const [source, before] = await Promise.all([
-        teamTransfer.capture(context.sourcePath, { refPrefix: `${prefix}/source` }),
-        teamTransfer.capture(context.project.rootPath, { refPrefix: `${prefix}/destination` }),
+        workspaceTransfer.capture(context.sourcePath, { refPrefix: `${prefix}/source` }),
+        workspaceTransfer.capture(context.project.rootPath, { refPrefix: `${prefix}/destination` }),
       ]);
       if (previous && (previous.source.rootPath !== source.rootPath || previous.destinationPath !== before.rootPath || previous.baseSha !== context.baseSha))
         throw new Error("The retained application belongs to a different task workspace or checkout. Restore that location before continuing.");
@@ -103,7 +102,7 @@ export class TaskCheckoutService {
       const baseTree =
         previous?.state === "applied" ? previous.source.treeSha : (previous?.sourceBaseTree ?? (await git(context.sourcePath, ["rev-parse", `${context.baseSha}^{tree}`])).stdout.trim());
       const scratchPath = path.join(this.dataDir, "task-checkout", taskId, id);
-      const merge = await teamTransfer.stageMerge(context.project.rootPath, {
+      const merge = await workspaceTransfer.stageMerge(context.project.rootPath, {
         baseTree,
         outputTree: source.treeSha,
         destinationTree: before.treeSha,
@@ -113,7 +112,10 @@ export class TaskCheckoutService {
       });
       this.assertContext(taskId, context);
       const afterTree = merge.status === "clean" ? merge.treeSha : null;
-      const [left, right] = await Promise.all([teamTransfer.listTree(context.project.rootPath, before.treeSha), teamTransfer.listTree(context.project.rootPath, afterTree ?? before.treeSha)]);
+      const [left, right] = await Promise.all([
+        workspaceTransfer.listTree(context.project.rootPath, before.treeSha),
+        workspaceTransfer.listTree(context.project.rootPath, afterTree ?? before.treeSha),
+      ]);
       const old = new Map(left.map((entry) => [entry.path, entry])),
         next = new Map(right.map((entry) => [entry.path, entry]));
       const entries = [...new Set([...old.keys(), ...next.keys()])]
@@ -152,7 +154,7 @@ export class TaskCheckoutService {
       if (receipt.source.rootPath !== (await realpath(context.sourcePath)) || receipt.destinationPath !== (await realpath(context.project.rootPath)) || receipt.baseSha !== context.baseSha)
         throw new Error("The task or checkout location changed. Prepare a new preview.");
       if (receipt.state === "ready") {
-        const current = await teamTransfer.capture(context.sourcePath, { refPrefix: `refs/openorc/task-checkout/${taskId}/verify-${randomUUID()}` });
+        const current = await workspaceTransfer.capture(context.sourcePath, { refPrefix: `refs/openorc/task-checkout/${taskId}/verify-${randomUUID()}` });
         if (current.treeSha !== receipt.source.treeSha || current.headSha !== receipt.source.headSha) throw new Error("The source changed after preview. Prepare a new preview before applying.");
       }
       await this.assertGitReady(context.sourcePath);
@@ -162,7 +164,7 @@ export class TaskCheckoutService {
       receipt.state = "attention";
       this.save(receipt);
       try {
-        await publishTeamFiles(receipt, () => this.assertContext(taskId, context), this.fault);
+        await publishWorkspaceFiles(receipt, () => this.assertContext(taskId, context), this.fault);
         receipt.state = "applied";
         receipt.error = null;
         this.save(receipt);

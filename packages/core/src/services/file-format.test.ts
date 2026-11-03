@@ -1,8 +1,8 @@
+import { FolderPath } from "@openorc/protocol";
 import { access, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, expect, it } from "vitest";
-import { FolderPath } from "@openorc/protocol";
 import type { FolderKind } from "./conversation-folder.js";
 import { FileFormatter } from "./file-format.js";
 
@@ -34,7 +34,7 @@ const formatter = (options: { timeoutMs?: number; env?: Record<string, string> }
   new FileFormatter({ bundled: null, environment: () => ({ ...login(), ...(options.env ? { env: options.env } : {}) }), timeoutMs: options.timeoutMs });
 const format = (file: string, text: string, kind: FolderKind = "checkout", using = formatter()) => using.format({ root, kind }, FolderPath.parse(file), text, false);
 
-it.each(["review", "member"] as const)("never runs a project's formatter in a %s copy", async (kind) => {
+it.each(["review"] as const)("never runs a project's formatter in a %s copy", async (kind) => {
   await writeFile(join(root, ".prettierrc"), "{}\n");
   await script(join(root, "node_modules/.bin/prettier"), UPPERCASE);
   expect(await format("src/app.ts", "export {};\n", kind)).toEqual({ kind: "unavailable" });

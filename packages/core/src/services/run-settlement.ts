@@ -1,13 +1,13 @@
-import { realpath } from "node:fs/promises";
 import { checkpoints, listEvents, redact, runCosts, runs, snapshots, tasks, threads, type Db, type LedgerWriter } from "@openorc/db";
 import { diffStat, pinObject, treeHash, worktree } from "@openorc/git";
-import { DEFAULT_CLAUDE_ACCOUNT, type Project, type Run, type Task, type Thread, type ThreadSession } from "@openorc/protocol";
 import type { OpenOrcMcpServer } from "@openorc/mcp";
+import { DEFAULT_CLAUDE_ACCOUNT, type Project, type Run, type Task, type Thread, type ThreadSession } from "@openorc/protocol";
+import { realpath } from "node:fs/promises";
+import type { Logger } from "../transport.js";
 import { checkpointRefs, snapshotRefs } from "./checkpoint-refs.js";
+import type { McpAppService } from "./mcp-apps.js";
 import { noticeLine } from "./notice-text.js";
 import { projectGit } from "./project-git.js";
-import type { McpAppService } from "./mcp-apps.js";
-import type { Logger } from "../transport.js";
 import { capturedTurnOutcome, providerTurnStatus, type CompletedTurn, type LiveRun, type Notification, type RunHooks, type RunScope, type TurnSettledOutcome } from "./run-types.js";
 
 /** The provider forgot the session: the words its CLIs use when a resume finds nothing. */
@@ -41,7 +41,7 @@ interface RunSettlementDependencies {
   db: Db;
   ledger: LedgerWriter;
   log: Logger;
-  hooks: Pick<RunHooks, "captureTeamTree" | "onThreadTurn" | "onRunFinished" | "syncCloud">;
+  hooks: Pick<RunHooks, "onThreadTurn" | "onRunFinished" | "syncCloud">;
   mcp: () => Promise<OpenOrcMcpServer>;
   mcpApps: McpAppService;
   detach: (runId: string) => void;
@@ -121,9 +121,7 @@ export class RunSettlement {
     else if (turn.status !== "cancelled") this.deps.notifyFor(entry.scope, "error", thread.title, entry.failed ?? "The turn failed.");
   }
 
-  private async captureTree(entry: LiveRun, cwd: string, refs: string): Promise<string> {
-    const team = await this.deps.hooks.captureTeamTree?.(entry.run.id, cwd, entry.workspaceLease);
-    if (team) return team;
+  private async captureTree(cwd: string, refs: string): Promise<string> {
     const tree = await treeHash(cwd);
     await pinObject(cwd, `${refs}${tree}`, tree);
     return tree;
@@ -135,7 +133,7 @@ export class RunSettlement {
     if (!cwd) return { snapshotId: null, error: "This task has no workspace to snapshot." };
     try {
       if ((await projectGit(project)) === "none") return { snapshotId: null, error: null };
-      const [tree, stat] = await Promise.all([this.captureTree(entry, cwd, snapshotRefs(task.id)), diffStat(cwd, task.baseSha)]);
+      const [tree, stat] = await Promise.all([this.captureTree(cwd, snapshotRefs(task.id)), diffStat(cwd, task.baseSha)]);
       return { snapshotId: snapshots.insert(this.deps.db, { taskId: task.id, runId: entry.run.id, turn: entry.turns, treeSha: tree, diffStat: stat }).id, error: null };
     } catch (e) {
       const error = `Snapshot failed: ${e instanceof Error ? e.message : String(e)}`;
@@ -147,7 +145,7 @@ export class RunSettlement {
   private async checkpoint(entry: LiveRun, project: Project, thread: Thread, cwd: string): Promise<{ snapshotId: string | null; error: string | null }> {
     try {
       if ((await projectGit(project)) === "none") return { snapshotId: null, error: null };
-      const [tree, stat, root] = await Promise.all([this.captureTree(entry, cwd, checkpointRefs(thread.id)), diffStat(cwd, thread.baseSha), realpath(cwd)]);
+      const [tree, stat, root] = await Promise.all([this.captureTree(cwd, checkpointRefs(thread.id)), diffStat(cwd, thread.baseSha), realpath(cwd)]);
       const last = checkpoints.listForThread(this.deps.db, thread.id).at(-1);
       if (last?.treeSha === tree && last.root === root) return { snapshotId: last.id, error: null };
       return { snapshotId: checkpoints.insert(this.deps.db, { threadId: thread.id, runId: entry.run.id, turn: entry.turns, treeSha: tree, diffStat: stat, root }).id, error: null };

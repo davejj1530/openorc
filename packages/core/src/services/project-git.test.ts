@@ -1,16 +1,16 @@
-import { afterEach, expect, it, vi } from "vitest";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { CodexAdapter, RunHandle } from "@openorc/agents";
 import { projects, runs, tasks, threads } from "@openorc/db";
 import { emptyTree, git } from "@openorc/git";
 import type { RunSpec } from "@openorc/protocol";
-import { CodexAdapter, RunHandle } from "@openorc/agents";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, expect, it, vi } from "vitest";
 import { OpenOrc } from "../openorc.js";
+import { rpcClient } from "../rpc-test-client.js";
 import { projectGit } from "./project-git.js";
 import { threadTurnChanges } from "./thread-turn-changes.js";
 import { directory } from "./workspace-home.js";
-import { rpcClient } from "../rpc-test-client.js";
 
 const dirs: string[] = [];
 afterEach(async () => {
@@ -88,7 +88,7 @@ it("runs a folder without git as a project, keeps git features off with a reason
     expect(logs).toEqual([]);
     expect((await git(outer, ["for-each-ref", "refs/openorc/"])).stdout).toBe("");
     await expect(core.review.threadDiff(thread, project)).rejects.toThrow("app isn't a git repository yet, so OpenOrc can't track or review its changes.");
-    const needsGit = "app isn't a git repository yet. Worktrees and teams need git and a first commit.";
+    const needsGit = "app isn't a git repository yet. Worktrees need git and a first commit.";
     expect(await core.threads.movePreview(thread.id, "worktree")).toEqual({ files: [], blocked: `This conversation cannot move. ${needsGit}` });
     await expect(core.threads.moveWorkspace(thread.id, "worktree")).rejects.toThrow(needsGit);
     await expect(core.threads.start({ ...input, projectId: project.id, prompt: "Isolate it", workspaceMode: "worktree" })).rejects.toThrow(needsGit);
@@ -125,7 +125,7 @@ it("tracks a repository's changes before its first commit, and branches once it 
     expect((await core.review.threadDiff(thread, project)).files).toEqual([{ path: "plan.md", status: "untracked", oldPath: null }]);
     expect(await core.review.threadLog(thread, project)).toEqual([]);
     expect(await core.review.threadPushState(thread, project)).toMatchObject({ blocked: "Make a first commit before pushing." });
-    await expect(core.threads.moveWorkspace(thread.id, "worktree")).rejects.toThrow("gallery has no commits yet. Worktrees and teams need a first commit.");
+    await expect(core.threads.moveWorkspace(thread.id, "worktree")).rejects.toThrow("gallery has no commits yet. Worktrees need a first commit.");
 
     const { sha } = await core.review.commitThread(thread, project, "Add the plan");
     expect(await projectGit(project)).toBe("ready");
@@ -151,7 +151,7 @@ it("refuses a worktree in a folder that cannot branch and leaves nothing behind,
   try {
     const project = await core.projects.import(folder);
     const start = { ...input, projectId: project.id, prompt: "Isolate it", workspaceMode: "worktree" as const };
-    const refusal = "plain isn't a git repository yet. Worktrees and teams need git and a first commit.";
+    const refusal = "plain isn't a git repository yet. Worktrees need git and a first commit.";
     // The phone and the desktop both start through threads.start; the Mac's reason is what they show.
     await expect(call("threads.start", start)).rejects.toThrow(refusal);
     expect(threads.list(core.db, { filter: "all" })).toEqual([]);

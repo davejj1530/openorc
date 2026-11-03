@@ -1,16 +1,16 @@
-import { SocketModeClient } from "@slack/socket-mode";
-import { WebClient, LogLevel } from "@slack/web-api";
-import { settings, redactJson } from "@openorc/db";
+import { redactJson, settings } from "@openorc/db";
+import type { ExecutionSwitchInput } from "@openorc/mcp";
 import { citationName, replaceFileCitations, type AgentEvent, type RpcParams, type SlackClientConfig, type SlackDirectConfig, type SlackStatus } from "@openorc/protocol";
+import { SocketModeClient } from "@slack/socket-mode";
+import { LogLevel, WebClient } from "@slack/web-api";
 import { z } from "zod";
 import type { OpenOrc } from "../../openorc.js";
-import { ContextMessage, SlackJob, SlackRelay, RelayRequestError, newDevice, relayRequest, relayUrl, type Device, type SlackResult, type RelayJournal } from "./relay.js";
-import { RemoteDecision, approvalSections } from "./approvals.js";
-import { downloadSlackImage, SlackFile, SlackImages } from "./images.js";
 import type { AttachmentService } from "../attachments.js";
-import { SlackRunner } from "./runner.js";
-import type { ExecutionSwitchInput } from "@openorc/mcp";
 import type { TurnSettledOutcome } from "../runs.js";
+import { RemoteDecision, approvalSections } from "./approvals.js";
+import { SlackFile, SlackImages, downloadSlackImage } from "./images.js";
+import { ContextMessage, RelayRequestError, SlackJob, SlackRelay, newDevice, relayRequest, relayUrl, type Device, type RelayJournal, type SlackResult } from "./relay.js";
+import { SlackRunner } from "./runner.js";
 
 export interface SlackSecretStore {
   load(): Promise<string | null>;
@@ -144,7 +144,7 @@ export class SlackService {
   async connectDirect(): Promise<void> {
     await this.load();
     if (!this.saved.direct) throw new Error("Save your personal Slack settings first.");
-    if (!this.directSession && (this.socket || this.timer || this.active)) throw new Error("Disconnect the team relay and finish pending work first.");
+    if (!this.directSession && (this.socket || this.timer || this.active)) throw new Error("Disconnect the shared relay and finish pending work first.");
     this.directSession = true;
     this.directError = null;
     await this.save({ ...this.saved, mode: "direct" });

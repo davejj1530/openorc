@@ -1,19 +1,19 @@
-import { claudeAccounts } from "./claude-accounts.js";
-import { DEFAULT_CLAUDE_ACCOUNT } from "@openorc/protocol";
-import { threadListLimit, threadListOrder } from "./thread-list-order.js";
-import { threadTreeSql } from "./thread-list-tree.js";
-import { randomUUID } from "node:crypto";
-import { WORKSPACE_ID } from "@openorc/protocol";
 import type { Run, RunState, Snapshot, Task, TaskStatus, Thread, Usage } from "@openorc/protocol";
+import { DEFAULT_CLAUDE_ACCOUNT, WORKSPACE_ID } from "@openorc/protocol";
+import { randomUUID } from "node:crypto";
+import { claudeAccounts } from "./claude-accounts.js";
 import type { Db } from "./database.js";
 import { redact, redactJson } from "./redact.js";
+import { retiredTaskIds, retiredTeams, retiredThreadIds } from "./retired-teams.js";
 import { jaccard, normalizeTitle, wordSet } from "./task-similarity.js";
+import { threadListLimit, threadListOrder } from "./thread-list-order.js";
+import { threadTreeSql } from "./thread-list-tree.js";
 
 const now = () => Date.now();
 
 // Keep the repository exports stable while project persistence and review comments live in their own modules.
 export { projects } from "./projects.js";
-export { comments, type ReviewCommentScope, type ReviewCommentInsert } from "./review-comments.js";
+export { comments, type ReviewCommentInsert, type ReviewCommentScope } from "./review-comments.js";
 
 /* Tasks */
 
@@ -41,9 +41,10 @@ interface TaskRow {
   completed_at: number | null;
 }
 
-function taskFromRow(r: TaskRow): Task {
+function taskFromRow(db: Db, r: TaskRow): Task {
   return {
     id: r.id,
+    retiredTeam: retiredTeams.hasTask(db, r.id),
     projectId: r.project_id,
     title: r.title,
     spec: r.spec,
@@ -105,7 +106,7 @@ const taskColumns: Record<keyof TaskPatch, string> = {
 
 export const tasks = {
   list(db: Db, filter: { projectId?: string; threadId?: string; statuses?: TaskStatus[] } = {}): Task[] {
-    const where: string[] = [];
+    const where: string[] = [`id NOT IN (${retiredTaskIds})`];
     const args: unknown[] = [];
     if (filter.projectId) {
       where.push("project_id = ?");
@@ -120,11 +121,11 @@ export const tasks = {
       args.push(...filter.statuses);
     }
     const sql = `SELECT * FROM tasks ${where.length ? `WHERE ${where.join(" AND ")}` : ""} ORDER BY ${filter.threadId ? "created_at" : "updated_at DESC"}`;
-    return (db.stmt(sql).all(...(args as (string | number)[])) as unknown as TaskRow[]).map(taskFromRow);
+    return (db.stmt(sql).all(...(args as (string | number)[])) as unknown as TaskRow[]).map((row) => taskFromRow(db, row));
   },
   get(db: Db, id: string): Task | null {
     const r = db.stmt("SELECT * FROM tasks WHERE id = ?").get(id) as unknown as TaskRow | undefined;
-    return r ? taskFromRow(r) : null;
+    return r ? taskFromRow(db, r) : null;
   },
   insert(
     db: Db,
@@ -349,8 +350,8 @@ export interface ThreadInsert {
   createdAt?: number;
 }
 
-/** Hidden owners of retained team tasks stay readable by id and by internal inventories only. */
-const VISIBLE = "NOT EXISTS (SELECT 1 FROM team_deleted_threads hidden WHERE hidden.thread_id = threads.id)";
+/** Raw rows remain available internally; user inventories exclude retired records. */
+const VISIBLE = `id NOT IN (${retiredThreadIds})`;
 
 export const threads = {
   /**
@@ -387,7 +388,7 @@ export const threads = {
       where.push("project_id != ?");
       args.push(WORKSPACE_ID);
     }
-    // A deleted team conversation keeps its row for its saved tasks; it is never listed, including with filter=all.
+    // Exclude hidden records before applying pagination, including archived and all views.
     where.push(VISIBLE);
     if (filter.excludeSubagents) where.push("COALESCE(parent_relation, '') != 'subagent'");
     if (filter.pinnedOnly) where.push("pinned_at IS NOT NULL");

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { ClaudeStreamParser, CodexExecParser, claudePermissionMode } from "@openorc/agents";
 import { pushWorkspace, SANDBOX_PREFIX, seedWorkspace, type MirrorState, type RemoteProcess, type RunnerClient, type TakeoverStarted, type WorkspaceLocation } from "@openorc/cloud";
 import { realpath } from "node:fs/promises";
-import { checkpoints, cloudWorkspaces, orchestration, runs, threads, type CloudProviderId, type Db, type LedgerWriter } from "@openorc/db";
+import { checkpoints, cloudWorkspaces, retiredTeams, runs, threads, type CloudProviderId, type Db, type LedgerWriter } from "@openorc/db";
 import { diffStat, originUrl, pinObject, treeHash } from "@openorc/git";
 import { WORKSPACE_ID, type AgentEvent, type Project, type Thread, type ThreadMessage } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
@@ -68,11 +68,11 @@ export class CloudStandby {
 
   constructor(private readonly deps: CloudStandbyDeps) {}
 
-  /** Claude, in a worktree of a project, on this Mac, not a team's: what a sandbox can carry on with. */
+  /** Claude, in a worktree of a project, on this Mac, and visible: what a sandbox can carry on with. */
   private eligible(thread: Thread): boolean {
     if (!CLOUD_HARNESSES.has(thread.agent) || thread.workspaceMode !== "worktree" || !thread.worktreePath || !thread.branch) return false;
     if (thread.projectId === WORKSPACE_ID || cloudWorkspaces.get(this.deps.db, thread.id)) return false;
-    return !orchestration.getInstance(this.deps.db, thread.id);
+    return !retiredTeams.isHidden(this.deps.db, thread.id);
   }
 
   /** A sync hook call from a turn: its start, its working tick, or its end. Never rejects. */

@@ -1,8 +1,4 @@
-import { WORKSPACE_ID, isDetachedCopy, reviewCommentPlace, teamReviewComment } from "@openorc/protocol";
-import { randomUUID } from "node:crypto";
-import { access, mkdir, realpath, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { audit, comments, orchestration, projects, snapshots, tasks, teamDeletedThreads, teamRuntime, teamTasks, threads, type Db, type ReviewCommentScope } from "@openorc/db";
+import { audit, comments, projects, retiredTeams, snapshots, tasks, threads, type Db, type ReviewCommentScope } from "@openorc/db";
 import {
   changedFiles,
   changeStats,
@@ -18,56 +14,30 @@ import {
   patchSinceTree,
   pullRequestTemplate,
   push,
-  teamTransfer,
   unpushedCommits,
+  workspaceTransfer,
 } from "@openorc/git";
-import type {
-  ChangeComparison,
-  Commit,
-  FileDiff,
-  Project,
-  PushState,
-  ReviewComment,
-  ReviewDiff,
-  Snapshot,
-  Task,
-  TeamActionAvailability,
-  TeamReviewComment,
-  Thread,
-  WorkspaceChanges,
-} from "@openorc/protocol";
-import { assertRepository, projectGit } from "./project-git.js";
-import { executionFolder } from "./conversation-folder.js";
-import { workspaceWriters, type WorkspaceWriters } from "./workspace-writers.js";
-import { teamPublicationBranch, teamWorkspaceLocation } from "./team-workspace-location.js";
-import type { TeamTaskExport } from "./team-task-export.js";
-import { slugify } from "./workspace.js";
+import type { ChangeComparison, Commit, FileDiff, Project, PushState, ReviewComment, ReviewDiff, Snapshot, Task, Thread, WorkspaceChanges } from "@openorc/protocol";
+import { isDetachedCopy, reviewCommentPlace, WORKSPACE_ID } from "@openorc/protocol";
+import { randomUUID } from "node:crypto";
+import { access, mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { phoneOrigin } from "../request-origin.js";
-
-export interface ReviewTeamMutations {
-  /** Reserve before any await; new team work stays blocked until release. */
-  reserve(threadId: string): { assertCurrent(): void; release(): void };
-  /** Read-only availability; native Git state is checked when the action runs. */
-  reason?(threadId: string): string | null;
-}
+import { executionFolder } from "./conversation-folder.js";
+import { assertRepository, projectGit } from "./project-git.js";
+import { assertMutableThread } from "./thread-mutations.js";
+import { workspaceWriters, type WorkspaceWriters } from "./workspace-writers.js";
+import { slugify } from "./workspace.js";
 interface ThreadMutation {
   thread: Thread;
   project: Project;
   cwd: string;
-  team: boolean;
   assertCurrent(): void;
-}
-interface PublicationRef {
-  branch: string;
-  ref: string;
-  head: string;
-  previous: string | null;
 }
 interface TaskMutation {
   task: Task;
   project: Project;
   cwd: string;
-  team: TeamTaskExport | null;
   assertCurrent(): void;
 }
 /** Where a task's work happens, and how a conversation receives a follow-up message. */
@@ -78,8 +48,6 @@ export interface ReviewConversations {
 export interface ReviewOptions {
   /** Where exported patches are written. */
   dataDir?: string;
-  /** Team-owned task publication availability; null for ordinary tasks. */
-  taskExport?(taskId: string): TeamTaskExport | null;
   conversations?: ReviewConversations;
   github?: GitHubPulls;
 }
@@ -98,20 +66,16 @@ export interface NewReviewComment extends ReviewCommentScope {
 const REVIEW_COMMENT_ERRORS = {
   scopeRequired: "Review comments need a conversation or a task.",
   conversationNotFound: "This conversation no longer exists.",
-  deletedConversation: "This conversation was deleted. Its saved tasks keep their team activity and controls.",
+  deletedConversation: "This conversation is no longer available.",
   workspaceConversation: "Git review is available in project conversations. Workspace uses ordinary folders.",
-  teamConversation: "Team conversations take feedback through their tasks' team review.",
   taskNotFound: "Task not found.",
   unassignedTask: "This task hasn't started in a conversation yet. Review it once it has.",
   otherConversation: "This task works in another conversation. Review it there.",
-  teamTaskOnly: "Review comments without a conversation belong to team review.",
   notInReview: "Comment not found in this review.",
-  teamFeedback: "This comment belongs to retained team feedback. Add another comment to clarify it.",
   selectOnce: "Select each review comment once.",
   alreadySent: "Some of these comments were already sent. Refresh and send the rest.",
   queueUnavailable: "Sending review comments needs the conversation queue.",
   archivedTask: "Unarchive this task before sending it review comments.",
-  teamSingleLine: "Team review comments cover one line.",
 } as const;
 
 /** A long range quotes its first lines only; the agent reads the rest in the file. */
@@ -161,23 +125,8 @@ export class ReviewService {
   constructor(
     private readonly db: Db,
     private readonly writers: WorkspaceWriters = workspaceWriters,
-    private readonly teamMutations?: ReviewTeamMutations,
     private readonly options: ReviewOptions = {},
   ) {}
-
-  teamActionAvailability(threadId: string): TeamActionAvailability {
-    try {
-      const thread = threads.get(this.db, threadId);
-      if (!thread || !orchestration.getInstance(this.db, threadId)) throw new Error("This conversation has no saved team.");
-      if (!this.teamMutations?.reason) throw new Error("Team Git actions require the team's execution guard.");
-      const reason = this.teamMutations.reason(threadId);
-      if (reason) throw new Error(reason);
-      this.assertTeamWorkspace(thread);
-      return { allowed: true, reason: null };
-    } catch (error) {
-      return { allowed: false, reason: error instanceof Error ? error.message : String(error) };
-    }
-  }
 
   /** What the thread agent changed in the checkout itself, against HEAD. */
   async projectDiff(project: Project): Promise<ReviewDiff> {
@@ -219,6 +168,7 @@ export class ReviewService {
   /* Threads: the checkout against HEAD, or the thread's worktree against where it branched. */
 
   private async threadCwd(thread: Thread, project: Project): Promise<string> {
+    if (retiredTeams.isHidden(this.db, thread.id)) throw new Error(REVIEW_COMMENT_ERRORS.deletedConversation);
     if (project.id === WORKSPACE_ID) throw new Error("Git review is available in project conversations. Workspace uses ordinary folders.");
     if (!thread.worktreePath) await assertRepository(project);
     return executionFolder({ thread, task: null }, project);
@@ -248,18 +198,10 @@ export class ReviewService {
   async commitThread(thread: Thread, project: Project, message: string): Promise<{ sha: string }> {
     return this.withThreadMutation(thread, project, "committing", async (context) => {
       // Committing runs the user's hooks, which in a pull request's copy would be its author's.
-      if (!context.team && isDetachedCopy(context.thread)) throw new Error(DETACHED_COPY);
-      const publication = context.team && context.thread.workspaceMode === "worktree" ? await this.publicationRef(context) : null;
+      if (isDetachedCopy(context.thread)) throw new Error(DETACHED_COPY);
       context.assertCurrent();
       const sha = await commitAll(context.cwd, message);
       audit.record(this.db, { actor: "user", action: "thread.commit", resourceType: "thread", resourceId: thread.id, metadata: { sha, ...phoneOrigin() } });
-      if (publication) {
-        try {
-          await this.updatePublicationRef(context, { ...publication, head: sha });
-        } catch (error) {
-          throw new Error(`Commit ${sha} was created in the team workspace, but its publication branch could not advance: ${error instanceof Error ? error.message : String(error)}`);
-        }
-      }
       return { sha };
     });
   }
@@ -291,15 +233,12 @@ export class ReviewService {
   /** What Push would publish from the thread's workspace, judged by what origin was last seen to have. */
   async threadPushState(thread: Thread, project: Project): Promise<PushState> {
     const cwd = await this.threadCwd(thread, project);
-    // A team worktree stays detached, and Push first advances its publication branch to HEAD.
-    const team = thread.workspaceMode === "worktree" && Boolean(orchestration.getInstance(this.db, thread.id));
-    return this.withBusy(cwd, () => (team ? pushState(cwd, () => this.teamBranch(thread.id), "HEAD") : pushState(cwd, () => this.threadBranch(thread, project))));
+    return this.withBusy(cwd, () => pushState(cwd, () => this.threadBranch(thread, project)));
   }
 
   async pushThread(thread: Thread, project: Project): Promise<{ remote: string; branch: string }> {
     return this.withThreadMutation(thread, project, "pushing", async (context) => {
-      const publication = context.team && context.thread.workspaceMode === "worktree" ? await this.publicationRef(context) : null;
-      const branch = publication ? await this.updatePublicationRef(context, publication) : await this.threadBranch(context.thread, context.project);
+      const branch = await this.threadBranch(context.thread, context.project);
       context.assertCurrent();
       await push(context.cwd, branch);
       audit.record(this.db, { actor: "user", action: "thread.push", resourceType: "thread", resourceId: thread.id, metadata: { branch, ...phoneOrigin() } });
@@ -317,15 +256,9 @@ export class ReviewService {
     return this.withThreadMutation(thread, project, "publishing", async (context) => {
       if (!(await hasGh())) throw new Error("the GitHub CLI (gh) is not installed");
       context.assertCurrent();
-      const publication = context.team && context.thread.workspaceMode === "worktree" ? await this.publicationRef(context) : null;
-      const branch = publication ? await this.updatePublicationRef(context, publication) : await this.threadBranch(context.thread, context.project);
+      const branch = await this.threadBranch(context.thread, context.project);
       if (branch === base) throw new Error(`the thread is on ${base}; a pull request needs a branch of its own`);
-      if (publication) {
-        const remote = await git(context.cwd, ["ls-remote", "--exit-code", "origin", `refs/heads/${branch}`], { okCodes: [0, 2] });
-        if (remote.code !== 0 || remote.stdout.split(/\s/)[0] !== publication.head) throw new Error("Push the team's committed changes before creating its pull request.");
-      } else {
-        await this.assertPushed(context.cwd, branch);
-      }
+      await this.assertPushed(context.cwd, branch);
       context.assertCurrent();
       const url = await this.openPullRequest(context.cwd, { title, body, base, head: branch });
       threads.update(this.db, thread.id, { prUrl: url, prState: "open" });
@@ -361,116 +294,46 @@ export class ReviewService {
     const ownedProject = projects.get(this.db, project.id);
     if (!thread || !ownedProject || thread.projectId !== ownedProject.id) throw new Error("The conversation no longer belongs to this project.");
     assertMutableThread(thread);
-    const instance = orchestration.getInstance(this.db, thread.id);
-    if (instance && !this.teamMutations) throw new Error("Team Git actions require the team's execution guard.");
-    const reservation = instance ? this.teamMutations!.reserve(thread.id) : null;
-    try {
-      const cwd = await this.threadCwd(thread, ownedProject);
-      const assertCurrent = () => {
-        reservation?.assertCurrent();
-        const current = threads.get(this.db, thread.id);
-        const currentProject = projects.get(this.db, ownedProject.id);
-        if (
-          !current ||
-          !currentProject ||
-          current.projectId !== ownedProject.id ||
-          currentProject.rootPath !== ownedProject.rootPath ||
-          current.worktreePath !== thread.worktreePath ||
-          current.baseSha !== thread.baseSha ||
-          current.workspaceMode !== thread.workspaceMode ||
-          orchestration.getInstance(this.db, thread.id)?.id !== instance?.id
-        )
-          throw new Error("The conversation's workspace changed. Reload before publishing its changes.");
-        if (instance) this.assertTeamWorkspace(current);
-      };
+    if (retiredTeams.isHidden(this.db, thread.id)) throw new Error("This item is no longer available.");
+    const cwd = await this.threadCwd(thread, ownedProject);
+    const assertCurrent = () => {
+      const current = threads.get(this.db, thread.id);
+      const currentProject = projects.get(this.db, ownedProject.id);
+      if (
+        !current ||
+        !currentProject ||
+        current.projectId !== ownedProject.id ||
+        currentProject.rootPath !== ownedProject.rootPath ||
+        current.worktreePath !== thread.worktreePath ||
+        current.baseSha !== thread.baseSha ||
+        current.workspaceMode !== thread.workspaceMode
+      )
+        throw new Error("The conversation's workspace changed. Reload before publishing its changes.");
+    };
+    assertCurrent();
+    return await this.writers.withLease(cwd, `${action} thread ${thread.id}`, async (lease) => {
       assertCurrent();
-      return await this.writers.withLease(cwd, `${action} thread ${thread.id}`, async (lease) => {
-        assertCurrent();
-        if (instance) {
-          const isProject = (await realpath(ownedProject.rootPath)) === lease.paths[0];
-          if (isProject !== (thread.workspaceMode === "current")) throw new Error("Team Git actions must use their retained local or isolated lead workspace.");
-        }
-        assertCurrent();
-        return operation({ thread, project: ownedProject, cwd: lease.paths[0]!, team: Boolean(instance), assertCurrent });
-      });
-    } finally {
-      reservation?.release();
-    }
+      assertCurrent();
+      return operation({ thread, project: ownedProject, cwd: lease.paths[0]!, assertCurrent });
+    });
   }
 
-  private teamBranch(threadId: string): string {
-    return teamPublicationBranch(this.db, threadId);
-  }
-
-  private assertTeamWorkspace(thread: Thread): void {
-    teamWorkspaceLocation(this.db, thread.id);
-    teamPublicationBranch(this.db, thread.id);
-  }
-
-  /** Lead workspaces stay detached; only explicit Git actions advance this thread's ref. */
-  private publicationRef(context: ThreadMutation): Promise<PublicationRef> {
-    return this.dedicatedRef(context.cwd, this.teamBranch(context.thread.id), context.assertCurrent);
-  }
-
-  /** Team workspaces stay detached; a dedicated branch advances only by explicit action, never divergently. */
-  private async dedicatedRef(cwd: string, branch: string, assertCurrent: () => void): Promise<PublicationRef> {
-    const ref = `refs/heads/${branch}`;
-    const [symbolic, head, existing, worktrees] = await Promise.all([
-      git(cwd, ["symbolic-ref", "-q", "HEAD"], { okCodes: [0, 1] }),
-      git(cwd, ["rev-parse", "HEAD"]),
-      git(cwd, ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`], { okCodes: [0, 1] }),
-      git(cwd, ["worktree", "list", "--porcelain", "-z"]),
-    ]);
-    assertCurrent();
-    if (symbolic.code === 0) throw new Error("The team workspace is attached to a branch outside its publication flow. Detach it before publishing team changes.");
-    if (worktrees.stdout.split("\0").includes(`branch ${ref}`)) throw new Error("The team's publication branch is checked out in another workspace. Detach that checkout before advancing it.");
-    const previous = existing.code === 0 ? existing.stdout.trim() : null;
-    const currentHead = head.stdout.trim();
-    if (previous) {
-      const ancestry = await git(cwd, ["merge-base", "--is-ancestor", previous, currentHead], { okCodes: [0, 1] });
-      if (ancestry.code !== 0) throw new Error("The team's publication branch has divergent commits. Reconcile them before publishing; it will not be overwritten.");
-    }
-    assertCurrent();
-    return { branch, ref, head: currentHead, previous };
-  }
-
-  private async advanceRef(cwd: string, publication: PublicationRef, assertCurrent: () => void): Promise<void> {
-    assertCurrent();
-    await git(cwd, ["update-ref", publication.ref, publication.head, publication.previous ?? "0".repeat(publication.head.length)]);
-    const verified = (await git(cwd, ["rev-parse", "--verify", publication.ref])).stdout.trim();
-    if (verified !== publication.head) throw new Error("The team publication ref changed during the operation. Reload its Git state before retrying.");
-  }
-
-  private async updatePublicationRef(context: ThreadMutation, publication: PublicationRef): Promise<string> {
-    await this.advanceRef(context.cwd, publication, context.assertCurrent);
-    threads.update(this.db, context.thread.id, { branch: publication.branch });
-    return publication.branch;
-  }
-
-  /** Ordinary tasks publish their own branch; team assignments publish a dedicated detached-worktree ref under the team fences. */
+  /** Publish a task's branch after checking its workspace. */
   private async withTaskMutation<T>(input: Task, project: Project, action: string, operation: (context: TaskMutation) => Promise<T>): Promise<T> {
     const task = tasks.get(this.db, input.id);
     if (!task || task.projectId !== project.id) throw new Error("The task no longer belongs to this project.");
-    const team = this.options.taskExport?.(task.id) ?? null;
-    if (team && !team.allowed) throw new Error(team.reason!);
-    // A team-owned task never takes the ordinary path without an export authority; the integrated team branch stays the fallback.
-    if (!team && ((task.threadId && orchestration.getInstance(this.db, task.threadId)) || teamRuntime.assignmentsForTask(this.db, task.id).length))
-      throw new Error("Publish integrated team changes from the main team conversation. This assignment has no publication authority in this app instance.");
+    if (this.isRetiredTask(task)) throw new Error("This item is no longer available.");
     if (!task.worktreePath) await assertRepository(project);
     const cwd = task.worktreePath ?? project.rootPath;
     const assertCurrent = () => {
       const current = tasks.get(this.db, task.id);
       if (!current || current.worktreePath !== task.worktreePath || current.baseSha !== task.baseSha || current.threadId !== task.threadId)
         throw new Error("The task's workspace changed. Reload before publishing its changes.");
-      if (team) {
-        const latest = this.options.taskExport?.(task.id);
-        if (!latest?.allowed) throw new Error(latest?.reason ?? "This assignment can no longer be published.");
-      }
     };
     assertCurrent();
     return this.writers.withLease(cwd, `${action} task ${task.id}`, async (lease) => {
       assertCurrent();
-      return operation({ task, project, cwd: lease.paths[0]!, team, assertCurrent });
+      return operation({ task, project, cwd: lease.paths[0]!, assertCurrent });
     });
   }
 
@@ -502,24 +365,18 @@ export class ReviewService {
   }
 
   comments(scope: ReviewCommentScope): ReviewComment[] {
+    if ((scope.threadId && retiredTeams.isHidden(this.db, scope.threadId)) || (scope.taskId && retiredTeams.hasTask(this.db, scope.taskId))) return [];
     if (scope.threadId) this.reviewableConversation(scope.threadId);
     return comments.list(this.db, scope);
   }
 
-  /**
-   * A conversation comment may carry the task it was written from, but only
-   * for the conversation that task works in. Without a conversation, a
-   * comment belongs to team review and keeps the task's latest snapshot.
-   */
+  /** A conversation comment can also name the task that works in that conversation. */
   addComment(input: NewReviewComment): ReviewComment {
     const scope = this.writableScope(input);
-    // A retained team batch keeps a frozen single-line copy of each comment.
-    if (!scope.threadId && input.startLine !== null) throw new Error(REVIEW_COMMENT_ERRORS.teamSingleLine);
-    const teamSnapshot = scope.threadId ? null : snapshots.latestForTask(this.db, scope.taskId!);
     return comments.insert(this.db, {
       threadId: scope.threadId ?? null,
       taskId: scope.taskId ?? null,
-      snapshotId: teamSnapshot?.id ?? null,
+      snapshotId: null,
       path: input.path,
       startLine: input.startLine,
       startSide: input.startSide,
@@ -532,7 +389,6 @@ export class ReviewService {
 
   removeComment(scope: ReviewCommentScope, id: string): void {
     if (!comments.list(this.db, this.writableScope(scope)).some((comment) => comment.id === id)) throw new Error(REVIEW_COMMENT_ERRORS.notInReview);
-    if (teamTasks.claim(this.db, id)) throw new Error(REVIEW_COMMENT_ERRORS.teamFeedback);
     comments.remove(this.db, id);
   }
 
@@ -552,7 +408,6 @@ export class ReviewService {
       const selected = input.commentIds.map((id) => {
         const comment = available.get(id);
         if (!comment) throw new Error(REVIEW_COMMENT_ERRORS.notInReview);
-        if (teamTasks.claim(this.db, id)) throw new Error(REVIEW_COMMENT_ERRORS.teamFeedback);
         return comment;
       });
       const accepted = acceptedMessage(selected);
@@ -579,27 +434,6 @@ export class ReviewService {
     });
   }
 
-  /** Validate and snapshot an explicit team selection; the caller owns durable claims and delivery. */
-  composeSelectedComments(taskId: string, commentIds: string[]): { prompt: string; comments: TeamReviewComment[] } {
-    if (commentIds.length === 0) throw new Error("Select at least one review comment");
-    if (new Set(commentIds).size !== commentIds.length) throw new Error("Selected review comment IDs must be distinct");
-    return this.db.transaction(() => {
-      if (!tasks.get(this.db, taskId)) throw new Error(`task ${taskId} not found`);
-      const available = new Map(comments.listForTask(this.db, taskId).map((comment) => [comment.id, comment]));
-      const selected = commentIds.map((id) => {
-        const comment = available.get(id);
-        if (!comment) throw new Error(`Review comment ${id} was not found on this task`);
-        if (comment.sentInRunId !== null || comment.sentMessageId !== null) throw new Error(`Review comment ${id} was already sent`);
-        if (comment.snapshotId !== null) {
-          const source = snapshots.get(this.db, comment.snapshotId);
-          if (!source || source.taskId !== taskId) throw new Error(`Review comment ${id} references a snapshot that does not belong to this task`);
-        }
-        return comment;
-      });
-      return { prompt: this.formatComments(selected), comments: selected.map(teamReviewComment) };
-    });
-  }
-
   private formatComments(selected: ReviewComment[]): string {
     const lines = selected.map((c, i) => `${i + 1}. ${reviewCommentPlace(c)}${quotedLines(c.lineText)}\n   ${c.body.replace(/\n/g, "\n   ")}`);
     const removedLines = selected.some((c) => c.side === "old" || c.startSide === "old");
@@ -613,19 +447,19 @@ export class ReviewService {
     ].join("\n");
   }
 
-  /** Git review of a conversation's own workspace. Team conversations take feedback through team review. */
+  /** Git review of a conversation's own workspace. */
   private reviewableConversation(threadId: string): Thread {
     const thread = threads.get(this.db, threadId);
     if (!thread) throw new Error(REVIEW_COMMENT_ERRORS.conversationNotFound);
-    if (teamDeletedThreads.has(this.db, thread.id)) throw new Error(REVIEW_COMMENT_ERRORS.deletedConversation);
+    if (retiredTeams.isHidden(this.db, thread.id)) throw new Error(REVIEW_COMMENT_ERRORS.deletedConversation);
     if (thread.projectId === WORKSPACE_ID) throw new Error(REVIEW_COMMENT_ERRORS.workspaceConversation);
-    if (orchestration.getInstance(this.db, thread.id)) throw new Error(REVIEW_COMMENT_ERRORS.teamConversation);
     return thread;
   }
 
   private writableScope(input: ReviewCommentScope): ReviewCommentScope {
     if (input.threadId) {
       const thread = this.reviewableConversation(input.threadId);
+      if (retiredTeams.isHidden(this.db, thread.id)) throw new Error("This item is no longer available.");
       if (!input.taskId) return { threadId: thread.id };
       const assigned = this.options.conversations?.executionThreadFor(input.taskId) ?? null;
       if (!assigned) throw new Error(REVIEW_COMMENT_ERRORS.unassignedTask);
@@ -635,13 +469,11 @@ export class ReviewService {
     if (!input.taskId) throw new Error(REVIEW_COMMENT_ERRORS.scopeRequired);
     const task = tasks.get(this.db, input.taskId);
     if (!task) throw new Error(REVIEW_COMMENT_ERRORS.taskNotFound);
-    if (!this.isTeamTask(task)) throw new Error(REVIEW_COMMENT_ERRORS.teamTaskOnly);
-    return { taskId: task.id };
+    throw new Error(this.isRetiredTask(task) ? "This item is no longer available." : REVIEW_COMMENT_ERRORS.unassignedTask);
   }
 
-  private isTeamTask(task: Task): boolean {
-    if (teamRuntime.assignmentForTask(this.db, task.id) || teamTasks.intent(this.db, task.id)) return true;
-    return [task.threadId, task.executionThreadId].some((threadId) => Boolean(threadId && orchestration.getInstance(this.db, threadId)));
+  private isRetiredTask(task: Task): boolean {
+    return retiredTeams.hasTask(this.db, task.id);
   }
 
   async log(task: Task, project: Project, limit = 50): Promise<Commit[]> {
@@ -665,17 +497,8 @@ export class ReviewService {
 
   async commit(task: Task, project: Project, message: string): Promise<{ sha: string }> {
     return this.withTaskMutation(task, project, "committing", async (context) => {
-      const publication = context.team ? await this.dedicatedRef(context.cwd, context.team.branch, context.assertCurrent) : null;
       const sha = await commitAll(context.cwd, message);
-      audit.record(this.db, { actor: "user", action: "review.commit", resourceType: "task", resourceId: task.id, metadata: { sha, message, ...(publication ? { branch: publication.branch } : {}) } });
-      if (publication) {
-        try {
-          await this.advanceRef(context.cwd, { ...publication, head: sha }, context.assertCurrent);
-          tasks.update(this.db, task.id, { branch: publication.branch });
-        } catch (error) {
-          throw new Error(`Commit ${sha} was created in the assignment workspace, but its branch could not advance: ${error instanceof Error ? error.message : String(error)}`);
-        }
-      }
+      audit.record(this.db, { actor: "user", action: "review.commit", resourceType: "task", resourceId: task.id, metadata: { sha, message } });
       return { sha };
     });
   }
@@ -683,12 +506,6 @@ export class ReviewService {
   async push(task: Task, project: Project): Promise<{ remote: string; branch: string }> {
     return this.withTaskMutation(task, project, "pushing", async (context) => {
       let branch = context.task.branch;
-      if (context.team) {
-        const publication = await this.dedicatedRef(context.cwd, context.team.branch, context.assertCurrent);
-        await this.advanceRef(context.cwd, publication, context.assertCurrent);
-        tasks.update(this.db, task.id, { branch: publication.branch });
-        branch = publication.branch;
-      }
       if (!branch) throw new Error("task has no branch to push");
       context.assertCurrent();
       await push(context.cwd, branch);
@@ -702,13 +519,8 @@ export class ReviewService {
     return this.withTaskMutation(task, project, "publishing", async (context) => {
       if (!(await hasGh())) throw new Error("GitHub CLI (gh) is not installed. Install it and run gh auth login, or push and open the PR in the browser.");
       context.assertCurrent();
-      const publication = context.team ? await this.dedicatedRef(context.cwd, context.team.branch, context.assertCurrent) : null;
-      const head = publication?.branch ?? context.task.branch;
+      const head = context.task.branch;
       if (!head || head === base) throw new Error("task needs its own branch to open a PR");
-      if (publication) {
-        const remote = await git(context.cwd, ["ls-remote", "--exit-code", "origin", `refs/heads/${head}`], { okCodes: [0, 2] });
-        if (remote.code !== 0 || remote.stdout.split(/\s/)[0] !== publication.head) throw new Error("Push the assignment's committed changes before creating its pull request.");
-      }
       context.assertCurrent();
       const url = await this.openPullRequest(context.cwd, { title, body, base, head });
       audit.record(this.db, { actor: "user", action: "review.pr", resourceType: "task", resourceId: task.id, metadata: { url } });
@@ -722,7 +534,7 @@ export class ReviewService {
     const dataDir = this.options.dataDir;
     return this.withTaskMutation(task, project, "exporting", async (context) => {
       const id = randomUUID();
-      const snapshot = await teamTransfer.capture(context.cwd, { refPrefix: `refs/openorc/exports/${id}` });
+      const snapshot = await workspaceTransfer.capture(context.cwd, { refPrefix: `refs/openorc/exports/${id}` });
       try {
         context.assertCurrent();
         const base = context.task.worktreePath ? (context.task.baseSha ?? snapshot.headSha) : snapshot.headSha;
@@ -740,4 +552,3 @@ export class ReviewService {
     });
   }
 }
-import { assertMutableThread } from "./thread-mutations.js";

@@ -11,7 +11,7 @@ export type OrclingPlace = "home" | "thread" | "guest" | "elsewhere";
 export function orclingBrief(orcling: Orcling, input: { instructions: string; memory: string; place: OrclingPlace; tools: boolean }): string {
   const lines = [
     `# You are ${orcling.name}`,
-    `You are ${orcling.name}, an Orcling: the user's long-term companion in OpenOrc. You are the same ${orcling.name} everywhere: in your own conversation with them and wherever they bring you, such as project threads, task comments, teams, pull request reviews and Slack. What you learn in one place stays with you in the others.`,
+    `You are ${orcling.name}, an Orcling: the user's long-term companion in OpenOrc. You are the same ${orcling.name} everywhere: in your own conversation with them and wherever they bring you, such as project threads, task comments, pull request reviews and Slack. What you learn in one place stays with you in the others.`,
     placeNote(orcling, input.place),
     "",
     "## Your instructions",

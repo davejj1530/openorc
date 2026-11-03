@@ -1,11 +1,11 @@
-import { teamDeletedThreads, threads, type Db } from "@openorc/db";
+import { retiredTeams, threads, type Db } from "@openorc/db";
 import type { PreviewFrame, PreviewHost, PreviewHostPage, PreviewPhase, PreviewState } from "@openorc/protocol";
 
 /** What a phone hears when the thread it watches, or asks to watch, is no more. */
 export const PREVIEW_THREAD_GONE = "This thread is gone.";
 
-/** Whether a thread can have a Preview: it exists, and no team deletion hid it. */
-export const previewThreadLive = (db: Db, threadId: string): boolean => Boolean(threads.get(db, threadId)) && !teamDeletedThreads.has(db, threadId);
+/** Whether a thread can have a Preview: it exists, and it is visible. */
+export const previewThreadLive = (db: Db, threadId: string): boolean => Boolean(threads.get(db, threadId)) && !retiredTeams.isHidden(db, threadId);
 
 /** The phase a phone draws: a crash first, since a crashed pane also carries its error, then a failed load, then a load. */
 function phase(page: PreviewHostPage): PreviewPhase {

@@ -1,7 +1,7 @@
 import { Db, projects } from "@openorc/db";
 import { ReviewService } from "../services/review.js";
 import { TaskCheckoutService } from "../services/task-checkout.js";
-import { reviewWorkspace, taskAndProject } from "./context.js";
+import { taskAndProject } from "./context.js";
 import type { Handlers } from "./types.js";
 type Dependencies = {
   review: Pick<
@@ -42,7 +42,7 @@ export function createReviewWorkspaceHandlers({
   };
   return {
     "review.diff": async ({ taskId, sinceReviewed }) => {
-      const { task, project } = await reviewWorkspace(db, taskId);
+      const { task, project } = taskAndProject(db, taskId);
       return review.diff(task, project, { sinceReviewed: sinceReviewed ?? false });
     },
     "review.projectDiff": ({ projectId }) => review.projectDiff(checkout(projectId)),
@@ -85,7 +85,7 @@ export function createReviewWorkspaceHandlers({
       return review.createPr(task, project, title, body, base);
     },
     "git.log": async ({ taskId, limit }) => {
-      const { task, project } = await reviewWorkspace(db, taskId);
+      const { task, project } = taskAndProject(db, taskId);
       return review.log(task, project, limit);
     },
   };

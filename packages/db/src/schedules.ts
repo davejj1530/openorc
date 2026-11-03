@@ -1,8 +1,7 @@
-import { claudeAccounts } from "./claude-accounts.js";
-import { randomUUID } from "node:crypto";
 import { ExecutionTarget, ScheduleLaunchSnapshot, type Schedule, type ScheduleFiringRecord } from "@openorc/protocol";
+import { randomUUID } from "node:crypto";
+import { claudeAccounts } from "./claude-accounts.js";
 import type { Db } from "./database.js";
-import { orchestration } from "./orchestration.js";
 
 interface ScheduleRow {
   claude_account_id: string | null;
@@ -49,7 +48,7 @@ function firingFromRow(row: FiringRow): ScheduleFiringRecord {
     scheduleVersion: row.schedule_version,
     trigger: row.trigger,
     scheduledFor: row.scheduled_for,
-    snapshot: ScheduleLaunchSnapshot.parse(JSON.parse(row.snapshot)),
+    snapshot: ScheduleLaunchSnapshot.parse({ ...JSON.parse(row.snapshot), executionTarget: readTarget(JSON.parse(row.snapshot).executionTarget) }),
     state: row.state,
     threadId: row.thread_id,
     executionId: row.execution_id,
@@ -59,8 +58,7 @@ function firingFromRow(row: FiringRow): ScheduleFiringRecord {
   };
 }
 function fromRow(db: Db, row: ScheduleRow): Schedule {
-  const executionTarget = row.execution_target ? ExecutionTarget.parse(JSON.parse(row.execution_target)) : null;
-  const revision = executionTarget?.kind === "team" ? orchestration.getRevision(db, executionTarget.teamRevisionId) : null;
+  const executionTarget = row.execution_target ? readTarget(JSON.parse(row.execution_target)) : null;
   const last = db.stmt("SELECT * FROM schedule_firings WHERE schedule_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1").get(row.id) as unknown as FiringRow | undefined;
   const lastFire = last ? (({ scheduleId: _scheduleId, requestKey: _requestKey, scheduleVersion: _version, snapshot: _snapshot, ...view }) => view)(firingFromRow(last)) : null;
   return {
@@ -76,6 +74,7 @@ function fromRow(db: Db, row: ScheduleRow): Schedule {
     permissionMode: row.permission_mode,
     workspaceMode: row.workspace_mode,
     executionTarget,
+    retiredTeam: Boolean(row.execution_target && JSON.parse(row.execution_target).kind === "team"),
     version: row.version,
     everyMinutes: row.every_minutes,
     enabled: Boolean(row.enabled),
@@ -84,7 +83,6 @@ function fromRow(db: Db, row: ScheduleRow): Schedule {
     lastThreadId: row.last_thread_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    team: revision ? { revision, archived: orchestration.get(db, revision.teamId)?.team.archivedAt !== null } : null,
     lastFire,
   };
 }
@@ -131,7 +129,7 @@ export const schedules = {
     const rows = (projectId
       ? db.stmt("SELECT * FROM schedules WHERE project_id=? ORDER BY created_at").all(projectId)
       : db.stmt("SELECT * FROM schedules ORDER BY created_at").all()) as unknown as ScheduleRow[];
-    return rows.map((row) => fromRow(db, row));
+    return rows.map((row) => fromRow(db, row)).filter((schedule) => !schedule.retiredTeam);
   },
   get(db: Db, id: string): Schedule | null {
     const row = db.stmt("SELECT * FROM schedules WHERE id=?").get(id) as unknown as ScheduleRow | undefined;
@@ -161,7 +159,7 @@ export const schedules = {
       s.workspaceMode,
       s.everyMinutes,
       s.executionTarget ? JSON.stringify(s.executionTarget) : null,
-      s.executionTarget?.kind === "team" ? s.executionTarget.teamRevisionId : null,
+      null,
       time + s.everyMinutes * 60_000,
       time,
       time,
@@ -185,9 +183,8 @@ export const schedules = {
         args.push(scheduleColumnValue(key, parsed));
         if (!bookkeeping.has(key)) changed = true;
         if (key === "executionTarget") {
-          const target = parsed as Schedule["executionTarget"];
           sets.push("team_revision_id=?");
-          args.push(target?.kind === "team" ? target.teamRevisionId : null);
+          args.push(null);
         }
       }
       if (sets.length === 0) return current;
@@ -270,4 +267,10 @@ function scheduleColumnValue(key: string, value: unknown): string | number | nul
   if (key === "executionTarget") return value ? JSON.stringify(value) : null;
   if (typeof value === "boolean") return Number(value);
   return value as string | number | null;
+}
+
+/** Retired team selections stay in storage; clients can choose a model when editing a disabled schedule. */
+function readTarget(value: unknown): Schedule["executionTarget"] {
+  if (value == null || (typeof value === "object" && "kind" in value && value.kind === "team")) return null;
+  return ExecutionTarget.parse(value);
 }

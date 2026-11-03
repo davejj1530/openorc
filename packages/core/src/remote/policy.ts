@@ -1,4 +1,3 @@
-import path from "node:path";
 import { redact, redactValue } from "@openorc/db";
 import {
   isRemoteMethod,
@@ -12,6 +11,7 @@ import {
   type RpcResults,
   type Thread,
 } from "@openorc/protocol";
+import path from "node:path";
 import type { Broadcast } from "../transport.js";
 import { previewReply, type PhoneShaping } from "./phone-words.js";
 
@@ -66,9 +66,9 @@ function phoneSnooze(until: number | null | undefined): string | null {
   return until > now && until <= now + SNOOZE_HORIZON_MS ? null : "Choose a time within the next year.";
 }
 
-/** A team's Git availability comes from its own projection, which a phone does not read, so its work is published on the Mac. */
+/** Reject mutations of retired conversations from older clients. */
 function teamWork(threadId: string, { thread }: GuardContext): string | null {
-  return thread(threadId)?.team ? "Publish a team's work on your Mac." : null;
+  return thread(threadId)?.team ? "This item is no longer available." : null;
 }
 
 function commitMessage(message: string): string | null {
@@ -85,8 +85,8 @@ function prBody(body: string): string | null {
   return [...body].length <= PR_BODY_MAX ? null : `A pull request body must be up to ${PR_BODY_MAX.toLocaleString("en-US")} characters.`;
 }
 
-function threadUpdate({ taskId, patch }: RpcParams<"threads.update">): string | null {
-  if (taskId !== undefined || !Object.keys(patch).every((key) => PHONE_THREAD_PATCH.has(key))) return "Make this change on your Mac.";
+function threadUpdate({ patch }: RpcParams<"threads.update">): string | null {
+  if (!Object.keys(patch).every((key) => PHONE_THREAD_PATCH.has(key))) return "Make this change on your Mac.";
   return phoneTitle(patch.title) ?? phoneSnooze(patch.snoozedUntil);
 }
 
@@ -120,7 +120,7 @@ export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {
   "threads.start": (params, context) =>
     params.workingDirectory !== undefined ? "Choose a folder for this conversation on your Mac." : (phoneTitle(params.title) ?? storedImages(params.attachments, context)),
   "threads.update": threadUpdate,
-  // The core refuses an Orcling's or a team's conversation, a turn in progress and an account turned off, as on the Mac.
+  // The core checks conversation ownership, active turns and account availability, as on the Mac.
   "threads.switchClaudeAccount": allow,
   "runs.start": (params, context) => storedImages(params.attachments, context),
   "runs.send": (params, context) => storedImages(params.attachments, context),
@@ -145,7 +145,7 @@ export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {
   "review.commitThread": (params, context) => teamWork(params.threadId, context) ?? commitMessage(params.message),
   "review.pushThread": (params, context) => teamWork(params.threadId, context),
   "review.createThreadPr": (params, context) => teamWork(params.threadId, context) ?? prTitle(params.title) ?? prBody(params.body),
-  // One page's state; the handler answers closed for a missing or team-deleted thread.
+  // One page's state; the handler answers closed for a missing or retired thread.
   "preview.state": allow,
 };
 

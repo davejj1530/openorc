@@ -9,7 +9,7 @@ export class RunBriefs {
     private readonly hooks: Pick<RunHooks, "brief" | "memoryEnabled" | "threadContext">,
   ) {}
 
-  taskBrief(task: Task, project: Project, mode: RunMode, teamManaged = false): string {
+  taskBrief(task: Task, project: Project, mode: RunMode): string {
     const location =
       task.workspaceMode === "current"
         ? `in the project's default checkout at ${project.rootPath}. Use this checkout; do not create or attach a worktree`
@@ -21,17 +21,10 @@ export class RunBriefs {
       if (thread)
         lines.push(
           "",
-          teamManaged
-            ? `This assignment belongs to the team conversation "${thread.title}". The team coordinator routes your result to your requesting manager.`
-            : `This task was delegated from the thread "${thread.title}". When you finish, your final message is reported back there, so end with a short summary of what changed and what is left.`,
+          `This task was delegated from the thread "${thread.title}". When you finish, your final message is reported back there, so end with a short summary of what changed and what is left.`,
         );
     }
-    lines.push(
-      "",
-      teamManaged
-        ? "Stay inside this assignment. Follow the team roster and coordination rules below for delegation and reporting. task_list and task_get provide context for this team's work."
-        : "Stay inside this task. Do not create tasks; task_list and task_get show sibling tasks if you need context.",
-    );
+    lines.push("", "Stay inside this task. Do not create tasks; task_list and task_get show sibling tasks if you need context.");
     if (mode === "plan") lines.push("", "Plan mode: investigate and produce a concrete plan. Do not modify files or run commands that change state.");
     lines.push(
       "",

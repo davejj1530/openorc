@@ -1,10 +1,10 @@
+import { projects, threads } from "@openorc/db";
+import * as gitTools from "@openorc/git";
+import type { Project, Thread } from "@openorc/protocol";
 import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { orchestration, projects, threads } from "@openorc/db";
-import * as gitTools from "@openorc/git";
-import type { Project, Thread } from "@openorc/protocol";
 import { OpenOrc } from "../openorc.js";
 import type { ProtectedSecretStore } from "../services/extraction-credentials.js";
 import { RemoteTestClient } from "./test-client.js";
@@ -121,19 +121,6 @@ describe("a phone publishing a thread's work", () => {
     } finally {
       await rm(hook);
     }
-  });
-
-  it("leaves a team's publishing to the Mac, and keeps the whole patch and the Mac's paths", async () => {
-    const thread = await worktreeThread("Team");
-    const instance = vi.spyOn(orchestration, "getInstance").mockImplementation(((_db: unknown, id: string) => (id === thread.id ? ({ id: "instance" } as never) : null)) as never);
-    try {
-      await expect(phone.call("review.commitThread", { threadId: thread.id, message: "Team work" })).rejects.toThrow("Publish a team's work on your Mac.");
-      await expect(phone.call("review.pushThread", { threadId: thread.id })).rejects.toThrow("Publish a team's work on your Mac.");
-    } finally {
-      instance.mockRestore();
-    }
-    await expect(phone.call("review.threadDiff", { threadId: thread.id })).rejects.toThrow("This is not available from a phone.");
-    await expect(phone.call("system.info", {})).rejects.toThrow("This is not available from a phone.");
   });
 
   it("audits a window's commit without a phone", async () => {

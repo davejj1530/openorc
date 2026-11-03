@@ -1,12 +1,12 @@
-import { randomUUID } from "node:crypto";
 import type { AcpApprovalRequest, CodexApprovalRequest } from "@openorc/agents";
-import { audit, orchestration, runs, tasks, threads, type Db } from "@openorc/db";
+import { audit, runs, threads, type Db } from "@openorc/db";
 import { UserInput, validateUserAnswers, type UserInputResult } from "@openorc/mcp";
-import { executionMode, harnessCatalog, isHarnessId, stricterPermission, type AgentEvent, type ApprovalDecision, type ApprovalResolution } from "@openorc/protocol";
-import { appActionPolicy, blockedInPlan, type AppAction } from "./app-actions.js";
-import type { Logger } from "../transport.js";
-import type { LiveRun, PendingApproval, RunScope, ThreadPermissionState } from "./run-types.js";
 import type { ExecutionMode, Thread } from "@openorc/protocol";
+import { executionMode, harnessCatalog, isHarnessId, stricterPermission, type AgentEvent, type ApprovalDecision, type ApprovalResolution } from "@openorc/protocol";
+import { randomUUID } from "node:crypto";
+import type { Logger } from "../transport.js";
+import { appActionPolicy, blockedInPlan, type AppAction } from "./app-actions.js";
+import type { LiveRun, PendingApproval, RunScope, ThreadPermissionState } from "./run-types.js";
 
 /** Words and answer requirements for one Codex transport request. */
 function codexApprovalPresentation(
@@ -251,7 +251,7 @@ export class RunApprovals {
     const entry = this.deps.live.get(runId);
     const run = entry?.run ?? runs.get(this.deps.db, runId);
     if (!run) throw new Error("This run is no longer active.");
-    const decision = appActionPolicy(action, executionMode(run.mode, entry?.permissionGate ?? run.permissionMode), receiver);
+    const decision = appActionPolicy(action, executionMode(run.mode, run.permissionMode), receiver);
     if (decision === "allow" || (decision === "ask" && action !== "secret_input" && entry?.appActionsAllowed?.has(action))) return;
     if (decision === "block") {
       audit.record(this.deps.db, { actor: "openorc", action: "approval.deny", resourceType: "run", resourceId: runId, metadata: { tool: request.toolName, policy: "plan" } });
@@ -295,7 +295,7 @@ export class RunApprovals {
       audit.record(this.deps.db, { actor: "openorc", action: "approval.deny", resourceType: "run", resourceId: runId, metadata: { approvalId, policy: "plan" } });
       return Promise.resolve({ decision: "deny" });
     }
-    const autonomous = run?.mode === "act" && (entry?.permissionGate ?? run.permissionMode) === "autonomous";
+    const autonomous = run?.mode === "act" && run.permissionMode === "autonomous";
     if (!needsAnswer && (category === "internal_app" || (category === "external" && autonomous))) {
       audit.record(this.deps.db, {
         actor: "openorc",
@@ -350,20 +350,7 @@ export class RunApprovals {
   }
 
   private permissionEntries(thread: Thread): LiveRun[] {
-    const team = Boolean(orchestration.getInstance(this.deps.db, thread.id));
-    return [...this.deps.live.values()].filter((entry) => {
-      if (entry.scope.thread?.id === thread.id) {
-        if (entry.scope.thread.projectId !== thread.projectId) throw new Error("The live lead no longer belongs to this project.");
-        return true;
-      }
-      if (!team || !entry.scope.task) return false;
-      const task = tasks.get(this.deps.db, entry.scope.task.id);
-      if (task?.threadId !== thread.id && entry.scope.task.threadId !== thread.id) return false;
-      if (!task || task.threadId !== thread.id || entry.scope.task.threadId !== thread.id || task.projectId !== thread.projectId || entry.scope.task.projectId !== thread.projectId) {
-        throw new Error("A live team assignment has inconsistent ownership. Close it before changing permissions.");
-      }
-      return true;
-    });
+    return [...this.deps.live.values()].filter((entry) => entry.scope.thread?.id === thread.id);
   }
 
   assertThreadPermissions(threadId: string): void {
@@ -400,22 +387,20 @@ export class RunApprovals {
 
   applyThreadPermissions(thread: Thread): ThreadPermissionState {
     const entries = this.permissionEntries(thread);
-    const team = Boolean(orchestration.getInstance(this.deps.db, thread.id));
-    const target = team && thread.mode === "plan" ? "review" : thread.permissionMode;
-    for (const entry of entries) this.applyEntryPermission(entry, target, team);
+    const target = thread.mode === "plan" ? "review" : thread.permissionMode;
+    for (const entry of entries) this.applyEntryPermission(entry, target);
     return this.threadPermissions(thread.id);
   }
 
-  private applyEntryPermission(entry: LiveRun, requested: Thread["permissionMode"], team: boolean): void {
+  private applyEntryPermission(entry: LiveRun, requested: Thread["permissionMode"]): void {
     const run = entry.run;
     const target = entry.orclingCeiling ? stricterPermission(requested, entry.orclingCeiling) : requested;
     if (entry.closingRequested || entry.exiting) return;
-    if (team) entry.permissionGate = target;
     if (run.mode !== "act") return;
     // Native bypass cannot be tightened. A gated process can stop app-level
     // automatic grants immediately, restoring its original native ceiling.
-    if (!team && target !== "autonomous" && target !== entry.providerPermissionMode) return;
-    const effective = team && target !== "autonomous" ? entry.providerPermissionMode : target;
+    if (target !== "autonomous" && target !== entry.providerPermissionMode) return;
+    const effective = target;
     this.updateStoredPermission(entry, effective);
     // Reopening the gate releases requests parked while a stricter policy awaited native restart.
     if (target === "autonomous") this.releaseAutomaticApprovals(run.id);

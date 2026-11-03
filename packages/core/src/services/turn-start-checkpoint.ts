@@ -1,13 +1,13 @@
-import { realpath } from "node:fs/promises";
-import { checkpoints, orchestration, runs, type Db } from "@openorc/db";
+import { checkpoints, retiredTeams, runs, type Db } from "@openorc/db";
 import { diffStat, pinObject, treeHash } from "@openorc/git";
 import type { Project, Thread, ThreadCheckpoint } from "@openorc/protocol";
+import { realpath } from "node:fs/promises";
+import type { Logger } from "../transport.js";
 import { checkpointRefs } from "./checkpoint-refs.js";
 import { projectGit } from "./project-git.js";
 import { working, type LiveRun } from "./run-types.js";
 import { treeChanges } from "./tree-changes.js";
 import { overlaps } from "./workspace-writers.js";
-import type { Logger } from "../transport.js";
 
 /** Files that changed since the conversation's last checkpoint, found as a turn started. */
 export interface OutsideChanges {
@@ -24,8 +24,6 @@ export interface TurnStart {
   project: Project;
   /** The folder the run holds its lease on. */
   cwd: string;
-  /** Team turns are captured by the coordinator. */
-  team: boolean;
 }
 
 interface Dependencies {
@@ -61,10 +59,10 @@ export class TurnStartCapture {
 
   constructor(private readonly deps: Dependencies) {}
 
-  /** Null when nothing changed, on a first turn (its "Starting files" row is saved instead), and for a team's folder. */
+  /** Null when nothing changed, on a first turn (its "Starting files" row is saved instead), and for retired folders. */
   async capture(start: TurnStart): Promise<OutsideChanges | null> {
     const { thread, project, cwd } = start;
-    if (start.team || orchestration.getInstance(this.deps.db, thread.id)) return null;
+    if (retiredTeams.isHidden(this.deps.db, thread.id)) return null;
     if ((await projectGit(project)) === "none") return this.withoutGit(thread.id, await realpath(cwd));
     const last = checkpoints.listForThread(this.deps.db, thread.id).at(-1);
     if (!last) {

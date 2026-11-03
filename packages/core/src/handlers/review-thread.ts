@@ -54,12 +54,12 @@ export function createReviewThreadHandlers({
     },
     "review.commitThread": ({ threadId, message }) => {
       const { thread, project } = threadAndProject(db, threadId);
-      const keys = ["workspace-diff", `threaddiff:${threadId}`, `threadlog:${threadId}`, `thread:${threadId}`, "threads", "orchestration"];
+      const keys = ["workspace-diff", `threaddiff:${threadId}`, `threadlog:${threadId}`, `thread:${threadId}`, "threads"];
       return landed(threadId, keys, () => review.commitThread(thread, project, message));
     },
     "review.pushThread": ({ threadId }) => {
       const { thread, project } = threadAndProject(db, threadId);
-      return landed(threadId, [`thread:${threadId}`, "threads", "orchestration"], () => review.pushThread(thread, project));
+      return landed(threadId, [`thread:${threadId}`, "threads"], () => review.pushThread(thread, project));
     },
     "review.createThreadPr": ({ threadId, title, body, base }) => {
       const { thread, project } = threadAndProject(db, threadId);

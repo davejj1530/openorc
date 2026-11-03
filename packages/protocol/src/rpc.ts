@@ -1,30 +1,10 @@
-import { CommentRecipient, type TaskDiscussion, type TaskComment, type CommentAttempt } from "./task-comments.js";
-import type { ConversationPlan } from "./execution-mode.js";
-import type { TaskForwardingState } from "./task-forwarding.js";
-import type { TaskCheckoutState } from "./task-checkout.js";
-import { BranchLoss, type ChangePreview, type FileDiff, type RemovalImpact, type WorkspaceChanges, workspaceChangeRpcParams } from "./workspace-changes.js";
-import { claudeAccountRpcParams, ClaudeAccountId, type ClaudeAccountRpcResults } from "./claude-accounts.js";
 import { z } from "zod";
 import type { AgentUpdates } from "./agent-updates.js";
-import { slackRpcParams, type SlackStatus } from "./slack.js";
-import { BranchName, pullRequestRpcParams, type PullRequestRpcResults } from "./pull-requests.js";
-import { orclingRpcParams, type OrclingRpcResults } from "./orclings.js";
-import { projectRpcParams, type ProjectRpcResults } from "./projects.js";
-import { fileRpcParams, type FileRpcResults } from "./files.js";
-import { editorRpcParams, type EditorRpcResults } from "./code-intelligence.js";
-import { codeExplanationRpcParams, type CodeExplanationRpcResults } from "./code-explanations.js";
-import { remoteRpcParams, type RemoteRpcResults } from "./remote.js";
-import { devicePanelRpcParams, DevicePanelPush, type DevicePanelRpcResults } from "./devices.js";
-import { previewRpcParams, type PreviewRpcResults } from "./preview.js";
-import { ThreadStartParams } from "./thread-start.js";
-import { ThreadListParams } from "./thread-list.js";
+import { ClaudeAccountId, claudeAccountRpcParams, type ClaudeAccountRpcResults } from "./claude-accounts.js";
 import { cloudRpcParams, type CloudRpcResults } from "./cloud.js";
-import { HarnessId, type HarnessAvailability, type HarnessInfo } from "./harness.js";
-import { AgentEvent, AgentKind, ApprovalDecision, Frame } from "./events.js";
-import type { McpAppOpenResult } from "./mcp-apps.js";
-import { ExecutionTarget, LeadOverrides, TeamDraft, type TeamDetail, type TeamPreflight } from "./orchestration.js";
-import type { TeamTurnChanges, TeamConversation, TeamExecutionAvailability, TeamRetainedTaskRuntime } from "./team-conversation.js";
-import type { TeamTaskActionResult, TeamTaskView } from "./team-tasks.js";
+import { codeExplanationRpcParams, type CodeExplanationRpcResults } from "./code-explanations.js";
+import { editorRpcParams, type EditorRpcResults } from "./code-intelligence.js";
+import { DevicePanelPush, devicePanelRpcParams, type DevicePanelRpcResults } from "./devices.js";
 import {
   AgentSkill,
   AppSettings,
@@ -49,23 +29,36 @@ import {
   Task,
   TaskPriority,
   TaskStatus,
-  TeamMemberAvatarChoice,
   Thread,
   ThreadCheckpoint,
+  ThreadMessage,
   ThreadSearchHit,
   ThreadSummary,
-  ThreadMessage,
   type TurnFileChanges,
-  type TeamMemberAvatar,
   WorkspaceMode,
 } from "./domain.js";
+import { AgentEvent, AgentKind, ApprovalDecision, Frame } from "./events.js";
+import type { ConversationPlan } from "./execution-mode.js";
+import { fileRpcParams, type FileRpcResults } from "./files.js";
+import { type HarnessAvailability, HarnessId, type HarnessInfo } from "./harness.js";
+import type { McpAppOpenResult } from "./mcp-apps.js";
+import { ExecutionTarget } from "./execution-target.js";
+import { orclingRpcParams, type OrclingRpcResults } from "./orclings.js";
+import { previewRpcParams, type PreviewRpcResults } from "./preview.js";
+import { projectRpcParams, type ProjectRpcResults } from "./projects.js";
+import { BranchName, pullRequestRpcParams, type PullRequestRpcResults } from "./pull-requests.js";
+import { remoteRpcParams, type RemoteRpcResults } from "./remote.js";
+import { slackRpcParams, type SlackStatus } from "./slack.js";
+import type { TaskCheckoutState } from "./task-checkout.js";
+import { type CommentAttempt, CommentRecipient, type TaskComment, type TaskDiscussion } from "./task-comments.js";
+import { ThreadListParams } from "./thread-list.js";
+import { ThreadStartParams } from "./thread-start.js";
+import { BranchLoss, type ChangePreview, type FileDiff, type RemovalImpact, workspaceChangeRpcParams, type WorkspaceChanges } from "./workspace-changes.js";
 
 /**
  * Renderer to core RPC. Params are validated in the core; results are typed
  * but trusted. One method map keeps both sides honest.
  */
-/** Optional saved-task scope: a deleted conversation's team accepts controls only through a surviving task. */
-const TaskScope = z.string().min(1).optional();
 
 const reviewCommentScope = { threadId: z.string().min(1).optional(), taskId: z.string().min(1).optional() };
 const hasReviewScope = (scope: { threadId?: string; taskId?: string }) => Boolean(scope.threadId || scope.taskId);
@@ -110,81 +103,6 @@ export const rpcParams = {
   /** The Mac's plan limits for a phone: Codex, then each enabled Claude account. Takes nothing, so a phone cannot force a fresh read. */
   "providers.limits": z.object({}).strict(),
   "providers.codex.reset": z.object({ attemptId: z.string().uuid(), creditId: z.string().min(1).optional(), confirmationToken: z.string().min(1) }),
-  "orchestration.list": z.object({ projectId: z.string().min(1), includeArchived: z.boolean().optional() }),
-  "orchestration.get": z.object({ id: z.string().min(1) }),
-  "orchestration.save": z.object({ projectId: z.string().min(1), teamId: z.string().min(1).optional(), expectedRevisionId: z.string().min(1).nullable(), draft: TeamDraft }).strict(),
-  "orchestration.archive": z.object({ projectId: z.string().min(1), teamId: z.string().min(1), expectedRevisionId: z.string().min(1), archived: z.boolean() }).strict(),
-  "orchestration.avatars.list": z.object({ teamId: z.string().min(1) }).strict(),
-  "orchestration.avatars.set": z.object({ teamId: z.string().min(1), memberKey: z.string().min(1), avatar: TeamMemberAvatarChoice }).strict(),
-  "orchestration.avatars.reset": z.object({ teamId: z.string().min(1), memberKey: z.string().min(1) }).strict(),
-  "orchestration.preflight": z.object({ projectId: z.string().min(1), draft: TeamDraft }).strict(),
-  "orchestration.availability": z.object({}).strict(),
-  "orchestration.turnChanges": z
-    .object({
-      threadId: z.string().min(1),
-      executionId: z.string().min(1),
-      turnId: z.string().min(1),
-      includePatch: z.boolean().optional(),
-      paths: z.array(z.string().min(1)).min(1).max(500).optional(),
-      taskId: TaskScope,
-    })
-    .strict(),
-  "orchestration.runtime": z.object({ threadId: z.string().min(1) }).strict(),
-  "orchestration.taskState": z.object({ taskId: z.string().min(1) }).strict(),
-  "orchestration.tasks.start": z.object({ taskId: z.string().min(1), requestKey: z.string().min(1).max(200) }).strict(),
-  "orchestration.tasks.retry": z.object({ taskId: z.string().min(1), admissionId: z.string().min(1), requestKey: z.string().min(1).max(200) }).strict(),
-  "orchestration.review.send": z
-    .object({ taskId: z.string().min(1), commentIds: z.array(z.string().min(1)).min(1).max(100), requestKey: z.string().min(1).max(200) })
-    .strict()
-    .refine((input) => new Set(input.commentIds).size === input.commentIds.length, "Review selection must contain distinct comments."),
-  /** A deleted conversation's saved task reads and controls its retained team through its own identity. */
-  "orchestration.taskRuntime": z.object({ taskId: z.string().min(1) }).strict(),
-  "orchestration.stop": z.object({ threadId: z.string().min(1), executionId: z.string().min(1), taskId: TaskScope }).strict(),
-  "orchestration.retry": z
-    .object({
-      threadId: z.string().min(1),
-      executionId: z.string().min(1),
-      actorId: z.string().min(1),
-      fresh: z.boolean().optional(),
-      requestKey: z.string().min(1).max(200).optional(),
-      taskId: TaskScope,
-    })
-    .strict()
-    .superRefine((input, ctx) => {
-      if (input.fresh && !input.requestKey) ctx.addIssue({ code: "custom", path: ["requestKey"], message: "A fresh-session retry requires a durable request key." });
-      if (!input.fresh && input.requestKey) ctx.addIssue({ code: "custom", path: ["requestKey"], message: "Retry request keys apply to a fresh-session retry." });
-    }),
-  "orchestration.compact": z.object({ threadId: z.string().min(1), requestKey: z.string().min(1).max(200), taskId: TaskScope }).strict(),
-  "orchestration.cancelDirection": z.object({ threadId: z.string().min(1), executionId: z.string().min(1), messageId: z.string().min(1), taskId: TaskScope }).strict(),
-  "orchestration.sendNow": z.object({ threadId: z.string().min(1), executionId: z.string().min(1), messageId: z.string().min(1), taskId: TaskScope }).strict(),
-  "orchestration.implementPlan": z.object({ threadId: z.string().min(1), planId: z.string().min(1) }).strict(),
-  "orchestration.send": z
-    .object({
-      threadId: z.string().min(1),
-      text: z.string().trim().min(1).max(100_000),
-      attachments: z.array(z.string().min(1).max(4096)).max(20).optional(),
-      requestKey: z.string().min(1).max(200),
-      now: z.boolean().optional(),
-      taskId: TaskScope,
-      /** Member keys, "lead" or "all". Absent means the lead, as queued direction. */
-      to: z.array(z.string().min(1).max(200)).min(1).max(50).optional(),
-    })
-    .strict(),
-  "orchestration.configureLead": z.object({ threadId: z.string().min(1), leadOverrides: LeadOverrides, taskId: TaskScope }).strict(),
-  /** Explicit setup recovery for a blocked assignment workspace; the request key makes a lost reply replayable. */
-  "orchestration.workspace.retrySetup": z
-    .object({ threadId: z.string().min(1), executionId: z.string().min(1), actorId: z.string().min(1), requestKey: z.string().min(1).max(200), taskId: TaskScope })
-    .strict(),
-  "orchestration.workspace.acceptSetup": z
-    .object({ threadId: z.string().min(1), executionId: z.string().min(1), actorId: z.string().min(1), requestKey: z.string().min(1).max(200), taskId: TaskScope })
-    .strict(),
-  /** Explicit integration recovery for a conflicting or interrupted publication. */
-  "orchestration.integration.retry": z
-    .object({ threadId: z.string().min(1), executionId: z.string().min(1), publicationId: z.string().min(1), requestKey: z.string().min(1).max(200), taskId: TaskScope })
-    .strict(),
-  "orchestration.integration.accept": z
-    .object({ threadId: z.string().min(1), executionId: z.string().min(1), publicationId: z.string().min(1), requestKey: z.string().min(1).max(200), taskId: TaskScope })
-    .strict(),
   /** Active threads by default; every project when none is named. Offset pages older threads in. */
   "threads.list": ThreadListParams,
   "threads.get": z.object({ id: z.string() }),
@@ -205,7 +123,6 @@ export const rpcParams = {
   "threads.update": z.object({
     id: z.string(),
     /** Through a surviving task of a deleted conversation, only mode, permissions and the draft can change. */
-    taskId: TaskScope,
     patch: z.object({
       executionTarget: z.never().optional(),
       title: z.string().optional(),
@@ -228,7 +145,6 @@ export const rpcParams = {
   }),
   /** The conversation goes on with another Claude account from its next message, which resumes its session there. */
   "threads.switchClaudeAccount": z.object({ id: z.string(), claudeAccountId: ClaudeAccountId }),
-  /** A team conversation needs a request key so an interrupted delete can be retried without repeating cleanup. */
   "threads.delete": z.object({ id: z.string(), requestKey: z.string().min(1).max(200).optional() }),
   /** A new thread that continues this one's conversation, through the given run (the latest by default). */
   "threads.fork": z.object({ id: z.string(), upToRunId: z.string().optional(), requestKey: z.string().min(1).max(200).optional() }),
@@ -238,8 +154,6 @@ export const rpcParams = {
   "threads.moveWorkspace": z.object({ id: z.string(), to: WorkspaceMode, requestKey: z.string().min(1).max(200).optional() }),
   /** The files a move would carry, for its confirmation. */
   "threads.movePreview": z.object({ id: z.string(), to: WorkspaceMode }),
-  "threads.cancelMove": z.object({ id: z.string(), requestKey: z.string().min(1).max(200) }),
-  "threads.cancelTeamOperation": z.object({ id: z.string().min(1), kind: z.enum(["fork", "restore", "delete"]), requestKey: z.string().min(1).max(200), keepFiles: z.boolean().optional() }).strict(),
   /** Ask the agent to summarise the conversation so far and continue from the summary. */
   "threads.compact": z.object({ id: z.string(), requestKey: z.string().min(1).max(200).optional() }),
   /** Hold a message until the current turn ends, then send it. */
@@ -262,8 +176,6 @@ export const rpcParams = {
   /** The other threads of the project, for cross-thread messaging in the UI. */
   "threads.send": z.object({ id: z.string(), text: z.string().min(1), fromThreadId: z.string().optional() }),
   "tasks.list": z.object({ threadId: z.string().optional(), projectId: z.string().optional(), statuses: z.array(TaskStatus).optional() }),
-  "tasks.forwarding": z.object({ taskId: z.string() }),
-  "tasks.forward": z.object({ taskId: z.string(), workspaceMode: WorkspaceMode }),
   "tasks.get": z.object({ id: z.string() }),
   "tasks.openThread": z.object({ taskId: z.string() }),
   "tasks.executionThread": z.object({ taskId: z.string() }),
@@ -400,7 +312,7 @@ export const rpcParams = {
   "schedules.trigger": z.object({ id: z.string(), requestKey: z.string().min(1).max(300) }),
   "review.snapshots": z.object({ taskId: z.string() }),
   "review.markReviewed": z.object({ taskId: z.string() }),
-  /** A conversation's comments; with a task too, also that task's comments from before it had a conversation. A task alone lists team review comments. */
+  /** A conversation's comments; with a task too, also that task's comments from before it had a conversation. A task alone lists its saved review comments. */
   "review.comments.list": z.object(reviewCommentScope).refine(hasReviewScope, REVIEW_SCOPE_REQUIRED),
   "review.comments.add": z
     .object({
@@ -602,34 +514,6 @@ export interface RpcResults
   "providers.usage": import("./provider-usage.js").ProviderUsage;
   "providers.limits": import("./provider-usage.js").PlanLimits[];
   "providers.codex.reset": import("./provider-usage.js").ResetResult;
-  "orchestration.list": TeamDetail[];
-  "orchestration.get": TeamDetail | null;
-  "orchestration.save": TeamDetail;
-  "orchestration.archive": TeamDetail;
-  "orchestration.avatars.list": TeamMemberAvatar[];
-  "orchestration.avatars.set": TeamMemberAvatar;
-  "orchestration.avatars.reset": TeamMemberAvatar;
-  "orchestration.preflight": TeamPreflight;
-  "orchestration.availability": TeamExecutionAvailability;
-  "orchestration.turnChanges": TeamTurnChanges;
-  "orchestration.runtime": TeamConversation | null;
-  "orchestration.taskState": TeamTaskView | null;
-  "orchestration.taskRuntime": TeamRetainedTaskRuntime | null;
-  "orchestration.tasks.start": TeamTaskActionResult;
-  "orchestration.tasks.retry": TeamTaskActionResult;
-  "orchestration.review.send": TeamTaskActionResult;
-  "orchestration.stop": TeamConversation;
-  "orchestration.retry": TeamConversation;
-  "orchestration.compact": TeamConversation;
-  "orchestration.cancelDirection": TeamConversation;
-  "orchestration.sendNow": TeamConversation;
-  "orchestration.implementPlan": TeamConversation;
-  "orchestration.send": TeamConversation;
-  "orchestration.configureLead": TeamConversation;
-  "orchestration.workspace.retrySetup": TeamConversation;
-  "orchestration.workspace.acceptSetup": TeamConversation;
-  "orchestration.integration.retry": TeamConversation;
-  "orchestration.integration.accept": TeamConversation;
   "threads.list": ThreadSummary[];
   "threads.get": ThreadSummary | null;
   "threads.messages": ThreadMessage[];
@@ -640,13 +524,11 @@ export interface RpcResults
   "threads.start": { thread: Thread; run: Run | null };
   "threads.update": Thread;
   "threads.switchClaudeAccount": Thread;
-  "threads.delete": null | { rejected: string };
-  "threads.fork": Thread | { rejected: string };
+  "threads.delete": null;
+  "threads.fork": Thread;
   "threads.search": ThreadSearchHit[];
-  "threads.moveWorkspace": Thread | { rejected: string };
+  "threads.moveWorkspace": Thread;
   "threads.movePreview": ChangePreview;
-  "threads.cancelMove": { state: "cancelled" | "applied" };
-  "threads.cancelTeamOperation": { state: "cancelled" | "applied" };
   "threads.compact": null;
   "threads.queue": QueuedMessage[];
   "threads.unqueue": QueuedMessage[];
@@ -655,7 +537,7 @@ export interface RpcResults
   "subagents.stop": null;
   "threads.checkpoints": ThreadCheckpoint[];
   "threads.turnChanges": TurnFileChanges;
-  "threads.restore": null | { rejected: string };
+  "threads.restore": null;
   "threads.restorePreview": ChangePreview;
   "threads.importable": ImportableSession[];
   "threads.import": Thread[];
@@ -683,8 +565,6 @@ export interface RpcResults
   "tasks.start": Run;
   "runs.listForThread": Run[];
   "tasks.list": Task[];
-  "tasks.forwarding": TaskForwardingState;
-  "tasks.forward": Task;
   "tasks.get": Task | null;
   "tasks.openThread": Thread;
   "tasks.executionThread": ThreadSummary | null;

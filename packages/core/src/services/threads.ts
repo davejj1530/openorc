@@ -1,60 +1,42 @@
-import {
-  audit,
-  claudeAccounts,
-  plans,
-  settings,
-  subagents,
-  checkpoints,
-  messages,
-  orchestration,
-  runs as runRepo,
-  tasks,
-  teamDeletedThreads,
-  teamRuntime,
-  threads,
-  threadQueue,
-  type CloudProviderId,
-  type Db,
-} from "@openorc/db";
-import { diffStat, git, pinObject, switchFiles, teamTransfer, treeHash } from "@openorc/git";
+import { audit, checkpoints, claudeAccounts, messages, plans, retiredTeams, runs as runRepo, settings, subagents, tasks, threadQueue, threads, type CloudProviderId, type Db } from "@openorc/db";
+import { diffStat, git, pinObject, switchFiles, treeHash, workspaceTransfer } from "@openorc/git";
 import {
   WORKSPACE_ID,
+  executionModeUnavailable,
   normalizeModelEffort,
   normalizeModelSettings,
-  executionModeUnavailable,
   type AgentKind,
   type ChangePreview,
   type PermissionPreset,
+  type RpcParams,
   type Run,
   type RunMode,
   type Thread,
   type ThreadCheckpoint,
+  type ThreadMessage,
   type ThreadSearchHit,
   type ThreadSummary,
-  type RpcParams,
-  type ThreadMessage,
   type WorkspaceMode,
 } from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
 import { realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Logger } from "../transport.js";
-import { teamQuiescenceReason } from "./thread-team-quiescence.js";
-import { applyRequestedPolicy } from "./thread-policy-requests.js";
-import { titleFromPrompt, type StartThreadInput, type ThreadPatch, type ThreadTitler } from "./thread-inputs.js";
-import { switchedClaudeAccount, ThreadSessions, type ClaudeFolder } from "./thread-session.js";
+import { checkpointRefs, unpinProjectRefs } from "./checkpoint-refs.js";
+import { executionFolder } from "./conversation-folder.js";
 import { inUnvettedCopy } from "./review-copies.js";
 import type { RunService } from "./runs.js";
-import type { WorkspaceService } from "./workspace.js";
-import { directory, executionProject, worktreeShared } from "./workspace-home.js";
-import { executionFolder } from "./conversation-folder.js";
-import { workspaceWriters, type WorkspaceWriters } from "./workspace-writers.js";
-import { checkpointRefs, unpinProjectRefs } from "./checkpoint-refs.js";
-import { ThreadMoves, fileChanges } from "./thread-moves.js";
-import { ThreadMessageQueue } from "./thread-message-queue.js";
-import { ThreadTaskExecution } from "./thread-task-execution.js";
-import { assertMutableThread } from "./thread-mutations.js";
 import { ThreadAgentTools } from "./thread-agent-tools.js";
+import { titleFromPrompt, type StartThreadInput, type ThreadPatch, type ThreadTitler } from "./thread-inputs.js";
+import { ThreadMessageQueue } from "./thread-message-queue.js";
+import { ThreadMoves, fileChanges } from "./thread-moves.js";
+import { assertMutableThread } from "./thread-mutations.js";
+import { applyRequestedPolicy } from "./thread-policy-requests.js";
+import { ThreadSessions, switchedClaudeAccount, type ClaudeFolder } from "./thread-session.js";
+import { ThreadTaskExecution } from "./thread-task-execution.js";
+import { directory, executionProject, worktreeShared } from "./workspace-home.js";
+import { workspaceWriters, type WorkspaceWriters } from "./workspace-writers.js";
+import type { WorkspaceService } from "./workspace.js";
 
 /** How many agent messages in a row may pass between conversations before a person has to write. */
 export { MAX_AGENT_HOPS } from "./thread-agent-tools.js";
@@ -83,7 +65,6 @@ export class ThreadService {
     private readonly log: Logger,
     private readonly titler: ThreadTitler,
     private readonly writers: WorkspaceWriters = workspaceWriters,
-    private readonly onTeamModeChanged?: (threadId: string) => void,
     private readonly onDeleted?: (threadId: string) => void,
     claudeFolder?: ClaudeFolder,
   ) {
@@ -92,7 +73,7 @@ export class ThreadService {
       runs,
       invalidate,
       log,
-      (id) => this.rejectPinnedTeam(id),
+      (id) => this.rejectRetiredThread(id),
       (id, input) => this.continueThread(id, input),
       (input) => this.queueFollowUp(input),
       () => this.stopAccepting(),
@@ -103,12 +84,12 @@ export class ThreadService {
       taskThreadForStart: (id, selected) => this.taskThreadForStart(id, selected),
       continueThread: (id, input) => this.continueThread(id, input),
       handoffBrief: (thread, own) => this.agentTools.handoffBrief(thread, own),
-      rejectPinnedTeam: (id) => this.rejectPinnedTeam(id),
+      rejectRetiredThread: (id) => this.rejectRetiredThread(id),
     });
     this.agentTools = new ThreadAgentTools(db, runs, invalidate, {
       spawnTask: (thread, input, origin) => this.spawnTask(thread, input, origin),
-      rejectPinnedTeam: (id) => this.rejectPinnedTeam(id),
-      send: (id, text, from, attribution, options) => this.send(id, text, from, attribution, options),
+      rejectRetiredThread: (id) => this.rejectRetiredThread(id),
+      send: (id, text, from) => this.send(id, text, from),
       messages: (id) => this.messages(id),
       withCheckoutBranches: (rows) => this.withCheckoutBranches(rows),
       start: (input, internal) => this.start({ ...input, cloud: false }, internal),
@@ -120,10 +101,10 @@ export class ThreadService {
     return threads.list(this.db, filter).map((t) => this.summarize(t));
   }
 
-  /** A deleted team conversation reads as absent; its saved tasks reach it through their own endpoints. */
+  /** Missing and retired conversations read as absent, including previously open tabs. */
   get(id: string): ThreadSummary | null {
     const t = threads.get(this.db, id);
-    return t && !teamDeletedThreads.has(this.db, id) ? this.summarize(t) : null;
+    return t && !retiredTeams.isHidden(this.db, id) ? this.summarize(t) : null;
   }
 
   /** Local conversations can have missing or stale metadata. Read their checkout's HEAD for display. */
@@ -133,36 +114,13 @@ export class ThreadService {
 
   private summarize(t: Thread): ThreadSummary {
     const own = tasks.list(this.db, { threadId: t.id });
-    const instance = orchestration.getInstance(this.db, t.id);
-    const execution = instance ? teamRuntime.activeForThread(this.db, t.id) : null;
-    const executionRuns = new Set(execution?.attempts.flatMap((attempt) => (attempt.runId ? [attempt.runId] : [])) ?? []);
-    const needsApproval = execution ? this.runs.pending().some((approval) => executionRuns.has(approval.runId)) : false;
-    const heldByMode = (actor: NonNullable<typeof execution>["actors"][number]) =>
-      t.mode === "plan" && ((actor.modeHold === "plan" && actor.state === "waiting") || (actor.parentId !== null && actor.state === "queued"));
-    const working = execution?.actors.some((actor) => !heldByMode(actor) && ["queued", "starting", "running"].includes(actor.state)) || [...executionRuns].some((runId) => this.runs.isLive(runId));
-    const modeHeld = execution?.actors.some(heldByMode);
-    let activity: ThreadSummary["activity"];
-    if (!execution) activity = this.runs.threadActivity(t.id);
-    else if (execution.state === "stopping") activity = "running";
-    else if (needsApproval) activity = "waiting";
-    else if (working || (execution.state === "active" && !modeHeld)) activity = "running";
-    else activity = "waiting";
-    // A team's work runs on its attempts, which are bound to tasks rather than
-    // to this thread, so the thread's own live run is empty for them. Take the
-    // most recent event across the execution's runs, as the activity above does.
-    const lastAgentEventAt = execution
-      ? [...executionRuns].reduce<number | null>((latest, runId) => {
-          const at = this.runs.lastAgentEventAt(runId);
-          return at !== null && (latest === null || at > latest) ? at : latest;
-        }, null)
-      : this.runs.threadLastAgentEventAt(t.id);
-    const liveRunId = this.liveRunId(t.id, execution, executionRuns);
+    const activity = this.runs.threadActivity(t.id);
     return {
       ...t,
       subagent: this.runs.subagents.summary(t.id),
-      hasStarted: Boolean(this.db.stmt("SELECT 1 FROM runs WHERE thread_id = ? LIMIT 1").get(t.id) || this.db.stmt("SELECT 1 FROM team_executions WHERE thread_id = ? LIMIT 1").get(t.id)),
-      teamInstanceId: instance?.id ?? null,
-      agents: (instance ? orchestration.getRevision(this.db, instance.teamRevisionId)?.members.map((member) => member.settings.agent) : null) ?? [t.agent],
+      hasStarted: Boolean(this.db.stmt("SELECT 1 FROM runs WHERE thread_id = ? LIMIT 1").get(t.id)),
+      teamInstanceId: null,
+      agents: [t.agent],
       activity,
       backgroundCommands: this.runs.threadBackgroundCommands(t.id),
       // Activity the user has not looked at yet, once the agent is done with it.
@@ -171,42 +129,28 @@ export class ThreadService {
       context: this.runs.threadContext(t.id),
       queued: threadQueue.list(this.db, t.id),
       cloud: this.workspaces.cloudState(t.id),
-      lastAgentEventAt,
-      liveRunId,
+      lastAgentEventAt: this.runs.threadLastAgentEventAt(t.id),
+      liveRunId: this.liveRunId(t.id),
       taskCount: own.filter((x) => x.status !== "archived").length,
       openTaskCount: own.filter((x) => x.status === "proposed" || x.status === "backlog" || x.status === "in_progress" || x.status === "review").length,
     };
   }
 
-  /** The run streaming for a thread now: its own live run, or the team attempt that spoke last, as its silence is measured. */
-  private liveRunId(threadId: string, execution: unknown, executionRuns: Set<string>): string | null {
+  /** A hosted child's run belongs to its parent provider session. */
+  private liveRunId(threadId: string): string | null {
     const child = subagents.byThread(this.db, threadId);
-    if (child?.status === "running") return child.runId;
-    if (!execution) return this.runs.liveRunForThread(threadId)?.id ?? null;
-    let latest: { runId: string; at: number } | null = null;
-    for (const runId of executionRuns) {
-      const at = this.runs.lastAgentEventAt(runId);
-      if (at !== null && this.runs.isLive(runId) && (!latest || at > latest.at)) latest = { runId, at };
-    }
-    return latest?.runId ?? null;
+    return child?.status === "running" ? child.runId : (this.runs.liveRunForThread(threadId)?.id ?? null);
   }
 
   private thread(id: string): Thread {
     const t = threads.get(this.db, id);
-    if (!t) throw new Error(`thread ${id} not found`);
+    if (!t || retiredTeams.isHidden(this.db, id)) throw new Error(`thread ${id} not found`);
     return t;
   }
 
-  private rejectPinnedTeam(threadId: string | null): void {
+  private rejectRetiredThread(threadId: string | null): void {
     if (threadId) this.runs.subagents.assertExecutable({ threadId });
-    if (threadId && (orchestration.getInstance(this.db, threadId) || teamRuntime.activeForThread(this.db, threadId))) {
-      throw new Error("This thread is managed by a saved team. Use its team execution controls.");
-    }
-  }
-
-  /** Organization never hides unfinished team work. */
-  teamQuiescenceReason(threadId: string): string | null {
-    return teamQuiescenceReason(this.db, this.runs, threadId);
+    if (threadId && retiredTeams.isHidden(this.db, threadId)) throw new Error("This item is no longer available.");
   }
 
   /** A cloud thread returns at once with no run: its first message waits in the queue while its sandbox gets ready. */
@@ -319,6 +263,7 @@ export class ThreadService {
   }
 
   messages(id: string): ThreadMessage[] {
+    if (retiredTeams.isHidden(this.db, id)) return [];
     return this.agentTools.messages(id);
   }
 
@@ -338,7 +283,7 @@ export class ThreadService {
   }
 
   async implementPlan(id: string, planId: string, permissionMode: PermissionPreset): Promise<Run> {
-    this.rejectPinnedTeam(id);
+    this.rejectRetiredThread(id);
     const thread = this.thread(id);
     const unavailable = executionModeUnavailable(thread.agent, permissionMode);
     if (unavailable) throw new Error(unavailable);
@@ -406,7 +351,7 @@ export class ThreadService {
     },
   ): Promise<Run> {
     input = normalizeModelSettings(input);
-    this.rejectPinnedTeam(id);
+    this.rejectRetiredThread(id);
     const thread = this.thread(id);
     if (input.workingDirectory && thread.projectId !== WORKSPACE_ID) throw new Error("Only Workspace conversations can change folders.");
     const currentProject = executionProject(this.db, thread);
@@ -423,7 +368,7 @@ export class ThreadService {
       this.workspaces.threadPath(thread, project),
       `continuing thread ${id}`,
       async (workspaceLease) => {
-        this.rejectPinnedTeam(id);
+        this.rejectRetiredThread(id);
         input.assertCanStart?.();
         if (folderChanged) threads.update(this.db, id, { workingDirectory: nextDirectory });
         if (
@@ -504,24 +449,15 @@ export class ThreadService {
     void this.messageQueue.drainQueue(thread.id);
   }
 
-  update(id: string, patch: ThreadPatch, scope: { taskId?: string } = {}): Thread {
+  update(id: string, patch: ThreadPatch): Thread {
+    this.thread(id);
     if (Object.keys(patch).some((key) => key !== "seen")) this.runs.subagents.assertExecutable({ threadId: id });
-    // Through a saved task of a deleted conversation only next-turn controls may change; nothing resurrects the owner.
-    if (teamDeletedThreads.has(this.db, id)) {
-      const allowed = new Set(["mode", "permissionMode", "draft"]);
-      const keys = Object.keys(patch).filter((key) => (patch as Record<string, unknown>)[key] !== undefined);
-      if (!scope.taskId || tasks.get(this.db, scope.taskId)?.threadId !== id) throw new Error("This conversation was deleted. Continue from one of its saved tasks.");
-      if (keys.some((key) => !allowed.has(key))) throw new Error("A deleted conversation only accepts mode, permission and draft changes through its saved tasks.");
-    }
     const structural: (keyof ThreadPatch)[] = ["agent", "model", "effort", "fastMode"];
-    if (structural.some((key) => patch[key] !== undefined)) this.rejectPinnedTeam(id);
+    const execution: (keyof ThreadPatch)[] = [...structural, "mode", "permissionMode", "draft"];
+    if (execution.some((key) => patch[key] !== undefined)) this.rejectRetiredThread(id);
     if (structural.some((key) => patch[key] !== undefined)) {
       const next = { ...this.thread(id), ...patch };
       patch = { ...patch, effort: normalizeModelEffort(next.agent, next.model, next.effort) };
-    }
-    if (["archived", "done", "snoozedUntil"].some((key) => patch[key as keyof ThreadPatch] !== undefined)) {
-      const reason = this.teamQuiescenceReason(id);
-      if (reason) throw new Error(reason);
     }
     const previousPermission = patch.permissionMode === undefined ? null : this.thread(id).permissionMode;
     const previousMode = patch.mode === undefined ? null : this.thread(id).mode;
@@ -546,7 +482,7 @@ export class ThreadService {
         metadata: { archived, done, pinned, snoozedUntil: patch.snoozedUntil },
       });
     }
-    if (patch.permissionMode !== undefined || patch.mode !== undefined) applyRequestedPolicy(this.db, this.runs, t, { permission: previousPermission, mode: previousMode }, this.onTeamModeChanged);
+    if (patch.permissionMode !== undefined || patch.mode !== undefined) applyRequestedPolicy(this.db, this.runs, t, { permission: previousPermission, mode: previousMode });
     this.invalidate(["threads", `thread:${id}`]);
     if (archived === false) void this.messageQueue.drainQueue(id);
     return t;
@@ -554,7 +490,7 @@ export class ThreadService {
 
   /** The conversation goes on with another Claude account from its next message, which carries its session there. */
   async switchClaudeAccount(id: string, claudeAccountId: string): Promise<Thread> {
-    this.rejectPinnedTeam(id);
+    this.rejectRetiredThread(id);
     const thread = await this.sessions.switchAccount(this.thread(id), claudeAccountId);
     this.invalidate(["threads", `thread:${id}`]);
     return thread;
@@ -596,6 +532,7 @@ export class ThreadService {
    */
   fork(id: string): Thread {
     this.runs.subagents.assertExecutable({ threadId: id });
+    this.rejectRetiredThread(id);
     const parent = this.thread(id);
     const at = runRepo.listForThread(this.db, id).at(-1);
     const forked = threads.insert(this.db, {
@@ -628,6 +565,7 @@ export class ThreadService {
 
   /** The runs a conversation is made of: the parent's up to the fork point, then the thread's own. */
   conversationRuns(id: string): Run[] {
+    if (retiredTeams.isHidden(this.db, id)) return [];
     const thread = this.thread(id);
     const own = runRepo.listForThread(this.db, id);
     if (!thread.forkedFromId) return own;
@@ -648,6 +586,7 @@ export class ThreadService {
    * back at the source, file by file, only once they landed.
    */
   async moveWorkspace(id: string, to: WorkspaceMode): Promise<Thread> {
+    this.rejectRetiredThread(id);
     const thread = this.thread(id);
     assertMutableThread(thread);
     if (thread.projectId === WORKSPACE_ID) throw new Error("Workspace conversations use their selected folder. Open a project for Git worktree actions.");
@@ -750,7 +689,7 @@ export class ThreadService {
   /** Stop a command the agent left running in the background, such as a dev server. */
   async stopCommand(id: string, commandId: string): Promise<void> {
     this.thread(id);
-    this.rejectPinnedTeam(id);
+    this.rejectRetiredThread(id);
     await this.runs.stopBackgroundCommand(id, commandId);
   }
   /* Checkpoints */
@@ -762,7 +701,7 @@ export class ThreadService {
   async restorePreview(id: string, checkpointId: string): Promise<ChangePreview> {
     try {
       const { checkpoint, project, cwd } = await this.restoreTarget(id, checkpointId);
-      return { files: fileChanges(await teamTransfer.treeDelta(project.rootPath, await treeHash(cwd), checkpoint.treeSha)), blocked: null };
+      return { files: fileChanges(await workspaceTransfer.treeDelta(project.rootPath, await treeHash(cwd), checkpoint.treeSha)), blocked: null };
     } catch (error) {
       return { files: [], blocked: error instanceof Error ? error.message : String(error) };
     }

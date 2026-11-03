@@ -8,13 +8,13 @@ type Dependencies = {
   db: Db;
   runService: Pick<RunService, "isBusy" | "authorizeAppAction">;
   browser?: BrowserHost;
-  assertTeamActor: RunContext["assertTeamActor"];
+  assertRunAvailable: RunContext["assertRunAvailable"];
 };
-export function createBrowserHost({ db, runService, browser, assertTeamActor }: Dependencies): Pick<McpHost, "browser"> {
+export function createBrowserHost({ db, runService, browser, assertRunAvailable }: Dependencies): Pick<McpHost, "browser"> {
   return browser
     ? ({
         browser: async (runId, command) => {
-          assertTeamActor(runId);
+          assertRunAvailable(runId);
           const surface = conversationSurface(db, runService, runId, "Browser");
           if (command.action === "click" || command.action === "fill" || command.action === "press")
             await runService.authorizeAppAction(runId, "browser_input", { toolName: `browser ${command.action}`, reason: browserInputReason(command), input: command });

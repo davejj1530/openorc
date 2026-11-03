@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { AgentKind } from "./events.js";
-import { ModelExecutionSettings } from "./orchestration.js";
+import { ModelExecutionSettings } from "./execution-target.js";
 
 /** Which pull requests a list shows: open ones, those waiting on your review, your own, or closed and merged ones. */
 export const PullRequestFilter = z.enum(["open", "review_requested", "authored", "closed"]);

@@ -1,6 +1,6 @@
+import { ledgerMaintenance, settings, type Db } from "@openorc/db";
 import { statfsSync } from "node:fs";
 import { Worker } from "node:worker_threads";
-import { ledgerMaintenance, settings, type Db } from "@openorc/db";
 import type { Logger } from "../transport.js";
 import type { ToolImageStore } from "./tool-images.js";
 
@@ -147,8 +147,7 @@ export class LedgerUpkeep {
   }
 
   /**
-   * Removes what deleted runs leave outside the rows that cascade with them, whichever way their thread, task or
-   * team went: search entries and stored tool images. Returns how many runs' images went.
+   * Removes search entries and stored tool images left by deleted runs. Returns how many runs' images went.
    */
   async forgetDeletedRuns(): Promise<number> {
     ledgerMaintenance.clearDeletedRunSearch(this.db);

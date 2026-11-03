@@ -1,11 +1,11 @@
+import { CodexAdapter, RunHandle } from "@openorc/agents";
+import { projects, threads } from "@openorc/db";
+import { commitAll, git } from "@openorc/git";
+import { type Project } from "@openorc/protocol";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { CodexAdapter, RunHandle } from "@openorc/agents";
-import { orchestration, projects, threads } from "@openorc/db";
-import { commitAll, git } from "@openorc/git";
-import { DEFAULT_TEAM_LIMITS, type Project } from "@openorc/protocol";
 import { OpenOrc } from "../openorc.js";
 import { rpcClient } from "../rpc-test-client.js";
 
@@ -44,23 +44,7 @@ async function taskThread() {
   return call("tasks.openThread", { taskId: task.id });
 }
 
-function teamThread() {
-  const thread = threads.insert(core.db, { projectId: project.id, title: "Hi @everyone", agent: "codex", model: null, mode: "plan", permissionMode: "trusted", workspaceMode: "current" });
-  const saved = orchestration.save(core.db, {
-    projectId: project.id,
-    expectedRevisionId: null,
-    draft: {
-      name: "Branch team",
-      limits: { ...DEFAULT_TEAM_LIMITS },
-      members: [{ key: "lead", name: "Lead", managerKey: null, responsibility: "Coordinate", settings: { agent: "codex", model: "fixture", effort: null, fastMode: false } }],
-    },
-  });
-  orchestration.createInstance(core.db, { threadId: thread.id, teamRevisionId: saved.revision.id });
-  return thread;
-}
-
 const localConversations = [
-  { kind: "team", create: teamThread },
   { kind: "ordinary", create: localThread },
   { kind: "task", create: taskThread },
 ];

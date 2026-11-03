@@ -1,7 +1,7 @@
+import type { FolderPath, FormatResult } from "@openorc/protocol";
 import { execFile, type ExecFileException } from "node:child_process";
 import { access, constants, readFile } from "node:fs/promises";
 import { dirname, extname, join, sep } from "node:path";
-import type { FolderPath, FormatResult } from "@openorc/protocol";
 import type { ConversationFolder, FolderKind } from "./conversation-folder.js";
 import { MAX_FILE_BYTES } from "./file-write.js";
 import { resolveBinary } from "./shell-environment.js";
@@ -109,8 +109,8 @@ const LANGUAGES: readonly Language[] = [
   { extensions: [".rs"], project: ["rustfmt"], bundled: false },
 ];
 
-/** Copies of someone else's code: a pull request under review and a team member's work in progress. Their tools never run. */
-const UNVETTED: ReadonlySet<FolderKind> = new Set(["review", "member"]);
+/** Pull request copies contain unreviewed code. Their tools never run. */
+const UNVETTED: ReadonlySet<FolderKind> = new Set(["review"]);
 
 /** A project's formatter, ready to run in the folder that declared it. */
 interface Command {

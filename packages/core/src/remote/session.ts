@@ -48,7 +48,7 @@ export interface SessionDeps {
   device(deviceId: string, method: DeviceMethod, params: DeviceParams<DeviceMethod>): Promise<unknown>;
   /** The Mac's Preview, watched per session. Null on a Mac without one: a watch reads as closed, no frame is served. */
   preview: Pick<PreviewCasters, "watch" | "unwatch" | "frame" | "input"> | null;
-  /** Whether a thread's Preview may be watched: the thread exists and no team deletion hid it. */
+  /** Whether a thread's Preview may be watched: the thread exists and it is visible. */
   watchable(threadId: string): boolean;
 }
 

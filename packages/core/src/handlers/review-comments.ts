@@ -1,7 +1,7 @@
 import type { ReviewCommentScope } from "@openorc/db";
 import { ReviewService } from "../services/review.js";
 import type { Handlers } from "./types.js";
-/** A review reads a conversation, a team task, or a conversation together with its task's earlier comments. */
+/** A review reads a conversation, a task, or a conversation together with its task's earlier comments. */
 function reviewCommentScope(threadId: string | undefined, taskId: string | undefined): ReviewCommentScope {
   return { ...(threadId ? { threadId } : {}), ...(taskId ? { taskId } : {}) };
 }

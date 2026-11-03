@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it } from "vitest";
 import { Db, settings } from "@openorc/db";
+import { afterEach, describe, expect, it } from "vitest";
 import { AppSettingsService } from "./settings.js";
 const databases: Db[] = [];
 afterEach(() => {
@@ -11,21 +11,11 @@ describe("settings persistence", () => {
     databases.push(db);
     settings.set(db, "app.settings", JSON.stringify({ sound: true, defaultWorkspaceMode: "worktree" }));
     const service = new AppSettingsService(db);
-    expect(service.get()).toMatchObject({ sound: true, defaultWorkspaceMode: "worktree", defaultPermissionMode: "trusted", defaultHarness: null, experimentalTeamExecution: true });
+    expect(service.get()).toMatchObject({ sound: true, defaultWorkspaceMode: "worktree", defaultPermissionMode: "trusted", defaultHarness: null });
     for (const permission of ["autonomous", "review", "trusted"] as const) {
       service.set({ defaultPermissionMode: permission });
       expect(new AppSettingsService(db).get()).toMatchObject({ sound: true, defaultWorkspaceMode: "worktree", defaultPermissionMode: permission });
     }
-  });
-  it("enables Beta for new profiles while preserving saved opt-outs", () => {
-    const db = Db.memory();
-    databases.push(db);
-    const service = new AppSettingsService(db);
-    expect(service.get().experimentalTeamExecution).toBe(true);
-    service.set({ experimentalTeamExecution: false });
-    const reopened = new AppSettingsService(db);
-    reopened.set({ sound: true });
-    expect(new AppSettingsService(db).get().experimentalTeamExecution).toBe(false);
   });
   it("persists every preference across service instances and preserves unrelated fields", () => {
     const db = Db.memory();
@@ -41,7 +31,6 @@ describe("settings persistence", () => {
       defaultPermissionMode: "review" as const,
       defaultHarness: "claude" as const,
       look: { palette: "linear", colors: { dark: { "--accent": "#5e6ad2" } } },
-      experimentalTeamExecution: true,
       idleProcessMinutes: null,
       claudeUserMcpServers: false,
     };
@@ -67,4 +56,12 @@ describe("settings persistence", () => {
     settings.set(db, "app.settings", JSON.stringify({ sound: true, defaultHarness: "codex", look: { palette: 7, colors: [] } }));
     expect(new AppSettingsService(db).get()).toMatchObject({ sound: true, defaultHarness: "codex", look: null });
   });
+});
+
+it("ignores a saved Teams preference without discarding other settings", () => {
+  const db = Db.memory();
+  databases.push(db);
+  settings.set(db, "app.settings", JSON.stringify({ experimentalTeamExecution: true, sound: true }));
+  expect(new AppSettingsService(db).get()).toMatchObject({ sound: true });
+  expect(new AppSettingsService(db).get()).not.toHaveProperty("experimentalTeamExecution");
 });

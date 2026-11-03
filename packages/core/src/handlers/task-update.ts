@@ -1,4 +1,4 @@
-import { Db, orchestration, tasks, teamRuntime, threads } from "@openorc/db";
+import { Db, tasks, threads } from "@openorc/db";
 import { RunService } from "../services/runs.js";
 import { ThreadService } from "../services/threads.js";
 import { WorkspaceWriters } from "../services/workspace-writers.js";
@@ -18,17 +18,16 @@ export function createTaskUpdateHandlers({ threadService, db, runService, worksp
   return {
     "tasks.update": async ({ id, patch }) => {
       const { task, project } = taskAndProject(db, id);
+      if (task.retiredTeam) throw new Error("This item is no longer available.");
       if (patch.workspaceMode !== undefined) threadService.assertTaskWorkspaceEditable(task);
       const update = () =>
         db.transaction(() => {
           if (patch.workspaceMode !== undefined && task.executionThreadId) threads.update(db, task.executionThreadId, { workspaceMode: patch.workspaceMode });
           return tasks.update(db, id, { ...patch, ...completionPatch(patch.status) }, { explicitStatus: true });
         });
-      const teamOwned = Boolean(teamRuntime.assignmentForTask(db, id) || (task.threadId && orchestration.getInstance(db, task.threadId)));
       // Claim the directory before changing visibility or deleting its files.
-      // Moving a team task never stops its execution or cleans its workspace.
       const t =
-        patch.status === "archived" && !teamOwned && task.worktreePath && !runService.liveRunForTask(id)
+        patch.status === "archived" && task.worktreePath && !runService.liveRunForTask(id)
           ? await workspaceWriters.withLease(task.worktreePath, `archive task ${id}`, async (lease) => {
               await workspaces.cleanup(task, project, {}, lease);
               return update();

@@ -1,11 +1,11 @@
-import { access, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { CodexAdapter, RunHandle } from "@openorc/agents";
 import { projects, runs, scheduleFirings, schedules, threads } from "@openorc/db";
 import { commitAll, git } from "@openorc/git";
 import { WORKSPACE_ID, harnessIds, type CorePush, type Project, type Task } from "@openorc/protocol";
+import { access, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { OpenOrc } from "./openorc.js";
 import { rpcClient } from "./rpc-test-client.js";
 
@@ -325,7 +325,7 @@ describe("core", () => {
 
   it("keeps every setting through a change to another, the default harness for every client included", async () => {
     expect((await call("app.settings.get", {})).defaultHarness).toBeNull();
-    const optedOut = { experimentalTeamExecution: false, idleProcessMinutes: null, claudeUserMcpServers: false };
+    const optedOut = { idleProcessMinutes: null, claudeUserMcpServers: false };
     await call("app.settings.set", optedOut);
     await call("app.settings.set", { defaultHarness: "claude" });
     await call("app.settings.set", { defaultPermissionMode: "trusted" });

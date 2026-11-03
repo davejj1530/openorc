@@ -1,0 +1,243 @@
+{
+  "source": "Claude Code 2.1.314 native nested Explore agent, November 3 2026. Message shapes from agent-a91d300b7362ec620.jsonl; text, paths and identifiers scrubbed. Parent stream had task progress/result but no nested assistant/user lines.",
+  "transcript": [
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": "Inspect the example."
+      },
+      "uuid": "native-line-0",
+      "agentId": "agent-nested",
+      "isSidechain": true,
+      "timestamp": "2026-11-03T03:59:05.140Z"
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "thinking",
+            "thinking": "Consider the example.",
+            "signature": "scrubbed"
+          }
+        ],
+        "id": "message-0",
+        "usage": {
+          "input_tokens": 2,
+          "cache_creation_input_tokens": 20344,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 235,
+          "output_tokens_details": {
+            "thinking_tokens": 19
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 20344
+          },
+          "inference_geo": "global",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 235,
+              "cache_read_input_tokens": 0,
+              "cache_creation_input_tokens": 20344,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 20344,
+                "ephemeral_1h_input_tokens": 0
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        }
+      },
+      "uuid": "native-line-1",
+      "agentId": "agent-nested",
+      "isSidechain": true,
+      "timestamp": "2026-11-03T03:59:06.485Z"
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Inspecting the example."
+          }
+        ],
+        "id": "message-1",
+        "usage": {
+          "input_tokens": 2,
+          "cache_creation_input_tokens": 4538,
+          "cache_read_input_tokens": 47493,
+          "output_tokens": 208,
+          "output_tokens_details": {
+            "thinking_tokens": 0
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 4538
+          },
+          "inference_geo": "global",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 208,
+              "cache_read_input_tokens": 47493,
+              "cache_creation_input_tokens": 4538,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 4538,
+                "ephemeral_1h_input_tokens": 0
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        }
+      },
+      "uuid": "native-line-2",
+      "agentId": "agent-nested",
+      "isSidechain": true,
+      "timestamp": "2026-11-03T03:59:23.836Z"
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_use",
+            "name": "Read",
+            "id": "read-file",
+            "input": {
+              "file_path": "/fixture/example.ts"
+            }
+          }
+        ],
+        "id": "message-2",
+        "usage": {
+          "input_tokens": 2,
+          "cache_creation_input_tokens": 1888,
+          "cache_read_input_tokens": 20344,
+          "output_tokens": 249,
+          "output_tokens_details": {
+            "thinking_tokens": 0
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 1888
+          },
+          "inference_geo": "global",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 249,
+              "cache_read_input_tokens": 20344,
+              "cache_creation_input_tokens": 1888,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 1888,
+                "ephemeral_1h_input_tokens": 0
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        }
+      },
+      "uuid": "native-line-3",
+      "agentId": "agent-nested",
+      "isSidechain": true,
+      "timestamp": "2026-11-03T03:59:10.141Z"
+    },
+    {
+      "type": "user",
+      "message": {
+        "role": "user",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_use_id": "read-file",
+            "content": "export const example = true;",
+            "is_error": false
+          }
+        ]
+      },
+      "uuid": "native-line-4",
+      "agentId": "agent-nested",
+      "isSidechain": true,
+      "timestamp": "2026-11-03T03:59:10.164Z"
+    },
+    {
+      "type": "assistant",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Nested report."
+          }
+        ],
+        "id": "message-3",
+        "usage": {
+          "input_tokens": 2,
+          "cache_creation_input_tokens": 346,
+          "cache_read_input_tokens": 103560,
+          "output_tokens": 3736,
+          "output_tokens_details": {
+            "thinking_tokens": 24
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 346
+          },
+          "inference_geo": "global",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 3736,
+              "cache_read_input_tokens": 103560,
+              "cache_creation_input_tokens": 346,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 346,
+                "ephemeral_1h_input_tokens": 0
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        }
+      },
+      "uuid": "native-line-5",
+      "agentId": "agent-nested",
+      "isSidechain": true,
+      "timestamp": "2026-11-03T04:00:59.769Z"
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
-import { spawn, type ChildProcess } from "node:child_process";
+import { spawn, type ChildProcess, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 import { fileBoundaryUrl, type AgentEvent } from "@openorc/protocol";
 import { ClaudeAdapter, ultracodeFallbackNotice } from "./adapter.js";
 import { SHARED_CLAUDE_CONFIG_DIR } from "./config-dir.js";
+import type { AgentHost } from "../agent-host.js";
 
 vi.mock("node:child_process", () => ({ spawn: vi.fn() }));
 vi.mock("node:fs", async (importOriginal) => {
@@ -70,6 +71,44 @@ const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 const launch = { revision: 0, binary: "claude", env: process.env };
 
 describe("Claude stream-json process", () => {
+  it.each([false, true])("drains workflow files before exit only for local runs (cloud=%s)", async (cloud) => {
+    const config = mkdtempSync(path.join(tmpdir(), "workflow-account-"));
+    const folder = path.join(config, "projects", "not-the-cwd", "observed-session", "subagents", "workflows", "wf-run");
+    mkdirSync(folder, { recursive: true });
+    writeFileSync(path.join(folder, "agent-child.jsonl"), `${JSON.stringify({ type: "assistant", uuid: "last", message: { id: "last", content: [{ type: "text", text: "Final disk result" }] } })}\n`);
+    const proc = mockProcess();
+    const host: AgentHost = {
+      home: config,
+      privateDir: (id) => `/remote/${id}`,
+      localUrl: (url) => url,
+      spawn: () => proc as unknown as ChildProcessWithoutNullStreams,
+      upload: async (paths) => paths,
+    };
+    const handle = new ClaudeAdapter().start(
+      { runId: "host-run", agent: "claude", cwd: process.cwd(), prompt: "Workflow", permissionMode: "autonomous" },
+      { ...launch, env: { ...process.env, CLAUDE_CONFIG_DIR: config }, host: cloud ? host : undefined },
+    );
+    const events: AgentEvent[] = [];
+    handle.on("event", (event) => events.push(event));
+    try {
+      for (const line of [
+        { type: "system", subtype: "init", session_id: "observed-session" },
+        { type: "system", subtype: "task_started", tool_use_id: "workflow", task_id: "task", task_type: "local_workflow" },
+        { type: "system", subtype: "task_progress", task_id: "task", workflow_progress: [{ type: "workflow_agent", index: 1, agentId: "child", state: "done" }] },
+      ])
+        proc.stdout.write(`${JSON.stringify(line)}\n`);
+      proc.kill();
+      await handle.wait();
+      expect(events.some((event) => event.type === "subagent.started" && event.parentSubagentId === "workflow")).toBe(true);
+      expect(events.some((event) => event.type === "message.completed" && event.text === "Final disk result")).toBe(!cloud);
+      expect(events.at(-1)?.type).toBe("session.completed");
+    } finally {
+      handle.close();
+      await handle.wait();
+      rmSync(config, { recursive: true, force: true });
+    }
+  });
+
   it("removes the private MCP directory when writing its config fails before spawn", () => {
     let configFile: string | undefined;
     vi.mocked(writeFileSync).mockImplementationOnce((file) => {
@@ -373,6 +412,33 @@ describe("Claude stream-json process", () => {
         { running: 0, commands: ["b1"] },
         { running: 0, commands: [] },
       ]);
+    } finally {
+      handle.close();
+      await handle.wait();
+    }
+  });
+
+  it("stops one native subagent by task id without sending a follow-up turn", async () => {
+    const proc = mockProcess();
+    const handle = new ClaudeAdapter().start({ runId: "fixture", agent: "claude", cwd: process.cwd(), prompt: "Explore", permissionMode: "autonomous" }, launch);
+    try {
+      await tick();
+      written(proc);
+      const lines = [
+        { type: "assistant", message: { id: "m1", content: [{ type: "tool_use", id: "agent-a", name: "Agent", input: { description: "Explore", run_in_background: true } }] } },
+        { type: "system", subtype: "task_started", task_id: "task-a", tool_use_id: "agent-a", task_type: "local_agent", is_backgrounded: true },
+        { type: "result", subtype: "success", result: "Started", num_turns: 1, duration_ms: 1 },
+      ];
+      for (const line of lines) proc.stdout.write(`${JSON.stringify(line)}\n`);
+      await tick();
+      expect(handle.canStopSubagent("unknown")).toBe(false);
+      expect(handle.canStopSubagent("agent-a")).toBe(true);
+      await handle.stopSubagent("agent-a");
+      expect(written(proc)).toEqual([expect.objectContaining({ type: "control_request", request: { subtype: "stop_task", task_id: "task-a" } })]);
+      proc.stdout.write(`${JSON.stringify({ type: "system", subtype: "task_notification", task_id: "task-a", tool_use_id: "agent-a", status: "stopped", summary: "Stopped" })}\n`);
+      await tick();
+      expect(handle.canStopSubagent("agent-a")).toBe(false);
+      expect(written(proc)).toEqual([]);
     } finally {
       handle.close();
       await handle.wait();
@@ -786,4 +852,23 @@ describe("added Claude accounts", () => {
       rmSync(shared, { recursive: true, force: true });
     }
   });
+});
+
+it("keeps a late first Claude task stopped after parent Stop", async () => {
+  const proc = mockProcess();
+  const handle = new ClaudeAdapter().start({ runId: "host", agent: "claude", cwd: process.cwd(), prompt: "Delegate", permissionMode: "autonomous" }, launch);
+  const events: AgentEvent[] = [];
+  handle.on("event", (event) => events.push(event));
+  const notify = (line: unknown) => proc.stdout.write(`${JSON.stringify(line)}\n`);
+  try {
+    await tick();
+    notify({ type: "assistant", message: { id: "launch", content: [{ type: "tool_use", id: "child", name: "Agent", input: { description: "Child", run_in_background: true } }] } });
+    await handle.interrupt();
+    notify({ type: "system", subtype: "task_started", task_type: "local_agent", tool_use_id: "child", task_id: "late-task", run_id: "late" });
+    expect(handle.canStopSubagent("child")).toBe(false);
+    expect(events.filter((event) => event.type === "subagent.updated").at(-1)).toMatchObject({ status: "stopped" });
+  } finally {
+    handle.close();
+    await handle.wait();
+  }
 });

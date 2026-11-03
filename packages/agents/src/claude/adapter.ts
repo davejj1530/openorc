@@ -7,6 +7,8 @@ import { stopProcess, waitForProcessGroup } from "../process-lifetime.js";
 import readline from "node:readline";
 import { ULTRACODE_EFFORT, type AgentEvent, type FileBoundary, type RunSpec } from "@openorc/protocol";
 import { ClaudeStreamParser } from "./stream-json.js";
+import { ClaudeTranscriptFiles } from "./transcript-files.js";
+import { claudeTaskControls } from "./task-controls.js";
 import { SHARED_CLAUDE_CONFIG_DIR, claudeConfigDir } from "./config-dir.js";
 import { installedClaudePlugins } from "./plugins.js";
 import { RunHandle, type RunControls } from "../run-handle.js";
@@ -291,7 +293,8 @@ function startClaudeSession(spec: RunSpec, prepared: ReturnType<typeof prepareCl
     if (connection) place.remove(connection.dir);
     throw error;
   }
-  const parser = new ClaudeStreamParser(spec.runId, { fastMode: spec.fastMode });
+  const parser = new ClaudeStreamParser(spec.runId, { fastMode: spec.fastMode, resumedSubagents: spec.resumedSubagents });
+  const transcriptFiles = place.host ? null : new ClaudeTranscriptFiles(parser, path.resolve(spec.cwd, claudeConfigDir(place.home, env)), (event) => handle.emit("event", event));
   /** A user message was written and its result has not arrived. Queued input starts turns too, so init lines set it as well. */
   let activeTurn = false;
   /** The next result ends a turn the user stopped, not one that failed. */
@@ -320,6 +323,7 @@ function startClaudeSession(spec: RunSpec, prepared: ReturnType<typeof prepareCl
       }
       proc.stdin.write(`${line}\n`, (error) => (error ? reject(error) : resolve()));
     });
+  const stopTask = (taskId: string) => write(controlRequest({ subtype: "stop_task", task_id: taskId }));
   /** Attachments are files on this Mac; a host gets copies, and the line names those. */
   const userLine = async (text: string, attachments?: string[]): Promise<string> => userMessageLine(text, place.host && attachments?.length ? await place.host.upload(attachments) : attachments);
   /** One user line, remembered as mid-turn input when a turn is running. */
@@ -374,6 +378,7 @@ function startClaudeSession(spec: RunSpec, prepared: ReturnType<typeof prepareCl
   /** Close all child resources before reporting the final session event. */
   const finalizeProcess = async (code: number | null): Promise<void> => {
     await waitForProcessGroup(proc);
+    await transcriptFiles?.close();
     if (connection) place.remove(connection.dir);
     releaseHeld();
     // The process is gone, and its background work with it.
@@ -416,10 +421,11 @@ function startClaudeSession(spec: RunSpec, prepared: ReturnType<typeof prepareCl
         return;
       }
       if (exited()) return;
+      for (const event of parser.stoppedSubagents()) routeEvent(event);
       if (!activeTurn) {
         // Between turns, what still works is background work the agent started. Stopping it starts no turn. Commands,
         // such as a dev server, are not the agent at work; each has its own stop.
-        for (const taskId of parser.backgroundWork) void write(controlRequest({ subtype: "stop_task", task_id: taskId })).catch(() => undefined);
+        for (const taskId of parser.backgroundWork) void stopTask(taskId).catch(() => undefined);
         return;
       }
       interrupting = true;
@@ -448,11 +454,12 @@ function startClaudeSession(spec: RunSpec, prepared: ReturnType<typeof prepareCl
       await writeUser(text, attachments);
       activeTurn = true;
     },
-    stopCommand: async (commandId) => {
-      // One that already ended has nothing to stop. A stop the user asked for starts no turn.
-      if (exited() || !parser.backgroundCommands.some((command) => command.id === commandId)) return;
-      await write(controlRequest({ subtype: "stop_task", task_id: commandId }));
-    },
+    ...claudeTaskControls(
+      parser,
+      () => !exited() && !ending,
+      stopTask,
+      (event) => routeEvent(event),
+    ),
     // set_model and the effortLevel and fastMode flags take effect on the next turn of the same session; the flags land in
     // the layer --settings filled at launch. The CLI answers each request.
     applySettings: async ({ model, effort, fastMode }) => {
@@ -501,6 +508,10 @@ function startClaudeSession(spec: RunSpec, prepared: ReturnType<typeof prepareCl
 
   /** Stream events settle controls and turn/background windows before emission. */
   const routeEvent = (ev: AgentEvent): void => {
+    if (ev.subagentId) {
+      handle.emit("event", ev);
+      return;
+    }
     if (ev.type === "raw") controlResponse(ev.payload as Record<string, unknown>);
     if (ev.type === "activity.updated" && ev.activityId.startsWith("compaction-") && ev.status !== "running" && compaction) {
       const pending = compaction;
@@ -546,14 +557,7 @@ function startClaudeSession(spec: RunSpec, prepared: ReturnType<typeof prepareCl
     }
     handle.emit("event", ev);
   };
-  const out = readline.createInterface({ input: proc.stdout, crlfDelay: Infinity });
-  out.on("line", (line) => {
-    for (const ev of parser.parseLine(line)) routeEvent(ev);
-  });
-  const err = readline.createInterface({ input: proc.stderr, crlfDelay: Infinity });
-  err.on("line", (line) => {
-    handle.emit("event", { type: "error", runId: spec.runId, ts: Date.now(), message: stripAnsi(line), fatal: false });
-  });
+  observeClaudeOutput(proc, parser, handle, routeEvent, transcriptFiles);
   proc.on("error", (e) => {
     handle.emit("event", { type: "error", runId: spec.runId, ts: Date.now(), message: e.message, fatal: true });
     // A binary that could not be spawned never exits; end the run here so it does not stay live forever.
@@ -569,4 +573,23 @@ function startClaudeSession(spec: RunSpec, prepared: ReturnType<typeof prepareCl
     });
 
   return handle;
+}
+
+/** Keep provider output and local workflow transcripts on the same run handle. */
+function observeClaudeOutput(
+  proc: ChildProcessWithoutNullStreams,
+  parser: ClaudeStreamParser,
+  handle: RunHandle,
+  routeEvent: (event: AgentEvent) => void,
+  transcriptFiles: ClaudeTranscriptFiles | null,
+): void {
+  const out = readline.createInterface({ input: proc.stdout, crlfDelay: Infinity });
+  out.on("line", (line) => {
+    for (const ev of parser.parseLine(line)) routeEvent(ev);
+    transcriptFiles?.sync();
+  });
+  const err = readline.createInterface({ input: proc.stderr, crlfDelay: Infinity });
+  err.on("line", (line) => {
+    handle.emit("event", { type: "error", runId: handle.runId, ts: Date.now(), message: stripAnsi(line), fatal: false });
+  });
 }

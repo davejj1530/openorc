@@ -58,7 +58,7 @@ describe("ClaudeStreamParser", () => {
     expect(started.map((e) => e.type)).toEqual(["activity.updated", "thinking.started", "thinking.delta", "thinking.completed"]);
     expect(started[0]).toMatchObject({ activityId: "request-1", status: "success" });
     expect(started.slice(1).every((e) => "messageId" in e && e.messageId === "m1")).toBe(true);
-    // A tool announced by its streamed block appears at once; the assistant line brings its input; task summaries describe it.
+    // A tool announced by its streamed block appears at once; the assistant line brings its input; task summaries describe the session.
     const tool = types([
       { type: "stream_event", event: { type: "content_block_start", index: 1, content_block: { type: "tool_use", id: "t1", name: "Bash", input: {} } } },
       { type: "assistant", message: { id: "m1", role: "assistant", content: [{ type: "tool_use", id: "t1", name: "Bash", input: { command: "ls" } }] } },
@@ -66,11 +66,10 @@ describe("ClaudeStreamParser", () => {
       { type: "system", subtype: "task_started", task_id: "bg1", tool_use_id: "t1", description: "Sleep for 6 seconds" },
       { type: "user", message: { role: "user", content: [{ type: "tool_result", tool_use_id: "t1", content: "ok" }] } },
     ]);
-    expect(tool.map((e) => e.type)).toEqual(["tool.started", "tool.updated", "tool.updated", "tool.updated", "tool.completed"]);
+    expect(tool.map((e) => e.type)).toEqual(["tool.started", "tool.updated", "tool.updated", "tool.completed"]);
     expect(tool[0]).toMatchObject({ toolCallId: "t1", name: "Bash", input: {} });
     expect(tool[1]).toMatchObject({ toolCallId: "t1", input: { command: "ls" } });
-    expect(tool[2]).toMatchObject({ toolCallId: "t1", progress: "Listing files" });
-    expect(tool[3]).toMatchObject({ toolCallId: "t1", progress: "Sleep for 6 seconds" });
+    expect(tool[2]).toMatchObject({ toolCallId: "t1", progress: "Sleep for 6 seconds" });
     // Background work without a tool row of its own becomes an activity; rate limits are reported, allowances are not.
     const tasks = types([
       { type: "system", subtype: "task_started", task_id: "bg2", description: "Indexing" },
@@ -135,8 +134,11 @@ describe("ClaudeStreamParser", () => {
       { type: "system", subtype: "task_notification", task_id: "a1", tool_use_id: "toolu_send", status: "completed", output_file: "", summary: "I replied to the workspace agent." },
     ]);
     expect(events).toEqual([
-      expect.objectContaining({ type: "tool.updated", toolCallId: "wf", progress: "Collapsible sidebar" }),
-      expect.objectContaining({ type: "tool.updated", toolCallId: "ag", progress: "Study the sidebar" }),
+      expect.objectContaining({ type: "subagent.started", subagentId: "wf", title: "Collapsible sidebar", agentType: "workflow" }),
+      expect.objectContaining({ type: "subagent.updated", subagentId: "wf", taskId: "wf1", status: "running" }),
+      expect.objectContaining({ type: "subagent.updated", subagentId: "ag", taskId: "a1", status: "running" }),
+      expect.objectContaining({ type: "subagent.updated", subagentId: "ag", taskId: "a1", status: "running" }),
+      expect.objectContaining({ type: "subagent.updated", subagentId: "ag", status: "completed", result: "I replied to the workspace agent." }),
     ]);
   });
 

@@ -15,7 +15,15 @@ let folder: string;
 let project: Project;
 let turns: Map<string, { spec: RunSpec; handle: RunHandle }>;
 
-const model = (id: string, label: string): ModelOption => ({ id, label, agent: "codex", isDefault: false, efforts: ["high"], defaultEffort: "high", fastMode: { supported: false } });
+const model = (id: string, label: string, fast = false): ModelOption => ({
+  id,
+  label,
+  agent: "codex",
+  isDefault: false,
+  efforts: ["high", "max"],
+  defaultEffort: "high",
+  fastMode: { supported: fast },
+});
 
 beforeEach(async () => {
   folder = await mkdtemp(path.join(os.tmpdir(), "openorc-thread-start-"));
@@ -50,7 +58,12 @@ beforeEach(async () => {
   await writeFile(path.join(root, "README.md"), "# Fixture\n");
   await commitAll(root, "Fixture baseline");
   project = projects.insert(core.db, { name: "Fixture", rootPath: root, defaultBranch: "main", gitRemote: null, settings: {} });
-  vi.spyOn(core.runs, "models").mockResolvedValue([model("fixture-codex", "Scripted provider"), model("gpt-6.1-sol", "GPT-6.1 Sol"), model("gpt-6.1-mini", "GPT-6.1 Mini")]);
+  vi.spyOn(core.runs, "models").mockResolvedValue([
+    model("fixture-codex", "Scripted provider"),
+    model("gpt-6.1-sol", "GPT-6.1 Sol"),
+    model("gpt-6.1-mini", "GPT-6.1 Mini"),
+    model("gpt-6-astra", "GPT-6 Astra", true),
+  ]);
   // An ended turn names its thread; a real titler would still be running when the core closes.
   vi.spyOn(core.textGeneration, "title").mockResolvedValue(null);
 });
@@ -151,6 +164,14 @@ it("finds a model by the name the user gave it, and answers a name it can't plac
   expect(() => pickModel(options, "codex", "6.1")).toThrow(/fits several codex models.*GPT-6.1 Sol \(gpt-6.1-sol\)/);
   expect(() => pickModel(options, "codex", "7.0 ultra")).toThrow(/No codex model is called "7.0 ultra"/);
   await expect(startThread(runId, { prompt: "Generate assets", model: "7.0 ultra" })).rejects.toThrow(/Choose one of/);
+});
+
+it("starts a thread in Fast mode when asked, and refuses it on a model without Fast", async () => {
+  const { runId } = await parent();
+  const started = await startThread(runId, { prompt: "Build it", model: "6 astra", effort: "max", fast: true });
+  expect(threads.get(core.db, started.thread.id)).toMatchObject({ model: "gpt-6-astra", effort: "max", fastMode: true });
+  expect((await firstSpec(started.thread.id)).fastMode).toBe(true);
+  await expect(startThread(runId, { prompt: "Build it", model: "6.1 sol", fast: true })).rejects.toThrow(/Fast mode is unavailable/);
 });
 
 it(`keeps ${MAX_WORKING_CHILDREN} started threads working at once, none of their own, and none from Plan mode`, async () => {

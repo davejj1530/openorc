@@ -121,7 +121,7 @@ export interface ThreadTools {
   /** Starts a thread in the caller's folder, with the caller as its parent; the two talk through send. */
   start(
     runId: string,
-    input: { prompt: string; title?: string; agent?: AgentKind; model?: string; effort?: string },
+    input: { prompt: string; title?: string; agent?: AgentKind; model?: string; effort?: string; fast?: boolean },
   ): Promise<{ thread: { id: string; title: string }; agent: string; model: string | null; message: string }>;
 }
 
@@ -619,13 +619,14 @@ function buildServer(host: McpHost, runId: string): McpServer {
     "thread_start",
     {
       description:
-        "Start a new thread in this project that works beside you, in your folder, with you as its parent. Use it when the user asks you to hand work to another agent or have something done alongside your own, such as generating assets while you code. Don't ask the user for permission when they asked for this; ask first only when it's unclear what to start or with which agent. The prompt is the new thread's first message, after a note that you started it. It works in your mode with your permissions, on your agent and model unless you name others; an unknown model name is answered with the available models. Talk to it with thread_send, and it can reach you the same way. Up to 3 threads you started can work at once, and a thread you started can't start its own.",
+        "Start a new thread in this project that works beside you, in your folder, with you as its parent. Use it when the user asks you to hand work to another agent or have something done alongside your own, such as generating assets while you code. Don't ask the user for permission when they asked for this; ask first only when it's unclear what to start or with which agent. The prompt is the new thread's first message, after a note that you started it. It works in your mode with your permissions, on your agent and model unless you name others; an unknown model name is answered with the available models. It keeps your Fast mode only on your own model; set fast to choose it. Talk to it with thread_send, and it can reach you the same way. Up to 3 threads you started can work at once, and a thread you started can't start its own.",
       inputSchema: {
         prompt: z.string().min(1).max(20000),
         title: z.string().min(1).max(120).optional(),
         agent: AgentKind.optional(),
         model: z.string().min(1).max(120).optional(),
         effort: z.string().min(1).max(40).optional(),
+        fast: z.boolean().optional(),
       },
     },
     async (input) => ({ content: [{ type: "text", text: JSON.stringify(await host.threads.start(runId, input)) }] }),

@@ -16,7 +16,7 @@ let props: CodeEditorProps;
 
 beforeEach(() => {
   key += 1;
-  props = { sessionKey: `buffer-${key}`, path: "notes.txt", text: "one\ntwo\nthree\n", readOnly: false, reveal: null, onChange: vi.fn(), onSave: vi.fn() };
+  props = { sessionKey: `buffer-${key}`, path: "notes.txt", text: "one\ntwo\nthree\n", readOnly: false, lineWrapping: true, reveal: null, onChange: vi.fn(), onSave: vi.fn() };
   useRouter.setState({ route: { view: "thread", threadId: "t1" }, threadIds: ["t1"], history: [{ view: "inbox" }], future: [{ view: "memory" }] });
   useUi.setState({ palette: false });
 });
@@ -151,4 +151,27 @@ it("forgets the least recently shown session once twenty are kept", () => {
   keepSession("recent-20", session());
   expect(findSession("recent-0")).toBeDefined();
   expect(findSession("recent-1")).toBeUndefined();
+});
+
+it("wraps long lines while asked to, follows the setting live, and reopens a kept session with the current one", () => {
+  const wraps = (view: EditorView) => view.contentDOM.classList.contains("cm-lineWrapping");
+  const { view, rerender, unmount } = mount({ path: "main.ts" });
+  expect(wraps(view())).toBe(true);
+  rerender({ lineWrapping: false });
+  expect(wraps(view())).toBe(false);
+  unmount();
+  const reopened = mount({ lineWrapping: true });
+  expect(wraps(reopened.view())).toBe(true);
+});
+
+it("toggles word wrap on Option+Z, as VS Code does, and lets the keys through without a handler", () => {
+  const onLineWrappingChange = vi.fn();
+  const { view, rerender } = mount({ onLineWrappingChange });
+  expect(press(view(), { key: "Ω", code: "KeyZ", keyCode: 90, altKey: true })).toBe(false);
+  expect(onLineWrappingChange).toHaveBeenLastCalledWith(false);
+  rerender({ lineWrapping: false });
+  press(view(), { key: "Ω", code: "KeyZ", keyCode: 90, altKey: true });
+  expect(onLineWrappingChange).toHaveBeenLastCalledWith(true);
+  rerender({ onLineWrappingChange: undefined });
+  expect(press(view(), { key: "Ω", code: "KeyZ", keyCode: 90, altKey: true })).toBe(true);
 });

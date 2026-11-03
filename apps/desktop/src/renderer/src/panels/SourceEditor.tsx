@@ -4,6 +4,7 @@ import { CodeEditor, type CodeEditorActions, type EditorIntelligence, type Edito
 import { applyEditorFix, queryEditor } from "../lib/editor-intelligence";
 import { editorCaret, editorNavigationKey, jumpInEditor, moveInEditor } from "../lib/editor-navigation";
 import { flushDrafts, useDrafts } from "../lib/file-drafts";
+import { useWordWrap } from "../lib/word-wrap";
 import type { FileSelection } from "../lib/layout";
 import type { FileBuffer } from "../lib/use-file-buffer";
 import { CodeInsights, useCodeInsight } from "./CodeInsights";
@@ -115,6 +116,7 @@ function useEditorFeatures({ selection, root, path, text, buffer }: Props) {
 export function SourceEditor(props: Props) {
   const { buffer, sessionKey, selection, text, path, onReady } = props;
   const features = useEditorFeatures(props);
+  const wordWrap = useWordWrap();
   const lines = Math.max(1, text.split("\n").length - (text.endsWith("\n") ? 1 : 0));
   const ready = useCallback(
     (actions: CodeEditorActions | null) => {
@@ -138,6 +140,8 @@ export function SourceEditor(props: Props) {
               path={path}
               text={text}
               readOnly={buffer.readOnly !== null}
+              lineWrapping={wordWrap.wrap}
+              onLineWrappingChange={wordWrap.setWrap}
               reveal={revealOf(selection)}
               focusRequest={buffer.focusRequest}
               onChange={buffer.edit}

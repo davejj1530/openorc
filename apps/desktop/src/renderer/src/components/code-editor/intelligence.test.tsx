@@ -26,7 +26,18 @@ function setup(overrides: Partial<CodeEditorProps> = {}) {
     back: vi.fn(() => true),
     forward: vi.fn(() => true),
   } satisfies EditorIntelligence;
-  const props: CodeEditorProps = { sessionKey: crypto.randomUUID(), path: "main.ts", text, readOnly: false, reveal: null, onChange: vi.fn(), onSave: vi.fn(), intelligence: api, ...overrides };
+  const props: CodeEditorProps = {
+    sessionKey: crypto.randomUUID(),
+    path: "main.ts",
+    text,
+    readOnly: false,
+    lineWrapping: true,
+    reveal: null,
+    onChange: vi.fn(),
+    onSave: vi.fn(),
+    intelligence: api,
+    ...overrides,
+  };
   const rendered = render(<CodeEditor {...props} />);
   const node = rendered.container.querySelector<HTMLElement>(".cm-editor");
   const view = node && EditorView.findFromDOM(node);

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Menu } from "@base-ui/react/menu";
-import { ArrowLeft, ArrowRight, ChevronRight, Copy, ExternalLink, Folder, FolderOpen, List, MoreHorizontal, RefreshCw } from "../components/icons";
+import { ArrowLeft, ArrowRight, Check, ChevronRight, Copy, ExternalLink, Folder, FolderOpen, List, MoreHorizontal, RefreshCw } from "../components/icons";
 import type { CodeEditorActions } from "../components/code-editor";
 import { Button, IconButton, Segmented, Tooltip } from "../components/ui";
 import { menuItem, menuPopup, menuSeparator } from "../components/menu";
@@ -11,6 +11,7 @@ import { relativeFilePath, useFileExplorer } from "../lib/file-explorer";
 import { filesKey } from "../lib/files-tool";
 import type { FileSelection } from "../lib/layout";
 import type { FileBuffer } from "../lib/use-file-buffer";
+import { useWordWrap } from "../lib/word-wrap";
 import { openBinaryFile, revealLabel } from "./BinaryView";
 
 export type FileView = "preview" | "source";
@@ -102,14 +103,17 @@ export function FileToolbar({ selection, buffer, directory, view, markdown, onVi
             </IconButton>
           </Tooltip>
         ) : null}
-        <FileMenu path={path} buffer={buffer} editorActions={editorActions} />
+        <FileMenu path={path} buffer={buffer} editorActions={editorActions} preview={markdown && view === "preview"} />
       </div>
     </header>
   );
 }
 
-function FileMenu({ path, buffer, editorActions }: { path: string; buffer: FileBuffer; editorActions?: CodeEditorActions | null }) {
+/** `preview` while a Markdown file shows rendered; Word wrap applies only while text shows as code. */
+function FileMenu({ path, buffer, editorActions, preview }: { path: string; buffer: FileBuffer; editorActions?: CodeEditorActions | null; preview: boolean }) {
   const [notice, setNotice] = useState("");
+  const wordWrap = useWordWrap();
+  const source = buffer.text !== null && !preview;
   const binary = buffer.view.kind === "binary" ? buffer.view.file : null;
   return (
     <>
@@ -142,6 +146,12 @@ function FileMenu({ path, buffer, editorActions }: { path: string; buffer: FileB
                 <Menu.Item className={menuItem} disabled={buffer.readOnly !== null} onClick={buffer.format}>
                   Format document
                 </Menu.Item>
+              ) : null}
+              {source ? (
+                <Menu.CheckboxItem className={menuItem} checked={wordWrap.wrap} onCheckedChange={wordWrap.setWrap}>
+                  <Check size={13} className={wordWrap.wrap ? "text-accent-ink" : "text-transparent"} />
+                  Word wrap
+                </Menu.CheckboxItem>
               ) : null}
               {binary ? (
                 <>

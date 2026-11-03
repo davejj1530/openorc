@@ -47,7 +47,7 @@ export interface CodeEditorProps {
    * with the caller.
    */
   sessionKey: string;
-  /** Picks the language and line wrapping. The editor never reads or writes files. */
+  /** Picks the language. The editor never reads or writes files. */
   path: string;
   /**
    * The buffer's text. A value equal to the last one this editor reported, or was given, changes nothing, so the
@@ -56,6 +56,10 @@ export interface CodeEditorProps {
    */
   text: string;
   readOnly: boolean;
+  /** Long lines wrap to the view instead of scrolling sideways. Changing it keeps the top visible line in place. */
+  lineWrapping: boolean;
+  /** Option+Z, VS Code's Toggle Word Wrap, asks for the other setting. Without it the keys pass through. */
+  onLineWrappingChange?: (wrap: boolean) => void;
   /** A new object selects and reveals its lines once per session. The same object again does nothing. */
   reveal: LineRange | null;
   /**

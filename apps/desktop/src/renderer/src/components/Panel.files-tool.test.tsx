@@ -9,6 +9,7 @@ import { useAppShortcuts } from "../lib/app-shortcuts";
 import { useDrafts } from "../lib/file-drafts";
 import { useFilesTool } from "../lib/files-tool";
 import { useFileExplorer } from "../lib/file-explorer";
+import { useWordWrap } from "../lib/word-wrap";
 import { useLayout } from "../lib/layout";
 import { usePanelSessions } from "../lib/panel-tabs";
 import { queryClient } from "../lib/client";
@@ -19,7 +20,9 @@ import { Panel } from "./Panel";
 
 vi.mock("../lib/window", () => ({ useTrafficLights: () => false, useWindowsControls: () => false }));
 vi.mock("./code-editor", () => ({
-  CodeEditor: ({ text, readOnly, onChange }: CodeEditorProps) => <textarea aria-label="Editor" readOnly={readOnly} value={text} onChange={(event) => onChange(event.target.value)} />,
+  CodeEditor: ({ text, readOnly, lineWrapping, onChange }: CodeEditorProps) => (
+    <textarea aria-label="Editor" data-wrap={lineWrapping} readOnly={readOnly} value={text} onChange={(event) => onChange(event.target.value)} />
+  ),
   closeEditorSession: () => {},
 }));
 
@@ -399,6 +402,25 @@ it("starts with a folder tree and keeps it beside file tabs without browser cont
   fireEvent.click(screen.getByRole("button", { name: "File actions" }));
   expect(await screen.findByRole("menuitem", { name: "Refresh" })).toBeTruthy();
   expect(screen.getByRole("menuitem", { name: "Copy path" })).toBeTruthy();
+});
+
+it("wraps code by default and turns it off from the file's Word wrap, for every file after", async () => {
+  useWordWrap.setState({ wrap: true });
+  useLayout.setState({ panelOpen: true });
+  render(<Window />);
+  fireEvent.click(screen.getByRole("button", { name: "Files" }));
+  fireEvent.click(await screen.findByRole("treeitem", { name: "src" }));
+  fireEvent.click(await screen.findByRole("treeitem", { name: "cart.ts" }));
+  expect((await editor()).dataset.wrap).toBe("true");
+  fireEvent.click(screen.getByRole("button", { name: "File actions" }));
+  const item = await screen.findByRole("menuitemcheckbox", { name: "Word wrap" });
+  expect(item.getAttribute("aria-checked")).toBe("true");
+  fireEvent.click(item);
+  await waitFor(() => expect(screen.getByRole("textbox", { name: "Editor" }).dataset.wrap).toBe("false"));
+  expect(localStorage.getItem("openorc.word-wrap")).toBe("off");
+  fireEvent.click(await screen.findByRole("treeitem", { name: "checkout.ts" }));
+  await waitFor(() => expect(screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Editor" }).value).toBe("export {};\n"));
+  expect(screen.getByRole("textbox", { name: "Editor" }).dataset.wrap).toBe("false");
 });
 
 it("navigates and collapses directories with the keyboard, then opens the selected file", async () => {

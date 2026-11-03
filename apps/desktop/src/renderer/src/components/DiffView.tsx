@@ -8,6 +8,7 @@ import { patchStat } from "@openorc/client";
 import { cn } from "../lib/cn";
 import { useTheme } from "../lib/theme";
 import { Button, Textarea, TextButton } from "./ui";
+import { useWordWrap } from "../lib/word-wrap";
 
 const workerFactory = () => new DiffWorker();
 
@@ -59,6 +60,21 @@ const PLAIN_LINES = `
 
 /** Lines marked with + and -, in the tones above, without word-level emphasis. */
 const plainLines = { diffIndicators: "classic", lineDiffType: "none", unsafeCSS: PLAIN_LINES } as const;
+
+/** What every file's viewer shares: layout, wrapping, colors, and the app's own header and icons. */
+function viewerOptions(diffStyle: "unified" | "split", wrap: boolean, theme: string, selectsRanges: boolean): FileDiffOptions<Annotation, undefined> {
+  return {
+    diffStyle,
+    overflow: wrap ? "wrap" : "scroll",
+    ...plainLines,
+    theme: { light: "github-light", dark: "github-dark" },
+    themeType: theme === "github-dark" ? "dark" : "light",
+    // The fold above carries the filename, the letter and the counts.
+    disableFileHeader: true,
+    onPostRender: applyDiffIcons,
+    enableLineSelection: selectsRanges,
+  };
+}
 
 /** The worker pool's highlighter: both GitHub themes, plain lines, and the languages a project usually holds. */
 const highlighter = {
@@ -369,18 +385,10 @@ function FileBlock({
   const selectsRanges = commentRanges && Boolean(onRequestComment);
   // The lines under the pointer while a drag is in progress; the viewer draws only the selection it is given.
   const [dragging, setDragging] = useState<SelectedLineRange | null>(null);
+  const wrap = useWordWrap((s) => s.wrap);
   // Stable while dragging: new options would make the viewer render the whole file again on every move.
   const options = useMemo((): FileDiffOptions<Annotation, undefined> => {
-    const base: FileDiffOptions<Annotation, undefined> = {
-      diffStyle,
-      ...plainLines,
-      theme: { light: "github-light", dark: "github-dark" },
-      themeType: theme === "github-dark" ? "dark" : "light",
-      // The fold above carries the filename, the letter and the counts.
-      disableFileHeader: true,
-      onPostRender: applyDiffIcons,
-      enableLineSelection: selectsRanges,
-    };
+    const base = viewerOptions(diffStyle, wrap, theme, selectsRanges);
     if (selectsRanges) {
       return {
         ...base,
@@ -402,7 +410,7 @@ function FileBlock({
         requestComment(point, point);
       },
     };
-  }, [diffStyle, theme, selectsRanges, onRequestComment, requestComment]);
+  }, [diffStyle, wrap, theme, selectsRanges, onRequestComment, requestComment]);
 
   const composer = draft ? (
     <DraftComposer

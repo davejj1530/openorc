@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef } from "react";
 import { isolateHistory } from "@codemirror/commands";
 import { Annotation, type StateEffect } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { bindCaller, createState, loadLanguage, setReadOnly } from "./extensions";
+import { bindCaller, createState, loadLanguage, setLineWrapping, setReadOnly } from "./extensions";
 import { replacement } from "./replacement";
 import { findSession, isKept, keepSession, type EditorSession } from "./sessions";
 import type { CodeEditorProps, LineRange } from "./types";
@@ -18,7 +18,7 @@ interface Mounted {
 
 function mount(parent: HTMLElement, key: string, props: () => CodeEditorProps): { mounted: Mounted; unmount: () => void } {
   const initial = props();
-  const session = findSession(key) ?? { state: createState(initial.text, initial.path, initial.readOnly), scroll: null, reported: initial.text, revealed: null };
+  const session = findSession(key) ?? { state: createState(initial.text, initial.path, initial.readOnly, initial.lineWrapping), scroll: null, reported: initial.text, revealed: null };
   keepSession(key, session);
   let alive = true;
   const view = new EditorView({
@@ -63,14 +63,14 @@ function revealLines(view: EditorView, { start, end, column, endColumn }: LineRa
 
 /**
  * CodeMirror 6 behind the contract in types.ts. Keys it handles prevent their event's default, so App's shortcuts
- * and the panel's Escape leave them alone: Cmd+S saves, Shift+Option+F formats, Cmd+F opens the find panel, Cmd+[
- * and Cmd+] indent. Edit menu Undo arrives as a history `beforeinput` event, which CodeMirror's history handles.
+ * and the panel's Escape leave them alone: Cmd+S saves, Shift+Option+F formats, Option+Z toggles word wrap, Cmd+F
+ * opens the find panel, Cmd+[ and Cmd+] indent. Edit menu Undo arrives as a history `beforeinput` event, which CodeMirror's history handles.
  */
 export function CodeEditor(props: CodeEditorProps) {
   const host = useRef<HTMLDivElement>(null);
   const latest = useRef(props);
   const editor = useRef<Mounted | null>(null);
-  const { sessionKey, text, readOnly, reveal, focusRequest } = props;
+  const { sessionKey, text, readOnly, lineWrapping, reveal, focusRequest } = props;
 
   useLayoutEffect(() => {
     latest.current = props;
@@ -96,6 +96,10 @@ export function CodeEditor(props: CodeEditorProps) {
   useLayoutEffect(() => {
     if (editor.current) setReadOnly(editor.current.view, readOnly);
   }, [sessionKey, readOnly]);
+
+  useLayoutEffect(() => {
+    if (editor.current) setLineWrapping(editor.current.view, lineWrapping);
+  }, [sessionKey, lineWrapping]);
 
   useLayoutEffect(() => {
     const mounted = editor.current;

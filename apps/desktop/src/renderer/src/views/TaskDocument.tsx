@@ -1,26 +1,20 @@
+import { relativeTime } from "@openorc/client";
+import { harnessName, type Project, type Run, type Task, type TaskPriority, type TaskStatus } from "@openorc/protocol";
 import { useImperativeHandle, type ReactNode, type Ref } from "react";
-import { ArrowUpRight, Check, GitBranch, MessageSquare } from "../components/icons";
-import { harnessName, type Project, type Run, type Task, type TaskPriority, type TaskStatus, type TeamTaskView } from "@openorc/protocol";
 import { DocumentEditor } from "../components/DocumentEditor";
+import { ArrowUpRight, Check, GitBranch, MessageSquare } from "../components/icons";
 import { PriorityIcon, StatusIcon, priorityLabel, priorityOrder, statusLabel, statusOrder } from "../components/status";
+import { TaskComments } from "../components/TaskComments";
+import { TaskDelete } from "../components/TaskDelete";
+import { TaskExecutionSettings, useTaskExecutionLocation } from "../components/TaskExecutionSettings";
 import { Button, Select, TextButton } from "../components/ui";
-import { useTaskDocumentDraft } from "../lib/task-document-draft";
 import { useRpcMutation } from "../lib/client";
 import { openTask, openThread } from "../lib/router";
-import { relativeTime } from "@openorc/client";
-import { TaskComments } from "../components/TaskComments";
-import { TaskExecutionSettings, useTaskExecutionLocation } from "../components/TaskExecutionSettings";
-import { TaskDelete } from "../components/TaskDelete";
+import { useTaskDocumentDraft } from "../lib/task-document-draft";
 
 export type TaskDocumentHandle = { flush: () => Promise<boolean> };
 
-function taskActivityPrompt(team: boolean, assignmentCount: number, historyCount: number, openActivity: () => void): ReactNode {
-  if (team)
-    return (
-      <TextButton tone="muted" className="mt-3 text-sm" onClick={openActivity}>
-        {assignmentCount ? "View saved team activity and request history." : "View task activity and start it with its saved team."}
-      </TextButton>
-    );
+function taskActivityPrompt(historyCount: number): ReactNode {
   if (historyCount === 0) return <p className="mt-3 text-sm text-ink-3">Work on this task in its thread. Opening a thread does not start work.</p>;
   return null;
 }
@@ -66,19 +60,7 @@ function taskDraftStatus(input: {
 }
 
 /** The task's creation and recorded runs, with the way into its activity and conversation. */
-function TaskHistory({
-  task,
-  history,
-  team,
-  openActivity,
-  openConversation,
-}: {
-  task: Task;
-  history: Run[];
-  team: TeamTaskView | null | undefined;
-  openActivity: () => void;
-  openConversation: () => void;
-}) {
+function TaskHistory({ task, history, openActivity, openConversation }: { task: Task; history: Run[]; openActivity: () => void; openConversation: () => void }) {
   return (
     <section className="task-activity">
       <h2 className="text-base mb-4">Activity</h2>
@@ -98,10 +80,10 @@ function TaskHistory({
           <ArrowUpRight size={12} className="mt-0.5" />
         </button>
       ))}
-      {taskActivityPrompt(Boolean(team), team?.assignments.length ?? 0, history.length, openActivity)}
+      {taskActivityPrompt(history.length)}
       {task.threadId || task.executionThreadId ? (
-        <TextButton tone="muted" className="flex items-center gap-2 mt-4 text-sm" onClick={() => (team?.ownerDeletedAt ? openActivity() : openConversation())}>
-          <MessageSquare size={13} /> {team?.ownerDeletedAt ? "Conversation deleted · open team activity" : "Open thread"}
+        <TextButton tone="muted" className="flex items-center gap-2 mt-4 text-sm" onClick={openConversation}>
+          <MessageSquare size={13} /> {"Open thread"}
           <ArrowUpRight size={12} />
         </TextButton>
       ) : null}
@@ -115,7 +97,7 @@ export function TaskDocument({ task, project, ref }: { task: Task; project: Proj
   const conversation = useRpcMutation("tasks.openThread");
   const properties = useRpcMutation("tasks.update");
   const execution = useTaskExecutionLocation(task, flush);
-  const { runs, team } = execution;
+  const { runs } = execution;
   const flushAll = async () => (await execution.wait()) && (await flush());
   useImperativeHandle(ref, () => ({ flush: flushAll }));
   const openConversation = async () => {
@@ -150,6 +132,7 @@ export function TaskDocument({ task, project, ref }: { task: Task; project: Proj
             aria-label="Task title"
             className="document-title native-field"
             value={draft.title}
+
             onChange={(e) => patch({ title: e.target.value.replace(/\n/g, " ") })}
             onBlur={flush}
           />
@@ -204,6 +187,7 @@ export function TaskDocument({ task, project, ref }: { task: Task; project: Proj
                 className="bg-transparent py-1 text-ink-2 placeholder:text-ink-4"
                 placeholder="Add labels, comma separated"
                 value={draft.labels}
+
                 onChange={(e) => patch({ labels: e.target.value })}
                 onBlur={flush}
               />
@@ -211,8 +195,8 @@ export function TaskDocument({ task, project, ref }: { task: Task; project: Proj
           </div>
           <TaskComments key={task.id} taskId={task.id} description={draft.spec} beforeSend={flushAll} />
           <TaskExecutionSettings execution={execution} />
-          <TaskHistory task={task} history={history} team={team.data} openActivity={openActivity} openConversation={() => void openConversation()} />
-          {team.data ? null : <TaskDelete task={task} />}
+          <TaskHistory task={task} history={history} openActivity={openActivity} openConversation={() => void openConversation()} />
+          <TaskDelete task={task} />
         </article>
       </div>
       <footer className="document-footer">

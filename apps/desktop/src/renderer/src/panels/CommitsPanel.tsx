@@ -1,11 +1,11 @@
-import { useState, type ReactNode } from "react";
+import { hasUnpushed, heldNotice, publishView, pushLabel, relativeTime, shortSha, threadGitActions, type GitStep, type PublishInput } from "@openorc/client";
 import type { Commit, Project, PushState, Task, ThreadSummary } from "@openorc/protocol";
+import { useState, type ReactNode } from "react";
 import { Upload } from "../components/icons";
-import { Badge, Button, Empty } from "../components/ui";
 import { PanelBar, PanelNotice } from "../components/PanelBar";
+import { Badge, Button, Empty } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { useThreadMutationPending } from "../lib/thread-mutations";
-import { hasUnpushed, heldNotice, publishView, pushLabel, relativeTime, shortSha, teamGitActions, type GitStep, type PublishInput } from "@openorc/client";
 import { ThreadPullRequest } from "./ThreadPullRequest";
 
 /** A task's branch, a thread's workspace, or the project's checkout outside any conversation. */
@@ -86,12 +86,11 @@ function runningStep(pushing: boolean, opening: boolean): PublishInput["running"
 /** A thread's Push, and its pull request once the branch is on origin. A team's work waits for the team's go-ahead. */
 function ThreadPushBar({ thread, project, state, error }: { thread: ThreadSummary; project: Project; state: PushState | undefined; error: Error | null }) {
   const team = Boolean(thread.teamInstanceId);
-  const runtime = useRpc("orchestration.runtime", { threadId: thread.id }, { enabled: team, refetchInterval: 8000 });
   const info = useRpc("system.info", {});
   const push = useRpcMutation("review.pushThread");
   const pr = useRpcMutation("review.createThreadPr");
   const threadMutationPending = useThreadMutationPending(thread.id);
-  const actions = teamGitActions(team, runtime);
+  const actions = threadGitActions(team);
   const busy = push.isPending || pr.isPending || (team && threadMutationPending);
   const view = publishView({
     thread,

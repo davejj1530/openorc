@@ -76,8 +76,7 @@ const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
   "memory.settings.get": ["settings"],
   "app.settings.get": ["settings"],
   "textGeneration.settings.get": ["text-generation", "system", "models"],
-  "schedules.list": ["schedules", "orchestration"],
-  "orchestration.availability": ["settings", "orchestration"],
+  "schedules.list": ["schedules"],
   "projects.list": ["projects"],
   "projects.checkoutBranch": ["projects", "workspace-diff"],
   "threads.list": ["threads"],
@@ -102,15 +101,7 @@ const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
 /** Reads tagged by the ids in their parameters. */
 const idReadTags: MethodRules = {
   "skills.list": (p) => ["skills", `project:${String(p["projectId"] ?? "")}`],
-  ...each(["orchestration.list", "orchestration.preflight"], (p) => ["orchestration", `orchestration:${String(p["projectId"])}`]),
-  "orchestration.get": (p) => ["orchestration", `team:${String(p["id"])}`],
-  "orchestration.avatars.list": (p) => ["orchestration.avatars", `team:${String(p["teamId"])}`],
-  "orchestration.turnChanges": (p) => [`checkpoints:${String(p["threadId"])}`],
-  "orchestration.runtime": (p) => ["orchestration", "inbox", `thread:${String(p["threadId"])}`],
   "tasks.executionThread": (p) => ["tasks", "threads", `task:${String(p["taskId"])}`],
-  "tasks.forwarding": (p) => ["settings", "tasks", "orchestration", "inbox", "threads", `task:${String(p["taskId"])}`],
-  "orchestration.taskState": (p) => ["orchestration", "inbox", "threads", `task:${String(p["taskId"])}`, `comments:${String(p["taskId"])}`],
-  "orchestration.taskRuntime": (p) => ["orchestration", "inbox", "tasks", `task:${String(p["taskId"])}`],
   "projects.get": (p) => ["projects", `project:${String(p["id"])}`],
   // Git can appear in a turn, a commit, the terminal or outside the app; focus and settled commands refresh workspace-diff.
   "projects.git": (p) => ["projects", "workspace-diff", `projectgit:${String(p["id"])}`],
@@ -159,7 +150,7 @@ export function tagsFor<M extends RpcMethod>(method: M, params: RpcParams<M>): s
  * What each mutation changes, so the renderer refreshes its own reads the
  * moment the call returns instead of waiting on a push from the core.
  */
-const workspaceMutations = new Set<RpcMethod>(["threads.moveWorkspace", "threads.cancelMove", "threads.cancelTeamOperation", "threads.restore"]);
+const workspaceMutations = new Set<RpcMethod>(["threads.moveWorkspace", "threads.restore"]);
 
 /** Mutations whose effects never depend on their parameters. */
 const fixedInvalidations: Partial<Record<RpcMethod, readonly string[]>> = {
@@ -198,9 +189,8 @@ const fixedInvalidations: Partial<Record<RpcMethod, readonly string[]>> = {
   "reviewerApp.configure": ["reviewer-app"],
   "reviewerApp.remove": ["reviewer-app"],
   "orclings.create": ["orclings", "threads"],
-  // Team seats read their Orcling's current model, so teams refresh with it.
-  "orclings.update": ["orclings", "threads", "orchestration"],
-  "orclings.delete": ["orclings", "threads", "memory", "orchestration"],
+  "orclings.update": ["orclings", "threads"],
+  "orclings.delete": ["orclings", "threads", "memory"],
   "orclings.instructions.save": ["orclings"],
   "orclings.instructions.restore": ["orclings"],
   "orclings.ask": ["threads"],
@@ -212,55 +202,19 @@ const fixedInvalidations: Partial<Record<RpcMethod, readonly string[]>> = {
 };
 
 function workspaceMutationTags(id: string): string[] {
-  return ["workspace-diff", "threads", "tasks", "inbox", "orchestration", `thread:${id}`, `threaddiff:${id}`, `threadlog:${id}`, `checkpoints:${id}`];
+  return ["workspace-diff", "threads", "tasks", "inbox", `thread:${id}`, `threaddiff:${id}`, `threadlog:${id}`, `checkpoints:${id}`];
 }
 
 /** Writes whose effects follow the ids in their parameters. */
 const idInvalidations: MethodRules = {
-  ...each(["orchestration.save", "orchestration.archive"], (p) => ["orchestration", `orchestration:${String(p["projectId"])}`, ...(p["teamId"] ? [`team:${String(p["teamId"])}`] : [])]),
-  ...each(["orchestration.avatars.set", "orchestration.avatars.reset"], (p) => ["orchestration.avatars", `team:${String(p["teamId"])}`]),
-  ...each(
-    [
-      "orchestration.stop",
-      "orchestration.retry",
-      "orchestration.workspace.retrySetup",
-      "orchestration.workspace.acceptSetup",
-      "orchestration.compact",
-      "orchestration.cancelDirection",
-      "orchestration.send",
-      "orchestration.implementPlan",
-      "orchestration.configureLead",
-    ],
-    (p) => ["orchestration", "threads", "tasks", `thread:${String(p["threadId"])}`, `runs:thread:${String(p["threadId"])}`, ...scopedTask(p)],
-  ),
-  ...each(["orchestration.integration.retry", "orchestration.integration.accept"], (p) => [
-    "workspace-diff",
-    "orchestration",
-    "threads",
-    "tasks",
-    `thread:${String(p["threadId"])}`,
-    `runs:thread:${String(p["threadId"])}`,
-    ...scopedTask(p),
-  ]),
-  "tasks.forward": (p) => ["workspace-diff", "orchestration", "threads", "tasks", "inbox", taskTag(p), `comments:${String(p["taskId"])}`, `runs:${String(p["taskId"])}`, `diff:${String(p["taskId"])}`],
-  ...each(["orchestration.tasks.start", "orchestration.tasks.retry", "orchestration.review.send"], (p) => [
-    "orchestration",
-    "threads",
-    "tasks",
-    "inbox",
-    taskTag(p),
-    `comments:${String(p["taskId"])}`,
-    `runs:${String(p["taskId"])}`,
-    `diff:${String(p["taskId"])}`,
-  ]),
   ...each(["tasks.create", "tasks.update", "tasks.delete", "tasks.prepareWorkspace", "tasks.start", "tasks.openThread"], (p) => ["tasks", "inbox", "threads", taskTag(p)]),
-  "threads.delete": (p) => ["threads", "tasks", "inbox", "orchestration", `thread:${String(p["id"])}`, `importable:${String(p["projectId"])}`],
+  "threads.delete": (p) => ["threads", "tasks", "inbox", `thread:${String(p["id"])}`, `importable:${String(p["projectId"])}`],
   ...each(["threads.start", "threads.fork", "threads.import"], (p) => ["threads", "tasks", "inbox", `thread:${String(p["id"])}`, `importable:${String(p["projectId"])}`]),
   "threads.update": (p) => ["threads", "tasks", "inbox", `thread:${String(p["id"])}`, `runs:thread:${String(p["id"])}`, `importable:${String(p["projectId"])}`, ...scopedTask(p)],
   ...each(["threads.implementPlan", "threads.compact", "threads.queue", "threads.send"], (p) => ["threads", `thread:${String(p["id"])}`, `runs:thread:${String(p["id"])}`]),
   // Removing a queued review message returns its comments to the review.
   "threads.unqueue": (p) => ["threads", `thread:${String(p["id"])}`, `runs:thread:${String(p["id"])}`, `comments:thread:${String(p["id"])}`],
-  "review.commitThread": (p) => ["workspace-diff", `threaddiff:${String(p["threadId"])}`, `threadlog:${String(p["threadId"])}`, `thread:${String(p["threadId"])}`, "threads", "orchestration"],
+  "review.commitThread": (p) => ["workspace-diff", `threaddiff:${String(p["threadId"])}`, `threadlog:${String(p["threadId"])}`, `thread:${String(p["threadId"])}`, "threads"],
   "review.pushThread": (p) => ["workspace-diff", "threads", `thread:${String(p["threadId"])}`, `threaddiff:${String(p["threadId"])}`, `threadlog:${String(p["threadId"])}`],
   "review.createThreadPr": (p) => ["threads", `thread:${String(p["threadId"])}`, `threaddiff:${String(p["threadId"])}`, `threadlog:${String(p["threadId"])}`],
   ...each(["schedules.create", "schedules.update", "schedules.delete", "schedules.run", "schedules.trigger"], () => ["schedules", "threads"]),

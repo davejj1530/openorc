@@ -1,6 +1,6 @@
+import type { GitActionAvailability, PullRequestStep } from "@openorc/client";
+import type { Project, ThreadSummary } from "@openorc/protocol";
 import { useState } from "react";
-import type { Project, TeamActionAvailability, ThreadSummary } from "@openorc/protocol";
-import type { PullRequestStep } from "@openorc/client";
 import { GitPullRequest } from "../components/icons";
 import { Button, Dialog, Field, Input, Textarea } from "../components/ui";
 import { useRpc, type useRpcMutation } from "../lib/client";
@@ -82,7 +82,7 @@ function PullRequestDialog({
   project: Project;
   head: string | null;
   pr: ReturnType<typeof useRpcMutation<"review.createThreadPr">>;
-  action: TeamActionAvailability;
+  action: GitActionAvailability;
   busy: boolean;
   onOpened: (url: string) => void;
 }) {

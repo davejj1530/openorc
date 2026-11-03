@@ -1,14 +1,14 @@
-import { create } from "zustand";
-import { withFileScope } from "./file-scope";
-import { WORKSPACE_ID } from "@openorc/protocol";
-import type { RpcParams } from "@openorc/protocol";
-import type { FileReference } from "../../../shared/file-reference";
 import { pruneThreadFolds, toggleSidebarFold, toggleThreadTree, type PanelTool, type SidebarFilter } from "@openorc/client";
+import type { RpcParams } from "@openorc/protocol";
+import { WORKSPACE_ID } from "@openorc/protocol";
+import { create } from "zustand";
+import type { FileReference } from "../../../shared/file-reference";
+import { withFileScope } from "./file-scope";
 
 /** The shared panel tools, and the desktop's own Device panel. */
 export type PanelTab = PanelTool | "device";
-/** One turn's saved diff, opened from its change card: a team attempt's checkpoint or a thread turn's. */
-export type ChangeSelection = ({ kind: "team" } & Omit<RpcParams<"orchestration.turnChanges">, "includePatch">) | ({ kind: "thread" } & Omit<RpcParams<"threads.turnChanges">, "includePatch">);
+/** One turn's saved diff, opened from its change card. */
+export type ChangeSelection = { kind: "thread" } & Omit<RpcParams<"threads.turnChanges">, "includePatch">;
 export type FileSelection = FileReference & { scope: RpcParams<"files.read">["scope"]; column?: number; endColumn?: number };
 export type WorkspaceChangesTarget = { kind: "thread" | "project"; id: string };
 export type WorkspaceChangesRequest = WorkspaceChangesTarget & { comparison: "base" | "head"; commit: boolean; requestId: number };
@@ -17,10 +17,10 @@ export type WorkspaceChangesRequest = WorkspaceChangesTarget & { comparison: "ba
 export type PanelSide = "left" | "right";
 
 /** A screen the sidebar can list. The ones the user hides wait under More; Inbox sits in the window's header instead. */
-export type SidebarScreen = "tasks" | "pulls" | "scheduled" | "orchestration" | "memory";
+export type SidebarScreen = "tasks" | "pulls" | "scheduled" | "memory";
 
 /** Every optional screen starts under More, until the user lists it. */
-const DEFAULT_HIDDEN_SCREENS: SidebarScreen[] = ["tasks", "pulls", "scheduled", "orchestration", "memory"];
+const DEFAULT_HIDDEN_SCREENS: SidebarScreen[] = ["tasks", "pulls", "scheduled", "memory"];
 
 interface LayoutState {
   sidebarOpen: boolean;
@@ -204,7 +204,6 @@ export const useLayout = create<LayoutState>((set, get) => {
     openChanges: (selectedChanges) => {
       let threadSelection: Partial<Pick<LayoutState, "panelThreadId">> = {};
       if (selectedChanges.kind === "thread") threadSelection = { panelThreadId: selectedChanges.id };
-      else if (!selectedChanges.taskId) threadSelection = { panelThreadId: selectedChanges.threadId };
       commit({
         selectedChanges,
         panelOpen: true,

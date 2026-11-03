@@ -1,7 +1,7 @@
-import { useId, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
 import { Popover } from "@base-ui/react/popover";
-import { ULTRACODE_EFFORT, effortHint, effortLabel, type AgentKind, type ModelOption } from "@openorc/protocol";
 import type { ModelChoice } from "@openorc/client";
+import { ULTRACODE_EFFORT, effortHint, effortLabel, type AgentKind, type ModelOption } from "@openorc/protocol";
+import { useId, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
 import { EffortGalaxy } from "./EffortGalaxy";
 import { FastModeRocket } from "./FastModeRocket";
 import { RotateCcw, Zap } from "./icons";
@@ -11,20 +11,6 @@ import { Select } from "./ui";
 export function fastStatus(fast: boolean, blocked: boolean): string {
   if (!fast) return "";
   return blocked ? "Fast can't run. " : "Fast requested. ";
-}
-
-/** The team whose lead the effort and Fast settings apply to. */
-export interface EffortTeam {
-  name: string;
-  revision: number;
-  leadName: string;
-  /** The Orcling leading the team, by name. It keeps its own model, effort and Fast mode. */
-  leadOrcling?: string | undefined;
-}
-
-/** Whether an Orcling leads the team, so its effort and Fast mode stay its own. */
-export function orclingLed(team: EffortTeam | undefined): boolean {
-  return Boolean(team?.leadOrcling);
 }
 
 /** What a picker knows about the chosen model's effort and Fast settings. */
@@ -39,7 +25,6 @@ interface EffortSettings {
   fast: boolean;
   fastBlocked: boolean;
   fastHint: string;
-  team?: EffortTeam | undefined;
   loading: boolean;
   failed: boolean;
 }
@@ -57,7 +42,6 @@ export function BrowserEffortFooter({
   fast,
   fastBlocked,
   fastHint,
-  team,
   loading,
   failed,
 }: EffortSettings & { effort: string | null }) {
@@ -102,7 +86,6 @@ export function BrowserEffortFooter({
           {fastHint}
         </p>
       ) : null}
-      {team ? <p className="model-picker-effort-hint">Effort and Fast apply to {team.leadName}, this task’s lead.</p> : null}
     </div>
   );
 }
@@ -122,21 +105,20 @@ export function ComposerEffortPanel({
   fastBlocked,
   fastHint,
   hint,
-  team,
   loading,
   failed,
   children,
 }: EffortSettings & { label: string; fastAvailable: boolean; hint: string | null; children: ReactNode }) {
   const fastDescriptionId = useId();
-  // Nothing changes without a model, and an Orcling lead keeps its own effort and Fast mode.
-  const fixed = disabled || !value || orclingLed(team);
+  // Nothing changes without a model.
+  const fixed = disabled || !value;
   return (
     <>
       <div className="composer-effort-heading">
         <button
           type="button"
           className="composer-icon-button composer-fast-toggle"
-          aria-label={team ? "Lead Fast mode" : "Fast mode"}
+          aria-label="Fast mode"
           aria-pressed={fast}
           data-blocked={fastBlocked || undefined}
           aria-describedby={fastDescriptionId}
@@ -163,7 +145,7 @@ export function ComposerEffortPanel({
         </button>
       </div>
       <div className="composer-effort-model">{children}</div>
-      {team ? <TeamLeadNote team={team} /> : null}
+
       {efforts.length > 1 && value ? (
         <EffortControl
           key={`${value.agent}:${value.model}`}
@@ -186,17 +168,6 @@ export function ComposerEffortPanel({
         {fastHint}
       </Popover.Description>
     </>
-  );
-}
-
-/** Whose effort a team conversation's panel sets, or why an Orcling lead's cannot change here. */
-function TeamLeadNote({ team }: { team: EffortTeam }) {
-  return (
-    <p className="text-xs text-ink-3 text-center mt-2">
-      {team.leadName} · Version {team.revision}
-      <br />
-      {team.leadOrcling ? `${team.leadOrcling} leads with its own model and effort. Edit ${team.leadOrcling} to change them.` : "Effort and Fast apply to this task’s lead."}
-    </p>
   );
 }
 

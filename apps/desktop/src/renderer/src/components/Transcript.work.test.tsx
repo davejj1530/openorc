@@ -1,12 +1,11 @@
+import { emptyRun, type Block } from "@openorc/client";
+import type { AgentEvent, ProviderUsage } from "@openorc/protocol";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import type { AgentEvent, ProviderUsage } from "@openorc/protocol";
 import { runs } from "../lib/client";
-import { emptyRun, type Block } from "@openorc/client";
 import { core } from "../lib/rpc";
-import { TeamWorkTranscript } from "./TeamWorkTranscript";
-import { Transcript, WorkTranscript, groupBlocks, groupSummary, AgentPresence } from "./Transcript";
+import { AgentPresence, Transcript, WorkTranscript, groupBlocks, groupSummary } from "./Transcript";
 vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: () => () => {} } }));
 vi.mock("./ThreadImages", () => ({
   ThreadRichText: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -250,27 +249,6 @@ it.each([false])("keeps a genuine turn failure visible with showActivity=%s", (s
   );
   expect(screen.getByText("Failed after 3m 42s")).toBeTruthy();
   expect(screen.getByText("Provider lost connection")).toBeTruthy();
-});
-
-it("keeps a streaming reply outside activity while retaining intermediate work and ambient privacy", () => {
-  const streaming: Block = { ...reply, streaming: true };
-  const { container, rerender } = render(<TeamWorkTranscript runId="run" blocks={[thought, streaming]} live showActivity={false} />);
-  expect(screen.getByText("The final answer.").closest(".work-section")).toBeNull();
-  rerender(<TeamWorkTranscript runId="run" blocks={[thought, streaming]} live showActivity />);
-  expect(screen.getAllByText("The final answer.")).toHaveLength(1);
-  expect(screen.getByText("The final answer.").closest(".work-section")).toBeNull();
-  fireEvent.click(receipt());
-  expect(screen.getByText("The final answer.").closest("[hidden]")).toBeNull();
-
-  // A subsequent tool reveals that the previous text was intermediate commentary.
-  rerender(<TeamWorkTranscript runId="run" blocks={[thought, reply, tool]} live showActivity={false} />);
-  expect(screen.queryByText("The final answer.")).toBeNull();
-  const answer: Block = { ...streaming, id: "answer", text: "The result is ready." };
-  rerender(<TeamWorkTranscript runId="run" blocks={[thought, reply, { ...tool, done: true }, answer]} live showActivity={false} />);
-  expect(screen.getByText("The result is ready.")).toBeTruthy();
-  expect(screen.queryByText("The final answer.")).toBeNull();
-  rerender(<TeamWorkTranscript runId="run" blocks={[thought, streaming]} ambient live showActivity={false} />);
-  expect(container.childElementCount).toBe(0);
 });
 
 it.each(["error", "cancelled"] as const)("quiet mode retains a %s turn status without an activity control", (outcome) => {

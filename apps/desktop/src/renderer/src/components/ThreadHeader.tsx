@@ -1,20 +1,20 @@
+import { Menu } from "@base-ui/react/menu";
 import { snoozeWakeLabel } from "@openorc/client";
 import type { CloudThreadState, Project, ThreadSummary as Thread } from "@openorc/protocol";
 import { isSubagentThread } from "@openorc/protocol";
-import { SubagentParent } from "./SubagentConversation";
-import { Menu } from "@base-ui/react/menu";
-import { AlarmClock, ArrowLeft, Cloud, GitFork, GitPullRequest, MoreHorizontal, X } from "./icons";
-import { ThreadClaudeAccount } from "./ThreadClaudeAccount";
-import { ThreadMenuItems } from "./ThreadActions";
-import { ThreadOrcling } from "./OrclingAvatar";
-import { ThreadTitle } from "./ThreadTitle";
-import { ThreadTools } from "./ThreadTools";
-import { TopBar } from "./TopBar";
-import { menuItem, menuPopup } from "./menu";
-import { IconButton, StatusDot, Tooltip } from "./ui";
 import { CoversPreview } from "../lib/browser-preview";
 import { openThread, useRouter } from "../lib/router";
 import { floatingGround } from "../lib/use-anchor-ground";
+import { ThreadOrcling } from "./OrclingAvatar";
+import { SubagentParent } from "./SubagentConversation";
+import { ThreadMenuItems } from "./ThreadActions";
+import { ThreadClaudeAccount } from "./ThreadClaudeAccount";
+import { ThreadTitle } from "./ThreadTitle";
+import { ThreadTools } from "./ThreadTools";
+import { TopBar } from "./TopBar";
+import { AlarmClock, ArrowLeft, Cloud, GitFork, GitPullRequest, MoreHorizontal, X } from "./icons";
+import { menuItem, menuPopup } from "./menu";
+import { IconButton, StatusDot, Tooltip } from "./ui";
 
 /** Whether the header starts or ends the work row, which decides who clears the native window controls. */
 type Placement = { first: boolean; last: boolean; onClose?: () => void };
@@ -58,7 +58,6 @@ export function ThreadHeader({
   renaming,
   onRenamingChange,
   onRename,
-  onTeamToolbar,
   first,
   last,
   onClose,
@@ -68,7 +67,6 @@ export function ThreadHeader({
   renaming: boolean;
   onRenamingChange: (renaming: boolean) => void;
   onRename: (title: string) => void;
-  onTeamToolbar: (element: HTMLSpanElement | null) => void;
 }) {
   return (
     <TopBar
@@ -78,7 +76,6 @@ export function ThreadHeader({
       rightmost={last}
       actions={
         <>
-          {t.teamInstanceId ? <span ref={onTeamToolbar} className="thread-team-toolbar" /> : null}
           <ClosePane onClose={onClose} />
           <Menu.Root>
             <Menu.Trigger render={<IconButton aria-label="Thread actions" />}>

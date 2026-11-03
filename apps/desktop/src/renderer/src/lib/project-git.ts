@@ -12,8 +12,8 @@ export function useProjectGit(projectId: string | null | undefined): ProjectGitV
   return projectGitView(query.data ?? null);
 }
 
-/** Why worktrees or teams are unavailable, for the places that already explain a disabled choice. */
-export function branchingReason(state: ProjectGit | null, feature: "Worktrees" | "Teams"): string | null {
+/** Why worktrees are unavailable, for the places that already explain a disabled choice. */
+export function branchingReason(state: ProjectGit | null, feature: "Worktrees"): string | null {
   if (state === "none") return `${feature} need git and a first commit.`;
   return state === "no_commits" ? `${feature} need a first commit.` : null;
 }

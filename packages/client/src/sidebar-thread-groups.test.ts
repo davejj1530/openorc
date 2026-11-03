@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
 import type { ThreadSummary } from "@openorc/protocol";
+import { describe, expect, it } from "vitest";
 import { ORC_MODE_WINDOW, projectMeta, sidebarSectionOpen, sidebarThreadPage, threadListParams, toggleSidebarFold, visibleSidebarThreadIds } from "./sidebar-thread-groups.js";
 import { threadTreeRows, toggleThreadTree } from "./thread-tree.js";
 
@@ -24,6 +24,12 @@ describe("sidebar thread page", () => {
     expect(page([{ ...parent, archivedAt: null }, child, nested], new Set(["parent"])).list.map((t) => t.id)).toEqual(["child", "nested"]);
     expect(page([{ ...parent, archivedAt: null }, child, nested]).pinned.map((t) => t.id)).toEqual(["child"]);
     expect(page([{ ...parent, archivedAt: null }, { ...child, pinnedAt: null, snoozedUntil: 200 }, nested]).snoozed.map((t) => t.id)).toEqual(["child"]);
+  });
+  it("omits retired conversations from cached pages and selected rows", () => {
+    const retired = thread("retired", { teamInstanceId: "saved" });
+    const current = thread("current");
+    const page = sidebarThreadPage({ projectId: "project", fetched: [retired, current], selected: retired, filter: "active", limit: 1, now: 100 });
+    expect(page.list).toEqual([current]);
   });
   it("keeps a selected thread outside the fetched page without changing pagination", () => {
     const fetched = [thread("first"), thread("lookahead")];

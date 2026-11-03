@@ -1,21 +1,18 @@
+import type { Project, Task } from "@openorc/protocol";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import type { Project, Task } from "@openorc/protocol";
 import { TaskDetailsPanel } from "./TaskDetailsPanel";
 
 const fixture = vi.hoisted(() => ({
   mutate: vi.fn(),
-  ownership: {} as { data?: unknown; isPending?: boolean; isError?: boolean },
   updatePending: false,
   updateError: null as Error | null,
 }));
 vi.mock("../lib/client", async (original) => ({
   ...(await original<object>()),
-  useRpc: (method: string) => (method === "orchestration.taskState" ? fixture.ownership : { data: method === "runs.listForTask" ? [] : undefined }),
+  useRpc: (method: string) => ({ data: method === "runs.listForTask" ? [] : undefined }),
   useRpcMutation: (method: string) => ({ mutate: fixture.mutate, isPending: method === "tasks.update" && fixture.updatePending, error: method === "tasks.update" ? fixture.updateError : null }),
 }));
-vi.mock("../components/TeamTaskStart", () => ({ TeamTaskStart: () => null, TeamTaskAdmissions: () => null }));
-vi.mock("../components/TeamRetainedDelete", () => ({ DeleteRetainedOwnerContent: () => null }));
 const task: Task = {
   id: "task",
   projectId: "project",
@@ -56,25 +53,17 @@ afterEach(() => {
   fixture.updateError = null;
 });
 
-it.each([{ data: { working: true } }, { isPending: true }, { isError: true }])("allows a status move while execution controls remain protected: %j", (ownership) => {
-  fixture.ownership = ownership;
-  render(<TaskDetailsPanel task={task} project={project} />);
-  const select = screen.getAllByRole("combobox")[0]!;
-  expect(select.hasAttribute("disabled")).toBe(false);
-  fireEvent.change(select, { target: { value: "done" } });
+it("allows ordinary status changes and keeps retired tasks read-only", () => {
+  const view = render(<TaskDetailsPanel task={task} project={project} />);
+  fireEvent.change(screen.getByRole("combobox", { name: "Status" }), { target: { value: "done" } });
   expect(fixture.mutate).toHaveBeenCalledWith({ id: "task", patch: { status: "done" } });
+  view.rerender(<TaskDetailsPanel task={{ ...task, retiredTeam: true }} project={project} />);
+  expect(screen.getByRole("combobox", { name: "Status" }).hasAttribute("disabled")).toBe(true);
   expect(screen.getByRole("button", { name: "Remove worktree" }).hasAttribute("disabled")).toBe(true);
-});
-
-it("uses loaded ownership over a stale load error when deciding workspace controls", () => {
-  fixture.ownership = { data: { working: false }, isError: true };
-  render(<TaskDetailsPanel task={task} project={project} />);
-  expect(screen.queryByText(/Task ownership could not be checked/)).toBeNull();
-  expect(screen.getByRole("button", { name: "Remove worktree" }).hasAttribute("disabled")).toBe(false);
+  expect(screen.queryByRole("textbox", { name: "Spec" })).toBeNull();
 });
 
 it("follows external updates in pristine fields without replacing a local spec edit", () => {
-  fixture.ownership = {};
   const original = { ...task, threadId: null, spec: "Original", labels: ["one"] };
   const mounted = render(<TaskDetailsPanel task={original} project={project} />);
   const spec = screen.getByRole<HTMLTextAreaElement>("textbox", { name: /Spec/ });
@@ -93,7 +82,6 @@ it("follows external updates in pristine fields without replacing a local spec e
 });
 
 it("saves edited labels and priority through their separate field actions", () => {
-  fixture.ownership = {};
   render(<TaskDetailsPanel task={{ ...task, threadId: null }} project={project} />);
   fireEvent.change(screen.getByRole<HTMLInputElement>("textbox", { name: /Labels/ }), { target: { value: " urgent, review , " } });
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
@@ -103,7 +91,6 @@ it("saves edited labels and priority through their separate field actions", () =
 });
 
 it("retains failed field edits for retry and disables competing saves while one is pending", () => {
-  fixture.ownership = {};
   const mounted = render(<TaskDetailsPanel task={{ ...task, threadId: null }} project={project} />);
   const spec = screen.getByRole<HTMLTextAreaElement>("textbox", { name: /Spec/ });
   fireEvent.change(spec, { target: { value: "  Keep this draft  " } });

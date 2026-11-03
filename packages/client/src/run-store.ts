@@ -160,7 +160,7 @@ async function loadPage(s: Store, runId: string, request: LoadRequest): Promise<
     let run = emptyRun(runId);
     run.hydrated = true;
     run.fromTurn = page.fromTurn;
-    // Turns before the page still count, so turn numbers match checkpoints and team attempts.
+    // Turns before the page still count, so turn numbers match checkpoints.
     run.turnsCompleted = page.fromTurn;
     applyEvents(run, page.events);
     // A page that starts after the session did has no session.started to say whether it is still open.

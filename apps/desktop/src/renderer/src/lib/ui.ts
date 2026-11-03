@@ -1,5 +1,5 @@
-import { create } from "zustand";
 import type { FileScope } from "@openorc/protocol";
+import { create } from "zustand";
 import { useRouter } from "./router";
 
 interface UiState {
@@ -14,7 +14,6 @@ interface UiState {
   conversationOrder: string[];
   /** The thread a delete was asked for; one confirm dialog serves every menu. */
   deleteThreadId: string | null;
-  teamMoveThreadId: string | null;
   /** The conversation whose move to or from a worktree is being confirmed. */
   moveThreadId: string | null;
   /** The open move goes to the cloud rather than between the checkout and a worktree. */
@@ -27,7 +26,6 @@ interface UiState {
   setPalette: (open: boolean, mode?: "all" | "messages") => void;
   setThreadOrder: (ids: string[], conversations?: readonly string[]) => void;
   setDeleteThread: (id: string | null) => void;
-  setTeamMoveThread: (id: string | null) => void;
   setMoveThread: (id: string | null, to?: "cloud") => void;
   setNewFile: (scope: FileScope | null) => void;
 }
@@ -41,12 +39,10 @@ export const useUi = create<UiState>((set, get) => ({
   threadOrder: [],
   conversationOrder: [],
   deleteThreadId: null,
-  teamMoveThreadId: null,
   moveThreadId: null,
   moveThreadToCloud: false,
   newFile: null,
   setDeleteThread: (deleteThreadId) => set({ deleteThreadId }),
-  setTeamMoveThread: (teamMoveThreadId) => set({ teamMoveThreadId }),
   setMoveThread: (moveThreadId, to) => set({ moveThreadId, moveThreadToCloud: to === "cloud" }),
   setNewFile: (newFile) => set({ newFile }),
   openNewTask: (projectId, threadId) => useRouter.getState().navigate({ view: "newtask", ...(projectId ? { projectId } : {}), ...(threadId ? { threadId } : {}) }),

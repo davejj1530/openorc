@@ -711,13 +711,13 @@
   color: var(--ink);
 }
 /* Commands and paths share one mono column as wide as the longest (half the list at most), so
-   every hint starts at the same edge. Team members keep their flex rows. */
-.composer-suggestions [role="listbox"]:not([data-team-mention-list]) {
+   every hint starts at the same edge. Orcling mentions keep their flex rows. */
+.composer-suggestions [role="listbox"]:not([data-agent-mention-list]) {
   display: grid;
   grid-template-columns: fit-content(50%) minmax(0, 1fr);
   column-gap: 12px;
 }
-.composer-suggestions [role="listbox"]:not([data-team-mention-list]) > .composer-suggestion {
+.composer-suggestions [role="listbox"]:not([data-agent-mention-list]) > .composer-suggestion {
   display: grid;
   grid-column: 1 / -1;
   grid-template-columns: subgrid;
@@ -971,9 +971,6 @@
   flex: 0 0 auto;
   color: var(--ink);
 }
-.model-picker-team-row {
-  min-height: 44px;
-}
 .model-picker-message {
   margin: 0;
   padding: 8px 10px;
@@ -1050,7 +1047,7 @@
   line-height: var(--text-sm--line-height);
 }
 
-/* The effort popup a running team uses in place of the model browser. */
+/* A compact effort popup. */
 .composer-effort-popup {
   --effort-galaxy-base: #906acb;
   --effort-galaxy-light: #c6a3f2;

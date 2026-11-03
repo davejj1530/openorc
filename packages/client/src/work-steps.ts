@@ -60,7 +60,7 @@ export function foldable(block: Block, taskCards: boolean): boolean {
       return !block.status || block.status === "success" || block.status === "running";
     case "tool":
       // Collaboration milestones and visual explanations remain individually visible.
-      if (visualizationFromTool(block) || /(?:spawn_agent|thread_send|send_message|team_say|team_complete)$/.test(block.name)) return false;
+      if (visualizationFromTool(block) || /(?:spawn_agent|thread_send|send_message)$/.test(block.name)) return false;
       return (!block.status || ["running", "success", "error"].includes(block.status)) && !(taskCards && toolShowsCard(block));
     case "activity":
       return ["running", "success"].includes(block.status) && !/finished|completed/i.test(block.label) && !isImageGeneration(block) && !isImageView(block);

@@ -1,19 +1,20 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
+import { AppUpdateNotice } from "./components/AppUpdateNotice";
 import { CommandPalette } from "./components/CommandPalette";
 import { Sidebar } from "./components/Sidebar";
 import { DeleteThreadDialog } from "./components/ThreadActions";
-import { TeamMoveDialog } from "./components/TeamMoveDialog";
 import { ThreadMoveDialog } from "./components/ThreadMoveDialog";
+import { ThreadWorkspace } from "./components/ThreadWorkspace";
 import { TooltipProvider } from "./components/ui";
 import { ImportProjectDialog } from "./dialogs/ImportProjectDialog";
 import { ImportSessionsDialog } from "./dialogs/ImportSessionsDialog";
 import { NewFileDialog } from "./dialogs/NewFileDialog";
 import { useAppShortcuts } from "./lib/app-shortcuts";
+import { useRpc } from "./lib/client";
 import { useOnboardingDefaultHarness } from "./lib/default-harness";
 import { useLayout } from "./lib/layout";
 import { useLookHandover } from "./lib/mac-look";
 import { readOnboardingState, resolveOnboarding, writeOnboardingState, type PersistedOnboardingState } from "./lib/onboarding";
-import { useRpc } from "./lib/client";
 import { useRouter, type Route } from "./lib/router";
 import { useUi } from "./lib/ui";
 import { useTrafficLights } from "./lib/window";
@@ -21,7 +22,6 @@ import { Inbox } from "./views/Inbox";
 import { Memory } from "./views/Memory";
 import { NewThread } from "./views/NewThread";
 import { Onboarding } from "./views/Onboarding";
-import { Orchestration } from "./views/Orchestration";
 import { OrclingDesigner } from "./views/OrclingDesigner";
 import { ProjectView } from "./views/ProjectView";
 import { PullRequestList } from "./views/PullRequestList";
@@ -29,9 +29,7 @@ import { PullRequestView } from "./views/PullRequestView";
 import { Scheduled } from "./views/Scheduled";
 import { Settings } from "./views/Settings";
 import { AgentUpdateNotice } from "./views/settings-agent-updates";
-import { AppUpdateNotice } from "./components/AppUpdateNotice";
 import { TaskListView } from "./views/TaskList";
-import { ThreadWorkspace } from "./components/ThreadWorkspace";
 
 // The diagnostics screen and its benchmark controls ship only in development and QA builds.
 const Diagnostics = __OPENORC_QA__ ? lazy(() => import("./views/Diagnostics").then((m) => ({ default: m.Diagnostics }))) : null;
@@ -39,7 +37,7 @@ const NewTask = lazy(() => import("./views/NewTask").then((m) => ({ default: m.N
 const TaskView = lazy(() => import("./views/TaskView").then((m) => ({ default: m.TaskView })));
 
 function projectForRoute(route: ReturnType<typeof useRouter.getState>["route"], savedProjectId: string | null): string | undefined {
-  if (route.view === "project" || route.view === "newthread" || route.view === "newtask" || route.view === "orchestration") return route.projectId;
+  if (route.view === "project" || route.view === "newthread" || route.view === "newtask") return route.projectId;
   return savedProjectId ?? undefined;
 }
 
@@ -167,7 +165,7 @@ export function App() {
         <ImportProjectDialog open={ui.importProject} onOpenChange={ui.setImportProject} />
         <ImportSessionsDialog open={ui.importSessions.open} projectId={ui.importSessions.projectId ?? currentProject} onOpenChange={(open) => ui.setImportSessions(open)} />
         <DeleteThreadDialog />
-        <TeamMoveDialog />
+
         <ThreadMoveDialog />
         <NewFileDialog />
       </div>
@@ -200,9 +198,6 @@ function MainScreen({ route, currentProject }: { route: Route; currentProject: s
       break;
     case "scheduled":
       screen = <Scheduled />;
-      break;
-    case "orchestration":
-      screen = <Orchestration projectId={route.projectId} teamId={route.teamId} />;
       break;
     case "orcling":
       screen = <OrclingDesigner orclingId={route.orclingId} />;

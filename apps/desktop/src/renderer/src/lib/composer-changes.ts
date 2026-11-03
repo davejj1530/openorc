@@ -1,9 +1,9 @@
-import { withFileScope } from "./file-scope";
+import { patchStat, publishView, threadGitActions, type GitActions, type PublishInput } from "@openorc/client";
 import { useMemo } from "react";
 import type { ComposerChanges } from "../components/Composer";
-import { patchStat, publishView, teamGitActions, type GitActions, type PublishInput } from "@openorc/client";
-import { useLayout, type WorkspaceChangesTarget } from "./layout";
 import { useRpc } from "./client";
+import { withFileScope } from "./file-scope";
+import { useLayout, type WorkspaceChangesTarget } from "./layout";
 import { useThreadMutationPending } from "./thread-mutations";
 
 type ComposerSource = WorkspaceChangesTarget & { projectName: string; team?: boolean; thread?: PublishInput["thread"] };
@@ -25,13 +25,12 @@ export function useComposerChanges(source: ComposerSource | null): ComposerChang
   const threadId = source?.kind === "thread" ? source.id : "";
   const threadDiff = useRpc("review.threadDiff", { threadId, comparison: "head" }, { enabled: Boolean(threadId) });
   const projectDiff = useRpc("review.projectDiff", { projectId: source?.kind === "project" ? source.id : "" }, { enabled: source?.kind === "project" });
-  const runtime = useRpc("orchestration.runtime", { threadId }, { enabled: Boolean(threadId && source?.team), refetchInterval: 8000 });
   const pending = useThreadMutationPending(threadId);
   const diff = source?.kind === "thread" ? threadDiff : projectDiff;
   const counts = useMemo(() => patchStat(diff.data?.patch ?? ""), [diff.data?.patch]);
   if (!source) return null;
   const files = diff.data?.files.length ?? 0;
-  const commitDisabledReason = commitReason(source, { failed: diff.isError, files, team: teamGitActions(Boolean(source.team), runtime), pending });
+  const commitDisabledReason = commitReason(source, { failed: diff.isError, files, team: threadGitActions(Boolean(source.thread?.teamInstanceId)), pending });
   return {
     projectName: source.projectName,
     files,

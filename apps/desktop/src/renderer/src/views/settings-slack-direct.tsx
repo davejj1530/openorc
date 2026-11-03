@@ -1,19 +1,19 @@
-import { directSlackStatus } from "./settings-presentation";
-import { useState } from "react";
 import {
-  harnessCatalog,
-  harnessIds,
   ExecutionMode,
   executionMode,
   executionModeAvailable,
   executionModeNote,
-  executionModeSettings,
   executionModePresentation,
+  executionModeSettings,
+  harnessCatalog,
+  harnessIds,
   type SlackDirectConfig,
 } from "@openorc/protocol";
+import { useState } from "react";
 import { Button, Input, Select } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { core } from "../lib/rpc";
+import { directSlackStatus } from "./settings-presentation";
 import { Field, LoadError, Section, Status } from "./settings-shared";
 import { SlackSetupGuide } from "./settings-slack-guide";
 
@@ -50,7 +50,7 @@ export function DirectSlackSettings({ active }: { active: boolean }) {
   }
   return (
     <>
-      <p className="settings-note mb-3">Connect your own Slack bot to this computer. Each teammate creates a separate bot. Keep OpenOrc open and your computer awake to receive requests.</p>
+      <p className="settings-note mb-3">Connect your own Slack bot to this computer. Each person creates a separate bot. Keep OpenOrc open and your computer awake to receive requests.</p>
       {status.isError && <LoadError retry={() => void status.refetch()} />}
       <SlackSetupGuide open={!direct?.configured} appName={appName} onAppName={setAppName} act={act} />
       <Section title="Personal connection" description="Tokens stay encrypted on this computer. Leave a saved token blank to keep it.">

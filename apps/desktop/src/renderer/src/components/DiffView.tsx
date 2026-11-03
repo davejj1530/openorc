@@ -89,7 +89,7 @@ const SPLIT_MIN = 880;
 interface DiffViewProps {
   patch: string;
   comments?: ReviewComment[];
-  /** A drag or shift-click across line numbers comments on a range. Team review keeps one line per comment. */
+  /** A drag or shift-click across line numbers comments on a range. */
   commentRanges?: boolean;
   draft?: CommentDraft | null;
   onRequestComment?: (location: CommentLocation) => void;

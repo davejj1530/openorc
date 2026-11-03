@@ -109,22 +109,6 @@ async function main() {
     assert(!codexItems.some((t) => t.includes("Every command")));
     await read(`Array.from(document.querySelectorAll('[role="menuitem"]')).find(e=>e.textContent.startsWith('Ask for approval')).click()`);
     await until(`document.querySelector('[aria-label="Mode: Ask for approval"]')`);
-    await read(`planSmoke.select('team')`);
-    await until(`document.querySelector('aside')?.textContent.includes('Team plan')`);
-    await until(`Array.from(document.querySelectorAll('button')).find(e=>e.textContent==='Implement this plan')?.disabled === false`);
-    assert.deepEqual(
-      await read(`Array.from(document.querySelector('[aria-label="Plan revision"]').options).map(o=>o.value)`),
-      ["plan-2"],
-      "chat replies and member proposals must not become shared plan revisions",
-    );
-    assert.equal(await read(`document.querySelector('aside').textContent.includes('saved permissions')`), true);
-    assert.equal(await read(`document.querySelector('aside').textContent.includes('Implementation mode')`), false);
-    await read(`Array.from(document.querySelectorAll('button')).find(e=>e.textContent==='Implement this plan').click()`);
-    await until(`planSmoke.calls.some(c=>c.method==='orchestration.implementPlan')`);
-    assert.deepEqual(await read(`planSmoke.calls.find(c=>c.method==='orchestration.implementPlan').input`), { threadId: "team", planId: "plan-2" });
-    const teamShot = path.join(dir, "team-plan.png");
-    await fs.writeFile(teamShot, (await win.webContents.capturePage()).toPNG());
-    shots.push(teamShot);
     assert.deepEqual(errors, []);
     console.log(JSON.stringify({ ok: true, screenshots: shots }));
   } finally {

@@ -1,11 +1,11 @@
 import { Command } from "cmdk";
-import { FolderGit2, MessageSquare, Search } from "./icons";
 import { useEffect, useState } from "react";
-import { paletteActions } from "../lib/palette-actions";
+import { CoversPreview } from "../lib/browser-preview";
 import { useRpc } from "../lib/client";
+import { paletteActions } from "../lib/palette-actions";
 import { openTask, openThread, useRouter } from "../lib/router";
 import { useUi } from "../lib/ui";
-import { CoversPreview } from "../lib/browser-preview";
+import { FolderGit2, MessageSquare, Search } from "./icons";
 import { StatusIcon } from "./status";
 
 function emptySearchMessage(query: string, messageMode: boolean, fetching: boolean): string {
@@ -87,7 +87,6 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
                     </span>
                     <span className="pl-6 text-sm text-ink-4 truncate">
                       {messageSender(h.role, h.member)} in {h.taskTitle ?? h.threadTitle}
-                      {h.member && h.taskTitle ? ` (team: ${h.threadTitle})` : ""}
                     </span>
                   </Command.Item>
                 ))}

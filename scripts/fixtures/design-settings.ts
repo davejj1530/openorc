@@ -1,13 +1,12 @@
+import type { ProviderUsage, SlackStatus } from "@openorc/protocol";
 import { createDesignClaudeAccountsRpc } from "./design-claude-accounts";
 import { createDesignRemoteRpc } from "./design-remote";
-import type { ProviderUsage, SlackStatus } from "@openorc/protocol";
 
 /** Session-only settings for the design preview. Never reads or writes a real account. */
 export function createDesignSettingsRpc({ phone = null }: { phone?: string | null } = {}) {
   const claudeAccountsRpc = createDesignClaudeAccountsRpc();
   const remoteRpc = createDesignRemoteRpc(phone);
   const settings: Record<string, Record<string, unknown>> = {
-    "app.settings": { defaultWorkspaceMode: "current", defaultPermissionMode: "review", notifications: true, sound: false, experimentalTeamExecution: true },
     "memory.settings": { enabled: true, provider: "auto", model: null, hasApiKey: false, resolved: null, automatic: [], reason: "Finished runs use each agent’s default summary model." },
     "textGeneration.settings": { provider: "auto", model: null, resolved: null, reason: "Each conversation uses its agent’s default small model." },
   };

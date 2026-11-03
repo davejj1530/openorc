@@ -1,17 +1,17 @@
-import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
+import { comparisons, fileCount, patchStat, publishView, threadGitActions, type GitActions, type GitStep } from "@openorc/client";
 import type { Project, Task, ThreadSummary } from "@openorc/protocol";
-import { comparisons, fileCount, patchStat, publishView, teamGitActions, type GitActions, type GitStep } from "@openorc/client";
-import { RefreshCw } from "../components/icons";
+import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { CommitSheet } from "../components/CommitSheet";
+import { RefreshCw } from "../components/icons";
 import { DiffStat, PanelBar, PanelBarMeta, PanelNotice } from "../components/PanelBar";
 import { Button, Empty, IconButton, Segmented, TextButton, Tooltip } from "../components/ui";
+import { useRpc, useRpcMutation } from "../lib/client";
 import { cn } from "../lib/cn";
+import { useLayout, type WorkspaceChangesTarget } from "../lib/layout";
+import { useThreadMutationPending } from "../lib/thread-mutations";
 import { ConversationReview } from "./ConversationReview";
 import { FileRows } from "./FileRows";
 import { PullRequestLink } from "./ThreadPullRequest";
-import { useRpc, useRpcMutation } from "../lib/client";
-import { useThreadMutationPending } from "../lib/thread-mutations";
-import { useLayout, type WorkspaceChangesTarget } from "../lib/layout";
 
 const DiffView = lazy(() => import("../components/DiffView").then((m) => ({ default: m.DiffView })));
 
@@ -33,7 +33,6 @@ export function ChangesPanel({ thread, project, task }: { thread?: ThreadSummary
   const diff = thread ? threadDiff : projectDiff;
   const uncommitted = thread ? headDiff : projectDiff;
   const team = Boolean(thread?.teamInstanceId);
-  const runtime = useRpc("orchestration.runtime", { threadId: thread?.id ?? "" }, { enabled: team, refetchInterval: 8000 });
   const threadCommit = useRpcMutation("review.commitThread");
   const projectCommit = useRpcMutation("review.commitProject");
   const commit = thread ? threadCommit : projectCommit;
@@ -44,7 +43,7 @@ export function ChangesPanel({ thread, project, task }: { thread?: ThreadSummary
   const patch = diff.data?.patch ?? "";
   const stat = patchStat(patch);
   const where = thread?.workspaceMode === "worktree" ? "this thread's worktree" : project.name;
-  const actions = teamGitActions(team, runtime);
+  const actions = threadGitActions(team);
   const threadMutationPending = useThreadMutationPending(thread?.id ?? "");
   const busy = commit.isPending || (team && threadMutationPending);
   const step = commitStep({ thread, project, uncommitted, team: actions, committing: commit.isPending });
@@ -55,7 +54,6 @@ export function ChangesPanel({ thread, project, task }: { thread?: ThreadSummary
   const refresh = () => {
     void diff.refetch();
     if (thread && comparison !== "head") void headDiff.refetch();
-    if (team) void runtime.refetch();
   };
   useEffect(() => {
     if (scoped?.commit) {
@@ -100,11 +98,6 @@ export function ChangesPanel({ thread, project, task }: { thread?: ThreadSummary
       </>
     );
   }
-  const refreshTeam = (
-    <TextButton type="button" disabled={busy || runtime.isFetching} underline onClick={refresh}>
-      Refresh team status
-    </TextButton>
-  );
 
   return (
     <div className="h-full flex flex-col min-h-0">
@@ -152,7 +145,7 @@ export function ChangesPanel({ thread, project, task }: { thread?: ThreadSummary
           >
             {actions.commit.reason ? (
               <p role="status" className="text-sm text-ink-3 mb-3">
-                {actions.commit.reason} {refreshTeam}
+                {actions.commit.reason}
               </p>
             ) : null}
             {uncommitted.isError ? (
@@ -171,11 +164,7 @@ export function ChangesPanel({ thread, project, task }: { thread?: ThreadSummary
           </CommitSheet>
         ) : null}
       </PanelBar>
-      {commitReason ? (
-        <PanelNotice>
-          {commitReason} {refreshTeam}
-        </PanelNotice>
-      ) : null}
+      {commitReason ? <PanelNotice>{commitReason}</PanelNotice> : null}
       {notice ? <PanelNotice>{notice}</PanelNotice> : null}
       <div className="flex-1 min-h-0 flex flex-col">{workspaceContent}</div>
     </div>

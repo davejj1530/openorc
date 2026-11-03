@@ -1,14 +1,14 @@
+import type { Project, ReviewDiff, RpcMethod, RpcParams, RpcResults, ThreadSummary } from "@openorc/protocol";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
-import { QueryClientProvider } from "@tanstack/react-query";
-import type { Project, ReviewDiff, RpcMethod, RpcParams, RpcResults, ThreadSummary } from "@openorc/protocol";
 import { Composer, ComposerChoice } from "../../apps/desktop/src/renderer/src/components/Composer";
-import { Laptop, GitBranch } from "../../apps/desktop/src/renderer/src/components/icons";
+import { GitBranch, Laptop } from "../../apps/desktop/src/renderer/src/components/icons";
 import { Panel } from "../../apps/desktop/src/renderer/src/components/Panel";
+import { invalidateTags, queryClient } from "../../apps/desktop/src/renderer/src/lib/client";
 import { useComposerChanges } from "../../apps/desktop/src/renderer/src/lib/composer-changes";
 import { useLayout } from "../../apps/desktop/src/renderer/src/lib/layout";
 import { core } from "../../apps/desktop/src/renderer/src/lib/rpc";
-import { invalidateTags, queryClient } from "../../apps/desktop/src/renderer/src/lib/client";
 import { useTheme, type ThemeChoice } from "../../apps/desktop/src/renderer/src/lib/theme";
 
 const project: Project = {
@@ -24,7 +24,6 @@ const project: Project = {
 let dirty = true;
 let binary = false;
 let failCommit = false;
-let blocked = false;
 const calls: { method: string; input: unknown }[] = [];
 const diff = (): ReviewDiff => ({
   baseSha: null,
@@ -41,10 +40,6 @@ core.call = async <M extends RpcMethod>(method: M, input: RpcParams<M>): Promise
     if (failCommit) throw Error("Commit could not be completed. Retry.");
     dirty = false;
     result = { sha: "abcdef1234567" };
-  }
-  if (method === "orchestration.runtime") {
-    const action = { allowed: !blocked, reason: blocked ? "The team is still working." : null };
-    result = { executions: [], actions: { commit: action, push: action, createPr: action } };
   }
   if (method === "system.info") result = { gh: { installed: false } };
   if (method === "agents.models") result = [{ agent: "codex", id: "gpt-6-astra", label: "GPT-6-Astra", isDefault: true, efforts: ["high", "xhigh", "ultra"] }];
@@ -70,7 +65,7 @@ function App() {
     branch,
     teamInstanceId: team ? "team" : null,
   } as ThreadSummary;
-  const changes = useComposerChanges({ kind: source, id: source, projectName: project.name, team });
+  const changes = useComposerChanges({ kind: source, id: source, projectName: project.name, thread });
   Object.assign(window, {
     changesSmoke: {
       calls,
@@ -91,10 +86,8 @@ function App() {
       failCommit: (next: boolean) => {
         failCommit = next;
       },
-      team: (next: boolean, isBlocked = false) => {
-        blocked = isBlocked;
+      team: (next: boolean) => {
         setTeam(next);
-        invalidateTags(["orchestration"], { immediate: true });
       },
       close: () => useLayout.getState().setPanel(false),
       layout: () => useLayout.getState(),

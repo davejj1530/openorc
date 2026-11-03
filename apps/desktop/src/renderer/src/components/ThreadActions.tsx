@@ -1,28 +1,19 @@
-import { cloudOffered } from "../lib/cloud-offered";
-import { threadForkLabel, threadMoveLabel, threadDeletionDescription, threadDeleteBlockedReason, deleteButtonLabel } from "../lib/team-action-presentation";
+import { Menu } from "@base-ui/react/menu";
 import { canMoveToCloud, snoozePresets } from "@openorc/client";
+import type { ThreadSummary } from "@openorc/protocol";
 import { WORKSPACE_ID, isSubagentThread } from "@openorc/protocol";
 import { useRef, useState } from "react";
-import { Menu } from "@base-ui/react/menu";
-import type { ThreadSummary } from "@openorc/protocol";
-import { AlarmClock, AppWindow, Archive, ArchiveRestore, ChevronRight, Cloud, Columns2, GitBranch, GitFork, Laptop, MailOpen, Pencil, Pin, PinOff, Trash2 } from "./icons";
-import { orclingHome, useOrclings } from "../lib/orclings";
-import { Button, Dialog } from "./ui";
-import { useRpc, useRpcMutation } from "../lib/client";
-import { hasOpenTeamExecution } from "../lib/team-activity";
-import { MAX_THREAD_PANES, openThread, useRouter } from "../lib/router";
-import { useUi } from "../lib/ui";
-import { useTeamFork } from "../lib/use-team-fork";
-import { useThreadMutationPending } from "../lib/thread-mutations";
-import { useTeamMoveRequest } from "../lib/use-team-move-request";
-import { pendingTeamMove } from "../lib/team-move-request";
-import { teamDeleteReason, teamLifecycleReason, teamMoveReason } from "../lib/thread-action-reasons";
-import { useTeamDeleteRequest } from "../lib/use-team-delete-request";
-import { beginTeamDeleteRequest, finishTeamDeleteRequest } from "../lib/team-delete-request";
 import { CoversPreview } from "../lib/browser-preview";
-import { TeamRecoveryActions } from "./TeamRecoveryActions";
-import { menuItem, menuItemDanger, menuPopup, menuSeparator } from "./menu";
+import { useRpc, useRpcMutation } from "../lib/client";
+import { cloudOffered } from "../lib/cloud-offered";
+import { orclingHome, useOrclings } from "../lib/orclings";
+import { MAX_THREAD_PANES, openThread, useRouter } from "../lib/router";
+import { useThreadMutationPending } from "../lib/thread-mutations";
+import { useUi } from "../lib/ui";
 import { floatingGround } from "../lib/use-anchor-ground";
+import { AlarmClock, AppWindow, Archive, ArchiveRestore, ChevronRight, Cloud, Columns2, GitBranch, GitFork, Laptop, MailOpen, Pencil, Pin, PinOff, Trash2 } from "./icons";
+import { menuItem, menuItemDanger, menuPopup, menuSeparator } from "./menu";
+import { Button, Dialog } from "./ui";
 
 /** The parts a dropdown and a context menu share, so one item list serves both. */
 export type MenuParts = Pick<typeof Menu, "Item" | "Separator" | "SubmenuRoot" | "SubmenuTrigger" | "Portal" | "Positioner" | "Popup">;
@@ -70,44 +61,11 @@ function ThreadMenuContent({ thread, parts: M }: { thread: ThreadSummary; parts:
   const archived = Boolean(thread.archivedAt);
   const busy = thread.activity !== "idle";
   const team = Boolean(thread.teamInstanceId);
-  const runtime = useRpc("orchestration.runtime", { threadId: thread.id }, { enabled: team });
-  const teamFork = useTeamFork(thread.id, team);
-  const savedMove = useTeamMoveRequest(thread.id, team);
-  const moveRecovery = runtime.data?.actions?.moveRecovery;
-  const pendingMove = pendingTeamMove(savedMove.request, moveRecovery);
-  const moveReason = teamMoveReason({
-    team,
-    loadFailed: runtime.isError,
-    loaded: Boolean(runtime.data),
-    availability: runtime.data?.actions?.move,
-    hasRecovery: Boolean(moveRecovery),
-    savedError: savedMove.error,
-    hasPendingRequest: Boolean(pendingMove),
-  });
-  const moveNeedsRefresh = team && (runtime.isError || !runtime.data?.actions?.move || Boolean(savedMove.error));
-  const savedDelete = useTeamDeleteRequest(thread.id, team);
-  const deleteRecovery = runtime.data?.actions?.deleteRecovery;
-  const deleteReason = teamDeleteReason({
-    team,
-    loadFailed: runtime.isError,
-    loaded: Boolean(runtime.data),
-    availability: runtime.data?.actions?.delete,
-    hasRecovery: Boolean(deleteRecovery),
-    savedError: savedDelete.error,
-    hasPendingRequest: Boolean(savedDelete.request),
-  });
-  const deleteNeedsRefresh = team && (runtime.isError || !runtime.data?.actions?.delete || Boolean(savedDelete.error));
-  const pendingDelete = deleteRecovery ?? savedDelete.request;
   // Mutations can outlive a closed menu. Reopening it must not enable sibling writes.
   const mutating = useThreadMutationPending(thread.id);
-  const lifecycleReason = teamLifecycleReason({
-    team,
-    loadFailed: runtime.isError,
-    loaded: Boolean(runtime.data),
-    hasOpenExecution: Boolean(runtime.data && hasOpenTeamExecution(runtime.data.executions)),
-    hasPendingPublication: Boolean(runtime.data?.executions.some((execution) => execution.publications.some((publication) => publication.state !== "applied"))),
-  });
-  const lifecycleBlocked = Boolean(lifecycleReason) || (team && mutating);
+  const lifecycleBlocked = mutating;
+  const moveReason = team ? "This item is no longer available." : null;
+  const deleteReason = moveReason;
   const actionError = update.error;
 
   return (
@@ -119,35 +77,17 @@ function ThreadMenuContent({ thread, parts: M }: { thread: ThreadSummary; parts:
         <AppWindow size={13} /> Open in new window
       </M.Item>
       <M.Separator className={menuSeparator} />
-      {lifecycleReason ? (
-        <div className="max-w-64 px-2 py-1 text-xs text-ink-3" role="status">
-          {lifecycleReason}
-        </div>
-      ) : null}
-      {team && (teamFork.needsRefresh || moveNeedsRefresh || deleteNeedsRefresh) ? (
-        <M.Item
-          className={menuItem}
-          disabled={mutating || teamFork.refreshing}
-          closeOnClick={false}
-          onClick={() => {
-            teamFork.refresh();
-            savedMove.refresh();
-            savedDelete.refresh();
-          }}
-        >
-          Refresh team status
-        </M.Item>
-      ) : null}
-      {teamFork.failure || actionError ? (
+
+      {actionError ? (
         <div className="max-w-64 px-2 py-1 text-xs text-bad break-words" role="alert">
-          {teamFork.failure?.message ?? actionError?.message}
+          {actionError?.message}
         </div>
       ) : null}
-      <M.Item className={menuItem} disabled={team && mutating} onClick={() => patch({ pinned: !thread.pinnedAt })}>
+      <M.Item className={menuItem} disabled={mutating} onClick={() => patch({ pinned: !thread.pinnedAt })}>
         {thread.pinnedAt ? <PinOff size={13} /> : <Pin size={13} />} {thread.pinnedAt ? "Unpin" : "Pin"}
       </M.Item>
       <M.SubmenuRoot>
-        <M.SubmenuTrigger className={menuItem} disabled={lifecycleBlocked} title={lifecycleReason ?? undefined}>
+        <M.SubmenuTrigger className={menuItem} disabled={lifecycleBlocked}>
           <AlarmClock size={13} /> {thread.snoozedUntil ? "Snoozed" : "Snooze"}
           <ChevronRight size={14} className="ml-auto" />
         </M.SubmenuTrigger>
@@ -156,14 +96,14 @@ function ThreadMenuContent({ thread, parts: M }: { thread: ThreadSummary; parts:
           <M.Positioner sideOffset={4} alignOffset={-6} collisionPadding={8}>
             <M.Popup ref={floatingGround} className={menuPopup}>
               {snoozePresets().map((p) => (
-                <M.Item key={p.label} className={menuItem} disabled={lifecycleBlocked} closeOnClick={!team} onClick={() => patch({ snoozedUntil: p.until(new Date()) })}>
+                <M.Item key={p.label} className={menuItem} disabled={lifecycleBlocked} closeOnClick onClick={() => patch({ snoozedUntil: p.until(new Date()) })}>
                   {p.label}
                 </M.Item>
               ))}
               {thread.snoozedUntil ? (
                 <>
                   <M.Separator className={menuSeparator} />
-                  <M.Item className={menuItem} disabled={lifecycleBlocked} closeOnClick={!team} onClick={() => patch({ snoozedUntil: null })}>
+                  <M.Item className={menuItem} disabled={lifecycleBlocked} closeOnClick onClick={() => patch({ snoozedUntil: null })}>
                     Wake now
                   </M.Item>
                 </>
@@ -172,25 +112,15 @@ function ThreadMenuContent({ thread, parts: M }: { thread: ThreadSummary; parts:
           </M.Positioner>
         </M.Portal>
       </M.SubmenuRoot>
-      <M.Item className={menuItem} disabled={team && mutating} onClick={() => patch({ seen: thread.unread })}>
+      <M.Item className={menuItem} disabled={mutating} onClick={() => patch({ seen: thread.unread })}>
         <MailOpen size={13} /> {thread.unread ? "Mark as read" : "Mark as unread"}
       </M.Item>
       <M.Separator className={menuSeparator} />
-      <ThreadForkActions thread={thread} parts={M} teamFork={teamFork} recoveryKey={runtime.data?.actions?.forkRecovery?.requestKey} />
-      {team && moveReason ? (
-        <div role="status" className="max-w-64 px-2 py-1 text-xs text-ink-3 break-words">
-          {moveReason}
-        </div>
-      ) : null}
+      <ThreadForkActions thread={thread} parts={M} />
+
       {thread.projectId !== WORKSPACE_ID ? (
-        <M.Item
-          className={menuItem}
-          disabled={team ? Boolean(moveReason) || mutating : busy}
-          title={moveReason ?? undefined}
-          onClick={() => (team ? useUi.getState().setTeamMoveThread(thread.id) : useUi.getState().setMoveThread(thread.id))}
-        >
-          {(pendingMove?.to ?? (thread.workspaceMode === "worktree" ? "current" : "worktree")) === "current" ? <Laptop size={13} /> : <GitBranch size={13} />}{" "}
-          {threadMoveLabel({ cancelling: pendingMove?.phase === "cancel", pending: Boolean(pendingMove), mode: thread.workspaceMode })}
+        <M.Item className={menuItem} disabled={team ? Boolean(moveReason) || mutating : busy} title={moveReason ?? undefined} onClick={() => useUi.getState().setMoveThread(thread.id)}>
+          {thread.workspaceMode === "worktree" ? <Laptop size={13} /> : <GitBranch size={13} />} {thread.workspaceMode === "worktree" ? "Move to the checkout" : "Move to a worktree"}
         </M.Item>
       ) : null}
       {cloudOffered && canMoveToCloud(thread) ? (
@@ -199,26 +129,20 @@ function ThreadMenuContent({ thread, parts: M }: { thread: ThreadSummary; parts:
         </M.Item>
       ) : null}
       <M.Separator className={menuSeparator} />
-      <M.Item className={menuItem} disabled={lifecycleBlocked} title={lifecycleReason ?? undefined} closeOnClick={!team} onClick={() => patch({ archived: !archived })}>
+      <M.Item className={menuItem} disabled={lifecycleBlocked} closeOnClick onClick={() => patch({ archived: !archived })}>
         {archived ? <ArchiveRestore size={13} /> : <Archive size={13} />} {archived ? "Unarchive" : "Archive"}
       </M.Item>
-      {team && deleteReason ? (
-        <div role="status" className="max-w-64 px-2 py-1 text-xs text-ink-3 break-words">
-          {deleteReason}
-        </div>
-      ) : null}
-      <M.Item className={menuItemDanger} disabled={team && (Boolean(deleteReason) || mutating)} title={deleteReason ?? undefined} onClick={() => useUi.getState().setDeleteThread(thread.id)}>
-        <Trash2 size={13} /> {pendingDelete ? "Retry delete" : "Delete thread"}
+
+      <M.Item className={menuItemDanger} disabled={team || mutating} title={deleteReason ?? undefined} onClick={() => useUi.getState().setDeleteThread(thread.id)}>
+        <Trash2 size={13} /> {"Delete thread"}
       </M.Item>
     </>
   );
 }
 
-function ThreadForkActions({ thread, parts: M, teamFork, recoveryKey }: { thread: ThreadSummary; parts: MenuParts; teamFork: ReturnType<typeof useTeamFork>; recoveryKey?: string }) {
-  const team = Boolean(thread.teamInstanceId);
+function ThreadForkActions({ thread, parts: M }: { thread: ThreadSummary; parts: MenuParts }) {
   const fork = useRpcMutation("threads.fork");
   const mutating = useThreadMutationPending(thread.id);
-  const [recovering, setRecovering] = useState<string | null>(null);
   return (
     <>
       {fork.error ? (
@@ -226,55 +150,9 @@ function ThreadForkActions({ thread, parts: M, teamFork, recoveryKey }: { thread
           {fork.error.message}
         </p>
       ) : null}
-      {team && (teamFork.reason || teamFork.recoveryError) ? (
-        <div role="status" className="max-w-64 px-2 py-1 text-xs text-ink-3 break-words">
-          {teamFork.reason ?? teamFork.recoveryError}
-        </div>
-      ) : null}
-      <M.Item
-        className={menuItem}
-        disabled={team ? Boolean(teamFork.reason) || mutating : fork.isPending}
-        closeOnClick={!team}
-        title={teamFork.reason ?? (team ? "Create an independent task with this team and conversation history." : undefined)}
-        onClick={() =>
-          team
-            ? void teamFork.run()
-            : fork.mutate(
-                { id: thread.id },
-                {
-                  onSuccess: (t) => {
-                    if (!("rejected" in t)) openThread(t.id);
-                  },
-                },
-              )
-        }
-      >
-        <GitFork size={13} /> {threadForkLabel({ working: fork.isPending || teamFork.working, retry: Boolean(team && teamFork.pending) })}
+      <M.Item className={menuItem} disabled={Boolean(thread.teamInstanceId) || mutating || fork.isPending} onClick={() => fork.mutate({ id: thread.id }, { onSuccess: (t) => openThread(t.id) })}>
+        <GitFork size={13} /> {fork.isPending ? "Forking…" : "Fork"}
       </M.Item>
-      {recoveryKey ? (
-        <M.Item className={menuItem} closeOnClick={false} disabled={mutating} onClick={() => setRecovering(recoveryKey)}>
-          Cancel pending fork…
-        </M.Item>
-      ) : null}
-      <Dialog
-        open={Boolean(recovering)}
-        onOpenChange={(open) => {
-          if (!open) setRecovering(null);
-        }}
-        title="Cancel pending fork?"
-      >
-        {recovering ? (
-          <TeamRecoveryActions
-            id={thread.id}
-            kind="fork"
-            requestKey={recovering}
-            onResolved={() => {
-              setRecovering(null);
-              teamFork.refresh();
-            }}
-          />
-        ) : null}
-      </Dialog>
     </>
   );
 }
@@ -293,31 +171,22 @@ export function DeleteThreadDialog() {
 function DeleteThreadContent({ id, close }: { id: string; close: () => void }) {
   const thread = useRpc("threads.get", { id });
   const team = Boolean(thread.data?.teamInstanceId);
-  const runtime = useRpc("orchestration.runtime", { threadId: id }, { enabled: team });
-  const saved = useTeamDeleteRequest(id, team);
   const remove = useRpcMutation("threads.delete");
   const [failure, setFailure] = useState<string | null>(null);
   const inFlight = useRef(false);
-  const recovery = runtime.data?.actions?.deleteRecovery;
-  const pending = recovery ?? saved.request;
-  const tasks = thread.data?.taskCount ?? 0;
-  const copy = threadDeletionDescription({ team, tasks, subagent: isSubagentThread(thread.data) });
-  const blocked = threadDeleteBlockedReason({ loading: thread.isPending, exists: Boolean(thread.data), teamLoading: team && runtime.isPending, savedError: team && !recovery ? saved.error : null });
-  // A team delete carries one durable key: a lost reply is retried with the
-  // same key, a rejection is final, and only a definite outcome clears it.
+  const copy = isSubagentThread(thread.data)
+    ? "This saved conversation and its nested subagents are removed. The parent conversation and shared files stay."
+    : "The conversation is removed, and its worktree with it. Tasks it created stay, with their worktrees and branches.";
+  let blocked: string | null = null;
+  if (thread.isPending) blocked = "Checking this thread…";
+  else if (!thread.data) blocked = "This thread no longer exists.";
+  else if (team) blocked = "This item is no longer available.";
   const run = async () => {
     if (inFlight.current) return;
     inFlight.current = true;
     setFailure(null);
     try {
-      const request = team ? beginTeamDeleteRequest(id, recovery) : null;
-      const result = await remove.mutateAsync({ id, ...(request ? { requestKey: request.requestKey } : {}) });
-      if (result && "rejected" in result) {
-        if (request) finishTeamDeleteRequest(id, request);
-        setFailure(result.rejected || "This delete request was rejected.");
-        return;
-      }
-      if (request) finishTeamDeleteRequest(id, request);
+      await remove.mutateAsync({ id });
       close();
       useRouter.getState().closeThreadPane(id);
     } catch (error) {
@@ -326,7 +195,7 @@ function DeleteThreadContent({ id, close }: { id: string; close: () => void }) {
       inFlight.current = false;
     }
   };
-  const error = failure ?? recovery?.error ?? null;
+  const error = failure;
   return (
     <>
       <p className="text-base text-ink-2 mb-4">{copy}</p>
@@ -335,30 +204,17 @@ function DeleteThreadContent({ id, close }: { id: string; close: () => void }) {
           {blocked}
         </p>
       ) : null}
-      {pending && !failure ? <p className="text-sm text-ink-3 mb-3">A delete request for this conversation is awaiting confirmation. Retry confirms its outcome without repeating cleanup.</p> : null}
+
       {error ? (
         <div role="alert" className="text-sm text-bad mb-3 break-words">
           {error}
         </div>
       ) : null}
-      {recovery ? (
-        <div className="mb-4">
-          <TeamRecoveryActions
-            id={id}
-            kind="delete"
-            requestKey={recovery.requestKey}
-            canKeepFiles={tasks === 0}
-            onResolved={(state) => {
-              close();
-              if (state === "applied") useRouter.getState().closeThreadPane(id);
-            }}
-          />
-        </div>
-      ) : null}
+
       <div className="flex justify-end gap-2">
-        <Button onClick={close}>{pending ? "Close" : "Cancel"}</Button>
+        <Button onClick={close}>{"Cancel"}</Button>
         <Button variant="danger" disabled={remove.isPending || Boolean(blocked)} onClick={() => void run()}>
-          {deleteButtonLabel({ working: remove.isPending, pending: Boolean(pending) })}
+          {remove.isPending ? "Deleting…" : "Delete"}
         </Button>
       </div>
     </>

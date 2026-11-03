@@ -1,13 +1,12 @@
+import { WORKSPACE_ID, harnessIds, type Project, type RpcResults } from "@openorc/protocol";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_TEAM_LIMITS, WORKSPACE_ID, harnessIds, type Project, type RpcResults, type TeamDetail } from "@openorc/protocol";
 import { readNewThreadDraft, writeNewThreadDraft } from "../lib/new-thread-draft";
 import { useRouter } from "../lib/router";
 
 const start = vi.fn();
 const resetStart = vi.fn();
 let projects: Project[];
-let teams: TeamDetail[];
 let models: RpcResults["agents.models"];
 let system: RpcResults["system.info"];
 let branches: Record<string, string | null | undefined>;
@@ -27,7 +26,6 @@ vi.mock("../lib/client", async (original) => ({
       "system.info": system,
       "agents.models": models,
       "app.settings.get": settings,
-      "orchestration.list": teams,
       "orchestration.availability": { enabled: true, reason: null, maxHierarchyDepth: 3 },
     };
     return { data: data[method], isError: method === "projects.checkoutBranch" && branchError, isPending: false, isLoading: false, error: null, refetch: vi.fn() };
@@ -70,7 +68,6 @@ beforeEach(() => {
     defaultId: "work",
     accounts: ["personal", "work", "client"].map((id, createdAt) => ({ id, name: id, kind: "managed", enabled: true, createdAt, status: "ready", email: null, organization: null, message: null })),
   };
-  teams = [];
   settings = { defaultWorkspaceMode: "current", defaultHarness: null };
   models = [{ id: "codex-model", label: "Codex", agent: "codex", isDefault: true, efforts: ["medium"], defaultEffort: "medium" }];
   system = {
@@ -188,28 +185,6 @@ describe("NewThread", () => {
     expect(screen.getByRole("status").textContent).toContain("selected model is unavailable");
     fireEvent.keyDown(message, { key: "Enter", code: "Enter" });
     expect(start).not.toHaveBeenCalled();
-  });
-
-  it("keeps a recovered team request while preventing start for an archived team", () => {
-    const revision: TeamDetail["revision"] = {
-      id: "revision-1",
-      teamId: "team-1",
-      projectId: "p1",
-      number: 1,
-      name: "Team",
-      createdAt: 1,
-      limits: { ...DEFAULT_TEAM_LIMITS },
-      members: [{ key: "lead", name: "Lead", managerKey: null, responsibility: "Lead", settings: { agent: "codex", model: "codex-model", effort: "medium", fastMode: false } }],
-    };
-    teams = [{ revision, team: { id: "team-1", projectId: "p1", currentRevisionId: revision.id, archivedAt: 2, createdAt: 1, updatedAt: 2 } }];
-    writeNewThreadDraft({ ...readNewThreadDraft("p1"), prompt: "Retained direction", target: { kind: "team", revision, initialLeadOverrides: {} } });
-    render(<NewThread projectId="p1" />);
-    const message = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Message" });
-    expect(message.value).toBe("Retained direction");
-    expect(screen.getByRole("status").textContent).toContain("archived");
-    fireEvent.keyDown(message, { key: "Enter", code: "Enter" });
-    expect(start).not.toHaveBeenCalled();
-    expect(readNewThreadDraft("p1").prompt).toBe("Retained direction");
   });
 });
 

@@ -82,7 +82,7 @@
      so there is no fill step to give it an edge. */
   --shadow-overlay: 0 0 32px -12px rgb(0 0 0 / 0.24);
   --ring: var(--accent-ink);
-  /* Content planes (transcript cards, provider, memory and orchestration cards) are planes:
+  /* Content planes (transcript cards, provider and memory cards) are planes:
      one fill step off the tile ground, with no border or shadow. */
   --plane-fill: var(--surface);
   /* The selected segment of a --surface-2 track, such as the appearance modes. It sits one

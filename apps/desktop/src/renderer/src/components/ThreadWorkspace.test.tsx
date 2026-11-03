@@ -1,7 +1,7 @@
-import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ReactNode } from "react";
 import type { ConversationPlan } from "@openorc/protocol";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mutate, planThreads, documents, teamThreads, subagentThreads } = vi.hoisted(() => ({
   mutate: vi.fn(),
@@ -27,7 +27,6 @@ vi.mock("../lib/client", async (original) => {
         prUrl: `https://example.com/${params.id}`,
       };
     if (method === "threads.plans") return documents.get(params.id ?? "") ?? [];
-    if (method === "orchestration.runtime") return { executions: [{ actors: [{ id: "lead", runIds: ["run"] }] }] };
     return { id: "project", name: "Project" };
   };
   return { ...(await original<object>()), useRpc: (method: string, params: { id?: string }) => ({ isSuccess: true, data: rpcData(method, params) }), useRpcMutation: () => ({ mutate }) };
@@ -53,9 +52,9 @@ vi.mock("./Conversation", () => ({
   ),
 }));
 
-import { ThreadWorkspace } from "./ThreadWorkspace";
-import { useRouter } from "../lib/router";
 import { useLayout } from "../lib/layout";
+import { useRouter } from "../lib/router";
+import { ThreadWorkspace } from "./ThreadWorkspace";
 
 afterEach(() => {
   cleanup();
@@ -97,8 +96,7 @@ const document = (id: string, source: ConversationPlan["source"] = "native"): Co
   updatedAt: 1,
 });
 
-it.each([true])("waits for an emitted plan and preserves manual sidebar choices (team=%s)", (team) => {
-  if (team) teamThreads.add("b");
+it("waits for an emitted plan and preserves manual sidebar choices", () => {
   planThreads.add("b");
   useRouter.setState({ threadIds: ["a", "b"] });
   const view = render(<ThreadWorkspace />);
@@ -108,11 +106,6 @@ it.each([true])("waits for an emitted plan and preserves manual sidebar choices 
   documents.set("b", [document("discussion", "response")]);
   view.rerender(<ThreadWorkspace />);
   expect(useLayout.getState().panelOpen).toBe(false);
-  if (team) {
-    documents.set("b", [{ ...document("member-proposal"), runId: "vice-run" }]);
-    view.rerender(<ThreadWorkspace />);
-    expect(useLayout.getState().panelOpen).toBe(false);
-  }
   documents.set("b", [document("proposal")]);
   view.rerender(<ThreadWorkspace />);
   expect(useLayout.getState()).toMatchObject({ panelThreadId: "b", panelOpen: true, panelTab: "plan" });

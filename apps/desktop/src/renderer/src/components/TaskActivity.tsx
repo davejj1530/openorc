@@ -1,28 +1,12 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Project, Task } from "@openorc/protocol";
-import { useRpc, useRpcMutation, runs, useRuns } from "../lib/client";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { runs, useRpc, useRpcMutation, useRuns } from "../lib/client";
 import { openThread } from "../lib/router";
-import { TeamTaskConversation } from "./TeamConversation";
 import { Transcript } from "./Transcript";
 import { Button } from "./ui";
 
 /** Retained task history has no separate composer. Conversation happens in a thread. */
 export function TaskActivity({ task, project }: { task: Task; project: Project }) {
-  const ownership = useRpc("orchestration.taskState", { taskId: task.id });
-  const retained = Boolean(ownership.data?.ownerDeletedAt);
-  const runtime = useRpc("orchestration.runtime", { threadId: task.threadId ?? "" }, { enabled: Boolean(ownership.data) && !retained });
-  const savedRuntime = useRpc("orchestration.taskRuntime", { taskId: task.id }, { enabled: retained });
-  const data = retained ? savedRuntime.data?.runtime : runtime.data;
-  const selected = retained ? savedRuntime : runtime;
-  if (ownership.isPending || ownership.isError)
-    return <div className="p-6 text-sm text-ink-3">{ownership.isError ? <Button onClick={() => void ownership.refetch()}>Retry loading activity</Button> : "Loading activity…"}</div>;
-  if (ownership.data) {
-    if (!data)
-      return (
-        <div className="p-6 text-sm text-ink-3">{selected.isError || !selected.isPending ? <Button onClick={() => void selected.refetch()}>Retry loading activity</Button> : "Loading activity…"}</div>
-      );
-    return <TeamTaskConversation task={task} project={project} data={data} />;
-  }
   return <TaskHistory task={task} project={project} />;
 }
 
@@ -31,6 +15,7 @@ function TaskHistory({ task, project }: { task: Task; project: Project }) {
   const [historyError, setHistoryError] = useState<string | null>(null);
   const conversation = useRpcMutation("tasks.openThread");
   const stop = useRpcMutation("runs.close");
+  const actionError = conversation.error ?? stop.error;
   const latest = history.data?.at(-1);
   const stoppable = latest && ["starting", "running", "waiting", "idle"].includes(latest.state);
   const transcripts = useRuns((history.data ?? []).map((run) => run.id));
@@ -62,9 +47,9 @@ function TaskHistory({ task, project }: { task: Task; project: Project }) {
           Open thread
         </Button>
       </div>
-      {conversation.error || stop.error ? (
+      {actionError ? (
         <p role="alert" className="px-6 text-sm text-bad">
-          {(conversation.error ?? stop.error)?.message}
+          {actionError.message}
         </p>
       ) : null}
       {historyError ? (

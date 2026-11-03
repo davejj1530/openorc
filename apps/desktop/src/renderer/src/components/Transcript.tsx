@@ -374,14 +374,14 @@ type WorkTranscriptProps = ComponentProps<typeof TranscriptContents> & {
   ambient?: boolean;
   author?: string | undefined;
   showActivity?: boolean;
-  /** Each turn opens with its head: the agent, its model and where it stands. Team turns carry their own author line. */
+  /** Each turn opens with its head: the agent, its model and where it stands. */
   head?: boolean;
   /** A message to bring into view; the turn that holds it opens its work when the message is there. */
   reveal?: Reveal | undefined;
 };
 type WorkTurnProps = WorkTranscriptProps & { id?: string; latest?: boolean };
 
-/** The same disclosure hierarchy serves solo turns, warm sessions, and team members. */
+/** The disclosure hierarchy stays consistent across turns and warm sessions. */
 export function WorkTranscript({ blocks, live = false, onFork, reveal, ...props }: WorkTranscriptProps) {
   const turns = useSteadyTurns(blocks);
   // A fork carries the whole conversation and the agent's latest session, so it is offered only at the latest message.
@@ -508,7 +508,7 @@ const WorkTurn = memo(function WorkTurn({
   );
 });
 
-/** A team turn has its own author line; a failed or stopped one still says so. */
+/** A failed or stopped turn retains its author and outcome. */
 function TurnOutcome({ named, runId, failed }: { named: string | undefined; runId: string; failed: boolean }) {
   const author = useTurnAuthor(named, runId);
   return (

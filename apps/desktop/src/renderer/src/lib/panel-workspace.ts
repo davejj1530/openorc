@@ -32,9 +32,7 @@ function useDeviceReveal(surface: string | null): void {
 
 function scopedChanges(context: PanelContext, changes: ChangeSelection | null): ChangeSelection | null {
   if (!changes) return null;
-  if (changes.kind === "thread") return context.kind === "thread" && context.thread.id === changes.id ? changes : null;
-  if (context.kind === "task") return changes.taskId === context.task.id ? changes : null;
-  return context.kind === "thread" && !changes.taskId && changes.threadId === context.thread.id ? changes : null;
+  return context.kind === "thread" && context.thread.id === changes.id ? changes : null;
 }
 
 function requestedPage(context: PanelContext, tab: PanelTab, file: FileSelection | null, changes: ChangeSelection | null): PanelPage {

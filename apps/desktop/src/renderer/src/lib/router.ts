@@ -25,11 +25,10 @@ export type Route =
   | { view: "task"; taskId: string; tab: TaskTab; message?: MessageTarget }
   | { view: "memory" }
   | { view: "scheduled" }
-  | { view: "orchestration"; projectId?: string; teamId?: string }
   /** The Orcling designer: a new Orcling, or one being changed. */
   | { view: "orcling"; orclingId?: string }
-  /** A section, optionally with what to bring into view there: a provider's usage, or team execution. */
-  | { view: "settings"; section?: SettingsSection; provider?: "codex" | "claude"; setting?: "team-execution" }
+  /** A section, optionally with what to bring into view there: a provider's usage. */
+  | { view: "settings"; section?: SettingsSection; provider?: "codex" | "claude" }
   | { view: "diagnostics" };
 
 interface RouterState {
@@ -157,12 +156,7 @@ export function routeFromSpec(spec: string): Route | null {
     };
   if (view === "project" && id) return { view: "project", projectId: id };
   if (view === "pull" && id && Number(tab) > 0) return { view: "pull", projectId: id, number: Number(tab) };
-  if (view === "orchestration")
-    return {
-      view,
-      ...(id ? { projectId: id } : {}),
-      ...(tab ? { teamId: tab } : {}),
-    };
+
   if (view === "settings") return settingsFromSpec(id, tab);
   if (isPlainView(view)) return { view };
   return null;
@@ -172,16 +166,15 @@ function isSettingsSection(value: string | undefined): value is SettingsSection 
   return value !== undefined && settingsSections.has(value);
 }
 
-/** "settings:<section>", with a provider after usage or a setting after general. */
+/** "settings:<section>", with a provider after usage. */
 function settingsFromSpec(section: string | undefined, detail: string | undefined): Route {
   if (!isSettingsSection(section)) return { view: "settings" };
   if (section === "usage" && (detail === "codex" || detail === "claude")) return { view: "settings", section, provider: detail };
-  if (section === "general" && detail === "team-execution") return { view: "settings", section, setting: detail };
   return { view: "settings", section };
 }
 
 function settingsSpec(route: Extract<Route, { view: "settings" }>): string {
-  return route.section ? ["settings", route.section, route.provider ?? route.setting].filter(Boolean).join(":") : "settings";
+  return route.section ? ["settings", route.section, route.provider].filter(Boolean).join(":") : "settings";
 }
 
 function onboardingSpec(route: Extract<Route, { view: "onboarding" }>): string {
@@ -204,8 +197,6 @@ export function specFromRoute(route: Route): string {
       return `pull:${route.projectId}:${route.number}`;
     case "newtask":
       return `newtask${route.projectId ? `:${route.projectId}` : ""}`;
-    case "orchestration":
-      return `orchestration${route.projectId ? `:${route.projectId}${route.teamId ? `:${route.teamId}` : ""}` : ""}`;
     default:
       return route.view;
   }

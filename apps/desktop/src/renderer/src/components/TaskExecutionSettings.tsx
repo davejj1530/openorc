@@ -1,10 +1,9 @@
-import { useRef, useState } from "react";
 import { WORKSPACE_ID, type Task, type WorkspaceMode } from "@openorc/protocol";
-import { useProjectGit } from "../lib/project-git";
+import { useRef, useState } from "react";
 import { useRpc, useRpcMutation } from "../lib/client";
-import { useUi } from "../lib/ui";
-import { Select, TextButton } from "./ui";
+import { useProjectGit } from "../lib/project-git";
 import { taskExecutionDisabledReason } from "../lib/task-execution-availability";
+import { Select, TextButton } from "./ui";
 
 export function ExecutionLocationSelect({
   value,
@@ -35,41 +34,33 @@ export function ExecutionLocationSelect({
 export function useTaskExecutionLocation(task: Task, beforeChange: () => Promise<boolean>) {
   const owner = useRpc("tasks.executionThread", { taskId: task.id });
   const runs = useRpc("runs.listForTask", { taskId: task.id });
-  const team = useRpc("orchestration.taskState", { taskId: task.id }, { enabled: Boolean(task.threadId) });
-  const forwarding = useRpc("tasks.forwarding", { taskId: task.id });
   const save = useRpcMutation("tasks.update");
   const open = useRpcMutation("tasks.openThread");
   const move = useRpcMutation("threads.moveWorkspace");
   const [error, setError] = useState<string | null>(null);
   const [isPending, setPending] = useState(false);
   const pending = useRef<Promise<boolean> | null>(null);
-  const targetHandoff = forwarding.data?.forwarding?.targetTaskId === task.id ? forwarding.data.forwarding : null;
-  const ownWorkspace = Boolean(task.worktreePath || runs.data?.length || targetHandoff);
+  const ownWorkspace = Boolean(task.worktreePath || runs.data?.length);
   const executionThread = owner.data ?? null;
   const sharedConversation = executionThread && (executionThread.id === task.threadId || executionThread.taskCount > 1);
   const pendingExecution = executionThread?.hasStarted === false && !executionThread.worktreePath && !ownWorkspace;
   const mode = executionThread?.workspaceMode ?? task.workspaceMode;
   const branch = executionThread ? executionThread.branch : task.branch;
-  const loadError = runs.error || forwarding.error || (task.threadId ? team.error : null) || (!team.data?.ownerDeletedAt && owner.error);
-  const loading = runs.isPending || forwarding.isPending || (!team.data?.ownerDeletedAt && owner.isPending) || Boolean(task.threadId && team.isPending);
+  const loadError = runs.error || owner.error;
+  const loading = runs.isPending || owner.isPending;
   const activeLegacy = runs.data?.some((run) => run.state === "starting" || run.state === "running");
   const reason = taskExecutionDisabledReason({
     loadFailed: Boolean(loadError),
     loading,
     workspaceProject: task.projectId === WORKSPACE_ID,
-    savedTeam: Boolean(team.data),
+    savedTeam: Boolean(task.retiredTeam),
     sharedConversation: Boolean(sharedConversation),
     activeAgent: Boolean(activeLegacy),
     activeConversation: Boolean(executionThread && executionThread.activity !== "idle"),
-    handoffPreparing: targetHandoff?.state === "preparing",
   });
   const refresh = () => {
     void runs.refetch();
-    void forwarding.refetch();
     void owner.refetch();
-    if (task.threadId) {
-      void team.refetch();
-    }
   };
   const change = (to: WorkspaceMode) => {
     if (pending.current || reason || to === mode) return;
@@ -82,8 +73,7 @@ export function useTaskExecutionLocation(task: Task, beforeChange: () => Promise
         else {
           // The core resolves legacy task ownership. Never move its historical parent by guessing here.
           const thread = await open.mutateAsync({ taskId: task.id });
-          const result = await move.mutateAsync({ id: thread.id, to });
-          if ("rejected" in result) throw new Error(result.rejected);
+          await move.mutateAsync({ id: thread.id, to });
         }
         return true;
       } catch (failure) {
@@ -101,7 +91,6 @@ export function useTaskExecutionLocation(task: Task, beforeChange: () => Promise
     mode,
     branch,
     runs,
-    team,
     reason,
     error,
     isPending,
@@ -111,7 +100,6 @@ export function useTaskExecutionLocation(task: Task, beforeChange: () => Promise
     movesThread: Boolean((executionThread && !pendingExecution) || ownWorkspace),
     projectId: task.projectId,
     wait: () => pending.current ?? Promise.resolve(true),
-    manageTeam: task.threadId && team.data && !team.data.ownerDeletedAt ? () => useUi.getState().setTeamMoveThread(task.threadId) : null,
   };
 }
 
@@ -128,7 +116,7 @@ export function TaskExecutionSettings({ execution }: { execution: ReturnType<typ
               ? "Changing this location moves this task’s execution conversation and its uncommitted changes."
               : "This choice is saved for when work starts. Saving it does not start an agent or create a worktree.")}
         </p>
-        {execution.manageTeam ? <TextButton onClick={execution.manageTeam}>Manage team workspace</TextButton> : null}
+
         {execution.loadError ? <TextButton onClick={execution.refresh}>Retry execution settings</TextButton> : null}
         {execution.isPending ? (
           <p role="status" className="text-sm text-ink-3">

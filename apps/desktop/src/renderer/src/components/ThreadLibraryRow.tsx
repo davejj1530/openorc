@@ -1,21 +1,21 @@
-import { harnessShortName, isHarnessId, type ThreadSummary } from "@openorc/protocol";
 import { ContextMenu } from "@base-ui/react/context-menu";
+import { pullRequestMark, relativeTime, subagentStatusLabel, threadPlace, useTicking, workDuration, type ThreadPlace } from "@openorc/client";
+import { harnessShortName, isHarnessId, type ThreadSummary } from "@openorc/protocol";
 import type { ReactNode } from "react";
-import { CircleCheck, CircleDashed, Folder, GitBranch, GitPullRequest, X } from "./icons";
-import { HarnessLogo } from "./HarnessLogo";
-import { ThreadStatusIndicator } from "./ThreadStatusIndicator";
-import { ThreadRowHeadline } from "./ThreadHeadline";
-import { ThreadMenuItems, type MenuParts } from "./ThreadActions";
-import { menuPopup } from "./menu";
-import { useLayout } from "../lib/layout";
-import { useRouter } from "../lib/router";
-import { startThreadDrag, endThreadDrag } from "../lib/thread-drag";
 import { CoversPreview } from "../lib/browser-preview";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
-import { pullRequestMark, relativeTime, threadPlace, useTicking, workDuration, subagentStatusLabel, type ThreadPlace } from "@openorc/client";
+import { useLayout } from "../lib/layout";
 import { orclingById, useOrclings } from "../lib/orclings";
-import { OrclingAvatar } from "./OrclingAvatar";
+import { useRouter } from "../lib/router";
+import { endThreadDrag, startThreadDrag } from "../lib/thread-drag";
 import { floatingGround } from "../lib/use-anchor-ground";
+import { HarnessLogo } from "./HarnessLogo";
+import { OrclingAvatar } from "./OrclingAvatar";
+import { ThreadMenuItems, type MenuParts } from "./ThreadActions";
+import { ThreadRowHeadline } from "./ThreadHeadline";
+import { ThreadStatusIndicator } from "./ThreadStatusIndicator";
+import { CircleCheck, CircleDashed, Folder, GitBranch, GitPullRequest, X } from "./icons";
+import { menuPopup } from "./menu";
 
 const placeIcons: Record<ThreadPlace["kind"], ReactNode> = {
   branch: <GitBranch size={11} className="shrink-0" />,
@@ -109,8 +109,8 @@ export function ThreadRow({ thread, active, projectName, compact = false }: { th
             <span
               className="inline-flex shrink-0 items-center gap-1.5"
               role="img"
-              aria-label={team ? `Team agents: ${agentLabel}` : `Agent: ${agentLabel}`}
-              title={team ? `Team agents: ${agentLabel}` : agentLabel}
+              aria-label={team ? `Agents: ${agentLabel}` : `Agent: ${agentLabel}`}
+              title={team ? `Agents: ${agentLabel}` : agentLabel}
             >
               {providers.map(({ agent, count }) => (
                 <span key={agent} className="inline-flex items-center gap-1">

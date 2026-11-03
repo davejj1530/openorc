@@ -1,18 +1,5 @@
+import { executionMode, harnessAvailability, harnessIds, WORKSPACE_ID, type AppSettings, type HarnessId, type ModelOption, type Project, type RpcParams, type SystemInfo } from "@openorc/protocol";
 import { describe, expect, it } from "vitest";
-import {
-  DEFAULT_TEAM_LIMITS,
-  executionMode,
-  harnessAvailability,
-  harnessIds,
-  WORKSPACE_ID,
-  type AppSettings,
-  type HarnessId,
-  type ModelOption,
-  type Project,
-  type RpcParams,
-  type SystemInfo,
-  type TeamRevision,
-} from "@openorc/protocol";
 import { decodeNewThreadDraft, newThreadChoice, newThreadStartInput, newThreadWorkspaceMode, targetModel } from "./new-thread.js";
 
 const option = (agent: ModelOption["agent"], id: string, extra: Partial<ModelOption> = {}): ModelOption => ({
@@ -66,14 +53,14 @@ const projects: Record<string, { project: Project; canBranch: boolean }> = {
   checking: { project: project("p-checking", "/code/checking"), canBranch: true },
 };
 
-const revision: TeamRevision = {
+const revision = {
   id: "revision-1",
   teamId: "team-1",
   projectId: "p-repo",
   number: 1,
   name: "Team",
   createdAt: 1,
-  limits: { ...DEFAULT_TEAM_LIMITS },
+  limits: {},
   members: [{ key: "lead", name: "Lead", managerKey: null, responsibility: "Lead", settings: { agent: "claude", model: "opus", effort: "max", fastMode: false } }],
 };
 
@@ -295,21 +282,6 @@ const rows: (Row & { expected: Record<string, unknown> })[] = [
     expected: { agent: "codex", model: "gpt-main", effort: undefined, fastMode: true, mode: "act", permissionMode: "trusted", execution: "trusted", workspaceMode: "current" },
   },
   {
-    name: "a saved team",
-    project: "repo",
-    models: "full",
-    signedIn: both,
-    settings: worktree,
-    saved: { projectId: "p-repo", target: { kind: "team", revision, initialLeadOverrides: { effort: "high" } } },
-    expected: {
-      executionTarget: { kind: "team", teamRevisionId: "revision-1", initialLeadOverrides: { effort: "high" } },
-      mode: "act",
-      permissionMode: "review",
-      execution: "review",
-      workspaceMode: "worktree",
-    },
-  },
-  {
     name: "a saved Orcling",
     project: "repo",
     models: "full",
@@ -418,24 +390,10 @@ describe("new thread defaults", () => {
 });
 
 describe("new thread drafts", () => {
-  it("preserves the exact saved revision and applies lead overrides without editing it", () => {
-    const team = {
-      ...revision,
-      members: [
-        ...revision.members,
-        { key: "worker", name: "Worker", managerKey: "lead", responsibility: "Implement", settings: { agent: "codex" as const, model: "gpt-mini", effort: "low", fastMode: false } },
-      ],
-    };
-    const draft = decodeNewThreadDraft("p-repo", {
-      projectId: "p-repo",
-      prompt: "Keep my request",
-      target: { kind: "team", revision: team, initialLeadOverrides: { effort: "high", fastMode: true } },
-      mode: "plan",
-      workspace: "current",
-    });
-    expect(draft).toMatchObject({ prompt: "Keep my request", target: { kind: "team", revision: { id: "revision-1", number: 1 } }, mode: "plan", workspace: "current" });
-    expect(targetModel(draft.target)).toEqual({ agent: "claude", model: "opus", effort: "high", fastMode: true });
-    expect(revision.members[0]?.settings).toMatchObject({ effort: "max", fastMode: false });
+  it("replaces saved removal copy without losing the draft", () => {
+    const draft = decodeNewThreadDraft("p-repo", { prompt: "Unsaved direction", target: { kind: "unavailable", label: "Saved team", reason: "Choose the team again." } });
+    expect(draft.prompt).toBe("Unsaved direction");
+    expect(draft.target).toEqual({ kind: "unavailable", label: "Saved selection", reason: "Choose a model or an Orcling to continue." });
   });
 
   it.each([

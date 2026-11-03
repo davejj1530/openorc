@@ -1,13 +1,13 @@
+import type { Project, ReviewDiff, RpcMethod, RpcParams, RpcResults, ThreadSummary } from "@openorc/protocol";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, renderHook, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { Project, ReviewDiff, RpcMethod, RpcParams, RpcResults, ThreadSummary } from "@openorc/protocol";
-import { Composer } from "./Composer";
-import { ChangesPanel } from "../panels/ChangesPanel";
+import { invalidateTags, queryClient } from "../lib/client";
 import { useComposerChanges } from "../lib/composer-changes";
 import { useLayout, type WorkspaceChangesTarget } from "../lib/layout";
 import { core } from "../lib/rpc";
-import { invalidateTags, queryClient } from "../lib/client";
+import { ChangesPanel } from "../panels/ChangesPanel";
+import { Composer } from "./Composer";
 
 vi.mock("./DiffView", () => ({ DiffView: () => <div>Diff viewer</div> }));
 const project: Project = {
@@ -59,7 +59,6 @@ const thread: ThreadSummary = {
   openTaskCount: 0,
 };
 let dirty: boolean;
-let blocked: boolean;
 let failCommit: boolean;
 let failRead: boolean;
 const calls: { method: string; params: unknown }[] = [];
@@ -68,7 +67,6 @@ const binary: ReviewDiff = { ...clean, files: [{ path: "image.png", status: "unt
 
 beforeEach(() => {
   dirty = true;
-  blocked = false;
   failCommit = false;
   failRead = false;
   calls.length = 0;
@@ -87,10 +85,6 @@ beforeEach(() => {
       dirty = false;
       return { sha: "1234567" } as RpcResults[M];
     }
-    if (method === "orchestration.runtime") {
-      const action = { allowed: !blocked, reason: blocked ? "Team is working" : null };
-      return { actions: { commit: action, push: action, createPr: action } } as RpcResults[M];
-    }
     if (method === "system.info") return { gh: { installed: false } } as RpcResults[M];
     const result: unknown = [];
     return result as RpcResults[M];
@@ -103,7 +97,7 @@ afterEach(() => {
 });
 
 function Surface({ source, team = false }: { source: WorkspaceChangesTarget; team?: boolean }) {
-  const changes = useComposerChanges({ ...source, projectName: project.name, team });
+  const changes = useComposerChanges({ ...source, projectName: project.name, thread: source.kind === "thread" ? { ...thread, teamInstanceId: team ? "team" : null } : undefined });
   const request = useLayout((s) => s.workspaceChanges);
   const open = useLayout((s) => s.panelOpen);
   return (
@@ -170,7 +164,6 @@ it("keeps the commit message and strip on failure, then refreshes on retry", asy
 });
 
 it("blocks team commits while leaving review available", async () => {
-  blocked = true;
   mount({ kind: "thread", id: "thread" }, true);
   const commit = await screen.findByRole<HTMLButtonElement>("button", { name: "Commit changes" });
   await waitFor(() => expect(commit.disabled).toBe(true));

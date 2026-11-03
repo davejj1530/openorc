@@ -1,4 +1,4 @@
-import { WORKSPACE_ID, type Project, type Thread, type WorkspaceMode } from "@openorc/protocol";
+import { WORKSPACE_ID, type Project, type WorkspaceMode } from "@openorc/protocol";
 import type { ConversationScope } from "../components/Conversation";
 
 export function conversationWorkspaceMode({ scope, firstTaskRun, selected }: { scope: ConversationScope; firstTaskRun: boolean; selected: WorkspaceMode | null }): WorkspaceMode {
@@ -45,48 +45,4 @@ export function conversationEmptyTitle({ count, firstTaskRun }: { count: number;
 export function workspaceDestination({ mode, rootPath, taskPath }: { mode: WorkspaceMode; rootPath: string; taskPath: string | null }): string {
   if (mode === "current") return rootPath;
   return taskPath || "A new isolated worktree will be created on send.";
-}
-
-export function durableActionLabel({ working, pending, labels }: { working: boolean; pending: boolean; labels: readonly [idle: string, pending: string, working: string] }): string {
-  if (working) return labels[2];
-  return pending ? labels[1] : labels[0];
-}
-
-export function teamMessageHint({
-  active,
-  hasMembers,
-  hasMention,
-  canSteer,
-  steerReason,
-  mentionHint,
-}: {
-  active: boolean;
-  hasMembers: boolean;
-  hasMention: boolean;
-  canSteer: boolean;
-  steerReason: string | null | undefined;
-  mentionHint: string;
-}): string {
-  if (active) return `Enter sends to the active turn where supported. Queue keeps it for the next turn. ${!hasMention && !canSteer ? (steerReason ?? "Waiting for delivery availability.") : ""}`;
-  return hasMembers ? mentionHint : "The next message starts this saved team with its current files.";
-}
-
-export function teamAttentionLabel({ approval, question }: { approval: boolean; question: boolean }): string {
-  if (!approval) return "Needs attention";
-  return question ? "Question" : "Approval";
-}
-
-export function teamActorStateLabel({ pending, heldForPlan, stateLabel }: { pending: boolean; heldForPlan: boolean; stateLabel: string }): string {
-  if (pending) return "Needs you";
-  return heldForPlan ? "Waiting for Act" : stateLabel;
-}
-
-export function teamReplyForkDescription({ mutating, saved }: { mutating: boolean; saved: boolean }): string {
-  if (mutating) return "Wait for the current task action to finish.";
-  return saved ? "Confirm the saved fork from this lead turn." : "Create an independent team task with history and files through this lead turn.";
-}
-
-/** The team's composer names its actual working copy, including a custom folder. */
-export function teamConversationLocation(thread: Thread, project: Project) {
-  return { label: thread.workspaceMode === "current" ? "Local checkout" : "Worktree", branch: thread.branch, directory: thread.workingDirectory ?? thread.worktreePath ?? project.rootPath };
 }

@@ -1,29 +1,13 @@
-import { useState } from "react";
+import { formatBytes, relativeTime, shortSha } from "@openorc/client";
 import { harnessName, type Project, type Task, type TaskPriority, type TaskStatus } from "@openorc/protocol";
+import { useState } from "react";
 import { Copy, MessageSquare, Play, Trash2 } from "../components/icons";
 import { PriorityIcon, priorityLabel, priorityOrder, statusLabel, statusOrder } from "../components/status";
 import { Badge, Button, Dialog, Field, IconButton, Input, Select, StatusDot, Textarea, TextButton } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { newThread, openTask, openThread } from "../lib/router";
-import { formatBytes, relativeTime, shortSha } from "@openorc/client";
-import { TeamTaskAdmissions, TeamTaskStart } from "../components/TeamTaskStart";
-import { DeleteRetainedOwnerContent } from "../components/TeamRetainedDelete";
-import { useTaskFields } from "./useTaskFields";
 import "./task-details.css";
-
-const TASK_WORKSPACE_REASONS = {
-  working: "The team is working on this task. Workspace changes are unavailable; task status can still be changed.",
-  loadFailed: "Task ownership could not be checked. Retry before changing its execution or workspace.",
-  loading: "Checking task ownership…",
-} as const;
-
-function taskWorkspaceBlockedReason(input: { hasThread: boolean; ownershipLoaded: boolean; working: boolean; loadFailed: boolean; loading: boolean }): string | null {
-  if (!input.hasThread) return null;
-  if (input.ownershipLoaded) return input.working ? TASK_WORKSPACE_REASONS.working : null;
-  if (input.loadFailed) return TASK_WORKSPACE_REASONS.loadFailed;
-  if (input.loading) return TASK_WORKSPACE_REASONS.loading;
-  return null;
-}
+import { useTaskFields } from "./useTaskFields";
 
 function taskWorkspaceLabel(mode: Task["workspaceMode"], worktreePath: string | null | undefined): string {
   if (mode !== "worktree") return "Current checkout";
@@ -49,19 +33,8 @@ function TaskDetails({ task: t, project: p }: { task: Task; project: Project }) 
   const startTask = useRpcMutation("tasks.start");
   const usage = useRpc("workspace.usage", { taskId: t.id }, { enabled: Boolean(t.worktreePath), staleTime: 60_000 });
   const runs = useRpc("runs.listForTask", { taskId: t.id });
-  const ownership = useRpc("orchestration.taskState", { taskId: t.id }, { enabled: Boolean(t.threadId) });
-  // A deleted owner is hidden from public thread reads; its task reaches it through Agent.
-  const ownerDeleted = Boolean(ownership.data?.ownerDeletedAt);
-  // A deleted owner's saved tasks are deleted together with it, through the same durable team delete.
-  const ownerDeletion = ownership.data?.deleteOwner;
-  const thread = useRpc("threads.get", { id: t.threadId ?? "" }, { enabled: Boolean(t.threadId) && !ownerDeleted });
-  const blockedReason = taskWorkspaceBlockedReason({
-    hasThread: Boolean(t.threadId),
-    ownershipLoaded: Boolean(ownership.data),
-    working: Boolean(ownership.data?.working),
-    loadFailed: ownership.isError,
-    loading: ownership.isPending,
-  });
+  const thread = useRpc("threads.get", { id: t.threadId ?? "" }, { enabled: Boolean(t.threadId) });
+  const blockedReason = t.retiredTeam ? "This item is no longer available." : null;
   const [deleting, setDeleting] = useState(false);
   const [deleteBranch, setDeleteBranch] = useState(false);
   const impact = useRpc("workspace.removalImpact", { taskId: t.id }, { enabled: deleting && deleteBranch, staleTime: 0 });
@@ -74,30 +47,13 @@ function TaskDetails({ task: t, project: p }: { task: Task; project: Project }) 
       {blockedReason ? (
         <p role="status" className="text-sm text-ink-3">
           {blockedReason}
-          {ownership.isError ? (
-            <>
-              {" "}
-              <TextButton type="button" underline onClick={() => void ownership.refetch()}>
-                Retry
-              </TextButton>
-            </>
-          ) : null}
         </p>
       ) : null}
-      {ownership.data ? (
-        <>
-          <TeamTaskStart key={t.id} task={ownership.data} />
-          <TeamTaskAdmissions task={ownership.data} />
-          <Button size="lg" className="justify-self-start" onClick={() => openTask(t.id, "spec")}>
-            Open Overview
-          </Button>
-        </>
-      ) : null}
-      {t.status === "proposed" && !ownership.data ? (
+
+      {t.status === "proposed" && !t.retiredTeam ? (
         <div className="grid gap-3 rounded-2xl bg-surface-2 px-4 py-3.5 text-base text-ink-2">
           <p className="flex items-center gap-2">
             <StatusDot tone="attention" />
-            {ownership.data ? "Proposed by the team. Send direction through the lead to continue." : "Proposed by the agent. Edit the spec if you like, then start it."}
           </p>
           <div>
             <Button
@@ -123,7 +79,7 @@ function TaskDetails({ task: t, project: p }: { task: Task; project: Project }) 
         </div>
       ) : null}
 
-      {!ownership.data ? (
+      {!t.retiredTeam ? (
         <div className="grid grid-cols-1 min-w-0 gap-2">
           <Field label="Spec" hint="Attached to every prompt for this task. Say what done looks like.">
             <Textarea variant="sheet" rows={8} value={fields.spec} onChange={(e) => fields.setSpec(e.target.value)} className="font-mono text-sm" />
@@ -133,7 +89,7 @@ function TaskDetails({ task: t, project: p }: { task: Task; project: Project }) 
           </Field>
           {fields.dirty ? (
             <div className="flex gap-2">
-              <Button variant="primary" disabled={fields.isPending} onClick={fields.save}>
+              <Button variant="primary" disabled={Boolean(t.retiredTeam) || fields.isPending} onClick={fields.save}>
                 Save
               </Button>
               <Button variant="ghost" onClick={fields.discard}>
@@ -147,7 +103,13 @@ function TaskDetails({ task: t, project: p }: { task: Task; project: Project }) 
 
       <div className="task-details-rows grid text-base">
         <Row label="Status">
-          <Select aria-label="Status" value={t.status} disabled={fields.isPending} onChange={(e) => fields.changeStatus(e.target.value as TaskStatus)} className="h-7 text-sm w-full">
+          <Select
+            aria-label="Status"
+            value={t.status}
+            disabled={Boolean(t.retiredTeam) || fields.isPending}
+            onChange={(e) => fields.changeStatus(e.target.value as TaskStatus)}
+            className="h-7 text-sm w-full"
+          >
             {statusOrder.map((s) => (
               <option key={s} value={s}>
                 {statusLabel[s]}
@@ -163,7 +125,7 @@ function TaskDetails({ task: t, project: p }: { task: Task; project: Project }) 
         <Row label="Priority">
           <div className="flex items-center gap-1.5">
             <PriorityIcon priority={t.priority} />
-            <Select value={t.priority} disabled={fields.isPending} onChange={(e) => fields.changePriority(e.target.value as TaskPriority)} className="h-7 text-sm w-full">
+            <Select value={t.priority} disabled={Boolean(t.retiredTeam) || fields.isPending} onChange={(e) => fields.changePriority(e.target.value as TaskPriority)} className="h-7 text-sm w-full">
               {priorityOrder.map((s) => (
                 <option key={s} value={s}>
                   {priorityLabel[s]}
@@ -174,11 +136,11 @@ function TaskDetails({ task: t, project: p }: { task: Task; project: Project }) 
         </Row>
         {t.threadId ? (
           <Row label="Thread">
-            {ownerDeleted ? (
+            {thread.data === null ? (
               <div className="flex items-center gap-2 min-w-0 text-ink-2">
                 <span className="truncate">Deleted conversation</span>
                 <TextButton onClick={() => openTask(t.id, "chat")} className="shrink-0 text-ink-3 hover:text-ink">
-                  Open team activity
+                  Open saved activity
                 </TextButton>
               </div>
             ) : (
@@ -250,54 +212,45 @@ function TaskDetails({ task: t, project: p }: { task: Task; project: Project }) 
             Remove worktree
           </Button>
         ) : null}
-        <Button
-          variant="danger"
-          disabled={ownerDeletion ? !ownerDeletion.allowed : Boolean(blockedReason)}
-          title={ownerDeletion ? (ownerDeletion.reason ?? undefined) : (blockedReason ?? undefined)}
-          onClick={() => setDeleting(true)}
-        >
+        <Button variant="danger" disabled={Boolean(blockedReason)} title={blockedReason ?? undefined} onClick={() => setDeleting(true)}>
           <Trash2 size={13} /> Delete task
         </Button>
         {cleanup.error ? <div className="basis-full text-sm text-bad">{cleanup.error.message}</div> : null}
       </div>
 
-      <Dialog open={deleting} onOpenChange={setDeleting} title={ownerDeletion && ownerDeletion.taskIds.length > 1 ? `Delete ${ownerDeletion.taskIds.length} saved tasks?` : "Delete this task?"}>
-        {ownerDeletion && t.threadId ? (
-          <DeleteRetainedOwnerContent threadId={t.threadId} deletion={ownerDeletion} close={() => setDeleting(false)} onDeleted={() => newThread(p.id)} />
-        ) : (
-          <>
-            <p className="text-base text-ink-2 mb-3">{taskDeletionNotice(t, deleteBranch)}</p>
-            {t.branch && t.workspaceMode === "worktree" ? (
-              <label className="flex items-center gap-2 text-base mb-4">
-                <input type="checkbox" checked={deleteBranch} onChange={(e) => setDeleteBranch(e.target.checked)} />
-                Also delete branch <span className="font-mono text-sm">{t.branch}</span>
-              </label>
-            ) : null}
-            {deleteBranch ? <BranchLossNotice impact={impact} /> : null}
-            {remove.error ? <div className="text-sm text-bad mb-3">{remove.error.message}</div> : null}
-            <div className="flex justify-end gap-2">
-              <Button onClick={() => setDeleting(false)}>Cancel</Button>
-              <Button
-                variant="danger"
-                disabled={Boolean(blockedReason) || remove.isPending || (deleteBranch && !impact.data)}
-                onClick={() =>
-                  remove.mutate(
-                    { id: t.id, deleteBranch, ...(deleteBranch && impact.data ? { acceptLoss: { uncommitted: impact.data.uncommitted, commits: impact.data.commits } } : {}) },
-                    {
-                      onSuccess: () => {
-                        setDeleting(false);
-                        if (t.threadId && !ownerDeleted) openThread(t.threadId);
-                        else newThread(p.id);
-                      },
+      <Dialog open={deleting} onOpenChange={setDeleting} title="Delete this task?">
+        <>
+          <p className="text-base text-ink-2 mb-3">{taskDeletionNotice(t, deleteBranch)}</p>
+          {t.branch && t.workspaceMode === "worktree" ? (
+            <label className="flex items-center gap-2 text-base mb-4">
+              <input type="checkbox" checked={deleteBranch} onChange={(e) => setDeleteBranch(e.target.checked)} />
+              Also delete branch <span className="font-mono text-sm">{t.branch}</span>
+            </label>
+          ) : null}
+          {deleteBranch ? <BranchLossNotice impact={impact} /> : null}
+          {remove.error ? <div className="text-sm text-bad mb-3">{remove.error.message}</div> : null}
+          <div className="flex justify-end gap-2">
+            <Button onClick={() => setDeleting(false)}>Cancel</Button>
+            <Button
+              variant="danger"
+              disabled={Boolean(blockedReason) || remove.isPending || (deleteBranch && !impact.data)}
+              onClick={() =>
+                remove.mutate(
+                  { id: t.id, deleteBranch, ...(deleteBranch && impact.data ? { acceptLoss: { uncommitted: impact.data.uncommitted, commits: impact.data.commits } } : {}) },
+                  {
+                    onSuccess: () => {
+                      setDeleting(false);
+                      if (t.threadId && !(thread.data === null)) openThread(t.threadId);
+                      else newThread(p.id);
                     },
-                  )
-                }
-              >
-                {deleteBranch && loses ? "Delete task and that work" : "Delete"}
-              </Button>
-            </div>
-          </>
-        )}
+                  },
+                )
+              }
+            >
+              {deleteBranch && loses ? "Delete task and that work" : "Delete"}
+            </Button>
+          </div>
+        </>
       </Dialog>
     </div>
   );

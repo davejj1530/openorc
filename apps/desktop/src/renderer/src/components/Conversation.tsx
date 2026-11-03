@@ -1,30 +1,27 @@
-import { CloudStart, queueAfterStart } from "./CloudStart";
-import { conversationWorkspaceMode, conversationLocation, conversationEmptyHint, conversationEmptyTitle, workspaceDestination } from "../lib/conversation-status-presentation";
-import { WORKSPACE_ID, isSubagentThread } from "@openorc/protocol";
-import { SubagentConversation } from "./SubagentConversation";
-import { TaskForwarding } from "./TaskForwarding";
-import { SessionRecovery } from "./SessionRecovery";
-import { useCallback, useState } from "react";
-import { defaultHarnessId, harnessShortName, type Project, type Run, type Task, type ThreadSummary, type WorkspaceMode } from "@openorc/protocol";
-import { GitBranch, Laptop } from "./icons";
-import { Composer, type SlashCommand } from "./Composer";
-import { ComposerChoice } from "./ComposerChoice";
-import { Transcript } from "./Transcript";
-import { MessageQueue } from "./MessageQueue";
-import { BackgroundCommands } from "./BackgroundCommands";
-import { useTurnFooter } from "./TurnFooter";
-import { conversationActivity, conversationPlaceholder, conversationSteerReason, conversationSendDisabledReason, messageBody, processFit, type SubmitRequest } from "@openorc/client";
 import { useComposerChanges } from "../lib/composer-changes";
 import { useProjectGit } from "../lib/project-git";
-import { Button, Empty } from "./ui";
+import { conversationActivity, conversationPlaceholder, conversationSendDisabledReason, conversationSteerReason, messageBody, processFit, type SubmitRequest } from "@openorc/client";
+import { WORKSPACE_ID, defaultHarnessId, harnessShortName, isSubagentThread, type Project, type Run, type Task, type ThreadSummary, type WorkspaceMode } from "@openorc/protocol";
+import { useCallback, useState } from "react";
 import { useConversationSettings, useConversationTranscript, useRpc, useRpcMutation, useSubmit } from "../lib/client";
 import { useConversationDraft } from "../lib/conversation-draft";
+import { conversationEmptyHint, conversationEmptyTitle, conversationLocation, conversationWorkspaceMode, workspaceDestination } from "../lib/conversation-status-presentation";
 import { openThread, useRouter, type MessageTarget } from "../lib/router";
 import { useSkillCommands } from "../lib/skill-commands";
-import { useTurnFooters } from "../lib/turn-footers";
-import { TeamConversation, TeamTaskConversation } from "./TeamConversation";
-import { useOrclingConversation } from "./useOrclingConversation";
 import { ConversationVoice, useRunVoices } from "../lib/turn-authors";
+import { useTurnFooters } from "../lib/turn-footers";
+import { BackgroundCommands } from "./BackgroundCommands";
+import { CloudStart, queueAfterStart } from "./CloudStart";
+import { Composer, type SlashCommand } from "./Composer";
+import { ComposerChoice } from "./ComposerChoice";
+import { GitBranch, Laptop } from "./icons";
+import { MessageQueue } from "./MessageQueue";
+import { SessionRecovery } from "./SessionRecovery";
+import { SubagentConversation } from "./SubagentConversation";
+import { Transcript } from "./Transcript";
+import { useTurnFooter } from "./TurnFooter";
+import { Button, Empty } from "./ui";
+import { useOrclingConversation } from "./useOrclingConversation";
 
 export type ConversationScope = { kind: "task"; task: Task } | { kind: "thread"; thread: ThreadSummary };
 
@@ -36,97 +33,9 @@ export type ConversationScope = { kind: "task"; task: Task } | { kind: "thread";
  */
 type ConversationProps = { scope: ConversationScope; project: Project; toolbarTarget?: HTMLElement | null };
 
-export function Conversation({ scope, project, toolbarTarget }: ConversationProps) {
-  if (scope.kind === "task") {
-    if (scope.task.threadId) return <OwnedTaskConversation task={scope.task} project={project} />;
-    return (
-      <TaskForwarding task={scope.task}>
-        <IndividualConversation scope={scope} project={project} />
-      </TaskForwarding>
-    );
-  }
-  if (isSubagentThread(scope.thread)) return <SubagentConversation thread={scope.thread} project={project} />;
-  return <ThreadConversation scope={scope} project={project} toolbarTarget={toolbarTarget} />;
-}
-
-function ThreadConversation({ scope, project, toolbarTarget }: Omit<ConversationProps, "scope"> & { scope: Extract<ConversationScope, { kind: "thread" }> }) {
-  const pinned = Boolean(scope.thread.teamInstanceId);
-  const runtime = useRpc("orchestration.runtime", { threadId: scope.thread.id }, { enabled: pinned });
-  if (pinned && (runtime.isPending || !runtime.data))
-    return (
-      <div className="p-6 text-sm text-ink-3">
-        {runtime.isPending ? "Loading team activity…" : "Could not load team activity."}
-        {runtime.isError || (!runtime.isPending && !runtime.data) ? (
-          <Button size="sm" className="ml-2" onClick={() => void runtime.refetch()}>
-            Retry
-          </Button>
-        ) : null}
-      </div>
-    );
-  if (runtime.data && pinned)
-    return (
-      <TeamConversation
-        thread={scope.thread}
-        project={project}
-        data={runtime.data}
-        refresh={() => void runtime.refetch()}
-        refreshError={runtime.error?.message ?? null}
-        toolbarTarget={toolbarTarget}
-      />
-    );
+export function Conversation({ scope, project }: ConversationProps) {
+  if (scope.kind === "thread" && isSubagentThread(scope.thread)) return <SubagentConversation thread={scope.thread} project={project} />;
   return <IndividualConversation scope={scope} project={project} />;
-}
-
-/** Check saved-task ownership before choosing its activity endpoint. A hidden
- * owner must never look like an ordinary task after a failed or missing read. */
-function OwnedTaskConversation({ task, project }: { task: Task; project: Project }) {
-  const ownership = useRpc("orchestration.taskState", { taskId: task.id });
-  const retained = Boolean(ownership.data?.ownerDeletedAt);
-  const runtime = useRpc("orchestration.runtime", { threadId: task.threadId! }, { enabled: Boolean(ownership.data) && !retained });
-  const taskRuntime = useRpc("orchestration.taskRuntime", { taskId: task.id }, { enabled: retained });
-  if (ownership.isPending || ownership.isError)
-    return (
-      <div className="p-6 text-sm text-ink-3">
-        {ownership.isPending ? "Loading team activity…" : "Could not check task ownership."}
-        {ownership.isError ? (
-          <Button size="sm" className="ml-2" onClick={() => void ownership.refetch()}>
-            Retry
-          </Button>
-        ) : null}
-      </div>
-    );
-  if (!ownership.data) return <IndividualConversation scope={{ kind: "task", task }} project={project} />;
-  const selected = retained ? taskRuntime : runtime;
-  if (selected.isPending || !selected.data)
-    return (
-      <div className="p-6 text-sm text-ink-3">
-        {selected.isPending ? "Loading team activity…" : "Could not load team activity."}
-        {!selected.isPending ? (
-          <Button size="sm" className="ml-2" onClick={() => void selected.refetch()}>
-            Retry
-          </Button>
-        ) : null}
-      </div>
-    );
-  if (retained && taskRuntime.data)
-    return (
-      <TaskForwarding task={task} team>
-        <TeamConversation
-          key={`retained:${task.id}`}
-          retainedTaskId={task.id}
-          thread={taskRuntime.data.thread}
-          project={project}
-          data={taskRuntime.data.runtime}
-          refresh={() => void taskRuntime.refetch()}
-          refreshError={taskRuntime.error?.message ?? null}
-        />
-      </TaskForwarding>
-    );
-  return runtime.data ? (
-    <TaskForwarding task={task} team>
-      <TeamTaskConversation task={task} project={project} data={runtime.data} />
-    </TaskForwarding>
-  ) : null;
 }
 
 /**
@@ -153,8 +62,6 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   const runsQuery = useRpc(scope.kind === "task" ? "runs.listForTask" : "runs.listForThread", scope.kind === "task" ? { taskId: scope.task.id } : { threadId: scope.thread.id });
   const runs = runsQuery.data ?? [];
   const firstTaskRun = scope.kind === "task" && runs.length === 0;
-  const forwarding = useRpc("tasks.forwarding", { taskId: scope.kind === "task" ? scope.task.id : "" }, { enabled: scope.kind === "task" });
-  const forwardedFiles = Boolean(forwarding.data?.forwarding?.snapshot);
   const [selectedWorkspace, setWorkspace] = useState<WorkspaceMode | null>(null);
   const workspaceMode = conversationWorkspaceMode({ scope, firstTaskRun, selected: selectedWorkspace });
   const thread = scope.kind === "thread" ? scope.thread : null;
@@ -340,7 +247,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
                   },
                 ]}
                 onChange={setWorkspace}
-                disabled={busy || forwardedFiles || Boolean(scope.task.worktreePath) || !runsQuery.data}
+                disabled={busy || Boolean(scope.task.worktreePath) || !runsQuery.data}
               />
             ) : null}
           </Composer>

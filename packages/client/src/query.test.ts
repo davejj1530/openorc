@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
 import { fileReads, type FolderPath, type RpcMethod } from "@openorc/protocol";
 import { QueryObserver } from "@tanstack/react-query";
+import { describe, expect, it, vi } from "vitest";
 import { invalidatesFor, tagsFor } from "./query-tags.js";
 import { testClient } from "./test-fixtures/fake-connection.js";
 
@@ -20,7 +20,6 @@ const contract: Array<[RpcMethod, RpcMethod[]]> = [
   ["runs.start", ["runs.listForTask", "tasks.get", "inbox.list"]],
   // Diffs are not polled: every write to a checkout refreshes each view of it.
   ["review.commit", ["review.diff", "git.log", "review.snapshots", "review.threadDiff", "review.projectDiff"]],
-  ["tasks.forward", ["review.threadDiff", "review.projectDiff"]],
   ["review.push", ["git.log"]],
   ["review.comments.add", ["review.comments.list"]],
   ["review.comments.send", ["review.comments.list", "threads.get", "tasks.get"]],
@@ -32,30 +31,15 @@ const contract: Array<[RpcMethod, RpcMethod[]]> = [
   ["tasks.start", ["tasks.get", "threads.list", "inbox.list"]],
   ["runs.start", ["runs.listForThread", "threads.get"]],
   ["threads.fork", ["threads.list"]],
-  ["threads.moveWorkspace", ["threads.get", "review.threadDiff", "review.projectDiff", "git.threadLog", "orchestration.runtime"]],
-  ["threads.cancelMove", ["threads.get", "review.threadDiff", "git.threadLog", "orchestration.runtime", "threads.checkpoints"]],
-  ["threads.cancelTeamOperation", ["threads.get", "threads.list", "tasks.list", "inbox.list", "orchestration.runtime", "review.threadDiff", "threads.checkpoints"]],
+  ["threads.moveWorkspace", ["threads.get", "review.threadDiff", "review.projectDiff", "git.threadLog"]],
   ["threads.restore", ["review.threadDiff", "review.projectDiff", "threads.checkpoints"]],
   ["threads.queue", ["threads.get", "threads.list", "threads.lastMessage"]],
   ["threads.unqueue", ["threads.get"]],
-  ["threads.compact", ["runs.listForThread", "threads.get", "orchestration.runtime"]],
-  ["orchestration.compact", ["orchestration.runtime", "threads.get"]],
-  ["orchestration.retry", ["orchestration.runtime", "runs.listForThread", "tasks.list"]],
-  ["orchestration.cancelDirection", ["orchestration.runtime", "threads.get"]],
-  ["orchestration.workspace.retrySetup", ["orchestration.runtime", "orchestration.taskRuntime", "runs.listForThread", "tasks.list"]],
-  ["orchestration.workspace.acceptSetup", ["orchestration.runtime", "orchestration.taskRuntime", "runs.listForThread", "tasks.list"]],
-  ["orchestration.integration.retry", ["orchestration.runtime", "orchestration.taskRuntime", "threads.get"]],
-  ["orchestration.integration.accept", ["orchestration.runtime", "orchestration.taskRuntime", "threads.get"]],
-  ["orchestration.tasks.start", ["orchestration.taskState", "orchestration.runtime", "tasks.get", "threads.list", "runs.listForTask"]],
-  ["orchestration.tasks.retry", ["orchestration.taskState", "orchestration.runtime", "tasks.get", "review.comments.list"]],
-  ["orchestration.review.send", ["orchestration.taskState", "orchestration.runtime", "review.comments.list", "review.diff", "runs.listForTask"]],
-  ["review.comments.add", ["orchestration.taskState"]],
-  ["review.comments.remove", ["orchestration.taskState"]],
-  ["threads.update", ["orchestration.taskState", "orchestration.taskRuntime"]],
-  ["threads.delete", ["orchestration.runtime", "orchestration.taskState", "orchestration.taskRuntime"]],
-  ["orchestration.send", ["orchestration.runtime", "orchestration.taskRuntime"]],
-  ["orchestration.stop", ["orchestration.taskRuntime"]],
-  ["orchestration.configureLead", ["orchestration.taskRuntime"]],
+  ["threads.compact", ["runs.listForThread", "threads.get"]],
+  ["review.comments.add", []],
+  ["review.comments.remove", []],
+  ["threads.update", []],
+  ["threads.delete", []],
   ["threads.import", ["threads.list", "threads.importable"]],
   ["review.commitThread", ["review.threadDiff", "git.threadLog", "git.threadPushState", "threads.get"]],
   ["review.pushThread", ["git.threadLog", "git.threadPushState"]],
@@ -68,7 +52,6 @@ const contract: Array<[RpcMethod, RpcMethod[]]> = [
   ["schedules.delete", ["schedules.list"]],
   ["schedules.run", ["schedules.list", "threads.list"]],
   ["schedules.trigger", ["schedules.list", "threads.list"]],
-  ["orchestration.archive", ["schedules.list"]],
   ["memory.promote", ["memory.list"]],
   ["textGeneration.settings.set", ["textGeneration.settings.get"]],
   ["pulls.review.comment", ["pulls.review.get"]],

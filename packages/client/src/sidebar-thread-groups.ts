@@ -58,12 +58,17 @@ export function sidebarThreadPage({
   hidden?: ReadonlySet<string>;
 }): ThreadPage {
   const archived = filter === "archived";
-  const all = visibleThreadForest(fetched ?? [], archived, now, hidden);
+  const all = visibleThreadForest(
+    (fetched ?? []).filter((thread) => !thread.teamInstanceId),
+    archived,
+    now,
+    hidden,
+  );
   const roots = all.filter((thread) => !thread.parentThreadId);
   if (!archived && all.some((thread) => thread.parentThreadId))
     roots.sort((a, b) => Number(Boolean(b.pinnedAt)) - Number(Boolean(a.pinnedAt)) || threadTreeActivity(b, all) - threadTreeActivity(a, all));
   const shown = roots.slice(0, limit);
-  if (selected && !hidden?.has(selected.id) && selected.projectId === projectId && archived === !!selected.archivedAt) {
+  if (selected && !selected.teamInstanceId && !hidden?.has(selected.id) && selected.projectId === projectId && archived === !!selected.archivedAt) {
     const byId = new Map(all.map((thread) => [thread.id, thread]));
     const root = threadTreeRoot(byId.get(selected.id) ?? selected, byId);
     if (root && !shown.some((thread) => thread.id === root.id)) shown.push(root);

@@ -4,7 +4,7 @@ import { ThreadImage, ThreadLink } from "./ThreadImages";
 
 const textStyle = "px-3 py-2 whitespace-pre-wrap break-words text-ink-3 max-h-72 overflow-auto";
 
-/** Shared by all tool rows, including restored conversations and team transcripts. */
+/** Shared by all tool rows, including restored conversations. */
 export const ToolResult = memo(function ToolResult({ output }: { output: unknown }) {
   const result = useMemo(() => toolResult(output), [output]);
   return (

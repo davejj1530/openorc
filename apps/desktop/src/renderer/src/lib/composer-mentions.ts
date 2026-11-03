@@ -1,22 +1,8 @@
-import { harnessName } from "@openorc/protocol";
-
 /** A member the composer can address with `@`. `name` is what gets inserted; `key` only identifies it. */
 export interface MentionEntry {
   key: string;
   name: string;
   hint: string;
-}
-
-type Roster = { members: { key: string; name: string; managerKey: string | null; settings: { agent: string } }[] };
-
-/** Who a team message can address: the whole team, the lead by name, then every member with its provider. The server reads the names from the text. */
-export function teamMentionEntries(revision: Roster): MentionEntry[] {
-  const lead = revision.members.find((member) => member.managerKey === null);
-  return [
-    { key: "everyone", name: "everyone", hint: "Whole team" },
-    ...(lead ? [{ key: "lead", name: lead.name, hint: "Lead" }] : []),
-    ...revision.members.filter((member) => member.managerKey !== null).map((member) => ({ key: member.key, name: member.name, hint: harnessName(member.settings.agent) })),
-  ];
 }
 
 /** The `@` word at the caret, when the `@` starts a word. */

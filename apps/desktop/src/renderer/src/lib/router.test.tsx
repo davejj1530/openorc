@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { openThread, useRouter } from "./router";
-import { useLayout } from "./layout";
 import { resizeThreadPair } from "../components/ThreadPaneDivider";
+import { useLayout } from "./layout";
+import { openThread, useRouter } from "./router";
 
 const router = () => useRouter.getState();
 const layout = () => useLayout.getState();
@@ -97,9 +97,7 @@ it("round-trips every Settings section and what a link points at there, while ke
     const route = { view: "settings" as const, section: "usage" as const, provider };
     expect(routeFromSpec(specFromRoute(route))).toEqual(route);
   }
-  const teamExecution = { view: "settings" as const, section: "general" as const, setting: "team-execution" as const };
-  expect(specFromRoute(teamExecution)).toBe("settings:general:team-execution");
-  expect(routeFromSpec(specFromRoute(teamExecution))).toEqual(teamExecution);
+  expect(routeFromSpec("settings:general:team-execution")).toEqual({ view: "settings", section: "general" });
   expect(routeFromSpec("settings:usage:unknown")).toEqual({ view: "settings", section: "usage" });
   expect(routeFromSpec("settings:general:codex")).toEqual({ view: "settings", section: "general" });
   expect(routeFromSpec("settings:unknown")).toEqual({ view: "settings" });

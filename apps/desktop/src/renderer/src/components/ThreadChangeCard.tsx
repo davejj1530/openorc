@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
+import { useRpc, useRpcMutation } from "../lib/client";
+import { cn } from "../lib/cn";
+import { useLayout } from "../lib/layout";
 import { ChangeCard } from "./ChangeCard";
 import { Button, Tooltip } from "./ui";
-import { cn } from "../lib/cn";
-import { useRpc, useRpcMutation } from "../lib/client";
-import { useLayout } from "../lib/layout";
 
 /** How long an Undo waits for its confirming second click before it settles back. */
 const CONFIRM_MS = 4000;
@@ -60,8 +60,7 @@ export function UndoTurnButton({
     setConfirming(false);
     onError(null);
     try {
-      const result = await restore.mutateAsync({ id: threadId, checkpointId });
-      if (result) onError(result.rejected || "The restore request was rejected.");
+      await restore.mutateAsync({ id: threadId, checkpointId });
     } catch (error) {
       onError(error instanceof Error ? error.message : String(error));
     }

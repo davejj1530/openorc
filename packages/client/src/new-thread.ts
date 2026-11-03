@@ -1,10 +1,8 @@
 import {
   harnessIds,
   harnessLoggedIn,
-  LeadOverrides,
   ModelExecutionSettings,
   normalizeModelSettings,
-  TeamRevision,
   type HarnessAvailability,
   type HarnessId,
   type ModelOption,
@@ -22,7 +20,6 @@ import { defaultChoice, type ModelChoice } from "./model-picker-selection.js";
 
 export type NewThreadTarget =
   | { kind: "model"; choice: ModelChoice | null }
-  | { kind: "team"; revision: TeamRevision; initialLeadOverrides: LeadOverrides }
   /** An Orcling, with the model it had when chosen for display; the core starts it with its current one. */
   | { kind: "orcling"; orclingId: string; name: string; settings: ModelExecutionSettings }
   | { kind: "unavailable"; label: string; reason: string };
@@ -38,27 +35,21 @@ export interface NewThreadDraft {
   target: NewThreadTarget;
   mode: RunMode;
   workspace: NewThreadPlace | null;
-  launchRequest: { key: string; fingerprint: string } | null;
 }
 
 const object = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === "object" && !Array.isArray(value));
 
-/** The revision is a snapshot for display; the core validates its ID again before launch. */
+/** Read saved choices without silently substituting a different execution target. */
 export function decodeNewThreadDraft(projectId: string, value: unknown, legacyPrompt = ""): NewThreadDraft {
   const raw = object(value) ? value : {};
-  const launchRequest =
-    object(raw.launchRequest) && typeof raw.launchRequest.key === "string" && raw.launchRequest.key.length > 0 && typeof raw.launchRequest.fingerprint === "string"
-      ? { key: raw.launchRequest.key, fingerprint: raw.launchRequest.fingerprint }
-      : null;
   return {
     ...(typeof raw.claudeAccountId === "string" && raw.claudeAccountId.length <= 100 ? { claudeAccountId: raw.claudeAccountId } : {}),
     projectId,
     ...(typeof raw.workingDirectory === "string" && raw.workingDirectory.length <= 4096 ? { workingDirectory: raw.workingDirectory } : {}),
     prompt: typeof raw.prompt === "string" ? raw.prompt : legacyPrompt,
-    target: object(raw.target) ? decodeTarget(projectId, raw.projectId, raw.target) : { kind: "model", choice: null },
+    target: object(raw.target) ? decodeTarget(raw.target) : { kind: "model", choice: null },
     mode: raw.mode === "plan" ? "plan" : "act",
     workspace: decodePlace(raw.workspace),
-    launchRequest,
   };
 }
 
@@ -66,17 +57,17 @@ const places: readonly NewThreadPlace[] = ["current", "worktree", "cloud"];
 const decodePlace = (value: unknown): NewThreadPlace | null => places.find((place) => place === value) ?? null;
 
 /** A saved target that no longer reads as one keeps the message and asks for the choice again. */
-function decodeTarget(projectId: string, savedProjectId: unknown, raw: Record<string, unknown>): NewThreadTarget {
-  if (raw.kind === "team") return decodeTeamTarget(projectId, savedProjectId, raw);
+function decodeTarget(raw: Record<string, unknown>): NewThreadTarget {
+  if (raw.kind === "team") return { kind: "unavailable", label: "Choose a model", reason: "Choose a model or an Orcling to continue. Your message and images are kept." };
   if (raw.kind === "orcling") return decodeOrclingTarget(raw);
   if (raw.kind === "model") return decodeModelTarget(raw.choice);
   if (raw.kind === "unavailable")
     return {
       kind: "unavailable",
-      label: typeof raw.label === "string" ? raw.label : "Saved team",
-      reason: typeof raw.reason === "string" ? raw.reason : "Choose the team again to continue.",
+      label: "Saved selection",
+      reason: "Choose a model or an Orcling to continue.",
     };
-  return { kind: "unavailable", label: "Saved target", reason: "This saved selection cannot be restored. Choose a model or team again; your message and images are kept." };
+  return { kind: "unavailable", label: "Saved target", reason: "This saved selection cannot be restored. Choose a model or an Orcling again; your message and images are kept." };
 }
 
 function decodeModelTarget(choice: unknown): NewThreadTarget {
@@ -84,15 +75,6 @@ function decodeModelTarget(choice: unknown): NewThreadTarget {
   const settings = object(choice) ? ModelExecutionSettings.safeParse({ ...choice, fastMode: choice.fastMode ?? false }) : null;
   if (settings?.success) return { kind: "model", choice: normalizeModelSettings(settings.data) };
   return { kind: "unavailable", label: "Saved model", reason: "This saved model selection cannot be restored. Choose a model again; your message and images are kept." };
-}
-
-function decodeTeamTarget(projectId: string, savedProjectId: unknown, raw: Record<string, unknown>): NewThreadTarget {
-  const revision = TeamRevision.safeParse(raw.revision);
-  const overrides = LeadOverrides.safeParse(raw.initialLeadOverrides ?? {});
-  if (revision.success && overrides.success && revision.data.projectId === projectId && savedProjectId === projectId) {
-    return { kind: "team", revision: revision.data, initialLeadOverrides: overrides.data };
-  }
-  return { kind: "unavailable", label: "Saved team", reason: "This saved team selection cannot be restored. Choose the team again; your message and images are kept." };
 }
 
 function decodeOrclingTarget(raw: Record<string, unknown>): NewThreadTarget {
@@ -104,9 +86,7 @@ function decodeOrclingTarget(raw: Record<string, unknown>): NewThreadTarget {
 export function targetModel(target: NewThreadTarget): ModelChoice | null {
   if (target.kind === "model") return target.choice ? normalizeModelSettings(target.choice) : null;
   if (target.kind === "orcling") return normalizeModelSettings(target.settings);
-  if (target.kind !== "team") return null;
-  const lead = target.revision.members.find((member) => member.managerKey === null);
-  return lead ? normalizeModelSettings({ ...lead.settings, ...target.initialLeadOverrides }) : null;
+  return null;
 }
 
 /**
@@ -149,7 +129,6 @@ export function newThreadStartInput(
 }
 
 function startTarget(target: Exclude<NewThreadTarget, { kind: "unavailable" }>, choice: ModelChoice): Partial<RpcParams<"threads.start">> {
-  if (target.kind === "team") return { executionTarget: { kind: "team", teamRevisionId: target.revision.id, initialLeadOverrides: target.initialLeadOverrides } };
   if (target.kind === "orcling") return { executionTarget: { kind: "orcling", orclingId: target.orclingId } };
   return { agent: choice.agent, model: choice.model, effort: choice.effort ?? undefined, fastMode: Boolean(choice.fastMode) };
 }

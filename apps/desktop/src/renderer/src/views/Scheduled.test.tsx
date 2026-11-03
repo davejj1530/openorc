@@ -1,11 +1,11 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { Schedule } from "@openorc/protocol";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { DEFAULT_TEAM_LIMITS, Schedule, TeamRevision } from "@openorc/protocol";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { Scheduled } from "./Scheduled";
-import { core } from "../lib/rpc";
 import { queryClient } from "../lib/client";
 import { useLayout } from "../lib/layout";
+import { core } from "../lib/rpc";
+import { Scheduled } from "./Scheduled";
 
 vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: () => () => {} } }));
 vi.mock("../components/TopBar", () => ({
@@ -17,28 +17,12 @@ vi.mock("../components/TopBar", () => ({
   ),
 }));
 vi.mock("../components/ModelPicker", () => {
-  const Picker = ({ teams }: { teams?: { selectedLabel?: string; options: { revisionId: string; name: string }[]; onSelect: (id: string) => void } }) => (
-    <div>
-      {teams?.selectedLabel ? <span>Selected: {teams.selectedLabel}</span> : null}
-      {teams?.options.map((option) => (
-        <button type="button" key={option.revisionId} onClick={() => teams.onSelect(option.revisionId)}>
-          Choose {option.name}
-        </button>
-      ))}
-    </div>
+  const Picker = ({ value, onChange }: { value: { model: string | null } | null; onChange: (choice: { agent: "codex"; model: string; effort: null; fastMode: false }) => void }) => (
+    <button type="button" onClick={() => onChange({ agent: "codex", model: "model", effort: null, fastMode: false })}>
+      {value ? "Model selected" : "Choose model"}
+    </button>
   );
   return { ModelPicker: Picker, ComposerModelPicker: Picker, defaultChoice: () => null };
-});
-
-const revision = TeamRevision.parse({
-  id: "revision",
-  teamId: "team",
-  projectId: "project",
-  number: 1,
-  createdAt: 1,
-  name: "Reviewers",
-  limits: DEFAULT_TEAM_LIMITS,
-  members: [{ key: "lead", name: "Lead", responsibility: "Review", managerKey: null, settings: { agent: "codex", model: "model", effort: null, fastMode: false } }],
 });
 function savedSchedule() {
   return Schedule.parse({
@@ -72,15 +56,13 @@ beforeEach(() => {
   paused = [];
   saveFailure = false;
   useLayout.setState({ projectId: null });
-  vi.mocked(core.call).mockImplementation(async (method, input) => {
+  vi.mocked(core.call).mockImplementation(async (method, _input) => {
     if (method === "projects.list")
       return [
         { id: "project", name: "Project" },
         { id: "other", name: "Other project" },
       ] as never;
     if (method === "schedules.list") return [...(schedule ? [schedule] : []), ...paused] as never;
-    if (method === "orchestration.list") return ((input as { projectId: string }).projectId === "project" ? [{ team: { id: "team", projectId: "project", archivedAt: null }, revision }] : []) as never;
-    if (method === "orchestration.availability") return { enabled: true, reason: null, maxHierarchyDepth: 3 } as never;
     if (method === "agents.models") return [];
     if (method === "system.info") return { harnesses: [{ id: "codex", state: "ready", path: "/bin/codex", version: "1", revision: 1 }] } as never;
     if (method === "app.settings.get") return { defaultPermissionMode: "trusted" } as never;
@@ -137,7 +119,7 @@ it("retains an edited schedule when a newer version arrives and reloads only on 
   await waitFor(() => expect((screen.getByPlaceholderText("Nightly dependency check") as HTMLInputElement).value).toBe("Remote edit"));
 });
 
-it("preserves a failed save and keeps a selected team through a project mismatch", async () => {
+it("preserves a failed save for retry", async () => {
   schedule = savedSchedule();
   saveFailure = true;
   render(
@@ -151,12 +133,4 @@ it("preserves a failed save and keeps a selected team through a project mismatch
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
   await screen.findByText(/Save unavailable Your draft is kept in this editor/);
   expect(name.value).toBe("Unsent review");
-  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-  fireEvent.click(screen.getByRole("button", { name: "New schedule" }));
-  fireEvent.click(await screen.findByRole("button", { name: "Choose Reviewers" }));
-  expect(screen.getByText("Selected: Reviewers")).toBeTruthy();
-  fireEvent.change(screen.getByRole("combobox", { name: "Schedule project" }), { target: { value: "other" } });
-  await screen.findByText(/The selected team belongs to another project/);
-  expect(screen.getByText("Selected: Reviewers")).toBeTruthy();
-  expect((screen.getByRole("button", { name: "Create" }) as HTMLButtonElement).disabled).toBe(true);
 });

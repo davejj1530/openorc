@@ -24,7 +24,7 @@ const listed = () =>
 const show = () => render(<SidebarNav route={useRouter.getState().route} projectId={null} />);
 
 it("starts with New thread and More, keeping every optional screen folded under More", () => {
-  expect(useLayout.getState().hiddenScreens).toEqual(["tasks", "pulls", "scheduled", "orchestration", "memory"]);
+  expect(useLayout.getState().hiddenScreens).toEqual(["tasks", "pulls", "scheduled", "memory"]);
   show();
   expect(listed()).toEqual(["New thread", "More"]);
 
@@ -32,7 +32,7 @@ it("starts with New thread and More, keeping every optional screen folded under 
   expect(more.getAttribute("aria-expanded")).toBe("false");
   fireEvent.click(more);
   expect(more.getAttribute("aria-expanded")).toBe("true");
-  expect(listed()).toEqual(["New thread", "More", "Tasks", "Pull requests", "Schedules", "Teams", "Memory", "Edit sidebar"]);
+  expect(listed()).toEqual(["New thread", "More", "Tasks", "Pull requests", "Schedules", "Memory", "Edit sidebar"]);
   expect(screen.getByRole("button", { name: /^Tasks/ }).querySelector(".sidebar-nav-count")?.textContent).toBe("3");
   expect(screen.getByRole("button", { name: /^Schedules/ }).querySelector(".sidebar-nav-count")?.textContent).toBe("1");
   fireEvent.click(screen.getByRole("button", { name: "Memory" }));
@@ -40,13 +40,13 @@ it("starts with New thread and More, keeping every optional screen folded under 
 });
 
 it("reads More as current while one of its screens is open and More is folded", () => {
-  useRouter.setState({ route: { view: "orchestration" } });
+  useRouter.setState({ route: { view: "memory" } });
   show();
   const more = screen.getByRole("button", { name: "More" });
   expect(more.getAttribute("aria-current")).toBe("page");
   fireEvent.click(more);
   expect(more.getAttribute("aria-current")).toBeNull();
-  expect(screen.getByRole("button", { name: "Teams" }).getAttribute("aria-current")).toBe("page");
+  expect(screen.getByRole("button", { name: "Memory" }).getAttribute("aria-current")).toBe("page");
 });
 
 it("edits which screens the sidebar lists in a dialog of switches, and remembers the choice", async () => {
@@ -63,7 +63,6 @@ it("edits which screens the sidebar lists in a dialog of switches, and remembers
     ["Tasks", false],
     ["Pull requests", false],
     ["Schedules", false],
-    ["Teams", false],
     ["Memory", false],
   ]);
   fireEvent.click(within(dialog).getByRole("switch", { name: "Memory" }));
@@ -73,6 +72,6 @@ it("edits which screens the sidebar lists in a dialog of switches, and remembers
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 
   // More stays unfolded, listing the screens that remain hidden.
-  expect(listed()).toEqual(["New thread", "Tasks", "Pull requests", "Memory", "More", "Schedules", "Teams", "Edit sidebar"]);
-  expect(JSON.parse(localStorage.getItem("openorc.layout") ?? "{}").hiddenScreens).toEqual(["scheduled", "orchestration"]);
+  expect(listed()).toEqual(["New thread", "Tasks", "Pull requests", "Memory", "More", "Schedules", "Edit sidebar"]);
+  expect(JSON.parse(localStorage.getItem("openorc.layout") ?? "{}").hiddenScreens).toEqual(["scheduled"]);
 });

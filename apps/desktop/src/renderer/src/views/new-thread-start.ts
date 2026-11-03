@@ -1,7 +1,7 @@
 import { newThreadStartInput, type NewThreadDraft, type NewThreadPlace } from "@openorc/client";
 import type { Project, RpcParams, RpcResults } from "@openorc/protocol";
 import { readDraft, writeDraft } from "../lib/drafts";
-import { readNewThreadDraft, teamLaunchRequest, writeNewThreadDraft } from "../lib/new-thread-draft";
+import { readNewThreadDraft, writeNewThreadDraft } from "../lib/new-thread-draft";
 
 interface StartNewThreadInput {
   draft: NewThreadDraft;
@@ -12,7 +12,6 @@ interface StartNewThreadInput {
   text: string;
   attachments: string[];
   launch: (params: RpcParams<"threads.start">) => Promise<RpcResults["threads.start"]>;
-  onPendingDraft: (draft: NewThreadDraft) => void;
 }
 
 /** A successful launch clears only the prompt and images it accepted, preserving later edits. */
@@ -24,20 +23,13 @@ export async function startNewThread(input: StartNewThreadInput): Promise<string
     prompt: input.text,
     attachments,
   });
-  const request = draft.target.kind === "team" ? teamLaunchRequest(draft.launchRequest, JSON.stringify(payload)) : null;
-  if (request) {
-    const pendingDraft = { ...draft, launchRequest: request };
-    input.onPendingDraft(pendingDraft);
-    if (!writeNewThreadDraft(pendingDraft)) throw new Error("This team launch could not be saved for retry. Free some local storage and try again; your message and images are kept here.");
-  }
   const { thread } = await input.launch({
     ...payload,
     ...(input.isWorkspace ? { workingDirectory: draft.workingDirectory ?? project.rootPath } : {}),
-    ...(request ? { requestKey: request.key } : {}),
   });
 
   const latest = readNewThreadDraft(draft.projectId);
-  if (latest.prompt === draft.prompt && (!request || latest.launchRequest?.key === request.key)) writeNewThreadDraft({ ...latest, prompt: "", launchRequest: null });
+  if (latest.prompt === draft.prompt) writeNewThreadDraft({ ...latest, prompt: "" });
   const attachmentKey = `newthread.${draft.projectId}.attachments`;
   const images = readDraft(attachmentKey, { attachments: [] as { path: string }[] });
   if (Array.isArray(images.attachments)) writeDraft(attachmentKey, { attachments: images.attachments.filter((image) => !attachments.includes(image.path)) });

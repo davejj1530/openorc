@@ -20,6 +20,7 @@ import { invalidateOnLifecycle, previewThreadLive } from "./services/preview.js"
 import { createCatalogHandlers } from "./handlers/catalog.js";
 import { createEventsHandlers } from "./handlers/events.js";
 import { createFilesHandlers } from "./handlers/files.js";
+import { createCodeExplanationHandlers } from "./handlers/code-explanations.js";
 import { createInstructionsHandlers } from "./handlers/instructions.js";
 import { createInboxHandlers } from "./handlers/inbox.js";
 import { createMcpAppsHandlers } from "./handlers/mcp-apps.js";
@@ -780,6 +781,7 @@ export class OpenOrc {
       createReviewCommentsHandlers({ review: this.review, invalidate }),
       createReviewWorkspaceHandlers({ review: this.review, db: this.db, taskCheckout: this.taskCheckout, invalidate }),
       createFilesHandlers({ db: this.db, files: this.files, claudeEnvironment: (id) => this.claudeAccounts.environment(this.environment.current(), id).env }),
+      createCodeExplanationHandlers({ db: this.db, files: this.files, textGeneration: this.textGeneration, settings: this.settings, dataDir: this.options.dataDir }),
       createInstructionsHandlers({ db: this.db, files: this.files, claudeEnvironment: (id) => this.claudeAccounts.environment(this.environment.current(), id).env }),
       createSettingsHandlers({ settings: this.settings, textGeneration: this.textGeneration, invalidate }),
       createSchedulesHandlers({ schedules: this.schedules }),

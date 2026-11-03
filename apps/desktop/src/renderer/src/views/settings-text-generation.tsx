@@ -15,7 +15,7 @@ export function TextGenerationSettings() {
   return (
     <>
       {s.query.isError && <LoadError retry={() => void s.query.refetch()} />}
-      <Section title="Text generation" description="Names new threads with a small model. Works independently of memory distillation and your conversation model.">
+      <Section title="Text generation" description="Names new threads and explains code with a small model. Works independently of memory distillation and your conversation model.">
         <Field
           label="Harness"
           hint="Automatic names each conversation with a small model from the agent it uses. For OpenCode, that can be a model from another provider. A chosen harness names every conversation."

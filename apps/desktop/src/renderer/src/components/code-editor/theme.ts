@@ -7,14 +7,14 @@ import { tags as t } from "@lezer/highlight";
  * Syntax colors from Shiki's github-light and github-dark, the themes every diff in the app uses, so a file reads the
  * same in the editor as in its diff. Light and dark switch with the app's `.dark` root class.
  */
-const syntaxColors = {
+export const syntaxColors = {
   light: { comment: "#6a737d", keyword: "#d73a49", string: "#032f62", regexp: "#032f62", constant: "#005cc5", entity: "#6f42c1", tag: "#22863a", variable: "#e36209", invalid: "#b31d28" },
   dark: { comment: "#6a737d", keyword: "#f97583", string: "#9ecbff", regexp: "#dbedff", constant: "#79b8ff", entity: "#b392f0", tag: "#85e89d", variable: "#ffab70", invalid: "#fdaeb7" },
 };
 
-const syntaxVariables = (colors: Record<string, string>) => Object.fromEntries(Object.entries(colors).map(([name, color]) => [`--syntax-${name}`, color]));
+export const syntaxVariables = (colors: Record<string, string>) => Object.fromEntries(Object.entries(colors).map(([name, color]) => [`--syntax-${name}`, color]));
 
-const highlight = HighlightStyle.define([
+export const highlight = HighlightStyle.define([
   { tag: [t.comment, t.lineComment, t.blockComment, t.docComment], color: "var(--syntax-comment)" },
   { tag: [t.keyword, t.controlKeyword, t.operatorKeyword, t.definitionKeyword, t.moduleKeyword, t.modifier, t.operator, t.unit], color: "var(--syntax-keyword)" },
   { tag: [t.string, t.special(t.string), t.docString, t.character, t.attributeValue], color: "var(--syntax-string)" },

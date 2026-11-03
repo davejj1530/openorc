@@ -42,6 +42,7 @@ const scope = { kind: "thread", id: thread.id } as const;
 let disk: ReturnType<typeof fakeFileDisk>;
 const searches: RpcParams<"files.search">[] = [];
 const finds: RpcParams<"files.find">[] = [];
+const explains: RpcParams<"code.explain">[] = [];
 
 /** The core's find over the fake disk: lines holding the text in either case, grouped by file. */
 function findOnDisk({ query }: RpcParams<"files.find">): FindResult {
@@ -74,6 +75,10 @@ beforeEach(() => {
       finds.push(params as RpcParams<"files.find">);
       return answerFind(params as RpcParams<"files.find">) as RpcResults[M];
     }
+    if (method === "code.explain") {
+      explains.push(params as RpcParams<"code.explain">);
+      return { kind: "explained", explanation: { view: "english", markdown: "Holds the cart's total." }, model: { provider: "claude", label: "Claude Haiku 4.5" }, createdAt: 1 } as RpcResults[M];
+    }
     return [] as unknown as RpcResults[M];
   });
   usePanelSessions.setState({ sessions: {} });
@@ -86,6 +91,7 @@ afterEach(() => {
   cleanup();
   searches.length = 0;
   finds.length = 0;
+  explains.length = 0;
   answerFind = findOnDisk;
   queryClient.clear();
   vi.restoreAllMocks();
@@ -402,6 +408,39 @@ it("starts with a folder tree and keeps it beside file tabs without browser cont
   fireEvent.click(screen.getByRole("button", { name: "File actions" }));
   expect(await screen.findByRole("menuitem", { name: "Refresh" })).toBeTruthy();
   expect(screen.getByRole("menuitem", { name: "Copy path" })).toBeTruthy();
+});
+
+it("offers a code file as Code, Plain English, Walkthrough and Diagram, and explains it once it is chosen", async () => {
+  disk.set("README.md", "# Shop\n");
+  useLayout.setState({ panelOpen: true });
+  render(<Window />);
+  fireEvent.click(screen.getByRole("button", { name: "Files" }));
+  fireEvent.click(await screen.findByRole("treeitem", { name: "src" }));
+  fireEvent.click(await screen.findByRole("treeitem", { name: "cart.ts" }));
+  await editor();
+  const views = screen.getByRole("radiogroup", { name: "File view" });
+  expect(
+    within(views)
+      .getAllByRole("radio")
+      .map((radio) => radio.textContent),
+  ).toEqual(["Code", "Plain English", "Walkthrough", "Diagram"]);
+  expect(within(views).getByRole("radio", { name: "Code" }).getAttribute("aria-checked")).toBe("true");
+  expect(explains).toEqual([]);
+  fireEvent.click(within(views).getByRole("radio", { name: "Plain English" }));
+  expect(await screen.findByText("Holds the cart's total.")).toBeTruthy();
+  expect(explains).toEqual([{ scope, path: "src/cart.ts", view: "english", text: "export const total = 1;\n" }]);
+  expect(screen.queryByRole("textbox", { name: "Editor" })).toBeNull();
+  fireEvent.click(within(views).getByRole("radio", { name: "Code" }));
+  expect(await editor()).toBeTruthy();
+
+  fireEvent.click(await screen.findByRole("treeitem", { name: "README.md" }));
+  await waitFor(() =>
+    expect(
+      within(screen.getByRole("radiogroup", { name: "File view" }))
+        .getAllByRole("radio")
+        .map((radio) => radio.textContent),
+    ).toEqual(["Preview", "Source"]),
+  );
 });
 
 it("wraps code by default and turns it off from the file's Word wrap, for every file after", async () => {

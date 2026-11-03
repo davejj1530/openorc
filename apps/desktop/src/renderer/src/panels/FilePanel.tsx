@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { editorLanguage } from "@openorc/protocol";
+import { lazy, Suspense, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { editorLanguage, ExplanationView, type LineSpan } from "@openorc/protocol";
 import type { CodeEditorActions } from "../components/code-editor";
 import { Button } from "../components/ui";
 import { ThreadMedia, ThreadRichText } from "../components/ThreadImages";
@@ -11,21 +11,21 @@ import { useFileExplorer } from "../lib/file-explorer";
 import { BinaryView } from "./BinaryView";
 import { FileExplorer } from "./FileExplorer";
 import { ExplorerResizeHandle } from "./ExplorerResizeHandle";
-import { FileToolbar, type FileView } from "./FileToolbar";
+import { fileViews, FileToolbar, isMarkdown, type FileView } from "./FileToolbar";
 import { SourceEditor } from "./SourceEditor";
 import { editorCaret, editorNavigationKey, moveInEditor, useEditorNavigation } from "../lib/editor-navigation";
+import { useLayout } from "../lib/layout";
 
-const isMarkdown = (path: string) => /\.(md|markdown)$/i.test(path);
+const ExplainView = lazy(() => import("./explain/ExplainView").then((m) => ({ default: m.ExplainView })));
 const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
 
 /** A file in the conversation's folder, edited in place. Markdown also renders, and a cited line opens the source there. */
 export function FilePanel({ selection, directory }: { selection: FileSelection; directory: string }) {
   const buffer = useFileBuffer(selection);
   const [editorActions, setEditorActions] = useState<CodeEditorActions | null>(null);
-  const markdown = isMarkdown(selection.path);
   const [chosen, choose] = useState<{ selection: FileSelection; view: FileView } | null>(null);
-  let view: FileView = selection.line ? "source" : "preview";
-  if (chosen?.selection === selection) view = chosen.view;
+  let view: FileView = isMarkdown(selection.path) && !selection.line ? "preview" : "source";
+  if (chosen?.selection === selection && fileViews(selection.path, true).some((option) => option.value === chosen.view)) view = chosen.view;
   const frame = useRef<HTMLElement>(null);
   const [compact, setCompact] = useState(false);
   const [overlayFor, setOverlayFor] = useState<string | null>(null);
@@ -68,7 +68,6 @@ export function FilePanel({ selection, directory }: { selection: FileSelection; 
         buffer={buffer}
         directory={root}
         view={view}
-        markdown={markdown}
         onView={(next) => choose({ selection, view: next })}
         treeVisible={treeVisible}
         onTree={onTree}
@@ -77,7 +76,7 @@ export function FilePanel({ selection, directory }: { selection: FileSelection; 
       />
       <div className="file-editor">
         <FileNotices buffer={buffer} name={fileName(selection.path)} />
-        <FileBody buffer={buffer} selection={selection} root={root} onReady={setEditorActions} preview={markdown && view === "preview"} />
+        <FileBody buffer={buffer} selection={selection} root={root} onReady={setEditorActions} view={view} />
       </div>
       {treeVisible ? (
         <>
@@ -145,13 +144,13 @@ function status(text: string): ReactNode {
 function FileBody({
   buffer,
   selection,
-  preview,
+  view: shown,
   root,
   onReady,
 }: {
   buffer: FileBuffer;
   selection: FileSelection;
-  preview: boolean;
+  view: FileView;
   root: string;
   onReady: (actions: CodeEditorActions | null) => void;
 }) {
@@ -171,19 +170,18 @@ function FileBody({
   if (view.kind === "unreadable") return status(view.reason);
   if (view.kind === "binary") return <BinaryView key={view.file.url} file={view.file} />;
   const text = buffer.text ?? "";
-  if (preview && view.kind !== "deleted") return <MarkdownPreview content={text} path={view.file.absolutePath} scope={selection.scope} />;
-  return (
-    <SourceEditor
-      key={buffer.key}
-      buffer={buffer}
-      sessionKey={buffer.key}
-      selection={selection}
-      root={root}
-      onReady={onReady}
-      text={text}
-      path={view.kind === "deleted" ? view.path : view.file.path}
-    />
-  );
+  const path = view.kind === "deleted" ? view.path : view.file.path;
+  if (shown === "preview" && view.kind !== "deleted") return <MarkdownPreview content={text} path={view.file.absolutePath} scope={selection.scope} />;
+  const explanation = ExplanationView.safeParse(shown);
+  if (explanation.success) {
+    const showLines = ({ start, end }: LineSpan) => useLayout.getState().openFile({ path: selection.path, scope: selection.scope, line: start, endLine: end });
+    return (
+      <Suspense fallback={status("Loading…")}>
+        <ExplainView view={explanation.data} scope={selection.scope} path={path} text={text} onShowLines={showLines} />
+      </Suspense>
+    );
+  }
+  return <SourceEditor key={buffer.key} buffer={buffer} sessionKey={buffer.key} selection={selection} root={root} onReady={onReady} text={text} path={path} />;
 }
 
 /** Rendered like a reply, with relative links and images resolved from the document's own folder. */

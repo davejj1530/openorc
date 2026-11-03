@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Menu } from "@base-ui/react/menu";
+import { explainable, type ExplanationView } from "@openorc/protocol";
 import { ArrowLeft, ArrowRight, Check, ChevronRight, Copy, ExternalLink, Folder, FolderOpen, List, MoreHorizontal, RefreshCw } from "../components/icons";
 import type { CodeEditorActions } from "../components/code-editor";
 import { Button, IconButton, Segmented, Tooltip } from "../components/ui";
@@ -14,18 +15,36 @@ import type { FileBuffer } from "../lib/use-file-buffer";
 import { useWordWrap } from "../lib/word-wrap";
 import { openBinaryFile, revealLabel } from "./BinaryView";
 
-export type FileView = "preview" | "source";
-const views: { value: FileView; label: string }[] = [
+export type FileView = "preview" | "source" | ExplanationView;
+type ViewOption = { value: FileView; label: string };
+const markdownViews: readonly ViewOption[] = [
   { value: "preview", label: "Preview" },
   { value: "source", label: "Source" },
 ];
+const codeViews: readonly ViewOption[] = [
+  { value: "source", label: "Code" },
+  { value: "english", label: "Plain English" },
+  { value: "walkthrough", label: "Walkthrough" },
+  { value: "diagram", label: "Diagram" },
+];
+
+export const isMarkdown = (path: string) => /\.(md|markdown)$/i.test(path);
+
+/** The ways a file can be read, in toolbar order. Markdown renders; other text can be explained; neither needs a switcher without text. */
+export function fileViews(path: string, text: boolean): readonly ViewOption[] {
+  if (!text) return [];
+  if (isMarkdown(path)) return markdownViews;
+  return explainable(path) ? codeViews : [];
+}
+
+/** Word wrap applies wherever the file shows as lines of code. */
+export const showsCode = (view: FileView) => view === "source" || view === "walkthrough";
 
 interface Props {
   selection: FileSelection;
   buffer: FileBuffer;
   directory: string;
   view: FileView;
-  markdown: boolean;
   onView: (view: FileView) => void;
   treeVisible: boolean;
   onTree: (show: boolean) => void;
@@ -33,8 +52,9 @@ interface Props {
   navigation?: { canBack: boolean; canForward: boolean; back: () => boolean; forward: () => boolean };
 }
 
-export function FileToolbar({ selection, buffer, directory, view, markdown, onView, treeVisible, onTree, editorActions, navigation }: Props) {
+export function FileToolbar({ selection, buffer, directory, view, onView, treeVisible, onTree, editorActions, navigation }: Props) {
   const path = relativeFilePath(selection.path, directory);
+  const views = fileViews(selection.path, buffer.text !== null);
   const parts = path.split("/");
   const root = directory.split(/[\\/]/).filter(Boolean).at(-1) ?? "Workspace";
   const reveal = (folder: string) => {
@@ -85,7 +105,6 @@ export function FileToolbar({ selection, buffer, directory, view, markdown, onVi
             </span>
           </Tooltip>
         ) : null}
-        {markdown ? <Segmented size="sm" label="File view" value={view} onChange={onView} options={views} /> : null}
         {hasUnsavedEdits(buffer.view) || buffer.saving ? (
           <Button size="sm" disabled={buffer.saving || buffer.view.kind === "conflict"} onClick={buffer.save}>
             {buffer.saving ? "Saving…" : "Save"}
@@ -103,17 +122,22 @@ export function FileToolbar({ selection, buffer, directory, view, markdown, onVi
             </IconButton>
           </Tooltip>
         ) : null}
-        <FileMenu path={path} buffer={buffer} editorActions={editorActions} preview={markdown && view === "preview"} />
+        <FileMenu path={path} buffer={buffer} editorActions={editorActions} code={showsCode(view)} />
       </div>
+      {views.length > 1 ? (
+        <div className="file-toolbar-views">
+          <Segmented size="sm" label="File view" value={view} onChange={onView} options={views} />
+        </div>
+      ) : null}
     </header>
   );
 }
 
-/** `preview` while a Markdown file shows rendered; Word wrap applies only while text shows as code. */
-function FileMenu({ path, buffer, editorActions, preview }: { path: string; buffer: FileBuffer; editorActions?: CodeEditorActions | null; preview: boolean }) {
+/** `code` while the file shows as lines of code, which is when Word wrap applies to it. */
+function FileMenu({ path, buffer, editorActions, code }: { path: string; buffer: FileBuffer; editorActions?: CodeEditorActions | null; code: boolean }) {
   const [notice, setNotice] = useState("");
   const wordWrap = useWordWrap();
-  const source = buffer.text !== null && !preview;
+  const source = buffer.text !== null && code;
   const binary = buffer.view.kind === "binary" ? buffer.view.file : null;
   return (
     <>

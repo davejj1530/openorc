@@ -42,3 +42,4 @@ export * from "./thread-start.js";
 export * from "./push.js";
 export * from "./preview.js";
 export * from "./code-intelligence.js";
+export * from "./code-explanations.js";

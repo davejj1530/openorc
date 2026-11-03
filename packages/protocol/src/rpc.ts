@@ -12,6 +12,7 @@ import { orclingRpcParams, type OrclingRpcResults } from "./orclings.js";
 import { projectRpcParams, type ProjectRpcResults } from "./projects.js";
 import { fileRpcParams, type FileRpcResults } from "./files.js";
 import { editorRpcParams, type EditorRpcResults } from "./code-intelligence.js";
+import { codeExplanationRpcParams, type CodeExplanationRpcResults } from "./code-explanations.js";
 import { remoteRpcParams, type RemoteRpcResults } from "./remote.js";
 import { devicePanelRpcParams, DevicePanelPush, type DevicePanelRpcResults } from "./devices.js";
 import { previewRpcParams, type PreviewRpcResults } from "./preview.js";
@@ -78,6 +79,7 @@ export const rpcParams = {
   ...projectRpcParams,
   ...fileRpcParams,
   ...editorRpcParams,
+  ...codeExplanationRpcParams,
   ...remoteRpcParams,
   ...cloudRpcParams,
   ...devicePanelRpcParams,
@@ -568,6 +570,7 @@ export interface RpcResults
     ProjectRpcResults,
     FileRpcResults,
     EditorRpcResults,
+    CodeExplanationRpcResults,
     ClaudeAccountRpcResults,
     RemoteRpcResults,
     DevicePanelRpcResults,

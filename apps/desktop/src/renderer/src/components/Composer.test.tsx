@@ -69,6 +69,32 @@ describe("slash suggestions", () => {
     expect(screen.queryByRole("option", { name: "/compact Summarize" })).toBeNull();
   });
 
+  it("offers every skill rather than stopping at a page, matching names in any case", () => {
+    const many: ComposerProps["commands"] = [...Array.from({ length: 30 }, (_, index) => `skill-${index}`), "COMMAND_CHEATSHEET"].map((name) => ({ name, hint: "A skill", insert: true, prefix: "/" }));
+    mount({ commands: many, value: "" });
+    fireEvent.change(message(), { target: { value: "/", selectionStart: 1 } });
+    expect(screen.getAllByRole("option")).toHaveLength(31);
+    fireEvent.change(message(), { target: { value: "/command", selectionStart: 8 } });
+    expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual(["/COMMAND_CHEATSHEETA skill"]);
+  });
+
+  it("selects a row when the pointer moves over it, not when a row scrolls under a still pointer", () => {
+    mount({ commands, value: "" });
+    fireEvent.change(message(), { target: { value: "/", selectionStart: 1 } });
+    const [first, second] = screen.getAllByRole("option");
+    fireEvent.mouseEnter(second!);
+    expect(first?.getAttribute("aria-selected")).toBe("true");
+    fireEvent.mouseMove(second!);
+    expect(second?.getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("keeps the textarea focused when the list itself is pressed, so its scrollbar can be dragged", () => {
+    mount({ commands, value: "" });
+    fireEvent.change(message(), { target: { value: "/", selectionStart: 1 } });
+    expect(fireEvent.mouseDown(screen.getByRole("listbox"))).toBe(false);
+    fireEvent.mouseUp(screen.getByRole("listbox"));
+  });
+
   it("updates action availability when the caret moves between identical slash queries", () => {
     mount({ commands, value: "/ /" });
     selectAt(1);

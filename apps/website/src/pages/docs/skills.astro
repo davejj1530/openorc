@@ -76,8 +76,9 @@ import { docHref } from "../../data/docs";
           <tr>
             <td>Claude Code</td>
             <td>
-              Reads <code>.claude/skills</code> in the project folder, <code>~/.claude/skills</code> (or the <code>skills</code> folder in <code>CLAUDE_CONFIG_DIR</code>), and the skills of plugins installed in Claude Code. Plugin
-              skills are named <code>plugin:skill</code>. When a personal skill and a project skill share a name, the personal one wins. Skills bundled with Claude Code itself aren't listed.
+              Reads <code>.claude/skills</code> and <code>.claude/commands</code> in the project folder, the same two folders in <code>~/.claude</code> (or in <code>CLAUDE_CONFIG_DIR</code>), and the skills and commands of plugins
+              installed in Claude Code. Plugin skills are named <code>plugin:skill</code>. When a personal skill and a project skill share a name, the personal one wins, and a skill wins over a command of the same name. Skills bundled
+              with Claude Code itself and skills synced from claude.ai aren't listed.
             </td>
           </tr>
           <tr>
@@ -95,7 +96,7 @@ import { docHref } from "../../data/docs";
 
   <section aria-labelledby="use">
     <h2 id="use">Use a skill in a conversation</h2>
-    <p>The composer suggests the skills of the conversation's current agent:</p>
+    <p>The composer suggests the skills of the conversation's current agent, with the project's own first. Scroll the list or keep typing to narrow it. How you open it depends on the agent:</p>
     <ul>
       <li>Claude Code: type <kbd>/</kbd> and pick a skill. OpenOrc inserts <code>/name</code>, which Claude Code runs as that skill.</li>
       <li>Codex: type <kbd>/</kbd> or <kbd>$</kbd> and pick a skill. OpenOrc inserts <code>$name</code>, the form Codex uses.</li>

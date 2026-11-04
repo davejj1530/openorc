@@ -37,7 +37,9 @@ function tokenAtCaret(text: string, caret: number): { start: number; token: stri
 function matchingCommands(commands: SlashCommand[] | undefined, query: string | null, prefix: string | undefined, start: number | undefined): SlashCommand[] {
   if (query === null) return [];
   // Slash opens the skill picker for either harness; selection still inserts its native prefix.
-  return (commands ?? []).filter((command) => (command.insert ? prefix === "/" || command.prefix === prefix : prefix === "/" && start === 0) && command.name.startsWith(query.toLowerCase()));
+  return (commands ?? []).filter(
+    (command) => (command.insert ? prefix === "/" || command.prefix === prefix : prefix === "/" && start === 0) && command.name.toLowerCase().startsWith(query.toLowerCase()),
+  );
 }
 
 function commandQueryAt(token: { token: string } | null, commands: SlashCommand[] | undefined): string | null {
@@ -117,7 +119,8 @@ export function ComposerInput(props: ComposerInputProps) {
       }));
     }
     return commandMatches.map((command) => ({
-      key: `${command.insert ? command.prefix : "/"}${command.name}`,
+      // A project may have a command named like one of the app's own actions, and both are offered.
+      key: `${command.insert ? `skill:${command.prefix}` : "action:/"}${command.name}`,
       label: `${command.insert ? command.prefix : "/"}${command.name}`,
       hint: command.hint,
       insert: command.insert === true,
@@ -135,14 +138,11 @@ export function ComposerInput(props: ComposerInputProps) {
       },
     }));
   }, [memberQuery, memberMatches, mentionQuery, files.data, commandMatches, token, caret, value, onChange, placeCaret]);
-  // Keep ten suggestions visible; typing narrows the rest.
   // Only a name this project actually has is a token, which is why the set
   // comes from the same commands the popover offers rather than from a shape.
   const skillNames = useMemo(() => new Set((commands ?? []).filter((command) => command.insert).map((command) => command.name)), [commands]);
   const skillPrefix = commands?.find((command) => command.insert)?.prefix ?? "/";
   const skillSpans = useMemo(() => skillSegments(value, skillNames, skillPrefix), [value, skillNames, skillPrefix]);
-  const shown = useMemo(() => suggestions.slice(0, 10), [suggestions]);
-  const hidden = suggestions.length - shown.length;
   useEffect(() => setCursor(0), [suggestions.length, memberQuery?.query, mentionQuery, commandQuery]);
   const memberList = suggestions.length > 0 && Boolean(suggestions[0]?.mention);
   const suggestionsOpen = suggestionsActive && suggestions.length > 0;
@@ -150,12 +150,9 @@ export function ComposerInput(props: ComposerInputProps) {
   return (
     <>
       {suggestionsOpen ? (
-        <ComposerSuggestions anchor={props.suggestionAnchor} side={props.suggestionSide} members={memberList} cursor={cursor} onDismiss={() => setSuggestionsActive(false)}>
-          {/* The count belongs to the popover, not to the listbox: a listbox
-                may only hold options, and a stray paragraph inside one is read
-                out as if it were selectable. */}
+        <ComposerSuggestions anchor={props.suggestionAnchor} side={props.suggestionSide} members={memberList} cursor={cursor} count={suggestions.length} onDismiss={() => setSuggestionsActive(false)}>
           <div role="listbox" aria-label={suggestionLabel(memberList, mentionQuery !== null)} data-team-mention-list={memberList || undefined}>
-            {shown.map((suggestion, index) => (
+            {suggestions.map((suggestion, index) => (
               <button
                 key={suggestion.key}
                 role="option"
@@ -165,7 +162,8 @@ export function ComposerInput(props: ComposerInputProps) {
                   e.preventDefault();
                   suggestion.pick();
                 }}
-                onMouseEnter={() => setCursor(index)}
+                // A move, not an enter: a row scrolling under a still pointer must not take the selection from the arrow keys.
+                onMouseMove={() => setCursor(index)}
                 className="composer-suggestion"
               >
                 {/* The label is the thing being inserted, so the hint gives way first. A
@@ -179,11 +177,6 @@ export function ComposerInput(props: ComposerInputProps) {
               </button>
             ))}
           </div>
-          {hidden > 0 ? (
-            <p role="status" className="composer-suggestions-more">
-              {hidden} more. Keep typing to narrow.
-            </p>
-          ) : null}
         </ComposerSuggestions>
       ) : null}
       <div className="composer-input-shell">
@@ -229,7 +222,7 @@ export function ComposerInput(props: ComposerInputProps) {
             if (suggestionsOpen) {
               if (e.key === "ArrowDown") {
                 e.preventDefault();
-                setCursor((current) => Math.min(shown.length - 1, current + 1));
+                setCursor((current) => Math.min(suggestions.length - 1, current + 1));
                 return;
               }
               if (e.key === "ArrowUp") {
@@ -239,7 +232,7 @@ export function ComposerInput(props: ComposerInputProps) {
               }
               if (e.key === "Enter" || e.key === "Tab") {
                 e.preventDefault();
-                shown[cursor]?.pick();
+                suggestions[cursor]?.pick();
                 return;
               }
               if (e.key === "Escape") {

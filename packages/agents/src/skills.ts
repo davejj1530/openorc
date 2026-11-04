@@ -1,12 +1,12 @@
 /**
- * Skills on disk for Claude Code and OpenCode.
+ * Skills on disk for Claude Code and OpenCode, and Claude Code's custom commands.
  *
  * Discovery only. Claude Code resolves "/name" out of the prompt itself once
  * the text reaches the CLI, so nothing here runs a skill or reads its body:
  * we find the headers, the composer writes "/name " at the caret, and the
  * provider does the rest.
  */
-import { open, readFile, readdir, stat, type FileHandle } from "node:fs/promises";
+import { open, readFile, readdir, realpath, stat, type FileHandle } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { AgentSkill } from "@openorc/protocol";
@@ -236,30 +236,100 @@ async function readSkillDir(root: SkillRoot): Promise<AgentSkill[]> {
   return out;
 }
 
-/** Where plugins keep their skills, under the name the CLI prefixes onto each one. */
-function pluginSkillRoots(plugins: InstalledClaudePlugin[]): SkillRoot[] {
-  return plugins.map((plugin): SkillRoot => ({ dir: path.join(plugin.dir, "skills"), source: "plugin", plugin: plugin.name })).slice(0, MAX_ENTRIES);
+/** A directory's entries in name order, each seen through any link, or none when it cannot be read. */
+async function treeEntries(dir: string): Promise<{ name: string; file: string; directory: boolean; regular: boolean }[]> {
+  let entries;
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  return Promise.all(
+    entries
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map(async (entry) => {
+        const file = path.join(dir, entry.name);
+        const kind = entry.isSymbolicLink() ? await stat(file).catch(() => null) : entry;
+        return { name: entry.name, file, directory: kind?.isDirectory() === true, regular: kind?.isFile() === true };
+      }),
+  );
+}
+
+/** A command's `description`, or what the CLI shows without one: the first line of its body, less any heading marks. */
+function commandDescription(text: string): string {
+  const described = skillHeader(text).description;
+  if (described) return oneLine(described);
+  const lines = (text.charCodeAt(0) === 0xfeff ? text.slice(1) : text).split(/\r?\n/);
+  const opens = lines[0]?.trim() === "---";
+  const close = opens ? lines.findIndex((line, index) => index > 0 && DELIMITER.test(line)) : -1;
+  // A header that never closes, as one past the read limit does, leaves no body to quote.
+  if (opens && close === -1) return "";
+  const first = lines.slice(close + 1).find((line) => line.trim() !== "");
+  return first ? oneLine(first.replace(/^\s*#+\s+/, "")) : "";
 }
 
 /**
- * Every Claude skill this project can name. Claude resolves personal skills
- * before project skills when names overlap.
- * Plugin skills shadow nothing and are shadowed by nothing: the CLI names them
- * "<plugin>:<skill>" and so do we, which puts them in their own namespace. The
- * list is sorted by name because readdir order is not.
+ * Custom commands: every Markdown file under `commands/`, named by its path and not its header, because that is the
+ * name the CLI answers to. A subfolder is a namespace, so `ops/deploy.md` is "/ops:deploy". Its header is optional.
+ * A folder holding a SKILL.md is one command named after the folder, and the rest of it is that command's own files.
+ */
+async function readCommandDir(root: SkillRoot): Promise<AgentSkill[]> {
+  const out: AgentSkill[] = [];
+  let folders = 0;
+  const add = async (file: string, names: string[]): Promise<void> => {
+    const name = [...(root.plugin ? [root.plugin] : []), ...names].join(":");
+    // The CLI reads a space as the end of the name, and a file called ".md" has no name to give, so neither can be run.
+    if (names.at(-1) === "" || /\s/.test(name)) return;
+    const text = await head(file);
+    if (text !== null) out.push({ name, description: commandDescription(text), source: root.source, path: file });
+  };
+  const visit = async (dir: string, names: string[], ancestors: string[]): Promise<void> => {
+    // Only accepted commands count toward the cap, so a large tree with little Markdown in it needs bounds of its own.
+    if (names.length > 8 || out.length >= MAX_ENTRIES || ++folders > MAX_ENTRIES) return;
+    const real = await realpath(dir).catch(() => null);
+    // A link back up the tree would list it all again under longer names the CLI does not have.
+    if (real === null || ancestors.includes(real)) return;
+    const entries = await treeEntries(dir);
+    const skill = entries.find((entry) => entry.regular && /^skill\.md$/i.test(entry.name));
+    if (skill) return add(skill.file, names.length > 0 ? names : [path.basename(dir)]);
+    for (const entry of entries) {
+      if (out.length >= MAX_ENTRIES) break;
+      if (entry.directory) await visit(entry.file, [...names, entry.name], [...ancestors, real]);
+      else if (entry.regular && entry.name.endsWith(".md")) await add(entry.file, [...names, path.basename(entry.name, ".md")]);
+    }
+  };
+  await visit(root.dir, [], []);
+  return out;
+}
+
+/** Where plugins keep one kind of entry, under the name the CLI prefixes onto each one. */
+function pluginRoots(plugins: InstalledClaudePlugin[], folder: "skills" | "commands"): SkillRoot[] {
+  return plugins.map((plugin): SkillRoot => ({ dir: path.join(plugin.dir, folder), source: "plugin", plugin: plugin.name })).slice(0, MAX_ENTRIES);
+}
+
+/**
+ * Every Claude skill and custom command this project can name. Claude resolves
+ * personal skills before project skills when names overlap, and a skill before
+ * a command of the same name.
+ * Plugin skills shadow nothing and are shadowed by nothing, short of a command
+ * folder named after the plugin: the CLI names them "<plugin>:<skill>" and so
+ * do we, which puts them in their own namespace. The list is sorted by name
+ * because readdir order is not.
  */
 async function listClaudeSkills(projectRoot: string, home: string, env: NodeJS.ProcessEnv): Promise<AgentSkill[]> {
   const configDir = claudeConfigDir(home, env);
   // An added account also runs the plugins the CLI login turns on; its personal skills are already linked into the account.
   const shared = env[SHARED_CLAUDE_CONFIG_DIR];
   const plugins = [...installedClaudePlugins(configDir), ...(shared ? installedClaudePlugins(shared).filter((plugin) => plugin.enabled) : [])];
-  const roots: SkillRoot[] = [{ dir: path.join(configDir, "skills"), source: "user" }, { dir: path.join(projectRoot, ".claude", "skills"), source: "project" }, ...pluginSkillRoots(plugins)];
+  const roots = (folder: "skills" | "commands"): SkillRoot[] => [
+    { dir: path.join(configDir, folder), source: "user" },
+    { dir: path.join(projectRoot, ".claude", folder), source: "project" },
+    ...pluginRoots(plugins, folder),
+  ];
+  // Read together but merged in this order, since the first of a name is the one the CLI resolves.
+  const read = await Promise.all([...roots("skills").map(readSkillDir), ...roots("commands").map(readCommandDir)]);
   const found = new Map<string, AgentSkill>();
-  for (const root of roots) {
-    for (const skill of await readSkillDir(root)) {
-      if (!found.has(skill.name)) found.set(skill.name, skill);
-    }
-  }
+  for (const skill of read.flat()) if (!found.has(skill.name)) found.set(skill.name, skill);
   return [...found.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
@@ -291,28 +361,20 @@ async function readOpenCodeRoot(root: SkillRoot): Promise<AgentSkill[]> {
   const found: AgentSkill[] = [];
   const visit = async (dir: string, depth: number): Promise<void> => {
     if (depth > 8 || found.length >= MAX_ENTRIES) return;
-    let entries;
-    try {
-      entries = await readdir(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+    for (const entry of await treeEntries(dir)) {
       if (found.length >= MAX_ENTRIES) break;
-      const file = path.join(dir, entry.name);
-      const kind = entry.isSymbolicLink() ? await stat(file).catch(() => null) : null;
-      if (entry.isDirectory() || kind?.isDirectory()) {
+      if (entry.directory) {
         // Depth bounds symlink cycles as well as unexpectedly large skill trees.
-        await visit(file, depth + 1);
+        await visit(entry.file, depth + 1);
         continue;
       }
-      if (!entry.isFile() && !kind?.isFile()) continue;
-      const id = openCodeSkillId(file, depth);
+      if (!entry.regular) continue;
+      const id = openCodeSkillId(entry.file, depth);
       if (!id) continue;
-      const content = await head(file);
+      const content = await head(entry.file);
       if (content === null) continue;
       const header = skillHeader(content);
-      found.push({ name: id, description: oneLine(header.description ?? ""), source: root.source, path: file });
+      found.push({ name: id, description: oneLine(header.description ?? ""), source: root.source, path: entry.file });
     }
   };
   await visit(root.dir, 0);

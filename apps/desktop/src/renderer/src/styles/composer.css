@@ -748,11 +748,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.composer-suggestions-more {
-  padding: 6px 10px 4px;
-  color: var(--ink-4);
-  font-size: var(--text-sm);
-}
 /* A "/name" the provider will resolve, marked in the message. A neutral wash rather than a
    fill: it sits under live text, so it reads as emphasis on the word, never as a control. */
 .skill-token {

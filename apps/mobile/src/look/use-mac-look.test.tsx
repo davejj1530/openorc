@@ -58,7 +58,7 @@ it("keeps the Mac's look for the next launch, which paints it before the Mac ans
   const stop = keepLists(queryClient, storage, () => "studio");
   mac.look = { palette: "github", colors: {} };
   const first = open();
-  await waitFor(() => expect(mac.phone!.saved.get("lists.studio")).toContain("github"), { timeout: 2_000 });
+  await waitFor(() => expect(mac.phone!.saved.get("lists.v2.studio")).toContain("github"), { timeout: 2_000 });
   first.unmount();
   stop();
   queryClient.clear();

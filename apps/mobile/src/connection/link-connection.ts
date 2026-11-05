@@ -167,6 +167,11 @@ export class LinkConnection implements CoreConnection {
     this.resumable = restored;
     for (const waiter of this.waiting) waiter.fail(new Error(NO_MAC));
     this.waiting.clear();
+    // The session still open is the host being left: a call for the next one must wait for that host's session, and
+    // what the old one still owes must not land in the state just cleared for the next.
+    const leaving = this.current;
+    this.current = null;
+    if (leaving) this.dropOwed(leaving);
   }
 
   receive(session: PhoneLine, message: CallMessage): void {
@@ -266,6 +271,11 @@ export class LinkConnection implements CoreConnection {
 
   private lost(session: PhoneLine): void {
     if (this.current === session) this.current = null;
+    this.dropOwed(session);
+  }
+
+  /** Fails everything asked over `session` that it has not answered yet. */
+  private dropOwed(session: PhoneLine): void {
     for (const [id, negotiation] of this.negotiations) if (negotiation.session === session) this.negotiated(id, []);
     for (const [id, pending] of this.pending) {
       if (pending.session !== session) continue;

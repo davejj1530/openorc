@@ -139,6 +139,26 @@ describe("calls over the link", () => {
     expect(wire(mac).filter((line) => line === "rpc runs.send")).toHaveLength(1);
   });
 
+  it("sends nothing for the next host over the session of the one it leaves, and lets nothing that session owes land", async () => {
+    const mac = new FakeMac();
+    mac.behave(lan, { kind: "answer" });
+    const { connection } = connect(mac);
+    await advance(10);
+    mac.answer = (method) => (method === "threads.list" ? [{ id: "left-behind" }] : undefined);
+    const owed = connection.call("threads.list", {});
+    const dropped = expect(owed).rejects.toThrow(DROPPED);
+    // The phone now shows another host: its client starts over, and its lists are asked for at once.
+    connection.reset(false);
+    const next = connection.call("threads.list", {});
+    const waited = expect(next).rejects.toThrow();
+    await advance(10);
+    await dropped;
+    expect(wire(mac).filter((line) => line === "rpc threads.list")).toHaveLength(1);
+    await advance(9_000);
+    await waited;
+    expect(wire(mac).filter((line) => line === "rpc threads.list")).toHaveLength(1);
+  });
+
   it("tells every new session the interest, then reports it resumed", async () => {
     const mac = new FakeMac();
     mac.behave(lan, { kind: "answer" });

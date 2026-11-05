@@ -14,7 +14,8 @@ interface Kept {
   at: number;
 }
 
-const storageKey = (macId: string) => `lists.${macId}`;
+// Version 2: lists saved before then could hold the other host's threads after a switch between a Mac and its brain.
+const storageKey = (macId: string) => `lists.v2.${macId}`;
 const kept = (query: Query) => KEPT.has(String(query.queryKey[0])) && query.state.status === "success";
 
 /** Puts a Mac's saved lists back in the cache, as old as they are, so they refetch once the Mac answers. */

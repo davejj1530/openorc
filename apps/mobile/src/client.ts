@@ -134,6 +134,13 @@ function regroup(): void {
 }
 const groupListeners = new Set<() => void>();
 
+// Before the link starts, so the look kept for the shown Mac paints before the first frame.
+followMacLook(client.queryClient.getQueryCache());
+// The link's first listener: what the others ask of the shown host must go over its own connection. Behind them, a host
+// paired anew would be asked over the session of the one before it, or the call dropped as that session is let go.
+link.subscribe(() => show(macOf(link.getState())));
+keepLists(client.queryClient, storage, () => shownMac);
+
 /** A Mac names its cloud brain on each new session; the group follows at once and on every cold start after. */
 let heardFrom = 0;
 link.subscribe(() => {
@@ -149,11 +156,6 @@ link.subscribe(() => {
 });
 link.subscribe(regroup);
 keepLists(partnerClient.queryClient, storage, () => partnerId);
-
-// Before the link starts, so the look kept for the shown Mac paints before the first frame.
-followMacLook(client.queryClient.getQueryCache());
-link.subscribe(() => show(macOf(link.getState())));
-keepLists(client.queryClient, storage, () => shownMac);
 
 const networkKinds: Partial<Record<NetworkStateType, NetworkKind>> = {
   [NetworkStateType.WIFI]: "wifi",

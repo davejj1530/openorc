@@ -26,6 +26,12 @@ export interface LineSpan {
   end: number;
 }
 
+/** What a few lines of the file do, in everyday words: one statement, or a few lines doing one small thing. */
+export interface LineNote {
+  lines: LineSpan;
+  text: string;
+}
+
 /** A line elsewhere in the folder that names something a block defines. */
 export interface CodeUsage {
   path: FolderPath;
@@ -36,8 +42,10 @@ export interface CodeUsage {
 export interface WalkthroughBlock {
   lines: LineSpan;
   title: string;
-  /** Markdown, for someone new to the codebase. */
+  /** Markdown: what the block is for and why it exists, for someone who has never programmed. */
   explanation: string;
+  /** The block's own lines explained in order, a step at a time. */
+  steps: LineNote[];
   /** The names the block defines, which `usedBy` was found from. */
   symbols: string[];
   usedBy: CodeUsage[];
@@ -64,7 +72,8 @@ export interface DiagramEdge {
 }
 
 export type CodeExplanation =
-  { view: "english"; markdown: string } | { view: "walkthrough"; overview: string; blocks: WalkthroughBlock[] } | { view: "diagram"; summary: string; nodes: DiagramNode[]; edges: DiagramEdge[] };
+  /** Every statement of the file, top to bottom, said in everyday words. */
+  { view: "english"; notes: LineNote[] } | { view: "walkthrough"; overview: string; blocks: WalkthroughBlock[] } | { view: "diagram"; summary: string; nodes: DiagramNode[]; edges: DiagramEdge[] };
 
 export type CodeExplainResult =
   | { kind: "explained"; explanation: CodeExplanation; model: { provider: HarnessId; label: string }; createdAt: number }

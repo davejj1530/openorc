@@ -1,24 +1,13 @@
-import { Suspense } from "react";
 import type { CodeExplanation, CodeUsage, FileScope, LineSpan, WalkthroughBlock } from "@openorc/protocol";
-import { CodeExcerpt } from "../../components/code-editor";
 import { RichText } from "../../components/RichText";
 import { Tooltip } from "../../components/ui";
 import { useLayout } from "../../lib/layout";
-import { useWordWrap } from "../../lib/word-wrap";
+import { AnnotatedCode, Excerpt } from "./AnnotatedCode";
 import { walkthroughSegments } from "./walkthrough-segments";
 
 type Walkthrough = Extract<CodeExplanation, { view: "walkthrough" }>;
 
 export const spanLabel = ({ start, end }: LineSpan) => (start === end ? `Line ${start}` : `Lines ${start}–${end}`);
-
-function Excerpt({ text, path, start, end }: { text: string; path: string; start: number; end: number }) {
-  const wrap = useWordWrap((state) => state.wrap);
-  return (
-    <Suspense fallback={<pre className="code-excerpt" style={{ minHeight: (end - start + 1) * 20 + 16 }} />}>
-      <CodeExcerpt text={text} path={path} start={start} end={end} wrap={wrap} />
-    </Suspense>
-  );
-}
 
 /** A file that uses the block, opened at the line that names it. */
 function Usage({ usage, scope }: { usage: CodeUsage; scope: FileScope }) {
@@ -58,13 +47,13 @@ function Block({ block, text, path, scope, onShowLines }: { block: WalkthroughBl
         </div>
       ) : null}
       <div className="explain-block-code">
-        <Excerpt text={text} path={path} start={block.lines.start} end={block.lines.end} />
+        <AnnotatedCode notes={block.steps} span={block.lines} text={text} path={path} />
       </div>
     </section>
   );
 }
 
-/** The file read top to bottom: each part framed with what it does and who uses it, the code between parts as it is. */
+/** The file read top to bottom: each part framed with what it does and who uses it, its lines explained a step at a time. */
 export function WalkthroughView({ explanation, text, path, scope, onShowLines }: { explanation: Walkthrough; text: string; path: string; scope: FileScope; onShowLines: (lines: LineSpan) => void }) {
   const source = text.replace(/\r\n/g, "\n");
   const segments = walkthroughSegments(explanation.blocks, source.replace(/\n$/, "").split("\n"));

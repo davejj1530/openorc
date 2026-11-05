@@ -17,24 +17,32 @@ import { openBinaryFile, revealLabel } from "./BinaryView";
 
 export type FileView = "preview" | "source" | ExplanationView;
 type ViewOption = { value: FileView; label: string };
-const markdownViews: readonly ViewOption[] = [
-  { value: "preview", label: "Preview" },
-  { value: "source", label: "Source" },
-];
-const codeViews: readonly ViewOption[] = [
-  { value: "source", label: "Code" },
-  { value: "english", label: "Plain English" },
-  { value: "walkthrough", label: "Walkthrough" },
-  { value: "diagram", label: "Diagram" },
-];
+/** The ways a file can be read, and where their switcher lives: Markdown's two on the toolbar, the explanations in the file's menu. */
+export type FileViews = { place: "toolbar" | "menu"; options: readonly ViewOption[] };
+const markdownViews: FileViews = {
+  place: "toolbar",
+  options: [
+    { value: "preview", label: "Preview" },
+    { value: "source", label: "Source" },
+  ],
+};
+const codeViews: FileViews = {
+  place: "menu",
+  options: [
+    { value: "source", label: "Code" },
+    { value: "english", label: "Plain English" },
+    { value: "walkthrough", label: "Walkthrough" },
+    { value: "diagram", label: "Diagram" },
+  ],
+};
 
 export const isMarkdown = (path: string) => /\.(md|markdown)$/i.test(path);
 
-/** The ways a file can be read, in toolbar order. Markdown renders; other text can be explained; neither needs a switcher without text. */
-export function fileViews(path: string, text: boolean): readonly ViewOption[] {
-  if (!text) return [];
+/** Markdown renders; other text can be explained; neither has another view without text. */
+export function fileViews(path: string, text: boolean): FileViews | null {
+  if (!text) return null;
   if (isMarkdown(path)) return markdownViews;
-  return explainable(path) ? codeViews : [];
+  return explainable(path) ? codeViews : null;
 }
 
 /** Word wrap applies wherever the file shows as lines of code. */
@@ -105,6 +113,7 @@ export function FileToolbar({ selection, buffer, directory, view, onView, treeVi
             </span>
           </Tooltip>
         ) : null}
+        {views?.place === "toolbar" ? <Segmented size="sm" label="File view" value={view} onChange={onView} options={views.options} /> : null}
         {hasUnsavedEdits(buffer.view) || buffer.saving ? (
           <Button size="sm" disabled={buffer.saving || buffer.view.kind === "conflict"} onClick={buffer.save}>
             {buffer.saving ? "Saving…" : "Save"}
@@ -122,22 +131,26 @@ export function FileToolbar({ selection, buffer, directory, view, onView, treeVi
             </IconButton>
           </Tooltip>
         ) : null}
-        <FileMenu path={path} buffer={buffer} editorActions={editorActions} code={showsCode(view)} />
+        <FileMenu path={path} buffer={buffer} editorActions={editorActions} views={views?.place === "menu" ? views.options : null} view={view} onView={onView} />
       </div>
-      {views.length > 1 ? (
-        <div className="file-toolbar-views">
-          <Segmented size="sm" label="File view" value={view} onChange={onView} options={views} />
-        </div>
-      ) : null}
     </header>
   );
 }
 
-/** `code` while the file shows as lines of code, which is when Word wrap applies to it. */
-function FileMenu({ path, buffer, editorActions, code }: { path: string; buffer: FileBuffer; editorActions?: CodeEditorActions | null; code: boolean }) {
+interface MenuProps {
+  path: string;
+  buffer: FileBuffer;
+  editorActions?: CodeEditorActions | null;
+  /** The ways to read the file that this menu switches between, when they live here. */
+  views: readonly ViewOption[] | null;
+  view: FileView;
+  onView: (view: FileView) => void;
+}
+
+function FileMenu({ path, buffer, editorActions, views, view, onView }: MenuProps) {
   const [notice, setNotice] = useState("");
   const wordWrap = useWordWrap();
-  const source = buffer.text !== null && code;
+  const source = buffer.text !== null && showsCode(view);
   const binary = buffer.view.kind === "binary" ? buffer.view.file : null;
   return (
     <>
@@ -149,6 +162,7 @@ function FileMenu({ path, buffer, editorActions, code }: { path: string; buffer:
           <CoversPreview />
           <Menu.Positioner sideOffset={6} align="end" className="z-40" collisionPadding={8}>
             <Menu.Popup ref={floatingGround} className={menuPopup}>
+              {views ? <ViewChoices views={views} view={view} onView={onView} /> : null}
               {editorActions ? (
                 <>
                   <Menu.Item className={menuItem} onClick={editorActions.definition}>
@@ -222,6 +236,23 @@ function FileMenu({ path, buffer, editorActions, code }: { path: string; buffer:
           {notice}
         </span>
       ) : null}
+    </>
+  );
+}
+
+/** How to read the file, at the top of its menu: picking one closes the menu on it. */
+function ViewChoices({ views, view, onView }: { views: readonly ViewOption[]; view: FileView; onView: (view: FileView) => void }) {
+  return (
+    <>
+      <Menu.RadioGroup aria-label="File view" value={view} onValueChange={(value: FileView) => onView(value)}>
+        {views.map((option) => (
+          <Menu.RadioItem key={option.value} value={option.value} className={menuItem} closeOnClick>
+            <Check size={13} className={view === option.value ? "text-ink" : "text-transparent"} />
+            <span className="flex-1">{option.label}</span>
+          </Menu.RadioItem>
+        ))}
+      </Menu.RadioGroup>
+      <Menu.Separator className={menuSeparator} />
     </>
   );
 }

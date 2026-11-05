@@ -22,7 +22,19 @@ const scope: FileScope = { kind: "thread", id: "thread" };
 const path = FolderPath.parse("src/cart.ts");
 const text = "import { sum } from './sum';\n\nexport function cartTotal() {\n  return sum();\n}\n";
 const model = { provider: "claude" as const, label: "Claude Haiku 4.5" };
-const english: CodeExplainResult = { kind: "explained", explanation: { view: "english", markdown: "Adds up a **cart**." }, model, createdAt: 1 };
+const english: CodeExplainResult = {
+  kind: "explained",
+  explanation: {
+    view: "english",
+    notes: [
+      { lines: { start: 1, end: 1 }, text: "Borrows `sum` from another file." },
+      { lines: { start: 3, end: 3 }, text: "Starts a recipe called `cartTotal`." },
+      { lines: { start: 4, end: 4 }, text: "Adds up the cart and hands back the total." },
+    ],
+  },
+  model,
+  createdAt: 1,
+};
 const walkthrough: CodeExplainResult = {
   kind: "explained",
   model,
@@ -35,6 +47,10 @@ const walkthrough: CodeExplainResult = {
         lines: { start: 3, end: 5 },
         title: "Cart total",
         explanation: "Sums the items.",
+        steps: [
+          { lines: { start: 3, end: 3 }, text: "Starts the recipe." },
+          { lines: { start: 4, end: 4 }, text: "Hands back the sum." },
+        ],
         symbols: ["cartTotal"],
         usedBy: [{ path: FolderPath.parse("src/checkout.ts"), line: 4, text: "cartTotal()" }],
       },
@@ -58,8 +74,19 @@ it("asks once when the view opens, says it is working, then shows the explanatio
   expect(call).toHaveBeenCalledTimes(1);
   expect(call).toHaveBeenCalledWith("code.explain", { scope, path, view: "english", text });
   await act(async () => answer(english));
-  expect(document.querySelector(".explain-prose")?.textContent).toBe("Adds up a cart.");
   expect(screen.getByText("Explained by Claude Haiku 4.5")).toBeTruthy();
+});
+
+it("reads the file line by line: each line's code, then what it does in plain words", async () => {
+  render(view());
+  await act(async () => answer(english));
+  const notes = [...document.querySelectorAll(".explain-note")].map((note) => [note.querySelector("[data-testid=excerpt]")?.textContent, note.querySelector(".explain-note-text")?.textContent]);
+  expect(notes).toEqual([
+    ["1-1", "Borrows sum from another file."],
+    ["3-3", "Starts a recipe called cartTotal."],
+    ["4-5", "Adds up the cart and hands back the total."],
+  ]);
+  expect(screen.getByText("cartTotal").tagName).toBe("CODE");
 });
 
 it("keeps an explanation through edits, says the file changed, and asks again only when told to", async () => {
@@ -71,7 +98,7 @@ it("keeps an explanation through edits, says the file changed, and asks again on
   fireEvent.click(screen.getByRole("button", { name: "Explain again" }));
   expect(call).toHaveBeenLastCalledWith("code.explain", { scope, path, view: "english", text: `${text}// more\n`, refresh: true });
   expect(screen.getByText("Explaining again…")).toBeTruthy();
-  expect(screen.getByText("cart")).toBeTruthy();
+  expect(screen.getByText("cartTotal")).toBeTruthy();
 });
 
 it("sends the reader to Settings when that is where the fix is, and offers another try", async () => {
@@ -104,14 +131,17 @@ it("asks again about a file that was empty once it has text, and not before", as
   expect(call).toHaveBeenLastCalledWith("code.explain", { scope, path, view: "english", text });
 });
 
-it("frames each block of the walkthrough with its code, its lines and the files that use it", async () => {
+it("frames each block of the walkthrough with its lines explained a step at a time, and the files that use it", async () => {
   const onShowLines = vi.fn();
   render(view({ view: "walkthrough", onShowLines }));
   await act(async () => answer(walkthrough));
   const block = screen.getByRole("region", { name: "Cart total" });
   expect(within(block).getByText("Sums the items.")).toBeTruthy();
-  expect(within(block).getByTestId("excerpt").textContent).toBe("3-5");
-  expect(screen.getAllByTestId("excerpt").map((excerpt) => excerpt.textContent)).toEqual(["1-1", "3-5"]);
+  expect([...block.querySelectorAll(".explain-note")].map((note) => [note.querySelector("[data-testid=excerpt]")?.textContent, note.querySelector(".explain-note-text")?.textContent])).toEqual([
+    ["3-3", "Starts the recipe."],
+    ["4-5", "Hands back the sum."],
+  ]);
+  expect(screen.getAllByTestId("excerpt").map((excerpt) => excerpt.textContent)).toEqual(["1-1", "3-3", "4-5"]);
   fireEvent.click(within(block).getByRole("button", { name: "Lines 3–5" }));
   expect(onShowLines).toHaveBeenCalledWith({ start: 3, end: 5 });
   const open = vi.spyOn(useLayout.getState(), "openFile");

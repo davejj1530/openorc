@@ -23,6 +23,7 @@ vi.mock("./code-editor", () => ({
   CodeEditor: ({ text, readOnly, lineWrapping, onChange }: CodeEditorProps) => (
     <textarea aria-label="Editor" data-wrap={lineWrapping} readOnly={readOnly} value={text} onChange={(event) => onChange(event.target.value)} />
   ),
+  CodeExcerpt: ({ start, end }: { start: number; end: number }) => <pre>{`lines ${start}-${end}`}</pre>,
   closeEditorSession: () => {},
 }));
 
@@ -77,7 +78,8 @@ beforeEach(() => {
     }
     if (method === "code.explain") {
       explains.push(params as RpcParams<"code.explain">);
-      return { kind: "explained", explanation: { view: "english", markdown: "Holds the cart's total." }, model: { provider: "claude", label: "Claude Haiku 4.5" }, createdAt: 1 } as RpcResults[M];
+      const notes = [{ lines: { start: 1, end: 1 }, text: "Holds the cart's total." }];
+      return { kind: "explained", explanation: { view: "english", notes }, model: { provider: "claude", label: "Claude Haiku 4.5" }, createdAt: 1 } as RpcResults[M];
     }
     return [] as unknown as RpcResults[M];
   });
@@ -410,7 +412,7 @@ it("starts with a folder tree and keeps it beside file tabs without browser cont
   expect(screen.getByRole("menuitem", { name: "Copy path" })).toBeTruthy();
 });
 
-it("offers a code file as Code, Plain English, Walkthrough and Diagram, and explains it once it is chosen", async () => {
+it("offers a code file's views in its menu, not on screen, and explains it once one is chosen", async () => {
   disk.set("README.md", "# Shop\n");
   useLayout.setState({ panelOpen: true });
   render(<Window />);
@@ -418,19 +420,21 @@ it("offers a code file as Code, Plain English, Walkthrough and Diagram, and expl
   fireEvent.click(await screen.findByRole("treeitem", { name: "src" }));
   fireEvent.click(await screen.findByRole("treeitem", { name: "cart.ts" }));
   await editor();
-  const views = screen.getByRole("radiogroup", { name: "File view" });
-  expect(
-    within(views)
-      .getAllByRole("radio")
-      .map((radio) => radio.textContent),
-  ).toEqual(["Code", "Plain English", "Walkthrough", "Diagram"]);
-  expect(within(views).getByRole("radio", { name: "Code" }).getAttribute("aria-checked")).toBe("true");
+  expect(screen.queryByRole("radiogroup", { name: "File view" })).toBeNull();
+  const views = async () => {
+    fireEvent.click(screen.getByRole("button", { name: "File actions" }));
+    return within(await screen.findByRole("group", { name: "File view" }));
+  };
+  const menu = await views();
+  expect(menu.getAllByRole("menuitemradio").map((item) => item.textContent)).toEqual(["Code", "Plain English", "Walkthrough", "Diagram"]);
+  expect(menu.getByRole("menuitemradio", { name: "Code" }).getAttribute("aria-checked")).toBe("true");
   expect(explains).toEqual([]);
-  fireEvent.click(within(views).getByRole("radio", { name: "Plain English" }));
+  fireEvent.click(menu.getByRole("menuitemradio", { name: "Plain English" }));
   expect(await screen.findByText("Holds the cart's total.")).toBeTruthy();
   expect(explains).toEqual([{ scope, path: "src/cart.ts", view: "english", text: "export const total = 1;\n" }]);
   expect(screen.queryByRole("textbox", { name: "Editor" })).toBeNull();
-  fireEvent.click(within(views).getByRole("radio", { name: "Code" }));
+  await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+  fireEvent.click((await views()).getByRole("menuitemradio", { name: "Code" }));
   expect(await editor()).toBeTruthy();
 
   fireEvent.click(await screen.findByRole("treeitem", { name: "README.md" }));

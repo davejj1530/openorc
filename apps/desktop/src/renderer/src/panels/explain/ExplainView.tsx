@@ -1,9 +1,9 @@
 import { useEffect } from "react";
 import type { CodeExplainResult, ExplanationView, FileScope, FolderPath, LineSpan } from "@openorc/protocol";
-import { RichText } from "../../components/RichText";
 import { Button, TextButton } from "../../components/ui";
 import { explanationKey, useExplanations, type Explanation, type ExplainRequest } from "../../lib/code-explanations";
 import { useRouter } from "../../lib/router";
+import { AnnotatedCode } from "./AnnotatedCode";
 import { DiagramView } from "./DiagramView";
 import { WalkthroughView } from "./WalkthroughView";
 import "./explain.css";
@@ -87,14 +87,16 @@ function Bar({ entry, text, onRefresh }: { entry: Explanation; text: string; onR
 function Body({ answer, request, onRetry, onShowLines }: { answer: Answered; request: ExplainRequest; onRetry: () => void; onShowLines: (lines: LineSpan) => void }) {
   if (answer.result.kind !== "explained") return <Problem result={answer.result} onRetry={onRetry} />;
   const { explanation } = answer.result;
-  if (explanation.view === "english")
+  if (explanation.view === "english") {
+    const text = answer.text.replace(/\r\n/g, "\n");
     return (
       <div className="explain-scroll">
-        <div className="explain-prose prose-chat">
-          <RichText mode="static">{explanation.markdown}</RichText>
+        <div className="explain-english">
+          <AnnotatedCode notes={explanation.notes} span={{ start: 1, end: text.replace(/\n$/, "").split("\n").length }} text={text} path={request.path} />
         </div>
       </div>
     );
+  }
   if (explanation.view === "walkthrough") return <WalkthroughView explanation={explanation} text={answer.text} path={request.path} scope={request.scope} onShowLines={onShowLines} />;
   return <DiagramView diagram={explanation} onShowLines={onShowLines} />;
 }

@@ -25,7 +25,7 @@ export function FilePanel({ selection, directory }: { selection: FileSelection; 
   const [editorActions, setEditorActions] = useState<CodeEditorActions | null>(null);
   const [chosen, choose] = useState<{ selection: FileSelection; view: FileView } | null>(null);
   let view: FileView = isMarkdown(selection.path) && !selection.line ? "preview" : "source";
-  if (chosen?.selection === selection && fileViews(selection.path, true).some((option) => option.value === chosen.view)) view = chosen.view;
+  if (chosen?.selection === selection && fileViews(selection.path, true)?.options.some((option) => option.value === chosen.view)) view = chosen.view;
   const frame = useRef<HTMLElement>(null);
   const [compact, setCompact] = useState(false);
   const [overlayFor, setOverlayFor] = useState<string | null>(null);

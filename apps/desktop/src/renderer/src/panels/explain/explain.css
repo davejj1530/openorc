@@ -72,11 +72,39 @@
   }
 }
 
-.explain-prose {
-  max-width: 720px;
-  padding: 4px 20px 32px;
-  font-size: var(--text-prose);
+/* Plain English: the file line by line, each line's code in a soft well with what it does written under it. */
+.explain-english {
+  max-width: 760px;
+  padding: 4px 12px 32px;
+}
+.explain-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.explain-note-code {
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+.explain-note-code .code-excerpt {
+  padding: 6px 0;
+}
+.explain-note-text {
+  margin: 6px 8px 0;
+  font-size: var(--text-md);
+  line-height: var(--text-md--line-height);
   color: var(--ink);
+}
+.explain-note-text code {
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-family: var(--font-mono);
+  font-size: 0.88em;
 }
 
 /* The walkthrough: each part framed by a hairline, its explanation over its code. */
@@ -170,9 +198,19 @@
 .explain-usage-folder {
   color: var(--ink-4);
 }
+/* Inside a walkthrough card the steps read at the card's own size. */
 .explain-block-code {
   margin-top: 12px;
-  background: var(--surface-2);
+  padding: 0 10px 12px;
+}
+.explain-block-code .explain-notes {
+  gap: 10px;
+}
+.explain-block-code .explain-note-text {
+  margin-top: 5px;
+  font-size: var(--text-base);
+  line-height: var(--text-base--line-height);
+  color: var(--ink-2);
 }
 .explain-between {
   margin: -4px 0;

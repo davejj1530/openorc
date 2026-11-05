@@ -2,7 +2,7 @@ import { expect, it } from "vitest";
 import type { WalkthroughBlock } from "@openorc/protocol";
 import { walkthroughSegments } from "./walkthrough-segments";
 
-const block = (start: number, end: number): WalkthroughBlock => ({ lines: { start, end }, title: `Lines ${start}`, explanation: "", symbols: [], usedBy: [] });
+const block = (start: number, end: number): WalkthroughBlock => ({ lines: { start, end }, title: `Lines ${start}`, explanation: "", steps: [], symbols: [], usedBy: [] });
 const lines = ["import a;", "", "const b = 1;", "", "", "function c() {}", "// tail", ""];
 
 it("reads the file top to bottom, showing the code no block covers without its blank edges", () => {

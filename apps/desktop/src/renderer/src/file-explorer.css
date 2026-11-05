@@ -62,13 +62,7 @@
   margin-left: auto;
   flex-shrink: 0;
 }
-/* How the file reads gets a row of its own, so switching views never reflows the path and tools above it. */
-.file-toolbar-views {
-  display: flex;
-  flex-basis: 100%;
-  margin-left: -4px;
-  padding-bottom: 4px;
-}
+
 .file-editor {
   grid-area: 2 / 1;
   overflow: hidden;

@@ -72,6 +72,7 @@ export default function RootLayout() {
             <Stack.Screen name="preview" dangerouslySingular={onePerPanel} options={pushed} />
             <Stack.Screen name="diff" options={pushed} />
             <Stack.Screen name="new" dangerouslySingular options={pushed} />
+            <Stack.Screen name="tasks" dangerouslySingular options={pushed} />
             <Stack.Screen name="pair" dangerouslySingular options={{ presentation: "modal" }} />
             <Stack.Screen name="settings" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [1] }} />
             <Stack.Screen name="filter" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: "fitToContents" }} />

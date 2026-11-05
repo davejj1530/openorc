@@ -15,7 +15,13 @@ vi.mock("../../client", async () => {
   return { storage: new ScratchStore({ getString: () => undefined, set: () => undefined, remove: () => undefined }), endDemo: () => void demo.ended++ };
 });
 
-afterEach(cleanup);
+const board = vi.hoisted(() => ({ available: false }));
+vi.mock("../../tasks/use-task-board", () => ({ useTaskBoard: () => ({ sections: [], available: board.available }) }));
+
+afterEach(() => {
+  cleanup();
+  board.available = false;
+});
 
 const studio = { id: "studio", name: "Studio" };
 const connected: LinkState = { kind: "connected", mac: studio, route: { kind: "lan", host: "studio.local", port: 1 }, serial: 1 };
@@ -106,4 +112,13 @@ it("names the demo Mac on the Mac line, with its dot and no route", () => {
   expect(screen.getByRole("button", { name: "Demo Mac, On this iPhone" })).toBeTruthy();
   expect(screen.getByText("Demo Mac")).toBeTruthy();
   expect(screen.queryByText(/·/)).toBeNull();
+});
+
+it("offers the task list only once a host answers with one, so a host from before shows the bar as it was", () => {
+  bar(connected, 0);
+  expect(screen.queryByRole("button", { name: "Tasks" })).toBeNull();
+  cleanup();
+  board.available = true;
+  bar(connected, 0);
+  expect(screen.getByRole("button", { name: "Tasks" })).toBeTruthy();
 });

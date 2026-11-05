@@ -1,7 +1,8 @@
 import { Link } from "expo-router";
 import { Pressable, View } from "react-native";
 import { endDemo } from "../../client";
-import { Funnel, Pin, Settings } from "../../generated/icons";
+import { Funnel, ListChecks, Pin, Settings } from "../../generated/icons";
+import { useTaskBoard } from "../../tasks/use-task-board";
 import { cn } from "../../ui/cn";
 import { useColors } from "../../ui/mode";
 import { OpenOrcMark } from "../../ui/OpenOrcMark";
@@ -20,6 +21,18 @@ export function FilterButton() {
         {choice === "orc" ? <OpenOrcMark size={16} color={colors.ink} working={false} /> : null}
         {choice === "pinned" ? <Pin size={16} className="text-ink" /> : null}
         {choice === "active" || choice === "archived" ? <Funnel size={16} className={cn("text-ink-4", narrowed && "text-ink")} /> : null}
+      </Pressable>
+    </Link>
+  );
+}
+
+/** The open tasks of this Mac and its cloud brain; shown once a host answers with its list, so never for one from before. */
+function TasksButton() {
+  if (!useTaskBoard().available) return null;
+  return (
+    <Link href="/tasks" asChild>
+      <Pressable accessibilityRole="button" accessibilityLabel="Tasks" className="size-touch items-center justify-center rounded-full active:bg-surface-2">
+        <ListChecks size={16} className="text-ink-4" />
       </Pressable>
     </Link>
   );
@@ -48,13 +61,14 @@ function SkipButton() {
 export type BarFor = "unpaired" | "paired" | "demo";
 
 /**
- * The filter, then Settings outermost, as two 44 pt buttons whose glyphs line up with the plus buttons on the list's
- * project headings. With no Mac there is nothing to filter. In the demo Skip takes Settings' place, which the Mac line
+ * Tasks once a host lists them, the filter, then Settings outermost, as 44 pt buttons whose glyphs line up with the plus
+ * buttons on the list's project headings. With no Mac there is nothing to filter. In the demo Skip takes Settings' place, which the Mac line
  * still opens.
  */
 export function HeaderButtons({ shows }: { shows: BarFor }) {
   return (
     <View className="-mr-2.5 flex-row">
+      {shows === "paired" ? <TasksButton /> : null}
       {shows === "unpaired" ? null : <FilterButton />}
       {shows === "demo" ? <SkipButton /> : <SettingsButton />}
     </View>

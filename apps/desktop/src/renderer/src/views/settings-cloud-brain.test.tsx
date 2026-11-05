@@ -21,6 +21,7 @@ const ready: Extract<CloudBrainStatus, { state: "ready" }> = {
   claude: ["Personal", "Work"],
   behind: false,
   working: null,
+  door: null,
   error: null,
 };
 
@@ -135,6 +136,29 @@ it("says it is updating, quietly, with nothing to click meanwhile", async () => 
   expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
   expect((screen.getByRole("button", { name: "Pair phone" }) as HTMLButtonElement).disabled).toBe(true);
   expect(screen.queryByRole("alert")).toBeNull();
+});
+
+it("shows the door's state in a word, with nothing to click, and why it did not open", async () => {
+  show({ ...ready, door: { state: "open" } });
+  const door = (await screen.findByText("Door")).closest(".settings-field") as HTMLElement;
+  expect(within(door).getByText("Open").getAttribute("data-ok")).toBe("true");
+  expect(within(door).queryAllByRole("button")).toEqual([]);
+  cleanup();
+  queryClient.clear();
+  show({ ...ready, door: { state: "opening" } });
+  expect((await screen.findByText("Opening")).getAttribute("data-ok")).toBeNull();
+  expect(screen.queryByRole("alert")).toBeNull();
+  cleanup();
+  queryClient.clear();
+  show({ ...ready, door: { state: "failed", error: "Could not deploy the door: Vercel is having a moment." } });
+  expect(await screen.findByText("Not open")).toBeTruthy();
+  expect((await screen.findByRole("alert")).textContent).toBe("Could not deploy the door: Vercel is having a moment.");
+});
+
+it("shows no door before this Mac has looked at it", async () => {
+  show(ready);
+  await screen.findByText("Asleep");
+  expect(screen.queryByText("Door")).toBeNull();
 });
 
 it("offers to remove a brain this Mac has no key for", async () => {

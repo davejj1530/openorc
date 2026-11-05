@@ -75,12 +75,14 @@ export function createCloudHandlers({ settings, tokens, checks, codex, sandboxes
     "cloud.status": status,
     "cloud.vercel.connect": async ({ token }) => {
       const { teams } = await settings.connect(token);
+      brain.vercelChanged();
       return { status: await changed(() => undefined), teams };
     },
     "cloud.vercel.teams": () => settings.teams(),
-    "cloud.vercel.team": ({ teamId }) => changed(() => settings.chooseTeam(teamId)),
-    "cloud.vercel.disconnect": () => changed(() => settings.disconnect()),
-    "cloud.vercel.size": ({ vcpus }) => changed(() => settings.chooseSize(vcpus)),
+    "cloud.vercel.team": ({ teamId }) => changed(() => settings.chooseTeam(teamId).then(() => brain.vercelChanged())),
+    // The brain's door holds a copy of the token: it goes first, or the connection stays.
+    "cloud.vercel.disconnect": () => changed(() => brain.disconnect(() => settings.disconnect())),
+    "cloud.vercel.size": ({ vcpus }) => changed(() => settings.chooseSize(vcpus).then(() => brain.vercelChanged())),
     "cloud.vercel.region": ({ region }) => changed(() => settings.chooseRegion(region)),
     "cloud.takeover": ({ enabled }) => changed(() => settings.setTakeover(enabled)),
     "cloud.claude.create": ({ accountId }) => changed(() => tokens.create(accountId)),

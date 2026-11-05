@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BRAIN_REGIONS, brainRegionFor, type BrainRegion, type CloudBrainMachine, type CloudBrainStatus, type CloudBrainStep } from "@openorc/protocol";
+import { BRAIN_REGIONS, brainRegionFor, type BrainRegion, type CloudBrainDoor, type CloudBrainMachine, type CloudBrainStatus, type CloudBrainStep } from "@openorc/protocol";
 import { Button, Dialog, Select, TextButton, Tooltip } from "../components/ui";
 import { StepMark } from "../components/WorkSteps";
 import { useRpc, useRpcMutation } from "../lib/client";
@@ -35,6 +35,7 @@ const stepLabels: Record<CloudBrainStep, string> = {
 const STEPS = Object.keys(stepLabels) as CloudBrainStep[];
 
 const machineLabels: Record<CloudBrainMachine, string> = { awake: "Awake", asleep: "Asleep", starting: "Waking", stopping: "Going to sleep", failed: "Failed" };
+const doorLabels: Record<CloudBrainDoor["state"], string> = { open: "Open", opening: "Opening", failed: "Not open" };
 
 /** What the brain's machine is doing, an update or a wake under way first; null while Vercel cannot be asked. */
 function machineStatus(brain: Extract<CloudBrainStatus, { state: "ready" }>, waking: boolean): { label: string; ok: boolean } | null {
@@ -49,6 +50,19 @@ function Alert({ error }: { error: string | null }) {
       {error}
     </p>
   ) : null;
+}
+
+/** The door a phone knocks on to wake the brain: a state in a word, and why when it could not open. */
+function Door({ door }: { door: CloudBrainDoor | null }) {
+  if (!door) return null;
+  return (
+    <>
+      <SettingRow label="Door">
+        <Status ok={door.state === "open"}>{doorLabels[door.state]}</Status>
+      </SettingRow>
+      <Alert error={door.state === "failed" ? door.error : null} />
+    </>
+  );
 }
 
 function NotSetUp({ available }: { available: boolean }) {
@@ -175,6 +189,7 @@ function Ready({ brain, active }: { brain: Extract<CloudBrainStatus, { state: "r
           </TextButton>
         ) : null}
       </SettingRow>
+      <Door door={brain.door} />
       <CloudBrainProjects active={active} />
       <Alert error={brain.error} />
     </>

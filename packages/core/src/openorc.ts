@@ -399,6 +399,7 @@ export class OpenOrc {
     core.schedules.start();
     core.threads.recoverQueue();
     core.upkeep.start();
+    core.cloudParts.brain.opened();
     if (!options.ephemeral) core.agentUpdates.start();
     void core.devices.reapStale();
     // Embed any memories that predate the vector index, off the startup path.

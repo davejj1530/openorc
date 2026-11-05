@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { brainLayout, newBrainKey, type BrainStart } from "@openorc/cloud";
+import { brainDoor, brainLayout, doorEpoch, newBrainKey, type BrainStart } from "@openorc/cloud";
 import { brainOptions } from "./options.js";
 import { SealedSecrets } from "./secrets.js";
 
@@ -51,6 +51,17 @@ describe("brainOptions", () => {
     expect(remoteNetwork?.machine.name()).toBe("Cloud");
     expect(remoteNetwork?.machine.lanHosts()).toEqual([]);
     expect(await remoteNetwork?.machine.tailnetHosts()).toEqual([]);
+  });
+
+  it("hands each phone on a Vercel brain this epoch's ticket to its door, for its own device; a local container has no door", async () => {
+    const layout = brainLayout(root);
+    const start: BrainStart = { key: newBrainKey(), name: "Cloud", address: "sb-fixture.vercel.run", port: 47_820, vercel: { connection, sandbox: "brain" } };
+    const secrets = await SealedSecrets.open(layout.secrets, start.key);
+    const input = { layout, appDir: root, start, self: { region: async () => "sin1" }, secrets, transport: { push() {} }, runnerFiles: [] };
+    const door = brainDoor(start.key);
+    const epoch = doorEpoch(Date.now());
+    expect(brainOptions(input).remoteNetwork?.door?.("phone-1")).toEqual({ host: door.host, device: "phone-1", epoch, ticket: Buffer.from(door.ticket("phone-1", epoch)).toString("base64url") });
+    expect(brainOptions({ ...input, start: { ...start, vercel: null } }).remoteNetwork?.door).toBeUndefined();
   });
 
   it("keeps its sealed stores and none for Slack or the Vercel connection", async () => {

@@ -18,7 +18,7 @@ afterEach(() => {
   vi.resetAllMocks();
 });
 
-const ready: CloudBrainStatus = { state: "ready", region: "sin1", machine: "awake", claude: [], behind: false, working: null, error: null };
+const ready: CloudBrainStatus = { state: "ready", region: "sin1", machine: "awake", claude: [], behind: false, working: null, door: null, error: null };
 const project = (id: string, name: string, shown: Partial<CloudBrainProject> = {}): CloudBrainProject => ({ id, name, on: false, blocked: null, sending: false, kept: false, error: null, ...shown });
 
 function show(projects: CloudBrainProject[], status: CloudBrainStatus = ready) {

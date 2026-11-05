@@ -3,6 +3,7 @@ import type { TextEmbedder } from "@openorc/memory";
 import type { BrowserHost, PreviewHost } from "@openorc/protocol";
 import type { DeviceSystem } from "./devices/system.js";
 import type { RemoteNetwork } from "./remote/remote-access.js";
+import type { BrainDoors } from "./services/cloud-brain-door.js";
 import type { BrainBundleSource, OpenBrainMachine } from "./services/cloud-brain.js";
 import type { ProtectedSecretStore } from "./services/extraction-credentials.js";
 import type { BundledFormatter } from "./services/file-format.js";
@@ -87,4 +88,6 @@ export interface OpenOrcOptions {
   cloudBrainBundle?: () => Promise<BrainBundleSource | null>;
   /** Reaches the cloud brain's machine in place of Vercel, for tests. */
   cloudBrainMachine?: OpenBrainMachine;
+  /** Reaches the cloud brain's door in place of Vercel, for tests. */
+  cloudBrainDoors?: BrainDoors;
 }

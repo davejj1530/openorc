@@ -16,11 +16,13 @@ export type { Takeover, TakeoverStarted } from "./runner/wire.js";
 export { RunnerClient, installRunner, runRunner, runnerFiles, type RunnerConnectionState, type RunnerFile, type RunnerInstall } from "./runner-client.js";
 export { CHECK_STEPS, checkSandbox, type CheckProgress, type CheckStep } from "./check.js";
 export { pullWorkspace, pushWorkspace, seedFromCommit, seedWorkspace, type MirrorState, type PullResult, type WorkspaceLocation } from "./sync.js";
-export { ensureVercelProject, type VercelProject, type VercelRequest } from "./vercel-projects.js";
+export { VercelRefusal, ensureVercelProject, vercelDenied, type VercelProject, type VercelRequest } from "./vercel-projects.js";
 export { BRAIN_AWAY_MS, BRAIN_EXIT, BRAIN_PORT, BRAIN_PROJECT, BRAIN_READY, BRAIN_SANDBOX, brainLayout, type BrainLayout } from "./brain/layout.js";
 export {
   BrainWireError,
   brainKeyFrom,
+  encodeDoorConfig,
+  readDoorConfig,
   brainTakesProject,
   brainKeyText,
   encodeControlReply,
@@ -40,6 +42,7 @@ export {
   type BrainKey,
   type BrainStart,
   type BrainStatus,
+  type DoorConfig,
   type HandoverKind,
   type HandoverRequest,
   type HandoverClaudeAccount,
@@ -67,3 +70,5 @@ export {
   type WakeResult,
 } from "./brain/machine.js";
 export { branchHead, bundleBranch, copyHeads, takeBranch, type Taken } from "./brain/project-copy.js";
+export { DOOR_EPOCH_MS, DOOR_PROJECT, brainDoor, doorEpoch, ticketStanding, type BrainDoor, type BrainDoorKey } from "./brain/door.js";
+export { closeDoor, openDoor, removeDoor, type DoorAccess, type DoorBundle, type DoorDeployOptions, type DoorOpening, type OpenedDoor } from "./brain/door-deploy.js";

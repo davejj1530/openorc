@@ -1,5 +1,6 @@
 import os from "node:os";
 import path from "node:path";
+import type { VercelConnection } from "@openorc/cloud";
 import type { Db, LedgerWriter } from "@openorc/db";
 import type { OpenOrcOptions } from "../options.js";
 import type { Logger } from "../transport.js";
@@ -21,6 +22,21 @@ import type { RunService } from "./runs.js";
 import type { EnvSnapshot } from "./shell-environment.js";
 import type { ThreadService } from "./threads.js";
 import { executionProject } from "./workspace-home.js";
+
+/** The cloud brain as this Mac keeps it, made with the Vercel connection the Mac's sandboxes use. */
+function cloudBrain(db: Db, options: OpenOrcOptions, tokens: ClaudeCloudTokens, vercel: () => Promise<VercelConnection | null>, invalidate: (keys: string[]) => void): CloudBrain {
+  return new CloudBrain({
+    db,
+    store: options.cloudBrainSecrets,
+    tokens,
+    vercel,
+    bundle: options.cloudBrainBundle,
+    // "cloud" too: the brain's region is where this Mac's sandboxes run unless another is chosen.
+    changed: () => invalidate(["cloud-brain", "cloud"]),
+    ...(options.cloudBrainMachine ? { open: options.cloudBrainMachine } : {}),
+    ...(options.cloudBrainDoors ? { doors: options.cloudBrainDoors } : {}),
+  });
+}
 
 /** The cloud's parts, made together: where sandboxes run, how agents sign in there, and the sandboxes themselves. */
 export function createCloud(input: {
@@ -62,16 +78,7 @@ export function createCloud(input: {
     },
   };
   const tokens = new ClaudeCloudTokens(options.claudeCloudSecrets, signIn, () => invalidate(["cloud"]), options.terminal);
-  const brain: CloudBrain = new CloudBrain({
-    db,
-    store: options.cloudBrainSecrets,
-    tokens,
-    vercel: options.cloudCredentials ?? (() => settings.credentials()),
-    bundle: options.cloudBrainBundle,
-    // "cloud" too: the brain's region is where this Mac's sandboxes run unless another is chosen.
-    changed: () => invalidate(["cloud-brain", "cloud"]),
-    ...(options.cloudBrainMachine ? { open: options.cloudBrainMachine } : {}),
-  });
+  const brain: CloudBrain = cloudBrain(db, options, tokens, options.cloudCredentials ?? (() => settings.credentials()), invalidate);
   const agentEnvironment = cloudAgentEnvironment({ accounts, tokens, snapshot: environment });
   const codexLogin = new CodexCloudLogin(options.codexCloudSecrets, {
     binary: () => environment().binaries.codex ?? null,

@@ -81,6 +81,12 @@ export type CloudBrainStep = "machine" | "start" | "sign-ins";
 /** The brain's sandbox as Vercel reports it. */
 export type CloudBrainMachine = "awake" | "asleep" | "starting" | "stopping" | "failed";
 
+/**
+ * The door a paired phone knocks on to wake the brain, a small function in the same team that this Mac deploys and keeps
+ * current. `failed` keeps the reason a phone cannot wake the brain by itself.
+ */
+export type CloudBrainDoor = { state: "open" } | { state: "opening" } | { state: "failed"; error: string };
+
 /** What Settings shows about the cloud brain. Its key and the tokens sent to it never leave the core. */
 export type CloudBrainStatus =
   /** This build carries no brain to set up. */
@@ -102,6 +108,8 @@ export type CloudBrainStatus =
       behind: boolean;
       /** Updating: installing this build's brain, or restarting it onto the one installed. */
       working: "waking" | "sending" | "updating" | null;
+      /** Null until this Mac has looked at it since it started, and in builds without one. */
+      door: CloudBrainDoor | null;
       error: string | null;
     }
   | { state: "removing" };
@@ -140,7 +148,7 @@ export const cloudBrainRpcParams = {
   "cloud.brain.pair": z.object({}),
   /** Sends the Claude sign-ins again, waking the brain. */
   "cloud.brain.handover": z.object({}),
-  /** Deletes the brain with its disk and its thread sandboxes, and forgets its key. */
+  /** Deletes the brain's door, then the brain with its disk and its thread sandboxes, and forgets its key. */
   "cloud.brain.remove": z.object({}),
   /** This Mac's projects, and which the brain has. Never wakes the brain. */
   "cloud.brain.projects": z.object({}),

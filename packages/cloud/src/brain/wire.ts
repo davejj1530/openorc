@@ -156,6 +156,51 @@ export function parseLaunch(line: string): BrainStart {
   return { key, name, address, port, vercel };
 }
 
+/**
+ * Everything the brain's door holds, as one sensitive env var of its project, written only by the Mac that set the
+ * brain up. The door wakes the brain exactly as that Mac does, with its key, token and start inputs.
+ */
+export interface DoorConfig {
+  key: BrainKey;
+  /** The brain's team and project, and the token its sessions get. */
+  vercel: { token: string; teamId: string; project: string };
+  /** What phones show for the brain. */
+  name: string;
+  threadVcpus?: number;
+  /** Device ids whose knocks are refused, for a phone cut off before its ticket runs out. */
+  revoked: string[];
+  /** The Mac's name for this config with the code it went out with: what the door answers on GET. */
+  mark: string;
+}
+
+const DOOR = object(
+  {
+    v: literal(1),
+    key: brainKey,
+    vercel: object({ token: text(4096), teamId: text(255), project: text(100) }),
+    name: text(255),
+    revoked: list(text(100), 1000),
+    mark: text(64, /^[A-Za-z0-9_-]+$/),
+  },
+  { threadVcpus: int(1, 64) },
+);
+
+export function encodeDoorConfig(config: DoorConfig): string {
+  const { key, vercel, name, threadVcpus, revoked, mark } = config;
+  return JSON.stringify({ v: 1, key: brainKeyText(key), vercel, name, ...(threadVcpus ? { threadVcpus } : {}), revoked, mark });
+}
+
+/** Null when the door holds none, or one it cannot read; such a door wakes nothing. Never throws, so never repeats it. */
+export function readDoorConfig(text: string | undefined): DoorConfig | null {
+  if (!text) return null;
+  try {
+    const { key, vercel, name, threadVcpus, revoked, mark } = parseLine("The door's config", DOOR, text);
+    return { key, vercel, name, ...(threadVcpus ? { threadVcpus } : {}), revoked, mark };
+  } catch {
+    return null;
+  }
+}
+
 /** A Claude account as the Mac has it, with the cloud token it signs in with. */
 export interface HandoverClaudeAccount {
   id: string;

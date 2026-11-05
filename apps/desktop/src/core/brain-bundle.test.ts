@@ -23,6 +23,19 @@ it("picks the newest brain archive and reads it only when asked", async () => {
   expect((await bundle!.read()).toString()).toBe("new");
 });
 
+it("carries the newest door beside the brain, read only when deployed", async () => {
+  await writeFile(join(dir, "brain-new0002.tgz"), "new");
+  expect((await newestBrainBundle(dir))?.door).toBeUndefined();
+  await writeFile(join(dir, "door-aaaaaaaaaaaa.mjs"), "old door");
+  await writeFile(join(dir, "door-bbbbbbbbbbbb.mjs"), "new door");
+  await writeFile(join(dir, "door-notadigest.mjs"), "not a door");
+  await utimes(join(dir, "door-aaaaaaaaaaaa.mjs"), 1_000, 1_000);
+  await utimes(join(dir, "door-bbbbbbbbbbbb.mjs"), 2_000, 2_000);
+  const door = (await newestBrainBundle(dir))?.door;
+  expect(door?.release).toBe("bbbbbbbbbbbb");
+  expect((await door!.code()).toString()).toBe("new door");
+});
+
 it("finds none in a build without the brain's folder, or once its archive is gone", async () => {
   expect(await newestBrainBundle(join(dir, "missing"))).toBeNull();
   await writeFile(join(dir, "app.tgz"), "not a brain");

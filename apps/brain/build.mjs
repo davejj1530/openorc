@@ -1,6 +1,7 @@
 // Builds the cloud brain for a Linux x64 (glibc) sandbox: dist/brain-<version>.tgz, which BrainMachine.provision
-// installs. The code is one esbuild bundle per entry; the native modules come from `pnpm deploy` of this app, so they
-// carry the workspace's patches, overrides and lockfile versions, as the desktop's do.
+// installs, and its door, dist/door-<release>.mjs, which the Mac deploys. The code is one esbuild bundle per entry; the
+// native modules come from `pnpm deploy` of this app, so they carry the workspace's patches, overrides and lockfile
+// versions, as the desktop's do.
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
@@ -59,6 +60,29 @@ const unshipped = new Set(
 );
 if (unshipped.size) fail(`the bundle loads ${[...unshipped].join(", ")} at runtime, which no dependency ships`);
 
+// The door: the function a paired phone knocks on to wake the brain, which the Mac deploys to the person's Vercel team.
+// One ES module with everything inside, since Vercel installs nothing for it.
+const door = await build({
+  absWorkingDir: here,
+  entryPoints: ["src/door-main.ts"],
+  write: false,
+  bundle: true,
+  platform: "node",
+  format: "esm",
+  target: "node24",
+  mainFields: ["module", "main"],
+  banner: { js: 'import { createRequire as __doorRequire } from "node:module"; const require = __doorRequire(import.meta.url);' },
+  metafile: true,
+  logLevel: "warning",
+});
+const doorLoads = Object.values(door.metafile.outputs)
+  .flatMap((output) => output.imports)
+  .filter((entry) => entry.external && !entry.path.startsWith("node:") && !builtinModules.includes(entry.path) && !optional.includes(entry.path));
+if (doorLoads.length) fail(`the door loads ${doorLoads.map((entry) => entry.path).join(", ")} at runtime, and Vercel installs nothing for it`);
+const doorCode = door.outputFiles[0].contents;
+const doorFile = path.join(dist, `door-${createHash("sha256").update(doorCode).digest("hex").slice(0, 12)}.mjs`);
+writeFileSync(doorFile, doorCode);
+
 mkdirSync(path.join(app, "runner"));
 for (const name of readdirSync(runner).filter((file) => file.endsWith(".ts") && !file.endsWith(".test.ts"))) writeFileSync(path.join(app, "runner", name), readFileSync(path.join(runner, name)));
 
@@ -109,3 +133,4 @@ writeFileSync(path.join(app, "manifest.json"), `${JSON.stringify({ version, node
 const archive = path.join(dist, `brain-${version}.tgz`);
 execFileSync("tar", ["--no-xattrs", "-czf", archive, "-C", app, "."], { env: { ...process.env, COPYFILE_DISABLE: "1" } });
 console.log(`${path.relative(process.cwd(), archive)} (${(lstatSync(archive).size / 1024 / 1024).toFixed(1)} MB)`);
+console.log(`${path.relative(process.cwd(), doorFile)} (${(doorCode.length / 1024 / 1024).toFixed(1)} MB)`);

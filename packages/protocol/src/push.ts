@@ -38,11 +38,30 @@ export const PUSH_SENDER_TAG = "push.sender";
 export const deviceRpcParams = {
   /** Null stops alerts to this phone. */
   "push.register": z.object({ registration: pushRegistration.nullable() }).strict(),
+  /** This phone's key to wake its host through the host's door, renewed on every session. */
+  "door.key": z.object({}).strict(),
 };
 export type DeviceMethod = keyof typeof deviceRpcParams;
 export type DeviceParams<M extends DeviceMethod> = z.infer<(typeof deviceRpcParams)[M]>;
+
+/**
+ * What a host that sleeps gives a phone to knock on its door with: its ticket for this phone's own device id, for one
+ * epoch. The ticket is a secret, kept in the phone's Keychain only.
+ */
+export interface DoorKey {
+  /** The door's host name. */
+  host: string;
+  /** This phone's id on the host, as its paired list names it. */
+  device: string;
+  epoch: number;
+  /** 32 bytes, base64url. */
+  ticket: string;
+}
+
 export interface DeviceRpcResults {
   "push.register": PushSenderStates;
+  /** Null from a host without a door, such as a Mac. */
+  "door.key": DoorKey | null;
 }
 export const isDeviceMethod = (method: string): method is DeviceMethod => Object.hasOwn(deviceRpcParams, method);
 

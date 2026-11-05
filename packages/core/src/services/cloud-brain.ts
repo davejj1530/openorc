@@ -1,4 +1,5 @@
 import {
+  BRAIN_PROJECT,
   BrainMachine,
   BrainRefused,
   BrainUnavailable,
@@ -9,12 +10,15 @@ import {
   sealHandover,
   type BrainAccess,
   type BrainControlResults,
+  type BrainKey,
   type BrainMachineStatus,
+  type DoorBundle,
   type HandoverClaudeAccount,
 } from "@openorc/cloud";
 import { claudeAccounts, projects, redact, type Db } from "@openorc/db";
 import type { BrainRegion, CloudBrainMachine, CloudBrainPairing, CloudBrainProject, CloudBrainStatus, CloudBrainStep, Project } from "@openorc/protocol";
 import type { ClaudeCloudTokens } from "./claude-cloud-tokens.js";
+import { BrainDoorKeeper, vercelDoors, type BrainDoors } from "./cloud-brain-door.js";
 import { copyBranch, keptOwn, moved, seen, sendProject, switchedOn, type BrainProject } from "./cloud-brain-projects.js";
 import type { ProtectedSecretStore } from "./extraction-credentials.js";
 
@@ -28,6 +32,8 @@ const hasThreads = "It has threads on the cloud brain.";
 export interface BrainBundleSource {
   version: string;
   read(): Promise<Buffer>;
+  /** The door this build deploys beside the brain, which a paired phone knocks on to wake it. */
+  door?: DoorBundle;
 }
 
 /** The parts of BrainMachine this uses; tests pass a stand-in. */
@@ -93,6 +99,9 @@ export interface CloudBrainDeps {
   bundle: (() => Promise<BrainBundleSource | null>) | undefined;
   changed: () => void;
   open?: OpenBrainMachine;
+  doors?: BrainDoors;
+  /** The brain's project and its door's; the product's own unless given, as for a QA brain kept apart. */
+  projects?: { brain?: string; door?: string };
 }
 
 /**
@@ -113,8 +122,11 @@ export class CloudBrain {
   private sendingProject: string | null = null;
   /** The version the brain ran when this Mac last woke it. */
   private running: string | null = null;
+  private readonly door: BrainDoorKeeper;
 
-  constructor(private readonly deps: CloudBrainDeps) {}
+  constructor(private readonly deps: CloudBrainDeps) {
+    this.door = new BrainDoorKeeper({ doors: deps.doors ?? vercelDoors, project: deps.projects?.door, changed: () => this.changed(), scrub: (error) => this.scrub(error) });
+  }
 
   async status(): Promise<CloudBrainStatus> {
     if (this.activity?.kind === "removing") return { state: "removing" };
@@ -134,7 +146,8 @@ export class CloudBrain {
     if (machine === "missing") return { state: "incomplete", region: stored.region, error: this.error ?? "The cloud brain's machine is gone." };
     const working = this.activity ? WORKING[this.activity.kind] : null;
     const behind = !sameSent((await this.claude().catch(() => [])).map(sent), stored.claude);
-    return { state: "ready", region: stored.region, machine, claude: stored.claude.map((account) => account.name), behind, working, error: this.error ?? error };
+    const claude = stored.claude.map((account) => account.name);
+    return { state: "ready", region: stored.region, machine, claude, behind, working, door: this.door.status(), error: this.error ?? error };
   }
 
   /**
@@ -240,12 +253,38 @@ export class CloudBrain {
     }).catch(() => undefined);
   }
 
-  /** Deletes the brain, its disk and its thread sandboxes, then forgets its key. A failure shows in the status. */
+  /** Once this Mac's core has started: the door is brought to this build, as after an update. Wakes nothing. */
+  opened(): void {
+    this.refreshDoor();
+  }
+
+  /** The Vercel connection's token or size changed: the door takes them, since it wakes the brain with them. */
+  vercelChanged(): void {
+    this.refreshDoor();
+  }
+
+  /**
+   * Forgets the Vercel connection with `forget`, once the door's deployments and its copy of the token are gone. One
+   * step, so no queued look opens the door again in between. Throws when they could not go, and the connection stays.
+   */
+  disconnect(forget: () => Promise<unknown>): Promise<void> {
+    return this.serialize(async () => {
+      const stored = await this.read();
+      const vercel = await this.deps.vercel();
+      if (stored && vercel) await this.door.close({ token: vercel.token, teamId: stored.teamId });
+      await forget();
+    });
+  }
+
+  /** Deletes the brain's door, then the brain, its disk and its thread sandboxes, then forgets its key. A failure shows in the status. */
   async remove(): Promise<void> {
     await this.run({ kind: "removing" }, async () => {
       const stored = await this.read();
       const vercel = await this.vercel();
-      await (await this.open({ token: vercel.token, teamId: stored?.teamId ?? vercel.teamId }, false))?.remove();
+      const teamId = stored?.teamId ?? vercel.teamId;
+      // First, so nothing wakes the brain while it goes.
+      await this.door.remove({ token: vercel.token, teamId });
+      await (await this.open({ token: vercel.token, teamId }, false))?.remove();
       await this.write(null);
       this.elsewhere = null;
     }).catch(() => undefined);
@@ -304,6 +343,27 @@ export class CloudBrain {
   /** Once the operation that woke the brain ends, so the brain runs this build's version first and a pairing waits on nothing. */
   private refreshAfter(): void {
     void this.serialize(() => this.refreshProjects()).catch(() => undefined);
+    this.refreshDoor();
+  }
+
+  /** Queued behind what runs. Never wakes the brain; costs one look at the door when it is current. */
+  private refreshDoor(): void {
+    void this.serialize(async () => {
+      const door = (await this.deps.bundle?.())?.door;
+      if (!door) return;
+      const stored = await this.read();
+      const vercel = await this.deps.vercel();
+      if (!stored?.ready || !vercel) return;
+      const access = { token: vercel.token, teamId: stored.teamId };
+      const project = this.deps.projects?.brain ?? BRAIN_PROJECT;
+      await this.door.open(access, { ...(await this.wakeInput(stored)), vercel: { ...access, project }, revoked: [] }, door);
+    }).catch(() => undefined);
+  }
+
+  /** What a wake hands the brain, the same for this Mac's own wake and its door's. */
+  private async wakeInput(stored: Stored): Promise<{ key: BrainKey; name: string; threadVcpus?: number }> {
+    const vcpus = (await this.deps.vercel())?.vcpus;
+    return { key: brainKeyFrom(stored.key), name: BRAIN_NAME, ...(vcpus ? { threadVcpus: vcpus } : {}) };
   }
 
   /**
@@ -419,8 +479,7 @@ export class CloudBrain {
   /** Starts the brain unless it runs, and says which version runs. */
   private async start(machine: BrainMachineLike): Promise<string> {
     const stored = await this.stored();
-    const vcpus = (await this.deps.vercel())?.vcpus;
-    const result = await machine.wake({ key: brainKeyFrom(stored.key), name: BRAIN_NAME, ...(vcpus ? { threadVcpus: vcpus } : {}) });
+    const result = await machine.wake(await this.wakeInput(stored));
     switch (result.state) {
       case "ready":
         if (!stored.ready || stored.address !== result.address) await this.write({ ...stored, ready: true, address: result.address });
@@ -499,7 +558,8 @@ export class CloudBrain {
   private async open(access: BrainAccess, create: boolean): Promise<BrainMachineLike | null> {
     const key = `${access.teamId}\n${access.token}`;
     if (this.connected?.key === key) return this.connected.machine;
-    const machine = await (this.deps.open ?? openMachine)(access, create);
+    const project = this.deps.projects?.brain;
+    const machine = await (this.deps.open ?? openMachine)(project ? { ...access, project } : access, create);
     if (machine) this.connected = { key, machine };
     return machine;
   }

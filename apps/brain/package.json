@@ -20,8 +20,10 @@
     "@openorc/core": "workspace:*",
     "@openorc/db": "workspace:*",
     "@openorc/git": "workspace:*",
+    "@openorc/link": "workspace:*",
     "@openorc/protocol": "workspace:*",
     "@types/node": "^24.0.0",
+    "@vercel/functions": "3.10.4",
     "esbuild": "0.28.2",
     "typescript": "^5.9.0",
     "vitest": "^4.1.11"

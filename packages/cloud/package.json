@@ -6,7 +6,8 @@
   "type": "module",
   "description": "Cloud workspaces: the sandbox a thread runs in, the runner inside it, and the sync that brings its files back to the Mac.",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./door": "./src/door.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit && tsc --noEmit -p src/runner",

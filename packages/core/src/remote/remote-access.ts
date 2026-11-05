@@ -7,6 +7,7 @@ import {
   type DeviceMethod,
   type DeviceParams,
   type DeviceRpcResults,
+  type DoorKey,
   type PairingOfferView,
   type PreviewHost,
   type PushEnvironment,
@@ -50,6 +51,8 @@ export interface RemoteNetwork {
    * forwards to, which is neither read from nor saved to the database. A Mac has none.
    */
   publicAddress?: string;
+  /** A host that sleeps hands each of its phones a key to its door, for the asking phone's own device id. A Mac has none. */
+  door?: (deviceId: string) => DoorKey;
   apns?: Record<PushEnvironment, string>;
 }
 
@@ -189,6 +192,8 @@ export class RemoteAccess {
         this.options.invalidate(["remote"]);
         return { sandbox: this.senderState("sandbox"), production: this.senderState("production") };
       }
+      case "door.key":
+        return this.network.door?.(deviceId) ?? null;
     }
   }
 

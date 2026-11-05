@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   BrainRefused,
   BrainUnavailable,
+  VercelRefusal,
   brainKeyText,
   brainVersionNewer,
   copyHeads,
@@ -18,15 +19,22 @@ import {
   type BrainControlResults,
   type BrainKey,
   type BrainMachineStatus,
+  type DoorAccess,
+  type DoorBundle,
+  type DoorDeployOptions,
+  type DoorOpening,
   type HandoverClaudeAccount,
+  type OpenedDoor,
   type ProjectBundle,
   type WakeResult,
 } from "@openorc/cloud";
+import { Db } from "@openorc/db";
 import { DEFAULT_CLAUDE_ACCOUNT, WORKSPACE_ID, brainRegionFor } from "@openorc/protocol";
 import { OpenOrc } from "../openorc.js";
 import type { OpenOrcOptions } from "../options.js";
 import { rpcClient } from "../rpc-test-client.js";
-import type { BrainMachineLike } from "./cloud-brain.js";
+import type { BrainDoors } from "./cloud-brain-door.js";
+import { CloudBrain, type BrainMachineLike } from "./cloud-brain.js";
 
 const VERCEL_TOKEN = "vcp_fixture-vercel-token-0123456789";
 const PERSONAL = "sk-ant-oat01-personal-fixture-token-0123456789";
@@ -185,6 +193,8 @@ async function open(options: Partial<OpenOrcOptions> = {}): Promise<void> {
       if (create) brain.project = true;
       return brain.project ? brain : null;
     },
+    // Never Vercel's.
+    cloudBrainDoors: new FakeDoors(() => brain.calls),
     ...options,
   });
 }
@@ -237,7 +247,7 @@ describe("the cloud brain from the Mac", () => {
     ]);
     expect(stored()).toMatchObject({ key: brainKeyText(brain.key!), region: "sin1", teamId: "team_fixture" });
     expect(record.saved.join("\n")).not.toContain(PERSONAL);
-    expect(await status()).toEqual({ state: "ready", region: "sin1", machine: "awake", claude: ["Existing CLI login", "Work"], behind: false, working: null, error: null });
+    expect(await status()).toEqual({ state: "ready", region: "sin1", machine: "awake", claude: ["Existing CLI login", "Work"], behind: false, working: null, door: null, error: null });
 
     const key = stored()!.key;
     await setUp();
@@ -767,5 +777,178 @@ describe("the cloud brain from the Mac", () => {
     expect(await status()).toEqual({ state: "unavailable" });
     await expect(rpc("cloud.brain.create", { region: "sin1" })).rejects.toThrow("isn't available in this build");
     expect(brain.calls).toEqual([]);
+  });
+});
+
+/** The brain's door on Vercel as the Mac sees it: what it was opened with, and the mark it answers with. */
+class FakeDoors implements BrainDoors {
+  opens: { access: DoorAccess; opening: DoorOpening; release: string; tidied: string | null }[] = [];
+  closes: DoorAccess[] = [];
+  removes: DoorAccess[] = [];
+  served: string | null = null;
+  fails: Error | null = null;
+  hold: Promise<void> = Promise.resolve();
+  constructor(private readonly log: () => string[]) {}
+
+  open = async (access: DoorAccess, opening: DoorOpening, bundle: DoorBundle, options: DoorDeployOptions = {}): Promise<OpenedDoor> => {
+    this.opens.push({ access, opening, release: bundle.release, tidied: options.tidied ?? null });
+    if (this.fails) throw this.fails;
+    const mark = createHash("sha256")
+      .update(JSON.stringify([bundle.release, brainKeyText(opening.key), opening.vercel, opening.threadVcpus ?? null]))
+      .digest("base64url")
+      .slice(0, 22);
+    const host = "openorc-door-abcdefghijklmnop.vercel.app";
+    if (this.served === mark && options.tidied === mark) return { host, mark, deployed: false };
+    options.deploying?.();
+    await this.hold;
+    this.served = mark;
+    return { host, mark, deployed: true };
+  };
+  close = async (access: DoorAccess) => {
+    this.closes.push(access);
+    if (this.fails) throw this.fails;
+    this.served = null;
+  };
+  remove = async (access: DoorAccess) => {
+    this.removes.push(access);
+    this.log().push("door remove");
+    if (this.fails) throw this.fails;
+    this.served = null;
+  };
+}
+
+describe("the cloud brain's door", () => {
+  let doors: FakeDoors;
+  const DOOR = { release: "door-1", code: async () => Buffer.from("export {};") };
+  const withDoor = async () => ({ version: carried, read: async () => Buffer.from("archive"), door: DOOR });
+  /** Settings' own Vercel connection, so a change there reaches the brain as it does in the app. */
+  const vercelSettings = () => {
+    const store = memoryStore();
+    void store.save(JSON.stringify({ vercel: { token: VERCEL_TOKEN, team: { id: "team_fixture", name: "Fixture" }, project: { id: "prj_sandboxes", name: "openorc-sandboxes" } } }));
+    return store;
+  };
+
+  beforeEach(async () => {
+    doors = new FakeDoors(() => brain.calls);
+    await core.close();
+    await open({ cloudBrainBundle: withDoor, cloudBrainDoors: doors });
+  });
+
+  it("opens after setup with the Mac's own wake, in the brain's team, and says it is open", async () => {
+    await setUp();
+    await vi.waitFor(async () => expect((await status()).state === "ready" && (await status())).toMatchObject({ door: { state: "open" } }));
+    expect(doors.opens).toEqual([
+      {
+        access: { token: VERCEL_TOKEN, teamId: "team_fixture" },
+        opening: { key: brain.key, vercel: { token: VERCEL_TOKEN, teamId: "team_fixture", project: "openorc-brain" }, name: "Cloud", revoked: [] },
+        release: "door-1",
+        tidied: null,
+      },
+    ]);
+    expect(brain.calls.filter((call) => call === "wake")).toHaveLength(1);
+  });
+
+  it("looks again when this Mac starts and after each wake it makes, asking only the door once it is current", async () => {
+    await setUp();
+    await vi.waitFor(() => expect(doors.opens).toHaveLength(1));
+    await core.close();
+    brain.calls = [];
+    await open({ cloudBrainBundle: withDoor, cloudBrainDoors: doors });
+    await vi.waitFor(() => expect(doors.opens).toHaveLength(2));
+    expect(doors.opens[1]!.tidied).toBeNull();
+    expect(brain.calls).not.toContain("wake");
+    brain.state = "stopped";
+    await rpc("cloud.brain.wake", {});
+    await vi.waitFor(() => expect(doors.opens).toHaveLength(3));
+    expect(doors.opens[2]!.tidied).toBe(doors.served);
+  });
+
+  it("shows the door opening while it deploys, and why it failed without the token, while the brain stays ready", async () => {
+    let deployed: () => void = () => undefined;
+    doors.hold = new Promise((resolve) => (deployed = resolve));
+    await setUp();
+    await vi.waitFor(async () => expect(await status()).toMatchObject({ state: "ready", door: { state: "opening" } }));
+    deployed();
+    await vi.waitFor(async () => expect(await status()).toMatchObject({ door: { state: "open" } }));
+    doors.fails = new Error(`Vercel refused vercel-token ${VERCEL_TOKEN}`);
+    await rpc("cloud.brain.wake", {});
+    await vi.waitFor(async () => expect(await status()).toMatchObject({ state: "ready", error: null, door: { state: "failed" } }));
+    const shown = await status();
+    expect(JSON.stringify(shown)).not.toContain(VERCEL_TOKEN);
+    expect(shown).toMatchObject({ door: { error: "Vercel refused vercel-token [redacted]" } });
+  });
+
+  it("takes a new sandbox size into the door, which starts thread sandboxes with it", async () => {
+    await core.close();
+    await open({ cloudBrainBundle: withDoor, cloudBrainDoors: doors, cloudCredentials: undefined, cloudSecrets: vercelSettings() });
+    await setUp();
+    await vi.waitFor(() => expect(doors.opens).toHaveLength(1));
+    await rpc("cloud.vercel.size", { vcpus: 4 });
+    await vi.waitFor(() => expect(doors.opens).toHaveLength(2));
+    expect(doors.opens[1]!.opening.threadVcpus).toBe(4);
+  });
+
+  it("is closed before the Vercel connection goes, which stays while it cannot be; a token Vercel refuses lets it go", async () => {
+    await core.close();
+    await open({ cloudBrainBundle: withDoor, cloudBrainDoors: doors, cloudCredentials: undefined, cloudSecrets: vercelSettings() });
+    await setUp();
+    doors.fails = new Error("fetch failed");
+    await expect(rpc("cloud.vercel.disconnect", {})).rejects.toThrow("Could not close the cloud brain's door. fetch failed");
+    expect((await rpc("cloud.status", {})).vercel).not.toBeNull();
+    doors.fails = new VercelRefusal("The token is not valid.", 403);
+    expect((await rpc("cloud.vercel.disconnect", {})).vercel).toBeNull();
+    expect(doors.closes).toEqual([
+      { token: VERCEL_TOKEN, teamId: "team_fixture" },
+      { token: VERCEL_TOKEN, teamId: "team_fixture" },
+    ]);
+  });
+
+  it("is removed before the brain, which stays while the door cannot go; a token Vercel refuses lets it be", async () => {
+    await setUp();
+    doors.fails = new Error("Vercel answered 500.");
+    await rpc("cloud.brain.remove", {});
+    expect(brain.calls).toContain("door remove");
+    expect(brain.calls).not.toContain("remove");
+    expect(await status()).toMatchObject({ state: "ready", error: "Could not remove the cloud brain's door. Vercel answered 500." });
+    doors.fails = new VercelRefusal("Not authorized.", 403);
+    brain.calls = [];
+    await rpc("cloud.brain.remove", {});
+    expect(brain.calls).toEqual(["door remove", "remove"]);
+    doors.fails = null;
+    expect(await status()).toEqual({ state: "none", error: null });
+    expect(doors.removes).toHaveLength(2);
+    expect(doors.removes[0]).toEqual({ token: VERCEL_TOKEN, teamId: "team_fixture" });
+  });
+
+  it("is never opened by a build without one", async () => {
+    await core.close();
+    await open({ cloudBrainDoors: doors });
+    await setUp();
+    await rpc("cloud.brain.wake", {});
+    expect(doors.opens).toEqual([]);
+    expect(await status()).toMatchObject({ state: "ready", door: null });
+  });
+
+  it("puts the brain and its door in the projects it is given", async () => {
+    const access: BrainAccess[] = [];
+    const service = new CloudBrain({
+      db: Db.memory(),
+      store: memoryStore(),
+      tokens: { status: async () => ({}), token: async () => null },
+      vercel: async () => ({ token: VERCEL_TOKEN, teamId: "team_fixture" }),
+      bundle: withDoor,
+      changed: () => undefined,
+      open: async (given, create) => {
+        access.push(given);
+        if (create) brain.project = true;
+        return brain.project ? brain : null;
+      },
+      doors,
+      projects: { brain: "openorc-brain-qa", door: "openorc-door-qa" },
+    });
+    await service.create("sin1");
+    await vi.waitFor(() => expect(doors.opens).toHaveLength(1));
+    expect(new Set(access.map((given) => given.project))).toEqual(new Set(["openorc-brain-qa"]));
+    expect(doors.opens[0]).toMatchObject({ access: { project: "openorc-door-qa" }, opening: { vercel: { project: "openorc-brain-qa" } } });
   });
 });

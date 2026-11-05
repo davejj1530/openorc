@@ -46,6 +46,23 @@ ALTER TABLE cloud_workspaces_next RENAME TO cloud_workspaces;
 `;
 
 /**
+ * Agent37 runs cloud conversations too. The table is made again with the provider's CHECK widened and every column it
+ * has by now, so it also opens a ledger migrated again from an earlier version.
+ */
+export function cloudWorkspaceAgent37Migration(raw: DatabaseSync): void {
+  const table = raw.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'cloud_workspaces'").get() as { sql: string } | undefined;
+  if (!table || table.sql.includes("'agent37'")) return;
+  const columns = (raw.prepare("PRAGMA table_info(cloud_workspaces)").all() as { name: string }[]).map((column) => column.name).join(", ");
+  const next = table.sql
+    .replace(/^CREATE TABLE\s+"?cloud_workspaces"?/, "CREATE TABLE cloud_workspaces_next")
+    .replace("CHECK (provider IN ('local', 'vercel'))", "CHECK (provider IN ('local', 'vercel', 'agent37'))");
+  raw.exec(`${next};
+INSERT INTO cloud_workspaces_next (${columns}) SELECT ${columns} FROM cloud_workspaces;
+DROP TABLE cloud_workspaces;
+ALTER TABLE cloud_workspaces_next RENAME TO cloud_workspaces;`);
+}
+
+/**
  * What a cloud conversation's sandbox got of its saved session, so a turn's end writes the host only when it changed.
  * Added only where missing, like the cloud brain's tables, so a ledger migrated again from an earlier version opens.
  */

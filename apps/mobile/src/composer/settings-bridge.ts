@@ -1,4 +1,5 @@
 import type { ClientState } from "@openorc/client";
+import type { CloudProvider } from "@openorc/protocol";
 import { useEffect, useSyncExternalStore } from "react";
 
 /** Where a new thread runs: on the Mac, as threads started there do, or in a sandbox of its own. */
@@ -17,7 +18,7 @@ export type ComposerSettings = Pick<ReturnType<ClientState["useConversationSetti
    * now, and `failed` why the last change did not go through.
    */
   claudeAccount?: { chosen: string | undefined; select: (id: string) => void; held?: string | null; failed?: string | null };
-  place?: { chosen: ThreadPlace; provider: "vercel" | "local"; select: (place: ThreadPlace) => void };
+  place?: { chosen: ThreadPlace; provider: CloudProvider; select: (place: ThreadPlace) => void };
 };
 
 /**

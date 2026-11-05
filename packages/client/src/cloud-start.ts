@@ -60,8 +60,10 @@ export function queueAfterStart(thread: ThreadSummary, runs: number): QueuedMess
 export type CloudStartStep = CloudStep | "agent";
 export type CloudStartStepState = "pending" | "running" | "done";
 
+const sandboxStart: Record<CloudThreadState["provider"], string> = { vercel: "Starting a Vercel sandbox", agent37: "Starting an Agent37 instance", local: "Starting the sandbox" };
+
 function stepLabel(step: CloudStartStep, thread: StartingCloudThread): string {
-  if (step === "sandbox") return thread.cloud.provider === "vercel" ? "Starting a Vercel sandbox" : "Starting the sandbox";
+  if (step === "sandbox") return sandboxStart[thread.cloud.provider];
   if (step === "code") return "Sending your code";
   if (step === "setup") return "Running the setup script";
   return `Starting ${harnessShortName(thread.agent)}`;
@@ -86,10 +88,12 @@ export function cloudStartFailure(thread: StartingCloudThread): string | null {
   return thread.cloud.error ?? message?.error ?? "Something went wrong while it was being set up.";
 }
 
+const placeLabels: Record<CloudThreadState["provider"], string> = { vercel: "Vercel Sandbox", agent37: "Agent37 instance", local: "Simulated sandbox" };
+
 /** Where a cloud thread runs, for a line of facts about it. */
 export function cloudPlaceLabel(cloud: CloudThreadState): string {
   if (cloud.state === "removed") return "Sandbox removed";
-  return cloud.provider === "vercel" ? "Vercel Sandbox" : "Simulated sandbox";
+  return placeLabels[cloud.provider];
 }
 
 const MOVE_ORDER: Record<"mac" | "cloud", MoveStep[]> = { cloud: ["packing", "waking", "sending"], mac: ["waking", "packing", "sending"] };

@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { SANDBOX_VCPUS, type BrainRegion, type ClaudeAccountConnection, type ClaudeCloudAccess, type CloudStatus } from "@openorc/protocol";
 import { Button, Select, TextButton, Tooltip } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/client";
+import { Agent37Settings, CloudServiceChoice } from "./settings-cloud-agent37";
 import { CloudBrainSection, RegionSelect } from "./settings-cloud-brain";
 import { CloudCheckSection } from "./settings-cloud-check";
 import { CloudSandboxesSection } from "./settings-cloud-sandboxes";
@@ -243,6 +244,8 @@ export function CloudSettings({ active }: { active: boolean }) {
         </p>
       ) : null}
       <VercelSettings status={status.data} />
+      <Agent37Settings status={status.data} />
+      <CloudServiceChoice status={status.data} />
       <ClaudeCloudAccounts status={status.data} active={active} />
       <CodexCloudSection codex={status.data.codex} />
       <OpenCodeCloudSection opencode={status.data.opencode} />

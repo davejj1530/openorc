@@ -245,6 +245,24 @@ describe("where cloud conversations run", () => {
     await expect(cloud.place({ agent: "opencode", model: "openrouter/acme/fast" }, project)).rejects.toThrow("OpenCode has no key for OpenRouter in the cloud. Add one in Settings > Cloud.");
   });
 
+  it("puts new conversations on the service chosen, and keeps each workspace on the service it was made with", async () => {
+    let service: "vercel" | "agent37" | null = "agent37";
+    const options = cloudSandboxProviders({
+      dataDir: directory,
+      env: () => process.env,
+      credentials: async () => ({ token: "tok", teamId: "team", projectId: "proj" }),
+      agent37: async () => ({ key: "sk_live_x", cpu: 2, memory: 4 }),
+      service: async () => service,
+    });
+    const cloud = new CloudWorkspaceService(db, options, quiet);
+    expect(await cloud.place({ agent: "claude" }, project)).toBe("agent37");
+    service = "vercel";
+    expect(await cloud.place({ agent: "claude" }, project)).toBe("vercel");
+    service = null;
+    expect(await cloud.place({ agent: "claude" }, project)).toBe("local");
+    expect(options.providers.map((provider) => provider.id)).toEqual(["local", "vercel", "agent37"]);
+  });
+
   it("lets a provider passed in take new conversations, whatever is connected", async () => {
     const cloud = new CloudWorkspaceService(
       db,
@@ -265,7 +283,7 @@ describe("where cloud conversations run", () => {
 describe("a cloud-only host", () => {
   it("has no sandboxes in folders: without a connection, a new conversation goes to Vercel, which asks for one", async () => {
     const options = cloudSandboxProviders({ dataDir: directory, env: () => process.env, credentials: async () => null, cloudOnly: true });
-    expect(options.providers.map((provider) => provider.id)).toEqual(["vercel"]);
+    expect(options.providers.map((provider) => provider.id)).toEqual(["vercel", "agent37"]);
     const cloud = new CloudWorkspaceService(db, { ...options, cloudOnly: true }, quiet);
     const thread = threads.insert(db, { projectId: project.id, title: "Cloud only", agent: "claude", model: null, mode: "act", permissionMode: "trusted", workspaceMode: "worktree" });
     const record = cloud.admit(thread.id, await cloud.place({ agent: "claude" }, project));

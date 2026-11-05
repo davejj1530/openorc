@@ -18,6 +18,10 @@ type CloudMethod =
   | "cloud.vercel.disconnect"
   | "cloud.vercel.size"
   | "cloud.vercel.region"
+  | "cloud.agent37.connect"
+  | "cloud.agent37.disconnect"
+  | "cloud.agent37.size"
+  | "cloud.service"
   | "cloud.takeover"
   | "cloud.claude.create"
   | "cloud.claude.cancel"
@@ -112,6 +116,10 @@ export function createCloudHandlers({ settings, tokens, checks, codex, opencode,
     "cloud.vercel.disconnect": () => changed(() => brain.disconnect(() => settings.disconnect())),
     "cloud.vercel.size": ({ vcpus }) => changed(() => settings.chooseSize(vcpus).then(() => brain.vercelChanged())),
     "cloud.vercel.region": ({ region }) => changed(() => settings.chooseRegion(region)),
+    "cloud.agent37.connect": ({ key }) => changed(() => settings.connectAgent37(key)),
+    "cloud.agent37.disconnect": () => changed(() => settings.disconnectAgent37()),
+    "cloud.agent37.size": ({ size }) => changed(() => settings.chooseAgent37Size(size)),
+    "cloud.service": ({ service }) => changed(() => settings.chooseService(service)),
     "cloud.takeover": ({ enabled }) => changed(() => settings.setTakeover(enabled)),
     "cloud.claude.create": ({ accountId }) => changed(() => tokens.create(accountId)),
     "cloud.claude.cancel": ({ accountId }) => changed(() => tokens.cancel(accountId)),
@@ -129,7 +137,7 @@ export function createCloudHandlers({ settings, tokens, checks, codex, opencode,
       if (!offered) return { offered: false, provider: null };
       const moves = await brain.moves();
       const projects = (moves?.projects ?? []).flatMap((copy) => (copy.brainId ? [{ mac: copy.id, cloud: copy.brainId }] : []));
-      return { offered: true, provider: (await settings.credentials()) ? "vercel" : "local", brain: moves ? { host: moves.linkKey, projects } : null };
+      return { offered: true, provider: (await settings.service()) ?? "local", brain: moves ? { host: moves.linkKey, projects } : null };
     },
     // With a cloud brain set up, the brain takes the thread; without one, it moves to a sandbox driven from this Mac.
     "cloud.move": async ({ threadId }) => {

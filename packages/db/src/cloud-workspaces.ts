@@ -1,6 +1,6 @@
 import type { Db } from "./database.js";
 
-export type CloudProviderId = "local" | "vercel";
+export type CloudProviderId = "local" | "vercel" | "agent37";
 /** `removed`: its sandbox was deleted; the next turn sets up a new one from the worktree on the Mac. */
 export type CloudWorkspaceState = "preparing" | "ready" | "failed" | "removed";
 

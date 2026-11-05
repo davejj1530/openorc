@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BRAIN_PROJECT } from "@openorc/cloud";
+import { Agent37Error, BRAIN_PROJECT } from "@openorc/cloud";
 import { CloudSettings, SANDBOX_PROJECT, type CloudSettingsOptions, type VercelRequest } from "./cloud-settings.js";
 
 const TOKEN = "vercel-token-123";
@@ -59,12 +59,14 @@ describe("cloud settings", () => {
 
     const { status, teams } = await settings.connect(TOKEN);
     expect(teams).toEqual([{ id: "team_a", name: "Acme" }]);
-    expect(status).toEqual({ vercel: { team: { id: "team_a", name: "Acme" }, project: SANDBOX_PROJECT, vcpus: null, region: "fra1" }, error: null, takeover: false });
+    expect(status).toEqual({ vercel: { team: { id: "team_a", name: "Acme" }, project: SANDBOX_PROJECT, vcpus: null, region: "fra1" }, agent37: null, service: "vercel", error: null, takeover: false });
     expect(vercel.calls).toEqual(["GET /v2/teams", `GET /v9/projects/${SANDBOX_PROJECT}`, "POST /v11/projects"]);
 
     expect(await settings.credentials()).toEqual({ token: TOKEN, teamId: "team_a", projectId: "prj_team_a", region: "fra1" });
     expect(await cloudSettings(store, vercel.request).status()).toEqual({
       vercel: { team: { id: "team_a", name: "Acme" }, project: SANDBOX_PROJECT, vcpus: null, region: "fra1" },
+      agent37: null,
+      service: "vercel",
       error: null,
       takeover: false,
     });
@@ -212,14 +214,55 @@ describe("cloud settings", () => {
   it("disconnects Vercel", async () => {
     const settings = cloudSettings(memoryStore(), fakeVercel([{ id: "team_a", name: "Acme", slug: "acme" }]).request);
     await settings.connect(TOKEN);
-    expect(await settings.disconnect()).toEqual({ vercel: null, error: null, takeover: false });
+    expect(await settings.disconnect()).toEqual({ vercel: null, agent37: null, service: null, error: null, takeover: false });
     expect(await settings.credentials()).toBeNull();
   });
 
   it("reports storage it cannot open without exposing anything", async () => {
     const settings = cloudSettings({ load: () => Promise.reject(new Error("keychain locked")), save: async () => {} }, fakeVercel([]).request);
-    expect(await settings.status()).toEqual({ vercel: null, error: expect.stringContaining("protected storage"), takeover: false });
+    expect(await settings.status()).toEqual({ vercel: null, agent37: null, service: null, error: expect.stringContaining("protected storage"), takeover: false });
     expect(await settings.credentials()).toBeNull();
+  });
+});
+
+describe("Agent37 in cloud settings", () => {
+  /** Agent37's API as settings use it: one key it accepts, refused in its own error shape otherwise. */
+  const agent37 = (key: string) => ({
+    list: async () => {
+      if (key !== "sk_live_good") throw new Agent37Error(401, "invalid_api_key", "Invalid API key.");
+      return [];
+    },
+  });
+
+  it("saves a key Agent37 accepts, gives instances the smallest size until another is chosen, and runs new threads there", async () => {
+    const store = memoryStore();
+    const settings = cloudSettings(store, fakeVercel([]).request, { agent37 });
+    expect(await settings.service()).toBeNull();
+    const status = await settings.connectAgent37("sk_live_good");
+    expect(status).toMatchObject({ vercel: null, agent37: { size: { cpu: 2, memory: 4 } }, service: "agent37" });
+    expect(await settings.agent37()).toEqual({ key: "sk_live_good", cpu: 2, memory: 4 });
+    await settings.chooseAgent37Size({ cpu: 4, memory: 16 });
+    expect(await cloudSettings(store, fakeVercel([]).request, { agent37 }).agent37()).toEqual({ key: "sk_live_good", cpu: 4, memory: 16 });
+    expect(JSON.stringify(await settings.status())).not.toContain("sk_live_good");
+  });
+
+  it("refuses a key Agent37 does not accept and saves nothing", async () => {
+    const store = memoryStore();
+    await expect(cloudSettings(store, fakeVercel([]).request, { agent37 }).connectAgent37("sk_live_bad")).rejects.toThrow("Agent37 did not accept that key.");
+    expect(store.peek()).toBeNull();
+  });
+
+  it("runs new threads on the service chosen while both are connected, and on the other once the chosen one goes", async () => {
+    const vercel = fakeVercel([{ id: "team_a", name: "Acme", slug: "acme" }]);
+    const settings = cloudSettings(memoryStore(), vercel.request, { agent37 });
+    await settings.connect(TOKEN);
+    await settings.connectAgent37("sk_live_good");
+    expect(await settings.service()).toBe("vercel");
+    expect((await settings.chooseService("agent37")).service).toBe("agent37");
+    expect((await settings.disconnectAgent37()).service).toBe("vercel");
+    await expect(settings.chooseService("agent37")).rejects.toThrow("Connect Agent37 first.");
+    await settings.disconnect();
+    expect(await settings.service()).toBeNull();
   });
 });
 

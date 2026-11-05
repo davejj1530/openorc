@@ -1,6 +1,7 @@
 import path from "node:path";
 import type { AgentHost } from "@openorc/agents";
 import {
+  Agent37SandboxProvider,
   BrokeringUnavailable,
   ensureAgent,
   installRunner,
@@ -17,13 +18,14 @@ import {
   type SandboxInfo,
   type SandboxProvider,
   type BrokeredHeader,
+  type Agent37Connection,
   type VercelConnection,
   type WorkspaceLocation,
 } from "@openorc/cloud";
 import { cloudWorkspaces, type CloudMirrorState, type CloudProviderId, type CloudWorkspaceRecord, type Db } from "@openorc/db";
 import { originUrl } from "@openorc/git";
 import { releaseOf, slotFor } from "@openorc/agents";
-import { harnessCatalog, isHarnessId, WORKSPACE_ID, type CloudStep, type CloudThreadState, type HarnessId, type Project, type Thread } from "@openorc/protocol";
+import { harnessCatalog, isHarnessId, WORKSPACE_ID, type CloudService, type CloudStep, type CloudThreadState, type HarnessId, type Project, type Thread } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
 import { cloudAgentHost } from "./cloud-agent-host.js";
 import { CloudAwake } from "./cloud-awake.js";
@@ -87,16 +89,29 @@ export function cloudSandboxProviders(input: {
   dataDir: string;
   env: () => NodeJS.ProcessEnv;
   credentials?: () => Promise<VercelConnection | null>;
+  agent37?: () => Promise<Agent37Connection | null>;
+  /** The connected service new conversations run on; Vercel's when connected, without it. */
+  service?: () => Promise<CloudService | null>;
+  /** The runner's files, which an Agent37 instance's own server comes from. */
+  files?: RunnerFile[];
   override?: SandboxProvider;
   cloudOnly?: boolean;
 }): Pick<CloudWorkspaceOptions, "providers" | "forNewThreads"> {
   const local = input.cloudOnly ? null : new LocalSandboxProvider(path.join(input.dataDir, "cloud-sandboxes"), input.env);
   const credentials = input.credentials ?? (async () => null);
   const vercel = new VercelSandboxProvider({ credentials });
-  const builtIn = local ? [local, vercel] : [vercel];
+  const agent37 = new Agent37SandboxProvider({ credentials: input.agent37 ?? (async () => null), files: input.files ?? runnerFiles() });
+  const service = input.service ?? (async () => ((await credentials()) ? "vercel" : null));
+  const builtIn = local ? [local, vercel, agent37] : [vercel, agent37];
   const { override } = input;
   const providers = override ? [override, ...builtIn.filter((provider) => provider.id !== override.id)] : builtIn;
-  return { providers, forNewThreads: async () => override ?? (local && !(await credentials()) ? local : vercel) };
+  const chosen = async (): Promise<SandboxProvider> => {
+    const where = await service();
+    if (where) return where === "agent37" ? agent37 : vercel;
+    // With nothing connected, a Mac simulates sandboxes; a cloud-only host goes to Vercel, which asks for a connection.
+    return local ?? vercel;
+  };
+  return { providers, forNewThreads: async () => override ?? (await chosen()) };
 }
 
 /** Which sandbox is a conversation's, on which service: its cloud workspace's, or its standby's before it has one. */

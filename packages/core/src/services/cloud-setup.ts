@@ -76,6 +76,19 @@ export interface CloudInput {
   log: Logger;
 }
 
+/** Where sandboxes run: the services Settings connects, unless the options name the credentials or the service. */
+function sandboxServices(options: OpenOrcOptions, settings: CloudSettings, env: () => NodeJS.ProcessEnv) {
+  return cloudSandboxProviders({
+    dataDir: options.dataDir,
+    env,
+    credentials: options.cloudCredentials ?? (() => settings.credentials()),
+    ...(options.cloudCredentials ? {} : { agent37: () => settings.agent37(), service: () => settings.service() }),
+    ...(options.cloudRunnerFiles ? { files: options.cloudRunnerFiles } : {}),
+    ...(options.cloudSandboxes ? { override: options.cloudSandboxes } : {}),
+    cloudOnly: options.cloudOnly,
+  });
+}
+
 /** The cloud's parts, made together: where sandboxes run, how agents sign in there, and the sandboxes themselves. */
 export function createCloud(input: CloudInput): {
   settings: CloudSettings;
@@ -94,13 +107,7 @@ export function createCloud(input: CloudInput): {
 } {
   const { db, options, accounts, environment, invalidate, log } = input;
   const settings = new CloudSettings(options.cloudSecrets, { brainRegion: () => brain.region() });
-  const sandboxes = cloudSandboxProviders({
-    dataDir: options.dataDir,
-    env: () => environment().env,
-    credentials: options.cloudCredentials ?? (() => settings.credentials()),
-    ...(options.cloudSandboxes ? { override: options.cloudSandboxes } : {}),
-    cloudOnly: options.cloudOnly,
-  });
+  const sandboxes = sandboxServices(options, settings, () => environment().env);
   const signIn = {
     signInLaunch: (id: string) => accounts.signInLaunch(id),
     cloudTokenChanged: (id: string) => {

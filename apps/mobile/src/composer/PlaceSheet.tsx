@@ -8,6 +8,7 @@ import { useSharedSettings, type ThreadPlace } from "./settings-bridge";
 
 const hints = {
   vercel: "A Vercel sandbox of its own; its changes arrive in a worktree on the Mac",
+  agent37: "An Agent37 instance of its own; its changes arrive in a worktree on the Mac",
   local: "A sandbox simulated on the Mac; its changes arrive in a worktree there",
 } as const;
 

@@ -4,13 +4,21 @@ import { ClaudeAccountId } from "./claude-accounts.js";
 import { BrainRegion, cloudBrainRpcParams, type CloudBrainRpcResults } from "./cloud-brain.js";
 import type { Thread } from "./domain.js";
 
+/** Where a cloud thread's sandbox runs: simulated on this Mac, on Vercel, or on Agent37. */
+export const CloudProvider = z.enum(["local", "vercel", "agent37"]);
+export type CloudProvider = z.infer<typeof CloudProvider>;
+
+/** A cloud service someone connects, which new cloud threads and the cloud brain run on. */
+export const CloudService = z.enum(["vercel", "agent37"]);
+export type CloudService = z.infer<typeof CloudService>;
+
 /** What a cloud thread's sandbox is doing before its first turn can start. */
 export const CloudStep = z.enum(["sandbox", "code", "setup"]);
 export type CloudStep = z.infer<typeof CloudStep>;
 
 /** Where a cloud thread's sandbox stands. `removed`: deleted from Settings; the next message sets up a new one. */
 export const CloudThreadState = z.object({
-  provider: z.enum(["local", "vercel"]),
+  provider: CloudProvider,
   state: z.enum(["preparing", "ready", "failed", "removed"]),
   /** The step running now while preparing. */
   step: CloudStep.nullable(),
@@ -26,7 +34,7 @@ export type CloudCheckStep = z.infer<typeof CloudCheckStep>;
 
 /** A run of the cloud check: everything a cloud thread needs, tried in a throwaway sandbox. */
 export interface CloudCheck {
-  provider: "local" | "vercel";
+  provider: CloudProvider;
   /** Null while it runs; whether every step passed once it ends. */
   passed: boolean | null;
   steps: {
@@ -59,7 +67,7 @@ export const Agent37Size = z
 /** One of OpenOrc's sandboxes, as Settings lists them. */
 export interface CloudSandbox {
   name: string;
-  provider: "local" | "vercel";
+  provider: CloudProvider;
   /** The conversation it belongs to; null for one no conversation has, such as a check's that was not deleted. */
   thread: { id: string; title: string } | null;
   state: "starting" | "running" | "stopping" | "stopped" | "failed";
@@ -80,7 +88,7 @@ export interface CloudSandbox {
 export interface CloudOffer {
   offered: boolean;
   /** Null when cloud threads are not offered. */
-  provider: "vercel" | "local" | null;
+  provider: CloudProvider | null;
   /** The cloud brain this Mac set up, once it has started: Move to cloud hands threads to it. Absent on older Macs. */
   brain?: CloudBrainOffer | null;
 }
@@ -136,6 +144,13 @@ export interface CloudStatus {
     /** Set when Vercel says the saved token reaches more than the chosen team: the whole account, or other teams too. */
     reachesMore?: true;
   } | null;
+  /** Null until an Agent37 key is saved. Absent from older cores. */
+  agent37?: {
+    /** The size of new instances. */
+    size: Agent37Size;
+  } | null;
+  /** The service new cloud threads and the cloud brain run on, among those connected; null with none. Absent from older cores. */
+  service?: CloudService | null;
   /** By Claude account id. */
   claude: Record<string, ClaudeCloudAccess>;
   codex: CodexCloudAccess;
@@ -166,6 +181,13 @@ export const cloudRpcParams = {
   "cloud.vercel.size": z.object({ vcpus: SandboxVcpus }).strict(),
   /** The region of sandboxes made from now on. */
   "cloud.vercel.region": z.object({ region: BrainRegion }).strict(),
+  /** Checks the key with Agent37 and saves it. */
+  "cloud.agent37.connect": z.object({ key: Token }).strict(),
+  "cloud.agent37.disconnect": z.object({}),
+  /** The size of instances made from now on. */
+  "cloud.agent37.size": z.object({ size: Agent37Size }).strict(),
+  /** Which connected service new cloud threads and the cloud brain run on. */
+  "cloud.service": z.object({ service: CloudService }).strict(),
   /** Runs `claude setup-token` for the account; its browser sign-in finishes it. */
   "cloud.claude.create": z.object({ accountId: ClaudeAccountId }).strict(),
   "cloud.claude.cancel": z.object({ accountId: ClaudeAccountId }).strict(),
@@ -211,6 +233,10 @@ export interface CloudRpcResults extends CloudBrainRpcResults, BrainSyncRpcResul
   "cloud.vercel.disconnect": CloudStatus;
   "cloud.vercel.size": CloudStatus;
   "cloud.vercel.region": CloudStatus;
+  "cloud.agent37.connect": CloudStatus;
+  "cloud.agent37.disconnect": CloudStatus;
+  "cloud.agent37.size": CloudStatus;
+  "cloud.service": CloudStatus;
   "cloud.takeover": CloudStatus;
   "cloud.claude.create": CloudStatus;
   "cloud.claude.cancel": CloudStatus;

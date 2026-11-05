@@ -1,4 +1,4 @@
-import { cloudWorkspaceSessionBaseMigration } from "./cloud-workspace-schema.js";
+import { cloudWorkspaceAgent37Migration, cloudWorkspaceSessionBaseMigration } from "./cloud-workspace-schema.js";
 import { relocationMigrations } from "./relocation-schema.js";
 
 /**
@@ -14,5 +14,5 @@ CREATE TABLE IF NOT EXISTS memory_tombstones (
 CREATE INDEX IF NOT EXISTS memory_tombstones_project ON memory_tombstones(project_id, removed_at);
 `;
 
-/** What the Mac and its cloud brain keep about each other's work, in order. */
-export const cloudBrainMigrations = [...relocationMigrations, memoryTombstoneMigration, cloudWorkspaceSessionBaseMigration];
+/** What the Mac and its cloud brain keep about each other's work, and the cloud services they run on, in order. */
+export const cloudBrainMigrations = [...relocationMigrations, memoryTombstoneMigration, cloudWorkspaceSessionBaseMigration, cloudWorkspaceAgent37Migration];

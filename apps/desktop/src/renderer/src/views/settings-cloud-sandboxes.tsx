@@ -34,13 +34,16 @@ function usd(amount: number): string {
   return amount > 0 && amount < 0.01 ? "under $0.01" : `$${amount.toFixed(2)}`;
 }
 
-/** Awake now and for how long, or asleep and how long it ran in all; then its size, and where it runs when simulated. */
+/** Where a sandbox runs, said when it is not Vercel. */
+const places: Record<CloudSandbox["provider"], string | null> = { local: "Simulated on this Mac", agent37: "On Agent37", vercel: null };
+
+/** Awake now and for how long, or asleep and how long it ran in all; then its size, and where it runs when not on Vercel. */
 function details(sandbox: CloudSandbox, now: number): string {
   const awake = sandbox.awakeSince === null ? null : `Awake for ${duration(now - sandbox.awakeSince)}`;
   const resting = sandbox.state === "running" ? "Awake" : stateLabels[sandbox.state];
   const ran = sandbox.awakeMs > 0 ? `, awake ${duration(sandbox.awakeMs)} in all` : "";
   const size = sandbox.vcpus ? `${sandbox.vcpus} vCPUs · ${Math.round((sandbox.memoryMb ?? sandbox.vcpus * 2048) / 1024)} GB` : null;
-  return [awake ?? `${resting}${ran}`, size, sandbox.provider === "local" ? "Simulated on this Mac" : null, sandbox.thread ? null : "No conversation"].filter(Boolean).join(" · ");
+  return [awake ?? `${resting}${ran}`, size, places[sandbox.provider], sandbox.thread ? null : "No conversation"].filter(Boolean).join(" · ");
 }
 
 function SandboxRow({ sandbox, now }: { sandbox: CloudSandbox; now: number }) {

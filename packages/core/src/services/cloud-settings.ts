@@ -1,5 +1,5 @@
-import type { VercelConnection } from "@openorc/cloud";
-import { brainRegionFor, type BrainRegion, type CloudStatus, type CloudTeam } from "@openorc/protocol";
+import { Agent37Error, agent37Api, type Agent37Api, type Agent37Connection, type VercelConnection } from "@openorc/cloud";
+import { AGENT37_SIZES, brainRegionFor, type Agent37Size, type BrainRegion, type CloudService, type CloudStatus, type CloudTeam } from "@openorc/protocol";
 import type { ProtectedSecretStore } from "./extraction-credentials.js";
 
 /** The project on the chosen team that cloud threads' sandboxes belong to. */
@@ -13,17 +13,33 @@ type Reach = "account" | string[] | null;
 interface Stored {
   /** `reach` is missing until Vercel was asked; records from before lack it. */
   vercel?: { token: string; team?: CloudTeam; project?: { id: string; name: string }; vcpus?: number; region?: BrainRegion; reach?: Reach };
+  agent37?: { key: string; size?: Agent37Size };
+  /** The service chosen for new cloud threads; the connected one when only one is. */
+  service?: CloudService;
   /** Working conversations move to the cloud when this Mac goes to sleep. */
   takeover?: boolean;
 }
 
 /** The part of what Settings shows that this keeps. */
-export type VercelStatus = Pick<CloudStatus, "vercel" | "error" | "takeover">;
+export type VercelStatus = Pick<CloudStatus, "vercel" | "agent37" | "service" | "error" | "takeover">;
+
+/** New Agent37 instances' size until another is chosen: the smallest. */
+const AGENT37_SIZE = AGENT37_SIZES[0];
+
+/** The service new cloud threads run on: the one chosen while it stays connected, else Vercel's, else Agent37's. */
+function serviceOf(stored: Stored): CloudService | null {
+  const connected = { vercel: Boolean(stored.vercel?.team && stored.vercel.project), agent37: Boolean(stored.agent37) };
+  if (stored.service && connected[stored.service]) return stored.service;
+  if (connected.vercel) return "vercel";
+  return connected.agent37 ? "agent37" : null;
+}
 
 export type VercelRequest = (url: string, init: RequestInit) => Promise<Response>;
 
 export interface CloudSettingsOptions {
   request?: VercelRequest;
+  /** How a key reaches Agent37; tests pass a stand-in. */
+  agent37?: (key: string) => Pick<Agent37Api, "list">;
   /** The cloud brain's region, null without one. Unless another is chosen, this Mac's sandboxes run beside it. */
   brainRegion?: () => Promise<BrainRegion | null>;
   /** This Mac's time zone, an IANA name, which picks the region when nothing else does. */
@@ -49,6 +65,7 @@ export class CloudSettings {
   private pending: Promise<unknown> = Promise.resolve();
   private cache: Stored | null = null;
   private readonly request: VercelRequest;
+  private readonly agent37Api: (key: string) => Pick<Agent37Api, "list">;
   private readonly brainRegion: () => Promise<BrainRegion | null>;
   private readonly timeZone: () => string;
   /** The token Vercel was last asked about, so one it could not answer for is asked again only at the next start. */
@@ -59,6 +76,7 @@ export class CloudSettings {
     options: CloudSettingsOptions = {},
   ) {
     this.request = options.request ?? ((url, init) => fetch(url, init));
+    this.agent37Api = options.agent37 ?? ((key) => agent37Api(key));
     this.brainRegion = options.brainRegion ?? (async () => null);
     this.timeZone = options.timeZone ?? (() => Intl.DateTimeFormat().resolvedOptions().timeZone);
   }
@@ -74,6 +92,8 @@ export class CloudSettings {
       vercel: vercel
         ? { team: vercel.team ?? null, project: vercel.project?.name ?? null, vcpus: vercel.vcpus ?? null, region: await this.region(vercel), ...(reachesMore(vercel) ? { reachesMore: true } : {}) }
         : null,
+      agent37: stored.agent37 ? { size: stored.agent37.size ?? AGENT37_SIZE } : null,
+      service: serviceOf(stored),
       error: null,
       takeover: stored.takeover ?? false,
     };
@@ -156,7 +176,7 @@ export class CloudSettings {
       try {
         return await this.view(await this.withReach(await this.read()));
       } catch (error) {
-        return { vercel: null, error: error instanceof Error ? error.message : storageError, takeover: false };
+        return { vercel: null, agent37: null, service: null, error: error instanceof Error ? error.message : storageError, takeover: false };
       }
     });
   }
@@ -167,6 +187,61 @@ export class CloudSettings {
       const vercel = (await this.read().catch(() => ({}) as Stored)).vercel;
       if (!vercel?.team || !vercel.project) return null;
       return { token: vercel.token, teamId: vercel.team.id, projectId: vercel.project.id, region: await this.region(vercel), ...(vercel.vcpus ? { vcpus: vercel.vcpus } : {}) };
+    });
+  }
+
+  /** What an Agent37 instance needs, or null until a key is saved. */
+  agent37(): Promise<Agent37Connection | null> {
+    return this.serialize(async () => {
+      const agent37 = (await this.read().catch(() => ({}) as Stored)).agent37;
+      if (!agent37) return null;
+      const { cpu, memory } = agent37.size ?? AGENT37_SIZE;
+      return { key: agent37.key, cpu, memory };
+    });
+  }
+
+  /** The service new cloud threads run on, among those connected; null with none. */
+  service(): Promise<CloudService | null> {
+    return this.serialize(async () => serviceOf(await this.read().catch(() => ({}) as Stored)));
+  }
+
+  /** Saves a key Agent37 accepts. */
+  connectAgent37(key: string): Promise<VercelStatus> {
+    return this.serialize(async () => {
+      try {
+        await this.agent37Api(key).list();
+      } catch (error) {
+        if (error instanceof Agent37Error && (error.status === 401 || error.status === 403)) throw new Error("Agent37 did not accept that key.");
+        throw error;
+      }
+      const stored = await this.read();
+      return this.write({ ...stored, agent37: { key } });
+    });
+  }
+
+  /** The size of instances made from now on. One that exists keeps its size. */
+  chooseAgent37Size(size: Agent37Size): Promise<VercelStatus> {
+    return this.serialize(async () => {
+      const stored = await this.read();
+      if (!stored.agent37) throw new Error("Connect Agent37 first.");
+      return this.write({ ...stored, agent37: { ...stored.agent37, size } });
+    });
+  }
+
+  /** Forgets the Agent37 key; instances made with it stay on Agent37 until removed there. */
+  disconnectAgent37(): Promise<VercelStatus> {
+    return this.serialize(async () => {
+      const { agent37: _agent37, ...rest } = await this.read();
+      return this.write(rest);
+    });
+  }
+
+  /** Which connected service new cloud threads run on. */
+  chooseService(service: CloudService): Promise<VercelStatus> {
+    return this.serialize(async () => {
+      const stored = await this.read();
+      if (serviceOf({ ...stored, service }) !== service) throw new Error(service === "vercel" ? "Connect Vercel first." : "Connect Agent37 first.");
+      return this.write({ ...stored, service });
     });
   }
 

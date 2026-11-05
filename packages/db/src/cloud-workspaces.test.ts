@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { cloudWorkspaceSessionBaseMigration } from "./cloud-workspace-schema.js";
+import { cloudWorkspaceAgent37Migration, cloudWorkspaceSessionBaseMigration } from "./cloud-workspace-schema.js";
 import { cloudWorkspaces } from "./cloud-workspaces.js";
 import { Db } from "./database.js";
 import { projects, threads } from "./repos.js";
@@ -45,6 +45,46 @@ describe("cloudWorkspaces", () => {
       try {
         expect(db.version).toBe(migrations.length);
         expect(cloudWorkspaces.get(db, thread.id)).toMatchObject({ state: "ready", sandbox: `openorc-${thread.id}`, mirror: { tree: "t".repeat(40) }, sessionBase: null });
+      } finally {
+        db.close();
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps every conversation and what its sandbox got of the session when Agent37 joins the services, and runs again harmlessly", () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "openorc-agent37-migration-"));
+    const file = path.join(dir, "old.sqlite");
+    try {
+      const raw = new DatabaseSync(file);
+      const before = migrations.indexOf(cloudWorkspaceAgent37Migration);
+      for (const migration of migrations.slice(0, before)) {
+        if (typeof migration === "string") raw.exec(migration);
+        else migration(raw);
+      }
+      raw.exec(`PRAGMA user_version = ${before}`);
+      const old = new Db(raw);
+      const project = projects.insert(old, { name: "Existing", rootPath: dir, gitRemote: null, defaultBranch: "main", settings: {} });
+      const thread = threads.insert(old, { projectId: project.id, title: "On Vercel", agent: "claude", model: null, mode: "act", permissionMode: "trusted", workspaceMode: "worktree" });
+      const base = { sessionId: "s-1", host: "h".repeat(64), sandbox: "b".repeat(64) };
+      cloudWorkspaces.insert(old, { threadId: thread.id, provider: "vercel", sandbox: "openorc-old", at: 1 });
+      cloudWorkspaces.setSessionBase(old, thread.id, base);
+      expect(() =>
+        cloudWorkspaces.insert(old, {
+          threadId: threads.insert(old, { projectId: project.id, title: "x", agent: "claude", model: null, mode: "act", permissionMode: "trusted", workspaceMode: "worktree" }).id,
+          provider: "agent37",
+          sandbox: "openorc-x",
+        }),
+      ).toThrow();
+      old.close();
+      const db = Db.open(file);
+      try {
+        expect(cloudWorkspaces.get(db, thread.id)).toMatchObject({ provider: "vercel", sandbox: "openorc-old", sessionBase: base });
+        const next = threads.insert(db, { projectId: project.id, title: "On Agent37", agent: "codex", model: null, mode: "act", permissionMode: "trusted", workspaceMode: "worktree" });
+        expect(cloudWorkspaces.insert(db, { threadId: next.id, provider: "agent37", sandbox: "openorc-new" }).provider).toBe("agent37");
+        cloudWorkspaceAgent37Migration(db.raw);
+        expect(cloudWorkspaces.get(db, next.id)?.provider).toBe("agent37");
       } finally {
         db.close();
       }

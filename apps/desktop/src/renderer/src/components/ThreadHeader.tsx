@@ -117,6 +117,7 @@ const cloudDot = { preparing: "live", failed: "bad", ready: null, removed: null 
 
 const cloudPlaces = {
   vercel: { label: "Vercel", tip: "Runs in Vercel Sandbox" },
+  agent37: { label: "Agent37", tip: "Runs in an Agent37 instance" },
   local: { label: "Simulated", tip: "Runs in a sandbox simulated on this Mac" },
 } as const;
 

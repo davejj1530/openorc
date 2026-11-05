@@ -2,12 +2,15 @@
  * OpenOrc's server in a cloud instance whose service runs a command only to completion, with no input and no way to
  * move files (Agent37's base template). The instance's own Node runs it:
  *
- *   node instance-server.ts --port 47821
+ *   node instance-server.ts --port 47821 --build <id>
  *
- *   GET  /health            "ok"
- *   PUT  /file?path=/abs    writes the body, whole or not at all
- *   GET  /file?path=/abs    the file, or 404
- *   WebSocket /process      one command: its input in, its output out by channel, its exit code last
+ *   GET  /openorc/health            "openorc-instance-server <id>"
+ *   PUT  /openorc/file?path=/abs    writes the body, whole or not at all
+ *   GET  /openorc/file?path=/abs    the file, or 404
+ *   WebSocket /openorc/process      one command: its input in, its output out by channel, its exit code last
+ *
+ * Every path is under /openorc: the service in front answers some common paths itself (Agent37 answers /health). The
+ * health answer names the build, so a server an older OpenOrc left running is replaced rather than spoken to.
  *
  * Node builtins only, since it runs from its own folder before anything else is there.
  */
@@ -266,8 +269,8 @@ async function getFile(file: string, response: http.ServerResponse): Promise<voi
 
 async function handle(request: http.IncomingMessage, response: http.ServerResponse): Promise<void> {
   const url = new URL(request.url ?? "/", "http://instance");
-  if (url.pathname === "/health" && request.method === "GET") return void response.end("ok");
-  if (url.pathname !== "/file") return void response.writeHead(404).end();
+  if (url.pathname === "/openorc/health" && request.method === "GET") return void response.end(`openorc-instance-server ${build}`);
+  if (url.pathname !== "/openorc/file") return void response.writeHead(404).end();
   const file = url.searchParams.get("path");
   if (!file || !path.isAbsolute(file)) return void response.writeHead(400).end("The path must be absolute.");
   if (request.method === "PUT") {
@@ -280,7 +283,7 @@ async function handle(request: http.IncomingMessage, response: http.ServerRespon
 
 function upgrade(request: http.IncomingMessage, socket: Duplex, head: Buffer): void {
   const key = request.headers["sec-websocket-key"];
-  if (new URL(request.url ?? "/", "http://instance").pathname !== "/process" || typeof key !== "string" || request.headers.upgrade?.toLowerCase() !== "websocket") {
+  if (new URL(request.url ?? "/", "http://instance").pathname !== "/openorc/process" || typeof key !== "string" || request.headers.upgrade?.toLowerCase() !== "websocket") {
     socket.end("HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n");
     return;
   }
@@ -297,9 +300,11 @@ function upgrade(request: http.IncomingMessage, socket: Duplex, head: Buffer): v
 const portAt = process.argv.indexOf("--port");
 const port = Number(process.argv[portAt + 1]);
 if (portAt < 0 || !Number.isInteger(port)) {
-  process.stderr.write("Usage: node instance-server.ts --port <port>\n");
+  process.stderr.write("Usage: node instance-server.ts --port <port> [--build <id>]\n");
   process.exit(2);
 }
+const buildAt = process.argv.indexOf("--build");
+const build = buildAt < 0 ? "dev" : (process.argv[buildAt + 1] ?? "dev");
 const server = http.createServer((request, response) => {
   handle(request, response).catch((error: unknown) => {
     if (response.headersSent) response.destroy();

@@ -56,6 +56,8 @@ export interface FakeAgent37 {
   readonly requests: string[];
   /** What the usage API reports for an instance. */
   setUsage(id: string, usage: Omit<Agent37Usage, "id">): void;
+  /** Makes an instance's addresses answer 502 container_unreachable while what listens inside keeps running. */
+  unroute(id: string): void;
   /** Puts an instance in a state no request leads to here, such as failed. */
   setStatus(id: string, status: Agent37Status, reason?: string): void;
   /** Ends every instance's processes and the server. */
@@ -152,6 +154,8 @@ class FakeAccount {
   readonly key = `sk_test_${randomBytes(12).toString("hex")}`;
   readonly held = new Map<string, Held>();
   readonly usage = new Map<string, Omit<Agent37Usage, "id">>();
+  /** Instances whose addresses do not reach their ports, as when Agent37's routing fails them. */
+  readonly unrouted = new Set<string>();
   readonly execs: FakeAgent37["execs"] = [];
   readonly requests: string[] = [];
 
@@ -300,9 +304,10 @@ class FakeAccount {
     const entry = this.held.get(match[1]!);
     const port = Number(match[2]);
     const open = entry?.instance.public_ports.some((each) => each.port === port);
-    if (!open && request.headers["x-agent37-key"] !== this.key) return flat(401, "unauthorized");
+    if (!open && request.headers["x-agent37-key"] !== this.key) return flat(401, "invalid_api_key");
     if (!entry) return flat(404, "not_found");
-    if (!this.awake(entry)) return flat(503, "instance_not_running");
+    if (!this.awake(entry)) return flat(502, "container_unavailable");
+    if (this.unrouted.has(entry.instance.id)) return flat(502, "container_unreachable");
     return port === INSTANCE_SERVER_PORT ? entry.serverPort : port;
   }
 }
@@ -323,13 +328,15 @@ const HOSTING: [string, RegExp, (account: FakeAccount, id: string, body: Record<
 function proxy(account: FakeAccount, request: http.IncomingMessage, response: http.ServerResponse, match: RegExpExecArray, search: string): void {
   const port = account.target(request, match);
   if (typeof port !== "number") return reply(response, port);
+  // As Agent37's own edge does: an instance address answers /health itself, whatever listens on the port.
+  if ((match[3] ?? "/") === "/health") return reply(response, ok({ ok: true }));
   const headers = { ...request.headers };
   delete headers["x-agent37-key"];
   const upstream = http.request({ host: "127.0.0.1", port, method: request.method, path: `${match[3] ?? "/"}${search}`, headers, agent: false }, (answer) => {
     response.writeHead(answer.statusCode ?? 502, answer.headers);
     answer.pipe(response);
   });
-  upstream.on("error", () => (response.headersSent ? response.destroy() : reply(response, flat(502, "bad_gateway"))));
+  upstream.on("error", () => (response.headersSent ? response.destroy() : reply(response, flat(502, "container_unreachable"))));
   request.pipe(upstream);
 }
 
@@ -391,6 +398,7 @@ export async function startFakeAgent37(dir: string, options: FakeAgent37Options 
     execs: account.execs,
     requests: account.requests,
     setUsage: (id, spent) => void account.usage.set(id, spent),
+    unroute: (id) => void account.unrouted.add(id),
     setStatus: (id, status, reason) => {
       const entry = account.held.get(id);
       if (entry) Object.assign(entry.instance, { status, status_reason: reason ? { code: status, message: reason } : null });

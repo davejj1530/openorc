@@ -1,8 +1,9 @@
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { AGENT37_SIZES } from "@openorc/protocol";
 import { setTimeout as sleep } from "node:timers/promises";
 import { agent37Api, agent37Hourly, type Agent37Api, type Agent37Instance, type Agent37Status, type Agent37Usage } from "./agent37.js";
-import { INSTANCE_SERVER_PORT, InstancePort, type InstanceProcess } from "./instance-port.js";
+import { INSTANCE_SERVER_PORT, InstancePort, instanceServerAnswer, type InstanceProcess } from "./instance-port.js";
 import type { RunnerFile } from "./runner-client.js";
 import { SANDBOX_AWAY_MS, SANDBOX_PREFIX, type Sandbox, type SandboxCommandOptions, type SandboxExecResult, type SandboxInfo, type SandboxProvider, type SandboxStream } from "./sandbox.js";
 
@@ -27,7 +28,15 @@ const DISK_GB = 20;
 const MAX_IDLE_SECONDS = 86_400;
 const POLL_MS = 1000;
 const READY_TIMEOUT_MS = 5 * 60_000;
-const SERVER_START_MS = 15_000;
+/** Agent37 says a server that just started may take a moment to answer at its address; this is how long it gets. */
+const SERVER_START_MS = 60_000;
+const SERVER_POLL_MS = 250;
+/**
+ * Ends any OpenOrc server already running in the instance, as one an older OpenOrc left on the port, before this one
+ * starts. Matched by its command line, which begins `node instance-server.ts`; the shell running this never does.
+ */
+const STOP_OLD_SERVERS = `{ for p in /proc/[0-9]*; do tr '\\0' ' ' < "$p/cmdline" 2>/dev/null | grep -q '^node instance-server.ts ' && kill "\${p#/proc/}" 2>/dev/null; done; sleep 0.5; true; }`;
+
 /** Agent37 refuses an exec request over 128 KB; this leaves room for the JSON around the command. */
 const COMMAND_LIMIT = 120 * 1024;
 const USAGE_DAYS = 90;
@@ -107,17 +116,21 @@ export class Agent37Sandbox implements Sandbox {
   /** Settles once the instance runs; null after `stop`, until the next call starts it again. */
   private running: Promise<void> | null = Promise.resolve();
   private serverStart: Promise<void> | null = null;
+  /** Names this build of OpenOrc's server, so one an older OpenOrc left running is replaced. */
+  private readonly build: string;
 
   constructor(
     readonly name: string,
     instance: Agent37Instance,
     private readonly api: Agent37Api,
     private readonly serverSource: Buffer,
+    private readonly serverStartMs = SERVER_START_MS,
   ) {
     this.id = instance.id;
     this.root = instance.mount_path;
     this.idleSeconds = instance.idle_timeout_seconds;
-    this.server = new InstancePort(api.port(instance.id, INSTANCE_SERVER_PORT));
+    this.build = createHash("sha256").update(serverSource).digest("hex").slice(0, 12);
+    this.server = new InstancePort(api.port(instance.id, INSTANCE_SERVER_PORT), this.build);
   }
 
   private awake(): Promise<void> {
@@ -208,19 +221,31 @@ export class Agent37Sandbox implements Sandbox {
       `mv ${shellQuote(`${file}.part`)} ${shellQuote(file)}`,
       `echo '{"type":"module"}' > ${shellQuote(path.posix.join(dir, "package.json"))}`,
       `cd ${shellQuote(dir)}`,
-      `(nohup node ${SERVER_FILE} --port "\${OPENORC_INSTANCE_PORT:-${INSTANCE_SERVER_PORT}}" </dev/null >${shellQuote(log)} 2>&1 &)`,
+      STOP_OLD_SERVERS,
+      `(nohup node ${SERVER_FILE} --port "\${OPENORC_INSTANCE_PORT:-${INSTANCE_SERVER_PORT}}" --build ${this.build} </dev/null >${shellQuote(log)} 2>&1 &)`,
     ].join(" && ");
     if (line.length > COMMAND_LIMIT) throw new Error(`OpenOrc's server for Agent37 is too large to send in one command.`);
     const started = await this.api.exec(this.id, line);
     if (started.exit_code !== 0) throw new Error(`Could not start OpenOrc's server in the Agent37 instance. ${started.stderr.trim()}`.trim());
-    const deadline = Date.now() + SERVER_START_MS;
-    while (!(await this.server.health())) {
-      if (Date.now() > deadline) {
-        const output = await this.api.exec(this.id, `tail -n 20 ${shellQuote(log)}`).catch(() => null);
-        throw new Error(`OpenOrc's server in the Agent37 instance did not start. ${output?.stdout.trim() ?? ""}`.trim());
-      }
-      await sleep(200);
+    const deadline = Date.now() + this.serverStartMs;
+    for (let answer = await this.server.probe(); answer !== null; answer = await this.server.probe()) {
+      if (Date.now() > deadline) throw new Error(await this.unreachable(answer, log));
+      await sleep(SERVER_POLL_MS);
     }
+  }
+
+  /** Why the server's address does not answer: the server is down, or it runs and Agent37's address does not reach it. */
+  private async unreachable(answer: string, log: string): Promise<string> {
+    const port = `\${OPENORC_INSTANCE_PORT:-${INSTANCE_SERVER_PORT}}`;
+    const inside = await this.api
+      .exec(
+        this.id,
+        `node -e "fetch('http://127.0.0.1:'+process.argv[1]+'/openorc/health').then((r) => r.text()).then((t) => process.exit(t === process.argv[2] ? 0 : 1), () => process.exit(1))" "${port}" ${shellQuote(instanceServerAnswer(this.build))}`,
+      )
+      .catch(() => null);
+    if (inside?.exit_code === 0) return `OpenOrc's server runs in the Agent37 instance, but Agent37's address for its port answered ${answer}.`;
+    const output = await this.api.exec(this.id, `tail -n 20 ${shellQuote(log)}`).catch(() => null);
+    return `OpenOrc's server in the Agent37 instance did not start (its address answered ${answer}). ${output?.stdout.trim() ?? ""}`.trim();
   }
 }
 
@@ -248,6 +273,8 @@ export interface Agent37ProviderOptions {
   /** The Mac's unless given. Each host opens, lists and removes only its own instances. */
   host?: Agent37Host;
   api?: (key: string) => Agent37Api;
+  /** How long a server just started gets to answer at its address; a minute unless given. */
+  serverStartMs?: number;
 }
 
 type Ours = Agent37Instance & { name: string };
@@ -317,7 +344,7 @@ export class Agent37SandboxProvider implements SandboxProvider {
         idle_timeout_seconds: SANDBOX_AWAY_MS / 1000,
       }));
     await ready(api, instance);
-    return new Agent37Sandbox(name, instance, api, instanceServerSource(this.options.files));
+    return new Agent37Sandbox(name, instance, api, instanceServerSource(this.options.files), this.options.serverStartMs);
   }
 
   /** Deletes the named instance and its files for good, every one of this host's by that name. */

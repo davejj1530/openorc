@@ -13,12 +13,15 @@ let port: number;
 let instance: InstancePort;
 let dir: string;
 
+/** The test server's address, once it is listening. */
+const instanceAddress = () => ({ url: `http://127.0.0.1:${port}`, headers: {} });
+
 beforeAll(async () => {
   dir = await mkdtemp(path.join(os.tmpdir(), "openorc-instance-server-"));
   server = spawn(process.execPath, [fileURLToPath(new URL("./instance-server.ts", import.meta.url)), "--port", "0"], { stdio: ["ignore", "pipe", "inherit"] });
   const line = await new Promise<string>((resolve) => server.stdout!.once("data", (chunk: Buffer) => resolve(chunk.toString("utf8"))));
   port = (JSON.parse(line) as { port: number }).port;
-  instance = new InstancePort({ url: `http://127.0.0.1:${port}`, headers: {} });
+  instance = new InstancePort(instanceAddress());
 });
 
 afterAll(async () => {
@@ -42,6 +45,8 @@ async function eventually(check: () => Promise<boolean>, ms = 5000): Promise<voi
 it("answers its health check", async () => {
   expect(await instance.health()).toBe(true);
   expect(await new InstancePort({ url: "http://127.0.0.1:1", headers: {} }).health()).toBe(false);
+  // Another build of the server at the address is not this client's: the sandbox replaces it rather than speak to it.
+  expect(await new InstancePort(instanceAddress(), "newer").probe()).toBe("200 openorc-instance-server dev");
 });
 
 it("writes a 3 MB binary file into folders it makes, reads it back byte for byte, and leaves nothing beside it", async () => {
@@ -135,7 +140,7 @@ function serverFrames(buffer: Buffer): { opcode: number; payload: Buffer }[] {
 it("speaks WebSocket by hand: the accept key, a fragmented first message, and a pong for a ping between its fragments", async () => {
   const socket = net.connect(port, "127.0.0.1");
   const key = randomBytes(16).toString("base64");
-  socket.write(`GET /process HTTP/1.1\r\nHost: x\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: ${key}\r\nSec-WebSocket-Version: 13\r\n\r\n`);
+  socket.write(`GET /openorc/process HTTP/1.1\r\nHost: x\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: ${key}\r\nSec-WebSocket-Version: 13\r\n\r\n`);
   const chunks: Buffer[] = [];
   socket.on("data", (chunk: Buffer) => chunks.push(chunk));
   const closed = new Promise((resolve) => socket.on("close", resolve));

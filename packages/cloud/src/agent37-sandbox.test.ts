@@ -128,10 +128,18 @@ describe("an Agent37 sandbox", () => {
     await expect(sandbox.exec("head", ["-c", "600000", "/dev/zero"])).rejects.toThrow("head printed more than Agent37 returns from one command, so its output was cut off.");
   });
 
+  it("says when its server runs but Agent37's address for the port does not reach it, with Agent37's answer", async () => {
+    const quick = new Agent37SandboxProvider({ credentials: async () => connection, files: runnerFiles(), api: (key) => agent37Api(key, fake.endpoints), serverStartMs: 1500 });
+    const sandbox = await quick.open("openorc-unrouted");
+    const instance = (await api.list()).find((each) => each.name === "openorc-unrouted")!;
+    fake.unroute(instance.id);
+    await expect(sandbox.readFile("/nothing")).rejects.toThrow("OpenOrc's server runs in the Agent37 instance, but Agent37's address for its port answered 502 container_unreachable.");
+  });
+
   it("launches a command that outlives the call", async () => {
     const sandbox = await provider.open("openorc-a");
     const marker = path.posix.join(sandbox.root, "launched.txt");
-    await sandbox.launch("sh", ["-c", `sleep 0.3; echo done > "$0"`, marker]);
+    await sandbox.launch("sh", ["-c", `sleep 2; echo done > "$0"`, marker]);
     expect(await sandbox.readFile(marker)).toBeNull();
     await eventually(async () => (await sandbox.readFile(marker))?.toString("utf8") === "done\n");
   });
@@ -168,8 +176,8 @@ describe("an Agent37 sandbox", () => {
     await sandbox.writeFile(path.posix.join(sandbox.root, "x.txt"), Buffer.from("x"));
     const [instance] = await api.list();
     const address = api.port(instance!.id, INSTANCE_SERVER_PORT);
-    expect(await new InstancePort(address).health()).toBe(true);
-    expect(await new InstancePort({ ...address, headers: { "x-agent37-key": "sk_live_wrong" } }).health()).toBe(false);
+    expect(await new InstancePort(address).probe()).toMatch(/^200 openorc-instance-server [0-9a-f]{12}$/);
+    expect(await new InstancePort({ ...address, headers: { "x-agent37-key": "sk_live_wrong" } }).probe()).toBe("401 invalid_api_key");
     await expect(new InstancePort({ ...address, headers: {} }).process({ cmd: "true", args: [] })).rejects.toThrow("Could not reach OpenOrc's server in the cloud instance.");
   });
 

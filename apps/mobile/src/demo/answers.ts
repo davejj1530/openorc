@@ -157,6 +157,7 @@ const answers: Answers = {
     return workspace.fileDiff(comparison ?? "base", path);
   },
   "git.threadLog": (core, { threadId, limit }) => core.workspaces.get(threadId)?.commits(limit ?? 50) ?? [],
+  "git.commitRange": () => null,
   "git.threadPushState": (core, { threadId }) =>
     core.workspaces.get(threadId)?.pushState() ?? { branch: null, blocked: "This thread works in the project's checkout.", published: false, unpushedCount: 0, unpushed: [], busy: false },
   "review.threadPrTemplate": () => ({ body: null }),

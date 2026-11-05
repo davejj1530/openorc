@@ -43,6 +43,7 @@ export const REMOTE_METHODS = [
   "review.threadChanges",
   "review.threadFileDiff",
   "git.threadLog",
+  "git.commitRange",
   "git.threadPushState",
   "review.threadPrTemplate",
   "pulls.branches",

@@ -3,6 +3,7 @@ import {
   changedFiles,
   changeStats,
   commitAll,
+  commitRange,
   createPr,
   filePatch,
   git,
@@ -17,7 +18,7 @@ import {
   unpushedCommits,
   workspaceTransfer,
 } from "@openorc/git";
-import type { ChangeComparison, Commit, FileDiff, Project, PushState, ReviewComment, ReviewDiff, Snapshot, Task, Thread, WorkspaceChanges } from "@openorc/protocol";
+import type { ChangeComparison, Commit, CommitRange, FileDiff, Project, PushState, ReviewComment, ReviewDiff, Snapshot, Task, Thread, WorkspaceChanges } from "@openorc/protocol";
 import { isDetachedCopy, reviewCommentPlace, WORKSPACE_ID } from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
 import { access, mkdir, writeFile } from "node:fs/promises";
@@ -340,6 +341,10 @@ export class ReviewService {
   async threadLog(thread: Thread, project: Project, limit = 50): Promise<Commit[]> {
     const range = thread.worktreePath && thread.baseSha ? `${thread.baseSha}..HEAD` : null;
     return log(await this.threadCwd(thread, project), range, limit);
+  }
+
+  async commitRange(thread: Thread, project: Project, request: { from: string | null; to: string; base: string | null; limit?: number }): Promise<CommitRange | null> {
+    return commitRange(await this.threadCwd(thread, project), request);
   }
 
   async diff(task: Task, project: Project, options: { sinceReviewed?: boolean } = {}): Promise<ReviewDiff> {

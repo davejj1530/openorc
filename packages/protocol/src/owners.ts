@@ -122,6 +122,7 @@ export const OWNER_ROUTES: { [M in RoutedMethod]: OwnerRoute<M> } & { [M in Excl
   "review.createThreadPr": byThreadId,
   "review.threadPrTemplate": byThreadId,
   "git.threadLog": byThreadId,
+  "git.commitRange": byThreadId,
   "git.threadPushState": byThreadId,
   "review.comments.list": byThreadId,
   "review.comments.add": byThreadId,
@@ -186,6 +187,7 @@ export const ROUTED_READS: ReadonlySet<RpcMethod> = new Set<RpcMethod>([
   "review.threadDiff",
   "review.threadPrTemplate",
   "git.threadLog",
+  "git.commitRange",
   "git.threadPushState",
   "review.comments.list",
 ]);

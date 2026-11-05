@@ -147,6 +147,8 @@ export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {
   // The schema's FolderPath and the core's own check that the file is among the changes hold the path.
   "review.threadFileDiff": allow,
   "git.threadLog": allow,
+  // Commit ids and a branch name; reads only.
+  "git.commitRange": allow,
   "git.threadPushState": allow,
   "review.threadPrTemplate": allow,
   // Branch names; one gh call.
@@ -211,6 +213,7 @@ export const remoteReplies: { [M in RemoteMethod]: Reply<M> } = {
   "review.threadChanges": same,
   "review.threadFileDiff": (diff) => ({ ...diff, patch: redact(diff.patch).text }),
   "git.threadLog": (log) => redactValue(log).value,
+  "git.commitRange": (range) => redactValue(range).value,
   // Why Push is blocked can be Git's own error, which names the Mac's folders.
   "git.threadPushState": (state, { words }) => (state.blocked ? { ...state, blocked: words(state.blocked) } : state),
   "review.threadPrTemplate": (template) => redactValue(template).value,

@@ -557,6 +557,19 @@ export const Commit = z.object({
 });
 export type Commit = z.infer<typeof Commit>;
 
+/** A run of commits for the work view: from `from` (or where `to` left `base`) up to `to`. */
+export interface CommitRange {
+  /** Newest first. */
+  commits: Commit[];
+  /** Commits in the range past `limit`. */
+  more: number;
+  /** The commit the range starts after: the old tip a push moved, or the base commit the branch left. */
+  start: Commit | null;
+  /** The branch `start` is on when it is where the branch left its base: the base asked for, or the default. */
+  base: string | null;
+  stat: { files: number; added: number; removed: number } | null;
+}
+
 /** What Push would publish from a workspace, judged by what origin was last seen to have. */
 export const PushState = z.object({
   /** The branch Push publishes; null when there is none. */

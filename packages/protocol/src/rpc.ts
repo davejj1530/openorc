@@ -9,6 +9,7 @@ import {
   AgentSkill,
   AppSettings,
   Commit,
+  type CommitRange,
   FileChange,
   ImportableSession,
   type InstructionFile,
@@ -265,6 +266,21 @@ export const rpcParams = {
   /** Opens a pull request from the thread's branch into `base`. */
   "review.createThreadPr": z.object({ threadId: z.string(), title: z.string().min(1), body: z.string(), base: BranchName }),
   "git.threadLog": z.object({ threadId: z.string(), limit: z.number().int().positive().max(200).optional() }),
+  /**
+   * The commits a turn's Git work covered, for drawing them: from `from` to `to`, or when `from` is null, what `to` has
+   * that `base` lacks. Keyed on commits, so an old turn still draws what it did.
+   */
+  "git.commitRange": z.object({
+    threadId: z.string(),
+    from: z
+      .string()
+      .regex(/^[0-9a-f]{7,40}$/)
+      .nullable(),
+    // A commit id, never a word git could read as an option.
+    to: z.string().regex(/^[0-9a-f]{7,40}$|^HEAD$/),
+    base: BranchName.nullable(),
+    limit: z.number().int().positive().max(50).optional(),
+  }),
   /** Which branch Push would publish from the thread's workspace and which commits origin lacks. Local refs only; never fetches. */
   "git.threadPushState": z.object({ threadId: z.string() }),
   "review.threadPrTemplate": z.object({ threadId: z.string() }),
@@ -569,6 +585,7 @@ export interface RpcResults
   "review.pushThread": { remote: string; branch: string };
   "review.createThreadPr": { url: string };
   "git.threadLog": Commit[];
+  "git.commitRange": CommitRange | null;
   "git.threadPushState": PushState;
   /** The repository's pull request template, read from the thread's workspace; null when it has none. */
   "review.threadPrTemplate": { body: string | null };

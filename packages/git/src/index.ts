@@ -6,7 +6,7 @@ export { GhError, GitHubPulls, fetchPullRequest, pullRequestRepository, pullRequ
 export { grepWorkingTree, type GrepLimits, type GrepLine, type GrepQuery, type GrepResult } from "./grep.js";
 export { commitAll, createPr, hasGh, pullRequestTemplate, push, unpushedCommits, type UnpushedCommits } from "./publish.js";
 export { pinObject, unpinAll } from "./refs.js";
-export { changedFiles, defaultBranch, emptyTree, fetch, gitState, headCommit, isDirty, isGitRepo, log, originUrl, patchAgainst, repoInfo, revParse, type RepoInfo } from "./repo.js";
+export { changedFiles, commitRange, defaultBranch, emptyTree, fetch, gitState, headCommit, isDirty, isGitRepo, log, originUrl, patchAgainst, repoInfo, revParse, type RepoInfo } from "./repo.js";
 export { diffStat, patchSinceTree, switchFiles, treeHash } from "./snapshot.js";
 export * as workspaceTransfer from "./workspace-transfer.js";
 export type { TreeDeltaEntry, WorkspaceMergeResult, WorkspaceTreeEntry, WorkspaceTreeSnapshot } from "./workspace-transfer.js";

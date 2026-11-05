@@ -3,7 +3,7 @@ import { once } from "node:events";
 import path from "node:path";
 import { AGENT37_SIZES } from "@openorc/protocol";
 import { AGENT37_ENDPOINTS, Agent37Error, agent37Api, type Agent37Api, type Agent37Instance } from "../agent37.js";
-import { Agent37Sandbox, OPENING, STATES, agent37HostOf, instanceServerSource, ready, shellQuote } from "../agent37-sandbox.js";
+import { Agent37Sandbox, OPENING, STATES, agent37Disk, agent37HostOf, instanceServerSource, ready, shellQuote } from "../agent37-sandbox.js";
 import type { InstanceProcess } from "../instance-port.js";
 import { runnerFiles, type RunnerFile } from "../runner-client.js";
 import type { SandboxExecResult, SandboxInfo } from "../sandbox.js";
@@ -11,7 +11,7 @@ import { BRAIN_PORT } from "./layout.js";
 import type { BrainAccess, BrainCommand, BrainHome, BrainStartCommand, BrainVm } from "./machine.js";
 
 /** The brain's instance. Agent37 does not keep names unique, so it is found by its tag. */
-const BRAIN = { template: "agent37-base", name: "OpenOrc brain", tag: "brain", disk: 20 } as const;
+const BRAIN = { template: "agent37-base", name: "OpenOrc brain", tag: "brain" } as const;
 /** Agent37's shortest: a brain keeps itself awake while used, and this is how soon it sleeps when nothing keeps it. */
 const IDLE_SECONDS = 300;
 /** Run by Agent37 at every boot, from the default user's home. */
@@ -226,7 +226,7 @@ export function agent37Home(access: Extract<BrainAccess, { service: "agent37" }>
           template: BRAIN.template,
           name: BRAIN.name,
           metadata: { openorc: BRAIN.tag },
-          resources: { ...AGENT37_SIZES[0], disk: BRAIN.disk },
+          resources: { ...AGENT37_SIZES[0], disk: agent37Disk(AGENT37_SIZES[0]) },
           auto_sleep: true,
           idle_timeout_seconds: IDLE_SECONDS,
           public_ports: [{ port: BRAIN_PORT, label: BRAIN.name }],

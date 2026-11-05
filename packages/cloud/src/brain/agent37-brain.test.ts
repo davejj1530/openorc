@@ -104,7 +104,7 @@ describe("the brain's Agent37 instance", () => {
       template: "agent37-base",
       name: "OpenOrc brain",
       metadata: { openorc: "brain" },
-      resources: { cpu: 2, memory: 4, disk: 20 },
+      resources: { cpu: 2, memory: 4, disk: 12 },
       auto_sleep: true,
       idle_timeout_seconds: 300,
       status: "running",

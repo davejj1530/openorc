@@ -24,7 +24,14 @@ export function agent37Connection(value: unknown): Agent37Connection | null {
 }
 
 const SERVER_FILE = "instance-server.ts";
+/** The disk OpenOrc gives an instance, within the most each size allows (agent37.com/docs/agents-api/instance-sizing). */
 const DISK_GB = 20;
+const MOST_DISK_GB: Record<string, number> = { "2/4": 12, "4/8": 20, "4/16": 40, "4/32": 80 };
+
+/** The disk for an instance of `size`: 20 GB, or the most its size allows when that is less. */
+export function agent37Disk(size: { cpu: number; memory: number }): number {
+  return Math.min(DISK_GB, MOST_DISK_GB[`${size.cpu}/${size.memory}`] ?? DISK_GB);
+}
 const MAX_IDLE_SECONDS = 86_400;
 const POLL_MS = 1000;
 const READY_TIMEOUT_MS = 5 * 60_000;
@@ -338,7 +345,7 @@ export class Agent37SandboxProvider implements SandboxProvider {
         name,
         metadata: { openorc: "thread", host: this.host },
         // Applies when the instance is made; one that exists keeps the size it was made with.
-        resources: { cpu: connection.cpu, memory: connection.memory, disk: DISK_GB },
+        resources: { cpu: connection.cpu, memory: connection.memory, disk: agent37Disk(connection) },
         // OpenOrc keeps the instance awake while an agent works; this is for when the Mac is away.
         auto_sleep: true,
         idle_timeout_seconds: SANDBOX_AWAY_MS / 1000,

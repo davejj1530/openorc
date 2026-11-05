@@ -14,11 +14,12 @@ import { INSTANCE_SERVER_PORT } from "./instance-port.js";
 const run = promisify(execFile);
 const OUTPUT_LIMIT = 512 * 1024;
 const EXEC_BODY_LIMIT = 128 * 1024;
+/** Each size and the most disk it takes, in GB, as Agent37 lists them. */
 const SIZES = [
-  [2, 4],
-  [4, 8],
-  [4, 16],
-  [4, 32],
+  [2, 4, 12],
+  [4, 8, 20],
+  [4, 16, 40],
+  [4, 32, 80],
 ] as const;
 const PORT_PATH = /^\/ports\/([a-z0-9]+)\/(\d+)(\/.*)?$/;
 const EXEC_PATH = /^\/sandbox\/v1\/instances\/([a-z0-9]+)\/exec$/;
@@ -143,7 +144,10 @@ function capture(stream: Readable): { text(): string; cut: boolean } {
 
 function invalid(params: Agent37CreateParams): string | null {
   const resources = params.resources;
-  if (resources && !SIZES.some(([cpu, memory]) => cpu === resources.cpu && memory === resources.memory)) return "resources must be one of the listed shapes.";
+  const size = resources && SIZES.find(([cpu, memory]) => cpu === resources.cpu && memory === resources.memory);
+  if (resources && !size) return "resources must be one of the listed shapes.";
+  if (resources && size && (!Number.isInteger(resources.disk) || resources.disk < 2 || resources.disk > size[2]))
+    return `Disk for the ${size[0]} vCPU / ${size[1]} GB shape must be a whole number between 2 and ${size[2]} GB.`;
   if (params.idle_timeout_seconds !== undefined && (params.idle_timeout_seconds < 300 || params.idle_timeout_seconds > 86_400)) return "idle_timeout_seconds must be between 300 and 86400.";
   if ((params.name?.length ?? 0) > 60) return "name must be at most 60 characters.";
   return null;

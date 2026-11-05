@@ -30,6 +30,12 @@ function show(status: CloudBrainStatus, timeZone = "Asia/Manila") {
   vi.mocked(core.call).mockImplementation(async (method: string) => {
     if (method === "cloud.brain.pair") return { url: "openorc://pair#v1.brain-fixture", expiresAt: Date.now() + 120_000 } as never;
     if (method === "cloud.brain.projects") return [] as never;
+    if (method === "cloud.brain.signIns")
+      return {
+        codex: { mode: null, email: null, plan: null, signingIn: false, pending: null, error: null },
+        github: { on: false, blocked: null, behind: false },
+        push: { has: false, behind: false },
+      } as never;
     return status as never;
   });
   render(
@@ -77,7 +83,7 @@ it("shows how far setting up has come", async () => {
   expect(steps.map((step) => [step.textContent, step.getAttribute("data-state")])).toEqual([
     ["Make its machine and install it", "done"],
     ["Start it", "running"],
-    ["Send it the Claude sign-ins", "pending"],
+    ["Send it the sign-ins", "pending"],
   ]);
   expect(screen.getByText("Singapore · sin1")).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Remove" })).toBeNull();

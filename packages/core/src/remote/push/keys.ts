@@ -17,6 +17,22 @@ export interface PushKeysOptions {
   origins?: Record<PushEnvironment, string>;
 }
 
+/** The saved key itself, for the cloud brain's sealed handover and the route; null before one is added. */
+export async function savedPushKey(db: Db, secrets: ProtectedSecretStore | undefined): Promise<{ keyId: string; pem: string } | null> {
+  const keyId = keyIdIn(db);
+  const pem = keyId ? await secrets?.load() : null;
+  return keyId && pem ? { keyId, pem } : null;
+}
+
+function keyIdIn(db: Db): string | null {
+  try {
+    const value = JSON.parse(settings.get(db, SETTING) ?? "null") as { keyId?: unknown } | null;
+    return typeof value?.keyId === "string" ? value.keyId : null;
+  } catch {
+    return null;
+  }
+}
+
 /** The Mac's Apple push key, and the route built from it on first use. Changing or removing the key closes the route. */
 export class PushKeys {
   private route: PushRoute | null = null;
@@ -26,12 +42,7 @@ export class PushKeys {
   constructor(private readonly options: PushKeysOptions) {}
 
   keyId(): string | null {
-    try {
-      const value = JSON.parse(settings.get(this.options.db, SETTING) ?? "null") as { keyId?: unknown } | null;
-      return typeof value?.keyId === "string" ? value.keyId : null;
-    } catch {
-      return null;
-    }
+    return keyIdIn(this.options.db);
   }
 
   /** The route for the saved key, or null before one is added. */
@@ -69,12 +80,10 @@ export class PushKeys {
   }
 
   private async build(): Promise<PushRoute | null> {
-    const keyId = this.keyId();
-    if (!keyId || !this.options.secrets) return null;
     try {
-      const pem = await this.options.secrets.load();
-      if (!pem) return null;
-      return new ApnsRoute({ key: { keyId, teamId: PHONE_APP.teamId, pem }, topic: PHONE_APP.bundleId, ...(this.options.origins ? { origins: this.options.origins } : {}) });
+      const key = await savedPushKey(this.options.db, this.options.secrets);
+      if (!key) return null;
+      return new ApnsRoute({ key: { ...key, teamId: PHONE_APP.teamId }, topic: PHONE_APP.bundleId, ...(this.options.origins ? { origins: this.options.origins } : {}) });
     } catch (error) {
       this.options.log.warn(`The push key could not be loaded: ${error instanceof Error ? error.message : String(error)}`);
       return null;

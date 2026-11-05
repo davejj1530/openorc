@@ -7,11 +7,13 @@ import type { Logger } from "../transport.js";
 import type { ClaudeAccountService } from "./claude-accounts.js";
 import { ClaudeCloudTokens } from "./claude-cloud-tokens.js";
 import { CloudBrain } from "./cloud-brain.js";
+import { macGitHub, type SignInSources } from "./cloud-brain-signins.js";
+import { savedPushKey } from "../remote/push/keys.js";
 import { cloudAgentEnvironment } from "./cloud-agent-env.js";
 import { CloudChecks } from "./cloud-check.js";
 import { CloudCodex } from "./cloud-codex.js";
 import { CloudHandoff } from "./cloud-handoff.js";
-import { CodexCloudLogin } from "./codex-cloud-login.js";
+import { CodexBrowserSignIn, CodexCloudLogin } from "./codex-cloud-login.js";
 import { spawnWithPipes } from "./terminal-process.js";
 import { CloudSandboxes, type CloudSandboxRuns } from "./cloud-sandboxes.js";
 import { CloudSessions } from "./cloud-sessions.js";
@@ -24,12 +26,20 @@ import type { ThreadService } from "./threads.js";
 import { executionProject } from "./workspace-home.js";
 
 /** The cloud brain as this Mac keeps it, made with the Vercel connection the Mac's sandboxes use. */
-function cloudBrain(db: Db, options: OpenOrcOptions, tokens: ClaudeCloudTokens, vercel: () => Promise<VercelConnection | null>, invalidate: (keys: string[]) => void): CloudBrain {
+function cloudBrain(
+  db: Db,
+  options: OpenOrcOptions,
+  tokens: ClaudeCloudTokens,
+  vercel: () => Promise<VercelConnection | null>,
+  signIns: SignInSources,
+  invalidate: (keys: string[]) => void,
+): CloudBrain {
   return new CloudBrain({
     db,
     store: options.cloudBrainSecrets,
     tokens,
     vercel,
+    signIns,
     bundle: options.cloudBrainBundle,
     // "cloud" too: the brain's region is where this Mac's sandboxes run unless another is chosen.
     changed: () => invalidate(["cloud-brain", "cloud"]),
@@ -74,18 +84,21 @@ export function createCloud(input: {
     signInLaunch: (id: string) => accounts.signInLaunch(id),
     cloudTokenChanged: (id: string) => {
       accounts.cloudTokenChanged(id);
-      brain.claudeChanged();
+      brain.signInsChanged();
     },
   };
   const tokens = new ClaudeCloudTokens(options.claudeCloudSecrets, signIn, () => invalidate(["cloud"]), options.terminal);
-  const brain: CloudBrain = cloudBrain(db, options, tokens, options.cloudCredentials ?? (() => settings.credentials()), invalidate);
+  const codexDeps = { binary: () => environment().binaries.codex ?? null, env: () => environment().env, terminal: options.terminal ?? spawnWithPipes };
+  // The brain's Codex sign-in is a separate one, never this Mac's cloud login.
+  const signIns: SignInSources = {
+    github: macGitHub(),
+    push: () => savedPushKey(db, options.pushSecrets),
+    codex: new CodexBrowserSignIn({ ...codexDeps, changed: () => invalidate(["cloud-brain"]) }),
+  };
+  const brain: CloudBrain = cloudBrain(db, options, tokens, options.cloudCredentials ?? (() => settings.credentials()), signIns, invalidate);
   const agentEnvironment = cloudAgentEnvironment({ accounts, tokens, snapshot: environment });
-  const codexLogin = new CodexCloudLogin(options.codexCloudSecrets, {
-    binary: () => environment().binaries.codex ?? null,
-    env: () => environment().env,
-    terminal: options.terminal ?? spawnWithPipes,
-    changed: () => invalidate(["cloud"]),
-  });
+  // On a cloud-only host the cloud login is the only one, so whether Codex is signed in changes with it.
+  const codexLogin = new CodexCloudLogin(options.codexCloudSecrets, { ...codexDeps, changed: () => invalidate(options.cloudOnly ? ["cloud", "system", "models"] : ["cloud"]) });
   const codex = new CloudCodex(codexLogin);
   const sessions = new CloudSessions({
     db,

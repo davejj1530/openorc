@@ -3,7 +3,7 @@
  * on stdin, and the control requests `ctl` reads on stdin with the reply on its last stdout line. Each side parses what
  * it reads; a parse error names the field and never repeats a value, since lines carry keys and tokens.
  */
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import type { VercelConnection } from "../vercel-sandbox.js";
 import { openSecret, sealSecret } from "./sealed-file.js";
 
@@ -210,15 +210,40 @@ export interface HandoverClaudeAccount {
   token: string;
 }
 
-/** Sign-ins the brain cannot make itself, by kind. They cross the wire only sealed under the brain key. */
+/** A Codex login made on the Mac for the brain alone, never a copy of the Mac's own: a ChatGPT refresh token works once. */
+export interface HandoverCodexLogin {
+  /** The Mac's name for this sign-in, so the same one handed over again leaves the login the brain refreshed since. */
+  id: string;
+  mode: "chatgpt" | "apiKey";
+  /** Codex's auth.json. */
+  auth: string;
+  email: string | null;
+  plan: string | null;
+}
+
+/** Sign-ins the brain cannot make itself, by kind. They cross the wire only sealed under the brain key. Null takes the brain's away. */
 export interface HandoverValues {
   /** Every Claude account that has a cloud token on the Mac, so an account missing here loses its sign-in on the brain. */
   claude: { accounts: HandoverClaudeAccount[] };
-  codex: { auth: string };
-  push: { keyId: string; pem: string };
+  codex: HandoverCodexLogin | null;
+  /**
+   * The GitHub CLI's sign-in on the Mac for github.com, and the author its commits carry, for the brain's own git and gh;
+   * never its thread sandboxes'.
+   */
+  github: { token: string; name: string | null; email: string | null } | null;
+  /** The Mac's APNs key, which the brain sends its phone alerts with. */
+  push: { keyId: string; pem: string } | null;
 }
 export type HandoverKind = keyof HandoverValues;
 export type BrainHandover = Partial<HandoverValues>;
+
+/** Names a handed-over value without holding it, the same on both sides whatever its keys' order, so each can tell a change. */
+export function signInPrint(value: Record<string, unknown>): string {
+  const entries = Object.keys(value)
+    .sort()
+    .map((key) => [key, value[key]]);
+  return createHash("sha256").update(JSON.stringify(entries)).digest("base64url");
+}
 
 const claudeAccounts: Parse<HandoverValues["claude"]> = (value, field) => {
   const account = object({ id: text(100), name: text(80), default: literal(true, false), token: text(4096) });
@@ -231,8 +256,9 @@ const claudeAccounts: Parse<HandoverValues["claude"]> = (value, field) => {
 
 const HANDOVER: { [K in HandoverKind]: Parse<HandoverValues[K]> } = {
   claude: claudeAccounts,
-  codex: object({ auth: text(65_536) }),
-  push: object({ keyId: text(64), pem: text(8192) }),
+  codex: nullable(object({ id: text(100, /^[A-Za-z0-9_-]+$/), mode: literal("chatgpt", "apiKey"), auth: text(65_536), email: nullable(text(320)), plan: nullable(text(100)) })),
+  github: nullable(object({ token: text(4096), name: nullable(text(255)), email: nullable(text(320)) })),
+  push: nullable(object({ keyId: text(64), pem: text(8192) })),
 };
 
 export type BrainControlRequest =
@@ -252,6 +278,8 @@ export type BrainControlRequest =
   | { op: "remove-project"; source: string }
   /** The Mac projects the brain has copies of. */
   | { op: "projects" }
+  /** What the brain holds of each sign-in besides Claude's, so the Mac takes its word over its own record. */
+  | { op: "sign-ins" }
   /** Close gracefully and exit; the sandbox keeps running. */
   | { op: "stop" }
   /** A stop for an update, answered at once: refused, the brain running on, while closing would cut work short. */
@@ -288,6 +316,8 @@ export interface BrainControlResults {
   "import-project": ProjectCopy | { lacksBase: true };
   "remove-project": { removed: boolean; threads: number };
   projects: { copies: (ProjectCopy & { source: string; threads: number })[] };
+  /** The id of the Codex login it holds, the signInPrint of its GitHub sign-in, and its push key's id; null for none. */
+  "sign-ins": { codex: string | null; github: string | null; push: string | null };
   stop: { stopping: true };
   "stop-for-update": { stopping: true };
 }
@@ -320,10 +350,11 @@ const REQUESTS = variants<BrainControlRequest>({
   status: object({ op: literal("status") }),
   wake: object({ op: literal("wake") }),
   pair: object({ op: literal("pair") }),
-  handover: object({ op: literal("handover"), sealed: object({}, { claude: sealedText, codex: sealedText, push: sealedText } satisfies Record<HandoverKind, Parse<string>>) }),
+  handover: object({ op: literal("handover"), sealed: object({}, { claude: sealedText, codex: sealedText, github: sealedText, push: sealedText } satisfies Record<HandoverKind, Parse<string>>) }),
   "import-project": object({ op: literal("import-project"), source: projectSource, name: folderName, branch: branchName, bundle: text(255, /^\w[\w.-]*$/) }, { origin: text(2048) }),
   "remove-project": object({ op: literal("remove-project"), source: projectSource }),
   projects: object({ op: literal("projects") }),
+  "sign-ins": object({ op: literal("sign-ins") }),
   stop: object({ op: literal("stop") }),
   "stop-for-update": object({ op: literal("stop-for-update") }),
 });
@@ -335,10 +366,11 @@ const RESULTS: { [K in BrainControlOp]: Parse<BrainControlResults[K]> } = {
   status,
   wake: status,
   pair: object({ url: text(4096), expiresAt: timestamp }),
-  handover: object({ applied: list(literal("claude", "codex", "push"), 3) }),
+  handover: object({ applied: list(literal("claude", "codex", "github", "push"), 4) }),
   "import-project": (value, field) => (isRecord(value) && value["lacksBase"] === true ? object({ lacksBase: literal(true) }) : projectCopy)(value, field),
   "remove-project": object({ removed: literal(true, false), threads: count }),
   projects: object({ copies: list(object({ source: projectSource, projectId: text(100), macHead: commit, head: commit, threads: count }), 10_000) }),
+  "sign-ins": object({ codex: nullable(text(100)), github: nullable(text(64)), push: nullable(text(64)) }),
   stop: object({ stopping: literal(true) }),
   "stop-for-update": object({ stopping: literal(true) }),
 };
@@ -364,7 +396,7 @@ export function sealHandover(key: BrainKey, handover: BrainHandover): HandoverRe
     const value = handover[kind];
     return value === undefined ? undefined : sealSecret(key, handoverChannel(kind), Buffer.from(JSON.stringify(value), "utf8")).toString("base64url");
   };
-  const sealed: { [K in HandoverKind]-?: string | undefined } = { claude: seal("claude"), codex: seal("codex"), push: seal("push") };
+  const sealed: { [K in HandoverKind]-?: string | undefined } = { claude: seal("claude"), codex: seal("codex"), github: seal("github"), push: seal("push") };
   return { op: "handover", sealed };
 }
 
@@ -376,6 +408,6 @@ export function openHandover(key: BrainKey, request: HandoverRequest): BrainHand
     const plain = openSecret(key, handoverChannel(kind), Buffer.from(sealed, "base64url")).toString("utf8");
     return parseLine(`The handed-over ${kind}`, HANDOVER[kind], plain);
   };
-  const handover: { [K in HandoverKind]: HandoverValues[K] | undefined } = { claude: open("claude"), codex: open("codex"), push: open("push") };
+  const handover: { [K in HandoverKind]: HandoverValues[K] | undefined } = { claude: open("claude"), codex: open("codex"), github: open("github"), push: open("push") };
   return handover;
 }

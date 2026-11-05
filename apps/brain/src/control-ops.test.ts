@@ -1,15 +1,16 @@
-import { randomUUID } from "node:crypto";
-import { mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, writeFile } from "node:fs/promises";
+import { generateKeyPairSync, randomUUID } from "node:crypto";
+import { chmod, mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { brainKeyText, brainLayout, bundleBranch, newBrainKey, sealHandover, type BrainControlResults, type BrainLayout, type BrainStart, type ProjectCopy } from "@openorc/cloud";
+import { brainKeyText, brainLayout, bundleBranch, newBrainKey, sealHandover, signInPrint, type BrainControlResults, type BrainLayout, type BrainStart, type ProjectCopy } from "@openorc/cloud";
 import { OpenOrc } from "@openorc/core";
 import { DEFAULT_CLAUDE_ACCOUNT } from "@openorc/protocol";
 import { claudeAccounts, threads } from "@openorc/db";
-import { commitAll, git } from "@openorc/git";
+import { commitAll, git, run, useGitHubSignIn } from "@openorc/git";
 import { NO_SANDBOX } from "./awake.js";
 import { controlHandlers, retireSignedOut } from "./control-ops.js";
+import { BrainGitHub, GITHUB_CHANNEL } from "./github.js";
 import { brainOptions } from "./options.js";
 import { SealedSecrets } from "./secrets.js";
 
@@ -25,23 +26,47 @@ let start: BrainStart;
 let core: OpenOrc;
 let stops = 0;
 let answering = false;
+let warnings: string[] = [];
+let invalidated: string[] = [];
+const transport = { push: (message: { type: string; keys?: string[] }) => void (message.type === "invalidate" && invalidated.push(...(message.keys ?? []))) };
+let github: BrainGitHub;
 
 beforeEach(async () => {
   root = await realpath(await mkdtemp(path.join(os.tmpdir(), "openorc-brain-ops-")));
   layout = brainLayout(root);
   start = { key: newBrainKey(), name: "Cloud", address: "localhost", port: 0, vercel: null };
   const secrets = await SealedSecrets.open(layout.secrets, start.key);
-  core = await OpenOrc.create({ ...brainOptions({ layout, appDir: path.join(root, "app", "v1"), start, self: NO_SANDBOX, secrets, transport: { push() {} }, runnerFiles: [] }), ephemeral: true });
+  // The brain's own Codex, which has no login of its own there: only the cloud login it is handed signs it in.
+  await mkdir(path.join(layout.npm, "bin"), { recursive: true });
+  await writeFile(path.join(layout.npm, "bin", "codex"), '#!/bin/sh\ncase "$1" in --version) echo "codex-cli 0.166.0";; login) echo "Not logged in"; exit 1;; esac\n');
+  await chmod(path.join(layout.npm, "bin", "codex"), 0o755);
+  warnings = [];
+  github = new BrainGitHub(secrets.store(GITHUB_CHANNEL), (text) => warnings.push(text));
+  useGitHubSignIn(() => github.environment());
+  core = await OpenOrc.create({ ...brainOptions({ layout, appDir: path.join(root, "app", "v1"), start, self: NO_SANDBOX, secrets, transport, runnerFiles: [] }), ephemeral: true });
   stops = 0;
   answering = false;
 });
 
 afterEach(async () => {
+  useGitHubSignIn(() => ({}));
   await core.close();
   await rm(root, { recursive: true, force: true });
 });
 
-const ops = () => controlHandlers({ core, key: start.key, layout, stop: () => stops++, answering: () => answering });
+const ops = () => controlHandlers({ core, key: start.key, layout, github, stop: () => stops++, answering: () => answering });
+
+const GH_TOKEN = "gho_handedOverFixtureToken0123456789";
+/** A ChatGPT login file as Codex writes it, last refreshed `ms` from now. */
+const codexAuth = (stamp: string, ms: number) => JSON.stringify({ auth_mode: "chatgpt", tokens: { refresh_token: `refresh-${stamp}` }, last_refresh: new Date(Date.now() + ms).toISOString() });
+/** Git with none of this Mac's own settings, so no credential helper of the person's is ever asked. */
+const isolatedGit = { PATH: process.env["PATH"], HOME: os.tmpdir(), GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null", GIT_TERMINAL_PROMPT: "0" };
+
+async function rpc(method: "agents.availability" | "remote.status"): Promise<unknown> {
+  const reply = await core.handle({ type: "rpc", id: 1, method, params: {} });
+  if (reply.type === "rpc.error") throw new Error(reply.message);
+  return reply.result;
+}
 
 async function sealedBytes(): Promise<string> {
   const names = await readdir(layout.secrets);
@@ -63,9 +88,88 @@ describe("control requests on the brain's core", () => {
     expect(core.claudeCloudTokens.known(DEFAULT_CLAUDE_ACCOUNT)).toBeNull();
   });
 
-  it("refuses a Codex login before applying anything else in the same handover", async () => {
-    await expect(ops()(sealHandover(start.key, { claude: { accounts: [personal] }, codex: { auth: "{}" } }))).rejects.toThrow("does not take a codex sign-in yet");
-    expect(core.claudeCloudTokens.known(DEFAULT_CLAUDE_ACCOUNT)).toBeNull();
+  it("takes a Codex login made for it alone, keeps what it refreshed when the same one comes again, and signs out on null", async () => {
+    const login = { id: "mac-login-1", mode: "chatgpt", auth: codexAuth("first", 0), email: "qa@example.com", plan: "plus" } as const;
+    expect(await ops()(sealHandover(start.key, { codex: login }))).toEqual({ applied: ["codex"] });
+    expect(await core.codexCloudLogin.status()).toMatchObject({ mode: "chatgpt", email: "qa@example.com", plan: "plus" });
+    expect(await core.codexCloudLogin.forSandbox()).toBe(login.auth);
+    expect(await sealedBytes()).not.toContain("refresh-first");
+    const refreshed = codexAuth("refreshed-here", 5_000);
+    await core.codexCloudLogin.keep(refreshed);
+    await ops()(sealHandover(start.key, { codex: login }));
+    expect(await core.codexCloudLogin.forSandbox()).toBe(refreshed);
+    const next = { ...login, id: "mac-login-2", mode: "apiKey", auth: '{"auth_mode":"apikey","OPENAI_API_KEY":"sk-fixture-0123456789"}', email: null, plan: null } as const;
+    await ops()(sealHandover(start.key, { codex: next }));
+    expect(await core.codexCloudLogin.forSandbox()).toBe(next.auth);
+    await ops()(sealHandover(start.key, { codex: null }));
+    expect(await core.codexCloudLogin.status()).toMatchObject({ mode: null });
+    expect(await core.codexCloudLogin.forSandbox()).toBeNull();
+  });
+
+  it("offers Codex to phones only while it has a cloud login, its own CLI having none", async () => {
+    const codex = async () => ((await rpc("agents.availability")) as { id: string; state: string }[]).find((row) => row.id === "codex")?.state;
+    expect(await codex()).toBe("sign_in");
+    invalidated = [];
+    await ops()(sealHandover(start.key, { codex: { id: "mac-login-1", mode: "chatgpt", auth: codexAuth("first", 0), email: null, plan: null } }));
+    expect(invalidated).toEqual(expect.arrayContaining(["system", "models"]));
+    expect(await codex()).toBe("ready");
+    await ops()(sealHandover(start.key, { codex: null }));
+    expect(await codex()).toBe("sign_in");
+  });
+
+  it("keeps the Mac's GitHub sign-in sealed and gives it to the core's git and gh alone, at once, until it is taken away", async () => {
+    const signIn = { token: GH_TOKEN, name: "Fixture Person", email: "fixture@example.com" };
+    expect(await ops()(sealHandover(start.key, { github: signIn }))).toEqual({ applied: ["github"] });
+    expect(await sealedBytes()).not.toContain(GH_TOKEN);
+    const bin = path.join(root, "bin");
+    await mkdir(bin);
+    await writeFile(path.join(bin, "gh"), '#!/bin/sh\nprintf %s "$GH_TOKEN"\n');
+    await chmod(path.join(bin, "gh"), 0o755);
+    const env = { ...isolatedGit, PATH: `${bin}:${process.env["PATH"] ?? ""}` };
+    const gitOut = async (args: string[], input?: string) => (await git(root, args, { env, okCodes: [0, 128], ...(input ? { input } : {}) })).stdout.trim();
+    expect((await gitOut(["config", "--get-all", "credential.https://github.com.helper"])).split("\n")).toHaveLength(1);
+    expect((await gitOut(["credential", "fill"], "protocol=https\nhost=github.com\n\n")).split("\n")).toContain(`password=${GH_TOKEN}`);
+    expect(await gitOut(["ls-remote", "--get-url", "git@github.com:example/my-app.git"])).toBe("https://github.com/example/my-app.git");
+    expect(await gitOut(["var", "GIT_AUTHOR_IDENT"])).toMatch(/^Fixture Person <fixture@example\.com> /);
+    expect((await run("gh", root, ["auth", "token"], { env })).stdout).toBe(GH_TOKEN);
+    // Every other program the brain starts, its background Claude included, inherits none of it.
+    expect((await run("sh", root, ["-c", 'printf %s "$GH_TOKEN"'], { env })).stdout).toBe("");
+    expect(process.env["GH_TOKEN"]).toBeUndefined();
+    expect(JSON.stringify(core.claudeAccounts.inspectionEnvironment(core.environment.current()))).not.toContain(GH_TOKEN);
+
+    const restarted = new BrainGitHub((await SealedSecrets.open(layout.secrets, start.key)).store(GITHUB_CHANNEL), (text) => warnings.push(text));
+    await restarted.load();
+    expect(restarted.environment()).toEqual(github.environment());
+    await ops()(sealHandover(start.key, { github: null }));
+    expect(await gitOut(["credential", "fill"], "protocol=https\nhost=github.com\n\n")).not.toContain("password=");
+    expect(await gitOut(["ls-remote", "--get-url", "git@github.com:example/my-app.git"])).toBe("git@github.com:example/my-app.git");
+    await restarted.load();
+    expect([restarted.environment(), warnings]).toEqual([{}, []]);
+  });
+
+  it("starts without the GitHub sign-in, saying why, when its sealed file cannot be read", async () => {
+    await writeFile(path.join(layout.secrets, `${GITHUB_CHANNEL}.sealed`), "not sealed");
+    const restarted = new BrainGitHub((await SealedSecrets.open(layout.secrets, start.key)).store(GITHUB_CHANNEL), (text) => warnings.push(text));
+    await restarted.load();
+    expect([restarted.environment(), warnings]).toEqual([{}, ["The GitHub sign-in could not be read, so it is off until the Mac sends it again."]]);
+  });
+
+  it("says which sign-ins it holds besides Claude's, so the Mac takes its word over its own record", async () => {
+    expect(await ops()({ op: "sign-ins" })).toEqual({ codex: null, github: null, push: null });
+    const signIn = { token: GH_TOKEN, name: null, email: "fixture@example.com" };
+    const pem = generateKeyPairSync("ec", { namedCurve: "prime256v1" }).privateKey.export({ format: "pem", type: "pkcs8" }).toString();
+    const codex = { id: "mac-login-1", mode: "chatgpt", auth: codexAuth("first", 0), email: null, plan: null } as const;
+    await ops()(sealHandover(start.key, { codex, github: signIn, push: { keyId: "ABC123DEFG", pem } }));
+    expect(await ops()({ op: "sign-ins" })).toEqual({ codex: "mac-login-1", github: signInPrint({ email: "fixture@example.com", name: null, token: GH_TOKEN }), push: "ABC123DEFG" });
+  });
+
+  it("sends its own phone alerts with the Mac's push key once handed it, and none once it is taken away", async () => {
+    const pem = generateKeyPairSync("ec", { namedCurve: "prime256v1" }).privateKey.export({ format: "pem", type: "pkcs8" }).toString();
+    expect(await ops()(sealHandover(start.key, { push: { keyId: "ABC123DEFG", pem } }))).toEqual({ applied: ["push"] });
+    expect(((await rpc("remote.status")) as { push: { keyId: string | null } }).push.keyId).toBe("ABC123DEFG");
+    expect(await sealedBytes()).not.toContain("PRIVATE KEY");
+    await ops()(sealHandover(start.key, { push: null }));
+    expect(((await rpc("remote.status")) as { push: { keyId: string | null } }).push.keyId).toBeNull();
   });
 
   it("makes each handed-over Claude account under the Mac's id, with its name, token and the Mac's default", async () => {

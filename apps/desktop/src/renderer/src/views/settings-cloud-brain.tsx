@@ -4,6 +4,7 @@ import { Button, Dialog, Select, TextButton, Tooltip } from "../components/ui";
 import { StepMark } from "../components/WorkSteps";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { CloudBrainProjects } from "./settings-cloud-brain-projects";
+import { CloudBrainSignIns } from "./settings-cloud-brain-signins";
 import { PairingCode, pairingSheet, useTicker } from "./settings-phone";
 import { Failure } from "./settings-secret-field";
 import { Section, SettingRow, Status } from "./settings-shared";
@@ -30,7 +31,7 @@ export function RegionSelect({ label, value, disabled, onChange }: { label?: str
 const stepLabels: Record<CloudBrainStep, string> = {
   machine: "Make its machine and install it",
   start: "Start it",
-  "sign-ins": "Send it the Claude sign-ins",
+  "sign-ins": "Send it the sign-ins",
 };
 const STEPS = Object.keys(stepLabels) as CloudBrainStep[];
 
@@ -189,6 +190,7 @@ function Ready({ brain, active }: { brain: Extract<CloudBrainStatus, { state: "r
           </TextButton>
         ) : null}
       </SettingRow>
+      <CloudBrainSignIns active={active} busy={busy} />
       <Door door={brain.door} />
       <CloudBrainProjects active={active} />
       <Alert error={brain.error} />

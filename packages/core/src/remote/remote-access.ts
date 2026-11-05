@@ -117,7 +117,8 @@ export class RemoteAccess {
     const { db, log } = options;
     this.pushKeys = new PushKeys({ db, secrets: options.pushSecrets, log, ...(this.network.apns ? { origins: this.network.apns } : {}) });
     const presence = options.presence ?? (async () => false);
-    this.push = new PushSender({ db, log, presence, route: () => this.pushKeys.current(), changed: (what) => options.invalidate(what === "sender" ? SENDER_CHANGED : ["remote"]) });
+    const host = this.network.publicAddress ? "cloud" : "mac";
+    this.push = new PushSender({ db, log, presence, host, route: () => this.pushKeys.current(), changed: (what) => options.invalidate(what === "sender" ? SENDER_CHANGED : ["remote"]) });
     this.previews = options.preview ? new PreviewCasters({ host: options.preview, words: (message) => remoteError(message, this.macRoots()), roots: () => this.macRoots() }) : null;
   }
 

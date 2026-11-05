@@ -109,8 +109,8 @@ const finished = (code: number, output: Output = {}) => {
 };
 
 /** What each package installs, as the survey names it. */
-const PROVIDES: Record<string, string> = { procps: "ps", "util-linux": "flock", git: "git", tar: "tar", "@anthropic-ai/claude-code": "claude", "@openai/codex": "codex" };
-const NEEDS = ["node24", "ps", "flock", "git", "tar", "claude", "codex"];
+const PROVIDES: Record<string, string> = { procps: "ps", "util-linux": "flock", git: "git", tar: "tar", gh: "gh", "@anthropic-ai/claude-code": "claude", "@openai/codex": "codex" };
+const NEEDS = ["node24", "ps", "flock", "git", "tar", "gh", "claude", "codex"];
 
 /** A Linux machine as the brain's steps see it. Every change it undergoes lands in `changes`. */
 class FakeMachine {
@@ -323,7 +323,7 @@ describe("provisioning a brain", () => {
     });
     const machine = vercel.machine;
     expect(machine.changes).toEqual([
-      "apt procps util-linux",
+      "apt procps util-linux gh",
       `folders ${ROOT} ${ROOT}/app ${ROOT}/data ${ROOT}/run ${ROOT}/logs ${ROOT}/npm ${ROOT}/inbox`,
       "npm @anthropic-ai/claude-code @openai/codex",
       `write ${ROOT}/inbox/brain-brain-v1.tgz`,

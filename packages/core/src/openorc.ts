@@ -63,6 +63,7 @@ import { AgentUpdateService } from "./services/agent-updates.js";
 import { AttachmentService } from "./services/attachments.js";
 import { ClaudeAccountService } from "./services/claude-accounts.js";
 import { claudeRunAccount } from "./services/claude-run-account.js";
+import { withCloudCodexLogin } from "./services/cloud-codex.js";
 import { createCloud, type ClaudeCloudTokens, type CloudChecks, type CloudHandoff, type CloudSandboxes, type CloudSettings, type CloudStandby, type CodexCloudLogin } from "./services/cloud-setup.js";
 import { CLOUD_IDLE_PROCESS_MS, type CloudWorkspaceService } from "./services/cloud-workspaces.js";
 import { createFileService } from "./services/file-service-setup.js";
@@ -509,7 +510,8 @@ export class OpenOrc {
 
   private async claudeSystemInfo(id?: string | null, refresh = false) {
     if (refresh) await this.environment.refresh();
-    return this.system.infoFor(this.claudeAccounts.inspectionEnvironment(this.environment.current(), id ?? undefined));
+    const info = await this.system.infoFor(this.claudeAccounts.inspectionEnvironment(this.environment.current(), id ?? undefined));
+    return this.options.cloudOnly ? withCloudCodexLogin(info, await this.codexCloudLogin.has()) : info;
   }
 
   private buildHandlers(invalidate: (keys: string[]) => void): Handlers {
@@ -559,7 +561,7 @@ export class OpenOrc {
       createOrclingHandlers({ orclings: this.orclings }),
       createDeviceHandlers({ devices: this.devices }),
       createInboxHandlers({ runService: this.runs, db: this.db }),
-      createRemoteHandlers({ remote: this.remote }),
+      createRemoteHandlers({ remote: this.remote, pushKeyChanged: () => this.cloudParts.brain.signInsChanged() }),
       createPreviewHandlers({ db: this.db, preview: this.options.preview }),
       createBenchHandlers({ frames: this.frames, bench: this.bench, db: this.db, ledger: this.ledger, transport: this.options.transport, benchmarks: Boolean(this.options.benchmarks) }),
     );

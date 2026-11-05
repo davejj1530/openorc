@@ -33,6 +33,7 @@ export {
   parseControlRequest,
   parseLaunch,
   sealHandover,
+  signInPrint,
   type BrainControlOp,
   type BrainControlReply,
   type BrainControlRequest,
@@ -46,6 +47,7 @@ export {
   type HandoverKind,
   type HandoverRequest,
   type HandoverClaudeAccount,
+  type HandoverCodexLogin,
   type HandoverValues,
   type ProjectCopy,
 } from "./brain/wire.js";

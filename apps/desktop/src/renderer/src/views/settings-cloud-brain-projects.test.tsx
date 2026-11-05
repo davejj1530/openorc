@@ -28,6 +28,12 @@ function show(projects: CloudBrainProject[], status: CloudBrainStatus = ready) {
       const { projectId, on } = params as { projectId: string; on: boolean };
       return projects.map((each) => (each.id === projectId ? { ...each, on } : each)) as never;
     }
+    if (method === "cloud.brain.signIns")
+      return {
+        codex: { mode: null, email: null, plan: null, signingIn: false, pending: null, error: null },
+        github: { on: false, blocked: null, behind: false },
+        push: { has: false, behind: false },
+      } as never;
     return status as never;
   });
   render(

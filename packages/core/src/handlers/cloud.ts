@@ -37,7 +37,13 @@ type CloudMethod =
   | "cloud.brain.handover"
   | "cloud.brain.remove"
   | "cloud.brain.projects"
-  | "cloud.brain.project";
+  | "cloud.brain.project"
+  | "cloud.brain.signIns"
+  | "cloud.brain.codex.signIn"
+  | "cloud.brain.codex.cancel"
+  | "cloud.brain.codex.apiKey"
+  | "cloud.brain.codex.remove"
+  | "cloud.brain.github";
 
 interface Dependencies {
   settings: CloudSettings;
@@ -132,5 +138,22 @@ export function createCloudHandlers({ settings, tokens, checks, codex, sandboxes
       await brain.setProject(projectId, on);
       return brain.projects();
     },
+    ...brainSignInHandlers(brain),
+  };
+}
+
+/** What the brain signs in with besides Claude; every change answers with the whole of it. */
+function brainSignInHandlers(brain: CloudBrain): Pick<Handlers, Extract<CloudMethod, "cloud.brain.signIns" | `cloud.brain.codex.${string}` | "cloud.brain.github">> {
+  const changed = async (work: () => Promise<unknown> | void) => {
+    await work();
+    return brain.signIns();
+  };
+  return {
+    "cloud.brain.signIns": () => brain.signIns(),
+    "cloud.brain.codex.signIn": () => changed(() => brain.codexSignIn()),
+    "cloud.brain.codex.cancel": () => changed(() => brain.codexCancel()),
+    "cloud.brain.codex.apiKey": ({ key }) => changed(() => brain.codexApiKey(key)),
+    "cloud.brain.codex.remove": () => changed(() => brain.codexRemove()),
+    "cloud.brain.github": ({ on }) => changed(() => brain.setGitHub(on)),
   };
 }

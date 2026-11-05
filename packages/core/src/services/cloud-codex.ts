@@ -1,6 +1,7 @@
 import path from "node:path";
 import type { Sandbox, WorkspaceLocation } from "@openorc/cloud";
 import type { CloudProviderId } from "@openorc/db";
+import type { SystemInfo } from "@openorc/protocol";
 import { CODEX_FILE_STORE } from "./codex-cloud-login.js";
 
 /** What the cloud needs from the Codex cloud login. */
@@ -51,6 +52,12 @@ export class CloudCodex {
     const auth = await location.install.sandbox.readFile(path.posix.join(home, "auth.json"));
     if (auth) await this.login.keep(auth.toString("utf8"));
   }
+}
+
+/** On a cloud-only host Codex signs in only with the cloud login, so a Codex found there counts as signed in while it has one. */
+export function withCloudCodexLogin(info: SystemInfo, signedIn: boolean): SystemInfo {
+  if (!signedIn) return info;
+  return { ...info, harnesses: info.harnesses.map((row) => (row.id === "codex" && row.state === "sign_in" ? { ...row, state: "ready" } : row)) };
 }
 
 /** Codex on the sandbox's PATH, installed when missing. Never on a sandbox simulated on this Mac: that is the Mac's own. */

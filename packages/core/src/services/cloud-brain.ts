@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   BRAIN_PROJECT,
   BrainMachine,
@@ -14,12 +15,15 @@ import {
   type BrainMachineStatus,
   type DoorBundle,
   type HandoverClaudeAccount,
+  type HandoverCodexLogin,
 } from "@openorc/cloud";
 import { claudeAccounts, projects, redact, type Db } from "@openorc/db";
-import type { BrainRegion, CloudBrainMachine, CloudBrainPairing, CloudBrainProject, CloudBrainStatus, CloudBrainStep, Project } from "@openorc/protocol";
+import type { BrainRegion, CloudBrainMachine, CloudBrainPairing, CloudBrainProject, CloudBrainSignIns, CloudBrainStatus, CloudBrainStep, Project } from "@openorc/protocol";
 import type { ClaudeCloudTokens } from "./claude-cloud-tokens.js";
 import { BrainDoorKeeper, vercelDoors, type BrainDoors } from "./cloud-brain-door.js";
 import { copyBranch, keptOwn, moved, seen, sendProject, switchedOn, type BrainProject } from "./cloud-brain-projects.js";
+import { NO_SIGN_INS, claimsSignIns, heardSignIns, signInChanges, signInsView, switchGitHub, type SignInRecord, type SignInSources } from "./cloud-brain-signins.js";
+import { apiKeyAuth } from "./codex-cloud-login.js";
 import type { ProtectedSecretStore } from "./extraction-credentials.js";
 
 /** What phones show for the brain. */
@@ -53,7 +57,7 @@ interface Sent {
 }
 
 /** Kept in protected storage. The key alone opens the brain's secrets, so it is saved before anything is made. */
-interface Stored {
+interface Stored extends SignInRecord {
   key: string;
   teamId: string;
   region: BrainRegion;
@@ -102,6 +106,8 @@ export interface CloudBrainDeps {
   doors?: BrainDoors;
   /** The brain's project and its door's; the product's own unless given, as for a QA brain kept apart. */
   projects?: { brain?: string; door?: string };
+  /** This Mac's sign-ins besides Claude's that the brain is kept on; none unless given. */
+  signIns?: SignInSources;
 }
 
 /**
@@ -122,6 +128,8 @@ export class CloudBrain {
   private sendingProject: string | null = null;
   /** The version the brain ran when this Mac last woke it. */
   private running: string | null = null;
+  /** A Codex login made for the brain, or its sign-out, shown at once while it waits its turn for the record. */
+  private codexWaiting: HandoverCodexLogin | null | undefined = undefined;
   private readonly door: BrainDoorKeeper;
 
   constructor(private readonly deps: CloudBrainDeps) {
@@ -213,7 +221,7 @@ export class CloudBrain {
     if (source) void this.run({ kind: "setting-up", step: "machine" }, () => this.setUp(source)).catch(() => undefined);
   }
 
-  /** Starts the brain unless it runs, and sends Claude sign-ins that changed. A failure shows in the status. */
+  /** Starts the brain unless it runs, and sends sign-ins that changed. A failure shows in the status. */
   async wake(): Promise<void> {
     await this.run({ kind: "waking" }, async () => {
       const machine = await this.machine();
@@ -232,7 +240,7 @@ export class CloudBrain {
     });
   }
 
-  /** Sends the Claude sign-ins, waking the brain. A failure shows in the status. */
+  /** Sends the sign-ins, waking the brain. A failure shows in the status. */
   async handover(): Promise<void> {
     await this.run({ kind: "sending" }, async () => {
       const machine = await this.machine();
@@ -241,8 +249,75 @@ export class CloudBrain {
     }).catch(() => undefined);
   }
 
-  /** A Claude cloud token was saved or removed on this Mac: a brain that is set up takes the new list, woken for it. */
-  claudeChanged(): void {
+  /** What the brain signs in with besides Claude. Never wakes the brain. */
+  async signIns(): Promise<CloudBrainSignIns> {
+    const record: SignInRecord = (await this.read().catch(() => null)) ?? {};
+    return signInsView(this.codexWaiting === undefined ? record : { ...record, codexNext: this.codexWaiting }, this.sources());
+  }
+
+  /** Opens the browser to sign in to Codex for the brain alone. The login goes to the brain, woken for it, and this Mac keeps none once it took it. */
+  codexSignIn(): void {
+    this.sources().codex.start(async (login) => this.codexNext({ id: randomUUID(), mode: "chatgpt", ...login }));
+  }
+
+  codexCancel(): void {
+    this.sources().codex.cancel();
+  }
+
+  /** An OpenAI API key for the brain's Codex, in place of a ChatGPT sign-in. */
+  codexApiKey(key: string): void {
+    this.codexNext({ id: randomUUID(), mode: "apiKey", auth: apiKeyAuth(key), email: null, plan: null });
+  }
+
+  /** Signs the brain out of Codex. */
+  codexRemove(): void {
+    this.codexNext(null);
+  }
+
+  /**
+   * Switched on, the brain gets this Mac's GitHub sign-in, and again whenever this Mac's changes; switched off, the
+   * brain deletes its copy. Wakes the brain for it; a failure shows in the status.
+   */
+  async setGitHub(on: boolean): Promise<void> {
+    await this.run({ kind: "sending" }, async () => {
+      const mac = on ? await this.sources().github(true) : null;
+      if (mac && "blocked" in mac) throw new Error(mac.blocked);
+      await this.write(switchGitHub(await this.stored(), on));
+      if (!(await this.behind())) return;
+      const machine = await this.machine();
+      await this.wakeUp(machine);
+      await this.send(machine);
+    }).catch(() => undefined);
+  }
+
+  /**
+   * Kept in the record until the brain takes it, so a brain that could not be reached gets it at its next wake. Shown as
+   * waiting at once, while it waits its turn behind whatever runs; a failure shows in the status.
+   */
+  private codexNext(login: HandoverCodexLogin | null): void {
+    this.codexWaiting = login;
+    this.changed();
+    const kept = this.serialize(async () => {
+      const stored = await this.stored();
+      if (login === null && !stored.codex && stored.codexNext === undefined) return false;
+      await this.write({ ...stored, codexNext: login });
+      return true;
+    });
+    void kept
+      .then(async (wrote) => {
+        if (wrote) await this.handover();
+      })
+      .catch(async (error: unknown) => {
+        this.error = await this.scrub(error);
+      })
+      .finally(() => {
+        this.codexWaiting = undefined;
+        this.changed();
+      });
+  }
+
+  /** A sign-in changed on this Mac, a Claude cloud token or the push key: a brain that is set up takes it, woken for it. */
+  signInsChanged(): void {
     void this.serialize(async () => {
       if (!(await this.read())?.ready || !(await this.behind())) return;
       await this.tracked({ kind: "sending" }, async () => {
@@ -342,6 +417,7 @@ export class CloudBrain {
 
   /** Once the operation that woke the brain ends, so the brain runs this build's version first and a pairing waits on nothing. */
   private refreshAfter(): void {
+    void this.serialize(() => this.refreshSignIns()).catch(() => undefined);
     void this.serialize(() => this.refreshProjects()).catch(() => undefined);
     this.refreshDoor();
   }
@@ -496,20 +572,46 @@ export class CloudBrain {
   }
 
   /**
-   * Hands over every Claude account with a cloud token, so the brain drops any other. Codex is not sent: a ChatGPT
-   * login's refresh token works once, so the Mac's cloud login and a copy on the brain would sign each other out.
+   * Hands over every Claude account with a cloud token, so the brain drops any other, and each other sign-in that
+   * changed since the brain took it. Codex goes only as a login made for the brain: a ChatGPT login's refresh token
+   * works once, so this Mac's own cloud login and a copy on the brain would sign each other out. A brain running an
+   * older version than this build may refuse the other kinds, and with them the whole handover, so it gets Claude's alone.
    */
   private async send(machine: BrainMachineLike): Promise<void> {
     const stored = await this.stored();
     const accounts = await this.claude();
     const handed: HandoverClaudeAccount[] = accounts.map(({ id, name, default: isDefault, token }) => ({ id, name, default: isDefault, token }));
-    await machine.control(sealHandover(brainKeyFrom(stored.key), { claude: { accounts: handed } }));
-    await this.write({ ...(await this.stored()), claude: accounts.map(sent) });
+    const others = (await this.behindUpdate(stored)) ? null : await signInChanges(stored, this.sources());
+    await machine.control(sealHandover(brainKeyFrom(stored.key), { claude: { accounts: handed }, ...others?.handover }));
+    const now = { ...(await this.stored()), claude: accounts.map(sent) };
+    await this.write(others ? others.took(now) : now);
+  }
+
+  /**
+   * Hears which sign-ins the brain holds, then sends what it lacks: its word wins over the record, as after its disk went
+   * back to an empty snapshot. Never wakes the brain, nor asks one older than this build; asks nothing while the record
+   * names none.
+   */
+  private async refreshSignIns(): Promise<void> {
+    const stored = await this.read();
+    if (!stored?.ready || !claimsSignIns(stored) || (await this.behindUpdate(stored))) return;
+    const machine = await this.machine();
+    const holds = await machine.control({ op: "sign-ins" }).catch(() => null);
+    if (!holds) return;
+    await this.write(heardSignIns(await this.stored(), holds));
+    this.changed();
+    if (await this.behind()) await this.tracked({ kind: "sending" }, () => this.send(machine));
   }
 
   private async behind(): Promise<boolean> {
     const stored = await this.read();
-    return stored !== null && !sameSent((await this.claude()).map(sent), stored.claude);
+    if (!stored) return false;
+    if (!sameSent((await this.claude()).map(sent), stored.claude)) return true;
+    return Object.keys((await signInChanges(stored, this.sources())).handover).length > 0;
+  }
+
+  private sources(): SignInSources {
+    return this.deps.signIns ?? NO_SIGN_INS;
   }
 
   /** Every enabled Claude account with a cloud token, the default marked. One turned off here does not run there either. */

@@ -57,3 +57,34 @@ it("shows why the sign-in did not finish", () => {
   show({ ...none, error: "The sign-in did not finish. Try again and complete it in the browser." });
   expect(screen.getByRole("alert").textContent).toBe("The sign-in did not finish. Try again and complete it in the browser.");
 });
+
+it("says once a login is removed that it still works at OpenAI, and where to end it, until another sign-in begins", async () => {
+  window.openorc = { ...window.openorc, openExternal: vi.fn() };
+  vi.mocked(core.call).mockResolvedValue(null);
+  const section = (codex: CodexCloudAccess) => (
+    <QueryClientProvider client={queryClient}>
+      <CodexCloudSection codex={codex} />
+    </QueryClientProvider>
+  );
+  const view = render(section({ ...none, mode: "chatgpt", email: "qa@example.com", plan: "plus" }));
+  expect(screen.queryByText(/until you/)).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.codex.remove", {}));
+  view.rerender(section(none));
+  const chatgpt = await screen.findByRole("button", { name: "ChatGPT" });
+  expect(chatgpt.closest("p")?.textContent).toBe("Removed from OpenOrc. It stays signed in until you log out its session in ChatGPT, under Settings > Security.");
+  fireEvent.click(chatgpt);
+  expect(window.openorc.openExternal).toHaveBeenCalledWith("https://chatgpt.com");
+  fireEvent.click(screen.getByRole("button", { name: "Use an API key" }));
+  expect(screen.queryByText(/until you/)).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Use an API key" }));
+
+  view.rerender(section({ ...none, mode: "apiKey" }));
+  fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+  await waitFor(() => expect(vi.mocked(core.call).mock.calls.filter(([method]) => method === "cloud.codex.remove")).toHaveLength(2));
+  view.rerender(section(none));
+  const account = await screen.findByRole("button", { name: "your OpenAI account" });
+  expect(account.closest("p")?.textContent).toBe("Removed from OpenOrc. It still works until you delete it in your OpenAI account.");
+  fireEvent.click(account);
+  expect(window.openorc.openExternal).toHaveBeenCalledWith("https://platform.openai.com/api-keys");
+});

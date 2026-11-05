@@ -14,10 +14,12 @@ import {
   type RunnerFile,
 } from "@openorc/cloud";
 import { OpenOrc, type RequestOrigin, type RpcReply } from "@openorc/core";
+import { useGitHubSignIn } from "@openorc/git";
 import type { RpcRequest } from "@openorc/protocol";
 import { BrainAwake, NO_SANDBOX, type SleepReason } from "./awake.js";
 import { serveControl, type ControlServer } from "./control.js";
 import { controlHandlers, retireSignedOut, type CoreOp } from "./control-ops.js";
+import { BrainGitHub, GITHUB_CHANNEL } from "./github.js";
 import { readLine } from "./line.js";
 import { BrainLog } from "./log.js";
 import { brainPath, missingTools } from "./machine-check.js";
@@ -144,13 +146,16 @@ export async function serve(appDir: string): Promise<void> {
     host.control = await serveControl(layout.socket, host.request, () => host.awake?.touch());
     // Agent updates install where machine setup did, as the same user and never with sudo.
     process.env["NPM_CONFIG_PREFIX"] = layout.npm;
+    const github = new BrainGitHub(secrets.store(GITHUB_CHANNEL), (text) => log.write("warn", text));
+    await github.load();
+    useGitHubSignIn(() => github.environment());
     const core = await OpenOrc.create(brainOptions({ layout, appDir, start, self, secrets, transport: log.transport(), runnerFiles: await runnerFiles(appDir) }));
     host.core = core;
     await retireSignedOut(core);
     await core.remote.attach(host.answer);
     const { listener } = await core.remote.configure(true);
     if (listener.state !== "on") throw new Error(`Phone access did not start: ${listener.state === "failed" ? listener.reason : "it is off"}.`);
-    host.ops = controlHandlers({ core, key: start.key, layout, stop: () => void host.shutdown("stop"), answering: () => host.control?.busy === "control" });
+    host.ops = controlHandlers({ core, key: start.key, layout, github, stop: () => void host.shutdown("stop"), answering: () => host.control?.busy === "control" });
     host.awake = new BrainAwake({ busy: () => host.busy(), self, sleep: (why) => host.shutdown(why), warn: (text) => log.write("warn", text) });
     host.phase = "ready";
     host.awake.start();

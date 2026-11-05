@@ -90,6 +90,7 @@ describe("the control socket", () => {
       "import-project": { op: "import-project", source: "p1", name: "demo", branch: "main", bundle: "demo.bundle" },
       "remove-project": { op: "remove-project", source: "p1" },
       projects: { op: "projects" },
+      "sign-ins": { op: "sign-ins" },
       stop: { op: "stop" },
       "stop-for-update": { op: "stop-for-update" },
     } satisfies { [K in BrainControlOp]: Extract<BrainControlRequest, { op: K }> };
@@ -105,7 +106,7 @@ describe("the control socket", () => {
       expect((await ctl(JSON.stringify(request))).code).toBe(0);
       if (uses > before) used.push(op);
     }
-    expect(used).toEqual(["wake", "pair", "handover", "import-project", "remove-project", "projects"]);
+    expect(used).toEqual(["wake", "pair", "handover", "import-project", "remove-project", "projects", "sign-ins"]);
   });
 
   it("names a bad field without repeating what was sent", async () => {

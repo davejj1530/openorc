@@ -131,6 +131,29 @@ export interface CloudBrainProject {
   error: string | null;
 }
 
+/** What the brain signs in with besides Claude, as this Mac last handed it over; `behind` while this Mac's changed since. */
+export interface CloudBrainSignIns {
+  /** The brain's own Codex login, made from this Mac and never a copy of its own. */
+  codex: {
+    mode: "chatgpt" | "apiKey" | null;
+    email: string | null;
+    plan: string | null;
+    /** The browser sign-in for the brain is open. */
+    signingIn: boolean;
+    /** A login made for the brain, or its sign-out, that the brain has not taken yet. */
+    pending: { mode: "chatgpt" | "apiKey"; email: string | null; plan: string | null } | "sign-out" | null;
+    /** Why the last browser sign-in did not finish. */
+    error: string | null;
+  };
+  /**
+   * This Mac's GitHub sign-in, for the brain's own pushes and pull requests. Off unless switched on. `blocked`: why it
+   * cannot be switched on, or why nothing was sent while it is on.
+   */
+  github: { on: boolean; blocked: string | null; behind: boolean };
+  /** This Mac's push key, which the brain sends phone alerts with. */
+  push: { has: boolean; behind: boolean };
+}
+
 export interface CloudBrainPairing {
   /** `openorc://pair#…`, drawn as a QR code. Holds a one-time secret. */
   url: string;
@@ -142,11 +165,11 @@ export const cloudBrainRpcParams = {
   "cloud.brain.status": z.object({}),
   /** Makes the brain in the region and sets it up in the background. Again after a failure, with the key and region it has. */
   "cloud.brain.create": z.object({ region: BrainRegion }).strict(),
-  /** Starts the brain unless it runs, and sends Claude sign-ins that changed. */
+  /** Starts the brain unless it runs, and sends sign-ins that changed. */
   "cloud.brain.wake": z.object({}),
   /** Wakes the brain and asks it for a phone pairing code. */
   "cloud.brain.pair": z.object({}),
-  /** Sends the Claude sign-ins again, waking the brain. */
+  /** Sends the sign-ins again, waking the brain. */
   "cloud.brain.handover": z.object({}),
   /** Deletes the brain's door, then the brain with its disk and its thread sandboxes, and forgets its key. */
   "cloud.brain.remove": z.object({}),
@@ -154,6 +177,16 @@ export const cloudBrainRpcParams = {
   "cloud.brain.projects": z.object({}),
   /** Sends a project to the brain, or removes its copy there, waking the brain. */
   "cloud.brain.project": z.object({ projectId: z.string().min(1), on: z.boolean() }).strict(),
+  /** What the brain signs in with besides Claude. Never wakes the brain. */
+  "cloud.brain.signIns": z.object({}),
+  /** Opens the browser to sign in to Codex for the brain alone; the login goes to the brain and this Mac keeps none. */
+  "cloud.brain.codex.signIn": z.object({}),
+  "cloud.brain.codex.cancel": z.object({}),
+  "cloud.brain.codex.apiKey": z.object({ key: z.string().trim().min(8).max(1000) }).strict(),
+  /** Signs the brain out of Codex. */
+  "cloud.brain.codex.remove": z.object({}),
+  /** Sends this Mac's GitHub sign-in to the brain, or deletes it there, waking the brain. */
+  "cloud.brain.github": z.object({ on: z.boolean() }).strict(),
 };
 
 export interface CloudBrainRpcResults {
@@ -165,4 +198,10 @@ export interface CloudBrainRpcResults {
   "cloud.brain.remove": CloudBrainStatus;
   "cloud.brain.projects": CloudBrainProject[];
   "cloud.brain.project": CloudBrainProject[];
+  "cloud.brain.signIns": CloudBrainSignIns;
+  "cloud.brain.codex.signIn": CloudBrainSignIns;
+  "cloud.brain.codex.cancel": CloudBrainSignIns;
+  "cloud.brain.codex.apiKey": CloudBrainSignIns;
+  "cloud.brain.codex.remove": CloudBrainSignIns;
+  "cloud.brain.github": CloudBrainSignIns;
 }

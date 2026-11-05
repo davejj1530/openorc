@@ -184,6 +184,7 @@ const NEEDS = {
   flock: { check: "command -v flock", remedy: { kind: "apt", package: "util-linux" } },
   git: { check: "command -v git", remedy: { kind: "apt", package: "git" } },
   tar: { check: "command -v tar", remedy: { kind: "apt", package: "tar" } },
+  gh: { check: "command -v gh", remedy: { kind: "apt", package: "gh" } },
   folders: { check: 'for folder in "$@"; do test -d "$folder" || exit 1; done', remedy: { kind: "folders" } },
   claude: { check: '"$npm/bin/claude" --version', remedy: { kind: "npm", package: "@anthropic-ai/claude-code" } },
   codex: { check: '"$npm/bin/codex" --version', remedy: { kind: "npm", package: "@openai/codex" } },

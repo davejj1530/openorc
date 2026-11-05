@@ -13,6 +13,7 @@ import {
   parseControlRequest,
   parseLaunch,
   sealHandover,
+  signInPrint,
   type BrainControlRequest,
   type BrainStart,
 } from "./wire.js";
@@ -189,6 +190,36 @@ describe("handovers", () => {
     const key = newBrainKey();
     const sealed = sealHandover(key, { claude: { accounts: [personal] } }).sealed.claude!;
     expect(() => openHandover(key, { op: "handover", sealed: { codex: sealed } })).toThrow(SealedUnreadable);
+  });
+
+  it("carry the brain's own Codex login, the Mac's GitHub sign-in and push key, or null for each to take it away", () => {
+    const key = newBrainKey();
+    const codex = { id: "mac-login-1", mode: "chatgpt", auth: '{"tokens":{"refresh_token":"rt-fixture"}}', email: "qa@example.com", plan: null } as const;
+    const github = { token: "gho_fixtureToken0123456789", name: "Fixture Person", email: null };
+    const line = JSON.stringify(sealHandover(key, { codex, github, push: null }));
+    expect(line).not.toMatch(/rt-fixture|gho_fixture|Fixture Person/);
+    const request = parseControlRequest(line);
+    if (request.op !== "handover") throw new Error("expected a handover");
+    expect(Object.keys(request.sealed).sort()).toEqual(["codex", "github", "push"]);
+    expect(openHandover(key, request)).toEqual({ claude: undefined, codex, github, push: null });
+    expect(openHandover(key, sealHandover(key, { codex: null, github: null }))).toMatchObject({ codex: null, github: null });
+  });
+
+  it("name a sign-in the same on both sides whatever its keys' order, and the brain says what it holds by those names", () => {
+    const github = { token: "gho_fixtureToken0123456789", name: "Fixture Person", email: null };
+    expect(signInPrint({ email: null, name: "Fixture Person", token: "gho_fixtureToken0123456789" })).toBe(signInPrint(github));
+    expect(signInPrint({ ...github, name: "Someone Else" })).not.toBe(signInPrint(github));
+    expect(signInPrint(github)).not.toContain("gho_");
+    const holds = { codex: "mac-login-1", github: signInPrint(github), push: "ABC123DEFG" };
+    expect(parseControlRequest(JSON.stringify({ op: "sign-ins" }))).toEqual({ op: "sign-ins" });
+    expect(parseControlReply("sign-ins", encodeControlReply({ ok: true, result: holds }))).toEqual({ ok: true, result: holds });
+  });
+
+  it("refuse a Codex login with an id the brain could not record, without repeating the login", () => {
+    const key = newBrainKey();
+    const error = refusal(() => openHandover(key, sealHandover(key, { codex: { id: "mac login/1", mode: "chatgpt", auth: "rt-fixture-secret", email: null, plan: null } })));
+    expect(error.field).toBe("id");
+    expect(error.message).not.toContain("rt-fixture-secret");
   });
 
   it("carry an empty Claude list, which signs every account out on the brain", () => {

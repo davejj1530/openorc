@@ -7,7 +7,7 @@ import { CloudCheckSection } from "./settings-cloud-check";
 import { CloudSandboxesSection } from "./settings-cloud-sandboxes";
 import { Field, LoadError, Section, SettingRow, Status, Toggle } from "./settings-shared";
 import { CodexCloudSection } from "./settings-cloud-codex";
-import { Failure, TokenField } from "./settings-secret-field";
+import { Failure, StillWorks, TokenField } from "./settings-secret-field";
 
 const TOKENS_URL = "https://vercel.com/account/settings/tokens";
 
@@ -116,6 +116,11 @@ function signInHint(account: ClaudeAccountConnection): string {
   return account.kind === "managed" ? `Sign in ${who} in the private window that opened.` : `Sign in ${who} in your browser.`;
 }
 
+/** Once its token was removed, until another is made or pasted: where to revoke the old one. */
+function revoked(removed: boolean, access: ClaudeCloudAccess | undefined): "claude" | null {
+  return removed && !access?.createdAt && !access?.creating ? "claude" : null;
+}
+
 function ClaudeCloudAccount({ account, access }: { account: ClaudeAccountConnection; access: ClaudeCloudAccess | undefined }) {
   const create = useRpcMutation("cloud.claude.create");
   const cancel = useRpcMutation("cloud.claude.cancel");
@@ -177,6 +182,7 @@ function ClaudeCloudAccount({ account, access }: { account: ClaudeAccountConnect
           onSave={(token) => save.mutate({ accountId, token }, { onSuccess: () => setPasting(false) })}
         />
       ) : null}
+      <StillWorks at={revoked(remove.isSuccess, access)} />
       <Failure error={create.error ?? cancel.error ?? save.error ?? remove.error ?? (access?.error ? new Error(access.error) : null)} />
     </>
   );

@@ -3,18 +3,19 @@ import type { CodexCloudAccess } from "@openorc/protocol";
 import { Button, TextButton } from "../components/ui";
 import { useRpcMutation } from "../lib/client";
 import { Section, SettingRow, Status } from "./settings-shared";
-import { Failure, TokenField } from "./settings-secret-field";
+import { Failure, StillWorks, TokenField, type RevokedAt } from "./settings-secret-field";
 
 const KEYS_URL = "https://platform.openai.com/api-keys";
 
-function who(codex: CodexCloudAccess): string {
+/** Who a Codex login belongs to, in a few words. */
+export function codexWho(codex: Pick<CodexCloudAccess, "mode" | "email" | "plan">): string {
   if (codex.mode === "apiKey") return "An OpenAI API key, billed by the token";
   return [codex.email, codex.plan ? `ChatGPT ${codex.plan[0]!.toUpperCase()}${codex.plan.slice(1)}` : null].filter(Boolean).join(" · ") || "Signed in with ChatGPT";
 }
 
 function hint(codex: CodexCloudAccess): string {
   if (codex.signingIn) return "Sign in to ChatGPT in the browser that opened.";
-  return codex.mode ? who(codex) : "Your ChatGPT plan, or an API key";
+  return codex.mode ? codexWho(codex) : "Your ChatGPT plan, or an API key";
 }
 
 type Mutations = { signIn: () => void; cancel: () => void; remove: () => void; paste: () => void; busy: boolean };
@@ -66,8 +67,25 @@ export function CodexCloudSection({ codex }: { codex: CodexCloudAccess }) {
   const apiKey = useRpcMutation("cloud.codex.apiKey");
   const remove = useRpcMutation("cloud.codex.remove");
   const [pasting, setPasting] = useState(false);
+  /** The kind of sign-in last removed, until another is begun. */
+  const [removed, setRemoved] = useState<RevokedAt | null>(null);
   const busy = signIn.isPending || cancel.isPending || apiKey.isPending || remove.isPending;
-  const act: Mutations = { busy, signIn: () => signIn.mutate({}), cancel: () => cancel.mutate({}), remove: () => remove.mutate({}), paste: () => setPasting(!pasting) };
+  const act: Mutations = {
+    busy,
+    signIn: () => {
+      setRemoved(null);
+      signIn.mutate({});
+    },
+    cancel: () => cancel.mutate({}),
+    remove: () => {
+      setRemoved(codex.mode);
+      remove.mutate({});
+    },
+    paste: () => {
+      setRemoved(null);
+      setPasting(!pasting);
+    },
+  };
   const error = signIn.error ?? cancel.error ?? apiKey.error ?? remove.error ?? (codex.error ? new Error(codex.error) : null);
   return (
     <Section title="Codex" description="Codex signs in to sandboxes with a sign-in of its own, never this Mac's.">
@@ -92,6 +110,7 @@ export function CodexCloudSection({ codex }: { codex: CodexCloudAccess }) {
           onSave={(key) => apiKey.mutate({ key }, { onSuccess: () => setPasting(false) })}
         />
       ) : null}
+      <StillWorks at={remove.isSuccess && !codex.mode ? removed : null} />
       <Failure error={error} />
     </Section>
   );

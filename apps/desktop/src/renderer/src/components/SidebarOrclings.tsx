@@ -29,12 +29,12 @@ export function SidebarOrclings({ route, search }: { route: Route; search: strin
   );
 }
 
-/** Starts a new Orcling; it sits where the thread list keeps its filter. */
+/** Starts a new Orcling; it sits where the thread list keeps its tools. */
 export function NewOrclingButton() {
   return (
     <Tooltip label="New Orcling">
-      <IconButton onClick={() => useRouter.getState().navigate({ view: "orcling" })} aria-label="New Orcling" size="xs" className="no-drag text-ink-4">
-        <Plus size={14} />
+      <IconButton onClick={() => useRouter.getState().navigate({ view: "orcling" })} aria-label="New Orcling" size="lg" className="no-drag">
+        <Plus size={16} />
       </IconButton>
     </Tooltip>
   );

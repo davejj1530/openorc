@@ -127,7 +127,7 @@ export function Panel({ context }: { context: PanelContext }) {
           if (expanded && event.key === "Escape" && !event.defaultPrevented) useLayout.getState().setPanelExpanded(false);
         }}
       >
-        <div className="panel-pane h-full flex flex-col">
+        <div className="panel-pane h-full flex flex-col" data-plane>
           <PanelHeader
             scope={scope}
             session={session}
@@ -138,20 +138,18 @@ export function Panel({ context }: { context: PanelContext }) {
             windowsControls={windowsControls}
             onClose={closing.requestClose}
           />
-          <div className="panel-card" data-plane>
-            <div
-              id="panel-tab-content"
-              role="tabpanel"
-              aria-labelledby={`panel-tab-${tab.id}`}
-              data-file-workspace={workspace.page.kind === "file" || undefined}
-              className="panel-content flex-1 min-h-0"
-            >
-              {mounted ? (
-                <Suspense fallback={null}>
-                  <PanelBody context={context} workspace={workspace} open={open} />
-                </Suspense>
-              ) : null}
-            </div>
+          <div
+            id="panel-tab-content"
+            role="tabpanel"
+            aria-labelledby={`panel-tab-${tab.id}`}
+            data-file-workspace={workspace.page.kind === "file" || undefined}
+            className="panel-content flex-1 min-h-0"
+          >
+            {mounted ? (
+              <Suspense fallback={null}>
+                <PanelBody context={context} workspace={workspace} open={open} />
+              </Suspense>
+            ) : null}
           </div>
         </div>
       </aside>

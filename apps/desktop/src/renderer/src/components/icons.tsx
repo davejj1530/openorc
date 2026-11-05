@@ -192,6 +192,7 @@ export const Home = icon("Home", <path d="m3 10 9-7 9 7 M5 8.5v10a2 2 0 0 0 2 2h
 export const Orclings = icon("Orclings", <path d="M12 3.5c7 0 8.5 1.5 8.5 8.5s-1.5 8.5-8.5 8.5-8.5-1.5-8.5-8.5S5 3.5 12 3.5Z M9 10v4 M15 10v4" />);
 export const FolderGit2 = icon("FolderGit2", folder);
 export const Folder = icon("Folder", folder);
+export const FolderPlus = icon("FolderPlus", <path d="M3 8V5.5a2 2 0 0 1 2-2h4.5L13 7h6a2 2 0 0 1 2 2v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z M12 10.5v6 M9 13.5h6" />);
 export const Zap = icon("Zap", <path d="m14 2-11 12h8l-1 8 11-12h-8Z" />);
 export const FolderOpen = icon("FolderOpen", <path d="M3 18V5.5a2 2 0 0 1 2-2h4l3.5 3.5H18a2 2 0 0 1 2 2v1 M3 19l3-8h15l-3 9H5a2 2 0 0 1-2-1Z" />);
 export const Inbox = icon("Inbox", <path d="m3 12 4-8h10l4 8v7a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 19Z M3 12h5l2 3h4l2-3h5" />);

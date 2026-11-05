@@ -1,4 +1,4 @@
-/* The sidebar: its column, window corner, screens, list head, project groups, footer and Orclings.
+/* The sidebar: its column, window corner, list head, project groups, Orclings and the footer dock.
    It sits on the tile and paints nothing of its own: no fill, no seam. Rows are 34px with a 10px
    corner; the current row takes --current-row-fill and keeps --navigation-ink. */
 
@@ -70,30 +70,12 @@
   display: none;
 }
 
-/* Screens. One knob carries the current row's fill and slides between rows. */
-.sidebar-nav,
+/* Settings' sections, in place of the app's navigation. */
 .settings-destinations {
-  position: relative;
-  isolation: isolate;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   padding: 0 10px;
   margin-top: 6px;
-}
-.sidebar-nav-knob {
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: -1;
-  border-radius: var(--radius-md);
-  background: var(--current-row-fill);
-  pointer-events: none;
-}
-.sidebar-nav-knob[data-placed] {
-  transition:
-    transform var(--duration-swap) var(--ease-out),
-    width var(--duration-swap) var(--ease-out),
-    height var(--duration-swap) var(--ease-out);
 }
 .sidebar-nav-row {
   display: flex;
@@ -115,10 +97,6 @@ button.sidebar-nav-row:hover {
   background-color: var(--surface-2);
   color: var(--ink);
 }
-/* The current row already sits on the knob; a hover fill over it would wash it out. */
-.sidebar-nav button.sidebar-nav-row[aria-current="page"]:hover {
-  background-color: transparent;
-}
 .sidebar-nav-icon {
   display: flex;
   flex-shrink: 0;
@@ -131,20 +109,10 @@ button.sidebar-nav-row:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.sidebar-nav-count {
-  flex-shrink: 0;
-  font-size: var(--text-sm);
-  line-height: 16px;
-  color: var(--ink-4);
-}
-.sidebar-new-thread {
-  color: var(--ink);
-}
 .sidebar-nav-row[aria-current="page"],
 .sidebar-nav-row[aria-current="page"] .sidebar-nav-icon {
   color: var(--navigation-ink);
 }
-/* Settings' own list keeps the row shape without the sliding knob. */
 .settings-destinations {
   flex: 1;
   min-height: 0;
@@ -158,93 +126,41 @@ button.sidebar-nav-row:hover {
   margin-bottom: 18px;
 }
 
-/* More unfolds in place: its rows grow from nothing to 34px. */
-.sidebar-more-chevron {
-  flex-shrink: 0;
-  color: var(--ink-4);
-  transition: rotate var(--duration-arrive) var(--ease-out);
-}
-.sidebar-more-toggle[aria-expanded="true"] {
-  color: var(--ink);
-}
-.sidebar-more-toggle[aria-expanded="true"] .sidebar-more-chevron {
-  rotate: 180deg;
-}
-.sidebar-more {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows var(--duration-resize) var(--ease-out);
-}
-.sidebar-more[data-open] {
-  grid-template-rows: 1fr;
-}
-.sidebar-more-rows {
-  display: grid;
-  min-height: 0;
-  overflow: hidden;
-  opacity: 0;
-  transition: opacity var(--duration-quick) var(--ease-out);
-}
-.sidebar-more[data-open] .sidebar-more-rows {
-  opacity: 1;
-  transition-duration: var(--duration-arrive);
-}
-.sidebar-edit-entry,
-.sidebar-edit-entry .sidebar-nav-icon {
-  color: var(--ink-4);
-}
-
-/* The Edit sidebar dialog: each screen with its switch. */
-.sidebar-edit {
-  display: grid;
-  gap: 2px;
-}
-.sidebar-edit-row {
+/* The list head: the list's name, a round search button, then the list's tools. While searching,
+   the capsule grows leftward over the name; the tools keep their place. */
+.sidebar-list-head {
   display: flex;
   align-items: center;
-  gap: 12px;
-  height: 40px;
-  padding: 0 10px;
-  border-radius: var(--radius-lg);
-  color: var(--ink);
-  transition: background-color var(--duration-quick) var(--ease-out);
-}
-.sidebar-edit-row:hover {
-  background-color: var(--control-fill);
-}
-
-/* The list head: Threads and Orclings at their own width, a round search button, then the list's
-   tool. While searching, the capsule grows over the tabs and the tool steps aside for Close. */
-.sidebar-list-head {
-  display: grid;
-  align-items: center;
+  gap: 2px;
   height: var(--control-row);
-  margin: 10px 10px 0;
+  margin: 6px 10px 0;
   flex-shrink: 0;
 }
-.sidebar-list-head > * {
+.sidebar-list-lead {
+  display: grid;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
+}
+.sidebar-list-lead > * {
   grid-area: 1 / 1;
 }
-/* The tabs leave room for search and the tool; on a narrow sidebar the track scrolls instead. */
-.sidebar-list-head .sidebar-list-tabs {
+.sidebar-list-title {
   justify-self: start;
-  max-width: calc(100% - var(--control-row) - 34px);
+  max-width: calc(100% - 34px);
+  padding-left: 10px;
+  overflow: hidden;
+  font-size: var(--text-base);
+  line-height: 16px;
+  color: var(--ink-3);
+  white-space: nowrap;
+  text-overflow: ellipsis;
   transition:
     opacity var(--duration-leave) var(--ease-out),
     filter var(--duration-leave) var(--ease-out),
     translate var(--duration-arrive) var(--ease-out);
 }
-/* 14px of side padding at the default width, easing to 7px as the sidebar nears its minimum. */
-.sidebar-list-tab {
-  height: 28px;
-  padding: 0 clamp(7px, calc((var(--width-sidebar) - 224px) / 7 + 7px), 14px);
-  font-size: var(--text-base);
-  line-height: 16px;
-}
-.sidebar-list-tab[aria-current="page"] {
-  color: var(--navigation-ink);
-}
-.sidebar-list-head[data-searching] .sidebar-list-tabs {
+.sidebar-list-head[data-searching] .sidebar-list-title {
   opacity: 0;
   filter: blur(var(--arrive-blur));
   translate: -8px 0;
@@ -253,31 +169,32 @@ button.sidebar-nav-row:hover {
   justify-self: end;
   display: flex;
   align-items: center;
-  width: var(--control-row);
-  height: var(--control-row);
-  margin-right: 30px;
+  width: 32px;
+  height: 32px;
   border-radius: var(--radius-pill);
-  background: var(--surface-2);
   overflow: hidden;
   transition:
     width var(--duration-resize) var(--ease-out),
-    margin-right var(--duration-resize) var(--ease-out);
+    background-color var(--duration-quick) var(--ease-out);
 }
 .sidebar-list-head[data-searching] .sidebar-search {
   width: 100%;
-  margin-right: 0;
+  background: var(--surface-2);
 }
 .sidebar-search-glass {
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  width: var(--control-row);
-  height: var(--control-row);
+  width: 32px;
+  height: 32px;
   border-radius: var(--radius-pill);
   color: var(--ink-3);
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out);
 }
 .sidebar-search-glass:hover {
-  background-color: var(--surface-3);
+  background-color: var(--surface-2);
   color: var(--ink);
 }
 .sidebar-list-head[data-searching] .sidebar-search-glass {
@@ -287,7 +204,6 @@ button.sidebar-nav-row:hover {
   flex: 1;
   min-width: 0;
   height: 100%;
-  margin-right: 26px;
   padding: 0;
   background: transparent;
   font-size: var(--text-base);
@@ -338,17 +254,14 @@ button.sidebar-nav-row:hover {
   pointer-events: auto;
   transition-delay: 200ms;
 }
-.sidebar-list-tool {
-  justify-self: end;
+.sidebar-list-tools {
   display: flex;
-  margin-right: 3px;
-  transition: translate var(--duration-resize) var(--ease-out);
+  flex-shrink: 0;
+  align-items: center;
+  gap: 2px;
 }
-.sidebar-list-head[data-searching] .sidebar-list-tool {
-  translate: -26px 0;
-}
-.sidebar-list-head[data-searching] .sidebar-list-tool button:hover {
-  background-color: var(--surface-3);
+.sidebar-new-thread {
+  color: var(--ink);
 }
 
 /* Lists */
@@ -611,22 +524,59 @@ button.browser-empty:hover,
   margin-top: 2px;
 }
 
-/* Footer: Add project as a quiet row, Settings as a round button. */
+/* Footer: the open thread's weekly usage, then the dock: the app's screens and Orclings as round
+   buttons, Settings at the end. One knob carries the current one's fill and slides between them. */
 .sidebar-footer {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 6px;
   padding: 6px 10px 10px;
 }
-/* The open thread's weekly usage, then Settings at the row's end. */
-.sidebar-account-row {
+.sidebar-dock {
+  position: relative;
+  isolation: isolate;
   display: flex;
   align-items: center;
-  gap: 6px;
-  min-width: 0;
+  gap: 2px;
+  width: 100%;
 }
-.sidebar-account-row > :last-child {
-  margin-left: auto;
+.sidebar-dock-knob {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  border-radius: var(--radius-pill);
+  background: var(--current-row-fill);
+  pointer-events: none;
+}
+.sidebar-dock-knob[data-placed] {
+  transition: transform var(--duration-swap) var(--ease-out);
+}
+.sidebar-dock-button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-pill);
+  color: var(--ink-3);
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out);
+}
+.sidebar-dock-button:hover {
+  background-color: var(--surface-2);
+  color: var(--ink);
+}
+.sidebar-dock-button:active {
+  background-color: var(--surface-3);
+}
+.sidebar-dock-button[data-current] {
+  color: var(--navigation-ink);
+}
+/* The current button already sits on the knob; a hover fill over it would wash it out. */
+.sidebar-dock-button[data-current]:hover {
+  background-color: transparent;
 }
 .account-usage-chip {
   display: flex;
@@ -678,41 +628,126 @@ button.browser-empty:hover,
   line-height: 16px;
   color: var(--ink-4);
 }
-/* The usage card from Settings, as the popover itself. */
+/* The chip's popover: every account's 5-hour and weekly limits in one table. Hairlines sit between
+   rows; the open thread's account sits on the current-row fill instead. */
 .account-usage-popup {
-  width: min(360px, calc(100vw - 24px));
-  padding: 0;
+  width: min(440px, calc(100vw - 24px));
+  padding: 6px;
 }
-.account-usage-popup .usage-account {
-  background: none;
+.usage-table-wrap {
+  display: grid;
+  gap: 4px;
 }
-.sidebar-add-project {
+.usage-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.usage-table :is(th, td) {
+  padding: 0 10px;
+  font-weight: 400;
+  text-align: left;
+}
+.usage-table thead th {
+  height: 30px;
+  font-size: var(--text-xs);
+  line-height: 16px;
+  color: var(--ink-4);
+}
+.usage-table thead th:not(:first-child) {
+  width: 124px;
+}
+.usage-table tbody :is(th, td) {
+  height: 52px;
+}
+.usage-table tbody tr + tr > * {
+  border-top: var(--hairline) solid var(--line);
+}
+.usage-table tbody tr[data-current] > *,
+.usage-table tbody tr[data-current] + tr > * {
+  border-top-color: transparent;
+}
+.usage-table tbody tr[data-current] > * {
+  background: var(--current-row-fill);
+}
+.usage-table tbody tr[data-current] > :first-child {
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+}
+.usage-table tbody tr[data-current] > :last-child {
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+}
+.usage-table-account {
   display: flex;
-  flex: none;
   align-items: center;
   gap: 10px;
   min-width: 0;
-  height: var(--control-row);
-  padding: 0 10px;
-  border-radius: var(--radius-md);
+}
+.usage-table-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: var(--text-base);
+  line-height: 16px;
+  color: var(--ink);
+}
+.usage-table-plan {
+  font-size: var(--text-xs);
+  line-height: 16px;
+  color: var(--ink-4);
+}
+.usage-table-limit {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 8px;
+}
+.usage-table-limit .account-usage-ring {
+  grid-row: span 2;
+}
+.usage-table-value {
+  font-size: var(--text-base);
+  line-height: 16px;
+  color: var(--ink);
+}
+.usage-table-reset {
+  overflow: hidden;
+  font-size: var(--text-xs);
+  line-height: 16px;
+  color: var(--ink-4);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.usage-table-cell[data-tone] .usage-table-value {
+  color: var(--warn);
+}
+.usage-table-cell[data-empty] {
+  font-size: var(--text-xs);
+  line-height: 16px;
+  color: var(--ink-4);
+}
+.usage-table-note {
+  padding: 12px 10px;
   font-size: var(--text-base);
   line-height: 16px;
   color: var(--ink-4);
-  transition:
-    background-color var(--duration-leave) var(--ease-out),
-    color var(--duration-leave) var(--ease-out);
 }
-.sidebar-add-project > span {
+.usage-table-more {
+  justify-self: start;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  line-height: 16px;
   color: var(--ink-3);
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out);
 }
-.sidebar-add-project:hover {
+.usage-table-more:hover {
   background-color: var(--surface-2);
   color: var(--ink);
 }
-.sidebar-add-project:hover > span {
-  color: var(--ink);
-}
-
 /* The resize grip rides the seam between the sidebar and the work column. */
 .app-shell .resize-handle[data-edge="sidebar"] {
   width: 0;
@@ -763,11 +798,11 @@ button.browser-empty:hover,
 }
 
 @media (forced-colors: active) {
-  .sidebar-nav-knob {
+  .sidebar-dock-knob {
     display: none;
   }
   .sidebar-nav-row[aria-current="page"],
-  .sidebar-list-tab[aria-current="page"],
+  .sidebar-dock-button[data-current],
   .orcling-contact[aria-current="page"] {
     outline: 1px solid Highlight;
   }

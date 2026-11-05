@@ -282,7 +282,6 @@ async function main() {
     panelOpen: false,
     projectId: null,
     collapsed: ["project:openorc-workspace", "project:atlas", ...(shell?.collapsed ?? [])],
-    hiddenScreens: ["pulls", "orchestration", "memory"],
   });
   useLayout.getState().setSidebarWidth(query.get("sidebar") === "narrow" ? limits.sidebar.min : limits.sidebar.default);
   useLayout.getState().setPanelWidth(640);

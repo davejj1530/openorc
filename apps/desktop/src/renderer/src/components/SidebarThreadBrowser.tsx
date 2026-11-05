@@ -372,8 +372,8 @@ const FILTER_NAMES: Record<SidebarFilter | "pinned", string> = { active: "Active
 
 /** The filter's mark: orcmode and pins show their own, so a narrowed list never looks like the whole one. */
 function FilterMark({ selection }: { selection: SidebarFilter | "pinned" }) {
-  if (selection === "orc") return <OpenOrcMark size={14} />;
-  return selection === "pinned" ? <Pin size={14} /> : <Funnel size={14} />;
+  if (selection === "orc") return <OpenOrcMark size={16} />;
+  return selection === "pinned" ? <Pin size={16} /> : <Funnel size={16} />;
 }
 
 /** The thread list's filter: orcmode, active, archived or pinned threads, and importing terminal sessions. */
@@ -395,8 +395,8 @@ export function ThreadFilter() {
           render={
             <IconButton
               aria-label={`Filter threads${selection === "active" ? "" : `: ${FILTER_NAMES[selection]}`}${ungrouped ? ": ungrouped by projects" : ""}${hiddenProjects.length ? ": projects filtered" : ""}`}
-              size="xs"
-              className={cn("no-drag", narrowed ? "text-accent-ink" : "text-ink-4")}
+              size="lg"
+              className={cn("no-drag", narrowed && "text-accent-ink")}
             />
           }
         >

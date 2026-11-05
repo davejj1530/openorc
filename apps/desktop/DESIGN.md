@@ -86,7 +86,6 @@ rounded:
   pill: "999px"
 spacing:
   chrome: "44px"
-  panel-margin: "8px"
   reading-gutter: "32px"
   composer-gutter: "24px"
   narrow-gutter: "12px"
@@ -160,7 +159,6 @@ components:
     size: "32px"
   work-panel:
     backgroundColor: "{colors.plane-light}"
-    rounded: "{rounded.3xl}"
   settings-card:
     backgroundColor: "{colors.tile-light}"
     rounded: "{rounded.2xl}"
@@ -219,11 +217,11 @@ The window has one navigation column, a conversation or destination, and an opti
 
 The conversation column is at most 800px with 32px reading gutters; the composer uses 24px. Both shrink to 12px at 520px and below and in narrow panes. Each column owns its scrolling. Split conversations keep their own header and panel ownership.
 
-The sidebar paints nothing and has no seam. Its header holds Inbox (with its count), Search, and the sidebar toggle as 32px round buttons by the window controls. New thread and More sit above the Threads/Orclings track; Add project and a round Settings button sit in the footer. All optional screens start under More, with every Edit sidebar switch off. Saved sidebar choices take precedence. While Settings is open, the sidebar lists its sections under Back to app.
+The sidebar paints nothing and has no seam. Its header holds Inbox (with its count), Search, and the sidebar toggle as 32px round buttons by the window controls. Under it, the list head names the list (Threads or Orclings) and holds search, the filter, Add project, and New thread as 32px round buttons. The footer holds the open thread's usage chip, then a dock of 32px round buttons: Tasks, Pull requests, Schedules, Memory, and Orclings, with Settings at the end. While Settings is open, the sidebar lists its sections under Back to app.
 
 Responsive rules:
 
-- At 900px and narrower, the sidebar floats over the page as an opaque tile with `--shadow-overlay`, the only shadow left. Opening a destination dismisses it; switching Threads/Orclings keeps it open.
+- At 900px and narrower, the sidebar floats over the page as an opaque tile with `--shadow-overlay`, the only shadow left. Opening a destination dismisses it; switching between Threads and Orclings keeps it open.
 - At work-row widths of 788px or less, an open panel overlays the work area.
 - New thread centers a 640px column; its composer bar wraps when the column narrows.
 
@@ -245,7 +243,7 @@ Corner radius is set per component:
 - 14: the browser viewport.
 - 16: drop menus, command, schedule, and toast cards, code blocks.
 - 18: popovers, the inbox, the palette, prompt bubbles, permission, task, and MCP cards, settings cards.
-- 20: the work panel, sheets, dialogs, grown menus (model, branch, context, slash), steps and question cards, the conversation composer.
+- 20: sheets, dialogs, grown menus (model, branch, context, slash), steps and question cards, the conversation composer.
 - 22: the commit sheet and usage account cards.
 - 24: the New thread composer.
 - Full: buttons, chips, tracks, and send.
@@ -268,7 +266,7 @@ Menus are r16 with 36px r10 rows, muted glyphs, and hairline separators. Grown m
 
 ### Sidebar
 
-Threads/Orclings is a segmented track at natural width. A round search button grows into a capsule over the tabs, and the list's tool (filter, or New Orcling) follows it. More opens inline; Edit sidebar shows every screen with an eye switch. The filter menu's Ungroup by projects toggle shows one list ordered by most recent thread activity, and remembers the choice independently of the thread filter. Each ungrouped row shows its project name above the title in small, muted text. Edit projects in the filter menu uses the same 360px dialog width as Edit sidebar. It lists Workspace and imported projects with their icons, names, folder paths, and visibility switches, all on by default. Search matches names and paths; Only shows one project, and Show all or Hide all changes the full list. Saved project visibility applies to both layouts and every thread filter, including search and the open thread. Hiding a project affects sidebar visibility only. Project headings are 34px with a faint folder that opens while its threads show, and a faint meta ("Needs you", "2 running", "12 threads") that swaps with the plus on hover. Thread rows are 34px with muted titles; the open row takes `--current-row-fill` and `--navigation-ink`. A 16px status lead shows a question for needs you, a spinner, a failure, a 7px attention dot for unread, or the pull request mark. Running threads keep their faint second line.
+The list head names the list in muted text. A round search button grows leftward into a capsule over the name while the list's tools (filter, Add project, and New thread, or New Orcling) keep their place. The footer dock reaches every screen in one row; the current one sits on a knob that slides between buttons, and Orclings is a toggle that swaps the list between project threads and Orclings. Open tasks and switched-on schedules appear in their buttons' names. The open thread's usage chip opens a table of every account: the 5-hour and weekly share left with their resets, the thread's account first on the current-row fill, hairlines between the rest. The filter menu's Ungroup by projects toggle shows one list ordered by most recent thread activity, and remembers the choice independently of the thread filter. Each ungrouped row shows its project name above the title in small, muted text. Edit projects in the filter menu opens a 360px dialog. It lists Workspace and imported projects with their icons, names, folder paths, and visibility switches, all on by default. Search matches names and paths; Only shows one project, and Show all or Hide all changes the full list. Saved project visibility applies to both layouts and every thread filter, including search and the open thread. Hiding a project affects sidebar visibility only. Project headings are 34px with a faint folder that opens while its threads show, and a faint meta ("Needs you", "2 running", "12 threads") that swaps with the plus on hover. Thread rows are 34px with muted titles; the open row takes `--current-row-fill` and `--navigation-ink`. A 16px status lead shows a question for needs you, a spinner, a failure, a 7px attention dot for unread, or the pull request mark. Running threads keep their faint second line.
 
 ### Conversation
 
@@ -284,7 +282,7 @@ New thread keeps the tile ground. Its toolbar holds only the panel toggle; the 2
 
 ### Work panel
 
-The panel is one r20 plane card with an 8px margin on the tile, holding a 52px header and the open tab's page. Tabs sit on a fill track at natural width with a sliding knob; a tab's glyph becomes its close button on hover. Changes is always the first tab. The round plus opens the New tab page with tool and recent page rows. Each tool page starts with a 48px bar (title, faint meta, actions); Commit is that page's ink pill and grows into the r22 commit sheet. Diffs have 40px r12 fill file heads, 22px rows of 12px mono, `--ok` and `--bad` runs on soft fills with r6 ends, and no syntax colors. Web pages get a 44px bar with their own Back/Forward, an address pill, and an r14 inset viewport.
+The panel is one opaque plane from the window's top edge to its bottom, beside the conversation's tile, with no margin, card, or seam between its header and the open tab's page. The header shares the 44px chrome line. Tabs are plain labels at natural width, faint at rest and full ink when open, with no track or knob; a tab's glyph becomes its close button on hover. The plus, expand, and hide are bare round buttons. Changes is always the first tab. The round plus opens the New tab page with tool and recent page rows. Each tool page starts with a 48px bar (title, faint meta, actions); Commit is that page's ink pill and grows into the r22 commit sheet. Diffs have 40px r12 fill file heads, 22px rows of 12px mono, `--ok` and `--bad` runs on soft fills with r6 ends, and no syntax colors. Web pages get a 44px bar with their own Back/Forward, an address pill, and an r14 inset viewport.
 
 ### Pages, tasks, and settings
 

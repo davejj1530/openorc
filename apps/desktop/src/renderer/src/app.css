@@ -688,7 +688,6 @@ body[data-resizing] .panel-shell {
 }
 .panel-shell[data-expanded="true"] .panel-pane {
   width: 100%;
-  background: var(--bg);
 }
 
 /* The sidebar slides in and out; its content keeps its width so nothing reflows while it moves.

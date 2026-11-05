@@ -253,36 +253,51 @@ it("leaves Workspace folded when an Orcling's own conversation opens, since Orcl
   expect(useLayout.getState().collapsed).toContain(folded);
 });
 
-it("switches between project threads and Orclings in one sidebar, remembering the project thread", () => {
+it("switches between project threads and Orclings with the footer's Orclings button, remembering the project thread", () => {
   open("notes");
   expect(screen.getByRole("region", { name: "Thread browser" })).toBeTruthy();
   expect(screen.queryByRole("region", { name: "Orclings" })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Orclings" }));
+  const orclings = () => within(screen.getByRole("navigation", { name: "Screens" })).getByRole("button", { name: "Orclings" });
+  expect(orclings().getAttribute("aria-pressed")).toBe("false");
+  fireEvent.click(orclings());
   expect(useRouter.getState().route).toEqual({ view: "thread", threadId: "rini-home" });
   expect(screen.queryByRole("region", { name: "Thread browser" })).toBeNull();
   expect(screen.getByRole("region", { name: "Orclings" })).toBeTruthy();
-  expect(screen.getByRole("button", { name: "Threads" }).getAttribute("aria-current")).toBeNull();
-  expect(screen.getByRole("button", { name: "Orclings" }).getAttribute("aria-current")).toBe("page");
-  fireEvent.click(screen.getByRole("button", { name: "Threads" }));
+  expect(orclings().getAttribute("aria-pressed")).toBe("true");
+  fireEvent.click(orclings());
   expect(useRouter.getState().route).toEqual({ view: "thread", threadId: "notes" });
   expect(screen.getByRole("region", { name: "Thread browser" })).toBeTruthy();
   expect(screen.queryByRole("region", { name: "Orclings" })).toBeNull();
 });
 
-it("opens project conversations when Threads is chosen from an initial Orcling chat", () => {
+it("opens project conversations when Orclings is turned off from an initial Orcling chat", () => {
   open("rini-home");
-  fireEvent.click(screen.getByRole("button", { name: "Threads" }));
+  fireEvent.click(within(screen.getByRole("navigation", { name: "Screens" })).getByRole("button", { name: "Orclings" }));
   expect(useRouter.getState().route).toMatchObject({ view: "newthread" });
   expect(screen.queryByRole("region", { name: "Orclings" })).toBeNull();
 });
 
-it.each([false, true])("keeps the current conversation destination when the selected Threads tab is clicked (draft=%s)", (draft) => {
+it("reaches the app's screens from the footer, marking the open one as current", () => {
   open("notes");
-  if (draft) fireEvent.click(screen.getByRole("button", { name: "New thread" }));
-  const { route, history } = useRouter.getState();
-  fireEvent.click(screen.getByRole("button", { name: "Threads" }));
-  expect(useRouter.getState().route).toEqual(route);
-  expect(useRouter.getState().history).toEqual(history);
+  const dock = screen.getByRole("navigation", { name: "Screens" });
+  expect(
+    within(dock)
+      .getAllByRole("button")
+      .map((button) => button.getAttribute("aria-label")),
+  ).toEqual(["Tasks", "Pull requests", "Schedules", "Memory", "Orclings", "Settings"]);
+  fireEvent.click(within(dock).getByRole("button", { name: "Memory" }));
+  expect(useRouter.getState().route).toEqual({ view: "memory" });
+  expect(within(dock).getByRole("button", { name: "Memory" }).getAttribute("aria-current")).toBe("page");
+  expect(within(dock).getByRole("button", { name: "Tasks" }).getAttribute("aria-current")).toBeNull();
+  expect(screen.queryByRole("button", { name: "More" })).toBeNull();
+});
+
+it("starts a new thread and adds a project from the list head", () => {
+  open("notes");
+  fireEvent.click(screen.getByRole("button", { name: "New thread" }));
+  expect(useRouter.getState().route).toMatchObject({ view: "newthread" });
+  fireEvent.click(screen.getByRole("button", { name: "Add project" }));
+  expect(useUi.getState().importProject).toBe(true);
 });
 
 it("lists Settings' sections in place of the app's navigation, then goes back to the screen Settings was opened from", () => {

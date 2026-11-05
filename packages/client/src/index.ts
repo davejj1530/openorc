@@ -64,7 +64,7 @@ export { decodeNewThreadDraft, newThreadChoice, newThreadStartInput, newThreadWo
 export { noticeVisible, type NoticePresence, type NoticeTarget } from "./notice-visible.js";
 export { panelToolLabels, tabsFor, type PanelTool, type PanelToolContext } from "./panel-tools.js";
 export { projectGitView, type ProjectGitView } from "./project-git.js";
-export { allowanceState, formatUsageTime, percentLeft, usageResetLabel, weeklyWindow } from "./provider-usage.js";
+export { allowanceState, formatUsageTime, percentLeft, sessionWindow, usageResetLabel, weeklyWindow } from "./provider-usage.js";
 export { invalidatesFor, tagsFor } from "./query-tags.js";
 export type { RpcQueryOptions } from "./query.js";
 export type { LoadRequest, RunStore } from "./run-store.js";

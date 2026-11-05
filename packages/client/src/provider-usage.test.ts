@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { allowanceState, usageResetLabel, weeklyWindow } from "./provider-usage.js";
+import { allowanceState, sessionWindow, usageResetLabel, weeklyWindow } from "./provider-usage.js";
 const report = { id: "5h", label: "5-hour", usedPercent: 50, remainingPercent: 50, resetsAt: 2_000_000, observedAt: 1_000_000, exhausted: false };
 describe("usage freshness", () => {
   it("marks old and expired reports stale without inferring a reset to zero", () => {
@@ -25,4 +25,13 @@ it("finds the account's week-long limit, account-wide before a single model's", 
   expect(weeklyWindow([limit("seven_day_opus", "7-day window · Opus")])?.id).toBe("seven_day_opus");
   expect(weeklyWindow([limit("session", "Current session"), limit("weekly", "Weekly limit")])?.id).toBe("weekly");
   expect(weeklyWindow([limit("five_hour", "5-hour window"), limit("seven_day", "7-day window", null)])).toBeNull();
+});
+
+it("finds the account's short rolling limit, never a week-long one or one without a share", () => {
+  const limit = (id: string, label: string, usedPercent: number | null = 40) => ({ ...report, id, label, usedPercent, remainingPercent: null });
+  expect(sessionWindow([limit("seven_day", "7-day window"), limit("five_hour", "5-hour window")])?.id).toBe("five_hour");
+  expect(sessionWindow([limit("codex:secondary", "7-day window"), limit("codex:primary", "5-hour window")])?.id).toBe("codex:primary");
+  expect(sessionWindow([limit("session", "Current session"), limit("weekly", "Weekly limit")])?.id).toBe("session");
+  expect(sessionWindow([limit("five_hour", "5-hour window", null), limit("seven_day", "7-day window")])).toBeNull();
+  expect(sessionWindow([limit("extra_usage", "Extra usage · monthly spend")])).toBeNull();
 });

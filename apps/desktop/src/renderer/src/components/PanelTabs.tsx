@@ -1,7 +1,6 @@
-import { useEffect, useRef, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import type { FileSelection } from "../lib/layout";
 import { currentPage, type PanelPage, type PanelSession, type WorkTab } from "../lib/panel-tabs";
-import { useSlidingKnob } from "../lib/use-sliding-knob";
 import { useUnsavedFile } from "../lib/use-file-buffer";
 import { pageIcon, tabLabel } from "./panel-tools";
 import { X } from "./icons";
@@ -65,19 +64,25 @@ function FileTab({ selection, ...props }: TabProps & { selection: FileSelection 
   return <PanelTab {...props} unsaved={useUnsavedFile(selection)} />;
 }
 
-/**
- * The panel's tabs on a fill track with a sliding knob under the open one. The track scrolls
- * sideways when the tabs outgrow it; the knob scrolls with it and the open tab is kept in view.
- */
+/** One frame after mount, so tabs restored with the strip appear in place and only later ones widen in. */
+function useSettled(): boolean {
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setSettled(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
+  return settled;
+}
+
+/** The panel's tabs as plain labels. The strip scrolls sideways when they outgrow it, keeping the open tab in view. */
 export function PanelTabs({ session, onSelect, onClose }: { session: PanelSession; onSelect: (id: string) => void; onClose: (id: string) => void }) {
   const strip = useRef<HTMLDivElement>(null);
-  const knob = useSlidingKnob(strip, '.panel-tab[data-active="true"]', `${session.activeId}:${session.tabs.length}`);
+  const settled = useSettled();
   useEffect(() => {
     strip.current?.querySelector('[aria-selected="true"]')?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
   }, [session.activeId]);
   return (
-    <div ref={strip} role="tablist" aria-label="Panel tabs" className="panel-tabs no-drag" data-placed={knob.placed || undefined}>
-      <span aria-hidden="true" className="panel-tabs-knob" data-placed={knob.placed || undefined} hidden={!knob.style} style={knob.style} />
+    <div ref={strip} role="tablist" aria-label="Panel tabs" className="panel-tabs no-drag" data-settled={settled || undefined}>
       {session.tabs.map((tab, index) => {
         const page = currentPage(tab);
         const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {

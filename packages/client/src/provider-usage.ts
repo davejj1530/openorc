@@ -25,6 +25,14 @@ export function weeklyWindow(windows: AllowanceWindow[]): AllowanceWindow | null
   return weekly.find((window) => !singleModel(window)) ?? weekly[0] ?? null;
 }
 
+const SESSION = /hour|session/i;
+
+/** The account's short rolling limit, such as Claude's and Codex's 5-hour window, for the usage table beside the week. */
+export function sessionWindow(windows: AllowanceWindow[]): AllowanceWindow | null {
+  const named = (pattern: RegExp, window: AllowanceWindow) => pattern.test(window.label) || pattern.test(window.id);
+  return windows.find((window) => named(SESSION, window) && !named(WEEK, window) && percentLeft(window) !== null) ?? null;
+}
+
 export function formatUsageTime(timestamp: number): string {
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(timestamp);
 }

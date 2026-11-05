@@ -7,9 +7,9 @@ import { PanelTabs } from "./PanelTabs";
 import { WindowCorner } from "./WindowCorner";
 
 /**
- * The panel's row on the window's chrome line, above its card: the tab track, the plus that adds
- * a New tab page, then expand and hide. It lines up with the thread header beside it and pads past
- * whichever native window controls it shares the line with. Hide shows only while the panel
+ * The panel's row on the window's chrome line, at the top of its plane: the tabs, the plus that
+ * adds a New tab page, then expand and hide. It lines up with the thread header beside it and pads
+ * past whichever native window controls it shares the line with. Hide shows only while the panel
  * covers the thread header and its panel toggle: expanded, or floating over a narrow work row.
  * Docked on the left it is the window's first header, so the window corner moves here while the
  * sidebar is hidden.
@@ -39,9 +39,8 @@ export function PanelHeader({
   return (
     <header
       data-traffic-clearance={trafficClearance || undefined}
-      // The row lines up with the card under it: flush with the card's edge beside the conversation,
-      // and past its 8px gutter, the traffic lights or the Windows controls at the window's edges.
-      className={cn("panel-header drag-region", outerLeft && (trafficClearance ? "pl-traffic" : "pl-2"), outerRight && (windowsControls ? "pr-controls" : "pr-2"))}
+      // The tabs line up with the page under them, and step past the traffic lights or the Windows controls at the window's edges.
+      className={cn("panel-header drag-region px-2.5", outerLeft && trafficClearance && "pl-traffic", outerRight && windowsControls && "pr-controls")}
     >
       {left ? (
         <span className="workspace-window-nav flex items-center" data-sidebar-open={sidebarOpen}>
@@ -50,7 +49,7 @@ export function PanelHeader({
       ) : null}
       <PanelTabs key={scope} session={session} onSelect={(id) => usePanelSessions.getState().select(scope, id)} onClose={onClose} />
       <Tooltip label="New tab">
-        <IconButton aria-label="New tab" className="panel-add no-drag hover-step size-9 bg-control-fill hover:bg-control-fill" onClick={() => usePanelSessions.getState().add(scope)}>
+        <IconButton aria-label="New tab" className="no-drag" onClick={() => usePanelSessions.getState().add(scope)}>
           <Plus size={15} />
         </IconButton>
       </Tooltip>

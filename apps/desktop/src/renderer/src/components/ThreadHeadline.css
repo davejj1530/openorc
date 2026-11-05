@@ -1,6 +1,14 @@
-/* Lines up under the title. */
+/* Lines up under the title; a working thread's spinner takes the end of the line. */
+.thread-preview-headline-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
 .thread-preview-headline {
   display: block;
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

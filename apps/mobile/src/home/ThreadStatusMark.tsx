@@ -10,7 +10,8 @@ const pullTone: Record<PrState, string> = { open: "text-ink-4", merged: "text-ok
 // Tailwind's animate-spin, which the desktop's spinner uses.
 const spin = { to: { transform: [{ rotate: "360deg" }] } };
 
-function Spinner() {
+/** The faint spinner of a thread at work, turning unless motion is reduced. */
+export function Spinner() {
   const still = useReducedMotion();
   return (
     <Animated.View style={still ? undefined : { animationName: spin, animationDuration: "1s", animationIterationCount: "infinite", animationTimingFunction: "linear" }}>

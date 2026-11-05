@@ -1,7 +1,7 @@
 import { ContextMenu } from "@base-ui/react/context-menu";
-import { ownerMark, pullRequestMark, pullRequestNumber, relativeTime, subagentStatusLabel, threadPlace, useTicking, workDuration, type ThreadPlace } from "@openorc/client";
+import { ownerMark, pullRequestMark, pullRequestNumber, relativeTime, subagentStatusLabel, threadPlace, threadStatus, useTicking, workDuration, type ThreadPlace } from "@openorc/client";
 import { harnessShortName, isHarnessId, type ThreadSummary } from "@openorc/protocol";
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { CoversPreview } from "../lib/browser-preview";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
 import { useLayout } from "../lib/layout";
@@ -13,7 +13,7 @@ import { HarnessLogo } from "./HarnessLogo";
 import { OrclingAvatar } from "./OrclingAvatar";
 import { ProjectIcon } from "./ProjectIconPicker";
 import { ThreadMenuItems, type MenuParts } from "./ThreadActions";
-import { ThreadRowHeadline } from "./ThreadHeadline";
+import { ThreadRowHeadline, useRowHeadline } from "./ThreadHeadline";
 import { ThreadStatusIndicator } from "./ThreadStatusIndicator";
 import { CircleCheck, CircleDashed, Cloud, Folder, GitBranch, GitMerge, GitPullRequest, GitPullRequestClosed, Globe, X } from "./icons";
 import { menuPopup } from "./menu";
@@ -150,27 +150,55 @@ export function ThreadRow({ thread, active, project, compact = false }: { thread
   );
 }
 
-/** A thread's visible lines: its title and what it needs, what its agent is doing, then its project and pull request. */
+/** How long one sweep of a working title takes; every working row sweeps on the same clock. */
+const SWEEP_MS = 2000;
+
+/** A row's title, its ink swept left to right while its agent works. The sweep keeps time with the wall clock, so every working row moves together. */
+function RowTitle({ title, working }: { title: string; working: boolean }) {
+  const delay = useMemo(() => (working ? -(Date.now() % SWEEP_MS) : 0), [working]);
+  return (
+    <span className="thread-preview-title" data-working={working || undefined} style={working ? { animationDelay: `${delay}ms` } : undefined}>
+      {title}
+    </span>
+  );
+}
+
+/**
+ * A thread's visible lines: its title, swept while it works, with what it needs from you at the end; what its agent is
+ * doing; then its project and pull request. A working thread's spinner sits at the end of the line under the title,
+ * under a parent's chevron, so the two keep their own places.
+ */
 function ThreadLines({ thread, project }: { thread: ThreadSummary; project?: RowProject }) {
+  const working = threadStatus(thread)?.kind === "running";
+  const headline = useRowHeadline(thread);
+  const below = working && Boolean(headline || project);
+  const spinner = below ? (
+    <span className="thread-preview-working">
+      <ThreadStatusIndicator thread={thread} />
+    </span>
+  ) : null;
   return (
     <>
       <span className="thread-preview-heading">
-        <span className="thread-preview-title">{thread.title}</span>
-        <span className="thread-preview-status">
-          <SidebarThreadMark thread={thread} pull={!project} />
-        </span>
+        <RowTitle title={thread.title} working={working} />
+        <span className="thread-preview-status">{below ? null : <SidebarThreadMark thread={thread} pull={!project} />}</span>
       </span>
-      <ThreadRowHeadline thread={thread} />
-      {project ? (
-        <span className="thread-preview-project">
-          <span className="thread-preview-project-icon">{project.rootPath ? <ProjectIcon rootPath={project.rootPath} /> : <Globe size={14} />}</span>
-          <span className="thread-preview-project-name" title={project.name}>
-            {project.name}
-          </span>
-          <PullRequestStatus thread={thread} />
-        </span>
-      ) : null}
+      {headline ? <ThreadRowHeadline headline={headline} trailing={spinner} /> : null}
+      {project ? <ProjectLine thread={thread} project={project} trailing={headline ? null : spinner} /> : null}
     </>
+  );
+}
+
+function ProjectLine({ thread, project, trailing }: { thread: ThreadSummary; project: RowProject; trailing: ReactNode }) {
+  return (
+    <span className="thread-preview-project">
+      <span className="thread-preview-project-icon">{project.rootPath ? <ProjectIcon rootPath={project.rootPath} /> : <Globe size={14} />}</span>
+      <span className="thread-preview-project-name" title={project.name}>
+        {project.name}
+      </span>
+      <PullRequestStatus thread={thread} />
+      {trailing}
+    </span>
   );
 }
 

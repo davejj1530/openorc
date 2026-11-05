@@ -2,6 +2,7 @@ import { subagentStatusLabel, useTicking, workDuration, type ThreadMark } from "
 import type { ThreadSummary } from "@openorc/protocol";
 import { View } from "react-native";
 import { CircleCheck, CircleDashed, X } from "../generated/icons";
+import { SweepText } from "../ui/SweepText";
 import { Text } from "../ui/Text";
 import { markReach, REACH, ThreadStatusMark } from "./ThreadStatusMark";
 
@@ -21,11 +22,12 @@ export function leadReach(thread: ThreadSummary, mark: ThreadMark | null): numbe
 }
 
 /**
- * A row's title line: the muted title at reading size with what the thread needs at its end. A sub thread keeps its
+ * A row's title line: the muted title at reading size, lighting up left to right while its agent works, with what the
+ * thread needs from you at its end. A sub thread keeps its
  * status in the lead column, where the tree's line reaches it, and says one fact at the end, whole: for how long it has
  * worked while it runs, then what kind of agent it was.
  */
-export function ThreadRowHeading({ thread, compact, mark }: { thread: ThreadSummary; compact: boolean; mark: ThreadMark | null }) {
+export function ThreadRowHeading({ thread, compact, mark, working = false }: { thread: ThreadSummary; compact: boolean; mark: ThreadMark | null; working?: boolean }) {
   const child = thread.subagent;
   const running = child?.status === "running";
   const tick = useTicking(running);
@@ -43,9 +45,7 @@ export function ThreadRowHeading({ thread, compact, mark }: { thread: ThreadSumm
   if (!compact)
     return (
       <View className="flex-row items-center gap-3">
-        <Text numberOfLines={1} className="flex-1 text-lg text-ink-3">
-          {thread.title}
-        </Text>
+        <SweepText text={thread.title} className="flex-1 text-lg text-ink-3" sweeping={working} />
         {Icon || mark ? lead : null}
       </View>
     );

@@ -9,6 +9,7 @@ export default defineConfig({
     alias: {
       "@expo/ui/swift-ui/modifiers": fixture("expo-ui.tsx"),
       "@expo/ui/swift-ui": fixture("expo-ui.tsx"),
+      "@react-native-masked-view/masked-view": fixture("masked-view.tsx"),
       "expo-application": fixture("notifications.ts"),
       "expo-clipboard": fixture("clipboard.ts"),
       "expo-haptics": fixture("haptics.ts"),

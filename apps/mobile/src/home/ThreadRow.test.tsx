@@ -69,6 +69,18 @@ it("marks missing subagent updates with a neutral dashed circle", () => {
   expect(view.getByLabelText("No updates").contains(view.getByLabelText("Neutral status mark"))).toBe(true);
 });
 
+it("lights up a working thread's title and still says it works, while an idle title stays plain", () => {
+  const paging = fixtureThreads.find((thread) => thread.id === "t-paging")!;
+  const working = render(<ThreadRow thread={paging} project="openorc" arriving={false} />);
+  expect(working.container.querySelector("[data-masked]")?.textContent).toBe(paging.title);
+  expect(working.getByRole("button").getAttribute("aria-label")).toContain("Working");
+  cleanup();
+  const plan = fixtureThreads.find((thread) => thread.id === "t-plan")!;
+  const idle = render(<ThreadRow thread={plan} project="Workspace" arriving={false} />);
+  expect(idle.container.querySelector("[data-masked]")).toBeNull();
+  expect(idle.getByText(plan.title)).toBeTruthy();
+});
+
 it("names a root row's project under its title, with its pull request's state and number at the end", () => {
   const canvas = fixtureThreads.find((thread) => thread.id === "t-canvas")!;
   const view = render(<ThreadRow thread={canvas} project="immaculate" arriving={false} />);

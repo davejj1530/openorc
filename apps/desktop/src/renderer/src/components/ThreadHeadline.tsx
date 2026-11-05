@@ -1,20 +1,23 @@
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import type { ThreadSummary } from "@openorc/protocol";
 import { useRun } from "../lib/client";
-import { threadHeadline } from "@openorc/client";
+import { threadHeadline, type ThreadHeadline } from "@openorc/client";
 import "./ThreadHeadline.css";
 
-/**
- * A thread row's second line, only while there is something to say: the step its agent is on, what it is waiting
- * for, or what a finished turn came to. Idle rows stay one line.
- */
-export function ThreadRowHeadline({ thread }: { thread: ThreadSummary }) {
+/** What a thread row says under its title while there is something to say: the step its agent is on, what it is waiting for, or what a finished turn came to. */
+export function useRowHeadline(thread: ThreadSummary): ThreadHeadline | null {
   const run = useRun(thread.liveRunId ?? undefined);
-  const headline = useMemo(() => threadHeadline(thread, run), [thread, run]);
-  if (!headline) return null;
+  return useMemo(() => threadHeadline(thread, run), [thread, run]);
+}
+
+/** A thread row's second line, with `trailing` at its end: the spinner of a thread at work. Idle rows stay one line. */
+export function ThreadRowHeadline({ headline, trailing }: { headline: ThreadHeadline; trailing?: ReactNode }) {
   return (
-    <span className="thread-preview-headline" data-tone={headline.tone} title={headline.text}>
-      {headline.text}
+    <span className="thread-preview-headline-line">
+      <span className="thread-preview-headline" data-tone={headline.tone} title={headline.text}>
+        {headline.text}
+      </span>
+      {trailing}
     </span>
   );
 }

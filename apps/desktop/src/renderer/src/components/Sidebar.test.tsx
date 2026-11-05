@@ -439,6 +439,20 @@ it("names each thread's project under its title, with its pull request at the en
   expect(screen.getByRole("button", { name: /Yesterday's notes/ }).querySelector(".thread-preview-pull")).toBeNull();
 });
 
+it("sweeps a working thread's title and puts its spinner under the title line, where a parent's chevron sits above", async () => {
+  dayThreads();
+  fixture.threads[0] = { ...fixture.threads[0]!, activity: "running" };
+  mountSidebar();
+  const row = await screen.findByRole("button", { name: /Today's notes/ });
+  expect(row.querySelector(".thread-preview-title")?.hasAttribute("data-working")).toBe(true);
+  expect(row.querySelector(".thread-preview-heading [aria-label='Working']")).toBeNull();
+  // The line right under the title: what its agent is doing when there is a headline, else its project.
+  expect(row.querySelector(".thread-preview-heading")?.nextElementSibling?.querySelector(".thread-preview-working [aria-label='Working']")).not.toBeNull();
+  const idle = await screen.findByRole("button", { name: /Yesterday's notes/ });
+  expect(idle.querySelector(".thread-preview-title")?.hasAttribute("data-working")).toBe(false);
+  expect(idle.querySelector(".thread-preview-working")).toBeNull();
+});
+
 it("reads on by itself until an open day is whole, then pages Older when asked", async () => {
   projectThreads();
   const base = fixture.threads[1]!;

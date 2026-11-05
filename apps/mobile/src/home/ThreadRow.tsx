@@ -9,6 +9,7 @@ import {
   threadPlace,
   threadStatus,
   type ThreadHeadline,
+  type ThreadMark,
   type ThreadTreeRow,
 } from "@openorc/client";
 import { harnessShortName, isHarnessId, isSubagentThread, WORKSPACE_ID, type PrState, type ThreadSummary } from "@openorc/protocol";
@@ -31,9 +32,10 @@ import { useThreadActions } from "../thread/use-thread-actions";
 import { useRowRun } from "./row-run";
 import { macAsleep, MAC_ASLEEP } from "./out-of-reach";
 import { STILL, type RowMotion } from "./fold-motion";
-import { ACTION_RESERVE } from "./grid";
+import { ACTION_INSET, ACTION_RESERVE, ROW_INSET } from "./grid";
 import { ThreadTreeFrame, treeIndent, TreeToggle } from "./ThreadBranch";
 import { leadReach, ThreadRowHeading } from "./ThreadRowHeading";
+import { Spinner } from "./ThreadStatusMark";
 
 const pullIcons: Record<PrState, ComponentType<IconProps>> = { open: GitPullRequest, merged: GitMerge, closed: GitPullRequestClosed };
 // The desktop's pull request tones.
@@ -51,13 +53,71 @@ function rowFacts(thread: ThreadSummary, where: string): string[] {
 }
 
 /** The live headline under the title while there is something to say, in its tone. */
-function HeadlineLine({ headline }: { headline: ThreadHeadline | null }) {
+function HeadlineLine({ headline, onMid }: { headline: ThreadHeadline | null; onMid: (mid: number) => void }) {
   if (!headline) return null;
   return (
-    <Text numberOfLines={1} className={cn("text-detail", headlineTones[headline.tone])}>
+    <Text numberOfLines={1} className={cn("text-detail", headlineTones[headline.tone])} onLayout={(event) => onMid(event.nativeEvent.layout.y + event.nativeEvent.layout.height / 2)}>
       {headline.text}
     </Text>
   );
+}
+
+/** A working root row's spinner, in the action column on the line under its title: under a parent's chevron. */
+function WorkingMark({ mid }: { mid: number }) {
+  return (
+    <View pointerEvents="none" className="absolute size-4 items-center justify-center" style={{ right: ACTION_INSET - ROW_INSET - 8, top: mid - 8 }}>
+      <Spinner />
+    </View>
+  );
+}
+
+/**
+ * A root row's lines: the title, lighting up while its agent works, with what it needs from you at the end; the live
+ * headline; the project line. While it works, its spinner sits in the action column on the line under the title.
+ */
+function RootLines({
+  thread,
+  project,
+  host,
+  headline,
+  mark,
+  working,
+  onNode,
+}: {
+  thread: ThreadSummary;
+  project: string | null;
+  host: string | null;
+  headline: ThreadHeadline | null;
+  mark: ThreadMark | null;
+  working: boolean;
+  onNode: (mid: number) => void;
+}) {
+  const [nodeMid, setNodeMid] = useState(NODE_MID);
+  const [headlineMid, setHeadlineMid] = useState(NODE_MID);
+  return (
+    <>
+      <ThreadRowHeading thread={thread} compact={false} mark={mark} working={working} />
+      <HeadlineLine headline={headline} onMid={setHeadlineMid} />
+      <ProjectLine
+        thread={thread}
+        project={project}
+        host={host}
+        onNode={(mid) => {
+          setNodeMid(mid);
+          onNode(mid);
+        }}
+      />
+      {working ? <WorkingMark mid={headline ? headlineMid : nodeMid} /> : null}
+    </>
+  );
+}
+
+/** What a row says of its thread's state: a root row's pull request has its own place, and a working one's spinner sits under its title. */
+function rowMarks(thread: ThreadSummary, compact: boolean, asleep: boolean) {
+  const status = threadStatus(thread);
+  const working = !compact && !asleep && status?.kind === "running";
+  if (compact) return { status, working, mark: threadMark(thread) };
+  return { status, working, mark: working ? null : status };
 }
 
 /**
@@ -157,8 +217,7 @@ export const ThreadRow = memo(
     const now = useSnoozeClock();
     const { compact, rowClass, rowStyle, open, moves } = treePlace(tree, motion, arriving);
     const child = thread.subagent;
-    // A root row's pull request has its own place on the project line.
-    const mark = compact ? threadMark(thread) : threadStatus(thread);
+    const { status, working, mark } = rowMarks(thread, compact, asleep);
     const place = threadPlace(thread);
     const [nodeMid, setNodeMid] = useState(NODE_MID);
     const owner = ownerMark(thread);
@@ -169,15 +228,13 @@ export const ThreadRow = memo(
     const leading: SwipeAction | undefined = isSubagentThread(thread) ? undefined : { label: swipes.leading.label, tone: "review", run: () => actions.save(swipes.leading.patch) };
     const trailing: SwipeAction | undefined = swipes.trailing ? { label: swipes.trailing.label, tone: "accent", run: () => actions.save(swipes.trailing!.patch) } : undefined;
     const pull = compact ? null : pullRequestMark(thread);
-    const label = [thread.title, child ? subagentStatusLabel[child.status] : mark?.label, child?.agentType, compact ? null : headline?.text, pull?.label, ...facts].filter(Boolean).join(", ");
+    const label = [thread.title, child ? subagentStatusLabel[child.status] : (mark ?? status)?.label, child?.agentType, compact ? null : headline?.text, pull?.label, ...facts]
+      .filter(Boolean)
+      .join(", ");
     const lines = compact ? (
       <ThreadRowHeading thread={thread} compact mark={mark} />
     ) : (
-      <>
-        <ThreadRowHeading thread={thread} compact={false} mark={mark} />
-        <HeadlineLine headline={headline} />
-        <ProjectLine thread={thread} project={project} host={owner?.label ?? null} onNode={setNodeMid} />
-      </>
+      <RootLines thread={thread} project={project} host={owner?.label ?? null} headline={headline} mark={mark} working={working} onNode={setNodeMid} />
     );
     const node = compact ? undefined : { mid: nodeMid, reach: NODE_REACH };
     const toggle = <TreeToggle tree={tree} open={open} compact={compact} onFold={onFold} />;

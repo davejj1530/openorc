@@ -7,7 +7,8 @@ import type { Logger } from "../transport.js";
 import type { ClaudeAccountService } from "./claude-accounts.js";
 import { ClaudeCloudTokens } from "./claude-cloud-tokens.js";
 import { CloudBrain } from "./cloud-brain.js";
-import { macGitHub, type SignInSources } from "./cloud-brain-signins.js";
+import { macGitHub, macMemoryKey, type SignInSources } from "./cloud-brain-signins.js";
+import type { MemoryService } from "./memory.js";
 import { savedPushKey } from "../remote/push/keys.js";
 import { cloudAgentEnvironment } from "./cloud-agent-env.js";
 import { CloudChecks } from "./cloud-check.js";
@@ -66,6 +67,8 @@ export interface CloudInput {
   invalidate: (keys: string[]) => void;
   /** The cloud brain changed: set up, removed, woken. */
   brainChanged?: () => void;
+  /** Made after the cloud's parts, so it is reached when used. */
+  memory: () => Pick<MemoryService, "choice" | "apiKey">;
   log: Logger;
 }
 
@@ -106,6 +109,7 @@ export function createCloud(input: CloudInput): {
   const signIns: SignInSources = {
     github: macGitHub(),
     push: () => savedPushKey(db, options.pushSecrets),
+    memory: () => macMemoryKey(input.memory()),
     codex: new CodexBrowserSignIn({ ...codexDeps, changed: () => invalidate(["cloud-brain"]) }),
   };
   const brain: CloudBrain = cloudBrain(db, options, tokens, options.cloudCredentials ?? (() => settings.credentials()), signIns, (keys) => [invalidate(keys), input.brainChanged?.()]);
@@ -154,7 +158,9 @@ export function createCloud(input: CloudInput): {
     invalidate,
     log,
   });
-  const { relocations, coordinator } = createRelocations({ input, sessions, cloud, runs, brain, changed });
+  // A thread's tasks move with it, so the task lists change too.
+  const moved = (id: string) => invalidate(["threads", `thread:${id}`, "tasks", "inbox"]);
+  const { relocations, coordinator } = createRelocations({ input, sessions, cloud, runs, brain, changed: moved });
   return { settings, tokens, codex: codexLogin, cloud, checks, sandboxes: list, handoff, standby, brain, relocations, coordinator };
 }
 

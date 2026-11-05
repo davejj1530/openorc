@@ -23,6 +23,7 @@ const none: CloudBrainSignIns = {
   codex: { mode: null, email: null, plan: null, signingIn: false, pending: null, error: null },
   github: { on: false, blocked: null, behind: false },
   push: { has: false, behind: false },
+  memory: { has: false, behind: false },
 };
 
 function show(signIns: CloudBrainSignIns, status: CloudBrainStatus = ready) {
@@ -49,6 +50,7 @@ it("lists what the brain signs in with besides Claude, quietly, and no notificat
   expect(within(row("Codex")).getByText("brain@example.com · ChatGPT Pro")).toBeTruthy();
   expect(github().checked).toBe(true);
   expect(within(row("Notifications")).getByText("On")).toBeTruthy();
+  expect(screen.queryByText("Anthropic API key")).toBeNull();
   expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
 
   cleanup();
@@ -58,6 +60,18 @@ it("lists what the brain signs in with besides Claude, quietly, and no notificat
   expect(within(row("Codex")).getByText("None")).toBeTruthy();
   expect(github().checked).toBe(false);
   expect(screen.queryByText("Notifications")).toBeNull();
+});
+
+it("shows the memory's Anthropic API key on the brain once it has one, with Send while this Mac's changed", async () => {
+  show({ ...none, memory: { has: true, behind: false } });
+  await screen.findByText("Anthropic API key");
+  expect(within(row("Anthropic API key")).getByText("On")).toBeTruthy();
+  cleanup();
+  queryClient.clear();
+  show({ ...none, memory: { has: true, behind: true } });
+  await screen.findByText("Anthropic API key");
+  fireEvent.click(within(row("Anthropic API key")).getByRole("button", { name: "Send" }));
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.brain.handover", {}));
 });
 
 it("signs the brain in to Codex from here in the browser, or with an API key", async () => {

@@ -1,9 +1,24 @@
-import { extractionJobs, listEvents, memories, settings, summaries, tasks, vectors, type Db, type MemoryFilter, type MemoryInput } from "@openorc/db";
+import {
+  extractionJobs,
+  listEvents,
+  memories,
+  mergeMemories,
+  settings,
+  summaries,
+  tasks,
+  vectors,
+  type Db,
+  type MemoryChanges,
+  type MemoryFilter,
+  type MemoryInput,
+  type MemoryMerge,
+} from "@openorc/db";
 import type { AgentLaunchEnvironment } from "@openorc/agents";
 import { buildBrief, buildOrclingBrief, DIGEST_EVENT_KINDS, digestRun, Embedder, Extractor, hasBrief, Retriever, type RetrievedMemory, type TextEmbedder } from "@openorc/memory";
 import {
   distillationHarnessIds,
   harnessCatalog,
+  harnessIds,
   harnessNameList,
   isHarnessId,
   type AgentEvent,
@@ -11,6 +26,7 @@ import {
   type ExtractionProviderChoice,
   type HarnessId,
   type Memory,
+  type MemoryChoice,
   type MemorySettings,
   type MemoryType,
   type ModelOption,
@@ -200,6 +216,19 @@ export class MemoryService {
     return this.configure(async () => {
       const credential = await this.credentials.read();
       return { hasApiKey: Boolean(credential.apiKey), ...(credential.error ? { apiKeyError: credential.error } : {}) };
+    });
+  }
+
+  /** The Anthropic API key, null without one: what a Mac hands its cloud brain, sealed, and what the brain says it holds. */
+  apiKey(): Promise<string | null> {
+    return this.configure(async () => (await this.credentials.read()).apiKey);
+  }
+
+  /** On a cloud brain: the key its Mac handed over, or null to delete it. */
+  takeApiKey(key: string | null): Promise<void> {
+    return this.configure(async () => {
+      await this.credentials.write(key ?? "");
+      this.invalidate(["settings"]);
     });
   }
 
@@ -492,6 +521,43 @@ export class MemoryService {
     return m;
   }
 
+  /** The other side's changes to a project's memory, taken here; what they wrote is embedded here, as recording does. */
+  merge(projectId: string, changes: MemoryChanges): MemoryMerge {
+    const merged = mergeMemories(this.db, projectId, changes);
+    if (merged.written.length || merged.deleted.length) this.invalidate(memoryKeys({ projectId }));
+    if (merged.written.length) void this.track(this.embedAll(merged.written, () => this.enabled()));
+    return merged;
+  }
+
+  /** The switch, provider and models as this side has them; a Mac's cloud brain follows its Mac's. */
+  choice(): MemoryChoice {
+    const models: MemoryChoice["models"] = {};
+    for (const id of harnessIds) {
+      const model = this.chosenModel(id);
+      if (model) models[id] = model;
+    }
+    return { enabled: settings.get(this.db, "memory.enabled") === "true", provider: this.providerChoice(), models };
+  }
+
+  /**
+   * The Mac's choices, taken by its cloud brain. Its Anthropic API key comes apart, sealed (takeApiKey); until it has, a
+   * brain told to distil with one distils nothing rather than spend another sign-in's allowance.
+   */
+  follow(choice: MemoryChoice): Promise<void> {
+    if (sameChoice(this.choice(), choice)) return Promise.resolve();
+    return this.configure(async () => {
+      if (!choice.enabled || choice.provider === "off") this.policyRevision += 1;
+      settings.set(this.db, "memory.enabled", String(choice.enabled));
+      settings.set(this.db, "extraction.provider", choice.provider);
+      for (const id of harnessIds) {
+        const model = choice.models[id];
+        if (model) settings.set(this.db, `extraction.model.${id}`, model);
+        else settings.remove(this.db, `extraction.model.${id}`);
+      }
+      this.invalidate(["settings"]);
+    });
+  }
+
   remove(id: string): void {
     const m = memories.get(this.db, id);
     memories.remove(this.db, id);
@@ -531,6 +597,8 @@ export class MemoryService {
 function memoryKeys(owner: { projectId: string | null; orclingId?: string | null }): string[] {
   return ["memory", owner.orclingId ? `memory:orcling:${owner.orclingId}` : `memory:${owner.projectId ?? ""}`];
 }
+
+const sameChoice = (a: MemoryChoice, b: MemoryChoice) => a.enabled === b.enabled && a.provider === b.provider && harnessIds.every((id) => a.models[id] === b.models[id]);
 
 function extractionHarness(choice: string) {
   if (choice === "apikey") return "claude";

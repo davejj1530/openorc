@@ -1,13 +1,11 @@
 import { settings, type Db } from "@openorc/db";
 import { TextGenerator } from "@openorc/memory";
-import { HarnessId, harnessCatalog, isHarnessId, type AgentKind, type ModelOption, type RpcParams, type TextGenerationSettings } from "@openorc/protocol";
+import { TextGenerationChoice, harnessCatalog, harnessIds, isHarnessId, type AgentKind, type HarnessId, type ModelOption, type RpcParams, type TextGenerationSettings } from "@openorc/protocol";
 import type { ProviderInfo } from "./memory.js";
-import { z } from "zod";
 
 type Provider = HarnessId;
 const KEY = "textGeneration.preferences";
-type Preferences = { provider: TextGenerationSettings["provider"]; models: Partial<Record<Provider, string>> };
-const preferenceSchema = z.object({ provider: z.enum(["auto", ...HarnessId.options, "off"]), models: z.partialRecord(HarnessId, z.string().min(1)) });
+type Preferences = TextGenerationChoice;
 
 /** Only small models are automatic candidates. Never fall back to the conversation's flagship. */
 function defaultModel(provider: Provider, models: ModelOption[]): ModelOption | null {
@@ -49,7 +47,7 @@ export class TextGenerationService {
   private preferences(): Preferences {
     const raw = settings.get(this.db, KEY);
     try {
-      return preferenceSchema.parse(JSON.parse(raw ?? "null"));
+      return TextGenerationChoice.parse(JSON.parse(raw ?? "null"));
     } catch {
       return { provider: "auto", models: {} };
     }
@@ -73,6 +71,19 @@ export class TextGenerationService {
     const model = chosen ? { id: chosen, label: models.find((model) => model.id === chosen)?.label ?? chosen } : defaultModel(provider, models);
     if (!model) return { resolved: null, reason: `${harnessCatalog[provider].name} has no small model. Choose a model explicitly.` };
     return { resolved: { provider, model: model.id, label: model.label }, reason: null };
+  }
+
+  /** The provider and models as this side has them; a Mac's cloud brain follows its Mac's. */
+  choice(): TextGenerationChoice {
+    return this.preferences();
+  }
+
+  /** The Mac's choice, taken by its cloud brain. */
+  follow(choice: TextGenerationChoice): void {
+    const prefs = this.preferences();
+    if (prefs.provider === choice.provider && harnessIds.every((id) => prefs.models[id] === choice.models[id])) return;
+    settings.set(this.db, KEY, JSON.stringify(choice));
+    this.invalidate(["text-generation"]);
   }
 
   async updateSettings(patch: RpcParams<"textGeneration.settings.set">): Promise<TextGenerationSettings> {

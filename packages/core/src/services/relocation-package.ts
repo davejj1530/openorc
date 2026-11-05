@@ -7,7 +7,7 @@ import { git, pinObject, switchFiles, treeHash, worktree as worktrees } from "@o
 import type { Brain, Thread } from "@openorc/protocol";
 import { z } from "zod";
 import type { RelocatedSession } from "./cloud-sessions.js";
-import { checkpointRefs } from "./checkpoint-refs.js";
+import { checkpointRefs, snapshotRefs } from "./checkpoint-refs.js";
 
 /**
  * Everything a thread needs to continue on the other brain: its rows, the files they name, its agent's session, and its
@@ -31,6 +31,7 @@ export interface RelocationPackage {
     head: string;
     /** The working tree as a commit on top of head, uncommitted and untracked work included; null when clean. */
     work: string | null;
+    /** The thread's checkpoint refs and its tasks' snapshot refs. */
     checkpoints: string[];
     /** The branch, the work and the checkpoint refs, minus what the target is known to have. */
     bundle: Buffer;
@@ -62,6 +63,8 @@ const Header = z
     rows: z.object({ v: z.literal(1), threadId: ID, tables: z.record(z.string(), z.array(z.record(z.string(), z.unknown()))), search: z.array(z.record(z.string(), z.unknown())) }),
     dataDir: z.string().min(1).max(4096),
     worktree: z.string().min(1).max(4096),
+    // How many tasks travel: a brain from before tasks moved refuses this unknown field rather than drop them.
+    tasks: z.number().int().positive().optional(),
     files: z.array(z.object({ path: z.string().regex(FILE_PATH), size: z.number().int().nonnegative() })).max(100_000),
     session: z.object({ agent: z.literal("claude"), accountId: ID, sessionId: ID, text: z.string() }).nullable(),
     code: z.object({
@@ -71,7 +74,7 @@ const Header = z
         .max(255),
       head: z.string().regex(COMMIT),
       work: z.string().regex(COMMIT).nullable(),
-      checkpoints: z.array(z.string().regex(/^refs\/openorc\/checkpoints\/[A-Za-z0-9-]+\/[A-Za-z0-9._/-]+$/)).max(100_000),
+      checkpoints: z.array(z.string().regex(/^refs\/openorc\/(checkpoints|snapshots)\/[A-Za-z0-9-]+\/[A-Za-z0-9._/-]+$/)).max(100_000),
       size: z.number().int().positive(),
     }),
   })
@@ -79,7 +82,13 @@ const Header = z
 
 export function encodePackage(pkg: RelocationPackage): Buffer {
   const { files, code, ...rest } = pkg;
-  const header = { ...rest, files: files.map((file) => ({ path: file.path, size: file.bytes.length })), code: { ...code, bundle: undefined, size: code.bundle.length } };
+  const tasks = pkg.rows.tables.tasks?.length;
+  const header = {
+    ...rest,
+    ...(tasks ? { tasks } : {}),
+    files: files.map((file) => ({ path: file.path, size: file.bytes.length })),
+    code: { ...code, bundle: undefined, size: code.bundle.length },
+  };
   const json = gzipSync(Buffer.from(JSON.stringify(header)));
   const length = Buffer.alloc(8);
   length.writeBigUInt64BE(BigInt(json.length));
@@ -110,8 +119,10 @@ export function decodePackage(bytes: Buffer): RelocationPackage {
   const files = parsed.files.map((file) => ({ path: file.path, bytes: take(file.size) }));
   const bundle = take(parsed.code.size);
   if (offset !== bytes.length) refuse("its sizes do not add up");
+  if ((parsed.tasks ?? 0) !== (parsed.rows.tables["tasks"]?.length ?? 0)) refuse("its tasks do not add up");
   const { size: _size, ...code } = parsed.code;
-  return { ...parsed, rows: parsed.rows as ThreadRows, files, code: { ...code, bundle } };
+  const { tasks: _tasks, ...header } = parsed;
+  return { ...header, rows: parsed.rows as ThreadRows, files, code: { ...code, bundle } };
 }
 
 /** The data folder's files the rows name: attachments by path or asset URL, and every tool image of their runs. */
@@ -144,8 +155,11 @@ async function commitKnown(root: string, commit: string): Promise<boolean> {
   return (await git(root, ["cat-file", "-e", `${commit}^{commit}`], { okCodes: [0, 1, 128] })).code === 0;
 }
 
-/** The worktree's branch, uncommitted work and checkpoints as one bundle, without the commits `since` already holds. */
-async function packCode(root: string, thread: Thread & { worktreePath: string; branch: string }, since: readonly string[]): Promise<RelocationPackage["code"]> {
+/**
+ * The worktree's branch, uncommitted work, checkpoints and its tasks' snapshots as one bundle, without the commits `since`
+ * already holds.
+ */
+async function packCode(root: string, thread: Thread & { worktreePath: string; branch: string }, tasks: readonly string[], since: readonly string[]): Promise<RelocationPackage["code"]> {
   const tree = thread.worktreePath;
   const head = (await git(tree, ["rev-parse", "HEAD"])).stdout.trim();
   const files = await treeHash(tree);
@@ -154,7 +168,7 @@ async function packCode(root: string, thread: Thread & { worktreePath: string; b
       ? null
       : (await git(tree, ["commit-tree", files, "-p", head, "-m", "OpenOrc work in progress"], { env: WORK_IDENTITY })).stdout.trim();
   if (work) await pinObject(root, workRef(thread.id), work);
-  const listed = (await git(root, ["for-each-ref", "--format=%(refname)", checkpointRefs(thread.id)])).stdout.split("\n").filter(Boolean);
+  const listed = (await git(root, ["for-each-ref", "--format=%(refname)", checkpointRefs(thread.id), ...tasks.map(snapshotRefs)])).stdout.split("\n").filter(Boolean);
   const exclude = [];
   for (const commit of since) if (commit !== head && (await commitKnown(root, commit))) exclude.push(`^${commit}`);
   const dir = await mkdtemp(path.join(os.tmpdir(), "openorc-relocate-"));
@@ -177,6 +191,8 @@ export interface PackInput {
   /** Read in one transaction after the ledger's last events are written. */
   rows: () => ThreadRows;
   thread: Thread;
+  /** The tasks that move with it, whose snapshots go in the bundle. */
+  tasks: readonly string[];
   session: RelocatedSession | null;
   /** Commits the target is known to have. */
   since: readonly string[];
@@ -185,7 +201,7 @@ export interface PackInput {
 export async function packThread(input: PackInput): Promise<RelocationPackage> {
   const { thread } = input;
   if (!thread.worktreePath || !thread.branch) throw new RelocationRefused("Only a conversation on a branch of its own can move.");
-  const code = await packCode(input.root, { ...thread, worktreePath: thread.worktreePath, branch: thread.branch }, input.since);
+  const code = await packCode(input.root, { ...thread, worktreePath: thread.worktreePath, branch: thread.branch }, input.tasks, input.since);
   const rows = input.rows();
   return {
     v: 1,

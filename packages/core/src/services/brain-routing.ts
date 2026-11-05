@@ -6,6 +6,7 @@ import type { Logger, RpcReply, Transport } from "../transport.js";
 import { BrainLink, type BrainEndpoint, type ProjectMapping } from "./brain-link.js";
 import { BrainMirrors } from "./brain-mirrors.js";
 import { BrainRouter } from "./brain-router.js";
+import { BrainSync, type BrainSyncDeps } from "./brain-sync.js";
 import type { CloudBrain } from "./cloud-brain.js";
 import { ownerLinkKeys } from "./owner-link.js";
 
@@ -42,6 +43,7 @@ async function projectMapping(brain: CloudBrain): Promise<ProjectMapping> {
   return {
     toCloud: (macProject) => copies.find((record) => record.id === macProject)?.brainId ?? null,
     toMac: (cloudProject) => copies.find((record) => record.brainId === cloudProject)?.id ?? null,
+    pairs: copies.map((record) => ({ mac: record.id, cloud: record.brainId! })),
   };
 }
 
@@ -62,6 +64,8 @@ export class BrainRouting {
     local(request: RpcRequest): Promise<RpcReply>;
     notificationsOn(): boolean;
     log: Logger;
+    memory: BrainSyncDeps["memory"];
+    textGeneration: BrainSyncDeps["textGeneration"];
     endpoint?: BrainEndpoint;
   }) {
     const { db, brain, windows, local, notificationsOn, log } = deps;
@@ -85,8 +89,25 @@ export class BrainRouting {
     this.endpoint = endpoint;
     this.windows = windows;
     this.log = log;
-    this.link.onReach((reach) => void (reach === "live" && this.freshen()));
+    this.sync = new BrainSync({
+      db,
+      memory: deps.memory,
+      textGeneration: deps.textGeneration,
+      call: (method, params) => this.link.call(method, params, { wake: false }),
+      mapping: () => endpoint.projects(),
+      log,
+    });
+    this.link.onReach((reach) => {
+      if (reach !== "live") return;
+      this.sync.relinked();
+      void this.freshen();
+    });
+    this.link.onPush((push) => {
+      if (push.type === "push" && push.push.type === "invalidate" && push.push.keys.some((key) => key.startsWith("memory"))) this.sync.brainTouched();
+    });
   }
+
+  private readonly sync: BrainSync;
 
   private readonly endpoint: BrainEndpoint;
   private readonly windows: Transport;
@@ -94,12 +115,13 @@ export class BrainRouting {
   private freshening: ReturnType<typeof setInterval> | null = null;
 
   /**
-   * The brain's copies follow this Mac's branches while both are awake: when the brain answers, now and then after, and
-   * once more as this Mac goes to sleep. Never wakes the brain.
+   * The brain's copies follow this Mac's branches while both are awake, and the two exchange memory and the Mac's open
+   * tasks: when the brain answers, now and then after, and once more as this Mac goes to sleep. Never wakes the brain.
    */
-  freshen(): Promise<void> {
-    if (!this.active || this.link.reach !== "live" || !this.endpoint.freshen) return Promise.resolve();
-    return this.endpoint.freshen().catch((error: unknown) => this.log.warn(`the cloud brain's project copies did not refresh: ${error instanceof Error ? error.message : String(error)}`));
+  async freshen(): Promise<void> {
+    if (!this.active || this.link.reach !== "live") return;
+    await this.endpoint.freshen?.().catch((error: unknown) => this.log.warn(`the cloud brain's project copies did not refresh: ${error instanceof Error ? error.message : String(error)}`));
+    await this.sync.exchange();
   }
 
   readonly mirrors: BrainMirrors;

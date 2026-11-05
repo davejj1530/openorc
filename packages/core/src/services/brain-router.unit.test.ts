@@ -2,8 +2,8 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, expect, it, vi } from "vitest";
-import { Db, relocations } from "@openorc/db";
-import { NOT_ON_BRAIN, threadListCompare, type CorePush, type InboxList, type OwnerReach, type RpcMethod, type RpcRequest, type ThreadSummary } from "@openorc/protocol";
+import { Db, projects, relocations, tasks } from "@openorc/db";
+import { NOT_ON_BRAIN, threadListCompare, type CorePush, type InboxList, type OwnerReach, type RpcMethod, type RpcRequest, type Task, type ThreadSummary } from "@openorc/protocol";
 import type { RpcReply } from "../transport.js";
 import { until } from "../test-fixtures/fake-claude.js";
 import type { BrainLink, BrainPush } from "./brain-link.js";
@@ -223,4 +223,46 @@ it("stores a window's attached files on the brain before the call naming them, i
   } finally {
     await rm(folder, { recursive: true, force: true });
   }
+});
+
+it("lists the brain's tasks beside this Mac's, on this Mac's project and marked as the cloud's, and sends a cloud task's calls to the brain", async () => {
+  const task = (taskId: string, projectId: string, updatedAt: number) => ({ id: taskId, projectId, title: taskId, status: "backlog", updatedAt, worktreePath: null }) as unknown as Task;
+  const asked: { method: RpcMethod; params: Record<string, unknown> }[] = [];
+  const windows: CorePush[] = [];
+  const db = Db.memory();
+  const project = projects.insert(db, { name: "App", rootPath: "/app", gitRemote: null, defaultBranch: null, settings: {} });
+  const local = tasks.insert(db, { projectId: project.id, title: "Here", spec: null, priority: "none", labels: [], workspaceMode: "worktree", baseRef: null, parentTaskId: null });
+  const link = {
+    reach: "live",
+    onPush: () => {},
+    onReach: () => {},
+    setInterest: () => {},
+    call: async (method: RpcMethod, params: Record<string, unknown>) => {
+      asked.push({ method, params });
+      if (method === "tasks.list") return [task("cloud-task", "cloud-project", 5)];
+      return task(String(params["id"]), "cloud-project", 5);
+    },
+  };
+  const router = new BrainRouter({
+    db,
+    link: link as unknown as BrainLink,
+    mirrors: { folder: () => null, isOpen: () => false, pull: async () => {} },
+    local: async (request) => ({ type: "rpc.result", id: request.id, result: request.method === "tasks.list" ? [task("mac-task", "mac-project", 3)] : "here" }),
+    windows: { push: (push) => void windows.push(push) },
+    mapping: async () => ({ toCloud: (each) => (each === "mac-project" ? "cloud-project" : null), toMac: (each) => (each === "cloud-project" ? "mac-project" : null) }),
+    notificationsOn: () => true,
+    log: { info: () => {}, warn: () => {}, error: () => {} } as never,
+  });
+  await ask(router, "tasks.list", { projectId: "mac-project" });
+  await until(() => windows.some((push) => push.type === "invalidate" && push.keys.includes("tasks")));
+  const listed = (await ask(router, "tasks.list", { projectId: "mac-project" })) as Task[];
+  expect(listed.map((each) => [each.id, each.projectId, each.owner?.brain ?? "mac"])).toEqual([
+    ["cloud-task", "mac-project", "cloud"],
+    ["mac-task", "mac-project", "mac"],
+  ]);
+  expect(asked[0]).toEqual({ method: "tasks.list", params: { projectId: "cloud-project" } });
+  expect(await ask(router, "tasks.get", { id: "cloud-task" })).toMatchObject({ id: "cloud-task", projectId: "mac-project", owner: { brain: "cloud" } });
+  expect(await ask(router, "tasks.get", { id: local.id })).toBe("here");
+  expect(asked.map((each) => each.method)).toEqual(["tasks.list", "tasks.list", "tasks.get"]);
+  router.close();
 });

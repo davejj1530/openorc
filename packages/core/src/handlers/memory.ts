@@ -7,12 +7,15 @@ type Dependencies = {
   memory: Pick<MemoryService, "list" | "searchSaved" | "summariesForTask" | "record" | "update" | "feedback" | "remove" | "settings" | "updateSettings">;
   db: Db;
   files: Pick<FileService, "read" | "write">;
+  /** The cloud brain gets this Mac's Anthropic API key only while memory is on and distils with it. */
+  keyChanged: () => void;
 };
 
 export function createMemoryHandlers({
   memory,
   db,
   files,
+  keyChanged,
 }: Dependencies): Pick<
   Handlers,
   "memory.list" | "memory.search" | "memory.forTask" | "memory.record" | "memory.update" | "memory.feedback" | "memory.remove" | "memory.promote" | "memory.settings.get" | "memory.settings.set"
@@ -34,6 +37,10 @@ export function createMemoryHandlers({
     },
     "memory.promote": async ({ id, file }) => promoteMemory({ db, files }, id, file),
     "memory.settings.get": () => memory.settings(),
-    "memory.settings.set": (patch) => memory.updateSettings(patch),
+    "memory.settings.set": async (patch) => {
+      const settings = await memory.updateSettings(patch);
+      if (patch.enabled !== undefined || patch.provider !== undefined || patch.apiKey !== undefined) keyChanged();
+      return settings;
+    },
   };
 }

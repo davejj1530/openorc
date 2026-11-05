@@ -69,6 +69,7 @@ afterEach(async () => {
 const ops = () => controlHandlers({ core, key: start.key, layout, github, stop: () => stops++, answering: () => answering });
 
 const GH_TOKEN = "gho_handedOverFixtureToken0123456789";
+const MEMORY_KEY = "sk-ant-api03-handed-over-memory-fixture-0123456789";
 /** A ChatGPT login file as Codex writes it, last refreshed `ms` from now. */
 const codexAuth = (stamp: string, ms: number) => JSON.stringify({ auth_mode: "chatgpt", tokens: { refresh_token: `refresh-${stamp}` }, last_refresh: new Date(Date.now() + ms).toISOString() });
 /** Git with none of this Mac's own settings, so no credential helper of the person's is ever asked. */
@@ -167,12 +168,47 @@ describe("control requests on the brain's core", () => {
   });
 
   it("says which sign-ins it holds besides Claude's, so the Mac takes its word over its own record", async () => {
-    expect(await ops()({ op: "sign-ins" })).toEqual({ codex: null, github: null, push: null });
+    expect(await ops()({ op: "sign-ins" })).toEqual({ codex: null, github: null, push: null, memory: null });
     const signIn = { token: GH_TOKEN, name: null, email: "fixture@example.com" };
     const pem = generateKeyPairSync("ec", { namedCurve: "prime256v1" }).privateKey.export({ format: "pem", type: "pkcs8" }).toString();
     const codex = { id: "mac-login-1", mode: "chatgpt", auth: codexAuth("first", 0), email: null, plan: null } as const;
-    await ops()(sealHandover(start.key, { codex, github: signIn, push: { keyId: "ABC123DEFG", pem } }));
-    expect(await ops()({ op: "sign-ins" })).toEqual({ codex: "mac-login-1", github: signInPrint({ email: "fixture@example.com", name: null, token: GH_TOKEN }), push: "ABC123DEFG" });
+    await ops()(sealHandover(start.key, { codex, github: signIn, push: { keyId: "ABC123DEFG", pem }, memory: { apiKey: MEMORY_KEY } }));
+    expect(await ops()({ op: "sign-ins" })).toEqual({
+      codex: "mac-login-1",
+      github: signInPrint({ email: "fixture@example.com", name: null, token: GH_TOKEN }),
+      push: "ABC123DEFG",
+      memory: signInPrint({ apiKey: MEMORY_KEY }),
+    });
+  });
+
+  it("keeps the Mac's memory key sealed for its own distilling, out of every agent's sign-in, and deletes it on null", async () => {
+    await core.memory.follow({ enabled: true, provider: "apikey", models: {} });
+    expect((await core.memory.settings()).reason).toBe("Add an Anthropic API key, or pick another provider.");
+    expect(await ops()(sealHandover(start.key, { memory: { apiKey: MEMORY_KEY } }))).toEqual({ applied: ["memory"] });
+    expect(await sealedBytes()).not.toContain(MEMORY_KEY);
+    expect(await (await SealedSecrets.open(layout.secrets, start.key)).store("memory").load()).toBe(MEMORY_KEY);
+    expect(await core.memory.settings()).toMatchObject({ hasApiKey: true, reason: null, resolved: { provider: "claude", viaApiKey: true } });
+    expect(process.env["ANTHROPIC_API_KEY"]).not.toBe(MEMORY_KEY);
+    const snapshot = core.environment.current();
+    expect(JSON.stringify([snapshot.env, core.claudeAccounts.environment(snapshot, DEFAULT_CLAUDE_ACCOUNT)])).not.toContain(MEMORY_KEY);
+    expect(await ops()(sealHandover(start.key, { memory: null }))).toEqual({ applied: ["memory"] });
+    expect(await core.memory.apiKey()).toBeNull();
+    expect((await core.memory.settings()).hasApiKey).toBe(false);
+  });
+
+  it("lists the phones paired with it and unpairs one for its Mac, so it can no longer connect", async () => {
+    expect(await ops()({ op: "phones" })).toEqual({ phones: [] });
+    const phone = remoteDevices.upsert(core.db, { publicKey: new Uint8Array(32).fill(1), name: "Pocket", at: 1_000 });
+    const other = remoteDevices.upsert(core.db, { publicKey: new Uint8Array(32).fill(2), name: "Tablet", at: 2_000 });
+    expect(await ops()({ op: "phones" })).toEqual({
+      phones: expect.arrayContaining([
+        { id: phone.id, name: "Pocket", createdAt: 1_000, lastSeenAt: 1_000, connected: false },
+        { id: other.id, name: "Tablet", createdAt: 2_000, lastSeenAt: 2_000, connected: false },
+      ]),
+    });
+    expect(await ops()({ op: "remove-phone", id: phone.id })).toEqual({ phones: [{ id: other.id, name: "Tablet", createdAt: 2_000, lastSeenAt: 2_000, connected: false }] });
+    expect(remoteDevices.byKey(core.db, new Uint8Array(32).fill(1))).toBeNull();
+    expect(await ops()({ op: "remove-phone", id: phone.id })).toEqual({ phones: [expect.objectContaining({ id: other.id })] });
   });
 
   it("sends its own phone alerts with the Mac's push key once handed it, and none once it is taken away", async () => {

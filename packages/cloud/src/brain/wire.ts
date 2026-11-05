@@ -68,6 +68,10 @@ const text =
   (max: number, pattern?: RegExp): Parse<string> =>
   (value, field) =>
     typeof value === "string" && value.length > 0 && value.length <= max && (!pattern || pattern.test(value)) ? value : bad(field);
+const textOrEmpty =
+  (max: number): Parse<string> =>
+  (value, field) =>
+    typeof value === "string" && value.length <= max ? value : bad(field);
 const int =
   (min: number, max: number): Parse<number> =>
   (value, field) =>
@@ -233,6 +237,8 @@ export interface HandoverValues {
   github: { token: string; name: string | null; email: string | null } | null;
   /** The Mac's APNs key, which the brain sends its phone alerts with. */
   push: { keyId: string; pem: string } | null;
+  /** The Anthropic API key the Mac's memory distils with, while it does; the brain's memory then distils with it too. */
+  memory: { apiKey: string } | null;
 }
 export type HandoverKind = keyof HandoverValues;
 export type BrainHandover = Partial<HandoverValues>;
@@ -259,6 +265,7 @@ const HANDOVER: { [K in HandoverKind]: Parse<HandoverValues[K]> } = {
   codex: nullable(object({ id: text(100, /^[A-Za-z0-9_-]+$/), mode: literal("chatgpt", "apiKey"), auth: text(65_536), email: nullable(text(320)), plan: nullable(text(100)) })),
   github: nullable(object({ token: text(4096), name: nullable(text(255)), email: nullable(text(320)) })),
   push: nullable(object({ keyId: text(64), pem: text(8192) })),
+  memory: nullable(object({ apiKey: text(4096) })),
 };
 
 export type BrainControlRequest =
@@ -305,6 +312,7 @@ export type BrainControlRequest =
   /** The Mac took the thread: the brain deletes its copy, its sandbox and the package. */
   | { op: "handed-off"; relocation: string };
 export type BrainControlOp = BrainControlRequest["op"];
+
 /** What a Mac project's settings say about the work in it, which its copy on the brain takes as its own. */
 export interface CopySettings {
   setupScript: string | null;
@@ -354,8 +362,8 @@ export interface BrainControlResults {
   "copies-current": { marked: number };
   /** False when the brain has no copy of that project. */
   "project-settings": { applied: boolean };
-  /** The id of the Codex login it holds, the signInPrint of its GitHub sign-in, and its push key's id; null for none. */
-  "sign-ins": { codex: string | null; github: string | null; push: string | null };
+  /** The id of the Codex login it holds, the signInPrint of its GitHub sign-in and of its memory key, and its push key's id; null for none. */
+  "sign-ins": { codex: string | null; github: string | null; push: string | null; memory: string | null };
   phones: { phones: BrainPhone[] };
   "remove-phone": { phones: BrainPhone[] };
   stop: { stopping: true };
@@ -402,7 +410,10 @@ const REQUESTS = variants<BrainControlRequest>({
   status: object({ op: literal("status") }),
   wake: object({ op: literal("wake") }),
   pair: object({ op: literal("pair") }),
-  handover: object({ op: literal("handover"), sealed: object({}, { claude: sealedText, codex: sealedText, github: sealedText, push: sealedText } satisfies Record<HandoverKind, Parse<string>>) }),
+  handover: object({
+    op: literal("handover"),
+    sealed: object({}, { claude: sealedText, codex: sealedText, github: sealedText, push: sealedText, memory: sealedText } satisfies Record<HandoverKind, Parse<string>>),
+  }),
   "import-project": object({ op: literal("import-project"), source: projectSource, name: folderName, branch: branchName, bundle: text(255, /^\w[\w.-]*$/) }, { origin: text(2048) }),
   "remove-project": object({ op: literal("remove-project"), source: projectSource }),
   projects: object({ op: literal("projects") }),
@@ -433,13 +444,13 @@ const RESULTS: { [K in BrainControlOp]: Parse<BrainControlResults[K]> } = {
   status,
   wake: status,
   pair: object({ url: text(4096), expiresAt: timestamp }),
-  handover: object({ applied: list(literal("claude", "codex", "github", "push"), 4) }),
+  handover: object({ applied: list(literal("claude", "codex", "github", "push", "memory"), 5) }),
   "import-project": (value, field) => (isRecord(value) && value["lacksBase"] === true ? object({ lacksBase: literal(true) }) : projectCopy)(value, field),
   "remove-project": object({ removed: literal(true, false), threads: count }),
   projects: object({ copies: list(object({ source: projectSource, projectId: text(100), macHead: commit, head: commit, threads: count }), 10_000) }),
   "copies-current": object({ marked: count }),
   "project-settings": object({ applied: literal(true, false) }),
-  "sign-ins": object({ codex: nullable(text(100)), github: nullable(text(64)), push: nullable(text(64)) }),
+  "sign-ins": object({ codex: nullable(text(100)), github: nullable(text(64)), push: nullable(text(64)), memory: nullable(text(64)) }),
   phones,
   "remove-phone": phones,
   stop: object({ stopping: literal(true) }),
@@ -476,7 +487,7 @@ export function sealHandover(key: BrainKey, handover: BrainHandover): HandoverRe
     const value = handover[kind];
     return value === undefined ? undefined : sealSecret(key, handoverChannel(kind), Buffer.from(JSON.stringify(value), "utf8")).toString("base64url");
   };
-  const sealed: { [K in HandoverKind]-?: string | undefined } = { claude: seal("claude"), codex: seal("codex"), github: seal("github"), push: seal("push") };
+  const sealed: { [K in HandoverKind]-?: string | undefined } = { claude: seal("claude"), codex: seal("codex"), github: seal("github"), push: seal("push"), memory: seal("memory") };
   return { op: "handover", sealed };
 }
 
@@ -488,6 +499,6 @@ export function openHandover(key: BrainKey, request: HandoverRequest): BrainHand
     const plain = openSecret(key, handoverChannel(kind), Buffer.from(sealed, "base64url")).toString("utf8");
     return parseLine(`The handed-over ${kind}`, HANDOVER[kind], plain);
   };
-  const handover: { [K in HandoverKind]: HandoverValues[K] | undefined } = { claude: open("claude"), codex: open("codex"), github: open("github"), push: open("push") };
+  const handover: { [K in HandoverKind]: HandoverValues[K] | undefined } = { claude: open("claude"), codex: open("codex"), github: open("github"), push: open("push"), memory: open("memory") };
   return handover;
 }

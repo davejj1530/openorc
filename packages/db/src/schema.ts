@@ -25,7 +25,7 @@ import { remoteDeviceMigration } from "./remote-device-schema.js";
 import { remotePushTargetMigration } from "./remote-push-target-schema.js";
 import { cloudWorkspaceMigration, cloudWorkspaceRemovedMigration } from "./cloud-workspace-schema.js";
 import { subagentMigration, subagentIdentityMigration, subagentObservationMigration } from "./subagent-schema.js";
-import { relocationMigrations } from "./relocation-schema.js";
+import { cloudBrainMigrations } from "./cloud-brain-schema.js";
 /**
  * Migrations run in order; `PRAGMA user_version` records how many applied.
  * Never edit a shipped migration. Append a new one.
@@ -796,5 +796,5 @@ export const migrations: Migration[] = [
      WHERE json_valid(execution_target) AND json_extract(execution_target, '$.kind')='team';
    UPDATE schedule_firings SET state='cancelled', reason='Teams are no longer supported.', finished_at=CAST(strftime('%s','now') AS INTEGER)*1000
      WHERE state='pending' AND json_valid(snapshot) AND json_extract(snapshot, '$.executionTarget.kind')='team';`,
-  ...relocationMigrations,
+  ...cloudBrainMigrations,
 ];

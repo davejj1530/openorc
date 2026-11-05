@@ -3,6 +3,7 @@ import { signInPrint, type BrainControlResults, type BrainHandover, type Handove
 import { GitError, git, run } from "@openorc/git";
 import type { CloudBrainSignIns } from "@openorc/protocol";
 import type { CodexBrowserSignIn } from "./codex-cloud-login.js";
+import type { MemoryService } from "./memory.js";
 
 /** The sign-ins besides Claude's that the brain holds, as this Mac last sent or heard, kept in its protected record. Records from before lack them. */
 export interface SignInRecord {
@@ -14,6 +15,8 @@ export interface SignInRecord {
   github?: { on: boolean; sent: string | null };
   /** The id of the push key the brain holds; null while it holds none. */
   push?: string | null;
+  /** The signInPrint of the memory's Anthropic API key the brain holds; null while it holds none. */
+  memory?: string | null;
 }
 
 export type MacGitHub = NonNullable<HandoverValues["github"]> | { blocked: string };
@@ -24,6 +27,8 @@ export interface SignInSources {
   /** Asked again at once when `fresh`, as when the switch moves. */
   github(fresh?: boolean): Promise<MacGitHub>;
   push(): Promise<PushKey | null>;
+  /** The Anthropic API key the brain's memory distils with: this Mac's, while its own does. */
+  memory(): Promise<string | null>;
   codex: Pick<CodexBrowserSignIn, "signingIn" | "error" | "start" | "cancel">;
 }
 
@@ -31,6 +36,7 @@ export interface SignInSources {
 export const NO_SIGN_INS: SignInSources = {
   github: async () => ({ blocked: "This build doesn't send GitHub sign-ins." }),
   push: async () => null,
+  memory: async () => null,
   codex: { signingIn: false, error: null, start: () => undefined, cancel: () => undefined },
 };
 
@@ -54,11 +60,23 @@ async function githubChange(github: SignInRecord["github"], mac: () => Promise<M
   return sent === github.sent ? null : { value: current, edit: (record) => setGitHub(record, { on: true, sent }) };
 }
 
+/** This Mac's Anthropic API key only while its memory is on and distils with it, so the brain never keeps one unused. */
+export async function macMemoryKey(memory: Pick<MemoryService, "choice" | "apiKey">): Promise<string | null> {
+  const { enabled, provider } = memory.choice();
+  return enabled && provider === "apikey" ? memory.apiKey() : null;
+}
+
+async function memoryChange(sent: string | null | undefined, mac: () => Promise<string | null>): Promise<{ value: Others["memory"]; print: string | null } | null> {
+  const apiKey = await mac();
+  const print = apiKey ? signInPrint({ apiKey }) : null;
+  return (sent ?? null) === print ? null : { value: apiKey ? { apiKey } : null, print };
+}
+
 /**
  * What to hand the brain, beside Claude's list, so it matches this Mac, and the record once it took that. The handover
  * is empty when it matches.
  */
-export async function signInChanges(record: SignInRecord, sources: Pick<SignInSources, "github" | "push">): Promise<{ handover: Others; took: <T extends SignInRecord>(record: T) => T }> {
+export async function signInChanges(record: SignInRecord, sources: Pick<SignInSources, "github" | "push" | "memory">): Promise<{ handover: Others; took: <T extends SignInRecord>(record: T) => T }> {
   const handover: Others = {};
   const edits: Edit[] = [];
   const next = record.codexNext;
@@ -81,6 +99,13 @@ export async function signInChanges(record: SignInRecord, sources: Pick<SignInSo
       taken.push = push?.keyId ?? null;
     });
   }
+  const memory = await memoryChange(record.memory, () => sources.memory());
+  if (memory) {
+    handover.memory = memory.value;
+    edits.push((taken) => {
+      taken.memory = memory.print;
+    });
+  }
   const took = <T extends SignInRecord>(current: T): T => {
     const taken = { ...current };
     for (const edit of edits) edit(taken);
@@ -90,7 +115,7 @@ export async function signInChanges(record: SignInRecord, sources: Pick<SignInSo
 }
 
 /** Whether the record says the brain holds any of them, so asking it could find one gone. */
-export const claimsSignIns = (record: SignInRecord): boolean => Boolean(record.codex || record.github?.sent || record.push);
+export const claimsSignIns = (record: SignInRecord): boolean => Boolean(record.codex || record.github?.sent || record.push || record.memory);
 
 /** The record once the brain said what it holds: its word wins, as after its disk went back to an empty snapshot. */
 export function heardSignIns<T extends SignInRecord>(record: T, holds: BrainControlResults["sign-ins"]): T {
@@ -100,6 +125,7 @@ export function heardSignIns<T extends SignInRecord>(record: T, holds: BrainCont
   const on = record.github?.on ?? false;
   setGitHub(heard, on || holds.github ? { on, sent: holds.github } : undefined);
   heard.push = holds.push;
+  heard.memory = holds.memory;
   return heard;
 }
 
@@ -126,6 +152,7 @@ export async function signInsView(record: SignInRecord, sources: SignInSources):
     },
     github: { on, blocked: mac && "blocked" in mac ? mac.blocked : null, behind: "github" in handover },
     push: { has: (record.push ?? null) !== null, behind: "push" in handover },
+    memory: { has: (record.memory ?? null) !== null, behind: "memory" in handover },
   };
 }
 

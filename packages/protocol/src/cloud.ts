@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { brainSyncRpcParams, type BrainSyncRpcResults } from "./brain-sync.js";
 import { ClaudeAccountId } from "./claude-accounts.js";
 import { BrainRegion, cloudBrainRpcParams, type CloudBrainRpcResults } from "./cloud-brain.js";
 import type { Thread } from "./domain.js";
@@ -174,9 +175,10 @@ export const cloudRpcParams = {
   /** Deletes a sandbox for good. A conversation's next message sets up a new one from its worktree on the Mac. */
   "cloud.sandboxes.remove": z.object({ name: z.string().min(1).max(200) }).strict(),
   ...cloudBrainRpcParams,
+  ...brainSyncRpcParams,
 };
 
-export interface CloudRpcResults extends CloudBrainRpcResults {
+export interface CloudRpcResults extends CloudBrainRpcResults, BrainSyncRpcResults {
   "cloud.status": CloudStatus;
   "cloud.bringToMac": null;
   "cloud.keep": null;

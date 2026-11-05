@@ -29,7 +29,6 @@ export function brainMove(thread: ThreadSummary): { shown: boolean; blocked: str
   const shown = !thread.owner && !thread.moving && !thread.teamInstanceId && thread.projectId !== WORKSPACE_ID && thread.parentRelation !== "subagent";
   if (!shown) return { shown, blocked: null };
   if (thread.agent !== "claude") return { shown, blocked: "Only Claude conversations can move to the cloud so far." };
-  if (thread.openTaskCount > 0) return { shown, blocked: "Conversations with tasks can't move yet." };
   return { shown, blocked: null };
 }
 

@@ -16,6 +16,8 @@ export interface BrainTarget {
 export interface ProjectMapping {
   toCloud(macProject: string): string | null;
   toMac(cloudProject: string): string | null;
+  /** Every Mac project the brain has a copy of, with its copy. */
+  pairs?: readonly { mac: string; cloud: string }[];
 }
 
 /** The Mac's cloud brain as its windows need it. */

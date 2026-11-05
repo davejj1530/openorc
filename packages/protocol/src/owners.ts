@@ -1,10 +1,11 @@
-import type { ThreadFilter, ThreadSummary } from "./domain.js";
+import type { Task, ThreadFilter, ThreadSummary } from "./domain.js";
 import type { InboxItem, InboxList, RpcMethod, RpcParams } from "./rpc.js";
 import type { Brain, OwnerReach } from "./thread-owner.js";
 
 /**
- * Every method whose params name a thread (`threadId`, or `id` on a threads.* method) or a run (`runId`). Derived from
- * the schemas, so a new such method does not compile until OWNER_ROUTES says how it routes.
+ * Every method whose params name a thread (`threadId`, or `id` on a threads.* method), a run (`runId`) or a task
+ * (`taskId`, or `id` on a tasks.* method). Derived from the schemas, so a new such method does not compile until
+ * OWNER_ROUTES says how it routes.
  */
 type NamesThreadOrRun<M extends RpcMethod, P = RpcParams<M>> = string extends keyof P
   ? never
@@ -12,11 +13,13 @@ type NamesThreadOrRun<M extends RpcMethod, P = RpcParams<M>> = string extends ke
     ? M
     : "runId" extends keyof P
       ? M
-      : M extends `threads.${string}`
-        ? "id" extends keyof P
-          ? M
-          : never
-        : never;
+      : "taskId" extends keyof P
+        ? M
+        : M extends `threads.${string}` | `tasks.${string}`
+          ? "id" extends keyof P
+            ? M
+            : never
+          : never;
 export type RoutedMethod = { [M in RpcMethod]: NamesThreadOrRun<M> }[RpcMethod];
 
 export type OwnerRoute<M extends RpcMethod> =
@@ -24,8 +27,10 @@ export type OwnerRoute<M extends RpcMethod> =
   | { by: "owner"; thread: (params: RpcParams<M>) => string | undefined }
   /** The owner of the run's thread answers. */
   | { by: "run"; run: (params: RpcParams<M>) => string }
-  /** Every brain answers its own rows; the asker merges them. Never waits on the brain. */
-  | { by: "merge" }
+  /** Every brain answers its own rows; the asker merges them. Never waits on the brain. Asked about one thread, its owner answers. */
+  | { by: "merge"; thread?: (params: RpcParams<M>) => string | undefined }
+  /** The host holding the task answers: tasks move with the thread doing their work. */
+  | { by: "task"; task: (params: RpcParams<M>) => string | undefined }
   /** Served by the asked host even for another host's thread: its folder, its preview, its windows. */
   | { by: "here" }
   /** Refused for a thread another host owns, in these words. */
@@ -41,6 +46,8 @@ const IN_CLOUD = "This conversation is already in the cloud.";
 const byThreadId = { by: "owner", thread: (p: { threadId?: string | undefined }) => p.threadId } as const;
 const byId = { by: "owner", thread: (p: { id: string }) => p.id } as const;
 const byRun = { by: "run", run: (p: { runId: string }) => p.runId } as const;
+const byTask = { by: "task", task: (p: { taskId: string }) => p.taskId } as const;
+const byTaskId = { by: "task", task: (p: { id: string }) => p.id } as const;
 const ownerOnly = (words: string) => ({ by: "owner-only", thread: (p: { id: string }) => p.id, words }) as const;
 const here = { by: "here" } as const;
 
@@ -79,8 +86,34 @@ export const OWNER_ROUTES: { [M in RoutedMethod]: OwnerRoute<M> } & { [M in Excl
   "events.page": byRun,
   "events.toolOutput": byRun,
   "approvals.resolve": byRun,
-  "tasks.list": byThreadId,
+  "tasks.list": { by: "merge", thread: (p) => p.threadId },
   "tasks.create": byThreadId,
+  "tasks.get": byTaskId,
+  "tasks.update": byTaskId,
+  "tasks.delete": byTaskId,
+  "tasks.start": byTask,
+  "tasks.openThread": byTask,
+  "tasks.executionThread": byTask,
+  "tasks.prepareWorkspace": byTask,
+  "tasks.comments.list": byTask,
+  "tasks.comments.post": byTask,
+  "tasks.comments.retry": byTask,
+  "tasks.comments.cancel": byTask,
+  "tasks.comments.execute": byTask,
+  "runs.listForTask": byTask,
+  "memory.forTask": byTask,
+  "workspace.cleanup": byTask,
+  "workspace.removalImpact": byTask,
+  "workspace.usage": byTask,
+  "review.diff": byTask,
+  "review.snapshots": byTask,
+  "review.markReviewed": byTask,
+  "review.commit": byTask,
+  "review.checkoutState": byTask,
+  "review.exportPatch": byTask,
+  "review.push": byTask,
+  "review.createPr": byTask,
+  "git.log": byTask,
   "review.threadChanges": byThreadId,
   "review.threadFileDiff": byThreadId,
   "review.threadDiff": byThreadId,
@@ -117,8 +150,11 @@ export const OWNER_ROUTES: { [M in RoutedMethod]: OwnerRoute<M> } & { [M in Excl
   "mcpApps.open": here,
 };
 
-/** Methods only the Mac's own session asks the brain, besides those the router forwards: attached files go up before the message naming them. */
-const OWNER_SESSION_EXTRA: readonly RpcMethod[] = ["threads.snapshot", "attachments.save", "attachments.saveFile"];
+/**
+ * Methods only the Mac's own session asks the brain, besides those the router forwards: attached files go up before the
+ * message naming them; memory, the Mac's open tasks and its text generation choice go while both are awake.
+ */
+const OWNER_SESSION_EXTRA: readonly RpcMethod[] = ["threads.snapshot", "attachments.save", "attachments.saveFile", "brain.memory.exchange", "brain.backlog", "brain.textGeneration"];
 
 /** What the brain admits from its Mac's session: everything the router may forward to it, derived, never listed. */
 export const OWNER_SESSION_METHODS: ReadonlySet<RpcMethod> = new Set([
@@ -200,6 +236,13 @@ export function mergeThreadPages(
     .flatMap((entry) => entry.tree)
     .sort((a, b) => compare(a.row, b.row))
     .map(stamp);
+}
+
+/** Tasks from every host, each once (the first host's copy wins, as in a move's gap), the latest change first. */
+export function mergeTaskPages(pages: readonly { brain: Brain; reach: OwnerReach; heardAt: number; rows: readonly Task[] }[], self: Brain): Task[] {
+  const held = new Map<string, Task>();
+  for (const { brain, reach, heardAt, rows } of pages) for (const row of rows) if (!held.has(row.id)) held.set(row.id, brain === self ? row : { ...row, owner: { brain, reach, heardAt } });
+  return [...held.values()].sort((a, b) => b.updatedAt - a.updatedAt || Number(a.id < b.id) - Number(a.id > b.id));
 }
 
 const inboxKey = (item: InboxItem) => `${item.kind}:${item.kind === "task" ? item.task.id : item.thread.id}:${item.runId ?? ""}:${item.reason}`;

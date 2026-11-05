@@ -1,5 +1,11 @@
-import { orclings, retiredTeams, tasks, type Db } from "@openorc/db";
+import { orclings, retiredTeams, taskTies, threadTaskIds, type Db } from "@openorc/db";
 import { isDetachedCopy, isSubagentThread, WORKSPACE_ID, type Thread } from "@openorc/protocol";
+
+/** Why a thread's tasks keep it where it is. Its tasks move with it otherwise. */
+const TASK_TIES = {
+  runs: "One of its tasks was worked on outside this conversation, so it can't move.",
+  folder: "One of its tasks has a folder of its own, so it can't move.",
+} as const;
 
 /** Why a thread cannot move between the Mac and the cloud brain now, or null. Shown on demand on the disabled choice. */
 export function relocationRefusal(db: Db, thread: Thread): string | null {
@@ -8,7 +14,9 @@ export function relocationRefusal(db: Db, thread: Thread): string | null {
   if (thread.agent !== "claude") return "Only Claude conversations can move between your Mac and the cloud so far.";
   if (retiredTeams.isHidden(db, thread.id)) return "This conversation is no longer available.";
   if (thread.orclingId || orclings.forThread(db, thread.id)) return "An Orcling's conversation stays where it is.";
-  if (tasks.list(db, { threadId: thread.id }).some((task) => task.status !== "archived")) return "Conversations with tasks can't move yet.";
+  if (threadTaskIds(db, thread.id).some((id) => retiredTeams.hasTask(db, id))) return "This conversation is no longer available.";
+  const tied = taskTies(db, thread.id);
+  if (tied) return TASK_TIES[tied];
   if (isDetachedCopy(thread)) return "A pull request's review copy stays on this Mac.";
   return null;
 }

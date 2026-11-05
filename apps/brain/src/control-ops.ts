@@ -4,6 +4,7 @@ import {
   confirmSynced,
   copyHeads,
   openHandover,
+  signInPrint,
   takeBranch,
   type BrainControlOp,
   type BrainControlRequest,
@@ -76,6 +77,8 @@ const HANDOVER: { [K in HandoverKind]: Take<K> } = {
   codex: ({ core }, login) => (login ? core.codexCloudLogin.adopt(login) : core.codexCloudLogin.remove()),
   github: ({ github }, value) => github.set(value),
   push: ({ core }, key) => (key ? core.remote.setPushKey(key.keyId, key.pem) : core.remote.removePushKey()),
+  // Kept where the core keeps its own, sealed on the brain's disk; only its distilling reads it, never an agent.
+  memory: ({ core }, value) => core.memory.takeApiKey(value?.apiKey ?? null),
 };
 const HANDOVER_KINDS = Object.keys(HANDOVER) as HandoverKind[];
 
@@ -218,7 +221,10 @@ export function controlHandlers({ core, key, layout, github, stop, answering }: 
       core.remote.removeDevice(id);
       return phonesOf(core);
     },
-    "sign-ins": async () => ({ codex: await core.codexCloudLogin.heldId(), github: github.print(), push: (await core.remote.status()).push.keyId }),
+    "sign-ins": async () => {
+      const apiKey = await core.memory.apiKey();
+      return { codex: await core.codexCloudLogin.heldId(), github: github.print(), push: (await core.remote.status()).push.keyId, memory: apiKey && signInPrint({ apiKey }) };
+    },
     stop: async () => {
       setImmediate(stop);
       return { stopping: true };

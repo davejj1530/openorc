@@ -13,6 +13,7 @@ import { createAttachmentsHandlers } from "./handlers/attachments.js";
 import { createBenchHandlers } from "./handlers/bench.js";
 import { createCatalogHandlers } from "./handlers/catalog.js";
 import { createClaudeAccountHandlers } from "./handlers/claude-accounts.js";
+import { createBrainSyncHandlers } from "./handlers/brain-sync.js";
 import { createCloudHandlers } from "./handlers/cloud.js";
 import { createCodeExplanationHandlers } from "./handlers/code-explanations.js";
 import { createDeviceHandlers } from "./handlers/devices.js";
@@ -240,6 +241,7 @@ export class OpenOrc {
       workspaces: () => this.workspaces,
       invalidate,
       brainChanged: () => void this.brainRouting?.refresh(),
+      memory: () => this.memory,
       log: this.log,
     });
     this.cloudParts = cloud;
@@ -331,6 +333,8 @@ export class OpenOrc {
             local: (request) => this.dispatch(request),
             notificationsOn: () => this.settings.get().notifications,
             log: this.log,
+            memory: this.memory,
+            textGeneration: this.textGeneration,
             endpoint: options.brainEndpoint,
           });
     return this.routing;
@@ -576,6 +580,7 @@ export class OpenOrc {
       createSlackHandlers({ slack: this.slack, invalidate }),
       createCloudHandlers({ ...this.cloudParts, offered: Boolean(this.options.cloudOffered && !this.options.cloudOnly), invalidate, removed: (linkKey) => this.brainRemoved(linkKey) }),
       createClaudeAccountHandlers(this.claudeAccounts),
+      createBrainSyncHandlers({ db: this.db, memory: this.memory, textGeneration: this.textGeneration, cloudOnly: this.options.cloudOnly ?? false, invalidate }),
       createSystemHandlers({
         system: this.system,
         accountInfo: (refresh, id) => (id ? this.claudeSystemInfo(id, refresh) : this.system.info(refresh)),
@@ -614,7 +619,7 @@ export class OpenOrc {
       createSettingsHandlers({ settings: this.settings, textGeneration: this.textGeneration, invalidate }),
       createSchedulesHandlers({ schedules: this.schedules }),
       createCatalogHandlers({ runService: this.runs, invalidate }),
-      createMemoryHandlers({ memory: this.memory, db: this.db, files: this.files }),
+      createMemoryHandlers({ memory: this.memory, db: this.db, files: this.files, keyChanged: () => this.cloudParts.brain.signInsChanged() }),
       createOrclingHandlers({ orclings: this.orclings }),
       createDeviceHandlers({ devices: this.devices }),
       createInboxHandlers({ runService: this.runs, db: this.db }),

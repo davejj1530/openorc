@@ -260,10 +260,18 @@ export const memories = {
     return m;
   },
 
-  remove(db: Db, id: string): void {
+  /** A project memory's removal is kept, so the copy on the Mac or its cloud brain drops it too and never brings it back. */
+  remove(db: Db, id: string, at = now()): void {
     const rowid = memories.rowidFor(db, id);
+    db.stmt("INSERT OR IGNORE INTO memory_tombstones (id, project_id, removed_at) SELECT id, project_id, ? FROM memories WHERE id = ? AND project_id IS NOT NULL AND orcling_id IS NULL").run(at, id);
     db.stmt("DELETE FROM memories WHERE id = ?").run(id);
     if (rowid !== null && db.hasVectors) db.stmt("DELETE FROM memory_vec WHERE memory_rowid = ?").run(BigInt(rowid));
+  },
+
+  /** The project's active memory on a topic, if any. */
+  activeOnTopic(db: Db, projectId: string, topicKey: string): Memory | null {
+    const r = db.stmt("SELECT * FROM memories WHERE project_id = ? AND orcling_id IS NULL AND topic_key = ? AND status = 'active'").get(projectId, topicKey) as unknown as MemoryRow | undefined;
+    return r ? fromRow(db, r) : null;
   },
 
   rowidFor(db: Db, id: string): number | null {

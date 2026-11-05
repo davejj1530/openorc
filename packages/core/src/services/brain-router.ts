@@ -1,8 +1,9 @@
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
-import { incomingMove, runs, settings, threads, type Db } from "@openorc/db";
+import { incomingMove, runs, settings, tasks, threads, type Db } from "@openorc/db";
 import {
   mergeInbox,
+  mergeTaskPages,
   mergeThreadPages,
   NOT_ON_BRAIN,
   ownerRoute,
@@ -12,6 +13,7 @@ import {
   type OwnerReach,
   type RpcMethod,
   type RpcRequest,
+  type Task,
   type ThreadSummary,
 } from "@openorc/protocol";
 import type { Logger, RpcReply, Transport } from "../transport.js";
@@ -29,7 +31,9 @@ const IMAGE_TYPES: Record<string, string> = { png: "image/png", jpg: "image/jpeg
 /** The UUID attachments.saveFile puts before a file's name here; the brain puts its own. */
 const STORED_PREFIX = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}-/;
 
-type Merged = "threads.list" | "inbox.list";
+type Merged = "threads.list" | "inbox.list" | "tasks.list";
+/** What windows hear when a merged list changed. */
+const LIST_KEYS: Record<Merged, string> = { "threads.list": "threads", "inbox.list": "inbox", "tasks.list": "tasks" };
 interface Page {
   method: Merged;
   params: unknown;
@@ -138,7 +142,9 @@ export class BrainRouter {
     const params = parsed.data as never;
     switch (route.by) {
       case "merge":
-        return this.merge(request, method as Merged, params);
+        return this.listed(request, method, params, route.thread?.(params));
+      case "task":
+        return this.task(request, method, params, route.task(params));
       case "run":
         return runs.get(this.deps.db, route.run(params)) ? this.deps.local(request) : this.forward(request, method, params);
       case "owner":
@@ -157,6 +163,16 @@ export class BrainRouter {
     if (ownerOnly !== null) return Promise.resolve(error(request.id, ownerOnly));
     const kept = method === "threads.get" ? this.kept(request, id) : null;
     return kept ? Promise.resolve(kept) : this.forward(request, method, params);
+  }
+
+  /** A list from every host, merged; asked about one thread, its owner's alone. */
+  private listed(request: RpcRequest, method: RpcMethod, params: Record<string, unknown>, thread: string | undefined): Promise<RpcReply> {
+    return thread ? this.owned(request, method, params, thread, null) : this.merge(request, method as Merged, params);
+  }
+
+  /** A call about one task: this Mac's own answers it; one the brain holds goes there, woken for it. */
+  private task(request: RpcRequest, method: RpcMethod, params: Record<string, unknown>, id: string | undefined): Promise<RpcReply> {
+    return !id || tasks.get(this.deps.db, id) ? this.deps.local(request) : this.forward(request, method, params);
   }
 
   /**
@@ -195,12 +211,23 @@ export class BrainRouter {
     const local = await this.deps.local(offset ? { ...request, params } : request);
     if (local.type === "rpc.error") return local;
     const mapping = await this.deps.mapping();
-    const cloud = method === "threads.list" ? listParams(params, mapping) : params;
+    const cloud = method === "inbox.list" ? params : listParams(params, mapping);
     if (cloud) void this.refresh(method, cloud, mapping);
     const page = cloud ? this.pages.peek(method, cloud) : null;
     if (!page) return offset ? { ...local, result: (local.result as ThreadSummary[]).slice(offset) } : local;
     if (method === "inbox.list") return { ...local, result: mergeInbox([{ inbox: local.result as InboxList }, { inbox: page.result as InboxList }]) };
     const reach: OwnerReach = this.deps.link.reach;
+    if (method === "tasks.list")
+      return {
+        ...local,
+        result: mergeTaskPages(
+          [
+            { brain: "mac", reach: "live", heardAt: Date.now(), rows: local.result as Task[] },
+            { brain: "cloud", reach, heardAt: page.heardAt, rows: page.result as Task[] },
+          ],
+          "mac",
+        ),
+      };
     const merged = mergeThreadPages(
       [
         { brain: "mac", reach: "live", heardAt: Date.now(), rows: local.result as ThreadSummary[] },
@@ -259,7 +286,7 @@ export class BrainRouter {
   private async refresh(method: Merged, params: unknown, mapping: ProjectMapping): Promise<void> {
     try {
       const result = rehome(await this.deps.link.call(method, params as never, { wake: false }), mapping, null, this.deps.mirrors);
-      if (this.pages.heard(method, params, result, Date.now())) this.deps.windows.push({ type: "invalidate", keys: [method === "threads.list" ? "threads" : "inbox"] });
+      if (this.pages.heard(method, params, result, Date.now())) this.deps.windows.push({ type: "invalidate", keys: [LIST_KEYS[method]] });
     } catch (caught) {
       if (!(caught instanceof BrainOutOfReach)) this.deps.log.warn(`the cloud brain's list did not refresh: ${caught instanceof Error ? caught.message : String(caught)}`);
     }
@@ -293,7 +320,7 @@ export class BrainRouter {
         this.watch(body.frame.runId);
         return windows.push({ type: "frame", frame: body.frame });
       case "invalidate": {
-        const lists: string[] = body.keys.filter((key) => key === "threads" || key === "inbox");
+        const lists: string[] = body.keys.filter((key) => Object.values(LIST_KEYS).includes(key));
         const rest = body.keys.filter((key) => !lists.includes(key));
         if (rest.length) windows.push({ type: "invalidate", keys: rest });
         // An open copy on this Mac follows the brain's files.

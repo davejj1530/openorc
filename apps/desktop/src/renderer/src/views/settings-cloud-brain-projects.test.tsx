@@ -35,6 +35,7 @@ function show(projects: CloudBrainProject[], status: CloudBrainStatus = ready) {
         codex: { mode: null, email: null, plan: null, signingIn: false, pending: null, error: null },
         github: { on: false, blocked: null, behind: false },
         push: { has: false, behind: false },
+        memory: { has: false, behind: false },
       } as never;
     return status as never;
   });

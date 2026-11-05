@@ -265,9 +265,24 @@ describe("handovers", () => {
     expect(signInPrint({ email: null, name: "Fixture Person", token: "gho_fixtureToken0123456789" })).toBe(signInPrint(github));
     expect(signInPrint({ ...github, name: "Someone Else" })).not.toBe(signInPrint(github));
     expect(signInPrint(github)).not.toContain("gho_");
-    const holds = { codex: "mac-login-1", github: signInPrint(github), push: "ABC123DEFG" };
+    const holds = { codex: "mac-login-1", github: signInPrint(github), push: "ABC123DEFG", memory: signInPrint({ apiKey: "sk-ant-fixture-0123456789abcdef" }) };
     expect(parseControlRequest(JSON.stringify({ op: "sign-ins" }))).toEqual({ op: "sign-ins" });
     expect(parseControlReply("sign-ins", encodeControlReply({ ok: true, result: holds }))).toEqual({ ok: true, result: holds });
+  });
+
+  it("carry the memory's Anthropic API key sealed, or null to take it away", () => {
+    const key = newBrainKey();
+    const memory = { apiKey: "sk-ant-fixture-0123456789abcdef" };
+    const line = JSON.stringify(sealHandover(key, { memory }));
+    expect(line).not.toContain("sk-ant-fixture");
+    const request = parseControlRequest(line);
+    if (request.op !== "handover") throw new Error("expected a handover");
+    expect(Object.keys(request.sealed)).toEqual(["memory"]);
+    expect(openHandover(key, request)).toMatchObject({ memory });
+    expect(openHandover(key, sealHandover(key, { memory: null }))).toMatchObject({ memory: null });
+    expect(parseControlReply("handover", encodeControlReply({ ok: true, result: { applied: ["claude", "memory"] } }))).toEqual({ ok: true, result: { applied: ["claude", "memory"] } });
+    const error = refusal(() => openHandover(key, sealHandover(key, { memory: { apiKey: "" } })));
+    expect(error.field).toBe("apiKey");
   });
 
   it("refuse a Codex login with an id the brain could not record, without repeating the login", () => {

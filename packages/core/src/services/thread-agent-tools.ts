@@ -17,6 +17,7 @@ import {
 import { createHash } from "node:crypto";
 import { checkoutBranch } from "./checkout-branch.js";
 import { projectGit } from "./project-git.js";
+import { assertTaskNotMoving } from "./relocation-fence.js";
 import type { RunService } from "./runs.js";
 import { titleFromPrompt, type StartThreadInput } from "./thread-inputs.js";
 import type { SpawnTaskInput, ThreadService } from "./threads.js";
@@ -217,6 +218,7 @@ export class ThreadAgentTools {
     const run = runRepo.get(this.db, runId);
     if (!scoped) throw new Error("Task not found in this agent's project.");
     const { task, currentTaskId } = scoped;
+    assertTaskNotMoving(this.db, task);
     this.assertTaskStartAllowed(task, run?.mode);
     const caller = this.scopeOf(runId).thread;
     this.assertTaskStartLocation(task, caller, workspaceMode);
@@ -263,6 +265,7 @@ export class ThreadAgentTools {
     if (!scoped) return null;
     const { task: t, currentTaskId } = scoped;
     if (t.retiredTeam) throw new Error("This item is no longer available.");
+    assertTaskNotMoving(this.db, t);
     const changes: { spec?: string; status?: TaskStatus; completedAt?: number | null } = {};
     if (patch.spec) changes.spec = patch.spec;
     if (patch.status) {

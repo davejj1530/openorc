@@ -16,6 +16,7 @@ import {
   type Thread,
 } from "@openorc/protocol";
 import { AttachmentService } from "./attachments.js";
+import { assertTaskNotMoving } from "./relocation-fence.js";
 import { isSessionLost, type RunService, type TurnSettledOutcome } from "./runs.js";
 import type { ThreadService } from "./threads.js";
 
@@ -83,6 +84,7 @@ export class TaskCommentService {
   private writableTask(taskId: string): Task {
     const task = this.task(taskId);
     if (task.retiredTeam) throw new Error("This item is no longer available.");
+    assertTaskNotMoving(this.db, task);
     return task;
   }
   async post(input: RpcParams<"tasks.comments.post">) {

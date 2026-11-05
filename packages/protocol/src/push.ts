@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Task } from "./domain.js";
 import type { CorePush } from "./rpc.js";
 
 /** The iPhone app: its APNs topic and the team whose key signs for it. apps/mobile/app.json must agree (tested). */
@@ -50,6 +51,11 @@ export const deviceRpcParams = {
    * A host from before this method answers with an error: none removed.
    */
   "brains.removed": z.object({}).strict(),
+  /**
+   * This host's open tasks, and on a cloud brain, its Mac's as it last heard them, for the phone's task list. A host from
+   * before this method answers with an error: the phone shows no task list.
+   */
+  "tasks.board": z.object({}).strict(),
 };
 export type DeviceMethod = keyof typeof deviceRpcParams;
 export type DeviceParams<M extends DeviceMethod> = z.infer<(typeof deviceRpcParams)[M]>;
@@ -74,6 +80,16 @@ export interface DeviceRpcResults {
   "door.key": DoorKey | null;
   "host.kind": "mac" | "brain";
   "brains.removed": string[];
+  "tasks.board": TaskBoard;
+}
+
+/** A task as a phone's list shows it: nothing about folders or branches on the host. */
+export type BoardTask = Pick<Task, "id" | "projectId" | "title" | "status" | "priority" | "threadId" | "executionThreadId" | "updatedAt">;
+
+export interface TaskBoard {
+  tasks: BoardTask[];
+  /** On a cloud brain, its Mac's open tasks as of its last exchange, never changed here; null on a Mac or before one. */
+  mac: { at: number; tasks: BoardTask[] } | null;
 }
 export const isDeviceMethod = (method: string): method is DeviceMethod => Object.hasOwn(deviceRpcParams, method);
 

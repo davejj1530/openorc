@@ -28,7 +28,7 @@ class FakeBrain implements BrainMachineLike {
   state: BrainMachineStatus["state"] = "missing";
   key: BrainKey | null = null;
   handovers: BrainHandover[] = [];
-  holds: BrainControlResults["sign-ins"] = { codex: null, github: null, push: null };
+  holds: BrainControlResults["sign-ins"] = { codex: null, github: null, push: null, memory: null };
   wakes: WakeResult = { state: "ready", address: "sb-fixture.vercel.run", version: "v1" };
   installed: string | null = null;
   running: string | null = null;
@@ -64,6 +64,7 @@ class FakeBrain implements BrainMachineLike {
     if (opened.codex !== undefined) this.holds.codex = opened.codex?.id ?? null;
     if (opened.github !== undefined) this.holds.github = opened.github && signInPrint(opened.github);
     if (opened.push !== undefined) this.holds.push = opened.push?.keyId ?? null;
+    if (opened.memory !== undefined) this.holds.memory = opened.memory && signInPrint(opened.memory);
     return { applied: kinds } as never;
   }
   async importProject(): Promise<never> {
@@ -109,6 +110,7 @@ const PERSONAL = "sk-ant-oat01-personal-fixture-token-0123456789";
 const GH_FIRST = "gho_firstFixtureToken0123456789";
 const GH_SECOND = "gho_secondFixtureToken0123456789";
 const API_KEY = "sk-fixture-brain-api-key-0123456789";
+const MEMORY_KEY = "sk-ant-api03-mac-memory-fixture-0123456789";
 const OLDER = "20261101000000-aaaaaaaaaaaa";
 const NEWER = "20261104000000-bbbbbbbbbbbb";
 const pushKey = (keyId = "ABC123DEFG") => ({ keyId, pem: generateKeyPairSync("ec", { namedCurve: "prime256v1" }).privateKey.export({ format: "pem", type: "pkcs8" }).toString() });
@@ -124,6 +126,7 @@ let brain: FakeBrain;
 let record: ReturnType<typeof memoryStore>;
 let claudeTokens: ReturnType<typeof memoryStore>;
 let push: ReturnType<typeof memoryStore>;
+let memoryKey: ReturnType<typeof memoryStore>;
 let ghToken: string;
 let env: NodeJS.ProcessEnv;
 /** The brain this Mac's build carries. */
@@ -145,6 +148,7 @@ async function open(): Promise<void> {
     codexCloudSecrets: memoryStore(),
     cloudBrainSecrets: record,
     pushSecrets: push,
+    memorySecrets: memoryKey,
     cloudCredentials: async () => ({ token: "vcp_fixture-vercel-token-0123456789", teamId: "team_fixture", projectId: "prj_sandboxes" }),
     cloudBrainBundle: async () => ({ version: carried, read: async () => Buffer.from("archive") }),
     cloudBrainMachine: async () => brain,
@@ -186,6 +190,7 @@ beforeEach(async () => {
   record = memoryStore();
   claudeTokens = memoryStore();
   push = memoryStore();
+  memoryKey = memoryStore();
   await open();
 });
 
@@ -289,6 +294,39 @@ describe("the cloud brain's sign-ins besides Claude", () => {
     await vi.waitFor(() => expect(brain.others()).toEqual({ push: null }));
     await vi.waitFor(async () => expect((await signIns()).push).toEqual({ has: false, behind: false }));
   });
+  it("hands the brain this Mac's memory key only while memory is on with it, and takes it away when either stops", async () => {
+    await setUp();
+    await call("memory.settings.set", { enabled: true, provider: "apikey", apiKey: MEMORY_KEY });
+    await vi.waitFor(() => expect(brain.others()).toEqual({ memory: { apiKey: MEMORY_KEY } }));
+    await vi.waitFor(async () => expect((await signIns()).memory).toEqual({ has: true, behind: false }));
+    expect(kept()).not.toContain(MEMORY_KEY);
+
+    brain.state = "stopped";
+    await call("memory.settings.set", { provider: "claude" });
+    await vi.waitFor(() => expect(brain.others()).toEqual({ memory: null }));
+    expect(brain.state).toBe("running");
+    await call("memory.settings.set", { provider: "apikey" });
+    await vi.waitFor(() => expect(brain.others()).toEqual({ memory: { apiKey: MEMORY_KEY } }));
+    await call("memory.settings.set", { enabled: false });
+    await vi.waitFor(() => expect(brain.others()).toEqual({ memory: null }));
+    await call("memory.settings.set", { enabled: true });
+    await vi.waitFor(() => expect(brain.others()).toEqual({ memory: { apiKey: MEMORY_KEY } }));
+    await call("memory.settings.set", { apiKey: "" });
+    await vi.waitFor(() => expect(brain.others()).toEqual({ memory: null }));
+    await vi.waitFor(async () => expect((await signIns()).memory).toEqual({ has: false, behind: false }));
+  });
+
+  it("gives the memory key again to a brain that lost it, though it holds nothing else", async () => {
+    await call("memory.settings.set", { enabled: true, provider: "apikey", apiKey: MEMORY_KEY });
+    await setUp();
+    expect(brain.holds.memory).toBe(signInPrint({ apiKey: MEMORY_KEY }));
+    brain.holds.memory = null;
+    const handed = brain.handovers.length;
+    await call("cloud.brain.wake", {});
+    await vi.waitFor(() => expect(brain.handovers).toHaveLength(handed + 1));
+    expect(brain.others()).toEqual({ memory: { apiKey: MEMORY_KEY } });
+  });
+
   it("hands a brain still on an older version Claude's sign-ins alone, keeping the failed update in view", async () => {
     await core.claudeCloudTokens.save("claude-cli", PERSONAL);
     await setUp();
@@ -311,17 +349,18 @@ describe("the cloud brain's sign-ins besides Claude", () => {
     const key = pushKey();
     await call("remote.push.setKey", key);
     await writeFile(ghToken, `${GH_FIRST}\n`);
+    await call("memory.settings.set", { enabled: true, provider: "apikey", apiKey: MEMORY_KEY });
     await setUp();
     await call("cloud.brain.github", { on: true });
     await call("cloud.brain.codex.apiKey", { key: API_KEY });
     await vi.waitFor(async () => expect((await signIns()).codex).toMatchObject({ mode: "apiKey", pending: null }));
-    expect(brain.holds).toMatchObject({ github: expect.any(String), push: key.keyId });
+    expect(brain.holds).toMatchObject({ github: expect.any(String), push: key.keyId, memory: expect.any(String) });
 
-    brain.holds = { codex: null, github: null, push: null };
+    brain.holds = { codex: null, github: null, push: null, memory: null };
     const handed = brain.handovers.length;
     await call("cloud.brain.wake", {});
     await vi.waitFor(() => expect(brain.handovers).toHaveLength(handed + 1));
-    expect(brain.others()).toEqual({ github: { token: GH_FIRST, name: "Fixture Person", email: "fixture@example.com" }, push: key });
+    expect(brain.others()).toEqual({ github: { token: GH_FIRST, name: "Fixture Person", email: "fixture@example.com" }, push: key, memory: { apiKey: MEMORY_KEY } });
     await vi.waitFor(async () => expect(await signIns()).toMatchObject({ codex: { mode: null, pending: null }, github: { on: true, behind: false }, push: { has: true, behind: false } }));
   });
 

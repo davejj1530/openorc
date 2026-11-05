@@ -4,9 +4,9 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { BrainUnavailable, LocalSandboxProvider, type BrainControlResults } from "@openorc/cloud";
-import { claudeAccounts, frozenMoving, incomingMove, LedgerWriter, relocations, runs, threads } from "@openorc/db";
-import { commitAll, git, worktree } from "@openorc/git";
-import { DEFAULT_CLAUDE_ACCOUNT, type Project } from "@openorc/protocol";
+import { claudeAccounts, frozenMoving, incomingMove, LedgerWriter, relocations, runs, snapshots, tasks, threads } from "@openorc/db";
+import { commitAll, git, pinObject, treeHash, worktree } from "@openorc/git";
+import { DEFAULT_CLAUDE_ACCOUNT, MOVING_WORDS, type Project } from "@openorc/protocol";
 import { OpenOrc } from "../openorc.js";
 import type { OpenOrcOptions } from "../options.js";
 import { until } from "../test-fixtures/fake-claude.js";
@@ -246,6 +246,93 @@ describe("a crash after every step leaves exactly one owner, with the thread who
       await until(() => settledHere() && relocations.openFor(brain.db, threadId) === null);
       expect(await holders(threadId)).toEqual([{ name: "mac", ...content }]);
     }, 60_000);
+});
+
+/** A Mac thread working on a task: a run of it, a comment on it, and a snapshot of its work pinned in the repository. */
+async function macThreadWithTask(): Promise<{ threadId: string; taskId: string }> {
+  const threadId = await macThread();
+  const db = mac!.db;
+  const task = tasks.insert(db, { projectId: project.id, title: "Matrix task", spec: "Do it", priority: "none", labels: [], workspaceMode: "worktree", baseRef: null, parentTaskId: null, threadId });
+  db.raw.prepare("UPDATE runs SET task_id = ? WHERE id = ?").run(task.id, `run-${threadId}`);
+  db.raw
+    .prepare("INSERT INTO task_comments (id, task_id, request_key, body, recipients, source, context, created_at) VALUES (?, ?, 'k', 'Ship it', '[]', 'user', '{}', 1)")
+    .run(`c-${task.id}`, task.id);
+  // As a turn's snapshot does: the worktree's files as a tree, pinned under the task's refs.
+  const tree = await treeHash(threads.get(db, threadId)!.worktreePath!);
+  await pinObject(checkout, `refs/openorc/snapshots/${task.id}/${tree}`, tree);
+  snapshots.insert(db, { taskId: task.id, runId: `run-${threadId}`, turn: 1, treeSha: tree, diffStat: { files: 0, additions: 0, deletions: 0 } } as never);
+  return { threadId, taskId: task.id };
+}
+
+/** Who holds the task, and what of it: its comment, its run still naming it, its snapshot and the snapshot's ref. */
+async function taskHolders(taskId: string, threadId: string) {
+  const held = [];
+  for (const [name, core, repo] of [
+    ["mac", mac!, checkout],
+    ["brain", brain, brainCopy.rootPath],
+  ] as const) {
+    const task = tasks.get(core.db, taskId);
+    if (!task) continue;
+    const tree = (core.db.raw.prepare("SELECT tree_sha FROM snapshots WHERE task_id = ?").get(taskId) as { tree_sha: string } | undefined)?.tree_sha;
+    const ref = (await git(repo, ["for-each-ref", "--format=%(objectname)", `refs/openorc/snapshots/${taskId}/`])).stdout.trim();
+    held.push({
+      name,
+      title: task.title,
+      creator: task.threadId === threadId,
+      comments: (core.db.raw.prepare("SELECT body FROM task_comments WHERE task_id = ?").all(taskId) as { body: string }[]).map((row) => row.body),
+      run: runs.get(core.db, `run-${threadId}`)?.taskId === taskId,
+      snapshots: core.db.raw.prepare("SELECT COUNT(*) AS c FROM snapshots WHERE task_id = ?").get(taskId),
+      ref: tree !== undefined && ref === tree,
+    });
+  }
+  return held;
+}
+
+const taskContent = { title: "Matrix task", creator: true, comments: ["Ship it"], run: true, snapshots: { c: 1 }, ref: true };
+
+describe("a crash after every step moves a thread's task with it, held by exactly one side", () => {
+  for (const at of ["frozen", "sending", "receive answered", "let go", "done"])
+    it(`to the cloud, the Mac dying at ${at}`, async () => {
+      const { threadId, taskId } = await macThreadWithTask();
+      dieAt = { step: at, after: 0 };
+      await moveUp(threadId);
+      await until(() => dead || settledHere());
+      await restart();
+      await until(() => settledHere() && relocations.withCleanup(mac!.db).length === 0);
+      expect(await holders(threadId)).toEqual([{ name: "brain", ...content }]);
+      expect(await taskHolders(taskId, threadId)).toEqual([{ name: "brain", ...taskContent }]);
+    }, 60_000);
+
+  for (const at of ["asking", "hand-off answered", "received", "handed-off answered", "done"])
+    it(`to the Mac, the Mac dying at ${at}`, async () => {
+      const { threadId, taskId } = await macThreadWithTask();
+      await moveUp(threadId);
+      await until(settledHere);
+      dieAt = { step: at, after: 0 };
+      await bringHome(threadId);
+      await until(() => dead || settledHere());
+      await restart();
+      await until(() => settledHere() && relocations.openFor(brain.db, threadId) === null);
+      expect(await holders(threadId)).toEqual([{ name: "mac", ...content }]);
+      expect(await taskHolders(taskId, threadId)).toEqual([{ name: "mac", ...taskContent }]);
+    }, 60_000);
+});
+
+describe("a task while its thread moves", () => {
+  it("refuses changes until the move settles, then takes them where the task went", async () => {
+    const { threadId, taskId } = await macThreadWithTask();
+    holdReceives = true;
+    await moveUp(threadId);
+    await until(() => held.length > 0);
+    const refused = await mac!.handle({ type: "rpc", id: 4, method: "tasks.update", params: { id: taskId, patch: { title: "Renamed" } } });
+    expect(refused).toMatchObject({ type: "rpc.error", message: MOVING_WORDS.cloud });
+    holdReceives = false;
+    await Promise.all(held.map((take) => take().catch(() => undefined)));
+    await until(settledHere);
+    expect(tasks.get(brain.db, taskId)?.title).toBe("Matrix task");
+    const renamed = await brain.handle({ type: "rpc", id: 5, method: "tasks.update", params: { id: taskId, patch: { title: "Renamed" } } });
+    expect(renamed).toMatchObject({ type: "rpc.result", result: { title: "Renamed" } });
+  }, 60_000);
 });
 
 describe("moving to the cloud", () => {

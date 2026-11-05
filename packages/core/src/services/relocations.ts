@@ -10,6 +10,7 @@ import {
   readThreadRows,
   relocations,
   runs as runRows,
+  threadTaskIds,
   threads,
   writeThreadRows,
   type CloudProviderId,
@@ -92,6 +93,7 @@ export class ThreadRelocations {
       root: executionProject(db, thread).rootPath,
       rows: () => readThreadRows(db, threadId),
       thread,
+      tasks: threadTaskIds(db, threadId),
       session: await this.deps.sessions.export(thread),
       since: options.since,
     });

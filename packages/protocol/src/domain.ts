@@ -85,6 +85,8 @@ export const Task = z.object({
   createdAt: z.number(),
   updatedAt: z.number(),
   completedAt: z.number().nullable(),
+  /** Set by the Mac's router on a task its cloud brain holds, as on threads. Never stored. */
+  owner: ThreadOwner.optional(),
 });
 export type Task = z.infer<typeof Task>;
 

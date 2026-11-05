@@ -33,6 +33,7 @@ import {
 } from "@openorc/protocol";
 import os from "node:os";
 import path from "node:path";
+import { taskBoard } from "../handlers/brain-sync.js";
 import type { ProtectedSecretStore } from "../services/extraction-credentials.js";
 import { PREVIEW_THREAD_GONE, previewThreadLive } from "../services/preview.js";
 import type { Broadcast, Logger } from "../transport.js";
@@ -224,6 +225,8 @@ export class RemoteAccess {
         return this.network.publicAddress ? "brain" : "mac";
       case "brains.removed":
         return removedBrains(this.options.db);
+      case "tasks.board":
+        return taskBoard(this.options.db, Boolean(this.network.publicAddress));
     }
   }
 

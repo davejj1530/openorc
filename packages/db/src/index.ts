@@ -5,6 +5,7 @@ export { lastThreadMessage } from "./last-message.js";
 export { LedgerWriter, activityImagePath, completedToolCall, countEvents, listEvents, type LedgerOptions, type ListEventsOptions } from "./ledger.js";
 export { ledgerMaintenance, type LedgerSpace } from "./maintenance.js";
 export { extractionJobs, ftsQuery, memories, settings, summaries, vectors, type MemoryFilter, type MemoryInput } from "./memories.js";
+export { memoryChangesSince, mergeMemories, type MemoryChanges, type MemoryMerge, type MemoryTombstone } from "./memory-merge.js";
 export { redact, redactJson, redactValue, type RedactResult, type RedactValueResult } from "./redact.js";
 export { audit, comments, projects, runs, snapshots, tasks, threads, type ReviewCommentScope, type TaskPatch, type ThreadInsert, type ThreadListFilter, type ThreadPatch } from "./repos.js";
 export { runCosts } from "./run-costs.js";
@@ -28,7 +29,9 @@ export {
   HOST_TABLE_PREFIXES,
   HOST_TABLES,
   readThreadRows,
+  taskTies,
   THREAD_TABLES,
+  threadTaskIds,
   unclassifiedTables,
   writeThreadRows,
   type RowRewrite,

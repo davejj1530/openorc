@@ -161,6 +161,8 @@ export interface CloudBrainSignIns {
   github: { on: boolean; blocked: string | null; behind: boolean };
   /** This Mac's push key, which the brain sends phone alerts with. */
   push: { has: boolean; behind: boolean };
+  /** This Mac's memory's Anthropic API key, which the brain's memory distils with while the Mac's does. */
+  memory: { has: boolean; behind: boolean };
 }
 
 export interface CloudBrainPairing {

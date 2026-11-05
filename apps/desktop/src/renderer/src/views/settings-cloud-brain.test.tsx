@@ -38,6 +38,7 @@ function show(status: CloudBrainStatus, timeZone = "Asia/Manila", cost: CloudBra
         codex: { mode: codex, email: null, plan: null, signingIn: false, pending: null, error: null },
         github: { on: false, blocked: null, behind: false },
         push: { has: false, behind: false },
+        memory: { has: false, behind: false },
       } as never;
     return status as never;
   });

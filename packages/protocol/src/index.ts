@@ -21,6 +21,7 @@ export * from "./agent-citations.js";
 export * from "./agent-updates.js";
 export * from "./browser.js";
 export * from "./cloud-brain.js";
+export * from "./brain-sync.js";
 export * from "./cloud.js";
 export * from "./code-explanations.js";
 export * from "./code-intelligence.js";

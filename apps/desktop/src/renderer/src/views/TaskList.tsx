@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { Menu } from "@base-ui/react/menu";
 import type { Task, TaskStatus } from "@openorc/protocol";
-import { Check, Funnel, Plus } from "../components/icons";
+import { Check, Cloud, Funnel, Plus } from "../components/icons";
 import { ListGroupHeading } from "../components/ListGroupHeading";
 import { HeaderSearch } from "../components/PageFilters";
 import { PriorityIcon, StatusIcon, groupLabel, groupOrder, statusLabel, statusOrder } from "../components/status";
@@ -14,7 +14,7 @@ import { cn } from "../lib/cn";
 import { useLayout } from "../lib/layout";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { openTask } from "../lib/router";
-import { relativeTime } from "@openorc/client";
+import { ownerMark, relativeTime } from "@openorc/client";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { stageCount } from "../lib/task-stage-counts";
 
@@ -136,6 +136,7 @@ export function TaskRows({ tasks, showProject }: { tasks: Task[]; showProject: b
                           {t.title}
                         </span>
                         {t.labels[0] ? <Badge className="task-row-label max-w-24 truncate">{t.labels[0]}</Badge> : null}
+                        <TaskOwnerMark task={t} />
                         {showProject ? <span className="task-row-meta task-row-project max-w-28 truncate text-right">{nameOf(t.projectId)}</span> : null}
                         <span className={cn(metaSlot, "task-row-meta task-row-time w-16")}>{relativeTime(t.updatedAt)}</span>
                         <PriorityIcon priority={t.priority} />
@@ -150,6 +151,18 @@ export function TaskRows({ tasks, showProject }: { tasks: Task[]; showProject: b
         ))}
       </div>
     </div>
+  );
+}
+
+/** Where a task the Mac lists from its cloud brain lives, as thread rows say it. */
+function TaskOwnerMark({ task }: { task: Task }) {
+  const mark = ownerMark({ owner: task.owner, moving: undefined });
+  if (!mark) return null;
+  return (
+    <span className={cn("task-row-meta inline-flex shrink-0 items-center gap-1", mark.dim && "opacity-60")}>
+      <Cloud size={12} />
+      {mark.label}
+    </span>
   );
 }
 

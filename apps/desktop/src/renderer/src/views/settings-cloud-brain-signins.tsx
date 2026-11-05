@@ -158,10 +158,10 @@ function BrainGitHub({ github, busy }: { github: SignIns["github"]; busy: boolea
   );
 }
 
-/** This Mac's push key on the brain, which sends its own phone alerts. Shown only once there is one. */
-function BrainPush({ push, busy }: { push: SignIns["push"]; busy: boolean }) {
-  if (!push.has && !push.behind) return null;
-  return <SettingRow label="Notifications">{push.behind ? <Send busy={busy} /> : <Status ok>On</Status>}</SettingRow>;
+/** A key of this Mac's the brain keeps a copy of: its push key, its memory's API key. Shown only once there is one. */
+function Handed({ label, handed, busy }: { label: string; handed: SignIns["push"]; busy: boolean }) {
+  if (!handed.has && !handed.behind) return null;
+  return <SettingRow label={label}>{handed.behind ? <Send busy={busy} /> : <Status ok>On</Status>}</SettingRow>;
 }
 
 /** What the brain signs in with besides Claude. `busy` while the brain is at another operation. */
@@ -172,7 +172,8 @@ export function CloudBrainSignIns({ active, busy }: { active: boolean; busy: boo
     <>
       <BrainCodex codex={signIns.data.codex} busy={busy} />
       <BrainGitHub github={signIns.data.github} busy={busy} />
-      <BrainPush push={signIns.data.push} busy={busy} />
+      <Handed label="Notifications" handed={signIns.data.push} busy={busy} />
+      <Handed label="Anthropic API key" handed={signIns.data.memory} busy={busy} />
     </>
   );
 }

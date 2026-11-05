@@ -111,10 +111,10 @@ describe("where a row lives", () => {
     expect(ownerMark(summary("t", 1, { moving: { to: "mac", since: 1 } }))).toEqual({ label: "Moving", dim: false });
   });
 
-  it("refuses Codex and task threads on demand, and hides the move for rows another host holds", () => {
+  it("refuses Codex threads on demand, moves a thread with its tasks, and hides the move for rows another host holds", () => {
     expect(brainMove(summary("t", 1))).toEqual({ shown: true, blocked: null });
     expect(brainMove(summary("t", 1, { agent: "codex" })).blocked).toContain("Only Claude");
-    expect(brainMove(summary("t", 1, { openTaskCount: 1 })).blocked).toContain("tasks");
+    expect(brainMove(summary("t", 1, { openTaskCount: 1 }))).toEqual({ shown: true, blocked: null });
     expect(brainMove(summary("t", 1, { owner: { brain: "cloud", reach: "live", heardAt: 1 } })).shown).toBe(false);
   });
 

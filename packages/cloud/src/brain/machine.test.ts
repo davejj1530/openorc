@@ -3,7 +3,21 @@ import { APIError } from "@vercel/sandbox";
 import { describe, expect, it } from "vitest";
 import type { SandboxInfo } from "../sandbox.js";
 import { BRAIN_AWAY_MS, BRAIN_PORT } from "./layout.js";
-import { BrainMachine, BrainRefused, BrainUnavailable, brainVersionNewer, type BrainApi, type BrainCommand, type BrainOpenParams, type BrainSettings, type BrainVm } from "./machine.js";
+import { vercelSandboxCost } from "../vercel-sandbox.js";
+import {
+  BrainMachine,
+  BrainRefused,
+  BrainUnavailable,
+  brainVersionNewer,
+  sessionShare,
+  type BrainApi,
+  type BrainCommand,
+  type BrainOpenParams,
+  type BrainSettings,
+  type BrainVm,
+  type SessionUsage,
+} from "./machine.js";
+import { billedSnapshots, snapshotStorageCost, type ListedSnapshot } from "./snapshot-storage.js";
 import { brainKeyText, encodeControlReply, newBrainKey, parseLaunch, type BrainControlRequest, type BrainStatus } from "./wire.js";
 
 const TOKEN = "vcp_brain_token_SECRET_value";
@@ -294,7 +308,36 @@ class FakeVercel implements BrainApi {
   async list() {
     return [...this.sandboxes.keys(), "openorc-gone-meanwhile"];
   }
+
+  /** The sessions Vercel counted, and from when the brain last asked. */
+  usage: SessionUsage[] = [];
+  readonly asked: number[] = [];
+  async sessions({ since }: { since: number }) {
+    this.asked.push(since);
+    return this.usage;
+  }
+
+  /** The project's snapshots as Vercel lists them, and those deleted by id. */
+  kept: ListedSnapshot[] = [];
+  readonly snapshotsDeleted: string[] = [];
+  async snapshots() {
+    return this.kept;
+  }
+  async deleteSnapshot({ id }: { id: string }) {
+    this.snapshotsDeleted.push(id);
+  }
+
+  /** The project's snapshot storage on the bill and where the bill ends; null as for a token that may not read it. */
+  billed: { usd: number; until: number } | null = null;
+  async billedSnapshots() {
+    return this.billed;
+  }
 }
+
+const HOUR = 3_600_000;
+const DAY = 24 * HOUR;
+/** A snapshot of 1 GB unless told otherwise. */
+const snapshot = (id: string, more: Partial<ListedSnapshot> & Pick<ListedSnapshot, "status">): ListedSnapshot => ({ id, sizeBytes: 1e9, createdAt: 0, ...more });
 
 const connect = (vercel: FakeVercel, startMs = 2000) => BrainMachine.connect({ token: TOKEN, teamId: "team_1" }, { api: vercel, startMs, pollMs: 1 });
 const labels = (runs: Run[]) => runs.map((run) => run.args[2]);
@@ -566,6 +609,94 @@ describe("waking a brain", () => {
   });
 });
 
+describe("what a brain costs", () => {
+  it("prices the sessions Vercel counted since the month began at its list prices, asking Vercel and no sandbox", async () => {
+    const { vercel, brain, machine } = await provisioned();
+    vercel.usage = [
+      { activeCpuMs: 3_600_000, durationMs: 7_200_000, memoryMb: 2048 },
+      { activeCpuMs: 600_000, durationMs: 1_800_000, memoryMb: 4096 },
+    ];
+    const since = Date.UTC(2026, 10, 1);
+    const cost = await brain.costSince(since);
+    expect(cost).toBeCloseTo(vercelSandboxCost(vercel.usage[0]!) + vercelSandboxCost(vercel.usage[1]!), 10);
+    expect(cost).toBeGreaterThan(0.2);
+    expect(vercel.asked).toEqual([since]);
+    expect(machine.runs).toEqual([]);
+  });
+
+  it("adds what the project's snapshots cost to keep this month: the days Vercel billed as billed, the hours since from its list", async () => {
+    const { vercel, brain } = await provisioned();
+    const since = Date.UTC(2026, 10, 1);
+    vercel.kept = [snapshot("snap_brain", { status: "created", sizeBytes: 1e9, createdAt: since - DAY })];
+    expect(await brain.costSince(since, since + 730 * HOUR)).toBeCloseTo(0.08, 10);
+    vercel.billed = { usd: 0.5, until: since + 365 * HOUR };
+    expect(await brain.costSince(since, since + 730 * HOUR)).toBeCloseTo(0.5 + 0.04, 10);
+  });
+
+  it("reads one project's snapshot storage from a team's daily charges, for the part of each day in the month", () => {
+    const since = Date.parse("2026-11-01T00:00:00Z");
+    const day = (start: string, end: string, quantity: number, more: object = {}) =>
+      JSON.stringify({
+        ChargePeriodStart: start,
+        ChargePeriodEnd: end,
+        ServiceName: "Snapshot Storage",
+        ConsumedQuantity: quantity,
+        ConsumedUnit: "gigabyte",
+        Tags: { ProjectId: "prj_brain" },
+        ...more,
+      });
+    const jsonl = [
+      day("2026-10-31T08:00:00.000Z", "2026-11-01T08:00:00.000Z", 3),
+      day("2026-11-01T08:00:00.000Z", "2026-11-02T08:00:00.000Z", 2),
+      day("2026-11-01T08:00:00.000Z", "2026-11-02T08:00:00.000Z", 50, { Tags: { ProjectId: "prj_other" } }),
+      day("2026-11-01T08:00:00.000Z", "2026-11-02T08:00:00.000Z", 50, { Tags: { ProjectId: "prj_brain_too" } }),
+      day("2026-11-01T08:00:00.000Z", "2026-11-02T08:00:00.000Z", 50, { ServiceName: "Drive Storage" }),
+      day("2026-11-02T08:00:00.000Z", "2026-11-03T08:00:00.000Z", 0),
+      "",
+    ].join("\n");
+    const billed = billedSnapshots(jsonl, "prj_brain", since);
+    expect(billed.until).toBe(Date.parse("2026-11-03T08:00:00Z"));
+    expect(billed.usd).toBeCloseTo(((3 * 8 + 2 * 24) / 730) * 0.08, 10);
+    expect(billedSnapshots("", "prj_brain", since)).toEqual({ usd: 0, until: since });
+  });
+
+  it("keeps each snapshot from the month's start or its making until now, or until the one that replaced it", () => {
+    const since = 100 * DAY;
+    const now = since + 10 * DAY;
+    const gbDay = 0.08 / (730 / 24);
+    // The brain keeps its last two: each snapshot went when the one two sessions later was made.
+    const chain = [
+      snapshot("a", { status: "deleted", createdAt: since - DAY, lastUsedAt: since - DAY + 1 }),
+      snapshot("b", { status: "deleted", parentId: "a", createdAt: since + DAY, lastUsedAt: since + DAY + 1 }),
+      snapshot("c", { status: "created", parentId: "b", createdAt: since + 3 * DAY }),
+      snapshot("d", { status: "created", parentId: "c", createdAt: since + 6 * DAY }),
+    ];
+    expect(snapshotStorageCost(chain, since, now)).toBeCloseTo((3 + 5 + 7 + 4) * gbDay, 10);
+    // Deleted with its sandbox: kept at least until its child, else its last use; one that failed never counts.
+    expect(
+      snapshotStorageCost(
+        [snapshot("e", { status: "deleted", createdAt: since, lastUsedAt: since + DAY }), snapshot("f", { status: "deleted", parentId: "e", createdAt: since + 2 * DAY, lastUsedAt: since + 2 * DAY })],
+        since,
+        now,
+      ),
+    ).toBeCloseTo(2 * gbDay, 10);
+    expect(snapshotStorageCost([snapshot("g", { status: "failed", createdAt: since })], since, now)).toBe(0);
+    // An expiry ends it; one made before the month counts from the month's start.
+    expect(snapshotStorageCost([snapshot("h", { status: "created", createdAt: since - 5 * DAY, expiresAt: since + 4 * DAY })], since, now)).toBeCloseTo(4 * gbDay, 10);
+  });
+
+  it("counts the share of a session that ran across the month's start, and none of one that ended before it", () => {
+    const since = 1_000_000;
+    expect(sessionShare({ createdAt: 0, startedAt: since - 1000, stoppedAt: since + 3000, activeCpuDurationMs: 400, memory: 2048 }, since, since + 10_000)).toEqual({
+      activeCpuMs: 300,
+      durationMs: 3000,
+      memoryMb: 2048,
+    });
+    expect(sessionShare({ createdAt: 0, startedAt: since - 5000, stoppedAt: since - 1, activeCpuDurationMs: 400, memory: 2048 }, since, since + 10_000)).toBeNull();
+    expect(sessionShare({ createdAt: 0, startedAt: since + 1000, activeCpuDurationMs: 50, memory: 2048 }, since, since + 5000)).toEqual({ activeCpuMs: 50, durationMs: 4000, memoryMb: 2048 });
+  });
+});
+
 describe("asking and removing a brain", () => {
   it("answers a control request from the running brain, without waking a sleeping one", async () => {
     const { vercel, brain, machine } = await provisioned();
@@ -691,8 +822,11 @@ describe("asking and removing a brain", () => {
     vercel.add("openorc-thread-1", settings());
     vercel.add("brain", settings());
     vercel.add("openorc-thread-2", settings(), "stopped");
+    vercel.kept = [snapshot("snap_left", { status: "created" }), snapshot("snap_gone", { status: "deleted" })];
     await (await connect(vercel)).remove();
     expect(vercel.deleted).toEqual(["brain", "openorc-thread-1", "openorc-thread-2"].map((name) => ({ name, options: { deleteOrphanSnapshots: true } })));
+    // Vercel deletes orphan snapshots on its own, later, and once left one: any still kept go too.
+    expect(vercel.snapshotsDeleted).toEqual(["snap_left"]);
     expect(vercel.sandboxes.size).toBe(0);
     expect(vercel.gets.every((get) => !get.resume)).toBe(true);
   });

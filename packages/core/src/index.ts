@@ -1,6 +1,6 @@
 export { OpenOrc } from "./openorc.js";
 export type { OpenOrcOptions } from "./options.js";
-export type { BrainBundleSource } from "./services/cloud-brain.js";
+export type { BrainBundleSource } from "./services/cloud-brain-machine.js";
 export { ownerLinkKeys } from "./services/owner-link.js";
 export { ShellEnvironment, pathProbe, resolveBinary, type EnvSnapshot, type HarnessBinaries, type RefreshResult, type ShellProbe } from "./services/shell-environment.js";
 export { FrameCoalescer } from "./frames.js";

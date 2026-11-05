@@ -39,14 +39,18 @@ type CloudMethod =
   | "cloud.brain.pair"
   | "cloud.brain.handover"
   | "cloud.brain.remove"
+  | "cloud.brain.recount"
   | "cloud.brain.projects"
+  | "cloud.brain.cost"
   | "cloud.brain.project"
   | "cloud.brain.signIns"
   | "cloud.brain.codex.signIn"
   | "cloud.brain.codex.cancel"
   | "cloud.brain.codex.apiKey"
   | "cloud.brain.codex.remove"
-  | "cloud.brain.github";
+  | "cloud.brain.github"
+  | "cloud.brain.phones"
+  | "cloud.brain.phones.remove";
 
 interface Dependencies {
   settings: CloudSettings;
@@ -61,9 +65,18 @@ interface Dependencies {
   /** Cloud threads are offered in this build. */
   offered: boolean;
   invalidate: (keys: string[]) => void;
+  /** After the brain was removed, with the key phones know it by: what this Mac kept of it goes. */
+  removed: (linkKey: string | null) => Promise<void>;
 }
 
 const noCodex = (error: string | null) => ({ mode: null, email: null, plan: null, refreshedAt: null, signingIn: false, error });
+
+/** Once the brain is gone, what this Mac kept of it goes too, named by the key its phones know it by. */
+async function removeBrain(brain: CloudBrain, removed: Dependencies["removed"]): Promise<void> {
+  const linkKey = (await brain.moves())?.linkKey ?? null;
+  await brain.remove();
+  if ((await brain.region()) === null) await removed(linkKey);
+}
 
 export function createCloudHandlers({ settings, tokens, checks, codex, sandboxes, handoff, brain, coordinator, offered, invalidate, removed }: Dependencies): Pick<Handlers, CloudMethod> {
   const status = async (): Promise<CloudStatus> => {
@@ -133,6 +146,16 @@ export function createCloudHandlers({ settings, tokens, checks, codex, sandboxes
       invalidate(["cloud"]);
       return sandboxes.list();
     },
+    ...brainHandlers(brain, removed),
+    ...brainSignInHandlers(brain),
+  };
+}
+
+type SignInMethod = Extract<CloudMethod, "cloud.brain.signIns" | `cloud.brain.codex.${string}` | "cloud.brain.github">;
+
+/** The brain itself: setting it up, waking it, its projects, its cost and the phones paired with it. */
+function brainHandlers(brain: CloudBrain, removed: Dependencies["removed"]): Pick<Handlers, Exclude<Extract<CloudMethod, `cloud.brain.${string}`>, SignInMethod>> {
+  return {
     "cloud.brain.status": () => brain.status(),
     "cloud.brain.create": async ({ region }) => {
       await brain.create(region);
@@ -148,20 +171,27 @@ export function createCloudHandlers({ settings, tokens, checks, codex, sandboxes
       return brain.status();
     },
     "cloud.brain.remove": async () => {
-      await brain.remove();
+      await removeBrain(brain, removed);
+      return brain.status();
+    },
+    "cloud.brain.recount": async () => {
+      await brain.recount();
       return brain.status();
     },
     "cloud.brain.projects": () => brain.projects(),
+    "cloud.brain.cost": () => brain.cost(),
     "cloud.brain.project": async ({ projectId, on }) => {
       await brain.setProject(projectId, on);
       return brain.projects();
     },
-    ...brainSignInHandlers(brain),
+    "cloud.brain.phones": () => brain.phones.list(),
+    // A failure shows in the brain's status, as the card's other operations' do.
+    "cloud.brain.phones.remove": ({ id }) => brain.phones.remove(id).catch(() => brain.phones.list()),
   };
 }
 
 /** What the brain signs in with besides Claude; every change answers with the whole of it. */
-function brainSignInHandlers(brain: CloudBrain): Pick<Handlers, Extract<CloudMethod, "cloud.brain.signIns" | `cloud.brain.codex.${string}` | "cloud.brain.github">> {
+function brainSignInHandlers(brain: CloudBrain): Pick<Handlers, SignInMethod> {
   const changed = async (work: () => Promise<unknown> | void) => {
     await work();
     return brain.signIns();

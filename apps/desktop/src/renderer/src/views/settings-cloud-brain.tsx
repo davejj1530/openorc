@@ -3,10 +3,11 @@ import { BRAIN_REGIONS, brainRegionFor, type BrainRegion, type CloudBrainDoor, t
 import { Button, Dialog, Select, TextButton, Tooltip } from "../components/ui";
 import { StepMark } from "../components/WorkSteps";
 import { useRpc, useRpcMutation } from "../lib/client";
+import { CloudBrainPhones } from "./settings-cloud-brain-phones";
 import { CloudBrainProjects } from "./settings-cloud-brain-projects";
 import { CloudBrainSignIns } from "./settings-cloud-brain-signins";
 import { PairingCode, pairingSheet, useTicker } from "./settings-phone";
-import { Failure } from "./settings-secret-field";
+import { Failure, StillWorks } from "./settings-secret-field";
 import { Section, SettingRow, Status } from "./settings-shared";
 import "./settings-cloud-check.css";
 
@@ -113,18 +114,33 @@ function SettingUp({ region, step }: { region: BrainRegion; step: CloudBrainStep
   );
 }
 
-/** Deletes the brain from the team, after a confirm. */
-function RemoveBrain({ disabled }: { disabled: boolean }) {
+/** What a removal deletes, the conversations on the brain by count when it has any. */
+function removalWords(threads: number): string {
+  if (!threads) return "This deletes it from your Vercel team, with its disk and the sandboxes it made. Phones paired with it can no longer reach it.";
+  const conversations = threads === 1 ? "the conversation on it. Bring it to your Mac first to keep it." : `the ${threads} conversations on it. Bring to Mac any you want to keep first.`;
+  return `This deletes it from your Vercel team, with its disk, the sandboxes it made and ${conversations} Phones paired with it can no longer reach it.`;
+}
+
+/** Deletes the brain from the team, after a confirm that counts the conversations going with it. */
+function RemoveBrain({ disabled, threads = 0 }: { disabled: boolean; threads?: number }) {
   const remove = useRpcMutation("cloud.brain.remove");
+  const recount = useRpcMutation("cloud.brain.recount");
   const [confirming, setConfirming] = useState(false);
+  // The brain's own Codex login goes with it, and keeps working at OpenAI.
+  const codex = useRpc("cloud.brain.signIns", {}, { enabled: confirming }).data?.codex.mode ?? null;
+  const confirm = () => {
+    setConfirming(true);
+    recount.mutate({});
+  };
   return (
     <>
-      <TextButton tone="muted" disabled={disabled || remove.isPending} onClick={() => setConfirming(true)}>
+      <TextButton tone="muted" disabled={disabled || remove.isPending} onClick={confirm}>
         Remove
       </TextButton>
       <Dialog open={confirming} onOpenChange={setConfirming} title="Remove the cloud brain?">
         <div className="space-y-3">
-          <p className="text-ink-2">This deletes it from your Vercel team, with its disk and the sandboxes it made. Phones paired with it can no longer reach it.</p>
+          <p className="text-ink-2">{removalWords(threads)}</p>
+          <StillWorks at={codex} subject={codex === "apiKey" ? "Its OpenAI API key " : "Its Codex login "} />
           <div className="flex justify-end gap-2">
             <Button onClick={() => setConfirming(false)}>Cancel</Button>
             <Button
@@ -165,6 +181,19 @@ function PairBrainPhone({ disabled }: { disabled: boolean }) {
   );
 }
 
+/** What the brain and its thread sandboxes ran this month, quietly; how it is counted on demand. Never wakes the brain. */
+function BrainCost({ active }: { active: boolean }) {
+  const cost = useRpc("cloud.brain.cost", {}, { enabled: active, staleTime: 5 * 60_000 }).data;
+  if (!cost) return null;
+  return (
+    <SettingRow label="This month">
+      <Tooltip label="Vercel's list prices for the brain, its thread sandboxes and their snapshots, before your plan's credit.">
+        <span className="text-ink-3">{cost.usd < 0.01 ? "Less than $0.01" : `$${cost.usd.toFixed(2)}`}</span>
+      </Tooltip>
+    </SettingRow>
+  );
+}
+
 function Ready({ brain, active }: { brain: Extract<CloudBrainStatus, { state: "ready" }>; active: boolean }) {
   const wake = useRpcMutation("cloud.brain.wake");
   const handover = useRpcMutation("cloud.brain.handover");
@@ -180,8 +209,9 @@ function Ready({ brain, active }: { brain: Extract<CloudBrainStatus, { state: "r
           </TextButton>
         ) : null}
         <PairBrainPhone disabled={busy} />
-        <RemoveBrain disabled={busy} />
+        <RemoveBrain disabled={busy} threads={brain.threads} />
       </SettingRow>
+      <CloudBrainPhones active={active} busy={busy} />
       <SettingRow label="Claude accounts" hint={brain.claude.length ? brain.claude.join(", ") : "None"}>
         {brain.working === "sending" || handover.isPending ? <Status>Sending</Status> : null}
         {brain.behind && !busy ? (
@@ -193,6 +223,7 @@ function Ready({ brain, active }: { brain: Extract<CloudBrainStatus, { state: "r
       <CloudBrainSignIns active={active} busy={busy} />
       <Door door={brain.door} />
       <CloudBrainProjects active={active} />
+      <BrainCost active={active} />
       <Alert error={brain.error} />
     </>
   );

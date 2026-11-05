@@ -40,7 +40,7 @@ export function PhoneSettings({ active }: { active: boolean }) {
       </Section>
       <div className="motion-collapse" hidden={!enabled && devices.length === 0}>
         <Section title="Paired phones">
-          {devices.length ? devices.map((device) => <PhoneRow key={device.id} device={device} />) : <p className="flex min-h-13 items-center text-ink-3">No paired phones yet.</p>}
+          {devices.length ? devices.map((device) => <MacPhone key={device.id} device={device} />) : <p className="flex min-h-13 items-center text-ink-3">No paired phones yet.</p>}
         </Section>
       </div>
       {enabled && status.data && <PushKey push={status.data.push} />}
@@ -75,14 +75,21 @@ function Addresses({ routes }: { routes: Route[] }) {
   );
 }
 
-function PhoneRow({ device }: { device: RemoteDevice }) {
-  const remove = useRpcMutation("remote.devices.remove");
+function MacPhone({ device }: { device: RemoteDevice }) {
+  return <PhoneRow device={device} remove={useRpcMutation("remote.devices.remove")} />;
+}
+
+/** Unpairs a phone, from this Mac or from the cloud brain. */
+type RemovePhone = { mutate: (params: { id: string }) => void; isPending: boolean; error: Error | null };
+
+/** A paired phone: its name, when it was last seen, and Remove. */
+export function PhoneRow({ device, remove, disabled = false }: { device: RemoteDevice; remove: RemovePhone; disabled?: boolean }) {
   return (
     <div className="settings-field">
       <span className="truncate">{device.name}</span>
       <div className="flex items-center gap-4">
         <Status ok={device.connected}>{presence(device)}</Status>
-        <Button size="sm" aria-label={`Remove ${device.name}`} disabled={remove.isPending} onClick={() => remove.mutate({ id: device.id })}>
+        <Button size="sm" aria-label={`Remove ${device.name}`} disabled={disabled || remove.isPending} onClick={() => remove.mutate({ id: device.id })}>
           Remove
         </Button>
       </div>

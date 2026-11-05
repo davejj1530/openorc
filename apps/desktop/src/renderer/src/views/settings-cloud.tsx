@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { SANDBOX_VCPUS, type BrainRegion, type ClaudeAccountConnection, type ClaudeCloudAccess, type CloudStatus } from "@openorc/protocol";
-import { Button, Select, TextButton } from "../components/ui";
+import { Button, Select, TextButton, Tooltip } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { CloudBrainSection, RegionSelect } from "./settings-cloud-brain";
 import { CloudCheckSection } from "./settings-cloud-check";
@@ -9,7 +9,9 @@ import { Field, LoadError, Section, SettingRow, Status, Toggle } from "./setting
 import { CodexCloudSection } from "./settings-cloud-codex";
 import { Failure, StillWorks, TokenField } from "./settings-secret-field";
 
-const TOKENS_URL = "https://vercel.com/account/settings/tokens";
+const TOKENS_URL = "https://vercel.com/account/tokens";
+/** Why a token scoped to one team, said on hover. */
+const MASTER_KEY = "Whoever holds the token can change everything it reaches.";
 
 /** Vercel's default when none is chosen. */
 const DEFAULT_VCPUS = 2;
@@ -65,7 +67,14 @@ function VercelTeam({ vercel }: { vercel: NonNullable<CloudStatus["vercel"]> }) 
       </Field>
       <SandboxSize vcpus={vercel.vcpus} disabled={busy || !vercel.team} />
       <SandboxRegion region={vercel.region} disabled={busy || !vercel.team} />
-      <SettingRow label="Account">
+      <SettingRow
+        label="Account"
+        hint={
+          vercel.team && vercel.reachesMore ? (
+            <Tooltip label={`${MASTER_KEY} Disconnect, then connect one scoped to ${vercel.team.name} alone.`}>This token reaches more than {vercel.team.name}.</Tooltip>
+          ) : null
+        }
+      >
         <Status ok={Boolean(vercel.team)}>{vercel.team ? "Connected" : "Choose a team"}</Status>
         <Button variant="ghost" disabled={busy} onClick={() => disconnect.mutate({})}>
           Disconnect
@@ -92,7 +101,7 @@ function VercelSettings({ status }: { status: CloudStatus }) {
                 <TextButton underline onClick={() => window.openorc.openExternal(TOKENS_URL)}>
                   your Vercel account
                 </TextButton>
-                .
+                , <Tooltip label={`Under Scope, choose the team, then All Projects. ${MASTER_KEY}`}>scoped to one team</Tooltip>.
               </>
             }
             action="Connect"

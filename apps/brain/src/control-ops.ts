@@ -87,6 +87,10 @@ async function take<K extends HandoverKind>(kind: K, values: BrainHandover, cont
   return true;
 }
 
+async function phonesOf(core: OpenOrc): Promise<BrainControlResults["phones"]> {
+  return { phones: (await core.remote.status()).devices };
+}
+
 /** Every Mac project's copies, under a folder named for the Mac project's id. */
 const projectsFolder = (layout: BrainLayout) => path.join(layout.data, "projects");
 /** The copies of one Mac project: each in a folder with the Mac project's name, so two of one name both fit. */
@@ -208,6 +212,11 @@ export function controlHandlers({ core, key, layout, github, stop, answering }: 
       const id = copyOf(core, layout, source);
       if (id) core.projects.updateSettings(id, settings);
       return { applied: id !== null };
+    },
+    phones: () => phonesOf(core),
+    "remove-phone": async ({ id }) => {
+      core.remote.removeDevice(id);
+      return phonesOf(core);
     },
     "sign-ins": async () => ({ codex: await core.codexCloudLogin.heldId(), github: github.print(), push: (await core.remote.status()).push.keyId }),
     stop: async () => {

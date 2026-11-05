@@ -172,6 +172,19 @@ describe("control requests and replies", () => {
   });
 });
 
+describe("the phones paired with the brain", () => {
+  it("lists them and unpairs one by its device id, refusing an id that is not one", () => {
+    const id = "0b6b8a5e-2f4c-4d2a-9c61-1f8e2d3c4b5a";
+    expect(parseControlRequest(JSON.stringify({ op: "phones" }))).toEqual({ op: "phones" });
+    expect(parseControlRequest(JSON.stringify({ op: "remove-phone", id }))).toEqual({ op: "remove-phone", id });
+    for (const bad of ["", "../owner", "a b"]) expect([bad, refusal(() => parseControlRequest(JSON.stringify({ op: "remove-phone", id: bad }))).field]).toEqual([bad, "id"]);
+    const phones = { phones: [{ id, name: "Pocket", createdAt: 1, lastSeenAt: null, connected: true }] };
+    expect(parseControlReply("phones", encodeControlReply<"phones">({ ok: true, result: phones }))).toEqual({ ok: true, result: phones });
+    expect(parseControlReply("remove-phone", encodeControlReply<"remove-phone">({ ok: true, result: { phones: [] } }))).toEqual({ ok: true, result: { phones: [] } });
+    expect(refusal(() => parseControlReply("phones", JSON.stringify({ ok: true, result: { phones: [{ ...phones.phones[0], connected: "yes" }] } }))).field).toBe("result.phones[0].connected");
+  });
+});
+
 describe("moving threads between the Mac and the brain", () => {
   const relocation = "6f1e2b3c-4d5e-4f60-8a71-92b3c4d5e6f7";
   const threadId = "0b9a8c7d-6e5f-4a3b-9c2d-1e0f9a8b7c6d";

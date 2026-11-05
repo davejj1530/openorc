@@ -123,6 +123,13 @@ export class BrainRouting {
     if (ready) this.link.awoke();
   }
 
+  /** The brain was removed: its kept lists and this Mac's read-only copies of its threads go, and windows read again. */
+  async forget(): Promise<void> {
+    this.router.pages.clear();
+    await this.mirrors.closeAll();
+    this.windows.push({ type: "invalidate", keys: ["threads"] });
+  }
+
   private stopFreshening(): void {
     if (this.freshening) clearInterval(this.freshening);
     this.freshening = null;

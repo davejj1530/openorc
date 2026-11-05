@@ -45,6 +45,11 @@ export const deviceRpcParams = {
    * its keys exactly and refuse one they do not know. A host from before this method answers with an error: a Mac.
    */
   "host.kind": z.object({}).strict(),
+  /**
+   * The cloud brains this host removed, by the ids phones saved them under, newest first: a phone forgets each it keeps.
+   * A host from before this method answers with an error: none removed.
+   */
+  "brains.removed": z.object({}).strict(),
 };
 export type DeviceMethod = keyof typeof deviceRpcParams;
 export type DeviceParams<M extends DeviceMethod> = z.infer<(typeof deviceRpcParams)[M]>;
@@ -68,6 +73,7 @@ export interface DeviceRpcResults {
   /** Null from a host without a door, such as a Mac. */
   "door.key": DoorKey | null;
   "host.kind": "mac" | "brain";
+  "brains.removed": string[];
 }
 export const isDeviceMethod = (method: string): method is DeviceMethod => Object.hasOwn(deviceRpcParams, method);
 

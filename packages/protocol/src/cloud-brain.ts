@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { RemoteDevice } from "./remote.js";
 
 /** Where a cloud brain can run, by city: the regions @vercel/sandbox names for sandboxes. */
 export const BRAIN_REGIONS = {
@@ -117,6 +118,12 @@ export type CloudBrainStatus =
   | { state: "removing" };
 
 /** A project on this Mac, and whether the cloud brain has a copy of it. */
+/** What the brain and its thread sandboxes ran since `since` (the month's start), at Vercel's list prices. */
+export interface CloudBrainCost {
+  usd: number;
+  since: number;
+}
+
 export interface CloudBrainProject {
   /** The Mac project. */
   id: string;
@@ -175,8 +182,12 @@ export const cloudBrainRpcParams = {
   "cloud.brain.handover": z.object({}),
   /** Deletes the brain's door, then the brain with its disk and its thread sandboxes, and forgets its key. */
   "cloud.brain.remove": z.object({}),
+  /** Has the brain count its conversations again, for the Remove confirm. Never wakes it: one asleep keeps its last count. */
+  "cloud.brain.recount": z.object({}),
   /** This Mac's projects, and which the brain has. Never wakes the brain. */
   "cloud.brain.projects": z.object({}),
+  /** What the brain, its thread sandboxes and their snapshots cost this month, from Vercel's own numbers; null before setup. Never wakes it. */
+  "cloud.brain.cost": z.object({}),
   /** Sends a project to the brain, or removes its copy there, waking the brain. */
   "cloud.brain.project": z.object({ projectId: z.string().min(1), on: z.boolean() }).strict(),
   /** What the brain signs in with besides Claude. Never wakes the brain. */
@@ -189,6 +200,10 @@ export const cloudBrainRpcParams = {
   "cloud.brain.codex.remove": z.object({}),
   /** Sends this Mac's GitHub sign-in to the brain, or deletes it there, waking the brain. */
   "cloud.brain.github": z.object({ on: z.boolean() }).strict(),
+  /** The phones paired with the brain, as this Mac last heard them. Never wakes the brain. */
+  "cloud.brain.phones": z.object({}),
+  /** Unpairs a phone from the brain, waking it, so the phone can no longer connect. */
+  "cloud.brain.phones.remove": z.object({ id: z.string().min(1).max(100) }).strict(),
 };
 
 export interface CloudBrainRpcResults {
@@ -198,7 +213,9 @@ export interface CloudBrainRpcResults {
   "cloud.brain.pair": CloudBrainPairing;
   "cloud.brain.handover": CloudBrainStatus;
   "cloud.brain.remove": CloudBrainStatus;
+  "cloud.brain.recount": CloudBrainStatus;
   "cloud.brain.projects": CloudBrainProject[];
+  "cloud.brain.cost": CloudBrainCost | null;
   "cloud.brain.project": CloudBrainProject[];
   "cloud.brain.signIns": CloudBrainSignIns;
   "cloud.brain.codex.signIn": CloudBrainSignIns;
@@ -206,4 +223,6 @@ export interface CloudBrainRpcResults {
   "cloud.brain.codex.apiKey": CloudBrainSignIns;
   "cloud.brain.codex.remove": CloudBrainSignIns;
   "cloud.brain.github": CloudBrainSignIns;
+  "cloud.brain.phones": RemoteDevice[];
+  "cloud.brain.phones.remove": RemoteDevice[];
 }

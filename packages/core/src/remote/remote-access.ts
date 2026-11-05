@@ -37,6 +37,7 @@ import type { ProtectedSecretStore } from "../services/extraction-credentials.js
 import { PREVIEW_THREAD_GONE, previewThreadLive } from "../services/preview.js";
 import type { Broadcast, Logger } from "../transport.js";
 import { readRemoteAsset } from "./assets.js";
+import { removedBrains } from "./removed-brains.js";
 import { listen, type Listener } from "./listener.js";
 import { PairingOffers } from "./offers.js";
 import { remoteError, type MacRoots } from "./phone-words.js";
@@ -221,6 +222,8 @@ export class RemoteAccess {
         return deviceId === OWNER ? null : (this.network.door?.(deviceId) ?? null);
       case "host.kind":
         return this.network.publicAddress ? "brain" : "mac";
+      case "brains.removed":
+        return removedBrains(this.options.db);
     }
   }
 

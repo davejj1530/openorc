@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import {
   BRAIN_PROJECT,
-  BrainMachine,
   BrainRefused,
   BrainUnavailable,
   brainKeyFrom,
@@ -12,13 +11,14 @@ import {
   type BrainAccess,
   type BrainControlResults,
   type BrainKey,
-  type BrainMachineStatus,
-  type DoorBundle,
   type HandoverClaudeAccount,
   type HandoverCodexLogin,
 } from "@openorc/cloud";
-import { claudeAccounts, projects, redact, type Db } from "@openorc/db";
-import type { BrainRegion, CloudBrainMachine, CloudBrainPairing, CloudBrainProject, CloudBrainSignIns, CloudBrainStatus, CloudBrainStep, Project } from "@openorc/protocol";
+import { projects, redact, type Db } from "@openorc/db";
+import type { BrainRegion, CloudBrainCost, CloudBrainMachine, CloudBrainPairing, CloudBrainProject, CloudBrainSignIns, CloudBrainStatus, CloudBrainStep, Project } from "@openorc/protocol";
+import { BrainCosts } from "./cloud-brain-cost.js";
+import { openMachine, shownMachine, type BrainBundleSource, type BrainMachineLike, type OpenBrainMachine } from "./cloud-brain-machine.js";
+import { BrainPhones } from "./cloud-brain-phones.js";
 import type { ClaudeCloudTokens } from "./claude-cloud-tokens.js";
 import { BrainDoorKeeper, vercelDoors, type BrainDoors } from "./cloud-brain-door.js";
 import { anyMoved, blocked, confirmCurrent, copyBranch, failedAt, freshCopy, hasThreads, keptOwn, seen, stale, switchedOn, type BrainProject } from "./cloud-brain-projects.js";
@@ -31,23 +31,6 @@ import type { ProtectedSecretStore } from "./extraction-credentials.js";
 const BRAIN_NAME = "Cloud";
 const storageError = "Cannot access protected storage for the cloud brain. Unlock your OS keychain and retry.";
 const unavailable = "The cloud brain isn't available in this build.";
-
-/** A brain this build can install. Read only when installing it, since it is tens of megabytes. */
-export interface BrainBundleSource {
-  version: string;
-  read(): Promise<Buffer>;
-  /** The door this build deploys beside the brain, which a paired phone knocks on to wake it. */
-  door?: DoorBundle;
-}
-
-/** The parts of BrainMachine this uses; tests pass a stand-in. Moving threads uses the transfers too. */
-export type BrainMachineLike = Pick<BrainMachine, "status" | "provision" | "wake" | "control" | "importProject" | "remove"> & Partial<Pick<BrainMachine, "receiveThread" | "readOutbox" | "costSince">>;
-
-/** The brain's machine on a team. Its project is made only when `create`; otherwise a team without one has none. */
-export type OpenBrainMachine = (access: BrainAccess, create: boolean) => Promise<BrainMachineLike | null>;
-const openMachine: OpenBrainMachine = (access, create) => (create ? BrainMachine.connect(access) : BrainMachine.find(access));
-
-/** What the brain last took of one Claude account, to name it in Settings and to tell a change since. */
 
 /** Kept in protected storage. The key alone opens the brain's secrets, so it is saved before anything is made. */
 interface Stored extends SignInRecord {
@@ -70,22 +53,7 @@ interface Stored extends SignInRecord {
 type Activity = { kind: "setting-up"; step: CloudBrainStep } | { kind: "removing" } | { kind: "waking" } | { kind: "sending" } | { kind: "updating" };
 
 /** What a ready brain shows it is at while each operation runs. */
-const WORKING: Record<Activity["kind"], Extract<CloudBrainStatus, { state: "ready" }>["working"]> = {
-  "setting-up": null,
-  removing: null,
-  waking: "waking",
-  sending: "sending",
-  updating: "updating",
-};
-
-const MACHINE: Record<BrainMachineStatus["state"], CloudBrainMachine | "missing"> = {
-  running: "awake",
-  stopped: "asleep",
-  starting: "starting",
-  stopping: "stopping",
-  failed: "failed",
-  missing: "missing",
-};
+const WORKING: Partial<Record<Activity["kind"], Extract<CloudBrainStatus, { state: "ready" }>["working"]>> = { waking: "waking", sending: "sending", updating: "updating" };
 
 export interface CloudBrainDeps {
   db: Db;
@@ -124,9 +92,14 @@ export class CloudBrain {
   /** A Codex login made for the brain, or its sign-out, shown at once while it waits its turn for the record. */
   private codexWaiting: HandoverCodexLogin | null | undefined = undefined;
   private readonly door: BrainDoorKeeper;
+  /** The phones paired with it, as this Mac last heard them. */
+  readonly phones: BrainPhones;
+  private readonly costs = new BrainCosts();
+  private stuck = new Map<string, string | null>();
 
   constructor(private readonly deps: CloudBrainDeps) {
     this.door = new BrainDoorKeeper({ doors: deps.doors ?? vercelDoors, project: deps.projects?.door, changed: () => this.changed(), scrub: (error) => this.scrub(error) });
+    this.phones = new BrainPhones({ db: deps.db, machine: (wake, work) => this.withMachine(wake, work), changed: () => this.changed() });
   }
 
   async status(): Promise<CloudBrainStatus> {
@@ -145,10 +118,11 @@ export class CloudBrain {
     if (!stored.ready) return { state: "incomplete", region: stored.region, error: this.error };
     const { machine, error } = await this.look(stored);
     if (machine === "missing") return { state: "incomplete", region: stored.region, error: this.error ?? "The cloud brain's machine is gone." };
-    const working = this.activity ? WORKING[this.activity.kind] : null;
+    const working = (this.activity && WORKING[this.activity.kind]) ?? null;
     const behind = !sameSent((await this.claude().catch(() => [])).map(sent), stored.claude);
     const claude = stored.claude.map((account) => account.name);
-    return { state: "ready", region: stored.region, machine, claude, behind, working, door: this.door.status(), error: this.error ?? error };
+    const threads = (stored.projects ?? []).reduce((sum, record) => sum + record.threads, 0);
+    return { state: "ready", region: stored.region, machine, claude, behind, working, door: this.door.status(), threads, error: this.error ?? error };
   }
 
   /**
@@ -188,7 +162,12 @@ export class CloudBrain {
     this.stuck = await failedAt(this.deps.db, (await this.read().catch(() => null))?.projects ?? []);
   }
 
-  /** What the brain and its thread sandboxes ran this month, at Vercel's list prices; null before setup. Never wakes it. */
+  /** The brain counts its conversations again when it runs, for the Remove confirm. Never wakes it. */
+  async recount(): Promise<void> {
+    await this.serialize(() => this.refreshProjects(false)).catch(() => undefined);
+  }
+
+  /** What the brain and its thread sandboxes ran and kept this month, at Vercel's list prices; null before setup. Never wakes it. */
   async cost(now = Date.now()): Promise<CloudBrainCost | null> {
     const stored = await this.read().catch(() => null);
     if (!stored?.ready) return null;
@@ -285,6 +264,7 @@ export class CloudBrain {
       const machine = await this.machine();
       await this.wakeUp(machine);
       const { url, expiresAt } = await machine.control({ op: "pair" });
+      this.phones.pairing(expiresAt);
       return { url, expiresAt };
     });
   }
@@ -410,6 +390,7 @@ export class CloudBrain {
       await this.door.remove({ token: vercel.token, teamId });
       await (await this.open({ token: vercel.token, teamId }, false))?.remove();
       await this.write(null);
+      this.phones.forget();
       this.elsewhere = null;
     }).catch(() => undefined);
   }
@@ -481,7 +462,7 @@ export class CloudBrain {
       if (!stored?.ready || !vercel) return;
       const access = { token: vercel.token, teamId: stored.teamId };
       const project = this.deps.projects?.brain ?? BRAIN_PROJECT;
-      await this.door.open(access, { ...(await this.wakeInput(stored)), vercel: { ...access, project }, revoked: [] }, door);
+      await this.door.open(access, { ...(await this.wakeInput(stored)), vercel: { ...access, project }, revoked: this.phones.refused() }, door);
     }).catch(() => undefined);
   }
 
@@ -496,7 +477,7 @@ export class CloudBrain {
    * the brain's copy took it, one at a time. Never wakes the brain: one that went to sleep meanwhile is refreshed at its
    * next wake.
    */
-  private async refreshProjects(): Promise<void> {
+  private async refreshProjects(send = true): Promise<void> {
     const stored = await this.read();
     if (!stored?.ready || !stored.projects?.length) return;
     if (await this.behindUpdate(stored)) return;
@@ -675,7 +656,7 @@ export class CloudBrain {
     try {
       const vercel = await this.vercel();
       const machine = await this.open({ token: vercel.token, teamId: stored.teamId }, false);
-      return { machine: machine ? MACHINE[(await machine.status()).state] : "missing", error: null };
+      return { machine: machine ? shownMachine[(await machine.status()).state] : "missing", error: null };
     } catch (error) {
       return { machine: null, error: `Could not ask Vercel about the cloud brain. ${await this.scrub(error)}` };
     }

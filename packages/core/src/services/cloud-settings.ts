@@ -7,8 +7,12 @@ export const SANDBOX_PROJECT = "openorc-sandboxes";
 const API = "https://api.vercel.com";
 const storageError = "Cannot access protected storage for cloud credentials. Unlock your OS keychain and retry.";
 
+/** What a token reaches, by Vercel's word: the whole account, these teams, or null when Vercel would not say. */
+type Reach = "account" | string[] | null;
+
 interface Stored {
-  vercel?: { token: string; team?: CloudTeam; project?: { id: string; name: string }; vcpus?: number; region?: BrainRegion };
+  /** `reach` is missing until Vercel was asked; records from before lack it. */
+  vercel?: { token: string; team?: CloudTeam; project?: { id: string; name: string }; vcpus?: number; region?: BrainRegion; reach?: Reach };
   /** Working conversations move to the cloud when this Mac goes to sleep. */
   takeover?: boolean;
 }
@@ -24,6 +28,11 @@ export interface CloudSettingsOptions {
   brainRegion?: () => Promise<BrainRegion | null>;
   /** This Mac's time zone, an IANA name, which picks the region when nothing else does. */
   timeZone?: () => string;
+}
+
+/** Whether the token reaches more than the chosen team, by Vercel's word; nothing before a team is chosen. */
+function reachesMore({ reach, team }: NonNullable<Stored["vercel"]>): boolean {
+  return Boolean(team && reach && (reach === "account" || reach.some((id) => id !== team.id)));
 }
 
 /** Vercel's own words about a refusal; never the request, which carries the token. */
@@ -42,6 +51,8 @@ export class CloudSettings {
   private readonly request: VercelRequest;
   private readonly brainRegion: () => Promise<BrainRegion | null>;
   private readonly timeZone: () => string;
+  /** The token Vercel was last asked about, so one it could not answer for is asked again only at the next start. */
+  private reachAskedFor: string | null = null;
 
   constructor(
     private readonly store: ProtectedSecretStore | undefined,
@@ -60,7 +71,9 @@ export class CloudSettings {
   private async view(stored: Stored): Promise<VercelStatus> {
     const vercel = stored.vercel;
     return {
-      vercel: vercel ? { team: vercel.team ?? null, project: vercel.project?.name ?? null, vcpus: vercel.vcpus ?? null, region: await this.region(vercel) } : null,
+      vercel: vercel
+        ? { team: vercel.team ?? null, project: vercel.project?.name ?? null, vcpus: vercel.vcpus ?? null, region: await this.region(vercel), ...(reachesMore(vercel) ? { reachesMore: true } : {}) }
+        : null,
       error: null,
       takeover: stored.takeover ?? false,
     };
@@ -105,6 +118,21 @@ export class CloudSettings {
     return { response, body: response.ok ? ((await response.json()) as T) : null };
   }
 
+  /** Undefined when Vercel could not be asked, so it is asked again later. */
+  private async reachOf(token: string): Promise<Reach | undefined> {
+    try {
+      const { response, body } = await this.call<{ token?: { scopes?: { type?: string; teamId?: string }[] } }>(token, "/v5/user/tokens/current");
+      if (!body) return [401, 403, 404].includes(response.status) ? null : undefined;
+      const scopes = body.token?.scopes ?? [];
+      // A token with no scope at all has no limit, as the Vercel CLI's own login does.
+      if (!scopes.length || scopes.some((scope) => scope.type === "user")) return "account";
+      const teams = scopes.flatMap((scope) => (scope.type === "team" && scope.teamId ? [scope.teamId] : []));
+      return teams.length ? teams : null;
+    } catch {
+      return undefined;
+    }
+  }
+
   private async teamsFor(token: string): Promise<CloudTeam[]> {
     const { response, body } = await this.call<{ teams: { id: string; name: string | null; slug: string }[] }>(token, "/v2/teams?limit=100");
     if (response.status === 401 || response.status === 403) throw new Error("Vercel did not accept that token.");
@@ -126,7 +154,7 @@ export class CloudSettings {
   status(): Promise<VercelStatus> {
     return this.serialize(async () => {
       try {
-        return await this.view(await this.read());
+        return await this.view(await this.withReach(await this.read()));
       } catch (error) {
         return { vercel: null, error: error instanceof Error ? error.message : storageError, takeover: false };
       }
@@ -197,6 +225,16 @@ export class CloudSettings {
       if (!team) throw new Error("That team is not on this Vercel account.");
       return this.write({ ...stored, vercel: { ...stored.vercel, token, team, project: await this.projectOn(token, team) } });
     });
+  }
+
+  /** What a saved token reaches is asked of Vercel once, when Settings first looks after it was saved. */
+  private async withReach(stored: Stored): Promise<Stored> {
+    if (!stored.vercel || stored.vercel.reach !== undefined || this.reachAskedFor === stored.vercel.token) return stored;
+    this.reachAskedFor = stored.vercel.token;
+    const reach = await this.reachOf(stored.vercel.token);
+    if (reach === undefined) return stored;
+    await this.write({ ...stored, vercel: { ...stored.vercel, reach } });
+    return this.read();
   }
 
   /** Forgets Vercel; where sandboxes run on this Mac stays chosen. */

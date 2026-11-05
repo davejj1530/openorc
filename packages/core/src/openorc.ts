@@ -59,6 +59,7 @@ import { createTasksHost } from "./mcp-host/tasks.js";
 import { createThreadsHost } from "./mcp-host/threads.js";
 import type { OpenOrcOptions } from "./options.js";
 import { RemoteAccess } from "./remote/remote-access.js";
+import { rememberRemovedBrain } from "./remote/removed-brains.js";
 import { requestOrigin, type RequestOrigin } from "./request-origin.js";
 import { AgentUpdateService } from "./services/agent-updates.js";
 import { AttachmentService } from "./services/attachments.js";
@@ -335,6 +336,13 @@ export class OpenOrc {
     return this.routing;
   }
 
+  /** The cloud brain is gone: moves to or from it settle now, its kept lists and read-only copies leave this Mac, and phones hear it went. */
+  private async brainRemoved(linkKey: string | null): Promise<void> {
+    if (linkKey) rememberRemovedBrain(this.db, linkKey);
+    await this.cloudParts.coordinator?.brainRemoved();
+    await this.brainRouting?.forget();
+  }
+
   /** Phones choose their own alerts, so they hear every notice; "Desktop notifications" is the windows' switch. */
   private notify(n: Omit<Notification, "type">): void {
     const notice: Notification = { type: "notify", ...n, id: n.id ?? randomUUID() };
@@ -566,7 +574,7 @@ export class OpenOrc {
   private buildHandlers(invalidate: (keys: string[]) => void): Handlers {
     return composeHandlers(
       createSlackHandlers({ slack: this.slack, invalidate }),
-      createCloudHandlers({ ...this.cloudParts, offered: Boolean(this.options.cloudOffered && !this.options.cloudOnly), invalidate }),
+      createCloudHandlers({ ...this.cloudParts, offered: Boolean(this.options.cloudOffered && !this.options.cloudOnly), invalidate, removed: (linkKey) => this.brainRemoved(linkKey) }),
       createClaudeAccountHandlers(this.claudeAccounts),
       createSystemHandlers({
         system: this.system,

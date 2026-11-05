@@ -1,11 +1,12 @@
 import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";
-import { APIError, Sandbox as SdkSandbox } from "@vercel/sandbox";
+import { APIError, Sandbox as SdkSandbox, Snapshot } from "@vercel/sandbox";
 import type { SandboxInfo } from "../sandbox.js";
-import { STATES, type VercelCredentials } from "../vercel-sandbox.js";
+import { STATES, vercelSandboxCost, type VercelCredentials } from "../vercel-sandbox.js";
 import { ensureVercelProject, findVercelProject } from "../vercel-projects.js";
 import { BRAIN_AWAY_MS, BRAIN_EXIT, BRAIN_PORT, BRAIN_PROJECT, BRAIN_READY, BRAIN_SANDBOX, brainLayout, type BrainLayout } from "./layout.js";
 import { alreadyStopping } from "./self.js";
+import { billedSnapshots, snapshotStorageCost, type ListedSnapshot } from "./snapshot-storage.js";
 import { brainKeyText, encodeLaunch, parseControlReply, type BrainControlRequest, type BrainControlResult, type BrainControlResults, type BrainKey } from "./wire.js";
 
 /** The brain's folder under its sandbox's working folder. */
@@ -130,6 +131,34 @@ export interface BrainApi {
   get(params: VercelCredentials & { name: string; resume: boolean }): Promise<BrainVm | null>;
   /** The names of every sandbox in the project. */
   list(params: VercelCredentials): Promise<string[]>;
+  /** What the project's sandboxes ran from `since` on, one entry per session, as Vercel counts it. Reads only. */
+  sessions(params: VercelCredentials & { since: number }): Promise<SessionUsage[]>;
+  /** Every snapshot the project's sandboxes made, kept or deleted. Reads only. */
+  snapshots(params: VercelCredentials): Promise<ListedSnapshot[]>;
+  /** The project's snapshot storage on the team's bill from `since` on, and where the bill ends; null when the token may not read it. */
+  billedSnapshots(params: VercelCredentials & { since: number; now: number }): Promise<{ usd: number; until: number } | null>;
+  deleteSnapshot(params: VercelCredentials & { id: string }): Promise<void>;
+}
+
+/** One session of a sandbox, as Vercel bills it: CPU while it computed, memory for as long as it ran. */
+export interface SessionUsage {
+  activeCpuMs: number;
+  durationMs: number;
+  memoryMb: number;
+}
+
+/** The part of a session that fell from `since` on: a session running across the start counts its share. */
+export function sessionShare(
+  session: { startedAt?: number | undefined; createdAt: number; stoppedAt?: number | undefined; duration?: number | undefined; activeCpuDurationMs?: number | undefined; memory: number },
+  since: number,
+  now: number,
+): SessionUsage | null {
+  const start = session.startedAt ?? session.createdAt;
+  const end = session.stoppedAt ?? (session.duration !== undefined ? start + session.duration : now);
+  if (end <= since) return null;
+  const durationMs = Math.max(0, end - start);
+  const share = durationMs > 0 ? (end - Math.max(start, since)) / durationMs : 1;
+  return { activeCpuMs: (session.activeCpuDurationMs ?? 0) * share, durationMs: durationMs * share, memoryMb: session.memory };
 }
 
 function brainVm(sandbox: SdkSandbox, resumes: boolean): BrainVm {
@@ -175,6 +204,37 @@ const sdk: BrainApi = {
     }
   },
   list: async ({ token, teamId, projectId }) => (await (await SdkSandbox.list({ projectId, token, teamId })).toArray()).map((sandbox) => sandbox.name),
+  sessions: async ({ token, teamId, projectId, since }) => {
+    const used: SessionUsage[] = [];
+    const now = Date.now();
+    for await (const listed of await SdkSandbox.list({ projectId, token, teamId })) {
+      // A sandbox untouched since then ran no session since, unless one still runs from before.
+      if (listed.updatedAt < since && listed.status !== "running") continue;
+      const sandbox = await SdkSandbox.get({ name: listed.name, resume: false, token, teamId, projectId });
+      for await (const session of await sandbox.listSessions({ sortOrder: "desc" })) {
+        const share = sessionShare(session, since, now);
+        if (!share) break;
+        used.push(share);
+      }
+    }
+    return used;
+  },
+  snapshots: async (credentials) =>
+    (await (await Snapshot.list(credentials)).toArray()).map(({ id, parentId, status, sizeBytes, createdAt, expiresAt, lastUsedAt }) => ({
+      id,
+      parentId,
+      status,
+      sizeBytes,
+      createdAt,
+      expiresAt,
+      lastUsedAt,
+    })),
+  deleteSnapshot: async ({ id, ...credentials }) => (await Snapshot.get({ snapshotId: id, ...credentials })).delete(),
+  billedSnapshots: async ({ token, teamId, projectId, since, now }) => {
+    const range = new URLSearchParams({ teamId, from: new Date(since).toISOString(), to: new Date(now).toISOString() });
+    const response = await fetch(`https://api.vercel.com/v1/billing/charges?${range}`, { headers: { authorization: `Bearer ${token}` } });
+    return response.ok ? billedSnapshots(await response.text(), projectId, since) : null;
+  },
 };
 
 /** How setup supplies each thing the survey can find missing. */
@@ -534,7 +594,25 @@ export class BrainMachine {
     return { state: vm.state, address: hostOf(vm.domain(BRAIN_PORT)), expiresAt: vm.expiresAt?.getTime() ?? null };
   }
 
-  /** Deletes every sandbox in the brain's project, the brain's and its threads', with the snapshots only they used. */
+  /**
+   * What the brain and its thread sandboxes ran from `since` on, at Vercel's list prices, from the sessions Vercel counts,
+   * and what their snapshots cost to keep. Asks Vercel only: a sleeping brain stays asleep.
+   */
+  async costSince(since: number, now = Date.now()): Promise<number> {
+    const [sessions, snapshots, billed] = await Promise.all([
+      this.api.sessions({ ...this.credentials, since }),
+      this.api.snapshots(this.credentials),
+      this.api.billedSnapshots({ ...this.credentials, since, now }).catch(() => null),
+    ]);
+    const ran = sessions.reduce((sum, session) => sum + vercelSandboxCost({ activeCpuMs: session.activeCpuMs, durationMs: session.durationMs, memoryMb: session.memoryMb }), 0);
+    // The days Vercel billed already, as billed; the hours since, from the snapshots it lists.
+    return ran + (billed?.usd ?? 0) + snapshotStorageCost(snapshots, Math.max(since, billed?.until ?? since), now);
+  }
+
+  /**
+   * Deletes every sandbox in the brain's project, the brain's and its threads', with their snapshots. Vercel deletes the
+   * snapshots only they used on its own, later, and has left one behind, so any still kept are deleted after.
+   */
   async remove(): Promise<void> {
     const names = await this.api.list(this.credentials);
     // The brain first, so it cannot make a thread sandbox again while the rest go.
@@ -542,6 +620,8 @@ export class BrainMachine {
       const vm = await this.api.get({ ...this.credentials, name, resume: false });
       await vm?.delete({ deleteOrphanSnapshots: true });
     }
+    for (const snapshot of await this.api.snapshots(this.credentials))
+      if (snapshot.status === "created") await this.api.deleteSnapshot({ ...this.credentials, id: snapshot.id }).catch(() => undefined);
   }
 
   private async run(vm: BrainVm, step: Step, args: string[]): Promise<string> {

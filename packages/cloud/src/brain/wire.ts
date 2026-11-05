@@ -284,6 +284,10 @@ export type BrainControlRequest =
   | { op: "project-settings"; source: string; settings: CopySettings }
   /** What the brain holds of each sign-in besides Claude's, so the Mac takes its word over its own record. */
   | { op: "sign-ins" }
+  /** The phones paired with the brain. */
+  | { op: "phones" }
+  /** Unpairs a phone, which can no longer connect; one already gone changes nothing. Answers the phones left. */
+  | { op: "remove-phone"; id: string }
   /** Close gracefully and exit; the sandbox keeps running. */
   | { op: "stop" }
   /** A stop for an update, answered at once: refused, the brain running on, while closing would cut work short. */
@@ -320,6 +324,15 @@ export interface BrainStatus {
   busy: string | null;
 }
 
+/** A phone paired with the brain, as its Mac's Settings lists it. */
+export interface BrainPhone {
+  id: string;
+  name: string;
+  createdAt: number;
+  lastSeenAt: number | null;
+  connected: boolean;
+}
+
 /** A Mac project's copy on the brain. */
 export interface ProjectCopy {
   projectId: string;
@@ -343,6 +356,8 @@ export interface BrainControlResults {
   "project-settings": { applied: boolean };
   /** The id of the Codex login it holds, the signInPrint of its GitHub sign-in, and its push key's id; null for none. */
   "sign-ins": { codex: string | null; github: string | null; push: string | null };
+  phones: { phones: BrainPhone[] };
+  "remove-phone": { phones: BrainPhone[] };
   stop: { stopping: true };
   "stop-for-update": { stopping: true };
   identity: { linkKey: string };
@@ -380,6 +395,7 @@ const commit = text(64, /^[0-9a-f]{40,64}$/);
 const count = int(0, Number.MAX_SAFE_INTEGER);
 const relocationId = text(64, /^[A-Za-z0-9-]+$/);
 const threadId = text(100, /^[A-Za-z0-9-]+$/);
+const deviceId = text(100, /^[A-Za-z0-9-]+$/);
 const packageFile = text(255, /^\w[\w.-]*$/);
 const refused = object({ refused: text(2000) });
 const REQUESTS = variants<BrainControlRequest>({
@@ -397,6 +413,8 @@ const REQUESTS = variants<BrainControlRequest>({
     settings: object({ setupScript: nullable(text(65_536)), branchPrefix: textOrEmpty(100), worktreeInclude: list(text(1000), 1000) }),
   }),
   "sign-ins": object({ op: literal("sign-ins") }),
+  phones: object({ op: literal("phones") }),
+  "remove-phone": object({ op: literal("remove-phone"), id: deviceId }),
   stop: object({ op: literal("stop") }),
   "stop-for-update": object({ op: literal("stop-for-update") }),
   identity: object({ op: literal("identity") }),
@@ -410,6 +428,7 @@ const REQUESTS = variants<BrainControlRequest>({
 const timestamp = int(0, Number.MAX_SAFE_INTEGER);
 const projectCopy = object({ projectId: text(100), macHead: commit, head: commit });
 const status = object({ state: literal("starting", "ready", "closing"), version: text(64), pid: int(1, 2 ** 31), since: timestamp, busy: nullable(text(100)) });
+const phones = object({ phones: list(object({ id: deviceId, name: textOrEmpty(255), createdAt: timestamp, lastSeenAt: nullable(timestamp), connected: literal(true, false) }), 1000) });
 const RESULTS: { [K in BrainControlOp]: Parse<BrainControlResults[K]> } = {
   status,
   wake: status,
@@ -421,6 +440,8 @@ const RESULTS: { [K in BrainControlOp]: Parse<BrainControlResults[K]> } = {
   "copies-current": object({ marked: count }),
   "project-settings": object({ applied: literal(true, false) }),
   "sign-ins": object({ codex: nullable(text(100)), github: nullable(text(64)), push: nullable(text(64)) }),
+  phones,
+  "remove-phone": phones,
   stop: object({ stopping: literal(true) }),
   "stop-for-update": object({ stopping: literal(true) }),
   identity: object({ linkKey: text(64, /^[A-Za-z0-9_-]+$/) }),

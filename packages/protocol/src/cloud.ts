@@ -118,6 +118,8 @@ export interface CloudStatus {
     vcpus: number | null;
     /** Where new sandboxes run: the region chosen, else the cloud brain's, else the nearest by this Mac's time zone. */
     region: BrainRegion;
+    /** Set when Vercel says the saved token reaches more than the chosen team: the whole account, or other teams too. */
+    reachesMore?: true;
   } | null;
   /** By Claude account id. */
   claude: Record<string, ClaudeCloudAccess>;

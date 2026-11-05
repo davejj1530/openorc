@@ -144,6 +144,12 @@ export class BrainMirrors {
     if (await closeMirror(this.deps.db, threadId)) this.deps.changed(threadId);
   }
 
+  /** Every copy here, as when the brain they follow is removed. */
+  async closeAll(): Promise<void> {
+    for (const threadId of Object.keys(records(this.deps.db)))
+      await this.close(threadId).catch((error: unknown) => this.deps.log.warn(`thread ${threadId}'s copy on this Mac was not removed: ${error instanceof Error ? error.message : String(error)}`));
+  }
+
   private async pullOnce(threadId: string): Promise<void> {
     const record = records(this.deps.db)[threadId];
     const root = record && projects.get(this.deps.db, record.projectId)?.rootPath;

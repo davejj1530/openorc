@@ -4,7 +4,7 @@ import type { BrowserHost, PreviewHost } from "@openorc/protocol";
 import type { DeviceSystem } from "./devices/system.js";
 import type { RemoteNetwork } from "./remote/remote-access.js";
 import type { BrainDoors } from "./services/cloud-brain-door.js";
-import type { BrainBundleSource, OpenBrainMachine } from "./services/cloud-brain.js";
+import type { BrainBundleSource, OpenBrainMachine } from "./services/cloud-brain-machine.js";
 import type { BrainChannel, CoordinatorDeps } from "./services/relocation-coordinator.js";
 import type { BrainEndpoint } from "./services/brain-link.js";
 import type { ProtectedSecretStore } from "./services/extraction-credentials.js";

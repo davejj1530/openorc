@@ -18,7 +18,7 @@ import {
 } from "@openorc/cloud";
 import { OpenOrc } from "@openorc/core";
 import { DEFAULT_CLAUDE_ACCOUNT } from "@openorc/protocol";
-import { claudeAccounts, threads } from "@openorc/db";
+import { claudeAccounts, remoteDevices, threads } from "@openorc/db";
 import { commitAll, git, run, useGitHubSignIn } from "@openorc/git";
 import { NO_SANDBOX } from "./awake.js";
 import { controlHandlers, retireSignedOut } from "./control-ops.js";

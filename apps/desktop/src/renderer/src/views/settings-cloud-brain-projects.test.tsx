@@ -18,12 +18,14 @@ afterEach(() => {
   vi.resetAllMocks();
 });
 
-const ready: CloudBrainStatus = { state: "ready", region: "sin1", machine: "awake", claude: [], behind: false, working: null, door: null, error: null };
+const ready: CloudBrainStatus = { state: "ready", region: "sin1", machine: "awake", claude: [], behind: false, working: null, door: null, threads: 0, error: null };
 const project = (id: string, name: string, shown: Partial<CloudBrainProject> = {}): CloudBrainProject => ({ id, name, on: false, blocked: null, sending: false, kept: false, error: null, ...shown });
 
 function show(projects: CloudBrainProject[], status: CloudBrainStatus = ready) {
   vi.mocked(core.call).mockImplementation(async (method: string, params: unknown) => {
     if (method === "cloud.brain.projects") return projects as never;
+    if (method === "cloud.brain.cost") return null as never;
+    if (method === "cloud.brain.phones") return [] as never;
     if (method === "cloud.brain.project") {
       const { projectId, on } = params as { projectId: string; on: boolean };
       return projects.map((each) => (each.id === projectId ? { ...each, on } : each)) as never;

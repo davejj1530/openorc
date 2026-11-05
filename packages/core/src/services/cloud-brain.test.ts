@@ -19,6 +19,7 @@ import {
   type BrainControlResults,
   type BrainKey,
   type BrainMachineStatus,
+  type BrainPhone,
   type CopySettings,
   type DoorAccess,
   type DoorBundle,
@@ -35,7 +36,8 @@ import { OpenOrc } from "../openorc.js";
 import type { OpenOrcOptions } from "../options.js";
 import { rpcClient } from "../rpc-test-client.js";
 import type { BrainDoors } from "./cloud-brain-door.js";
-import { CloudBrain, type BrainMachineLike } from "./cloud-brain.js";
+import { CloudBrain } from "./cloud-brain.js";
+import type { BrainMachineLike } from "./cloud-brain-machine.js";
 
 const VERCEL_TOKEN = "vcp_fixture-vercel-token-0123456789";
 const PERSONAL = "sk-ant-oat01-personal-fixture-token-0123456789";
@@ -81,6 +83,8 @@ class FakeBrain implements BrainMachineLike {
   /** Why it will not list its copies, as a brain from before projects. */
   refusesProjects: string | null = null;
   beforeProjects: () => Promise<void> = async () => undefined;
+  /** The phones paired with it. */
+  phones: BrainPhone[] = [];
 
   async status() {
     this.calls.push("status");
@@ -118,6 +122,11 @@ class FakeBrain implements BrainMachineLike {
       return { applied: ["claude"] } as never;
     }
     if (request.op === "pair") return { url: "openorc://pair#v1.fixture", expiresAt: Date.now() + 120_000 } as never;
+    if (request.op === "phones") return { phones: this.phones } as never;
+    if (request.op === "remove-phone") {
+      this.phones = this.phones.filter((phone) => phone.id !== request.id);
+      return { phones: this.phones } as never;
+    }
     if (request.op === "projects") {
       await this.beforeProjects();
       if (this.refusesProjects) throw new BrainRefused(this.refusesProjects);
@@ -173,6 +182,12 @@ class FakeBrain implements BrainMachineLike {
   async remove() {
     this.calls.push("remove");
     this.state = "missing";
+  }
+  /** What Vercel says the brain and its thread sandboxes ran this month, at list prices. */
+  usd = 1.25;
+  async costSince(since: number) {
+    this.calls.push(`cost ${since}`);
+    return this.usd;
   }
 }
 
@@ -261,12 +276,25 @@ describe("the cloud brain from the Mac", () => {
     ]);
     expect(stored()).toMatchObject({ key: brainKeyText(brain.key!), region: "sin1", teamId: "team_fixture" });
     expect(record.saved.join("\n")).not.toContain(PERSONAL);
-    expect(await status()).toEqual({ state: "ready", region: "sin1", machine: "awake", claude: ["Existing CLI login", "Work"], behind: false, working: null, door: null, error: null });
+    expect(await status()).toEqual({ state: "ready", region: "sin1", machine: "awake", claude: ["Existing CLI login", "Work"], behind: false, working: null, door: null, threads: 0, error: null });
 
     const key = stored()!.key;
     await setUp();
     expect(new Set(record.saved.map((value) => JSON.parse(value).key))).toEqual(new Set([key]));
     expect(brainKeyText(brain.key!)).toBe(key);
+  });
+
+  it("says what the brain and its thread sandboxes cost this month, from Vercel, asked at most every ten minutes, never waking it", async () => {
+    expect(await rpc("cloud.brain.cost", {})).toBeNull();
+    await setUp();
+    brain.state = "stopped";
+    brain.calls = [];
+    const now = new Date();
+    const since = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    expect(await rpc("cloud.brain.cost", {})).toEqual({ usd: 1.25, since });
+    brain.usd = 2;
+    expect(await rpc("cloud.brain.cost", {})).toEqual({ usd: 1.25, since });
+    expect(brain.calls).toEqual([`cost ${since}`]);
   });
 
   it("answers the status without waking a sleeping brain", async () => {
@@ -308,6 +336,16 @@ describe("the cloud brain from the Mac", () => {
     expect(await rpc("cloud.brain.remove", {})).toEqual({ state: "none", error: null });
     expect(brain.calls.at(-1)).toBe("remove");
     expect(stored()).toBeNull();
+  });
+
+  it("tells phones which brain it removed, by the key they saved it under; a brain it never reached adds none", async () => {
+    await setUp();
+    await (core as unknown as { cloudParts: { brain: CloudBrain } }).cloudParts.brain.rememberLinkKey("brain-link-key");
+    await rpc("cloud.brain.remove", {});
+    expect(await core.remote.device("phone", "brains.removed", {})).toEqual(["brain-link-key"]);
+    await setUp();
+    await rpc("cloud.brain.remove", {});
+    expect(await core.remote.device("phone", "brains.removed", {})).toEqual(["brain-link-key"]);
   });
 
   it("is where this Mac's cloud threads run while it is set up, unless Settings chooses another region", async () => {
@@ -819,6 +857,34 @@ describe("the cloud brain from the Mac", () => {
       expect(await readdir(brain.copies)).toEqual([]);
     });
 
+    it("counts the brain's conversations again for the Remove confirm while it runs, never waking it or sending a project", async () => {
+      const app = await sent();
+      brain.state = "running";
+      brain.threads.set(app.id, 2);
+      commit(app.folder, "b.txt", "b1\n");
+      expect(await rpc("cloud.brain.recount", {})).toMatchObject({ state: "ready", threads: 2 });
+      expect(imports()).toEqual([]);
+      brain.state = "stopped";
+      brain.threads.set(app.id, 3);
+      brain.calls = [];
+      expect(await rpc("cloud.brain.recount", {})).toMatchObject({ threads: 2 });
+      expect(brain.calls).not.toContain("wake");
+    });
+
+    it("tells the brain which copies hold this Mac's branch as it is now, so their synced age starts again", async () => {
+      const app = await sent();
+      const head = git(app.folder, "rev-parse", "main");
+      brain.confirmed = [];
+      await wake();
+      await vi.waitFor(() => expect(brain.confirmed).toEqual([{ source: app.id, macHead: head }]));
+      expect(imports()).toEqual([]);
+      brain.confirmed = [];
+      commit(app.folder, "b.txt", "b1\n");
+      await wake();
+      await vi.waitFor(() => expect(imports()).toEqual(["import app incremental"]));
+      expect(brain.confirmed).toEqual([]);
+    });
+
     it("updates the brain to this build's version first, then sends what is new", async () => {
       carried = "20261101120000-aaaaaaaaaaaa";
       const app = await sent();
@@ -983,6 +1049,49 @@ describe("the cloud brain's door", () => {
     expect(await status()).toEqual({ state: "none", error: null });
     expect(doors.removes).toHaveLength(2);
     expect(doors.removes[0]).toEqual({ token: VERCEL_TOKEN, teamId: "team_fixture" });
+  });
+
+  it("refuses a phone unpaired from the brain, which wakes for it, while Settings lists the phones without waking it", async () => {
+    const pocket = { id: randomUUID(), name: "Pocket", createdAt: 1_000, lastSeenAt: 5_000, connected: false };
+    const tablet = { id: randomUUID(), name: "Tablet", createdAt: 2_000, lastSeenAt: null, connected: false };
+    brain.phones = [pocket, tablet];
+    await setUp();
+    await vi.waitFor(async () => expect(await rpc("cloud.brain.phones", {})).toEqual([pocket, tablet]));
+    await vi.waitFor(() => expect(doors.opens).toHaveLength(1));
+    expect(doors.opens[0]!.opening.revoked).toEqual([]);
+
+    brain.state = "stopped";
+    brain.calls = [];
+    expect(await rpc("cloud.brain.phones", {})).toEqual([pocket, tablet]);
+    expect(brain.calls).not.toContain("wake");
+    expect(await rpc("cloud.brain.phones.remove", { id: pocket.id })).toEqual([tablet]);
+    expect(brain.calls.slice(0, 2)).toEqual(["wake", "control remove-phone"]);
+    expect(brain.phones).toEqual([tablet]);
+    await vi.waitFor(() => expect(doors.opens.at(-1)!.opening.revoked).toEqual([pocket.id]));
+
+    brain.state = "stopped";
+    brain.wakes = { state: "failed", detail: "Exited." };
+    expect(await rpc("cloud.brain.phones.remove", { id: tablet.id })).toEqual([tablet]);
+    expect(await status()).toMatchObject({ state: "ready", error: "The cloud brain did not start. Exited." });
+
+    await rpc("cloud.brain.remove", {});
+    expect(await rpc("cloud.brain.phones", {})).toEqual([]);
+  });
+
+  it("shows a phone paired with the brain's code within seconds while the code is out", async () => {
+    await setUp();
+    await rpc("cloud.brain.phones", {});
+    await vi.waitFor(() => expect(brain.calls).toContain("control phones"));
+    await rpc("cloud.brain.pair", {});
+    const pocket = { id: randomUUID(), name: "Pocket", createdAt: Date.now(), lastSeenAt: Date.now(), connected: true };
+    brain.phones = [pocket];
+    vi.useFakeTimers({ toFake: ["Date"], now: Date.now() + 11_000 });
+    try {
+      await rpc("cloud.brain.phones", {});
+      await vi.waitFor(async () => expect(await rpc("cloud.brain.phones", {})).toEqual([{ ...pocket, lastSeenAt: expect.any(Number) }]));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("is never opened by a build without one", async () => {

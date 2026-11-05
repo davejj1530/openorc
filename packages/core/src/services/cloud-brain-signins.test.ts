@@ -17,7 +17,7 @@ import {
 } from "@openorc/cloud";
 import type { RpcMethod, RpcParams, RpcResults } from "@openorc/protocol";
 import { OpenOrc } from "../openorc.js";
-import type { BrainMachineLike } from "./cloud-brain.js";
+import type { BrainMachineLike } from "./cloud-brain-machine.js";
 import { inheritedProbe } from "./shell-environment.js";
 
 /**

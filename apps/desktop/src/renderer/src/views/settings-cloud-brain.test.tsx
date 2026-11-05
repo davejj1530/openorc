@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
-import type { CloudBrainStatus } from "@openorc/protocol";
+import type { CloudBrainCost, CloudBrainStatus, RemoteDevice } from "@openorc/protocol";
 import { afterEach, expect, it, vi } from "vitest";
 import { CloudBrainSection } from "./settings-cloud-brain";
 import { queryClient } from "../lib/client";
@@ -22,17 +22,20 @@ const ready: Extract<CloudBrainStatus, { state: "ready" }> = {
   behind: false,
   working: null,
   door: null,
+  threads: 0,
   error: null,
 };
 
-function show(status: CloudBrainStatus, timeZone = "Asia/Manila") {
+function show(status: CloudBrainStatus, timeZone = "Asia/Manila", cost: CloudBrainCost | null = null, phones: RemoteDevice[] = [], codex: "chatgpt" | "apiKey" | null = null) {
   vi.spyOn(Intl.DateTimeFormat.prototype, "resolvedOptions").mockReturnValue({ timeZone } as Intl.ResolvedDateTimeFormatOptions);
   vi.mocked(core.call).mockImplementation(async (method: string) => {
     if (method === "cloud.brain.pair") return { url: "openorc://pair#v1.brain-fixture", expiresAt: Date.now() + 120_000 } as never;
     if (method === "cloud.brain.projects") return [] as never;
+    if (method === "cloud.brain.cost") return cost as never;
+    if (method === "cloud.brain.phones" || method === "cloud.brain.phones.remove") return phones as never;
     if (method === "cloud.brain.signIns")
       return {
-        codex: { mode: null, email: null, plan: null, signingIn: false, pending: null, error: null },
+        codex: { mode: codex, email: null, plan: null, signingIn: false, pending: null, error: null },
         github: { on: false, blocked: null, behind: false },
         push: { has: false, behind: false },
       } as never;
@@ -98,6 +101,17 @@ it("shows a set-up brain asleep with the Claude accounts it was sent, and wakes 
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.brain.wake", {}));
 });
 
+it("says quietly what the brain and its thread sandboxes cost this month, once Vercel said", async () => {
+  show(ready, "Asia/Manila", { usd: 3.456, since: 1 });
+  expect(await screen.findByText("$3.46")).toBeTruthy();
+  expect(screen.getByText("This month")).toBeTruthy();
+  cleanup();
+  queryClient.clear();
+  show(ready);
+  expect(await screen.findByText("Asleep")).toBeTruthy();
+  expect(screen.queryByText("This month")).toBeNull();
+});
+
 it("pairs a phone with the brain's own code", async () => {
   show({ ...ready, machine: "awake" });
   fireEvent.click(await screen.findByRole("button", { name: "Pair phone" }));
@@ -106,6 +120,41 @@ it("pairs a phone with the brain's own code", async () => {
   expect(core.call).toHaveBeenCalledWith("cloud.brain.pair", {});
   expect(within(sheet).getByText(/Expires in 1:5\d|Expires in 2:00/)).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Wake" })).toBeNull();
+});
+
+it("lists the phones paired with the brain as the Phone page does, and unpairs one there", async () => {
+  const pocket = { id: "phone-1", name: "Pocket", createdAt: Date.now() - 86_400_000, lastSeenAt: Date.now() - 7_200_000, connected: false };
+  show({ ...ready, machine: "awake" }, "Asia/Manila", null, [pocket, { ...pocket, id: "phone-2", name: "Tablet", lastSeenAt: null }]);
+  const row = (await screen.findByText("Pocket")).closest(".settings-field") as HTMLElement;
+  expect(within(row).getByText("Last seen 2h ago")).toBeTruthy();
+  expect(within(screen.getByText("Tablet").closest(".settings-field") as HTMLElement).getByText("Paired 1d ago")).toBeTruthy();
+  fireEvent.click(within(row).getByRole("button", { name: "Remove Pocket" }));
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.brain.phones.remove", { id: "phone-1" }));
+  expect(core.call).not.toHaveBeenCalledWith("remote.devices.remove", expect.anything());
+
+  cleanup();
+  queryClient.clear();
+  show({ ...ready, machine: "awake", working: "waking" }, "Asia/Manila", null, [pocket]);
+  expect(((await screen.findByRole("button", { name: "Remove Pocket" })) as HTMLButtonElement).disabled).toBe(true);
+});
+
+it("says in the removal confirm that the brain's own Codex login stays signed in at OpenAI, and where to end it", async () => {
+  show({ ...ready, machine: "awake" }, "Asia/Manila", null, [], "chatgpt");
+  fireEvent.click(await screen.findByRole("button", { name: "Remove" }));
+  const chatgpt = await screen.findByRole("button", { name: "ChatGPT" });
+  expect(chatgpt.closest("p")?.textContent).toBe("Its Codex login stays signed in until you log out its session in ChatGPT, under Settings > Security.");
+  cleanup();
+  queryClient.clear();
+  show({ ...ready, machine: "awake" }, "Asia/Manila", null, [], "apiKey");
+  fireEvent.click(await screen.findByRole("button", { name: "Remove" }));
+  const account = await screen.findByRole("button", { name: "your OpenAI account" });
+  expect(account.closest("p")?.textContent).toBe("Its OpenAI API key still works until you delete it in your OpenAI account.");
+  cleanup();
+  queryClient.clear();
+  show({ ...ready, machine: "awake" });
+  fireEvent.click(await screen.findByRole("button", { name: "Remove" }));
+  await screen.findByText("Remove the cloud brain?");
+  expect(screen.queryByText(/until you/)).toBeNull();
 });
 
 it("removes the brain only once the removal is confirmed", async () => {
@@ -117,6 +166,26 @@ it("removes the brain only once the removal is confirmed", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Remove" }));
   fireEvent.click(within(await screen.findByRole("dialog", { name: "Remove the cloud brain?" })).getByRole("button", { name: "Remove" }));
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.brain.remove", {}));
+});
+
+it("says how many conversations go with the brain, counted again as the confirm opens", async () => {
+  show({ ...ready, threads: 3 });
+  fireEvent.click(await screen.findByRole("button", { name: "Remove" }));
+  const confirm = await screen.findByRole("dialog", { name: "Remove the cloud brain?" });
+  expect(confirm.textContent).toContain("with its disk, the sandboxes it made and the 3 conversations on it. Bring to Mac any you want to keep first.");
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.brain.recount", {}));
+  cleanup();
+  queryClient.clear();
+  show({ ...ready, threads: 1 });
+  fireEvent.click(await screen.findByRole("button", { name: "Remove" }));
+  expect((await screen.findByRole("dialog", { name: "Remove the cloud brain?" })).textContent).toContain(
+    "with its disk, the sandboxes it made and the conversation on it. Bring it to your Mac first to keep it. Phones paired",
+  );
+  cleanup();
+  queryClient.clear();
+  show(ready);
+  fireEvent.click(await screen.findByRole("button", { name: "Remove" }));
+  expect((await screen.findByRole("dialog", { name: "Remove the cloud brain?" })).textContent).not.toContain("conversation");
 });
 
 it("sends the Claude sign-ins again after they failed to arrive, and says why", async () => {

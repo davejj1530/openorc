@@ -41,6 +41,7 @@ export {
   type BrainControlResults,
   type BrainHandover,
   type BrainKey,
+  type BrainPhone,
   type BrainStart,
   type BrainStatus,
   type CopySettings,

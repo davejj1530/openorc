@@ -1,9 +1,9 @@
-import type { RpcMethod } from "@openorc/protocol";
+import type { DeviceMethod, RpcMethod } from "@openorc/protocol";
 import type { Query, QueryClient, QueryKey } from "@tanstack/react-query";
 import type { KeyValue } from "./scratch-store";
 
-/** The reads the phone paints from on a cold start, before the Mac answers: Home's lists, and the Mac's look in its settings. */
-const KEPT: ReadonlySet<RpcMethod> = new Set<RpcMethod>(["projects.list", "threads.list", "app.settings.get"]);
+/** The reads the phone paints from on a cold start, before the Mac answers: Home's lists and task list, and the Mac's look in its settings. */
+const KEPT: ReadonlySet<string> = new Set<RpcMethod | DeviceMethod>(["projects.list", "threads.list", "app.settings.get", "tasks.board"]);
 const SAVE_AFTER_MS = 1_000;
 
 type Storage = KeyValue;
@@ -15,7 +15,7 @@ interface Kept {
 }
 
 const storageKey = (macId: string) => `lists.${macId}`;
-const kept = (query: Query) => KEPT.has(query.queryKey[0] as RpcMethod) && query.state.status === "success";
+const kept = (query: Query) => KEPT.has(String(query.queryKey[0])) && query.state.status === "success";
 
 /** Puts a Mac's saved lists back in the cache, as old as they are, so they refetch once the Mac answers. */
 export function restoreLists(client: QueryClient, storage: Storage, macId: string): boolean {

@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, expect, it, onTestFinished, vi } from "vitest";
 import { attachImage, pickImages } from "../composer/attachments";
 import type { DraftImage } from "../composer/drafts";
+import { HostContext } from "../connection/host-context";
 import type { FakeMac } from "../test-fixtures/fake-mac";
 import { nativeProps } from "../test-fixtures/react-native";
 import { NewThreadScreen } from "./NewThreadScreen";
@@ -73,6 +74,21 @@ it("swaps itself for the started thread", async () => {
   await act(async () => fireEvent.click(button("Start")));
   await waitFor(() => expect(router.replace).toHaveBeenCalledWith({ pathname: "/thread/[id]", params: { id: "thread-1" } }));
   expect(mac.start.mock.calls[0]![0]).toMatchObject({ projectId: "openorc", workspaceMode: "worktree" });
+});
+
+it("opens a thread started on the cloud brain there, not on the shown Mac", async () => {
+  render(
+    <HostContext.Provider value="brain-1">
+      <NewThreadScreen />
+    </HostContext.Provider>,
+    { wrapper: mac.phone!.wrapper },
+  );
+  await waitFor(() => expect(project("notes")).toBeTruthy());
+  act(() => (nativeProps.get(screen.getByLabelText("Message"))!.onChangeText as (text: string) => void)("Try the cloud"));
+  await waitFor(() => expect(button("Start").getAttribute("aria-disabled")).toBe("false"));
+  mac.start.mockResolvedValue({ thread: { id: "cloud-thread-1" } });
+  await act(async () => fireEvent.click(button("Start")));
+  await waitFor(() => expect(router.replace).toHaveBeenCalledWith({ pathname: "/thread/[id]", params: { id: "cloud-thread-1", host: "brain-1" } }));
 });
 
 it("leaves the person where they went when the Mac answers after they left", async () => {

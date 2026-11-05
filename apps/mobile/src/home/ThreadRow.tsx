@@ -1,7 +1,7 @@
 import { ownerMark, relativeTime, subagentStatusLabel, threadHeadline, threadMark, threadPlace, type ThreadHeadline, type ThreadPlace, type ThreadTreeRow } from "@openorc/client";
 import { harnessShortName, isHarnessId, isSubagentThread, type ThreadSummary } from "@openorc/protocol";
 import { Link } from "expo-router";
-import { memo, useContext, useMemo, type ComponentType } from "react";
+import { memo, useContext, useMemo, useState, type ComponentType, type ReactNode } from "react";
 import { View } from "react-native";
 import { HostContext } from "../connection/host-context";
 import { Folder, GitBranch, GitPullRequest } from "../generated/icons";
@@ -17,6 +17,7 @@ import { rowMenu } from "../thread/ThreadMenu";
 import { useSnoozeClock } from "../thread/snooze-clock";
 import { useThreadActions } from "../thread/use-thread-actions";
 import { useRowRun } from "./row-run";
+import { macAsleep, MAC_ASLEEP } from "./out-of-reach";
 import { ThreadTreeFrame } from "./ThreadBranch";
 import { ThreadRowHeading } from "./ThreadRowHeading";
 
@@ -29,11 +30,36 @@ function rowFacts(thread: ThreadSummary, where: string): string[] {
   return [where, isHarnessId(thread.agent) ? harnessShortName(thread.agent) : thread.agent, relativeTime(thread.lastActivityAt)];
 }
 
+/** The row's second line: the live headline in its tone, else where the thread works. */
+function RowLine({ headline, where, Icon }: { headline: ThreadHeadline | null; where: string; Icon: ComponentType<IconProps> }) {
+  return (
+    <View className="ml-6 flex-row items-center gap-1">
+      {headline ? null : <Icon size={12} className="text-ink-4" />}
+      <Text numberOfLines={1} className={cn("flex-1 text-sm text-ink-4", headline && headlineTones[headline.tone])}>
+        {headline?.text ?? where}
+      </Text>
+    </View>
+  );
+}
+
+/** A row of a Mac out of reach: dimmed, and a tap says why it does nothing. */
+function AsleepRow({ label, className, children }: { label: string; className: string; children: ReactNode }) {
+  const [explained, setExplained] = useState(false);
+  return (
+    <ListPressable accessibilityRole="button" accessibilityLabel={label} onPress={() => setExplained((shown) => !shown)} className={className}>
+      <View className="gap-0.5 opacity-60">{children}</View>
+      {explained ? <Text className="ml-6 text-sm text-ink-3">{MAC_ASLEEP}</Text> : null}
+    </ListPressable>
+  );
+}
+
 /**
  * The desktop sidebar's thread row at touch size: the status lead, the muted title, and a second line. That line is the
  * live headline while there is something to say (the step the agent is on, what it waits for, what a finished turn
  * came to), and otherwise where the thread works. The row holds the thread's live run, so the run's frames arrive.
  * Tapping it pushes the thread; holding it opens the thread's menu; swiping marks it read or unread, or archives it.
+ * A row of a Mac the phone cannot reach shows from the last list, dimmed, with where it works: a tap says why it does
+ * nothing, and it has no swipes or menu, since nothing would reach the Mac.
  */
 export const ThreadRow = memo(function ThreadRow({
   thread,
@@ -49,14 +75,16 @@ export const ThreadRow = memo(function ThreadRow({
   onToggle?: () => void;
 }) {
   const run = useRowRun(thread.liveRunId ?? undefined);
-  const headline = useMemo(() => threadHeadline(thread, run), [thread, run]);
+  const asleep = macAsleep(thread.owner);
+  const live = useMemo(() => threadHeadline(thread, run), [thread, run]);
+  // What it was doing when the Mac last answered is no longer happening.
+  const headline = asleep ? null : live;
   const actions = useThreadActions(thread);
   const now = useSnoozeClock();
   const compact = Boolean(tree?.depth);
   const child = thread.subagent;
   const mark = threadMark(thread);
   const place = threadPlace(thread);
-  const PlaceIcon = placeIcons[place.kind];
   const owner = ownerMark(thread);
   const host = useContext(HostContext);
   const where = [project, place.label, owner?.label].filter(Boolean).join(" · ");
@@ -64,26 +92,29 @@ export const ThreadRow = memo(function ThreadRow({
   const swipes = threadSwipes(thread);
   const leading: SwipeAction | undefined = isSubagentThread(thread) ? undefined : { label: swipes.leading.label, tone: "review", run: () => actions.save(swipes.leading.patch) };
   const trailing: SwipeAction | undefined = swipes.trailing ? { label: swipes.trailing.label, tone: "accent", run: () => actions.save(swipes.trailing!.patch) } : undefined;
+  const label = [thread.title, child ? subagentStatusLabel[child.status] : mark?.label, compact ? null : headline?.text, ...facts].filter(Boolean).join(", ");
+  const lines = (
+    <>
+      <ThreadRowHeading thread={thread} compact={compact} mark={mark} />
+      {compact ? null : <RowLine headline={headline} where={where} Icon={placeIcons[place.kind]} />}
+    </>
+  );
+  const rowClass = cn("mx-2.5 justify-center gap-0.5 rounded-md bg-bg px-2.5 py-1.5 active:bg-surface-2", compact ? "min-h-touch" : "min-h-touch-row");
+  if (asleep)
+    return (
+      <ThreadTreeFrame tree={tree} arriving={arriving} onToggle={onToggle}>
+        <AsleepRow label={label} className={rowClass}>
+          {lines}
+        </AsleepRow>
+      </ThreadTreeFrame>
+    );
   return (
     <ThreadTreeFrame tree={tree} arriving={arriving} onToggle={onToggle}>
       <SwipeRow id={thread.id} leading={leading} trailing={trailing}>
         <Link href={{ pathname: "/thread/[id]", params: host ? { id: thread.id, host } : { id: thread.id } }} push dangerouslySingular asChild onPress={() => markThreadOpening(thread.id)}>
           <Link.Trigger>
-            <ListPressable
-              accessibilityRole="button"
-              accessibilityLabel={[thread.title, child ? subagentStatusLabel[child.status] : mark?.label, compact ? null : headline?.text, ...facts].filter(Boolean).join(", ")}
-              {...swipeAccessibility([leading, trailing])}
-              className={cn("mx-2.5 justify-center gap-0.5 rounded-md bg-bg px-2.5 py-1.5 active:bg-surface-2", compact ? "min-h-touch" : "min-h-touch-row", owner?.dim && "opacity-60")}
-            >
-              <ThreadRowHeading thread={thread} compact={compact} mark={mark} />
-              {!compact ? (
-                <View className="ml-6 flex-row items-center gap-1">
-                  {headline ? null : <PlaceIcon size={12} className="text-ink-4" />}
-                  <Text numberOfLines={1} className={cn("flex-1 text-sm text-ink-4", headline && headlineTones[headline.tone])}>
-                    {headline?.text ?? where}
-                  </Text>
-                </View>
-              ) : null}
+            <ListPressable accessibilityRole="button" accessibilityLabel={label} {...swipeAccessibility([leading, trailing])} className={cn(rowClass, owner?.dim && "opacity-60")}>
+              {lines}
             </ListPressable>
           </Link.Trigger>
           {rowMenu(threadMenu(thread, "row", now), actions.run, { title: thread.title, subtitle: facts.join(" · ") })}

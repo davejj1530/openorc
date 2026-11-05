@@ -6,6 +6,8 @@ import { attachImage, pickImages } from "../composer/attachments";
 import type { DraftImage } from "../composer/drafts";
 import { KEYBOARD_LEFTOVER_MS } from "../composer/keyboard-leftover";
 import type { FakeMac } from "../test-fixtures/fake-mac";
+import type { ReactNode } from "react";
+import { HostContext } from "../connection/host-context";
 import { useNewThread } from "./use-new-thread";
 
 /**
@@ -20,17 +22,33 @@ const mac = vi.hoisted(() => {
   ];
   const reads: Partial<Record<RpcMethod, unknown>> = {};
   const git: Record<string, ProjectGit | Promise<ProjectGit>> = {};
-  return { models, reads, git, phone: null as FakeMac | null, start: vi.fn<(params: RpcParams<"threads.start">) => Promise<{ thread: { id: string } }>>() };
+  return {
+    models,
+    reads,
+    git,
+    phone: null as FakeMac | null,
+    start: vi.fn<(params: RpcParams<"threads.start">) => Promise<{ thread: { id: string } }>>(),
+    /** What the shown Mac and its cloud brain were asked about git, by project. */
+    gitAsked: { shown: [] as string[], brain: [] as string[] },
+  };
 });
 
 vi.mock("../client", async () => {
   const { fakeMac } = await import("../test-fixtures/fake-mac");
   mac.phone = fakeMac((method, params) => {
     if (method === "threads.start") return mac.start(params as RpcParams<"threads.start">);
-    if (method === "projects.git") return Promise.resolve(mac.git[(params as RpcParams<"projects.git">).id] ?? "ready");
+    if (method === "projects.git") {
+      mac.gitAsked.shown.push((params as RpcParams<"projects.git">).id);
+      return Promise.resolve(mac.git[(params as RpcParams<"projects.git">).id] ?? "ready");
+    }
     return Promise.resolve(mac.reads[method]);
   });
-  return mac.phone.module;
+  const brain = {
+    connection: {
+      call: (method: RpcMethod, params: RpcParams<"projects.git">) => (method === "projects.git" ? (mac.gitAsked.brain.push(params.id), Promise.resolve("ready")) : Promise.reject(new Error(method))),
+    },
+  };
+  return { ...mac.phone.module, hostLink: (host: string | null) => (host === "brain-1" ? brain : mac.phone!.module.link) };
 });
 vi.mock("../composer/attachments", () => ({ pickImages: vi.fn(), attachImage: vi.fn() }));
 
@@ -47,6 +65,8 @@ beforeEach(() => {
   mac.phone!.module.queryClient.clear();
   mac.start.mockReset();
   for (const id of Object.keys(mac.git)) delete mac.git[id];
+  mac.gitAsked.shown.length = 0;
+  mac.gitAsked.brain.length = 0;
   macState();
 });
 afterEach(cleanup);
@@ -125,6 +145,16 @@ it.each([
   mac.start.mockResolvedValue({ thread: { id: "thread-1" } });
   await submit(plain);
   expect(sent()).toMatchObject({ projectId: "notes", workspaceMode: "current" });
+});
+
+it("asks the git of the host its screen is on, so a start on the cloud brain never waits on the shown Mac", async () => {
+  const sheet = renderHook(() => useNewThread("cloud-openorc"), {
+    wrapper: ({ children }: { children: ReactNode }) => <HostContext.Provider value="brain-1">{mac.phone!.wrapper({ children })}</HostContext.Provider>,
+  });
+  await write(sheet, "Try the cloud");
+  mac.start.mockResolvedValue({ thread: { id: "cloud-thread-1" } });
+  expect(await submit(sheet)).toBe("cloud-thread-1");
+  expect(mac.gitAsked).toEqual({ shown: [], brain: ["cloud-openorc"] });
 });
 
 it("offers the cloud where the Mac does, for a project, and starts there when chosen", async () => {

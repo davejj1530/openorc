@@ -1,7 +1,8 @@
 import { THREAD_PAGE } from "@openorc/client";
 import { WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
 import { describe, expect, it } from "vitest";
-import { homeItems, homeWaiting, type HomeItem, type HomeOptions, type ProjectThreads } from "./home-items";
+import { homeItems, homeWaiting, owned, type HomeItem, type HomeOptions, type ProjectThreads } from "./home-items";
+import { newThreadRoute } from "./out-of-reach";
 import { fixtureProjects, fixtureThreads } from "./test-fixtures/threads";
 
 const outline = (items: HomeItem[]) =>
@@ -229,5 +230,34 @@ describe("Needs you beside a partner host", () => {
     expect(outline(partner).flat()).not.toContain("t-pairing");
     expect(homeWaiting(groups(), options()).map(({ thread, project }) => `${thread.id} @ ${project}`)).toEqual(["t-pairing @ openorc", "t-docs @ website"]);
     expect(homeWaiting(groups(), options({ filter: "archived" }))).toEqual([]);
+  });
+});
+
+describe("owned", () => {
+  const away = { brain: "mac", reach: "offline", heardAt: 1 } as const;
+  const partner = { brain: "cloud", reach: "live", heardAt: 1 } as const;
+
+  it("marks a host's rows and its project headings, never Needs you's heading or a partner's row listed there", () => {
+    const items = homeItems(groups(), options({ partnerWaiting: [{ thread: { ...fixtureThreads[0]!, id: "cloud-1", activity: "waiting", owner: partner }, project: "openorc", host: "brain-1" }] }));
+    const marked = owned(items, away);
+    const headings = marked.flatMap((item) => (item.kind === "heading" ? [[item.title, item.owner?.reach ?? null]] : []));
+    const rows = marked.flatMap((item) => (item.kind === "thread" ? [[item.thread.id, item.thread.owner?.reach ?? null]] : []));
+    expect(headings).toEqual([
+      ["Needs you", null],
+      ["Workspace", "offline"],
+      ["openorc", "offline"],
+      ["website", "offline"],
+      ["immaculate", "offline"],
+    ]);
+    expect(rows.filter(([, reach]) => reach !== "offline")).toEqual([["cloud-1", "live"]]);
+  });
+});
+
+describe("newThreadRoute", () => {
+  it("opens New thread on the cloud brain while the shown Mac is out of reach, else on the shown host", () => {
+    expect(newThreadRoute({ brain: "mac", reach: "offline", heardAt: 1 }, "brain-1")).toEqual({ pathname: "/new", params: { host: "brain-1" } });
+    expect(newThreadRoute(null, "brain-1")).toBe("/new");
+    expect(newThreadRoute({ brain: "cloud", reach: "asleep", heardAt: 1 }, "mac-1")).toBe("/new");
+    expect(newThreadRoute({ brain: "mac", reach: "offline", heardAt: 1 }, null)).toBe("/new");
   });
 });

@@ -10,7 +10,7 @@ import {
   type SidebarFold,
   type ThreadTreeRow,
 } from "@openorc/client";
-import { WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
+import { WORKSPACE_ID, type ThreadOwner, type ThreadSummary } from "@openorc/protocol";
 
 /** One project as Home reads it: its pages of active threads so far, undefined until the Mac answers. */
 export interface ProjectThreads {
@@ -25,8 +25,11 @@ export interface ProjectThreads {
 
 /** One row of Home's list. Headings and threads share one flat list so the virtualizer can recycle by kind. */
 export type HomeItem =
-  /** `open` while the section shows its threads; a project's heading folds it and starts a thread there. */
-  | { kind: "heading"; key: string; group: "needs-you" | "workspace" | "project"; projectId: string | null; title: string; meta: ProjectMeta | null; open: boolean }
+  /**
+   * `open` while the section shows its threads; a project's heading folds it and starts a thread there. `owner` is set by
+   * whoever merged the section in, as on its rows.
+   */
+  | { kind: "heading"; key: string; group: "needs-you" | "workspace" | "project"; projectId: string | null; title: string; meta: ProjectMeta | null; open: boolean; owner?: ThreadOwner }
   /** A project's pinned or snoozed threads, behind a disclosure. */
   | { kind: "section"; key: string; fold: Exclude<SidebarFold, "project">; projectId: string; count: number; open: boolean }
   /**
@@ -129,6 +132,15 @@ function projectRows(group: ProjectThreads, page: Page, options: HomeOptions, wa
 
 /** Orcmode lists only the projects with something in its working set, or whose threads failed to load. */
 const shownInOrcmode = ({ group, page }: { group: ProjectThreads; page: Page }) => group.failed || page.pinned.length + page.rest.length > 0;
+
+/** Rows and headings another host owns, marked with it: the shown host's when it cannot be reached, all of the partner's. */
+export function owned(items: HomeItem[], owner: ThreadOwner): HomeItem[] {
+  return items.map((item) => {
+    if (item.kind === "thread" && !item.host) return { ...item, thread: { ...item.thread, owner } };
+    if (item.kind === "heading" && item.projectId) return { ...item, owner };
+    return item;
+  });
+}
 
 /** This host's threads waiting on you, newest first; none in the archive, which lists them in their projects. */
 export function homeWaiting(groups: readonly ProjectThreads[], options: HomeOptions): Waiting[] {

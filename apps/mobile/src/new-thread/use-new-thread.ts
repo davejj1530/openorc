@@ -1,7 +1,8 @@
 import { newThreadChoice, newThreadStartInput, newThreadWorkspaceMode, projectGitView, runsInCloud, targetModel } from "@openorc/client";
 import { WORKSPACE_ID } from "@openorc/protocol";
-import { useEffect, useRef, useState } from "react";
-import { link, useRpc, useRpcMutation } from "../client";
+import { useContext, useEffect, useRef, useState } from "react";
+import { hostLink, useRpc, useRpcMutation } from "../client";
+import { HostContext } from "../connection/host-context";
 import { composerControls } from "../composer/composer-state";
 import { useDimReason } from "../composer/dim-reason";
 import type { ComposerSettings } from "../composer/settings-bridge";
@@ -39,6 +40,7 @@ export function useNewThread(projectId: string) {
   const { uploading, chooseImages } = useImageAttach({ onImage: (image) => setDraft((current) => ({ ...current, images: [...current.images, image] })), onError: setError });
 
   const cloud = useCloudPlace(projectId, draft, change);
+  const host = useContext(HostContext);
   const settings: ComposerSettings = {
     choice: targetModel(draft.target),
     mode: draft.mode,
@@ -77,13 +79,13 @@ export function useNewThread(projectId: string) {
     field.emptied();
     setError(null);
     try {
-      const branchable = await canBranch(projectId);
+      const branchable = await canBranch(host, projectId);
       const toCloud = cloud.place?.chosen === "cloud";
       if (toCloud && !branchable) throw new Error("A cloud thread starts on a branch of its own, and this project has no commit to branch from yet.");
       const workspaceMode = toCloud ? "cloud" : newThreadWorkspaceMode({ canBranch: branchable, chosen: null, preferred: appSettings?.defaultWorkspaceMode });
       const { thread } = await start.mutateAsync(newThreadStartInput(draft, { workspaceMode, permissionMode: permission.permission, ...sent }));
       haptic.confirm();
-      unfoldProject(projectId);
+      unfoldProject(projectId, host);
       return thread.id;
     } catch (error) {
       haptic.fail();
@@ -142,8 +144,8 @@ function useDefaultChoice(draft: SheetDraft, setDraft: ReturnType<typeof useShee
 
 /**
  * Whether a worktree can branch here, as the desktop's New thread decides it. The phone shows no workspace, so it asks
- * the Mac's git at every Start: a first commit made since the last read, or a repository removed since, counts.
+ * the host's git at every Start: a first commit made since the last read, or a repository removed since, counts.
  */
-async function canBranch(projectId: string): Promise<boolean> {
-  return projectId !== WORKSPACE_ID && !projectGitView(await link.connection.call("projects.git", { id: projectId })).cannotBranch;
+async function canBranch(host: string | null, projectId: string): Promise<boolean> {
+  return projectId !== WORKSPACE_ID && !projectGitView(await hostLink(host).connection.call("projects.git", { id: projectId })).cannotBranch;
 }

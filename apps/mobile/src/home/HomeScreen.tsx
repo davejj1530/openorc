@@ -17,7 +17,8 @@ import { Text } from "../ui/Text";
 import { HOME_BAR_HEIGHT, HomeBar } from "./header/HomeBar";
 import { MacLine, lineOverRows, type HomeScroll } from "./header/MacLine";
 import { HomeHeading, RetryRow, SectionToggle, ShowMore, ShowMoreChildren } from "./HomeHeading";
-import type { HomeItem, Waiting } from "./home-items";
+import { newThreadRoute } from "./out-of-reach";
+import { owned, type HomeItem, type Waiting } from "./home-items";
 import { refreshHome } from "./refresh";
 import { ThreadRow } from "./ThreadRow";
 import { Unpaired } from "./Unpaired";
@@ -55,11 +56,6 @@ function useRefresh(partner: string | null) {
       void refreshHome(link, queryClient, partner ? { link: partnerLink, queryClient: partnerClient.queryClient } : null).finally(() => setRefreshing(false));
     },
   };
-}
-
-/** Rows another host owns, marked with it: the shown host's when it cannot be reached, every row of the partner's. */
-function owned(items: HomeItem[], owner: NonNullable<ThreadSummary["owner"]>): HomeItem[] {
-  return items.map((item) => (item.kind === "thread" && !item.host ? { ...item, thread: { ...item.thread, owner } } : item));
 }
 
 const NO_WAITING: readonly Waiting[] = [];
@@ -103,6 +99,14 @@ function PartnerThreads({ partner, onWaiting }: { partner: string; onWaiting: (w
   );
 }
 
+/** How the shown host's rows are marked while it cannot be reached and a partner's rows show beside them; null otherwise. */
+function useShownAway(state: Paired): NonNullable<ThreadSummary["owner"]> | null {
+  const group = useHostGroup();
+  const brain = useSavedMacs().find((host) => host.id === group.primary)?.kind === "brain";
+  if (!group.partner || state.kind === "connected") return null;
+  return { brain: brain ? "cloud" : "mac", reach: brain ? "asleep" : "offline", heardAt: Date.now() };
+}
+
 function Threads({ state, scrollY, lineBottom }: HomeScroll & { state: Paired }) {
   const insets = useSafeAreaInsets();
   const group = useHostGroup();
@@ -113,9 +117,8 @@ function Threads({ state, scrollY, lineBottom }: HomeScroll & { state: Paired })
     [group.partner, partnerWaiting, partnerOwner],
   );
   const shown = useHomeItems(state.kind === "connected", { partnerWaiting: handed, selectedId: useSelectedThreadId() });
-  const brain = useSavedMacs().find((host) => host.id === group.primary)?.kind === "brain";
-  const away = { brain: brain ? "cloud" : "mac", reach: brain ? "asleep" : "offline", heardAt: Date.now() } as const;
-  const home = group.partner && state.kind !== "connected" ? { ...shown, items: owned(shown.items, away) } : shown;
+  const away = useShownAway(state);
+  const home = away ? { ...shown, items: owned(shown.items, away) } : shown;
   const refresh = useRefresh(group.partner);
   // One object for the list's life: a new one each render would make the list resubscribe and rewrite the offset.
   const sharedValues = useMemo(() => ({ scrollOffset: scrollY }), [scrollY]);
@@ -145,7 +148,11 @@ function Threads({ state, scrollY, lineBottom }: HomeScroll & { state: Paired })
   );
 }
 
-const newThread = () => router.push("/new");
+/** New thread on the shown host, or on its cloud brain while the shown Mac cannot be reached. */
+function useNewThread(state: Paired): () => void {
+  const route = newThreadRoute(useShownAway(state), useHostGroup().partner);
+  return () => router.push(route);
+}
 
 /**
  * A paired Mac's threads grouped by project on the tile ground, under the pinned bar, with New thread as the screen's
@@ -158,6 +165,7 @@ function PairedHome({ state }: { state: Paired }) {
   // Until the line lays out, where its words end at the default text size.
   const lineBottom = useSharedValue(16);
   const scroll = useMemo(() => ({ scrollY, lineBottom }), [scrollY, lineBottom]);
+  const newThread = useNewThread(state);
   return (
     <View className="flex-1 bg-bg" onMagicTap={newThread} onTouchStart={swipes.touched}>
       <View pointerEvents="box-none" className="absolute inset-x-0 bottom-0 z-10 items-center" style={{ paddingBottom: insets.bottom }}>

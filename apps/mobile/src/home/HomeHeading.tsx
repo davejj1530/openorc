@@ -3,6 +3,7 @@ import { router } from "expo-router";
 import { useContext, useState, type ComponentType } from "react";
 import { View } from "react-native";
 import { HostContext } from "../connection/host-context";
+import { macAsleep } from "./out-of-reach";
 import { ChevronDown, ChevronRight, Folder, FolderOpen, Globe, Inbox, Plus } from "../generated/icons";
 import type { IconProps } from "../ui/icon";
 import { cn } from "../ui/cn";
@@ -41,11 +42,12 @@ function HeadingLine({ heading: { group, title, meta, open } }: { heading: Headi
 /**
  * A section heading like the sidebar's project heading: a faint 16 pt glyph, the name in ink, the meta in its tone. A
  * project's heading folds it on a tap, its folder glyph closing, and keeps its meta while folded; its own plus beside
- * it starts a thread there, on the host the section lists. Needs you never folds.
+ * it starts a thread there, on the host the section lists, unless that is a Mac out of reach. Needs you never folds.
  */
 export function HomeHeading({ heading, onToggle }: { heading: Heading; onToggle: () => void }) {
   const { projectId, title, meta, open } = heading;
   const host = useContext(HostContext);
+  const asleep = macAsleep(heading.owner);
   if (!projectId) {
     return (
       <View accessible accessibilityRole="header" accessibilityLabel={[title, meta?.text].filter(Boolean).join(", ")} className="mx-2.5 mt-3 min-h-touch flex-row items-center gap-1 pl-1.5 pr-3">
@@ -54,7 +56,8 @@ export function HomeHeading({ heading, onToggle }: { heading: Heading; onToggle:
     );
   }
   return (
-    <View className="mx-2.5 mt-3 min-h-touch flex-row items-center">
+    // Without its plus, the meta ends where Needs you's does.
+    <View className={cn("mx-2.5 mt-3 min-h-touch flex-row items-center", asleep && "pr-3")}>
       <ListPressable
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
@@ -64,14 +67,16 @@ export function HomeHeading({ heading, onToggle }: { heading: Heading; onToggle:
       >
         <HeadingLine heading={heading} />
       </ListPressable>
-      <ListPressable
-        accessibilityRole="button"
-        accessibilityLabel={`New thread in ${title}`}
-        onPress={() => router.push({ pathname: "/new", params: host ? { projectId, host } : { projectId } })}
-        className="size-touch items-center justify-center rounded-full active:bg-surface-2"
-      >
-        <Plus size={16} className="text-ink-4" />
-      </ListPressable>
+      {asleep ? null : (
+        <ListPressable
+          accessibilityRole="button"
+          accessibilityLabel={`New thread in ${title}`}
+          onPress={() => router.push({ pathname: "/new", params: host ? { projectId, host } : { projectId } })}
+          className="size-touch items-center justify-center rounded-full active:bg-surface-2"
+        >
+          <Plus size={16} className="text-ink-4" />
+        </ListPressable>
+      )}
     </View>
   );
 }

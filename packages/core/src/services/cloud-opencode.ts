@@ -1,7 +1,22 @@
 import path from "node:path";
 import type { CloudProviderId } from "@openorc/db";
-import type { CloudRunWho, CloudSignIn } from "./cloud-agents.js";
+import { held, OUTSIDE_THE_SANDBOX, type CloudRunWho, type CloudSignIn, type TurnSignIn } from "./cloud-agents.js";
 import type { ProtectedSecretStore } from "./extraction-credentials.js";
+
+/**
+ * Where each provider OpenCode calls takes its key, so the sandbox's firewall can add it there: the host, the header
+ * its AI SDK provider sends, and the scheme before the key.
+ */
+const PROVIDER_APIS: Record<string, { domain: string; header: string; scheme?: string }> = {
+  anthropic: { domain: "api.anthropic.com", header: "x-api-key" },
+  openai: { domain: "api.openai.com", header: "authorization", scheme: "Bearer" },
+  openrouter: { domain: "openrouter.ai", header: "authorization", scheme: "Bearer" },
+  google: { domain: "generativelanguage.googleapis.com", header: "x-goog-api-key" },
+  groq: { domain: "api.groq.com", header: "authorization", scheme: "Bearer" },
+  mistral: { domain: "api.mistral.ai", header: "authorization", scheme: "Bearer" },
+  xai: { domain: "api.x.ai", header: "authorization", scheme: "Bearer" },
+  deepseek: { domain: "api.deepseek.com", header: "authorization", scheme: "Bearer" },
+};
 
 /** OpenCode's own provider, whose free models need no key. */
 const FREE = "opencode";
@@ -111,9 +126,17 @@ export class OpenCodeCloudSignIn implements CloudSignIn {
     return { XDG_DATA_HOME: path.posix.join(state, "opencode") };
   }
 
-  async prepare(_home: unknown, _provider: CloudProviderId, who: CloudRunWho): Promise<Record<string, string>> {
+  /**
+   * Brokered, OpenCode holds a stand-in key and the firewall sets the real one on its requests to the provider's API,
+   * in the header that provider reads. A provider not in that list keeps its key in the sandbox, as before.
+   */
+  async prepare(_home: unknown, _provider: CloudProviderId, who: CloudRunWho, brokered: boolean): Promise<TurnSignIn> {
     const found = await this.keyFor(who);
-    return found ? { OPENCODE_CONFIG_CONTENT: JSON.stringify({ provider: { [found.provider]: { options: { apiKey: found.key } } } }) } : {};
+    if (!found) return held({});
+    const api = brokered ? PROVIDER_APIS[found.provider] : undefined;
+    const apiKey = api ? `sk-${OUTSIDE_THE_SANDBOX}` : found.key;
+    const env = { OPENCODE_CONFIG_CONTENT: JSON.stringify({ provider: { [found.provider]: { options: { apiKey } } } }) };
+    return { env, headers: api ? [{ domain: api.domain, name: api.header, value: api.scheme ? `${api.scheme} ${found.key}` : found.key }] : [] };
   }
 
   async keep(): Promise<void> {}

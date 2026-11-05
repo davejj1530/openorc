@@ -21,7 +21,7 @@ export const CloudThreadState = z.object({
 export type CloudThreadState = z.infer<typeof CloudThreadState>;
 
 /** The steps of a cloud check, in order. */
-export const CloudCheckStep = z.enum(["sandbox", "tools", "runner", "relay", "sync", "remove"]);
+export const CloudCheckStep = z.enum(["sandbox", "tools", "runner", "relay", "signins", "sync", "remove"]);
 export type CloudCheckStep = z.infer<typeof CloudCheckStep>;
 
 /** A run of the cloud check: everything a cloud thread needs, tried in a throwaway sandbox. */

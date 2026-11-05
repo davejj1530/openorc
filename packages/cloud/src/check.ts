@@ -8,12 +8,12 @@ import path from "node:path";
 import { promisify } from "node:util";
 import type { RemoteProcess } from "./remote-process.js";
 import { installRunner, RunnerClient, type RunnerFile, type RunnerInstall } from "./runner-client.js";
-import { SANDBOX_PREFIX, type Sandbox, type SandboxProvider } from "./sandbox.js";
+import { BrokeringUnavailable, SANDBOX_PREFIX, type Sandbox, type SandboxProvider } from "./sandbox.js";
 import { pullWorkspace, seedWorkspace } from "./sync.js";
 
 const run = promisify(execFile);
 
-export const CHECK_STEPS = ["sandbox", "tools", "runner", "relay", "sync", "remove"] as const;
+export const CHECK_STEPS = ["sandbox", "tools", "runner", "relay", "signins", "sync", "remove"] as const;
 export type CheckStep = (typeof CHECK_STEPS)[number];
 
 export interface CheckProgress {
@@ -32,6 +32,13 @@ const NODE_MIN = [22, 18] as const;
 const SANDBOX_TIMEOUT_MS = 10 * 60_000;
 const STEP_TIMEOUT_MS = 2 * 60_000;
 const RELAY_ANSWER = "openorc-check";
+/**
+ * An API agents call, which answers a request without a key differently from one with a wrong key: the check's
+ * request carries a key only if the firewall added it.
+ */
+const SIGN_IN_PROBE = { domain: "api.anthropic.com", url: "https://api.anthropic.com/v1/models", header: "x-api-key" };
+/** The firewall's new rules can take a moment to reach the VM. */
+const BROKER_ATTEMPTS = 5;
 
 function within<T>(ms: number, work: Promise<T>, what: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -97,6 +104,49 @@ async function relay(client: RunnerClient, sandbox: Sandbox, node: string): Prom
   }
 }
 
+/** What the probe API says to a request from the sandbox, through the runner as an agent's requests go. */
+async function probeAnswer(client: RunnerClient, sandbox: Sandbox, node: string): Promise<string> {
+  const proc = client.spawn(`check-${randomUUID()}`, {
+    cmd: node,
+    args: [
+      "-e",
+      `fetch(${JSON.stringify(SIGN_IN_PROBE.url)}).then((r) => r.json()).then((j) => process.stdout.write(String(j?.error?.message ?? "")), (e) => { process.stderr.write(String(e?.cause?.code ?? e?.cause?.message ?? e)); process.exit(1); })`,
+    ],
+    cwd: sandbox.root,
+    env: {},
+  });
+  const result = await finished(proc);
+  if (result.code !== 0) throw new Error(`The sandbox could not reach ${SIGN_IN_PROBE.domain}: ${result.stderr.trim()}`);
+  return result.stdout;
+}
+
+/**
+ * The firewall adds a sign-in to a request on its way out, so agents can work with no sign-in in the sandbox: it adds a
+ * made-up key, which the API reads as a key, and the sandbox's Node trusts the certificate the firewall answers with.
+ * Nothing secret is added, and the rule is cleared after.
+ */
+async function signIns(client: RunnerClient, sandbox: Sandbox, node: string): Promise<string | void> {
+  if (!sandbox.broker) return "Sandboxes on this Mac use this Mac's sign-ins";
+  const without = await probeAnswer(client, sandbox, node);
+  try {
+    await sandbox.broker([{ domain: SIGN_IN_PROBE.domain, name: SIGN_IN_PROBE.header, value: `openorc-check-${randomUUID()}` }]);
+  } catch (error) {
+    throw error instanceof BrokeringUnavailable ? new Error(`${error.message} Each sandbox holds its agent's sign-in.`) : error;
+  }
+  try {
+    for (let attempt = 1; attempt <= BROKER_ATTEMPTS; attempt++) {
+      const answer = await probeAnswer(client, sandbox, node).catch((error: unknown) => {
+        throw new Error(`The sandbox does not trust its firewall's certificate, so agents could not sign in. ${error instanceof Error ? error.message : String(error)}`);
+      });
+      if (answer !== without) return;
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+    throw new Error("The sandbox's firewall did not add a sign-in to a request, so agents could not sign in.");
+  } finally {
+    await sandbox.broker([]);
+  }
+}
+
 /** A small repository goes to the sandbox, a file is made there, and it comes back. */
 async function sync(install: RunnerInstall): Promise<void> {
   const dir = await mkdtemp(path.join(os.tmpdir(), "openorc-cloud-check-"));
@@ -122,7 +172,8 @@ async function sync(install: RunnerInstall): Promise<void> {
 
 /**
  * Tries everything a cloud thread needs from `provider` in a throwaway sandbox: making it, the tools in it, OpenOrc's
- * runner and relay, and sync both ways. The sandbox is deleted at the end, whatever failed. True when every step passed.
+ * runner and relay, sign-ins kept outside it, and sync both ways. The sandbox is deleted at the end, whatever failed.
+ * True when every step passed.
  */
 export async function checkSandbox(provider: SandboxProvider, options: { files: RunnerFile[]; node?: string; report: (progress: CheckProgress) => void }): Promise<boolean> {
   const node = options.node ?? "node";
@@ -157,6 +208,7 @@ export async function checkSandbox(provider: SandboxProvider, options: { files: 
       await roundTrip(client, sandbox!, node);
     })) &&
     (await step("relay", () => relay(client!, sandbox!, node))) &&
+    (await step("signins", () => signIns(client!, sandbox!, node))) &&
     (await step("sync", () => sync(install!)));
   (client as RunnerClient | null)?.close();
   const removed = await step("remove", () => provider.remove(name));

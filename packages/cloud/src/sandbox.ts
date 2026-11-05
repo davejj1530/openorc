@@ -29,6 +29,20 @@ export interface SandboxStream {
 }
 
 /**
+ * A header the sandbox's firewall sets on every HTTPS request the VM makes to `domain`, in place of any the VM sent,
+ * so the secret it carries never enters the VM: a hijacked agent there finds a stand-in, not the sign-in.
+ */
+export interface BrokeredHeader {
+  /** As the firewall matches it, by the name the VM connects to: "api.anthropic.com". */
+  domain: string;
+  name: string;
+  value: string;
+}
+
+/** The sandbox service cannot add headers for this account, as on a plan without credential brokering. */
+export class BrokeringUnavailable extends Error {}
+
+/**
  * One Linux VM that holds a cloud workspace, whichever service runs it. Every path is the VM's own; nothing here
  * assumes the VM shares a disk with the Mac. Files persist while it sleeps and processes do not.
  */
@@ -51,6 +65,11 @@ export interface Sandbox {
   keepAwake(forMs?: number): Promise<void>;
   /** Ends every process. The files stay for the next `open`. */
   stop(): Promise<void>;
+  /**
+   * Present when the service adds headers for the VM: sets exactly `headers`, replacing the last set, the internet
+   * otherwise open as before. Throws BrokeringUnavailable when the account cannot.
+   */
+  broker?(headers: BrokeredHeader[]): Promise<void>;
 }
 
 /** Every sandbox OpenOrc makes is named with this, so a list leaves out a team's other sandboxes. */

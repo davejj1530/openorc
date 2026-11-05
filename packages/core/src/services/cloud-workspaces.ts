@@ -1,6 +1,7 @@
 import path from "node:path";
 import type { AgentHost } from "@openorc/agents";
 import {
+  BrokeringUnavailable,
   ensureAgent,
   installRunner,
   LocalSandboxProvider,
@@ -15,6 +16,7 @@ import {
   type Sandbox,
   type SandboxInfo,
   type SandboxProvider,
+  type BrokeredHeader,
   type VercelConnection,
   type WorkspaceLocation,
 } from "@openorc/cloud";
@@ -127,6 +129,10 @@ export class CloudWorkspaceService {
   private readonly connections = new Map<string, Promise<Connection>>();
   private readonly awake: CloudAwake;
   readonly agents: CloudAgents;
+  /** The headers each open sandbox's firewall adds now, as last applied. */
+  private readonly brokered = new WeakMap<Sandbox, string>();
+  /** The sandbox service's plan refused to add headers, so sign-ins go into sandboxes. */
+  private brokeringRefused = false;
   /** VMs being stopped because nothing needs them; the next use waits for the stop. */
   private readonly stopping = new Map<string, Promise<void>>();
   /** Conversations whose sandbox is finishing a turn it took over while this Mac slept. */
@@ -481,7 +487,11 @@ export class CloudWorkspaceService {
     await ensureAgent(location.install.sandbox, cli, { name, mayInstall, version, read: releaseOf });
   }
 
-  /** The agent on the sandbox's PATH and signed in for one turn: its folder and credential variables. */
+  /**
+   * The agent on the sandbox's PATH and signed in for one turn: its folder and credential variables. Where the sandbox
+   * service can add headers on the way out, the sign-in stays on this host and the sandbox holds only stand-ins; a
+   * plan that refuses that keeps sign-ins in the sandbox until OpenOrc restarts.
+   */
   async turnEnv(
     run: { agent: string; claudeAccountId?: string | null | undefined; model?: string | null | undefined },
     location: WorkspaceLocation,
@@ -492,7 +502,34 @@ export class CloudWorkspaceService {
     const { signIn } = this.agents[run.agent];
     const folders = await signIn.homeEnv(location.install.state, provider, who(run));
     const home = async () => folders && sandboxHome(location.install.sandbox, run.agent as HarnessId, folders);
-    return { ...folders, ...(await signIn.prepare(home, provider, who(run))) };
+    const { sandbox } = location.install;
+    if (!sandbox.broker) return { ...folders, ...(await signIn.prepare(home, provider, who(run), false)).env };
+    let turn = await signIn.prepare(home, provider, who(run), !this.brokeringRefused);
+    if (!(await this.broker(sandbox, turn.headers))) {
+      turn = await signIn.prepare(home, provider, who(run), false);
+      // Headers an earlier session set would replace the sign-in the sandbox holds now.
+      await this.broker(sandbox, turn.headers);
+    }
+    return { ...folders, ...turn.env };
+  }
+
+  /**
+   * The sandbox's firewall adds this turn's headers, and only these: a turn with none clears what an earlier one set.
+   * Applied only when they change. False when the plan refuses it.
+   */
+  private async broker(sandbox: Sandbox, headers: BrokeredHeader[]): Promise<boolean> {
+    const policy = JSON.stringify(headers);
+    if (this.brokered.get(sandbox) === policy) return true;
+    try {
+      await sandbox.broker!(headers);
+    } catch (error) {
+      if (!(error instanceof BrokeringUnavailable)) throw error;
+      this.brokeringRefused = true;
+      this.log.warn(`cloud sign-ins stay in their sandboxes: ${error.message}`);
+      return false;
+    }
+    this.brokered.set(sandbox, policy);
+    return true;
   }
 
   /** The agent's folders in the conversation's sandbox, as its sign-in names them; null when they are this host's own. */

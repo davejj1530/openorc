@@ -35,7 +35,7 @@ it("passes every step in a throwaway sandbox, says what it found, and deletes th
   const passed = await checkSandbox(sandboxes, { files: runnerFiles(), node: process.execPath, report: (entry) => progress.push(entry) });
   expect(progress.filter((entry) => entry.state === "failed")).toEqual([]);
   expect(passed).toBe(true);
-  expect(progress.filter((entry) => entry.state === "done").map((entry) => entry.step)).toEqual(["sandbox", "tools", "runner", "relay", "sync", "remove"]);
+  expect(progress.filter((entry) => entry.state === "done").map((entry) => entry.step)).toEqual(["sandbox", "tools", "runner", "relay", "signins", "sync", "remove"]);
   expect(progress.find((entry) => entry.step === "tools" && entry.state === "done")?.detail).toMatch(/^Node \d+\.\d+\.\d+ · Git \S+ · Claude Code 2\.1\.316$/);
   expect(await readdir(path.join(base, "sandboxes"))).toEqual([]);
   await sandboxes.close();

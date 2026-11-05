@@ -244,6 +244,7 @@ it("checks where new cloud threads run in a throwaway sandbox, and shows each st
     ["tools", "done"],
     ["runner", "done"],
     ["relay", "done"],
+    ["signins", "done"],
     ["sync", "done"],
     ["remove", "done"],
   ]);

@@ -12,7 +12,7 @@ afterEach(() => {
 });
 
 const steps = (states: CloudCheck["steps"][number]["state"][]): CloudCheck["steps"] =>
-  (["sandbox", "tools", "runner", "relay", "sync", "remove"] as const).map((step, index) => ({ step, state: states[index] ?? "pending", ms: null, detail: null, error: null }));
+  (["sandbox", "tools", "runner", "relay", "signins", "sync", "remove"] as const).map((step, index) => ({ step, state: states[index] ?? "pending", ms: null, detail: null, error: null }));
 
 function show(check: CloudCheck | null, vercel: CloudStatus["vercel"] = null) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
@@ -46,11 +46,11 @@ it("shows the steps while it runs, without a second start", () => {
   expect(screen.getByText("In a sandbox simulated on this Mac")).toBeTruthy();
   expect((screen.getByRole("button", { name: "Checking" }) as HTMLButtonElement).disabled).toBe(true);
   const rows = within(screen.getByRole("list", { name: "Cloud check" })).getAllByRole("listitem");
-  expect(rows.map((row) => row.dataset.state)).toEqual(["done", "running", "pending", "pending", "pending", "pending"]);
+  expect(rows.map((row) => row.dataset.state)).toEqual(["done", "running", "pending", "pending", "pending", "pending", "pending"]);
 });
 
 it("names the step that failed, with what went wrong, and what it found before", () => {
-  const failed = steps(["done", "done", "failed", "pending", "pending", "done"]);
+  const failed = steps(["done", "done", "failed", "pending", "pending", "pending", "done"]);
   failed[1] = { ...failed[1]!, detail: "Node 24.1.0 · Git 2.43.0 · Claude Code 2.1.316", ms: 1200 };
   failed[2] = { ...failed[2]!, error: 'The runner\'s process answered "" (exit 1).', ms: 300 };
   show({ provider: "vercel", passed: false, steps: failed });

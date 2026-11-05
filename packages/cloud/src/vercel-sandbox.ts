@@ -1,6 +1,17 @@
 import { PassThrough, Writable } from "node:stream";
-import { APIError, Sandbox as SdkSandbox } from "@vercel/sandbox";
-import { SANDBOX_AWAY_MS, SANDBOX_PREFIX, type Sandbox, type SandboxCommandOptions, type SandboxExecResult, type SandboxInfo, type SandboxProvider, type SandboxStream } from "./sandbox.js";
+import { APIError, Sandbox as SdkSandbox, type NetworkPolicy, type NetworkPolicyRule } from "@vercel/sandbox";
+import {
+  BrokeringUnavailable,
+  SANDBOX_AWAY_MS,
+  SANDBOX_PREFIX,
+  type BrokeredHeader,
+  type Sandbox,
+  type SandboxCommandOptions,
+  type SandboxExecResult,
+  type SandboxInfo,
+  type SandboxProvider,
+  type SandboxStream,
+} from "./sandbox.js";
 
 /** After the command exits, how long its remaining output gets to arrive before the stream ends anyway. */
 const LOG_DRAIN_MS = 2000;
@@ -86,6 +97,8 @@ export interface VercelVm {
   readonly expiresAt: Date | undefined;
   /** Moves the running session's timeout later by `duration`, up to the plan's longest session. */
   extendTimeout(duration: number): Promise<void>;
+  /** Replaces the sandbox's network policy, on the running session first, then for later ones. */
+  update(params: { networkPolicy: NetworkPolicy }): Promise<unknown>;
   stop(): Promise<unknown>;
 }
 
@@ -136,6 +149,21 @@ async function run(vm: VercelVm, cmd: string, args: string[], options: SandboxCo
   const command = await vm.runCommand({ cmd, args, cwd: options.cwd ?? vm.cwd, ...(options.env ? { env: options.env } : {}), ...(options.sudo ? { sudo: true } : {}), detached: true });
   const done = await command.wait();
   return { code: done.exitCode, stdout: Buffer.from(await done.stdout(), "utf8"), stderr: await done.stderr() };
+}
+
+/**
+ * The firewall rules for `headers`: each domain gets its headers set on the way out, and every other destination stays
+ * open, so a turn reaches what it did before. With no headers the default open policy comes back, so a sign-in a
+ * turn no longer needs does not linger.
+ */
+export function brokeringPolicy(headers: BrokeredHeader[]): NetworkPolicy {
+  if (!headers.length) return "allow-all";
+  const allow: Record<string, NetworkPolicyRule[]> = { "*": [] };
+  for (const { domain, name, value } of headers) {
+    const set = (allow[domain]?.[0]?.transform?.[0]?.headers ?? {}) as Record<string, string>;
+    allow[domain] = [{ transform: [{ headers: { ...set, [name]: value } }] }];
+  }
+  return { allow };
 }
 
 /** A VM on Vercel. Its files persist between sessions; its processes do not. */
@@ -197,6 +225,17 @@ export class VercelSandbox implements Sandbox {
 
   async stop(): Promise<void> {
     await this.vm.stop();
+  }
+
+  async broker(headers: BrokeredHeader[]): Promise<void> {
+    try {
+      await this.vm.update({ networkPolicy: brokeringPolicy(headers) });
+    } catch (error) {
+      // Vercel adds headers on Pro and Enterprise only; a Hobby team's request is refused as forbidden or unpaid.
+      if (headers.length && error instanceof APIError && (error.response.status === 402 || error.response.status === 403))
+        throw new BrokeringUnavailable("This Vercel plan cannot add sign-ins outside the sandbox.");
+      throw error;
+    }
   }
 }
 

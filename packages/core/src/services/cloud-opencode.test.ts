@@ -30,7 +30,7 @@ describe("OpenCode signing in to a sandbox", () => {
   const who = (model: string | null) => ({ claudeAccountId: null, model });
 
   it("hands a turn only the key of the provider serving its model, in the run's settings, and its own database folder", async () => {
-    const env = await signIn.prepare(async () => null, "vercel", who("openrouter/acme/fast"));
+    const { env } = await signIn.prepare(async () => null, "vercel", who("openrouter/acme/fast"), false);
     expect(Object.keys(env)).toEqual(["OPENCODE_CONFIG_CONTENT"]);
     expect(JSON.parse(env["OPENCODE_CONFIG_CONTENT"]!)).toEqual({ provider: { openrouter: { options: { apiKey: "sk-or" } } } });
     expect(env["OPENCODE_CONFIG_CONTENT"]).not.toContain("sk-ant");
@@ -41,6 +41,23 @@ describe("OpenCode signing in to a sandbox", () => {
     await expect(signIn.assertCanRun("vercel", who("openai/gpt-5"))).rejects.toThrow("OpenCode has no key for OpenAI in the cloud. Add one in Settings > Cloud.");
     await expect(signIn.assertCanRun("local", who("openai/gpt-5"))).rejects.toThrow("OpenCode has no key for OpenAI");
     await signIn.assertCanRun("vercel", who("opencode/big-pickle"));
-    expect(await signIn.prepare(async () => null, "vercel", who("opencode/big-pickle"))).toEqual({});
+    expect(await signIn.prepare(async () => null, "vercel", who("opencode/big-pickle"), true)).toEqual({ env: {}, headers: [] });
+  });
+
+  it("brokered, holds a stand-in key and has the firewall add the real one in the header each provider reads", async () => {
+    const config = (env: Record<string, string>) => JSON.stringify(env);
+    const openrouter = await signIn.prepare(async () => null, "vercel", who("openrouter/acme/fast"), true);
+    expect(config(openrouter.env)).not.toContain("sk-or");
+    expect(openrouter.headers).toEqual([{ domain: "openrouter.ai", name: "authorization", value: "Bearer sk-or" }]);
+    const anthropic = await signIn.prepare(async () => null, "vercel", who("anthropic/claude-sonnet-5-5"), true);
+    expect(config(anthropic.env)).not.toContain("sk-ant");
+    expect(anthropic.headers).toEqual([{ domain: "api.anthropic.com", name: "x-api-key", value: "sk-ant" }]);
+  });
+
+  it("keeps the key in the sandbox for a provider whose API it does not know", async () => {
+    const other = new OpenCodeCloudSignIn(new OpenCodeCloudKeys(store(JSON.stringify({ together: { key: "sk-tg", createdAt: 1 } }))));
+    const turn = await other.prepare(async () => null, "vercel", who("together/llama"), true);
+    expect(JSON.parse(turn.env["OPENCODE_CONFIG_CONTENT"]!)).toEqual({ provider: { together: { options: { apiKey: "sk-tg" } } } });
+    expect(turn.headers).toEqual([]);
   });
 });

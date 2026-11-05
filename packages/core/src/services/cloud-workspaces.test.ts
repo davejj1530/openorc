@@ -4,10 +4,13 @@ import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LocalSandboxProvider } from "@openorc/cloud";
+import { BrokeringUnavailable, LocalSandboxProvider, type BrokeredHeader } from "@openorc/cloud";
 import { cloudWorkspaces, Db, projects, threads } from "@openorc/db";
 import { git } from "@openorc/git";
 import type { Project, Thread } from "@openorc/protocol";
+import { cloudAgents, SANDBOX_OWN } from "./cloud-agents.js";
+import { CodexCloudSignIn } from "./cloud-codex.js";
+import { OpenCodeCloudKeys, OpenCodeCloudSignIn } from "./cloud-opencode.js";
 import { CloudWorkspaceService, cloudSandboxProviders, LOCAL_LAUNCH_REFUSED } from "./cloud-workspaces.js";
 import { WorkspaceService } from "./workspace.js";
 import { WorkspaceWriters } from "./workspace-writers.js";
@@ -190,6 +193,43 @@ describe("an agent in a sandbox for a turn", () => {
     runs.length = 0;
     await cloud.turnEnv({ agent: "opencode", model: "opencode/free" }, location, "local");
     expect(runs.filter(([cmd]) => cmd === "npm")).toEqual([]);
+  });
+
+  describe("with its sign-in kept outside the sandbox", () => {
+    const keys = { load: async () => JSON.stringify({ openrouter: { key: "sk-or-real", createdAt: 1 } }), save: async () => undefined };
+    const agents = cloudAgents({ claude: SANDBOX_OWN, codex: new CodexCloudSignIn(undefined), opencode: new OpenCodeCloudSignIn(new OpenCodeCloudKeys(keys)) });
+    const brokering = (refuse = false) => {
+      const applied: BrokeredHeader[][] = [];
+      const sandbox = {
+        exec: async (cmd: string) => ({ code: 0, stdout: Buffer.from(cmd === "sh" ? "opencode v2.0.10\n" : ""), stderr: "" }),
+        broker: async (headers: BrokeredHeader[]) => {
+          if (refuse && headers.length) throw new BrokeringUnavailable("This Vercel plan cannot add sign-ins outside the sandbox.");
+          applied.push(headers);
+        },
+      };
+      return { applied, location: { install: { sandbox, state: "/sandbox/.openorc" }, repo: "/sandbox/repo" } as never };
+    };
+    const paid = { agent: "opencode", model: "openrouter/acme/fast" };
+
+    it("has the firewall add the key, once while it is unchanged, and clears it for a turn that needs none", async () => {
+      const { applied, location } = brokering();
+      const cloud = new CloudWorkspaceService(db, { providers: [sandboxes], agents }, quiet);
+      expect(JSON.stringify(await cloud.turnEnv(paid, location, "vercel"))).not.toContain("sk-or-real");
+      await cloud.turnEnv(paid, location, "vercel");
+      expect(applied).toEqual([[{ domain: "openrouter.ai", name: "authorization", value: "Bearer sk-or-real" }]]);
+      await cloud.turnEnv({ agent: "opencode", model: "opencode/free" }, location, "vercel");
+      expect(applied.at(-1)).toEqual([]);
+    });
+
+    it("puts the key in the sandbox when the plan refuses, clears what an earlier session had the firewall add, and stops asking", async () => {
+      const warnings: string[] = [];
+      const { applied, location } = brokering(true);
+      const cloud = new CloudWorkspaceService(db, { providers: [sandboxes], agents }, { ...quiet, warn: (message: string) => void warnings.push(message) });
+      expect(JSON.stringify(await cloud.turnEnv(paid, location, "vercel"))).toContain("sk-or-real");
+      expect(JSON.stringify(await cloud.turnEnv(paid, location, "vercel"))).toContain("sk-or-real");
+      expect(warnings).toEqual(["cloud sign-ins stay in their sandboxes: This Vercel plan cannot add sign-ins outside the sandbox."]);
+      expect(applied).toEqual([[]]);
+    });
   });
 });
 

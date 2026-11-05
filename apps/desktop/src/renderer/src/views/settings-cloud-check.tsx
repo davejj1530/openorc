@@ -10,6 +10,7 @@ const stepLabels: Record<CloudCheckStep, string> = {
   tools: "Find Node, Git and Claude Code",
   runner: "Run a process",
   relay: "Reach this Mac",
+  signins: "Keep sign-ins outside the sandbox",
   sync: "Sync a change both ways",
   remove: "Delete the sandbox",
 };

@@ -2,8 +2,11 @@ import { SHARED_CLAUDE_CONFIG_DIR } from "@openorc/agents";
 import type { CloudProviderId } from "@openorc/db";
 import type { ClaudeAccountService } from "./claude-accounts.js";
 import type { ClaudeCloudTokens } from "./claude-cloud-tokens.js";
-import type { CloudRunWho, CloudSignIn } from "./cloud-agents.js";
+import { held, OUTSIDE_THE_SANDBOX, type CloudRunWho, type CloudSignIn, type TurnSignIn } from "./cloud-agents.js";
 import type { EnvSnapshot } from "./shell-environment.js";
+
+/** Where Claude Code sends its token: Anthropic's API, and the proxy for the account's claude.ai connectors. */
+const CLAUDE_HOSTS = ["api.anthropic.com", "mcp-proxy.anthropic.com"];
 
 /** The parts of an added account's environment that point Claude Code at its own login on this Mac. */
 const MAC_LOGIN = ["CLAUDE_CONFIG_DIR", "CLAUDE_CODE_REMOTE_MEMORY_DIR", SHARED_CLAUDE_CONFIG_DIR];
@@ -42,9 +45,18 @@ export class ClaudeCloudSignIn implements CloudSignIn {
     return folder ? { CLAUDE_CONFIG_DIR: folder } : {};
   }
 
-  async prepare(_home: unknown, provider: CloudProviderId, who: CloudRunWho): Promise<Record<string, string>> {
+  /**
+   * Brokered, Claude Code holds a token in its own token's shape that signs in nowhere, and the firewall sets the
+   * real one on its requests to Anthropic as Claude Code would.
+   */
+  async prepare(_home: unknown, provider: CloudProviderId, who: CloudRunWho, brokered: boolean): Promise<TurnSignIn> {
     const { CLAUDE_CONFIG_DIR: _folder, ...credentials } = await this.environment(provider, who.claudeAccountId);
-    return credentials;
+    const token = credentials["CLAUDE_CODE_OAUTH_TOKEN"];
+    if (!brokered || !token) return held(credentials);
+    return {
+      env: { CLAUDE_CODE_OAUTH_TOKEN: `sk-ant-oat01-${OUTSIDE_THE_SANDBOX}` },
+      headers: CLAUDE_HOSTS.map((domain) => ({ domain, name: "authorization", value: `Bearer ${token}` })),
+    };
   }
 
   async keep(): Promise<void> {}

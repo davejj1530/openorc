@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { SANDBOX_AWAY_MS } from "./sandbox.js";
+import { APIError } from "@vercel/sandbox";
+import { BrokeringUnavailable, SANDBOX_AWAY_MS } from "./sandbox.js";
 import { VercelSandbox, VercelSandboxProvider, type VercelApi, type VercelCommand, type VercelListed, type VercelVm } from "./vercel-sandbox.js";
 
 type Line = { stream: "stdout" | "stderr"; data: string };
@@ -63,15 +64,20 @@ class FakeCommand implements VercelCommand {
 type Run = Parameters<VercelVm["runCommand"]>[0];
 
 /** A VM whose commands answer through `answer`, which records each one. */
-type FakeVm = Omit<VercelVm, "expiresAt"> & { expiresAt: Date | undefined; runs: Run[]; extended: number[] };
+type FakeVm = Omit<VercelVm, "expiresAt"> & { expiresAt: Date | undefined; runs: Run[]; extended: number[]; policies: unknown[] };
 
 function fakeVm(answer: (run: Run) => FakeCommand, files: Record<string, Buffer> = {}, cwd = "/vercel/sandbox"): FakeVm {
   const runs: Run[] = [];
   const extended: number[] = [];
+  const policies: unknown[] = [];
   return {
     cwd,
     runs,
     extended,
+    policies,
+    update: async ({ networkPolicy }) => {
+      policies.push(networkPolicy);
+    },
     expiresAt: undefined,
     async extendTimeout(duration) {
       extended.push(duration);
@@ -279,5 +285,45 @@ describe("the Vercel sandbox provider", () => {
     for (const credentials of [async () => null, async () => ({ token: "tok", teamId: "", projectId: "proj" })])
       await expect(new VercelSandboxProvider({ credentials, api: fake }).open("x")).rejects.toThrow("Connect Vercel in Settings to run in the cloud.");
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe("brokered sign-ins", () => {
+  it("adds each domain's headers on the way out and leaves every other destination open", async () => {
+    const vm = fakeVm(() => finished(0));
+    const sandbox = new VercelSandbox("openorc-a", vm);
+    await sandbox.broker([
+      { domain: "api.anthropic.com", name: "authorization", value: "Bearer real" },
+      { domain: "api.anthropic.com", name: "x-extra", value: "1" },
+      { domain: "chatgpt.com", name: "authorization", value: "Bearer other" },
+    ]);
+    expect(vm.policies).toEqual([
+      {
+        allow: {
+          "*": [],
+          "api.anthropic.com": [{ transform: [{ headers: { authorization: "Bearer real", "x-extra": "1" } }] }],
+          "chatgpt.com": [{ transform: [{ headers: { authorization: "Bearer other" } }] }],
+        },
+      },
+    ]);
+  });
+
+  it("puts the open default back when a turn needs no sign-in, so the last one does not linger", async () => {
+    const vm = fakeVm(() => finished(0));
+    await new VercelSandbox("openorc-a", vm).broker([]);
+    expect(vm.policies).toEqual(["allow-all"]);
+  });
+
+  it("says when the plan cannot add headers, and passes other failures on", async () => {
+    const refused = (status: number) => {
+      const vm = fakeVm(() => finished(0));
+      vm.update = async () => {
+        throw new APIError(new Response("", { status }));
+      };
+      return new VercelSandbox("openorc-a", vm).broker([{ domain: "api.anthropic.com", name: "authorization", value: "Bearer real" }]);
+    };
+    await expect(refused(403)).rejects.toBeInstanceOf(BrokeringUnavailable);
+    await expect(refused(402)).rejects.toBeInstanceOf(BrokeringUnavailable);
+    await expect(refused(500)).rejects.toBeInstanceOf(APIError);
   });
 });

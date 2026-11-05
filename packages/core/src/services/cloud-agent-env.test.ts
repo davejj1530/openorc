@@ -22,7 +22,7 @@ const environment = (saved: Record<string, string>) => {
   return async (provider: "local" | "vercel", claudeAccountId: string | null) => {
     const who = { claudeAccountId, model: null };
     await signIn.assertCanRun(provider, who);
-    return { ...(await signIn.homeEnv("/state", provider, who)), ...(await signIn.prepare(async () => null, provider, who)) };
+    return { ...(await signIn.homeEnv("/state", provider, who)), ...(await signIn.prepare(async () => null, provider, who, false)).env };
   };
 };
 
@@ -51,6 +51,22 @@ describe("how a Claude account's agent signs in to a sandbox", () => {
     const signIn = new ClaudeCloudSignIn({ accounts, tokens: { token: async () => null }, snapshot });
     const who = { claudeAccountId: "work", model: null };
     expect(await signIn.homeEnv("/state", "local", who)).toEqual({ CLAUDE_CONFIG_DIR: "/data/claude-accounts/work" });
-    expect(await signIn.prepare(async () => null, "local", who)).toEqual({ CLAUDE_CODE_REMOTE_MEMORY_DIR: "/Users/me/.claude", [SHARED_CLAUDE_CONFIG_DIR]: "/Users/me/.claude" });
+    expect((await signIn.prepare(async () => null, "local", who, false)).env).toEqual({ CLAUDE_CODE_REMOTE_MEMORY_DIR: "/Users/me/.claude", [SHARED_CLAUDE_CONFIG_DIR]: "/Users/me/.claude" });
+  });
+
+  it("keeps the token outside a brokered sandbox: the agent holds a stand-in and the firewall signs its requests to Anthropic", async () => {
+    const signIn = new ClaudeCloudSignIn({ accounts, tokens: { token: async () => "sk-ant-oat01-work" }, snapshot });
+    const turn = await signIn.prepare(async () => null, "vercel", { claudeAccountId: "work", model: null }, true);
+    expect(JSON.stringify(turn.env)).not.toContain("sk-ant-oat01-work");
+    expect(turn.env["CLAUDE_CODE_OAUTH_TOKEN"]).toMatch(/^sk-ant-oat01-/);
+    expect(turn.headers).toEqual([
+      { domain: "api.anthropic.com", name: "authorization", value: "Bearer sk-ant-oat01-work" },
+      { domain: "mcp-proxy.anthropic.com", name: "authorization", value: "Bearer sk-ant-oat01-work" },
+    ]);
+  });
+
+  it("brokers nothing for an account's own login on this Mac", async () => {
+    const signIn = new ClaudeCloudSignIn({ accounts, tokens: { token: async () => null }, snapshot });
+    expect((await signIn.prepare(async () => null, "local", { claudeAccountId: "work", model: null }, true)).headers).toEqual([]);
   });
 });

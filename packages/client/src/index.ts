@@ -3,13 +3,16 @@ export { pageHost, pageLabel, publicAddress } from "./browser-page.js";
 export { isUnifiedDiff, toolDiff } from "./chat-diff.js";
 export { createClientState, type ClientState, type ClientStateOptions } from "./client-state.js";
 export {
+  brainMove,
   canMoveToCloud,
+  ownerMark,
   cloudPlaceLabel,
   cloudStartFailure,
   cloudStartSteps,
   queueAfterStart,
   runsInCloud,
   startingInCloud,
+  threadMoveCard,
   type CloudStartStep,
   type CloudStartStepState,
   type StartingCloudThread,

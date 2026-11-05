@@ -26,6 +26,7 @@ import { GitBranch, Laptop } from "./icons";
 import { MessageQueue } from "./MessageQueue";
 import { SessionRecovery } from "./SessionRecovery";
 import { SubagentConversation } from "./SubagentConversation";
+import { ThreadMoveCard } from "./ThreadMoveCard";
 import { Transcript } from "./Transcript";
 import { useTurnFooter } from "./TurnFooter";
 import { Button, Empty } from "./ui";
@@ -44,6 +45,12 @@ type ConversationProps = { scope: ConversationScope; project: Project; toolbarTa
 export function Conversation({ scope, project }: ConversationProps) {
   if (scope.kind === "thread" && isSubagentThread(scope.thread)) return <SubagentConversation thread={scope.thread} project={project} />;
   return <IndividualConversation scope={scope} project={project} />;
+}
+
+/** A conversation that ran with one agent, now set to another: that agent starts fresh, from a brief. */
+function SwitchingNote({ agent }: { agent: string | null }) {
+  if (!agent) return null;
+  return <div className="text-xs text-ink-3 px-1">Switching to {harnessShortName(agent)} starts a fresh session. It gets a brief of this conversation, not the other agent's session.</div>;
 }
 
 /**
@@ -104,7 +111,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   const { live, working, generatingImage } = conversationActivity({ thread, activeRun, liveTranscript, compacting: compact.isPending });
   const { sameAgent, settingsPending, canSteer } = processFit({ live, activeRun, choice, mode, permission, compacting: compact.isPending });
   const steerReason = conversationSteerReason({ canSteer, compacting: compact.isPending, settingsPending, sameAgent, agent: activeRun?.agent });
-  const sendDisabledReason = conversationSendDisabledReason({ permissionReady, historyLoading: runsQuery.isLoading, historyFailed: Boolean(runsQuery.error), hasModel: Boolean(choice) });
+  const sendDisabledReason = conversationSendDisabledReason({ permissionReady, historyLoading: runsQuery.isLoading, historyFailed: Boolean(runsQuery.error), hasModel: Boolean(choice), thread });
   const busy = submitter.pending;
   const turnFooter = useTurnFooter({ footers, threadId, working });
   const switching = Boolean(thread && choice && runs.length > 0 && !runs.some((r) => r.agent === choice.agent));
@@ -179,6 +186,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
       <div className="flex-1 min-h-0 relative">{renderTranscript()}</div>
       <div className="composer-padding shrink-0 px-6 pb-6 pt-2">
         <div className="max-w-chat w-full min-w-0 mx-auto grid grid-cols-1 gap-2">
+          <ThreadMoveCard thread={thread} />
           {thread ? (
             <MessageQueue
               messages={queueAfterStart(thread, runs.length)}
@@ -197,9 +205,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
           {thread?.session && !working ? (
             <SessionRecovery thread={thread} disabled={!choice || busy} onRestart={() => void restart().catch(() => {})} onContinueWith={(id) => void continueWith(id).catch(() => {})} />
           ) : null}
-          {switching && choice ? (
-            <div className="text-xs text-ink-3 px-1">Switching to {harnessShortName(choice.agent)} starts a fresh session. It gets a brief of this conversation, not the other agent's session.</div>
-          ) : null}
+          <SwitchingNote agent={switching && choice ? choice.agent : null} />
           {settingsPending && activeRun && thread && activeRun.mode === "act" && permission === "autonomous" && activeRun.permissionMode !== permission ? (
             <div role="status" className="text-xs text-ink-3 px-1">
               {settings.error ? "Could not apply Autonomous. Select it again to retry." : "Applying Autonomous to the current turn…"}

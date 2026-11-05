@@ -1,5 +1,5 @@
 import { ContextMenu } from "@base-ui/react/context-menu";
-import { pullRequestMark, relativeTime, subagentStatusLabel, threadPlace, useTicking, workDuration, type ThreadPlace } from "@openorc/client";
+import { ownerMark, pullRequestMark, relativeTime, subagentStatusLabel, threadPlace, useTicking, workDuration, type ThreadPlace } from "@openorc/client";
 import { harnessShortName, isHarnessId, type ThreadSummary } from "@openorc/protocol";
 import type { ReactNode } from "react";
 import { CoversPreview } from "../lib/browser-preview";
@@ -14,7 +14,7 @@ import { OrclingAvatar } from "./OrclingAvatar";
 import { ThreadMenuItems, type MenuParts } from "./ThreadActions";
 import { ThreadRowHeadline } from "./ThreadHeadline";
 import { ThreadStatusIndicator } from "./ThreadStatusIndicator";
-import { CircleCheck, CircleDashed, Folder, GitBranch, GitPullRequest, X } from "./icons";
+import { CircleCheck, CircleDashed, Cloud, Folder, GitBranch, GitPullRequest, X } from "./icons";
 import { menuPopup } from "./menu";
 
 const placeIcons: Record<ThreadPlace["kind"], ReactNode> = {
@@ -59,6 +59,7 @@ export function ThreadRow({ thread, active, projectName, compact = false }: { th
   const agentLabel = providers.map(({ agent, count }) => `${team ? `${count} × ` : ""}${harnessShortName(agent)}`).join(", ");
   const place = threadPlace(thread);
   const title = placeTitle(thread, place);
+  const mark = ownerMark(thread);
   return (
     <ContextMenu.Root>
       <ContextMenu.Trigger
@@ -100,6 +101,12 @@ export function ThreadRow({ thread, active, projectName, compact = false }: { th
             {placeIcons[place.kind]}
             <span className="truncate">{place.label}</span>
           </span>
+          {mark ? (
+            <span className={`inline-flex shrink-0 items-center gap-1${mark.dim ? " opacity-60" : ""}`}>
+              <Cloud size={12} />
+              {mark.label}
+            </span>
+          ) : null}
           {orcling ? (
             <span className="inline-flex shrink-0 items-center gap-1" title={orcling.name}>
               <OrclingAvatar orcling={orcling} size={12} />

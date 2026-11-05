@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { acceptsLiveInput, conversationActivity, conversationCanSteer, conversationPlaceholder, conversationSteerReason } from "./conversation-presentation.js";
+import { acceptsLiveInput, conversationActivity, conversationCanSteer, conversationPlaceholder, conversationSendDisabledReason, conversationSteerReason } from "./conversation-presentation.js";
 import { emptyRun, type Block } from "./transcript.js";
 
 describe("sending during a turn", () => {
@@ -16,6 +16,13 @@ describe("sending during a turn", () => {
     expect(conversationCanSteer({ live: true, sameAgent: true, agent: "claude", compacting: false, settingsPending: false })).toBe(true);
     expect(conversationSteerReason({ canSteer: true, compacting: false, settingsPending: false, sameAgent: true, agent: "claude" })).toBeNull();
   });
+});
+
+it("holds the composer while a conversation moves, in the words for where it goes", () => {
+  const ready = { permissionReady: true, historyLoading: false, historyFailed: false, hasModel: true };
+  expect(conversationSendDisabledReason(ready)).toBeNull();
+  expect(conversationSendDisabledReason({ ...ready, thread: { moving: { to: "cloud", since: 1 } } })).toBe("This conversation is moving to the cloud.");
+  expect(conversationSendDisabledReason({ ...ready, permissionReady: false, thread: { moving: { to: "mac", since: 1 } } })).toBe("This conversation is moving to your Mac.");
 });
 
 it("puts first task direction before active-turn placeholder states", () => {

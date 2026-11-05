@@ -1,5 +1,5 @@
 import { Menu } from "@base-ui/react/menu";
-import { canMoveToCloud, snoozePresets } from "@openorc/client";
+import { brainMove, canMoveToCloud, snoozePresets } from "@openorc/client";
 import type { ThreadSummary } from "@openorc/protocol";
 import { WORKSPACE_ID, isSubagentThread } from "@openorc/protocol";
 import { useRef, useState } from "react";
@@ -11,7 +11,7 @@ import { MAX_THREAD_PANES, openThread, useRouter } from "../lib/router";
 import { useThreadMutationPending } from "../lib/thread-mutations";
 import { useUi } from "../lib/ui";
 import { floatingGround } from "../lib/use-anchor-ground";
-import { AlarmClock, AppWindow, Archive, ArchiveRestore, ChevronRight, Cloud, Columns2, GitBranch, GitFork, Laptop, MailOpen, Pencil, Pin, PinOff, Trash2 } from "./icons";
+import { AlarmClock, AppWindow, Archive, ArchiveRestore, ChevronRight, Cloud, Columns2, Folder, GitBranch, GitFork, Laptop, MailOpen, Pencil, Pin, PinOff, Trash2 } from "./icons";
 import { menuItem, menuItemDanger, menuPopup, menuSeparator } from "./menu";
 import { Button, Dialog } from "./ui";
 
@@ -67,6 +67,7 @@ function ThreadMenuContent({ thread, parts: M }: { thread: ThreadSummary; parts:
   const moveReason = team ? "This item is no longer available." : null;
   const deleteReason = moveReason;
   const actionError = update.error;
+  const inCloud = thread.owner?.brain === "cloud";
 
   return (
     <>
@@ -118,16 +119,12 @@ function ThreadMenuContent({ thread, parts: M }: { thread: ThreadSummary; parts:
       <M.Separator className={menuSeparator} />
       <ThreadForkActions thread={thread} parts={M} />
 
-      {thread.projectId !== WORKSPACE_ID ? (
+      {thread.projectId !== WORKSPACE_ID && !inCloud ? (
         <M.Item className={menuItem} disabled={team ? Boolean(moveReason) || mutating : busy} title={moveReason ?? undefined} onClick={() => useUi.getState().setMoveThread(thread.id)}>
           {thread.workspaceMode === "worktree" ? <Laptop size={13} /> : <GitBranch size={13} />} {thread.workspaceMode === "worktree" ? "Move to the checkout" : "Move to a worktree"}
         </M.Item>
       ) : null}
-      {cloudOffered && canMoveToCloud(thread) ? (
-        <M.Item className={menuItem} disabled={busy} onClick={() => useUi.getState().setMoveThread(thread.id, "cloud")}>
-          <Cloud size={13} /> Move to cloud
-        </M.Item>
-      ) : null}
+      {cloudOffered ? <CloudMoveItems thread={thread} parts={M} /> : null}
       <M.Separator className={menuSeparator} />
       <M.Item className={menuItem} disabled={lifecycleBlocked} closeOnClick onClick={() => patch({ archived: !archived })}>
         {archived ? <ArchiveRestore size={13} /> : <Archive size={13} />} {archived ? "Unarchive" : "Archive"}
@@ -140,9 +137,67 @@ function ThreadMenuContent({ thread, parts: M }: { thread: ThreadSummary; parts:
   );
 }
 
+/** Where the conversation lives: Move to cloud, Bring to Mac, or Keep where it is while it moves. */
+function CloudMoveItems({ thread, parts }: { thread: ThreadSummary; parts: MenuParts }) {
+  if (thread.moving) return <KeepItem thread={thread} parts={parts} to={thread.moving.to} />;
+  if (thread.owner?.brain === "cloud") return <CloudThreadItems thread={thread} parts={parts} />;
+  return <MoveToCloudItem thread={thread} parts={parts} />;
+}
+
+function MenuError({ error }: { error: Error | null }) {
+  return error ? (
+    <p role="alert" className="max-w-64 px-2 py-1 text-xs text-bad break-words">
+      {error.message}
+    </p>
+  ) : null;
+}
+
+function KeepItem({ thread, parts: M, to }: { thread: ThreadSummary; parts: MenuParts; to: "mac" | "cloud" }) {
+  const keep = useRpcMutation("cloud.keep");
+  return (
+    <>
+      <MenuError error={keep.error} />
+      <M.Item className={menuItem} disabled={keep.isPending} onClick={() => keep.mutate({ threadId: thread.id })}>
+        {to === "cloud" ? <Laptop size={13} /> : <Cloud size={13} />} {to === "cloud" ? "Keep on this Mac" : "Keep in the cloud"}
+      </M.Item>
+    </>
+  );
+}
+
+function CloudThreadItems({ thread, parts: M }: { thread: ThreadSummary; parts: MenuParts }) {
+  const bring = useRpcMutation("cloud.bringToMac");
+  const openCopy = useRpcMutation("cloud.openOnMac");
+  const closeCopy = useRpcMutation("cloud.closeOnMac");
+  const mirrored = Boolean(thread.owner?.mirror);
+  return (
+    <>
+      <MenuError error={bring.error ?? openCopy.error ?? closeCopy.error} />
+      <M.Item className={menuItem} disabled={thread.activity !== "idle" || bring.isPending} onClick={() => bring.mutate({ threadId: thread.id })}>
+        <Laptop size={13} /> Bring to Mac
+      </M.Item>
+      <M.Item className={menuItem} disabled={openCopy.isPending || closeCopy.isPending} onClick={() => (mirrored ? closeCopy : openCopy).mutate({ threadId: thread.id })}>
+        <Folder size={13} /> {mirrored ? "Close on Mac" : "Open on Mac"}
+      </M.Item>
+    </>
+  );
+}
+
+/** With a cloud brain, the move is the brain's and may be refused with its reason; without one, today's sandbox move. */
+function MoveToCloudItem({ thread, parts: M }: { thread: ThreadSummary; parts: MenuParts }) {
+  const brain = Boolean(useRpc("cloud.offer", {}).data?.brain);
+  const move = brain ? brainMove(thread) : { shown: canMoveToCloud(thread), blocked: null };
+  if (!move.shown) return null;
+  return (
+    <M.Item className={menuItem} disabled={thread.activity !== "idle" || Boolean(move.blocked)} title={move.blocked ?? undefined} onClick={() => useUi.getState().setMoveThread(thread.id, "cloud")}>
+      <Cloud size={13} /> Move to cloud
+    </M.Item>
+  );
+}
+
 function ThreadForkActions({ thread, parts: M }: { thread: ThreadSummary; parts: MenuParts }) {
   const fork = useRpcMutation("threads.fork");
   const mutating = useThreadMutationPending(thread.id);
+  const inCloud = thread.owner?.brain === "cloud";
   return (
     <>
       {fork.error ? (
@@ -150,7 +205,12 @@ function ThreadForkActions({ thread, parts: M }: { thread: ThreadSummary; parts:
           {fork.error.message}
         </p>
       ) : null}
-      <M.Item className={menuItem} disabled={Boolean(thread.teamInstanceId) || mutating || fork.isPending} onClick={() => fork.mutate({ id: thread.id }, { onSuccess: (t) => openThread(t.id) })}>
+      <M.Item
+        className={menuItem}
+        disabled={Boolean(thread.teamInstanceId) || inCloud || mutating || fork.isPending}
+        title={inCloud ? "Bring it to this Mac first." : undefined}
+        onClick={() => fork.mutate({ id: thread.id }, { onSuccess: (t) => openThread(t.id) })}
+      >
         <GitFork size={13} /> {fork.isPending ? "Forking…" : "Fork"}
       </M.Item>
     </>

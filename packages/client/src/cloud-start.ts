@@ -1,4 +1,4 @@
-import { harnessShortName, WORKSPACE_ID, type CloudStep, type CloudThreadState, type AgentKind, type QueuedMessage, type ThreadSummary } from "@openorc/protocol";
+import { harnessShortName, WORKSPACE_ID, type CloudStep, type CloudThreadState, type AgentKind, type MoveStep, type QueuedMessage, type ThreadSummary } from "@openorc/protocol";
 
 /** The agents that run in a cloud sandbox so far. */
 export function runsInCloud(agent: AgentKind | null | undefined): boolean {
@@ -8,6 +8,26 @@ export function runsInCloud(agent: AgentKind | null | undefined): boolean {
 /** A conversation on this Mac that can move to a sandbox of its own: a project's, not a team's, with an agent that runs there. */
 export function canMoveToCloud(thread: ThreadSummary): boolean {
   return !thread.cloud && !thread.teamInstanceId && thread.projectId !== WORKSPACE_ID && runsInCloud(thread.agent);
+}
+
+/**
+ * Move to cloud with a cloud brain set up: shown for a project's conversation this host holds; the reason it cannot
+ * move yet, shown on demand on the disabled choice. The brain checks again when asked.
+ */
+export function brainMove(thread: ThreadSummary): { shown: boolean; blocked: string | null } {
+  const shown = !thread.owner && !thread.moving && !thread.teamInstanceId && thread.projectId !== WORKSPACE_ID && thread.parentRelation !== "subagent";
+  if (!shown) return { shown, blocked: null };
+  if (thread.agent !== "claude") return { shown, blocked: "Only Claude conversations can move to the cloud so far." };
+  if (thread.openTaskCount > 0) return { shown, blocked: "Conversations with tasks can't move yet." };
+  return { shown, blocked: null };
+}
+
+/** The quiet word a row shows for where it lives, dimmed while its owner cannot be reached; null for this host's own. */
+export function ownerMark(thread: Pick<ThreadSummary, "owner" | "moving">): { label: "Moving" | "Cloud" | "Mac asleep"; dim: boolean } | null {
+  if (thread.moving) return { label: "Moving", dim: false };
+  if (!thread.owner) return null;
+  if (thread.owner.brain === "cloud") return { label: "Cloud", dim: thread.owner.reach !== "live" };
+  return thread.owner.reach === "live" ? null : { label: "Mac asleep", dim: true };
 }
 
 /** A cloud thread before its first turn, with its cloud state. */
@@ -56,4 +76,27 @@ export function cloudStartFailure(thread: StartingCloudThread): string | null {
 export function cloudPlaceLabel(cloud: CloudThreadState): string {
   if (cloud.state === "removed") return "Sandbox removed";
   return cloud.provider === "vercel" ? "Vercel Sandbox" : "Simulated sandbox";
+}
+const MOVE_ORDER: Record<"mac" | "cloud", MoveStep[]> = { cloud: ["packing", "waking", "sending"], mac: ["waking", "packing", "sending"] };
+const MOVE_LABELS: Record<"mac" | "cloud", Record<MoveStep, string>> = {
+  cloud: { packing: "Packing the conversation", waking: "Waking the cloud brain", sending: "Sending it to the cloud" },
+  mac: { waking: "Waking the cloud brain", packing: "Packing it in the cloud", sending: "Bringing it to this Mac" },
+};
+
+/**
+ * The quiet card on a conversation while it moves between this Mac and the cloud brain, or while the brain it lives on
+ * wakes; null otherwise. A move whose step is not known yet is at its first.
+ */
+export function threadMoveCard(thread: Pick<ThreadSummary, "moving" | "owner">): { title: string | null; steps: { step: MoveStep; label: string; state: CloudStartStepState }[] } | null {
+  const moving = thread.moving;
+  if (!moving) {
+    if (thread.owner?.brain !== "cloud" || thread.owner.reach !== "waking") return null;
+    return { title: null, steps: [{ step: "waking", label: "Waking the cloud brain", state: "running" }] };
+  }
+  const order = MOVE_ORDER[moving.to];
+  const current = Math.max(0, order.indexOf(moving.step ?? order[0]!));
+  return {
+    title: moving.to === "cloud" ? "Moving to the cloud" : "Moving to this Mac",
+    steps: order.map((step, index) => ({ step, label: MOVE_LABELS[moving.to][step], state: stepState(index, current) })),
+  };
 }

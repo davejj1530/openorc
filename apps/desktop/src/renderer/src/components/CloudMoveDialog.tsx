@@ -31,12 +31,22 @@ function useCheckoutPreview(threadId: string, enabled: boolean): { blocked: stri
   };
 }
 
+function moveWords(fromCheckout: boolean, brain: boolean): string {
+  const checkout = "Every uncommitted change in the checkout first moves into a new worktree on its own branch, including changes you or other conversations made. ";
+  if (brain)
+    return `${fromCheckout ? checkout : ""}Its history, session, branch and uncommitted changes go to your cloud brain, where it carries on while this Mac sleeps. Its worktree leaves this Mac; Bring to Mac brings it back.`;
+  return fromCheckout
+    ? `${checkout}That worktree and the conversation’s session then go to a sandbox of its own, where its next message runs.`
+    : "Its worktree, uncommitted changes and session go to a sandbox of its own, where its next message runs. The worktree stays on this Mac and follows the sandbox.";
+}
+
 /**
  * One confirm for moving a conversation from this Mac to a sandbox of its own. A conversation in the checkout lists
  * the files that leave the checkout with it, as moving it to a worktree does.
  */
 export function CloudMoveDialog({ threadId }: { threadId: string }) {
   const thread = useRpc("threads.get", { id: threadId });
+  const brain = Boolean(useRpc("cloud.offer", {}).data?.brain);
   const fromCheckout = thread.data?.workspaceMode === "current";
   const preview = useCheckoutPreview(threadId, fromCheckout);
   const move = useRpcMutation("cloud.move");
@@ -59,11 +69,7 @@ export function CloudMoveDialog({ threadId }: { threadId: string }) {
     <Dialog open onOpenChange={(open) => (open ? undefined : close())} title="Move this conversation to the cloud?" width={520}>
       <div>
         {thread.data ? <p className="text-sm text-ink-3 mb-3 break-words">{thread.data.title}</p> : null}
-        <p className="text-base text-ink-2 mb-3">
-          {fromCheckout
-            ? "Every uncommitted change in the checkout first moves into a new worktree on its own branch, including changes you or other conversations made. That worktree and the conversation’s session then go to a sandbox of its own, where its next message runs."
-            : "Its worktree, uncommitted changes and session go to a sandbox of its own, where its next message runs. The worktree stays on this Mac and follows the sandbox."}
-        </p>
+        <p className="text-base text-ink-2 mb-3">{moveWords(fromCheckout, brain)}</p>
         {preview.contents}
         {problem ? (
           <p role="alert" className="text-sm text-bad mb-3 break-words">

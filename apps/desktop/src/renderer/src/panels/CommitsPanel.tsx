@@ -3,10 +3,11 @@ import type { Commit, Project, PushState, Task, ThreadSummary } from "@openorc/p
 import { useState, type ReactNode } from "react";
 import { Upload } from "../components/icons";
 import { PanelBar, PanelNotice } from "../components/PanelBar";
-import { Badge, Button, Empty } from "../components/ui";
+import { Button, Empty } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { useThreadMutationPending } from "../lib/thread-mutations";
 import { ThreadPullRequest } from "./ThreadPullRequest";
+import "./commits.css";
 
 /** A task's branch, a thread's workspace, or the project's checkout outside any conversation. */
 export type CommitSource = { kind: "task"; task: Task } | { kind: "thread"; thread: ThreadSummary; project: Project } | { kind: "checkout"; project: Project };
@@ -55,23 +56,29 @@ function SourcePushBar({ source, state, error }: { source: CommitSource; state: 
   return null;
 }
 
+/** The commits on one lane, newest first: a hollow dot is a commit origin lacks, a filled one is on origin. */
 function CommitList({ commits, unpushed }: { commits: Commit[]; unpushed: ReadonlySet<string> }) {
   return (
-    <div className="panel-rows flex-1 min-h-0 overflow-y-auto pb-2.5">
-      {commits.map((c) => (
-        <div key={c.sha} className="commit-row grid gap-1 mx-2.5 px-2.5 py-2.5 text-base">
-          <div className="flex items-center gap-2">
-            <span className="truncate">{c.subject}</span>
-            {unpushed.has(c.sha) ? <Badge className="ml-auto">Not pushed</Badge> : null}
-          </div>
-          <div className="flex items-center gap-2 text-sm text-ink-3">
-            <span className="font-mono">{shortSha(c.sha)}</span>
-            <span>{c.author}</span>
-            <span className="ml-auto tabular text-ink-4">{relativeTime(c.at)}</span>
-          </div>
-        </div>
-      ))}
-    </div>
+    <ol className="commit-rows flex-1 min-h-0 overflow-y-auto" aria-label="Commits">
+      {commits.map((c) => {
+        const sent = !unpushed.has(c.sha);
+        return (
+          <li key={c.sha} className="commit-row">
+            <span className="commit-dot" data-sent={sent || undefined} role="img" aria-label={sent ? "On origin" : "Not pushed"} title={sent ? "On origin" : "Not pushed"} />
+            <span className="commit-subject" title={c.subject}>
+              {c.subject}
+            </span>
+            <span className="commit-meta">
+              <span className="font-mono">{shortSha(c.sha)}</span>
+              <span className="commit-author">{c.author}</span>
+              <time className="tabular" dateTime={new Date(c.at).toISOString()}>
+                {relativeTime(c.at)}
+              </time>
+            </span>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 

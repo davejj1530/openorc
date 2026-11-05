@@ -93,19 +93,19 @@ const mount = (source: ThreadSummary = thread) =>
       <CommitsPanel source={{ kind: "thread", thread: source, project }} />
     </QueryClientProvider>,
   );
-const row = (subject: string) => screen.getByText(subject).closest(".grid") as HTMLElement;
+const row = (subject: string) => screen.getByText(subject).closest(".commit-row") as HTMLElement;
 
 it("marks the commits origin lacks and pushes them once everything is committed", async () => {
   mount();
   const button = await screen.findByRole("button", { name: "Push 1 commit" });
-  expect(within(row("perf: site overall improvements")).getByText("Not pushed")).toBeTruthy();
-  expect(within(row("fix: site ui bugs")).queryByText("Not pushed")).toBeNull();
+  expect(within(row("perf: site overall improvements")).getByRole("img", { name: "Not pushed" })).toBeTruthy();
+  expect(within(row("fix: site ui bugs")).getByRole("img", { name: "On origin" })).toBeTruthy();
 
   fireEvent.click(button);
   expect(await screen.findByRole("status")).toHaveProperty("textContent", "Pushed site-refresh to origin");
   expect(vi.mocked(core.call)).toHaveBeenCalledWith("review.pushThread", { threadId: thread.id });
   await waitFor(() => expect(screen.queryByRole("button", { name: /^Push/ })).toBeNull());
-  expect(screen.queryByText("Not pushed")).toBeNull();
+  expect(screen.queryByRole("img", { name: "Not pushed" })).toBeNull();
 
   // The next commit makes the success stale.
   state = { ...state, unpushedCount: 1, unpushed: [commits[0]!.sha] };
@@ -118,7 +118,7 @@ it("publishes a branch origin doesn't have yet", async () => {
   state = { ...state, published: false, unpushedCount: 2, unpushed: commits.map((commit) => commit.sha) };
   mount();
   expect(((await screen.findByRole("button", { name: "Publish branch" })) as HTMLButtonElement).disabled).toBe(false);
-  expect(screen.getAllByText("Not pushed")).toHaveLength(2);
+  expect(screen.getAllByRole("img", { name: "Not pushed" })).toHaveLength(2);
 });
 
 it("says why it can't push", async () => {
@@ -139,7 +139,7 @@ it("shows a rejected push and keeps the commits marked", async () => {
   mount();
   fireEvent.click(await screen.findByRole("button", { name: "Push 1 commit" }));
   expect((await screen.findByRole("alert")).textContent).toBe("origin has newer commits on site-refresh. Pull them in first, then push again.");
-  expect(screen.getByText("Not pushed")).toBeTruthy();
+  expect(screen.getByRole("img", { name: "Not pushed" })).toBeTruthy();
 });
 
 it("offers the pull request once the branch is on origin, drafted from the newest commit and the template", async () => {

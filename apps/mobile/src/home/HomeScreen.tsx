@@ -44,28 +44,29 @@ const slide = LinearTransition.duration(motion.duration.resize).easing(ease.outT
 type PartnerItem = { kind: "partner"; key: string; host: string };
 type Listed = HomeItem | PartnerItem;
 
-/** The room above the heading at `index`: none under a folded heading, so a run of folded projects stacks tight. */
+/** The room above the heading or part at `index`: none right under another, so a run of folded days stacks tight. */
 function headingRoom(items: readonly HomeItem[], index: number): HeadingRoom {
   if (index === 0) return "first";
-  return items[index - 1]!.kind === "heading" ? "after-heading" : "after-rows";
+  const before = items[index - 1]!.kind;
+  return before === "heading" || before === "section" ? "after-heading" : "after-rows";
 }
 
 function HomeRow({ item, home, index, motion, fold }: { item: HomeItem; home: Home; index: number; motion: RowMotion; fold: Fold }) {
   switch (item.kind) {
     case "heading":
-      return <HomeHeading heading={item} room={headingRoom(home.items, index)} motion={motion} onToggle={() => item.projectId && fold(item.key, !(item.open && !motion.folding))} />;
+      return <HomeHeading heading={item} room={headingRoom(home.items, index)} />;
     case "section":
-      return <SectionToggle section={item} motion={motion} onToggle={() => fold(item.key, !(item.open && !motion.folding))} />;
+      return <SectionToggle section={item} room={headingRoom(home.items, index)} motion={motion} onToggle={() => fold(item.key, !(item.open && !motion.folding))} />;
     case "thread": {
       const row = <ThreadRow thread={item.thread} project={item.project} arriving={item.arriving} tree={item.tree} motion={motion} onFold={fold} />;
       return item.host ? <HostScope host={item.host}>{row}</HostScope> : row;
     }
     case "more":
-      return <ShowMore project={item.project} motion={motion} onPress={() => home.showMore(item.projectId)} />;
+      return <ShowMore motion={motion} onPress={home.showMore} />;
     case "children-more":
       return <ShowMoreChildren item={item} motion={motion} onPress={() => home.showMoreChildren(item.tree.thread.projectId, item.tree.thread.id)} />;
     case "retry":
-      return <RetryRow projects={item.projectId === null} onPress={() => home.retry(item.projectId)} />;
+      return <RetryRow projects={item.projects} onPress={() => home.retry(item.projects)} />;
   }
 }
 
@@ -74,7 +75,7 @@ function useHomeFolds(home: Home) {
   return useFoldMotion(home.items, (key, open) => {
     const item = home.items.find((each) => (each.kind === "thread" ? each.thread.id : each.key) === key);
     if (item?.kind === "thread") home.toggleThread(item.thread.id, !open);
-    else if ((item?.kind === "heading" || item?.kind === "section") && item.projectId) home.toggle(item.key, item.projectId);
+    else if (item?.kind === "section") home.toggle(item.key);
   });
 }
 
@@ -225,7 +226,7 @@ function useNewThread(state: Paired): () => void {
 }
 
 /**
- * A paired Mac's threads grouped by project on the tile ground, under the pinned bar, with New thread as the screen's
+ * A paired Mac's threads by the day they last saw work on the tile ground, under the pinned bar, with New thread as the screen's
  * one ink pill; a two-finger double tap starts one. Where the list has scrolled lives here, so a Mac shown again after
  * none starts at the top.
  */

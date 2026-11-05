@@ -1,11 +1,12 @@
-import { pruneThreadFolds, sidebarFoldKey, sidebarSectionOpen, toggleSidebarFold, toggleThreadTree } from "@openorc/client";
+import { liveSidebarFold, pruneThreadFolds, toggleSidebarFold, toggleThreadTree } from "@openorc/client";
 import { useSyncExternalStore } from "react";
 import { shownMacId, storage } from "../client";
 import { foldsKey } from "./fold-keys";
 
 /*
- * Which of Home's sections the reader folded, per host, in the desktop sidebar's keys (project:, pinned:,
- * snoozed-open:). The desktop keeps its folds on the Mac's own screen and does not sync them, so neither does this.
+ * Which of Home's parts the reader folded, per host, in the desktop sidebar's keys (days, the list's pinned and snoozed
+ * parts, sub thread trees). The desktop keeps its folds on the Mac's own screen and does not sync them, so neither does
+ * this. Keys of the project groups Home used to show are dropped as they are read.
  * Each function takes the host whose section it is (a scope's host), null for the shown one.
  */
 
@@ -19,7 +20,7 @@ function parse(raw: string | undefined): readonly string[] {
   if (raw === undefined) return NONE;
   try {
     const saved: unknown = JSON.parse(raw);
-    return Array.isArray(saved) ? saved.filter((key): key is string => typeof key === "string") : NONE;
+    return Array.isArray(saved) ? saved.filter((key): key is string => typeof key === "string" && liveSidebarFold(key)) : NONE;
   } catch {
     return NONE;
   }
@@ -61,11 +62,6 @@ export function pruneMissingFolds(missing: ReadonlySet<string>, host: string | n
     const next = pruneThreadFolds(saved, missing);
     return next.length === saved.length ? saved : next;
   });
-}
-
-/** Opens a project that is folded, as a thread starts in it. */
-export function unfoldProject(projectId: string, host: string | null = null): void {
-  if (!sidebarSectionOpen(savedFolds(host), "project", projectId)) toggleFold(sidebarFoldKey.project(projectId), host);
 }
 
 export function useFolds(host: string | null = null): readonly string[] {

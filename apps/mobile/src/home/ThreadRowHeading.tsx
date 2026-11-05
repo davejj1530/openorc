@@ -21,8 +21,9 @@ export function leadReach(thread: ThreadSummary, mark: ThreadMark | null): numbe
 }
 
 /**
- * A row's title line: its status in the lead column and the muted title at reading size. A sub thread says one fact at
- * the end, whole: for how long it has worked while it runs, then what kind of agent it was.
+ * A row's title line: the muted title at reading size with what the thread needs at its end. A sub thread keeps its
+ * status in the lead column, where the tree's line reaches it, and says one fact at the end, whole: for how long it has
+ * worked while it runs, then what kind of agent it was.
  */
 export function ThreadRowHeading({ thread, compact, mark }: { thread: ThreadSummary; compact: boolean; mark: ThreadMark | null }) {
   const child = thread.subagent;
@@ -31,15 +32,26 @@ export function ThreadRowHeading({ thread, compact, mark }: { thread: ThreadSumm
   const Icon = child && !running ? finishedIcon(child.status) : null;
   let fact: string | null = null;
   if (compact && child) fact = running ? workDuration(tick - child.startedAt) : child.agentType;
+  const lead =
+    Icon && child ? (
+      <View accessibilityLabel={subagentStatusLabel[child.status]} className="w-7 items-center">
+        <Icon size={16} className={child.status === "failed" ? "text-bad" : "text-ink-4"} />
+      </View>
+    ) : (
+      <ThreadStatusMark mark={mark} />
+    );
+  if (!compact)
+    return (
+      <View className="flex-row items-center gap-3">
+        <Text numberOfLines={1} className="flex-1 text-lg text-ink-3">
+          {thread.title}
+        </Text>
+        {Icon || mark ? lead : null}
+      </View>
+    );
   return (
     <View className="flex-row items-center gap-3">
-      {Icon && child ? (
-        <View accessibilityLabel={subagentStatusLabel[child.status]} className="w-7 items-center">
-          <Icon size={16} className={child.status === "failed" ? "text-bad" : "text-ink-4"} />
-        </View>
-      ) : (
-        <ThreadStatusMark mark={mark} />
-      )}
+      {lead}
       <Text numberOfLines={1} className="flex-1 text-lg text-ink-3">
         {thread.title}
       </Text>

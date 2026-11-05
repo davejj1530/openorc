@@ -84,6 +84,7 @@ export {
   type ProjectMeta,
   type SidebarFilter,
   type SidebarFold,
+  type ThreadPage,
 } from "./sidebar-thread-groups.js";
 export {
   SIDEBAR_DAYS,
@@ -91,10 +92,12 @@ export {
   liveSidebarFold,
   sidebarDay,
   sidebarDayKey,
+  sidebarDayList,
   sidebarDayOpen,
   sidebarDaySections,
   sidebarListGrows,
   type SidebarDay,
+  type SidebarDayList,
   type SidebarDaySection,
 } from "./sidebar-days.js";
 export { snoozePresets, snoozePresetsChangeAt, snoozeWakeLabel } from "./snooze.js";
@@ -174,4 +177,4 @@ export {
   type WorkSection,
 } from "./work-steps.js";
 export { workDuration, workParts, workTiming, workTurns } from "./work-transcript.js";
-export { useChildThreadPages, cachedChildPage } from "./thread-child-pages.js";
+export { useChildThreadPages, cachedChildPage, cachedListPage } from "./thread-child-pages.js";

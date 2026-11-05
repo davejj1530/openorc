@@ -1,6 +1,6 @@
 import type { ThreadSummary } from "@openorc/protocol";
-import { sidebarFoldKey } from "./sidebar-thread-groups.js";
-import { threadTreeActivity } from "./thread-tree.js";
+import { sidebarFoldKey, type ThreadPage } from "./sidebar-thread-groups.js";
+import { threadTreeActivity, threadTreeMatches } from "./thread-tree.js";
 
 /** When a thread last saw work, as the sidebar groups it. The last two start folded and open on demand. */
 export type SidebarDay = "today" | "yesterday" | "week" | "older";
@@ -61,13 +61,59 @@ export function sidebarDaySections(roots: readonly ThreadSummary[], all: readonl
   return SIDEBAR_DAYS.filter(({ day }) => byDay.has(day) || (day === "older" && hasMore)).map(({ day, label }) => ({ day, label, roots: byDay.get(day) ?? [] }));
 }
 
+/** How many threads the list reads by itself to complete an open day; past it the reader asks. */
+const GROWTH_LIMIT = 400;
+
 /**
  * Whether the list reads its next page by itself: while the day the loaded threads end in is open, so an open day is
  * never cut short, or while Older is open with nothing of it loaded yet. Inside Older the reader asks for more.
  */
-export function sidebarListGrows({ sections, hasMore, collapsed }: { sections: readonly SidebarDaySection[]; hasMore: boolean; collapsed: readonly string[] }): boolean {
-  if (!hasMore) return false;
+export function sidebarListGrows({ sections, hasMore, collapsed, limit = 0 }: { sections: readonly SidebarDaySection[]; hasMore: boolean; collapsed: readonly string[]; limit?: number }): boolean {
+  if (!hasMore || limit >= GROWTH_LIMIT) return false;
   const last = sections.findLast((section) => section.roots.length)?.day;
   if (last === "older") return false;
   return !last || sidebarDayOpen(collapsed, last) || sidebarDayOpen(collapsed, "older");
 }
+
+const unique = (rows: readonly ThreadSummary[]) => [...new Map(rows.map((thread) => [thread.id, thread])).values()];
+
+/**
+ * The list's parts from the pages it read: pins first (under the pinned filter, every pin), then the rest in their
+ * days, and snoozed threads apart. `pins` is the read of every pin, so an old pin still leads. Orcmode has no next
+ * page. `shown` keeps a folded part's rows down to the open thread's tree, so the list never hides where you are.
+ */
+export function sidebarDayList({
+  pages,
+  pins,
+  pinnedOnly,
+  orc,
+  activeId,
+  now,
+}: {
+  pages: readonly ThreadPage[];
+  pins?: ThreadPage;
+  pinnedOnly: boolean;
+  orc: boolean;
+  activeId: string | null | undefined;
+  now: number;
+}) {
+  const hasMore = !orc && pages.some((page) => page.hasMore);
+  const all = unique([...(pins?.list ?? []), ...pages.flatMap((page) => page.list)]);
+  const latestFirst = (a: ThreadSummary, b: ThreadSummary) => threadTreeActivity(b, all) - threadTreeActivity(a, all) || b.id.localeCompare(a.id);
+  const pinned = unique([...(pins?.pinned ?? []), ...pages.flatMap((page) => page.pinned)]).sort(latestFirst);
+  const unpinned = (thread: ThreadSummary) => !pinned.some((pin) => pin.id === thread.id);
+  const rest = pinnedOnly ? [] : pages.flatMap((page) => page.rest.filter(unpinned)).sort(latestFirst);
+  const snoozed = pinnedOnly ? [] : pages.flatMap((page) => page.snoozed).sort(latestFirst);
+  const holdsActive = (root: ThreadSummary) => Boolean(activeId) && threadTreeMatches(root, all, (row) => row.id === activeId);
+  return {
+    all,
+    hasMore,
+    pinned,
+    rest,
+    snoozed,
+    sections: sidebarDaySections(rest, all, now, hasMore && !pinnedOnly),
+    shown: (roots: readonly ThreadSummary[], open: boolean) => (open ? [...roots] : roots.filter(holdsActive)),
+  };
+}
+
+export type SidebarDayList = ReturnType<typeof sidebarDayList>;

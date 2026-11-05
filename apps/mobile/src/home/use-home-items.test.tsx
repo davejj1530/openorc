@@ -73,7 +73,8 @@ afterEach(() => {
   mac.phone!.module.queryClient.clear();
 });
 
-const threads: ThreadSummary[] = Array.from({ length: THREAD_PAGE + 4 }, (_, index) => ({ ...fixtureThreads[0]!, id: `w-${index}`, lastActivityAt: fixtureThreads[0]!.lastActivityAt - index }));
+/** Today's threads, so they list under Today, which starts open. */
+const threads: ThreadSummary[] = Array.from({ length: THREAD_PAGE + 4 }, (_, index) => ({ ...fixtureThreads[0]!, id: `w-${index}`, lastActivityAt: Date.now() - (index + 1) * 1000 }));
 const outline = (items: HomeItem[]) => items.map((item) => (item.kind === "thread" ? item.thread.id : item.kind));
 /** The Mac answers the read behind a page of `limit` threads, which asks for one more. */
 const answer = (limit: number) => act(async () => mac.pages.get(limit + 1)!(threads.slice(0, limit + 1)));
@@ -91,19 +92,15 @@ it("reads just the waiting thread outside the page and shows a started child who
   ).toBe(false);
 });
 
-it("keeps a project's rows while Show more's next page loads, then adds the page", async () => {
+it("reads the next page by itself while today is unfinished, keeping its rows meanwhile, then adds the page", async () => {
   const home = renderHook(() => useHomeItems(true), { wrapper: mac.phone!.wrapper });
   await waitFor(() => expect(mac.pages.has(THREAD_PAGE + 1)).toBe(true));
   await answer(THREAD_PAGE);
-  const first = ["heading", ...threads.slice(0, THREAD_PAGE).map((thread) => thread.id), "more"];
-  await waitFor(() => expect(outline(home.result.current.items)).toEqual(first));
-
-  act(() => home.result.current.showMore(WORKSPACE_ID));
-  expect(outline(home.result.current.items)).toEqual(first);
-
+  const first = ["section", ...threads.slice(0, THREAD_PAGE).map((thread) => thread.id), "section"];
   await waitFor(() => expect(mac.pages.has(THREAD_PAGE * 2 + 1)).toBe(true));
+  expect(outline(home.result.current.items)).toEqual(first);
   await answer(THREAD_PAGE * 2);
-  await waitFor(() => expect(outline(home.result.current.items)).toEqual(["heading", ...threads.map((thread) => thread.id)]));
+  await waitFor(() => expect(outline(home.result.current.items)).toEqual(["section", ...threads.map((thread) => thread.id)]));
 });
 
 it("asks again for a list that failed while connected, and leaves a failure while not connected to the header", async () => {
@@ -119,20 +116,20 @@ it("asks again for a list that failed while connected, and leaves a failure whil
       ).toBe(true),
     { timeout: 3_000 },
   );
-  expect(outline(offline.result.current.items)).toEqual(["heading"]);
+  expect(outline(offline.result.current.items)).toEqual([]);
   offline.unmount();
   const online = renderHook(() => useHomeItems(true), { wrapper: mac.phone!.wrapper });
-  await waitFor(() => expect(outline(online.result.current.items)).toEqual(["heading", "retry"]), { timeout: 3_000 });
+  await waitFor(() => expect(outline(online.result.current.items)).toEqual(["retry"]), { timeout: 3_000 });
 });
 
-it("prunes only deleted thread folds after checking the Mac, leaving off-page and project folds", async () => {
+it("prunes only deleted thread folds after checking the Mac, leaving off-page and day folds", async () => {
   const { toggleFold, savedFolds } = await import("./folds");
   mac.waiting = [{ ...threads[0]!, id: "kept" }];
   toggleFold("thread-open:deleted");
   toggleFold("thread-closed:kept");
-  toggleFold("project:other");
+  toggleFold("day-open:week");
   renderHook(() => useHomeItems(true), { wrapper: mac.phone!.wrapper });
   await waitFor(() => expect(savedFolds()).not.toContain("thread-open:deleted"));
   expect(savedFolds()).toContain("thread-closed:kept");
-  expect(savedFolds()).toContain("project:other");
+  expect(savedFolds()).toContain("day-open:week");
 });

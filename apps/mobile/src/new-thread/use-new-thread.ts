@@ -9,7 +9,6 @@ import type { ComposerSettings } from "../composer/settings-bridge";
 import { useEmptiedPrompt } from "../composer/keyboard-leftover";
 import { useImageAttach } from "../composer/use-image-attach";
 import { failureMessage } from "../failure";
-import { unfoldProject } from "../home/folds";
 import { haptic } from "../ui/haptics";
 import { useSheetDraft, useSheetPermission } from "./drafts";
 import { startBlocker, unstarted, type SheetDraft } from "./new-thread-state";
@@ -85,7 +84,6 @@ export function useNewThread(projectId: string) {
       const workspaceMode = toCloud ? "cloud" : newThreadWorkspaceMode({ canBranch: branchable, chosen: null, preferred: appSettings?.defaultWorkspaceMode });
       const { thread } = await start.mutateAsync(newThreadStartInput(draft, { workspaceMode, permissionMode: permission.permission, ...sent }));
       haptic.confirm();
-      unfoldProject(projectId, host);
       return thread.id;
     } catch (error) {
       haptic.fail();

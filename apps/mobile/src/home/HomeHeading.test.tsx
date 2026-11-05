@@ -1,39 +1,24 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import { HostContext } from "../connection/host-context";
-import { HomeHeading } from "./HomeHeading";
+import { HomeHeading, SectionToggle } from "./HomeHeading";
 
-const pushed = vi.hoisted(() => [] as unknown[]);
-vi.mock("expo-router", () => ({ router: { push: (to: unknown) => void pushed.push(to) } }));
-afterEach(() => {
-  cleanup();
-  pushed.length = 0;
+afterEach(cleanup);
+
+it("heads Needs you with how many wait, and never folds it", () => {
+  const view = render(<HomeHeading heading={{ kind: "heading", key: "needs-you", title: "Needs you", count: 3 }} />);
+  expect(view.getByLabelText("Needs you, 3")).toBeTruthy();
+  expect(view.queryByRole("button")).toBeNull();
 });
 
-const heading = { kind: "heading", key: "project:cloud-website", group: "project", projectId: "cloud-website", title: "website", meta: null, open: true } as const;
-
-it("starts a thread on the host whose section it heads: the cloud brain's under its heading, the shown host's otherwise", () => {
-  const brain = render(
-    <HostContext.Provider value="brain-key">
-      <HomeHeading heading={heading} onToggle={() => undefined} />
-    </HostContext.Provider>,
-  );
-  fireEvent.click(brain.getByLabelText("New thread in website"));
-  expect(pushed).toEqual([{ pathname: "/new", params: { projectId: "cloud-website", host: "brain-key" } }]);
-  cleanup();
-  const shown = render(<HomeHeading heading={{ ...heading, projectId: "website" }} onToggle={() => undefined} />);
-  fireEvent.click(shown.getByLabelText("New thread in website"));
-  expect(pushed.at(-1)).toEqual({ pathname: "/new", params: { projectId: "website" } });
-});
-
-it("offers no new thread under a Mac out of reach, and still folds there", () => {
+it("folds a part of the list from its label, naming Pinned's count but no day's", () => {
   const toggled = vi.fn();
-  const view = render(<HomeHeading heading={{ ...heading, projectId: "website", owner: { brain: "mac", reach: "offline", heardAt: 1 } }} onToggle={toggled} />);
-  expect(view.queryByLabelText("New thread in website")).toBeNull();
-  fireEvent.click(view.getByRole("button", { name: "website" }));
+  const pinned = render(<SectionToggle section={{ kind: "section", key: "pinned:threads", label: "Pinned", count: 2, open: true }} motion={{}} onToggle={toggled} />);
+  const button = pinned.getByRole("button", { name: "Pinned, 2" });
+  expect(button.getAttribute("aria-expanded")).toBe("true");
+  fireEvent.click(button);
   expect(toggled).toHaveBeenCalledOnce();
   cleanup();
-  const live = render(<HomeHeading heading={{ ...heading, owner: { brain: "cloud", reach: "asleep", heardAt: 1 } }} onToggle={() => undefined} />);
-  expect(live.getByLabelText("New thread in website")).toBeTruthy();
+  const day = render(<SectionToggle section={{ kind: "section", key: "day-open:week", label: "Last 7 days", open: false }} motion={{}} onToggle={toggled} />);
+  expect(day.getByRole("button", { name: "Last 7 days" }).getAttribute("aria-expanded")).toBe("false");
 });

@@ -11,6 +11,8 @@ const GAP = 12;
 export const STEP = LEAD + GAP;
 export const LEAD_CENTER = MARGIN + LEAD / 2;
 export const TEXT_X = MARGIN + STEP;
+/** The center of a root row's 16 pt project glyph at the margin, where the row's tree line leaves for its sub threads. */
+export const ROOT_NODE = MARGIN + 8;
 /** From the trailing edge to the action column's center: a 40 pt header circle ends at the margin. */
 export const ACTION_INSET = MARGIN + 20;
 /** The 44 pt touch around an action, from the trailing edge. */

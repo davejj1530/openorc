@@ -25,7 +25,8 @@ export function threadListParams(projectId: string, filter: SidebarFilter, shown
   return { projectId, filter: listedThreads(filter), limit: shown + 1, includeChildren: true };
 }
 
-type ThreadPage = { list: ThreadSummary[]; pinned: ThreadSummary[]; rest: ThreadSummary[]; snoozed: ThreadSummary[]; hasMore: boolean; leftOut: number };
+/** One read of a list as the sidebar shows it: the whole fetched family, and its roots split into pinned, the rest and snoozed. */
+export type ThreadPage = { list: ThreadSummary[]; pinned: ThreadSummary[]; rest: ThreadSummary[]; snoozed: ThreadSummary[]; hasMore: boolean; leftOut: number };
 
 /** Orcmode keeps the working set and the open thread. Snoozed threads wait, and the rest are counted rather than shown. */
 function orcPage(page: ThreadPage, selected: ThreadSummary | null | undefined, now: number): ThreadPage {

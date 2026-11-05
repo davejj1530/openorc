@@ -1,5 +1,5 @@
 import type { ThreadTreeRow } from "@openorc/client";
-import { LEAD_CENTER, MAX_DEPTH, STEP, TEXT_X } from "./grid";
+import { LEAD_CENTER, MAX_DEPTH, ROOT_NODE, STEP, TEXT_X } from "./grid";
 
 /** The space every line leaves before what it meets: a status glyph's edge, or a title. */
 export const LINE_GAP = 3;
@@ -8,8 +8,8 @@ const TURN = 6;
 /** How far a trunk runs past its row's top and foot, into the next row's, so stacked rows join without a seam. */
 export const SEAM = 1;
 
-/** The center of the lead column `level` steps in. */
-const lane = (level: number) => LEAD_CENTER + Math.min(level, MAX_DEPTH) * STEP;
+/** Where a tree's line runs `level` steps in: under a root's project glyph, then the lead column of each sub thread. */
+const lane = (level: number) => (level <= 0 ? ROOT_NODE : LEAD_CENTER + Math.min(level, MAX_DEPTH) * STEP);
 
 /**
  * Where a line meets a row on its title line: `LINE_GAP` short of its status glyph, which reaches `reach` left of the

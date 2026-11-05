@@ -15,7 +15,7 @@ export interface RowMotion {
   folding?: true;
 }
 
-/** A fold just moved: a project heading's or section's key, or a parent thread's id, and which way it went. */
+/** A fold just moved: a part of the list's key, or a parent thread's id, and which way it went. */
 export interface Moving {
   key: string;
   open: boolean;
@@ -29,10 +29,9 @@ const SETTLE_MS = 70 + motion.stagger * 8 + motion.duration.arrive + 100;
 /** A closing fold commits once its rows have all but faded, so the list's own latency overlaps the end of the fade. */
 const FOLD_AFTER_MS = motion.duration.leave - 40;
 
-/** Whether `item` is held by the fold at `holder`: a heading holds its project, a section its threads, a parent its tree. */
+/** Whether `item` is held by the fold at `holder`: a part of the list holds its rows and paging, a parent its tree. */
 function holds(holder: HomeItem, item: HomeItem): boolean {
-  if (holder.kind === "heading") return item.kind !== "heading";
-  if (holder.kind === "section") return item.kind === "thread" || item.kind === "children-more";
+  if (holder.kind === "section") return item.kind === "thread" || item.kind === "children-more" || item.kind === "more";
   if (holder.kind !== "thread") return false;
   const depth = holder.tree.depth;
   if (item.kind === "thread") return item.tree.depth > depth;

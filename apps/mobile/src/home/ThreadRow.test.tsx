@@ -51,8 +51,8 @@ it("shows a row of a Mac out of reach from its last list: it opens nothing, has 
   expect(view.queryByTestId("opens-thread")).toBeNull();
   expect(view.queryByTestId("swipes")).toBeNull();
   expect(menus.built).toEqual([]);
-  // Where it works, not what it was doing when the Mac last answered.
-  expect(view.getByText("perf/transcript-paging · Mac asleep")).toBeTruthy();
+  // Whose it is, not what it was doing when the Mac last answered.
+  expect(view.getByText("Mac asleep")).toBeTruthy();
   expect(view.queryByText(MAC_ASLEEP)).toBeNull();
   fireEvent.click(view.getByRole("button"));
   expect(view.getByText(MAC_ASLEEP)).toBeTruthy();
@@ -67,6 +67,14 @@ it("marks missing subagent updates with a neutral dashed circle", () => {
   const thread = { ...fixtureThreads[0]!, subagent: { status: "no_updates" as const, agentType: null, toolCallId: null, startedAt: 1, endedAt: 2, stoppable: false } };
   const view = render(<ThreadRow thread={thread} project="openorc" arriving={false} />);
   expect(view.getByLabelText("No updates").contains(view.getByLabelText("Neutral status mark"))).toBe(true);
+});
+
+it("names a root row's project under its title, with its pull request's state and number at the end", () => {
+  const canvas = fixtureThreads.find((thread) => thread.id === "t-canvas")!;
+  const view = render(<ThreadRow thread={canvas} project="immaculate" arriving={false} />);
+  expect(view.getByText("immaculate")).toBeTruthy();
+  expect(view.getByLabelText("Pull request #93, closed").textContent).toBe("#93");
+  expect(view.getByRole("button").getAttribute("aria-label")).toContain("Pull request #93, closed");
 });
 
 it("keeps a parent's disclosure on its own row, beside the link that opens the thread, and asks for the opposite fold", () => {

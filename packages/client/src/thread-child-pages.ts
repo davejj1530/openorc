@@ -25,3 +25,16 @@ export function cachedChildPage(cache: QueryClient, params: RpcParams<"threads.l
     .findAll({ queryKey: ["threads.list"], predicate: (query) => key(query.queryKey[1] as RpcParams<"threads.list">) === key(params) && Array.isArray(query.state.data) })
     .sort((a, b) => b.state.dataUpdatedAt - a.state.dataUpdatedAt)[0]?.state.data as ThreadSummary[] | undefined;
 }
+
+/** While a longer page loads, a list keeps the last page it read of the same threads, at that page's length. */
+export function cachedListPage(cache: QueryClient, params: RpcParams<"threads.list">): { rows: ThreadSummary[]; limit: number } | undefined {
+  const exact = cachedChildPage(cache, params);
+  if (exact) return { rows: exact, limit: (params.limit ?? exact.length) - 1 };
+  const key = (value: RpcParams<"threads.list">) => JSON.stringify({ ...value, childLimits: undefined, limit: undefined });
+  const query = cache
+    .getQueryCache()
+    .findAll({ queryKey: ["threads.list"], predicate: (entry) => key(entry.queryKey[1] as RpcParams<"threads.list">) === key(params) && Array.isArray(entry.state.data) })
+    .sort((a, b) => b.state.dataUpdatedAt - a.state.dataUpdatedAt)[0];
+  const rows = query?.state.data as ThreadSummary[] | undefined;
+  return rows && query ? { rows, limit: ((query.queryKey[1] as RpcParams<"threads.list">).limit ?? rows.length) - 1 } : undefined;
+}

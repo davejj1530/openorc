@@ -1,15 +1,17 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Menu } from "@base-ui/react/menu";
-import { useQueryClient, type QueryClient } from "@tanstack/react-query";
-import { WORKSPACE_ID, type RpcParams, type ThreadSummary } from "@openorc/protocol";
+import { useQueryClient } from "@tanstack/react-query";
+import { WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
 import { CoversPreview } from "../lib/browser-preview";
 import { useLayout } from "../lib/layout";
 import {
+  type SidebarDayList,
   type SidebarFilter,
+  cachedListPage,
   listedThreads,
   sidebarDayKey,
+  sidebarDayList,
   sidebarDayOpen,
-  sidebarDaySections,
   sidebarFoldKey,
   sidebarListGrows,
   SIDEBAR_LIST,
@@ -17,12 +19,9 @@ import {
   sidebarThreadPage,
   THREAD_PAGE,
   threadListParams,
-  threadTreeActivity,
-  threadTreeMatches,
   threadTreeRows,
   threadFoldIds,
   useChildThreadPages,
-  cachedChildPage,
 } from "@openorc/client";
 import { useOrclings } from "../lib/orclings";
 import { useRpc, useRpcs } from "../lib/client";
@@ -78,19 +77,6 @@ function withFamily(page: ThreadSummary[] | undefined, family: ThreadSummary[] |
   return [...new Map([...page, ...(family ?? []).filter((thread) => projectIds.includes(thread.projectId))].map((thread) => [thread.id, thread])).values()];
 }
 
-/** While a longer page loads, the list keeps the last page it read of the same threads, at that page's length. */
-function cachedListPage(cache: QueryClient, params: RpcParams<"threads.list">): { rows: ThreadSummary[]; limit: number } | undefined {
-  const exact = cachedChildPage(cache, params);
-  if (exact) return { rows: exact, limit: (params.limit ?? exact.length) - 1 };
-  const key = (value: RpcParams<"threads.list">) => JSON.stringify({ ...value, childLimits: undefined, limit: undefined });
-  const query = cache
-    .getQueryCache()
-    .findAll({ queryKey: ["threads.list"], predicate: (entry) => key(entry.queryKey[1] as RpcParams<"threads.list">) === key(params) && Array.isArray(entry.state.data) })
-    .sort((a, b) => b.state.dataUpdatedAt - a.state.dataUpdatedAt)[0];
-  const rows = query?.state.data as ThreadSummary[] | undefined;
-  return rows ? { rows, limit: ((query!.queryKey[1] as RpcParams<"threads.list">).limit ?? rows.length) - 1 } : undefined;
-}
-
 /** Orcmode's way out: the threads it leaves out, one click from the full list. */
 function OrcModeEnd({ leftOut, more, pending, shown }: { leftOut: number; more: boolean; pending: boolean; shown: number }) {
   const setFilter = useLayout((s) => s.setSidebarFilter);
@@ -122,9 +108,6 @@ export function SidebarThreadBrowser() {
   }, [missingKey]);
   return <DayThreadBrowser children={children} />;
 }
-
-/** How far the list reads by itself to complete an open day; past it the reader asks. */
-const GROWTH_LIMIT = 400;
 
 /**
  * One list across the shown projects, newest work first. Orcmode keeps each project's working set; the other
@@ -201,36 +184,15 @@ function ListFeedback({ state, shown, snoozed }: { state: ThreadList; shown: num
   return <p className="browser-empty">{emptyMessage(pinnedOnly)}</p>;
 }
 
-const unique = (rows: readonly ThreadSummary[]) => [...new Map(rows.map((thread) => [thread.id, thread])).values()];
-
-/**
- * The list's parts from its pages: pins first (with the pinned filter, every pin), then the rest in their days, and
- * snoozed threads apart. A folded part still shows the open thread, so the list never hides where you are.
- */
+/** The list's parts from its pages: pins first, then the rest in their days, snoozed threads apart. */
 function dayList({ pages, pinPage, pinnedOnly, view, activeId }: ThreadList) {
-  const hasMore = view !== "orc" && pages.some((page) => page.hasMore);
-  const all = unique([...pinPage.list, ...pages.flatMap((page) => page.list)]);
-  const latestFirst = (a: ThreadSummary, b: ThreadSummary) => threadTreeActivity(b, all) - threadTreeActivity(a, all) || b.id.localeCompare(a.id);
-  const pinned = unique([...pinPage.pinned, ...pages.flatMap((page) => page.pinned)]).sort(latestFirst);
-  const unpinned = (thread: ThreadSummary) => !pinned.some((pin) => pin.id === thread.id);
-  const rest = pinnedOnly ? [] : pages.flatMap((page) => page.rest.filter(unpinned)).sort(latestFirst);
-  const snoozed = pinnedOnly ? [] : pages.flatMap((page) => page.snoozed).sort(latestFirst);
-  const holdsActive = (root: ThreadSummary) => Boolean(activeId) && threadTreeMatches(root, all, (row) => row.id === activeId);
-  return {
-    all,
-    hasMore,
-    pinned,
-    rest,
-    snoozed,
-    sections: sidebarDaySections(rest, all, Date.now(), hasMore && !pinnedOnly),
-    shown: (roots: ThreadSummary[], open: boolean) => (open ? roots : roots.filter(holdsActive)),
-  };
+  return sidebarDayList({ pages, pins: pinPage, pinnedOnly, orc: view === "orc", activeId, now: Date.now() });
 }
 
 type ListPart = { key: string; label: string; count?: number; open: boolean; fold: string; roots: ThreadSummary[]; more: boolean };
 
 /** The parts that fold, in order: Pinned, then each day. Paging sits at the end of Pinned under the pinned filter, else of Older. */
-function listParts(list: ReturnType<typeof dayList>, collapsed: readonly string[], pinnedOnly: boolean): ListPart[] {
+function listParts(list: SidebarDayList, collapsed: readonly string[], pinnedOnly: boolean): ListPart[] {
   const pinsOpen = sidebarSectionOpen(collapsed, "pinned", SIDEBAR_LIST);
   const pins: ListPart = {
     key: "pinned",
@@ -263,7 +225,7 @@ function DayThreadBrowser({ children }: { children: ChildPages }) {
   useEffect(() => {
     useUi.getState().setThreadOrder(JSON.parse(orderKey) as string[]);
   }, [orderKey]);
-  const grows = view !== "orc" && !pinnedOnly && !pending && limit < GROWTH_LIMIT && sidebarListGrows({ sections: list.sections, hasMore: list.hasMore, collapsed });
+  const grows = view !== "orc" && !pinnedOnly && !pending && sidebarListGrows({ sections: list.sections, hasMore: list.hasMore, collapsed, limit });
   useEffect(() => {
     if (grows) loadMore();
   }, [grows, limit, loadMore]);

@@ -1,33 +1,30 @@
-import { cachedChildPage, useChildThreadPages, listedThreads, sidebarFoldKey, sidebarSectionOpen, THREAD_PAGE, threadFoldIds, threadListParams, type SidebarFilter } from "@openorc/client";
-import type { InboxList, ThreadSummary } from "@openorc/protocol";
-import { useQueryClient, type QueryClient } from "@tanstack/react-query";
+import {
+  cachedListPage,
+  listedThreads,
+  sidebarDayList,
+  sidebarListGrows,
+  sidebarThreadPage,
+  THREAD_PAGE,
+  threadFoldIds,
+  threadListParams,
+  useChildThreadPages,
+  type SidebarFilter,
+} from "@openorc/client";
+import { WORKSPACE_ID, type InboxList, type ThreadSummary } from "@openorc/protocol";
+import { useQueryClient } from "@tanstack/react-query";
 import { useContext, useEffect, useState } from "react";
 import { useRpc, useRpcs } from "../client";
 import { HostContext } from "../connection/host-context";
 import { projectChoices } from "../projects";
-import { homeItems, homeWaiting, type HomeOptions, type ProjectThreads } from "./home-items";
+import { homeItems, homeWaiting, type HomeList, type HomeOptions } from "./home-items";
 import { useHomeFilter } from "./filter";
 import { pruneMissingFolds, toggleFold, toggleThreadChildren, useFolds } from "./folds";
 
-const listParams = (projectId: string, filter: SidebarFilter, limit: number) => threadListParams(projectId, filter, limit);
 /** How long rows a reader unfolds take to rise in. */
 const OPENING_MS = 500;
 const NO_IDS: string[] = [];
 
-/**
- * A project's threads as Home shows them: its page, or while Show more's next page loads, the largest page it already
- * read at that page's size. The next page has its own read, so without this the rows would empty under the finger.
- */
-function shownPage(cache: QueryClient, group: Omit<ProjectThreads, "threads">, filter: SidebarFilter, threads: readonly ThreadSummary[] | undefined): ProjectThreads {
-  if (threads) return { ...group, threads };
-  for (let limit = group.limit - THREAD_PAGE; limit >= THREAD_PAGE; limit -= THREAD_PAGE) {
-    const page = cachedChildPage(cache, listParams(group.id, filter, limit));
-    if (page) return { ...group, threads: page, limit };
-  }
-  return { ...group, threads: undefined };
-}
-
-/** The threads the Mac's inbox says wait on you that no loaded page lists, read one by one. */
+/** The threads the host's inbox says wait on you that no loaded page lists, read one by one. */
 function useWaitingElsewhere(inbox: InboxList | undefined, listed: ReadonlySet<string>): ThreadSummary[] {
   const ids = inbox ? [...new Set(inbox.items.flatMap((item) => (item.kind === "thread" ? [item.thread.id] : [])))].filter((id) => !listed.has(id)) : NO_IDS;
   const reads = useRpcs(
@@ -37,8 +34,8 @@ function useWaitingElsewhere(inbox: InboxList | undefined, listed: ReadonlySet<s
   return reads.flatMap((read) => (read.data ? [read.data] : []));
 }
 
-/** The project a reader just unfolded, for a moment, so only a fold they open animates. */
-function useOpening(): [string | null, (projectId: string) => void] {
+/** The part a reader just unfolded, for a moment, so only a fold they open animates. */
+function useOpening(): [string | null, (key: string) => void] {
   const [opened, setOpened] = useState<string | null>(null);
   useEffect(() => {
     if (!opened) return;
@@ -48,19 +45,57 @@ function useOpening(): [string | null, (projectId: string) => void] {
   return [opened, setOpened];
 }
 
+/** The open thread's family when no loaded page holds it, so it shows in its day. */
+function useSelectedFamily(selected: ThreadSummary | null, filter: SidebarFilter, listed: ReadonlySet<string>, children: ReturnType<typeof useChildThreadPages>) {
+  return useRpc(
+    "threads.list",
+    { projectId: selected?.projectId, filter: listedThreads(filter), includeChildren: true, limit: 1, selectedId: selected?.id, ...children.params(selected?.projectId) },
+    { enabled: Boolean(selected && !listed.has(selected.id)) },
+  ).data;
+}
+
 /**
- * Home's rows from the scope's host's lists, each project a page at a time and folded as the reader left it. While the
- * phone is not `connected` a list that fails keeps the threads it had and shows no retry: the header says once why.
- * `needsYou` lists a partner host's waiting threads here, or this host's under the shown one's Needs you.
+ * The host's threads as one list across its projects, newest work first, read a page at a time; pins come from their
+ * own read so an old pin still leads. Orcmode reads each project's working set. The list reads on by itself until
+ * every open day is whole, and Older pages on request.
  */
-export function useHomeItems(connected: boolean, needsYou: Pick<HomeOptions, "partnerWaiting" | "waitingShownElsewhere" | "selectedId"> = {}) {
+function useThreadList(connected: boolean, selectedId: string | undefined) {
   const projects = useRpc("projects.list", {});
   const { filter, pinnedOnly } = useHomeFilter();
-  // How many threads each project shows per list (active or archived), a page more for each Show more.
-  const [limits, setLimits] = useState<Record<string, number>>({});
+  const [limit, setLimit] = useState(THREAD_PAGE);
   const children = useChildThreadPages();
-  const selected = useRpc("threads.get", { id: needsYou.selectedId ?? "" }, { enabled: Boolean(needsYou.selectedId) });
-  const limitKey = (projectId: string) => `${listedThreads(filter)}:${projectId}`;
+  const cache = useQueryClient();
+  const choices = projectChoices(projects.data);
+  const projectIds = choices.map((project) => project.id).sort();
+  const orc = filter === "orc";
+  const listed = { projectIds, filter: listedThreads(filter), orderBy: "activity" as const, includeChildren: true, ...children.params() };
+  const params = orc ? choices.map(({ id }) => ({ ...threadListParams(id, filter), ...children.params(id) })) : [{ ...listed, pinnedOnly, limit: limit + 1 }];
+  const lists = useRpcs("threads.list", params, { refetchInterval: 60_000 });
+  const pins = useRpc("threads.list", { ...listed, pinnedOnly: true }, { enabled: filter === "active" && !pinnedOnly, refetchInterval: 60_000 });
+  const fetched = lists.map((list, index) => (list.data ? { rows: list.data, limit: orc ? THREAD_PAGE : limit } : cachedListPage(cache, params[index]!)));
+  const opened = useRpc("threads.get", { id: selectedId ?? "" }, { enabled: Boolean(selectedId) }).data;
+  const selected = opened && projectIds.includes(opened.projectId) ? opened : null;
+  const family = useSelectedFamily(selected, filter, new Set(fetched.flatMap((page) => page?.rows.map((thread) => thread.id) ?? [])), children);
+  const now = Date.now();
+  const withFamily = (rows: readonly ThreadSummary[] | undefined) => (rows ? [...new Map([...rows, ...(family ?? [])].map((thread) => [thread.id, thread])).values()] : rows);
+  const pages = fetched.map((page, index) =>
+    sidebarThreadPage({ projectId: orc ? choices[index]!.id : (selected?.projectId ?? WORKSPACE_ID), fetched: withFamily(page?.rows), selected, filter, limit: page?.limit ?? limit, now }),
+  );
+  const pinPage = sidebarThreadPage({ projectId: WORKSPACE_ID, fetched: pins.data, selected: null, filter, limit: Number.MAX_SAFE_INTEGER, now });
+  const days = sidebarDayList({ pages, pins: pinPage, pinnedOnly, orc, activeId: selectedId, now });
+  const read = [...(pins.data ?? []), ...fetched.flatMap((page) => page?.rows ?? [])];
+  const list: HomeList = { days, read, names: new Map(choices.map(({ id, name }) => [id, name])), failed: connected && lists.some((each) => each.isError) };
+  const pending = lists.some((each) => each.isPending);
+  return { projects, lists, list, filter, pinnedOnly, children, pending, orc, limit, showMore: () => setLimit((old) => old + THREAD_PAGE) };
+}
+
+/**
+ * Home's rows from the scope's host's lists, folded as the reader left them. While the phone is not `connected` a list
+ * that fails keeps the threads it had and shows no retry: the header says once why. `needsYou` lists a partner host's
+ * waiting threads here, or this host's under the shown one's Needs you.
+ */
+export function useHomeItems(connected: boolean, needsYou: Pick<HomeOptions, "partnerWaiting" | "waitingShownElsewhere" | "selectedId"> = {}) {
+  const { projects, lists, list, filter, pinnedOnly, children, pending, orc, limit, showMore } = useThreadList(connected, needsYou.selectedId);
   // A partner's sections fold on their own host.
   const host = useContext(HostContext);
   const collapsed = useFolds(host);
@@ -74,36 +109,31 @@ export function useHomeItems(connected: boolean, needsYou: Pick<HomeOptions, "pa
   useEffect(() => {
     if (connected) pruneMissingFolds(new Set(JSON.parse(missingKey) as string[]), host);
   }, [connected, missingKey, host]);
+  const grows = !orc && !pinnedOnly && !pending && sidebarListGrows({ sections: list.days.sections, hasMore: list.days.hasMore, collapsed, limit });
+  useEffect(() => {
+    if (grows) showMore();
+  }, [grows, limit, showMore]);
   const [opened, setOpened] = useOpening();
-  const groups = projectChoices(projects.data).map(({ id, name }) => ({ id, name, limit: limits[limitKey(id)] ?? THREAD_PAGE }));
-  const params = groups.map((group) => ({
-    ...listParams(group.id, filter, group.limit),
-    ...children.params(group.id),
-    ...(selected.data?.projectId === group.id ? { selectedId: selected.data.id } : {}),
-  }));
-  const lists = useRpcs("threads.list", params, { refetchInterval: 60_000 });
   const inbox = useRpc("inbox.list", {}, { refetchInterval: 60_000 });
-  const cache = useQueryClient();
-  const shown = groups.map((group, index) => shownPage(cache, { ...group, failed: connected && Boolean(lists[index]?.isError) }, filter, lists[index]?.data ?? cachedChildPage(cache, params[index]!)));
-  const listed = new Set(shown.flatMap((group) => group.threads?.map((thread) => thread.id) ?? []));
-  const waiting = useWaitingElsewhere(inbox.data, listed);
+  const waiting = useWaitingElsewhere(inbox.data, new Set(list.read.map((thread) => thread.id)));
   const options: HomeOptions = { now: Date.now(), filter, pinnedOnly, collapsed, waiting, projectsFailed: connected && projects.isError, opened, childLimits: children.limits, ...needsYou };
+  const items = homeItems(list, options);
   return {
-    items: homeItems(shown, options),
+    items,
     /** This host's threads waiting on you, for the shown host's Needs you when this is the partner. */
-    waiting: homeWaiting(shown, options),
-    showMore: (projectId: string) => setLimits((current) => ({ ...current, [limitKey(projectId)]: (current[limitKey(projectId)] ?? THREAD_PAGE) + THREAD_PAGE })),
+    waiting: homeWaiting(list, options),
+    showMore,
     showMoreChildren: children.showMore,
     toggleThread: (id: string, expanded: boolean) => toggleThreadChildren(id, expanded, host),
-    /** Folds or opens a section; a project the reader opens rises its rows in. */
-    toggle: (key: string, projectId: string) => {
-      if (key === sidebarFoldKey.project(projectId) && !sidebarSectionOpen(collapsed, "project", projectId)) setOpened(projectId);
+    /** Folds or opens a part of the list by its key; a part the reader opens rises its rows in. */
+    toggle: (key: string) => {
+      if (items.some((item) => item.kind === "section" && item.key === key && !item.open)) setOpened(key);
       toggleFold(key, host);
     },
-    /** Asks the Mac again for a list it could not give: a project's threads, or the projects. */
-    retry: (projectId: string | null) => {
-      const index = groups.findIndex((group) => group.id === projectId);
-      void (index === -1 ? projects.refetch() : lists[index]?.refetch());
+    /** Asks the host again for a list it could not give: the projects, or the threads. */
+    retry: (projectsList: boolean) => {
+      if (projectsList) void projects.refetch();
+      else lists.filter((each) => each.isError).forEach((each) => void each.refetch());
     },
   };
 }

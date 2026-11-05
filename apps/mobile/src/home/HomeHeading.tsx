@@ -1,94 +1,42 @@
-import type { ProjectMeta } from "@openorc/client";
-import { router } from "expo-router";
-import { useContext, useState, type ComponentType, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { View } from "react-native";
-import { HostContext } from "../connection/host-context";
-import { macAsleep } from "./out-of-reach";
-import { ChevronDown, Folder, FolderOpen, Globe, Inbox, Plus } from "../generated/icons";
-import type { IconProps } from "../ui/icon";
+import { ChevronDown } from "../generated/icons";
 import { cn } from "../ui/cn";
 import { ListPressable } from "../ui/ListPressable";
 import { useReducedMotion } from "../ui/reduced-motion";
 import { turn } from "../ui/motion";
 import { Text } from "../ui/Text";
 import Animated from "react-native-reanimated";
-import { movingStyle, STILL, type RowMotion } from "./fold-motion";
+import { movingStyle, type RowMotion } from "./fold-motion";
 import type { HomeItem } from "./home-items";
-import { TEXT_X, titleMid } from "./grid";
+import { MARGIN, ROW_INSET, TEXT_X, titleMid } from "./grid";
 import { ThreadBranch, treeIndent } from "./ThreadBranch";
 
 type Heading = Extract<HomeItem, { kind: "heading" }>;
 type Section = Extract<HomeItem, { kind: "section" }>;
 
-// The desktop's project-group-activity tones.
-const metaTones: Record<ProjectMeta["tone"], string> = { attention: "text-warn", faint: "text-ink-4" };
+/** Where a root row's title starts, inside the row's inset: labels of the list's parts line up with it. */
+const LABEL_PAD = MARGIN - ROW_INSET;
 
-const groupIcons: Record<Heading["group"], (open: boolean) => ComponentType<IconProps>> = {
-  "needs-you": () => Inbox,
-  workspace: () => Globe,
-  project: (open) => (open ? FolderOpen : Folder),
-};
-
-/** The room above a heading: the most after rows end a section, none after a folded heading, so folds stack tight. */
+/** The room above a heading or part: the most after rows end one, none at the top past the bar's own. */
 export type HeadingRoom = "first" | "after-rows" | "after-heading";
-const rooms: Record<HeadingRoom, string> = { first: "mt-3", "after-rows": "mt-4", "after-heading": "" };
-
-function HeadingLine({ heading: { group, title, meta }, open }: { heading: Heading; open: boolean }) {
-  const Icon = groupIcons[group](open);
-  return (
-    <>
-      <View className="w-7 items-center">
-        <Icon size={20} className="text-ink-4" />
-      </View>
-      <Text numberOfLines={1} className="flex-1 text-lg">
-        {title}
-      </Text>
-      {meta ? <Text className={cn("text-detail tabular-nums", metaTones[meta.tone])}>{meta.text}</Text> : null}
-    </>
-  );
-}
+const rooms: Record<HeadingRoom, string> = { first: "mt-1", "after-rows": "mt-3", "after-heading": "" };
 
 /**
- * A section heading like the sidebar's project heading, on Home's grid: a faint 20 pt glyph in the lead column, the
- * name in ink where row titles start, the meta in its tone ending where the plus begins. A project's heading folds it
- * on a tap, its folder glyph closing at once while its rows leave, and keeps its meta while folded; its own plus starts
- * a thread there, on the host the section lists, unless that is a Mac out of reach. Needs you never folds. Without a
- * plus the meta still ends at the action column, so every count lines up.
+ * Needs you's heading, in the form of the list's parts: its label where titles start, and how many wait in the
+ * attention tone. It never folds, so it holds no chevron.
  */
-export function HomeHeading({ heading, room = "after-rows", motion = STILL, onToggle }: { heading: Heading; room?: HeadingRoom; motion?: RowMotion; onToggle: () => void }) {
-  const { projectId, title, meta } = heading;
-  const open = heading.open && !motion.folding;
-  const host = useContext(HostContext);
-  const asleep = macAsleep(heading.owner);
-  const label = [title, meta?.text].filter(Boolean).join(", ");
-  if (!projectId) {
-    return (
-      <View accessible accessibilityRole="header" accessibilityLabel={label} className={cn("mx-3 min-h-touch flex-row items-center gap-3 pl-2 pr-12.5", rooms[room])}>
-        <HeadingLine heading={heading} open={open} />
-      </View>
-    );
-  }
+export function HomeHeading({ heading, room = "after-rows" }: { heading: Heading; room?: HeadingRoom }) {
   return (
-    <View className={cn("mx-3 min-h-touch flex-row items-center", rooms[room])}>
-      <ListPressable
-        accessibilityRole="button"
-        accessibilityState={{ expanded: open }}
-        accessibilityLabel={label}
-        onPress={onToggle}
-        className={cn("min-h-touch flex-1 flex-row items-center gap-3 rounded-lg pl-2 active:bg-surface-2", asleep && "mr-12.5")}
-      >
-        <HeadingLine heading={heading} open={open} />
-      </ListPressable>
-      {asleep ? null : (
-        <ListPressable
-          accessibilityRole="button"
-          accessibilityLabel={`New thread in ${title}`}
-          onPress={() => router.push({ pathname: "/new", params: host ? { projectId, host } : { projectId } })}
-          className="mr-1.5 size-touch items-center justify-center rounded-full active:bg-surface-2"
-        >
-          <Plus size={20} className="text-ink-4" />
-        </ListPressable>
-      )}
+    <View
+      accessible
+      accessibilityRole="header"
+      accessibilityLabel={`${heading.title}, ${heading.count}`}
+      className={cn("mx-3 min-h-touch flex-row items-center gap-1.5", rooms[room])}
+      style={{ paddingLeft: LABEL_PAD }}
+    >
+      <Text className="text-detail text-ink-4">{heading.title}</Text>
+      <Text className="text-detail text-warn tabular-nums">{heading.count}</Text>
     </View>
   );
 }
@@ -98,46 +46,41 @@ function Moving({ motion, children }: { motion: RowMotion; children: ReactNode }
   return <Animated.View style={movingStyle(motion, useReducedMotion())}>{children}</Animated.View>;
 }
 
-const sectionLabels: Record<Section["fold"], string> = { pinned: "Pinned", snoozed: "Snoozed" };
-
 /**
- * A project's pinned or snoozed threads behind a quiet disclosure: the label and count where titles start, and the
- * chevron the sub threads use, in the action column, turning as the section opens.
+ * A part of the list that folds: Pinned, a day, or Snoozed. Its label (and, for Pinned and Snoozed, its count) where
+ * titles start, and the chevron the sub threads use in the action column, turning as the part opens.
  */
-export function SectionToggle({ section, motion, onToggle }: { section: Section; motion: RowMotion; onToggle: () => void }) {
-  const label = sectionLabels[section.fold];
+export function SectionToggle({ section, room = "after-rows", motion, onToggle }: { section: Section; room?: HeadingRoom; motion: RowMotion; onToggle: () => void }) {
   const open = section.open && !motion.folding;
   const still = useReducedMotion();
   return (
-    <Moving motion={motion}>
-      <ListPressable
-        accessibilityRole="button"
-        accessibilityState={{ expanded: open }}
-        accessibilityLabel={`${label}, ${section.count}`}
-        onPress={onToggle}
-        className="mx-3 min-h-touch flex-row items-center gap-1.5 rounded-lg pr-5 active:bg-surface-2"
-        style={{ paddingLeft: TEXT_X - 12 }}
-      >
-        <Text className="text-detail text-ink-4">{label}</Text>
-        <Text className="flex-1 text-detail text-ink-4 tabular-nums">{section.count}</Text>
-        <Animated.View style={turn(open, still)}>
-          <ChevronDown size={16} className="text-ink-4" />
-        </Animated.View>
-      </ListPressable>
-    </Moving>
+    <ListPressable
+      accessibilityRole="button"
+      accessibilityState={{ expanded: open }}
+      accessibilityLabel={section.count === undefined ? section.label : `${section.label}, ${section.count}`}
+      onPress={onToggle}
+      className={cn("mx-3 min-h-touch flex-row items-center gap-1.5 rounded-lg pr-5 active:bg-surface-2", rooms[room])}
+      style={{ paddingLeft: LABEL_PAD }}
+    >
+      <Text className="text-detail text-ink-4">{section.label}</Text>
+      <Text className="flex-1 text-detail text-ink-4 tabular-nums">{section.count ?? ""}</Text>
+      <Animated.View style={turn(open, still)}>
+        <ChevronDown size={16} className="text-ink-4" />
+      </Animated.View>
+    </ListPressable>
   );
 }
 
-/** The foot of a project that lists more threads than it shows: the next page, as the sidebar loads more. */
-export function ShowMore({ project, motion, onPress }: { project: string; motion: RowMotion; onPress: () => void }) {
+/** The foot of Older while the host has more threads to give: the next page, as the sidebar loads more. */
+export function ShowMore({ motion, onPress }: { motion: RowMotion; onPress: () => void }) {
   return (
     <Moving motion={motion}>
       <ListPressable
         accessibilityRole="button"
-        accessibilityLabel={`Show more in ${project}`}
+        accessibilityLabel="Show more"
         onPress={onPress}
         className="mx-3 min-h-touch justify-center rounded-lg active:bg-surface-2"
-        style={{ paddingLeft: TEXT_X - 12 }}
+        style={{ paddingLeft: LABEL_PAD }}
       >
         <Text className="text-detail text-ink-4">Show more</Text>
       </ListPressable>
@@ -166,15 +109,10 @@ export function ShowMoreChildren({ item, motion, onPress }: { item: Extract<Home
   );
 }
 
-/** A list the Mac could not give, as one faint row that asks again, where titles start. */
+/** A list the host could not give, as one faint row that asks again, where titles start. */
 export function RetryRow({ projects, onPress }: { projects: boolean; onPress: () => void }) {
   return (
-    <ListPressable
-      accessibilityRole="button"
-      onPress={onPress}
-      className={cn("mx-3 min-h-touch justify-center rounded-lg active:bg-surface-2", projects && "mt-2")}
-      style={{ paddingLeft: TEXT_X - 12 }}
-    >
+    <ListPressable accessibilityRole="button" onPress={onPress} className={cn("mx-3 min-h-touch justify-center rounded-lg active:bg-surface-2", projects && "mt-2")} style={{ paddingLeft: LABEL_PAD }}>
       <Text className="text-detail text-ink-4">{projects ? "Couldn’t load projects. Retry" : "Couldn’t load threads. Retry"}</Text>
     </ListPressable>
   );

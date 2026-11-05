@@ -62,6 +62,8 @@ import type { OpenOrcOptions } from "./options.js";
 import { RemoteAccess } from "./remote/remote-access.js";
 import { rememberRemovedBrain } from "./remote/removed-brains.js";
 import { requestOrigin, type RequestOrigin } from "./request-origin.js";
+import { forgetKeptSessions } from "./services/agent-sessions.js";
+import type { OpenCodeCloudKeys } from "./services/cloud-opencode.js";
 import { AgentUpdateService } from "./services/agent-updates.js";
 import { AttachmentService } from "./services/attachments.js";
 import { ClaudeAccountService } from "./services/claude-accounts.js";
@@ -199,7 +201,7 @@ export class OpenOrc {
       preview: options.preview,
     });
     this.settings = new AppSettingsService(db);
-    this.environment = new ShellEnvironment({ probe: options.shellProbe ?? (options.ephemeral ? inheritedProbe() : undefined) });
+    this.environment = new ShellEnvironment({ probe: options.shellProbe ?? (options.ephemeral ? inheritedProbe() : undefined), ...(options.shellEnv ? { env: options.shellEnv } : {}) });
     this.devices = new DeviceService({ db, dataDir: options.dataDir, environment: () => this.environment.current(), transport: options.transport, log: this.log, system: options.deviceSystem });
     this.system = new SystemService(options.dataDir, this.environment);
     this.claudeAccounts = new ClaudeAccountService(
@@ -281,7 +283,7 @@ export class OpenOrc {
       this.log,
       (exchange, agent, accountId) => this.textGeneration.title(exchange, agent, accountId),
       this.workspaceWriters,
-      (id) => this.previewGone(id),
+      (id) => this.threadGone(id),
       (id) => claudeConfigDir(undefined, this.claudeAccounts.environment(this.environment.current(), id).env),
     );
     this.comments = new TaskCommentService(db, this.runs, this.threads, invalidate, options.dataDir);
@@ -355,7 +357,20 @@ export class OpenOrc {
     if (this.settings.get().notifications) this.options.transport.push(notice);
   }
 
-  /** A deleted thread's Preview goes with it: phones watching it hear so, and main closes its pages. */
+  /** OpenCode's provider keys for cloud turns: entered on the Mac, handed over sealed to its brain. */
+  get openCodeCloudKeys(): OpenCodeCloudKeys {
+    return this.cloudParts.opencode;
+  }
+
+  /** A deleted thread's Preview goes with it, and the session copies kept aside for it. */
+  private threadGone(threadId: string): void {
+    this.previewGone(threadId);
+    void forgetKeptSessions(this.options.dataDir, threadId).catch((error: unknown) =>
+      this.log.warn(`kept sessions of thread ${threadId} stay: ${error instanceof Error ? error.message : String(error)}`),
+    );
+  }
+
+  /** Phones watching its Preview hear so, and main closes its pages. */
   private previewGone(threadId: string): void {
     this.remote.previewGone(threadId);
     this.options.preview?.threadGone(threadId);

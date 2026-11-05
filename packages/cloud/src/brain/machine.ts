@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";
+import { harnessCatalog, harnessIds, type HarnessId } from "@openorc/protocol";
 import { APIError, Sandbox as SdkSandbox, Snapshot } from "@vercel/sandbox";
 import type { SandboxInfo } from "../sandbox.js";
 import { STATES, vercelSandboxCost, type VercelCredentials } from "../vercel-sandbox.js";
@@ -240,6 +241,14 @@ const sdk: BrainApi = {
 /** How setup supplies each thing the survey can find missing. */
 type Remedy = { kind: "image" } | { kind: "apt"; package: string } | { kind: "folders" } | { kind: "npm"; package: string };
 
+/** Each agent's CLI, from the one list of them, in the brain's own npm prefix. */
+const AGENT_NEEDS = Object.fromEntries(
+  harnessIds.map((id) => {
+    const { npm, bin } = harnessCatalog[id].cli;
+    return [id, { check: `"$npm/bin/${bin}" --version`, remedy: { kind: "npm", package: npm } }];
+  }),
+) as Record<HarnessId, { check: string; remedy: Remedy }>;
+
 /** Checks run with `$npm` set and the layout's folders as arguments. */
 const NEEDS = {
   node24: { check: `node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 24 ? 0 : 1)'`, remedy: { kind: "image" } },
@@ -249,8 +258,7 @@ const NEEDS = {
   tar: { check: "command -v tar", remedy: { kind: "apt", package: "tar" } },
   gh: { check: "command -v gh", remedy: { kind: "apt", package: "gh" } },
   folders: { check: 'for folder in "$@"; do test -d "$folder" || exit 1; done', remedy: { kind: "folders" } },
-  claude: { check: '"$npm/bin/claude" --version', remedy: { kind: "npm", package: "@anthropic-ai/claude-code" } },
-  codex: { check: '"$npm/bin/codex" --version', remedy: { kind: "npm", package: "@openai/codex" } },
+  ...AGENT_NEEDS,
 } satisfies Record<string, { check: string; remedy: Remedy }>;
 type Need = keyof typeof NEEDS;
 const isNeed = (name: string): name is Need => Object.hasOwn(NEEDS, name);

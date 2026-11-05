@@ -1,6 +1,7 @@
 import path from "node:path";
 import type { AgentHost } from "@openorc/agents";
 import {
+  ensureAgent,
   installRunner,
   LocalSandboxProvider,
   pullWorkspace,
@@ -19,14 +20,17 @@ import {
 } from "@openorc/cloud";
 import { cloudWorkspaces, type CloudMirrorState, type CloudProviderId, type CloudWorkspaceRecord, type Db } from "@openorc/db";
 import { originUrl } from "@openorc/git";
-import { WORKSPACE_ID, type CloudStep, type CloudThreadState, type Project, type Thread } from "@openorc/protocol";
+import { releaseOf, slotFor } from "@openorc/agents";
+import { harnessCatalog, isHarnessId, WORKSPACE_ID, type CloudStep, type CloudThreadState, type HarnessId, type Project, type Thread } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
 import { cloudAgentHost } from "./cloud-agent-host.js";
 import { CloudAwake } from "./cloud-awake.js";
 import type { CloudCheckTarget } from "./cloud-check.js";
-import type { CloudSessions } from "./cloud-sessions.js";
-import { CloudCodex } from "./cloud-codex.js";
-import type { CloudAgentEnvironment } from "./cloud-agent-env.js";
+import type { AgentSessions, SessionBase } from "./agent-sessions.js";
+import { cloudAgents, SANDBOX_OWN, type CloudAgents, type CloudRunWho } from "./cloud-agents.js";
+import { CodexCloudSignIn } from "./cloud-codex.js";
+import { OpenCodeCloudKeys, OpenCodeCloudSignIn } from "./cloud-opencode.js";
+import { sandboxHome } from "./agent-homes.js";
 import type { StartThreadInput } from "./thread-inputs.js";
 
 export interface CloudWorkspaceOptions {
@@ -37,14 +41,14 @@ export interface CloudWorkspaceOptions {
   /** Node in the sandbox, which runs OpenOrc's runner. */
   node?: string;
   files?: RunnerFile[];
-  /** How the thread's Claude account signs in to the sandbox. Without it, agents use the sandbox's own environment. */
-  agentEnvironment?: CloudAgentEnvironment;
+  /** How each agent signs in to a sandbox. Without it, agents use the sandbox's own environment. */
+  agents?: CloudAgents;
+  /** The version of each agent's CLI on this host, which its sandboxes run too; null when unknown. */
+  versions?: (agent: HarnessId) => Promise<string | null>;
   /** A conversation's cloud state changed, for the window to refresh it. */
   changed?: (threadId: string) => void;
   /** Keeps each conversation's session on both sides. */
-  sessions?: CloudSessions;
-  /** Codex's login and folder in sandboxes. Without it, Codex runs only in sandboxes simulated on this Mac. */
-  codex?: CloudCodex;
+  sessions?: AgentSessions;
   /** Every conversation runs in a cloud sandbox: any agent launch that would run on this machine is refused. */
   cloudOnly?: boolean;
 }
@@ -55,16 +59,22 @@ export const LOCAL_LAUNCH_REFUSED = "This machine runs agents only in cloud sand
 export const CLOUD_IDLE_PROCESS_MS = 10 * 60_000;
 /** A host made for a turn whose agent never starts lets its VM go after this. */
 const LAUNCH_HOLD_MS = 60_000;
-/** The adapters take a cloud host, but only Claude's has been tried in a sandbox. */
-export const CLOUD_AGENTS = "Only Claude and Codex run in cloud workspaces so far.";
-/** The agents whose adapters run in a sandbox. */
-export const CLOUD_HARNESSES: ReadonlySet<string> = new Set(["claude", "codex"]);
+const STAYS = "This agent's conversations stay where they started.";
 
-/** A cloud conversation runs in a project, on a worktree of its own, with an agent that runs in a sandbox. */
+/** A cloud conversation runs in a project, on a worktree of its own, with an agent whose conversations travel. */
 export function assertCloudStart(input: Pick<StartThreadInput, "agent" | "checkout">, project: Project): void {
   if (input.checkout || project.id === WORKSPACE_ID) throw new Error("Cloud conversations start in a project, on a worktree of their own.");
-  if (!CLOUD_HARNESSES.has(input.agent)) throw new Error(CLOUD_AGENTS);
+  const slot = slotFor(input.agent);
+  const stays = slot ? slot.stays : STAYS;
+  if (stays) throw new Error(stays);
 }
+
+/** What a cloud start or turn names of who it runs as. */
+export type CloudStartInput = Pick<StartThreadInput, "agent" | "checkout" | "claudeAccountId"> & { model?: string | null | undefined };
+const who = (input: { claudeAccountId?: string | null | undefined; model?: string | null | undefined }): CloudRunWho => ({
+  claudeAccountId: input.claudeAccountId ?? null,
+  model: input.model ?? null,
+});
 
 /**
  * The sandbox services the app offers: Vercel once it is connected, sandboxes simulated on this Mac otherwise. A
@@ -116,7 +126,7 @@ export class CloudWorkspaceService {
   /** One runner connection per conversation, kept while its VM is held awake. */
   private readonly connections = new Map<string, Promise<Connection>>();
   private readonly awake: CloudAwake;
-  readonly codex: CloudCodex;
+  readonly agents: CloudAgents;
   /** VMs being stopped because nothing needs them; the next use waits for the stop. */
   private readonly stopping = new Map<string, Promise<void>>();
   /** Conversations whose sandbox is finishing a turn it took over while this Mac slept. */
@@ -137,7 +147,7 @@ export class CloudWorkspaceService {
   ) {
     this.files = options.files ?? null;
     this.awake = new CloudAwake({ released: (threadId) => this.sleep(threadId), log });
-    this.codex = options.codex ?? new CloudCodex(undefined);
+    this.agents = options.agents ?? cloudAgents({ claude: SANDBOX_OWN, codex: new CodexCloudSignIn(undefined), opencode: new OpenCodeCloudSignIn(new OpenCodeCloudKeys(undefined)) });
   }
 
   /** Every conversation here runs in a cloud sandbox, whatever its start asked for. */
@@ -150,13 +160,11 @@ export class CloudWorkspaceService {
     return this.progress.size > 0 || this.syncs.size > 0 || this.stopping.size > 0 || this.awake.holding;
   }
 
-  /** Checks a new cloud conversation and picks where it runs. Call before admitting it. */
-  /** The provider a new cloud conversation runs on. Refused before anything is made when its account cannot sign in there. */
-  async place(input: Pick<StartThreadInput, "agent" | "checkout" | "claudeAccountId">, project: Project): Promise<CloudProviderId> {
+  /** The provider a new cloud conversation runs on. Refused before anything is made when its agent cannot sign in there. */
+  async place(input: CloudStartInput, project: Project): Promise<CloudProviderId> {
     assertCloudStart(input, project);
     const provider = await this.forNewThreads();
-    if (input.agent === "codex") await this.codex.assertCanRun(provider.id);
-    else await this.options.agentEnvironment?.(provider.id, input.claudeAccountId);
+    await this.agents[input.agent as HarnessId].signIn.assertCanRun(provider.id, who(input));
     return provider.id;
   }
 
@@ -270,19 +278,25 @@ export class CloudWorkspaceService {
     // The conversation may have run on this Mac, or in a sandbox since replaced: its session goes up with the code.
     const seed = async (location: WorkspaceLocation, origin: string | undefined) => {
       const state = await seedWorkspace(location, branch, origin);
-      await this.options.sessions?.send(thread, location, record.provider);
+      if (this.options.sessions && isHarnessId(thread.agent)) {
+        await this.installAgent(thread.agent, location, record.provider);
+        cloudWorkspaces.setSessionBase(this.db, thread.id, await this.options.sessions.send(thread, location, record.provider));
+      }
       return state;
     };
     this.ready(thread.id, await this.build(thread.id, project, worktreePath, seed));
   }
 
-  /** Brings the conversation's Claude session to this Mac. A session not kept now is kept after the next turn. */
-  /** After a turn: the conversation's session comes to this Mac, and a Codex login refreshed in the sandbox comes back. */
+  /** After a turn: the conversation's session comes to this host, and a Codex login refreshed in the sandbox comes back. */
   private async keepSession(thread: Thread, mirror: string, required: boolean): Promise<void> {
     const record = cloudWorkspaces.get(this.db, thread.id);
     if (!record) return;
     const location = await this.location(record, mirror);
-    const kept = [this.options.sessions?.keep(thread, location, record.provider), thread.agent === "codex" ? this.codex.keep(location, record.provider) : undefined];
+    const { sessions } = this.options;
+    const session = sessions?.keep(thread, location, record.provider, record.sessionBase, { required }).then((base) => cloudWorkspaces.setSessionBase(this.db, thread.id, base));
+    const signIn = isHarnessId(thread.agent) ? this.agents[thread.agent].signIn : SANDBOX_OWN;
+    const login = signIn.keep(() => this.agentHome(thread.agent as HarnessId, location, record.provider, who(thread)), record.provider);
+    const kept = [session, login];
     for (const result of await Promise.allSettled(kept))
       if (result.status === "rejected") {
         if (required) throw result.reason;
@@ -353,7 +367,7 @@ export class CloudWorkspaceService {
    * conversation too, so a cloud-only host refuses each local one here. MCP requests from the sandbox reach
    * `mcpOrigin` on the Mac through the runner.
    */
-  async host(thread: Thread | null, mcpOrigin: string, run: { agent: string; claudeAccountId?: string | null | undefined }): Promise<CloudRunHost | null> {
+  async host(thread: Thread | null, mcpOrigin: string, run: { agent: string; claudeAccountId?: string | null | undefined; model?: string | null | undefined }): Promise<CloudRunHost | null> {
     const record = thread ? cloudWorkspaces.get(this.db, thread.id) : null;
     if (!thread || !record) {
       if (this.options.cloudOnly) throw new Error(LOCAL_LAUNCH_REFUSED);
@@ -361,10 +375,11 @@ export class CloudWorkspaceService {
     }
     if (record.state !== "ready" || !thread.worktreePath) throw new Error("This conversation's cloud workspace is not ready. Send again to set it up.");
     if (this.takeovers.has(thread.id)) throw new Error("The agent is still finishing the turn it carried on in the cloud while this Mac slept. Send again once it is done.");
+    if (!isHarnessId(run.agent)) throw new Error(STAYS);
     const placed = await this.location(record, thread.worktreePath);
     const { sandbox } = placed.install;
     // Each turn signs in as the account it runs on, so changing the thread's account takes effect at the next turn.
-    const env = run.agent === "codex" ? await this.codex.prepare(placed, record.provider) : ((await this.options.agentEnvironment?.(record.provider, run.claudeAccountId)) ?? {});
+    const env = await this.turnEnv({ ...run, agent: run.agent }, placed, record.provider);
     // The VM stays awake from here until the agent's process has started, then for as long as each process runs.
     const launching = this.awake.hold(thread.id, sandbox);
     const unused = setTimeout(launching, LAUNCH_HOLD_MS);
@@ -450,10 +465,32 @@ export class CloudWorkspaceService {
    * A conversation whose standby sandbox took over becomes a cloud conversation, its worktree on this Mac matching
    * `mirror` in that sandbox. Its next sync brings what the sandbox did since.
    */
-  adopt(ref: SandboxRef, mirror: CloudMirrorState): void {
+  adopt(ref: SandboxRef, mirror: CloudMirrorState, base: SessionBase | null): void {
     cloudWorkspaces.insert(this.db, { threadId: ref.threadId, provider: ref.provider, sandbox: ref.sandbox });
     cloudWorkspaces.ready(this.db, ref.threadId, mirror);
+    cloudWorkspaces.setSessionBase(this.db, ref.threadId, base);
     this.options.changed?.(ref.threadId);
+  }
+
+  /** The agent on the sandbox's PATH and signed in for one turn: its folder and credential variables. */
+  async turnEnv(
+    run: { agent: string; claudeAccountId?: string | null | undefined; model?: string | null | undefined },
+    location: WorkspaceLocation,
+    provider: CloudProviderId,
+  ): Promise<Record<string, string>> {
+    if (!isHarnessId(run.agent)) throw new Error(STAYS);
+    const { cli, name } = harnessCatalog[run.agent];
+    await ensureAgent(location.install.sandbox, cli, { name, mayInstall: provider !== "local" });
+    const { signIn } = this.agents[run.agent];
+    const folders = await signIn.homeEnv(location.install.state, provider, who(run));
+    const home = async () => folders && sandboxHome(location.install.sandbox, run.agent as HarnessId, folders);
+    return { ...folders, ...(await signIn.prepare(home, provider, who(run))) };
+  }
+
+  /** The agent's folders in the conversation's sandbox, as its sign-in names them; null when they are this host's own. */
+  private async agentHome(agent: HarnessId, location: WorkspaceLocation, provider: CloudProviderId, runner: CloudRunWho) {
+    const folders = await this.agents[agent].signIn.homeEnv(location.install.state, provider, runner);
+    return folders && sandboxHome(location.install.sandbox, agent, folders);
   }
 
   /** Disconnects from every sandbox. Processes in a cloud VM keep running there; sandboxes on this Mac stop. */

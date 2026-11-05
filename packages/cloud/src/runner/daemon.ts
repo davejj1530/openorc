@@ -208,7 +208,8 @@ export class RunnerDaemon {
         writeFileSync(file.path, file.content, { mode: 0o600 });
       }
       // Its own process group, so a signal reaches whatever the agent started too.
-      child = spawn(frame.cmd, frame.args, { cwd: frame.cwd, env: { ...process.env, ...frame.env }, stdio: "pipe", detached: true });
+      // PWD follows cwd: some CLIs (OpenCode) read their folder from it, and the daemon's own would be wrong.
+      child = spawn(frame.cmd, frame.args, { cwd: frame.cwd, env: { ...process.env, ...frame.env, ...(frame.cwd ? { PWD: frame.cwd } : {}) }, stdio: "pipe", detached: true });
     } catch (error) {
       this.finish(managed, { code: null, signal: null, error: error instanceof Error ? error.message : String(error) });
       return;

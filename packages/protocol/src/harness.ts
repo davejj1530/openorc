@@ -46,6 +46,8 @@ export interface HarnessCatalogEntry {
   nativePlans: boolean;
   /** Whether a message can reach the agent during a running turn; otherwise it waits in the queue for the next one. */
   liveInput: boolean;
+  /** The npm package that installs the CLI and the binary it puts on PATH: the one list for updates and cloud installs. */
+  cli: { npm: string; bin: string };
 }
 
 export const harnessCatalog: Record<HarnessId, HarnessCatalogEntry> = {
@@ -61,6 +63,7 @@ export const harnessCatalog: Record<HarnessId, HarnessCatalogEntry> = {
     distillation: true,
     nativePlans: true,
     liveInput: true,
+    cli: { npm: "@openai/codex", bin: "codex" },
   },
   claude: {
     id: "claude",
@@ -74,6 +77,7 @@ export const harnessCatalog: Record<HarnessId, HarnessCatalogEntry> = {
     distillation: true,
     nativePlans: true,
     liveInput: true,
+    cli: { npm: "@anthropic-ai/claude-code", bin: "claude" },
   },
   opencode: {
     id: "opencode",
@@ -88,6 +92,7 @@ export const harnessCatalog: Record<HarnessId, HarnessCatalogEntry> = {
     distillation: false,
     nativePlans: false,
     liveInput: false,
+    cli: { npm: "@opencode/cli", bin: "opencode" },
   },
 };
 

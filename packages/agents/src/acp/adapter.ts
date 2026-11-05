@@ -23,9 +23,10 @@ import {
   type Usage as AcpUsage,
 } from "@agentclientprotocol/sdk";
 import type { AgentEvent, ApprovalDecision, ApprovalKind, ApprovalResolution, RunSpec, RunStatus, Usage } from "@openorc/protocol";
+import { definedEnv, type AgentHost } from "../agent-host.js";
 import { agentBinary } from "../bin.js";
 import { launchCommand } from "../command-launch.js";
-import type { AgentLaunchEnvironment } from "../launch-environment.js";
+import { inFolder, type AgentLaunchEnvironment } from "../launch-environment.js";
 import { partitionAttachments, withAttachedFiles } from "../attachments.js";
 import { stopProcess, waitForProcessGroup } from "../process-lifetime.js";
 import { RunHandle } from "../run-handle.js";
@@ -142,6 +143,24 @@ function openCodeEnv(base: NodeJS.ProcessEnv, spec: RunSpec, askUser: boolean): 
   return env;
 }
 
+/** A host's folder cannot be looked into from here, so an unvetted checkout there is refused rather than trusted. */
+function assertVetted(spec: RunSpec, host: AgentHost | undefined): void {
+  if (spec.untrustedCheckout && (host || carriesOpenCodeConfig(spec.cwd)))
+    throw new Error("OpenCode could load this pull request's own OpenCode settings and plugins, which can run commands. Review it with a Claude model instead.");
+}
+
+/** OpenOrc's tools, at the address that reaches them from where the agent runs: on a host, such as a cloud sandbox, the host's. */
+function toolsAddress(spec: RunSpec, host: AgentHost | undefined): string | undefined {
+  const own = spec.internalMcp?.url ?? spec.mcpUrl;
+  return own && host ? host.localUrl(own) : own;
+}
+
+/** The agent's ACP process, on its host when the run has one, as the Codex adapter starts its own. */
+function acpProcess(launch: AgentLaunchEnvironment, spec: RunSpec, env: NodeJS.ProcessEnv) {
+  if (launch.host) return launch.host.spawn(launch.binary, ["acp"], { runId: spec.runId, cwd: spec.cwd, env: definedEnv(env), files: [], dirs: [] });
+  return spawnAgentProcess(launch.binary, ["acp"], { cwd: spec.cwd, env, registry: launch.processRegistry });
+}
+
 export class AcpAdapter {
   constructor(private readonly options: AcpAdapterOptions) {}
 
@@ -151,7 +170,7 @@ export class AcpAdapter {
     const env = launch ? { ...launch.env, ...this.options.env } : { ...process.env, ...this.options.env };
     const cwd = this.options.modelsCwd ?? os.homedir();
     const command = launchCommand(binary, ["acp"]);
-    const proc = spawn(command.file, command.args, { ...command.options, cwd, env, stdio: ["pipe", "pipe", "pipe"] });
+    const proc = spawn(command.file, command.args, { ...command.options, cwd, env: inFolder(env, cwd), stdio: ["pipe", "pipe", "pipe"] });
     const connection = client({ name: "openorc" }).connect(streamOf(proc));
     let sessionId: string | undefined;
     try {
@@ -185,15 +204,15 @@ export class AcpAdapter {
   start(spec: RunSpec, launch: AgentLaunchEnvironment): RunHandle {
     const unavailable = executionModeUnavailable(spec.agent, executionMode(spec.mode ?? "act", spec.permissionMode));
     if (unavailable) throw new Error(unavailable);
-    if (spec.untrustedCheckout && carriesOpenCodeConfig(spec.cwd))
-      throw new Error("OpenCode could load this pull request's own OpenCode settings and plugins, which can run commands. Review it with a Claude model instead.");
+    const host = launch.host;
+    assertVetted(spec, host);
     const serverName = spec.internalMcp?.serverName ?? this.options.mcpServerName ?? "openorc";
-    const mcpUrl = spec.internalMcp?.url ?? spec.mcpUrl;
+    const mcpUrl = toolsAddress(spec, host);
     const mcpServers: McpServer[] = mcpUrl ? [{ type: "http", name: serverName, url: mcpUrl, headers: [] }] : [];
     const askUser = Boolean(mcpUrl && spec.internalMcp?.toolNames.includes("ask_user"));
     const env = openCodeEnv({ ...launch.env, ...this.options.env }, spec, askUser);
     const startedAt = Date.now();
-    const proc = spawnAgentProcess(launch.binary, ["acp"], { cwd: spec.cwd, env, registry: launch.processRegistry });
+    const proc = acpProcess(launch, spec, env);
     const mapper = new AcpUpdateMapper(spec.runId);
     let handle: RunHandle;
     let sessionId: string | null = null;
@@ -275,7 +294,7 @@ export class AcpAdapter {
       if (!sessionId) throw new Error("OpenCode has no session yet.");
       if (turn) throw new Error("OpenCode is still answering. Wait for the turn to finish.");
       if (exited()) throw new Error("The OpenCode process is no longer running.");
-      const blocks = await promptBlocks(text, attachments, [appendix, askUser ? questionInstructions(serverName) : undefined].filter(Boolean).join("\n\n") || undefined);
+      const blocks = await promptBlocks(text, attachments, host, [appendix, askUser ? questionInstructions(serverName) : undefined].filter(Boolean).join("\n\n") || undefined);
       const id = randomUUID();
       turn = { id, startedAt: now(), maintenance: maintenance ?? null };
       if (!maintenance) emit({ type: "turn.started", runId: spec.runId, ts: now(), turnId: id });
@@ -460,12 +479,14 @@ function currentModel(options: SessionConfigOption[] | null | undefined): string
 }
 
 /** Pictures go in as image blocks; other files are named for the agent to open. */
-async function promptBlocks(text: string, attachments: string[] | undefined, appendix: string | undefined): Promise<ContentBlock[]> {
+/** Images travel inline from this Mac; other files are named by path, so a host gets copies and the text names those. */
+async function promptBlocks(text: string, attachments: string[] | undefined, host: AgentHost | undefined, appendix: string | undefined): Promise<ContentBlock[]> {
   const { images, files } = partitionAttachments(attachments);
+  const named = host && files.length ? await host.upload(files) : files;
   const blocks: ContentBlock[] = [];
   // ACP has no system prompt channel, so the app's brief travels ahead of the first message.
   if (appendix) blocks.push({ type: "text", text: appendix });
-  blocks.push({ type: "text", text: withAttachedFiles(text, files, "open them to read") });
+  blocks.push({ type: "text", text: withAttachedFiles(text, named, "open them to read") });
   for (const path of images) {
     blocks.push({ type: "image", mimeType: imageMimeTypes[extname(path).toLowerCase()] ?? "image/png", data: await readFile(path, { encoding: "base64" }) });
   }

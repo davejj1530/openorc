@@ -1,14 +1,14 @@
 import { randomUUID } from "node:crypto";
-import { ClaudeStreamParser, CodexExecParser, claudePermissionMode } from "@openorc/agents";
+import { sessionId, slotFor, type HeadlessRun } from "@openorc/agents";
 import { pushWorkspace, SANDBOX_PREFIX, seedWorkspace, type MirrorState, type RemoteProcess, type RunnerClient, type TakeoverStarted, type WorkspaceLocation } from "@openorc/cloud";
 import { realpath } from "node:fs/promises";
-import { checkpoints, cloudWorkspaces, retiredTeams, runs, threads, type CloudProviderId, type Db, type LedgerWriter } from "@openorc/db";
+import { checkpoints, cloudWorkspaces, retiredTeams, runs, threads, type Db, type LedgerWriter } from "@openorc/db";
 import { diffStat, originUrl, pinObject, treeHash } from "@openorc/git";
-import { WORKSPACE_ID, type AgentEvent, type Project, type Thread, type ThreadMessage } from "@openorc/protocol";
+import { harnessShortName, WORKSPACE_ID, type AgentEvent, type HarnessId, type Project, type Thread, type ThreadMessage } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
 import { checkpointRefs } from "./checkpoint-refs.js";
-import type { CloudSessions } from "./cloud-sessions.js";
-import { CLOUD_HARNESSES, type CloudWorkspaceService, type SandboxRef } from "./cloud-workspaces.js";
+import type { AgentSessions, SessionBase } from "./agent-sessions.js";
+import type { CloudWorkspaceService, SandboxRef } from "./cloud-workspaces.js";
 
 /** What the agent is told when its sandbox takes over the turn. */
 const TAKEOVER_PROMPT =
@@ -30,6 +30,10 @@ interface Standby {
   location: WorkspaceLocation;
   /** What the worktree and the sandbox both have. */
   mirror: MirrorState;
+  /** What the sandbox got of the session at the last send, and what this Mac held then. */
+  base: SessionBase | null;
+  /** How the armed command's output reads, once armed. */
+  parser: HeadlessRun["parser"] | null;
   /** For the turn in progress; null between turns. */
   turn: { client: RunnerClient; release: () => void; sessionId: string | null; sessionSentAt: number } | null;
   /** The sandbox carries the turn on: its runner connection is kept, whatever happens to the turn here, until the Mac takes it in. */
@@ -42,9 +46,8 @@ export interface CloudStandbyDeps {
   db: Db;
   ledger: LedgerWriter;
   cloud: CloudWorkspaceService;
-  sessions: CloudSessions;
+  sessions: AgentSessions;
   enabled(): Promise<boolean>;
-  agentEnvironment(provider: CloudProviderId, accountId: string): Promise<Record<string, string>>;
   defaultAccountId(): string;
   project(thread: Thread): Project;
   runs: { liveRunForThread(threadId: string): { id: string } | null; interrupt(runId: string): Promise<void>; closeAndWait(runId: string): Promise<void> };
@@ -68,9 +71,9 @@ export class CloudStandby {
 
   constructor(private readonly deps: CloudStandbyDeps) {}
 
-  /** Claude, in a worktree of a project, on this Mac, and visible: what a sandbox can carry on with. */
+  /** An agent whose conversations travel, in a worktree of a project, on this Mac, and visible: what a sandbox can carry on with. */
   private eligible(thread: Thread): boolean {
-    if (!CLOUD_HARNESSES.has(thread.agent) || thread.workspaceMode !== "worktree" || !thread.worktreePath || !thread.branch) return false;
+    if (slotFor(thread.agent)?.stays !== null || thread.workspaceMode !== "worktree" || !thread.worktreePath || !thread.branch) return false;
     if (thread.projectId === WORKSPACE_ID || cloudWorkspaces.get(this.deps.db, thread.id)) return false;
     return !retiredTeams.isHidden(this.deps.db, thread.id);
   }
@@ -127,7 +130,7 @@ export class CloudStandby {
 
   private async seed(thread: Thread): Promise<Standby | null> {
     const project = this.deps.project(thread);
-    const provider = await this.deps.cloud.place({ agent: thread.agent, claudeAccountId: thread.claudeAccountId ?? undefined }, project).catch((error: unknown) => {
+    const provider = await this.deps.cloud.place({ agent: thread.agent, claudeAccountId: thread.claudeAccountId ?? undefined, model: thread.model }, project).catch((error: unknown) => {
       this.deps.log.info(`thread ${thread.id} has no standby sandbox: ${message(error)}`);
       return null;
     });
@@ -137,7 +140,7 @@ export class CloudStandby {
     const release = this.deps.cloud.holdAwake(thread.id, location.install.sandbox);
     try {
       const mirror = await seedWorkspace(location, thread.branch!, (await originUrl(project.rootPath)) ?? undefined);
-      const standby: Standby = { thread, ref, location, mirror, turn: null, carried: null, busy: null };
+      const standby: Standby = { thread, ref, location, mirror, base: null, parser: null, turn: null, carried: null, busy: null };
       this.standbys.set(thread.id, standby);
       return standby;
     } finally {
@@ -157,18 +160,21 @@ export class CloudStandby {
     if (!turn) return;
     standby.mirror = (await pushWorkspace(standby.location, standby.mirror)).state;
     if (now || Date.now() - turn.sessionSentAt >= SESSION_EVERY_MS) {
-      await this.deps.sessions.send(standby.thread, standby.location, standby.ref.provider);
+      await this.deps.cloud.installAgent(standby.thread.agent as HarnessId, standby.location, standby.ref.provider);
+      standby.base = await this.deps.sessions.send(standby.thread, standby.location, standby.ref.provider);
       turn.sessionSentAt = Date.now();
     }
     const { thread } = standby;
     const accountId = thread.claudeAccountId ?? this.deps.defaultAccountId();
-    const codex = thread.agent === "codex";
-    const sessionId = runs.lastSession(this.deps.db, { threadId: thread.id }, codex ? "codex" : "claude", null, accountId);
+    const session = sessionId(runs.lastSession(this.deps.db, { threadId: thread.id }, thread.agent, null, accountId));
     // A first turn's session is known once the agent starts it; a later tick arms it then.
-    if (!sessionId || sessionId === turn.sessionId) return;
-    const env = codex ? await this.deps.cloud.codex.prepare(standby.location, standby.ref.provider) : await this.deps.agentEnvironment(standby.ref.provider, accountId);
-    turn.client.standby({ id: `takeover-${randomUUID()}`, ...takeoverCommand(thread, sessionId), cwd: standby.location.repo, env, afterMs: TAKEOVER_AFTER_MS });
-    turn.sessionId = sessionId;
+    if (!session || session === turn.sessionId) return;
+    const env = await this.deps.cloud.turnEnv(thread, standby.location, standby.ref.provider);
+    const run = slotFor(thread.agent)!.continueOnce({ sessionId: session }, TAKEOVER_PROMPT, thread);
+    const { cmd, args, parser } = run;
+    turn.client.standby({ id: `takeover-${randomUUID()}`, cmd, args, cwd: standby.location.repo, env: run.env ? run.env(env) : env, afterMs: TAKEOVER_AFTER_MS });
+    standby.parser = parser;
+    turn.sessionId = session;
   }
 
   /**
@@ -220,11 +226,11 @@ export class CloudStandby {
     standby.carried = null;
     const live = this.deps.runs.liveRunForThread(threadId);
     if (live) await this.deps.runs.closeAndWait(live.id).catch(() => undefined);
-    this.deps.cloud.adopt(standby.ref, standby.mirror);
+    this.deps.cloud.adopt(standby.ref, standby.mirror, standby.base);
     this.deps.cloud.takingOver(threadId, true);
     this.deps.recordMessage(threadId, { id: randomUUID(), role: "system", text: "This Mac went to sleep, so the turn carried on in the cloud.", createdAt: started.at });
     try {
-      const runId = await this.record(standby.thread, client.adopt(started.id));
+      const runId = await this.record(standby, client.adopt(started.id));
       client.takeoverSeen();
       const thread = threads.get(this.deps.db, threadId);
       if (thread) {
@@ -248,7 +254,8 @@ export class CloudStandby {
   }
 
   /** Writes what the agent did in the sandbox into the conversation as a turn, as its output arrives. Resolves with the run. */
-  private async record(thread: Thread, proc: RemoteProcess): Promise<string> {
+  private async record(standby: Standby, proc: RemoteProcess): Promise<string> {
+    const { thread } = standby;
     const runId = randomUUID();
     const started = Date.now();
     runs.insert(this.deps.db, {
@@ -262,7 +269,9 @@ export class CloudStandby {
       permissionMode: thread.permissionMode,
       claudeAccountId: thread.claudeAccountId ?? null,
     });
-    const parser = thread.agent === "codex" ? new CodexExecParser(runId) : new ClaudeStreamParser(runId);
+    // The runner starts only an armed command, and arming keeps its parser.
+    if (!standby.parser) throw new Error(`thread ${thread.id}'s sandbox took over a turn it was never armed for`);
+    const parser = standby.parser(runId);
     let pending = "";
     let sessionId: string | null = null;
     let resultText: string | null = null;
@@ -280,6 +289,7 @@ export class CloudStandby {
     });
     const code = await new Promise<number | null>((resolve) => proc.once("close", (exit: number | null) => resolve(exit)));
     if (pending.trim()) parser.parseLine(pending).forEach(take);
+    parser.end?.(code).forEach(take);
     const status = code === 0 ? "success" : "error";
     take({ type: "session.completed", runId, ts: Date.now(), status, durationMs: Date.now() - started, turns: parser.turns });
     this.deps.ledger.flush();
@@ -288,33 +298,10 @@ export class CloudStandby {
       endedAt: Date.now(),
       externalSessionId: sessionId,
       resultText,
-      ...(code === 0 ? {} : { error: "Claude stopped in the cloud before finishing the turn." }),
+      ...(code === 0 ? {} : { error: `${harnessShortName(thread.agent)} stopped in the cloud before finishing the turn.` }),
     });
     return runId;
   }
-}
-
-/** How codex exec's sandbox stands in for the conversation's permissions: nothing can ask, so review only reads. */
-const codexExecPermission: Record<Thread["permissionMode"], string[]> = {
-  review: ["-c", 'sandbox_mode="read-only"'],
-  trusted: ["-c", 'sandbox_mode="workspace-write"'],
-  autonomous: ["--dangerously-bypass-approvals-and-sandbox"],
-};
-
-/** The agent resuming its session in one go, its prompt in its arguments, its events on stdout as JSON lines. */
-function takeoverCommand(thread: Thread, sessionId: string): { cmd: string; args: string[] } {
-  if (thread.agent === "codex") {
-    const permission = thread.mode === "plan" ? codexExecPermission.review : codexExecPermission[thread.permissionMode];
-    const model = thread.model ? ["-m", thread.model] : [];
-    const effort = thread.effort ? ["-c", `model_reasoning_effort="${thread.effort}"`] : [];
-    return { cmd: "codex", args: ["exec", "resume", "--json", ...permission, ...model, ...effort, sessionId, TAKEOVER_PROMPT] };
-  }
-  const model = thread.model ? ["--model", thread.model] : [];
-  const effort = thread.effort ? ["--effort", thread.effort] : [];
-  return {
-    cmd: "claude",
-    args: ["-p", TAKEOVER_PROMPT, "--output-format", "stream-json", "--verbose", "--resume", sessionId, "--permission-mode", claudePermissionMode(thread), ...model, ...effort],
-  };
 }
 
 async function waitFor(check: () => boolean, ms: number): Promise<void> {

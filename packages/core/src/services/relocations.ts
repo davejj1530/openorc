@@ -3,7 +3,6 @@ import { readFile, rename, rm, stat, writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 import type { BrainControlResults } from "@openorc/cloud";
 import {
-  claudeAccounts,
   deleteThreadRows,
   frozenMoving,
   projects,
@@ -19,9 +18,9 @@ import {
   type LedgerWriter,
 } from "@openorc/db";
 import { git } from "@openorc/git";
-import { type Brain, type Project, type Thread, type ThreadMoving } from "@openorc/protocol";
+import { type AgentKind, type Brain, type Project, type Thread, type ThreadMoving } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
-import type { CloudSessions } from "./cloud-sessions.js";
+import type { AgentSessions } from "./agent-sessions.js";
 import type { CloudWorkspaceService } from "./cloud-workspaces.js";
 import { decodePackage, encodePackage, LacksBase, packThread, RelocationRefused, retireCode, takeCode, takeFiles, type RelocationPackage } from "./relocation-package.js";
 import { AT_WORK, relocationRefusal } from "./relocation-rules.js";
@@ -39,7 +38,7 @@ export interface RelocationDeps {
   db: Db;
   dataDir: string;
   ledger: Pick<LedgerWriter, "flush" | "forget">;
-  sessions: Pick<CloudSessions, "export" | "import">;
+  sessions: Pick<AgentSessions, "export" | "take" | "assertTakeable">;
   /** Where a worktree of the thread's own lives in the project, as WorkspaceService names it. */
   threadPath(thread: Pick<Thread, "id" | "title" | "workspaceMode" | "worktreePath">, project: Project): string;
   cloud: Pick<CloudWorkspaceService, "place" | "admit" | "prepare" | "get" | "sync" | "removeSandbox" | "sandboxes">;
@@ -117,15 +116,16 @@ export class ThreadRelocations {
     const projectId = target.projectId(pkg.macProject);
     const project = projectId ? projects.get(db, projectId) : null;
     if (!project) throw new RelocationRefused("This conversation's project is not on this side. Switch it on for the cloud brain in Settings > Cloud.");
-    const root = pkg.rows.tables.threads[0] as { title: string; agent: string; claude_account_id: string | null } | undefined;
-    if (!root || root.agent !== "claude") throw new RelocationRefused("Only Claude conversations can move between brains so far.");
-    const accountId = root.claude_account_id ?? claudeAccounts.defaultId(db);
-    if (!claudeAccounts.list(db).some((account) => account.id === accountId)) throw new RelocationRefused("Its Claude account is not here.");
-    const provider = target.place === "cloud" ? await this.deps.cloud.place({ agent: "claude", claudeAccountId: accountId }, project) : null;
+    const root = pkg.rows.tables.threads[0] as { title: string; agent: AgentKind; claude_account_id: string | null; model: string | null } | undefined;
+    if (!root) throw new RelocationRefused("The thread's package is not valid: it has no conversation.");
+    const children = (pkg.rows.tables["subagents"] ?? []).map((row) => String(row["native_id"]));
+    const taken = { id: threadId, agent: root.agent, claudeAccountId: root.claude_account_id, children };
+    this.deps.sessions.assertTakeable(taken);
+    const provider = target.place === "cloud" ? await this.deps.cloud.place({ agent: root.agent, claudeAccountId: root.claude_account_id ?? undefined, model: root.model }, project) : null;
     const folder = this.deps.threadPath({ id: threadId, title: root.title, workspaceMode: "worktree", worktreePath: null }, project);
     await takeCode(project.rootPath, threadId, pkg.code, folder);
     await takeFiles(dataDir, pkg.files);
-    if (pkg.session) await this.deps.sessions.import({ id: threadId, worktreePath: folder } as Thread & { worktreePath: string }, pkg.session);
+    if (pkg.session) await this.deps.sessions.take(taken, pkg.session, folder, pkg.relocation, pkg.from);
     this.deps.ledger.forget(pkg.rows.tables.runs.map((run) => String(run.id)));
     db.transaction(() => {
       writeThreadRows(db, pkg.rows, {

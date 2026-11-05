@@ -15,7 +15,12 @@ vi.mock("node:child_process", () => ({ spawn: vi.fn() }));
 type Request = { id: number; method: string; params: Record<string, unknown> };
 
 /** A scripted ACP agent on the far side of the pipes; the adapter and the SDK client run unchanged. */
-function agent(permissionMode: PermissionPreset = "autonomous", overrides: Partial<RunSpec> = {}, decide: (request: AcpApprovalRequest) => Promise<ApprovalDecision> = async () => "allow") {
+function agent(
+  permissionMode: PermissionPreset = "autonomous",
+  overrides: Partial<RunSpec> = {},
+  decide: (request: AcpApprovalRequest) => Promise<ApprovalDecision> = async () => "allow",
+  place: Parameters<AcpAdapter["start"]>[1] = launch,
+) {
   const stdin = new PassThrough();
   const stdout = new PassThrough();
   const stderr = new PassThrough();
@@ -121,7 +126,7 @@ function agent(permissionMode: PermissionPreset = "autonomous", overrides: Parti
       internalMcp: { serverName: "openorc_0123456789abcdef0123456789abcdef", url: "http://127.0.0.1:1/mcp", toolNames: ["task_create", "ask_user"] },
       ...overrides,
     },
-    launch,
+    place,
   );
   handle.on("event", (event) => events.push(event));
   const finish = (result: Record<string, unknown> = { stopReason: "end_turn" }) => {
@@ -403,6 +408,46 @@ describe("AcpAdapter", () => {
     await s.handle.wait();
     expect(s.events.filter((event) => event.type === "session.completed")).toHaveLength(1);
     expect(s.events.find((event) => event.type === "turn.completed")).toMatchObject({ status: "error" });
+  });
+});
+
+describe("AcpAdapter on a host", () => {
+  /** A cloud sandbox as the adapter sees it: its own process, address for OpenOrc's tools, and copies of files. */
+  function host() {
+    return {
+      home: "/home/sandbox",
+      privateDir: () => "/home/sandbox/private",
+      localUrl: (url: string) => url.replace("127.0.0.1:1", "127.0.0.1:41000"),
+      // The scripted agent's pipes, as the host's process would carry them.
+      spawn: vi.fn(() => vi.mocked(spawn)("opencode")),
+      upload: vi.fn(async (paths: string[]) => paths.map((file) => `/home/sandbox/uploads/${path.basename(file)}`)),
+    };
+  }
+
+  it("starts OpenCode on the host, reaching OpenOrc's tools at the host's address and naming files by the host's copies", async () => {
+    const sandbox = host();
+    vi.mocked(spawn).mockClear();
+    const s = agent("autonomous", { attachments: ["/Users/me/notes.md"] }, undefined, {
+      revision: 0,
+      binary: "opencode",
+      env: { PATH: "/usr/bin", OPENCODE_CONFIG_CONTENT: '{"provider":{"openrouter":{"options":{"apiKey":"k"}}}}' },
+      host: sandbox as never,
+    });
+    await vi.waitFor(() => expect(s.promptCalls()).toHaveLength(1));
+    expect(sandbox.spawn).toHaveBeenCalledWith("opencode", ["acp"], expect.objectContaining({ runId: "run-1", cwd: "/repo" }));
+    const env = (sandbox.spawn.mock.calls[0] as unknown as [string, string[], { env: Record<string, string> }])[2].env;
+    expect(JSON.parse(env["OPENCODE_CONFIG_CONTENT"]!).provider.openrouter.options.apiKey).toBe("k");
+    expect(s.calls.find((call) => call.method === "session/new")!.params["mcpServers"]).toEqual([expect.objectContaining({ url: "http://127.0.0.1:41000/mcp" })]);
+    expect(JSON.stringify(s.promptCalls()[0]!.params["prompt"])).toContain("/home/sandbox/uploads/notes.md");
+  });
+
+  it("refuses an unvetted checkout on a host, whose settings it cannot look into", () => {
+    expect(() =>
+      new AcpAdapter({ onApproval: async () => "allow" }).start(
+        { runId: "r", agent: "opencode", cwd: "/repo", prompt: "x", permissionMode: "autonomous", untrustedCheckout: true },
+        { ...launch, host: host() as never },
+      ),
+    ).toThrow("OpenCode could load this pull request's own OpenCode settings");
   });
 });
 

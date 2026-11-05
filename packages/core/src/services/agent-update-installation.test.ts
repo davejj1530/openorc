@@ -120,3 +120,15 @@ it("does not infer native update ownership from a custom Claude launcher", async
   vi.mocked(realpath).mockResolvedValue("/home/test/.local/share/claude/versions/2.1.0");
   expect((await detectAgentInstallation("claude", "/custom/claude", snapshot)).command).toBeNull();
 });
+it("updates an npm-installed OpenCode through its own package", async () => {
+  vi.mocked(realpath).mockImplementation(async (p) => (String(p) === "/prefix/bin/opencode" ? "/prefix/lib/node_modules/@opencode/cli/bin/opencode.exe" : String(p)));
+  vi.mocked(resolveBinary).mockResolvedValue("/prefix/bin/npm");
+  const run = vi.fn<UpdateRunner>().mockResolvedValue("/prefix/lib/node_modules");
+  const install = { binary: "/prefix/bin/npm", args: ["install", "--global", "@opencode/cli@latest"] };
+  expect(await detectAgentInstallation("opencode", "/prefix/bin/opencode", snapshot, run)).toMatchObject({
+    method: "npm",
+    releaseUrl: "https://registry.npmjs.org/@opencode/cli/latest",
+    command: install,
+    repair: install,
+  });
+});

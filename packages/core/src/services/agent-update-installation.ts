@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { readFile, realpath } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import type { HarnessId } from "@openorc/protocol";
+import { harnessCatalog, type HarnessId } from "@openorc/protocol";
 import { resolveBinary, type EnvSnapshot } from "./shell-environment.js";
 
 export interface UpdateCommand {
@@ -81,8 +81,8 @@ export const runUpdateCommand: UpdateRunner = (command, env) =>
     child.stdin.end();
   });
 
-const packages: Record<HarnessId, string> = { codex: "@openai/codex", claude: "@anthropic-ai/claude-code", opencode: "opencode-ai" };
-const registry = (id: HarnessId, channel = "latest") => `https://registry.npmjs.org/${packages[id]}/${channel}`;
+const npmPackage = (id: HarnessId) => harnessCatalog[id].cli.npm;
+const registry = (id: HarnessId, channel = "latest") => `https://registry.npmjs.org/${npmPackage(id)}/${channel}`;
 
 /** Recognize only installations whose owner can be proved; wrappers/custom package managers stay manual. */
 export async function detectAgentInstallation(id: HarnessId, binary: string, snapshot: EnvSnapshot, run: UpdateRunner = runUpdateCommand): Promise<AgentInstallation> {
@@ -116,14 +116,14 @@ export async function detectAgentInstallation(id: HarnessId, binary: string, sna
   }
 
   // npm's actual global root must own this exact binary, excluding pnpm, bun and project-local installs.
-  const npmRoot = target.slice(0, target.lastIndexOf(`/node_modules/${packages[id]}/`));
-  if (npmRoot && target.includes(`/node_modules/${packages[id]}/`) && !/[\\/](?:\.pnpm|\.bun|\.yarn)[\\/]/.test(target)) {
+  const npmRoot = target.slice(0, target.lastIndexOf(`/node_modules/${npmPackage(id)}/`));
+  if (npmRoot && target.includes(`/node_modules/${npmPackage(id)}/`) && !/[\\/](?:\.pnpm|\.bun|\.yarn)[\\/]/.test(target)) {
     const npm = await resolveBinary("npm", snapshot.path);
     if (npm) {
       const root = await run({ binary: npm, args: ["root", "--global"] }, { ...snapshot.env });
       if ((await realpath(root).catch(() => root)) === `${npmRoot}/node_modules`) {
         // npm skips a platform package it failed to fetch and still exits 0; installing again restores it.
-        const command = { binary: npm, args: ["install", "--global", `${packages[id]}@latest`] };
+        const command = { binary: npm, args: ["install", "--global", `${npmPackage(id)}@latest`] };
         return { ...manual, method: "npm", command, repair: command, message: null };
       }
     }

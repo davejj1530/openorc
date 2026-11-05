@@ -5,10 +5,9 @@ import { canMoveToCloud, cloudPlaceLabel, cloudStartBlocked } from "./cloud-star
 
 const thread = (more: Partial<ThreadSummary>) => ({ agent: "claude", projectId: "openorc", teamInstanceId: null, cloud: undefined, ...more }) as ThreadSummary;
 
-it("moves a project's Claude or Codex conversation on this Mac, and nothing else", () => {
-  expect(canMoveToCloud(thread({}))).toBe(true);
-  expect(canMoveToCloud(thread({ agent: "codex" }))).toBe(true);
-  expect(canMoveToCloud(thread({ agent: "opencode" }))).toBe(false);
+it("moves a project's conversation on this Mac, whichever agent it has, and nothing else", () => {
+  for (const agent of ["claude", "codex", "opencode"] as const) expect(canMoveToCloud(thread({ agent }))).toBe(true);
+  expect(canMoveToCloud(thread({ agent: "acp" }))).toBe(false);
   expect(canMoveToCloud(thread({ projectId: WORKSPACE_ID }))).toBe(false);
   expect(canMoveToCloud(thread({ teamInstanceId: "team-1" }))).toBe(false);
   expect(canMoveToCloud(thread({ cloud: { provider: "vercel", state: "ready", step: null, setup: false, error: null } }))).toBe(false);

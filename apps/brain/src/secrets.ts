@@ -15,6 +15,7 @@ export const BRAIN_SECRETS = {
   pushSecrets: "push",
   claudeCloudSecrets: "claude-cloud",
   codexCloudSecrets: "codex-cloud",
+  opencodeCloudSecrets: "opencode-cloud",
   memorySecrets: "memory",
   githubSecrets: "github",
   // The Vercel connection arrives with every start and is held in memory only.

@@ -316,11 +316,11 @@ it("lists a conversation's sandbox, removes it once its agent is idle, and sets 
   expect(core.threads.get(thread.id)!.cloud).toMatchObject({ state: "ready" });
 }, 60_000);
 
-it("refuses a cloud conversation for an agent that has not run in a sandbox, before making one", async () => {
+it("refuses a cloud OpenCode conversation whose model's provider has no key for the cloud, before making one", async () => {
   await expect(
     core.threads.start({
       agent: "opencode",
-      model: "fixture",
+      model: "openrouter/acme/fast",
       effort: undefined,
       mode: "act",
       permissionMode: "autonomous",
@@ -330,7 +330,7 @@ it("refuses a cloud conversation for an agent that has not run in a sandbox, bef
       prompt: "Work in the cloud",
       cloud: true,
     }),
-  ).rejects.toThrow("Only Claude and Codex run in cloud workspaces so far.");
+  ).rejects.toThrow("OpenCode has no key for OpenRouter in the cloud. Add one in Settings > Cloud.");
   expect(existsSync(path.join(root, "sandboxes"))).toBe(false);
 });
 

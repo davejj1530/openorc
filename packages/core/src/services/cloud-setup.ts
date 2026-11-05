@@ -1,7 +1,6 @@
-import os from "node:os";
-import path from "node:path";
 import type { VercelConnection } from "@openorc/cloud";
-import type { Db, LedgerWriter } from "@openorc/db";
+import type { HarnessId } from "@openorc/protocol";
+import { claudeAccounts, type Db, type LedgerWriter } from "@openorc/db";
 import type { OpenOrcOptions } from "../options.js";
 import type { Logger } from "../transport.js";
 import type { ClaudeAccountService } from "./claude-accounts.js";
@@ -10,14 +9,17 @@ import { CloudBrain } from "./cloud-brain.js";
 import { macGitHub, macMemoryKey, type SignInSources } from "./cloud-brain-signins.js";
 import type { MemoryService } from "./memory.js";
 import { savedPushKey } from "../remote/push/keys.js";
-import { cloudAgentEnvironment } from "./cloud-agent-env.js";
+import { ClaudeCloudSignIn } from "./cloud-agent-env.js";
+import { cloudAgents, type CloudAgents } from "./cloud-agents.js";
 import { CloudChecks } from "./cloud-check.js";
-import { CloudCodex } from "./cloud-codex.js";
+import { CodexCloudSignIn } from "./cloud-codex.js";
+import { OpenCodeCloudKeys, OpenCodeCloudSignIn } from "./cloud-opencode.js";
 import { CloudHandoff } from "./cloud-handoff.js";
 import { CodexBrowserSignIn, CodexCloudLogin } from "./codex-cloud-login.js";
 import { spawnWithPipes } from "./terminal-process.js";
 import { CloudSandboxes, type CloudSandboxRuns } from "./cloud-sandboxes.js";
-import { CloudSessions } from "./cloud-sessions.js";
+import { agentHomes } from "./agent-homes.js";
+import { AgentSessions } from "./agent-sessions.js";
 import { CloudStandby, type CloudStandbyDeps } from "./cloud-standby.js";
 import { CloudSettings } from "./cloud-settings.js";
 import { CloudWorkspaceService, cloudSandboxProviders } from "./cloud-workspaces.js";
@@ -77,6 +79,7 @@ export function createCloud(input: CloudInput): {
   settings: CloudSettings;
   tokens: ClaudeCloudTokens;
   codex: CodexCloudLogin;
+  opencode: OpenCodeCloudKeys;
   cloud: CloudWorkspaceService;
   checks: CloudChecks;
   sandboxes: CloudSandboxes;
@@ -110,25 +113,26 @@ export function createCloud(input: CloudInput): {
     github: macGitHub(),
     push: () => savedPushKey(db, options.pushSecrets),
     memory: () => macMemoryKey(input.memory()),
+    opencode: () => opencode.all(),
     codex: new CodexBrowserSignIn({ ...codexDeps, changed: () => invalidate(["cloud-brain"]) }),
   };
   const brain: CloudBrain = cloudBrain(db, options, tokens, options.cloudCredentials ?? (() => settings.credentials()), signIns, (keys) => [invalidate(keys), input.brainChanged?.()]);
-  const agentEnvironment = cloudAgentEnvironment({ accounts, tokens, snapshot: environment });
   // On a cloud-only host the cloud login is the only one, so whether Codex is signed in changes with it.
   const codexLogin = new CodexCloudLogin(options.codexCloudSecrets, { ...codexDeps, changed: () => invalidate(options.cloudOnly ? ["cloud", "system", "models"] : ["cloud"]) });
-  const codex = new CloudCodex(codexLogin);
-  const sessions = new CloudSessions({
-    db,
-    configDirectory: (id) => accounts.configDirectory(id),
-    defaultAccountId: () => accounts.defaultId(),
-    agentEnvironment: (provider, id) => agentEnvironment(provider, id),
-    codexHomeIn: (location, provider) => codex.home(location, provider),
-    codexHomeOnMac: () => environment().env["CODEX_HOME"] || path.join(os.homedir(), ".codex"),
+  const opencode = new OpenCodeCloudKeys(options.opencodeCloudSecrets, () => {
+    invalidate(["cloud"]);
+    brain.signInsChanged();
   });
+  const agents = cloudAgents({
+    claude: new ClaudeCloudSignIn({ accounts, tokens, snapshot: environment }),
+    codex: new CodexCloudSignIn(codexLogin),
+    opencode: new OpenCodeCloudSignIn(opencode),
+  });
+  const { sessions, versions } = agentParts(input, agents);
   const changed = (id: string) => invalidate(["threads", `thread:${id}`]);
   const cloud = new CloudWorkspaceService(
     db,
-    { ...sandboxes, agentEnvironment, sessions, codex, changed, cloudOnly: options.cloudOnly, ...(options.cloudRunnerFiles ? { files: options.cloudRunnerFiles } : {}) },
+    { ...sandboxes, agents, sessions, versions, changed, cloudOnly: options.cloudOnly, ...(options.cloudRunnerFiles ? { files: options.cloudRunnerFiles } : {}) },
     log,
   );
   const checks = new CloudChecks(
@@ -150,7 +154,6 @@ export function createCloud(input: CloudInput): {
     cloud,
     sessions,
     enabled: () => settings.takeover(),
-    agentEnvironment: (provider, id) => agentEnvironment(provider, id),
     defaultAccountId: () => accounts.defaultId(),
     project: (thread) => executionProject(db, thread),
     runs,
@@ -161,7 +164,7 @@ export function createCloud(input: CloudInput): {
   // A thread's tasks move with it, so the task lists change too.
   const moved = (id: string) => invalidate(["threads", `thread:${id}`, "tasks", "inbox"]);
   const { relocations, coordinator } = createRelocations({ input, sessions, cloud, runs, brain, changed: moved });
-  return { settings, tokens, codex: codexLogin, cloud, checks, sandboxes: list, handoff, standby, brain, relocations, coordinator };
+  return { settings, tokens, codex: codexLogin, opencode, cloud, checks, sandboxes: list, handoff, standby, brain, relocations, coordinator };
 }
 
 /** Moving threads between this host and the other brain; the Mac alone coordinates. */
@@ -174,7 +177,7 @@ function createRelocations({
   changed,
 }: {
   input: CloudInput;
-  sessions: CloudSessions;
+  sessions: AgentSessions;
   cloud: CloudWorkspaceService;
   runs: CloudSandboxRuns & CloudStandbyDeps["runs"];
   brain: CloudBrain;

@@ -33,6 +33,7 @@ import {
 import { Db } from "@openorc/db";
 import { DEFAULT_CLAUDE_ACCOUNT, WORKSPACE_ID, brainRegionFor } from "@openorc/protocol";
 import { OpenOrc } from "../openorc.js";
+import { inheritedProbe } from "./shell-environment.js";
 import type { OpenOrcOptions } from "../options.js";
 import { rpcClient } from "../rpc-test-client.js";
 import type { BrainDoors } from "./cloud-brain-door.js";
@@ -210,6 +211,7 @@ async function open(options: Partial<OpenOrcOptions> = {}): Promise<void> {
   core = await OpenOrc.create({
     dataDir: path.join(root, `data-${Math.random().toString(36).slice(2)}`),
     ephemeral: true,
+    shellProbe: inheritedProbe(env),
     transport: { push: (message) => void (message.type === "invalidate" && invalidated.push(...message.keys)) },
     claudeCloudSecrets: memoryStore(),
     cloudBrainSecrets: record,
@@ -230,12 +232,22 @@ async function open(options: Partial<OpenOrcOptions> = {}): Promise<void> {
 const status = () => rpc("cloud.brain.status", {});
 async function setUp(): Promise<void> {
   expect((await rpc("cloud.brain.create", { region: "sin1" })).state).toBe("setting-up");
-  await vi.waitFor(async () => expect((await status()).state).toBe("ready"));
+  await vi.waitFor(async () => expect((await status()).state).toBe("ready"), { timeout: 5000 });
 }
 const stored = () => JSON.parse(record.saved.at(-1) || "null") as { key: string; region: string; teamId: string } | null;
 
+/** Stand-in agent CLIs on this Mac that only say their versions, which the brain is brought to. */
+const MAC_VERSIONS = { claude: "2.1.317 (Claude Code)", codex: "codex-cli 0.166.0", opencode: "opencode v2.0.11" };
+let env: NodeJS.ProcessEnv;
+
 beforeEach(async () => {
   root = await mkdtemp(path.join(os.tmpdir(), "openorc-cloud-brain-"));
+  await mkdir(path.join(root, "bin"));
+  env = { ...process.env };
+  for (const [agent, line] of Object.entries(MAC_VERSIONS)) {
+    await writeFile(path.join(root, "bin", agent), `#!/bin/sh\necho "${line}"\n`, { mode: 0o755 });
+    env[`OPENORC_${agent.toUpperCase()}_BIN`] = path.join(root, "bin", agent);
+  }
   brain = new FakeBrain();
   brain.copies = path.join(root, "brain", "projects");
   await mkdir(brain.copies, { recursive: true });

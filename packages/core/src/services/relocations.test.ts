@@ -10,7 +10,7 @@ import { DEFAULT_CLAUDE_ACCOUNT, MOVING_WORDS, type Project } from "@openorc/pro
 import { OpenOrc } from "../openorc.js";
 import type { OpenOrcOptions } from "../options.js";
 import { FAKE_CLAUDE, turnsIn, until } from "../test-fixtures/fake-claude.js";
-import { claudeSessionFile } from "./cloud-sessions.js";
+import { claudeSessionFile } from "@openorc/agents";
 import { inheritedProbe } from "./shell-environment.js";
 
 let root: string;

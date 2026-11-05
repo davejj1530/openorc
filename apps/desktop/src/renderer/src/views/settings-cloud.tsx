@@ -7,6 +7,7 @@ import { CloudCheckSection } from "./settings-cloud-check";
 import { CloudSandboxesSection } from "./settings-cloud-sandboxes";
 import { Field, LoadError, Section, SettingRow, Status, Toggle } from "./settings-shared";
 import { CodexCloudSection } from "./settings-cloud-codex";
+import { OpenCodeCloudSection } from "./settings-cloud-opencode";
 import { Failure, StillWorks, TokenField } from "./settings-secret-field";
 
 const TOKENS_URL = "https://vercel.com/account/tokens";
@@ -244,6 +245,7 @@ export function CloudSettings({ active }: { active: boolean }) {
       <VercelSettings status={status.data} />
       <ClaudeCloudAccounts status={status.data} active={active} />
       <CodexCloudSection codex={status.data.codex} />
+      <OpenCodeCloudSection opencode={status.data.opencode} />
       {status.data.vercel?.team ? <CloudBrainSection active={active} /> : null}
       <TakeoverSection enabled={status.data.takeover} />
       <CloudSandboxesSection active={active} />

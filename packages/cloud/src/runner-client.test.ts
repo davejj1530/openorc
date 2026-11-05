@@ -1,6 +1,6 @@
 import http from "node:http";
 import type { AddressInfo } from "node:net";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -57,6 +57,15 @@ describe("RunnerClient", () => {
     proc.stdin.end();
     expect(await out.closed).toEqual([7, null]);
     expect(out.text()).toBe("echo:hello\n");
+  });
+
+  it("starts a process in its folder with PWD naming that folder, whatever PWD the runner or the caller had", async () => {
+    const folder = path.join(sandbox.root, "checkout");
+    await mkdir(folder, { recursive: true });
+    const proc = client!.spawn("pwd", { ...node(`process.stdout.write(process.env.PWD + "|" + process.cwd())`), cwd: folder, env: { PWD: "/elsewhere" } });
+    const out = collect(proc);
+    expect(await out.closed).toEqual([0, null]);
+    expect(out.text()).toBe(`${folder}|${await realpath(folder)}`);
   });
 
   it("keeps a process running through a dropped connection and delivers every byte once", async () => {

@@ -58,11 +58,13 @@ it("offers to keep a moving thread where it was", () => {
   expect(mutations.get("cloud.keep")).toHaveBeenCalledWith({ threadId: "t1" });
 });
 
-it("disables Move to cloud with the reason for a conversation that cannot go to the brain yet", () => {
-  open({ agent: "codex" });
-  const item = screen.getByText("Move to cloud").closest("[role=menuitem]");
-  expect(item?.getAttribute("aria-disabled")).toBe("true");
-  expect(item?.getAttribute("title")).toBe("Only Claude conversations can move to the cloud so far.");
+it("offers Move to cloud for every agent's conversation, the brain checking again when asked", () => {
+  for (const agent of ["claude", "codex", "opencode"] as const) {
+    open({ agent });
+    const item = screen.getAllByText("Move to cloud").at(-1)!.closest("[role=menuitem]");
+    expect(item?.getAttribute("aria-disabled")).not.toBe("true");
+    expect(item?.getAttribute("title")).toBeNull();
+  }
 });
 
 it("keeps today's sandbox move without a brain", () => {

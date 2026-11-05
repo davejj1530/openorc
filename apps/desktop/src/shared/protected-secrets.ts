@@ -15,6 +15,8 @@ export const PROTECTED_SECRET_FILES = {
   /** Each Claude account's token for signing in to cloud sandboxes. */
   "claude-cloud.secrets": "claude-cloud-tokens.enc",
   "codex-cloud.secrets": "codex-cloud-login.enc",
+  /** OpenCode's provider keys entered for the cloud. */
+  "opencode-cloud.secrets": "opencode-cloud-keys.enc",
   /** The cloud brain's key, team and region. */
   "cloud-brain.secrets": "cloud-brain.enc",
 } as const;

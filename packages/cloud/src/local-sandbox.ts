@@ -58,7 +58,9 @@ export class LocalSandbox implements Sandbox {
 
   private start(cmd: string, args: string[], options: SandboxCommandOptions, stdio: StdioOptions): ChildProcess {
     this.wake();
-    const child = spawn(cmd, args, { cwd: options.cwd ?? this.root, env: { ...this.env(), ...options.env }, stdio, detached: true });
+    const cwd = options.cwd ?? this.root;
+    // PWD follows cwd, as the sandbox runner does: some CLIs (OpenCode) read their folder from it.
+    const child = spawn(cmd, args, { cwd, env: { ...this.env(), ...options.env, PWD: cwd }, stdio, detached: true });
     this.running.add(child);
     child.once("close", () => this.running.delete(child));
     child.once("error", () => this.running.delete(child));

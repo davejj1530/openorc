@@ -1,4 +1,5 @@
 import { orclings, retiredTeams, taskTies, threadTaskIds, type Db } from "@openorc/db";
+import { slotFor } from "@openorc/agents";
 import { isDetachedCopy, isSubagentThread, WORKSPACE_ID, type Thread } from "@openorc/protocol";
 
 /** Why a thread's tasks keep it where it is. Its tasks move with it otherwise. */
@@ -11,7 +12,8 @@ const TASK_TIES = {
 export function relocationRefusal(db: Db, thread: Thread): string | null {
   if (thread.projectId === WORKSPACE_ID) return "Only a project's conversations can move.";
   if (isSubagentThread(thread)) return "Move the conversation that started this subagent.";
-  if (thread.agent !== "claude") return "Only Claude conversations can move between your Mac and the cloud so far.";
+  const slot = slotFor(thread.agent);
+  if (!slot || slot.stays) return slot?.stays ?? "This agent's conversations stay where they started.";
   if (retiredTeams.isHidden(db, thread.id)) return "This conversation is no longer available.";
   if (thread.orclingId || orclings.forThread(db, thread.id)) return "An Orcling's conversation stays where it is.";
   if (threadTaskIds(db, thread.id).some((id) => retiredTeams.hasTask(db, id))) return "This conversation is no longer available.";

@@ -1,7 +1,13 @@
+import { mkdtempSync, rmSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { cloudWorkspaceSessionBaseMigration } from "./cloud-workspace-schema.js";
 import { cloudWorkspaces } from "./cloud-workspaces.js";
 import { Db } from "./database.js";
 import { projects, threads } from "./repos.js";
+import { migrations } from "./schema.js";
 
 let db: Db;
 let threadId: string;
@@ -15,6 +21,47 @@ beforeEach(() => {
 afterEach(() => db.close());
 
 describe("cloudWorkspaces", () => {
+  it("reads a cloud conversation made before the session base as having none, its sandbox and mirror as they were", () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "openorc-session-base-migration-"));
+    const file = path.join(dir, "old.sqlite");
+    try {
+      const raw = new DatabaseSync(file);
+      const before = migrations.indexOf(cloudWorkspaceSessionBaseMigration);
+      for (const migration of migrations.slice(0, before)) {
+        if (typeof migration === "string") raw.exec(migration);
+        else migration(raw);
+      }
+      raw.exec(`PRAGMA user_version = ${before}`);
+      const old = new Db(raw);
+      const project = projects.insert(old, { name: "Existing", rootPath: dir, gitRemote: null, defaultBranch: "main", settings: {} });
+      const thread = threads.insert(old, { projectId: project.id, title: "In the cloud", agent: "claude", model: null, mode: "act", permissionMode: "trusted", workspaceMode: "worktree" });
+      raw
+        .prepare(
+          "INSERT INTO cloud_workspaces (thread_id, provider, sandbox, state, mirror_tree, mirror_head, mirror_known, created_at, updated_at) VALUES (?, 'vercel', ?, 'ready', ?, ?, '[]', 1, 2)",
+        )
+        .run(thread.id, `openorc-${thread.id}`, "t".repeat(40), "c".repeat(40));
+      old.close();
+      const db = Db.open(file);
+      try {
+        expect(db.version).toBe(migrations.length);
+        expect(cloudWorkspaces.get(db, thread.id)).toMatchObject({ state: "ready", sandbox: `openorc-${thread.id}`, mirror: { tree: "t".repeat(40) }, sessionBase: null });
+      } finally {
+        db.close();
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps what the sandbox got of the session until its sandbox is removed", () => {
+    cloudWorkspaces.insert(db, { threadId, provider: "vercel", sandbox: "openorc-a", at: 1 });
+    const base = { sessionId: "s-1", host: "h".repeat(64), sandbox: "b".repeat(64) };
+    cloudWorkspaces.setSessionBase(db, threadId, base);
+    expect(cloudWorkspaces.get(db, threadId)?.sessionBase).toEqual(base);
+    cloudWorkspaces.removed(db, threadId);
+    expect(cloudWorkspaces.get(db, threadId)?.sessionBase).toBeNull();
+  });
+
   it("starts preparing with no mirror, and records the mirror once ready", () => {
     expect(cloudWorkspaces.insert(db, { threadId, provider: "local", sandbox: "openorc-a", at: 1 })).toEqual({
       threadId,
@@ -23,6 +70,7 @@ describe("cloudWorkspaces", () => {
       state: "preparing",
       error: null,
       mirror: null,
+      sessionBase: null,
       createdAt: 1,
       updatedAt: 1,
     });

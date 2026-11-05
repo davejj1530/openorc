@@ -1,5 +1,5 @@
 import { mergeInbox, mergeThreadPages, OWNER_SESSION_METHODS, type HostPage, type InboxList, type ThreadSummary } from "@openorc/protocol";
-import { brainMove, ownerMark, threadMoveCard } from "./cloud-start.js";
+import { offersBrainMove, ownerMark, threadMoveCard } from "./cloud-start.js";
 import { tabsFor } from "./panel-tools.js";
 import { describe, expect, it } from "vitest";
 
@@ -111,11 +111,10 @@ describe("where a row lives", () => {
     expect(ownerMark(summary("t", 1, { moving: { to: "mac", since: 1 } }))).toEqual({ label: "Moving", dim: false });
   });
 
-  it("refuses Codex threads on demand, moves a thread with its tasks, and hides the move for rows another host holds", () => {
-    expect(brainMove(summary("t", 1))).toEqual({ shown: true, blocked: null });
-    expect(brainMove(summary("t", 1, { agent: "codex" })).blocked).toContain("Only Claude");
-    expect(brainMove(summary("t", 1, { openTaskCount: 1 }))).toEqual({ shown: true, blocked: null });
-    expect(brainMove(summary("t", 1, { owner: { brain: "cloud", reach: "live", heardAt: 1 } })).shown).toBe(false);
+  it("offers the move for every agent's thread, with its tasks, and hides it for rows another host holds", () => {
+    for (const agent of ["claude", "codex", "opencode"] as const) expect(offersBrainMove(summary("t", 1, { agent }))).toBe(true);
+    expect(offersBrainMove(summary("t", 1, { openTaskCount: 1 }))).toBe(true);
+    expect(offersBrainMove(summary("t", 1, { owner: { brain: "cloud", reach: "live", heardAt: 1 } }))).toBe(false);
   });
 
   it("gives a cloud thread's panel no folder of this Mac's", () => {
@@ -146,6 +145,7 @@ describe("the card on a conversation that moves", () => {
 
   it("says the cloud brain is waking on a cloud conversation, and nothing on one that is live or this Mac's own", () => {
     expect(threadMoveCard(summary("t", 1, { owner: { brain: "cloud", reach: "waking", heardAt: 1 } }))).toEqual({
+      kind: "moving",
       title: null,
       steps: [{ step: "waking", label: "Waking the cloud brain", state: "running" }],
     });

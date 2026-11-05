@@ -1,5 +1,6 @@
 import {
   harnessShortName,
+  isHarnessId,
   NOT_ON_BRAIN,
   WORKSPACE_ID,
   type CloudOffer,
@@ -11,9 +12,9 @@ import {
   type ThreadSummary,
 } from "@openorc/protocol";
 
-/** The agents that run in a cloud sandbox so far. */
+/** Every agent runs in a cloud sandbox; the reserved ACP kind has no adapter anywhere. */
 export function runsInCloud(agent: AgentKind | null | undefined): boolean {
-  return agent === "claude" || agent === "codex";
+  return isHarnessId(agent);
 }
 
 /** A conversation on this Mac that can move to a sandbox of its own: a project's, not a team's, with an agent that runs there. */
@@ -21,15 +22,9 @@ export function canMoveToCloud(thread: ThreadSummary): boolean {
   return !thread.cloud && !thread.teamInstanceId && thread.projectId !== WORKSPACE_ID && runsInCloud(thread.agent);
 }
 
-/**
- * Move to cloud with a cloud brain set up: shown for a project's conversation this host holds; the reason it cannot
- * move yet, shown on demand on the disabled choice. The brain checks again when asked.
- */
-export function brainMove(thread: ThreadSummary): { shown: boolean; blocked: string | null } {
-  const shown = !thread.owner && !thread.moving && !thread.teamInstanceId && thread.projectId !== WORKSPACE_ID && thread.parentRelation !== "subagent";
-  if (!shown) return { shown, blocked: null };
-  if (thread.agent !== "claude") return { shown, blocked: "Only Claude conversations can move to the cloud so far." };
-  return { shown, blocked: null };
+/** Move to cloud with a cloud brain set up: offered for a project's conversation this host holds. The brain checks again when asked. */
+export function offersBrainMove(thread: ThreadSummary): boolean {
+  return !thread.owner && !thread.moving && !thread.teamInstanceId && thread.projectId !== WORKSPACE_ID && thread.parentRelation !== "subagent";
 }
 
 /**

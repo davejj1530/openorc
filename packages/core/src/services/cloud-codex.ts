@@ -1,7 +1,8 @@
 import path from "node:path";
-import type { Sandbox, WorkspaceLocation } from "@openorc/cloud";
+import type { AgentHome } from "@openorc/agents";
 import type { CloudProviderId } from "@openorc/db";
 import type { SystemInfo } from "@openorc/protocol";
+import type { CloudSignIn } from "./cloud-agents.js";
 import { CODEX_FILE_STORE } from "./codex-cloud-login.js";
 
 /** What the cloud needs from the Codex cloud login. */
@@ -18,39 +19,34 @@ const NO_LOGIN = "Codex has no sign-in for the cloud. Sign in with ChatGPT or ad
  * before each turn and handing it back after, in case Codex refreshed it. A sandbox simulated on this Mac without a
  * cloud login uses this Mac's own Codex folder instead, as a turn here would.
  */
-export class CloudCodex {
+export class CodexCloudSignIn implements CloudSignIn {
   constructor(private readonly login: CodexCloudLoginSource | undefined) {}
 
-  /** Refuses before anything is made when Codex cannot sign in where the conversation would run. */
   async assertCanRun(provider: CloudProviderId): Promise<void> {
     if (provider !== "local" && !(await this.login?.has())) throw new Error(NO_LOGIN);
   }
 
-  /** Codex's folder in the sandbox; null when it uses this Mac's own. */
-  async home(location: WorkspaceLocation, provider: CloudProviderId): Promise<string | null> {
+  async homeEnv(state: string, provider: CloudProviderId): Promise<Record<string, string> | null> {
     if (provider === "local" && !(await this.login?.has())) return null;
-    return path.posix.join(location.install.state, "codex");
+    return { CODEX_HOME: path.posix.join(state, "codex") };
   }
 
-  /** Puts Codex and its login in place for a turn, and returns what its process needs to find them. */
-  async prepare(location: WorkspaceLocation, provider: CloudProviderId): Promise<Record<string, string>> {
-    const { sandbox } = location.install;
-    await ensureCodex(sandbox, provider);
-    const home = await this.home(location, provider);
-    if (!home) return {};
+  async prepare(home: () => Promise<AgentHome | null>): Promise<Record<string, string>> {
+    const codex = await home();
+    if (!codex) return {};
     const auth = await this.login?.forSandbox();
     if (!auth) throw new Error(NO_LOGIN);
-    await sandbox.writeFile(path.posix.join(home, "config.toml"), Buffer.from(CODEX_FILE_STORE));
-    await sandbox.writeFile(path.posix.join(home, "auth.json"), Buffer.from(auth));
-    return { CODEX_HOME: home };
+    const folder = codex.env["CODEX_HOME"]!;
+    await codex.write(path.posix.join(folder, "config.toml"), Buffer.from(CODEX_FILE_STORE));
+    await codex.write(path.posix.join(folder, "auth.json"), Buffer.from(auth));
+    return {};
   }
 
-  /** After a turn: a login Codex refreshed in the sandbox comes back, so the next sandbox gets the live one. */
-  async keep(location: WorkspaceLocation, provider: CloudProviderId): Promise<void> {
-    const home = await this.home(location, provider);
-    if (!home || !this.login) return;
-    const auth = await location.install.sandbox.readFile(path.posix.join(home, "auth.json"));
-    if (auth) await this.login.keep(auth.toString("utf8"));
+  async keep(home: () => Promise<AgentHome | null>): Promise<void> {
+    const codex = this.login && (await home());
+    if (!codex) return;
+    const auth = await codex.read(path.posix.join(codex.env["CODEX_HOME"]!, "auth.json"));
+    if (auth) await this.login!.keep(auth.toString("utf8"));
   }
 }
 
@@ -58,12 +54,4 @@ export class CloudCodex {
 export function withCloudCodexLogin(info: SystemInfo, signedIn: boolean): SystemInfo {
   if (!signedIn) return info;
   return { ...info, harnesses: info.harnesses.map((row) => (row.id === "codex" && row.state === "sign_in" ? { ...row, state: "ready" } : row)) };
-}
-
-/** Codex on the sandbox's PATH, installed when missing. Never on a sandbox simulated on this Mac: that is the Mac's own. */
-async function ensureCodex(sandbox: Sandbox, provider: CloudProviderId): Promise<void> {
-  if ((await sandbox.exec("sh", ["-c", "command -v codex"])).code === 0) return;
-  if (provider === "local") throw new Error("Codex is not installed on this Mac, where this sandbox is simulated.");
-  const install = await sandbox.exec("npm", ["install", "-g", "@openai/codex"], { sudo: true });
-  if (install.code !== 0) throw new Error(`Codex could not be installed in the cloud workspace: ${install.stderr.trim().slice(-500)}`);
 }

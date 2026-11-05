@@ -123,8 +123,17 @@ const finished = (code: number, output: Output = {}) => {
 };
 
 /** What each package installs, as the survey names it. */
-const PROVIDES: Record<string, string> = { procps: "ps", "util-linux": "flock", git: "git", tar: "tar", gh: "gh", "@anthropic-ai/claude-code": "claude", "@openai/codex": "codex" };
-const NEEDS = ["node24", "ps", "flock", "git", "tar", "gh", "claude", "codex"];
+const PROVIDES: Record<string, string> = {
+  procps: "ps",
+  "util-linux": "flock",
+  git: "git",
+  tar: "tar",
+  gh: "gh",
+  "@anthropic-ai/claude-code": "claude",
+  "@openai/codex": "codex",
+  "@opencode/cli": "opencode",
+};
+const NEEDS = ["node24", "ps", "flock", "git", "tar", "gh", "claude", "codex", "opencode"];
 
 /** A Linux machine as the brain's steps see it. Every change it undergoes lands in `changes`. */
 class FakeMachine {
@@ -376,7 +385,7 @@ describe("provisioning a brain", () => {
     expect(machine.changes).toEqual([
       "apt procps util-linux gh",
       `folders ${ROOT} ${ROOT}/app ${ROOT}/data ${ROOT}/run ${ROOT}/logs ${ROOT}/npm ${ROOT}/inbox ${ROOT}/outbox`,
-      "npm @anthropic-ai/claude-code @openai/codex",
+      "npm @anthropic-ai/claude-code @openai/codex @opencode/cli",
       `write ${ROOT}/inbox/brain-brain-v1.tgz`,
       "unpack brain-v1",
       "switch brain-v1",
@@ -388,6 +397,14 @@ describe("provisioning a brain", () => {
     expect(await brain.provision(bundle("brain-v1"))).toEqual({ installed: "brain-v1", running: null });
     expect(machine.changes).toEqual(before);
     expect(labels(machine.runs)).toEqual(["brain-survey", "brain-ctl"]);
+  });
+
+  it("looks for Claude, Codex and OpenCode in the brain's own npm folder", async () => {
+    const vercel = new FakeVercel();
+    const brain = await connect(vercel);
+    await brain.provision(bundle("brain-v1"), { region: "fra1" });
+    const survey = vercel.machine.runs.find((run) => run.args[2] === "brain-survey")!.args[1];
+    for (const bin of ["claude", "codex", "opencode"]) expect(survey).toContain(`"$npm/bin/${bin}" --version`);
   });
 
   it("gives a brain made before the snapshot policy that policy, once", async () => {

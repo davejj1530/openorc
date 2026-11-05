@@ -1,19 +1,37 @@
-import { existsSync, readFileSync } from "node:fs";
-import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
+import { chmod, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { claudeSessionFile, hostHome, sessionSlots, type SessionId } from "@openorc/agents";
 import { BrainUnavailable, LocalSandboxProvider, type BrainControlResults } from "@openorc/cloud";
 import { claudeAccounts, cloudWorkspaces, frozenMoving, incomingMove, LedgerWriter, relocations, runs, snapshots, tasks, threads } from "@openorc/db";
 import { commitAll, git, pinObject, treeHash, worktree } from "@openorc/git";
 import { DEFAULT_CLAUDE_ACCOUNT, MOVING_WORDS, type Project } from "@openorc/protocol";
 import { OpenOrc } from "../openorc.js";
 import type { OpenOrcOptions } from "../options.js";
-import { until } from "../test-fixtures/fake-claude.js";
+import { FAKE_CLAUDE, until } from "../test-fixtures/fake-claude.js";
+import { FAKE_CODEX_RESUME } from "../test-fixtures/fake-codex.js";
+import { FAKE_OPENCODE } from "../test-fixtures/fake-opencode.js";
+import { inheritedProbe } from "./shell-environment.js";
 import { BrainMirrors, mirrorFolder, snapshotFolder } from "./brain-mirrors.js";
 import type { AwakeBrain, BrainChannel } from "./relocation-coordinator.js";
 
 class Died extends Error {}
+
+type Agent = "claude" | "codex" | "opencode";
+/** Each host's agent folders and stand-in CLIs, apart from the person's own; a sandbox's home is apart from both. */
+const homeOf = (name: "mac" | "brain" | "sandbox") => path.join(root, `${name}-home`);
+function hostEnv(name: "mac" | "brain" | "sandbox"): NodeJS.ProcessEnv {
+  const bin = path.join(root, "bin");
+  const home = homeOf(name);
+  const folders =
+    name === "sandbox"
+      ? { CLAUDE_CONFIG_DIR: undefined, CODEX_HOME: undefined, XDG_DATA_HOME: undefined }
+      : { CLAUDE_CONFIG_DIR: path.join(home, ".claude"), CODEX_HOME: path.join(home, ".codex"), XDG_DATA_HOME: path.join(home, "data") };
+  const bins = { OPENORC_CLAUDE_BIN: path.join(bin, "claude"), OPENORC_CODEX_BIN: path.join(bin, "codex"), OPENORC_OPENCODE_BIN: path.join(bin, "opencode") };
+  return { ...process.env, PATH: `${bin}:${process.env["PATH"] ?? ""}`, HOME: home, ...folders, ...bins };
+}
 
 let root: string;
 let checkout: string;
@@ -135,7 +153,14 @@ function step(name: string): void {
 async function openMac(retryMs = 20): Promise<OpenOrc> {
   dead = false;
   const push: OpenOrcOptions["transport"]["push"] = (message) => void (message.type === "log" && message.level === "warn" && warnings.push(message.message));
-  mac = await OpenOrc.create({ dataDir: path.join(root, "mac"), transport: { push }, brainChannel: channel, relocationTiming: { retryMs, step } });
+  mac = await OpenOrc.create({
+    dataDir: path.join(root, "mac"),
+    transport: { push },
+    shellProbe: inheritedProbe(hostEnv("mac")),
+    shellEnv: hostEnv("mac"),
+    brainChannel: channel,
+    relocationTiming: { retryMs, step },
+  });
   return mac;
 }
 
@@ -153,6 +178,15 @@ beforeEach(async () => {
   await writeFile(path.join(checkout, "README.md"), "# Matrix\n");
   await commitAll(checkout, "Baseline");
   main = (await git(checkout, ["rev-parse", "main"])).stdout.trim();
+  await mkdir(path.join(root, "bin"));
+  for (const [name, script] of [
+    ["claude", FAKE_CLAUDE],
+    ["codex", FAKE_CODEX_RESUME],
+    ["opencode", FAKE_OPENCODE],
+  ] as const) {
+    await writeFile(path.join(root, "bin", name), script);
+    await chmod(path.join(root, "bin", name), 0o755);
+  }
   [dead, dieAt, held, holdReceives, loseNextReply, resumes, failReceives, warnings, watched, stepsSeen, failHandOffs] = [false, null, [], false, false, true, 0, [], null, [], 0];
   [asleep, wakes, macProjectOf] = [false, 0, () => project.id];
   passed.clear();
@@ -164,8 +198,10 @@ beforeEach(async () => {
     transport: { push: () => {} },
     cloudOnly: true,
     deviceSystem: null,
+    shellProbe: inheritedProbe(hostEnv("brain")),
+    shellEnv: hostEnv("brain"),
     claudeCloudSecrets: tokenStore(),
-    cloudSandboxes: new LocalSandboxProvider(path.join(root, "sandboxes"), () => process.env, 1500),
+    cloudSandboxes: new LocalSandboxProvider(path.join(root, "sandboxes"), () => hostEnv("sandbox"), 1500),
   });
   const copy = path.join(root, "brain", "projects", project.id, "app");
   await git(root, ["clone", "-q", checkout, copy]);
@@ -179,21 +215,57 @@ afterEach(async () => {
   await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 });
 
-/** A Mac thread with a run of events, a commit on its own branch and a change not committed. */
-const macThread = (): Promise<string> => threadOn(mac!, project.id, checkout);
+/** A Mac thread with a run of events, its agent's session, a commit on its own branch and a change not committed. */
+const macThread = (agent: Agent = "claude"): Promise<string> => threadOn(mac!, project.id, checkout, agent);
+
+/** The agent's session for a thread, in that agent's own layout at a host's folders, as its CLI writes it. */
+async function writeSession(core: OpenOrc, agent: Agent, sessionId: string, folder: string): Promise<void> {
+  const home = homeOf(core === mac ? "mac" : "brain");
+  const line = (value: object) => `${JSON.stringify(value)}\n`;
+  if (agent === "claude") {
+    const file = claudeSessionFile(path.join(home, ".claude"), realpathSync(folder), sessionId);
+    await mkdir(path.dirname(file), { recursive: true });
+    await writeFile(file, line({ type: "user", cwd: folder, sessionId, text: "Started here" }));
+  } else if (agent === "opencode") {
+    const file = path.join(home, "data", "fake-opencode", `${sessionId}.json`);
+    await mkdir(path.dirname(file), { recursive: true });
+    await writeFile(file, JSON.stringify({ info: { id: sessionId, location: { directory: folder } }, messages: [{ id: "msg_1", type: "user", text: "Started here" }] }));
+  } else {
+    const file = path.join(home, ".codex", "sessions", "2026", "11", "05", `rollout-2026-11-05T00-00-00-${sessionId}.jsonl`);
+    await mkdir(path.dirname(file), { recursive: true });
+    await writeFile(file, line({ type: "session_meta", payload: { id: sessionId, cwd: folder } }) + line({ type: "response_item", payload: { text: "Started here" } }));
+  }
+}
+
+/** Whether the thread's agent resumes its newest session at a host, from the thread's folder there, as its CLI would. */
+async function resumable(core: OpenOrc, threadId: string): Promise<boolean> {
+  const thread = threads.get(core.db, threadId)!;
+  const agent = thread.agent as Agent;
+  const env = hostEnv(core === mac ? "mac" : "brain");
+  const folders: Record<string, string> = { claude: { CLAUDE_CONFIG_DIR: env["CLAUDE_CONFIG_DIR"]! }, codex: { CODEX_HOME: env["CODEX_HOME"]! }, opencode: { XDG_DATA_HOME: env["XDG_DATA_HOME"]! } }[
+    agent
+  ];
+  const home = hostHome({ agent, userHome: env["HOME"]!, env: folders, binary: env[`OPENORC_${agent.toUpperCase()}_BIN`]!, processEnv: env });
+  const sessionId = runs.get(core.db, `run-${threadId}`)?.externalSessionId as SessionId;
+  const ref = { sessionId, cwd: realpathSync(thread.worktreePath!), children: [] };
+  const saved = await sessionSlots[agent].export(home, ref);
+  return Boolean(saved?.parts[0]?.bytes.toString().includes("Started here")) && (await sessionSlots[agent].check(home, ref)) === null;
+}
 
 /** Such a thread on either host: on the brain, one started there, whose branch this Mac never had. */
-async function threadOn(core: OpenOrc, projectId: string, repo: string): Promise<string> {
+async function threadOn(core: OpenOrc, projectId: string, repo: string, agent: Agent = "claude"): Promise<string> {
   const db = core.db;
-  const thread = threads.insert(db, { projectId, title: "Matrix thread", agent: "claude", model: null, mode: "act", permissionMode: "autonomous", workspaceMode: "worktree" });
+  const thread = threads.insert(db, { projectId, title: "Matrix thread", agent, model: null, mode: "act", permissionMode: "autonomous", workspaceMode: "worktree" });
   const folder = path.join(root, core === mac ? "mac" : "brain", "worktrees", thread.id);
   await worktree.add(repo, { path: folder, branch: `openorc/${thread.id.slice(0, 8)}`, startPoint: "main" });
   await writeFile(path.join(folder, "feature.md"), "committed\n");
   await commitAll(folder, "Feature");
   await writeFile(path.join(folder, "draft.md"), "uncommitted\n");
   threads.update(db, thread.id, { worktreePath: folder, branch: `openorc/${thread.id.slice(0, 8)}` });
-  runs.insert(db, { id: `run-${thread.id}`, taskId: null, threadId: thread.id, agent: "claude", model: null, mode: "act", permissionMode: "autonomous" });
-  runs.update(db, `run-${thread.id}`, { state: "success", endedAt: 2 });
+  const sessionId = agent === "opencode" ? `ses_${thread.id.slice(0, 8)}` : `s${thread.id.slice(0, 8)}-${agent}`;
+  runs.insert(db, { id: `run-${thread.id}`, taskId: null, threadId: thread.id, agent, model: null, mode: "act", permissionMode: "autonomous" });
+  runs.update(db, `run-${thread.id}`, { state: "success", endedAt: 2, externalSessionId: sessionId });
+  await writeSession(core, agent, sessionId, folder);
   const ledger = new LedgerWriter(db);
   for (let index = 0; index < 5; index++) ledger.push({ type: "message.completed", runId: `run-${thread.id}`, ts: index, messageId: `m${index}`, role: "assistant", text: `line ${index}` } as never);
   ledger.close();
@@ -211,12 +283,12 @@ async function holders(threadId: string) {
     if (!thread) continue;
     const events = (core.db.stmt("SELECT COUNT(*) AS c FROM events WHERE run_id IN (SELECT id FROM runs WHERE thread_id = ?)").get(threadId) as { c: number }).c;
     const read = (file: string) => (thread.worktreePath && existsSync(path.join(thread.worktreePath, file)) ? readFileSync(path.join(thread.worktreePath, file), "utf8") : null);
-    held.push({ name, frozen: frozenMoving(core.db, threadId) !== null, title: thread.title, events, feature: read("feature.md"), draft: read("draft.md") });
+    held.push({ name, frozen: frozenMoving(core.db, threadId) !== null, title: thread.title, events, feature: read("feature.md"), draft: read("draft.md"), resumes: await resumable(core, threadId) });
   }
   return held;
 }
 
-const content = { frozen: false, title: "Matrix thread", events: 5, feature: "committed\n", draft: "uncommitted\n" };
+const content = { frozen: false, title: "Matrix thread", events: 5, feature: "committed\n", draft: "uncommitted\n", resumes: true };
 const settledHere = () => relocations.unsettled(mac!.db).length === 0;
 
 async function moveUp(threadId: string): Promise<void> {
@@ -227,14 +299,15 @@ async function bringHome(threadId: string): Promise<void> {
   await mac!.handle({ type: "rpc", id: 2, method: "cloud.bringToMac", params: { threadId } });
 }
 
-describe("a crash after every step leaves exactly one owner, with the thread whole", () => {
+describe.each(["claude", "codex", "opencode"] as const)("a crash after every step leaves exactly one owner, with the %s thread whole and resumable", (agent) => {
   for (const at of ["frozen", "sending", "receive answered", "let go", "done"])
     it(`to the cloud, the Mac dying at ${at}`, async () => {
-      const threadId = await macThread();
+      const threadId = await macThread(agent);
       const folder = threads.get(mac!.db, threadId)!.worktreePath!;
       dieAt = { step: at, after: 0 };
       await moveUp(threadId);
-      await until(() => dead || settledHere());
+      // A Mac that dies after the move settles has let its copy go first, as the dying process would have.
+      await until(() => dead || (settledHere() && relocations.withCleanup(mac!.db).length === 0));
       await restart();
       await until(() => settledHere() && relocations.withCleanup(mac!.db).length === 0);
       expect(await holders(threadId)).toEqual([{ name: "brain", ...content }]);
@@ -245,7 +318,7 @@ describe("a crash after every step leaves exactly one owner, with the thread who
 
   for (const at of ["asking", "hand-off answered", "received", "handed-off answered", "done"])
     it(`to the Mac, the Mac dying at ${at}`, async () => {
-      const threadId = await macThread();
+      const threadId = await macThread(agent);
       await moveUp(threadId);
       await until(settledHere);
       dieAt = { step: at, after: 0 };
@@ -254,6 +327,8 @@ describe("a crash after every step leaves exactly one owner, with the thread who
       await restart();
       await until(() => settledHere() && relocations.openFor(brain.db, threadId) === null);
       expect(await holders(threadId)).toEqual([{ name: "mac", ...content }]);
+      // The copy this Mac kept from before the round trip was set aside under the move that replaced it, never lost.
+      expect(readdirSync(path.join(root, "mac", "kept-sessions", threadId))).toHaveLength(1);
     }, 60_000);
 });
 
@@ -305,7 +380,8 @@ describe("a crash after every step moves a thread's task with it, held by exactl
       const { threadId, taskId } = await macThreadWithTask();
       dieAt = { step: at, after: 0 };
       await moveUp(threadId);
-      await until(() => dead || settledHere());
+      // A Mac that dies after the move settles has let its copy go first, as the dying process would have.
+      await until(() => dead || (settledHere() && relocations.withCleanup(mac!.db).length === 0));
       await restart();
       await until(() => settledHere() && relocations.withCleanup(mac!.db).length === 0);
       expect(await holders(threadId)).toEqual([{ name: "brain", ...content }]);

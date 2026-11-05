@@ -410,6 +410,7 @@ const SECRET_PARAMS: ReadonlySet<RpcMethod> = new Set<RpcMethod>([
   "cloud.vercel.connect",
   "cloud.claude.save",
   "cloud.codex.apiKey",
+  "cloud.opencode.saveKey",
   "cloud.brain.codex.apiKey",
   "providers.codex.reset",
 ]);

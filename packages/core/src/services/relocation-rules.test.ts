@@ -17,6 +17,14 @@ function threadWithTask() {
   return { db, thread: threads.get(db, insert.id)!, task };
 }
 
+describe("which agents' conversations move", () => {
+  it("moves Claude and Codex conversations alike, and says why one whose agent has no session slot stays", () => {
+    const { db, thread } = threadWithTask();
+    for (const agent of ["claude", "codex"] as const) expect(relocationRefusal(db, { ...thread, agent })).toBeNull();
+    expect(relocationRefusal(db, { ...thread, agent: "acp" })).toBe("This agent's conversations stay where they started.");
+  });
+});
+
 describe("what keeps a thread with tasks from moving", () => {
   it("moves a thread with the tasks it works on", () => {
     const { db, thread } = threadWithTask();

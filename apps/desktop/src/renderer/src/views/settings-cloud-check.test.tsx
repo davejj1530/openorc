@@ -18,7 +18,17 @@ function show(check: CloudCheck | null, vercel: CloudStatus["vercel"] = null) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
-      <CloudCheckSection status={{ vercel, claude: {}, codex: { mode: null, email: null, plan: null, refreshedAt: null, signingIn: false, error: null }, check, error: null, takeover: false }} />
+      <CloudCheckSection
+        status={{
+          vercel,
+          claude: {},
+          codex: { mode: null, email: null, plan: null, refreshedAt: null, signingIn: false, error: null },
+          opencode: { providers: [] },
+          check,
+          error: null,
+          takeover: false,
+        }}
+      />
     </QueryClientProvider>,
   );
 }

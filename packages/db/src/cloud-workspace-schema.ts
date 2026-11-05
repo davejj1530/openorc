@@ -1,3 +1,5 @@
+import type { DatabaseSync } from "node:sqlite";
+
 /**
  * A conversation whose agent runs in a cloud sandbox. Its worktree on the Mac mirrors the sandbox's checkout; the
  * mirror columns record what that worktree last matched, so the next sync sends only what is new.
@@ -42,3 +44,12 @@ INSERT INTO cloud_workspaces_next (thread_id, provider, sandbox, state, error, m
 DROP TABLE cloud_workspaces;
 ALTER TABLE cloud_workspaces_next RENAME TO cloud_workspaces;
 `;
+
+/**
+ * What a cloud conversation's sandbox got of its saved session, so a turn's end writes the host only when it changed.
+ * Added only where missing, like the cloud brain's tables, so a ledger migrated again from an earlier version opens.
+ */
+export function cloudWorkspaceSessionBaseMigration(raw: DatabaseSync): void {
+  const columns = raw.prepare("PRAGMA table_info(cloud_workspaces)").all() as { name: string }[];
+  if (!columns.some((column) => column.name === "session_base")) raw.exec("ALTER TABLE cloud_workspaces ADD COLUMN session_base TEXT;");
+}

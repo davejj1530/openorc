@@ -3,6 +3,7 @@ import type { ClaudeCloudTokens } from "../services/claude-cloud-tokens.js";
 import type { CloudBrain } from "../services/cloud-brain.js";
 import type { CloudChecks } from "../services/cloud-check.js";
 import type { CodexCloudLogin } from "../services/codex-cloud-login.js";
+import type { OpenCodeCloudKeys } from "../services/cloud-opencode.js";
 import type { CloudHandoff } from "../services/cloud-handoff.js";
 import type { CloudSandboxes } from "../services/cloud-sandboxes.js";
 import type { CloudSettings } from "../services/cloud-settings.js";
@@ -26,6 +27,8 @@ type CloudMethod =
   | "cloud.codex.cancel"
   | "cloud.codex.apiKey"
   | "cloud.codex.remove"
+  | "cloud.opencode.saveKey"
+  | "cloud.opencode.removeKey"
   | "cloud.check"
   | "cloud.sandboxes"
   | "cloud.offer"
@@ -57,6 +60,7 @@ interface Dependencies {
   tokens: ClaudeCloudTokens;
   checks: CloudChecks;
   codex: CodexCloudLogin;
+  opencode: Pick<OpenCodeCloudKeys, "providers" | "save" | "remove">;
   sandboxes: CloudSandboxes;
   handoff: CloudHandoff;
   brain: CloudBrain;
@@ -78,15 +82,15 @@ async function removeBrain(brain: CloudBrain, removed: Dependencies["removed"]):
   if ((await brain.region()) === null) await removed(linkKey);
 }
 
-export function createCloudHandlers({ settings, tokens, checks, codex, sandboxes, handoff, brain, coordinator, offered, invalidate, removed }: Dependencies): Pick<Handlers, CloudMethod> {
+export function createCloudHandlers({ settings, tokens, checks, codex, opencode, sandboxes, handoff, brain, coordinator, offered, invalidate, removed }: Dependencies): Pick<Handlers, CloudMethod> {
   const status = async (): Promise<CloudStatus> => {
     const vercel = await settings.status();
     const check = checks.status();
     const codexAccess = await codex.status().catch((error: unknown) => noCodex(error instanceof Error ? error.message : String(error)));
     try {
-      return { ...vercel, claude: await tokens.status(), codex: codexAccess, check };
+      return { ...vercel, claude: await tokens.status(), codex: codexAccess, opencode: { providers: await opencode.providers() }, check };
     } catch (error) {
-      return { ...vercel, claude: {}, codex: codexAccess, check, error: vercel.error ?? (error instanceof Error ? error.message : String(error)) };
+      return { ...vercel, claude: {}, codex: codexAccess, opencode: { providers: [] }, check, error: vercel.error ?? (error instanceof Error ? error.message : String(error)) };
     }
   };
   /** Every change refreshes Settings and answers with the whole status. */
@@ -117,6 +121,8 @@ export function createCloudHandlers({ settings, tokens, checks, codex, sandboxes
     "cloud.codex.cancel": () => changed(() => codex.cancel()),
     "cloud.codex.apiKey": ({ key }) => changed(() => codex.saveApiKey(key)),
     "cloud.codex.remove": () => changed(() => codex.remove()),
+    "cloud.opencode.saveKey": ({ provider, key }) => changed(() => opencode.save(provider, key)),
+    "cloud.opencode.removeKey": ({ provider }) => changed(() => opencode.remove(provider)),
     "cloud.check": () => changed(() => checks.start()),
     "cloud.sandboxes": () => sandboxes.list(),
     "cloud.offer": async () => {

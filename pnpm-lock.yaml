@@ -619,6 +619,9 @@ importers:
       '@openorc/git':
         specifier: workspace:*
         version: link:../git
+      '@openorc/protocol':
+        specifier: workspace:*
+        version: link:../protocol
       '@vercel/sandbox':
         specifier: 3.9.1
         version: 3.9.1
@@ -626,9 +629,6 @@ importers:
       '@openorc/mcp':
         specifier: workspace:*
         version: link:../mcp
-      '@openorc/protocol':
-        specifier: workspace:*
-        version: link:../protocol
       '@types/node':
         specifier: ^24.0.0
         version: 24.13.4

@@ -54,6 +54,8 @@ export interface OpenOrcOptions {
    * asked about. Pass a probe to test that path on purpose.
    */
   shellProbe?: ShellProbe;
+  /** The environment the core starts from instead of this process's, so two cores in one test keep their agent folders apart. */
+  shellEnv?: NodeJS.ProcessEnv;
   /** Serves the bench.* methods, which stream synthetic events and write a synthetic thread into the ledger. Development and QA builds only. */
   benchmarks?: boolean;
   /**
@@ -80,6 +82,8 @@ export interface OpenOrcOptions {
   cloudOnly?: boolean;
   /** Keeps the Codex login cloud sandboxes use, separate from this Mac's own. */
   codexCloudSecrets?: ProtectedSecretStore;
+  /** Keeps OpenCode's provider keys for the cloud, entered for the cloud only. */
+  opencodeCloudSecrets?: ProtectedSecretStore;
   /** Starts a command in a terminal of its own, for CLIs whose sign-in screens need one. Without it they get pipes. */
   terminal?: SpawnTerminal;
   /** Overrides the credentials Settings keeps, for tests and smoke scripts. While it resolves to null, new cloud conversations run in sandboxes on this Mac. */

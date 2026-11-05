@@ -22,3 +22,20 @@ export { readClaudeUsage, type ClaudeUsageResult, type ClaudeUsageOptions } from
 export { SHARED_CLAUDE_CONFIG_DIR, claudeConfigDir } from "./claude/config-dir.js";
 export { StdioJsonRpc, stripAnsi } from "./jsonrpc.js";
 export { listClaudeSessions, listCodexSessions, readClaudeSession, readCodexSession, claudeProjectDir, codexSessionsDir, type SessionFile, type ImportedSession, type SessionCache } from "./import.js";
+export {
+  releaseOf,
+  sessionId,
+  SessionRefused,
+  type AgentHome,
+  type HeadlessRun,
+  type HostHome,
+  type PackedSession,
+  type RunSettings,
+  type SavedSession,
+  type SessionId,
+  type SessionRef,
+  type SessionSlot,
+} from "./session-slot.js";
+export { sessionSlots, slotFor } from "./session-slots.js";
+export { hostHome } from "./host-home.js";
+export { claudeSessionFile } from "./claude/session-slot.js";

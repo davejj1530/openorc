@@ -6,6 +6,14 @@ import type { AgentHost } from "./agent-host.js";
  * Callers capture it before awaiting so a later shell refresh cannot split a
  * binary from the PATH and credentials/configuration it was resolved under.
  */
+/**
+ * The environment for a process started in `cwd`. Some CLIs (OpenCode) take their folder from PWD rather than the
+ * process's own working directory, so an inherited PWD would put their sessions and instructions in the wrong folder.
+ */
+export function inFolder<E extends NodeJS.ProcessEnv | Record<string, string>>(env: E, cwd: string): E {
+  return { ...env, PWD: cwd };
+}
+
 export interface AgentLaunchEnvironment {
   readonly scope?: string;
   readonly revision: number;

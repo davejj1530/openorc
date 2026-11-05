@@ -1,3 +1,4 @@
+import { cloudWorkspaceSessionBaseMigration } from "./cloud-workspace-schema.js";
 import { relocationMigrations } from "./relocation-schema.js";
 
 /**
@@ -14,4 +15,4 @@ CREATE INDEX IF NOT EXISTS memory_tombstones_project ON memory_tombstones(projec
 `;
 
 /** What the Mac and its cloud brain keep about each other's work, in order. */
-export const cloudBrainMigrations = [...relocationMigrations, memoryTombstoneMigration];
+export const cloudBrainMigrations = [...relocationMigrations, memoryTombstoneMigration, cloudWorkspaceSessionBaseMigration];

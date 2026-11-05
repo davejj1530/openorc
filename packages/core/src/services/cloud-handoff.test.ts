@@ -8,7 +8,7 @@ import { settings } from "@openorc/db";
 import { commitAll, git } from "@openorc/git";
 import type { Project } from "@openorc/protocol";
 import { OpenOrc } from "../openorc.js";
-import { claudeSessionFile } from "./cloud-sessions.js";
+import { claudeSessionFile } from "@openorc/agents";
 import { inheritedProbe } from "./shell-environment.js";
 
 /**

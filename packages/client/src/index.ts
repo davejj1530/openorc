@@ -3,7 +3,7 @@ export { pageHost, pageLabel, publicAddress } from "./browser-page.js";
 export { isUnifiedDiff, toolDiff } from "./chat-diff.js";
 export { createClientState, type ClientState, type ClientStateOptions } from "./client-state.js";
 export {
-  brainMove,
+  offersBrainMove,
   canMoveToCloud,
   cloudStartBlocked,
   ownerMark,

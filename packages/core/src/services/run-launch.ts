@@ -20,7 +20,7 @@ import {
 } from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
 import type { Logger } from "../transport.js";
-import { CLOUD_AGENTS, CLOUD_HARNESSES, type CloudRunHost } from "./cloud-workspaces.js";
+import type { CloudRunHost } from "./cloud-workspaces.js";
 import { executionFolder } from "./conversation-folder.js";
 import {
   working,
@@ -194,7 +194,6 @@ export class RunLaunch {
     // Captured before the spec is built, so the prompt the provider receives can carry the outside-changes note.
     const outside = await this.captureTurnStart(input, lease);
     const cloud = await connecting;
-    if (cloud && !CLOUD_HARNESSES.has(input.agent)) throw new Error(CLOUD_AGENTS);
     phase("cloud");
     const spec = this.runSpec(prepared, lease, internalMcp, outside, cloud?.cwd);
     assertAdmission();

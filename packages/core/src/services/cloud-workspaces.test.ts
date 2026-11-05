@@ -131,6 +131,68 @@ describe("a cloud workspace's last pull", () => {
   });
 });
 
+describe("what a sandbox got of its conversation's session", () => {
+  it("is handed to each turn's keep and replaced by what it returns, and recorded again when a new sandbox is seeded", async () => {
+    const base = (n: number) => ({ sessionId: "s-1", host: `h${n}`, sandbox: `b${n}` });
+    const given: unknown[] = [];
+    const sessions = { send: async () => base(0), keep: async (_t: unknown, _l: unknown, _p: unknown, previous: unknown) => (given.push(previous), base(given.length)) };
+    // The agent's CLI is looked for before its session goes in: a stand-in here, never the person's own.
+    const bin = path.join(directory, "bin-base");
+    await mkdir(bin, { recursive: true });
+    await writeFile(path.join(bin, "claude"), "#!/bin/sh\necho 2.1.317\n", { mode: 0o755 });
+    const local = new LocalSandboxProvider(path.join(directory, "sandboxes-base"), () => ({ ...process.env, PATH: `${bin}:${process.env["PATH"] ?? ""}` }));
+    const cloud = new CloudWorkspaceService(db, { providers: [local], sessions: sessions as never }, quiet);
+    const workspaces = new WorkspaceService(db, { dataDir: path.join(directory, "data-base"), cloud }, quiet, new WorkspaceWriters());
+    try {
+      const thread = db.transaction(() => {
+        const created = threads.insert(db, { projectId: project.id, title: "Based", agent: "claude", model: null, mode: "act", permissionMode: "trusted", workspaceMode: "worktree" });
+        workspaces.admitCloud(created.id, "local");
+        return created;
+      });
+      const prepared = await workspaces.prepareThread(thread, project, "HEAD");
+      await cloud.sync(prepared, { turnEnded: true });
+      await cloud.sync(prepared, { turnEnded: true });
+      expect(given).toEqual([null, base(1)]);
+      expect(cloud.get(thread.id)?.sessionBase).toEqual(base(2));
+      // A removed sandbox forgets it; the next one is seeded with the session and records what it got.
+      cloudWorkspaces.removed(db, thread.id);
+      expect(cloud.get(thread.id)?.sessionBase).toBeNull();
+      await cloud.prepare(prepared, project);
+      await cloud.sync(prepared, { turnEnded: true });
+      expect(given.at(-1)).toEqual(base(0));
+    } finally {
+      await workspaces.shutdown();
+    }
+  });
+
+  it("comes with a standby that took over, so its first keep compares against what the standby last sent", () => {
+    const cloud = new CloudWorkspaceService(db, { providers: [sandboxes] }, quiet);
+    const thread = threads.insert(db, { projectId: project.id, title: "Adopted", agent: "codex", model: null, mode: "act", permissionMode: "trusted", workspaceMode: "worktree" });
+    const sent = { sessionId: "s-2", host: "h", sandbox: "b" };
+    cloud.adopt({ threadId: thread.id, provider: "local", sandbox: `openorc-${thread.id}` }, { snapshot: null, tree: "t".repeat(40), head: null, known: [] }, sent);
+    expect(cloud.get(thread.id)?.sessionBase).toEqual(sent);
+  });
+});
+
+describe("an agent in a sandbox for a turn", () => {
+  it("is brought to this host's version on a real sandbox, with its own folders, and left alone on one simulated here", async () => {
+    const runs: string[][] = [];
+    const sandbox = {
+      exec: async (cmd: string, args: string[]) => {
+        runs.push([cmd, ...args]);
+        return cmd === "sh" ? { code: 0, stdout: Buffer.from("opencode v2.0.10\n"), stderr: "" } : { code: 0, stdout: Buffer.alloc(0), stderr: "" };
+      },
+    };
+    const location = { install: { sandbox, state: "/sandbox/.openorc" }, repo: "/sandbox/repo" } as never;
+    const cloud = new CloudWorkspaceService(db, { providers: [sandboxes], versions: async (agent) => (agent === "opencode" ? "2.0.11" : null) }, quiet);
+    expect(await cloud.turnEnv({ agent: "opencode", model: "opencode/free" }, location, "vercel")).toEqual({ XDG_DATA_HOME: "/sandbox/.openorc/opencode" });
+    expect(runs.filter(([cmd]) => cmd === "npm")).toEqual([["npm", "install", "-g", "@opencode/cli@2.0.11"]]);
+    runs.length = 0;
+    await cloud.turnEnv({ agent: "opencode", model: "opencode/free" }, location, "local");
+    expect(runs.filter(([cmd]) => cmd === "npm")).toEqual([]);
+  });
+});
+
 describe("where cloud conversations run", () => {
   it("puts new conversations on Vercel once it is connected, and on this Mac until then", async () => {
     let access: { token: string; teamId: string; projectId: string } | null = null;
@@ -139,7 +201,8 @@ describe("where cloud conversations run", () => {
     access = { token: "tok", teamId: "team", projectId: "proj" };
     expect(await cloud.place({ agent: "claude" }, project)).toBe("vercel");
     await expect(cloud.place({ agent: "codex" }, project)).rejects.toThrow("Codex has no sign-in for the cloud.");
-    await expect(cloud.place({ agent: "opencode" }, project)).rejects.toThrow("Only Claude and Codex run in cloud workspaces so far.");
+    expect(await cloud.place({ agent: "opencode", model: "opencode/free-model" }, project)).toBe("vercel");
+    await expect(cloud.place({ agent: "opencode", model: "openrouter/acme/fast" }, project)).rejects.toThrow("OpenCode has no key for OpenRouter in the cloud. Add one in Settings > Cloud.");
   });
 
   it("lets a provider passed in take new conversations, whatever is connected", async () => {

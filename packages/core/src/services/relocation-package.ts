@@ -1,12 +1,13 @@
 import { mkdir, mkdtemp, readdir, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { gunzipSync, gzipSync } from "node:zlib";
+import type { PackedSession, SessionId } from "@openorc/agents";
 import type { ThreadRows } from "@openorc/db";
 import { git, pinObject, switchFiles, treeHash, worktree as worktrees } from "@openorc/git";
-import { SESSION_ID, type Brain, type Thread } from "@openorc/protocol";
+import { HarnessId, SESSION_ID, type Brain, type Thread } from "@openorc/protocol";
 import { z } from "zod";
-import type { RelocatedSession } from "./cloud-sessions.js";
 import { checkpointRefs, snapshotRefs } from "./checkpoint-refs.js";
 
 /**
@@ -14,7 +15,7 @@ import { checkpointRefs, snapshotRefs } from "./checkpoint-refs.js";
  * code as one git bundle of its branch, its uncommitted work and its checkpoints. The same format both ways.
  */
 export interface RelocationPackage {
-  v: 1;
+  v: 2;
   relocation: string;
   from: Brain;
   /** The Mac project the thread belongs to, whichever brain packs it. */
@@ -25,7 +26,8 @@ export interface RelocationPackage {
   worktree: string;
   /** Attachments and tool images the rows name, by their path under the data folder. */
   files: { path: string; bytes: Buffer }[];
-  session: RelocatedSession | null;
+  /** The agent's saved conversation, as its slot exported it with the CLI version that wrote it. */
+  session: PackedSession | null;
   code: {
     branch: string;
     head: string;
@@ -52,11 +54,13 @@ const MAGIC = Buffer.from("OPENORC-THREAD-1\n");
 const MAX_BYTES = 2 ** 31;
 const FILE_PATH = /^(attachments\/[A-Za-z0-9][A-Za-z0-9._-]{0,254}|tool-images\/[A-Za-z0-9-]{1,100}\/[A-Za-z0-9][A-Za-z0-9._-]{0,254})$/;
 const COMMIT = /^[0-9a-f]{40,64}$/;
+const SHA256 = /^[0-9a-f]{64}$/;
+const sha256 = (bytes: Buffer) => createHash("sha256").update(bytes).digest("hex");
 const ID = z.string().min(1).max(200);
 
 const Header = z
   .object({
-    v: z.literal(1),
+    v: z.literal(2),
     relocation: ID,
     from: z.enum(["mac", "cloud"]),
     macProject: ID,
@@ -66,7 +70,17 @@ const Header = z
     // How many tasks travel: a brain from before tasks moved refuses this unknown field rather than drop them.
     tasks: z.number().int().positive().optional(),
     files: z.array(z.object({ path: z.string().regex(FILE_PATH), size: z.number().int().nonnegative() })).max(100_000),
-    session: z.object({ agent: z.literal("claude"), accountId: ID, sessionId: z.string().regex(SESSION_ID), text: z.string() }).nullable(),
+    session: z
+      .object({
+        agent: HarnessId,
+        format: z.number().int().positive(),
+        cliVersion: z.string().min(1).max(64),
+        sessionId: z.string().regex(SESSION_ID),
+        meta: z.record(z.string().max(64), z.union([z.string().max(4096), z.number(), z.boolean(), z.null()])),
+        parts: z.array(z.object({ name: z.string().min(1).max(512), size: z.number().int().nonnegative(), sha256: z.string().regex(SHA256) })).max(10_000),
+      })
+      .strict()
+      .nullable(),
     code: z.object({
       branch: z
         .string()
@@ -81,18 +95,20 @@ const Header = z
   .strict();
 
 export function encodePackage(pkg: RelocationPackage): Buffer {
-  const { files, code, ...rest } = pkg;
+  const { files, code, session, ...rest } = pkg;
   const tasks = pkg.rows.tables.tasks?.length;
+  const parts = session?.parts ?? [];
   const header = {
     ...rest,
     ...(tasks ? { tasks } : {}),
     files: files.map((file) => ({ path: file.path, size: file.bytes.length })),
+    session: session && { ...session, parts: parts.map((part) => ({ name: part.name, size: part.bytes.length, sha256: sha256(part.bytes) })) },
     code: { ...code, bundle: undefined, size: code.bundle.length },
   };
   const json = gzipSync(Buffer.from(JSON.stringify(header)));
   const length = Buffer.alloc(8);
   length.writeBigUInt64BE(BigInt(json.length));
-  return Buffer.concat([MAGIC, length, json, ...files.map((file) => file.bytes), code.bundle]);
+  return Buffer.concat([MAGIC, length, json, ...files.map((file) => file.bytes), ...parts.map((part) => part.bytes), code.bundle]);
 }
 
 /** Checks a package at the boundary: its format, sizes and every name it would write. Throws RelocationRefused. */
@@ -104,12 +120,8 @@ export function decodePackage(bytes: Buffer): RelocationPackage {
   const start = MAGIC.length + 8;
   const length = Number(bytes.readBigUInt64BE(MAGIC.length));
   if (start + length > bytes.length) refuse("it is cut short");
-  let parsed: z.infer<typeof Header>;
-  try {
-    parsed = Header.parse(JSON.parse(gunzipSync(bytes.subarray(start, start + length)).toString("utf8")));
-  } catch {
-    return refuse("its header does not read");
-  }
+  const parsed = readHeader(bytes.subarray(start, start + length));
+  if (typeof parsed === "string") return refuse(parsed);
   let offset = start + length;
   const take = (size: number) => {
     const slice = bytes.subarray(offset, offset + size);
@@ -117,15 +129,44 @@ export function decodePackage(bytes: Buffer): RelocationPackage {
     return Buffer.from(slice);
   };
   const files = parsed.files.map((file) => ({ path: file.path, bytes: take(file.size) }));
+  const parts = (parsed.session?.parts ?? []).map((part) => ({ name: part.name, bytes: take(part.size), sha256: part.sha256 }));
   const bundle = take(parsed.code.size);
   if (offset !== bytes.length) refuse("its sizes do not add up");
   if ((parsed.tasks ?? 0) !== (parsed.rows.tables["tasks"]?.length ?? 0)) refuse("its tasks do not add up");
+  const wrongSession = sessionMismatch(parsed, parts);
+  if (wrongSession) refuse(wrongSession);
   // A run's session id names the session's file here once the thread resumes, so it is a plain name or nothing.
   if ((parsed.rows.tables["runs"] ?? []).some(({ external_session_id: id }) => id != null && !(typeof id === "string" && SESSION_ID.test(id))))
     refuse("a run names a session that is not a plain name");
   const { size: _size, ...code } = parsed.code;
-  const { tasks: _tasks, ...header } = parsed;
-  return { ...header, rows: parsed.rows as ThreadRows, files, code: { ...code, bundle } };
+  const { tasks: _tasks, session, ...rest } = parsed;
+  return {
+    ...rest,
+    rows: parsed.rows as ThreadRows,
+    files,
+    session: session && { ...session, sessionId: session.sessionId as SessionId, parts: parts.map(({ name, bytes }) => ({ name, bytes })) },
+    code: { ...code, bundle },
+  };
+}
+
+/** The header, or why it does not read; one from another version of OpenOrc is named as such. */
+function readHeader(gzipped: Buffer): z.infer<typeof Header> | string {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(gunzipSync(gzipped).toString("utf8"));
+  } catch {
+    return "its header does not read";
+  }
+  if (typeof raw === "object" && raw !== null && "v" in raw && raw.v !== 2) return "it was packed by another version of OpenOrc. Try again";
+  const header = Header.safeParse(raw);
+  return header.success ? header.data : "its header does not read";
+}
+
+/** Why the session's parts are not the header's, or not its thread's agent's; null when they are. */
+function sessionMismatch(header: z.infer<typeof Header>, parts: { bytes: Buffer; sha256: string }[]): string | null {
+  if (parts.some((part) => sha256(part.bytes) !== part.sha256)) return "its session does not match what its header says";
+  if (header.session && header.session.agent !== header.rows.tables["threads"]?.[0]?.["agent"]) return "its session belongs to another agent";
+  return null;
 }
 
 /** The data folder's files the rows name: attachments by path or asset URL, and every tool image of their runs. */
@@ -196,7 +237,7 @@ export interface PackInput {
   thread: Thread;
   /** The tasks that move with it, whose snapshots go in the bundle. */
   tasks: readonly string[];
-  session: RelocatedSession | null;
+  session: RelocationPackage["session"];
   /** Commits the target is known to have. */
   since: readonly string[];
 }
@@ -207,7 +248,7 @@ export async function packThread(input: PackInput): Promise<RelocationPackage> {
   const code = await packCode(input.root, { ...thread, worktreePath: thread.worktreePath, branch: thread.branch }, input.tasks, input.since);
   const rows = input.rows();
   return {
-    v: 1,
+    v: 2,
     relocation: input.relocation,
     from: input.from,
     macProject: input.macProject,

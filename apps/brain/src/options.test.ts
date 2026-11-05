@@ -66,7 +66,8 @@ describe("brainOptions", () => {
 
   it("keeps its sealed stores and none for Slack or the Vercel connection", async () => {
     const brain = (await options(null)).options;
-    for (const option of ["remoteSecrets", "pushSecrets", "claudeCloudSecrets", "codexCloudSecrets", "memorySecrets", "githubSecrets"] as const) expect(brain[option]).toBeDefined();
+    for (const option of ["remoteSecrets", "pushSecrets", "claudeCloudSecrets", "codexCloudSecrets", "opencodeCloudSecrets", "memorySecrets", "githubSecrets"] as const)
+      expect(brain[option]).toBeDefined();
     expect(brain.slackSecrets).toBeUndefined();
     expect(brain.cloudSecrets).toBeUndefined();
   });

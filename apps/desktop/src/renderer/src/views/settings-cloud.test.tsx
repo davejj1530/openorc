@@ -22,6 +22,7 @@ const status: CloudStatus = {
   vercel: { team: { id: "team_a", name: "Acme" }, project: "openorc-sandboxes", vcpus: null, region: "sin1" },
   claude: {},
   codex: { mode: null, email: null, plan: null, refreshedAt: null, signingIn: false, error: null },
+  opencode: { providers: [] },
   check: null,
   takeover: false,
   error: null,

@@ -5,6 +5,7 @@ import path from "node:path";
 import type { Writable } from "node:stream";
 import { launchCommand } from "./command-launch.js";
 import { stopProcess } from "./process-lifetime.js";
+import { inFolder } from "./launch-environment.js";
 
 interface ProcessReceipt {
   pid: number;
@@ -45,7 +46,8 @@ function remove(file: string): void {
 
 /** The provider cannot execute until its process identity is durably retained. */
 export function spawnAgentProcess(binary: string, args: string[], options: LaunchOptions): ChildProcessWithoutNullStreams {
-  const { registry, ...launch } = options;
+  const { registry, ...rest } = options;
+  const launch = { ...rest, env: inFolder(rest.env, rest.cwd) };
   if (!registry || process.platform === "win32") {
     const command = launchCommand(binary, args);
     return spawn(command.file, command.args, { ...launch, ...command.options, stdio: ["pipe", "pipe", "pipe"], detached: process.platform !== "win32" });

@@ -79,6 +79,8 @@ const HANDOVER: { [K in HandoverKind]: Take<K> } = {
   push: ({ core }, key) => (key ? core.remote.setPushKey(key.keyId, key.pem) : core.remote.removePushKey()),
   // Kept where the core keeps its own, sealed on the brain's disk; only its distilling reads it, never an agent.
   memory: ({ core }, value) => core.memory.takeApiKey(value?.apiKey ?? null),
+  // Read by a cloud turn only for the provider of its model, and handed to that turn alone.
+  opencode: ({ core }, value) => core.openCodeCloudKeys.adopt(value?.keys ?? []),
 };
 const HANDOVER_KINDS = Object.keys(HANDOVER) as HandoverKind[];
 
@@ -223,7 +225,14 @@ export function controlHandlers({ core, key, layout, github, stop, answering }: 
     },
     "sign-ins": async () => {
       const apiKey = await core.memory.apiKey();
-      return { codex: await core.codexCloudLogin.heldId(), github: github.print(), push: (await core.remote.status()).push.keyId, memory: apiKey && signInPrint({ apiKey }) };
+      const keys = (await core.openCodeCloudKeys.all()).sort((a, b) => (a.provider < b.provider ? -1 : 1));
+      return {
+        codex: await core.codexCloudLogin.heldId(),
+        github: github.print(),
+        push: (await core.remote.status()).push.keyId,
+        memory: apiKey && signInPrint({ apiKey }),
+        opencode: keys.length ? signInPrint({ keys }) : null,
+      };
     },
     stop: async () => {
       setImmediate(stop);

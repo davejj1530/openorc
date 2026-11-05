@@ -4,6 +4,7 @@
  * it reads; a parse error names the field and never repeats a value, since lines carry keys and tokens.
  */
 import { createHash, randomBytes } from "node:crypto";
+import type { HarnessId } from "@openorc/protocol";
 import type { VercelConnection } from "../vercel-sandbox.js";
 import { openSecret, sealSecret } from "./sealed-file.js";
 
@@ -239,6 +240,8 @@ export interface HandoverValues {
   push: { keyId: string; pem: string } | null;
   /** The Anthropic API key the Mac's memory distils with, while it does; the brain's memory then distils with it too. */
   memory: { apiKey: string } | null;
+  /** OpenCode's provider keys entered on the Mac for the cloud; the brain's cloud turns use the one their model needs. */
+  opencode: { keys: { provider: string; key: string }[] } | null;
 }
 export type HandoverKind = keyof HandoverValues;
 export type BrainHandover = Partial<HandoverValues>;
@@ -266,6 +269,7 @@ const HANDOVER: { [K in HandoverKind]: Parse<HandoverValues[K]> } = {
   github: nullable(object({ token: text(4096), name: nullable(text(255)), email: nullable(text(320)) })),
   push: nullable(object({ keyId: text(64), pem: text(8192) })),
   memory: nullable(object({ apiKey: text(4096) })),
+  opencode: nullable(object({ keys: list(object({ provider: text(64, /^[a-z0-9][a-z0-9._-]*$/), key: text(1000) }), 100) })),
 };
 
 export type BrainControlRequest =
@@ -362,8 +366,11 @@ export interface BrainControlResults {
   "copies-current": { marked: number };
   /** False when the brain has no copy of that project. */
   "project-settings": { applied: boolean };
-  /** The id of the Codex login it holds, the signInPrint of its GitHub sign-in and of its memory key, and its push key's id; null for none. */
-  "sign-ins": { codex: string | null; github: string | null; push: string | null; memory: string | null };
+  /**
+   * The id of the Codex login it holds, the signInPrint of its GitHub sign-in, of its memory key and of its OpenCode keys,
+   * and its push key's id; null for none. A brain from before OpenCode keys names none.
+   */
+  "sign-ins": { codex: string | null; github: string | null; push: string | null; memory: string | null; opencode?: string | null };
   phones: { phones: BrainPhone[] };
   "remove-phone": { phones: BrainPhone[] };
   stop: { stopping: true };
@@ -412,7 +419,7 @@ const REQUESTS = variants<BrainControlRequest>({
   pair: object({ op: literal("pair") }),
   handover: object({
     op: literal("handover"),
-    sealed: object({}, { claude: sealedText, codex: sealedText, github: sealedText, push: sealedText, memory: sealedText } satisfies Record<HandoverKind, Parse<string>>),
+    sealed: object({}, { claude: sealedText, codex: sealedText, github: sealedText, push: sealedText, memory: sealedText, opencode: sealedText } satisfies Record<HandoverKind, Parse<string>>),
   }),
   "import-project": object({ op: literal("import-project"), source: projectSource, name: folderName, branch: branchName, bundle: text(255, /^\w[\w.-]*$/) }, { origin: text(2048) }),
   "remove-project": object({ op: literal("remove-project"), source: projectSource }),
@@ -450,7 +457,7 @@ const RESULTS: { [K in BrainControlOp]: Parse<BrainControlResults[K]> } = {
   projects: object({ copies: list(object({ source: projectSource, projectId: text(100), macHead: commit, head: commit, threads: count }), 10_000) }),
   "copies-current": object({ marked: count }),
   "project-settings": object({ applied: literal(true, false) }),
-  "sign-ins": object({ codex: nullable(text(100)), github: nullable(text(64)), push: nullable(text(64)), memory: nullable(text(64)) }),
+  "sign-ins": object({ codex: nullable(text(100)), github: nullable(text(64)), push: nullable(text(64)), memory: nullable(text(64)) }, { opencode: nullable(text(64)) }),
   phones,
   "remove-phone": phones,
   stop: object({ stopping: literal(true) }),
@@ -487,7 +494,14 @@ export function sealHandover(key: BrainKey, handover: BrainHandover): HandoverRe
     const value = handover[kind];
     return value === undefined ? undefined : sealSecret(key, handoverChannel(kind), Buffer.from(JSON.stringify(value), "utf8")).toString("base64url");
   };
-  const sealed: { [K in HandoverKind]-?: string | undefined } = { claude: seal("claude"), codex: seal("codex"), github: seal("github"), push: seal("push"), memory: seal("memory") };
+  const sealed: { [K in HandoverKind]-?: string | undefined } = {
+    claude: seal("claude"),
+    codex: seal("codex"),
+    github: seal("github"),
+    push: seal("push"),
+    memory: seal("memory"),
+    opencode: seal("opencode"),
+  };
   return { op: "handover", sealed };
 }
 
@@ -499,6 +513,13 @@ export function openHandover(key: BrainKey, request: HandoverRequest): BrainHand
     const plain = openSecret(key, handoverChannel(kind), Buffer.from(sealed, "base64url")).toString("utf8");
     return parseLine(`The handed-over ${kind}`, HANDOVER[kind], plain);
   };
-  const handover: { [K in HandoverKind]: HandoverValues[K] | undefined } = { claude: open("claude"), codex: open("codex"), github: open("github"), push: open("push"), memory: open("memory") };
+  const handover: { [K in HandoverKind]: HandoverValues[K] | undefined } = {
+    claude: open("claude"),
+    codex: open("codex"),
+    github: open("github"),
+    push: open("push"),
+    memory: open("memory"),
+    opencode: open("opencode"),
+  };
   return handover;
 }

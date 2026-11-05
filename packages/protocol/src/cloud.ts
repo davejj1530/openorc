@@ -125,6 +125,8 @@ export interface CloudStatus {
   /** By Claude account id. */
   claude: Record<string, ClaudeCloudAccess>;
   codex: CodexCloudAccess;
+  /** OpenCode's provider keys for the cloud, by provider id, entered for the cloud only; the keys never leave the core. */
+  opencode: { providers: string[] };
   /** The last cloud check since OpenOrc started; null before one ran. */
   check: CloudCheck | null;
   /** Working conversations in a worktree move to the cloud when this Mac goes to sleep. */
@@ -134,6 +136,8 @@ export interface CloudStatus {
 }
 
 const Token = z.string().trim().min(8).max(1000);
+/** A provider as OpenCode names it in a model id, `provider/model`. */
+export const OpenCodeProviderId = z.string().regex(/^[a-z0-9][a-z0-9._-]{0,63}$/);
 
 export const cloudRpcParams = {
   "cloud.status": z.object({}),
@@ -159,6 +163,9 @@ export const cloudRpcParams = {
   "cloud.codex.cancel": z.object({}),
   "cloud.codex.apiKey": z.object({ key: Token }).strict(),
   "cloud.codex.remove": z.object({}),
+  /** An API key for one of OpenCode's providers, used only by cloud turns whose model that provider serves. */
+  "cloud.opencode.saveKey": z.object({ provider: OpenCodeProviderId, key: Token }).strict(),
+  "cloud.opencode.removeKey": z.object({ provider: OpenCodeProviderId }).strict(),
   /** Starts a cloud check where new cloud threads would run; its progress arrives in `cloud.status`. */
   "cloud.check": z.object({}),
   "cloud.sandboxes": z.object({}),
@@ -199,6 +206,8 @@ export interface CloudRpcResults extends CloudBrainRpcResults, BrainSyncRpcResul
   "cloud.codex.cancel": CloudStatus;
   "cloud.codex.apiKey": CloudStatus;
   "cloud.codex.remove": CloudStatus;
+  "cloud.opencode.saveKey": CloudStatus;
+  "cloud.opencode.removeKey": CloudStatus;
   "cloud.check": CloudStatus;
   "cloud.sandboxes": CloudSandbox[];
   "cloud.offer": CloudOffer;

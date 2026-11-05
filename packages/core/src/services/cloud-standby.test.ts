@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { LocalSandboxProvider } from "@openorc/cloud";
-import { runs, settings } from "@openorc/db";
+import { cloudWorkspaces, runs, settings } from "@openorc/db";
 import { commitAll, git } from "@openorc/git";
 import type { Project } from "@openorc/protocol";
 import { OpenOrc } from "../openorc.js";
@@ -153,6 +153,8 @@ it("carries a turn on in the cloud when this Mac goes to sleep, and brings it in
   expect(core.runs.liveRunForThread(thread.id)).toBeNull();
   // What the sandbox did reaches the worktree, and its turn is in the conversation.
   await until(() => existsSync(path.join(worktree, "carried-on.txt")));
+  // The session the sandbox carried on came back, and what the sandbox now holds is recorded for the next turn's end.
+  expect(cloudWorkspaces.get(core.db, thread.id)?.sessionBase?.sessionId).toBe(sessionId);
   const last = runs.listForThread(core.db, thread.id).at(-1)!;
   expect(last).toMatchObject({ state: "success", externalSessionId: sessionId, resultText: "Carried on in the cloud" });
   expect(core.threads.messages(thread.id).map((message) => message.text)).toContain("This Mac went to sleep, so the turn carried on in the cloud.");

@@ -65,6 +65,7 @@ class FakeBrain implements BrainMachineLike {
     if (opened.github !== undefined) this.holds.github = opened.github && signInPrint(opened.github);
     if (opened.push !== undefined) this.holds.push = opened.push?.keyId ?? null;
     if (opened.memory !== undefined) this.holds.memory = opened.memory && signInPrint(opened.memory);
+    if (opened.opencode !== undefined) this.holds.opencode = opened.opencode && signInPrint(opened.opencode);
     return { applied: kinds } as never;
   }
   async importProject(): Promise<never> {
@@ -127,6 +128,7 @@ let record: ReturnType<typeof memoryStore>;
 let claudeTokens: ReturnType<typeof memoryStore>;
 let push: ReturnType<typeof memoryStore>;
 let memoryKey: ReturnType<typeof memoryStore>;
+let opencodeKeys: ReturnType<typeof memoryStore>;
 let ghToken: string;
 let env: NodeJS.ProcessEnv;
 /** The brain this Mac's build carries. */
@@ -149,6 +151,7 @@ async function open(): Promise<void> {
     cloudBrainSecrets: record,
     pushSecrets: push,
     memorySecrets: memoryKey,
+    opencodeCloudSecrets: opencodeKeys,
     cloudCredentials: async () => ({ token: "vcp_fixture-vercel-token-0123456789", teamId: "team_fixture", projectId: "prj_sandboxes" }),
     cloudBrainBundle: async () => ({ version: carried, read: async () => Buffer.from("archive") }),
     cloudBrainMachine: async () => brain,
@@ -191,6 +194,7 @@ beforeEach(async () => {
   claudeTokens = memoryStore();
   push = memoryStore();
   memoryKey = memoryStore();
+  opencodeKeys = memoryStore();
   await open();
 });
 
@@ -314,6 +318,29 @@ describe("the cloud brain's sign-ins besides Claude", () => {
     await call("memory.settings.set", { apiKey: "" });
     await vi.waitFor(() => expect(brain.others()).toEqual({ memory: null }));
     await vi.waitFor(async () => expect((await signIns()).memory).toEqual({ has: false, behind: false }));
+  });
+
+  it("hands the brain OpenCode's cloud keys, again when they change, and takes them away when the last is removed", async () => {
+    await setUp();
+    await call("cloud.opencode.saveKey", { provider: "openrouter", key: "sk-or-fixture-key-1" });
+    await vi.waitFor(() => expect(brain.others()).toEqual({ opencode: { keys: [{ provider: "openrouter", key: "sk-or-fixture-key-1" }] } }));
+    expect(kept()).not.toContain("sk-or-fixture-key-1");
+    expect(await call("cloud.status", {})).toMatchObject({ opencode: { providers: ["openrouter"] } });
+    expect(JSON.stringify(await call("cloud.status", {}))).not.toContain("sk-or-fixture-key-1");
+    await call("cloud.opencode.saveKey", { provider: "anthropic", key: "sk-ant-fixture-key-2" });
+    await vi.waitFor(() =>
+      expect(brain.others()).toEqual({
+        opencode: {
+          keys: [
+            { provider: "anthropic", key: "sk-ant-fixture-key-2" },
+            { provider: "openrouter", key: "sk-or-fixture-key-1" },
+          ],
+        },
+      }),
+    );
+    await call("cloud.opencode.removeKey", { provider: "anthropic" });
+    await call("cloud.opencode.removeKey", { provider: "openrouter" });
+    await vi.waitFor(() => expect(brain.others()).toEqual({ opencode: null }));
   });
 
   it("gives the memory key again to a brain that lost it, though it holds nothing else", async () => {

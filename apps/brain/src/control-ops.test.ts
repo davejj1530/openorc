@@ -168,17 +168,28 @@ describe("control requests on the brain's core", () => {
   });
 
   it("says which sign-ins it holds besides Claude's, so the Mac takes its word over its own record", async () => {
-    expect(await ops()({ op: "sign-ins" })).toEqual({ codex: null, github: null, push: null, memory: null });
+    expect(await ops()({ op: "sign-ins" })).toEqual({ codex: null, github: null, push: null, memory: null, opencode: null });
     const signIn = { token: GH_TOKEN, name: null, email: "fixture@example.com" };
     const pem = generateKeyPairSync("ec", { namedCurve: "prime256v1" }).privateKey.export({ format: "pem", type: "pkcs8" }).toString();
     const codex = { id: "mac-login-1", mode: "chatgpt", auth: codexAuth("first", 0), email: null, plan: null } as const;
-    await ops()(sealHandover(start.key, { codex, github: signIn, push: { keyId: "ABC123DEFG", pem }, memory: { apiKey: MEMORY_KEY } }));
+    const keys = [{ provider: "openrouter", key: "sk-or-fixture-key" }];
+    await ops()(sealHandover(start.key, { codex, github: signIn, push: { keyId: "ABC123DEFG", pem }, memory: { apiKey: MEMORY_KEY }, opencode: { keys } }));
     expect(await ops()({ op: "sign-ins" })).toEqual({
       codex: "mac-login-1",
       github: signInPrint({ email: "fixture@example.com", name: null, token: GH_TOKEN }),
       push: "ABC123DEFG",
       memory: signInPrint({ apiKey: MEMORY_KEY }),
+      opencode: signInPrint({ keys }),
     });
+  });
+
+  it("keeps the Mac's OpenCode keys sealed, for the cloud turn whose model needs one, and drops them on null", async () => {
+    const keys = [{ provider: "openrouter", key: "sk-or-fixture-key" }];
+    expect(await ops()(sealHandover(start.key, { opencode: { keys } }))).toEqual({ applied: ["opencode"] });
+    expect(await sealedBytes()).not.toContain("sk-or-fixture-key");
+    expect(await core.openCodeCloudKeys.key("openrouter")).toBe("sk-or-fixture-key");
+    expect(await ops()(sealHandover(start.key, { opencode: null }))).toEqual({ applied: ["opencode"] });
+    expect(await core.openCodeCloudKeys.providers()).toEqual([]);
   });
 
   it("keeps the Mac's memory key sealed for its own distilling, out of every agent's sign-in, and deletes it on null", async () => {

@@ -28,6 +28,7 @@ export type MoveStep = z.infer<typeof MoveStep>;
 
 /** A thread frozen on this host while it relocates: reads answer, every write is refused. Derived from the journal. */
 export const ThreadMoving = z.object({ to: Brain, since: z.number(), step: MoveStep.optional() });
+
 export type ThreadMoving = z.infer<typeof ThreadMoving>;
 
 export const MOVING_WORDS: Record<Brain, string> = {

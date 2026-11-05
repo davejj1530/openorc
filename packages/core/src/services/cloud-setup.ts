@@ -5,7 +5,10 @@ import type { OpenOrcOptions } from "../options.js";
 import type { Logger } from "../transport.js";
 import type { ClaudeAccountService } from "./claude-accounts.js";
 import { ClaudeCloudTokens } from "./claude-cloud-tokens.js";
-import { CloudBrain } from "./cloud-brain.js";
+import { CloudBrain, type CloudBrainDeps } from "./cloud-brain.js";
+import { BrainMove, MOVE_PHONES, type BrainMoveDeps } from "./cloud-brain-move.js";
+import type { BrainRouting } from "./brain-routing.js";
+import { rememberRemovedBrain } from "../remote/removed-brains.js";
 import { machineOpener } from "./cloud-brain-machine.js";
 import { macGitHub, macMemoryKey, type SignInSources } from "./cloud-brain-signins.js";
 import type { MemoryService } from "./memory.js";
@@ -56,7 +59,10 @@ function cloudSources(options: OpenOrcOptions, settings: CloudSettings): CloudSo
   return { vercel, agent37, service };
 }
 
-/** The cloud brain as this Mac keeps it, made on the service and with the connection the Mac's sandboxes use. */
+/**
+ * The cloud brain as this Mac keeps it, made on the service and with the connection the Mac's sandboxes use, and a
+ * maker of brains kept beside it in other records while it moves to the other service.
+ */
 function cloudBrain(
   db: Db,
   options: OpenOrcOptions,
@@ -65,8 +71,10 @@ function cloudBrain(
   signIns: SignInSources,
   invalidate: (keys: string[]) => void,
   agentVersions: () => Promise<AgentVersions>,
-): CloudBrain {
-  return new CloudBrain({
+): { brain: CloudBrain; beside: BrainMoveDeps["beside"] } {
+  // "cloud" too: the brain's region is where this Mac's sandboxes run unless another is chosen.
+  const changed = () => invalidate(["cloud-brain", "cloud"]);
+  const deps: CloudBrainDeps = {
     db,
     store: options.cloudBrainSecrets,
     tokens,
@@ -74,12 +82,16 @@ function cloudBrain(
     signIns,
     agentVersions,
     bundle: options.cloudBrainBundle,
-    // "cloud" too: the brain's region is where this Mac's sandboxes run unless another is chosen.
-    changed: () => invalidate(["cloud-brain", "cloud"]),
+    changed,
     open: options.cloudBrainMachine ?? machineOpener(options.cloudRunnerFiles),
     ...(options.cloudBrainUpdateWait ? { updateWait: options.cloudBrainUpdateWait } : {}),
     ...(options.cloudBrainDoors ? { doors: options.cloudBrainDoors } : {}),
-  });
+  };
+  return {
+    brain: new CloudBrain(deps),
+    // Settings shows a brain beside this one only through the move, which follows it with `also`.
+    beside: (store, also) => new CloudBrain({ ...deps, store, phonesKey: MOVE_PHONES, changed: () => also?.() }),
+  };
 }
 
 /** What the cloud's parts are made from. */
@@ -94,8 +106,11 @@ export interface CloudInput {
   threads: () => ThreadService;
   workspaces: () => WorkspaceService;
   invalidate: (keys: string[]) => void;
-  /** The cloud brain changed: set up, removed, woken. */
-  brainChanged?: () => void;
+  /**
+   * How this Mac's windows reach the cloud brain, made after the cloud's parts: it follows the brain as it changes, and
+   * lists and lets go of a brain that moves. Null on the brain itself.
+   */
+  routing?: () => BrainRouting | null;
   /** Made after the cloud's parts, so it is reached when used. */
   memory: () => Pick<MemoryService, "choice" | "apiKey">;
   log: Logger;
@@ -131,6 +146,8 @@ export function createCloud(input: CloudInput): {
   relocations: ThreadRelocations;
   /** Null on the brain itself, which never coordinates a move. */
   coordinator: RelocationCoordinator | null;
+  /** Moves the brain to the other service; null on the brain itself, and without a store for the new one. */
+  move: BrainMove | null;
 } {
   const { db, options, accounts, environment, invalidate, log } = input;
   const settings = new CloudSettings(options.cloudSecrets, { brainRegion: () => brain.region() });
@@ -153,13 +170,13 @@ export function createCloud(input: CloudInput): {
     opencode: () => opencode.all(),
     codex: new CodexBrowserSignIn({ ...codexDeps, changed: () => invalidate(["cloud-brain"]) }),
   };
-  const brain: CloudBrain = cloudBrain(
+  const { brain, beside } = cloudBrain(
     db,
     options,
     tokens,
     sources,
     signIns,
-    (keys) => [invalidate(keys), input.brainChanged?.()],
+    (keys) => [invalidate(keys), void input.routing?.()?.refresh()],
     () => everyVersion(versions),
   );
   // On a cloud-only host the cloud login is the only one, so whether Codex is signed in changes with it.
@@ -210,7 +227,33 @@ export function createCloud(input: CloudInput): {
   const moved = (id: string) => invalidate(["threads", `thread:${id}`, "tasks", "inbox"]);
   const { relocations, coordinator } = createRelocations({ input, sessions, cloud, runs, brain, changed: moved });
   const flow = new CloudSignInsFlow({ db, tokens, codex: codexLogin, opencode, brain, mac: macSignIns(environment), changed: () => invalidate(["cloud-sign-ins"]) });
-  return { settings, tokens, codex: codexLogin, opencode, cloud, checks, sandboxes: list, handoff, standby, brain, signIns: flow, relocations, coordinator };
+  const move = brainMove(input, { brain, beside, coordinator, connections: sources });
+  return { settings, tokens, codex: codexLogin, opencode, cloud, checks, sandboxes: list, handoff, standby, brain, signIns: flow, relocations, coordinator, move };
+}
+
+/** Moving the brain to the other service: the Mac's alone, given a store for the new brain's record. */
+function brainMove(input: CloudInput, parts: Pick<BrainMoveDeps, "brain" | "beside" | "connections"> & { coordinator: RelocationCoordinator | null }): BrainMove | null {
+  const { db, options, routing } = input;
+  const { coordinator } = parts;
+  const store = options.cloudBrainMoveSecrets;
+  if (!coordinator || !store) return null;
+  return new BrainMove({
+    ...parts,
+    db,
+    store,
+    coordinator,
+    threads: async () => {
+      const link = routing?.()?.link;
+      if (!link) throw new Error("This Mac can't reach the cloud brain's threads.");
+      // Archived ones too: they keep their history, and go with the brain that holds them.
+      return link.call("threads.list", { filter: "all" }, { wake: true });
+    },
+    swapped: async (linkKey) => {
+      if (linkKey) rememberRemovedBrain(db, linkKey);
+      await routing?.()?.replaced();
+    },
+    changed: () => input.invalidate(["cloud-brain", "cloud"]),
+  });
 }
 
 /** Where each agent keeps its conversations here and in sandboxes, the one caller that moves them, and this host's CLI versions. */

@@ -1,6 +1,7 @@
 import type { CloudStatus } from "@openorc/protocol";
 import type { ClaudeCloudTokens } from "../services/claude-cloud-tokens.js";
 import type { CloudBrain } from "../services/cloud-brain.js";
+import { MOVING_WORDS, type BrainMove } from "../services/cloud-brain-move.js";
 import type { CloudChecks } from "../services/cloud-check.js";
 import type { CodexCloudLogin } from "../services/codex-cloud-login.js";
 import type { OpenCodeCloudKeys } from "../services/cloud-opencode.js";
@@ -43,6 +44,9 @@ type CloudMethod =
   | "cloud.sandboxes.remove"
   | "cloud.brain.status"
   | "cloud.brain.create"
+  | "cloud.brain.move"
+  | "cloud.brain.move.cancel"
+  | "cloud.brain.move.dismiss"
   | "cloud.brain.wake"
   | "cloud.brain.pair"
   | "cloud.brain.handover"
@@ -76,6 +80,8 @@ interface Dependencies {
   signIns: CloudSignInsFlow;
   /** Moves threads to the cloud brain and back; null on the brain itself. */
   coordinator: RelocationCoordinator | null;
+  /** Moves the brain to the other service; null where it cannot move. */
+  move: BrainMove | null;
   /** Cloud threads are offered in this build. */
   offered: boolean;
   invalidate: (keys: string[]) => void;
@@ -103,6 +109,7 @@ export function createCloudHandlers({
   brain,
   signIns,
   coordinator,
+  move,
   offered,
   invalidate,
   removed,
@@ -163,6 +170,8 @@ export function createCloudHandlers({
     },
     // With a cloud brain set up, the brain takes the thread; without one, it moves to a sandbox driven from this Mac.
     "cloud.move": async ({ threadId }) => {
+      // Until the new brain takes over, a thread sent now would go to the one that is leaving.
+      if (await move?.holding()) throw new Error(MOVING_WORDS);
       const thread = coordinator && (await coordinator.ready()) ? await coordinator.toCloud(threadId) : await handoff.move(threadId);
       invalidate(["threads", `thread:${threadId}`, "cloud"]);
       return thread;
@@ -182,7 +191,7 @@ export function createCloudHandlers({
       invalidate(["cloud"]);
       return sandboxes.list();
     },
-    ...brainHandlers(brain, removed),
+    ...brainHandlers(brain, move, removed),
     ...brainSignInHandlers(brain),
     ...signInFlowHandlers(signIns),
   };
@@ -204,30 +213,53 @@ function signInFlowHandlers(flow: CloudSignInsFlow): Pick<Handlers, Extract<Clou
 
 type SignInMethod = Extract<CloudMethod, "cloud.brain.signIns" | `cloud.brain.codex.${string}` | "cloud.brain.github">;
 
-/** The brain itself: setting it up, waking it, its projects, its cost and the phones paired with it. */
-function brainHandlers(brain: CloudBrain, removed: Dependencies["removed"]): Pick<Handlers, Exclude<Extract<CloudMethod, `cloud.brain.${string}`>, SignInMethod>> {
+/** The brain itself: setting it up, waking it, moving it, its projects, its cost and the phones paired with it. */
+function brainHandlers(brain: CloudBrain, move: BrainMove | null, removed: Dependencies["removed"]): Pick<Handlers, Exclude<Extract<CloudMethod, `cloud.brain.${string}`>, SignInMethod>> {
+  const status = () => (move ? move.status() : brain.status());
+  /** Setting up or removing waits for a move to end, which makes and removes brains itself. */
+  const settled = async () => {
+    if (await move?.busy()) throw new Error(MOVING_WORDS);
+  };
+  const moving = () => {
+    if (!move) throw new Error("The cloud brain can't move in this build.");
+    return move;
+  };
   return {
-    "cloud.brain.status": () => brain.status(),
-    "cloud.brain.create": async ({ region }) => {
-      await brain.create(region);
-      return brain.status();
+    "cloud.brain.status": status,
+    "cloud.brain.create": async ({ region, service }) => {
+      await settled();
+      await brain.create(region, service);
+      return status();
+    },
+    "cloud.brain.move": async ({ to, region }) => {
+      await moving().start(to, region);
+      return status();
+    },
+    "cloud.brain.move.cancel": async () => {
+      await moving().cancel();
+      return status();
+    },
+    "cloud.brain.move.dismiss": () => {
+      moving().dismiss();
+      return status();
     },
     "cloud.brain.wake": async () => {
       await brain.wake();
-      return brain.status();
+      return status();
     },
     "cloud.brain.pair": () => brain.pair(),
     "cloud.brain.handover": async () => {
       await brain.handover();
-      return brain.status();
+      return status();
     },
     "cloud.brain.remove": async () => {
+      await settled();
       await removeBrain(brain, removed);
-      return brain.status();
+      return status();
     },
     "cloud.brain.recount": async () => {
       await brain.recount();
-      return brain.status();
+      return status();
     },
     "cloud.brain.projects": () => brain.projects(),
     "cloud.brain.cost": () => brain.cost(),

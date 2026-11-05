@@ -22,8 +22,9 @@ export const BRAIN_SECRETS = {
   cloudSecrets: null,
   // Slack stays on the Mac.
   slackSecrets: null,
-  // The Mac keeps the key to its cloud brain; a brain sets up none.
+  // The Mac keeps the key to its cloud brain; a brain sets up none, and moves none.
   cloudBrainSecrets: null,
+  cloudBrainMoveSecrets: null,
 } as const satisfies Record<SecretOption, string | null>;
 
 type Sealed = { [K in keyof typeof BRAIN_SECRETS as (typeof BRAIN_SECRETS)[K] extends string ? K : never]: ProtectedSecretStore };

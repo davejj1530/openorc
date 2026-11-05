@@ -69,6 +69,8 @@ export class BrainRouting {
     textGeneration: BrainSyncDeps["textGeneration"];
     /** The service the brain's new threads run on, as Settings says. */
     service(): Promise<CloudService | null>;
+    /** Why a new cloud thread waits now, as while the brain moves; null when it need not. */
+    holding?(): Promise<string | null>;
     endpoint?: BrainEndpoint;
   }) {
     const { db, brain, windows, local, notificationsOn, log } = deps;
@@ -98,6 +100,7 @@ export class BrainRouting {
       wake: () => endpoint.wake(),
       updating: () => brain.installingUpdate,
       service: deps.service,
+      ...(deps.holding ? { holding: deps.holding } : {}),
       notificationsOn,
       log,
     });
@@ -166,6 +169,15 @@ export class BrainRouting {
     this.router.pages.clear();
     await this.mirrors.closeAll();
     this.windows.push({ type: "invalidate", keys: ["threads"] });
+  }
+
+  /** A move replaced the brain: what this Mac kept of the old one goes, and the link hangs up to dial the new one. */
+  async replaced(): Promise<void> {
+    if (this.active) this.link.close();
+    this.active = false;
+    this.stopFreshening();
+    await this.forget();
+    await this.refresh();
   }
 
   private stopFreshening(): void {

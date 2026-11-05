@@ -18,6 +18,8 @@ interface Kept {
 
 export interface BrainPhonesDeps {
   db: Db;
+  /** The setting they are kept under; the cloud brain's own unless given. */
+  key?: string | undefined;
   /** `work` on the brain's machine, in turn with the brain's other operations; `wake` starts the brain first. */
   machine<T>(wake: boolean, work: (machine: BrainMachineLike) => Promise<T>): Promise<T>;
   changed(): void;
@@ -84,18 +86,22 @@ export class BrainPhones {
 
   /** The brain is gone, and every phone paired with it with it. */
   forget(): void {
-    settings.remove(this.deps.db, KEY);
+    settings.remove(this.deps.db, this.key);
+  }
+
+  private get key(): string {
+    return this.deps.key ?? KEY;
   }
 
   private kept(): Kept {
     try {
-      return { heard: null, unpaired: [], ...(JSON.parse(settings.get(this.deps.db, KEY) ?? "{}") as Partial<Kept>) };
+      return { heard: null, unpaired: [], ...(JSON.parse(settings.get(this.deps.db, this.key) ?? "{}") as Partial<Kept>) };
     } catch {
       return { heard: null, unpaired: [] };
     }
   }
 
   private save(kept: Kept): void {
-    settings.set(this.deps.db, KEY, JSON.stringify(kept));
+    settings.set(this.deps.db, this.key, JSON.stringify(kept));
   }
 }

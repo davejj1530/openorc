@@ -19,6 +19,8 @@ export const PROTECTED_SECRET_FILES = {
   "opencode-cloud.secrets": "opencode-cloud-keys.enc",
   /** The cloud brain's key, team and region. */
   "cloud-brain.secrets": "cloud-brain.enc",
+  /** A new cloud brain's, set up on the other service while the brain moves there. */
+  "cloud-brain-move.secrets": "cloud-brain-move.enc",
 } as const;
 
 export type ProtectedSecretChannel = keyof typeof PROTECTED_SECRET_FILES;

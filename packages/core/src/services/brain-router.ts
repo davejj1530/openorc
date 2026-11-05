@@ -119,6 +119,8 @@ export interface BrainRouterDeps {
   updating(): boolean;
   /** The service the brain's new threads run on, as Settings says. */
   service(): Promise<CloudService | null>;
+  /** Why a new cloud thread waits now, as while the brain moves to another service; null when it need not. */
+  holding?(): Promise<string | null>;
   notificationsOn(): boolean;
   log: Logger;
 }
@@ -243,6 +245,8 @@ export class BrainRouter {
    */
   private async start(request: RpcRequest, params: Record<string, unknown>, project: string | undefined): Promise<RpcReply> {
     if (!project) return this.deps.local(request);
+    const held = await this.deps.holding?.();
+    if (held) return error(request.id, held);
     if (!(await this.deps.mapping()).toCloud(project)) return error(request.id, NOT_ON_BRAIN);
     const place = { provider: (await this.deps.service()) ?? "vercel", setup: Boolean(projects.get(this.deps.db, project)?.settings.setupScript) };
     return { type: "rpc.result", id: request.id, result: { thread: this.starts.begin(params as RpcParams<"threads.start">, place), run: null } };

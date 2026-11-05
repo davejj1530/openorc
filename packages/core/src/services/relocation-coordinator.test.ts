@@ -15,7 +15,7 @@ import { FAKE_CODEX_RESUME } from "../test-fixtures/fake-codex.js";
 import { FAKE_OPENCODE } from "../test-fixtures/fake-opencode.js";
 import { inheritedProbe } from "./shell-environment.js";
 import { BrainMirrors, mirrorFolder, snapshotFolder } from "./brain-mirrors.js";
-import type { AwakeBrain, BrainChannel } from "./relocation-coordinator.js";
+import type { AwakeBrain, BrainChannel, RelocationCoordinator } from "./relocation-coordinator.js";
 
 class Died extends Error {}
 
@@ -474,6 +474,45 @@ describe("writes to a thread while it moves", () => {
     await until(() => settledHere() && relocations.openFor(brain.db, threadId) === null);
     expect(titles(brain)).toEqual([]);
     expect(await taskHolders(taskId, threadId)).toEqual([{ name: "mac", ...taskContent }]);
+  }, 60_000);
+});
+
+describe("moving a thread and waiting until it settles, as moving the brain does", () => {
+  const coordinator = () => (mac as unknown as { cloudParts: { coordinator: RelocationCoordinator } }).cloudParts.coordinator;
+
+  it("says why a thread stayed, or nothing once it is where it was sent, both ways", async () => {
+    const threadId = await macThread();
+    const awake = channel.awake;
+    channel.awake = async () => {
+      channel.awake = awake;
+      throw new Error("The cloud brain did not start.");
+    };
+    expect(await coordinator().sendBack(threadId)).toBe("The cloud brain did not start.");
+    expect(await coordinator().sendBack(threadId)).toBeNull();
+    expect(await holders(threadId)).toEqual([{ name: "brain", ...content }]);
+    // Not on this Mac any more: nothing to send.
+    expect(await coordinator().sendBack(threadId)).toBeNull();
+    await until(() => relocations.withCleanup(mac!.db).length === 0);
+    macProjectOf = () => null;
+    expect(await coordinator().bringHome(threadId)).toBe("This conversation's project has no copy on the Mac.");
+    macProjectOf = () => project.id;
+    // A move here already under way is followed, not asked again.
+    coordinator().bringToMac(threadId);
+    expect(await coordinator().bringHome(threadId)).toBeNull();
+    expect(relocations.unsettled(mac!.db)).toEqual([]);
+    expect(await holders(threadId)).toEqual([{ name: "mac", ...content }]);
+    expect(await coordinator().bringHome(threadId)).toBeNull();
+  }, 60_000);
+
+  it("stops waiting on a move whose drive fails again when tried once more, with its words", async () => {
+    const threadId = await macThread();
+    let tries = 0;
+    mac!.relocations.letGo = async () => {
+      tries++;
+      throw new Error("The thread's folder could not be removed.");
+    };
+    await expect(coordinator().sendBack(threadId)).rejects.toThrow("The thread's folder could not be removed.");
+    expect(tries).toBe(2);
   }, 60_000);
 });
 

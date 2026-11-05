@@ -104,6 +104,7 @@ describe("the control socket", () => {
       "cancel-hand-off": { op: "cancel-hand-off", relocation: "r1", threadId: "t1" },
       "handed-off": { op: "handed-off", relocation: "r1" },
       "agent-versions": { op: "agent-versions", versions: { claude: "2.1.317", codex: null, opencode: "2.0.11" } },
+      leaving: { op: "leaving", until: 1 },
     } satisfies { [K in BrainControlOp]: Extract<BrainControlRequest, { op: K }> };
     let uses = 0;
     server = await serveControl(
@@ -132,6 +133,7 @@ describe("the control socket", () => {
       "cancel-hand-off",
       "handed-off",
       "agent-versions",
+      "leaving",
     ]);
   });
 

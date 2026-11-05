@@ -16,7 +16,7 @@ import {
   type HandoverKind,
   type HandoverValues,
 } from "@openorc/cloud";
-import type { OpenOrc } from "@openorc/core";
+import { markLeaving, type OpenOrc } from "@openorc/core";
 import { claudeAccounts, projects, redact, threads } from "@openorc/db";
 import type { Project } from "@openorc/protocol";
 import type { BrainCloud } from "./cloud.js";
@@ -220,6 +220,10 @@ export function controlHandlers({ core, key, layout, github, cloud, stop, answer
     projects: () => listCopies(core, layout),
     "copies-current": (request) => copiesCurrent(core, layout, request),
     "agent-versions": ({ versions }) => alignAgents(layout.npm, versions),
+    leaving: async ({ until }) => {
+      markLeaving(core.db, until);
+      return { until };
+    },
     "project-settings": async ({ source, settings }) => {
       const id = copyOf(core, layout, source);
       if (id) core.projects.updateSettings(id, settings);

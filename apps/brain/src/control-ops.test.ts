@@ -416,6 +416,24 @@ describe("control requests on the brain's core", () => {
     });
   });
 
+  it("starts no new conversation while it is leaving for another service, until that time passes or the Mac calls it off", async () => {
+    const LEAVING = "The cloud brain is moving to another service. Start the conversation once it's done.";
+    const started = () =>
+      core.threads.start({} as never).then(
+        () => "started",
+        (error: Error) => error.message,
+      );
+    const until = Date.now() + 60_000;
+    expect(await ops()({ op: "leaving", until })).toEqual({ until });
+    expect(await started()).toBe(LEAVING);
+    expect(() => core.threads.fork("t1")).toThrow(LEAVING);
+    await ops()({ op: "leaving", until: Date.now() - 1 });
+    expect(await started()).not.toBe(LEAVING);
+    await ops()({ op: "leaving", until });
+    expect(await ops()({ op: "leaving", until: null })).toEqual({ until: null });
+    expect(await started()).not.toBe(LEAVING);
+  });
+
   it("answers stop before it closes the brain", async () => {
     expect(await ops()({ op: "stop" })).toEqual({ stopping: true });
     expect(stops).toBe(0);

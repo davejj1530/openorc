@@ -70,6 +70,8 @@ export class RelocationCoordinator {
   private readonly warned = new Set<string>();
   /** Moves waiting to try again, each its own way to stop waiting. */
   private readonly waiting = new Set<() => void>();
+  /** Why a move's drive stopped short of settling it, for whoever waits on it. */
+  private readonly failures = new Map<string, unknown>();
   private closed = false;
 
   constructor(private readonly deps: CoordinatorDeps) {}
@@ -106,8 +108,8 @@ export class RelocationCoordinator {
     return threads.get(db, threadId)!;
   }
 
-  /** Bring to Mac: asks the brain for its thread. The brain refuses, freezing nothing, when it cannot move now. */
-  bringToMac(threadId: string): void {
+  /** Bring to Mac: asks the brain for its thread. The brain refuses, freezing nothing, when it cannot move now. Returns the move's id. */
+  bringToMac(threadId: string): string {
     const { db } = this.deps;
     if (threads.get(db, threadId)) throw new Error("This conversation is on this Mac already.");
     if (relocations.openFor(db, threadId)) throw new Error("This conversation is already moving.");
@@ -115,6 +117,61 @@ export class RelocationCoordinator {
     this.deps.changed(threadId);
     this.step("asking");
     this.drive(row.id);
+    return row.id;
+  }
+
+  /**
+   * Brings the thread here, or follows its move here under way, until the move settles: null once the thread is on
+   * this Mac, else why it stayed in the cloud. Throws when this Mac closes first; the move goes on at its next start.
+   */
+  async bringHome(threadId: string): Promise<string | null> {
+    const { db } = this.deps;
+    if (threads.get(db, threadId)) return null;
+    const open = relocations.openFor(db, threadId);
+    const row = await this.settled(open?.role === "coordinator" ? open.id : this.bringToMac(threadId));
+    return threads.get(db, threadId) ? null : (row.error ?? "It stayed in the cloud.");
+  }
+
+  /**
+   * Move to cloud, or follows its move under way, until the move settles: null once the thread is in the cloud, or is
+   * no longer on this Mac, else why it stayed here. Throws when this Mac closes first.
+   */
+  async sendBack(threadId: string): Promise<string | null> {
+    const { db } = this.deps;
+    if (!threads.get(db, threadId)) return null;
+    if (relocations.openFor(db, threadId)?.role !== "coordinator") {
+      try {
+        await this.toCloud(threadId);
+      } catch (error) {
+        return words(error);
+      }
+    }
+    const open = relocations.openFor(db, threadId);
+    const row = open?.role === "coordinator" ? await this.settled(open.id) : null;
+    return threads.get(db, threadId) ? (row?.error ?? "It stayed on this Mac.") : null;
+  }
+
+  /** Every move under way, each once it settled, driven until then. */
+  async quiet(): Promise<void> {
+    for (const row of relocations.unsettled(this.deps.db)) await this.settled(row.id);
+  }
+
+  /** The move once it settled, driven until then. A drive that failed is tried once more, then its failure is the answer. */
+  private async settled(id: string): Promise<CoordinatorRelocation> {
+    let tried = false;
+    for (;;) {
+      const row = this.row(id);
+      if (!row) throw new Error("That move is not on this Mac.");
+      if (settled(row)) return row;
+      const failed = this.failures.get(id);
+      this.failures.delete(id);
+      if (failed !== undefined && tried) throw failed instanceof Error ? failed : new Error(String(failed));
+      tried ||= failed !== undefined;
+      this.drive(id);
+      const run = this.driving.get(id);
+      if (!run) throw new Error("This Mac closed before the move settled.");
+      await run;
+    }
   }
 
   /** "Keep where it is" while a move has not settled, when the other side can still be told. */
@@ -178,7 +235,10 @@ export class RelocationCoordinator {
   private drive(id: string): void {
     if (this.closed || this.driving.has(id)) return;
     const run = this.loop(id)
-      .catch((error: unknown) => this.deps.log.warn(`moving a conversation stopped: ${words(error)}`))
+      .catch((error: unknown) => {
+        this.failures.set(id, error);
+        this.deps.log.warn(`moving a conversation stopped: ${words(error)}`);
+      })
       .finally(() => this.driving.delete(id));
     this.driving.set(id, run);
   }

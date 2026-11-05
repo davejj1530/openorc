@@ -29,6 +29,8 @@ interface Answers {
   wake?: () => Promise<void>;
   /** CloudBrain installs a newer brain meanwhile. */
   updating?: boolean;
+  /** Why new cloud threads wait, as while the brain moves. */
+  holding?: string;
 }
 
 function harness(answers: Answers = {}) {
@@ -74,6 +76,7 @@ function harness(answers: Answers = {}) {
     wake: () => answers.wake?.() ?? Promise.resolve(),
     updating: () => answers.updating ?? false,
     service: async () => "agent37",
+    holding: async () => answers.holding ?? null,
     mirrors: { folder: (id) => answers.mirrors?.[id] ?? null, isOpen: () => false, pull: async () => {} },
     local: async (request) => ({
       type: "rpc.result",
@@ -253,6 +256,18 @@ it("answers a window's cloud start before the brain wakes, under the id the brai
   const listed = ((await ask(router, "threads.list", {})) as ThreadSummary[]).filter((each) => each.id === thread.id);
   expect(listed).toEqual([expect.objectContaining({ id: thread.id, projectId: "mac-project", lastActivityAt: 99, owner: expect.objectContaining({ brain: "cloud" }) })]);
   expect(listed[0]!.cloud).toBeUndefined();
+  router.close();
+});
+
+it("refuses a window's cloud start while the brain moves, waking and starting nothing", async () => {
+  const answers: Answers = { cloud: [], holding: "The cloud brain is moving. Try again once it's done." };
+  const { router, sent, woke } = harness(answers);
+  await expect(ask(router, "threads.start", { ...start, projectId: "mac-project", cloud: true })).rejects.toThrow("The cloud brain is moving. Try again once it's done.");
+  expect(router.starts.rows(() => true)).toEqual([]);
+  expect([sent, woke]).toEqual([[], []]);
+  answers.holding = undefined;
+  await ask(router, "threads.start", { ...start, projectId: "mac-project", cloud: true });
+  expect(router.starts.rows(() => true)).toHaveLength(1);
   router.close();
 });
 

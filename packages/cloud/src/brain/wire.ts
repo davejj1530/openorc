@@ -343,7 +343,12 @@ export type BrainControlRequest =
   /** The Mac took the thread: the brain deletes its copy, its sandbox and the package. */
   | { op: "handed-off"; relocation: string }
   /** The Mac's agent CLI versions: the brain installs each that differs, so a conversation moved either way resumes. Null keeps the brain's. */
-  | { op: "agent-versions"; versions: AgentVersions };
+  | { op: "agent-versions"; versions: AgentVersions }
+  /**
+   * The brain moves to another service: until `until`, it starts no new conversation, so none is left behind when it
+   * goes. Asked again before each look at its threads; null starts them again, as when the move is called off.
+   */
+  | { op: "leaving"; until: number | null };
 
 /** Each agent CLI's version, as its `--version` reads; null when unknown or not installed. */
 export type AgentVersions = { [A in HarnessId]: string | null };
@@ -417,6 +422,7 @@ export interface BrainControlResults {
   "handed-off": { left: true };
   /** What the brain has after: an install that failed leaves the version it had. */
   "agent-versions": { versions: AgentVersions };
+  leaving: { until: number | null };
 }
 export type BrainControlResult<R extends BrainControlRequest> = BrainControlResults[R["op"]];
 export type BrainControlReply<Op extends BrainControlOp> = { ok: true; result: BrainControlResults[Op] } | { ok: false; error: string };
@@ -479,6 +485,7 @@ const REQUESTS = variants<BrainControlRequest>({
   "cancel-hand-off": object({ op: literal("cancel-hand-off"), relocation: relocationId, threadId }),
   "handed-off": object({ op: literal("handed-off"), relocation: relocationId }),
   "agent-versions": object({ op: literal("agent-versions"), versions: agentVersions }),
+  leaving: object({ op: literal("leaving"), until: nullable(int(0, Number.MAX_SAFE_INTEGER)) }),
 });
 
 const timestamp = int(0, Number.MAX_SAFE_INTEGER);
@@ -510,6 +517,7 @@ const RESULTS: { [K in BrainControlOp]: Parse<BrainControlResults[K]> } = {
   "cancel-hand-off": (value, field) => (isRecord(value) && "left" in value ? object({ left: literal(true) }) : object({ stayed: literal(true) }))(value, field),
   "handed-off": object({ left: literal(true) }),
   "agent-versions": object({ versions: agentVersions }),
+  leaving: object({ until: nullable(timestamp) }),
 };
 
 export function parseControlRequest(line: string): BrainControlRequest {

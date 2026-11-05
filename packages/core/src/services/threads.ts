@@ -38,6 +38,7 @@ import { summarizeThread } from "./thread-summary.js";
 import { ThreadTaskExecution } from "./thread-task-execution.js";
 import { directory, executionProject, worktreeShared } from "./workspace-home.js";
 import { workspaceWriters, type WorkspaceWriters } from "./workspace-writers.js";
+import { assertStaying } from "./brain-leaving.js";
 import type { WorkspaceService } from "./workspace.js";
 
 /** How many agent messages in a row may pass between conversations before a person has to write. */
@@ -135,6 +136,7 @@ export class ThreadService {
 
   /** A cloud thread returns at once with no run: its first message waits in the queue while its sandbox gets ready. */
   async start(input: StartThreadInput, internal?: ThreadAdmission): Promise<{ thread: Thread; run: Run | null }> {
+    assertStaying(this.db);
     input = { ...normalizeModelSettings(input), claudeAccountId: input.claudeAccountId ?? claudeAccounts.defaultId(this.db) };
     await this.runs.validateFastMode(input.agent, input.model, input.fastMode, undefined, undefined, input.claudeAccountId);
     internal?.assertCanAdmit();
@@ -517,6 +519,7 @@ export class ThreadService {
    * transcript leaves out.
    */
   fork(id: string): Thread {
+    assertStaying(this.db);
     this.runs.subagents.assertExecutable({ threadId: id });
     this.rejectRetiredThread(id);
     const parent = this.thread(id);

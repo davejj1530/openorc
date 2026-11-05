@@ -35,6 +35,7 @@ function show(
   codex: "chatgpt" | "apiKey" | null = null,
   service: CloudService = "vercel",
   signIns: CloudSignIns = { rows: [], bringing: false },
+  services: CloudService[] = [service],
 ) {
   vi.spyOn(Intl.DateTimeFormat.prototype, "resolvedOptions").mockReturnValue({ timeZone } as Intl.ResolvedDateTimeFormatOptions);
   vi.mocked(core.call).mockImplementation(async (method: string) => {
@@ -54,7 +55,7 @@ function show(
   });
   render(
     <QueryClientProvider client={queryClient}>
-      <CloudBrainSection active service={service} />
+      <CloudBrainSection active service={service} services={services} />
     </QueryClientProvider>,
   );
 }
@@ -99,7 +100,7 @@ it("shows how far setting up has come", async () => {
     ["Start it", "running"],
     ["Send it the sign-ins", "pending"],
   ]);
-  expect(screen.getByText("Singapore · sin1")).toBeTruthy();
+  expect(screen.getByText("Vercel · Singapore")).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Remove" })).toBeNull();
 });
 
@@ -271,7 +272,7 @@ it("sets up on Agent37 without a region, and names its place, cost and removal f
   cleanup();
   queryClient.clear();
   show({ ...ready, service: "agent37", region: null, threads: 2 }, "Asia/Manila", { usd: 0.42, since: 1 }, [], null, "vercel");
-  expect(await screen.findByText("Agent37")).toBeTruthy();
+  expect(await screen.findByText("Runs on Agent37")).toBeTruthy();
   expect(await screen.findByText("$0.42")).toBeTruthy();
   expect(screen.getByText("A copy of OpenOrc in your Agent37 account, for your phone while this Mac sleeps.")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Remove" }));
@@ -293,4 +294,126 @@ it("offers to bring the missing sign-ins before the brain's first wake", async (
   fireEvent.click(await screen.findByRole("button", { name: "Bring them" }));
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.signIns.bringAll", { copy: false }));
   expect(screen.getByRole("button", { name: "Set up" })).toBeTruthy();
+});
+
+it("asks where it runs once both services are connected, starting on the one new threads run on", async () => {
+  show({ state: "none", error: null }, "Europe/Berlin", null, [], null, "vercel", undefined, ["vercel", "agent37"]);
+  const choice = await screen.findByRole("radiogroup", { name: "Runs on" });
+  expect(within(choice).getByRole("radio", { name: "Vercel" }).getAttribute("aria-checked")).toBe("true");
+  fireEvent.click(within(choice).getByRole("radio", { name: "Agent37" }));
+  expect(screen.queryByRole("combobox", { name: "Region" })).toBeNull();
+  expect(screen.getByText("A copy of OpenOrc in your Agent37 account, for your phone while this Mac sleeps.")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Set up" }));
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.brain.create", { service: "agent37" }));
+  fireEvent.click(within(choice).getByRole("radio", { name: "Vercel" }));
+  fireEvent.click(screen.getByRole("button", { name: "Set up" }));
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.brain.create", { region: "fra1", service: "vercel" }));
+});
+
+it("shows no choice of service with one connected", async () => {
+  show({ state: "none", error: null }, "Europe/Berlin", null, [], null, "agent37");
+  await screen.findByRole("button", { name: "Set up" });
+  expect(screen.queryByRole("radiogroup")).toBeNull();
+});
+
+it("names where a ready brain runs, and offers to move it only once the other service is connected", async () => {
+  show(ready);
+  expect(await screen.findByText("Runs on Vercel · Singapore")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: /^Move to/ })).toBeNull();
+  cleanup();
+  queryClient.clear();
+  show(ready, "Asia/Manila", null, [], null, "vercel", undefined, ["vercel", "agent37"]);
+  expect(await screen.findByRole("button", { name: "Move to Agent37" })).toBeTruthy();
+});
+
+it("moves only once the confirm says what happens, Cancel leaving it be", async () => {
+  const pocket: RemoteDevice = { id: "phone-1", name: "Pocket", createdAt: 1, lastSeenAt: null, connected: false };
+  show(ready, "Asia/Manila", null, [pocket], "chatgpt", "vercel", undefined, ["vercel", "agent37"]);
+  fireEvent.click(await screen.findByRole("button", { name: "Move to Agent37" }));
+  const dialog = await screen.findByRole("dialog", { name: "Move the cloud brain to Agent37?" });
+  await waitFor(() => expect(dialog.textContent).toContain("Its threads come to this Mac first, then go to a new brain on Agent37. Phones need pairing again, and it takes a few minutes."));
+  await waitFor(() => expect(dialog.textContent).toContain("Its Codex sign-in doesn't move. Sign in again after."));
+  expect(within(dialog).queryByRole("combobox", { name: "Region" })).toBeNull();
+  fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+  expect(core.call).not.toHaveBeenCalledWith("cloud.brain.move", expect.anything());
+  fireEvent.click(screen.getByRole("button", { name: "Move to Agent37" }));
+  fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Move" }));
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.brain.move", { to: "agent37" }));
+});
+
+it("asks for a region when moving to Vercel", async () => {
+  show({ ...ready, service: "agent37", region: null }, "Europe/Berlin", null, [], null, "agent37", undefined, ["vercel", "agent37"]);
+  fireEvent.click(await screen.findByRole("button", { name: "Move to Vercel" }));
+  const dialog = await screen.findByRole("dialog", { name: "Move the cloud brain to Vercel?" });
+  expect(dialog.textContent).toContain("It takes a few minutes.");
+  expect((within(dialog).getByRole("combobox", { name: "Region" }) as HTMLSelectElement).value).toBe("fra1");
+  fireEvent.change(within(dialog).getByRole("combobox", { name: "Region" }), { target: { value: "lhr1" } });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Move" }));
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.brain.move", { to: "vercel", region: "lhr1" }));
+});
+
+const moving: Extract<CloudBrainStatus, { state: "moving" }> = {
+  state: "moving",
+  service: "vercel",
+  region: "sin1",
+  to: { service: "agent37", region: null },
+  step: "home",
+  threads: { done: 2, of: 5 },
+  setup: null,
+  error: null,
+};
+const steps = () => within(screen.getByRole("list", { name: "Moving the cloud brain" })).getAllByRole("listitem");
+
+it("shows each step of a move, with the threads moved so far and what setting up is at", async () => {
+  show(moving);
+  expect(await screen.findByText("Moving to Agent37")).toBeTruthy();
+  expect(steps().map((step) => [step.getAttribute("data-state"), step.textContent])).toEqual([
+    ["running", "Bring threads to this Mac2 of 5"],
+    ["pending", "Set up on Agent37"],
+    ["pending", "Remove it from Vercel"],
+    ["pending", "Move threads back"],
+  ]);
+  expect(screen.queryByRole("button", { name: "Remove" })).toBeNull();
+  cleanup();
+  queryClient.clear();
+  show({ ...moving, step: "setting-up", threads: null, setup: "start" });
+  await screen.findByText("Moving to Agent37");
+  expect(steps().map((step) => step.getAttribute("data-state"))).toEqual(["done", "running", "pending", "pending"]);
+  expect(steps()[1]!.textContent).toBe("Set up on Agent37Starting it");
+  cleanup();
+  queryClient.clear();
+  show({ ...moving, service: "agent37", region: null, step: "back", threads: { done: 1, of: 5 } });
+  await screen.findByText("Moving to Agent37");
+  expect(steps()[3]!.textContent).toBe("Move threads back1 of 5");
+});
+
+it("shows where a move stopped and why, and goes on from there", async () => {
+  show({ ...moving, step: "removing", threads: null, error: "Could not remove the cloud brain's door. Vercel answered 500." });
+  expect(await screen.findByText("Stopped")).toBeTruthy();
+  expect(steps()[2]!.getAttribute("data-state")).toBe("failed");
+  expect(within(steps()[2]!).getByRole("alert").textContent).toBe("Could not remove the cloud brain's door. Vercel answered 500.");
+  fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.brain.move", { to: "agent37" }));
+  fireEvent.click(screen.getByRole("button", { name: "Stay on Vercel" }));
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.brain.move.cancel", {}));
+  cleanup();
+  queryClient.clear();
+  show({ ...moving, service: "agent37", region: null, step: "back", threads: { done: 1, of: 5 }, error: "The package could not be written." });
+  expect(await screen.findByRole("button", { name: "Leave them on this Mac" })).toBeTruthy();
+});
+
+it("says why a move did not happen, on the brain that stayed, until dismissed", async () => {
+  show({ ...ready, note: "Didn't move to Agent37. A thread is still working on the cloud brain. Try again once it's done." });
+  expect((await screen.findByRole("alert")).textContent).toBe("Didn't move to Agent37. A thread is still working on the cloud brain. Try again once it's done.");
+  fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.brain.move.dismiss", {}));
+});
+
+it("asks to pair the phone again after a move, with the one pair action", async () => {
+  show({ ...ready, service: "agent37", region: null, pairAgain: true });
+  const row = (await screen.findByText("Pair your phone again")).closest(".settings-field") as HTMLElement;
+  expect(within(row).getByText("Phones paired before the move can't reach it.")).toBeTruthy();
+  expect(screen.getAllByRole("button", { name: "Pair phone" })).toHaveLength(1);
+  fireEvent.click(within(row).getByRole("button", { name: "Pair phone" }));
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.brain.pair", {}));
 });

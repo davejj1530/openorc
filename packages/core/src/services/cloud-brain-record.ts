@@ -1,3 +1,4 @@
+import type { CloudBrainPlace } from "@openorc/protocol";
 import type { Sent } from "./cloud-brain-claude.js";
 import type { BrainPlace } from "./cloud-brain-place.js";
 import type { BrainProject } from "./cloud-brain-projects.js";
@@ -5,6 +6,23 @@ import type { SignInRecord } from "./cloud-brain-signins.js";
 import type { ProtectedSecretStore } from "./extraction-credentials.js";
 
 const storageError = "Cannot access protected storage for the cloud brain. Unlock your OS keychain and retry.";
+
+/**
+ * A move to the other service, as far as it got. Its threads come home, a new brain is set up beside this one in a
+ * record of its own, the old one is removed, then one write swaps the records, and the threads go back.
+ */
+export interface BrainMoving {
+  /** Where it moves to, in the team Settings has when it sets up there on Vercel. */
+  to: CloudBrainPlace;
+  /** home: threads come to this Mac; staging: the new brain is set up; swapping: the old one goes; back: threads go to the new one. */
+  stage: "home" | "staging" | "swapping" | "back";
+  /** The threads it brought to this Mac, which go back to the new brain. */
+  threads: string[];
+  /** From here on the record in the move's own store is this move's new brain, never one an earlier move left there. */
+  staging?: true;
+  /** From the swap until this Mac has let the old brain go: its link key, and whether phones were paired with it. */
+  left?: { linkKey: string | null; phones: boolean };
+}
 
 /** Kept in protected storage. The key alone opens the brain's secrets, so it is saved before anything is made. */
 export type StoredBrain = SignInRecord &
@@ -23,6 +41,8 @@ export type StoredBrain = SignInRecord &
     linkKey?: string;
     /** The signInPrint of the agent CLI versions the brain last said it has, once they were this Mac's. */
     agentVersions?: string;
+    /** A move to the other service under way. */
+    moving?: BrainMoving;
   };
 
 /** The brain's record in protected storage, read once and kept. Losing it loses the brain: only its key opens the brain's secrets. */

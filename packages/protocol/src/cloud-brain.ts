@@ -26,6 +26,8 @@ export const BRAIN_REGIONS = {
 } as const;
 export type BrainRegion = keyof typeof BRAIN_REGIONS;
 export const BrainRegion = z.enum(Object.keys(BRAIN_REGIONS) as [BrainRegion, ...BrainRegion[]]);
+/** CloudService's schema, here since cloud.ts takes this file's params: importing its value back would be a cycle. */
+const BrainService: z.ZodType<CloudService> = z.enum(["vercel", "agent37"]);
 
 /** Time zones nearer a region than their area's default, mostly cities with a region of their own. */
 const CITIES: Record<string, BrainRegion> = {
@@ -96,6 +98,15 @@ export interface CloudBrainPlace {
   region: BrainRegion | null;
 }
 
+/**
+ * Moving a brain to the other service: its threads come to this Mac, a new brain is set up there, the old one is
+ * removed, and the threads go to the new one.
+ */
+export type CloudBrainMoveStep = "home" | "setting-up" | "removing" | "back";
+
+/** What setting up the new brain is doing, its project copies last. */
+export type CloudBrainMoveSetup = CloudBrainStep | "projects";
+
 /** What Settings shows about the cloud brain. Its key and the tokens sent to it never leave the core. */
 export type CloudBrainStatus =
   /** This build carries no brain to set up. */
@@ -120,6 +131,25 @@ export type CloudBrainStatus =
       door: CloudBrainDoor | null;
       /** The conversations on it, as it last counted them for this Mac. They go with it when it is removed. */
       threads: number;
+      /** It moved here from the other service, and no phone has paired with it since. Absent unless it moved. */
+      pairAgain?: boolean;
+      /** What the last move left to say: why it did not happen, or which threads stayed on this Mac. Kept until dismissed. */
+      note?: string;
+      error: string | null;
+    } & CloudBrainPlace)
+  /**
+   * Moving to `to`, where it runs from the swap on: the place is where it runs now. A move that stopped on a failure it
+   * can go on from keeps its step and says why.
+   */
+  | ({
+      state: "moving";
+      to: CloudBrainPlace;
+      step: CloudBrainMoveStep;
+      /** The threads moved in this step so far, of how many; null in the step that moves none. */
+      threads: { done: number; of: number } | null;
+      /** While setting up the new brain, the part under way. */
+      setup: CloudBrainMoveSetup | null;
+      /** Why it stopped; null while it runs. */
       error: string | null;
     } & CloudBrainPlace)
   | { state: "removing" };
@@ -182,10 +212,20 @@ export interface CloudBrainPairing {
 export const cloudBrainRpcParams = {
   "cloud.brain.status": z.object({}),
   /**
-   * Makes the brain on the service new cloud threads run on, on Vercel in the region, and sets it up in the background.
-   * Again after a failure, with the key and place it has.
+   * Makes the brain on the service, the one new cloud threads run on unless given, on Vercel in the region, and sets it
+   * up in the background. Again after a failure, with the key and place it has.
    */
-  "cloud.brain.create": z.object({ region: BrainRegion.optional() }).strict(),
+  "cloud.brain.create": z.object({ region: BrainRegion.optional(), service: BrainService.optional() }).strict(),
+  /**
+   * Moves a ready brain to the other service, on Vercel in the region, in the background: its threads come to this Mac,
+   * a new brain is set up there with a new key, the old one is removed, and the threads go back. Again on a move that
+   * stopped, it goes on from where it stopped.
+   */
+  "cloud.brain.move": z.object({ to: BrainService, region: BrainRegion.optional() }).strict(),
+  /** Calls off a move that stopped: before the old brain went, the new one goes; after the swap, threads not yet back stay on this Mac. */
+  "cloud.brain.move.cancel": z.object({}),
+  /** Forgets what the last move left to say. */
+  "cloud.brain.move.dismiss": z.object({}),
   /** Starts the brain unless it runs, and sends sign-ins that changed. */
   "cloud.brain.wake": z.object({}),
   /** Wakes the brain and asks it for a phone pairing code. */
@@ -221,6 +261,9 @@ export const cloudBrainRpcParams = {
 export interface CloudBrainRpcResults {
   "cloud.brain.status": CloudBrainStatus;
   "cloud.brain.create": CloudBrainStatus;
+  "cloud.brain.move": CloudBrainStatus;
+  "cloud.brain.move.cancel": CloudBrainStatus;
+  "cloud.brain.move.dismiss": CloudBrainStatus;
   "cloud.brain.wake": CloudBrainStatus;
   "cloud.brain.pair": CloudBrainPairing;
   "cloud.brain.handover": CloudBrainStatus;

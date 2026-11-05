@@ -75,6 +75,7 @@ const corePromise = OpenOrc.create({
   codexCloudSecrets: secrets.store("codex-cloud.secrets"),
   opencodeCloudSecrets: secrets.store("opencode-cloud.secrets"),
   cloudBrainSecrets: secrets.store("cloud-brain.secrets"),
+  cloudBrainMoveSecrets: secrets.store("cloud-brain-move.secrets"),
   terminal,
   presence: presence.inUse,
   // The embedding model runs in its own thread, so loading it and embedding memories never stall the core.

@@ -95,6 +95,8 @@ export interface OpenOrcOptions {
   cloudService?: () => Promise<CloudService | null>;
   /** Keeps the cloud brain's key, team and region. Losing it loses the brain: only its key opens the brain's secrets. */
   cloudBrainSecrets?: ProtectedSecretStore;
+  /** Keeps the record of a new cloud brain set up on the other service while the brain moves there. Without it, none moves. */
+  cloudBrainMoveSecrets?: ProtectedSecretStore;
   /** The cloud brain this build installs, looked up when Settings asks. Without one, no brain can be set up. */
   cloudBrainBundle?: () => Promise<BrainBundleSource | null>;
   /** Reaches the cloud brain's machine in place of Vercel, for tests. */

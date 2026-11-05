@@ -1,9 +1,10 @@
 import { useState, type ReactNode } from "react";
-import { SANDBOX_VCPUS, type BrainRegion, type ClaudeAccountConnection, type ClaudeCloudAccess, type CloudStatus } from "@openorc/protocol";
+import { SANDBOX_VCPUS, type BrainRegion, type ClaudeAccountConnection, type ClaudeCloudAccess, type CloudService, type CloudStatus } from "@openorc/protocol";
 import { Button, Select, TextButton, Tooltip } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { Agent37Settings, CloudServiceChoice } from "./settings-cloud-agent37";
-import { CloudBrainSection, RegionSelect } from "./settings-cloud-brain";
+import { CloudBrainSection } from "./settings-cloud-brain";
+import { RegionSelect } from "./settings-cloud-place";
 import { CloudCheckSection } from "./settings-cloud-check";
 import { CloudSandboxesSection } from "./settings-cloud-sandboxes";
 import { CloudSignInsSection } from "./settings-cloud-sign-ins";
@@ -232,6 +233,9 @@ function TakeoverSection({ enabled }: { enabled: boolean }) {
   );
 }
 
+/** The services connected: Vercel once it has a team, Agent37 once it has a key. */
+const connected = (status: CloudStatus): CloudService[] => [...(status.vercel?.team ? (["vercel"] as const) : []), ...(status.agent37 ? (["agent37"] as const) : [])];
+
 /** Where cloud threads run and how their agents sign in. Tokens go to the core and stay in protected storage. */
 export function CloudSettings({ active }: { active: boolean }) {
   const status = useRpc("cloud.status", {}, { enabled: active });
@@ -251,7 +255,7 @@ export function CloudSettings({ active }: { active: boolean }) {
       <ClaudeCloudAccounts status={status.data} active={active} />
       <CodexCloudSection codex={status.data.codex} />
       <OpenCodeCloudSection opencode={status.data.opencode} />
-      {status.data.service ? <CloudBrainSection active={active} service={status.data.service} /> : null}
+      {status.data.service ? <CloudBrainSection active={active} service={status.data.service} services={connected(status.data)} /> : null}
       <TakeoverSection enabled={status.data.takeover} />
       <CloudSandboxesSection active={active} />
       <CloudCheckSection status={status.data} />

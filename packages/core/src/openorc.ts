@@ -61,6 +61,7 @@ import { createThreadsHost } from "./mcp-host/threads.js";
 import type { OpenOrcOptions } from "./options.js";
 import { RemoteAccess } from "./remote/remote-access.js";
 import { rememberRemovedBrain } from "./remote/removed-brains.js";
+import { MOVING_WORDS } from "./services/cloud-brain-move.js";
 import { requestOrigin, type RequestOrigin } from "./request-origin.js";
 import { forgetKeptSessions } from "./services/agent-sessions.js";
 import type { OpenCodeCloudKeys } from "./services/cloud-opencode.js";
@@ -243,7 +244,7 @@ export class OpenOrc {
       threads: () => this.threads,
       workspaces: () => this.workspaces,
       invalidate,
-      brainChanged: () => void this.brainRouting?.refresh(),
+      routing: () => this.brainRouting,
       memory: () => this.memory,
       log: this.log,
     });
@@ -339,6 +340,7 @@ export class OpenOrc {
             memory: this.memory,
             textGeneration: this.textGeneration,
             service: () => this.cloudParts.settings.service(),
+            holding: async () => ((await this.cloudParts.move?.holding()) ? MOVING_WORDS : null),
             endpoint: options.brainEndpoint,
           });
     return this.routing;
@@ -470,6 +472,7 @@ export class OpenOrc {
     core.upkeep.start();
     core.cloudParts.brain.opened();
     core.cloudParts.coordinator?.start();
+    core.cloudParts.move?.resume();
     void core.cloudParts.relocations.cleanUpAll();
     core.brainRouting?.link.onReach((reach) => {
       if (reach === "live") core.cloudParts.coordinator?.reachable();
@@ -562,6 +565,7 @@ export class OpenOrc {
   }
 
   async close(): Promise<void> {
+    this.cloudParts.move?.close();
     this.cloudParts.coordinator?.close();
     this.brainRouting?.close();
     await this.remote.close(this.closingForUpdate ? "update" : "shutdown");

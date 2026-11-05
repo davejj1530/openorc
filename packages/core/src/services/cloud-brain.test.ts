@@ -1272,6 +1272,29 @@ describe("the cloud brain on Agent37", () => {
     expect(brain.calls.length).toBe(looks);
   });
 
+  it("sets up on the service chosen at setup, whatever new cloud threads run on", async () => {
+    await core.close();
+    await open({ cloudAgent37: async () => AGENT37, cloudService: async () => "vercel" as const, cloudBrainBundle: bundle, cloudBrainDoors: doors });
+    expect((await rpc("cloud.brain.create", { service: "agent37" })).state).toBe("setting-up");
+    await vi.waitFor(async () => expect((await status()).state).toBe("ready"));
+    expect(new Set(brain.access.map((given) => given.service))).toEqual(new Set(["agent37"]));
+    expect(await status()).toMatchObject({ state: "ready", service: "agent37", region: null });
+    expect(stored()).toMatchObject({ service: "agent37" });
+  });
+
+  it("keeps a brain this Mac has no key for found on the chosen service, and removes it from there", async () => {
+    await core.close();
+    await open({ cloudAgent37: async () => AGENT37, cloudService: async () => "vercel" as const, cloudBrainBundle: bundle, cloudBrainDoors: doors });
+    brain.project = true;
+    brain.state = "stopped";
+    expect(await rpc("cloud.brain.create", { service: "agent37" })).toEqual({ state: "elsewhere", service: "agent37", error: null });
+    expect(await status()).toEqual({ state: "elsewhere", service: "agent37", error: null });
+    expect(await rpc("cloud.brain.remove", {})).toEqual({ state: "none", error: null });
+    expect(brain.calls.at(-1)).toBe("remove");
+    expect(brain.access.at(-1)).toEqual({ service: "agent37", key: AGENT37.key });
+    expect(doors.removes).toEqual([]);
+  });
+
   it("asks for a region only of a brain on Vercel", async () => {
     await expect(cloudBrain(() => "vercel").cloud.create()).rejects.toThrow("Choose a region for the cloud brain.");
   });

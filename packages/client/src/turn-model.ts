@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Block } from "./transcript.js";
-import { receiptItems } from "./work-receipt.js";
+import { receiptItems, type TurnSize } from "./work-receipt.js";
 import { workEntries } from "./work-steps.js";
 import { workDuration, workParts, workTiming } from "./work-transcript.js";
 
@@ -53,7 +53,7 @@ export function turnReply(after: Block[]): Extract<Block, { kind: "message" }> |
  * What a turn shows above and around its blocks: its parts (the prompt, the work, the reply), the status its head
  * reads, and the receipt row that opens its work.
  */
-export function useTurnModel(blocks: Block[], live: boolean, taskCards: boolean | undefined, ambient: boolean, pinned: string | undefined) {
+export function useTurnModel(blocks: Block[], live: boolean, taskCards: boolean | undefined, ambient: boolean, pinned: string | undefined, size: TurnSize | null = null) {
   const timing = workTiming(blocks, live);
   const parts = useMemo(() => workParts(blocks, timing.live, taskCards, ambient), [blocks, timing.live, taskCards, ambient]);
   const steps = useMemo(
@@ -68,7 +68,7 @@ export function useTurnModel(blocks: Block[], live: boolean, taskCards: boolean 
   const now = useTicking(timing.live);
   const writing = parts.after.some((block) => block.kind === "message" && block.role === "assistant" && block.streaming);
   const status = turnStatus({ ...timing, writing }, now);
-  const receipt = useMemo(() => receiptItems(blocks, steps, timing.live), [blocks, steps, timing.live]);
+  const receipt = useMemo(() => receiptItems(blocks, steps, timing.live, size), [blocks, steps, timing.live, size]);
   const reply = turnReply(parts.after);
   return { live: timing.live, parts, status, receipt, reply };
 }

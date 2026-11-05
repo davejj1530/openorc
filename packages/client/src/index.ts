@@ -122,7 +122,29 @@ export {
 } from "./visualization-document.js";
 export { visualizationFromTool } from "./visualization.js";
 export { chipCalls, toolIntent, type WorkChip } from "./work-chips.js";
-export { isCheckCommand, receiptItems, type ReceiptItem } from "./work-receipt.js";
+export { isCheckCommand, receiptItems, type ReceiptItem, type TurnSize } from "./work-receipt.js";
+export {
+  blockDigest,
+  objectState,
+  workObjects,
+  type CommandObject,
+  type EditLine,
+  type EditObject,
+  type FetchObject,
+  type GitObject,
+  type MadeCommit,
+  type ObjectState,
+  type PullRequestWork,
+  type PushWork,
+  type ReadObject,
+  type SearchHit,
+  type SearchObject,
+  type TestsObject,
+  type ToolObject,
+  type WebObject,
+  type WorkObject,
+} from "./work-objects.js";
+export { objectOutcome, objectsTitle, phaseOutcome, type Outcome } from "./work-outcomes.js";
 export {
   chipTitle,
   foldable,

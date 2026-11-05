@@ -57,7 +57,7 @@ function rowMeta(row: ArrivalRow, now: number): ReactNode {
   return relativeTime(row.thread.lastActivityAt, now);
 }
 
-function RowLead({ row }: { row: ArrivalRow }) {
+function RowStatus({ row }: { row: ArrivalRow }) {
   if (row.kind === "waiting") return <StatusDot tone="attention" />;
   if (row.kind === "running") return <LoaderCircle size={14} className="animate-spin" />;
   if (row.kind === "tasks") return <StatusIcon status={row.status} />;
@@ -76,9 +76,6 @@ export function NewThreadRecent({ activity }: { activity: ArrivalActivity }) {
       <div className="motion-stagger">
         {arrivalRows(activity).map((row) => (
           <button key={row.key} type="button" className="new-thread-recent-row motion-arrive" onClick={() => (row.kind === "tasks" ? navigate({ view: "tasks" }) : openThread(row.thread.id))}>
-            <span className="new-thread-recent-lead">
-              <RowLead row={row} />
-            </span>
             <span className="new-thread-recent-title">
               {row.kind === "tasks" ? (
                 <>
@@ -88,7 +85,10 @@ export function NewThreadRecent({ activity }: { activity: ArrivalActivity }) {
                 row.thread.title
               )}
             </span>
-            <span className="new-thread-recent-meta">{rowMeta(row, now)}</span>
+            <span className="new-thread-recent-meta">
+              <RowStatus row={row} />
+              {rowMeta(row, now)}
+            </span>
           </button>
         ))}
       </div>

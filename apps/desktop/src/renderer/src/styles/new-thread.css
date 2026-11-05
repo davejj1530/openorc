@@ -150,7 +150,7 @@
   outline-offset: 2px;
 }
 
-/* "Pick up where you left off": a flat list of 42px rows with a status lead. */
+/* "Pick up where you left off": a flat list of 42px rows, the title flush left and the status beside the time. */
 .new-thread-recent {
   display: flex;
   flex-direction: column;
@@ -181,14 +181,6 @@
 .new-thread-recent-row:hover {
   background: var(--surface-2);
 }
-.new-thread-recent-lead {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  color: var(--ink-4);
-}
 .new-thread-recent-title {
   flex: 1;
   min-width: 0;
@@ -200,7 +192,10 @@
   letter-spacing: var(--text-base--letter-spacing);
 }
 .new-thread-recent-meta {
+  display: flex;
   flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
   color: var(--ink-4);
   font-size: var(--text-sm);
   line-height: var(--text-sm--line-height);

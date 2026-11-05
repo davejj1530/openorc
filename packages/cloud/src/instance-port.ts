@@ -5,6 +5,9 @@ import type { PortAddress } from "./agent37.js";
 export const INSTANCE_SERVER_PORT = 47_821;
 
 const HEALTH_TIMEOUT_MS = 5000;
+
+/** Node's WebSocket takes headers beside the protocols that the DOM's typing alone allows. */
+type HeaderedWebSocket = new (url: string, init: { headers: Record<string, string> }) => WebSocket;
 const STDERR_CHANNEL = 2;
 
 export interface ProcessSpec {
@@ -48,7 +51,7 @@ export class InstancePort {
   }
 
   async putFile(file: string, content: Buffer): Promise<void> {
-    const response = await fetch(this.url("/file", file), { method: "PUT", headers: this.address.headers, body: content });
+    const response = await fetch(this.url("/file", file), { method: "PUT", headers: this.address.headers, body: new Uint8Array(content) });
     if (!response.ok) throw new Error(`Could not write ${file} in the cloud instance (${response.status}). ${await response.text()}`.trim());
   }
 
@@ -62,7 +65,7 @@ export class InstancePort {
 
   /** Starts `spec` and answers once the server has it. */
   process(spec: ProcessSpec): Promise<InstanceProcess> {
-    const socket = new WebSocket(this.url("/process").replace(/^http/, "ws"), { headers: this.address.headers });
+    const socket = new (WebSocket as unknown as HeaderedWebSocket)(this.url("/process").replace(/^http/, "ws"), { headers: this.address.headers });
     socket.binaryType = "arraybuffer";
     const stdout = new PassThrough();
     const stderr = new PassThrough();

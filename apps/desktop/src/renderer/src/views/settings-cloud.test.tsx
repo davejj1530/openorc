@@ -107,3 +107,13 @@ it("says once a Claude token is removed that it still works at Anthropic, and wh
   fireEvent.click(settings);
   expect(window.openorc.openExternal).toHaveBeenCalledWith("https://claude.ai/settings/claude-code");
 });
+
+it("shows the cloud brain once either service is connected, on Agent37 alone too, and not before", async () => {
+  showCloud({ ...status, vercel: null, agent37: { size: { cpu: 2, memory: 4 } }, service: "agent37" });
+  expect(await screen.findByText("Cloud brain")).toBeTruthy();
+  cleanup();
+  queryClient.clear();
+  showCloud({ ...status, vercel: null, agent37: null, service: null });
+  expect(await screen.findByText("Vercel")).toBeTruthy();
+  expect(screen.queryByText("Cloud brain")).toBeNull();
+});

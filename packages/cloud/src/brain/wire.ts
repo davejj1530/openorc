@@ -5,6 +5,7 @@
  */
 import { createHash, randomBytes } from "node:crypto";
 import type { HarnessId } from "@openorc/protocol";
+import type { Agent37Connection } from "../agent37-sandbox.js";
 import type { VercelConnection } from "../vercel-sandbox.js";
 import { openSecret, sealSecret } from "./sealed-file.js";
 
@@ -141,24 +142,38 @@ export interface BrainStart {
   port: number;
   /** The brain's own sandbox and the connection its thread sandboxes are made with. Null in a local container: nothing keeps it awake, and no thread sandboxes. */
   vercel: { connection: VercelConnection; sandbox: string } | null;
+  /**
+   * A brain on Agent37: its own instance and the connection its thread instances are made with. Absent elsewhere, and
+   * from lines older brains read. Never in argv either, but kept in the instance's env as well: an instance that boots
+   * again ends every process, and only that line starts the brain there without a waker. The same trust as the Vercel
+   * door's env, which holds the key and token too.
+   */
+  agent37?: { connection: Agent37Connection; instance: string };
 }
 
-const START = object({
-  v: literal(1),
-  key: brainKey,
-  name: text(255),
-  address: text(253, /^[A-Za-z0-9.-]+$/),
-  port: int(1, 65_535),
-  vercel: nullable(object({ connection: object({ token: text(4096), teamId: text(255), projectId: text(255) }, { vcpus: int(1, 64) }), sandbox: text(255) })),
-});
+const START = object(
+  {
+    v: literal(1),
+    key: brainKey,
+    name: text(255),
+    address: text(253, /^[A-Za-z0-9.-]+$/),
+    port: int(1, 65_535),
+    vercel: nullable(object({ connection: object({ token: text(4096), teamId: text(255), projectId: text(255) }, { vcpus: int(1, 64) }), sandbox: text(255) })),
+  },
+  {
+    agent37: object({ connection: object({ key: text(4096), cpu: literal(2, 4), memory: literal(4, 8, 16, 32) }), instance: text(64, /^[a-z0-9]+$/) }),
+  },
+);
 
+/** A Vercel brain's line has no `agent37`, so a brain from before it reads the line still. */
 export function encodeLaunch(start: BrainStart): string {
-  return JSON.stringify({ v: 1, key: brainKeyText(start.key), name: start.name, address: start.address, port: start.port, vercel: start.vercel });
+  const { key, name, address, port, vercel, agent37 } = start;
+  return JSON.stringify({ v: 1, key: brainKeyText(key), name, address, port, vercel, ...(agent37 ? { agent37 } : {}) });
 }
 
 export function parseLaunch(line: string): BrainStart {
-  const { key, name, address, port, vercel } = parseLine("The brain's start line", START, line);
-  return { key, name, address, port, vercel };
+  const { key, name, address, port, vercel, agent37 } = parseLine("The brain's start line", START, line);
+  return { key, name, address, port, vercel, ...(agent37 ? { agent37 } : {}) };
 }
 
 /**

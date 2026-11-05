@@ -40,7 +40,7 @@ beforeEach(() => {
 
 it("reads and writes a looked-up brain's files only through the session it runs in", async () => {
   const { BrainMachine } = await import("./machine.js");
-  const brain = (await BrainMachine.find({ token: "t", teamId: "team_1" }))!;
+  const brain = (await BrainMachine.find({ service: "vercel", token: "t", teamId: "team_1" }))!;
   expect(Buffer.from(await brain.readOutbox("r.thread")).toString()).toBe("package");
   await brain.receiveThread("r", Buffer.from("package")).catch(() => undefined);
   expect(calls.filter((call) => call.startsWith("resuming"))).toEqual([]);

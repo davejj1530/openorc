@@ -57,7 +57,10 @@ export interface BrainAwakeDeps {
   /** Why the brain must stay up now, or null when nothing would be cut short. */
   busy(): string | null;
   self: BrainSelf;
-  /** Closes the core and stops the sandbox. Returns when it decided not to, because something became busy. */
+  /**
+   * Closes the core and stops the sandbox. Returns when it decided not to, because something became busy. Not asked
+   * of a brain whose sleep keeps its process: that one sleeps with its core open.
+   */
   sleep(why: SleepReason): Promise<void>;
   warn(text: string): void;
   now?: () => number;
@@ -67,6 +70,8 @@ export interface BrainAwakeDeps {
 export class BrainAwake {
   private state: AwakeState;
   private timer: NodeJS.Timeout | null = null;
+  /** When the next look is due; null before the first. */
+  private due: number | null = null;
   private stopped = false;
   private failing = false;
   private readonly now: () => number;
@@ -96,16 +101,20 @@ export class BrainAwake {
 
   private async look(): Promise<void> {
     if (this.stopped) return;
+    // A look this late means the machine slept with the brain in it and woke since: the idle clock starts over, as at a
+    // start, so whoever woke it gets the whole grace.
+    if (this.due !== null && this.now() - this.due > this.timing.tickMs) this.touch();
     const decision = decide(this.state, { now: this.now(), busy: this.deps.busy() }, this.timing);
     this.state = decision.state;
     await this.act(decision.action);
     if (this.stopped) return;
+    this.due = decision.next;
     this.timer = setTimeout(() => void this.look(), Math.max(0, decision.next - this.now()));
     this.timer.unref();
   }
 
   private async act(action: AwakeAction): Promise<void> {
-    if (action.kind === "sleep") return this.deps.sleep(action.why);
+    if (action.kind === "sleep") return this.deps.self.keepsProcesses ? this.nap() : this.deps.sleep(action.why);
     if (action.kind === "wait") return;
     try {
       const { expiresAt, capped } = await this.deps.self.extend(action.forMs);
@@ -116,5 +125,14 @@ export class BrainAwake {
       if (!this.failing) this.deps.warn(`Could not keep the brain awake: ${error instanceof Error ? error.message : String(error)}`);
       this.failing = true;
     }
+  }
+
+  /**
+   * Sleeps a machine that keeps the brain's process, with the core open: the brain goes on where it was once woken. The
+   * call may answer only after that wake, or fail across it; either way the idle clock starts over then.
+   */
+  private async nap(): Promise<void> {
+    await this.deps.self.stop().catch((error: unknown) => this.deps.warn(`Could not put the brain to sleep: ${error instanceof Error ? error.message : String(error)}`));
+    this.touch();
   }
 }

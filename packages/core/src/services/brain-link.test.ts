@@ -159,3 +159,38 @@ it("has a call that may not wake the brain wait for a wake under way, and answer
   expect(wakes).toBe(1);
   link.close();
 });
+
+it("never dials a brain whose address would wake it while it sleeps, and dials it after a wake", async () => {
+  const brainKeys = nodeCrypto.generateKeyPair();
+  let dials = 0;
+  const dial = async () => {
+    dials++;
+    const { phone, mac } = socketPair();
+    void acceptLink({ socket: mac, crypto: nodeCrypto, local: brainKeys, admit: () => ({ ok: true, value: null, hello: { mac: { name: "Cloud" }, deviceId: "owner", routes: [] } }) }).then(
+      (accepted) => accepted?.session.onMessage((message) => message.t === "rpc" && accepted.session.send({ t: "rpc.result", id: message.id, result: message.method })),
+    );
+    return phone;
+  };
+  let wakes = 0;
+  const link = new BrainLink({
+    endpoint: {
+      ready: async () => true,
+      locate: async () => ({ url: "ws://brain/link", brainKey: brainKeys.publicKey, ownerKeys: nodeCrypto.generateKeyPair() }),
+      // Its machine says it is asleep, and a status read is all it takes to know.
+      dialable: async () => false,
+      wake: async () => void wakes++,
+      projects: async () => ({ toCloud: () => null, toMac: () => null }),
+    },
+    log: { info: () => {}, warn: () => {}, error: () => {} } as never,
+    retryMs: 20,
+    dial,
+  });
+  link.start();
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  link.awoke();
+  await expect(link.call("threads.list", {}, { wake: false })).rejects.toThrow(BrainOutOfReach);
+  expect([dials, link.reach]).toEqual([0, "asleep"]);
+  expect(await link.call("threads.get", { id: "thread" }, { wake: true })).toBe("threads.get");
+  expect([dials, wakes, link.reach]).toEqual([1, 1, "live"]);
+  link.close();
+});

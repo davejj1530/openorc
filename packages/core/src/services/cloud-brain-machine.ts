@@ -1,4 +1,4 @@
-import { BrainMachine, type BrainAccess, type BrainMachineStatus, type DoorBundle } from "@openorc/cloud";
+import { BrainMachine, type BrainAccess, type BrainMachineStatus, type DoorBundle, type RunnerFile } from "@openorc/cloud";
 import type { CloudBrainMachine } from "@openorc/protocol";
 
 /** A brain this build can install. Read only when installing it, since it is tens of megabytes. */
@@ -14,9 +14,14 @@ export type BrainMachineLike = Pick<BrainMachine, "status" | "provision" | "wake
 
 /** The brain's machine on a team. Its project is made only when `create`; otherwise a team without one has none. */
 export type OpenBrainMachine = (access: BrainAccess, create: boolean) => Promise<BrainMachineLike | null>;
-export const openMachine: OpenBrainMachine = (access, create) => (create ? BrainMachine.connect(access) : BrainMachine.find(access));
+/** Opens machines with the runner's files this build bundles, which an Agent37 brain's instance server comes from. */
+export const machineOpener =
+  (files: RunnerFile[] | undefined): OpenBrainMachine =>
+  (access, create) =>
+    create ? BrainMachine.connect(access, files ? { files } : {}) : BrainMachine.find(access, files ? { files } : {});
+export const openMachine: OpenBrainMachine = machineOpener(undefined);
 
-/** What Settings says of the machine, by Vercel's state. */
+/** What Settings says of the machine, by its service's state. */
 export const shownMachine: Record<BrainMachineStatus["state"], CloudBrainMachine | "missing"> = {
   running: "awake",
   stopped: "asleep",

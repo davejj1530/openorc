@@ -225,6 +225,19 @@ describe("listing and removing Agent37 instances", () => {
     expect(await provider.list()).toMatchObject([{ state: "stopped", awakeMs: 0, costUsd: 0 }]);
   });
 
+  it("keeps the Mac's thread instances and its cloud brain's apart: each host opens, lists and removes only its own", async () => {
+    const brain = new Agent37SandboxProvider({ credentials: async () => connection, files: runnerFiles(), host: "brain", api: (key) => agent37Api(key, fake.endpoints) });
+    await provider.open("openorc-a");
+    await brain.open("openorc-a");
+    await api.create({ name: "openorc-from-before", metadata: { openorc: "thread" } });
+    expect((await api.list()).map((instance) => instance.metadata?.host ?? null).sort()).toEqual(["brain", "mac", null]);
+    expect((await provider.list()).map((listed) => listed.name).sort()).toEqual(["openorc-a", "openorc-from-before"]);
+    expect((await brain.list()).map((listed) => listed.name)).toEqual(["openorc-a"]);
+    await brain.remove("openorc-a");
+    expect((await provider.list()).map((listed) => listed.name).sort()).toEqual(["openorc-a", "openorc-from-before"]);
+    expect(await brain.list()).toEqual([]);
+  });
+
   it("deletes an instance by name with its files, and is done when it is already gone", async () => {
     const sandbox = await provider.open("openorc-a");
     await provider.remove("openorc-a");

@@ -31,6 +31,8 @@ describe("brainOptions", () => {
     const { layout, options: brain, runnerFiles } = await options({ connection, sandbox: "brain" });
     expect(brain).toMatchObject({ dataDir: layout.data, cloudOnly: true, deviceSystem: null, cloudRunnerFiles: runnerFiles });
     expect(await brain.cloudCredentials?.()).toMatchObject(connection);
+    expect(brain).not.toHaveProperty("cloudAgent37");
+    expect(brain).not.toHaveProperty("cloudService");
   });
 
   it("makes thread sandboxes in the region of the brain's own sandbox", async () => {
@@ -43,6 +45,18 @@ describe("brainOptions", () => {
       throw new Error("A brain in a local container has no sandbox.");
     };
     expect(await (await options(null, region)).options.cloudCredentials?.()).toBeNull();
+  });
+
+  it("runs every conversation on Agent37 with the connection from an Agent37 brain's start, and has no door", async () => {
+    const layout = brainLayout(root);
+    const agent37 = { connection: { key: "sk_live_fixture", cpu: 4, memory: 16 }, instance: "ab12cd34ef" } as const;
+    const start: BrainStart = { key: newBrainKey(), name: "Cloud", address: "ab12cd34ef-47820.agent37.app", port: 47_820, vercel: null, agent37 };
+    const secrets = await SealedSecrets.open(layout.secrets, start.key);
+    const brain = brainOptions({ layout, appDir: root, start, self: { region: async () => "us" }, secrets, transport: { push() {} }, runnerFiles: [] });
+    expect(await brain.cloudAgent37?.()).toEqual(agent37.connection);
+    expect(brain.cloudService).toBe("agent37");
+    expect(await brain.cloudCredentials?.()).toBeNull();
+    expect(brain.remoteNetwork?.door).toBeUndefined();
   });
 
   it("is reached only through the proxy at its public address, on the port the sandbox declared", async () => {

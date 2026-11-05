@@ -1,11 +1,12 @@
-import type { AgentVersions, VercelConnection } from "@openorc/cloud";
-import type { HarnessId } from "@openorc/protocol";
+import type { Agent37Connection, AgentVersions, VercelConnection } from "@openorc/cloud";
+import type { CloudService, HarnessId } from "@openorc/protocol";
 import { claudeAccounts, type Db, type LedgerWriter } from "@openorc/db";
 import type { OpenOrcOptions } from "../options.js";
 import type { Logger } from "../transport.js";
 import type { ClaudeAccountService } from "./claude-accounts.js";
 import { ClaudeCloudTokens } from "./claude-cloud-tokens.js";
 import { CloudBrain } from "./cloud-brain.js";
+import { machineOpener } from "./cloud-brain-machine.js";
 import { macGitHub, macMemoryKey, type SignInSources } from "./cloud-brain-signins.js";
 import type { MemoryService } from "./memory.js";
 import { savedPushKey } from "../remote/push/keys.js";
@@ -32,12 +33,32 @@ import { RelocationCoordinator } from "./relocation-coordinator.js";
 import { brainChannel } from "./cloud-brain-channel.js";
 import type { WorkspaceService } from "./workspace.js";
 
-/** The cloud brain as this Mac keeps it, made with the Vercel connection the Mac's sandboxes use. */
+/** The connections cloud machines are made with, and the service new ones go to. */
+interface CloudSources {
+  vercel: () => Promise<VercelConnection | null>;
+  agent37: () => Promise<Agent37Connection | null>;
+  service: () => Promise<CloudService | null>;
+}
+
+/** The services Settings connects, unless the options name the connections, as tests and the brain's start line do. */
+function cloudSources(options: OpenOrcOptions, settings: CloudSettings): CloudSources {
+  if (!options.cloudCredentials && !options.cloudAgent37) return { vercel: () => settings.credentials(), agent37: () => settings.agent37(), service: () => settings.service() };
+  const vercel = options.cloudCredentials ?? (async () => null);
+  const agent37 = options.cloudAgent37 ?? (async () => null);
+  const service = async (): Promise<CloudService | null> => {
+    if (options.cloudService) return options.cloudService;
+    if (await vercel()) return "vercel";
+    return (await agent37()) ? "agent37" : null;
+  };
+  return { vercel, agent37, service };
+}
+
+/** The cloud brain as this Mac keeps it, made on the service and with the connection the Mac's sandboxes use. */
 function cloudBrain(
   db: Db,
   options: OpenOrcOptions,
   tokens: ClaudeCloudTokens,
-  vercel: () => Promise<VercelConnection | null>,
+  sources: CloudSources,
   signIns: SignInSources,
   invalidate: (keys: string[]) => void,
   agentVersions: () => Promise<AgentVersions>,
@@ -46,13 +67,13 @@ function cloudBrain(
     db,
     store: options.cloudBrainSecrets,
     tokens,
-    vercel,
+    ...sources,
     signIns,
     agentVersions,
     bundle: options.cloudBrainBundle,
     // "cloud" too: the brain's region is where this Mac's sandboxes run unless another is chosen.
     changed: () => invalidate(["cloud-brain", "cloud"]),
-    ...(options.cloudBrainMachine ? { open: options.cloudBrainMachine } : {}),
+    open: options.cloudBrainMachine ?? machineOpener(options.cloudRunnerFiles),
     ...(options.cloudBrainDoors ? { doors: options.cloudBrainDoors } : {}),
   });
 }
@@ -76,13 +97,14 @@ export interface CloudInput {
   log: Logger;
 }
 
-/** Where sandboxes run: the services Settings connects, unless the options name the credentials or the service. */
-function sandboxServices(options: OpenOrcOptions, settings: CloudSettings, env: () => NodeJS.ProcessEnv) {
+/** Where sandboxes run. */
+function sandboxServices(options: OpenOrcOptions, sources: CloudSources, env: () => NodeJS.ProcessEnv) {
   return cloudSandboxProviders({
     dataDir: options.dataDir,
     env,
-    credentials: options.cloudCredentials ?? (() => settings.credentials()),
-    ...(options.cloudCredentials ? {} : { agent37: () => settings.agent37(), service: () => settings.service() }),
+    credentials: sources.vercel,
+    agent37: sources.agent37,
+    service: sources.service,
     ...(options.cloudRunnerFiles ? { files: options.cloudRunnerFiles } : {}),
     ...(options.cloudSandboxes ? { override: options.cloudSandboxes } : {}),
     cloudOnly: options.cloudOnly,
@@ -107,7 +129,8 @@ export function createCloud(input: CloudInput): {
 } {
   const { db, options, accounts, environment, invalidate, log } = input;
   const settings = new CloudSettings(options.cloudSecrets, { brainRegion: () => brain.region() });
-  const sandboxes = sandboxServices(options, settings, () => environment().env);
+  const sources = cloudSources(options, settings);
+  const sandboxes = sandboxServices(options, sources, () => environment().env);
   const signIn = {
     signInLaunch: (id: string) => accounts.signInLaunch(id),
     cloudTokenChanged: (id: string) => {
@@ -129,7 +152,7 @@ export function createCloud(input: CloudInput): {
     db,
     options,
     tokens,
-    options.cloudCredentials ?? (() => settings.credentials()),
+    sources,
     signIns,
     (keys) => [invalidate(keys), input.brainChanged?.()],
     () => everyVersion(versions),

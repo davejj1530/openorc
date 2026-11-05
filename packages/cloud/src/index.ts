@@ -35,12 +35,13 @@ export {
   type Agent37Endpoints,
   type Agent37ExecResult,
   type Agent37Instance,
+  type Agent37PublicPort,
   type Agent37Resources,
   type Agent37Status,
   type Agent37Usage,
   type PortAddress,
 } from "./agent37.js";
-export { Agent37Sandbox, Agent37SandboxProvider, agent37Connection, type Agent37Connection, type Agent37ProviderOptions } from "./agent37-sandbox.js";
+export { Agent37Sandbox, Agent37SandboxProvider, agent37Connection, type Agent37Connection, type Agent37Host, type Agent37ProviderOptions } from "./agent37-sandbox.js";
 export { startFakeAgent37, type FakeAgent37, type FakeAgent37Options } from "./agent37-fake.js";
 export { INSTANCE_SERVER_PORT, InstancePort, type InstanceProcess, type ProcessSpec } from "./instance-port.js";
 export { RemoteProcess, type RemoteCommand } from "./remote-process.js";
@@ -87,25 +88,26 @@ export {
   type ProjectCopy,
 } from "./brain/wire.js";
 export { SealedUnreadable, brainKeyCheck, keyCheckMatches, openSecret, sealSecret } from "./brain/sealed-file.js";
-export { brainSelf, type BrainSelf, type BrainSession, type OpenBrainSession } from "./brain/self.js";
+export { agent37Self, brainSelf, type BrainSelf, type BrainSession, type OpenBrainSession } from "./brain/self.js";
 export {
   BrainMachine,
   BrainRefused,
   BrainUnavailable,
   brainVersionNewer,
   type BrainAccess,
-  type BrainApi,
   type BrainBundle,
   type BrainCommand,
+  type BrainHome,
   type BrainMachineOptions,
   type BrainMachineStatus,
-  type BrainOpenParams,
-  type BrainSettings,
+  type BrainStartCommand,
   type BrainVm,
   type ProjectBundle,
   type ProvisionOptions,
+  type WakeInput,
   type WakeResult,
 } from "./brain/machine.js";
+export type { BrainApi, BrainOpenParams, BrainSettings } from "./brain/vercel-brain.js";
 export { branchHead, bundleBranch, catchUpWithOrigin, confirmSynced, copyHeads, copySyncedAt, takeBranch, type OriginCatchUp, type Taken } from "./brain/project-copy.js";
 export { DOOR_EPOCH_MS, DOOR_PROJECT, brainDoor, doorEpoch, ticketStanding, type BrainDoor, type BrainDoorKey } from "./brain/door.js";
 export { closeDoor, openDoor, removeDoor, type DoorAccess, type DoorBundle, type DoorDeployOptions, type DoorOpening, type OpenedDoor } from "./brain/door-deploy.js";

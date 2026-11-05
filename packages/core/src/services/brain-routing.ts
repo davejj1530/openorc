@@ -30,6 +30,7 @@ function cloudBrainEndpoint(brain: CloudBrain): BrainEndpoint {
       const brainKey = fromBase64Url(linkKey);
       return { url: linkUrl({ kind: "public", host: target.address, port: 443 }, brainKey, nodeCrypto), brainKey, ownerKeys: ownerLinkKeys(target.key) };
     },
+    dialable: () => brain.dialable(),
     wake: () => brain.withMachine(true, async () => undefined),
     freshen: () => brain.freshenProjects(),
   };

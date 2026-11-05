@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { CloudService } from "./cloud.js";
 import type { RemoteDevice } from "./remote.js";
 
 /** Where a cloud brain can run, by city: the regions @vercel/sandbox names for sandboxes. */
@@ -79,29 +80,35 @@ export function brainRegionFor(timeZone: string): BrainRegion {
 /** What setting a brain up is doing: making its machine and installing it, starting it, sending it the sign-ins. */
 export type CloudBrainStep = "machine" | "start" | "sign-ins";
 
-/** The brain's sandbox as Vercel reports it. */
+/** The brain's machine as its service reports it. */
 export type CloudBrainMachine = "awake" | "asleep" | "starting" | "stopping" | "failed";
 
 /**
- * The door a paired phone knocks on to wake the brain, a small function in the same team that this Mac deploys and keeps
- * current. `failed` keeps the reason a phone cannot wake the brain by itself.
+ * The door a paired phone knocks on to wake a brain on Vercel, a small function in the same team that this Mac deploys
+ * and keeps current. `failed` keeps the reason a phone cannot wake the brain by itself. A brain on Agent37 has none: any
+ * request to its address wakes it.
  */
 export type CloudBrainDoor = { state: "open" } | { state: "opening" } | { state: "failed"; error: string };
+
+/** Where a brain lives: its service, and its region on Vercel. Agent37 runs its default instances in one region, so null there. */
+export interface CloudBrainPlace {
+  service: CloudService;
+  region: BrainRegion | null;
+}
 
 /** What Settings shows about the cloud brain. Its key and the tokens sent to it never leave the core. */
 export type CloudBrainStatus =
   /** This build carries no brain to set up. */
   | { state: "unavailable" }
   | { state: "none"; error: string | null }
-  /** The Vercel team has a brain this Mac has no key for. */
-  | { state: "elsewhere"; error: string | null }
-  | { state: "setting-up"; region: BrainRegion; step: CloudBrainStep }
-  /** Setup stopped before the brain first started, or its machine is gone. Setting up again keeps its key and region. */
-  | { state: "incomplete"; region: BrainRegion; error: string | null }
-  | {
+  /** The Vercel team or Agent37 account has a brain this Mac has no key for. */
+  | { state: "elsewhere"; service: CloudService; error: string | null }
+  | ({ state: "setting-up"; step: CloudBrainStep } & CloudBrainPlace)
+  /** Setup stopped before the brain first started, or its machine is gone. Setting up again keeps its key and place. */
+  | ({ state: "incomplete"; error: string | null } & CloudBrainPlace)
+  | ({
       state: "ready";
-      region: BrainRegion;
-      /** Null while Vercel cannot be asked. */
+      /** Null while its service cannot be asked. */
       machine: CloudBrainMachine | null;
       /** The Claude accounts it signs in as, by name, as last sent. */
       claude: string[];
@@ -114,11 +121,11 @@ export type CloudBrainStatus =
       /** The conversations on it, as it last counted them for this Mac. They go with it when it is removed. */
       threads: number;
       error: string | null;
-    }
+    } & CloudBrainPlace)
   | { state: "removing" };
 
 /** A project on this Mac, and whether the cloud brain has a copy of it. */
-/** What the brain and its thread sandboxes ran since `since` (the month's start), at Vercel's list prices. */
+/** What the brain and its thread machines ran since `since` (the month's start), by its service's numbers. */
 export interface CloudBrainCost {
   usd: number;
   since: number;
@@ -174,21 +181,24 @@ export interface CloudBrainPairing {
 /** Desktop-only, like the rest of cloud.*: a phone cannot set up, wake or remove the brain. */
 export const cloudBrainRpcParams = {
   "cloud.brain.status": z.object({}),
-  /** Makes the brain in the region and sets it up in the background. Again after a failure, with the key and region it has. */
-  "cloud.brain.create": z.object({ region: BrainRegion }).strict(),
+  /**
+   * Makes the brain on the service new cloud threads run on, on Vercel in the region, and sets it up in the background.
+   * Again after a failure, with the key and place it has.
+   */
+  "cloud.brain.create": z.object({ region: BrainRegion.optional() }).strict(),
   /** Starts the brain unless it runs, and sends sign-ins that changed. */
   "cloud.brain.wake": z.object({}),
   /** Wakes the brain and asks it for a phone pairing code. */
   "cloud.brain.pair": z.object({}),
   /** Sends the sign-ins again, waking the brain. */
   "cloud.brain.handover": z.object({}),
-  /** Deletes the brain's door, then the brain with its disk and its thread sandboxes, and forgets its key. */
+  /** Deletes a Vercel brain's door, then the brain with its disk and its thread machines, and forgets its key. */
   "cloud.brain.remove": z.object({}),
   /** Has the brain count its conversations again, for the Remove confirm. Never wakes it: one asleep keeps its last count. */
   "cloud.brain.recount": z.object({}),
   /** This Mac's projects, and which the brain has. Never wakes the brain. */
   "cloud.brain.projects": z.object({}),
-  /** What the brain, its thread sandboxes and their snapshots cost this month, from Vercel's own numbers; null before setup. Never wakes it. */
+  /** What the brain and its thread machines cost this month, from its service's own numbers; null before setup. Never wakes it. */
   "cloud.brain.cost": z.object({}),
   /** Sends a project to the brain, or removes its copy there, waking the brain. */
   "cloud.brain.project": z.object({ projectId: z.string().min(1), on: z.boolean() }).strict(),

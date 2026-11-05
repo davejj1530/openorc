@@ -249,7 +249,7 @@ export function CloudSettings({ active }: { active: boolean }) {
       <ClaudeCloudAccounts status={status.data} active={active} />
       <CodexCloudSection codex={status.data.codex} />
       <OpenCodeCloudSection opencode={status.data.opencode} />
-      {status.data.vercel?.team ? <CloudBrainSection active={active} /> : null}
+      {status.data.service ? <CloudBrainSection active={active} service={status.data.service} /> : null}
       <TakeoverSection enabled={status.data.takeover} />
       <CloudSandboxesSection active={active} />
       <CloudCheckSection status={status.data} />

@@ -1,6 +1,6 @@
-import type { RunnerFile, SandboxProvider, VercelConnection } from "@openorc/cloud";
+import type { Agent37Connection, RunnerFile, SandboxProvider, VercelConnection } from "@openorc/cloud";
 import type { TextEmbedder } from "@openorc/memory";
-import type { BrowserHost, PreviewHost } from "@openorc/protocol";
+import type { BrowserHost, CloudService, PreviewHost } from "@openorc/protocol";
 import type { DeviceSystem } from "./devices/system.js";
 import type { RemoteNetwork } from "./remote/remote-access.js";
 import type { BrainDoors } from "./services/cloud-brain-door.js";
@@ -88,6 +88,10 @@ export interface OpenOrcOptions {
   terminal?: SpawnTerminal;
   /** Overrides the credentials Settings keeps, for tests and smoke scripts. While it resolves to null, new cloud conversations run in sandboxes on this Mac. */
   cloudCredentials?: () => Promise<VercelConnection | null>;
+  /** Overrides the Agent37 connection Settings keeps, as on a cloud brain on Agent37, whose start line names it. */
+  cloudAgent37?: () => Promise<Agent37Connection | null>;
+  /** The service new cloud conversations run on, in place of the one Settings chose. */
+  cloudService?: CloudService;
   /** Keeps the cloud brain's key, team and region. Losing it loses the brain: only its key opens the brain's secrets. */
   cloudBrainSecrets?: ProtectedSecretStore;
   /** The cloud brain this build installs, looked up when Settings asks. Without one, no brain can be set up. */

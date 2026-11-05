@@ -1,5 +1,15 @@
 import { useState } from "react";
-import { BRAIN_REGIONS, brainRegionFor, type BrainRegion, type CloudBrainDoor, type CloudBrainMachine, type CloudBrainStatus, type CloudBrainStep } from "@openorc/protocol";
+import {
+  BRAIN_REGIONS,
+  brainRegionFor,
+  type BrainRegion,
+  type CloudBrainDoor,
+  type CloudBrainMachine,
+  type CloudBrainPlace,
+  type CloudBrainStatus,
+  type CloudBrainStep,
+  type CloudService,
+} from "@openorc/protocol";
 import { Button, Dialog, Select, TextButton, Tooltip } from "../components/ui";
 import { StepMark } from "../components/WorkSteps";
 import { useRpc, useRpcMutation } from "../lib/client";
@@ -11,10 +21,24 @@ import { Failure, StillWorks } from "./settings-secret-field";
 import { Section, SettingRow, Status } from "./settings-shared";
 import "./settings-cloud-check.css";
 
-/** Vercel is asked on each look; the brain falls asleep on its own about five minutes after its last use. */
+/** Its service is asked on each look; the brain falls asleep on its own about five minutes after its last use. */
 const REFRESH_MS = 30_000;
 
 const regionName = (region: BrainRegion) => `${BRAIN_REGIONS[region]} · ${region}`;
+
+/** How each service's words go: where the brain lives, what it makes there, and how its cost is counted. */
+const SERVICES: Record<CloudService, { name: string; account: string; machines: string; cost: string }> = {
+  vercel: {
+    name: "Vercel",
+    account: "your Vercel team",
+    machines: "sandboxes",
+    cost: "Vercel's list prices for the brain, its thread sandboxes and their snapshots, before your plan's credit.",
+  },
+  agent37: { name: "Agent37", account: "your Agent37 account", machines: "instances", cost: "What Agent37 counts for the brain and the thread instances it made." },
+};
+
+/** A brain on Vercel by its region; one on Agent37, which has a single region, by its service. */
+const placeName = ({ service, region }: CloudBrainPlace) => (region ? regionName(region) : SERVICES[service].name);
 
 /** Every region Vercel runs sandboxes in, by city: where the brain is set up, and where new sandboxes run. */
 export function RegionSelect({ label, value, disabled, onChange }: { label?: string; value: BrainRegion; disabled: boolean; onChange: (region: BrainRegion) => void }) {
@@ -39,7 +63,7 @@ const STEPS = Object.keys(stepLabels) as CloudBrainStep[];
 const machineLabels: Record<CloudBrainMachine, string> = { awake: "Awake", asleep: "Asleep", starting: "Waking", stopping: "Going to sleep", failed: "Failed" };
 const doorLabels: Record<CloudBrainDoor["state"], string> = { open: "Open", opening: "Opening", failed: "Not open" };
 
-/** What the brain's machine is doing, an update or a wake under way first; null while Vercel cannot be asked. */
+/** What the brain's machine is doing, an update or a wake under way first; null while its service cannot be asked. */
 function machineStatus(brain: Extract<CloudBrainStatus, { state: "ready" }>, waking: boolean): { label: string; ok: boolean } | null {
   if (brain.working === "updating") return { label: "Updating", ok: false };
   if (waking) return { label: "Waking", ok: false };
@@ -67,18 +91,20 @@ function Door({ door }: { door: CloudBrainDoor | null }) {
   );
 }
 
-function NotSetUp({ available }: { available: boolean }) {
+/** Set up on the service new cloud threads run on; on Vercel in a region, since Agent37 has one. */
+function NotSetUp({ available, service }: { available: boolean; service: CloudService }) {
   const create = useRpcMutation("cloud.brain.create");
   const [region, setRegion] = useState<BrainRegion>(() => brainRegionFor(Intl.DateTimeFormat().resolvedOptions().timeZone));
+  const vercel = service === "vercel";
   const setUp = (
-    <Button disabled={!available || create.isPending} onClick={() => create.mutate({ region })}>
+    <Button disabled={!available || create.isPending} onClick={() => create.mutate(vercel ? { region } : {})}>
       Set up
     </Button>
   );
   return (
     <>
-      <SettingRow label="Region" hint="Fixed once it is set up.">
-        <RegionSelect label="Region" value={region} disabled={!available || create.isPending} onChange={setRegion} />
+      <SettingRow label={vercel ? "Region" : SERVICES[service].name} hint={vercel ? "Fixed once it is set up." : null}>
+        {vercel ? <RegionSelect label="Region" value={region} disabled={!available || create.isPending} onChange={setRegion} /> : null}
         {available ? setUp : <Tooltip label="The cloud brain isn't available in this build.">{setUp}</Tooltip>}
       </SettingRow>
       <Failure error={create.error} />
@@ -91,11 +117,11 @@ function stepState(index: number, at: number): "done" | "running" | "pending" {
   return index === at ? "running" : "pending";
 }
 
-function SettingUp({ region, step }: { region: BrainRegion; step: CloudBrainStep }) {
+function SettingUp({ place, step }: { place: CloudBrainPlace; step: CloudBrainStep }) {
   const at = STEPS.indexOf(step);
   return (
     <>
-      <SettingRow label={regionName(region)}>
+      <SettingRow label={placeName(place)}>
         <Status>Setting up</Status>
       </SettingRow>
       <ol className="cloud-check-steps" aria-label="Setting up the cloud brain">
@@ -115,14 +141,15 @@ function SettingUp({ region, step }: { region: BrainRegion; step: CloudBrainStep
 }
 
 /** What a removal deletes, the conversations on the brain by count when it has any. */
-function removalWords(threads: number): string {
-  if (!threads) return "This deletes it from your Vercel team, with its disk and the sandboxes it made. Phones paired with it can no longer reach it.";
+function removalWords(threads: number, service: CloudService): string {
+  const { account, machines } = SERVICES[service];
+  if (!threads) return `This deletes it from ${account}, with its disk and the ${machines} it made. Phones paired with it can no longer reach it.`;
   const conversations = threads === 1 ? "the conversation on it. Bring it to your Mac first to keep it." : `the ${threads} conversations on it. Bring to Mac any you want to keep first.`;
-  return `This deletes it from your Vercel team, with its disk, the sandboxes it made and ${conversations} Phones paired with it can no longer reach it.`;
+  return `This deletes it from ${account}, with its disk, the ${machines} it made and ${conversations} Phones paired with it can no longer reach it.`;
 }
 
-/** Deletes the brain from the team, after a confirm that counts the conversations going with it. */
-function RemoveBrain({ disabled, threads = 0 }: { disabled: boolean; threads?: number }) {
+/** Deletes the brain from its service, after a confirm that counts the conversations going with it. */
+function RemoveBrain({ disabled, service, threads = 0 }: { disabled: boolean; service: CloudService; threads?: number }) {
   const remove = useRpcMutation("cloud.brain.remove");
   const recount = useRpcMutation("cloud.brain.recount");
   const [confirming, setConfirming] = useState(false);
@@ -139,7 +166,7 @@ function RemoveBrain({ disabled, threads = 0 }: { disabled: boolean; threads?: n
       </TextButton>
       <Dialog open={confirming} onOpenChange={setConfirming} title="Remove the cloud brain?">
         <div className="space-y-3">
-          <p className="text-ink-2">{removalWords(threads)}</p>
+          <p className="text-ink-2">{removalWords(threads, service)}</p>
           <StillWorks at={codex} subject={codex === "apiKey" ? "Its OpenAI API key " : "Its Codex login "} />
           <div className="flex justify-end gap-2">
             <Button onClick={() => setConfirming(false)}>Cancel</Button>
@@ -181,13 +208,13 @@ function PairBrainPhone({ disabled }: { disabled: boolean }) {
   );
 }
 
-/** What the brain and its thread sandboxes ran this month, quietly; how it is counted on demand. Never wakes the brain. */
-function BrainCost({ active }: { active: boolean }) {
+/** What the brain and its thread machines ran this month, quietly; how it is counted on demand. Never wakes the brain. */
+function BrainCost({ active, service }: { active: boolean; service: CloudService }) {
   const cost = useRpc("cloud.brain.cost", {}, { enabled: active, staleTime: 5 * 60_000 }).data;
   if (!cost) return null;
   return (
     <SettingRow label="This month">
-      <Tooltip label="Vercel's list prices for the brain, its thread sandboxes and their snapshots, before your plan's credit.">
+      <Tooltip label={SERVICES[service].cost}>
         <span className="text-ink-3">{cost.usd < 0.01 ? "Less than $0.01" : `$${cost.usd.toFixed(2)}`}</span>
       </Tooltip>
     </SettingRow>
@@ -201,7 +228,7 @@ function Ready({ brain, active }: { brain: Extract<CloudBrainStatus, { state: "r
   const machine = machineStatus(brain, brain.working === "waking" || wake.isPending);
   return (
     <>
-      <SettingRow label={regionName(brain.region)}>
+      <SettingRow label={placeName(brain)}>
         {machine ? <Status ok={machine.ok}>{machine.label}</Status> : null}
         {brain.machine === "asleep" && !busy ? (
           <TextButton tone="muted" onClick={() => wake.mutate({})}>
@@ -209,7 +236,7 @@ function Ready({ brain, active }: { brain: Extract<CloudBrainStatus, { state: "r
           </TextButton>
         ) : null}
         <PairBrainPhone disabled={busy} />
-        <RemoveBrain disabled={busy} threads={brain.threads} />
+        <RemoveBrain disabled={busy} service={brain.service} threads={brain.threads} />
       </SettingRow>
       <CloudBrainPhones active={active} busy={busy} />
       <SettingRow label="Claude accounts" hint={brain.claude.length ? brain.claude.join(", ") : "None"}>
@@ -223,44 +250,44 @@ function Ready({ brain, active }: { brain: Extract<CloudBrainStatus, { state: "r
       <CloudBrainSignIns active={active} busy={busy} />
       <Door door={brain.door} />
       <CloudBrainProjects active={active} />
-      <BrainCost active={active} />
+      <BrainCost active={active} service={brain.service} />
       <Alert error={brain.error} />
     </>
   );
 }
 
-function BrainState({ brain, active }: { brain: CloudBrainStatus; active: boolean }) {
+function BrainState({ brain, active, service }: { brain: CloudBrainStatus; active: boolean; service: CloudService }) {
   const create = useRpcMutation("cloud.brain.create");
   switch (brain.state) {
     case "unavailable":
-      return <NotSetUp available={false} />;
+      return <NotSetUp available={false} service={service} />;
     case "none":
       return (
         <>
-          <NotSetUp available />
+          <NotSetUp available service={service} />
           <Alert error={brain.error} />
         </>
       );
     case "elsewhere":
       return (
         <>
-          <SettingRow label="Already in this team" hint="This Mac doesn't have its key.">
-            <RemoveBrain disabled={false} />
+          <SettingRow label={brain.service === "vercel" ? "Already in this team" : "Already on this account"} hint="This Mac doesn't have its key.">
+            <RemoveBrain disabled={false} service={brain.service} />
           </SettingRow>
           <Alert error={brain.error} />
         </>
       );
     case "setting-up":
-      return <SettingUp region={brain.region} step={brain.step} />;
+      return <SettingUp place={brain} step={brain.step} />;
     case "incomplete":
       return (
         <>
-          <SettingRow label={regionName(brain.region)}>
+          <SettingRow label={placeName(brain)}>
             <Status>Not set up</Status>
-            <Button disabled={create.isPending} onClick={() => create.mutate({ region: brain.region })}>
+            <Button disabled={create.isPending} onClick={() => create.mutate(brain.region ? { region: brain.region } : {})}>
               Try again
             </Button>
-            <RemoveBrain disabled={create.isPending} />
+            <RemoveBrain disabled={create.isPending} service={brain.service} />
           </SettingRow>
           <Alert error={brain.error} />
           <Failure error={create.error} />
@@ -277,12 +304,17 @@ function BrainState({ brain, active }: { brain: CloudBrainStatus; active: boolea
   }
 }
 
-/** OpenOrc in the user's own Vercel team: set up from here, handed this Mac's Claude sign-ins and projects, paired with a phone. */
-export function CloudBrainSection({ active }: { active: boolean }) {
+/**
+ * OpenOrc on the user's own Vercel team or Agent37 account: set up from here, handed this Mac's Claude sign-ins and
+ * projects, paired with a phone. `service` is where new cloud threads run, and so where a brain set up now goes.
+ */
+export function CloudBrainSection({ active, service }: { active: boolean; service: CloudService }) {
   const status = useRpc("cloud.brain.status", {}, { enabled: active, refetchInterval: active ? REFRESH_MS : false });
+  const brain = status.data;
+  const where = brain && "service" in brain ? brain.service : service;
   return (
-    <Section title="Cloud brain" description="A copy of OpenOrc in your Vercel team, for your phone while this Mac sleeps.">
-      {status.data ? <BrainState brain={status.data} active={active} /> : null}
+    <Section title="Cloud brain" description={`A copy of OpenOrc in ${SERVICES[where].account}, for your phone while this Mac sleeps.`}>
+      {brain ? <BrainState brain={brain} active={active} service={service} /> : null}
       <Failure error={status.error} />
     </Section>
   );

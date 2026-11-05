@@ -69,7 +69,7 @@ describe("BrainAwake", () => {
     vi.useRealTimers();
   });
 
-  function awake(options: { busy?: () => string | null; extend?: BrainSelf["extend"] } = {}) {
+  function awake(options: { busy?: () => string | null; extend?: BrainSelf["extend"]; naps?: { stop: BrainSelf["stop"] } } = {}) {
     vi.useFakeTimers({ now: T });
     const extends_: number[] = [];
     const sleeps: string[] = [];
@@ -81,8 +81,9 @@ describe("BrainAwake", () => {
           extends_.push(Date.now());
           return { expiresAt: Date.now() + forMs, capped: false };
         }),
-      stop: async () => undefined,
+      stop: options.naps?.stop ?? (async () => undefined),
       region: async () => "sin1",
+      ...(options.naps ? { keepsProcesses: true as const } : {}),
     };
     const brain = new BrainAwake({
       busy: options.busy ?? (() => null),
@@ -145,5 +146,40 @@ describe("BrainAwake", () => {
     expect(sleeps).toEqual([]);
     await vi.advanceTimersByTimeAsync(1);
     expect(sleeps).toEqual(["session-limit"]);
+  });
+
+  it("sleeps a machine that keeps its process without closing the brain, and starts the idle clock over once the sleep answers", async () => {
+    const stops: number[] = [];
+    let woke: () => void = () => undefined;
+    const { brain, sleeps } = awake({ naps: { stop: () => (stops.push(Date.now()), new Promise<void>((resolve) => (woke = resolve))) } });
+    brain.start();
+    await vi.advanceTimersByTimeAsync(5 * MIN);
+    expect(stops).toEqual([T + 5 * MIN]);
+    // Asleep for half a minute: the call answers once the machine woke, and the next look is on time.
+    await vi.advanceTimersByTimeAsync(MIN / 2);
+    woke();
+    await vi.advanceTimersByTimeAsync(5 * MIN);
+    expect(stops).toEqual([T + 5 * MIN]);
+    await vi.advanceTimersByTimeAsync(MIN / 2);
+    expect(stops).toEqual([T + 5 * MIN, T + 11 * MIN]);
+    expect(sleeps).toEqual([]);
+    brain.stop();
+  });
+
+  it("starts the idle clock over at a look long after it was due, as when the sleep answered before the machine slept", async () => {
+    const stops: number[] = [];
+    const { brain, extends_, sleeps } = awake({ naps: { stop: async () => void stops.push(Date.now()) } });
+    brain.start();
+    await vi.advanceTimersByTimeAsync(5 * MIN);
+    expect(stops).toEqual([T + 5 * MIN]);
+    // Asleep for two hours, its timers held: the next look comes that much late.
+    vi.setSystemTime(T + 125 * MIN);
+    await vi.advanceTimersByTimeAsync(MIN);
+    expect(stops).toEqual([T + 5 * MIN]);
+    expect(extends_.at(-1)).toBe(T + 126 * MIN);
+    await vi.advanceTimersByTimeAsync(5 * MIN);
+    expect(stops).toEqual([T + 5 * MIN, T + 131 * MIN]);
+    expect(sleeps).toEqual([]);
+    brain.stop();
   });
 });

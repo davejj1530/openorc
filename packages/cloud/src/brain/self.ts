@@ -1,4 +1,6 @@
 import { APIError, Sandbox as SdkSandbox } from "@vercel/sandbox";
+import { agent37Api, type Agent37Api } from "../agent37.js";
+import type { Agent37Connection } from "../agent37-sandbox.js";
 import type { VercelCredentials } from "../vercel-sandbox.js";
 
 /** The brain's handle on its own sandbox, with the connection from its start. */
@@ -12,6 +14,8 @@ export interface BrainSelf {
   stop(): Promise<void>;
   /** The region this sandbox was made in, where the brain makes its thread sandboxes too. */
   region(): Promise<string>;
+  /** Its sleep keeps the brain's process, as Agent37's does: the brain sleeps with its core open and goes on once woken. */
+  readonly keepsProcesses?: true;
 }
 
 /** The running session of the brain's own sandbox. Tests pass a stand-in; the brain passes the SDK's. */
@@ -88,5 +92,28 @@ export function brainSelf(connection: VercelCredentials, sandbox: string, open: 
       }
     },
     region: async () => (await current()).region,
+  };
+}
+
+/** The idle timeouts Agent37 takes. */
+const IDLE_SECONDS = { min: 300, max: 86_400 };
+
+/**
+ * The brain's own Agent37 instance. It has no stop to move: it sleeps once idle for its idle timeout, so an extension
+ * raises that timeout when asked for longer, then runs a command, which counts as activity and starts its clock over.
+ */
+export function agent37Self(connection: Agent37Connection, instance: string, api: Agent37Api = agent37Api(connection.key)): BrainSelf {
+  let idleSeconds = 0;
+  return {
+    keepsProcesses: true,
+    async extend(forMs) {
+      const seconds = Math.max(IDLE_SECONDS.min, Math.min(IDLE_SECONDS.max, Math.ceil(forMs / 1000)));
+      if (seconds > idleSeconds) idleSeconds = (await api.edit(instance, { idle_timeout_seconds: seconds })).idle_timeout_seconds;
+      await api.exec(instance, "true");
+      return { expiresAt: Date.now() + idleSeconds * 1000, capped: false };
+    },
+    stop: () => api.sleep(instance),
+    // Agent37 makes instances in its default region unless asked, as the brain makes its own and its threads'.
+    region: async () => "us",
   };
 }

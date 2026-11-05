@@ -3,6 +3,7 @@ import path from "node:path";
 import {
   BRAIN_EXIT,
   BRAIN_READY,
+  agent37Self,
   brainLayout,
   brainSelf,
   parseLaunch,
@@ -51,6 +52,8 @@ async function boot(layout: BrainLayout, log: BrainLog): Promise<{ start: BrainS
     exitWith(log, BRAIN_EXIT.badStart, words(error));
   }
   process.stdin.destroy();
+  // Kept in an Agent37 instance's env for its boot hook; the agents and tools the brain starts get none of it.
+  delete process.env["OPENORC_BRAIN_START"];
   const missing = await missingTools(brainPath(layout));
   if (missing.length) exitWith(log, BRAIN_EXIT.needsProvision, `The brain's machine lacks ${missing.join(", ")}.`);
   try {
@@ -59,6 +62,12 @@ async function boot(layout: BrainLayout, log: BrainLog): Promise<{ start: BrainS
     if (error instanceof WrongBrainKey) exitWith(log, BRAIN_EXIT.wrongKey, error.message);
     throw error;
   }
+}
+
+/** The brain's handle on its own machine, from the service its start line names. */
+function selfOf(start: BrainStart): BrainSelf {
+  if (start.vercel) return brainSelf(start.vercel.connection, start.vercel.sandbox);
+  return start.agent37 ? agent37Self(start.agent37.connection, start.agent37.instance) : NO_SANDBOX;
 }
 
 /** The runner's source files the build put beside the entry points; cloud sandboxes are given them as they are. */
@@ -139,7 +148,7 @@ export async function serve(appDir: string): Promise<void> {
   const version = path.basename(appDir);
   const log = new BrainLog(layout.log);
   const { start, secrets } = await boot(layout, log);
-  const self = start.vercel ? brainSelf(start.vercel.connection, start.vercel.sandbox) : NO_SANDBOX;
+  const self = selfOf(start);
   const host = new Host(version, self, log);
   process.on("SIGTERM", () => void host.shutdown("stop"));
   process.on("SIGINT", () => void host.shutdown("stop"));

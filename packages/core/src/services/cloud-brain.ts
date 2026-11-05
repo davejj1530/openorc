@@ -8,18 +8,33 @@ import {
   brainVersionNewer,
   newBrainKey,
   sealHandover,
+  type Agent37Connection,
   type AgentVersions,
   type BrainAccess,
   type BrainControlResults,
   type BrainKey,
   type HandoverClaudeAccount,
   type HandoverCodexLogin,
+  type WakeInput,
 } from "@openorc/cloud";
 import { projects, redact, type Db } from "@openorc/db";
-import type { BrainRegion, CloudBrainCost, CloudBrainMachine, CloudBrainPairing, CloudBrainProject, CloudBrainSignIns, CloudBrainStatus, CloudBrainStep, Project } from "@openorc/protocol";
+import type {
+  BrainRegion,
+  CloudBrainCost,
+  CloudBrainMachine,
+  CloudBrainPairing,
+  CloudBrainProject,
+  CloudBrainSignIns,
+  CloudBrainStatus,
+  CloudBrainStep,
+  CloudService,
+  Project,
+} from "@openorc/protocol";
 import { BrainCosts } from "./cloud-brain-cost.js";
 import { openMachine, shownMachine, type BrainBundleSource, type BrainMachineLike, type OpenBrainMachine } from "./cloud-brain-machine.js";
 import { BrainPhones } from "./cloud-brain-phones.js";
+import { SERVICE_NAMES, accessHere, accountOf, brainConnections, placeOf, provisionAt, reach, regionOf, serviceOf, threadSizes, type BrainConnections } from "./cloud-brain-place.js";
+import { BrainRecord, type StoredBrain } from "./cloud-brain-record.js";
 import type { ClaudeCloudTokens } from "./claude-cloud-tokens.js";
 import { BrainDoorKeeper, vercelDoors, type BrainDoors } from "./cloud-brain-door.js";
 import { anyMoved, blocked, confirmCurrent, copyBranch, failedAt, freshCopy, hasThreads, keptOwn, seen, stale, switchedOn, type BrainProject } from "./cloud-brain-projects.js";
@@ -31,28 +46,7 @@ import type { ProtectedSecretStore } from "./extraction-credentials.js";
 
 /** What phones show for the brain. */
 const BRAIN_NAME = "Cloud";
-const storageError = "Cannot access protected storage for the cloud brain. Unlock your OS keychain and retry.";
 const unavailable = "The cloud brain isn't available in this build.";
-
-/** Kept in protected storage. The key alone opens the brain's secrets, so it is saved before anything is made. */
-interface Stored extends SignInRecord {
-  key: string;
-  teamId: string;
-  region: BrainRegion;
-  /** The brain's public host, once it has started. */
-  address: string | null;
-  /** The brain has started once; until then setting up again keeps this key and region. */
-  ready: boolean;
-  claude: Sent[];
-  /** The brain installed on its machine, as this Mac last installed or found it. Records from before lack it. */
-  version?: string;
-  /** The projects switched on for it. Records from before lack them. */
-  projects?: BrainProject[];
-  /** The brain's link key, learned at its first start, which this Mac dials it with. */
-  linkKey?: string;
-  /** The signInPrint of the agent CLI versions the brain last said it has, once they were this Mac's. */
-  agentVersions?: string;
-}
 
 type Activity = { kind: "setting-up"; step: CloudBrainStep } | { kind: "removing" } | { kind: "waking" } | { kind: "sending" } | { kind: "updating" };
 
@@ -63,8 +57,12 @@ export interface CloudBrainDeps {
   db: Db;
   store: ProtectedSecretStore | undefined;
   tokens: Pick<ClaudeCloudTokens, "status" | "token">;
-  /** The Vercel connection the brain is made with. The brain keeps its own project on the team. */
+  /** The Vercel connection a brain on Vercel is made with. The brain keeps its own project on the team. */
   vercel: () => Promise<{ token: string; teamId: string; vcpus?: number } | null>;
+  /** The Agent37 connection a brain on Agent37 is made with; none unless given. */
+  agent37?: () => Promise<Agent37Connection | null>;
+  /** The service a new brain is made on; Vercel while it is connected, unless given. */
+  service?: () => Promise<CloudService | null>;
   bundle: (() => Promise<BrainBundleSource | null>) | undefined;
   changed: () => void;
   open?: OpenBrainMachine;
@@ -84,12 +82,11 @@ export interface CloudBrainDeps {
  */
 export class CloudBrain {
   private pending: Promise<unknown> = Promise.resolve();
-  /** Undefined until read; null when no brain is set up. */
-  private cache: Stored | null | undefined;
+  private readonly record: BrainRecord;
   private activity: Activity | null = null;
   private error: string | null = null;
-  /** The team a brain this Mac has no key for was found in, when setting up. */
-  private elsewhere: string | null = null;
+  /** The account a brain this Mac has no key for was found in, when setting up. */
+  private elsewhere: { service: CloudService; account: string } | null = null;
   private connected: { key: string; machine: BrainMachineLike } | null = null;
   /** The Mac project whose copy is on its way to the brain. */
   private sendingProject: string | null = null;
@@ -103,45 +100,70 @@ export class CloudBrain {
   private readonly costs = new BrainCosts();
   private stuck = new Map<string, string | null>();
 
+  private readonly connections: BrainConnections;
+
   constructor(private readonly deps: CloudBrainDeps) {
+    this.connections = brainConnections(deps);
+    this.record = new BrainRecord(deps.store);
     this.door = new BrainDoorKeeper({ doors: deps.doors ?? vercelDoors, project: deps.projects?.door, changed: () => this.changed(), scrub: (error) => this.scrub(error) });
     this.phones = new BrainPhones({ db: deps.db, machine: (wake, work) => this.withMachine(wake, work), changed: () => this.changed() });
   }
 
   async status(): Promise<CloudBrainStatus> {
     if (this.activity?.kind === "removing") return { state: "removing" };
-    let stored: Stored | null;
+    let stored: StoredBrain | null;
     try {
-      stored = await this.read();
+      stored = await this.record.read();
     } catch (error) {
       return { state: "none", error: words(error) };
     }
     if (!stored) {
-      if (await this.stillElsewhere()) return { state: "elsewhere", error: this.error };
+      const elsewhere = await this.stillElsewhere();
+      if (elsewhere) return { state: "elsewhere", service: elsewhere, error: this.error };
       return (await this.deps.bundle?.()) ? { state: "none", error: this.error } : { state: "unavailable" };
     }
-    if (this.activity?.kind === "setting-up") return { state: "setting-up", region: stored.region, step: this.activity.step };
-    if (!stored.ready) return { state: "incomplete", region: stored.region, error: this.error };
+    const where = { service: serviceOf(stored), region: regionOf(stored) };
+    if (this.activity?.kind === "setting-up") return { state: "setting-up", ...where, step: this.activity.step };
+    if (!stored.ready) return { state: "incomplete", ...where, error: this.error };
     const { machine, error } = await this.look(stored);
-    if (machine === "missing") return { state: "incomplete", region: stored.region, error: this.error ?? "The cloud brain's machine is gone." };
+    if (machine === "missing") return { state: "incomplete", ...where, error: this.error ?? "The cloud brain's machine is gone." };
     const working = (this.activity && WORKING[this.activity.kind]) ?? null;
     const behind = !sameSent((await this.claude().catch(() => [])).map(sent), stored.claude);
     const claude = stored.claude.map((account) => account.name);
     const threads = (stored.projects ?? []).reduce((sum, record) => sum + record.threads, 0);
-    return { state: "ready", region: stored.region, machine, claude, behind, working, door: this.door.status(), threads, error: this.error ?? error };
+    return { state: "ready", ...where, machine, claude, behind, working, door: this.door.status(), threads, error: this.error ?? error };
   }
 
   /**
-   * The region of the brain this Mac set up, null without one. Never waits for an operation: one running asks the
-   * Vercel connection, which asks this.
+   * The region of the brain this Mac set up, null without one or on Agent37. Never waits for an operation: one running
+   * asks the Vercel connection, which asks this.
    */
   async region(): Promise<BrainRegion | null> {
-    return (await this.read().catch(() => null))?.region ?? null;
+    const stored = await this.record.read().catch(() => null);
+    return stored && regionOf(stored);
+  }
+
+  /** A brain is set up, or setting up, from this Mac. */
+  async exists(): Promise<boolean> {
+    return (await this.record.read().catch(() => null)) !== null;
+  }
+
+  /**
+   * Whether dialing the brain now leaves it as it is. A Vercel brain's address refuses a dial while it sleeps; any
+   * request to an Agent37 brain's wakes it, so that one is dialed only while its machine runs. Never wakes it.
+   */
+  async dialable(): Promise<boolean> {
+    const stored = await this.record.read().catch(() => null);
+    if (stored?.service !== "agent37") return true;
+    const machine = await this.reach(stored)
+      .then((access) => this.open(access, false))
+      .catch(() => null);
+    return (await machine?.status().catch(() => null))?.state === "running";
   }
 
   /** What moving threads needs of the brain this Mac set up, once it has started; null before. Never wakes it. */
   async moves(): Promise<{ address: string; key: BrainKey; linkKey: string | null; projects: BrainProject[] } | null> {
-    const stored = await this.read().catch(() => null);
+    const stored = await this.record.read().catch(() => null);
     return stored?.ready && stored.address ? { address: stored.address, key: brainKeyFrom(stored.key), linkKey: stored.linkKey ?? null, projects: stored.projects ?? [] } : null;
   }
 
@@ -161,11 +183,11 @@ export class CloudBrain {
    * when one moved. Never wakes the brain; one asleep meanwhile is refreshed at its next wake.
    */
   async freshenProjects(): Promise<void> {
-    const stored = await this.read().catch(() => null);
+    const stored = await this.record.read().catch(() => null);
     if (!stored?.ready || !stored.projects?.length || this.sendingProject) return;
     if (!(await anyMoved(this.deps.db, stored.projects, this.stuck))) return;
     await this.serialize(() => this.refreshProjects()).catch(() => undefined);
-    this.stuck = await failedAt(this.deps.db, (await this.read().catch(() => null))?.projects ?? []);
+    this.stuck = await failedAt(this.deps.db, (await this.record.read().catch(() => null))?.projects ?? []);
   }
 
   /** The brain counts its conversations again when it runs, for the Remove confirm. Never wakes it. */
@@ -175,11 +197,10 @@ export class CloudBrain {
 
   /** What the brain and its thread sandboxes ran and kept this month, at Vercel's list prices; null before setup. Never wakes it. */
   async cost(now = Date.now()): Promise<CloudBrainCost | null> {
-    const stored = await this.read().catch(() => null);
+    const stored = await this.record.read().catch(() => null);
     if (!stored?.ready) return null;
     return this.costs.read(now, async (since) => {
-      const vercel = await this.deps.vercel();
-      const machine = vercel ? await this.open({ token: vercel.token, teamId: stored.teamId }, false) : null;
+      const machine = await this.reach(stored).then((access) => this.open(access, false));
       return machine?.costSince ? machine.costSince(since) : null;
     });
   }
@@ -188,21 +209,21 @@ export class CloudBrain {
   async rememberLinkKey(linkKey: string): Promise<void> {
     await this.serialize(async () => {
       const stored = await this.stored();
-      if (stored.linkKey !== linkKey) await this.write({ ...stored, linkKey });
+      if (stored.linkKey !== linkKey) await this.record.write({ ...stored, linkKey });
     });
   }
 
   /** The brain's machine no longer exists on its team, and its ledger is gone with it. */
   async machineGone(): Promise<boolean> {
-    const stored = await this.read();
+    const stored = await this.record.read();
     if (!stored) return true;
-    const machine = await this.open({ token: (await this.vercel()).token, teamId: stored.teamId }, false);
+    const machine = await this.open(await this.reach(stored), false);
     return !machine || (await machine.status()).state === "missing";
   }
 
   /** This Mac's projects, Workspace aside, and which the brain has a copy of. Never wakes the brain. */
   async projects(): Promise<CloudBrainProject[]> {
-    const records = new Map(((await this.read().catch(() => null))?.projects ?? []).map((record) => [record.id, record]));
+    const records = new Map(((await this.record.read().catch(() => null))?.projects ?? []).map((record) => [record.id, record]));
     const listed = projects.list(this.deps.db);
     // A project removed from this Mac's list keeps its copy until switched off here.
     const unlisted = [...records.keys()].filter((id) => !listed.some((project) => project.id === id)).flatMap((id) => projects.get(this.deps.db, id) ?? []);
@@ -228,7 +249,7 @@ export class CloudBrain {
         const project = projects.get(this.deps.db, id);
         const copy = project ? await copyBranch(project) : { blocked: "That project is not on this Mac." };
         if ("blocked" in copy) throw new Error(copy.blocked);
-        await this.write({ ...stored, projects: [...(stored.projects ?? []), switchedOn(id, copy.branch)] });
+        await this.record.write({ ...stored, projects: [...(stored.projects ?? []), switchedOn(id, copy.branch)] });
         await this.wakeUp(await this.machine());
         return;
       }
@@ -239,16 +260,16 @@ export class CloudBrain {
       const { removed, threads } = await machine.control({ op: "remove-project", source: id });
       if (!removed) return this.saveProjects([{ ...record, threads }]);
       const now = await this.stored();
-      await this.write({ ...now, projects: now.projects?.filter((project) => project.id !== id) });
+      await this.record.write({ ...now, projects: now.projects?.filter((project) => project.id !== id) });
     }).catch(() => undefined);
   }
 
   /**
-   * Makes the brain in the region and sets it up in the background, its progress in the status. Again after a failure,
-   * or on a brain that is set up, it keeps the key and region it has and installs this build's brain, unless the
-   * machine has a newer one.
+   * Makes the brain on the service new cloud machines run on, on Vercel in the region, and sets it up in the
+   * background, its progress in the status. Again after a failure, or on a brain that is set up, it keeps the key and
+   * place it has and installs this build's brain, unless the machine has a newer one.
    */
-  async create(region: BrainRegion): Promise<void> {
+  async create(region?: BrainRegion): Promise<void> {
     const source = await this.serialize(() => this.prepare(region)).catch(async (error: unknown) => {
       throw new Error(await this.scrub(error));
     });
@@ -286,7 +307,7 @@ export class CloudBrain {
 
   /** What the brain signs in with besides Claude. Never wakes the brain. */
   async signIns(): Promise<CloudBrainSignIns> {
-    const record: SignInRecord = (await this.read().catch(() => null)) ?? {};
+    const record: SignInRecord = (await this.record.read().catch(() => null)) ?? {};
     return signInsView(this.codexWaiting === undefined ? record : { ...record, codexNext: this.codexWaiting }, this.sources());
   }
 
@@ -317,7 +338,7 @@ export class CloudBrain {
     await this.run({ kind: "sending" }, async () => {
       const mac = on ? await this.sources().github(true) : null;
       if (mac && "blocked" in mac) throw new Error(mac.blocked);
-      await this.write(switchGitHub(await this.stored(), on));
+      await this.record.write(switchGitHub(await this.stored(), on));
       if (!(await this.behind())) return;
       const machine = await this.machine();
       await this.wakeUp(machine);
@@ -335,7 +356,7 @@ export class CloudBrain {
     const kept = this.serialize(async () => {
       const stored = await this.stored();
       if (login === null && !stored.codex && stored.codexNext === undefined) return false;
-      await this.write({ ...stored, codexNext: login });
+      await this.record.write({ ...stored, codexNext: login });
       return true;
     });
     void kept
@@ -354,7 +375,7 @@ export class CloudBrain {
   /** A sign-in changed on this Mac, a Claude cloud token or the push key: a brain that is set up takes it, woken for it. */
   signInsChanged(): void {
     void this.serialize(async () => {
-      if (!(await this.read())?.ready || !(await this.behind())) return;
+      if (!(await this.record.read())?.ready || !(await this.behind())) return;
       await this.tracked({ kind: "sending" }, async () => {
         const machine = await this.machine();
         await this.wakeUp(machine);
@@ -368,54 +389,62 @@ export class CloudBrain {
     this.refreshDoor();
   }
 
-  /** The Vercel connection's token or size changed: the door takes them, since it wakes the brain with them. */
+  /** The Vercel connection's token or size changed: a Vercel brain's door takes them, since it wakes the brain with them. */
   vercelChanged(): void {
     this.refreshDoor();
   }
 
   /**
-   * Forgets the Vercel connection with `forget`, once the door's deployments and its copy of the token are gone. One
-   * step, so no queued look opens the door again in between. Throws when they could not go, and the connection stays.
+   * Forgets the Vercel connection with `forget`, once a Vercel brain's door's deployments and its copy of the token are
+   * gone. One step, so no queued look opens the door again in between. Throws when they could not go, and the
+   * connection stays.
    */
   disconnect(forget: () => Promise<unknown>): Promise<void> {
     return this.serialize(async () => {
-      const stored = await this.read();
+      const stored = await this.record.read();
       const vercel = await this.deps.vercel();
-      if (stored && vercel) await this.door.close({ token: vercel.token, teamId: stored.teamId });
+      if (stored && stored.service !== "agent37" && vercel) await this.door.close({ token: vercel.token, teamId: stored.teamId });
       await forget();
     });
   }
 
-  /** Deletes the brain's door, then the brain, its disk and its thread sandboxes, then forgets its key. A failure shows in the status. */
+  /**
+   * Deletes a Vercel brain's door, then the brain, its disk and its thread machines, then forgets its key. A brain
+   * found elsewhere goes from where Settings points. A failure shows in the status.
+   */
   async remove(): Promise<void> {
     await this.run({ kind: "removing" }, async () => {
-      const stored = await this.read();
-      const vercel = await this.vercel();
-      const teamId = stored?.teamId ?? vercel.teamId;
+      const stored = await this.record.read();
+      const access = stored ? await this.reach(stored) : await accessHere(this.connections);
+      if (!access) throw new Error("Connect Vercel or Agent37 first.");
       // First, so nothing wakes the brain while it goes.
-      await this.door.remove({ token: vercel.token, teamId });
-      await (await this.open({ token: vercel.token, teamId }, false))?.remove();
-      await this.write(null);
+      if (access.service === "vercel") await this.door.remove({ token: access.token, teamId: access.teamId });
+      await (await this.open(access, false))?.remove();
+      await this.record.write(null);
       this.phones.forget();
       this.elsewhere = null;
     }).catch(() => undefined);
   }
 
   /** The checks a Set up click hears at once. Null when there is nothing to set up in the background. */
-  private async prepare(region: BrainRegion) {
+  private async prepare(region: BrainRegion | undefined) {
     if (this.activity?.kind === "setting-up") return null;
     const source = await this.deps.bundle?.();
     if (!source) throw new Error(unavailable);
-    const vercel = await this.vercel();
-    if (!(await this.read())) {
-      const machine = await this.open({ token: vercel.token, teamId: vercel.teamId }, false);
+    const stored = await this.record.read();
+    if (stored) await this.reach(stored);
+    else {
+      const access = await accessHere(this.connections);
+      if (!access) throw new Error("Connect Vercel or Agent37 first.");
+      const place = placeOf(access, region);
+      const machine = await this.open(access, false);
       if (machine && (await machine.status()).state !== "missing") {
-        this.elsewhere = vercel.teamId;
+        this.elsewhere = { service: serviceOf(place), account: accountOf(access) };
         this.changed();
         return null;
       }
       // Saved before anything is made, so whatever setup leaves behind opens with a key this Mac keeps.
-      await this.write({ key: brainKeyText(newBrainKey()), teamId: vercel.teamId, region, address: null, ready: false, claude: [] });
+      await this.record.write({ key: brainKeyText(newBrainKey()), ...place, address: null, ready: false, claude: [] });
     }
     this.elsewhere = null;
     this.activity = { kind: "setting-up", step: "machine" };
@@ -425,8 +454,8 @@ export class CloudBrain {
 
   private async setUp(source: BrainBundleSource): Promise<void> {
     const machine = await this.machine(true);
-    const { installed } = await machine.provision({ version: source.version, archive: await source.read() }, { region: (await this.stored()).region });
-    await this.write({ ...(await this.stored()), version: installed });
+    const { installed } = await machine.provision({ version: source.version, archive: await source.read() }, provisionAt(await this.stored()));
+    await this.record.write({ ...(await this.stored()), version: installed });
     this.step("start");
     await this.startInstalled(machine);
     await this.alignAgents(machine).catch(() => undefined);
@@ -462,7 +491,7 @@ export class CloudBrain {
     const stored = await this.stored();
     if (!this.deps.agentVersions || (await this.behindUpdate(stored))) return;
     const confirmed = await alignAgentVersions(machine, stored.agentVersions, await this.deps.agentVersions());
-    if (confirmed) await this.write({ ...(await this.stored()), agentVersions: confirmed });
+    if (confirmed) await this.record.write({ ...(await this.stored()), agentVersions: confirmed });
   }
 
   /** Once the operation that woke the brain ends, so the brain runs this build's version first and a pairing waits on nothing. */
@@ -477,9 +506,10 @@ export class CloudBrain {
     void this.serialize(async () => {
       const door = (await this.deps.bundle?.())?.door;
       if (!door) return;
-      const stored = await this.read();
+      const stored = await this.record.read();
       const vercel = await this.deps.vercel();
-      if (!stored?.ready || !vercel) return;
+      // An Agent37 brain needs no door: any request to its address wakes it.
+      if (!stored?.ready || stored.service === "agent37" || !vercel) return;
       const access = { token: vercel.token, teamId: stored.teamId };
       const project = this.deps.projects?.brain ?? BRAIN_PROJECT;
       await this.door.open(access, { ...(await this.wakeInput(stored)), vercel: { ...access, project }, revoked: this.phones.refused() }, door);
@@ -487,9 +517,8 @@ export class CloudBrain {
   }
 
   /** What a wake hands the brain, the same for this Mac's own wake and its door's. */
-  private async wakeInput(stored: Stored): Promise<{ key: BrainKey; name: string; threadVcpus?: number }> {
-    const vcpus = (await this.deps.vercel())?.vcpus;
-    return { key: brainKeyFrom(stored.key), name: BRAIN_NAME, ...(vcpus ? { threadVcpus: vcpus } : {}) };
+  private async wakeInput(stored: StoredBrain): Promise<WakeInput> {
+    return { key: brainKeyFrom(stored.key), name: BRAIN_NAME, ...(await threadSizes(stored, this.connections)) };
   }
 
   /**
@@ -498,7 +527,7 @@ export class CloudBrain {
    * next wake.
    */
   private async refreshProjects(send = true): Promise<void> {
-    const stored = await this.read();
+    const stored = await this.record.read();
     if (!stored?.ready || !stored.projects?.length) return;
     if (await this.behindUpdate(stored)) return;
     const machine = await this.machine();
@@ -530,7 +559,7 @@ export class CloudBrain {
    * it may not know the requests projects need. The build's version counts too, since a stop that went unanswered
    * records what the brain ran as installed.
    */
-  private async behindUpdate(stored: Stored): Promise<boolean> {
+  private async behindUpdate(stored: StoredBrain): Promise<boolean> {
     const running = this.running;
     if (!running) return false;
     const versions = [stored.version, (await this.deps.bundle?.())?.version];
@@ -540,7 +569,7 @@ export class CloudBrain {
   /** Each record replaces the one with its id, unless switched off meanwhile. */
   private async saveProjects(records: BrainProject[]): Promise<void> {
     const stored = await this.stored();
-    await this.write({ ...stored, projects: stored.projects?.map((each) => records.find((record) => record.id === each.id) ?? each) });
+    await this.record.write({ ...stored, projects: stored.projects?.map((each) => records.find((record) => record.id === each.id) ?? each) });
     this.changed();
   }
 
@@ -574,7 +603,7 @@ export class CloudBrain {
       const restarted = await this.start(machine);
       // What a fresh start runs is what the machine has, behind the record once its disk went back to an older
       // snapshot. Recorded, the next wake installs this build's brain again.
-      if (restarted !== installed) await this.write({ ...(await this.stored()), version: restarted });
+      if (restarted !== installed) await this.record.write({ ...(await this.stored()), version: restarted });
     });
   }
 
@@ -586,8 +615,8 @@ export class CloudBrain {
     // Installing makes a machine that is gone, empty; waking it says it needs setting up again instead.
     if ((await machine.status()).state === "missing") return;
     await this.updating(async () => {
-      const { installed } = await machine.provision({ version: source.version, archive: await source.read() }, { region: stored.region });
-      await this.write({ ...(await this.stored()), version: installed });
+      const { installed } = await machine.provision({ version: source.version, archive: await source.read() }, provisionAt(stored));
+      await this.record.write({ ...(await this.stored()), version: installed });
     });
   }
 
@@ -611,11 +640,11 @@ export class CloudBrain {
     const result = await machine.wake(await this.wakeInput(stored));
     switch (result.state) {
       case "ready":
-        if (!stored.ready || stored.address !== result.address) await this.write({ ...stored, ready: true, address: result.address });
+        if (!stored.ready || stored.address !== result.address) await this.record.write({ ...stored, ready: true, address: result.address });
         this.running = result.version;
         return result.version;
       case "needs-provision":
-        await this.write({ ...stored, ready: false });
+        await this.record.write({ ...stored, ready: false });
         throw new Error(`The cloud brain needs setting up again. ${result.detail}`);
       case "wrong-key":
         throw new Error("This Mac's key does not open the cloud brain. Remove it to set up a new one.");
@@ -637,7 +666,7 @@ export class CloudBrain {
     const others = (await this.behindUpdate(stored)) ? null : await signInChanges(stored, this.sources());
     await machine.control(sealHandover(brainKeyFrom(stored.key), { claude: { accounts: handed }, ...others?.handover }));
     const now = { ...(await this.stored()), claude: accounts.map(sent) };
-    await this.write(others ? others.took(now) : now);
+    await this.record.write(others ? others.took(now) : now);
   }
 
   /**
@@ -646,18 +675,18 @@ export class CloudBrain {
    * names none.
    */
   private async refreshSignIns(): Promise<void> {
-    const stored = await this.read();
+    const stored = await this.record.read();
     if (!stored?.ready || !claimsSignIns(stored) || (await this.behindUpdate(stored))) return;
     const machine = await this.machine();
     const holds = await machine.control({ op: "sign-ins" }).catch(() => null);
     if (!holds) return;
-    await this.write(heardSignIns(await this.stored(), holds));
+    await this.record.write(heardSignIns(await this.stored(), holds));
     this.changed();
     if (await this.behind()) await this.tracked({ kind: "sending" }, () => this.send(machine));
   }
 
   private async behind(): Promise<boolean> {
-    const stored = await this.read();
+    const stored = await this.record.read();
     if (!stored) return false;
     if (!sameSent((await this.claude()).map(sent), stored.claude)) return true;
     return Object.keys((await signInChanges(stored, this.sources())).handover).length > 0;
@@ -671,56 +700,53 @@ export class CloudBrain {
     return claudeToSend(this.deps.db, this.deps.tokens);
   }
 
-  /** How Vercel reports the brain's machine; null with a reason when it cannot be asked. */
-  private async look(stored: Stored): Promise<{ machine: CloudBrainMachine | "missing" | null; error: string | null }> {
+  /** How its service reports the brain's machine; null with a reason when it cannot be asked. */
+  private async look(stored: StoredBrain): Promise<{ machine: CloudBrainMachine | "missing" | null; error: string | null }> {
     try {
-      const vercel = await this.vercel();
-      const machine = await this.open({ token: vercel.token, teamId: stored.teamId }, false);
+      const machine = await this.open(await this.reach(stored), false);
       return { machine: machine ? shownMachine[(await machine.status()).state] : "missing", error: null };
     } catch (error) {
-      return { machine: null, error: `Could not ask Vercel about the cloud brain. ${await this.scrub(error)}` };
+      return { machine: null, error: `Could not ask ${SERVICE_NAMES[serviceOf(stored)]} about the cloud brain. ${await this.scrub(error)}` };
     }
   }
 
-  private async vercel(): Promise<{ token: string; teamId: string; vcpus?: number }> {
-    const vercel = await this.deps.vercel();
-    if (!vercel) throw new Error("Connect Vercel and choose a team first.");
-    return vercel;
+  private reach(stored: StoredBrain): Promise<BrainAccess> {
+    return reach(stored, this.connections);
   }
 
   /**
-   * The machine of the brain this Mac set up, on the team it was made on. Only setup makes the brain's project: a brain
+   * The machine of the brain this Mac set up, where it was made. Only setup makes a Vercel brain's project: a brain
    * whose project is gone needs setting up again.
    */
   private async machine(create = false): Promise<BrainMachineLike> {
     const stored = await this.stored();
-    const machine = await this.open({ token: (await this.vercel()).token, teamId: stored.teamId }, create);
+    const machine = await this.open(await this.reach(stored), create);
     if (machine) return machine;
-    await this.write({ ...stored, ready: false });
+    await this.record.write({ ...stored, ready: false });
     throw new Error("The cloud brain's machine is gone.");
   }
 
-  /** One connection per token and team, since connecting looks up the brain's project. */
+  /** One connection per account and credential, since connecting to Vercel looks up the brain's project. */
   private async open(access: BrainAccess, create: boolean): Promise<BrainMachineLike | null> {
-    const key = `${access.teamId}\n${access.token}`;
+    const key = JSON.stringify(access);
     if (this.connected?.key === key) return this.connected.machine;
     const project = this.deps.projects?.brain;
-    const machine = await (this.deps.open ?? openMachine)(project ? { ...access, project } : access, create);
+    const machine = await (this.deps.open ?? openMachine)(access.service === "vercel" && project ? { ...access, project } : access, create);
     if (machine) this.connected = { key, machine };
     return machine;
   }
 
-  /** Whether the brain found when setting up is still there, on the team Settings has now. */
-  private async stillElsewhere(): Promise<boolean> {
-    if (!this.elsewhere) return false;
+  /** The service of the brain found when setting up, while it is still there, where Settings points now. */
+  private async stillElsewhere(): Promise<CloudService | null> {
+    if (!this.elsewhere) return null;
     try {
-      const vercel = await this.deps.vercel();
-      const machine = vercel?.teamId === this.elsewhere ? await this.open({ token: vercel.token, teamId: vercel.teamId }, false) : null;
+      const access = await accessHere(this.connections);
+      const machine = access && accountOf(access) === this.elsewhere.account ? await this.open(access, false) : null;
       if (!machine || (await machine.status()).state === "missing") this.elsewhere = null;
     } catch {
-      // Vercel could not be asked: what was found stays until it can.
+      // Its service could not be asked: what was found stays until it can.
     }
-    return this.elsewhere !== null;
+    return this.elsewhere?.service ?? null;
   }
 
   /** One operation at a time, shown in the status while it runs, its failure kept for Settings. */
@@ -753,44 +779,16 @@ export class CloudBrain {
     this.deps.changed();
   }
 
-  /** An error's words without the Vercel token or the brain key, whatever passed them on. */
+  /** An error's words without the Vercel token, the Agent37 key or the brain key, whatever passed them on. */
   private async scrub(error: unknown): Promise<string> {
-    const secrets = [(await this.deps.vercel().catch(() => null))?.token, this.cache?.key];
+    const secrets = [(await this.deps.vercel().catch(() => null))?.token, (await this.connections.agent37().catch(() => null))?.key, this.record.cached?.key];
     return secrets.reduce<string>((text, secret) => (secret ? text.replaceAll(secret, "[redacted]") : text), redact(words(error)).text);
   }
 
-  private async stored(): Promise<Stored> {
-    const stored = await this.read();
+  private async stored(): Promise<StoredBrain> {
+    const stored = await this.record.read();
     if (!stored) throw new Error("The cloud brain is not set up.");
     return stored;
-  }
-
-  private async read(): Promise<Stored | null> {
-    if (this.cache !== undefined) return this.cache;
-    if (!this.deps.store) return (this.cache = null);
-    let raw: string | null;
-    try {
-      raw = await this.deps.store.load();
-    } catch {
-      throw new Error(storageError);
-    }
-    try {
-      this.cache = raw ? (JSON.parse(raw) as Stored) : null;
-    } catch {
-      // JSON.parse's message quotes what it read, which holds the key.
-      throw new Error(storageError);
-    }
-    return this.cache;
-  }
-
-  private async write(next: Stored | null): Promise<void> {
-    try {
-      if (!this.deps.store) throw new Error(storageError);
-      await this.deps.store.save(next ? JSON.stringify(next) : "");
-    } catch {
-      throw new Error(storageError);
-    }
-    this.cache = next;
   }
 }
 

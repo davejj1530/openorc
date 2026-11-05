@@ -59,6 +59,15 @@ describe("the brain's start line", () => {
     }
   });
 
+  it("carries an Agent37 brain's instance and connection, and leaves a Vercel brain's line as brains before Agent37 read it", () => {
+    const agent37 = { connection: { key: "sk_live_agent37SECRET", cpu: 4, memory: 16 }, instance: "ab12cd34ef" } as const;
+    const sent = start({ address: "ab12cd34ef-47820.agent37.app", vercel: null, agent37 });
+    expect({ ...parseLaunch(encodeLaunch(sent)), key: null }).toEqual({ ...sent, key: null });
+    expect(JSON.parse(encodeLaunch(start()))).not.toHaveProperty("agent37");
+    expect(refusal(() => parseLaunch(lineWith(["agent37", "connection", "cpu"], 3, sent))).field).toBe("agent37.connection.cpu");
+    expect(refusal(() => parseLaunch(lineWith(["agent37", "instance"], "../brain", sent))).field).toBe("agent37.instance");
+  });
+
   it("names the bad field and never repeats a value, even one that holds the token or the key", () => {
     const base = start();
     const keyText = brainKeyText(base.key);

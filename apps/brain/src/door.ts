@@ -157,7 +157,7 @@ export async function wakeThroughDoor(
 ): Promise<DoorOutcome> {
   const secrets = [config.vercel.token, Buffer.from(config.key).toString("base64url")];
   try {
-    const machine = await find({ token: config.vercel.token, teamId: config.vercel.teamId, project: config.vercel.project });
+    const machine = await find({ service: "vercel", token: config.vercel.token, teamId: config.vercel.teamId, project: config.vercel.project });
     if (!machine) return { state: "needs-mac", why: "setup" };
     const result = await machine.wake({ key: config.key, name: config.name, ...(config.threadVcpus ? { threadVcpus: config.threadVcpus } : {}) });
     if (result.state === "failed" || result.state === "needs-provision") log(`door wake ${result.state}: ${scrub(result.detail, secrets)}`);

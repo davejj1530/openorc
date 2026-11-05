@@ -52,6 +52,8 @@ export interface FakeAgent37 {
   readonly key: string;
   /** Every command the exec API ran, in order. */
   readonly execs: { id: string; command: string; user: string | null; name: string | null }[];
+  /** Every hosting API request with the key, as its method and path, in order. */
+  readonly requests: string[];
   /** What the usage API reports for an instance. */
   setUsage(id: string, usage: Omit<Agent37Usage, "id">): void;
   /** Puts an instance in a state no request leads to here, such as failed. */
@@ -151,6 +153,7 @@ class FakeAccount {
   readonly held = new Map<string, Held>();
   readonly usage = new Map<string, Omit<Agent37Usage, "id">>();
   readonly execs: FakeAgent37["execs"] = [];
+  readonly requests: string[] = [];
 
   constructor(
     private readonly dir: string,
@@ -224,6 +227,15 @@ class FakeAccount {
     return ok({ id: entry.instance.id, deleted: true });
   }
 
+  addPublicPort(entry: Held, body: Record<string, unknown>): Answer {
+    const { instance } = entry;
+    if (typeof body.port !== "number" || !Number.isInteger(body.port)) return refused(400, "invalid_request", "port must be an integer.");
+    if (instance.public_ports.some((open) => open.port === body.port)) return refused(409, "public_port_exists", "This port is public already.");
+    const opened = { port: body.port, url: `https://${instance.id}-${body.port}.agent37.app`, prefix: null, label: typeof body.label === "string" ? body.label : null };
+    instance.public_ports.push(opened);
+    return ok(opened, 201);
+  }
+
   start(entry: Held): Answer {
     const { instance } = entry;
     if (!this.options.startMs) {
@@ -275,6 +287,7 @@ class FakeAccount {
 
   async serveHosting(request: http.IncomingMessage, url: URL, body: Buffer): Promise<Answer> {
     if (request.headers.authorization !== `Bearer ${this.key}`) return refused(401, "unauthorized", "The API key is missing or wrong.");
+    this.requests.push(`${request.method} ${url.pathname}`);
     for (const [method, pattern, work] of HOSTING) {
       const match = pattern.exec(url.pathname);
       if (match && method === request.method) return work(this, match[1] ?? "", parse(body), url);
@@ -282,13 +295,14 @@ class FakeAccount {
     return refused(404, "not_found", "No such route.");
   }
 
-  /** Where a request to an instance's address goes on this Mac, or why it does not. */
+  /** Where a request to an instance's address goes on this Mac, or why it does not. A public port needs no key. */
   target(request: http.IncomingMessage, match: RegExpExecArray): number | Answer {
-    if (request.headers["x-agent37-key"] !== this.key) return flat(401, "unauthorized");
     const entry = this.held.get(match[1]!);
+    const port = Number(match[2]);
+    const open = entry?.instance.public_ports.some((each) => each.port === port);
+    if (!open && request.headers["x-agent37-key"] !== this.key) return flat(401, "unauthorized");
     if (!entry) return flat(404, "not_found");
     if (!this.awake(entry)) return flat(503, "instance_not_running");
-    const port = Number(match[2]);
     return port === INSTANCE_SERVER_PORT ? entry.serverPort : port;
   }
 }
@@ -299,6 +313,7 @@ const HOSTING: [string, RegExp, (account: FakeAccount, id: string, body: Record<
   ["GET", /^\/v1\/instances\/(\w+)$/, (account, id) => account.find(id, (entry) => ok(entry.instance))],
   ["PATCH", /^\/v1\/instances\/(\w+)$/, (account, id, body) => account.find(id, (entry) => account.edit(entry, body as Agent37EditParams))],
   ["DELETE", /^\/v1\/instances\/(\w+)$/, (account, id) => account.find(id, (entry) => account.remove(entry))],
+  ["POST", /^\/v1\/instances\/(\w+)\/public-ports$/, (account, id, body) => account.find(id, (entry) => account.addPublicPort(entry, body))],
   ["POST", /^\/v1\/instances\/(\w+)\/start$/, (account, id) => account.find(id, (entry) => account.start(entry))],
   ["POST", /^\/v1\/instances\/(\w+)\/stop$/, (account, id) => account.find(id, (entry) => account.down(entry, "stopped"))],
   ["POST", /^\/v1\/instances\/(\w+)\/sleep$/, (account, id) => account.find(id, (entry) => account.down(entry, "sleeping"))],
@@ -374,6 +389,7 @@ export async function startFakeAgent37(dir: string, options: FakeAgent37Options 
     endpoints: { api: `${base}/v1`, sandbox: `${base}/sandbox`, instance: (id, port) => `${base}/ports/${id}/${port}` },
     key: account.key,
     execs: account.execs,
+    requests: account.requests,
     setUsage: (id, spent) => void account.usage.set(id, spent),
     setStatus: (id, status, reason) => {
       const entry = account.held.get(id);

@@ -161,7 +161,7 @@ describe("the door's wake", () => {
     );
     expect(outcome).toEqual(READY);
     expect(asked).toEqual([
-      { token: TOKEN, teamId: "team_1", project: "openorc-brain" },
+      { service: "vercel", token: TOKEN, teamId: "team_1", project: "openorc-brain" },
       { key: KEY, name: "Cloud", threadVcpus: 4 },
     ]);
   });

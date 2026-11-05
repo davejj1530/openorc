@@ -100,7 +100,8 @@ export function cloudSandboxProviders(input: {
   const local = input.cloudOnly ? null : new LocalSandboxProvider(path.join(input.dataDir, "cloud-sandboxes"), input.env);
   const credentials = input.credentials ?? (async () => null);
   const vercel = new VercelSandboxProvider({ credentials });
-  const agent37 = new Agent37SandboxProvider({ credentials: input.agent37 ?? (async () => null), files: input.files ?? runnerFiles() });
+  // A cloud-only host is the cloud brain, whose thread instances share the Agent37 account with the Mac's.
+  const agent37 = new Agent37SandboxProvider({ credentials: input.agent37 ?? (async () => null), files: input.files ?? runnerFiles(), host: input.cloudOnly ? "brain" : "mac" });
   const service = input.service ?? (async () => ((await credentials()) ? "vercel" : null));
   const builtIn = local ? [local, vercel, agent37] : [vercel, agent37];
   const { override } = input;

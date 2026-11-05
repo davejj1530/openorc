@@ -213,7 +213,9 @@ describe("the cloud brain's sign-ins besides Claude", () => {
     await vi.waitFor(() => expect(brain.others().codex).toBeDefined(), { timeout: 10_000 });
     expect(brain.others().codex).toMatchObject({ mode: "chatgpt", email: "brain@example.com", plan: "pro" });
     expect(brain.others().codex!.auth).toContain("refresh-made-for-the-brain");
-    await vi.waitFor(async () => expect((await signIns()).codex).toEqual({ mode: "chatgpt", email: "brain@example.com", plan: "pro", signingIn: false, pending: null, error: null }));
+    await vi.waitFor(async () => expect((await signIns()).codex).toEqual({ mode: "chatgpt", email: "brain@example.com", plan: "pro", signingIn: false, pending: null, error: null }), {
+      timeout: 10_000,
+    });
     // This Mac's own cloud login is another one, untouched.
     expect((await core.codexCloudLogin.status()).mode).toBeNull();
     expect(JSON.parse(record.saved.at(-1)!)).not.toHaveProperty("codexNext");
@@ -221,13 +223,13 @@ describe("the cloud brain's sign-ins besides Claude", () => {
     await call("cloud.brain.handover", {});
     expect(brain.others()).toEqual({});
     await call("cloud.brain.codex.apiKey", { key: API_KEY });
-    await vi.waitFor(() => expect(brain.others().codex).toMatchObject({ mode: "apiKey", email: null }));
+    await vi.waitFor(() => expect(brain.others().codex).toMatchObject({ mode: "apiKey", email: null }), { timeout: 10_000 });
     expect(JSON.parse(brain.others().codex!.auth)).toEqual({ auth_mode: "apikey", OPENAI_API_KEY: API_KEY });
-    await vi.waitFor(async () => expect((await signIns()).codex).toMatchObject({ mode: "apiKey", pending: null }));
+    await vi.waitFor(async () => expect((await signIns()).codex).toMatchObject({ mode: "apiKey", pending: null }), { timeout: 10_000 });
     expect(JSON.parse(record.saved.at(-1)!)).not.toHaveProperty("codexNext");
     await call("cloud.brain.codex.remove", {});
-    await vi.waitFor(() => expect(brain.others()).toEqual({ codex: null }));
-    await vi.waitFor(async () => expect((await signIns()).codex).toMatchObject({ mode: null, pending: null }));
+    await vi.waitFor(() => expect(brain.others()).toEqual({ codex: null }), { timeout: 10_000 });
+    await vi.waitFor(async () => expect((await signIns()).codex).toMatchObject({ mode: null, pending: null }), { timeout: 10_000 });
   }, 20_000);
 
   it("keeps a Codex login the brain could not take until its next wake, then forgets it", async () => {

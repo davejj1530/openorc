@@ -24,14 +24,15 @@ function doorKeys(key: BrainKey): (deviceId: string) => BrainDoorKey {
 }
 
 /**
- * What the brain passes the core. Every conversation runs in a cloud sandbox, made with the Vercel connection from
- * this start, which is held in memory only. Phones reach the brain only through the proxy at its public address.
+ * What the brain passes the core. Every conversation runs in a cloud sandbox, made with the Vercel or Agent37 connection
+ * from this start, which the brain holds in memory. Phones reach the brain only through the proxy at its public address.
  *
  * Left out on purpose: browser and preview (there are none here); presence (always away, so every alert reaches
  * phones); a terminal (sign-ins arrive by handover, so no node-pty and no compiler); the bundled formatter; cloudOffered
  * (every conversation is cloud, so there is no place to choose); a file key; benchmarks.
  */
 export function brainOptions({ layout, appDir, start, self, secrets, transport, runnerFiles }: BrainOptionsInput): OpenOrcOptions {
+  const { agent37 } = start;
   return {
     dataDir: layout.data,
     transport,
@@ -50,6 +51,7 @@ export function brainOptions({ layout, appDir, start, self, secrets, transport, 
     cloudOnly: true,
     deviceSystem: null,
     cloudCredentials: async () => (start.vercel ? { ...start.vercel.connection, region: await self.region() } : null),
+    ...(agent37 ? { cloudAgent37: async () => agent37.connection, cloudService: "agent37" as const } : {}),
     cloudRunnerFiles: runnerFiles,
   };
 }

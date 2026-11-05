@@ -4,19 +4,8 @@ import { describe, expect, it } from "vitest";
 import type { SandboxInfo } from "../sandbox.js";
 import { BRAIN_AWAY_MS, BRAIN_PORT } from "./layout.js";
 import { vercelSandboxCost } from "../vercel-sandbox.js";
-import {
-  BrainMachine,
-  BrainRefused,
-  BrainUnavailable,
-  brainVersionNewer,
-  sessionShare,
-  type BrainApi,
-  type BrainCommand,
-  type BrainOpenParams,
-  type BrainSettings,
-  type BrainVm,
-  type SessionUsage,
-} from "./machine.js";
+import { BrainMachine, BrainRefused, BrainUnavailable, brainVersionNewer, type BrainCommand, type BrainVm } from "./machine.js";
+import { sessionShare, type BrainApi, type BrainOpenParams, type BrainSettings, type SessionUsage } from "./vercel-brain.js";
 import { billedSnapshots, snapshotStorageCost, type ListedSnapshot } from "./snapshot-storage.js";
 import { brainKeyText, encodeControlReply, newBrainKey, parseLaunch, type BrainControlRequest, type BrainStatus } from "./wire.js";
 
@@ -348,7 +337,7 @@ const DAY = 24 * HOUR;
 /** A snapshot of 1 GB unless told otherwise. */
 const snapshot = (id: string, more: Partial<ListedSnapshot> & Pick<ListedSnapshot, "status">): ListedSnapshot => ({ id, sizeBytes: 1e9, createdAt: 0, ...more });
 
-const connect = (vercel: FakeVercel, startMs = 2000) => BrainMachine.connect({ token: TOKEN, teamId: "team_1" }, { api: vercel, startMs, pollMs: 1 });
+const connect = (vercel: FakeVercel, startMs = 2000) => BrainMachine.connect({ service: "vercel", token: TOKEN, teamId: "team_1" }, { api: vercel, startMs, pollMs: 1 });
 const labels = (runs: Run[]) => runs.map((run) => run.args[2]);
 
 /** A brain provisioned with brain-v1 and every tool it needs, nothing running. */
@@ -761,7 +750,7 @@ describe("asking and removing a brain", () => {
 
   it("finds no brain in a team without its project, and makes none", async () => {
     const vercel = new FakeVercel();
-    const find = () => BrainMachine.find({ token: TOKEN, teamId: "team_1" }, { api: vercel });
+    const find = () => BrainMachine.find({ service: "vercel", token: TOKEN, teamId: "team_1" }, { api: vercel });
     expect(await find()).toBeNull();
     expect(vercel.projects).toEqual([]);
     await connect(vercel);
@@ -820,7 +809,7 @@ describe("asking and removing a brain", () => {
 
   it("keeps a brain made in another project there, and makes its thread sandboxes there too", async () => {
     const vercel = new FakeVercel();
-    const access = { token: TOKEN, teamId: "team_1", project: "openorc-brain-qa" };
+    const access = { service: "vercel", token: TOKEN, teamId: "team_1", project: "openorc-brain-qa" } as const;
     const brain = await BrainMachine.connect(access, { api: vercel, startMs: 2000, pollMs: 1 });
     await brain.provision(bundle("brain-v1"));
     vercel.machine.onStart = (command) => command.emit("stdout", "openorc-brain ready brain-v1\n");
@@ -830,7 +819,7 @@ describe("asking and removing a brain", () => {
     expect(new Set(vercel.gets.map((get) => get.projectId))).toEqual(new Set(["prj_openorc-brain-qa"]));
     expect(parseLaunch(vercel.machine.starts[0]!.stdin.trim()).vercel?.connection.projectId).toBe("prj_openorc-brain-qa");
     expect(await (await BrainMachine.find(access, { api: vercel }))?.status()).toMatchObject({ state: "running" });
-    expect(await BrainMachine.find({ token: TOKEN, teamId: "team_1" }, { api: vercel })).toBeNull();
+    expect(await BrainMachine.find({ service: "vercel", token: TOKEN, teamId: "team_1" }, { api: vercel })).toBeNull();
   });
 
   it("deletes every sandbox in the brain's project, the brain first, with their orphan snapshots", async () => {

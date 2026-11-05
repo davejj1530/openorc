@@ -83,7 +83,7 @@ const noCodex = (error: string | null) => ({ mode: null, email: null, plan: null
 async function removeBrain(brain: CloudBrain, removed: Dependencies["removed"]): Promise<void> {
   const linkKey = (await brain.moves())?.linkKey ?? null;
   await brain.remove();
-  if ((await brain.region()) === null) await removed(linkKey);
+  if (!(await brain.exists())) await removed(linkKey);
 }
 
 export function createCloudHandlers({ settings, tokens, checks, codex, opencode, sandboxes, handoff, brain, coordinator, offered, invalidate, removed }: Dependencies): Pick<Handlers, CloudMethod> {

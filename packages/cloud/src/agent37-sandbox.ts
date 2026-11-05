@@ -2,7 +2,7 @@ import path from "node:path";
 import { AGENT37_SIZES } from "@openorc/protocol";
 import { setTimeout as sleep } from "node:timers/promises";
 import { agent37Api, agent37Hourly, type Agent37Api, type Agent37Instance, type Agent37Status, type Agent37Usage } from "./agent37.js";
-import { INSTANCE_SERVER_PORT, InstancePort } from "./instance-port.js";
+import { INSTANCE_SERVER_PORT, InstancePort, type InstanceProcess } from "./instance-port.js";
 import type { RunnerFile } from "./runner-client.js";
 import { SANDBOX_AWAY_MS, SANDBOX_PREFIX, type Sandbox, type SandboxCommandOptions, type SandboxExecResult, type SandboxInfo, type SandboxProvider, type SandboxStream } from "./sandbox.js";
 
@@ -35,7 +35,7 @@ const DAY_MS = 86_400_000;
 const HOUR_MS = 3_600_000;
 
 /** What opening an instance does in each state: use it, start it, wait for it to settle, or give up. */
-const OPENING: Record<Agent37Status, "ready" | "start" | "wait" | "failed" | "gone"> = {
+export const OPENING: Record<Agent37Status, "ready" | "start" | "wait" | "failed" | "gone"> = {
   running: "ready",
   // The next command or request wakes it.
   sleeping: "ready",
@@ -77,7 +77,7 @@ function commandWords(cmd: string, args: string[], env: Record<string, string> =
 }
 
 /** Waits out a change of state and starts a stopped instance, so commands can run in it. */
-async function ready(api: Agent37Api, first: Agent37Instance | null): Promise<void> {
+export async function ready(api: Agent37Api, first: Agent37Instance | null): Promise<void> {
   const deadline = Date.now() + READY_TIMEOUT_MS;
   let instance = first;
   for (;;) {
@@ -147,9 +147,14 @@ export class Agent37Sandbox implements Sandbox {
     if (result.exit_code !== 0) throw new Error(`Could not start ${cmd} in the Agent37 instance. ${result.stderr.trim()}`.trim());
   }
 
-  async stream(cmd: string, args: string[], options: SandboxCommandOptions = {}): Promise<SandboxStream> {
+  /** One command through OpenOrc's server, with its input, both of its outputs and its exit code. */
+  async process(cmd: string, args: string[], options: SandboxCommandOptions = {}): Promise<InstanceProcess> {
     const server = await this.serverUp();
-    const proc = await server.process({ cmd, args, cwd: options.cwd ?? this.root, ...(options.env ? { env: options.env } : {}) });
+    return server.process({ cmd, args, cwd: options.cwd ?? this.root, ...(options.env ? { env: options.env } : {}) });
+  }
+
+  async stream(cmd: string, args: string[], options: SandboxCommandOptions = {}): Promise<SandboxStream> {
+    const proc = await this.process(cmd, args, options);
     proc.stderr.resume();
     return {
       input: proc.stdin,
@@ -219,20 +224,33 @@ export class Agent37Sandbox implements Sandbox {
   }
 }
 
+/** OpenOrc's server for an instance, from the runner's files. */
+export function instanceServerSource(files: RunnerFile[]): Buffer {
+  const server = files.find((file) => file.name === SERVER_FILE);
+  if (!server) throw new Error(`The runner's files lack ${SERVER_FILE}.`);
+  return server.content;
+}
+
+/** Which OpenOrc makes and lists an account's thread instances: the Mac's, or its cloud brain's beside it. */
+export type Agent37Host = "mac" | "brain";
+
+/** The host a thread instance belongs to. Instances from before hosts were kept are the Mac's. */
+export function agent37HostOf(instance: Agent37Instance): Agent37Host | null {
+  if (instance.metadata?.openorc !== "thread") return null;
+  return instance.metadata.host === "brain" ? "brain" : "mac";
+}
+
 export interface Agent37ProviderOptions {
   /** Null until Agent37 is connected. Read on every open, so a change in Settings applies to the next instance. */
   credentials: () => Promise<Agent37Connection | null>;
   /** The runner's files; OpenOrc's server for an instance is the one named instance-server.ts. */
   files: RunnerFile[];
+  /** The Mac's unless given. Each host opens, lists and removes only its own instances. */
+  host?: Agent37Host;
   api?: (key: string) => Agent37Api;
 }
 
 type Ours = Agent37Instance & { name: string };
-
-/** An instance a cloud thread made, which leaves out anything else on the account. */
-function ours(instance: Agent37Instance): instance is Ours {
-  return !!instance.name?.startsWith(SANDBOX_PREFIX) && instance.metadata?.openorc === "thread" && instance.status !== "deleted";
-}
 
 function info(instance: Ours, spent: Agent37Usage | undefined): SandboxInfo {
   const { compute } = agent37Hourly(instance.resources);
@@ -255,15 +273,18 @@ const day = (time: number) => new Date(time).toISOString().slice(0, 10);
 export class Agent37SandboxProvider implements SandboxProvider {
   readonly id = "agent37";
   private readonly api: (key: string) => Agent37Api;
-  private readonly serverSource: Buffer;
+  private readonly host: Agent37Host;
   /** Agent37 does not keep names unique, so opening one name twice at once must not make two instances. */
   private readonly opening = new Map<string, Promise<Agent37Sandbox>>();
 
   constructor(private readonly options: Agent37ProviderOptions) {
     this.api = options.api ?? ((key) => agent37Api(key));
-    const server = options.files.find((file) => file.name === SERVER_FILE);
-    if (!server) throw new Error(`The runner's files lack ${SERVER_FILE}.`);
-    this.serverSource = server.content;
+    this.host = options.host ?? "mac";
+  }
+
+  /** A thread instance this host made, which leaves out the other host's and anything else on the account. */
+  private ours(instance: Agent37Instance): instance is Ours {
+    return !!instance.name?.startsWith(SANDBOX_PREFIX) && agent37HostOf(instance) === this.host && instance.status !== "deleted";
   }
 
   private async access(): Promise<{ api: Agent37Api; connection: Agent37Connection }> {
@@ -282,13 +303,13 @@ export class Agent37SandboxProvider implements SandboxProvider {
 
   private async openNow(name: string): Promise<Agent37Sandbox> {
     const { api, connection } = await this.access();
-    const found = (await api.list()).find((instance) => instance.name === name && OPENING[instance.status] !== "gone");
+    const found = (await api.list()).find((instance) => instance.name === name && this.ours(instance) && OPENING[instance.status] !== "gone");
     const instance =
       found ??
       (await api.create({
         template: "agent37-base",
         name,
-        metadata: { openorc: "thread" },
+        metadata: { openorc: "thread", host: this.host },
         // Applies when the instance is made; one that exists keeps the size it was made with.
         resources: { cpu: connection.cpu, memory: connection.memory, disk: DISK_GB },
         // OpenOrc keeps the instance awake while an agent works; this is for when the Mac is away.
@@ -296,13 +317,13 @@ export class Agent37SandboxProvider implements SandboxProvider {
         idle_timeout_seconds: SANDBOX_AWAY_MS / 1000,
       }));
     await ready(api, instance);
-    return new Agent37Sandbox(name, instance, api, this.serverSource);
+    return new Agent37Sandbox(name, instance, api, instanceServerSource(this.options.files));
   }
 
-  /** Deletes the named instance and its files for good, every one by that name. */
+  /** Deletes the named instance and its files for good, every one of this host's by that name. */
   async remove(name: string): Promise<void> {
     const { api } = await this.access();
-    for (const instance of (await api.list()).filter((entry) => entry.name === name)) await api.remove(instance.id);
+    for (const instance of (await api.list()).filter((entry) => entry.name === name && this.ours(entry))) await api.remove(instance.id);
   }
 
   /** None until Agent37 is connected. Time awake and cost come from Agent37's usage over the last 90 days. */
@@ -314,7 +335,7 @@ export class Agent37SandboxProvider implements SandboxProvider {
     // A key that may not read usage still lists its instances, with nothing spent.
     const [instances, usage] = await Promise.all([api.list(), api.usage(day(now - (USAGE_DAYS - 1) * DAY_MS), day(now)).catch(() => [])]);
     const spent = new Map(usage.map((entry) => [entry.id, entry]));
-    return instances.filter(ours).map((instance) => info(instance, spent.get(instance.id)));
+    return instances.filter((instance) => this.ours(instance)).map((instance) => info(instance, spent.get(instance.id)));
   }
 
   /** Instances keep running when OpenOrc closes and sleep on their own. */

@@ -29,10 +29,11 @@ import {
   type HandoverClaudeAccount,
   type OpenedDoor,
   type ProjectBundle,
+  type WakeInput,
   type WakeResult,
 } from "@openorc/cloud";
 import { Db } from "@openorc/db";
-import { DEFAULT_CLAUDE_ACCOUNT, WORKSPACE_ID, brainRegionFor } from "@openorc/protocol";
+import { DEFAULT_CLAUDE_ACCOUNT, WORKSPACE_ID, brainRegionFor, type CloudService } from "@openorc/protocol";
 import { OpenOrc } from "../openorc.js";
 import { inheritedProbe } from "./shell-environment.js";
 import type { OpenOrcOptions } from "../options.js";
@@ -56,6 +57,7 @@ class FakeBrain implements BrainMachineLike {
   opens: { create: boolean; saved: number }[] = [];
   key: BrainKey | null = null;
   handovers: HandoverClaudeAccount[][] = [];
+  wakeInputs: WakeInput[] = [];
   wakes: WakeResult = { state: "ready", address: "sb-fixture.vercel.run", version: "v1" };
   /** The bundle on its machine, and the one its brain runs; null while no brain runs. */
   installed: string | null = null;
@@ -101,8 +103,9 @@ class FakeBrain implements BrainMachineLike {
     if (!this.installed || !brainVersionNewer(this.installed, bundle.version)) this.installed = bundle.version;
     return { installed: this.installed, running: this.running };
   }
-  async wake(input: { key: BrainKey; name: string }) {
+  async wake(input: WakeInput) {
     this.calls.push("wake");
+    this.wakeInputs.push(input);
     await this.beforeWake();
     if (this.wakes.state !== "ready") return this.wakes;
     if (this.state !== "running") this.running = null;
@@ -284,7 +287,7 @@ describe("the cloud brain from the Mac", () => {
     expect(brain.calls).toEqual(["provision v1 archive sin1", "wake", "control agent-versions", "control handover", "status"]);
     // Its agent CLIs are brought to this Mac's as it starts; later wakes ask only once one changed.
     expect(brain.agentVersions).toEqual([{ claude: "2.1.317", codex: "0.166.0", opencode: "2.0.11" }]);
-    expect(brain.access[0]).toEqual({ token: VERCEL_TOKEN, teamId: "team_fixture" });
+    expect(brain.access[0]).toEqual({ service: "vercel", token: VERCEL_TOKEN, teamId: "team_fixture" });
     expect(brain.opens.slice(0, 2)).toEqual([
       { create: false, saved: 0 },
       { create: true, saved: 1 },
@@ -297,7 +300,18 @@ describe("the cloud brain from the Mac", () => {
     ]);
     expect(stored()).toMatchObject({ key: brainKeyText(brain.key!), region: "sin1", teamId: "team_fixture" });
     expect(record.saved.join("\n")).not.toContain(PERSONAL);
-    expect(await status()).toEqual({ state: "ready", region: "sin1", machine: "awake", claude: ["Existing CLI login", "Work"], behind: false, working: null, door: null, threads: 0, error: null });
+    expect(await status()).toEqual({
+      state: "ready",
+      service: "vercel",
+      region: "sin1",
+      machine: "awake",
+      claude: ["Existing CLI login", "Work"],
+      behind: false,
+      working: null,
+      door: null,
+      threads: 0,
+      error: null,
+    });
 
     const key = stored()!.key;
     await setUp();
@@ -391,7 +405,7 @@ describe("the cloud brain from the Mac", () => {
   it("makes nothing in a team that has a brain this Mac has no key for, and can remove that one", async () => {
     brain.project = true;
     brain.state = "stopped";
-    expect(await rpc("cloud.brain.create", { region: "sin1" })).toEqual({ state: "elsewhere", error: null });
+    expect(await rpc("cloud.brain.create", { region: "sin1" })).toEqual({ state: "elsewhere", service: "vercel", error: null });
     expect(brain.calls).toEqual(["status", "status"]);
     expect(record.saved).toEqual([]);
     expect(await rpc("cloud.brain.remove", {})).toEqual({ state: "none", error: null });
@@ -425,7 +439,7 @@ describe("the cloud brain from the Mac", () => {
     await setUp();
     brain.wakes = { state: "needs-provision", detail: "No brain is installed on its sandbox." };
     await expect(rpc("cloud.brain.pair", {})).rejects.toThrow("needs setting up again");
-    expect(await status()).toEqual({ state: "incomplete", region: "sin1", error: "The cloud brain needs setting up again. No brain is installed on its sandbox." });
+    expect(await status()).toEqual({ state: "incomplete", service: "vercel", region: "sin1", error: "The cloud brain needs setting up again. No brain is installed on its sandbox." });
   });
 
   it("says why the brain did not start, without the Vercel token or the brain's key", async () => {
@@ -539,7 +553,7 @@ describe("the cloud brain from the Mac", () => {
       };
       await rpc("cloud.brain.create", { region: "sin1" });
       await vi.waitFor(() => expect(restart).toBeDefined());
-      expect(await status()).toEqual({ state: "setting-up", region: "sin1", step: "start" });
+      expect(await status()).toEqual({ state: "setting-up", service: "vercel", region: "sin1", step: "start" });
       restart!();
       await vi.waitFor(async () => expect((await status()).state).toBe("ready"));
       expect(brain.calls.filter((call) => call !== "status")).toEqual([`provision ${NEW} archive sin1`, "wake", "control stop-for-update", "wake", "control handover"]);
@@ -1143,7 +1157,101 @@ describe("the cloud brain's door", () => {
     });
     await service.create("sin1");
     await vi.waitFor(() => expect(doors.opens).toHaveLength(1));
-    expect(new Set(access.map((given) => given.project))).toEqual(new Set(["openorc-brain-qa"]));
+    expect(new Set(access.map((given) => given.service === "vercel" && given.project))).toEqual(new Set(["openorc-brain-qa"]));
     expect(doors.opens[0]).toMatchObject({ access: { project: "openorc-door-qa" }, opening: { vercel: { project: "openorc-brain-qa" } } });
+  });
+});
+
+describe("the cloud brain on Agent37", () => {
+  const AGENT37 = { key: "sk_live_agent37-fixture-key-0123456789", cpu: 4, memory: 16 } as const;
+  const bundle = async () => ({ version: carried, read: async () => Buffer.from("archive"), door: { release: "door-1", code: async () => Buffer.from("export {};") } });
+  let doors: FakeDoors;
+
+  /** A CloudBrain whose new brains go where `service` says, as Settings' choice does. */
+  function cloudBrain(service: () => CloudService) {
+    const access: BrainAccess[] = [];
+    const cloud = new CloudBrain({
+      db: Db.memory(),
+      store: memoryStore(),
+      tokens: { status: async () => ({}), token: async () => null },
+      vercel: async () => ({ token: VERCEL_TOKEN, teamId: "team_fixture", vcpus: 4 }),
+      agent37: async () => AGENT37,
+      service: async () => service(),
+      bundle,
+      changed: () => undefined,
+      open: async (given, create) => {
+        access.push(given);
+        if (create) brain.project = true;
+        return brain.project ? brain : null;
+      },
+      doors,
+    });
+    return { cloud, access };
+  }
+
+  beforeEach(async () => {
+    doors = new FakeDoors(() => brain.calls);
+    await core.close();
+    // Vercel is connected too: the brain goes where Settings sends new cloud machines.
+    await open({ cloudAgent37: async () => AGENT37, cloudService: "agent37", cloudBrainBundle: bundle, cloudBrainDoors: doors });
+  });
+
+  it("sets up where new cloud machines go, with no region and no door, its threads in the size Settings chose", async () => {
+    expect((await rpc("cloud.brain.create", {})).state).toBe("setting-up");
+    await vi.waitFor(async () => expect((await status()).state).toBe("ready"));
+    expect(brain.access[0]).toEqual({ service: "agent37", key: AGENT37.key });
+    expect(brain.calls[0]).toBe("provision v1 archive undefined");
+    expect(brain.wakeInputs[0]).toEqual({ key: brain.key, name: "Cloud", threadSize: { cpu: 4, memory: 16 } });
+    expect(stored()).toMatchObject({ service: "agent37" });
+    expect(stored()).not.toHaveProperty("teamId");
+    await rpc("cloud.brain.wake", {});
+    expect(await status()).toMatchObject({ state: "ready", service: "agent37", region: null, door: null });
+    await rpc("cloud.brain.remove", {});
+    expect(brain.calls.at(-1)).toBe("remove");
+    expect(await status()).toEqual({ state: "none", error: null });
+    expect([doors.opens, doors.removes]).toEqual([[], []]);
+  });
+
+  it("says why the brain did not start without the Agent37 key", async () => {
+    brain.wakes = { state: "failed", detail: `Exited: key ${AGENT37.key}` };
+    await rpc("cloud.brain.create", {});
+    await vi.waitFor(async () => expect((await status()).state).toBe("incomplete"));
+    const shown = await status();
+    expect(shown).toMatchObject({ state: "incomplete", service: "agent37", region: null, error: expect.stringContaining("[redacted]") });
+    expect(JSON.stringify(shown)).not.toContain(AGENT37.key);
+  });
+
+  it("keeps the service it was made on when new cloud machines go to the other", async () => {
+    let service: CloudService = "vercel";
+    const { cloud, access } = cloudBrain(() => service);
+    await cloud.create("sin1");
+    await vi.waitFor(async () => expect((await cloud.status()).state).toBe("ready"));
+    service = "agent37";
+    await cloud.wake();
+    expect(await cloud.status()).toMatchObject({ state: "ready", service: "vercel", region: "sin1" });
+    expect(new Set(access.map((given) => given.service))).toEqual(new Set(["vercel"]));
+    expect(brain.wakeInputs.at(-1)).toEqual({ key: brain.key, name: "Cloud", threadVcpus: 4 });
+  });
+
+  it("is dialed only while its machine runs, since any request to its address wakes it; a Vercel brain's dial never needs a look", async () => {
+    const { cloud } = cloudBrain(() => "agent37");
+    await cloud.create();
+    await vi.waitFor(async () => expect((await cloud.status()).state).toBe("ready"));
+    expect(await cloud.dialable()).toBe(true);
+    brain.state = "stopped";
+    expect(await cloud.dialable()).toBe(false);
+    // The same stand-in machine, made again on Vercel.
+    brain.state = "missing";
+    const vercel = cloudBrain(() => "vercel").cloud;
+    await vercel.create("sin1");
+    await vi.waitFor(async () => expect((await vercel.status()).state).toBe("ready"));
+    brain.state = "stopped";
+    const looks = brain.calls.length;
+    expect(await vercel.dialable()).toBe(true);
+    expect(brain.calls.length).toBe(looks);
+  });
+
+  it("asks for a region only of a brain on Vercel", async () => {
+    await expect(cloudBrain(() => "vercel").cloud.create()).rejects.toThrow("Choose a region for the cloud brain.");
   });
 });

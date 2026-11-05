@@ -26,6 +26,11 @@ export interface BrainEndpoint {
   ready(): Promise<boolean>;
   /** Null before the Mac has learned how to dial it. Never wakes it. */
   locate(): Promise<BrainTarget | null>;
+  /**
+   * Whether a dial now leaves the brain as it is; always, when absent. A brain whose address wakes it for any request
+   * is dialed only while it runs. Never wakes it.
+   */
+  dialable?(): Promise<boolean>;
   /** Wakes the brain for a window's own intent, as Wake does; resolves once it runs. */
   wake(): Promise<void>;
   projects(): Promise<ProjectMapping>;
@@ -77,8 +82,9 @@ interface Pending {
 
 /**
  * The Mac's one session with its cloud brain, as its owner. It dials at start, after every wake, and every two
- * minutes while not connected; a sleeping brain refuses the upgrade at once and nothing wakes it. Only a window's own
- * intent wakes the brain. Frames come for the runs in its interest; everything it hears goes to `onPush`.
+ * minutes while not connected; a sleeping brain refuses the upgrade at once, or is not dialed while its address would
+ * wake it, and nothing wakes it. Only a window's own intent wakes the brain. Frames come for the runs in its interest;
+ * everything it hears goes to `onPush`.
  */
 export class BrainLink {
   private session: PhoneSession | null = null;
@@ -125,9 +131,16 @@ export class BrainLink {
    */
   async call<M extends RpcMethod>(method: M, params: RpcParams<M>, options: { wake: boolean }): Promise<RpcResults[M]> {
     let session = this.session ?? (await this.connect());
-    if (!session && (options.wake || this.waking)) {
-      await (options.wake ? this.wake() : this.waking?.catch(() => undefined));
-      session = await this.connect();
+    // Right after a wake brought the brain up, a dial needs no look first.
+    if (!session && options.wake) {
+      await this.wake();
+      session = await this.connect(true);
+    } else if (!session && this.waking) {
+      const woke = await this.waking.then(
+        () => true,
+        () => false,
+      );
+      session = await this.connect(woke);
     }
     if (!session) throw new BrainOutOfReach(this.current === "live" ? "offline" : this.current);
     return (await this.request(session, method, params)) as RpcResults[M];
@@ -192,16 +205,21 @@ export class BrainLink {
     for (const listener of this.reaches) listener(reach);
   }
 
-  private connect(): Promise<PhoneSession | null> {
+  /** `woke`: a wake just brought the brain up, so the dial needs no look first. */
+  private connect(woke = false): Promise<PhoneSession | null> {
     if (this.closed) return Promise.resolve(null);
     // One session at a time: a call that waited for a wake finds the one an earlier call opened after it.
     if (this.session) return Promise.resolve(this.session);
-    this.connecting ??= this.open().finally(() => (this.connecting = null));
+    this.connecting ??= this.open(woke).finally(() => (this.connecting = null));
     return this.connecting;
   }
 
-  private async open(): Promise<PhoneSession | null> {
+  private async open(woke: boolean): Promise<PhoneSession | null> {
     this.dialed = Date.now();
+    if (!woke && this.deps.endpoint.dialable && !(await this.deps.endpoint.dialable())) {
+      this.fell("asleep");
+      return null;
+    }
     const target = await this.deps.endpoint.locate().catch(() => null);
     if (!target) return null;
     let socket: LinkSocket;

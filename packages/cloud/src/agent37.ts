@@ -23,7 +23,7 @@ export interface Agent37Instance {
   mount_path: string;
   resources: Agent37Resources;
   url: string;
-  public_ports: { port: number; url: string; prefix?: string; label?: string }[];
+  public_ports: Agent37PublicPort[];
   name: string | null;
   metadata: Record<string, string> | null;
   auto_sleep: boolean;
@@ -33,6 +33,14 @@ export interface Agent37Instance {
   past_due: boolean;
   /** Epoch seconds. */
   created: number;
+}
+
+/** A port anyone can reach at `url`, with no key. */
+export interface Agent37PublicPort {
+  port: number;
+  url: string;
+  prefix?: string | null;
+  label?: string | null;
 }
 
 export interface Agent37CreateParams {
@@ -104,6 +112,8 @@ export interface Agent37Api {
   edit(id: string, params: Agent37EditParams): Promise<Agent37Instance>;
   /** Deletes the instance and its disk. Done when it is already gone. */
   remove(id: string): Promise<void>;
+  /** Gives `port` a URL anyone can reach with no key. Refused with `public_port_exists` when it has one. */
+  addPublicPort(id: string, port: number, label?: string): Promise<Agent37PublicPort>;
   /** Answers once the instance runs. */
   start(id: string): Promise<void>;
   /** Ends its processes; the disk stays, and it stays down until started. */
@@ -187,6 +197,7 @@ export function agent37Api(key: string, endpoints: Agent37Endpoints = AGENT37_EN
     remove: async (id) => {
       await hosting("DELETE", `/instances/${id}`).catch((error: unknown) => missing(error, null));
     },
+    addPublicPort: (id, port, label) => hosting("POST", `/instances/${id}/public-ports`, { port, ...(label ? { label } : {}) }),
     start: async (id) => {
       const started = await send<{ status?: string }>("POST", `${endpoints.api}/instances/${id}/start`, { authorization: `Bearer ${key}` });
       if (started.status === 200 && started.body?.status === "running") return;

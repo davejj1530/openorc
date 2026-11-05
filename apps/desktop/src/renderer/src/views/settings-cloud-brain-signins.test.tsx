@@ -18,7 +18,7 @@ afterEach(() => {
   vi.resetAllMocks();
 });
 
-const ready: CloudBrainStatus = { state: "ready", region: "sin1", machine: "awake", claude: ["Personal"], behind: false, working: null, door: null, threads: 0, error: null };
+const ready: CloudBrainStatus = { state: "ready", service: "vercel", region: "sin1", machine: "awake", claude: ["Personal"], behind: false, working: null, door: null, threads: 0, error: null };
 const none: CloudBrainSignIns = {
   codex: { mode: null, email: null, plan: null, signingIn: false, pending: null, error: null },
   github: { on: false, blocked: null, behind: false },
@@ -36,7 +36,7 @@ function show(signIns: CloudBrainSignIns, status: CloudBrainStatus = ready) {
   });
   render(
     <QueryClientProvider client={queryClient}>
-      <CloudBrainSection active />
+      <CloudBrainSection active service="vercel" />
     </QueryClientProvider>,
   );
 }

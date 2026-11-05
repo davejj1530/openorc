@@ -1,0 +1,32 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.11 [39m[90m/private/tmp/test-run-fixtures/vitest[39m
+
+ [32m✓[39m src/cart.test.ts[2m > [22mcart[2m > [22madds items[32m 1[2mms[22m[39m
+ [32m✓[39m src/cart.test.ts[2m > [22mcart[2m > [22mremoves items[32m 0[2mms[22m[39m
+ [32m✓[39m src/cart.test.ts[2m > [22mcart[2m > [22mtotals prices[32m 0[2mms[22m[39m
+ [2m[90m↓[39m[22m src/cart.test.ts[2m > [22mcart[2m > [22mapplies coupons
+ [31m×[39m src/mailer.test.ts[2m > [22mmailer[2m > [22mretries[2m > [22msends once[32m 2[2mms[22m[39m
+[31m   → expected "send" to be called 1 times, but got 2 times[39m
+ [32m✓[39m src/mailer.test.ts[2m > [22mmailer[2m > [22mretries[2m > [22mgives up after three tries[32m 0[2mms[22m[39m
+ [32m✓[39m src/mailer.test.ts[2m > [22mmailer[2m > [22mformats the subject[32m 0[2mms[22m[39m
+ [31m×[39m src/mailer.test.ts[2m > [22mmailer[2m > [22mloads the template[32m 0[2mms[22m[39m
+[31m   → template missing: welcome.html[39m
+ [32m✓[39m src/queue.test.ts[2m > [22mdrains in order[33m 403[2mms[22m[39m
+ [32m✓[39m src/queue.test.ts[2m > [22mdrops duplicates[33m 402[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 2 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m src/mailer.test.ts[2m > [22mmailer[2m > [22mretries[2m > [22msends once
+[31m[1mAssertionError[22m: expected "send" to be called 1 times, but got 2 times[39m
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/mailer.test.ts[2m > [22mmailer[2m > [22mloads the template
+[31m[1mError[22m: template missing: welcome.html[39m
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m2 passed[39m[22m[90m (3)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m7 passed[39m[22m[2m | [22m[33m1 skipped[39m[90m (10)[39m
+[2m   Start at [22m 12:13:54
+[2m   Duration [22m 894ms[2m (transform 30ms, setup 0ms, import 46ms, tests 812ms, environment 0ms)[22m
+

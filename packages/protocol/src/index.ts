@@ -38,6 +38,8 @@ export * from "./thread-start.js";
 export * from "./thread-owner.js";
 export * from "./owners.js";
 export * from "./tool-images.js";
+export * from "./test-run.js";
+export * from "./tool-digest.js";
 
 export { MAX_TEAM_CONTEXT_BYTES } from "./legacy-migrations.js";
 export * from "./workspace-transfer.js";

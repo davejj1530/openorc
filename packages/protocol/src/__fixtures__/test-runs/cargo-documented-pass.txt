@@ -1,0 +1,18 @@
+   Compiling shop v0.1.0 (/tmp/shop)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.41s
+     Running unittests src/lib.rs (target/debug/deps/shop-1f2e3d4c5b6a7980)
+
+running 3 tests
+test cart::tests::adds_items ... ok
+test cart::tests::applies_coupons ... ignored, coupons are not built
+test cart::tests::rounds_down ... ok
+
+test result: ok. 2 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests shop
+
+running 1 test
+test src/cart.rs - cart::total (line 12) ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+

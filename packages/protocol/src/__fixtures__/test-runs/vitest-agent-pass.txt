@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /private/tmp/test-run-fixtures/vitest
+
+
+ Test Files  2 passed (2)
+      Tests  5 passed | 1 skipped (6)
+   Start at  12:13:45
+   Duration  897ms (transform 20ms, setup 0ms, import 31ms, tests 806ms, environment 0ms)
+

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { HarnessId } from "./harness.js";
 import { McpToolSource } from "./mcp-apps.js";
+import { ToolDigest } from "./tool-digest.js";
 
 /**
  * The internal event model. Every adapter (Claude Code, Codex, ACP) maps its
@@ -202,6 +203,8 @@ export const AgentEvent = z.discriminatedUnion("type", [
     input: z.unknown().optional(),
     /** Set on transcript pages, which leave large outputs out; the row loads its output when opened. */
     outputOmitted: z.boolean().optional(),
+    /** What a large output came to, saved by the core so a page that leaves the output out still says it. */
+    digest: ToolDigest.optional(),
   }),
   z.object({
     type: z.literal("file.changed"),

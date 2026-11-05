@@ -1,4 +1,4 @@
-import type { ActivityRecovery, ActivityStatus, AgentEvent, AgentEventType, McpToolSource } from "@openorc/protocol";
+import type { ActivityRecovery, ActivityStatus, AgentEvent, AgentEventType, McpToolSource, ToolDigest } from "@openorc/protocol";
 import { replaceSubagentCompletionReply, subagentBlock, subagentCompletionReply, type SubagentCard } from "./transcript-subagents.js";
 
 /**
@@ -26,6 +26,8 @@ export type Block = { at?: number; turnKey?: string; runId?: string } & (
       done: boolean;
       status?: ActivityStatus;
       progress?: string;
+      /** What a large output came to, when the page left the output out. */
+      digest?: ToolDigest;
       mcp?: McpToolSource;
       subagent?: SubagentCard;
     }
@@ -242,6 +244,7 @@ const handlers: { [T in AgentEventType]: Handler<T> } = {
       input: ev.input ?? existing?.input,
       // An output left out of the page is read when the row opens, never pieced together from a kept fragment.
       ...(ev.outputOmitted ? { outputOmitted: true } : { output: ev.output ?? existing?.output }),
+      ...(ev.digest ? { digest: ev.digest } : {}),
       ...((ev.mcp ?? existing?.mcp) ? { mcp: ev.mcp ?? existing?.mcp } : {}),
       isError: ev.isError,
       done: true,

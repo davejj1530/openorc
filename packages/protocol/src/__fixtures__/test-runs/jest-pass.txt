@@ -1,0 +1,8 @@
+PASS ./queue.test.js
+PASS ./cart.test.js
+
+Test Suites: 2 passed, 2 total
+Tests:       1 skipped, 5 passed, 6 total
+Snapshots:   0 total
+Time:        0.912 s, estimated 1 s
+Ran all test suites matching cart|queue.

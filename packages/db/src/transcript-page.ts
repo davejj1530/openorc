@@ -1,4 +1,4 @@
-import type { AgentEvent } from "@openorc/protocol";
+import { toolDigest, type AgentEvent } from "@openorc/protocol";
 import type { Db } from "./database.js";
 
 /** Tool results whose stored event is larger than this stay out of a page; the row loads its output when opened. */
@@ -6,11 +6,20 @@ export const OMIT_OUTPUT_CHARS = 4096;
 /** Task tools stay whole: their rows read the task id from the output. */
 const KEEPS_OUTPUT = /task_(?:create|start)$/;
 
+const leavesOutputOut = (event: Extract<AgentEvent, { type: "tool.completed" }>) => !KEEPS_OUTPUT.test(event.name) && JSON.stringify(event).length > OMIT_OUTPUT_CHARS;
+
 /** The page's rule for one event already in hand, as a live view applies it to a redacted event. */
 export function pagedEvent(event: AgentEvent): AgentEvent {
-  if (event.type !== "tool.completed" || KEEPS_OUTPUT.test(event.name) || JSON.stringify(event).length <= OMIT_OUTPUT_CHARS) return event;
+  if (event.type !== "tool.completed" || !leavesOutputOut(event)) return event;
   // Undefined leaves the key out of the JSON, as the page's json_remove does.
   return { ...event, output: undefined, outputOmitted: true };
+}
+
+/** A result that pages will leave out keeps its digest, so a page still says what it came to. Stored once, before the ledger. */
+export function digestedEvent(event: AgentEvent): AgentEvent {
+  if (event.type !== "tool.completed" || event.digest || !leavesOutputOut(event)) return event;
+  const digest = toolDigest(event.output);
+  return digest ? { ...event, digest } : event;
 }
 
 export interface TranscriptPage {

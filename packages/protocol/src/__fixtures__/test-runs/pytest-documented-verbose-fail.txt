@@ -1,0 +1,35 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.4, pytest-8.3.2, pluggy-1.5.0 -- /usr/local/bin/python3
+cachedir: .pytest_cache
+rootdir: /tmp/shop
+collecting ... collected 5 items
+
+tests/test_cart.py::test_adds_items PASSED                                [ 20%]
+tests/test_cart.py::test_applies_discount FAILED                          [ 40%]
+tests/test_cart.py::test_applies_coupons SKIPPED (coupons are not built)  [ 60%]
+tests/test_cart.py::TestTotals::test_rounds_down PASSED                   [ 80%]
+tests/test_cart.py::TestTotals::test_adds_tax FAILED                      [100%]
+
+=================================== FAILURES ===================================
+____________________________ test_applies_discount _____________________________
+
+    def test_applies_discount():
+>       assert apply_discount(100, 0.1) == 91
+E       assert 90.0 == 91
+E        +  where 90.0 = apply_discount(100, 0.1)
+
+tests/test_cart.py:9: AssertionError
+___________________________ TestTotals.test_adds_tax ___________________________
+
+self = <tests.test_cart.TestTotals object at 0x104f2c050>
+
+    def test_adds_tax(self):
+>       assert add_tax(100) == 108
+E       assert 107.0 == 108
+E        +  where 107.0 = add_tax(100)
+
+tests/test_cart.py:20: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_cart.py::test_applies_discount - assert 90.0 == 91
+FAILED tests/test_cart.py::TestTotals::test_adds_tax - assert 107.0 == 108
+==================== 2 failed, 2 passed, 1 skipped in 0.04s ====================

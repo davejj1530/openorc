@@ -1,0 +1,29 @@
+
+ RUN  v4.1.11 /private/tmp/test-run-fixtures/vitest
+
+ ✓ src/cart.test.ts (4 tests | 1 skipped) 2ms
+ ❯ src/mailer.test.ts (4 tests | 2 failed) 3ms
+       × sends once 2ms
+       ✓ gives up after three tries 0ms
+     ✓ formats the subject 0ms
+     × loads the template 0ms
+ ✓ src/queue.test.ts (2 tests) 807ms
+   ✓ drains in order  403ms
+   ✓ drops duplicates  402ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/mailer.test.ts > mailer > retries > sends once
+AssertionError: expected "send" to be called 1 times, but got 2 times
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/mailer.test.ts > mailer > loads the template
+Error: template missing: welcome.html
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  2 failed | 7 passed | 1 skipped (10)
+   Start at  12:13:51
+   Duration  896ms (transform 30ms, setup 0ms, import 46ms, tests 812ms, environment 0ms)
+

@@ -1,0 +1,57 @@
+PASS ./s14.test.js
+PASS ./s17.test.js
+PASS ./s16.test.js
+PASS ./s12.test.js
+PASS ./s11.test.js
+PASS ./s20.test.js
+PASS ./s9.test.js
+PASS ./s10.test.js
+PASS ./s7.test.js
+PASS ./s13.test.js
+PASS ./s8.test.js
+PASS ./s15.test.js
+PASS ./s18.test.js
+PASS ./s19.test.js
+PASS ./s6.test.js
+PASS ./s21.test.js
+FAIL ./s22.test.js
+  ● breaks
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 2
+    Received: 1
+
+    > 1 | it("breaks", () => expect(1).toBe(2));
+        |                              ^
+      2 |
+
+      at Object.toBe (s22.test.js:1:30)
+
+PASS ./s3.test.js
+PASS ./s4.test.js
+PASS ./s2.test.js
+PASS ./s5.test.js
+PASS ./s1.test.js
+
+Summary of all failing tests
+FAIL ./s22.test.js
+  ● breaks
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 2
+    Received: 1
+
+    > 1 | it("breaks", () => expect(1).toBe(2));
+        |                              ^
+      2 |
+
+      at Object.toBe (s22.test.js:1:30)
+
+
+Test Suites: 1 failed, 21 passed, 22 total
+Tests:       1 failed, 21 passed, 22 total
+Snapshots:   0 total
+Time:        0.332 s, estimated 1 s
+Ran all test suites.

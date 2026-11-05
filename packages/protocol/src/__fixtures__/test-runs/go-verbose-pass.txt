@@ -1,0 +1,9 @@
+=== RUN   TestAddsItems
+--- PASS: TestAddsItems (0.00s)
+=== RUN   TestRemovesItems
+--- PASS: TestRemovesItems (0.00s)
+=== RUN   TestAppliesCoupons
+    cart_test.go:14: coupons are not built yet
+--- SKIP: TestAppliesCoupons (0.00s)
+PASS
+ok  	example.com/shop/cart	0.196s

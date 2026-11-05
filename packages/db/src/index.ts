@@ -14,7 +14,7 @@ export { messages } from "./search.js";
 export { subagents, type SubagentRecord } from "./subagents.js";
 export { taskComments } from "./task-comments.js";
 export { threadQueue, type ThreadQueueEntry } from "./thread-queue.js";
-export { OMIT_OUTPUT_CHARS, pagedEvent, transcriptPage, type TranscriptPage } from "./transcript-page.js";
+export { digestedEvent, OMIT_OUTPUT_CHARS, pagedEvent, transcriptPage, type TranscriptPage } from "./transcript-page.js";
 
 export { cloudWorkspaces, type CloudMirrorState, type CloudProviderId, type CloudWorkspaceRecord, type CloudWorkspaceState, type SessionBase } from "./cloud-workspaces.js";
 export { orclings, type OrclingInsert } from "./orclings.js";

@@ -8,3 +8,6 @@
 /licenses/** -text
 /apps/website/public/licenses/** -text
 /apps/desktop/src/renderer/src/assets/project-stacks/*.svg -text
+
+# Terminal captures keep their carriage returns; the test-run reader reads them as a terminal printed them.
+/packages/protocol/src/__fixtures__/test-runs/** -text

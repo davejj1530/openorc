@@ -1,7 +1,7 @@
 import type { Block } from "@openorc/client";
 import type { InboxList } from "@openorc/protocol";
 import { useEffect, useMemo, useRef } from "react";
-import { client, useRpc } from "../client";
+import { useHostClient, useRpc } from "../client";
 
 type ApprovalBlock = Extract<Block, { kind: "approval" }>;
 
@@ -44,6 +44,7 @@ export function useWaitingApprovals(threadId: string, shown: readonly string[]):
   const inbox = useRpc("inbox.list", {});
   const waiting = useMemo(() => waitingRuns(inbox.data, threadId, shown), [inbox.data, threadId, shown]);
   const runIds = useMemo(() => waiting.map((run) => run.runId), [waiting]);
+  const client = useHostClient();
   const transcripts = client.useRuns(runIds);
   const failed = client.useFailedLoads();
   useEffect(() => {
@@ -51,7 +52,7 @@ export function useWaitingApprovals(threadId: string, shown: readonly string[]):
       if (client.runs.get(runId)?.hydrated || failed.has(runId)) continue;
       client.runs.hydrate(runId, { turns: 1 }).catch(() => undefined);
     }
-  }, [runIds, transcripts, failed]);
+  }, [client, runIds, transcripts, failed]);
   const last = useRef<WaitingApproval[]>([]);
   return useMemo(() => {
     const next = waiting.flatMap(({ runId, task }, index) => {

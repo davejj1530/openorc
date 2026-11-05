@@ -1,7 +1,7 @@
 import { WORKSPACE_ID } from "@openorc/protocol";
 import { describe, expect, it } from "vitest";
 import { projectChoices } from "../projects";
-import { decodeSheetDraft, openingProject, startBlocker, unstarted } from "./new-thread-state";
+import { copyAge, decodeSheetDraft, openingProject, startBlocker, unstarted } from "./new-thread-state";
 
 const choices = projectChoices([
   { id: "openorc", name: "openorc" },
@@ -54,5 +54,18 @@ describe("the new thread sheet", () => {
     const since = { ...decodeSheetDraft("openorc", null), mode: "plan" as const, prompt: "and the docs", images: [later] };
     expect(unstarted({ prompt: "Fix the build", images: [image] }, since)).toMatchObject({ prompt: "Fix the build\nand the docs", images: [image, later], mode: "plan" });
     expect(unstarted({ prompt: "Fix the build", images: [] }, { ...since, prompt: "  ", images: [] })).toMatchObject({ prompt: "Fix the build", images: [] });
+  });
+});
+
+describe("the cloud brain's copy of a project", () => {
+  const now = Date.UTC(2026, 10, 4, 12);
+  const day = 86_400_000;
+
+  it("is named by its age only once it is a day old or more, and never for a project that is no copy", () => {
+    expect(copyAge({ defaultBranch: "main", copy: { syncedAt: now - 3 * day - 1000 } }, now)).toBe("From main, synced 3 days ago");
+    expect(copyAge({ defaultBranch: "main", copy: { syncedAt: now - day } }, now)).toBe("From main, synced 1 day ago");
+    expect(copyAge({ defaultBranch: "main", copy: { syncedAt: now - day + 60_000 } }, now)).toBeNull();
+    expect(copyAge({ defaultBranch: "main" }, now)).toBeNull();
+    expect(copyAge(undefined, now)).toBeNull();
   });
 });

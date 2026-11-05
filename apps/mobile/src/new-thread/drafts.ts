@@ -1,6 +1,6 @@
 import { PermissionPreset } from "@openorc/protocol";
 import { useCallback, useState } from "react";
-import { client, shownMacId, storage } from "../client";
+import { shownMacId, storage, useHostClient } from "../client";
 import { decodeSheetDraft, type SheetDraft } from "./new-thread-state";
 
 const draftKey = (projectId: string) => `newthread.${shownMacId() ?? "none"}.${projectId}`;
@@ -41,7 +41,7 @@ export function useSheetDraft(projectId: string): [SheetDraft, (update: (draft: 
  */
 export function useSheetPermission() {
   const [chosen, setChosen] = useState(() => PermissionPreset.safeParse(storage.getString(permissionKey())).data);
-  const selection = client.usePermissionSelection(chosen);
+  const selection = useHostClient().usePermissionSelection(chosen);
   return {
     ...selection,
     select: (permission: PermissionPreset) => {

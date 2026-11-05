@@ -12,7 +12,8 @@ const probe = vi.hoisted(() => ({ store: null as ReturnType<typeof runStore> | n
 vi.mock("../client", async () => {
   const { runStore } = await import("./test-fixtures/run-store");
   probe.store = runStore();
-  return { client: probe.store.client };
+  const client = probe.store.client;
+  return { useHostClient: () => client };
 });
 vi.mock("./Markdown", () => ({
   Markdown: function Markdown({ text, streaming }: { text: string; streaming: boolean }) {

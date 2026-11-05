@@ -29,8 +29,11 @@ export type HomeItem =
   | { kind: "heading"; key: string; group: "needs-you" | "workspace" | "project"; projectId: string | null; title: string; meta: ProjectMeta | null; open: boolean }
   /** A project's pinned or snoozed threads, behind a disclosure. */
   | { kind: "section"; key: string; fold: Exclude<SidebarFold, "project">; projectId: string; count: number; open: boolean }
-  /** `project` names the thread's project where the section does not, as under Needs you. `arriving` rises it in. */
-  | { kind: "thread"; key: string; thread: ThreadSummary; tree: ThreadTreeRow; project: string | null; arriving: boolean }
+  /**
+   * `project` names the thread's project where the section does not, as under Needs you. `arriving` rises it in.
+   * `host` names the partner host a thread under the shown host's Needs you lives on.
+   */
+  | { kind: "thread"; key: string; thread: ThreadSummary; tree: ThreadTreeRow; project: string | null; arriving: boolean; host?: string }
   /** The foot of a project that lists more threads than it shows. */
   | { kind: "more"; key: string; projectId: string; project: string }
   /** A list the Mac could not give: a project's threads, or with no project, the projects themselves. */
@@ -49,6 +52,17 @@ export interface HomeOptions {
   projectsFailed: boolean;
   /** The project the reader just opened, whose rows rise in. */
   opened: string | null;
+  /** The partner host's threads waiting on you, listed under this host's Needs you with its own. */
+  partnerWaiting?: readonly Waiting[];
+  /** This host is the partner: its waiting threads are listed under the shown host's Needs you, and none here. */
+  waitingShownElsewhere?: boolean;
+}
+
+/** A thread waiting on you, with the project it is in; `host` is the partner host it lives on. */
+export interface Waiting {
+  thread: ThreadSummary;
+  project: string | null;
+  host?: string;
 }
 
 const newestFirst = (a: ThreadSummary, b: ThreadSummary) => b.lastActivityAt - a.lastActivityAt;
@@ -58,7 +72,7 @@ const isWaiting = (thread: ThreadSummary) => thread.activity === "waiting";
  * Every thread waiting on you, once each, newest first: from every thread the lists read, the one past a page's end
  * included (the inbox's reads skip what a list already read), and from the inbox.
  */
-function needsYou(groups: readonly ProjectThreads[], all: readonly ThreadSummary[]) {
+function needsYou(groups: readonly ProjectThreads[], all: readonly ThreadSummary[]): Waiting[] {
   const names = new Map(groups.map((group) => [group.id, group.name]));
   const found = new Map(all.filter((thread) => isWaiting(thread) && !thread.archivedAt && !thread.teamInstanceId).map((thread) => [thread.id, thread]));
   return [...found.values()].sort(newestFirst).map((thread) => ({ thread, project: names.get(thread.projectId) ?? null }));
@@ -99,28 +113,47 @@ function projectRows(group: ProjectThreads, page: Page, options: HomeOptions, wa
 /** Orcmode lists only the projects with something in its working set, or whose threads failed to load. */
 const shownInOrcmode = ({ group, page }: { group: ProjectThreads; page: Page }) => group.failed || page.pinned.length + page.rest.length > 0;
 
+/** This host's threads waiting on you, newest first; none in the archive, which lists them in their projects. */
+export function homeWaiting(groups: readonly ProjectThreads[], options: HomeOptions): Waiting[] {
+  if (listsWaiting(options)) return [];
+  const all = visibleThreadForest(
+    [...new Map([...options.waiting, ...groups.flatMap((group) => group.threads ?? [])].map((thread) => [thread.id, thread])).values()],
+    options.filter === "archived",
+    options.now,
+  );
+  return needsYou(groups, all);
+}
+
 /**
- * Home: every thread waiting on you first, across projects, then Workspace and each project as the sidebar lists it,
- * pinned threads ahead of the rest and snoozed ones folded at the foot, a page at a time. A waiting thread appears
- * once, under Needs you, which never folds, so a folded project still shows what waits on you.
+ * Home: every thread waiting on you first, across projects and the partner host, then Workspace and each project as
+ * the sidebar lists it, pinned threads ahead of the rest and snoozed ones folded at the foot, a page at a time. A
+ * waiting thread appears once, under Needs you, which never folds, so a folded project still shows what waits on you.
  */
 export function homeItems(groups: readonly ProjectThreads[], options: HomeOptions): HomeItem[] {
   const pages = groups.map((group) => ({
     group,
     page: sidebarThreadPage({ projectId: group.id, fetched: group.threads, selected: null, filter: options.filter, limit: group.limit, now: options.now }),
   }));
-  const all = visibleThreadForest(
-    [...new Map([...options.waiting, ...groups.flatMap((group) => group.threads ?? [])].map((thread) => [thread.id, thread])).values()],
-    options.filter === "archived",
-    options.now,
-  );
-  const waiting = listsWaiting(options) ? [] : needsYou(groups, all);
-  const waitingRoots = new Set(waiting.map(({ thread }) => thread.id));
+  const own = homeWaiting(groups, options);
+  const waitingRoots = new Set(own.map(({ thread }) => thread.id));
+  // A thread that just moved here may still wait in the partner's last list: this host's own row stands for it.
+  const here = new Set([...options.waiting, ...groups.flatMap((group) => group.threads ?? [])].map((thread) => thread.id));
+  const partner = (options.partnerWaiting ?? []).filter(({ thread }) => !here.has(thread.id));
+  const waiting = options.waitingShownElsewhere ? [] : [...own, ...partner].sort((a, b) => newestFirst(a.thread, b.thread));
   const items: HomeItem[] = [];
   if (waiting.length) {
     items.push({ kind: "heading", key: "needs-you", group: "needs-you", projectId: null, title: "Needs you", meta: { text: String(waiting.length), tone: "attention" }, open: true });
-    for (const { thread, project } of waiting) {
-      for (const tree of threadTreeRows([thread], [thread], [])) items.push({ kind: "thread", key: tree.thread.id, thread: tree.thread, tree, project: tree.depth ? null : project, arriving: false });
+    for (const { thread, project, host } of waiting) {
+      for (const tree of threadTreeRows([thread], [thread], []))
+        items.push({
+          kind: "thread",
+          key: host ? `${host}:${tree.thread.id}` : tree.thread.id,
+          thread: tree.thread,
+          tree,
+          project: tree.depth ? null : project,
+          arriving: false,
+          ...(host ? { host } : {}),
+        });
     }
   }
   if (options.projectsFailed) items.push({ kind: "retry", key: "retry:projects", projectId: null });

@@ -9,7 +9,7 @@ const connected: LinkState = { kind: "connected", mac: { id: "mac-1", name: "Stu
 
 /**
  * The phone's `../client` over a Mac a test answers, shown as `mac-1` connected over Wi-Fi: the real query cache,
- * mutations and permission default, every call (through the hooks or `link.connection`) going to `answer`, and a map
+ * mutations and permission default, every call (through the hooks or a link's `connection`) going to `answer`, and a map
  * standing in for the phone's MMKV. `wrapper` gives rendered hooks the cache.
  */
 export function fakeMac(answer: (method: RpcMethod, params: unknown) => Promise<unknown>) {
@@ -30,13 +30,17 @@ export function fakeMac(answer: (method: RpcMethod, params: unknown) => Promise<
   });
   const saved = new Map<string, string>();
   const storage = new ScratchStore({ getString: (key) => saved.get(key), set: (key, value) => void saved.set(key, value), remove: (key) => void saved.delete(key) });
+  const link = { connection, getState: () => connected, subscribe: () => () => undefined, retry: async () => undefined };
   const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: client.queryClient }, children);
   return {
     saved,
     wrapper,
     module: {
       client,
-      link: { connection, getState: () => connected, subscribe: () => () => undefined },
+      hostClient: () => client,
+      useHostClient: () => client,
+      link,
+      hostLink: () => link,
       queryClient: client.queryClient,
       storage,
       shownMacId: () => "mac-1",

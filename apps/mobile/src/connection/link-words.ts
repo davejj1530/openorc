@@ -33,6 +33,10 @@ const down: Record<DownReason, LinkWords> = {
   unreachable: { tone: "busy", status: "Reconnecting", spoken: "Reconnecting", detail: "This Mac isn’t answering. It may be asleep or on another network." },
   silent: { tone: "off", status: "Not reachable", spoken: "Not reachable", detail: "This Mac isn’t answering. It may be asleep or on another network." },
   tailnet: { tone: "attention", status: "Check Tailscale", spoken: "Not reachable over Tailscale", detail: "Tailscale is off on this iPhone, or another VPN is on." },
+  waking: { tone: "busy", status: "Waking", spoken: "Waking", detail: "Waking it up. This takes a few seconds." },
+  "wake-refused": { tone: "attention", status: "Can’t wake it", spoken: "Can’t wake it", detail: "Pair this iPhone with it again from OpenOrc on your Mac." },
+  "needs-mac": { tone: "attention", status: "Needs your Mac", spoken: "Needs your Mac", detail: "Open OpenOrc on your Mac to wake it." },
+  "wake-failed": { tone: "attention", status: "Didn’t start", spoken: "Didn’t start", detail: "It didn’t start. This iPhone tries again in a moment." },
 };
 
 export function linkWords(state: LinkState): LinkWords {

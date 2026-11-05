@@ -1,7 +1,7 @@
 import { clearLastNotificationResponse, useLastNotificationResponse } from "expo-notifications";
 import { router } from "expo-router";
 import { useEffect } from "react";
-import { link } from "../client";
+import { link, partnerHost } from "../client";
 import { keychainKeys, phoneCrypto } from "../connection/native";
 import { noticeOpener, openTap, tapOf } from "./taps";
 
@@ -20,10 +20,13 @@ export function useNoticeTaps(): void {
     if (!tap) return;
     void openTap(tap, {
       macs: link.getMacs,
-      select: (macId) => link.select(macId),
-      openThread: (id) => {
+      // A tap on the partner's alert keeps the group: its thread opens on that host beside the shown one.
+      select: (macId) => {
+        if (macId !== partnerHost()) link.select(macId);
+      },
+      openThread: (id, host) => {
         router.dismissTo("/");
-        router.push({ pathname: "/thread/[id]", params: { id } });
+        router.push({ pathname: "/thread/[id]", params: host === partnerHost() ? { id, host } : { id } });
       },
       open,
       now: Date.now,

@@ -18,7 +18,8 @@ vi.mock("./Markdown", () => ({ Markdown: ({ text }: { text: string }) => <div>{t
 vi.mock("../client", async () => {
   const { runStore } = await import("./test-fixtures/run-store");
   work.store = runStore();
-  return { client: work.store.client };
+  const client = work.store.client;
+  return { useHostClient: () => client };
 });
 
 afterEach(() => {

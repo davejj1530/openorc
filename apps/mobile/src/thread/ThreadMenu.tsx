@@ -1,6 +1,7 @@
 import { canMoveToCloud } from "@openorc/client";
 import { isSubagentThread, type ThreadSummary } from "@openorc/protocol";
 import { useRpc } from "../client";
+import { useMover } from "./use-mover";
 import { useChangesCount } from "./use-changes-count";
 import { usePreviewPanel } from "./use-preview-panel";
 import { Link, Stack } from "expo-router";
@@ -76,5 +77,6 @@ export function useThreadHeaderMenu(thread: ThreadSummary | null, now: Date, run
   const preview = usePreviewPanel(actionable);
   const cloudOffer = useRpc("cloud.offer", {});
   const toCloud = Boolean(cloudOffer.data?.offered && actionable && canMoveToCloud(actionable));
-  return useMemo(() => thread && headerMenu(threadMenu(thread, "header", now, { uncommitted, preview, toCloud }), run), [thread, run, now, uncommitted, preview, toCloud]);
+  const moves = useMover();
+  return useMemo(() => thread && headerMenu(threadMenu(thread, "header", now, { uncommitted, preview, toCloud, moves }), run), [thread, run, now, uncommitted, preview, toCloud, moves]);
 }

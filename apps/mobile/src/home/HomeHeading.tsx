@@ -1,7 +1,8 @@
 import type { ProjectMeta } from "@openorc/client";
 import { router } from "expo-router";
-import type { ComponentType } from "react";
+import { useContext, type ComponentType } from "react";
 import { View } from "react-native";
+import { HostContext } from "../connection/host-context";
 import { ChevronDown, ChevronRight, Folder, FolderOpen, Globe, Inbox, Plus } from "../generated/icons";
 import type { IconProps } from "../ui/icon";
 import { cn } from "../ui/cn";
@@ -39,10 +40,11 @@ function HeadingLine({ heading: { group, title, meta, open } }: { heading: Headi
 /**
  * A section heading like the sidebar's project heading: a faint 16 pt glyph, the name in ink, the meta in its tone. A
  * project's heading folds it on a tap, its folder glyph closing, and keeps its meta while folded; its own plus beside
- * it starts a thread there. Needs you never folds.
+ * it starts a thread there, on the host the section lists. Needs you never folds.
  */
 export function HomeHeading({ heading, onToggle }: { heading: Heading; onToggle: () => void }) {
   const { projectId, title, meta, open } = heading;
+  const host = useContext(HostContext);
   if (!projectId) {
     return (
       <View accessible accessibilityRole="header" accessibilityLabel={[title, meta?.text].filter(Boolean).join(", ")} className="mx-2.5 mt-3 min-h-touch flex-row items-center gap-1 pl-1.5 pr-3">
@@ -64,7 +66,7 @@ export function HomeHeading({ heading, onToggle }: { heading: Heading; onToggle:
       <ListPressable
         accessibilityRole="button"
         accessibilityLabel={`New thread in ${title}`}
-        onPress={() => router.push({ pathname: "/new", params: { projectId } })}
+        onPress={() => router.push({ pathname: "/new", params: host ? { projectId, host } : { projectId } })}
         className="size-touch items-center justify-center rounded-full active:bg-surface-2"
       >
         <Plus size={16} className="text-ink-4" />

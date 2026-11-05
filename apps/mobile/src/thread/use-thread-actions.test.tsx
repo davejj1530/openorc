@@ -11,19 +11,37 @@ import { threadMenu, threadSwipes, type ThreadAction } from "./thread-actions";
 import { useThreadActions } from "./use-thread-actions";
 
 vi.mock("expo-router", () => ({ router: { push: vi.fn() } }));
-const mac = vi.hoisted(() => ({ phone: null as FakeMac | null, updates: [] as RpcParams<"threads.update">[], refuse: null as string | null }));
+const mac = vi.hoisted(() => ({
+  phone: null as FakeMac | null,
+  updates: [] as RpcParams<"threads.update">[],
+  refuse: null as string | null,
+  moves: [] as { host: string | null; method: string; params: unknown }[],
+  asked: null as string | null,
+}));
 vi.mock("../client", async () => {
   const { fakeMac } = await import("../test-fixtures/fake-mac");
   mac.phone = fakeMac((method: RpcMethod, params) => {
+    if (method.startsWith("cloud.")) {
+      mac.moves.push({ host: mac.asked, method, params });
+      return mac.refuse ? Promise.reject(new Error(mac.refuse)) : Promise.resolve(null);
+    }
     if (method !== "threads.update") return Promise.resolve(null);
     mac.updates.push(params as RpcParams<"threads.update">);
     return mac.refuse ? Promise.reject(new Error(mac.refuse)) : Promise.resolve(null);
   });
-  return mac.phone.module;
+  const { hostLink } = mac.phone.module;
+  return {
+    ...mac.phone.module,
+    hostLink: (host: string | null) => {
+      mac.asked = host;
+      return hostLink();
+    },
+  };
 });
 
 beforeEach(() => {
   mac.updates.length = 0;
+  mac.moves.length = 0;
   mac.refuse = null;
   alerts.length = 0;
   opened.length = 0;
@@ -113,6 +131,18 @@ it("opens the thread's Changes and Preview from the header's menu", () => {
   act(() => result.current.run(find(menu, "Changes")));
   act(() => result.current.run(find(menu, "Preview")));
   expect(vi.mocked(router.push).mock.calls).toEqual([[{ pathname: "/changes", params: { threadId: "t-settings" } }], [{ pathname: "/preview", params: { threadId: "t-settings" } }]]);
+  expect(mac.updates).toEqual([]);
+});
+
+it("asks the group's Mac to bring a cloud brain thread home, and says why when it cannot", async () => {
+  const onBrain = { ...settings, activity: "idle" as const };
+  const { result } = renderHook(() => useThreadActions(onBrain), { wrapper: mac.phone!.wrapper });
+  const bring = find(threadMenu(onBrain, "header", new Date(), { uncommitted: null, preview: null, moves: { mac: "mac-1", onBrain: true } }), "Bring to Mac");
+  act(() => result.current.run(bring));
+  await waitFor(() => expect(mac.moves).toEqual([{ host: "mac-1", method: "cloud.bringToMac", params: { threadId: "t-settings" } }]));
+  mac.refuse = "This conversation is already moving.";
+  act(() => result.current.run(bring));
+  await waitFor(() => expect(alerts.at(-1)).toMatchObject({ title: "Couldn’t move this thread", message: "This conversation is already moving." }));
   expect(mac.updates).toEqual([]);
 });
 

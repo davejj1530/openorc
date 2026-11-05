@@ -1,5 +1,5 @@
 import type { ClientPush } from "@openorc/client";
-import { PUSH_SENDER_TAG, type DeviceMethod, type DeviceParams, type DeviceRpcResults, type PushEnvironment } from "@openorc/protocol";
+import { PUSH_SENDER_TAG, type DeviceParams, type DeviceRpcResults, type PushEnvironment } from "@openorc/protocol";
 import type { LinkState } from "../connection/manager";
 import { DEFAULT_PREFS, registrationFor, type AlertChoice, type AlertPrefs, type MacSender, type Permission } from "./registration";
 
@@ -18,7 +18,7 @@ export interface AlertsLink {
   getState(): LinkState;
   forget(macId: string): Promise<void>;
   connection: {
-    device<M extends DeviceMethod>(method: M, params: DeviceParams<M>): Promise<DeviceRpcResults[M]>;
+    device(method: "push.register", params: DeviceParams<"push.register">): Promise<DeviceRpcResults["push.register"]>;
     onPush(listener: (push: ClientPush) => void): () => void;
   };
 }

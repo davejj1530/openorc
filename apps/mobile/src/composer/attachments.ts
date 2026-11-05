@@ -1,7 +1,7 @@
 import { REMOTE_ATTACHMENT_BYTES } from "@openorc/protocol";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
-import { link } from "../client";
+import { hostLink } from "../client";
 import type { DraftImage } from "./drafts";
 
 /** The longest side an attached image keeps: plenty for an agent to read, a fraction of a camera's full frame. */
@@ -20,8 +20,8 @@ export async function pickImages(source: ImageSource): Promise<ImagePicker.Image
   return result.canceled ? [] : result.assets;
 }
 
-/** Resizes one picked image on the phone and saves it on the Mac, which hands back the path a message carries. */
-export async function attachImage(asset: ImagePicker.ImagePickerAsset): Promise<DraftImage> {
+/** Resizes one picked image on the phone and saves it on the thread's host, which hands back the path a message carries. */
+export async function attachImage(asset: ImagePicker.ImagePickerAsset, host: string | null): Promise<DraftImage> {
   const context = ImageManipulator.manipulate(asset.uri);
   if (Math.max(asset.width, asset.height) > LONGEST_SIDE) context.resize(asset.width >= asset.height ? { width: LONGEST_SIDE } : { height: LONGEST_SIDE });
   const image = await context.renderAsync();
@@ -29,6 +29,6 @@ export async function attachImage(asset: ImagePicker.ImagePickerAsset): Promise<
   const dataBase64 = saved.base64 ?? "";
   if ((dataBase64.length * 3) / 4 > REMOTE_ATTACHMENT_BYTES) throw new Error(`Images sent from a phone must be ${REMOTE_ATTACHMENT_BYTES / 1024 / 1024} MB or smaller.`);
   const name = `${(asset.fileName ?? "photo").replace(/\.[^.]+$/, "")}.jpg`;
-  const { path } = await link.connection.call("attachments.save", { name, mime: "image/jpeg", dataBase64 });
+  const { path } = await hostLink(host).connection.call("attachments.save", { name, mime: "image/jpeg", dataBase64 });
   return { path, preview: saved.uri };
 }

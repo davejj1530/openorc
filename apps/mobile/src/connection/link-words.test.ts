@@ -30,6 +30,15 @@ it("names how the phone reaches the Mac, and what is in the way when it does not
   expect(lostWords.removed("Studio")).toBe("Studio removed this iPhone");
 });
 
+it("says what a host's door is doing, at once, while it wakes the host or could not", () => {
+  expect(linkWords({ kind: "connecting", mac, why: "waking" })).toMatchObject({ tone: "busy", status: "Waking" });
+  expect(linkWords({ kind: "waiting", mac, why: "wake-refused", retryAt: 1 })).toMatchObject({ tone: "attention", status: "Can’t wake it" });
+  expect(linkWords({ kind: "waiting", mac, why: "needs-mac", retryAt: 1 })).toMatchObject({ tone: "attention", status: "Needs your Mac" });
+  expect(linkWords({ kind: "waiting", mac, why: "wake-failed", retryAt: 1 })).toMatchObject({ tone: "attention", status: "Didn’t start" });
+  const words = renderHook(() => useLinkWords({ kind: "connecting", mac, why: "waking" }));
+  expect(words.result.current.status).toBe("Waking");
+});
+
 it("says the demo Mac lives on this iPhone, with no route to name", () => {
   const demo: LinkState = { kind: "connected", mac: { id: "demo", name: "Demo Mac" }, route: { kind: "demo" }, serial: 1 };
   expect(linkWords(demo)).toEqual({ tone: "ok", status: null, spoken: "On this iPhone", detail: "On this iPhone" });

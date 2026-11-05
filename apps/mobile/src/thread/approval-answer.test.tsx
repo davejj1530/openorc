@@ -2,7 +2,9 @@
 import type { Block } from "@openorc/client";
 import type { AgentEvent } from "@openorc/protocol";
 import { act, cleanup, render, waitFor } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { HostContext } from "../connection/host-context";
 import { queueAnswer } from "../notifications/answers";
 import type { FakeMac } from "../test-fixtures/fake-mac";
 
@@ -24,7 +26,7 @@ vi.mock("../client", async () => {
   return mac.phone.module;
 });
 
-const { client } = await import("../client");
+const client = (await import("../client")).hostClient(null);
 const { ApprovalCard } = await import("./cards");
 
 type ApprovalBlock = Extract<Block, { kind: "approval" }>;
@@ -50,6 +52,13 @@ it("sends the answer chosen on the alert, once, when its card comes on screen", 
   view.rerender(card(block()));
   await act(async () => undefined);
   expect(mac.resolved).toHaveLength(1);
+});
+
+it("sends the answer chosen on a cloud brain's alert from its card on the brain's thread", async () => {
+  queueAnswer(answerFor("r1", "a1", "brain"), "allow", Date.now());
+  const onBrain = ({ children }: { children: ReactNode }) => mac.phone!.wrapper({ children: <HostContext.Provider value="brain">{children}</HostContext.Provider> });
+  render(card(block()), { wrapper: onBrain });
+  await waitFor(() => expect(mac.resolved).toEqual([{ runId: "r1", approvalId: "a1", decision: "allow" }]));
 });
 
 it("sends an answer chosen while the card is already open", async () => {

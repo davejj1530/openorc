@@ -1,7 +1,7 @@
 import { THREAD_PAGE } from "@openorc/client";
 import { WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
 import { describe, expect, it } from "vitest";
-import { homeItems, type HomeItem, type HomeOptions, type ProjectThreads } from "./home-items";
+import { homeItems, homeWaiting, type HomeItem, type HomeOptions, type ProjectThreads } from "./home-items";
 import { fixtureProjects, fixtureThreads } from "./test-fixtures/threads";
 
 const outline = (items: HomeItem[]) =>
@@ -171,4 +171,28 @@ it("lists the waiting child itself in Needs you even when its parent and project
   const child: ThreadSummary = { ...parent, id: "child", parentThreadId: parent.id, parentRelation: "started", activity: "waiting" };
   const listed = homeItems(groups([], []), options({ waiting: [child, parent], collapsed: [`project:${WORKSPACE_ID}`, "thread-closed:parent"] }));
   expect(listed.filter((item) => item.kind === "thread").map((item) => [item.thread.id, item.tree.depth])).toEqual([["child", 0]]);
+});
+
+describe("Needs you beside a partner host", () => {
+  const cloud = { ...fixtureThreads.find((thread) => thread.id === "t-hero")!, id: "c-review", activity: "waiting" as const, lastActivityAt: Date.UTC(2026, 9, 23, 11, 59) };
+
+  it("lists the partner's waiting threads with the shown host's, newest first, each keyed and marked by its host", () => {
+    const items = homeItems(groups(), options({ partnerWaiting: [{ thread: cloud, project: "openorc", host: "brain" }] }));
+    expect(outline(items).slice(0, 4)).toEqual(["# Needs you (3)", "c-review @ openorc", "t-pairing @ openorc", "t-docs @ website"]);
+    expect(items.find((item) => item.kind === "thread" && item.thread.id === "c-review")).toMatchObject({ key: "brain:c-review", host: "brain" });
+  });
+
+  it("lists a thread that just came here from the partner once, as this host's, while the partner's last list still has it", () => {
+    const moved = { ...cloud, id: "t-hero" };
+    const items = homeItems(groups(), options({ partnerWaiting: [{ thread: moved, project: "website", host: "brain" }] }));
+    expect(items.filter((item) => item.kind === "thread" && item.thread.id === "t-hero").map((item) => item.key)).toEqual(["t-hero"]);
+  });
+
+  it("leaves a partner's own list without Needs you, its waiting threads out of its projects, and hands them over", () => {
+    const partner = homeItems(groups(), options({ waitingShownElsewhere: true }));
+    expect(outline(partner)).not.toContain("# Needs you (2)");
+    expect(outline(partner).flat()).not.toContain("t-pairing");
+    expect(homeWaiting(groups(), options()).map(({ thread, project }) => `${thread.id} @ ${project}`)).toEqual(["t-pairing @ openorc", "t-docs @ website"]);
+    expect(homeWaiting(groups(), options({ filter: "archived" }))).toEqual([]);
+  });
 });

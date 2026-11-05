@@ -1,9 +1,11 @@
 import { createNodeStyleCrypto, fromBase64Url, LinkCloseCode, linkUrl, toBase64Url, type LinkSocket } from "@openorc/link";
 import type { Route } from "@openorc/protocol";
+import { fetch as expoFetch } from "expo/fetch";
 import * as SecureStore from "expo-secure-store";
 import type { MMKV } from "react-native-mmkv";
 import QuickCrypto, { type KeyObject } from "react-native-quick-crypto";
 import { perfEnabled, timeRecord } from "../thread/perf-probe";
+import { streamLines, type DoorKeyStore, type DoorPost } from "./door";
 import type { OpeningSocket } from "./manager";
 import type { Clock } from "./route-race";
 import type { DeviceKeys, MacStore, SavedMac } from "./saved-macs";
@@ -104,6 +106,19 @@ export function storedMacs(storage: MMKV): MacStore {
 // Readable after the first unlock, so a reconnect in the background works; never leaves this phone.
 const keychain: SecureStore.SecureStoreOptions = { keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY };
 const keyName = (macId: string) => `device-key.${macId}`;
+
+/** Each host's door key, in the Keychain beside the device key. */
+export const keychainDoorKeys: DoorKeyStore = {
+  read: (macId) => SecureStore.getItemAsync(`door-key.${macId}`, keychain),
+  write: (macId, value) => SecureStore.setItemAsync(`door-key.${macId}`, value, keychain),
+  remove: (macId) => SecureStore.deleteItemAsync(`door-key.${macId}`, keychain),
+};
+
+/** A knock through expo/fetch, whose body streams as it comes; React Native's own fetch hands it over only at the end. */
+export const postKnock: DoorPost = async (url, { body, signal }) => {
+  const response = await expoFetch(url, { method: "POST", headers: { "content-type": "application/json" }, body, signal });
+  return { status: response.status, text: () => response.text(), lines: () => streamLines(response.body) };
+};
 
 /** This phone's private key for each Mac, in the Keychain. */
 export const keychainKeys: DeviceKeys = {

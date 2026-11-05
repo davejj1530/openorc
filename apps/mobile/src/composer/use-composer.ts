@@ -1,6 +1,6 @@
 import type { SubmitRequest } from "@openorc/client";
 import { useRef, useState } from "react";
-import { client, useRpcMutation } from "../client";
+import { useHostClient, useRpcMutation } from "../client";
 import { failureMessage } from "../failure";
 import { haptic } from "../ui/haptics";
 import { composerControls, unsent } from "./composer-state";
@@ -36,7 +36,7 @@ export function useComposer({ threadId, request, live, working, canSteer, disabl
     onImage: (image) => setDraft((current) => ({ ...current, images: [...current.images, image] })),
     onError: setError,
   });
-  const submitter = client.useSubmit();
+  const submitter = useHostClient().useSubmit();
   const interrupt = useRpcMutation("runs.interrupt");
   const controls = composerControls({
     text: draft.text,

@@ -7,6 +7,7 @@ import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useMemo, useRef, useState, type RefObject } from "react";
 import { RefreshControl, View } from "react-native";
 import { useLinkState } from "../client";
+import { useHeaderScope } from "../connection/HostScope";
 import { linkReason } from "../connection/link-reason";
 import { cn } from "../ui/cn";
 import { haptic } from "../ui/haptics";
@@ -111,6 +112,7 @@ export function ChangesScreen() {
   const [comparison, setComparison] = useState<ChangeComparison>("head");
   const reads = useChangesReads(threadId, comparison);
   const publish = usePublish(threadId, reads);
+  const inScope = useHeaderScope();
   const dim = linkReason(useLinkState()) !== null;
   const [footer, setFooter] = useState(0);
   const list = useRef<LegendListRef>(null);
@@ -122,7 +124,7 @@ export function ChangesScreen() {
   };
   return (
     <View className="flex-1 bg-bg">
-      <Stack.Screen options={{ headerTitle: () => <PanelTitle title={panelToolLabels.changes} line={totals ? changesLine(totals) : null} /> }} />
+      <Stack.Screen options={{ headerTitle: () => inScope(<PanelTitle title={panelToolLabels.changes} line={totals ? changesLine(totals) : null} />) }} />
       <ChangesList threadId={threadId} reads={reads} comparison={comparison} onComparison={choose} footer={footer} dim={dim} list={list} />
       {perfEnabled() ? <ChangesPerf reads={reads} list={list} /> : null}
       <View onLayout={({ nativeEvent }) => setFooter(nativeEvent.layout.height)} className="absolute inset-x-0 bottom-0">

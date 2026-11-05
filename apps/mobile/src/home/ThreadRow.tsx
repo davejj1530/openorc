@@ -1,8 +1,9 @@
-import { relativeTime, subagentStatusLabel, threadHeadline, threadMark, threadPlace, type ThreadHeadline, type ThreadPlace, type ThreadTreeRow } from "@openorc/client";
+import { ownerMark, relativeTime, subagentStatusLabel, threadHeadline, threadMark, threadPlace, type ThreadHeadline, type ThreadPlace, type ThreadTreeRow } from "@openorc/client";
 import { harnessShortName, isHarnessId, isSubagentThread, type ThreadSummary } from "@openorc/protocol";
 import { Link } from "expo-router";
-import { memo, useMemo, type ComponentType } from "react";
+import { memo, useContext, useMemo, type ComponentType } from "react";
 import { View } from "react-native";
+import { HostContext } from "../connection/host-context";
 import { Folder, GitBranch, GitPullRequest } from "../generated/icons";
 import { cn } from "../ui/cn";
 import type { IconProps } from "../ui/icon";
@@ -56,7 +57,9 @@ export const ThreadRow = memo(function ThreadRow({
   const mark = threadMark(thread);
   const place = threadPlace(thread);
   const PlaceIcon = placeIcons[place.kind];
-  const where = project ? `${project} · ${place.label}` : place.label;
+  const owner = ownerMark(thread);
+  const host = useContext(HostContext);
+  const where = [project, place.label, owner?.label].filter(Boolean).join(" · ");
   const facts = rowFacts(thread, where);
   const swipes = threadSwipes(thread);
   const leading: SwipeAction | undefined = isSubagentThread(thread) ? undefined : { label: swipes.leading.label, tone: "review", run: () => actions.save(swipes.leading.patch) };
@@ -64,13 +67,13 @@ export const ThreadRow = memo(function ThreadRow({
   return (
     <ThreadTreeFrame tree={tree} arriving={arriving} onToggle={onToggle}>
       <SwipeRow id={thread.id} leading={leading} trailing={trailing}>
-        <Link href={{ pathname: "/thread/[id]", params: { id: thread.id } }} push dangerouslySingular asChild onPress={() => markThreadOpening(thread.id)}>
+        <Link href={{ pathname: "/thread/[id]", params: host ? { id: thread.id, host } : { id: thread.id } }} push dangerouslySingular asChild onPress={() => markThreadOpening(thread.id)}>
           <Link.Trigger>
             <ListPressable
               accessibilityRole="button"
               accessibilityLabel={[thread.title, child ? subagentStatusLabel[child.status] : mark?.label, compact ? null : headline?.text, ...facts].filter(Boolean).join(", ")}
               {...swipeAccessibility([leading, trailing])}
-              className={cn("mx-2.5 justify-center gap-0.5 rounded-md bg-bg px-2.5 py-1.5 active:bg-surface-2", compact ? "min-h-touch" : "min-h-touch-row")}
+              className={cn("mx-2.5 justify-center gap-0.5 rounded-md bg-bg px-2.5 py-1.5 active:bg-surface-2", compact ? "min-h-touch" : "min-h-touch-row", owner?.dim && "opacity-60")}
             >
               <ThreadRowHeading thread={thread} compact={compact} mark={mark} />
               {!compact ? (

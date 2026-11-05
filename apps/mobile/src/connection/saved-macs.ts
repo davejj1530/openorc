@@ -9,6 +9,10 @@ export interface SavedMac {
   routes: Route[];
   /** The route the last session used. It goes first while it suits the network. */
   lastRoute: Route | null;
+  /** A cloud brain or a Mac, as it answers host.kind; hosts saved before read as Macs. */
+  kind?: "mac" | "brain";
+  /** The cloud brain this Mac named as its own, by the brain's id here; null once it names none. */
+  brain?: string | null;
 }
 
 /** The saved Macs and which one the app shows. Synchronous, so Home can paint before anything connects. */

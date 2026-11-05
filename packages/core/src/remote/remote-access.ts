@@ -219,6 +219,8 @@ export class RemoteAccess {
       case "door.key":
         // The owner wakes the brain through Vercel, never through the door.
         return deviceId === OWNER ? null : (this.network.door?.(deviceId) ?? null);
+      case "host.kind":
+        return this.network.publicAddress ? "brain" : "mac";
     }
   }
 
@@ -425,7 +427,7 @@ export class RemoteAccess {
     const now = Date.now();
     if (this.network.owner && equalBytes(publicKey, this.network.owner)) {
       const owner = { id: OWNER, name: hello.device.name, publicKey, createdAt: now, lastSeenAt: now };
-      return { ok: true, value: owner, hello: { mac: { name: this.network.machine.name() }, deviceId: OWNER, routes: this.knownRoutes } };
+      return { ok: true, value: owner, hello: this.hello(OWNER) };
     }
     let device = remoteDevices.byKey(db, publicKey);
     if (!device && hello.pair) {
@@ -435,7 +437,12 @@ export class RemoteAccess {
     if (!device) return { ok: false, reason: "unpaired" };
     remoteDevices.touch(db, device.id, now);
     void this.routes();
-    return { ok: true, value: device, hello: { mac: { name: this.network.machine.name() }, deviceId: device.id, routes: this.knownRoutes } };
+    return { ok: true, value: device, hello: this.hello(device.id) };
+  }
+
+  /** What this host tells a device it admitted. Nothing new goes here: phones already installed refuse a key they do not know. */
+  private hello(deviceId: string): Extract<Admission<RemoteDeviceRecord>, { ok: true }>["hello"] {
+    return { mac: { name: this.network.machine.name() }, deviceId, routes: this.knownRoutes };
   }
 }
 

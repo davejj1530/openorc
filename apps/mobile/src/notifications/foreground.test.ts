@@ -1,6 +1,6 @@
-import { expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { LinkState } from "../connection/manager";
-import { clearDelivered, presentationFor } from "./foreground";
+import { clearDelivered, oncePerNotice, presentationFor } from "./foreground";
 
 const studio = { id: "studio", name: "Studio" };
 const connected: LinkState = { kind: "connected", mac: studio, route: { kind: "lan", host: "studio.local", port: 1 }, serial: 1 };
@@ -30,4 +30,16 @@ it("clears only that Mac's delivered alerts for the thread just opened", async (
   const dismissed: string[] = [];
   await clearDelivered("studio", "t1", { delivered: async () => delivered, dismiss: async (id) => void dismissed.push(id) });
   expect(dismissed).toEqual(["a", "e"]);
+});
+
+describe("a phone paired with a Mac and its cloud brain", () => {
+  it("shows one banner per notice, however many times it arrives", () => {
+    const shown = vi.fn(() => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false }));
+    const present = oncePerNotice(shown);
+    const alert = { macId: "brain", id: "notice-1", kind: "finished", threadId: "t" };
+    expect(present(alert).shouldShowBanner).toBe(true);
+    expect(present({ ...alert, macId: "mac" }).shouldShowBanner).toBe(false);
+    expect(present({ ...alert, id: "notice-2" }).shouldShowBanner).toBe(true);
+    expect(shown).toHaveBeenCalledTimes(2);
+  });
 });

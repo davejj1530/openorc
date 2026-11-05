@@ -34,7 +34,7 @@ it("asks the Mac for a generated image by the agent's activity id, not the trans
     imagePath: "/Users/me/.codex/generated_images/a/exec-1.png",
   };
   render(<Card block={block} runId="run-1" />);
-  expect(tile.uri).toHaveBeenCalledWith({ kind: "activity", runId: "run-1", activityId: "exec-1" });
+  expect(tile.uri).toHaveBeenCalledWith({ kind: "activity", runId: "run-1", activityId: "exec-1" }, null);
 });
 
 it("shows an image the agent viewed, open by default, from the activity that recorded it", () => {
@@ -42,5 +42,5 @@ it("shows an image the agent viewed, open by default, from the activity that rec
   render(<ActivityRow block={block} runId="run-2" />);
   expect(screen.getByText("Viewed image")).toBeTruthy();
   expect(screen.getByText("shot.png")).toBeTruthy();
-  expect(tile.uri).toHaveBeenCalledWith({ kind: "activity", runId: "run-2", activityId: "exec-2" });
+  expect(tile.uri).toHaveBeenCalledWith({ kind: "activity", runId: "run-2", activityId: "exec-2" }, null);
 });

@@ -3,7 +3,7 @@ import type { ClaudeAccountConnection, ModelOption, RpcMethod, RpcParams, Thread
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { client } from "../client";
+import { hostClient } from "../client";
 import { NewThreadScreen } from "../new-thread/NewThreadScreen";
 import type { FakeMac } from "../test-fixtures/fake-mac";
 import { nativeProps } from "../test-fixtures/react-native";
@@ -94,6 +94,7 @@ async function open() {
   await waitFor(() => expect(screen.getByRole("button", { name: /^Model, (?!Model$)/ })).toBeTruthy());
 }
 
+const client = hostClient(null);
 const write = (prompt: string) => act(() => (nativeProps.get(screen.getByLabelText("Message"))!.onChangeText as (text: string) => void)(prompt));
 const start = () => act(async () => fireEvent.click(screen.getByRole("button", { name: "Start" })));
 

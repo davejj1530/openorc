@@ -74,6 +74,7 @@ describe("phone access", () => {
     const phone = await pairPhone("David's iPhone");
     const list = await phone.call("threads.list", { projectId: project.id });
     expect(list.map((thread) => thread.title)).toEqual(["Seen from a phone"]);
+    expect(await phone.device("host.kind", {})).toBe("mac");
     const status = await core.remote.status();
     expect(status.listener).toMatchObject({ state: "on", routes: [{ kind: "lan", host: "127.0.0.1" }] });
     expect(status.devices).toContainEqual(expect.objectContaining({ id: phone.deviceId, name: "David's iPhone", connected: true }));

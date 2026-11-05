@@ -75,6 +75,26 @@ describe("a thread's menu on the phone", () => {
     expect(outline(threadMenu(thread("t-settings"), "row", wednesday, { uncommitted: null, preview: null, toCloud: true })).flat()).not.toContain("Move to Cloud");
   });
 
+  it("brings an idle cloud brain thread to the Mac from the header, and offers to keep a thread where it is while it moves", () => {
+    const onBrain = { uncommitted: null, preview: null, moves: { mac: "mac-1", onBrain: true } };
+    const idle = { ...thread("t-settings"), activity: "idle" as const };
+    expect(threadMenu(idle, "header", wednesday, onBrain).flat()).toContainEqual({
+      kind: "move",
+      label: "Bring to Mac",
+      icon: "laptopcomputer.and.arrow.down",
+      method: "cloud.bringToMac",
+      mac: "mac-1",
+    });
+    expect(outline(threadMenu({ ...idle, activity: "running" }, "header", wednesday, onBrain)).flat()).not.toContain("Bring to Mac");
+    expect(outline(threadMenu(idle, "header", wednesday, { ...onBrain, moves: { mac: "mac-1", onBrain: false } })).flat()).not.toContain("Bring to Mac");
+    const coming = { ...idle, moving: { to: "mac" as const, since: 1 } };
+    expect(threadMenu(coming, "header", wednesday, onBrain).flat()).toContainEqual({ kind: "move", label: "Keep in Cloud", icon: "icloud", method: "cloud.keep", mac: "mac-1" });
+    const leaving = { ...idle, moving: { to: "cloud" as const, since: 1 } };
+    expect(outline(threadMenu(leaving, "header", wednesday, { ...onBrain, moves: { mac: "mac-1", onBrain: false } })).flat()).toContain("Keep on Mac");
+    expect(outline(threadMenu(coming, "header", wednesday)).flat()).not.toContain("Keep in Cloud");
+    expect(outline(threadMenu(idle, "row", wednesday, onBrain)).flat()).not.toContain("Bring to Mac");
+  });
+
   it("leaves a team thread's snooze and archive to the team on the Mac", () => {
     expect(outline(threadMenu({ ...thread("t-plan"), teamInstanceId: "team-1" }, "row", wednesday))).toEqual([["Pin", "Mark as Unread"], ["Rename…"]]);
   });

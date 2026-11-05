@@ -1,7 +1,8 @@
 import type { AssetRef } from "@openorc/protocol";
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { Image, Keyboard, Pressable, View } from "react-native";
 import { assetUri, useLinkRead } from "../client";
+import { HostContext } from "../connection/host-context";
 import { Text } from "../ui/Text";
 import { ImageViewer } from "./ImageViewer";
 
@@ -11,15 +12,18 @@ export const attachmentRef = (path: string): AssetRef => ({ kind: "attachment", 
 const IMAGE_PATH = /\.(png|jpe?g|gif|webp|heic|avif)$/i;
 export const isImagePath = (path: string) => IMAGE_PATH.test(path);
 
-/** An image the transcript names, fetched from the Mac once and kept on the phone; `key` is its asset ref. */
-const readAsset = (key: string) => assetUri(JSON.parse(key) as AssetRef);
+/** An image the transcript names, fetched from its host once and kept on the phone; `key` names the host and the ref. */
+const readAsset = (key: string) => {
+  const [host, ref] = JSON.parse(key) as [string | null, AssetRef];
+  return assetUri(ref, host);
+};
 
 /**
  * An image in the transcript as an r16 tile that opens full screen. `compact` is the prompt's thumbnail size; an
  * agent's image takes the column's width.
  */
 export function ImageTile({ asset, label, compact = false }: { asset: AssetRef; label: string; compact?: boolean }) {
-  const loaded = useLinkRead(JSON.stringify(asset), readAsset);
+  const loaded = useLinkRead(JSON.stringify([useContext(HostContext), asset]), readAsset);
   const [open, setOpen] = useState(false);
   // A prompt's thumbnail is a 72 pt square; an agent's image takes the column at 16:9.
   const size = compact ? { width: 72, height: 72 } : { width: "100%" as const, aspectRatio: 16 / 9 };

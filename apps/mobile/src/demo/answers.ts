@@ -96,6 +96,10 @@ const answers: Answers = {
     throw new Error("Cloud threads are not available on this Mac.");
   },
   "threads.movePreview": () => ({ files: [], blocked: null }),
+  "cloud.bringToMac": () => {
+    throw new Error("Cloud threads are not available on this Mac.");
+  },
+  "cloud.keep": () => null,
   "threads.start": (core, params) => {
     const id = core.id("demo-thread");
     const title = params.title ?? params.prompt.split("\n")[0]!.slice(0, 60);

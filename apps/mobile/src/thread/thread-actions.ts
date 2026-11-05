@@ -22,7 +22,9 @@ export type ThreadAction =
   | { kind: "rename"; label: string; icon: Symbol }
   | { kind: "open"; label: string; icon: Symbol; url: string }
   | { kind: "parent"; label: string; icon: Symbol; threadId: string }
-  | { kind: "screen"; label: string; icon: Symbol; subtitle?: string; pathname: ThreadScreenPath };
+  | { kind: "screen"; label: string; icon: Symbol; subtitle?: string; pathname: ThreadScreenPath }
+  /** Asked of the Mac `mac`, which moves every thread between itself and its cloud brain. */
+  | { kind: "move"; label: string; icon: Symbol; method: "cloud.bringToMac" | "cloud.keep"; mac: string };
 
 /** Where the menu opens: a Home row (long press), or the open thread's header, where Rename leads after Changes. */
 export type MenuPlace = "row" | "header";
@@ -43,6 +45,8 @@ export interface ThreadPanels {
   uncommitted: number | null;
   preview: { page: string | null } | null;
   toCloud?: boolean;
+  /** The Mac grouped with its cloud brain, which brings the brain's threads home; null without both. */
+  moves?: { mac: string; onBrain: boolean } | null;
 }
 
 const NO_PANELS: ThreadPanels = { uncommitted: null, preview: null };
@@ -51,6 +55,17 @@ const NO_PANELS: ThreadPanels = { uncommitted: null, preview: null };
 function preview(page: string | null): ThreadAction {
   const item: ThreadAction = { kind: "screen", label: panelToolLabels.browser, icon: "globe", pathname: "/preview" };
   return page ? { ...item, subtitle: page } : item;
+}
+
+/** Bring to Mac for an idle thread on the cloud brain, and Keep where it is while a thread moves. */
+function brainMoves(thread: ThreadSummary, moves: ThreadPanels["moves"]): ThreadAction[] {
+  if (!moves) return [];
+  const { mac } = moves;
+  if (thread.moving) {
+    const toMac = thread.moving.to === "mac";
+    return [{ kind: "move", label: toMac ? "Keep in Cloud" : "Keep on Mac", icon: toMac ? "icloud" : "laptopcomputer", method: "cloud.keep", mac }];
+  }
+  return moves.onBrain && thread.activity === "idle" ? [{ kind: "move", label: "Bring to Mac", icon: "laptopcomputer.and.arrow.down", method: "cloud.bringToMac", mac }] : [];
 }
 
 /** Changes, with the uncommitted file count beneath it when there is one. */
@@ -76,7 +91,10 @@ export function threadMenu(thread: ThreadSummary, place: MenuPlace, now: Date, p
     thread.unread ? { kind: "patch", label: "Mark as Read", icon: "envelope.open", patch: { seen: true } } : { kind: "patch", label: "Mark as Unread", icon: "envelope.badge", patch: { seen: false } },
   ];
   const pull: ThreadAction[] = thread.prUrl ? [{ kind: "open", label: "Open Pull Request", icon: "arrow.up.right.square", url: thread.prUrl }] : [];
-  const move: ThreadAction[] = panels.toCloud ? [{ kind: "screen", label: "Move to Cloud", icon: "icloud.and.arrow.up", pathname: "/move-to-cloud" }] : [];
+  const move: ThreadAction[] = [
+    ...(panels.toCloud ? [{ kind: "screen", label: "Move to Cloud", icon: "icloud.and.arrow.up", pathname: "/move-to-cloud" } as const] : []),
+    ...brainMoves(thread, panels.moves),
+  ];
   const archive: ThreadAction[] = team
     ? []
     : [

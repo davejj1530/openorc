@@ -1,8 +1,9 @@
 import { Host, Menu, Picker, RNHostView, Text as MenuText } from "@expo/ui/swift-ui";
 import { accessibilityLabel, accessibilityValue, pickerStyle, tag } from "@expo/ui/swift-ui/modifiers";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, TextInput, View } from "react-native";
+import { HostContext } from "../connection/host-context";
 import { ChevronsUpDown } from "../generated/icons";
 import { cn } from "../ui/cn";
 import { haptic } from "../ui/haptics";
@@ -95,6 +96,7 @@ export function PullRequestSheet() {
   const locked = publishing.kind === "running" || (publishing.kind === "lost" && publishing.lost.action === "pr");
   const step = view?.pullRequest?.kind === "open" ? view.pullRequest.step : null;
   const reason = step?.reason ?? null;
+  const host = useContext(HostContext);
   const ready = Boolean(form.title.trim() && form.base);
   useEffect(() => setAsked(null), [reason]);
   useEffect(() => {
@@ -107,7 +109,7 @@ export function PullRequestSheet() {
       return setAsked(reason);
     }
     started.current = true;
-    void openPullRequest(threadId, { title: form.title.trim(), body: form.body, base: form.base });
+    void openPullRequest(host, threadId, { title: form.title.trim(), body: form.body, base: form.base });
   };
   const failure = publishing.kind === "notice" && publishing.action === "pr" && publishing.tone === "bad" ? publishing : null;
   return (

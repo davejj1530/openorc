@@ -14,7 +14,8 @@ import {
 } from "@openorc/link";
 import { nobleCrypto } from "@openorc/link/test-fixtures/noble-crypto";
 import { socketPair } from "@openorc/link/test-fixtures/socket-pair";
-import type { Route } from "@openorc/protocol";
+import type { DoorKey, Route } from "@openorc/protocol";
+import type { PhoneDoors, WakeOutcome } from "../door";
 import type { ConnectionEffects, OpeningSocket } from "../manager";
 import type { DeviceKeys, MacStore, SavedMac } from "../saved-macs";
 
@@ -48,6 +49,12 @@ export class FakeMac {
   internetChecks = 0;
   /** Answers a call, or holds it when this returns undefined. */
   answer: (method: string, params: unknown) => unknown = () => undefined;
+  /** What it answers door.key with: a Mac has no door; "unknown" is a host from before doors. */
+  doorKey: DoorKey | null | "unknown" = null;
+  /** What it answers host.kind with: "unknown" is a host from before the question, and "held" never answers. */
+  hostKind: "mac" | "brain" | "unknown" | "held" = "mac";
+  /** The brains it says it removed; "unknown" is a host from before the question. */
+  removedBrains: string[] | "unknown" = [];
 
   constructor(readonly name = "Studio") {}
 
@@ -97,6 +104,21 @@ export class FakeMac {
         this.heard.push(message);
         if (message.t === "ping" && !this.mute) accepted.session.send({ t: "pong", id: message.id });
         if (message.t !== "rpc") return;
+        if (message.method === "host.kind") {
+          if (this.hostKind === "unknown") accepted.session.send({ t: "rpc.error", id: message.id, message: "This is not available from a phone." });
+          else if (this.hostKind !== "held") accepted.session.send({ t: "rpc.result", id: message.id, result: this.hostKind });
+          return;
+        }
+        if (message.method === "brains.removed") {
+          if (this.removedBrains === "unknown") accepted.session.send({ t: "rpc.error", id: message.id, message: "This is not available from a phone." });
+          else accepted.session.send({ t: "rpc.result", id: message.id, result: this.removedBrains });
+          return;
+        }
+        if (message.method === "door.key") {
+          if (this.doorKey === "unknown") accepted.session.send({ t: "rpc.error", id: message.id, message: "This is not available from a phone." });
+          else accepted.session.send({ t: "rpc.result", id: message.id, result: this.doorKey });
+          return;
+        }
         const result = this.answer(message.method, message.params);
         if (result !== undefined) accepted.session.send({ t: "rpc.result", id: message.id, result });
       });
@@ -141,13 +163,39 @@ export function memoryKeys(): DeviceKeys & { stored: Map<string, Uint8Array> } {
   };
 }
 
+/** Hosts' doors as the manager uses them: the keys learned, and each knock answered with what `wake` says. */
+export function memoryDoors(): PhoneDoors & { keys: Map<string, DoorKey>; knocks: string[]; wake: (macId: string, signal: AbortSignal) => Promise<WakeOutcome> } {
+  const keys = new Map<string, DoorKey>();
+  const knocks: string[] = [];
+  const doors: ReturnType<typeof memoryDoors> = {
+    keys,
+    knocks,
+    wake: async () => ({ kind: "unanswered" }),
+    learn: async (macId: string, key: DoorKey | null) => void (key ? keys.set(macId, key) : keys.delete(macId)),
+    has: async (macId: string) => keys.has(macId),
+    knock: (macId: string, signal: AbortSignal) => {
+      knocks.push(macId);
+      return doors.wake(macId, signal);
+    },
+    forget: async (macId: string) => void keys.delete(macId),
+  };
+  return doors;
+}
+
 /** Effects for a manager talking to `mac`, on timers vitest fakes. */
 export function effectsFor(
   mac: FakeMac,
   macs = memoryMacs(),
   keys = memoryKeys(),
-): ConnectionEffects & { macs: ReturnType<typeof memoryMacs>; keys: ReturnType<typeof memoryKeys>; forgotten: string[] } {
+): ConnectionEffects & {
+  macs: ReturnType<typeof memoryMacs>;
+  keys: ReturnType<typeof memoryKeys>;
+  doors: ReturnType<typeof memoryDoors>;
+  forgotten: string[];
+  removed: [string, readonly string[]][];
+} {
   const forgotten: string[] = [];
+  const removed: [string, readonly string[]][] = [];
   return {
     openSocket: (route, hostKey) => mac.openSocket(route, hostKey),
     crypto: nobleCrypto,
@@ -158,7 +206,10 @@ export function effectsFor(
     deviceName: "Test iPhone",
     forgetCache: (id) => void forgotten.push(id),
     reachesInternet: (signal) => mac.reachesInternet(signal),
+    doors: memoryDoors(),
+    brainsRemoved: (macId, ids) => void removed.push([macId, ids]),
     forgotten,
+    removed,
   };
 }
 

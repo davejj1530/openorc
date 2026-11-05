@@ -5,12 +5,14 @@ import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { WebSocket } from "ws";
 import { settings } from "@openorc/db";
-import { decodePairingUrl, linkPath, type LinkSocket } from "@openorc/link";
+import { decodePairingUrl, linkPath, toBase64Url, type LinkSocket } from "@openorc/link";
 import { nodeCrypto } from "@openorc/link/node";
+import { decodePairingUrlAsInstalled, parseMacHelloAsInstalled, rawMacHello } from "@openorc/link/test-fixtures/installed-phone";
 import { OpenOrc } from "../openorc.js";
 import { listen, type Exposure } from "./listener.js";
 import { currentRoutes } from "./routes.js";
 import { RemoteTestClient } from "./test-client.js";
+import { linkSocket } from "./ws-socket.js";
 
 // Behind a proxy every peer arrives from wherever the proxy runs, which a Mac's filter may well refuse.
 vi.mock("./peers.js", () => ({ isLocalPeer: () => false }));
@@ -133,7 +135,28 @@ describe("a host with a public address", () => {
       const phone = await RemoteTestClient.pair(url, { proxyTo: port });
       if (typeof phone === "string") throw new Error(`refused: ${phone}`);
       expect(await phone.call("projects.list", {})).toEqual(expect.any(Array));
+      expect(await phone.device("host.kind", {})).toBe("brain");
       phone.close();
+    });
+  });
+
+  it("speaks a pairing code and a hello that phones already installed read", async () => {
+    await withCloudCore(await freePort(), async (core) => {
+      const { listener } = await core.remote.configure(true);
+      if (listener.state !== "on") throw new Error("not listening");
+      const { url } = await core.remote.beginPairing();
+      const offer = decodePairingUrlAsInstalled(url);
+      expect(offer.routes).toEqual([{ kind: "public", host: "sb-abc.vercel.run", port: 443 }]);
+      const ws = new WebSocket(`ws://127.0.0.1:${listener.port}${linkPath("public", offer.macKey, nodeCrypto)}`);
+      await new Promise((resolve, reject) => ws.once("open", resolve).once("error", reject));
+      const hello = await rawMacHello({
+        socket: linkSocket(ws),
+        crypto: nodeCrypto,
+        device: nodeCrypto.generateKeyPair(),
+        macKey: offer.macKey,
+        pair: { offerId: offer.offerId, secret: toBase64Url(offer.secret) },
+      });
+      expect(parseMacHelloAsInstalled(hello)).toMatchObject({ t: "hello", mac: { name: "Cloud" }, routes: offer.routes });
     });
   });
 

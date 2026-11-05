@@ -40,6 +40,11 @@ export const deviceRpcParams = {
   "push.register": z.object({ registration: pushRegistration.nullable() }).strict(),
   /** This phone's key to wake its host through the host's door, renewed on every session. */
   "door.key": z.object({}).strict(),
+  /**
+   * Whether the host is a cloud brain or a Mac, asked once a session. Not in the hello: phones already installed read
+   * its keys exactly and refuse one they do not know. A host from before this method answers with an error: a Mac.
+   */
+  "host.kind": z.object({}).strict(),
 };
 export type DeviceMethod = keyof typeof deviceRpcParams;
 export type DeviceParams<M extends DeviceMethod> = z.infer<(typeof deviceRpcParams)[M]>;
@@ -62,6 +67,7 @@ export interface DeviceRpcResults {
   "push.register": PushSenderStates;
   /** Null from a host without a door, such as a Mac. */
   "door.key": DoorKey | null;
+  "host.kind": "mac" | "brain";
 }
 export const isDeviceMethod = (method: string): method is DeviceMethod => Object.hasOwn(deviceRpcParams, method);
 

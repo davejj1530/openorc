@@ -7,7 +7,7 @@ import { redact, redactJson } from "./redact.js";
 import { retiredTaskIds, retiredTeams, retiredThreadIds } from "./retired-teams.js";
 import { jaccard, normalizeTitle, wordSet } from "./task-similarity.js";
 import { threadListLimit, threadListOrder } from "./thread-list-order.js";
-import { threadTreeSql } from "./thread-list-tree.js";
+import { threadTreeArgs, threadTreeSql } from "./thread-list-tree.js";
 
 const now = () => Date.now();
 
@@ -372,8 +372,11 @@ export const threads = {
       includeChildren?: boolean;
       excludeSubagents?: boolean;
       selectedId?: string;
+      childLimits?: Record<string, number>;
+      childSearch?: string;
+      attentionIds?: readonly string[];
     } = {},
-  ): Thread[] {
+  ): (Thread & { hiddenChildren?: number; treeActivityAt?: number })[] {
     const where: string[] = [];
     const args: (string | number)[] = [];
     if (filter.projectId) {
@@ -399,8 +402,12 @@ export const threads = {
     const limit = threadListLimit(filter);
     const order = threadListOrder(kind, filter.orderBy);
     const sql = filter.includeChildren ? threadTreeSql(where.join(" AND "), order, limit) : `SELECT * FROM threads WHERE ${where.join(" AND ")} ORDER BY ${order}${limit}`;
-    if (filter.includeChildren) args.unshift(filter.selectedId ?? "");
-    return (db.stmt(sql).all(...args) as unknown as ThreadRow[]).map(threadFromRow);
+    if (filter.includeChildren) args.unshift(...threadTreeArgs(filter));
+    return (db.stmt(sql).all(...args) as unknown as (ThreadRow & { hidden_children?: number; tree_activity?: number | null })[]).map((row) => ({
+      ...threadFromRow(row),
+      ...(row.hidden_children === undefined ? {} : { hiddenChildren: row.hidden_children }),
+      ...(row.tree_activity == null ? {} : { treeActivityAt: row.tree_activity }),
+    }));
   },
   get(db: Db, id: string): Thread | null {
     const r = db.stmt("SELECT * FROM threads WHERE id = ?").get(id) as unknown as ThreadRow | undefined;

@@ -1,6 +1,6 @@
 import type { ThreadSummary } from "@openorc/protocol";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { threadAncestors, threadSearchFolds, threadBranchPath, threadChildren, threadTreeRows, type ThreadTreeRow } from "@openorc/client";
+import { threadAncestors, threadSearchFolds, threadBranchPath, threadPageBranchPath, threadChildren, threadTreeRows, type ThreadTreeRow } from "@openorc/client";
 import { useLayout } from "../lib/layout";
 import { ChevronRight } from "./icons";
 import { ThreadRow } from "./ThreadLibraryRow";
@@ -11,12 +11,16 @@ export function ThreadTreeList({
   activeId,
   projectNames,
   search = "",
+  childLimits,
+  onShowMore,
 }: {
   roots: ThreadSummary[];
   all: ThreadSummary[];
   activeId: string | null;
   projectNames?: ReadonlyMap<string, string>;
   search?: string;
+  childLimits?: Readonly<Record<string, number>>;
+  onShowMore?: (projectId: string, parentId: string) => void;
 }) {
   const saved = useLayout((state) => state.collapsed);
   const toggle = useLayout((state) => state.toggleThreadChildren);
@@ -25,7 +29,7 @@ export function ThreadTreeList({
   useLayoutEffect(() => {
     useLayout.getState().revealThreads(JSON.parse(ancestorsKey) as string[]);
   }, [activeId, ancestorsKey]);
-  const rows = new Map(threadTreeRows(roots, all, threadSearchFolds(saved, all, search), reveal).map((row) => [row.thread.id, row]));
+  const rows = new Map(threadTreeRows(roots, all, threadSearchFolds(saved, all, search), reveal, childLimits).map((row) => [row.thread.id, row]));
   const children = threadChildren(all);
   const visited = new Set<string>();
   const render = (thread: ThreadSummary): ReactNode => {
@@ -49,6 +53,13 @@ export function ThreadTreeList({
         {expanded && hasChildren ? (
           <div className="sidebar-tree-children" data-capped={depth >= 3 || undefined}>
             {children.get(thread.id)?.map(render)}
+            {row.hiddenChildren ? (
+              <BranchRow row={row} paging>
+                <button className="browser-load-more" aria-label={`Show ${row.hiddenChildren} more in ${thread.title}`} onClick={() => onShowMore?.(thread.projectId, thread.id)}>
+                  Show {row.hiddenChildren} more
+                </button>
+              </BranchRow>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -57,7 +68,7 @@ export function ThreadTreeList({
   return roots.map(render);
 }
 
-function BranchRow({ row, projectName, children }: { row: ThreadTreeRow; projectName?: string; children: ReactNode }) {
+function BranchRow({ row, projectName, children, paging = false }: { row: ThreadTreeRow; projectName?: string; children: ReactNode; paging?: boolean }) {
   const element = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ height: projectName ? 52 : 34, mid: projectName ? 35 : 17 });
   useLayoutEffect(() => {
@@ -67,19 +78,19 @@ function BranchRow({ row, projectName, children }: { row: ThreadTreeRow; project
       const bounds = node.getBoundingClientRect();
       const mark = node.querySelector(".thread-preview-status")?.getBoundingClientRect();
       const scale = bounds.height / node.offsetHeight;
-      if (mark && scale) setSize({ height: node.offsetHeight, mid: (mark.top - bounds.top + mark.height / 2) / scale });
+      if (scale) setSize({ height: node.offsetHeight, mid: mark ? (mark.top - bounds.top + mark.height / 2) / scale : node.offsetHeight / 2 });
     };
     const observer = new ResizeObserver(measure);
     observer.observe(node);
     measure();
     return () => observer.disconnect();
   }, []);
-  const indent = Math.min(row.depth, 3) * 20;
+  const indent = Math.min(row.depth + Number(paging), 3) * 20;
   return (
     <div ref={element} className="sidebar-tree-item">
       {children}
       <svg aria-hidden className="sidebar-tree-lines" style={{ left: -indent }} width={34 + indent} height={size.height}>
-        <path d={threadBranchPath(row, { markX: 34, ...size })} />
+        <path d={(paging ? threadPageBranchPath : threadBranchPath)(row, { markX: 34, ...size })} />
       </svg>
     </div>
   );

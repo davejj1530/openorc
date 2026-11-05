@@ -3,7 +3,7 @@ import Animated from "react-native-reanimated";
 import { ChevronRight } from "../generated/icons";
 import { arrive } from "../ui/motion";
 import { useReducedMotion } from "../ui/reduced-motion";
-import { threadBranchPath, type ThreadTreeRow } from "@openorc/client";
+import { threadBranchPath, threadPageBranchPath, type ThreadTreeRow } from "@openorc/client";
 import { Pressable, StyleSheet, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { useColors } from "../ui/mode";
@@ -12,12 +12,12 @@ export const TREE_STEP = 20;
 const MARK_X = 52;
 
 /** One stroke owns the elbows and continuations, including coincident lanes at the indentation cap. */
-export function ThreadBranch({ row, height }: { row: ThreadTreeRow; height: number }) {
+export function ThreadBranch({ row, height, paging = false }: { row: ThreadTreeRow; height: number; paging?: boolean }) {
   const colors = useColors();
   const depth = Math.min(row.depth, 3);
   const mid = height / 2 - (row.depth ? 0 : 9);
   const mark = MARK_X + depth * TREE_STEP;
-  const branch = threadBranchPath(row, { markX: MARK_X, mid, height });
+  const branch = (paging ? threadPageBranchPath : threadBranchPath)(row, { markX: MARK_X, mid, height });
   if (!branch) return null;
   return (
     <Svg pointerEvents="none" width={mark} height={height} style={StyleSheet.absoluteFill}>

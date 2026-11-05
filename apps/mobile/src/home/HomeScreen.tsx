@@ -1,12 +1,13 @@
 import { AnimatedLegendList } from "@legendapp/list/reanimated";
 import type { ThreadSummary } from "@openorc/protocol";
-import { router } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { router, useGlobalSearchParams, usePathname } from "expo-router";
+import { useContext, useEffect, useMemo, useState } from "react";
 import { Pressable, RefreshControl, View } from "react-native";
 import { useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { link, partnerClient, partnerLink, queryClient, useHostGroup, useLinkState, usePartnerLinkState, useSavedMacs } from "../client";
 import { HostScope } from "../connection/HostScope";
+import { HostContext } from "../connection/host-context";
 import type { LinkState } from "../connection/manager";
 import { Plus } from "../generated/icons";
 import { reportFirstFrame } from "../startup";
@@ -15,7 +16,7 @@ import { swipes } from "../ui/swipe";
 import { Text } from "../ui/Text";
 import { HOME_BAR_HEIGHT, HomeBar } from "./header/HomeBar";
 import { MacLine, lineOverRows, type HomeScroll } from "./header/MacLine";
-import { HomeHeading, RetryRow, SectionToggle, ShowMore } from "./HomeHeading";
+import { HomeHeading, RetryRow, SectionToggle, ShowMore, ShowMoreChildren } from "./HomeHeading";
 import type { HomeItem, Waiting } from "./home-items";
 import { refreshHome } from "./refresh";
 import { ThreadRow } from "./ThreadRow";
@@ -37,6 +38,8 @@ function HomeRow({ item, home }: { item: HomeItem; home: Home }) {
     }
     case "more":
       return <ShowMore project={item.project} onPress={() => home.showMore(item.projectId)} />;
+    case "children-more":
+      return <ShowMoreChildren item={item} onPress={() => home.showMoreChildren(item.tree.thread.projectId, item.tree.thread.id)} />;
     case "retry":
       return <RetryRow projects={item.projectId === null} onPress={() => home.retry(item.projectId)} />;
   }
@@ -61,6 +64,14 @@ function owned(items: HomeItem[], owner: NonNullable<ThreadSummary["owner"]>): H
 
 const NO_WAITING: readonly Waiting[] = [];
 
+/** Home stays mounted under a thread; its selected branch must survive a page refresh there. */
+function useSelectedThreadId(): string | undefined {
+  const params = useGlobalSearchParams<{ id?: string; host?: string }>();
+  const path = usePathname();
+  const host = useContext(HostContext);
+  return path.startsWith("/thread/") && (params.host ?? null) === host ? params.id : undefined;
+}
+
 /** How the partner host's rows are marked: whose they are, and whether it answers now. */
 function usePartnerOwner(partner: string | null): NonNullable<ThreadSummary["owner"]> {
   const state = usePartnerLinkState();
@@ -76,7 +87,7 @@ function usePartnerOwner(partner: string | null): NonNullable<ThreadSummary["own
  */
 function PartnerThreads({ partner, onWaiting }: { partner: string; onWaiting: (waiting: readonly Waiting[]) => void }) {
   const state = usePartnerLinkState();
-  const home = useHomeItems(state.kind === "connected", { waitingShownElsewhere: true });
+  const home = useHomeItems(state.kind === "connected", { waitingShownElsewhere: true, selectedId: useSelectedThreadId() });
   const name = useSavedMacs().find((host) => host.id === partner)?.name;
   const items = owned(home.items, usePartnerOwner(partner));
   const waiting = JSON.stringify(home.waiting);
@@ -101,7 +112,7 @@ function Threads({ state, scrollY, lineBottom }: HomeScroll & { state: Paired })
     () => (group.partner ? partnerWaiting.map((each) => ({ ...each, host: group.partner!, thread: { ...each.thread, owner: partnerOwner } })) : NO_WAITING),
     [group.partner, partnerWaiting, partnerOwner],
   );
-  const shown = useHomeItems(state.kind === "connected", { partnerWaiting: handed });
+  const shown = useHomeItems(state.kind === "connected", { partnerWaiting: handed, selectedId: useSelectedThreadId() });
   const brain = useSavedMacs().find((host) => host.id === group.primary)?.kind === "brain";
   const away = { brain: brain ? "cloud" : "mac", reach: brain ? "asleep" : "offline", heardAt: Date.now() } as const;
   const home = group.partner && state.kind !== "connected" ? { ...shown, items: owned(shown.items, away) } : shown;

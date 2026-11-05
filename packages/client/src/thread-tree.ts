@@ -1,4 +1,4 @@
-import { isSubagentThread, type ThreadSummary } from "@openorc/protocol";
+import { isSubagentThread, THREAD_CHILD_PAGE, type ThreadSummary } from "@openorc/protocol";
 
 /** Started threads own their archive, pin and snooze settings; native children inherit them. */
 export function visibleThreadForest(all: readonly ThreadSummary[], archived: boolean, now: number, hidden?: ReadonlySet<string>): ThreadSummary[] {
@@ -32,6 +32,9 @@ export type ThreadTreeRow = {
   last: boolean;
   /** Ancestors whose trunk continues past this row to another sibling. */
   continuing: number[];
+  /** Direct children left behind this parent's page, including those not fetched yet. */
+  hiddenChildren?: number;
+  visibleChildren?: number;
 };
 
 export function threadChildren(all: readonly ThreadSummary[]): Map<string, ThreadSummary[]> {
@@ -42,7 +45,7 @@ export function threadChildren(all: readonly ThreadSummary[]): Map<string, Threa
     siblings.push(thread);
     children.set(thread.parentThreadId, siblings);
   }
-  for (const siblings of children.values()) siblings.sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
+  for (const siblings of children.values()) siblings.sort((a, b) => b.createdAt - a.createdAt || Number(a.id > b.id) - Number(a.id < b.id));
   return children;
 }
 
@@ -89,18 +92,28 @@ export function threadAncestors(all: readonly ThreadSummary[], reveal: readonly 
   return forced;
 }
 
-export function threadTreeRows(roots: readonly ThreadSummary[], all: readonly ThreadSummary[], saved: readonly string[], reveal: readonly string[] = []): ThreadTreeRow[] {
+export function threadTreeRows(
+  roots: readonly ThreadSummary[],
+  all: readonly ThreadSummary[],
+  saved: readonly string[],
+  reveal: readonly string[] = [],
+  limits: Readonly<Record<string, number>> = {},
+): ThreadTreeRow[] {
   const children = threadChildren(all);
   const forced = threadAncestors(all, reveal);
+  const attention = all.filter((thread) => thread.activity !== "idle").map((thread) => thread.id);
+  const required = new Set([...reveal, ...forced, ...attention, ...threadAncestors(all, attention)]);
   const rows: ThreadTreeRow[] = [];
   const visited = new Set<string>();
   const visit = (thread: ThreadSummary, depth: number, last: boolean, continuing: number[]) => {
     if (visited.has(thread.id)) return;
     visited.add(thread.id);
     const expanded = threadTreeOpen(thread, children, saved, new Set(), forced);
-    rows.push({ thread, depth, hasChildren: children.has(thread.id), expanded, last, continuing });
     const siblings = children.get(thread.id) ?? [];
-    if (expanded) siblings.forEach((child, index) => visit(child, depth + 1, index === siblings.length - 1, depth && !last ? [...continuing, depth] : continuing));
+    const shown = siblings.filter((child, index) => index < (limits[thread.id] ?? THREAD_CHILD_PAGE) || required.has(child.id));
+    const hiddenChildren = (thread.hiddenChildren ?? 0) + siblings.length - shown.length;
+    rows.push({ thread, depth, hasChildren: children.has(thread.id) || hiddenChildren > 0, expanded, last, continuing, hiddenChildren, visibleChildren: shown.length });
+    if (expanded) shown.forEach((child, index) => visit(child, depth + 1, index === shown.length - 1, depth && !last ? [...continuing, depth] : continuing));
   };
   for (const root of roots) visit(root, 0, true, []);
   return rows;
@@ -116,10 +129,16 @@ export function threadBranchPath(row: ThreadTreeRow, { markX, mid, height, step 
     paths.push(`M${spine} 0V${mid - 6}q0 6 6 6h${step - 14}`);
     if (!row.last) paths.push(`M${spine} ${mid - 6}V${height}`);
   }
-  if (row.hasChildren && row.expanded) {
+  if (row.hasChildren && row.expanded && row.visibleChildren !== 0) {
     paths.push(row.depth >= 3 ? `M${mark} ${mid + 8}H${spine + 6}q-6 0 -6 6V${height}` : `M${mark} ${mid + 8}V${height}`);
   }
   return paths.join(" ");
+}
+
+/** A paging row continues only ancestor trunks; its own parent's trunk ended at the last visible child. */
+export function threadPageBranchPath(row: ThreadTreeRow, { markX, height, step = 20 }: { markX: number; height: number; step?: number }): string {
+  const continuing = row.depth && !row.last ? [...row.continuing, row.depth] : row.continuing;
+  return [...new Set(continuing.map((level) => markX + (Math.min(level, 3) - 1) * step))].map((x) => `M${x} 0V${height}`).join(" ");
 }
 
 export function threadTreeActivity(thread: ThreadSummary, all: readonly ThreadSummary[]): number {
@@ -128,7 +147,7 @@ export function threadTreeActivity(thread: ThreadSummary, all: readonly ThreadSu
   const latest = (row: ThreadSummary): number => {
     if (visited.has(row.id)) return row.lastActivityAt;
     visited.add(row.id);
-    return Math.max(row.lastActivityAt, ...(children.get(row.id) ?? []).map(latest));
+    return Math.max(row.treeActivityAt ?? row.lastActivityAt, ...(children.get(row.id) ?? []).map(latest));
   };
   return latest(thread);
 }

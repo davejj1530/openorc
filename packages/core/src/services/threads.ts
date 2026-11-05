@@ -99,7 +99,11 @@ export class ThreadService {
   }
 
   list(filter: RpcParams<"threads.list"> = {}): ThreadSummary[] {
-    return threads.list(this.db, filter).map((t) => this.summarize(t));
+    return threads.list(this.db, { ...filter, ...(filter.includeChildren ? { attentionIds: this.runs.attentionThreadIds() } : {}) }).map(({ hiddenChildren, treeActivityAt, ...thread }) => ({
+      ...this.summarize(thread),
+      ...(hiddenChildren === undefined ? {} : { hiddenChildren }),
+      ...(treeActivityAt === undefined ? {} : { treeActivityAt }),
+    }));
   }
 
   /** Missing and retired conversations read as absent, including previously open tabs. */

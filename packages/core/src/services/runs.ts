@@ -402,6 +402,11 @@ export class RunService {
     return working(entry) || subagents.hasWorkingDescendants(this.db, threadId) ? "running" : "idle";
   }
 
+  /** Working ordinary conversations and pending approvals supplement native child status in tree pages. */
+  attentionThreadIds(): string[] {
+    return [...new Set([...this.pending().flatMap((pending) => pending.threadId ?? []), ...[...this.live.values()].filter(working).flatMap((entry) => entry.run.threadId ?? [])])];
+  }
+
   /** Commands the thread's agent left running in the background, such as a dev server. */
   threadBackgroundCommands(threadId: string): BackgroundCommand[] {
     return [...this.live.values()].find((e) => e.run.threadId === threadId)?.commands ?? [];

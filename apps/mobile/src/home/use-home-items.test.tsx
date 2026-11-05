@@ -7,6 +7,7 @@ import type { FakeMac } from "../test-fixtures/fake-mac";
 import type { HomeItem } from "./home-items";
 import { fixtureThreads } from "./test-fixtures/threads";
 import { useHomeItems } from "./use-home-items";
+import { useChildThreadPages } from "@openorc/client";
 
 /** A Mac with only Workspace, whose pages of threads arrive when the test sends them, by how many each asked for. */
 const mac = vi.hoisted(() => ({ phone: null as FakeMac | null, pages: new Map<number, (threads: ThreadSummary[]) => void>(), failing: false, waiting: [] as ThreadSummary[] }));
@@ -21,6 +22,48 @@ vi.mock("../client", async () => {
     return new Promise((resolve) => mac.pages.set((params as { limit: number }).limit, resolve as (threads: ThreadSummary[]) => void));
   });
   return mac.phone.module;
+});
+
+it("keeps the shown children during a parent page fetch, then shows the new page and count", async () => {
+  const parent = { ...threads[0]!, id: "parent", hiddenChildren: 15 };
+  const children = Array.from({ length: 20 }, (_, i): ThreadSummary => ({
+    ...parent,
+    id: `child-${i}`,
+    parentThreadId: parent.id,
+    parentRelation: "subagent",
+    hiddenChildren: 0,
+    createdAt: i,
+    activity: i === 19 ? "running" : "idle",
+  }));
+  const home = renderHook(() => useHomeItems(true), { wrapper: mac.phone!.wrapper });
+  await waitFor(() => expect(mac.pages.has(THREAD_PAGE + 1)).toBe(true));
+  await act(async () => mac.pages.get(THREAD_PAGE + 1)!([parent, ...children.slice(15)]));
+  await waitFor(() => expect(outline(home.result.current.items)).toContain("children-more"));
+  const first = outline(home.result.current.items);
+  act(() => home.result.current.showMoreChildren(WORKSPACE_ID, "parent"));
+  expect(outline(home.result.current.items)).toEqual(first);
+  await waitFor(() =>
+    expect(
+      mac
+        .phone!.module.queryClient.getQueryCache()
+        .findAll({ queryKey: ["threads.list"] })
+        .some((query) => (query.queryKey[1] as { childLimits?: Record<string, number> }).childLimits?.["parent"] === 17),
+    ).toBe(true),
+  );
+  await act(async () => mac.pages.get(THREAD_PAGE + 1)!([{ ...parent, hiddenChildren: 3 }, ...children.slice(3)]));
+  await waitFor(() => expect(home.result.current.items.filter((item) => item.kind === "thread")).toHaveLength(18));
+  expect(home.result.current.items.find((item) => item.kind === "children-more")).toMatchObject({ count: 3 });
+});
+
+it("keeps parent page sizes in session memory only and isolates projects", () => {
+  const state = renderHook(useChildThreadPages);
+  act(() => state.result.current.showMore("p", "parent"));
+  expect(state.result.current.params("p")).toEqual({ childLimits: { parent: 17 } });
+  expect(state.result.current.params("other")).toEqual({});
+  act(() => state.result.current.showMore("p", "parent"));
+  expect(state.result.current.limits).toEqual({ parent: 29 });
+  state.unmount();
+  expect(renderHook(useChildThreadPages).result.current.limits).toEqual({});
 });
 
 afterEach(() => {

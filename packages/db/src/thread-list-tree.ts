@@ -1,11 +1,24 @@
 import { retiredThreadIds } from "./retired-teams.js";
+import { THREAD_CHILD_PAGE, type RpcParams } from "@openorc/protocol";
+
+export function threadTreeArgs(options: Pick<RpcParams<"threads.list">, "selectedId" | "childLimits" | "childSearch"> & { attentionIds?: readonly string[] }): string[] {
+  return [options.selectedId ?? "", JSON.stringify(options.childLimits ?? {}), options.childSearch ?? "", JSON.stringify(options.attentionIds ?? [])];
+}
 
 /** Independent conversations obey filters; native children inherit their owner's visibility. */
 export function threadTreeSql(where: string, order: string, limit: string): string {
   return `WITH RECURSIVE
+    options AS (SELECT ? AS selected_id, ? AS child_limits, ? AS child_search, ? AS attention_ids),
     ancestry(id, parent_thread_id) AS (
-      SELECT id, parent_thread_id FROM threads WHERE id = ?
+      SELECT id, parent_thread_id FROM threads WHERE id = (SELECT selected_id FROM options)
       UNION SELECT t.id, t.parent_thread_id FROM threads t JOIN ancestry a ON a.parent_thread_id = t.id
+    ),
+    required(id, parent_thread_id) AS (
+      SELECT id, parent_thread_id FROM threads WHERE id IN (SELECT id FROM ancestry)
+        OR id IN (SELECT thread_id FROM subagents WHERE status = 'running')
+        OR id IN (SELECT value FROM json_each((SELECT attention_ids FROM options)))
+        OR ((SELECT child_search FROM options) != '' AND includes_text(title, (SELECT child_search FROM options)))
+      UNION SELECT t.id, t.parent_thread_id FROM threads t JOIN required r ON r.parent_thread_id = t.id
     ),
     eligible AS (
       SELECT threads.* FROM threads WHERE COALESCE(parent_relation, '') != 'subagent' AND ${where}
@@ -29,8 +42,20 @@ export function threadTreeSql(where: string, order: string, limit: string): stri
       SELECT root_id, MAX(last_activity_at) AS tree_activity FROM forest GROUP BY root_id
     ),
     page AS (SELECT roots.*, latest.tree_activity FROM roots JOIN latest ON latest.root_id = roots.id
-      ORDER BY ${order.replaceAll("last_activity_at", "tree_activity")}${limit})
-    SELECT threads.* FROM threads WHERE id IN (SELECT id FROM forest WHERE root_id IN (
+      ORDER BY ${order.replaceAll("last_activity_at", "tree_activity")}${limit}),
+    selected AS (SELECT * FROM threads WHERE id IN (SELECT id FROM forest WHERE root_id IN (
       SELECT id FROM page UNION SELECT id FROM roots WHERE id IN (SELECT id FROM ancestry)
-    )) ORDER BY ${order}`;
+    ))),
+    ranked AS (SELECT id, parent_thread_id, ROW_NUMBER() OVER (PARTITION BY parent_thread_id ORDER BY created_at DESC, id) AS position FROM selected),
+    allowed AS (SELECT id, parent_thread_id FROM ranked WHERE position <= COALESCE(
+      (SELECT value FROM json_each((SELECT child_limits FROM options)) WHERE key = ranked.parent_thread_id), ${THREAD_CHILD_PAGE})
+      OR id IN (SELECT id FROM required)),
+    visible(id) AS (
+      SELECT id FROM roots WHERE id IN (SELECT id FROM selected)
+      UNION SELECT a.id FROM allowed a JOIN visible v ON a.parent_thread_id = v.id
+    ),
+    hidden AS (SELECT parent_thread_id, COUNT(*) AS n FROM ranked WHERE id NOT IN (SELECT id FROM visible) GROUP BY parent_thread_id)
+    SELECT threads.*, COALESCE(hidden.n, 0) AS hidden_children, latest.tree_activity FROM threads
+      LEFT JOIN hidden ON hidden.parent_thread_id = threads.id LEFT JOIN latest ON latest.root_id = threads.id
+      WHERE threads.id IN (SELECT id FROM visible) ORDER BY ${order}`;
 }

@@ -1,5 +1,5 @@
 import type { ThreadSummary } from "@openorc/protocol";
-import { threadTreeActivity, threadTreeMatches, threadTreeRoot, threadTreeRows, visibleThreadForest } from "./thread-tree.js";
+import { threadChildren, threadTreeActivity, threadTreeMatches, threadTreeRoot, threadTreeRows, visibleThreadForest } from "./thread-tree.js";
 
 /** Which threads the sidebar lists: every active thread, orcmode's working set of them, or the archive. */
 export type SidebarFilter = "active" | "orc" | "archived";
@@ -73,11 +73,17 @@ export function sidebarThreadPage({
     const root = threadTreeRoot(byId.get(selected.id) ?? selected, byId);
     if (root && !shown.some((thread) => thread.id === root.id)) shown.push(root);
   }
-  const list = threadTreeRows(
-    shown,
-    all,
-    all.map((thread) => `thread-open:${thread.id}`),
-  ).map((row) => row.thread);
+  // Keep the whole fetched family here; the visible tree applies each parent's page and folds later.
+  const children = threadChildren(all);
+  const list: ThreadSummary[] = [];
+  const visited = new Set<string>();
+  const collect = (thread: ThreadSummary) => {
+    if (visited.has(thread.id)) return;
+    visited.add(thread.id);
+    list.push(thread);
+    children.get(thread.id)?.forEach(collect);
+  };
+  shown.forEach(collect);
   const snoozed = archived ? [] : shown.filter((thread) => thread.snoozedUntil && thread.snoozedUntil > now);
   const pinned = archived ? [] : shown.filter((thread) => thread.pinnedAt && !snoozed.includes(thread));
   const rest = shown.filter((thread) => !pinned.includes(thread) && !snoozed.includes(thread));
@@ -115,6 +121,7 @@ export function visibleSidebarThreadIds(
   collapsed: readonly string[],
   projectId: string | null = null,
   reveal: readonly string[] = [],
+  childLimits: Readonly<Record<string, number>> = {},
 ): string[] {
   return sections
     .flatMap((section) =>
@@ -125,6 +132,7 @@ export function visibleSidebarThreadIds(
             section.list ?? [],
             collapsed,
             reveal,
+            childLimits,
           ).map((row) => row.thread),
     )
     .map((thread) => thread.id);

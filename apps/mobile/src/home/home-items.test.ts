@@ -8,6 +8,7 @@ const outline = (items: HomeItem[]) =>
   items.map((item) => {
     if (item.kind === "heading") return `# ${item.title} (${item.meta?.text ?? "…"})${item.projectId && !item.open ? " folded" : ""}`;
     if (item.kind === "section") return `${item.fold} ${item.count}${item.open ? "" : " folded"}`;
+    if (item.kind === "children-more") return `more ${item.count} in ${item.tree.thread.id}`;
     if (item.kind === "more") return `more ${item.projectId}`;
     if (item.kind === "retry") return `retry ${item.projectId ?? "projects"}`;
     return item.project ? `${item.thread.id} @ ${item.project}` : item.thread.id;
@@ -141,6 +142,40 @@ describe("homeItems", () => {
   });
 });
 
+it("pages each parent's newest children with separate Show more rows, keeps older work and the selection, and ends visible trunks", () => {
+  const parent = { ...fixtureThreads[0]!, id: "parent", parentThreadId: null, createdAt: 0 };
+  const children = Array.from({ length: 20 }, (_, i): ThreadSummary => ({
+    ...parent,
+    id: `child-${i}`,
+    parentThreadId: parent.id,
+    parentRelation: "subagent",
+    createdAt: i,
+    activity: i === 0 ? "running" : "idle",
+  }));
+  const nested = Array.from({ length: 8 }, (_, i): ThreadSummary => ({ ...children[0]!, id: `nested-${i}`, parentThreadId: children[19]!.id, createdAt: i, activity: "idle" }));
+  const listed = groups([parent, ...children, ...nested], []);
+  const open = { collapsed: ["thread-open:child-19"] };
+  const first = homeItems(listed, options(open));
+  expect(first.filter((item) => item.kind === "children-more").map((item) => [item.tree.thread.id, item.count])).toEqual([
+    ["child-19", 3],
+    ["parent", 14],
+  ]);
+  const rows = first.filter((item) => item.kind === "thread");
+  expect(rows.map((item) => item.thread.id)).toEqual(["parent", "child-19", "nested-7", "nested-6", "nested-5", "nested-4", "nested-3", "child-18", "child-17", "child-16", "child-15", "child-0"]);
+  expect(rows.at(-1)?.tree.last).toBe(true);
+  expect(
+    homeItems(listed, options({ ...open, childLimits: { parent: 17, "child-19": 17 } }))
+      .filter((item) => item.kind === "children-more")
+      .map((item) => item.count),
+  ).toEqual([2]);
+  expect(
+    homeItems(listed, options({ selectedId: "nested-0" }))
+      .filter((item) => item.kind === "thread")
+      .map((item) => item.thread.id),
+  ).toContain("nested-0");
+  expect(homeItems(listed, options({ collapsed: ["thread-closed:parent"] })).some((item) => item.kind === "children-more")).toBe(false);
+});
+
 it("nests children and a grandchild in place, preserving continuation lanes and manual folds", () => {
   const parent = { ...fixtureThreads[0]!, id: "parent", parentThreadId: null };
   const child: ThreadSummary = { ...parent, id: "child", parentThreadId: parent.id, parentRelation: "subagent", createdAt: 1 };
@@ -150,11 +185,11 @@ it("nests children and a grandchild in place, preserving continuation lanes and 
   const rows = homeItems(listed, options()).filter((item) => item.kind === "thread");
   expect(rows.map((item) => [item.thread.id, item.tree.depth])).toEqual([
     ["parent", 0],
+    ["sibling", 1],
     ["child", 1],
     ["grandchild", 2],
-    ["sibling", 1],
   ]);
-  expect(rows[2]!.tree.continuing).toEqual([1]);
+  expect(rows[3]!.tree.continuing).toEqual([]);
   expect(rows[1]!.tree.last).toBe(false);
   expect(rows[3]!.tree.last).toBe(true);
   expect(

@@ -226,7 +226,7 @@ export function mergeThreadPages(
     trees.set(root, [...(trees.get(root) ?? []), entry]);
   }
   const compare = threadListCompare(list);
-  const treeActivity = (tree: Held[]) => Math.max(...tree.map((entry) => entry.row.lastActivityAt));
+  const treeActivity = (tree: Held[]) => Math.max(...tree.map((entry) => entry.row.treeActivityAt ?? entry.row.lastActivityAt));
   const roots = [...trees.entries()]
     .map(([root, tree]) => ({ root, tree, sorted: { ...root.row, lastActivityAt: list.includeChildren ? treeActivity(tree) : root.row.lastActivityAt } }))
     .sort((a, b) => compare(a.sorted, b.sorted));

@@ -1,6 +1,6 @@
 import type { ProjectMeta } from "@openorc/client";
 import { router } from "expo-router";
-import { useContext, type ComponentType } from "react";
+import { useContext, useState, type ComponentType } from "react";
 import { View } from "react-native";
 import { HostContext } from "../connection/host-context";
 import { ChevronDown, ChevronRight, Folder, FolderOpen, Globe, Inbox, Plus } from "../generated/icons";
@@ -9,6 +9,7 @@ import { cn } from "../ui/cn";
 import { ListPressable } from "../ui/ListPressable";
 import { Text } from "../ui/Text";
 import type { HomeItem } from "./home-items";
+import { ThreadBranch, TREE_STEP } from "./ThreadBranch";
 
 type Heading = Extract<HomeItem, { kind: "heading" }>;
 type Section = Extract<HomeItem, { kind: "section" }>;
@@ -102,6 +103,24 @@ export function ShowMore({ project, onPress }: { project: string; onPress: () =>
     <ListPressable accessibilityRole="button" accessibilityLabel={`Show more in ${project}`} onPress={onPress} className="mx-2.5 min-h-touch justify-center rounded-md pl-8.5 active:bg-surface-2">
       <Text className="text-sm text-ink-4">Show more</Text>
     </ListPressable>
+  );
+}
+
+export function ShowMoreChildren({ item, onPress }: { item: Extract<HomeItem, { kind: "children-more" }>; onPress: () => void }) {
+  const [height, setHeight] = useState(44);
+  return (
+    <View onLayout={(event) => setHeight(event.nativeEvent.layout.height)}>
+      <ListPressable
+        accessibilityRole="button"
+        accessibilityLabel={`Show ${item.count} more in ${item.tree.thread.title}`}
+        onPress={onPress}
+        style={{ marginLeft: 10 + Math.min(item.tree.depth + 1, 3) * TREE_STEP }}
+        className="mr-2.5 min-h-touch justify-center rounded-md pl-8.5 active:bg-surface-2"
+      >
+        <Text className="text-sm text-ink-4">Show {item.count} more</Text>
+      </ListPressable>
+      <ThreadBranch row={item.tree} height={height} paging />
+    </View>
   );
 }
 

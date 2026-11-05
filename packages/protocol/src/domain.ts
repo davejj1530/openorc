@@ -189,6 +189,10 @@ export function isDetachedCopy(thread: Pick<Thread, "worktreePath" | "branch">):
 }
 
 export const ThreadSummary = Thread.extend({
+  /** Direct children omitted from this list response, after paging and visibility exceptions. */
+  hiddenChildren: z.number().int().nonnegative().optional(),
+  /** Root ordering includes activity in children omitted from this page. */
+  treeActivityAt: z.number().optional(),
   subagent: z
     .object({
       status: SubagentStatus,

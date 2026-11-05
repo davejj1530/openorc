@@ -41,3 +41,4 @@ export * from "./tool-images.js";
 
 export { MAX_TEAM_CONTEXT_BYTES } from "./legacy-migrations.js";
 export * from "./workspace-transfer.js";
+export { THREAD_CHILD_PAGE } from "./thread-list.js";

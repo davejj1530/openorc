@@ -40,7 +40,7 @@ const step = (direction: 1 | -1) =>
 const numbered =
   (position: number): Shortcut =>
   () => {
-    const id = useUi.getState().conversationOrder[position - 1];
+    const id = useUi.getState().threadOrder[position - 1];
     if (!id) return false;
     openThread(id);
     return true;

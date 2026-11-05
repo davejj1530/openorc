@@ -10,6 +10,46 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+it("pages children and fetches more for that parent, preserving an older running child and search hits", () => {
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      disconnect() {}
+    },
+  );
+  const parent = { id: "parent", projectId: "project", title: "Parent", activity: "idle", createdAt: 0 } as ThreadSummary;
+  const children = Array.from({ length: 20 }, (_, i): ThreadSummary => ({
+    ...parent,
+    id: `child-${i}`,
+    title: `Child ${i}`,
+    parentThreadId: parent.id,
+    parentRelation: "subagent",
+    createdAt: i,
+    activity: i === 0 ? "running" : "idle",
+  }));
+  const more = vi.fn();
+  useLayout.setState({ collapsed: [] });
+  const props = { roots: [parent], all: [parent, ...children], activeId: null, onShowMore: more };
+  const view = render(<ThreadTreeList {...props} />);
+  const button = screen.getByRole("button", { name: "Show 14 more in Parent" });
+  expect(screen.getByText("Child 0")).toBeTruthy();
+  expect(screen.queryByText("Child 14")).toBeNull();
+  fireEvent.click(button);
+  expect(more).toHaveBeenCalledExactlyOnceWith("project", "parent");
+  view.rerender(<ThreadTreeList {...props} childLimits={{ parent: 17 }} />);
+  expect(screen.getByText("Child 14")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Show 2 more in Parent" })).toBeTruthy();
+  view.rerender(<ThreadTreeList {...props} search="Child 1" />);
+  expect(screen.getByText("Child 1")).toBeTruthy();
+  expect(screen.getByText("Child 10")).toBeTruthy();
+  view.rerender(<ThreadTreeList {...props} activeId="child-2" />);
+  expect(screen.getByText("Child 2")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Collapse Parent" }));
+  expect(screen.queryByText(/Show \d+ more/)).toBeNull();
+  expect(screen.queryByText("Child 0")).toBeNull();
+});
+
 it("reveals a selected grandchild once, lets the user collapse it, and reveals again on navigation", () => {
   vi.stubGlobal(
     "ResizeObserver",

@@ -89,6 +89,7 @@ export { pullRequestMark, pullRequestNumber, renamedTitle, threadMark, threadPla
 export {
   threadAncestors,
   threadBranchPath,
+  threadPageBranchPath,
   threadChildren,
   threadSearchFolds,
   threadTreeActivity,
@@ -136,3 +137,4 @@ export {
   type WorkSection,
 } from "./work-steps.js";
 export { workDuration, workParts, workTiming, workTurns } from "./work-transcript.js";
+export { useChildThreadPages, cachedChildPage } from "./thread-child-pages.js";

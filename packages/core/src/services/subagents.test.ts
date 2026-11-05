@@ -92,6 +92,31 @@ async function setup() {
 beforeEach(async () => {
   fixture = await setup();
 });
+
+it("serves bounded child pages with counts and keeps older native work and ordinary approvals", async () => {
+  const { db, launch, update, parent, project, conversations, service, input } = fixture;
+  const children = Array.from({ length: 20 }, (_, index) => {
+    const child = launch(`page-${index}`);
+    db.stmt("UPDATE threads SET created_at = ? WHERE id = ?").run(index + 1, child.threadId);
+    if (index !== 0) update(`page-${index}`, "completed");
+    return child;
+  });
+  const ordinary = threads.insert(db, { projectId: project.id, title: "Waiting older child", ...settings });
+  threads.update(db, ordinary.id, { parentThreadId: parent.id, parentRelation: "started" });
+  db.stmt("UPDATE threads SET created_at = 0 WHERE id = ?").run(ordinary.id);
+  const run = await service.start({ ...input, scope: { task: null, thread: ordinary } });
+  const approval = service.requestApproval(run.id, "choice", "AskUserQuestion", {});
+  const page = conversations.list({ projectId: project.id, includeChildren: true });
+  expect(page.map((thread) => thread.id)).toEqual(expect.arrayContaining([parent.id, children[0]!.threadId, ordinary.id]));
+  expect(page).toHaveLength(8);
+  expect(page.find((thread) => thread.id === parent.id)).toMatchObject({ hiddenChildren: 14 });
+  expect(page.find((thread) => thread.id === ordinary.id)?.activity).toBe("waiting");
+  expect(conversations.list({ projectId: project.id, includeChildren: true, childLimits: { [parent.id]: 17 } })).toHaveLength(20);
+  const selected = conversations.list({ projectId: project.id, includeChildren: true, selectedId: children[1]!.threadId });
+  expect(selected.some((thread) => thread.id === children[1]!.threadId)).toBe(true);
+  await service.closeAndWait(run.id);
+  await approval;
+});
 afterEach(async () => {
   await fixture.service.closeAll();
   fixture.coalescer.flush();

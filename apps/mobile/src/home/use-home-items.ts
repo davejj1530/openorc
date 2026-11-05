@@ -1,4 +1,4 @@
-import { listedThreads, sidebarFoldKey, sidebarSectionOpen, THREAD_PAGE, threadFoldIds, threadListParams, type SidebarFilter } from "@openorc/client";
+import { cachedChildPage, useChildThreadPages, listedThreads, sidebarFoldKey, sidebarSectionOpen, THREAD_PAGE, threadFoldIds, threadListParams, type SidebarFilter } from "@openorc/client";
 import type { InboxList, ThreadSummary } from "@openorc/protocol";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useContext, useEffect, useState } from "react";
@@ -21,7 +21,7 @@ const NO_IDS: string[] = [];
 function shownPage(cache: QueryClient, group: Omit<ProjectThreads, "threads">, filter: SidebarFilter, threads: readonly ThreadSummary[] | undefined): ProjectThreads {
   if (threads) return { ...group, threads };
   for (let limit = group.limit - THREAD_PAGE; limit >= THREAD_PAGE; limit -= THREAD_PAGE) {
-    const page = cache.getQueryData<ThreadSummary[]>(["threads.list", listParams(group.id, filter, limit)]);
+    const page = cachedChildPage(cache, listParams(group.id, filter, limit));
     if (page) return { ...group, threads: page, limit };
   }
   return { ...group, threads: undefined };
@@ -53,11 +53,13 @@ function useOpening(): [string | null, (projectId: string) => void] {
  * phone is not `connected` a list that fails keeps the threads it had and shows no retry: the header says once why.
  * `needsYou` lists a partner host's waiting threads here, or this host's under the shown one's Needs you.
  */
-export function useHomeItems(connected: boolean, needsYou: Pick<HomeOptions, "partnerWaiting" | "waitingShownElsewhere"> = {}) {
+export function useHomeItems(connected: boolean, needsYou: Pick<HomeOptions, "partnerWaiting" | "waitingShownElsewhere" | "selectedId"> = {}) {
   const projects = useRpc("projects.list", {});
   const { filter, pinnedOnly } = useHomeFilter();
   // How many threads each project shows per list (active or archived), a page more for each Show more.
   const [limits, setLimits] = useState<Record<string, number>>({});
+  const children = useChildThreadPages();
+  const selected = useRpc("threads.get", { id: needsYou.selectedId ?? "" }, { enabled: Boolean(needsYou.selectedId) });
   const limitKey = (projectId: string) => `${listedThreads(filter)}:${projectId}`;
   // A partner's sections fold on their own host.
   const host = useContext(HostContext);
@@ -74,22 +76,24 @@ export function useHomeItems(connected: boolean, needsYou: Pick<HomeOptions, "pa
   }, [connected, missingKey, host]);
   const [opened, setOpened] = useOpening();
   const groups = projectChoices(projects.data).map(({ id, name }) => ({ id, name, limit: limits[limitKey(id)] ?? THREAD_PAGE }));
-  const lists = useRpcs(
-    "threads.list",
-    groups.map((group) => listParams(group.id, filter, group.limit)),
-    { refetchInterval: 60_000 },
-  );
+  const params = groups.map((group) => ({
+    ...listParams(group.id, filter, group.limit),
+    ...children.params(group.id),
+    ...(selected.data?.projectId === group.id ? { selectedId: selected.data.id } : {}),
+  }));
+  const lists = useRpcs("threads.list", params, { refetchInterval: 60_000 });
   const inbox = useRpc("inbox.list", {}, { refetchInterval: 60_000 });
   const cache = useQueryClient();
-  const shown = groups.map((group, index) => shownPage(cache, { ...group, failed: connected && Boolean(lists[index]?.isError) }, filter, lists[index]?.data));
+  const shown = groups.map((group, index) => shownPage(cache, { ...group, failed: connected && Boolean(lists[index]?.isError) }, filter, lists[index]?.data ?? cachedChildPage(cache, params[index]!)));
   const listed = new Set(shown.flatMap((group) => group.threads?.map((thread) => thread.id) ?? []));
   const waiting = useWaitingElsewhere(inbox.data, listed);
-  const options: HomeOptions = { now: Date.now(), filter, pinnedOnly, collapsed, waiting, projectsFailed: connected && projects.isError, opened, ...needsYou };
+  const options: HomeOptions = { now: Date.now(), filter, pinnedOnly, collapsed, waiting, projectsFailed: connected && projects.isError, opened, childLimits: children.limits, ...needsYou };
   return {
     items: homeItems(shown, options),
     /** This host's threads waiting on you, for the shown host's Needs you when this is the partner. */
     waiting: homeWaiting(shown, options),
     showMore: (projectId: string) => setLimits((current) => ({ ...current, [limitKey(projectId)]: (current[limitKey(projectId)] ?? THREAD_PAGE) + THREAD_PAGE })),
+    showMoreChildren: children.showMore,
     toggleThread: (id: string, expanded: boolean) => toggleThreadChildren(id, expanded, host),
     /** Folds or opens a section; a project the reader opens rises its rows in. */
     toggle: (key: string, projectId: string) => {

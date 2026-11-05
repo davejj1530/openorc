@@ -167,6 +167,66 @@ it.each([false, true])("keeps the sidebar and keyboard order visible during a th
   }
 });
 
+it.each([false, true])("fetches another child page, keeps rows while loading, and searches beyond the page (ungrouped=%s)", async (ungroupByProjects) => {
+  const parent = {
+    id: "parent",
+    title: "Parent",
+    projectId: WORKSPACE_ID,
+    agent: "claude",
+    activity: "idle",
+    unread: false,
+    session: { status: "idle", message: null },
+    pinnedAt: null,
+    snoozedUntil: null,
+    lastActivityAt: 1,
+    createdAt: 0,
+  } as const;
+  const children = Array.from({ length: 20 }, (_, i) => ({
+    ...parent,
+    id: `child-${i}`,
+    title: `Child ${i}`,
+    parentThreadId: parent.id,
+    parentRelation: "subagent" as const,
+    createdAt: i,
+    activity: i === 0 ? ("running" as const) : ("idle" as const),
+  }));
+  fixture.threads = [parent, ...children];
+  useLayout.setState({ ungroupByProjects });
+  const implementation = vi.mocked(core.call).getMockImplementation()!;
+  let release: (() => void) | undefined;
+  const requests: RpcParams<"threads.list">[] = [];
+  vi.mocked(core.call).mockImplementation(async (method, params) => {
+    if (method !== "threads.list") return implementation(method, params);
+    const list = params as RpcParams<"threads.list">;
+    requests.push(list);
+    if (list.childLimits?.[parent.id] === 17 && !list.childSearch)
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+    const shown = [...children]
+      .reverse()
+      .filter((child, index) => index < (list.childLimits?.[parent.id] ?? 5) || child.activity === "running" || (list.childSearch && child.title.includes(list.childSearch)));
+    return [{ ...parent, hiddenChildren: children.length - shown.length }, ...shown] as never;
+  });
+  try {
+    mountSidebar();
+    await screen.findByRole("button", { name: "Show 14 more in Parent" });
+    expect(useUi.getState().threadOrder).toEqual(["parent", "child-19", "child-18", "child-17", "child-16", "child-15", "child-0"]);
+    fireEvent.click(screen.getByRole("button", { name: "Show 14 more in Parent" }));
+    expect(screen.getByText("Child 19")).toBeTruthy();
+    await waitFor(() => expect(release).toBeTypeOf("function"));
+    await act(async () => release!());
+    await screen.findByRole("button", { name: "Show 2 more in Parent" });
+    expect(useUi.getState().threadOrder).toHaveLength(19);
+    fireEvent.change(screen.getByRole("textbox", { name: "Filter loaded threads" }), { target: { value: "Child 1" } });
+    await screen.findByText("Child 1");
+    expect(requests.some((params) => params.childSearch === "Child 1")).toBe(true);
+    expect(useUi.getState().threadOrder).toContain("child-1");
+  } finally {
+    vi.mocked(core.call).mockImplementation(implementation);
+  }
+});
+
 it("shows the OpenOrc wordmark only while fullscreen and keeps the header controls available", () => {
   mountSidebar();
   expect(screen.queryByRole("img", { name: "OpenOrc" })).toBeNull();
@@ -512,7 +572,7 @@ it("keeps pinned, archived and title filters available while projects are ungrou
   fireEvent.click(await screen.findByRole("menuitem", { name: "Archived threads" }));
   await waitFor(() => expect(useUi.getState().threadOrder).toEqual(["archived"]));
   fireEvent.change(screen.getByRole("textbox", { name: "Filter loaded threads" }), { target: { value: "no match" } });
-  expect(screen.getByText("No matches in loaded threads.")).toBeTruthy();
+  expect(await screen.findByText("No matches in loaded threads.")).toBeTruthy();
   expect(useUi.getState().threadOrder).toEqual([]);
   expect(useLayout.getState().ungroupByProjects).toBe(true);
 });

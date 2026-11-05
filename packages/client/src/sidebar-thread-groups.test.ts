@@ -108,13 +108,13 @@ describe("sidebar folds", () => {
     expect(page.rest.map((row) => row.id)).toEqual(["parent"]);
     expect(page.hasMore).toBe(true);
     const section = [{ id: "project", ...page }];
-    expect(visibleSidebarThreadIds(section, [])).toEqual(["parent", "child", "nested", "started"]);
-    expect(threadTreeRows(page.rest, page.list, []).map((row) => row.depth)).toEqual([0, 1, 2, 1]);
+    expect(visibleSidebarThreadIds(section, [])).toEqual(["parent", "started", "child", "nested"]);
+    expect(threadTreeRows(page.rest, page.list, []).map((row) => row.depth)).toEqual([0, 1, 1, 2]);
     const closed = toggleThreadTree([], "parent", true);
     expect(visibleSidebarThreadIds(section, closed)).toEqual(["parent"]);
     const finished = page.list.map((row) => ({ ...row, activity: "idle" as const }));
     expect(threadTreeRows(page.rest, finished, []).map((row) => row.thread.id)).toEqual(["parent"]);
-    expect(threadTreeRows(page.rest, finished, toggleThreadTree(closed, "parent", false)).map((row) => row.thread.id)).toEqual(["parent", "child", "started"]);
+    expect(threadTreeRows(page.rest, finished, toggleThreadTree(closed, "parent", false)).map((row) => row.thread.id)).toEqual(["parent", "started", "child"]);
   });
   it("lists projects and pins until folded, and snoozed threads once opened", () => {
     expect([sidebarSectionOpen([], "project", "p"), sidebarSectionOpen([], "pinned", "p"), sidebarSectionOpen([], "snoozed", "p")]).toEqual([true, true, false]);

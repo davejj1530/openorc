@@ -36,6 +36,7 @@ export type HomeItem =
   | { kind: "thread"; key: string; thread: ThreadSummary; tree: ThreadTreeRow; project: string | null; arriving: boolean; host?: string }
   /** The foot of a project that lists more threads than it shows. */
   | { kind: "more"; key: string; projectId: string; project: string }
+  | { kind: "children-more"; key: string; tree: ThreadTreeRow; count: number }
   /** A list the Mac could not give: a project's threads, or with no project, the projects themselves. */
   | { kind: "retry"; key: string; projectId: string | null };
 
@@ -52,6 +53,8 @@ export interface HomeOptions {
   projectsFailed: boolean;
   /** The project the reader just opened, whose rows rise in. */
   opened: string | null;
+  childLimits?: Readonly<Record<string, number>>;
+  selectedId?: string;
   /** The partner host's threads waiting on you, listed under this host's Needs you with its own. */
   partnerWaiting?: readonly Waiting[];
   /** This host is the partner: its waiting threads are listed under the shown host's Needs you, and none here. */
@@ -85,14 +88,28 @@ const listsWaiting = (options: HomeOptions) => options.filter === "archived";
 
 function projectRows(group: ProjectThreads, page: Page, options: HomeOptions, waitingRoots: ReadonlySet<string>): HomeItem[] {
   const arriving = options.opened === group.id;
-  const rows = (threads: readonly ThreadSummary[]) =>
-    threadTreeRows(
+  const rows = (threads: readonly ThreadSummary[]): HomeItem[] => {
+    const trees = threadTreeRows(
       threads.filter((thread) => !waitingRoots.has(thread.id)),
-      page.list,
+      page.list.filter((thread) => !waitingRoots.has(thread.id)),
       options.collapsed,
-    )
-      .filter((tree) => !waitingRoots.has(tree.thread.id))
-      .map((tree): HomeItem => ({ kind: "thread", key: tree.thread.id, thread: tree.thread, tree, project: null, arriving }));
+      options.selectedId ? [options.selectedId] : [],
+      options.childLimits,
+    );
+    const items: HomeItem[] = [];
+    const pages: ThreadTreeRow[] = [];
+    const end = () => {
+      const tree = pages.pop()!;
+      items.push({ kind: "children-more", key: `children-more:${tree.thread.id}`, tree, count: tree.hiddenChildren! });
+    };
+    for (const tree of trees) {
+      while (pages.length && pages.at(-1)!.depth >= tree.depth) end();
+      items.push({ kind: "thread", key: tree.thread.id, thread: tree.thread, tree, project: null, arriving });
+      if (tree.expanded && tree.hiddenChildren) pages.push(tree);
+    }
+    while (pages.length) end();
+    return items;
+  };
   const section = (fold: "pinned" | "snoozed", threads: readonly ThreadSummary[]): HomeItem[] => {
     const shown = rows(threads);
     if (!shown.length) return [];
@@ -132,7 +149,14 @@ export function homeWaiting(groups: readonly ProjectThreads[], options: HomeOpti
 export function homeItems(groups: readonly ProjectThreads[], options: HomeOptions): HomeItem[] {
   const pages = groups.map((group) => ({
     group,
-    page: sidebarThreadPage({ projectId: group.id, fetched: group.threads, selected: null, filter: options.filter, limit: group.limit, now: options.now }),
+    page: sidebarThreadPage({
+      projectId: group.id,
+      fetched: group.threads,
+      selected: group.threads?.find((thread) => thread.id === options.selectedId),
+      filter: options.filter,
+      limit: group.limit,
+      now: options.now,
+    }),
   }));
   const own = homeWaiting(groups, options);
   const waitingRoots = new Set(own.map(({ thread }) => thread.id));

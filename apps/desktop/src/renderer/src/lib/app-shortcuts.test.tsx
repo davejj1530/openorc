@@ -145,11 +145,11 @@ it("does not queue a file panel when a subagent path is opened", async () => {
   expect(useLayout.getState()).toMatchObject({ panelOpen: false, panelThreadId: null, selectedFile: null, panelRequest: null });
 });
 
-it("numbers messageable conversations and still steps through visible subagents", () => {
-  useUi.getState().setThreadOrder(["parent", "child", "started"], ["parent", "started"]);
+it("numbers and steps through the same visible rows, including subagents", () => {
+  useUi.getState().setThreadOrder(["parent", "child", "started"]);
   renderHook(() => useAppShortcuts("project"));
   press("2");
-  expect(route()).toEqual({ view: "thread", threadId: "started" });
-  press("⇧[");
   expect(route()).toEqual({ view: "thread", threadId: "child" });
+  press("⇧]");
+  expect(route()).toEqual({ view: "thread", threadId: "started" });
 });

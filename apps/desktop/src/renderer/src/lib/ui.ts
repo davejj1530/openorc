@@ -8,10 +8,8 @@ interface UiState {
   palette: boolean;
   /** What the palette opens on: everything, or messages across threads. */
   paletteMode: "all" | "messages";
-  /** Thread ids in the order the sidebar shows them, for next/previous. */
+  /** Thread ids in the order the sidebar shows them, for next/previous and ⌘1–9. */
   threadOrder: string[];
-  /** Messageable conversations in sidebar order, for ⌘1 to ⌘9. */
-  conversationOrder: string[];
   /** The thread a delete was asked for; one confirm dialog serves every menu. */
   deleteThreadId: string | null;
   /** The conversation whose move to or from a worktree is being confirmed. */
@@ -24,7 +22,7 @@ interface UiState {
   setImportProject: (open: boolean) => void;
   setImportSessions: (open: boolean, projectId?: string) => void;
   setPalette: (open: boolean, mode?: "all" | "messages") => void;
-  setThreadOrder: (ids: string[], conversations?: readonly string[]) => void;
+  setThreadOrder: (ids: string[]) => void;
   setDeleteThread: (id: string | null) => void;
   setMoveThread: (id: string | null, to?: "cloud") => void;
   setNewFile: (scope: FileScope | null) => void;
@@ -37,7 +35,6 @@ export const useUi = create<UiState>((set, get) => ({
   palette: false,
   paletteMode: "all",
   threadOrder: [],
-  conversationOrder: [],
   deleteThreadId: null,
   moveThreadId: null,
   moveThreadToCloud: false,
@@ -49,11 +46,9 @@ export const useUi = create<UiState>((set, get) => ({
   setImportProject: (importProject) => set({ importProject }),
   setImportSessions: (open, projectId) => set({ importSessions: { open, ...(projectId ? { projectId } : {}) } }),
   setPalette: (palette, mode) => set({ palette, paletteMode: mode ?? (palette ? get().paletteMode : "all") }),
-  setThreadOrder: (ids, conversations = ids) => {
+  setThreadOrder: (ids) => {
     const current = get().threadOrder;
-    const known = new Set(conversations);
-    const conversationOrder = ids.filter((id) => known.has(id));
-    if (current.length === ids.length && current.every((id, i) => id === ids[i]) && JSON.stringify(get().conversationOrder) === JSON.stringify(conversationOrder)) return;
-    set({ threadOrder: ids, conversationOrder });
+    if (current.length === ids.length && current.every((id, i) => id === ids[i])) return;
+    set({ threadOrder: ids });
   },
 }));

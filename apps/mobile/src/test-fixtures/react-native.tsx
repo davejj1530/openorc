@@ -116,6 +116,7 @@ export const Dimensions = { get: () => screen };
 export const keyboard = { up: false };
 export const Keyboard = { dismiss: () => void (keyboard.up = false) };
 export const useWindowDimensions = () => screen;
+export const PixelRatio = { get: () => screen.scale };
 export const StyleSheet = { create: <T,>(styles: T) => styles, hairlineWidth: 1 / 3, absoluteFill: {} };
 /** The app's state as iOS reports it: a test calls `appState.set` to move the app in or out of the front. */
 export const appState = {

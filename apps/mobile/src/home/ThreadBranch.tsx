@@ -1,55 +1,90 @@
+import type { ThreadTreeRow } from "@openorc/client";
 import { useState, type ReactNode } from "react";
+import { PixelRatio, Pressable, useWindowDimensions } from "react-native";
 import Animated from "react-native-reanimated";
-import { ChevronRight } from "../generated/icons";
-import { arrive } from "../ui/motion";
-import { useReducedMotion } from "../ui/reduced-motion";
-import { threadBranchPath, threadPageBranchPath, type ThreadTreeRow } from "@openorc/client";
-import { Pressable, StyleSheet, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
+import { ChevronDown } from "../generated/icons";
+import { turn } from "../ui/motion";
 import { useColors } from "../ui/mode";
+import { useReducedMotion } from "../ui/reduced-motion";
+import { movingStyle, type RowMotion } from "./fold-motion";
+import { ACTION_RIGHT, MAX_DEPTH, STEP, TEXT_X, titleMid } from "./grid";
+import { branchPath, pagePath, SEAM } from "./tree-lines";
 
-export const TREE_STEP = 20;
-const MARK_X = 52;
+/** How far a row of the tree steps in from a root's. */
+export const treeIndent = (depth: number) => Math.min(depth, MAX_DEPTH) * STEP;
 
-/** One stroke owns the elbows and continuations, including coincident lanes at the indentation cap. */
-export function ThreadBranch({ row, height, paging = false }: { row: ThreadTreeRow; height: number; paging?: boolean }) {
+/** The tree's line: one point, the strong line's ink in both themes. */
+const WEIGHT = 1;
+
+/**
+ * `line` (#rrggbbaa) laid over `ground` (#rrggbb) as one opaque color, so where a row's lines run into the next row's
+ * they never darken; a color in another form passes through.
+ */
+export function solid(line: string, ground: string): string {
+  const [ink, base] = [/^#([\da-f]{6})([\da-f]{2})$/i.exec(line), /^#([\da-f]{6})$/i.exec(ground)];
+  if (!ink || !base) return line;
+  const alpha = parseInt(ink[2]!, 16) / 255;
+  const channel = (hex: string, at: number) => parseInt(hex.slice(at, at + 2), 16);
+  const mixed = [0, 2, 4].map((at) => Math.round(channel(ink[1]!, at) * alpha + channel(base[1]!, at) * (1 - alpha)));
+  return `#${mixed.map((value) => value.toString(16).padStart(2, "0")).join("")}`;
+}
+/** Half a device pixel where a one point line covers an odd number of them, so it lands on whole pixels, crisp. */
+const NUDGE = (PixelRatio.get() % 2) / (2 * PixelRatio.get());
+
+/**
+ * A row's share of its project's tree (see `branchPath`), or a paging row's, which only lets its ancestors' trunks
+ * through. One stroke owns every segment, so coincident lanes at the indentation cap never darken.
+ */
+export function ThreadBranch({ row, height, mid, reach = null, paging = false }: { row: ThreadTreeRow; height: number; mid: number; reach?: number | null; paging?: boolean }) {
   const colors = useColors();
-  const depth = Math.min(row.depth, 3);
-  const mid = height / 2 - (row.depth ? 0 : 9);
-  const mark = MARK_X + depth * TREE_STEP;
-  const branch = (paging ? threadPageBranchPath : threadBranchPath)(row, { markX: MARK_X, mid, height });
+  // Trunks run past the row's top and foot so rows join without a seam; only the elbows' line moves by the nudge.
+  const branch = paging ? pagePath(row, height) : branchPath(row, { mid: mid + NUDGE, height, reach });
   if (!branch) return null;
   return (
-    <Svg pointerEvents="none" width={mark} height={height} style={StyleSheet.absoluteFill}>
-      <Path d={branch} fill="none" stroke={colors.line} strokeWidth={StyleSheet.hairlineWidth} />
+    <Svg pointerEvents="none" width={TEXT_X + treeIndent(row.depth)} height={height + 2 * SEAM} style={lines}>
+      <Path d={branch} transform={`translate(${NUDGE} ${SEAM})`} fill="none" stroke={solid(colors["line-strong"], colors.bg)} strokeWidth={WEIGHT} strokeLinecap="round" />
     </Svg>
   );
 }
 
-export function ThreadTreeFrame({ tree, arriving, onToggle, children }: { tree?: ThreadTreeRow; arriving: boolean; onToggle?: () => void; children: ReactNode }) {
+/**
+ * A parent's disclosure, in the action column on its title line, where the headings' pluses and the header's circles
+ * line up: the chevron points down while its sub threads are folded and turns up as they open. `open` already says
+ * what the reader asked for while the rows still move.
+ */
+export function TreeToggle({ tree, open, compact, onFold }: { tree?: ThreadTreeRow; open: boolean; compact: boolean; onFold?: (id: string, open: boolean) => void }) {
   const still = useReducedMotion();
-  const [height, setHeight] = useState(tree?.depth ? 44 : 52);
+  const top = titleMid(compact, useWindowDimensions().fontScale) - 22;
+  if (!tree?.hasChildren || !onFold) return null;
   return (
-    <Animated.View style={arriving && !still ? arrive : undefined} onLayout={(event) => setHeight(event.nativeEvent.layout.height)}>
-      <View className="flex-row items-center" style={{ marginLeft: Math.min(tree?.depth ?? 0, 3) * TREE_STEP }}>
-        {tree?.hasChildren ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`${tree.expanded ? "Collapse" : "Expand"} ${tree.thread.title}`}
-            accessibilityState={{ expanded: tree.expanded }}
-            onPress={onToggle}
-            hitSlop={8}
-            className="w-6 min-h-touch items-center justify-center"
-          >
-            <View style={{ transform: [{ rotate: tree.expanded ? "90deg" : "0deg" }] }}>
-              <ChevronRight size={12} className="text-ink-4" />
-            </View>
-          </Pressable>
-        ) : null}
-        {tree && !tree.hasChildren ? <View className="w-6" /> : null}
-        <View className="min-w-0 flex-1">{children}</View>
-      </View>
-      {tree ? <ThreadBranch row={tree} height={height} /> : null}
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${open ? "Collapse" : "Expand"} ${tree.thread.title}`}
+      accessibilityState={{ expanded: open }}
+      onPress={() => onFold(tree.thread.id, !open)}
+      className="absolute size-touch items-center justify-center rounded-full active:bg-surface-2"
+      style={{ right: ACTION_RIGHT, top }}
+    >
+      {/* Keyed so a row the list recycles for another thread does not turn from that thread's state. */}
+      <Animated.View key={tree.thread.id} style={turn(open, still)}>
+        <ChevronDown size={16} className="text-ink-4" />
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+/** A row of a project's tree: it rises in as its fold opens, fades as it folds, and draws its branch over its lead. */
+export function ThreadTreeFrame({ tree, reach, motion, compact, children }: { tree?: ThreadTreeRow; reach: number | null; motion: RowMotion; compact: boolean; children: ReactNode }) {
+  const still = useReducedMotion();
+  const fontScale = useWindowDimensions().fontScale;
+  const [height, setHeight] = useState(compact ? 44 : 60);
+  return (
+    <Animated.View style={movingStyle(motion, still)} onLayout={(event) => setHeight(event.nativeEvent.layout.height)}>
+      {children}
+      {tree ? <ThreadBranch row={tree} height={height} mid={titleMid(compact, fontScale)} reach={reach} /> : null}
     </Animated.View>
   );
 }
+
+const lines = { position: "absolute", left: 0, top: -SEAM } as const;

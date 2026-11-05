@@ -68,3 +68,21 @@ it("marks missing subagent updates with a neutral dashed circle", () => {
   const view = render(<ThreadRow thread={thread} project="openorc" arriving={false} />);
   expect(view.getByLabelText("No updates").contains(view.getByLabelText("Neutral status mark"))).toBe(true);
 });
+
+it("keeps a parent's disclosure on its own row, beside the link that opens the thread, and asks for the opposite fold", () => {
+  const parent = fixtureThreads.find((thread) => thread.id === "t-plan")!;
+  const tree = { thread: parent, depth: 0, hasChildren: true, expanded: false, last: true, continuing: [] };
+  const onFold = vi.fn();
+  const view = render(<ThreadRow thread={parent} project={null} arriving={false} tree={tree} onFold={onFold} />);
+  const expand = view.getByRole("button", { name: `Expand ${parent.title}` });
+  expect(view.getByTestId("opens-thread").contains(expand)).toBe(false);
+  fireEvent.click(expand);
+  expect(onFold).toHaveBeenCalledExactlyOnceWith(parent.id, true);
+  view.rerender(<ThreadRow thread={parent} project={null} arriving={false} tree={{ ...tree, expanded: true }} onFold={onFold} />);
+  fireEvent.click(view.getByRole("button", { name: `Collapse ${parent.title}` }));
+  expect(onFold).toHaveBeenLastCalledWith(parent.id, false);
+  // While its sub threads fade out, it already reads closed, and pressing it again keeps them.
+  view.rerender(<ThreadRow thread={parent} project={null} arriving={false} tree={{ ...tree, expanded: true }} motion={{ folding: true }} onFold={onFold} />);
+  fireEvent.click(view.getByRole("button", { name: `Expand ${parent.title}` }));
+  expect(onFold).toHaveBeenLastCalledWith(parent.id, true);
+});

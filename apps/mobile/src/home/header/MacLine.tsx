@@ -52,7 +52,7 @@ export function useLineUnder({ scrollY, lineBottom }: HomeScroll): boolean {
 /** The status after the Mac's name, in ink-4 while healthy and a step stronger while not. */
 export function StatusWords({ status, trouble, className, ...text }: TextProps & { status: string; trouble: boolean }) {
   return (
-    <Text numberOfLines={1} className={cn("text-sm text-ink-4", trouble && "text-ink-2", className)} {...text}>
+    <Text numberOfLines={1} className={cn("text-detail text-ink-4", trouble && "text-ink-2", className)} {...text}>
       {status}
     </Text>
   );
@@ -63,10 +63,10 @@ export const lineOverRows = { zIndex: 1 };
 
 /**
  * The Mac Home shows, on the line under the wordmark, scrolling with the rows. It always holds text, so its words
- * changing never moves a row. It reads as a list row: the dot in the 16 pt glyph column, the words where row titles
- * start. A tap opens Settings, where the Mac's row says more. The touch is as wide as the words and runs from the bar
- * down to the first row, over that row's top margin (`lineOverRows`), so rows stay where they are; at the default text
- * size that is 32 pt. Once the line has gone under the bar, the bar says the same, so VoiceOver skips this one.
+ * changing never moves a row. It sits on Home's grid: the dot in the lead column under the wordmark's cube, the words
+ * where the name and row titles start. A tap opens Settings, where the Mac's row says more. The touch is as wide as
+ * the words and runs from the bar down to the first row, over that row's top margin (`lineOverRows`), so rows stay
+ * where they are. Once the line has gone under the bar, the bar says the same, so VoiceOver skips this one.
  */
 export function MacLine({ state, scrollY, lineBottom }: HomeScroll & { state: Paired }) {
   const line = useMacLine(state);
@@ -74,23 +74,23 @@ export function MacLine({ state, scrollY, lineBottom }: HomeScroll & { state: Pa
   return (
     <View accessibilityElementsHidden={under} importantForAccessibility={under ? "no-hide-descendants" : "auto"} className="-mb-3 px-5">
       <Link href="/settings" asChild>
-        <Pressable accessibilityRole="button" accessibilityLabel={line.label} className="self-start pb-4 active:opacity-60">
+        <Pressable accessibilityRole="button" accessibilityLabel={line.label} className="self-start pb-4 pt-2 active:opacity-60">
           <View
-            className="flex-row items-center gap-2"
+            className="flex-row items-center gap-3"
             onLayout={(event) => {
               const { y, height } = event.nativeEvent.layout;
               lineBottom.value = y + height;
             }}
           >
-            <View className="w-4 items-center">
+            <View className="w-7 items-center">
               <LinkDot tone={line.tone} />
             </View>
             <View className="shrink flex-row">
-              <Text numberOfLines={1} className="shrink text-sm text-ink-4">
+              <Text numberOfLines={1} className="shrink text-detail text-ink-4">
                 {line.name}
               </Text>
               {line.status ? (
-                <Text className="text-sm text-ink-4">
+                <Text className="text-detail text-ink-4">
                   {" · "}
                   <StatusWords status={line.status} trouble={line.trouble} />
                 </Text>
@@ -106,8 +106,8 @@ export function MacLine({ state, scrollY, lineBottom }: HomeScroll & { state: Pa
 /** With no Mac: why the last one went, when the person did not forget it, with no dot, as there is no link to show. */
 export function LostLine({ lost }: { lost: LostMac }) {
   return (
-    <View className="px-5 pb-1">
-      <Text className="text-sm text-ink-2">{lostWords[lost.why](lost.macName)}</Text>
+    <View className="pb-1 pl-15 pr-5">
+      <Text className="text-detail text-ink-2">{lostWords[lost.why](lost.macName)}</Text>
     </View>
   );
 }

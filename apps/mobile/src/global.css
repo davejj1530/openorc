@@ -10,10 +10,17 @@
   --spacing-touch: 44px;
   --spacing-touch-row: 52px;
   /*
-   * The wordmark's step: the website's -0.02em tracking, in points, as React Native tracks. The cube that goes with it
-   * is sized in ui/Wordmark.tsx.
+   * The wordmark's step: the desktop's title-sm size with the website's -0.02em tracking, in points, as React Native
+   * tracks. The cube that goes with it is sized in ui/Wordmark.tsx.
    */
-  --text-wordmark: 20px;
-  --text-wordmark--line-height: 24px;
-  --text-wordmark--letter-spacing: -0.4px;
+  --text-wordmark: 22px;
+  --text-wordmark--line-height: 28px;
+  --text-wordmark--letter-spacing: -0.44px;
+  /*
+   * A second line at phone reading size: the desktop's md step on a line its 16 pt row titles (lg) can sit on, for
+   * where a thread works, counts and the Mac line.
+   */
+  --text-detail: 14px;
+  --text-detail--line-height: 18px;
+  --text-detail--letter-spacing: -0.14px;
 }

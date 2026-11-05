@@ -5,6 +5,7 @@ import type { DeviceSystem } from "./devices/system.js";
 import type { RemoteNetwork } from "./remote/remote-access.js";
 import type { BrainDoors } from "./services/cloud-brain-door.js";
 import type { BrainBundleSource, OpenBrainMachine } from "./services/cloud-brain-machine.js";
+import type { UpdateWait } from "./services/cloud-brain-update.js";
 import type { BrainChannel, CoordinatorDeps } from "./services/relocation-coordinator.js";
 import type { BrainEndpoint } from "./services/brain-link.js";
 import type { ProtectedSecretStore } from "./services/extraction-credentials.js";
@@ -98,6 +99,8 @@ export interface OpenOrcOptions {
   cloudBrainBundle?: () => Promise<BrainBundleSource | null>;
   /** Reaches the cloud brain's machine in place of Vercel, for tests. */
   cloudBrainMachine?: OpenBrainMachine;
+  /** How long a wake waits for a busy brain to restart onto its update; tests shorten it. */
+  cloudBrainUpdateWait?: UpdateWait;
   /** Reaches the cloud brain's door in place of Vercel, for tests. */
   cloudBrainDoors?: BrainDoors;
   /** Reaches a cloud brain for moving threads in place of CloudBrain, for tests. */

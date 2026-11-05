@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import {
   BRAIN_PROJECT,
-  BrainRefused,
   BrainUnavailable,
   brainKeyFrom,
   brainKeyText,
@@ -31,6 +30,7 @@ import type {
   Project,
 } from "@openorc/protocol";
 import { BrainCosts } from "./cloud-brain-cost.js";
+import { stopForUpdate, type UpdateWait } from "./cloud-brain-update.js";
 import { openMachine, shownMachine, type BrainBundleSource, type BrainMachineLike, type OpenBrainMachine } from "./cloud-brain-machine.js";
 import { BrainPhones } from "./cloud-brain-phones.js";
 import { SERVICE_NAMES, accessHere, accountOf, brainConnections, placeOf, provisionAt, reach, regionOf, serviceOf, threadCloud, threadSizes, type BrainConnections } from "./cloud-brain-place.js";
@@ -73,7 +73,11 @@ export interface CloudBrainDeps {
   signIns?: SignInSources;
   /** This Mac's agent CLI versions, which the brain is brought to at each wake; none unless given. */
   agentVersions?: () => Promise<AgentVersions>;
+  /** How long a wake waits for a busy brain to restart onto its update; a minute, asking every five seconds, unless given. */
+  updateWait?: UpdateWait;
 }
+
+const UPDATE_WAIT: UpdateWait = { waitMs: 5000, forMs: 60_000 };
 
 /**
  * The cloud brain as this Mac sets it up, keeps it on this build's brain and hands it sign-ins: its key, team, region,
@@ -594,13 +598,7 @@ export class CloudBrain {
     const installed = (await this.stored()).version;
     if (!installed || !brainVersionNewer(installed, running)) return;
     await this.updating(async () => {
-      try {
-        await machine.control({ op: "stop-for-update" });
-      } catch (error) {
-        // Work runs, or a brain from before such stops: it starts on the new one next time. Any other failure may have
-        // stopped it, so it starts again.
-        if (error instanceof BrainRefused) return;
-      }
+      if (!(await stopForUpdate(machine, this.deps.updateWait ?? UPDATE_WAIT))) return;
       const restarted = await this.start(machine);
       // What a fresh start runs is what the machine has, behind the record once its disk went back to an older
       // snapshot. Recorded, the next wake installs this build's brain again.

@@ -235,6 +235,8 @@ async function open(options: Partial<OpenOrcOptions> = {}): Promise<void> {
     },
     // Never Vercel's.
     cloudBrainDoors: new FakeDoors(() => brain.calls),
+    // A brain that refuses the restart is asked once, unless a test waits for it.
+    cloudBrainUpdateWait: { waitMs: 1, forMs: 0 },
     ...options,
   });
 }
@@ -518,6 +520,23 @@ describe("the cloud brain from the Mac", () => {
       brain.calls = [];
       await rpc("cloud.brain.wake", {});
       expect(asked()).toEqual(["wake", "control stop-for-update", "wake", "status"]);
+      expect(brain.running).toBe(NEW);
+    });
+
+    it("waits for a brain busy for a moment, as right after a failed start, and restarts it onto the new one", async () => {
+      await core.close();
+      await open({ cloudBrainUpdateWait: { waitMs: 5, forMs: 2000 } });
+      await setUpOn(NEW, { awake: true });
+      brain.refusesUpdate = BUSY;
+      const control = brain.control.bind(brain);
+      brain.control = async (request) => {
+        const answer = control(request);
+        if (request.op === "stop-for-update") brain.refusesUpdate = null;
+        return answer;
+      };
+      brain.calls = [];
+      await rpc("cloud.brain.wake", {});
+      expect(asked()).toEqual(["status", `provision ${NEW} archive sin1`, "wake", "control stop-for-update", "control stop-for-update", "wake", "status"]);
       expect(brain.running).toBe(NEW);
     });
 

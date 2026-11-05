@@ -77,6 +77,7 @@ function cloudBrain(
     // "cloud" too: the brain's region is where this Mac's sandboxes run unless another is chosen.
     changed: () => invalidate(["cloud-brain", "cloud"]),
     open: options.cloudBrainMachine ?? machineOpener(options.cloudRunnerFiles),
+    ...(options.cloudBrainUpdateWait ? { updateWait: options.cloudBrainUpdateWait } : {}),
     ...(options.cloudBrainDoors ? { doors: options.cloudBrainDoors } : {}),
   });
 }

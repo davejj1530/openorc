@@ -3,6 +3,8 @@ import type { AgentKind, PermissionPreset, RunMode, TaskPriority, WorkspaceMode 
 import { leadingText } from "./notice-text.js";
 
 export interface StartThreadInput {
+  /** The id its owner chose, as the cloud brain's Mac does; a new one unless given. */
+  id?: string;
   claudeAccountId?: string;
   projectId: string;
   workingDirectory?: string;

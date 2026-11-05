@@ -22,6 +22,7 @@ import { claudeAccounts, remoteDevices, threads } from "@openorc/db";
 import { commitAll, git, run, useGitHubSignIn } from "@openorc/git";
 import { NO_SANDBOX } from "./awake.js";
 import { controlHandlers, retireSignedOut } from "./control-ops.js";
+import { BrainCloud, CLOUD_CHANNEL } from "./cloud.js";
 import { BrainGitHub, GITHUB_CHANNEL } from "./github.js";
 import { brainOptions } from "./options.js";
 import { SealedSecrets } from "./secrets.js";
@@ -42,6 +43,7 @@ let warnings: string[] = [];
 let invalidated: string[] = [];
 const transport = { push: (message: { type: string; keys?: string[] }) => void (message.type === "invalidate" && invalidated.push(...(message.keys ?? []))) };
 let github: BrainGitHub;
+let cloud: BrainCloud;
 
 beforeEach(async () => {
   root = await realpath(await mkdtemp(path.join(os.tmpdir(), "openorc-brain-ops-")));
@@ -55,7 +57,8 @@ beforeEach(async () => {
   warnings = [];
   github = new BrainGitHub(secrets.store(GITHUB_CHANNEL), (text) => warnings.push(text));
   useGitHubSignIn(() => github.environment());
-  core = await OpenOrc.create({ ...brainOptions({ layout, appDir: path.join(root, "app", "v1"), start, self: NO_SANDBOX, secrets, transport, runnerFiles: [] }), ephemeral: true });
+  cloud = new BrainCloud({ store: secrets.store(CLOUD_CHANNEL), start, self: NO_SANDBOX, warn: (text) => warnings.push(text) });
+  core = await OpenOrc.create({ ...brainOptions({ layout, appDir: path.join(root, "app", "v1"), start, cloud, secrets, transport, runnerFiles: [] }), ephemeral: true });
   stops = 0;
   answering = false;
 });
@@ -66,7 +69,7 @@ afterEach(async () => {
   await rm(root, { recursive: true, force: true });
 });
 
-const ops = () => controlHandlers({ core, key: start.key, layout, github, stop: () => stops++, answering: () => answering });
+const ops = () => controlHandlers({ core, key: start.key, layout, github, cloud, stop: () => stops++, answering: () => answering });
 
 const GH_TOKEN = "gho_handedOverFixtureToken0123456789";
 const MEMORY_KEY = "sk-ant-api03-handed-over-memory-fixture-0123456789";
@@ -168,18 +171,20 @@ describe("control requests on the brain's core", () => {
   });
 
   it("says which sign-ins it holds besides Claude's, so the Mac takes its word over its own record", async () => {
-    expect(await ops()({ op: "sign-ins" })).toEqual({ codex: null, github: null, push: null, memory: null, opencode: null });
+    expect(await ops()({ op: "sign-ins" })).toEqual({ codex: null, github: null, push: null, memory: null, opencode: null, cloud: null });
     const signIn = { token: GH_TOKEN, name: null, email: "fixture@example.com" };
     const pem = generateKeyPairSync("ec", { namedCurve: "prime256v1" }).privateKey.export({ format: "pem", type: "pkcs8" }).toString();
     const codex = { id: "mac-login-1", mode: "chatgpt", auth: codexAuth("first", 0), email: null, plan: null } as const;
     const keys = [{ provider: "openrouter", key: "sk-or-fixture-key" }];
-    await ops()(sealHandover(start.key, { codex, github: signIn, push: { keyId: "ABC123DEFG", pem }, memory: { apiKey: MEMORY_KEY }, opencode: { keys } }));
+    const cloud = { service: "agent37", agent37: { key: "sk_live_fixture", cpu: 2, memory: 4 }, vercel: null } as const;
+    await ops()(sealHandover(start.key, { codex, github: signIn, push: { keyId: "ABC123DEFG", pem }, memory: { apiKey: MEMORY_KEY }, opencode: { keys }, cloud }));
     expect(await ops()({ op: "sign-ins" })).toEqual({
       codex: "mac-login-1",
       github: signInPrint({ email: "fixture@example.com", name: null, token: GH_TOKEN }),
       push: "ABC123DEFG",
       memory: signInPrint({ apiKey: MEMORY_KEY }),
       opencode: signInPrint({ keys }),
+      cloud: signInPrint(cloud),
     });
   });
 

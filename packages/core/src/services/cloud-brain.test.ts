@@ -244,6 +244,8 @@ async function setUp(): Promise<void> {
   expect((await rpc("cloud.brain.create", { region: "sin1" })).state).toBe("setting-up");
   await vi.waitFor(async () => expect((await status()).state).toBe("ready"), { timeout: 5000 });
 }
+/** What this Mac asked of the brain's machine, less the read of what the brain holds that follows each wake in the background. */
+const asked = () => brain.calls.filter((call) => call !== "control sign-ins");
 const stored = () => JSON.parse(record.saved.at(-1) || "null") as { key: string; region: string; teamId: string } | null;
 
 /** Stand-in agent CLIs on this Mac that only say their versions, which the brain is brought to. */
@@ -284,7 +286,7 @@ describe("the cloud brain from the Mac", () => {
     core.claudeAccounts.update({ id: old.id, enabled: false });
     expect(await status()).toEqual({ state: "none", error: null });
     await setUp();
-    expect(brain.calls).toEqual(["provision v1 archive sin1", "wake", "control agent-versions", "control handover", "status"]);
+    expect(asked()).toEqual(["provision v1 archive sin1", "wake", "control agent-versions", "control handover", "status"]);
     // Its agent CLIs are brought to this Mac's as it starts; later wakes ask only once one changed.
     expect(brain.agentVersions).toEqual([{ claude: "2.1.317", codex: "0.166.0", opencode: "2.0.11" }]);
     expect(brain.access[0]).toEqual({ service: "vercel", token: VERCEL_TOKEN, teamId: "team_fixture" });
@@ -474,7 +476,7 @@ describe("the cloud brain from the Mac", () => {
     it("installs this build's newer brain before waking it, so the brain starts on it, then nothing more", async () => {
       await setUpOn(NEW);
       await rpc("cloud.brain.wake", {});
-      expect(brain.calls).toEqual(["status", `provision ${NEW} archive sin1`, "wake", "status"]);
+      expect(asked()).toEqual(["status", `provision ${NEW} archive sin1`, "wake", "status"]);
       expect(brain.running).toBe(NEW);
       expect(stored()).toMatchObject({ version: NEW });
       brain.state = "stopped";
@@ -501,7 +503,7 @@ describe("the cloud brain from the Mac", () => {
       expect([brain.installed, brain.running, stored()]).toEqual([NEW, NEW, expect.objectContaining({ version: NEW })]);
       brain.calls = [];
       await rpc("cloud.brain.wake", {});
-      expect(brain.calls).toEqual(["wake", "status"]);
+      expect(asked()).toEqual(["wake", "status"]);
     });
 
     it("restarts a brain running an older one onto the new one only once nothing would be cut short", async () => {
@@ -515,7 +517,7 @@ describe("the cloud brain from the Mac", () => {
       brain.refusesUpdate = null;
       brain.calls = [];
       await rpc("cloud.brain.wake", {});
-      expect(brain.calls).toEqual(["wake", "control stop-for-update", "wake", "status"]);
+      expect(asked()).toEqual(["wake", "control stop-for-update", "wake", "status"]);
       expect(brain.running).toBe(NEW);
     });
 
@@ -534,15 +536,15 @@ describe("the cloud brain from the Mac", () => {
       brain.running = OLD;
       brain.calls = [];
       await rpc("cloud.brain.wake", {});
-      expect(brain.calls).toEqual(["wake", "control stop-for-update", "wake", "status"]);
+      expect(asked()).toEqual(["wake", "control stop-for-update", "wake", "status"]);
       expect(stored()).toMatchObject({ version: OLD });
       brain.calls = [];
       await rpc("cloud.brain.wake", {});
-      expect(brain.calls).toEqual(["status", `provision ${NEW} archive sin1`, "wake", "control stop-for-update", "wake", "status"]);
+      expect(asked()).toEqual(["status", `provision ${NEW} archive sin1`, "wake", "control stop-for-update", "wake", "status"]);
       expect(brain.running).toBe(NEW);
       brain.calls = [];
       await rpc("cloud.brain.wake", {});
-      expect(brain.calls).toEqual(["wake", "status"]);
+      expect(asked()).toEqual(["wake", "status"]);
     });
 
     it("restarts an idle brain running an older one when set up again, showing the setup's own steps meanwhile", async () => {
@@ -556,7 +558,7 @@ describe("the cloud brain from the Mac", () => {
       expect(await status()).toEqual({ state: "setting-up", service: "vercel", region: "sin1", step: "start" });
       restart!();
       await vi.waitFor(async () => expect((await status()).state).toBe("ready"));
-      expect(brain.calls.filter((call) => call !== "status")).toEqual([`provision ${NEW} archive sin1`, "wake", "control stop-for-update", "wake", "control handover"]);
+      expect(asked().filter((call) => call !== "status")).toEqual([`provision ${NEW} archive sin1`, "wake", "control stop-for-update", "wake", "control handover"]);
       expect(brain.running).toBe(NEW);
     });
 
@@ -685,7 +687,7 @@ describe("the cloud brain from the Mac", () => {
       await choose(app.id, true);
       const head = git(app.folder, "rev-parse", "main");
       await vi.waitFor(() => expect(records()).toEqual([{ id: app.id, brainId: `brain-${app.id}`, branch: "main", sent: head, head, threads: 0, error: null, settings: expect.any(String) }]));
-      expect(brain.calls.filter((call) => call !== "status")).toEqual(["wake", "control projects", "import app whole", "control project-settings"]);
+      expect(asked().filter((call) => call !== "status")).toEqual(["wake", "control projects", "import app whole", "control project-settings"]);
       const copy = brain.copy(app.id, "app");
       expect(git(copy, "rev-parse", "main")).toBe(head);
       expect(git(copy, "remote", "get-url", "origin")).toBe("https://github.com/me/app.git");
@@ -1193,7 +1195,7 @@ describe("the cloud brain on Agent37", () => {
     doors = new FakeDoors(() => brain.calls);
     await core.close();
     // Vercel is connected too: the brain goes where Settings sends new cloud machines.
-    await open({ cloudAgent37: async () => AGENT37, cloudService: "agent37", cloudBrainBundle: bundle, cloudBrainDoors: doors });
+    await open({ cloudAgent37: async () => AGENT37, cloudService: async () => "agent37" as const, cloudBrainBundle: bundle, cloudBrainDoors: doors });
   });
 
   it("sets up where new cloud machines go, with no region and no door, its threads in the size Settings chose", async () => {

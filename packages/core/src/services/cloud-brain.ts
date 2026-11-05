@@ -33,13 +33,13 @@ import type {
 import { BrainCosts } from "./cloud-brain-cost.js";
 import { openMachine, shownMachine, type BrainBundleSource, type BrainMachineLike, type OpenBrainMachine } from "./cloud-brain-machine.js";
 import { BrainPhones } from "./cloud-brain-phones.js";
-import { SERVICE_NAMES, accessHere, accountOf, brainConnections, placeOf, provisionAt, reach, regionOf, serviceOf, threadSizes, type BrainConnections } from "./cloud-brain-place.js";
+import { SERVICE_NAMES, accessHere, accountOf, brainConnections, placeOf, provisionAt, reach, regionOf, serviceOf, threadCloud, threadSizes, type BrainConnections } from "./cloud-brain-place.js";
 import { BrainRecord, type StoredBrain } from "./cloud-brain-record.js";
 import type { ClaudeCloudTokens } from "./claude-cloud-tokens.js";
 import { BrainDoorKeeper, vercelDoors, type BrainDoors } from "./cloud-brain-door.js";
-import { anyMoved, blocked, confirmCurrent, copyBranch, failedAt, freshCopy, hasThreads, keptOwn, seen, stale, switchedOn, type BrainProject } from "./cloud-brain-projects.js";
+import { anyMoved, confirmCurrent, copyBranch, failedAt, freshCopy, hasThreads, projectsShown, seen, stale, switchedOn, type BrainProject } from "./cloud-brain-projects.js";
 import { claudeToSend, sameSent, sent, type Sent } from "./cloud-brain-claude.js";
-import { NO_SIGN_INS, claimsSignIns, heardSignIns, signInChanges, signInsView, switchGitHub, type SignInRecord, type SignInSources } from "./cloud-brain-signins.js";
+import { NO_SIGN_INS, claimsSignIns, heardSignIns, signInChanges, signInsView, switchGitHub, type CloudSource, type SignInRecord, type SignInSources } from "./cloud-brain-signins.js";
 import { alignAgentVersions } from "./cloud-brain-versions.js";
 import { apiKeyAuth } from "./codex-cloud-login.js";
 import type { ProtectedSecretStore } from "./extraction-credentials.js";
@@ -58,7 +58,7 @@ export interface CloudBrainDeps {
   store: ProtectedSecretStore | undefined;
   tokens: Pick<ClaudeCloudTokens, "status" | "token">;
   /** The Vercel connection a brain on Vercel is made with. The brain keeps its own project on the team. */
-  vercel: () => Promise<{ token: string; teamId: string; vcpus?: number } | null>;
+  vercel: BrainConnections["vercel"];
   /** The Agent37 connection a brain on Agent37 is made with; none unless given. */
   agent37?: () => Promise<Agent37Connection | null>;
   /** The service a new brain is made on; Vercel while it is connected, unless given. */
@@ -143,6 +143,11 @@ export class CloudBrain {
     return stored && regionOf(stored);
   }
 
+  /** Installing this build's brain on its machine, as a wake does first after an update. */
+  get installingUpdate(): boolean {
+    return this.activity?.kind === "updating";
+  }
+
   /** A brain is set up, or setting up, from this Mac. */
   async exists(): Promise<boolean> {
     return (await this.record.read().catch(() => null)) !== null;
@@ -223,17 +228,7 @@ export class CloudBrain {
 
   /** This Mac's projects, Workspace aside, and which the brain has a copy of. Never wakes the brain. */
   async projects(): Promise<CloudBrainProject[]> {
-    const records = new Map(((await this.record.read().catch(() => null))?.projects ?? []).map((record) => [record.id, record]));
-    const listed = projects.list(this.deps.db);
-    // A project removed from this Mac's list keeps its copy until switched off here.
-    const unlisted = [...records.keys()].filter((id) => !listed.some((project) => project.id === id)).flatMap((id) => projects.get(this.deps.db, id) ?? []);
-    return Promise.all(
-      [...listed, ...unlisted].map(async (project) => {
-        const record = records.get(project.id);
-        const shown = { on: record !== undefined, blocked: await blocked(project, record), sending: this.sendingProject === project.id, kept: record ? keptOwn(record) : false };
-        return { id: project.id, name: project.name, ...shown, error: record?.error ?? null };
-      }),
-    );
+    return projectsShown(this.deps.db, (await this.record.read().catch(() => null))?.projects ?? [], this.sendingProject);
   }
 
   /**
@@ -278,11 +273,7 @@ export class CloudBrain {
 
   /** Starts the brain unless it runs, and sends sign-ins that changed. A failure shows in the status. */
   async wake(): Promise<void> {
-    await this.run({ kind: "waking" }, async () => {
-      const machine = await this.machine();
-      await this.wakeUp(machine);
-      if (await this.behind()) await this.send(machine);
-    }).catch(() => undefined);
+    await this.run({ kind: "waking" }, async () => this.wakeUp(await this.machine())).catch(() => undefined);
   }
 
   /** Wakes the brain and asks it for a phone pairing code. A failure shows in the status too, since it can end setup. */
@@ -298,11 +289,7 @@ export class CloudBrain {
 
   /** Sends the sign-ins, waking the brain. A failure shows in the status. */
   async handover(): Promise<void> {
-    await this.run({ kind: "sending" }, async () => {
-      const machine = await this.machine();
-      await this.wakeUp(machine);
-      await this.send(machine);
-    }).catch(() => undefined);
+    await this.run({ kind: "sending" }, async () => this.wakeUp(await this.machine(), true)).catch(() => undefined);
   }
 
   /** What the brain signs in with besides Claude. Never wakes the brain. */
@@ -339,10 +326,7 @@ export class CloudBrain {
       const mac = on ? await this.sources().github(true) : null;
       if (mac && "blocked" in mac) throw new Error(mac.blocked);
       await this.record.write(switchGitHub(await this.stored(), on));
-      if (!(await this.behind())) return;
-      const machine = await this.machine();
-      await this.wakeUp(machine);
-      await this.send(machine);
+      if (await this.behind()) await this.wakeUp(await this.machine());
     }).catch(() => undefined);
   }
 
@@ -376,11 +360,7 @@ export class CloudBrain {
   signInsChanged(): void {
     void this.serialize(async () => {
       if (!(await this.record.read())?.ready || !(await this.behind())) return;
-      await this.tracked({ kind: "sending" }, async () => {
-        const machine = await this.machine();
-        await this.wakeUp(machine);
-        await this.send(machine);
-      });
+      await this.tracked({ kind: "sending" }, async () => this.wakeUp(await this.machine()));
     }).catch(() => undefined);
   }
 
@@ -389,9 +369,22 @@ export class CloudBrain {
     this.refreshDoor();
   }
 
-  /** The Vercel connection's token or size changed: a Vercel brain's door takes them, since it wakes the brain with them. */
-  vercelChanged(): void {
+  /**
+   * A connection, a size or "Run on" changed: a running brain takes where its new threads run at once, an asleep one at
+   * its next wake, so this never wakes it. A Vercel brain's door takes the token and size, since it wakes the brain with them.
+   */
+  cloudChanged(): void {
     this.refreshDoor();
+    void this.serialize(async () => {
+      const stored = await this.record.read();
+      if (!stored?.ready || !(await this.behind())) return;
+      await this.send(await this.machine()).catch((error: unknown) => {
+        if (!(error instanceof BrainUnavailable)) throw error;
+      });
+    }).catch(async (error: unknown) => {
+      this.error = await this.scrub(error);
+      this.changed();
+    });
   }
 
   /**
@@ -472,8 +465,9 @@ export class CloudBrain {
   /**
    * Starts the brain unless it runs, on this build's brain when that is newer than the one its machine has: installed
    * first, so the brain starts on it. Never installs an older one; a failed update leaves the brain on what it has.
+   * Then hands over what changed since it last took it, or everything with `sendAll`.
    */
-  private async wakeUp(machine: BrainMachineLike): Promise<void> {
+  private async wakeUp(machine: BrainMachineLike, sendAll = false): Promise<void> {
     await this.update(machine).catch(async (error: unknown) => {
       this.error = `The cloud brain could not be updated. ${await this.scrub(error)}`;
     });
@@ -481,6 +475,8 @@ export class CloudBrain {
     // One that failed is asked again at the next wake; a move meanwhile refuses in words if the versions differ.
     await this.alignAgents(machine).catch(() => undefined);
     this.refreshAfter();
+    // Before whoever woke it asks anything: a thread it starts next runs where "Run on" says now.
+    if (sendAll || (await this.behind())) await this.send(machine);
   }
 
   /**
@@ -663,7 +659,7 @@ export class CloudBrain {
     const stored = await this.stored();
     const accounts = await this.claude();
     const handed: HandoverClaudeAccount[] = accounts.map(({ id, name, default: isDefault, token }) => ({ id, name, default: isDefault, token }));
-    const others = (await this.behindUpdate(stored)) ? null : await signInChanges(stored, this.sources());
+    const others = (await this.behindUpdate(stored)) ? null : await signInChanges(stored, this.sources(stored));
     await machine.control(sealHandover(brainKeyFrom(stored.key), { claude: { accounts: handed }, ...others?.handover }));
     const now = { ...(await this.stored()), claude: accounts.map(sent) };
     await this.record.write(others ? others.took(now) : now);
@@ -689,11 +685,13 @@ export class CloudBrain {
     const stored = await this.record.read();
     if (!stored) return false;
     if (!sameSent((await this.claude()).map(sent), stored.claude)) return true;
-    return Object.keys((await signInChanges(stored, this.sources())).handover).length > 0;
+    return Object.keys((await signInChanges(stored, this.sources(stored))).handover).length > 0;
   }
 
-  private sources(): SignInSources {
-    return this.deps.signIns ?? NO_SIGN_INS;
+  /** This Mac's sign-ins, with where the threads of the brain set up as `stored` run. */
+  private sources(stored?: StoredBrain): SignInSources & { cloud?: CloudSource } {
+    const sources = this.deps.signIns ?? NO_SIGN_INS;
+    return stored ? { ...sources, cloud: () => threadCloud(stored, this.connections) } : sources;
   }
 
   private claude(): Promise<(Sent & { token: string })[]> {

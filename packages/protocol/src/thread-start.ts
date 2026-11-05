@@ -4,9 +4,17 @@ import { PermissionPreset, RunMode, WorkspaceMode } from "./domain.js";
 import { AgentKind } from "./events.js";
 import { ExecutionTarget } from "./execution-target.js";
 
+/** Why a start that names its thread's id is refused: that thread exists. */
+export const THREAD_EXISTS = "That conversation already exists.";
+
 /** Creates the thread and starts its first turn in one step. */
 export const ThreadStartParams = z
   .object({
+    /**
+     * The thread's id, chosen by the cloud brain's own Mac so its windows show the thread before the brain has it. Only
+     * that Mac sets one; a phone's start with one is refused, and so is one naming a thread that exists.
+     */
+    id: z.string().uuid().optional(),
     claudeAccountId: ClaudeAccountId.optional(),
     projectId: z.string(),
     workingDirectory: z.string().min(1).max(4096).optional(),

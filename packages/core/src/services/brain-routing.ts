@@ -1,7 +1,7 @@
 import type { Db } from "@openorc/db";
 import { fromBase64Url, linkUrl } from "@openorc/link";
 import { nodeCrypto } from "@openorc/link/node";
-import type { RpcRequest } from "@openorc/protocol";
+import type { CloudService, RpcRequest } from "@openorc/protocol";
 import type { Logger, RpcReply, Transport } from "../transport.js";
 import { BrainLink, type BrainEndpoint, type ProjectMapping } from "./brain-link.js";
 import { BrainMirrors } from "./brain-mirrors.js";
@@ -67,6 +67,8 @@ export class BrainRouting {
     log: Logger;
     memory: BrainSyncDeps["memory"];
     textGeneration: BrainSyncDeps["textGeneration"];
+    /** The service the brain's new threads run on, as Settings says. */
+    service(): Promise<CloudService | null>;
     endpoint?: BrainEndpoint;
   }) {
     const { db, brain, windows, local, notificationsOn, log } = deps;
@@ -86,7 +88,19 @@ export class BrainRouting {
       changed: (id) => windows.push({ type: "invalidate", keys: ["threads", `thread:${id}`, "files", "workspace-diff"] }),
       log,
     });
-    this.router = new BrainRouter({ db, link: this.link, mirrors: this.mirrors, local, windows, mapping: () => endpoint.projects(), notificationsOn, log });
+    this.router = new BrainRouter({
+      db,
+      link: this.link,
+      mirrors: this.mirrors,
+      local,
+      windows,
+      mapping: () => endpoint.projects(),
+      wake: () => endpoint.wake(),
+      updating: () => brain.installingUpdate,
+      service: deps.service,
+      notificationsOn,
+      log,
+    });
     this.endpoint = endpoint;
     this.windows = windows;
     this.log = log;
@@ -144,6 +158,7 @@ export class BrainRouting {
     }
     this.active = ready;
     if (ready) this.link.awoke();
+    this.router.starts.brainChanged();
   }
 
   /** The brain was removed: its kept lists and this Mac's read-only copies of its threads go, and windows read again. */

@@ -79,6 +79,27 @@ it("shows the sandbox's setup as steps above the first message while it is prepa
   expect(screen.getByText("Add a footer")).toBeTruthy();
 });
 
+it("starts a thread on the cloud brain by waking it, then shows the brain's own setup, and a wake that failed like any", async () => {
+  const onBrain = (cloud: CloudThreadState): ThreadSummary => ({ ...cloudThread(cloud), worktreePath: null, owner: { brain: "cloud", reach: "waking", heardAt: 1 } });
+  const labels = () =>
+    within(screen.getByRole("list"))
+      .getAllByRole("listitem")
+      .map((row) => [row.textContent, row.dataset.state]);
+  show(onBrain({ provider: "agent37", state: "preparing", step: null, setup: false, error: null, brain: "updating" }));
+  expect(labels()).toEqual([
+    ["Updating the cloud brain", "running"],
+    ["Starting an Agent37 instance", "pending"],
+    ["Sending your code", "pending"],
+    ["Starting Claude", "pending"],
+  ]);
+  cleanup();
+  vi.mocked(core.call).mockResolvedValue([first]);
+  show(onBrain({ provider: "agent37", state: "failed", step: null, setup: false, error: "The cloud brain did not start. Agent37 is down." }));
+  expect(screen.getByRole("alert").textContent).toBe("The cloud brain did not start. Agent37 is down.");
+  fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("threads.sendQueued", { id: "thread", messageId: "first" }));
+});
+
 it("offers to try again with the waiting message when the sandbox failed", async () => {
   vi.mocked(core.call).mockResolvedValue(null);
   show(cloudThread({ ...preparing, state: "failed", step: null, error: "Vercel refused the sandbox: quota reached" }));

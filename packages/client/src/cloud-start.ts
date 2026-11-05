@@ -57,12 +57,14 @@ export function queueAfterStart(thread: ThreadSummary, runs: number): QueuedMess
   return startingInCloud(thread, runs) ? thread.queued.slice(1) : thread.queued;
 }
 
-export type CloudStartStep = CloudStep | "agent";
+export type CloudStartStep = "brain" | CloudStep | "agent";
 export type CloudStartStepState = "pending" | "running" | "done";
 
 const sandboxStart: Record<CloudThreadState["provider"], string> = { vercel: "Starting a Vercel sandbox", agent37: "Starting an Agent37 instance", local: "Starting the sandbox" };
+const brainStart: Record<NonNullable<CloudThreadState["brain"]>, string> = { waking: "Waking the cloud brain", updating: "Updating the cloud brain" };
 
 function stepLabel(step: CloudStartStep, thread: StartingCloudThread): string {
+  if (step === "brain") return brainStart[thread.cloud.brain ?? "waking"];
   if (step === "sandbox") return sandboxStart[thread.cloud.provider];
   if (step === "code") return "Sending your code";
   if (step === "setup") return "Running the setup script";
@@ -74,10 +76,18 @@ function stepState(index: number, current: number): CloudStartStepState {
   return index === current ? "running" : "pending";
 }
 
-/** The sandbox's setup as steps: every step before the current one is done; the agent starts once the sandbox is ready. */
+function currentStep(cloud: CloudThreadState): CloudStartStep {
+  if (cloud.brain) return "brain";
+  return cloud.state === "ready" ? "agent" : (cloud.step ?? "sandbox");
+}
+
+/**
+ * The sandbox's setup as steps: every step before the current one is done; the agent starts once the sandbox is ready. A
+ * thread on the cloud brain first has the brain woken, and updated when this Mac carries a newer one.
+ */
 export function cloudStartSteps(thread: StartingCloudThread): { step: CloudStartStep; label: string; state: CloudStartStepState }[] {
-  const order: CloudStartStep[] = ["sandbox", "code", ...(thread.cloud.setup ? (["setup"] as const) : []), "agent"];
-  const current = order.indexOf(thread.cloud.state === "ready" ? "agent" : (thread.cloud.step ?? "sandbox"));
+  const order: CloudStartStep[] = [...(thread.owner?.brain === "cloud" ? (["brain"] as const) : []), "sandbox", "code", ...(thread.cloud.setup ? (["setup"] as const) : []), "agent"];
+  const current = order.indexOf(currentStep(thread.cloud));
   return order.map((step, index) => ({ step, label: stepLabel(step, thread), state: stepState(index, current) }));
 }
 
@@ -112,13 +122,14 @@ export type MoveCard =
  * wakes, or after a move this Mac asked for was refused, until it is tried again or the conversation does something
  * else; null otherwise. A move whose step is not known yet is at its first.
  */
-export function threadMoveCard(thread: Pick<ThreadSummary, "moving" | "owner" | "moveRefused" | "lastActivityAt">): MoveCard | null {
+export function threadMoveCard(thread: Pick<ThreadSummary, "moving" | "owner" | "moveRefused" | "lastActivityAt" | "cloud">): MoveCard | null {
   const moving = thread.moving;
   const refused = thread.moveRefused;
   if (!moving && refused && thread.lastActivityAt <= refused.at)
     return { kind: "refused", title: "Didn't move", reason: refused.reason, retry: refused.to === "cloud" ? "cloud.move" : "cloud.bringToMac" };
   if (!moving) {
-    if (thread.owner?.brain !== "cloud" || thread.owner.reach !== "waking") return null;
+    // A thread starting there shows the wake among its start's steps.
+    if (thread.owner?.brain !== "cloud" || thread.owner.reach !== "waking" || thread.cloud?.brain) return null;
     return { kind: "moving", title: null, steps: [{ step: "waking", label: "Waking the cloud brain", state: "running" }] };
   }
   const order = MOVE_ORDER[moving.to];

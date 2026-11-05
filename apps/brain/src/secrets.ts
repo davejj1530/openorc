@@ -18,7 +18,7 @@ export const BRAIN_SECRETS = {
   opencodeCloudSecrets: "opencode-cloud",
   memorySecrets: "memory",
   githubSecrets: "github",
-  // The Vercel connection arrives with every start and is held in memory only.
+  // The connections arrive with every start, and where threads run by handover, in its own channel (cloud.ts).
   cloudSecrets: null,
   // Slack stays on the Mac.
   slackSecrets: null,

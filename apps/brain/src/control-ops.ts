@@ -19,6 +19,7 @@ import {
 import type { OpenOrc } from "@openorc/core";
 import { claudeAccounts, projects, redact, threads } from "@openorc/db";
 import type { Project } from "@openorc/protocol";
+import type { BrainCloud } from "./cloud.js";
 import type { BrainGitHub } from "./github.js";
 
 export interface ControlContext {
@@ -26,6 +27,7 @@ export interface ControlContext {
   key: BrainKey;
   layout: BrainLayout;
   github: BrainGitHub;
+  cloud: Pick<BrainCloud, "take" | "print">;
   /** Closes the brain once the reply is on its way. */
   stop(): void;
   /** A control request is at work or waiting its turn. */
@@ -69,7 +71,8 @@ export async function retireSignedOut(core: OpenOrc): Promise<void> {
   }
 }
 
-type Take<K extends HandoverKind> = (context: Pick<ControlContext, "core" | "github">, value: HandoverValues[K]) => Promise<unknown>;
+type Take<K extends HandoverKind> = (context: TakeContext, value: HandoverValues[K]) => Promise<unknown>;
+type TakeContext = Pick<ControlContext, "core" | "github" | "cloud">;
 
 /** Where each handed-over sign-in goes on the brain: through the core service that owns it, as on the Mac. */
 const HANDOVER: { [K in HandoverKind]: Take<K> } = {
@@ -82,11 +85,13 @@ const HANDOVER: { [K in HandoverKind]: Take<K> } = {
   memory: ({ core }, value) => core.memory.takeApiKey(value?.apiKey ?? null),
   // Read by a cloud turn only for the provider of its model, and handed to that turn alone.
   opencode: ({ core }, value) => core.openCodeCloudKeys.adopt(value?.keys ?? []),
+  // The core's sandbox services ask it at each use: threads started from now on run where it says.
+  cloud: ({ cloud }, value) => cloud.take(value),
 };
 const HANDOVER_KINDS = Object.keys(HANDOVER) as HandoverKind[];
 
 /** Applies one kind when the handover carries it. */
-async function take<K extends HandoverKind>(kind: K, values: BrainHandover, context: Pick<ControlContext, "core" | "github">): Promise<boolean> {
+async function take<K extends HandoverKind>(kind: K, values: BrainHandover, context: TakeContext): Promise<boolean> {
   const value: HandoverValues[K] | undefined = values[kind];
   if (value === undefined) return false;
   await HANDOVER[kind](context, value);
@@ -198,7 +203,7 @@ function relocationHandlers(core: OpenOrc, layout: BrainLayout): Pick<Handlers, 
 }
 
 /** Each control request onto services the core already has. Handed-over values are never logged or repeated. */
-export function controlHandlers({ core, key, layout, github, stop, answering }: ControlContext): (request: Extract<BrainControlRequest, { op: CoreOp }>) => Promise<unknown> {
+export function controlHandlers({ core, key, layout, github, cloud, stop, answering }: ControlContext): (request: Extract<BrainControlRequest, { op: CoreOp }>) => Promise<unknown> {
   const handlers: Handlers = {
     pair: async () => {
       const { url, expiresAt } = await core.remote.beginPairing();
@@ -207,7 +212,7 @@ export function controlHandlers({ core, key, layout, github, stop, answering }: 
     handover: async (request) => {
       const values = openHandover(key, request);
       const applied: HandoverKind[] = [];
-      for (const kind of HANDOVER_KINDS) if (await take(kind, values, { core, github })) applied.push(kind);
+      for (const kind of HANDOVER_KINDS) if (await take(kind, values, { core, github, cloud })) applied.push(kind);
       return { applied };
     },
     "import-project": (request) => importProject(core, layout, request),
@@ -234,6 +239,7 @@ export function controlHandlers({ core, key, layout, github, stop, answering }: 
         push: (await core.remote.status()).push.keyId,
         memory: apiKey && signInPrint({ apiKey }),
         opencode: keys.length ? signInPrint({ keys }) : null,
+        cloud: cloud.print(),
       };
     },
     stop: async () => {

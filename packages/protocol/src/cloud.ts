@@ -25,6 +25,8 @@ export const CloudThreadState = z.object({
   /** Whether preparing includes the project's setup script. */
   setup: z.boolean(),
   error: z.string().nullable(),
+  /** A thread this Mac started on its cloud brain, before the brain has it: the brain waking for it, or being updated first. */
+  brain: z.enum(["waking", "updating"]).optional(),
 });
 export type CloudThreadState = z.infer<typeof CloudThreadState>;
 

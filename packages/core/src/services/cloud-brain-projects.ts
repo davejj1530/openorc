@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { brainTakesProject, branchHead, bundleBranch, type BrainControlResults, type BrainMachine, type CopySettings } from "@openorc/cloud";
 import { projects, type Db } from "@openorc/db";
 import { defaultBranch, originUrl } from "@openorc/git";
-import type { Project } from "@openorc/protocol";
+import type { CloudBrainProject, Project } from "@openorc/protocol";
 import { projectGit } from "./project-git.js";
 
 /** A Mac project switched on for the cloud brain, kept in the brain's record so removing the brain forgets it. */
@@ -43,6 +43,21 @@ export function seen(record: BrainProject, copies: BrainControlResults["projects
 export const keptOwn = (project: BrainProject) => project.head !== null && project.head !== project.sent;
 
 export const hasThreads = "It has threads on the cloud brain.";
+
+/** This Mac's projects, Workspace aside, and which the brain has a copy of, as Settings lists them. */
+export async function projectsShown(db: Db, kept: readonly BrainProject[], sending: string | null): Promise<CloudBrainProject[]> {
+  const records = new Map(kept.map((record) => [record.id, record]));
+  const listed = projects.list(db);
+  // A project removed from this Mac's list keeps its copy until switched off here.
+  const unlisted = [...records.keys()].filter((id) => !listed.some((project) => project.id === id)).flatMap((id) => projects.get(db, id) ?? []);
+  return Promise.all(
+    [...listed, ...unlisted].map(async (project) => {
+      const record = records.get(project.id);
+      const shown = { on: record !== undefined, blocked: await blocked(project, record), sending: sending === project.id, kept: record ? keptOwn(record) : false };
+      return { id: project.id, name: project.name, ...shown, error: record?.error ?? null };
+    }),
+  );
+}
 
 /** Why a project's switch cannot move now: on, the brain has threads in its copy; off, it cannot have a copy. */
 export async function blocked(project: Project, record: BrainProject | undefined): Promise<string | null> {

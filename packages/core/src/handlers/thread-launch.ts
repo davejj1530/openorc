@@ -23,6 +23,7 @@ export function createThreadLaunchHandlers({
     "threads.implementPlan": ({ id, planId, permissionMode }) => threadService.implementPlan(id, planId, permissionMode),
     "threads.exportPlan": ({ id, planId, filename }) => threadService.exportPlan(id, planId, filename),
     "threads.start": ({
+      id,
       projectId,
       workingDirectory,
       agent,
@@ -57,6 +58,7 @@ export function createThreadLaunchHandlers({
       const selected = executionTarget?.settings;
       const executable = ExecutableAgent.parse(selected?.agent ?? agent);
       return threadService.start({
+        ...(id ? { id } : {}),
         projectId,
         claudeAccountId,
         ...(workingDirectory ? { workingDirectory } : {}),

@@ -47,6 +47,12 @@ it("shows a starting cloud thread's setup as steps over the message that waits f
   expect(screen.getByText("Add a footer with the links")).toBeTruthy();
 });
 
+it("shows a thread on the cloud brain with the brain's wake done before its own setup", () => {
+  const onBrain = { ...starting(cloud({ provider: "agent37", step: "sandbox", setup: false })), owner: { brain: "cloud", reach: "live", heardAt: 1 } } as const;
+  render(<CloudStart thread={onBrain} />, { wrapper: mac.phone!.wrapper });
+  for (const label of ["Waking the cloud brain", "Starting an Agent37 instance", "Sending your code", "Starting Claude"]) expect(screen.getByText(label)).toBeTruthy();
+});
+
 it("says why the setup failed, and Try again sends the waiting message again", async () => {
   const sendQueued = vi.fn(async () => base);
   mac.reads["threads.sendQueued"] = sendQueued;

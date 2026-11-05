@@ -19,6 +19,8 @@ export interface SignInRecord {
   memory?: string | null;
   /** The signInPrint of the OpenCode keys the brain holds; null while it holds none. */
   opencode?: string | null;
+  /** The signInPrint of where the brain's threads run, as it holds it; null while it holds none and runs them where it lives. */
+  cloud?: string | null;
 }
 
 export type MacGitHub = NonNullable<HandoverValues["github"]> | { blocked: string };
@@ -83,13 +85,22 @@ async function openCodeChange(sent: string | null | undefined, mac: () => Promis
   return (sent ?? null) === print ? null : { value: keys.length ? { keys } : null, print };
 }
 
+/** Where the brain's threads run, which follows Settings; null while nothing is connected, so the brain keeps what it has. */
+export type CloudSource = () => Promise<HandoverValues["cloud"] | null>;
+
+async function cloudChange(sent: string | null | undefined, mac: CloudSource | undefined): Promise<{ value: HandoverValues["cloud"]; print: string } | null> {
+  const value = mac ? await mac() : null;
+  const print = value && signInPrint(value);
+  return value && print && print !== sent ? { value, print } : null;
+}
+
 /**
  * What to hand the brain, beside Claude's list, so it matches this Mac, and the record once it took that. The handover
  * is empty when it matches.
  */
 export async function signInChanges(
   record: SignInRecord,
-  sources: Pick<SignInSources, "github" | "push" | "memory" | "opencode">,
+  sources: Pick<SignInSources, "github" | "push" | "memory" | "opencode"> & { cloud?: CloudSource },
 ): Promise<{ handover: Others; took: <T extends SignInRecord>(record: T) => T }> {
   const handover: Others = {};
   const edits: Edit[] = [];
@@ -127,6 +138,13 @@ export async function signInChanges(
       taken.opencode = opencode.print;
     });
   }
+  const cloud = await cloudChange(record.cloud, sources.cloud);
+  if (cloud) {
+    handover.cloud = cloud.value;
+    edits.push((taken) => {
+      taken.cloud = cloud.print;
+    });
+  }
   const took = <T extends SignInRecord>(current: T): T => {
     const taken = { ...current };
     for (const edit of edits) edit(taken);
@@ -136,7 +154,7 @@ export async function signInChanges(
 }
 
 /** Whether the record says the brain holds any of them, so asking it could find one gone. */
-export const claimsSignIns = (record: SignInRecord): boolean => Boolean(record.codex || record.github?.sent || record.push || record.memory || record.opencode);
+export const claimsSignIns = (record: SignInRecord): boolean => Boolean(record.codex || record.github?.sent || record.push || record.memory || record.opencode || record.cloud);
 
 /** The record once the brain said what it holds: its word wins, as after its disk went back to an empty snapshot. */
 export function heardSignIns<T extends SignInRecord>(record: T, holds: BrainControlResults["sign-ins"]): T {
@@ -148,6 +166,7 @@ export function heardSignIns<T extends SignInRecord>(record: T, holds: BrainCont
   heard.push = holds.push;
   heard.memory = holds.memory;
   heard.opencode = holds.opencode ?? null;
+  heard.cloud = holds.cloud ?? null;
   return heard;
 }
 

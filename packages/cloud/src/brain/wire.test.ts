@@ -294,6 +294,22 @@ describe("handovers", () => {
     expect(error.field).toBe("apiKey");
   });
 
+  it("carry where the brain's threads run, with each service's connection, sealed; the brain says each kind it applied", () => {
+    const key = newBrainKey();
+    const cloud = { service: "agent37", agent37: { key: "sk_live_fixture", cpu: 2, memory: 4 }, vercel: { token: "vercel-token-fixture", teamId: "team_1", vcpus: 4, region: "fra1" } } as const;
+    const line = JSON.stringify(sealHandover(key, { cloud }));
+    expect(line).not.toMatch(/sk_live_fixture|vercel-token-fixture/);
+    const request = parseControlRequest(line);
+    if (request.op !== "handover") throw new Error("expected a handover");
+    expect(Object.keys(request.sealed)).toEqual(["cloud"]);
+    expect(openHandover(key, request)).toMatchObject({ cloud });
+    expect(refusal(() => openHandover(key, sealHandover(key, { cloud: { ...cloud, service: "local" as "vercel" } }))).field).toBe("service");
+    const applied = { applied: ["claude", "opencode", "cloud"] as const };
+    expect(parseControlReply("handover", encodeControlReply({ ok: true, result: { applied: [...applied.applied] } }))).toEqual({ ok: true, result: applied });
+    const holds = { codex: null, github: null, push: null, memory: null, opencode: null, cloud: signInPrint(cloud) };
+    expect(parseControlReply("sign-ins", encodeControlReply({ ok: true, result: holds }))).toEqual({ ok: true, result: holds });
+  });
+
   it("refuse a Codex login with an id the brain could not record, without repeating the login", () => {
     const key = newBrainKey();
     const error = refusal(() => openHandover(key, sealHandover(key, { codex: { id: "mac login/1", mode: "chatgpt", auth: "rt-fixture-secret", email: null, plan: null } })));

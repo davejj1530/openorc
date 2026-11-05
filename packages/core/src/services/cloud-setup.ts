@@ -46,7 +46,8 @@ function cloudSources(options: OpenOrcOptions, settings: CloudSettings): CloudSo
   const vercel = options.cloudCredentials ?? (async () => null);
   const agent37 = options.cloudAgent37 ?? (async () => null);
   const service = async (): Promise<CloudService | null> => {
-    if (options.cloudService) return options.cloudService;
+    const chosen = await options.cloudService?.();
+    if (chosen) return chosen;
     if (await vercel()) return "vercel";
     return (await agent37()) ? "agent37" : null;
   };

@@ -99,6 +99,8 @@ function threadUpdate({ patch }: RpcParams<"threads.update">): string | null {
   return phoneTitle(patch.title) ?? phoneSnooze(patch.snoozedUntil);
 }
 
+const NOT_FROM_PHONE = "This is not available from a phone.";
+
 /** Typed over REMOTE_METHODS: a method listed there without a guard here, or guarded but not listed, fails the build. */
 export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {
   "projects.list": allow,
@@ -116,7 +118,7 @@ export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {
   "agents.models": allow,
   "agents.availability": allow,
   // The cached list only: a refresh asks every account's CLI again, which is the Mac's Settings' to do.
-  "claude.accounts.list": ({ refresh }) => (refresh ? "This is not available from a phone." : null),
+  "claude.accounts.list": ({ refresh }) => (refresh ? NOT_FROM_PHONE : null),
   // Takes nothing and answers the shares and plans alone, shaped by the core: no email, token, path or CLI text.
   "providers.limits": allow,
   "app.settings.get": allow,
@@ -128,8 +130,12 @@ export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {
   "threads.movePreview": allow,
   "cloud.bringToMac": allow,
   "cloud.keep": allow,
-  "threads.start": (params, context) =>
-    params.workingDirectory !== undefined ? "Choose a folder for this conversation on your Mac." : (phoneTitle(params.title) ?? storedImages(params.attachments, context)),
+  "threads.start": (params, context) => {
+    if (params.workingDirectory !== undefined) return "Choose a folder for this conversation on your Mac.";
+    // Only the brain's own Mac names a thread's id, for the thread its windows show before the brain has it.
+    if (params.id !== undefined) return NOT_FROM_PHONE;
+    return phoneTitle(params.title) ?? storedImages(params.attachments, context);
+  },
   "threads.update": threadUpdate,
   // The core checks conversation ownership, active turns and account availability, as on the Mac.
   "threads.switchClaudeAccount": allow,
@@ -245,7 +251,7 @@ export type RemoteAdmission = { ok: true } | { ok: false; message: string };
  */
 const ownerGuards: Partial<{ [M in RemoteMethod]: Guard<M> }> = {
   "threads.update": allow,
-  "threads.start": (params, context) => remoteGuards["threads.start"]({ ...params, attachments: undefined }, context) ?? storedFiles(params.attachments, context),
+  "threads.start": ({ id: _id, ...params }, context) => remoteGuards["threads.start"]({ ...params, attachments: undefined }, context) ?? storedFiles(params.attachments, context),
   "runs.start": (params, context) => storedFiles(params.attachments, context),
   "runs.send": (params, context) => storedFiles(params.attachments, context),
   "threads.queue": (params, context) => storedFiles(params.attachments, context),
@@ -253,7 +259,7 @@ const ownerGuards: Partial<{ [M in RemoteMethod]: Guard<M> }> = {
 
 /** Admits one phone request, or one from the brain's own Mac, or says why not. Params a method's schema rejects pass through, so `handle` words the error. */
 export function admitRemoteRequest(method: string, params: unknown, context: GuardContext, from: "phone" | "owner" = "phone"): RemoteAdmission {
-  if (!isRemoteMethod(method)) return { ok: false, message: "This is not available from a phone." };
+  if (!isRemoteMethod(method)) return { ok: false, message: NOT_FROM_PHONE };
   const parsed = rpcParams[method].safeParse(params ?? {});
   if (!parsed.success) return { ok: true };
   const guard = (from === "owner" ? ownerGuards[method] : undefined) ?? remoteGuards[method];

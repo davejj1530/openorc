@@ -61,10 +61,12 @@ async function openBrain(): Promise<OpenOrc> {
   return quiet(core);
 }
 
+/** The wake a window's cloud start waits for; at once unless a test holds it. */
+let waking: Promise<void> = Promise.resolve();
 const endpoint: BrainEndpoint = {
   ready: async () => true,
   locate: async () => ({ url: `ws://127.0.0.1:${port}${linkPath("public", brainKey, nodeCrypto)}`, brainKey, ownerKeys: owner }),
-  wake: async () => undefined,
+  wake: () => waking,
   projects: async () => ({
     toCloud: (id) => (id === macProject.id ? brainProject.id : null),
     toMac: (id) => (id === brainProject.id ? macProject.id : null),
@@ -80,6 +82,7 @@ async function window<M extends RpcMethod>(method: M, params: RpcParams<M>): Pro
 beforeEach(async () => {
   root = await realpath(await mkdtemp(path.join(os.tmpdir(), "openorc-brain-start-")));
   windows = [];
+  waking = Promise.resolve();
   const checkout = path.join(root, "app");
   await mkdir(checkout);
   await git(checkout, ["init", "-q", "-b", "main"]);
@@ -109,12 +112,14 @@ afterEach(async () => {
   await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 });
 
-it("starts a new cloud thread from a Mac window on the brain, listed in the window at once, its first message run there", async () => {
+it("starts a new cloud thread from a Mac window on the brain, open at once, its first message and one sent meanwhile run there", async () => {
   await until(() => mac.brainRouting!.link.reach === "live");
   const heard = windows.length;
   await window("threads.list", {});
   await until(() => windows.slice(heard).some((push) => push.type === "invalidate" && push.keys.includes("threads")));
 
+  let woken!: () => void;
+  waking = new Promise((resolve) => (woken = resolve));
   const { thread } = (await window("threads.start", {
     projectId: macProject.id,
     cloud: true,
@@ -126,12 +131,24 @@ it("starts a new cloud thread from a Mac window on the brain, listed in the wind
     prompt: "Start in the cloud",
   })) as { thread: ThreadSummary };
 
-  expect(thread).toMatchObject({ projectId: macProject.id, worktreePath: null, owner: { brain: "cloud" } });
+  expect(thread).toMatchObject({ projectId: macProject.id, worktreePath: null, owner: { brain: "cloud" }, cloud: { state: "preparing", brain: "waking" } });
   expect(threads.get(mac.db, thread.id)).toBeNull();
-  expect(threads.get(brain.db, thread.id)).toMatchObject({ projectId: brainProject.id });
-  const rows = (await window("threads.list", {})) as ThreadSummary[];
-  expect(rows.find((row) => row.id === thread.id)).toMatchObject({ projectId: macProject.id, owner: { brain: "cloud", reach: "live" } });
+  expect(threads.get(brain.db, thread.id)).toBeNull();
+  expect(((await window("threads.list", {})) as ThreadSummary[]).find((row) => row.id === thread.id)).toMatchObject({ cloud: { brain: "waking" } });
+  await window("threads.queue", { id: thread.id, text: "Then say more" });
+  woken();
+
+  await until(() => threads.get(brain.db, thread.id) !== null);
+  expect(threads.get(brain.db, thread.id)).toMatchObject({ id: thread.id, projectId: brainProject.id });
+  // The brain's own row, under the same id, in place of the one shown while it started.
+  await vi.waitFor(async () => {
+    const row = ((await window("threads.list", {})) as ThreadSummary[]).find((each) => each.id === thread.id);
+    expect(row).toMatchObject({ projectId: macProject.id, owner: { brain: "cloud", reach: "live" } });
+    expect(row?.cloud?.brain).toBeUndefined();
+    expect(mac.brainRouting!.router.starts.rows(() => true)).toEqual([]);
+  });
   await until(() => turnsIn(log).some((turn) => turn.prompt.includes("Start in the cloud")), 30_000);
+  await until(() => turnsIn(log).some((turn) => turn.prompt.includes("Then say more")), 30_000);
   expect(await window("threads.get", { id: thread.id })).toMatchObject({ id: thread.id, projectId: macProject.id, owner: { brain: "cloud" } });
 
   // An image the window attached on this Mac is stored on the brain before the message naming it.

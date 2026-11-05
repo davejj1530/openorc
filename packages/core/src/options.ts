@@ -90,8 +90,8 @@ export interface OpenOrcOptions {
   cloudCredentials?: () => Promise<VercelConnection | null>;
   /** Overrides the Agent37 connection Settings keeps, as on a cloud brain on Agent37, whose start line names it. */
   cloudAgent37?: () => Promise<Agent37Connection | null>;
-  /** The service new cloud conversations run on, in place of the one Settings chose. */
-  cloudService?: CloudService;
+  /** The service new cloud conversations run on, in place of the one Settings chose; asked at each start. */
+  cloudService?: () => Promise<CloudService | null>;
   /** Keeps the cloud brain's key, team and region. Losing it loses the brain: only its key opens the brain's secrets. */
   cloudBrainSecrets?: ProtectedSecretStore;
   /** The cloud brain this build installs, looked up when Settings asks. Without one, no brain can be set up. */

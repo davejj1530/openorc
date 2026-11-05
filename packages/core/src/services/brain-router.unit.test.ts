@@ -19,7 +19,19 @@ function paged(rows: ThreadSummary[], params: { limit?: number; offset?: number 
   return sorted.slice(offset, params.limit ? offset + params.limit : undefined);
 }
 
-function harness(answers: { mac?: ThreadSummary[]; cloud?: ThreadSummary[]; cloudInbox?: InboxList; mirrors?: Record<string, string>; listMs?: number } = {}) {
+interface Answers {
+  mac?: ThreadSummary[];
+  cloud?: ThreadSummary[];
+  cloudInbox?: InboxList;
+  mirrors?: Record<string, string>;
+  listMs?: number;
+  /** How a wake for a window's cloud start goes. */
+  wake?: () => Promise<void>;
+  /** CloudBrain installs a newer brain meanwhile. */
+  updating?: boolean;
+}
+
+function harness(answers: Answers = {}) {
   const interest: string[][] = [];
   const windows: CorePush[] = [];
   const reaches: ((reach: OwnerReach) => void)[] = [];
@@ -41,7 +53,7 @@ function harness(answers: { mac?: ThreadSummary[]; cloud?: ThreadSummary[]; clou
       if (method === "attachments.save") return { path: `/brain/attachments/${sent.length}.png`, url: "" };
       if (method === "attachments.saveFile") return { path: `/brain/attachments/${sent.length}-${String(params["name"])}`, name: params["name"], bytes: 1 };
       if (method === "threads.start") {
-        const started = row("new-thread", 99, params["projectId"] as string);
+        const started = row(String(params["id"] ?? "new-thread"), 99, params["projectId"] as string);
         answers.cloud = [...(answers.cloud ?? []), started];
         return { thread: started, run: null };
       }
@@ -59,6 +71,9 @@ function harness(answers: { mac?: ThreadSummary[]; cloud?: ThreadSummary[]; clou
   const router = new BrainRouter({
     db,
     link: link as unknown as BrainLink,
+    wake: () => answers.wake?.() ?? Promise.resolve(),
+    updating: () => answers.updating ?? false,
+    service: async () => "agent37",
     mirrors: { folder: (id) => answers.mirrors?.[id] ?? null, isOpen: () => false, pull: async () => {} },
     local: async (request) => ({
       type: "rpc.result",
@@ -196,14 +211,75 @@ it("says on a cloud thread that Bring to Mac did not happen, from this Mac's own
 
 const start = { mode: "act", permissionMode: "autonomous", agent: "claude", prompt: "Fix the build" } as const;
 
-it("starts a thread asked for the cloud on the brain's copy of the project, listed before the reply", async () => {
-  const { router, windows, sent } = harness({ cloud: [row("c1", 1, "cloud-project")], listMs: 20 });
+/** A wake that ends when the test says. */
+function heldWake(): { wake: () => Promise<void>; end: (error?: Error) => void } {
+  let end!: (error?: Error) => void;
+  const woken = new Promise<void>((resolve, reject) => (end = (error) => (error ? reject(error) : resolve())));
+  return { wake: () => woken, end };
+}
+
+const get = (router: BrainRouter, threadId: string) => ask(router, "threads.get", { id: threadId }) as Promise<ThreadSummary>;
+
+it("answers a window's cloud start before the brain wakes, under the id the brain makes it with, until the brain's row replaces it", async () => {
+  const held = heldWake();
+  const answers: Answers = { cloud: [row("c1", 1, "cloud-project")], wake: held.wake };
+  const { router, windows, sent } = harness(answers);
   await listedTwice(router, windows, "threads.list", {});
   const { thread } = (await ask(router, "threads.start", { ...start, projectId: "mac-project", cloud: true })) as { thread: ThreadSummary };
-  expect(sent.find((each) => each.method === "threads.start")?.params).toMatchObject({ projectId: "cloud-project", cloud: true });
-  expect(thread).toMatchObject({ id: "new-thread", projectId: "mac-project", worktreePath: null, owner: { brain: "cloud", reach: "live" } });
-  const rows = (await ask(router, "threads.list", {})) as ThreadSummary[];
-  expect(rows.find((each) => each.id === "new-thread")).toMatchObject({ projectId: "mac-project", owner: { brain: "cloud" } });
+  const waking = { projectId: "mac-project", worktreePath: null, activity: "running", owner: { brain: "cloud", reach: "waking" }, cloud: { provider: "agent37", state: "preparing", brain: "waking" } };
+  expect(thread).toMatchObject({ ...waking, title: "Fix the build", queued: [{ text: "Fix the build" }] });
+  expect(sent.map((each) => each.method)).not.toContain("threads.start");
+  expect(((await ask(router, "threads.list", {})) as ThreadSummary[]).find((each) => each.id === thread.id)).toMatchObject(waking);
+  answers.updating = true;
+  expect(await get(router, thread.id)).toMatchObject({ cloud: { brain: "updating" } });
+  expect(await ask(router, "runs.listForThread", { threadId: thread.id })).toEqual([]);
+  expect(await ask(router, "review.threadDiff", { threadId: thread.id, comparison: "head" })).toEqual({ baseSha: null, patch: "", files: [], since: null });
+
+  // Sent before the brain has the thread, it waits in its queue, then follows the start there.
+  const queued = (await ask(router, "threads.queue", { id: thread.id, text: "Then run the tests", requestKey: "second" })) as ThreadSummary["queued"];
+  expect(queued.map((message) => message.text)).toEqual(["Fix the build", "Then run the tests"]);
+  expect((await get(router, thread.id)).queued).toEqual(queued);
+  held.end();
+  await until(() => sent.some((each) => each.method === "threads.queue"));
+  const toBrain = sent.filter((each) => each.method === "threads.start" || each.method === "threads.queue");
+  expect(toBrain.map(({ method, params }) => [method, params["id"]])).toEqual([
+    ["threads.start", thread.id],
+    ["threads.queue", thread.id],
+  ]);
+  expect(toBrain[0]!.params).toMatchObject({ projectId: "cloud-project", cloud: true, prompt: "Fix the build" });
+  expect(toBrain[1]!.params).toEqual({ id: thread.id, text: "Then run the tests", attachments: [], requestKey: "second" });
+
+  await until(() => router.starts.rows(() => true).length === 0);
+  const listed = ((await ask(router, "threads.list", {})) as ThreadSummary[]).filter((each) => each.id === thread.id);
+  expect(listed).toEqual([expect.objectContaining({ id: thread.id, projectId: "mac-project", lastActivityAt: 99, owner: expect.objectContaining({ brain: "cloud" }) })]);
+  expect(listed[0]!.cloud).toBeUndefined();
+  router.close();
+});
+
+it("shows a wake that failed on the thread, in its words, and starts it anew on Try again", async () => {
+  let wakes = 0;
+  const answers: Answers = {
+    cloud: [],
+    wake: async () => {
+      if (wakes++ === 0) throw new Error("The cloud brain did not start. Vercel is down.");
+    },
+  };
+  const { router, sent } = harness(answers);
+  const { thread } = (await ask(router, "threads.start", { ...start, projectId: "mac-project", cloud: true })) as { thread: ThreadSummary };
+  await vi.waitFor(async () => expect(await get(router, thread.id)).toMatchObject({ cloud: { state: "failed", error: "The cloud brain did not start. Vercel is down." } }));
+  await expect(ask(router, "runs.start", { threadId: thread.id, ...start })).rejects.toThrow("Vercel is down.");
+  // A message queued meanwhile waits with the first for the start to go again.
+  await ask(router, "threads.queue", { id: thread.id, text: "Anything?" });
+  expect(sent.map((each) => each.method)).not.toContain("threads.start");
+
+  const [first] = (await get(router, thread.id)).queued;
+  await ask(router, "threads.sendQueued", { id: thread.id, messageId: first!.id });
+  await until(() => sent.some((each) => each.method === "threads.queue"));
+  expect(sent.filter((each) => each.method === "threads.start" || each.method === "threads.queue").map(({ method, params }) => [method, params["id"]])).toEqual([
+    ["threads.start", thread.id],
+    ["threads.queue", thread.id],
+  ]);
+  expect(wakes).toBe(2);
   router.close();
 });
 
@@ -259,6 +335,9 @@ it("lists the brain's tasks beside this Mac's, on this Mac's project and marked 
   const router = new BrainRouter({
     db,
     link: link as unknown as BrainLink,
+    wake: async () => undefined,
+    updating: () => false,
+    service: async () => "vercel",
     mirrors: { folder: () => null, isOpen: () => false, pull: async () => {} },
     local: async (request) => ({ type: "rpc.result", id: request.id, result: request.method === "tasks.list" ? [task("mac-task", "mac-project", 3)] : "here" }),
     windows: { push: (push) => void windows.push(push) },

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { ClaudeAdapter, CodexAdapter, RunHandle } from "@openorc/agents";
 import { projects, runs, settings, threads } from "@openorc/db";
 import { commitAll, git } from "@openorc/git";
-import type { ModelOption, Project, RpcParams, RunSpec } from "@openorc/protocol";
+import { THREAD_EXISTS, type ModelOption, type Project, type RpcParams, type RunSpec } from "@openorc/protocol";
 import { OpenOrc } from "./openorc.js";
 import { MAX_WORKING_CHILDREN, pickModel } from "./services/thread-agent-tools.js";
 import { rpcClient } from "./rpc-test-client.js";
@@ -130,6 +130,14 @@ function endTurn(runId: string) {
   handle.emit("event", { type: "message.completed", runId, role: "assistant", messageId: `reply-${runId}`, text: "Done", ts: Date.now() });
   handle.emit("event", { type: "turn.completed", runId, turnId: `turn-${runId}`, status: "success", durationMs: 1, ts: Date.now() });
 }
+
+it("starts a thread under the id its owner chose, and refuses that id once it is taken", async () => {
+  const named = { id: "5b0e7a52-1c3f-4d8e-9a6b-2f4c8e1d7a90", projectId: project.id, agent: "codex", model: "fixture-codex", mode: "act", permissionMode: "autonomous", prompt: "Named" } as const;
+  const { thread } = await call("threads.start", named);
+  expect(thread.id).toBe(named.id);
+  await expect(call("threads.start", { ...named, prompt: "Again" })).rejects.toThrow(THREAD_EXISTS);
+  expect(threads.list(core.db, { projectId: project.id }).filter((each) => each.id === named.id)).toHaveLength(1);
+});
 
 it("starts a thread beside its parent, in its checkout with its settings, and tells it who to talk to", async () => {
   const { thread: home, runId } = await parent();

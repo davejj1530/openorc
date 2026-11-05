@@ -1,6 +1,7 @@
 import { audit, checkpoints, claudeAccounts, messages, plans, retiredTeams, runs as runRepo, settings, tasks, threadQueue, threads, type CloudProviderId, type Db } from "@openorc/db";
 import { diffStat, git, pinObject, switchFiles, treeHash, workspaceTransfer } from "@openorc/git";
 import {
+  THREAD_EXISTS,
   WORKSPACE_ID,
   executionModeUnavailable,
   normalizeModelEffort,
@@ -144,7 +145,7 @@ export class ThreadService {
     const cloudProvider = cloud ? await this.workspaces.placeCloud(input, project) : null;
     const workspaceMode = input.checkout || cloud ? "worktree" : (input.workspaceMode ?? "current");
     await this.workspaces.assertNewThreadWorkspace(project, workspaceMode, Boolean(input.checkout));
-    const id = randomUUID();
+    const id = this.newThreadId(input.id);
     const title = input.title?.trim() || titleFromPrompt(input.prompt);
     const destination = this.workspaces.threadPath({ id, title, workspaceMode, worktreePath: input.checkout?.path ?? null }, project);
     const started = await this.writers.withLease(
@@ -213,6 +214,12 @@ export class ThreadService {
     // Delivery takes its own lease on the worktree, so it starts once this one is released.
     if (!started.run) void this.messageQueue.drainQueue(started.thread.id);
     return started;
+  }
+
+  /** The id its owner chose, unless a thread has it already, or a new one. */
+  private newThreadId(chosen: string | undefined): string {
+    if (chosen && threads.get(this.db, chosen)) throw new Error(THREAD_EXISTS);
+    return chosen ?? randomUUID();
   }
 
   /** In the admitting transaction: the sandbox record, the base the worktree will start from, and the queued first message. */

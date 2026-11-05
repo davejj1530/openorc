@@ -26,6 +26,12 @@ describe("phone policy", () => {
     expect(admitRemoteRequest("threads.switchClaudeAccount", { id: "t", claudeAccountId: "work" }, context)).toEqual({ ok: true });
   });
 
+  it("lets only the brain's own Mac name a new thread's id", () => {
+    const named = { id: "5b0e7a52-1c3f-4d8e-9a6b-2f4c8e1d7a90", projectId: "p", agent: "claude", mode: "act", permissionMode: "autonomous", cloud: true, prompt: "x" };
+    expect(admitRemoteRequest("threads.start", named, context)).toEqual({ ok: false, message: "This is not available from a phone." });
+    expect(admitRemoteRequest("threads.start", named, context, "owner")).toEqual({ ok: true });
+  });
+
   it("keeps phone access and its push key out of a phone's reach", () => {
     expect(Object.keys(remoteRpcParams)).toEqual(expect.arrayContaining(["remote.push.setKey", "remote.push.removeKey", "remote.push.test"]));
     for (const method of Object.keys(remoteRpcParams)) expect(isRemoteMethod(method), method).toBe(false);

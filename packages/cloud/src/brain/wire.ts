@@ -4,7 +4,7 @@
  * it reads; a parse error names the field and never repeats a value, since lines carry keys and tokens.
  */
 import { createHash, randomBytes } from "node:crypto";
-import type { HarnessId } from "@openorc/protocol";
+import type { CloudService, HarnessId } from "@openorc/protocol";
 import type { Agent37Connection } from "../agent37-sandbox.js";
 import type { VercelConnection } from "../vercel-sandbox.js";
 import { openSecret, sealSecret } from "./sealed-file.js";
@@ -257,6 +257,12 @@ export interface HandoverValues {
   memory: { apiKey: string } | null;
   /** OpenCode's provider keys entered on the Mac for the cloud; the brain's cloud turns use the one their model needs. */
   opencode: { keys: { provider: string; key: string }[] } | null;
+  /**
+   * Where the brain's new threads run, as the Mac's Settings says ("Run on"), and the connection to each service, so a
+   * thread keeps running where it started. Vercel's is in the brain's own project there: the brain finds it, or makes it
+   * on a team it has none on. Each is null while the Mac has it unconnected.
+   */
+  cloud: { service: CloudService; agent37: Agent37Connection | null; vercel: Omit<VercelConnection, "projectId"> | null };
 }
 export type HandoverKind = keyof HandoverValues;
 export type BrainHandover = Partial<HandoverValues>;
@@ -285,7 +291,13 @@ const HANDOVER: { [K in HandoverKind]: Parse<HandoverValues[K]> } = {
   push: nullable(object({ keyId: text(64), pem: text(8192) })),
   memory: nullable(object({ apiKey: text(4096) })),
   opencode: nullable(object({ keys: list(object({ provider: text(64, /^[a-z0-9][a-z0-9._-]*$/), key: text(1000) }), 100) })),
+  cloud: object({
+    service: literal("vercel", "agent37"),
+    agent37: nullable(object({ key: text(4096), cpu: literal(2, 4), memory: literal(4, 8, 16, 32) })),
+    vercel: nullable(object({ token: text(4096), teamId: text(255) }, { vcpus: int(1, 64), region: text(32, /^[a-z0-9]+$/) })),
+  }),
 };
+const HANDOVER_KINDS = Object.keys(HANDOVER) as HandoverKind[];
 
 export type BrainControlRequest =
   | { op: "status" }
@@ -387,10 +399,11 @@ export interface BrainControlResults {
   /** False when the brain has no copy of that project. */
   "project-settings": { applied: boolean };
   /**
-   * The id of the Codex login it holds, the signInPrint of its GitHub sign-in, of its memory key and of its OpenCode keys,
-   * and its push key's id; null for none. A brain from before OpenCode keys names none.
+   * The id of the Codex login it holds, the signInPrint of its GitHub sign-in, of its memory key, of its OpenCode keys and
+   * of where its threads run, and its push key's id; null for none. A brain from before OpenCode keys, or before the
+   * cloud kind, names none of those.
    */
-  "sign-ins": { codex: string | null; github: string | null; push: string | null; memory: string | null; opencode?: string | null };
+  "sign-ins": { codex: string | null; github: string | null; push: string | null; memory: string | null; opencode?: string | null; cloud?: string | null };
   phones: { phones: BrainPhone[] };
   "remove-phone": { phones: BrainPhone[] };
   stop: { stopping: true };
@@ -443,7 +456,7 @@ const REQUESTS = variants<BrainControlRequest>({
   pair: object({ op: literal("pair") }),
   handover: object({
     op: literal("handover"),
-    sealed: object({}, { claude: sealedText, codex: sealedText, github: sealedText, push: sealedText, memory: sealedText, opencode: sealedText } satisfies Record<HandoverKind, Parse<string>>),
+    sealed: object({}, Object.fromEntries(HANDOVER_KINDS.map((kind) => [kind, sealedText])) as Record<HandoverKind, Parse<string>>),
   }),
   "import-project": object({ op: literal("import-project"), source: projectSource, name: folderName, branch: branchName, bundle: text(255, /^\w[\w.-]*$/) }, { origin: text(2048) }),
   "remove-project": object({ op: literal("remove-project"), source: projectSource }),
@@ -476,13 +489,13 @@ const RESULTS: { [K in BrainControlOp]: Parse<BrainControlResults[K]> } = {
   status,
   wake: status,
   pair: object({ url: text(4096), expiresAt: timestamp }),
-  handover: object({ applied: list(literal("claude", "codex", "github", "push", "memory"), 5) }),
+  handover: object({ applied: list(literal(...HANDOVER_KINDS), HANDOVER_KINDS.length) }),
   "import-project": (value, field) => (isRecord(value) && value["lacksBase"] === true ? object({ lacksBase: literal(true) }) : projectCopy)(value, field),
   "remove-project": object({ removed: literal(true, false), threads: count }),
   projects: object({ copies: list(object({ source: projectSource, projectId: text(100), macHead: commit, head: commit, threads: count }), 10_000) }),
   "copies-current": object({ marked: count }),
   "project-settings": object({ applied: literal(true, false) }),
-  "sign-ins": object({ codex: nullable(text(100)), github: nullable(text(64)), push: nullable(text(64)), memory: nullable(text(64)) }, { opencode: nullable(text(64)) }),
+  "sign-ins": object({ codex: nullable(text(100)), github: nullable(text(64)), push: nullable(text(64)), memory: nullable(text(64)) }, { opencode: nullable(text(64)), cloud: nullable(text(64)) }),
   phones,
   "remove-phone": phones,
   stop: object({ stopping: literal(true) }),
@@ -527,6 +540,7 @@ export function sealHandover(key: BrainKey, handover: BrainHandover): HandoverRe
     push: seal("push"),
     memory: seal("memory"),
     opencode: seal("opencode"),
+    cloud: seal("cloud"),
   };
   return { op: "handover", sealed };
 }
@@ -546,6 +560,7 @@ export function openHandover(key: BrainKey, request: HandoverRequest): BrainHand
     push: open("push"),
     memory: open("memory"),
     opencode: open("opencode"),
+    cloud: open("cloud"),
   };
   return handover;
 }

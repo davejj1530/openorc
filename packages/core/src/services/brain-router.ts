@@ -1,6 +1,6 @@
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
-import { incomingMove, refusedMove, runs, settings, tasks, threads, type Db } from "@openorc/db";
+import { incomingMove, projects, refusedMove, runs, settings, tasks, threads, type Db } from "@openorc/db";
 import {
   mergeInbox,
   mergeTaskPages,
@@ -10,9 +10,11 @@ import {
   REMOTE_ATTACHMENT_BYTES,
   ROUTED_READS,
   rpcParams,
+  type CloudService,
   type InboxList,
   type OwnerReach,
   type RpcMethod,
+  type RpcParams,
   type RpcRequest,
   type Task,
   type ThreadSummary,
@@ -20,6 +22,7 @@ import {
 import type { Logger, RpcReply, Transport } from "../transport.js";
 import { BrainOutOfReach, type BrainLink, type BrainPush, type ProjectMapping } from "./brain-link.js";
 import type { BrainMirrors } from "./brain-mirrors.js";
+import { BrainStarts } from "./brain-starts.js";
 
 const PAGES = "brain.pages";
 const MAX_PAGES = 40;
@@ -110,6 +113,12 @@ export interface BrainRouterDeps {
   /** The windows alone: what the brain pushes never reaches this Mac's phones, which hear the brain themselves. */
   windows: Transport;
   mapping(): Promise<ProjectMapping>;
+  /** Wakes the brain as Wake does, for a thread a window starts there. */
+  wake(): Promise<void>;
+  /** CloudBrain installs a newer brain before it starts it. */
+  updating(): boolean;
+  /** The service the brain's new threads run on, as Settings says. */
+  service(): Promise<CloudService | null>;
   notificationsOn(): boolean;
   log: Logger;
 }
@@ -123,6 +132,7 @@ const error = (id: number, message: string): RpcReply => ({ type: "rpc.error", i
  */
 export class BrainRouter {
   readonly pages: BrainPages;
+  readonly starts: BrainStarts;
   private readonly watched = new Map<string, number>();
   private expiry: ReturnType<typeof setTimeout> | null = null;
   private refreshing: Promise<void> | null = null;
@@ -130,6 +140,22 @@ export class BrainRouter {
 
   constructor(private readonly deps: BrainRouterDeps) {
     this.pages = new BrainPages(deps.db);
+    this.starts = new BrainStarts({
+      wake: () => deps.wake(),
+      start: async (params) => {
+        const mapping = await deps.mapping();
+        await deps.link.call("threads.start", (await this.filesUp(toCloud(params, mapping))) as never, { wake: true });
+      },
+      queue: async (params) => {
+        const reply = await this.forward({ type: "rpc", id: 0, method: "threads.queue", params }, "threads.queue", params, true, true);
+        if (reply.type === "rpc.error") throw new Error(reply.message);
+      },
+      listed: () => this.refreshRecent(),
+      changed: (id) => deps.windows.push({ type: "invalidate", keys: ["threads", `thread:${id}`] }),
+      updating: () => deps.updating(),
+      reach: () => deps.link.reach,
+      warn: (text) => deps.log.warn(text),
+    });
     deps.link.onPush((push) => this.relay(push));
     // Cloud rows dim while the brain is out of reach, so the lists are read again whenever that changes.
     deps.link.onReach(() => deps.windows.push({ type: "invalidate", keys: ["threads"] }));
@@ -163,6 +189,8 @@ export class BrainRouter {
   private owned(request: RpcRequest, method: RpcMethod, params: Record<string, unknown>, id: string | undefined, ownerOnly: string | null): Promise<RpcReply> {
     if (!id || threads.get(this.deps.db, id)) return this.deps.local(request);
     if (ownerOnly !== null) return Promise.resolve(error(request.id, ownerOnly));
+    const starting = this.starts.answer(request, method, params, id);
+    if (starting) return starting;
     const kept = method === "threads.get" ? this.kept(request, id) : null;
     const known = this.holdsThread(id);
     return kept ? Promise.resolve(kept) : this.forward(request, method, params, this.wakes(request, method, known), known);
@@ -210,15 +238,14 @@ export class BrainRouter {
   }
 
   /**
-   * A new thread asked for the cloud starts on the brain, on its copy of the project, woken for it. The windows' lists
-   * have it before the reply, so the sidebar shows it as the conversation opens.
+   * A new thread asked for the cloud starts on the brain, on its copy of the project, woken for it. The window has it at
+   * once, under the id the brain makes it with, and sees the wake as its first step; the brain's row replaces it.
    */
   private async start(request: RpcRequest, params: Record<string, unknown>, project: string | undefined): Promise<RpcReply> {
     if (!project) return this.deps.local(request);
     if (!(await this.deps.mapping()).toCloud(project)) return error(request.id, NOT_ON_BRAIN);
-    const reply = await this.forward(request, "threads.start", params, true, true);
-    if (reply.type === "rpc.result") await this.refreshRecent();
-    return reply;
+    const place = { provider: (await this.deps.service()) ?? "vercel", setup: Boolean(projects.get(this.deps.db, project)?.settings.setupScript) };
+    return { type: "rpc.result", id: request.id, result: { thread: this.starts.begin(params as RpcParams<"threads.start">, place), run: null } };
   }
 
   /**
@@ -252,29 +279,36 @@ export class BrainRouter {
     const cloud = method === "inbox.list" ? params : listParams(params, mapping);
     if (cloud) void this.refresh(method, cloud, mapping);
     const page = cloud ? this.pages.peek(method, cloud) : null;
-    if (!page) return offset ? { ...local, result: (local.result as ThreadSummary[]).slice(offset) } : local;
+    if (method === "threads.list") return this.mergeThreads(local, params, page, offset);
+    if (!page) return local;
     if (method === "inbox.list") return { ...local, result: mergeInbox([{ inbox: local.result as InboxList }, { inbox: page.result as InboxList }]) };
     const reach: OwnerReach = this.deps.link.reach;
-    if (method === "tasks.list")
-      return {
-        ...local,
-        result: mergeTaskPages(
-          [
-            { brain: "mac", reach: "live", heardAt: Date.now(), rows: local.result as Task[] },
-            { brain: "cloud", reach, heardAt: page.heardAt, rows: page.result as Task[] },
-          ],
-          "mac",
-        ),
-      };
+    return {
+      ...local,
+      result: mergeTaskPages(
+        [
+          { brain: "mac", reach: "live", heardAt: Date.now(), rows: local.result as Task[] },
+          { brain: "cloud", reach, heardAt: page.heardAt, rows: page.result as Task[] },
+        ],
+        "mac",
+      ),
+    };
+  }
+
+  /** This Mac's threads, the brain's as it last listed them, and those still starting there that the list asks for. */
+  private mergeThreads(local: RpcReply & { type: "rpc.result" }, params: Record<string, unknown>, page: Page | null, offset: number): RpcReply {
+    const brainRows = (page?.result ?? []) as ThreadSummary[];
+    const starting = new Map(this.starts.rows(startingIn(params)).flatMap((row) => (brainRows.some((each) => each.id === row.id) ? [] : [[row.id, row] as const])));
+    if (!page && !starting.size) return offset ? { ...local, result: (local.result as ThreadSummary[]).slice(offset) } : local;
     const merged = mergeThreadPages(
       [
         { brain: "mac", reach: "live", heardAt: Date.now(), rows: local.result as ThreadSummary[] },
-        { brain: "cloud", reach, heardAt: page.heardAt, rows: page.result as ThreadSummary[] },
+        { brain: "cloud", reach: this.deps.link.reach, heardAt: page?.heardAt ?? Date.now(), rows: [...brainRows, ...starting.values()] },
       ],
       params,
       "mac",
     );
-    return { ...local, result: merged.slice(offset).map((row) => this.asNow(row)) };
+    return { ...local, result: merged.slice(offset).map((row) => starting.get(row.id) ?? this.asNow(row)) };
   }
 
   /**
@@ -401,6 +435,15 @@ export class BrainRouter {
     this.expiry = null;
     this.pages.save();
   }
+}
+
+/** Whether a thread still starting on the brain belongs in a list asked with these params: an active one of its project. */
+function startingIn(params: Record<string, unknown>): (row: ThreadSummary) => boolean {
+  return (row) => {
+    if (params["filter"] === "done" || params["filter"] === "archived" || params["pinnedOnly"] === true) return false;
+    if (typeof params["projectId"] === "string" && params["projectId"] !== row.projectId) return false;
+    return !Array.isArray(params["projectIds"]) || (params["projectIds"] as string[]).includes(row.projectId);
+  };
 }
 
 /** A thread list for the brain: this Mac's project ids as the brain's copies; null when no project asked has a copy. */

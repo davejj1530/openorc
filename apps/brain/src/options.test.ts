@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { brainDoor, brainLayout, doorEpoch, newBrainKey, type BrainStart } from "@openorc/cloud";
+import { BrainCloud, CLOUD_CHANNEL } from "./cloud.js";
 import { brainOptions } from "./options.js";
 import { SealedSecrets } from "./secrets.js";
 
@@ -18,12 +19,19 @@ afterEach(async () => {
   await rm(root, { recursive: true, force: true });
 });
 
-async function options(vercel: BrainStart["vercel"], region = async () => "sin1") {
+async function sealed(start: BrainStart, region = async () => "sin1") {
   const layout = brainLayout(root);
-  const start: BrainStart = { key: newBrainKey(), name: "Cloud", address: "sb-fixture.vercel.run", port: 47_820, vercel };
   const secrets = await SealedSecrets.open(layout.secrets, start.key);
+  const cloud = new BrainCloud({ store: secrets.store(CLOUD_CHANNEL), start, self: { region }, warn: () => undefined });
+  await cloud.load();
+  return { layout, secrets, cloud };
+}
+
+async function options(vercel: BrainStart["vercel"], region = async () => "sin1") {
+  const start: BrainStart = { key: newBrainKey(), name: "Cloud", address: "sb-fixture.vercel.run", port: 47_820, vercel };
+  const { layout, secrets, cloud } = await sealed(start, region);
   const runnerFiles = [{ name: "runner.ts", content: Buffer.from("export {};\n") }];
-  return { layout, options: brainOptions({ layout, appDir: path.join(root, "app", "v1"), start, self: { region }, secrets, transport: { push() {} }, runnerFiles }), runnerFiles };
+  return { layout, options: brainOptions({ layout, appDir: path.join(root, "app", "v1"), start, cloud, secrets, transport: { push() {} }, runnerFiles }), runnerFiles };
 }
 
 describe("brainOptions", () => {
@@ -31,8 +39,8 @@ describe("brainOptions", () => {
     const { layout, options: brain, runnerFiles } = await options({ connection, sandbox: "brain" });
     expect(brain).toMatchObject({ dataDir: layout.data, cloudOnly: true, deviceSystem: null, cloudRunnerFiles: runnerFiles });
     expect(await brain.cloudCredentials?.()).toMatchObject(connection);
-    expect(brain).not.toHaveProperty("cloudAgent37");
-    expect(brain).not.toHaveProperty("cloudService");
+    expect(await brain.cloudAgent37?.()).toBeNull();
+    expect(await brain.cloudService?.()).toBe("vercel");
   });
 
   it("makes thread sandboxes in the region of the brain's own sandbox", async () => {
@@ -48,13 +56,12 @@ describe("brainOptions", () => {
   });
 
   it("runs every conversation on Agent37 with the connection from an Agent37 brain's start, and has no door", async () => {
-    const layout = brainLayout(root);
     const agent37 = { connection: { key: "sk_live_fixture", cpu: 4, memory: 16 }, instance: "ab12cd34ef" } as const;
     const start: BrainStart = { key: newBrainKey(), name: "Cloud", address: "ab12cd34ef-47820.agent37.app", port: 47_820, vercel: null, agent37 };
-    const secrets = await SealedSecrets.open(layout.secrets, start.key);
-    const brain = brainOptions({ layout, appDir: root, start, self: { region: async () => "us" }, secrets, transport: { push() {} }, runnerFiles: [] });
+    const { layout, secrets, cloud } = await sealed(start, async () => "us");
+    const brain = brainOptions({ layout, appDir: root, start, cloud, secrets, transport: { push() {} }, runnerFiles: [] });
     expect(await brain.cloudAgent37?.()).toEqual(agent37.connection);
-    expect(brain.cloudService).toBe("agent37");
+    expect(await brain.cloudService?.()).toBe("agent37");
     expect(await brain.cloudCredentials?.()).toBeNull();
     expect(brain.remoteNetwork?.door).toBeUndefined();
   });
@@ -68,10 +75,9 @@ describe("brainOptions", () => {
   });
 
   it("hands each phone on a Vercel brain this epoch's ticket to its door, for its own device; a local container has no door", async () => {
-    const layout = brainLayout(root);
     const start: BrainStart = { key: newBrainKey(), name: "Cloud", address: "sb-fixture.vercel.run", port: 47_820, vercel: { connection, sandbox: "brain" } };
-    const secrets = await SealedSecrets.open(layout.secrets, start.key);
-    const input = { layout, appDir: root, start, self: { region: async () => "sin1" }, secrets, transport: { push() {} }, runnerFiles: [] };
+    const { layout, secrets, cloud } = await sealed(start);
+    const input = { layout, appDir: root, start, cloud, secrets, transport: { push() {} }, runnerFiles: [] };
     const door = brainDoor(start.key);
     const epoch = doorEpoch(Date.now());
     expect(brainOptions(input).remoteNetwork?.door?.("phone-1")).toEqual({ host: door.host, device: "phone-1", epoch, ticket: Buffer.from(door.ticket("phone-1", epoch)).toString("base64url") });

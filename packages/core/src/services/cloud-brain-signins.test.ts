@@ -66,6 +66,7 @@ class FakeBrain implements BrainMachineLike {
     if (opened.push !== undefined) this.holds.push = opened.push?.keyId ?? null;
     if (opened.memory !== undefined) this.holds.memory = opened.memory && signInPrint(opened.memory);
     if (opened.opencode !== undefined) this.holds.opencode = opened.opencode && signInPrint(opened.opencode);
+    if (opened.cloud !== undefined) this.holds.cloud = signInPrint(opened.cloud);
     return { applied: kinds } as never;
   }
   async importProject(): Promise<never> {
@@ -74,10 +75,14 @@ class FakeBrain implements BrainMachineLike {
   async remove() {
     this.state = "missing";
   }
-  /** What the last handover carried besides Claude's list. */
-  others(): Omit<BrainHandover, "claude"> {
-    const { claude: _claude, ...others } = this.handovers.at(-1) ?? {};
+  /** What the last handover carried besides Claude's list and where threads run, which follows Settings. */
+  others(): Omit<BrainHandover, "claude" | "cloud"> {
+    const { claude: _claude, cloud: _cloud, ...others } = this.handovers.at(-1) ?? {};
     return Object.fromEntries(Object.entries(others).filter(([, value]) => value !== undefined));
+  }
+  /** Where threads run, as the brain last took it. */
+  cloud(): BrainHandover["cloud"] {
+    return this.handovers.findLast((handover) => handover.cloud)?.cloud;
   }
 }
 
@@ -140,7 +145,9 @@ async function call<M extends RpcMethod>(method: M, params: RpcParams<M>): Promi
   return reply.result as RpcResults[M];
 }
 
-async function open(): Promise<void> {
+/** With `settings`, the cloud connections are Settings' own, kept there, as on a Mac; else a fixed Vercel connection. */
+async function open(settings?: ReturnType<typeof memoryStore>): Promise<void> {
+  const fixed = async () => ({ token: "vcp_fixture-vercel-token-0123456789", teamId: "team_fixture", projectId: "prj_sandboxes" });
   core = await OpenOrc.create({
     dataDir: path.join(root, `data-${Math.random().toString(36).slice(2)}`),
     ephemeral: true,
@@ -152,7 +159,7 @@ async function open(): Promise<void> {
     pushSecrets: push,
     memorySecrets: memoryKey,
     opencodeCloudSecrets: opencodeKeys,
-    cloudCredentials: async () => ({ token: "vcp_fixture-vercel-token-0123456789", teamId: "team_fixture", projectId: "prj_sandboxes" }),
+    ...(settings ? { cloudSecrets: settings } : { cloudCredentials: fixed }),
     cloudBrainBundle: async () => ({ version: carried, read: async () => Buffer.from("archive") }),
     cloudBrainMachine: async () => brain,
   });
@@ -438,5 +445,52 @@ describe("the cloud brain's sign-ins besides Claude", () => {
     await core.close();
     await open();
     expect((await signIns()).github).toEqual({ on: true, blocked: "The GitHub CLI isn't signed in to github.com on this Mac.", behind: false });
+  });
+});
+
+describe("where the cloud brain's threads run", () => {
+  const VERCEL = {
+    token: "vcp_fixture-vercel-token-0123456789",
+    team: { id: "team_fixture", name: "Fixture" },
+    project: { id: "prj_sandboxes", name: "openorc-sandboxes" },
+    region: "fra1",
+    reach: "account",
+  };
+  const AGENT37_KEY = "sk_live_fixture-agent37-key";
+
+  beforeEach(async () => {
+    await core.close();
+    const settings = memoryStore();
+    await settings.save(JSON.stringify({ vercel: VERCEL, agent37: { key: AGENT37_KEY }, service: "vercel" }));
+    await open(settings);
+  });
+
+  it("follows Run on: at setup, at once to a running brain, and at the next wake to an asleep one, which nothing wakes for it", async () => {
+    await setUp();
+    expect(brain.cloud()).toEqual({ service: "vercel", agent37: { key: AGENT37_KEY, cpu: 2, memory: 4 }, vercel: { token: VERCEL.token, teamId: "team_fixture", region: "fra1" } });
+
+    await call("cloud.service", { service: "agent37" });
+    await vi.waitFor(() => expect(brain.cloud()?.service).toBe("agent37"));
+
+    brain.state = "stopped";
+    await call("cloud.agent37.size", { size: { cpu: 4, memory: 16 } });
+    // Queued behind the change: once it ran, the brain still sleeps, with what it had.
+    await call("cloud.brain.recount", {});
+    expect(brain.state).toBe("stopped");
+    expect(brain.cloud()?.agent37).toEqual({ key: AGENT37_KEY, cpu: 2, memory: 4 });
+    expect(await brainError()).toBeNull();
+
+    await call("cloud.brain.wake", {});
+    expect(brain.cloud()).toMatchObject({ service: "agent37", agent37: { key: AGENT37_KEY, cpu: 4, memory: 16 } });
+  });
+
+  it("gives it again to a brain that lost it, though it holds nothing else", async () => {
+    await setUp();
+    brain.state = "stopped";
+    brain.holds.cloud = null;
+    const before = brain.handovers.length;
+    await call("cloud.brain.wake", {});
+    await vi.waitFor(() => expect(brain.handovers.length).toBeGreaterThan(before));
+    expect(brain.handovers.at(-1)?.cloud).toMatchObject({ service: "vercel" });
   });
 });

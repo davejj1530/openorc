@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { Agent37Connection, BrainAccess, WakeInput } from "@openorc/cloud";
+import type { Agent37Connection, BrainAccess, HandoverValues, WakeInput } from "@openorc/cloud";
 import type { BrainRegion, CloudService } from "@openorc/protocol";
 
 /** Where a brain lives, as this Mac keeps it: a Vercel team and region, or the Agent37 account. Records from before Agent37 lack `service`. */
@@ -7,7 +7,7 @@ export type BrainPlace = { service?: "vercel"; teamId: string; region: BrainRegi
 
 /** The connections a brain is reached with, as Settings has them now. */
 export interface BrainConnections {
-  vercel: () => Promise<{ token: string; teamId: string; vcpus?: number } | null>;
+  vercel: () => Promise<{ token: string; teamId: string; vcpus?: number; region?: string } | null>;
   agent37: () => Promise<Agent37Connection | null>;
   /** The service a new brain is made on. */
   service: () => Promise<CloudService | null>;
@@ -68,6 +68,23 @@ export async function threadSizes(place: BrainPlace, connections: BrainConnectio
   }
   const vcpus = (await connections.vercel())?.vcpus;
   return vcpus ? { threadVcpus: vcpus } : {};
+}
+
+/**
+ * Where the brain's new threads run, from Settings now: the service "Run on" names, and each connection. A brain on
+ * Vercel keeps its thread sandboxes on its own team; one on Agent37 uses the team Settings chose. Null with none connected.
+ */
+export async function threadCloud(place: BrainPlace, connections: BrainConnections): Promise<HandoverValues["cloud"] | null> {
+  const service = await connections.service();
+  if (!service) return null;
+  const vercel = await connections.vercel();
+  const { token, teamId, vcpus, region } = vercel ?? {};
+  const team = place.service === "agent37" ? teamId : place.teamId;
+  return {
+    service,
+    agent37: await connections.agent37(),
+    vercel: token && team ? { token, teamId: team, ...(vcpus ? { vcpus } : {}), ...(region ? { region } : {}) } : null,
+  };
 }
 
 /** The region a provision makes the machine in, where its service has regions. */

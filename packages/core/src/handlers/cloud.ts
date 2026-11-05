@@ -103,23 +103,25 @@ export function createCloudHandlers({ settings, tokens, checks, codex, opencode,
     invalidate(["cloud"]);
     return status();
   };
+  /** A change to where cloud threads run, which the brain's threads follow too. */
+  const moved = (work: () => Promise<unknown>) => changed(() => work().then(() => brain.cloudChanged()));
   return {
     "cloud.status": status,
     "cloud.vercel.connect": async ({ token }) => {
       const { teams } = await settings.connect(token);
-      brain.vercelChanged();
+      brain.cloudChanged();
       return { status: await changed(() => undefined), teams };
     },
     "cloud.vercel.teams": () => settings.teams(),
-    "cloud.vercel.team": ({ teamId }) => changed(() => settings.chooseTeam(teamId).then(() => brain.vercelChanged())),
+    "cloud.vercel.team": ({ teamId }) => moved(() => settings.chooseTeam(teamId)),
     // The brain's door holds a copy of the token: it goes first, or the connection stays.
-    "cloud.vercel.disconnect": () => changed(() => brain.disconnect(() => settings.disconnect())),
-    "cloud.vercel.size": ({ vcpus }) => changed(() => settings.chooseSize(vcpus).then(() => brain.vercelChanged())),
-    "cloud.vercel.region": ({ region }) => changed(() => settings.chooseRegion(region)),
-    "cloud.agent37.connect": ({ key }) => changed(() => settings.connectAgent37(key)),
-    "cloud.agent37.disconnect": () => changed(() => settings.disconnectAgent37()),
-    "cloud.agent37.size": ({ size }) => changed(() => settings.chooseAgent37Size(size)),
-    "cloud.service": ({ service }) => changed(() => settings.chooseService(service)),
+    "cloud.vercel.disconnect": () => moved(() => brain.disconnect(() => settings.disconnect())),
+    "cloud.vercel.size": ({ vcpus }) => moved(() => settings.chooseSize(vcpus)),
+    "cloud.vercel.region": ({ region }) => moved(() => settings.chooseRegion(region)),
+    "cloud.agent37.connect": ({ key }) => moved(() => settings.connectAgent37(key)),
+    "cloud.agent37.disconnect": () => moved(() => settings.disconnectAgent37()),
+    "cloud.agent37.size": ({ size }) => moved(() => settings.chooseAgent37Size(size)),
+    "cloud.service": ({ service }) => moved(() => settings.chooseService(service)),
     "cloud.takeover": ({ enabled }) => changed(() => settings.setTakeover(enabled)),
     "cloud.claude.create": ({ accountId }) => changed(() => tokens.create(accountId)),
     "cloud.claude.cancel": ({ accountId }) => changed(() => tokens.cancel(accountId)),

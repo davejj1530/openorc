@@ -338,6 +338,7 @@ export class OpenOrc {
             log: this.log,
             memory: this.memory,
             textGeneration: this.textGeneration,
+            service: () => this.cloudParts.settings.service(),
             endpoint: options.brainEndpoint,
           });
     return this.routing;

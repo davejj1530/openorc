@@ -4,6 +4,7 @@ import { createClientState } from "@openorc/client";
 import { SubagentCards } from "./SubagentCards";
 const fixture = vi.hoisted(() => ({ exists: true as boolean | undefined }));
 vi.mock("../lib/client", () => ({
+  useRpc: () => ({ data: undefined }),
   useRpcs: () => {
     if (fixture.exists === undefined) return [{ data: undefined }];
     return [{ data: fixture.exists ? { id: "child" } : null }];

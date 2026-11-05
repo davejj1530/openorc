@@ -91,11 +91,12 @@ it("names MCP tool calls by server and tool in each provider's naming", () => {
   render(<WorkTranscript runId="run" blocks={blocks} />);
   fireEvent.click(receipt());
   fireEvent.click(screen.getByRole("button", { name: "Used Codegraph, used Mobbin" }));
+  // Each row reads the tool and what it was asked.
   for (const [chip, call] of [
-    ["explore", /^Codegraph: explore who calls describe/],
-    ["search screens", /^Mobbin: search screens onboarding/],
-    ["get design context", /^Figma: get design context/],
-    ["thread list", /^OpenOrc: thread list/],
+    [/^explore who calls describe/, /^Codegraph: explore who calls describe/],
+    [/^search screens onboarding/, /^Mobbin: search screens onboarding/],
+    [/^get design context/, /^Figma: get design context/],
+    [/^thread list/, /^OpenOrc: thread list/],
   ] as const) {
     fireEvent.click(screen.getByRole("button", { name: chip }));
     expect(screen.getByRole("button", { name: call }).getAttribute("aria-expanded")).toBe("true");
@@ -141,8 +142,10 @@ it("carries the live step on one line, open or folded", () => {
 it("preserves an inspected command when it fails and a retry arrives", () => {
   const command: Block = { ...tool, name: "shell", input: { command: "pnpm test" } };
   const { rerender } = render(<WorkTranscript runId="run" blocks={[command]} live />);
-  // A phase that is its one call opens straight to it.
-  fireEvent.click(screen.getByRole("button", { name: /Running command pnpm test/ }));
+  // A test run under way is drawn as one; its row opens the call itself.
+  fireEvent.click(screen.getByRole("button", { name: "Run the tests" }));
+  expect(screen.getByRole("button", { name: /Running command pnpm test/ }).getAttribute("aria-expanded")).toBe("true");
+  // It failed without a runner's counts, so it turns into a plain command and stays open as the retry starts.
   const failed: Block = { ...command, done: true, isError: true, status: "error", output: "7 tests failed" };
   rerender(<WorkTranscript runId="run" blocks={[failed, { ...command, id: "retry" }]} live />);
   expect(screen.getByRole("button", { name: /pnpm test.*Failed/ }).getAttribute("aria-expanded")).toBe("true");
@@ -173,7 +176,8 @@ it("keeps pending input visible and failed tools inside collapsed work", () => {
   expect(screen.queryByRole("button", { name: /failed-test.*Failed/ })).toBeNull();
   fireEvent.click(receipt());
   expect(screen.queryByRole("button", { name: /failed-test.*Failed/ })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Read a file, ran a command" }));
+  // The folded step says what failed; the call itself stays one click deeper.
+  fireEvent.click(screen.getByRole("button", { name: "Read a file, ran a command Command failed" }));
   fireEvent.click(screen.getByRole("button", { name: "Ran" }));
   expect(screen.getByRole("button", { name: /failed-test.*Failed/ })).toBeTruthy();
 });
@@ -221,11 +225,13 @@ it.each([["individual", WorkTranscript]] as const)("keeps failed attempts in %s 
   expect(screen.queryByRole("button", { name: /.*Failed/ })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Read a file, ran the tests" }));
   fireEvent.click(screen.getByRole("button", { name: "Read" }));
-  fireEvent.click(screen.getByRole("button", { name: "Ran" }));
+  // Each run keeps its place in time: the failed one, then the retry that passed.
+  fireEvent.click(screen.getAllByRole("button", { name: "Ran" })[0]!);
   fireEvent.click(screen.getByRole("button", { name: /cat scripts\/build-mascot-review.cjs.*Failed/ }));
   fireEvent.click(screen.getByRole("button", { name: /pnpm test.*Failed/ }));
   expect(screen.getByText("No such file or directory")).toBeTruthy();
-  expect(screen.getByText("7 tests failed")).toBeTruthy();
+  // The failed run's last line reads under its row too, so its output shows twice once its call is open.
+  expect(screen.getAllByText("7 tests failed")).toHaveLength(2);
   expect(screen.getByText("Verified all 37 tests.").closest(".work-section")).toBeNull();
 });
 it("preserves the orb presence independently of the work header", () => {
@@ -439,6 +445,7 @@ it("counts work steps without counting the separately displayed child cards agai
       />
     </QueryClientProvider>,
   );
-  expect(receipt().textContent).toContain("2 steps");
-  expect(receipt().textContent).not.toContain("4 steps");
+  // A turn that came to agents' findings says so; its children are counted once, as agents.
+  expect(receipt().textContent).toContain("2 agents");
+  expect(receipt().textContent).not.toMatch(/\d steps?/);
 });

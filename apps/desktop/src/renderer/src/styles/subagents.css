@@ -58,15 +58,60 @@
 .subagent-cards {
   background: var(--surface);
   border-radius: var(--radius-2xl);
-  padding: 4px 12px;
+  padding: 4px 12px 6px;
 }
 .subagent-group-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 10px 4px 4px;
   color: var(--ink-3);
   font-size: var(--text-xs);
 }
-.subagent-card + .subagent-card {
-  border-top: var(--hairline) solid var(--line);
+.subagent-tally {
+  margin-left: auto;
+  justify-items: end;
+  color: var(--ink-4);
+  font-variant-numeric: tabular-nums;
+}
+.subagent-lanes {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* Several agents hang off one trunk: it runs down the left, and each lane leaves it on an elbow to its mark. */
+.subagent-lanes[data-trunk] {
+  padding-left: 14px;
+}
+.subagent-lanes[data-trunk] > .subagent-card {
+  position: relative;
+}
+.subagent-lanes[data-trunk] > .subagent-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -8px;
+  border-left: 1.5px solid var(--line-strong);
+}
+.subagent-lanes[data-trunk] > .subagent-card:last-child::before {
+  bottom: auto;
+  height: 14px;
+}
+.subagent-lanes[data-trunk] > .subagent-card::after {
+  content: "";
+  position: absolute;
+  top: 8px;
+  left: -8px;
+  width: 9px;
+  height: 14px;
+  border-bottom: 1.5px solid var(--line-strong);
+  border-left: 1.5px solid var(--line-strong);
+  border-bottom-left-radius: 7px;
+}
+.subagent-lanes[data-trunk] > .subagent-card[data-status="running"]::after {
+  border-color: var(--ink-3);
 }
 .subagent-card-heading {
   display: flex;
@@ -88,33 +133,67 @@
 .subagent-card-link:hover {
   background: var(--surface-2);
 }
-.subagent-card-link > svg {
+.subagent-card-mark {
+  display: grid;
   flex-shrink: 0;
+  place-items: center;
+  width: 16px;
   color: var(--ink-3);
 }
-.subagent-card[data-status="failed"] .subagent-card-link > svg {
+.subagent-card-mark [data-tone="bad"] {
   color: var(--bad);
 }
+.subagent-check {
+  width: 15px;
+  height: 15px;
+}
 .subagent-card-name {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: var(--text-sm);
+  color: var(--ink);
 }
 .subagent-card-meta {
   flex-shrink: 0;
   color: var(--ink-3);
   font-size: var(--text-xs);
 }
+.subagent-card-kind {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink-4);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.subagent-card-open {
+  flex-shrink: 0;
+  color: var(--ink-4);
+  opacity: 0;
+  transition: opacity var(--duration-leave) var(--ease-out);
+}
+.subagent-card-link:hover > .subagent-card-open,
+.subagent-card-link:focus-visible > .subagent-card-open {
+  opacity: 1;
+}
 .subagent-card-progress {
+  overflow: hidden;
+  padding: 0 4px 10px 28px;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  line-height: 16px;
+}
+.subagent-card-progress > span {
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  padding: 0 4px 10px 27px;
-  color: var(--ink-3);
-  font-size: var(--text-xs);
+}
+.subagent-card-progress[data-live] {
+  color: var(--ink-2);
 }
 .subagent-card-detail {
   display: grid;

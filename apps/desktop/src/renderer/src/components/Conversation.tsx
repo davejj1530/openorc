@@ -28,7 +28,7 @@ import { SessionRecovery } from "./SessionRecovery";
 import { SubagentConversation } from "./SubagentConversation";
 import { ThreadMoveCard } from "./ThreadMoveCard";
 import { Transcript } from "./Transcript";
-import { useTurnFooter } from "./TurnFooter";
+import { TurnChangesProvider, useTurnFooter } from "./TurnFooter";
 import { Button, Empty } from "./ui";
 import { useOrclingConversation } from "./useOrclingConversation";
 
@@ -160,18 +160,20 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
     if (merged && merged.blocks.length > 0)
       return (
         <ConversationVoice.Provider value={voice}>
-          <Transcript
-            working={working}
-            media={links ? { basePath: links, fileScope: conversation } : { fileLinks: "cite" }}
-            run={merged}
-            scrollKey={conversation.id}
-            followKey={sends}
-            onFork={thread ? forkConversation : undefined}
-            hasOlder={hasOlder}
-            onLoadOlder={loadOlder}
-            reveal={target}
-            trailing={turnFooter}
-          />
+          <TurnChangesProvider footers={footers} threadId={threadId}>
+            <Transcript
+              working={working}
+              media={links ? { basePath: links, fileScope: conversation } : { fileLinks: "cite" }}
+              run={merged}
+              scrollKey={conversation.id}
+              followKey={sends}
+              onFork={thread ? forkConversation : undefined}
+              hasOlder={hasOlder}
+              onLoadOlder={loadOlder}
+              reveal={target}
+              trailing={turnFooter}
+            />
+          </TurnChangesProvider>
         </ConversationVoice.Provider>
       );
     if (runsQuery.isLoading) return null;

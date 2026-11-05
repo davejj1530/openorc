@@ -111,7 +111,7 @@ it("stays open when the turn ends once the reader has pressed inside the live wo
       <WorkRow row={done} />
     </DisclosureContext.Provider>,
   );
-  const work = () => screen.getByRole("button", { name: /step/ }).getAttribute("aria-expanded");
+  const work = () => screen.getByRole("button", { name: /tests passed/ }).getAttribute("aria-expanded");
   expect(work()).toBe("true");
 
   view.rerender(

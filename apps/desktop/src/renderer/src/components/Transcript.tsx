@@ -27,6 +27,7 @@ import { toolIcons } from "./tool-icons";
 import { WorkNow, WorkSteps } from "./WorkSteps";
 import { TurnHead } from "./TurnHead";
 import { TurnReceipt } from "./TurnReceipt";
+import { useTurnSize } from "./TurnFooter";
 import { useTurnAuthor } from "../lib/turn-authors";
 import { ToolRow } from "./ToolRow";
 import { SubagentCards } from "./SubagentCards";
@@ -454,7 +455,8 @@ const WorkTurn = memo(function WorkTurn({
   ...props
 }: WorkTurnProps) {
   props = { ...props, runId: blocks.find((b) => b.runId)?.runId ?? props.runId };
-  const turn = useTurnModel(blocks, live, props.taskCards, ambient, props.replyAction?.blockId);
+  const size = useTurnSize(blocks);
+  const turn = useTurnModel(blocks, live, props.taskCards, ambient, props.replyAction?.blockId, size);
   const { before, work, after } = turn.parts;
   const revealWork = reveal && work.some((block) => block.id === reveal.messageId) ? reveal : undefined;
   const { open, visited, choose } = useWorkOpen(showActivity, turn.live, revealWork);

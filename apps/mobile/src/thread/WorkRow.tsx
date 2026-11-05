@@ -11,6 +11,7 @@ import {
   type Block,
   type LiveHeadline,
   type PlanItem,
+  type ReceiptItem,
   type WorkChip,
   type WorkEntry,
   type WorkPhase,
@@ -19,7 +20,7 @@ import {
 import { memo, useCallback, useMemo, useRef, useState, type ComponentType } from "react";
 import { View } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
-import { Brain, ChevronDown, ChevronRight, CircleCheck, FileText, Folder, Globe, Hammer, Lightbulb, Search, Terminal, WorkDelegate } from "../generated/icons";
+import { Brain, ChevronDown, ChevronRight, CircleCheck, FileDiff, FileText, Folder, GitPullRequest, Globe, Hammer, Lightbulb, Search, Terminal, Upload, WorkDelegate, X } from "../generated/icons";
 import { cn } from "../ui/cn";
 import type { IconProps } from "../ui/icon";
 import { arrive } from "../ui/motion";
@@ -37,7 +38,12 @@ import { ActivityRow, openTool, StepMark, ThinkingRow, ToolRow } from "./tools";
 type WorkRowProps = Extract<Row, { kind: "work" }>;
 
 const CHIP_LIMIT = 6;
-const receiptIcons = { thought: Lightbulb, steps: CircleCheck, check: Terminal } as const;
+/** As on the Mac: a pull request reads as one, a push or a commit as sending, a failure as a cross. */
+function receiptIcon(item: ReceiptItem): ComponentType<IconProps> {
+  if (item.failed) return X;
+  if (item.kind === "git") return item.label.startsWith("#") ? GitPullRequest : Upload;
+  return { thought: Lightbulb, steps: CircleCheck, check: Terminal, tests: CircleCheck, changes: FileDiff, agents: WorkDelegate, sources: Globe }[item.kind];
+}
 const chipIcons: Record<WorkChip["kind"], ComponentType<IconProps>> = {
   file: FileText,
   edit: FileText,
@@ -348,7 +354,7 @@ export const WorkRow = memo(function WorkRow({ row }: { row: WorkRowProps }) {
         className="-mx-2 min-h-touch flex-row flex-wrap items-center gap-x-4 gap-y-1 self-start px-2 py-3.5 active:opacity-60"
       >
         {receipt.map((item) => {
-          const Icon = receiptIcons[item.kind];
+          const Icon = receiptIcon(item);
           return (
             <View key={item.kind} className="flex-row items-center gap-1.5">
               <Icon size={14} className={item.failed ? "text-bad" : "text-ink-4"} />

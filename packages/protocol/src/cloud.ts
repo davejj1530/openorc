@@ -42,6 +42,20 @@ export interface CloudCheck {
 export const SandboxVcpus = z.union([z.literal(2), z.literal(4), z.literal(8), z.literal(16), z.literal(32)]);
 export const SANDBOX_VCPUS = SandboxVcpus.options.map((option) => option.value);
 
+/** The sizes an Agent37 instance comes in: vCPUs and GB of memory. */
+export const AGENT37_SIZES = [
+  { cpu: 2, memory: 4 },
+  { cpu: 4, memory: 8 },
+  { cpu: 4, memory: 16 },
+  { cpu: 4, memory: 32 },
+] as const;
+export type Agent37Size = (typeof AGENT37_SIZES)[number];
+export const Agent37Size = z
+  .object({ cpu: z.number().int(), memory: z.number().int() })
+  .strict()
+  .refine(({ cpu, memory }) => AGENT37_SIZES.some((size) => size.cpu === cpu && size.memory === memory), "Agent37 has no instance of that size.")
+  .transform((size) => size as Agent37Size);
+
 /** One of OpenOrc's sandboxes, as Settings lists them. */
 export interface CloudSandbox {
   name: string;

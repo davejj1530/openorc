@@ -125,8 +125,8 @@ async function probeAnswer(client: RunnerClient, sandbox: Sandbox, node: string)
  * made-up key, which the API reads as a key, and the sandbox's Node trusts the certificate the firewall answers with.
  * Nothing secret is added, and the rule is cleared after.
  */
-async function signIns(client: RunnerClient, sandbox: Sandbox, node: string): Promise<string | void> {
-  if (!sandbox.broker) return "Sandboxes on this Mac use this Mac's sign-ins";
+async function signIns(client: RunnerClient, sandbox: Sandbox, node: string, simulated: boolean): Promise<string | void> {
+  if (!sandbox.broker) return simulated ? "Sandboxes on this Mac use this Mac's sign-ins" : "This service keeps each agent's sign-in in its sandbox";
   const without = await probeAnswer(client, sandbox, node);
   try {
     await sandbox.broker([{ domain: SIGN_IN_PROBE.domain, name: SIGN_IN_PROBE.header, value: `openorc-check-${randomUUID()}` }]);
@@ -208,7 +208,7 @@ export async function checkSandbox(provider: SandboxProvider, options: { files: 
       await roundTrip(client, sandbox!, node);
     })) &&
     (await step("relay", () => relay(client!, sandbox!, node))) &&
-    (await step("signins", () => signIns(client!, sandbox!, node))) &&
+    (await step("signins", () => signIns(client!, sandbox!, node, provider.id === "local"))) &&
     (await step("sync", () => sync(install!)));
   (client as RunnerClient | null)?.close();
   const removed = await step("remove", () => provider.remove(name));

@@ -91,7 +91,7 @@ export interface SandboxInfo {
 }
 
 export interface SandboxProvider {
-  readonly id: "local" | "vercel";
+  readonly id: "local" | "vercel" | "agent37";
   /** Creates the named sandbox, or wakes it when it exists. */
   open(name: string): Promise<Sandbox>;
   /** Deletes the named sandbox and its files for good. */

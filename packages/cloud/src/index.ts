@@ -23,6 +23,26 @@ export {
   type VercelVm,
   vercelSandboxCost,
 } from "./vercel-sandbox.js";
+export {
+  AGENT37_ENDPOINTS,
+  Agent37Error,
+  agent37Api,
+  agent37Cost,
+  agent37Hourly,
+  type Agent37Api,
+  type Agent37CreateParams,
+  type Agent37EditParams,
+  type Agent37Endpoints,
+  type Agent37ExecResult,
+  type Agent37Instance,
+  type Agent37Resources,
+  type Agent37Status,
+  type Agent37Usage,
+  type PortAddress,
+} from "./agent37.js";
+export { Agent37Sandbox, Agent37SandboxProvider, agent37Connection, type Agent37Connection, type Agent37ProviderOptions } from "./agent37-sandbox.js";
+export { startFakeAgent37, type FakeAgent37, type FakeAgent37Options } from "./agent37-fake.js";
+export { INSTANCE_SERVER_PORT, InstancePort, type InstanceProcess, type ProcessSpec } from "./instance-port.js";
 export { RemoteProcess, type RemoteCommand } from "./remote-process.js";
 export type { Takeover, TakeoverStarted } from "./runner/wire.js";
 export { RunnerClient, installRunner, runRunner, runnerFiles, type RunnerConnectionState, type RunnerFile, type RunnerInstall } from "./runner-client.js";

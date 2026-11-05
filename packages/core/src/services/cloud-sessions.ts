@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, realpath, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { WorkspaceLocation } from "@openorc/cloud";
 import { runs, type CloudProviderId, type Db } from "@openorc/db";
@@ -8,6 +8,9 @@ import type { Thread } from "@openorc/protocol";
 export function claudeSessionFile(configDir: string, cwd: string, sessionId: string): string {
   return path.posix.join(configDir, "projects", cwd.replace(/[^A-Za-z0-9]/g, "-"), `${sessionId}.jsonl`);
 }
+
+/** A folder as Claude Code names it on this host: by its real path, which its working directory reads as. */
+const asClaudeSees = (folder: string): Promise<string> => realpath(folder).catch(() => folder);
 
 /** Every folder a session ran in, as its lines record them: on the line itself for Claude, inside its payload for Codex. */
 function sessionFolders(text: string): string[] {
@@ -42,6 +45,14 @@ export function sessionMovedTo(text: string, cwd: string): string {
     .filter((folder) => folder !== cwd)
     .sort((a, b) => b.length - a.length)
     .reduce((moved, folder) => moved.split(folder).join(cwd), text);
+}
+
+/** A Claude session on its way to another host, with every folder it ran in still the source's. */
+export interface RelocatedSession {
+  agent: "claude";
+  accountId: string;
+  sessionId: string;
+  text: string;
 }
 
 export interface CloudSessionDeps {
@@ -84,7 +95,7 @@ export class CloudSessions {
 
   /** The session's file on this Mac: where the worktree's Claude would keep it, or wherever else it ran here. */
   private async onMac(configDir: string, worktree: string, sessionId: string): Promise<string | null> {
-    const expected = claudeSessionFile(configDir, worktree, sessionId);
+    const expected = claudeSessionFile(configDir, await asClaudeSees(worktree), sessionId);
     if (await isFile(expected)) return expected;
     const projects = path.join(configDir, "projects");
     for (const folder of await readdir(projects).catch(() => [] as string[])) {
@@ -130,6 +141,22 @@ export class CloudSessions {
     await writeFile(target, sessionMovedTo(data.toString("utf8"), thread.worktreePath), { mode: 0o600 });
   }
 
+  /** The conversation's last Claude session as this host keeps it, for its relocation package; null before its first turn. */
+  async export(thread: Thread): Promise<RelocatedSession | null> {
+    const latest = thread.agent === "claude" ? this.latest(thread) : null;
+    if (!latest || !thread.worktreePath) return null;
+    const file = await this.onMac(this.deps.configDirectory(latest.accountId), thread.worktreePath, latest.sessionId);
+    return file ? { agent: "claude", ...latest, text: await readFile(file, "utf8") } : null;
+  }
+
+  /** A relocated session, where Claude looks for it in the thread's worktree on this host. */
+  async import(thread: Thread & { worktreePath: string }, session: RelocatedSession): Promise<void> {
+    const cwd = await asClaudeSees(thread.worktreePath);
+    const target = claudeSessionFile(this.deps.configDirectory(session.accountId), cwd, session.sessionId);
+    await mkdir(path.dirname(target), { recursive: true, mode: 0o700 });
+    await writeFile(target, sessionMovedTo(session.text, cwd), { mode: 0o600 });
+  }
+
   /** Brings the conversation's session from the sandbox to the account's folder on this Mac. */
   async keep(thread: Thread, location: WorkspaceLocation, provider: CloudProviderId): Promise<void> {
     if (thread.agent === "codex") return this.keepCodex(thread, location, provider);
@@ -137,9 +164,10 @@ export class CloudSessions {
     if (!latest || !thread.worktreePath) return;
     const data = await location.install.sandbox.readFile(await this.inSandbox(location, provider, latest.accountId, latest.sessionId));
     if (!data) return;
-    const target = claudeSessionFile(this.deps.configDirectory(latest.accountId), thread.worktreePath, latest.sessionId);
+    const cwd = await asClaudeSees(thread.worktreePath);
+    const target = claudeSessionFile(this.deps.configDirectory(latest.accountId), cwd, latest.sessionId);
     await mkdir(path.dirname(target), { recursive: true, mode: 0o700 });
-    await writeFile(target, sessionMovedTo(data.toString("utf8"), thread.worktreePath), { mode: 0o600 });
+    await writeFile(target, sessionMovedTo(data.toString("utf8"), cwd), { mode: 0o600 });
   }
 }
 

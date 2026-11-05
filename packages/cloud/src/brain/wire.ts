@@ -283,7 +283,19 @@ export type BrainControlRequest =
   /** Close gracefully and exit; the sandbox keeps running. */
   | { op: "stop" }
   /** A stop for an update, answered at once: refused, the brain running on, while closing would cut work short. */
-  | { op: "stop-for-update" };
+  | { op: "stop-for-update" }
+  /** The brain's link key, so its Mac can dial it and name it to its phones. */
+  | { op: "identity" }
+  /** A thread's relocation package already in the inbox, by file name. Taking it again changes nothing. */
+  | { op: "receive-thread"; relocation: string; package: string }
+  /** Calls off a receive that may or may not have landed; one that comes later is refused. */
+  | { op: "drop-arrival"; relocation: string; threadId: string }
+  /** Freezes the thread and writes its package to the outbox. Asked again, the same package. */
+  | { op: "hand-off-thread"; relocation: string; threadId: string }
+  /** Unfreezes a thread the Mac did not take; a hand-off asked later is refused. */
+  | { op: "cancel-hand-off"; relocation: string; threadId: string }
+  /** The Mac took the thread: the brain deletes its copy, its sandbox and the package. */
+  | { op: "handed-off"; relocation: string };
 export type BrainControlOp = BrainControlRequest["op"];
 export type HandoverRequest = Extract<BrainControlRequest, { op: "handover" }>;
 
@@ -320,6 +332,13 @@ export interface BrainControlResults {
   "sign-ins": { codex: string | null; github: string | null; push: string | null };
   stop: { stopping: true };
   "stop-for-update": { stopping: true };
+  identity: { linkKey: string };
+  /** `lacksBase`: the brain's copy lacks the commit the package's code builds on, so it took nothing; a whole one will do. */
+  "receive-thread": { received: true } | { refused: string } | { lacksBase: true };
+  "drop-arrival": { dropped: true } | { received: true };
+  "hand-off-thread": { file: string; bytes: number; sha256: string } | { refused: string };
+  "cancel-hand-off": { stayed: true } | { left: true };
+  "handed-off": { left: true };
 }
 export type BrainControlResult<R extends BrainControlRequest> = BrainControlResults[R["op"]];
 export type BrainControlReply<Op extends BrainControlOp> = { ok: true; result: BrainControlResults[Op] } | { ok: false; error: string };
@@ -346,6 +365,10 @@ export function brainTakesProject(name: string, branch: string): boolean {
 }
 const commit = text(64, /^[0-9a-f]{40,64}$/);
 const count = int(0, Number.MAX_SAFE_INTEGER);
+const relocationId = text(64, /^[A-Za-z0-9-]+$/);
+const threadId = text(100, /^[A-Za-z0-9-]+$/);
+const packageFile = text(255, /^\w[\w.-]*$/);
+const refused = object({ refused: text(2000) });
 const REQUESTS = variants<BrainControlRequest>({
   status: object({ op: literal("status") }),
   wake: object({ op: literal("wake") }),
@@ -357,6 +380,12 @@ const REQUESTS = variants<BrainControlRequest>({
   "sign-ins": object({ op: literal("sign-ins") }),
   stop: object({ op: literal("stop") }),
   "stop-for-update": object({ op: literal("stop-for-update") }),
+  identity: object({ op: literal("identity") }),
+  "receive-thread": object({ op: literal("receive-thread"), relocation: relocationId, package: packageFile }),
+  "drop-arrival": object({ op: literal("drop-arrival"), relocation: relocationId, threadId }),
+  "hand-off-thread": object({ op: literal("hand-off-thread"), relocation: relocationId, threadId }),
+  "cancel-hand-off": object({ op: literal("cancel-hand-off"), relocation: relocationId, threadId }),
+  "handed-off": object({ op: literal("handed-off"), relocation: relocationId }),
 });
 
 const timestamp = int(0, Number.MAX_SAFE_INTEGER);
@@ -373,6 +402,15 @@ const RESULTS: { [K in BrainControlOp]: Parse<BrainControlResults[K]> } = {
   "sign-ins": object({ codex: nullable(text(100)), github: nullable(text(64)), push: nullable(text(64)) }),
   stop: object({ stopping: literal(true) }),
   "stop-for-update": object({ stopping: literal(true) }),
+  identity: object({ linkKey: text(64, /^[A-Za-z0-9_-]+$/) }),
+  "receive-thread": (value, field) => {
+    if (isRecord(value) && "refused" in value) return refused(value, field);
+    return (isRecord(value) && "lacksBase" in value ? object({ lacksBase: literal(true) }) : object({ received: literal(true) }))(value, field);
+  },
+  "drop-arrival": (value, field) => (isRecord(value) && "received" in value ? object({ received: literal(true) }) : object({ dropped: literal(true) }))(value, field),
+  "hand-off-thread": (value, field) => (isRecord(value) && "refused" in value ? refused : object({ file: packageFile, bytes: count, sha256: text(64, /^[0-9a-f]{64}$/) }))(value, field),
+  "cancel-hand-off": (value, field) => (isRecord(value) && "left" in value ? object({ left: literal(true) }) : object({ stayed: literal(true) }))(value, field),
+  "handed-off": object({ left: literal(true) }),
 };
 
 export function parseControlRequest(line: string): BrainControlRequest {

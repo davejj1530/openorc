@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { listEvents, runs, subagents, threads, type Db, type SubagentRecord } from "@openorc/db";
 import type { RunHandle } from "@openorc/agents";
 import { isSubagentThread, type AgentEvent, type Run, type Thread, type ThreadSummary, type Usage } from "@openorc/protocol";
+import { assertNotMoving } from "./relocation-fence.js";
 import { titleFromPrompt } from "./thread-inputs.js";
 
 type Started = Extract<AgentEvent, { type: "subagent.started" }>;
@@ -42,6 +43,7 @@ export class SubagentService {
   assertExecutable(target: { runId: string } | { threadId: string }): void {
     const child = "runId" in target ? subagents.byRun(this.deps.db, target.runId) : subagents.byThread(this.deps.db, target.threadId);
     if (child) throw new Error("A subagent thread is read-only. Continue in its parent thread.");
+    if ("threadId" in target) assertNotMoving(this.deps.db, target.threadId);
   }
 
   summary(threadId: string): ThreadSummary["subagent"] {

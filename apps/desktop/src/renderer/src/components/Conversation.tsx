@@ -5,7 +5,15 @@ import { WORKSPACE_ID, defaultHarnessId, harnessShortName, isSubagentThread, typ
 import { useCallback, useState } from "react";
 import { useConversationSettings, useConversationTranscript, useRpc, useRpcMutation, useSubmit } from "../lib/client";
 import { useConversationDraft } from "../lib/conversation-draft";
-import { conversationEmptyHint, conversationEmptyTitle, conversationLocation, conversationWorkspaceMode, workspaceDestination } from "../lib/conversation-status-presentation";
+import {
+  conversationEmptyHint,
+  conversationEmptyTitle,
+  conversationLocation,
+  conversationWorkspaceMode,
+  linkFolder,
+  toolPathBase,
+  workspaceDestination,
+} from "../lib/conversation-status-presentation";
 import { openThread, useRouter, type MessageTarget } from "../lib/router";
 import { useSkillCommands } from "../lib/skill-commands";
 import { ConversationVoice, useRunVoices } from "../lib/turn-authors";
@@ -69,10 +77,10 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   const { checkout, changes: composerChanges, git } = useCheckout(thread, project);
 
   const activeRun: Run | undefined = runs[runs.length - 1];
-  const basePath = (scope.kind === "task" ? scope.task.worktreePath : (scope.thread.workingDirectory ?? scope.thread.worktreePath)) ?? project.rootPath;
+  const links = linkFolder(scope, project);
   const target = useMessageTarget(scope);
   const { merged, transcripts, liveTranscript, hasOlder, loadOlder } = useConversationTranscript({ runs, threadId: thread?.id ?? null, target });
-  const footers = useTurnFooters({ threadId: thread?.id ?? null, transcripts, blocks: merged?.blocks, basePath });
+  const footers = useTurnFooters({ threadId: thread?.id ?? null, transcripts, blocks: merged?.blocks, basePath: toolPathBase(scope, links ?? project.rootPath) });
 
   const settings = useConversationSettings({ thread, activeRun });
   const { choice, mode, permission, permissionReady, permissionError } = settings;
@@ -137,7 +145,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
     ...skills,
   ];
 
-  const location = conversationLocation({ scope, project, mode: workspaceMode, basePath, checkoutBranch: checkout.data?.branch, plainFolder: git.state === "none" });
+  const location = conversationLocation({ scope, project, mode: workspaceMode, basePath: links ?? project.rootPath, checkoutBranch: checkout.data?.branch, plainFolder: git.state === "none" });
   const emptyHint = conversationEmptyHint({ task: scope.kind === "task", workspace: project.id === WORKSPACE_ID });
   const placeholder = conversationPlaceholder({ firstTaskRun, working, canSteer, agent: choice?.agent });
 
@@ -147,8 +155,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
         <ConversationVoice.Provider value={voice}>
           <Transcript
             working={working}
-            fileScope={conversation}
-            basePath={basePath}
+            media={links ? { basePath: links, fileScope: conversation } : { fileLinks: "cite" }}
             run={merged}
             scrollKey={conversation.id}
             followKey={sends}

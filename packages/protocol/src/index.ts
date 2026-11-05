@@ -34,6 +34,8 @@ export * from "./preview.js";
 export * from "./push.js";
 export * from "./remote.js";
 export * from "./thread-start.js";
+export * from "./thread-owner.js";
+export * from "./owners.js";
 export * from "./tool-images.js";
 
 export { MAX_TEAM_CONTEXT_BYTES } from "./legacy-migrations.js";

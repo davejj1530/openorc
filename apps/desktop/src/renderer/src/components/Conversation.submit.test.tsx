@@ -39,7 +39,7 @@ type RunSpec = { id: string; agent: AgentKind; live: boolean; mode?: RunMode; pe
 const live = new Map<string, boolean>();
 const project = { id: "project", name: "project", rootPath: "/tmp/project" } as Project;
 const run = ({ id, agent, mode = "act", permissionMode = "trusted" }: RunSpec, index: number) =>
-  ({ id, threadId: "thread", taskId: null, agent, model: "m", mode, permissionMode, state: "running", startedAt: 1000 + index }) as unknown as Run;
+  ({ id, threadId: "thread", taskId: null, agent, model: "m", mode, permissionMode, state: "running", startedAt: 1000 + index, endedAt: null }) as unknown as Run;
 const thread = (overrides: Partial<ThreadSummary>) =>
   ({
     id: "thread",

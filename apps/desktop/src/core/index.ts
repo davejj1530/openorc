@@ -138,7 +138,14 @@ process.parentPort.on("message", (e) => {
   }
   if (e.data?.type === "power") {
     const asleep = e.data.state === "suspend";
-    void corePromise.then((core) => (asleep ? core.cloudStandby.away() : core.cloudStandby.back())).catch((error: unknown) => console.error("[core] cloud takeover", error));
+    void corePromise
+      .then((core) => {
+        if (asleep) return core.cloudStandby.away();
+        // Back from sleep, maybe on another network: the cloud brain is dialed again now, not at the next retry.
+        if (core.brainRouting?.active) core.brainRouting.link.awoke();
+        return core.cloudStandby.back();
+      })
+      .catch((error: unknown) => console.error("[core] cloud takeover", error));
     return;
   }
   const [port, media] = e.ports;

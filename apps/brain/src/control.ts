@@ -27,6 +27,13 @@ const OPS: Record<BrainControlOp, { answerMs: number; use: boolean; inTurn: bool
   stop: { answerMs: 15_000, use: false, inTurn: true },
   // At once, so it never closes the brain after its waker gave up waiting behind a long request.
   "stop-for-update": { answerMs: 5_000, use: false, inTurn: false },
+  identity: { answerMs: 5_000, use: false, inTurn: false },
+  // In turn, so calling a move off never interleaves with taking it.
+  "receive-thread": { answerMs: 300_000, use: true, inTurn: true },
+  "drop-arrival": { answerMs: 30_000, use: true, inTurn: true },
+  "hand-off-thread": { answerMs: 300_000, use: true, inTurn: true },
+  "cancel-hand-off": { answerMs: 30_000, use: true, inTurn: true },
+  "handed-off": { answerMs: 60_000, use: true, inTurn: true },
 };
 
 export type ControlAnswer = (request: BrainControlRequest) => Promise<unknown>;

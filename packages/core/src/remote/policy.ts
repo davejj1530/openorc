@@ -117,6 +117,8 @@ export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {
   "cloud.move": allow,
   // The files a move from the checkout would take with it, for that confirm.
   "threads.movePreview": allow,
+  "cloud.bringToMac": allow,
+  "cloud.keep": allow,
   "threads.start": (params, context) =>
     params.workingDirectory !== undefined ? "Choose a folder for this conversation on your Mac." : (phoneTitle(params.title) ?? storedImages(params.attachments, context)),
   "threads.update": threadUpdate,
@@ -183,6 +185,8 @@ export const remoteReplies: { [M in RemoteMethod]: Reply<M> } = {
   "cloud.offer": same,
   "cloud.move": same,
   "threads.movePreview": same,
+  "cloud.bringToMac": same,
+  "cloud.keep": same,
   "threads.start": same,
   "threads.update": same,
   "threads.switchClaudeAccount": same,
@@ -246,6 +250,8 @@ const pushes: { [T in Broadcast["type"]]: (push: Extract<Broadcast, { type: T }>
   "bench.done": () => null,
   // The phone has no Device panel.
   "device.panel": () => null,
+  // Only for the Mac's windows: phones hear the brain themselves.
+  gap: () => null,
 };
 
 export function remotePush(push: Broadcast): RemotePush | null {

@@ -109,6 +109,8 @@ export const rpcParams = {
   "threads.messages": z.object({ id: z.string() }),
   /** The newest thing the person or an agent said in the conversation, its text clipped for a preview. */
   "threads.lastMessage": z.object({ id: z.string() }),
+  /** The brain's answer to its Mac's copy of a thread: its code now, minus the commits the Mac names. */
+  "threads.snapshot": z.object({ threadId: z.string().min(1).max(200), known: z.array(z.string().regex(/^[0-9a-f]{40,64}$/)).max(32) }).strict(),
   "threads.plans": z.object({ id: z.string() }),
   "threads.implementPlan": z.object({ id: z.string(), planId: z.string(), permissionMode: PermissionPreset }),
   "threads.exportPlan": z.object({
@@ -518,6 +520,7 @@ export interface RpcResults
   "threads.get": ThreadSummary | null;
   "threads.messages": ThreadMessage[];
   "threads.lastMessage": ThreadMessage | null;
+  "threads.snapshot": import("./thread-owner.js").MirrorSnapshot;
   "threads.plans": ConversationPlan[];
   "threads.implementPlan": Run;
   "threads.exportPlan": { path: string };
@@ -650,6 +653,8 @@ export const CorePush = z.discriminatedUnion("type", [
   z.object({ type: z.literal("frame"), frame: Frame }),
   /** Cache keys whose data changed. The renderer refetches. */
   z.object({ type: z.literal("invalidate"), keys: z.array(z.string()) }),
+  /** Frames of these runs were lost on the way from the cloud brain; the renderer reloads them. */
+  z.object({ type: z.literal("gap"), runIds: z.array(z.string()) }),
   DevicePanelPush,
   /** Something worth telling the user about when they are looking elsewhere. */
   z.object({

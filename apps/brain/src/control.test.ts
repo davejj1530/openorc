@@ -93,6 +93,12 @@ describe("the control socket", () => {
       "sign-ins": { op: "sign-ins" },
       stop: { op: "stop" },
       "stop-for-update": { op: "stop-for-update" },
+      identity: { op: "identity" },
+      "receive-thread": { op: "receive-thread", relocation: "r1", package: "r1.thread" },
+      "drop-arrival": { op: "drop-arrival", relocation: "r1", threadId: "t1" },
+      "hand-off-thread": { op: "hand-off-thread", relocation: "r1", threadId: "t1" },
+      "cancel-hand-off": { op: "cancel-hand-off", relocation: "r1", threadId: "t1" },
+      "handed-off": { op: "handed-off", relocation: "r1" },
     } satisfies { [K in BrainControlOp]: Extract<BrainControlRequest, { op: K }> };
     let uses = 0;
     server = await serveControl(
@@ -106,7 +112,20 @@ describe("the control socket", () => {
       expect((await ctl(JSON.stringify(request))).code).toBe(0);
       if (uses > before) used.push(op);
     }
-    expect(used).toEqual(["wake", "pair", "handover", "import-project", "remove-project", "projects", "sign-ins"]);
+    expect(used).toEqual([
+      "wake",
+      "pair",
+      "handover",
+      "import-project",
+      "remove-project",
+      "projects",
+      "sign-ins",
+      "receive-thread",
+      "drop-arrival",
+      "hand-off-thread",
+      "cancel-hand-off",
+      "handed-off",
+    ]);
   });
 
   it("names a bad field without repeating what was sent", async () => {

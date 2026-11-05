@@ -13,7 +13,13 @@ import { rehypeMentionNames } from "../lib/mention-names";
 import { CoversPreview } from "../lib/browser-preview";
 
 type ImageSelection = { src: string; label: string; path: string | null };
-const MediaContext = createContext<{ basePath?: string; fileScope?: FileSelection["scope"]; mentionNames?: ReadonlyMap<string, string> | undefined; openImage: (image: ImageSelection) => void }>({
+const MediaContext = createContext<{
+  basePath?: string;
+  fileScope?: FileSelection["scope"];
+  fileLinks?: "open" | "cite";
+  mentionNames?: ReadonlyMap<string, string> | undefined;
+  openImage: (image: ImageSelection) => void;
+}>({
   openImage: () => {},
 });
 
@@ -21,17 +27,24 @@ export const useThreadMentionNames = () => useContext(MediaContext).mentionNames
 /** The workspace path and image viewer, for images drawn outside Markdown like the task editor's. */
 export const useThreadMedia = () => useContext(MediaContext);
 
+/** Where a transcript's files are: the folder its links resolve in and the scope its file panel reads, or elsewhere. */
+export interface MediaScope {
+  basePath?: string;
+  fileScope?: FileSelection["scope"];
+  /** "cite" when the files live elsewhere: links to them read as references. */
+  fileLinks?: "open" | "cite";
+}
+
 export function ThreadMedia({
   children,
   basePath,
   scopeKey,
   fileScope,
+  fileLinks = "open",
   mentionNames: ownNames,
-}: {
+}: MediaScope & {
   children: ReactNode;
-  basePath?: string;
   scopeKey: string;
-  fileScope?: FileSelection["scope"];
   mentionNames?: ReadonlyMap<string, string> | undefined;
 }) {
   const inherited = useContext(MediaContext);
@@ -50,8 +63,8 @@ export function ThreadMedia({
   const context = useMemo(() => {
     let scope: FileSelection["scope"] | undefined;
     if (scopeKind && scopeId !== undefined) scope = scopeKind === "project" ? { kind: scopeKind, id: scopeId, workingDirectory: scopeDirectory } : { kind: scopeKind, id: scopeId };
-    return { basePath, openImage, fileScope: scope, mentionNames };
-  }, [basePath, openImage, scopeKind, scopeId, scopeDirectory, mentionNames]);
+    return { basePath, openImage, fileScope: scope, fileLinks, mentionNames };
+  }, [basePath, openImage, scopeKind, scopeId, scopeDirectory, fileLinks, mentionNames]);
   return (
     <MediaContext.Provider value={context}>
       {children}
@@ -208,11 +221,11 @@ export const threadUrlTransform: UrlTransform = (url, key, node) => (localPath(u
 
 /** Resolve relative citations in the workspace before Markdown's URL sanitizer runs. */
 export function ThreadRichText(props: StreamdownProps) {
-  const { basePath, mentionNames } = useContext(MediaContext);
+  const { basePath, fileLinks, mentionNames } = useContext(MediaContext);
   const rehypePlugins = useMemo<NonNullable<StreamdownProps["rehypePlugins"]>>(() => {
     const plugins: NonNullable<StreamdownProps["rehypePlugins"]> = [
       defaultRehypePlugins.raw!,
-      [localFileLinks, { basePath }],
+      [localFileLinks, { basePath, cite: fileLinks === "cite" }],
       ...Object.entries(defaultRehypePlugins)
         .filter(([name]) => name !== "raw")
         .map(([, plugin]) => plugin),
@@ -221,7 +234,7 @@ export function ThreadRichText(props: StreamdownProps) {
     // serializes as {}, which would reuse names from another conversation.
     if (mentionNames?.size) plugins.push([rehypeMentionNames, { names: [...mentionNames] }]);
     return plugins;
-  }, [basePath, mentionNames]);
+  }, [basePath, fileLinks, mentionNames]);
   const text = typeof props.children === "string" ? citationLinks(props.children) : props.children;
   return (
     <RichText {...props} components={threadMarkdownComponents} rehypePlugins={rehypePlugins} urlTransform={threadUrlTransform}>
@@ -251,20 +264,35 @@ function imageGenerationLabel(status: string): string {
   if (status === "error") return "Image generation failed";
   return "Image generation interrupted";
 }
-/** Normalize local file URLs before the standard sanitizer removes file: links. */
-function localFileLinks(options?: { basePath?: string }) {
+/** A link to a file this Mac cannot open: its words, the path on hover. */
+function cite(node: MarkdownNode, url: string): void {
+  node.tagName = "span";
+  node.properties = { title: url };
+}
+
+/** A local link's URL as a path under the workspace, so the sanitizer keeps it. */
+function resolveLink(node: MarkdownNode, key: "href" | "src", url: string, basePath: string | undefined): void {
+  const reference = key === "href" ? fileReference(url, basePath) : null;
+  if (reference && node.properties && (basePath || /^file:/i.test(url) || reference.line)) {
+    node.properties[key] = reference.path.split("/").map(encodeURIComponent).join("/") + (reference.line ? `#L${reference.line}${reference.endLine ? `-L${reference.endLine}` : ""}` : "");
+  } else if (basePath || /^file:/i.test(url)) {
+    const path = localPath(url, basePath);
+    if (path && node.properties) node.properties[key] = path.split("/").map(encodeURIComponent).join("/");
+  }
+}
+
+/**
+ * Normalize local file URLs before the standard sanitizer removes file: links. With `cite`, the files live elsewhere:
+ * a link to one reads as its words, the path on hover, as the phone shows it.
+ */
+function localFileLinks(options?: { basePath?: string; cite?: boolean }) {
   return (tree: MarkdownNode) => {
     const visit = (node: MarkdownNode) => {
       const key = localLinkAttribute(node.tagName);
       const url = key ? node.properties?.[key] : undefined;
       if (key && typeof url === "string") {
-        const reference = key === "href" ? fileReference(url, options?.basePath) : null;
-        if (reference && node.properties && (options?.basePath || /^file:/i.test(url) || reference.line)) {
-          node.properties[key] = reference.path.split("/").map(encodeURIComponent).join("/") + (reference.line ? `#L${reference.line}${reference.endLine ? `-L${reference.endLine}` : ""}` : "");
-        } else if (options?.basePath || /^file:/i.test(url)) {
-          const path = localPath(url, options?.basePath);
-          if (path && node.properties) node.properties[key] = path.split("/").map(encodeURIComponent).join("/");
-        }
+        if (options?.cite && key === "href" && localPath(url, ".")) cite(node, url);
+        else resolveLink(node, key, url, options?.basePath);
       }
       node.children?.forEach(visit);
     };

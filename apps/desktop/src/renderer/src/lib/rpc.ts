@@ -139,6 +139,9 @@ class CoreClient implements CoreConnection {
       case "invalidate":
         this.push({ type: "invalidate", keys: msg.keys });
         return;
+      case "gap":
+        this.push({ type: "gap", runIds: msg.runIds });
+        return;
       case "device.panel":
         emit(this.devicePanelListeners, msg);
         return;

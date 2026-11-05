@@ -4,6 +4,7 @@ import {
   isDeviceMethod,
   isRemoteMethod,
   isSessionMethod,
+  OWNER_SESSION_METHODS,
   PHONE_CAPABILITIES,
   phoneEvents,
   PREVIEW_INPUT_WORDS,
@@ -13,6 +14,7 @@ import {
   type DeviceMethod,
   type DeviceParams,
   type RemotePush,
+  type RpcMethod,
   type RpcRequest,
   type SessionMethod,
   type SessionParams,
@@ -50,6 +52,8 @@ export interface SessionDeps {
   preview: Pick<PreviewCasters, "watch" | "unwatch" | "frame" | "input"> | null;
   /** Whether a thread's Preview may be watched: the thread exists and it is visible. */
   watchable(threadId: string): boolean;
+  /** The brain's own Mac: the methods its router forwards, answered as the core answers its windows. */
+  owner?: boolean;
 }
 
 /**
@@ -107,6 +111,11 @@ export class RemoteSession {
 
   wants(runId: string): boolean {
     return this.interest.has(runId);
+  }
+
+  /** Whether the other end wants any run's frames: it has a conversation open. */
+  get watching(): boolean {
+    return this.interest.size > 0;
   }
 
   onClose(listener: () => void): void {
@@ -203,10 +212,19 @@ export class RemoteSession {
       return { type: "rpc.result", id, result: await this.deps.device(this.deviceId, method, parsed.data) };
     }
     if (isSessionMethod(method)) return this.ownSession(id, method, params);
+    if (this.deps.owner) return this.forOwner(id, method, params);
     const admission = admitRemoteRequest(method, params, this.deps.guard);
     if (!admission.ok || !isRemoteMethod(method)) return { type: "rpc.error", id, message: admission.ok ? "This is not available from a phone." : admission.message };
     const reply = await this.deps.answer({ type: "rpc", id, method, params: remoteParams(method, params, this.capabilities) }, { kind: "phone", deviceId: this.deviceId });
     return reply.type === "rpc.result" ? { ...reply, result: remoteReply(method, reply.result as never, { words: this.words, roots: this.deps.roots, capabilities: this.capabilities }) } : reply;
+  }
+
+  /** The owner's own methods: what its router may forward, guarded as a phone's unless its Mac may do more, unshaped. */
+  private async forOwner(id: number, method: string, params: unknown): Promise<RpcReply> {
+    if (!OWNER_SESSION_METHODS.has(method as RpcMethod)) return { type: "rpc.error", id, message: "This is not available to the Mac." };
+    const admission = isRemoteMethod(method) ? admitRemoteRequest(method, params, this.deps.guard, "owner") : { ok: true as const };
+    if (!admission.ok) return { type: "rpc.error", id, message: admission.message };
+    return this.deps.answer({ type: "rpc", id, method, params }, { kind: "phone", deviceId: this.deviceId });
   }
 
   /** A method about this session itself: its one watch of a thread's Preview, and its input on what it watches. */

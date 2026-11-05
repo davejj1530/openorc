@@ -24,6 +24,10 @@ import type { RunService } from "./runs.js";
 import type { EnvSnapshot } from "./shell-environment.js";
 import type { ThreadService } from "./threads.js";
 import { executionProject } from "./workspace-home.js";
+import { ThreadRelocations } from "./relocations.js";
+import { RelocationCoordinator } from "./relocation-coordinator.js";
+import { brainChannel } from "./cloud-brain-channel.js";
+import type { WorkspaceService } from "./workspace.js";
 
 /** The cloud brain as this Mac keeps it, made with the Vercel connection the Mac's sandboxes use. */
 function cloudBrain(
@@ -48,8 +52,8 @@ function cloudBrain(
   });
 }
 
-/** The cloud's parts, made together: where sandboxes run, how agents sign in there, and the sandboxes themselves. */
-export function createCloud(input: {
+/** What the cloud's parts are made from. */
+export interface CloudInput {
   db: Db;
   ledger: LedgerWriter;
   options: OpenOrcOptions;
@@ -58,9 +62,15 @@ export function createCloud(input: {
   /** Made after the cloud's parts, so they are reached when used. */
   runs: () => RunService;
   threads: () => ThreadService;
+  workspaces: () => WorkspaceService;
   invalidate: (keys: string[]) => void;
+  /** The cloud brain changed: set up, removed, woken. */
+  brainChanged?: () => void;
   log: Logger;
-}): {
+}
+
+/** The cloud's parts, made together: where sandboxes run, how agents sign in there, and the sandboxes themselves. */
+export function createCloud(input: CloudInput): {
   settings: CloudSettings;
   tokens: ClaudeCloudTokens;
   codex: CodexCloudLogin;
@@ -70,6 +80,9 @@ export function createCloud(input: {
   handoff: CloudHandoff;
   standby: CloudStandby;
   brain: CloudBrain;
+  relocations: ThreadRelocations;
+  /** Null on the brain itself, which never coordinates a move. */
+  coordinator: RelocationCoordinator | null;
 } {
   const { db, options, accounts, environment, invalidate, log } = input;
   const settings = new CloudSettings(options.cloudSecrets, { brainRegion: () => brain.region() });
@@ -95,7 +108,7 @@ export function createCloud(input: {
     push: () => savedPushKey(db, options.pushSecrets),
     codex: new CodexBrowserSignIn({ ...codexDeps, changed: () => invalidate(["cloud-brain"]) }),
   };
-  const brain: CloudBrain = cloudBrain(db, options, tokens, options.cloudCredentials ?? (() => settings.credentials()), signIns, invalidate);
+  const brain: CloudBrain = cloudBrain(db, options, tokens, options.cloudCredentials ?? (() => settings.credentials()), signIns, (keys) => [invalidate(keys), input.brainChanged?.()]);
   const agentEnvironment = cloudAgentEnvironment({ accounts, tokens, snapshot: environment });
   // On a cloud-only host the cloud login is the only one, so whether Codex is signed in changes with it.
   const codexLogin = new CodexCloudLogin(options.codexCloudSecrets, { ...codexDeps, changed: () => invalidate(options.cloudOnly ? ["cloud", "system", "models"] : ["cloud"]) });
@@ -141,7 +154,52 @@ export function createCloud(input: {
     invalidate,
     log,
   });
-  return { settings, tokens, codex: codexLogin, cloud, checks, sandboxes: list, handoff, standby, brain };
+  const { relocations, coordinator } = createRelocations({ input, sessions, cloud, runs, brain, changed });
+  return { settings, tokens, codex: codexLogin, cloud, checks, sandboxes: list, handoff, standby, brain, relocations, coordinator };
+}
+
+/** Moving threads between this host and the other brain; the Mac alone coordinates. */
+function createRelocations({
+  input,
+  sessions,
+  cloud,
+  runs,
+  brain,
+  changed,
+}: {
+  input: CloudInput;
+  sessions: CloudSessions;
+  cloud: CloudWorkspaceService;
+  runs: CloudSandboxRuns & CloudStandbyDeps["runs"];
+  brain: CloudBrain;
+  changed: (threadId: string) => void;
+}): { relocations: ThreadRelocations; coordinator: RelocationCoordinator | null } {
+  const { db, options, log } = input;
+  const relocations = new ThreadRelocations({
+    db,
+    dataDir: options.dataDir,
+    ledger: input.ledger,
+    sessions,
+    threadPath: (thread, project) => input.workspaces().threadPath(thread, project),
+    cloud,
+    runs,
+    changed,
+    drain: () => input.threads().recoverQueue(),
+    log,
+  });
+  if (options.cloudOnly) return { relocations, coordinator: null };
+  const coordinator = new RelocationCoordinator({
+    db,
+    brain: options.brainChannel ?? brainChannel(brain),
+    relocations,
+    runs,
+    toWorktree: (id) => input.threads().moveWorkspace(id, "worktree"),
+    cloud,
+    changed,
+    log,
+    ...options.relocationTiming,
+  });
+  return { relocations, coordinator };
 }
 
 export type { ClaudeCloudTokens, CloudBrain, CloudChecks, CloudHandoff, CloudSandboxes, CloudSettings, CloudStandby, CodexCloudLogin };

@@ -6,6 +6,7 @@ import type { CodexCloudLogin } from "../services/codex-cloud-login.js";
 import type { CloudHandoff } from "../services/cloud-handoff.js";
 import type { CloudSandboxes } from "../services/cloud-sandboxes.js";
 import type { CloudSettings } from "../services/cloud-settings.js";
+import type { RelocationCoordinator } from "../services/relocation-coordinator.js";
 import type { Handlers } from "./types.js";
 
 type CloudMethod =
@@ -29,6 +30,8 @@ type CloudMethod =
   | "cloud.sandboxes"
   | "cloud.offer"
   | "cloud.move"
+  | "cloud.bringToMac"
+  | "cloud.keep"
   | "cloud.sandboxes.remove"
   | "cloud.brain.status"
   | "cloud.brain.create"
@@ -53,6 +56,8 @@ interface Dependencies {
   sandboxes: CloudSandboxes;
   handoff: CloudHandoff;
   brain: CloudBrain;
+  /** Moves threads to the cloud brain and back; null on the brain itself. */
+  coordinator: RelocationCoordinator | null;
   /** Cloud threads are offered in this build. */
   offered: boolean;
   invalidate: (keys: string[]) => void;
@@ -60,7 +65,7 @@ interface Dependencies {
 
 const noCodex = (error: string | null) => ({ mode: null, email: null, plan: null, refreshedAt: null, signingIn: false, error });
 
-export function createCloudHandlers({ settings, tokens, checks, codex, sandboxes, handoff, brain, offered, invalidate }: Dependencies): Pick<Handlers, CloudMethod> {
+export function createCloudHandlers({ settings, tokens, checks, codex, sandboxes, handoff, brain, coordinator, offered, invalidate, removed }: Dependencies): Pick<Handlers, CloudMethod> {
   const status = async (): Promise<CloudStatus> => {
     const vercel = await settings.status();
     const check = checks.status();
@@ -103,12 +108,25 @@ export function createCloudHandlers({ settings, tokens, checks, codex, sandboxes
     "cloud.sandboxes": () => sandboxes.list(),
     "cloud.offer": async () => {
       if (!offered) return { offered: false, provider: null };
-      return { offered: true, provider: (await settings.credentials()) ? "vercel" : "local" };
+      const moves = await brain.moves();
+      const projects = (moves?.projects ?? []).flatMap((copy) => (copy.brainId ? [{ mac: copy.id, cloud: copy.brainId }] : []));
+      return { offered: true, provider: (await settings.credentials()) ? "vercel" : "local", brain: moves ? { host: moves.linkKey, projects } : null };
     },
+    // With a cloud brain set up, the brain takes the thread; without one, it moves to a sandbox driven from this Mac.
     "cloud.move": async ({ threadId }) => {
-      const thread = await handoff.move(threadId);
+      const thread = coordinator && (await coordinator.ready()) ? await coordinator.toCloud(threadId) : await handoff.move(threadId);
       invalidate(["threads", `thread:${threadId}`, "cloud"]);
       return thread;
+    },
+    "cloud.bringToMac": ({ threadId }) => {
+      if (!coordinator) throw new Error("Only the Mac brings conversations home.");
+      coordinator.bringToMac(threadId);
+      return null;
+    },
+    "cloud.keep": async ({ threadId }) => {
+      await coordinator?.cancel(threadId);
+      invalidate(["threads", `thread:${threadId}`]);
+      return null;
     },
     "cloud.sandboxes.remove": async ({ name }) => {
       await sandboxes.remove(name);

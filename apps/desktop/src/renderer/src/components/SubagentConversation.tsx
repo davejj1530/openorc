@@ -5,12 +5,15 @@ import { openThread, useRouter } from "../lib/router";
 import { Transcript } from "./Transcript";
 import { Button } from "./ui";
 import { ConversationVoice, useRunVoices } from "../lib/turn-authors";
+import { subagentLinkFolder } from "../lib/conversation-status-presentation";
 
 export function SubagentConversation({ thread, project }: { thread: ThreadSummary; project: Project }) {
   const history = useRpc("runs.listForThread", { threadId: thread.id });
   const target = useRouter(({ route }) => (route.view === "thread" && route.threadId === thread.id ? route.message : undefined));
   const { merged, hasOlder, loadOlder } = useConversationTranscript({ runs: history.data ?? [], threadId: thread.id, target });
   const voice = useRunVoices({ authors: new Map() }, history.data ?? [], thread);
+  const parent = useRpc("threads.get", { id: thread.parentThreadId ?? "" }, { enabled: thread.owner?.brain === "cloud" && Boolean(thread.parentThreadId) });
+  const links = subagentLinkFolder(thread, parent.data, project);
   return (
     <ConversationVoice.Provider value={voice}>
       <div className="h-full min-w-0 flex flex-col min-h-0">
@@ -19,7 +22,7 @@ export function SubagentConversation({ thread, project }: { thread: ThreadSummar
             <Transcript
               run={merged}
               scrollKey={thread.id}
-              basePath={thread.workingDirectory ?? project.rootPath}
+              media={links ? { basePath: links } : { fileLinks: "cite" }}
               working={thread.subagent?.status === "running"}
               hasOlder={hasOlder}
               onLoadOlder={loadOlder}

@@ -242,6 +242,10 @@ class FakeVercel implements BrainApi {
         for (const file of files) machine.files.set(file.path, Buffer.from(file.content));
         machine.changes.push(...files.map((file) => `write ${file.path}`));
       },
+      readFile: async (file) => {
+        machine.changes.push(`read ${file}`);
+        return machine.files.get(file) ?? null;
+      },
       delete: async (options) => {
         this.deleted.push({ name, options });
         this.sandboxes.delete(name);
@@ -280,7 +284,11 @@ class FakeVercel implements BrainApi {
       if (vm.state !== "running") throw new APIError(new Response(null, { status: 410 }));
       return vm.runCommand(params);
     };
-    return Object.create(vm, { runCommand: { value: runCommand } }) as FakeVm;
+    const readFile: BrainVm["readFile"] = async (file) => {
+      if (vm.state !== "running") throw new APIError(new Response(null, { status: 410 }));
+      return vm.readFile(file);
+    };
+    return Object.create(vm, { runCommand: { value: runCommand }, readFile: { value: readFile } }) as FakeVm;
   }
 
   async list() {
@@ -324,7 +332,7 @@ describe("provisioning a brain", () => {
     const machine = vercel.machine;
     expect(machine.changes).toEqual([
       "apt procps util-linux gh",
-      `folders ${ROOT} ${ROOT}/app ${ROOT}/data ${ROOT}/run ${ROOT}/logs ${ROOT}/npm ${ROOT}/inbox`,
+      `folders ${ROOT} ${ROOT}/app ${ROOT}/data ${ROOT}/run ${ROOT}/logs ${ROOT}/npm ${ROOT}/inbox ${ROOT}/outbox`,
       "npm @anthropic-ai/claude-code @openai/codex",
       `write ${ROOT}/inbox/brain-brain-v1.tgz`,
       "unpack brain-v1",
@@ -633,6 +641,31 @@ describe("asking and removing a brain", () => {
     vercel.sandboxes.get("brain")!.state = "stopped";
     machine.changes.length = 0;
     await expect(brain.importProject({ ...project, name: "other", bundle })).rejects.toThrow(BrainUnavailable);
+    expect(machine.changes).toEqual([]);
+    expect(vercel.sandboxes.get("brain")!.state).toBe("stopped");
+  });
+
+  it("moves a thread's package into the running brain and reads one back, never waking a sleeping one", async () => {
+    const { vercel, brain, machine } = await provisioned();
+    const heard: BrainControlRequest[] = [];
+    machine.answer = (request) => {
+      heard.push(request);
+      if (request.op !== "receive-thread") return { code: 69 };
+      const uploaded = machine.files.get(`${ROOT}/inbox/${request.package}`);
+      const result = uploaded?.toString() === "thread package" ? { received: true as const } : { refused: "No such package." };
+      return { code: 0, stdout: `${encodeControlReply<"receive-thread">({ ok: true, result })}\n` };
+    };
+    expect(await brain.receiveThread("relocation-1", Buffer.from("thread package"))).toEqual({ received: true });
+    expect(heard).toEqual([{ op: "receive-thread", relocation: "relocation-1", package: "relocation-1.thread" }]);
+    machine.files.set(`${ROOT}/outbox/relocation-2.thread`, Buffer.from("package going home"));
+    expect(Buffer.from(await brain.readOutbox("relocation-2.thread")).toString()).toBe("package going home");
+    await expect(brain.readOutbox("missing.thread")).rejects.toThrow("no longer has");
+    expect(vercel.gets.every((get) => !get.resume)).toBe(true);
+
+    vercel.sandboxes.get("brain")!.state = "stopped";
+    machine.changes.length = 0;
+    await expect(brain.readOutbox("relocation-2.thread")).rejects.toThrow(BrainUnavailable);
+    await expect(brain.receiveThread("relocation-3", Buffer.from("thread package"))).rejects.toThrow(BrainUnavailable);
     expect(machine.changes).toEqual([]);
     expect(vercel.sandboxes.get("brain")!.state).toBe("stopped");
   });

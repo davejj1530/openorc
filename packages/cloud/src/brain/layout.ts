@@ -50,6 +50,8 @@ export interface BrainLayout {
   npm: string;
   /** Uploads waiting to be installed or imported. */
   inbox: string;
+  /** Threads' packages waiting for the Mac to read them. */
+  outbox: string;
   /** Every folder machine setup makes, under a root only the default user can open. */
   folders: string[];
 }
@@ -75,6 +77,7 @@ export function brainLayout(root: string): BrainLayout {
     log: at("logs", "brain.log"),
     npm: at("npm"),
     inbox: at("inbox"),
+    outbox: at("outbox"),
   };
-  return { ...layout, folders: [layout.apps, layout.data, layout.run, layout.logs, layout.npm, layout.inbox] };
+  return { ...layout, folders: [layout.apps, layout.data, layout.run, layout.logs, layout.npm, layout.inbox, layout.outbox] };
 }

@@ -21,7 +21,7 @@ import { claudeAccounts, projects, redact, type Db } from "@openorc/db";
 import type { BrainRegion, CloudBrainMachine, CloudBrainPairing, CloudBrainProject, CloudBrainSignIns, CloudBrainStatus, CloudBrainStep, Project } from "@openorc/protocol";
 import type { ClaudeCloudTokens } from "./claude-cloud-tokens.js";
 import { BrainDoorKeeper, vercelDoors, type BrainDoors } from "./cloud-brain-door.js";
-import { copyBranch, keptOwn, moved, seen, sendProject, switchedOn, type BrainProject } from "./cloud-brain-projects.js";
+import { blocked, copyBranch, hasThreads, keptOwn, moved, seen, sendProject, switchedOn, type BrainProject } from "./cloud-brain-projects.js";
 import { NO_SIGN_INS, claimsSignIns, heardSignIns, signInChanges, signInsView, switchGitHub, type SignInRecord, type SignInSources } from "./cloud-brain-signins.js";
 import { apiKeyAuth } from "./codex-cloud-login.js";
 import type { ProtectedSecretStore } from "./extraction-credentials.js";
@@ -30,7 +30,6 @@ import type { ProtectedSecretStore } from "./extraction-credentials.js";
 const BRAIN_NAME = "Cloud";
 const storageError = "Cannot access protected storage for the cloud brain. Unlock your OS keychain and retry.";
 const unavailable = "The cloud brain isn't available in this build.";
-const hasThreads = "It has threads on the cloud brain.";
 
 /** A brain this build can install. Read only when installing it, since it is tens of megabytes. */
 export interface BrainBundleSource {
@@ -40,8 +39,8 @@ export interface BrainBundleSource {
   door?: DoorBundle;
 }
 
-/** The parts of BrainMachine this uses; tests pass a stand-in. */
-export type BrainMachineLike = Pick<BrainMachine, "status" | "provision" | "wake" | "control" | "importProject" | "remove">;
+/** The parts of BrainMachine this uses; tests pass a stand-in. Moving threads uses the transfers too. */
+export type BrainMachineLike = Pick<BrainMachine, "status" | "provision" | "wake" | "control" | "importProject" | "remove"> & Partial<Pick<BrainMachine, "receiveThread" | "readOutbox">>;
 
 /** The brain's machine on a team. Its project is made only when `create`; otherwise a team without one has none. */
 export type OpenBrainMachine = (access: BrainAccess, create: boolean) => Promise<BrainMachineLike | null>;
@@ -70,6 +69,8 @@ interface Stored extends SignInRecord {
   version?: string;
   /** The projects switched on for it. Records from before lack them. */
   projects?: BrainProject[];
+  /** The brain's link key, learned at its first start, which this Mac dials it with. */
+  linkKey?: string;
 }
 
 type Activity = { kind: "setting-up"; step: CloudBrainStep } | { kind: "removing" } | { kind: "waking" } | { kind: "sending" } | { kind: "updating" };
@@ -164,6 +165,38 @@ export class CloudBrain {
    */
   async region(): Promise<BrainRegion | null> {
     return (await this.read().catch(() => null))?.region ?? null;
+  }
+
+  /** What moving threads needs of the brain this Mac set up, once it has started; null before. Never wakes it. */
+  async moves(): Promise<{ address: string; key: BrainKey; linkKey: string | null; projects: BrainProject[] } | null> {
+    const stored = await this.read().catch(() => null);
+    return stored?.ready && stored.address ? { address: stored.address, key: brainKeyFrom(stored.key), linkKey: stored.linkKey ?? null, projects: stored.projects ?? [] } : null;
+  }
+
+  /** `work` on the brain's machine, in turn with every other operation; `wake` starts the brain first, as Wake does. */
+  withMachine<T>(wake: boolean, work: (machine: BrainMachineLike) => Promise<T>): Promise<T> {
+    if (!wake) return this.serialize(async () => work(await this.machine()));
+    return this.run({ kind: "waking" }, async () => {
+      const machine = await this.machine();
+      await this.wakeUp(machine);
+      return work(machine);
+    });
+  }
+
+  /** The brain's link key, as the brain itself said it, which this Mac dials it with. */
+  async rememberLinkKey(linkKey: string): Promise<void> {
+    await this.serialize(async () => {
+      const stored = await this.stored();
+      if (stored.linkKey !== linkKey) await this.write({ ...stored, linkKey });
+    });
+  }
+
+  /** The brain's machine no longer exists on its team, and its ledger is gone with it. */
+  async machineGone(): Promise<boolean> {
+    const stored = await this.read();
+    if (!stored) return true;
+    const machine = await this.open({ token: (await this.vercel()).token, teamId: stored.teamId }, false);
+    return !machine || (await machine.status()).state === "missing";
   }
 
   /** This Mac's projects, Workspace aside, and which the brain has a copy of. Never wakes the brain. */
@@ -443,8 +476,9 @@ export class CloudBrain {
   }
 
   /**
-   * Hears which copies the brain has, then sends each project switched on whose branch moved since the brain's copy
-   * took it, one at a time. Never wakes the brain: one that went to sleep meanwhile is refreshed at its next wake.
+   * Hears which copies the brain has, then, unless only counting, sends each project switched on whose branch moved since
+   * the brain's copy took it, one at a time. Never wakes the brain: one that went to sleep meanwhile is refreshed at its
+   * next wake.
    */
   private async refreshProjects(): Promise<void> {
     const stored = await this.read();
@@ -748,13 +782,6 @@ export class CloudBrain {
     }
     this.cache = next;
   }
-}
-
-/** Why a project's switch cannot move now: on, the brain has threads in its copy; off, it cannot have a copy. */
-async function blocked(project: Project, record: BrainProject | undefined): Promise<string | null> {
-  if (record) return record.threads ? hasThreads : null;
-  const copy = await copyBranch(project);
-  return "blocked" in copy ? copy.blocked : null;
 }
 
 function sent({ id, name, default: isDefault, tokenAt }: Sent): Sent {

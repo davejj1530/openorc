@@ -105,10 +105,10 @@ async function settle() {
   act(() => runStore.flush());
 }
 
-async function show() {
+async function show(shown: ThreadSummary = thread) {
   const view = render(
     <QueryClientProvider client={new QueryClient()}>
-      <Conversation scope={{ kind: "thread", thread }} project={project} />
+      <Conversation scope={{ kind: "thread", thread: shown }} project={project} />
     </QueryClientProvider>,
   );
   await settle();
@@ -199,4 +199,24 @@ it("keeps the footers while the next reply streams, so finished turns keep their
   });
   expect(result.current.merged?.blocks.at(-1)).toMatchObject({ text: "Working", streaming: true });
   expect(result.current.footers).toBe(footers);
+});
+
+it("names a sandbox conversation's changed files as its saved diff lists them, never by the sandbox's own paths", async () => {
+  const edit = (runId: string, ts: number, path: string): AgentEvent[] => [
+    { type: "tool.started", runId, ts, toolCallId: `${runId}-edit`, name: "Edit", input: { file_path: path }, parentToolCallId: null, eventId: next() },
+    { type: "tool.completed", runId, ts: ts + 1, toolCallId: `${runId}-edit`, name: "Edit", output: "ok", isError: false, input: { file_path: path }, eventId: next() },
+  ];
+  ledger.set("A", [started("A", 1000), ask("A", 0, 1010), ...edit("A", 1011, "/vercel/sandbox/repo/src/footer.tsx"), ...reply("A", 0, 1013)]);
+  const history = [checkpoint("starting", 1005), checkpoint("A1", 1015, { runId: "A", turn: 1 })];
+  const cloud = { ...thread, workspaceMode: "worktree", cloud: { provider: "vercel", state: "ready", step: null, setup: false, error: null } } as ThreadSummary;
+  serve([run("A", 1000)], history, {});
+  await show(cloud);
+  expect(screen.queryByRole("region", { name: "Code changes" })).toBeNull();
+  cleanup();
+  serve([run("A", 1000)], history, { A1: changed("src/footer.tsx") });
+  await show(cloud);
+  const card = screen.getByRole("region", { name: "Code changes" });
+  fireEvent.click(screen.getByRole("button", { name: "Show 1 file" }));
+  expect(card.textContent).toContain("footer.tsx");
+  expect(card.textContent).not.toContain("/vercel");
 });

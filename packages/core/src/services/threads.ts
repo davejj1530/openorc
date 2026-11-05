@@ -1,4 +1,4 @@
-import { audit, checkpoints, claudeAccounts, messages, plans, retiredTeams, runs as runRepo, settings, subagents, tasks, threadQueue, threads, type CloudProviderId, type Db } from "@openorc/db";
+import { audit, checkpoints, claudeAccounts, messages, plans, retiredTeams, runs as runRepo, settings, tasks, threadQueue, threads, type CloudProviderId, type Db } from "@openorc/db";
 import { diffStat, git, pinObject, switchFiles, treeHash, workspaceTransfer } from "@openorc/git";
 import {
   WORKSPACE_ID,
@@ -33,6 +33,7 @@ import { ThreadMoves, fileChanges } from "./thread-moves.js";
 import { assertMutableThread } from "./thread-mutations.js";
 import { applyRequestedPolicy } from "./thread-policy-requests.js";
 import { ThreadSessions, switchedClaudeAccount, type ClaudeFolder } from "./thread-session.js";
+import { summarizeThread } from "./thread-summary.js";
 import { ThreadTaskExecution } from "./thread-task-execution.js";
 import { directory, executionProject, worktreeShared } from "./workspace-home.js";
 import { workspaceWriters, type WorkspaceWriters } from "./workspace-writers.js";
@@ -113,33 +114,7 @@ export class ThreadService {
   }
 
   private summarize(t: Thread): ThreadSummary {
-    const own = tasks.list(this.db, { threadId: t.id });
-    const activity = this.runs.threadActivity(t.id);
-    return {
-      ...t,
-      subagent: this.runs.subagents.summary(t.id),
-      hasStarted: Boolean(this.db.stmt("SELECT 1 FROM runs WHERE thread_id = ? LIMIT 1").get(t.id)),
-      teamInstanceId: null,
-      agents: [t.agent],
-      activity,
-      backgroundCommands: this.runs.threadBackgroundCommands(t.id),
-      // Activity the user has not looked at yet, once the agent is done with it.
-      unread: activity === "idle" && (t.seenAt === null || t.lastActivityAt > t.seenAt),
-      session: this.runs.threadSession(t.id),
-      context: this.runs.threadContext(t.id),
-      queued: threadQueue.list(this.db, t.id),
-      cloud: this.workspaces.cloudState(t.id),
-      lastAgentEventAt: this.runs.threadLastAgentEventAt(t.id),
-      liveRunId: this.liveRunId(t.id),
-      taskCount: own.filter((x) => x.status !== "archived").length,
-      openTaskCount: own.filter((x) => x.status === "proposed" || x.status === "backlog" || x.status === "in_progress" || x.status === "review").length,
-    };
-  }
-
-  /** A hosted child's run belongs to its parent provider session. */
-  private liveRunId(threadId: string): string | null {
-    const child = subagents.byThread(this.db, threadId);
-    return child?.status === "running" ? child.runId : (this.runs.liveRunForThread(threadId)?.id ?? null);
+    return summarizeThread({ db: this.db, runs: this.runs, workspaces: this.workspaces }, t);
   }
 
   private thread(id: string): Thread {

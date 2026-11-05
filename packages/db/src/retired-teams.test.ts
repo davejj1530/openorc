@@ -51,7 +51,7 @@ it("upgrades saved teams without removing their history or work, and cancels sch
       schedule.id,
       snapshot,
     );
-    db.raw.exec(`PRAGMA user_version=${migrations.length - 1}`);
+    db.raw.exec(`PRAGMA user_version=${migrations.findIndex((migration) => typeof migration === "string" && migration.includes("Teams are no longer supported."))}`);
     db.close();
     db = Db.open(file);
     expect(schedules.get(db, schedule.id)).toMatchObject({ enabled: false, retiredTeam: true, executionTarget: null });

@@ -100,6 +100,8 @@ export interface BrainVm {
   update(changes: Partial<BrainSettings>): Promise<void>;
   runCommand(params: { cmd: string; args: string[]; cwd: string; sudo?: boolean; detached: true; stdin?: boolean }): Promise<BrainCommand>;
   writeFiles(files: { path: string; content: Uint8Array }[]): Promise<void>;
+  /** Null when there is no such file. */
+  readFile(path: string): Promise<Uint8Array | null>;
   delete(options: { deleteOrphanSnapshots: true }): Promise<void>;
 }
 
@@ -155,6 +157,7 @@ function brainVm(sandbox: SdkSandbox, resumes: boolean): BrainVm {
     // The sandbox's own runCommand and writeFiles resume it once stopped, as when it stops between a look and a command.
     runCommand: (params) => (resumes ? sandbox.runCommand(params) : sandbox.currentSession().runCommand(params)),
     writeFiles: (files) => (resumes ? sandbox.writeFiles(files) : sandbox.currentSession().writeFiles(files)),
+    readFile: (file) => (resumes ? sandbox.readFileToBuffer({ path: file }) : sandbox.currentSession().readFileToBuffer({ path: file })),
     delete: (options) => sandbox.delete(options),
   };
 }
@@ -490,6 +493,24 @@ export class BrainMachine {
     return this.whileRunning(async (vm, layout) => {
       await vm.writeFiles([{ path: path.posix.join(layout.inbox, file), content: bundle }]);
       return this.ask(vm, layout, { op: "import-project", ...project, bundle: file });
+    });
+  }
+
+  /** Uploads a thread's relocation package and asks the running brain to take it. Never wakes the brain. */
+  receiveThread(relocation: string, bytes: Uint8Array): Promise<BrainControlResults["receive-thread"]> {
+    const file = `${relocation}.thread`;
+    return this.whileRunning(async (vm, layout) => {
+      await vm.writeFiles([{ path: path.posix.join(layout.inbox, file), content: bytes }]);
+      return this.ask(vm, layout, { op: "receive-thread", relocation, package: file });
+    });
+  }
+
+  /** A package the brain left in its outbox, read through the session it runs in, so a stopped brain is never resumed. */
+  readOutbox(file: string): Promise<Uint8Array> {
+    return this.whileRunning(async (vm, layout) => {
+      const bytes = await vm.readFile(path.posix.join(layout.outbox, file));
+      if (!bytes) throw new Error("The cloud brain no longer has this conversation's package.");
+      return bytes;
     });
   }
 

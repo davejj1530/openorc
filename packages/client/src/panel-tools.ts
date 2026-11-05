@@ -21,7 +21,7 @@ export const panelToolLabels: Record<PanelTool, string> = {
 
 /** What decides a panel's tools: whose panel it is, and for a thread whether it is a detached copy or an Orcling's. */
 export type PanelToolContext =
-  | { kind: "thread"; thread: Pick<ThreadSummary, "worktreePath" | "branch" | "orclingId">; project: Pick<Project, "id"> }
+  | { kind: "thread"; thread: Pick<ThreadSummary, "worktreePath" | "branch" | "orclingId" | "owner">; project: Pick<Project, "id"> }
   | { kind: "task"; project: Pick<Project, "id"> }
   | { kind: "project"; project: Pick<Project, "id"> }
   | { kind: "newthread"; project: Pick<Project, "id">; changes: boolean };
@@ -35,6 +35,8 @@ export function tabsFor(context: PanelToolContext): PanelTool[] {
     context.project.id === WORKSPACE_ID
       ? ["terminal", "file", "tasks", "plan", "memory", "instructions"]
       : ["changes", "terminal", "file", "plan", "tasks", "checkpoints", "commits", "memory", "instructions"];
+  // A thread the cloud brain holds has no folder on this Mac: its terminal and files would be this Mac's checkout.
+  if (context.thread.owner?.brain === "cloud" && !context.thread.owner.mirror) return tools.filter((tool) => tool !== "terminal" && tool !== "file" && tool !== "instructions");
   if (isDetachedCopy(context.thread)) tools.splice(tools.indexOf("commits"), tools.includes("commits") ? 1 : 0);
   if (context.thread.orclingId) tools.push("orcling");
   return tools;

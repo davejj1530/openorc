@@ -1,6 +1,6 @@
 import path from "node:path";
 import { Worker } from "node:worker_threads";
-import { WorkerEmbedder, pathProbe, type OpenOrcOptions, type Transport } from "@openorc/core";
+import { WorkerEmbedder, ownerLinkKeys, pathProbe, type OpenOrcOptions, type Transport } from "@openorc/core";
 import { brainDoor, type BrainDoorKey, type BrainKey, type BrainLayout, type BrainSelf, type BrainStart, type RunnerFile } from "@openorc/cloud";
 import { brainPath } from "./machine-check.js";
 import type { SealedSecrets } from "./secrets.js";
@@ -42,6 +42,7 @@ export function brainOptions({ layout, appDir, start, self, secrets, transport, 
       machine: { name: () => start.name, lanHosts: () => [], tailnetHosts: async () => [] },
       // Only a brain on Vercel has a door; one in a local container stays up while it runs.
       ...(start.vercel ? { door: doorKeys(start.key) } : {}),
+      owner: ownerLinkKeys(start.key).publicKey,
     },
     shellProbe: pathProbe({ PATH: brainPath(layout) }),
     // The embedding model runs in its own thread, so loading it and embedding memories never stall the core.

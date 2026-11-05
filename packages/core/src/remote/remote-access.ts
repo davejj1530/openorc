@@ -1,5 +1,18 @@
 import { projects, remoteDevices, remotePushTargets, retiredTeams, settings, threads, type Db, type LedgerWriter, type RemoteDeviceRecord } from "@openorc/db";
-import { acceptLink, encodePairingUrl, fromBase64Url, LinkCloseCode, linkPath, toBase64Url, type Admission, type ClosingReason, type KeyPair, type LinkSocket, type PhoneHello } from "@openorc/link";
+import {
+  acceptLink,
+  encodePairingUrl,
+  equalBytes,
+  fromBase64Url,
+  LinkCloseCode,
+  linkPath,
+  toBase64Url,
+  type Admission,
+  type ClosingReason,
+  type KeyPair,
+  type LinkSocket,
+  type PhoneHello,
+} from "@openorc/link";
 import { nodeCrypto } from "@openorc/link/node";
 import {
   PUSH_SENDER_TAG,
@@ -53,6 +66,8 @@ export interface RemoteNetwork {
   publicAddress?: string;
   /** A host that sleeps hands each of its phones a key to its door, for the asking phone's own device id. A Mac has none. */
   door?: (deviceId: string) => DoorKey;
+  /** The one key admitted without pairing, as this brain's owner: the Mac that set it up. A Mac has none. */
+  owner?: Uint8Array;
   apns?: Record<PushEnvironment, string>;
 }
 
@@ -139,9 +154,17 @@ export class RemoteAccess {
     return this.converge();
   }
 
-  /** A phone is connected, as Settings counts one: someone is looking at this host. */
+  /** This host's static link key, base64url: what a client that knows the host dials it by. */
+  async linkKey(): Promise<string> {
+    return toBase64Url((await this.loadKeys()).publicKey);
+  }
+
+  /**
+   * A phone is connected, as Settings counts one: someone is looking at this host. The owner's quiet session, kept for
+   * its lists, counts only while it watches a run: someone at the Mac has a cloud conversation open.
+   */
   get busy(): boolean {
-    return [...this.sessions].some((session) => session.live);
+    return [...this.sessions].some((session) => session.live && (session.deviceId !== OWNER || session.watching));
   }
 
   async status(): Promise<RemoteStatus> {
@@ -194,7 +217,8 @@ export class RemoteAccess {
         return { sandbox: this.senderState("sandbox"), production: this.senderState("production") };
       }
       case "door.key":
-        return this.network.door?.(deviceId) ?? null;
+        // The owner wakes the brain through Vercel, never through the door.
+        return deviceId === OWNER ? null : (this.network.door?.(deviceId) ?? null);
     }
   }
 
@@ -364,6 +388,7 @@ export class RemoteAccess {
       return;
     }
     const { dataDir, db, ledger } = this.options;
+    const role = accepted.value.id;
     const session = new RemoteSession(accepted.value.id, accepted.session, {
       answer,
       guard: {
@@ -378,9 +403,10 @@ export class RemoteAccess {
       device: (deviceId, method, params) => this.device(deviceId, method, params),
       preview: this.previews,
       watchable: (id) => previewThreadLive(db, id),
+      owner: role === OWNER,
     });
     // Removing a phone ends the sessions it finds, and this one may have been admitted just before.
-    if (remoteDevices.byKey(db, accepted.session.remoteStatic)?.id !== session.deviceId) {
+    if (session.deviceId !== OWNER && remoteDevices.byKey(db, accepted.session.remoteStatic)?.id !== session.deviceId) {
       session.close("removed");
       return;
     }
@@ -397,6 +423,10 @@ export class RemoteAccess {
     if (this.sessions.size >= MAX_SESSIONS) return { ok: false, reason: "busy" };
     const { db } = this.options;
     const now = Date.now();
+    if (this.network.owner && equalBytes(publicKey, this.network.owner)) {
+      const owner = { id: OWNER, name: hello.device.name, publicKey, createdAt: now, lastSeenAt: now };
+      return { ok: true, value: owner, hello: { mac: { name: this.network.machine.name() }, deviceId: OWNER, routes: this.knownRoutes } };
+    }
     let device = remoteDevices.byKey(db, publicKey);
     if (!device && hello.pair) {
       if (!this.offers.redeem(hello.pair.offerId, secretOf(hello.pair.secret), now)) return { ok: false, reason: "offer-invalid" };

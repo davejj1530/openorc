@@ -144,6 +144,37 @@ async function removeProject(core: OpenOrc, layout: BrainLayout, { source }: Ext
   return { removed: true, threads: 0 };
 }
 
+/** The brain's copy of a Mac project, by the Mac project's id. */
+function copyOf(core: OpenOrc, layout: BrainLayout, source: string): string | null {
+  const folder = `${copiesOf(layout, source)}${path.sep}`;
+  return core.projects.list().find((project) => project.rootPath.startsWith(folder))?.id ?? null;
+}
+
+/** The Mac project a copy belongs to, from the folder it lives in. */
+function sourceOf(core: OpenOrc, layout: BrainLayout, projectId: string): string | null {
+  const root = projects.get(core.db, projectId)?.rootPath;
+  return root?.startsWith(`${projectsFolder(layout)}${path.sep}`) ? path.basename(path.dirname(root)) : null;
+}
+
+/** A thread's move between its Mac and the brain, onto the core's relocations. A package taken leaves the inbox. */
+function relocationHandlers(core: OpenOrc, layout: BrainLayout): Pick<Handlers, "identity" | "receive-thread" | "drop-arrival" | "hand-off-thread" | "cancel-hand-off" | "handed-off"> {
+  return {
+    identity: async () => ({ linkKey: await core.remote.linkKey() }),
+    "receive-thread": async ({ relocation, package: file }) => {
+      const inbox = path.join(layout.inbox, file);
+      try {
+        return await core.relocations.receive(relocation, inbox, (source) => copyOf(core, layout, source));
+      } finally {
+        await rm(inbox, { force: true });
+      }
+    },
+    "drop-arrival": async ({ relocation, threadId }) => core.relocations.dropArrival(relocation, threadId),
+    "hand-off-thread": ({ relocation, threadId }) => core.relocations.handOff(relocation, threadId, layout.outbox, (projectId) => sourceOf(core, layout, projectId)),
+    "cancel-hand-off": ({ relocation, threadId }) => core.relocations.cancelHandOff(relocation, threadId, layout.outbox),
+    "handed-off": ({ relocation }) => core.relocations.handedOff(relocation, layout.outbox),
+  };
+}
+
 /** Each control request onto services the core already has. Handed-over values are never logged or repeated. */
 export function controlHandlers({ core, key, layout, github, stop, answering }: ControlContext): (request: Extract<BrainControlRequest, { op: CoreOp }>) => Promise<unknown> {
   const handlers: Handlers = {
@@ -173,6 +204,7 @@ export function controlHandlers({ core, key, layout, github, stop, answering }: 
       setImmediate(stop);
       return { stopping: true };
     },
+    ...relocationHandlers(core, layout),
   };
   return async (request) => {
     try {

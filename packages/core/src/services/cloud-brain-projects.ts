@@ -38,6 +38,15 @@ export function seen(record: BrainProject, copies: BrainControlResults["projects
 
 export const keptOwn = (project: BrainProject) => project.head !== null && project.head !== project.sent;
 
+export const hasThreads = "It has threads on the cloud brain.";
+
+/** Why a project's switch cannot move now: on, the brain has threads in its copy; off, it cannot have a copy. */
+export async function blocked(project: Project, record: BrainProject | undefined): Promise<string | null> {
+  if (record) return record.threads ? hasThreads : null;
+  const copy = await copyBranch(project);
+  return "blocked" in copy ? copy.blocked : null;
+}
+
 /** The branch a copy of the project follows, its default unless given, or why the project cannot have one. */
 export async function copyBranch(project: Project, followed?: string): Promise<{ branch: string } | { blocked: string }> {
   const state = await projectGit(project).catch(() => null);

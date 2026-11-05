@@ -88,6 +88,15 @@ export class LedgerWriter {
     this.flush();
   }
 
+  /** Runs whose rows left for another ledger or came from one: their numbering is read again from the rows. */
+  forget(runIds: readonly string[]): void {
+    this.flush();
+    for (const runId of runIds) {
+      this.seqs.delete(runId);
+      this.fragments.endRun(runId);
+    }
+  }
+
   private nextSeq(runId: string): number {
     let seq = this.seqs.get(runId);
     if (seq === undefined) {

@@ -5,6 +5,8 @@ import type { DeviceSystem } from "./devices/system.js";
 import type { RemoteNetwork } from "./remote/remote-access.js";
 import type { BrainDoors } from "./services/cloud-brain-door.js";
 import type { BrainBundleSource, OpenBrainMachine } from "./services/cloud-brain.js";
+import type { BrainChannel, CoordinatorDeps } from "./services/relocation-coordinator.js";
+import type { BrainEndpoint } from "./services/brain-link.js";
 import type { ProtectedSecretStore } from "./services/extraction-credentials.js";
 import type { BundledFormatter } from "./services/file-format.js";
 import type { ShellProbe } from "./services/shell-environment.js";
@@ -90,4 +92,10 @@ export interface OpenOrcOptions {
   cloudBrainMachine?: OpenBrainMachine;
   /** Reaches the cloud brain's door in place of Vercel, for tests. */
   cloudBrainDoors?: BrainDoors;
+  /** Reaches a cloud brain for moving threads in place of CloudBrain, for tests. */
+  brainChannel?: BrainChannel;
+  /** Dials a cloud brain for the windows in place of CloudBrain's, for tests. */
+  brainEndpoint?: BrainEndpoint;
+  /** For tests: how soon a move asks an unreachable brain again, and a hook after each of its steps. */
+  relocationTiming?: Pick<CoordinatorDeps, "retryMs" | "step">;
 }

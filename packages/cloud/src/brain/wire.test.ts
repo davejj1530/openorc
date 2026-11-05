@@ -169,6 +169,45 @@ describe("control requests and replies", () => {
   });
 });
 
+describe("moving threads between the Mac and the brain", () => {
+  const relocation = "6f1e2b3c-4d5e-4f60-8a71-92b3c4d5e6f7";
+  const threadId = "0b9a8c7d-6e5f-4a3b-9c2d-1e0f9a8b7c6d";
+
+  it("parses each request and reads each answer, a refusal included", () => {
+    const requests: BrainControlRequest[] = [
+      { op: "identity" },
+      { op: "receive-thread", relocation, package: `${relocation}.thread` },
+      { op: "drop-arrival", relocation, threadId },
+      { op: "hand-off-thread", relocation, threadId },
+      { op: "cancel-hand-off", relocation, threadId },
+      { op: "handed-off", relocation },
+    ];
+    for (const request of requests) expect(parseControlRequest(JSON.stringify(request))).toEqual(request);
+    const answers: [BrainControlRequest["op"], unknown][] = [
+      ["identity", { linkKey: "A".repeat(43) }],
+      ["receive-thread", { received: true }],
+      ["receive-thread", { refused: "This move was called off." }],
+      ["receive-thread", { lacksBase: true }],
+      ["drop-arrival", { dropped: true }],
+      ["drop-arrival", { received: true }],
+      ["hand-off-thread", { file: `${relocation}.thread`, bytes: 1024, sha256: "c".repeat(64) }],
+      ["hand-off-thread", { refused: "Its agent is at work. Stop the turn, then move it." }],
+      ["cancel-hand-off", { stayed: true }],
+      ["cancel-hand-off", { left: true }],
+      ["handed-off", { left: true }],
+    ];
+    for (const [op, result] of answers) expect(parseControlReply(op, JSON.stringify({ ok: true, result }))).toEqual({ ok: true, result });
+  });
+
+  it("refuses a package outside the inbox, an id that could name a path, and an answer it does not expect", () => {
+    expect(refusal(() => parseControlRequest(JSON.stringify({ op: "receive-thread", relocation, package: "../outbox/x.thread" }))).field).toBe("package");
+    expect(refusal(() => parseControlRequest(JSON.stringify({ op: "hand-off-thread", relocation: "../r", threadId }))).field).toBe("relocation");
+    expect(refusal(() => parseControlRequest(JSON.stringify({ op: "drop-arrival", relocation, threadId: "a/b" }))).field).toBe("threadId");
+    expect(refusal(() => parseControlReply("receive-thread", '{"ok":true,"result":{"received":false}}')).field).toBe("result.received");
+    expect(refusal(() => parseControlReply("hand-off-thread", JSON.stringify({ ok: true, result: { file: "../x", bytes: 1, sha256: "c".repeat(64) } }))).field).toBe("result.file");
+  });
+});
+
 const work = { id: "4c1f0a52-7a0e-4b44-9d7e-1f0c2a6b8e11", name: "Work", default: false, token: "sk-ant-oat01-work-abcdefghijklmnopqrstuvwxyz" };
 const personal = { id: "claude-cli", name: "Personal", default: true, token: "sk-ant-oat01-personal-abcdefghijklmnopqrstuvwxyz" };
 

@@ -44,10 +44,12 @@ export function conversationSendDisabledReason(input: { permissionReady: boolean
 /**
  * Whether a conversation's newest process is attached, and whether the conversation is busy: a turn, background work,
  * an image being made, a compaction. A thread says for itself; a task's conversation is busy while a reply streams.
+ * A run that ended is not attached even when its transcript never heard the end, as a cloud run's last frames are not
+ * relayed once no window has read it for a while.
  */
 export function conversationActivity(input: { thread: Pick<ThreadSummary, "activity"> | null; activeRun: Run | undefined; liveTranscript: RunTranscript | undefined; compacting: boolean }) {
   const { liveTranscript } = input;
-  const live = Boolean(input.activeRun && liveTranscript?.live);
+  const live = Boolean(input.activeRun && input.activeRun.endedAt === null && liveTranscript?.live);
   const generatingImage = Boolean(liveTranscript?.blocks.some((b) => isImageGeneration(b) && b.kind === "activity" && b.status === "running"));
   const replying = live && Boolean(liveTranscript?.blocks.some((b) => b.kind === "message" && b.role === "assistant" && b.streaming));
   const working = generatingImage || input.compacting || (input.thread ? input.thread.activity !== "idle" : replying);

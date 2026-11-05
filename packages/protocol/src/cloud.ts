@@ -66,6 +66,16 @@ export interface CloudOffer {
   offered: boolean;
   /** Null when cloud threads are not offered. */
   provider: "vercel" | "local" | null;
+  /** The cloud brain this Mac set up, once it has started: Move to cloud hands threads to it. Absent on older Macs. */
+  brain?: CloudBrainOffer | null;
+}
+
+/** The Mac's cloud brain, named for its windows and phones. */
+export interface CloudBrainOffer {
+  /** The brain's link key, base64url: the id a phone paired with it saved it under; null until the Mac has learned it. */
+  host: string | null;
+  /** Each Mac project and the brain's copy of it. */
+  projects: { mac: string; cloud: string }[];
 }
 
 /** A Vercel team cloud threads can run on. */
@@ -150,8 +160,15 @@ export const cloudRpcParams = {
   "cloud.check": z.object({}),
   "cloud.sandboxes": z.object({}),
   "cloud.offer": z.object({}),
-  /** Moves a conversation from this Mac to a sandbox of its own; its sandbox is set up in the background. */
+  /** Moves a conversation from this Mac to the cloud brain when one is set up, else to a sandbox of its own. */
   "cloud.move": z.object({ threadId: z.string().min(1).max(200) }).strict(),
+  /** Brings a conversation the cloud brain holds to this Mac; it moves in the background. */
+  "cloud.bringToMac": z.object({ threadId: z.string().min(1).max(200) }).strict(),
+  /** Calls a move off while it has not settled: the conversation stays where it was. */
+  "cloud.keep": z.object({ threadId: z.string().min(1).max(200) }).strict(),
+  /** A read-only copy of a cloud conversation's code in a folder on this Mac, kept current while it is open. */
+  "cloud.openOnMac": z.object({ threadId: z.string().min(1).max(200) }).strict(),
+  "cloud.closeOnMac": z.object({ threadId: z.string().min(1).max(200) }).strict(),
   /** Deletes a sandbox for good. A conversation's next message sets up a new one from its worktree on the Mac. */
   "cloud.sandboxes.remove": z.object({ name: z.string().min(1).max(200) }).strict(),
   ...cloudBrainRpcParams,
@@ -159,6 +176,10 @@ export const cloudRpcParams = {
 
 export interface CloudRpcResults extends CloudBrainRpcResults {
   "cloud.status": CloudStatus;
+  "cloud.bringToMac": null;
+  "cloud.keep": null;
+  "cloud.openOnMac": null;
+  "cloud.closeOnMac": null;
   "cloud.vercel.connect": { status: CloudStatus; teams: CloudTeam[] };
   "cloud.vercel.teams": CloudTeam[];
   "cloud.vercel.team": CloudStatus;

@@ -27,6 +27,7 @@ import { createOrclingHandlers } from "./handlers/orclings.js";
 import { createPreviewHandlers } from "./handlers/preview.js";
 import { createProjectsHandlers } from "./handlers/projects.js";
 import { createPullRequestHandlers } from "./handlers/pull-requests.js";
+import { createBrainThreadHandlers } from "./handlers/brain-threads.js";
 import { createRemoteHandlers } from "./handlers/remote.js";
 import { createReviewCommentsHandlers } from "./handlers/review-comments.js";
 import { createReviewThreadHandlers } from "./handlers/review-thread.js";
@@ -76,6 +77,8 @@ import { OrclingService } from "./services/orclings.js";
 import { readPlanLimits } from "./services/plan-limits.js";
 import { invalidateOnLifecycle } from "./services/preview.js";
 import { ProjectService } from "./services/projects.js";
+import type { ThreadRelocations } from "./services/relocations.js";
+import { BrainRouting } from "./services/brain-routing.js";
 import { ProviderLog } from "./services/provider-log.js";
 import { ProviderUsageService } from "./services/provider-usage.js";
 import { PullRequestService } from "./services/pull-requests.js";
@@ -122,6 +125,7 @@ export class OpenOrc {
   readonly cloudSandboxes: CloudSandboxes;
   readonly cloudHandoff: CloudHandoff;
   readonly cloudStandby: CloudStandby;
+  private routing: BrainRouting | null | undefined;
   private readonly cloudParts: ReturnType<typeof createCloud>;
   readonly runs: RunService;
   readonly comments: TaskCommentService;
@@ -151,6 +155,8 @@ export class OpenOrc {
   /** Phone access. Its listener runs once the host attaches its request path. */
   readonly remote: RemoteAccess;
   private readonly options: OpenOrcOptions;
+  /** The windows alone, before the phone tap. */
+  private readonly windows: OpenOrcOptions["transport"];
   private closingForUpdate = false;
   private mcp: Promise<OpenOrcMcpServer> | null = null;
   private readonly handlers: Handlers;
@@ -158,6 +164,7 @@ export class OpenOrc {
   private constructor(options: OpenOrcOptions, db: Db) {
     // Phones hear what the windows hear, through this one tap.
     const host = options.transport;
+    this.windows = host;
     this.options = options = {
       ...options,
       transport: {
@@ -218,13 +225,8 @@ export class OpenOrc {
       read: (key) => storedSettings.get(db, key),
       write: (key, value) => storedSettings.set(db, key, value),
     });
-    // Phones choose their own alerts, so they hear every notice; "Desktop notifications" is the windows' switch.
     // The renderer decides whether the thread is already on screen.
-    const notify = (n: Omit<Notification, "type">) => {
-      const notice: Notification = { type: "notify", ...n, id: n.id ?? randomUUID() };
-      this.remote.alert(notice);
-      if (this.settings.get().notifications) options.transport.push(notice);
-    };
+    const notify = (n: Omit<Notification, "type">) => this.notify(n);
     this.projects = new ProjectService(db);
     const cloud = createCloud({
       db,
@@ -234,7 +236,9 @@ export class OpenOrc {
       environment: () => this.environment.current(),
       runs: () => this.runs,
       threads: () => this.threads,
+      workspaces: () => this.workspaces,
       invalidate,
+      brainChanged: () => void this.brainRouting?.refresh(),
       log: this.log,
     });
     this.cloudParts = cloud;
@@ -301,6 +305,41 @@ export class OpenOrc {
     this.slack = new SlackService(this, options.slackSecrets, new AttachmentService(options.dataDir));
     this.handlers = this.buildHandlers(invalidate);
     invalidateOnLifecycle(options.preview, invalidate);
+  }
+
+  /** Threads moving between this host and the other brain. */
+  get relocations(): ThreadRelocations {
+    return this.cloudParts.relocations;
+  }
+
+  /**
+   * A Mac's windows reaching threads its cloud brain holds; null on the brain itself. An ephemeral core keeps no
+   * profile, so it neither caches a brain's lists nor dials one. Made at its first use, once the core's parts exist.
+   */
+  get brainRouting(): BrainRouting | null {
+    if (this.routing !== undefined) return this.routing;
+    const { options } = this;
+    this.routing =
+      options.cloudOnly || options.ephemeral
+        ? null
+        : new BrainRouting({
+            db: this.db,
+            dataDir: options.dataDir,
+            brain: this.cloudParts.brain,
+            windows: this.windows,
+            local: (request) => this.dispatch(request),
+            notificationsOn: () => this.settings.get().notifications,
+            log: this.log,
+            endpoint: options.brainEndpoint,
+          });
+    return this.routing;
+  }
+
+  /** Phones choose their own alerts, so they hear every notice; "Desktop notifications" is the windows' switch. */
+  private notify(n: Omit<Notification, "type">): void {
+    const notice: Notification = { type: "notify", ...n, id: n.id ?? randomUUID() };
+    this.remote.alert(notice);
+    if (this.settings.get().notifications) this.options.transport.push(notice);
   }
 
   /** A deleted thread's Preview goes with it: phones watching it hear so, and main closes its pages. */
@@ -401,6 +440,8 @@ export class OpenOrc {
     core.threads.recoverQueue();
     core.upkeep.start();
     core.cloudParts.brain.opened();
+    core.cloudParts.coordinator?.start();
+    void core.brainRouting?.refresh();
     if (!options.ephemeral) core.agentUpdates.start();
     void core.devices.reapStale();
     // Embed any memories that predate the vector index, off the startup path.
@@ -448,6 +489,12 @@ export class OpenOrc {
    * request names its origin, which the handler's audit rows can read for as long as it runs.
    */
   async handle(request: RpcRequest, origin?: RequestOrigin): Promise<RpcReply> {
+    // A window's call while a cloud brain is set up may be about a thread the brain holds; a phone's never goes there.
+    if (!origin && this.brainRouting?.active) return this.brainRouting.router.handle(request);
+    return this.dispatch(request, origin);
+  }
+
+  private async dispatch(request: RpcRequest, origin?: RequestOrigin): Promise<RpcReply> {
     const { id, method } = request;
     const privateParams = method.startsWith("slack.") || method === "memory.settings.set" || method === "remote.push.setKey";
     try {
@@ -482,6 +529,8 @@ export class OpenOrc {
   }
 
   async close(): Promise<void> {
+    this.cloudParts.coordinator?.close();
+    this.brainRouting?.close();
     await this.remote.close(this.closingForUpdate ? "update" : "shutdown");
     await this.files.intelligence.close();
     this.threads.stopAccepting();
@@ -562,6 +611,7 @@ export class OpenOrc {
       createDeviceHandlers({ devices: this.devices }),
       createInboxHandlers({ runService: this.runs, db: this.db }),
       createRemoteHandlers({ remote: this.remote, pushKeyChanged: () => this.cloudParts.brain.signInsChanged() }),
+      createBrainThreadHandlers({ db: this.db, cloud: this.cloud, mirrors: () => this.brainRouting?.mirrors ?? null }),
       createPreviewHandlers({ db: this.db, preview: this.options.preview }),
       createBenchHandlers({ frames: this.frames, bench: this.bench, db: this.db, ledger: this.ledger, transport: this.options.transport, benchmarks: Boolean(this.options.benchmarks) }),
     );

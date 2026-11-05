@@ -1,0 +1,327 @@
+import { incomingMove, runs, settings, threads, type Db } from "@openorc/db";
+import { mergeInbox, mergeThreadPages, ownerRoute, rpcParams, type InboxList, type OwnerReach, type RpcMethod, type RpcRequest, type ThreadSummary } from "@openorc/protocol";
+import type { Logger, RpcReply, Transport } from "../transport.js";
+import { BrainOutOfReach, type BrainLink, type BrainPush, type ProjectMapping } from "./brain-link.js";
+import type { BrainMirrors } from "./brain-mirrors.js";
+
+const PAGES = "brain.pages";
+const MAX_PAGES = 40;
+/** The lists a push about changed threads refreshes: the newest asked, which the windows most likely show. */
+const RECENT_PAGES = 8;
+/** A run a window looked at stays in the brain's interest this long after its last frame or read. */
+const WATCH_MS = 5 * 60_000;
+const READS_RUN = new Set<RpcMethod>(["events.page", "events.listForRun", "events.toolOutput", "runs.send", "approvals.resolve", "runs.interrupt"]);
+
+type Merged = "threads.list" | "inbox.list";
+interface Page {
+  method: Merged;
+  params: unknown;
+  result: unknown;
+  heardAt: number;
+}
+
+/**
+ * The brain's last answers to the lists windows ask, so the sidebar lists cloud threads while the brain sleeps or the
+ * Mac is offline, across restarts too. Written only from the brain's answers; never authoritative.
+ */
+export class BrainPages {
+  private kept: Map<string, Page> | null = null;
+  private saving: ReturnType<typeof setTimeout> | null = null;
+
+  constructor(private readonly db: Db) {}
+
+  /** Read once, at the first list a window asks with a brain set up. */
+  private get pages(): Map<string, Page> {
+    if (this.kept) return this.kept;
+    this.kept = new Map();
+    try {
+      for (const page of JSON.parse(settings.get(this.db, PAGES) ?? "[]") as Page[]) this.kept.set(pageKey(page.method, page.params), page);
+    } catch {
+      // A cache that does not read starts empty.
+    }
+    return this.kept;
+  }
+
+  peek(method: Merged, params: unknown): Page | null {
+    return this.pages.get(pageKey(method, params)) ?? null;
+  }
+
+  /** True when the answer differs from the one kept. */
+  heard(method: Merged, params: unknown, result: unknown, at: number): boolean {
+    const key = pageKey(method, params);
+    const changed = JSON.stringify(this.pages.get(key)?.result) !== JSON.stringify(result);
+    this.pages.delete(key);
+    this.pages.set(key, { method, params, result, heardAt: at });
+    for (const old of this.pages.keys()) if (this.pages.size > MAX_PAGES) this.pages.delete(old);
+    this.saving ??= setTimeout(() => this.save(), 1000);
+    return changed;
+  }
+
+  /** The lists windows asked lately, newest last. */
+  recent(): Page[] {
+    return [...this.pages.values()];
+  }
+
+  clear(): void {
+    if (this.saving) clearTimeout(this.saving);
+    this.saving = null;
+    this.kept = new Map();
+    settings.remove(this.db, PAGES);
+  }
+
+  save(): void {
+    if (this.saving) clearTimeout(this.saving);
+    this.saving = null;
+    if (this.kept) settings.set(this.db, PAGES, JSON.stringify([...this.kept.values()]));
+  }
+}
+
+const pageKey = (method: string, params: unknown) => `${method} ${JSON.stringify(params)}`;
+
+export interface BrainRouterDeps {
+  db: Db;
+  link: BrainLink;
+  /** The read-only folder a cloud thread opened on this Mac has here, and a pull of it when its files changed. */
+  mirrors: Pick<BrainMirrors, "folder" | "isOpen" | "pull">;
+  /** This core's own dispatch, as `handle` has it without the router. */
+  local(request: RpcRequest): Promise<RpcReply>;
+  /** The windows alone: what the brain pushes never reaches this Mac's phones, which hear the brain themselves. */
+  windows: Transport;
+  mapping(): Promise<ProjectMapping>;
+  notificationsOn(): boolean;
+  log: Logger;
+}
+
+const error = (id: number, message: string): RpcReply => ({ type: "rpc.error", id, message });
+
+/**
+ * A window's calls while a cloud brain is set up. Windows stay single-host: a call about a thread or run this ledger
+ * lacks goes to the brain, its rows rehomed onto this Mac's projects and marked as the cloud's; lists answer at once
+ * from this Mac plus the brain's last answer, then refresh in the background. Phones never come here.
+ */
+export class BrainRouter {
+  readonly pages: BrainPages;
+  private readonly watched = new Map<string, number>();
+  private expiry: ReturnType<typeof setTimeout> | null = null;
+  private refreshing: Promise<void> | null = null;
+  private refreshAgain = false;
+
+  constructor(private readonly deps: BrainRouterDeps) {
+    this.pages = new BrainPages(deps.db);
+    deps.link.onPush((push) => this.relay(push));
+    // Cloud rows dim while the brain is out of reach, so the lists are read again whenever that changes.
+    deps.link.onReach(() => deps.windows.push({ type: "invalidate", keys: ["threads"] }));
+  }
+
+  async handle(request: RpcRequest): Promise<RpcReply> {
+    const method = request.method as RpcMethod;
+    const route = Object.hasOwn(rpcParams, method) ? ownerRoute(method) : undefined;
+    const parsed = route && route.by !== "here" ? rpcParams[method].safeParse(request.params ?? {}) : null;
+    if (!route || !parsed?.success) return this.deps.local(request);
+    const params = parsed.data as never;
+    switch (route.by) {
+      case "merge":
+        return this.merge(request, method as Merged, params);
+      case "run":
+        return runs.get(this.deps.db, route.run(params)) ? this.deps.local(request) : this.forward(request, method, params);
+      case "owner":
+      case "owner-only":
+        return this.owned(request, method, params, route.thread(params), route.by === "owner-only" ? route.words : null);
+      default:
+        return this.deps.local(request);
+    }
+  }
+
+  /** A call about one thread: this Mac's own answers it; a cloud thread's goes to the brain, unless only its owner may. */
+  private owned(request: RpcRequest, method: RpcMethod, params: Record<string, unknown>, id: string | undefined, ownerOnly: string | null): Promise<RpcReply> {
+    if (!id || threads.get(this.deps.db, id)) return this.deps.local(request);
+    if (ownerOnly !== null) return Promise.resolve(error(request.id, ownerOnly));
+    const kept = method === "threads.get" ? this.kept(request, id) : null;
+    return kept ? Promise.resolve(kept) : this.forward(request, method, params);
+  }
+
+  /** A window's call for a thread the brain holds, woken for it: opening or sending to it is the person's own intent. */
+  private async forward(request: RpcRequest, method: RpcMethod, params: Record<string, unknown>): Promise<RpcReply> {
+    if (READS_RUN.has(method) && typeof params["runId"] === "string") this.watch(params["runId"]);
+    try {
+      const mapping = await this.deps.mapping();
+      const result = await this.deps.link.call(method, toCloud(params, mapping) as never, { wake: true });
+      const rehomed = rehome(result, mapping, { brain: "cloud", reach: "live", heardAt: Date.now() }, this.deps.mirrors);
+      if (method === "threads.get" && isThread(rehomed) && rehomed.liveRunId) this.watch(rehomed.liveRunId);
+      return { type: "rpc.result", id: request.id, result: isThread(rehomed) ? this.asNow(rehomed) : rehomed };
+    } catch (caught) {
+      return error(request.id, caught instanceof Error ? caught.message : String(caught));
+    }
+  }
+
+  /**
+   * This Mac's answer now, merged with the brain's last; the brain's part refreshes behind it. A later page asks each
+   * host for everything up to its end, since either host's rows can fill it.
+   */
+  private async merge(request: RpcRequest, method: Merged, asked: Record<string, unknown>): Promise<RpcReply> {
+    const offset = method === "threads.list" && typeof asked["offset"] === "number" ? asked["offset"] : 0;
+    const params = offset ? { ...asked, offset: 0, ...(typeof asked["limit"] === "number" ? { limit: offset + asked["limit"] } : {}) } : asked;
+    const local = await this.deps.local(offset ? { ...request, params } : request);
+    if (local.type === "rpc.error") return local;
+    const mapping = await this.deps.mapping();
+    const cloud = method === "threads.list" ? listParams(params, mapping) : params;
+    if (cloud) void this.refresh(method, cloud, mapping);
+    const page = cloud ? this.pages.peek(method, cloud) : null;
+    if (!page) return offset ? { ...local, result: (local.result as ThreadSummary[]).slice(offset) } : local;
+    if (method === "inbox.list") return { ...local, result: mergeInbox([{ inbox: local.result as InboxList }, { inbox: page.result as InboxList }]) };
+    const reach: OwnerReach = this.deps.link.reach;
+    const merged = mergeThreadPages(
+      [
+        { brain: "mac", reach: "live", heardAt: Date.now(), rows: local.result as ThreadSummary[] },
+        { brain: "cloud", reach, heardAt: page.heardAt, rows: page.result as ThreadSummary[] },
+      ],
+      params,
+      "mac",
+    );
+    return { ...local, result: merged.slice(offset).map((row) => this.asNow(row)) };
+  }
+
+  /**
+   * A cloud thread a window opens while the brain is not live: its row as the brain last listed it, at once and without
+   * waking it, so the conversation shows while the brain sleeps or wakes. The reach change after has windows read it again.
+   */
+  private kept(request: RpcRequest, id: string): RpcReply | null {
+    const reach = this.deps.link.reach;
+    if (reach === "live") return null;
+    for (const page of this.pages.recent().reverse()) {
+      const row = page.method === "threads.list" ? (page.result as ThreadSummary[]).find((each) => each.id === id) : undefined;
+      if (row) return { type: "rpc.result", id: request.id, result: this.asNow({ ...row, owner: { brain: "cloud", reach, heardAt: page.heardAt } }) };
+    }
+    return null;
+  }
+
+  /**
+   * A cloud row as it is on this Mac now rather than when the brain answered: open here as a read-only copy, or on its way
+   * here, which the brain does not know until it freezes its copy.
+   */
+  private asNow(row: ThreadSummary): ThreadSummary {
+    if (!row.owner) return row;
+    const folder = this.deps.mirrors.folder(row.id);
+    const moving = incomingMove(this.deps.db, row.id) ?? row.moving;
+    const mirrored = folder ? { worktreePath: folder, owner: { ...row.owner, mirror: true } } : {};
+    return { ...row, ...mirrored, ...(moving ? { moving } : {}) };
+  }
+
+  /** The brain's answer to a list, kept; windows hear the list changed only when it did. Never wakes the brain. */
+  private async refresh(method: Merged, params: unknown, mapping: ProjectMapping): Promise<void> {
+    try {
+      const result = rehome(await this.deps.link.call(method, params as never, { wake: false }), mapping, null, this.deps.mirrors);
+      if (this.pages.heard(method, params, result, Date.now())) this.deps.windows.push({ type: "invalidate", keys: [method === "threads.list" ? "threads" : "inbox"] });
+    } catch (caught) {
+      if (!(caught instanceof BrainOutOfReach)) this.deps.log.warn(`the cloud brain's list did not refresh: ${caught instanceof Error ? caught.message : String(caught)}`);
+    }
+  }
+
+  private watch(runId: string): void {
+    this.watched.set(runId, Date.now() + WATCH_MS);
+    this.updateInterest();
+  }
+
+  private updateInterest(): void {
+    const now = Date.now();
+    for (const [runId, until] of this.watched) if (until <= now) this.watched.delete(runId);
+    this.deps.link.setInterest([...this.watched.keys()]);
+    if (this.expiry) clearTimeout(this.expiry);
+    this.expiry = null;
+    if (!this.watched.size) return;
+    // A window that stops reading must let the brain sleep without another call to notice it.
+    this.expiry = setTimeout(() => this.updateInterest(), Math.min(...this.watched.values()) - now);
+    this.expiry.unref?.();
+  }
+
+  /** The brain's pushes, to the windows alone. A list that changed is refreshed first, then the windows hear of it once. */
+  private relay(push: BrainPush): void {
+    const { windows } = this.deps;
+    if (push.type === "gap") return windows.push({ type: "gap", runIds: push.runIds });
+    const body = push.push;
+    switch (body.type) {
+      case "frame":
+        if (!this.watched.has(body.frame.runId)) return;
+        this.watch(body.frame.runId);
+        return windows.push({ type: "frame", frame: body.frame });
+      case "invalidate": {
+        const lists: string[] = body.keys.filter((key) => key === "threads" || key === "inbox");
+        const rest = body.keys.filter((key) => !lists.includes(key));
+        if (rest.length) windows.push({ type: "invalidate", keys: rest });
+        // An open copy on this Mac follows the brain's files.
+        for (const key of rest) if (key.startsWith("threaddiff:") && this.deps.mirrors.isOpen(key.slice("threaddiff:".length))) void this.deps.mirrors.pull(key.slice("threaddiff:".length));
+        if (lists.length) this.refreshRecent();
+        return;
+      }
+      case "notify":
+        if (this.deps.notificationsOn()) windows.push(body);
+        return;
+      default:
+        return;
+    }
+  }
+
+  /** One refresh of the recent lists at a time; pushes while it runs ask for one more after it, however many arrive. */
+  private refreshRecent(): void {
+    if (this.refreshing) {
+      this.refreshAgain = true;
+      return;
+    }
+    const round = async () => {
+      do {
+        this.refreshAgain = false;
+        const mapping = await this.deps.mapping();
+        for (const page of this.pages.recent().slice(-RECENT_PAGES)) await this.refresh(page.method, page.params, mapping);
+      } while (this.refreshAgain);
+    };
+    this.refreshing = round()
+      .catch((caught: unknown) => this.deps.log.warn(`the cloud brain's lists did not refresh: ${caught instanceof Error ? caught.message : String(caught)}`))
+      .finally(() => (this.refreshing = null));
+  }
+
+  close(): void {
+    if (this.expiry) clearTimeout(this.expiry);
+    this.expiry = null;
+    this.pages.save();
+  }
+}
+
+/** A thread list for the brain: this Mac's project ids as the brain's copies; null when no project asked has a copy. */
+function listParams(params: Record<string, unknown>, mapping: ProjectMapping): Record<string, unknown> | null {
+  const next = { ...params };
+  if (typeof params["projectId"] === "string") {
+    const project = mapping.toCloud(params["projectId"]);
+    if (!project) return null;
+    next["projectId"] = project;
+  }
+  if (Array.isArray(params["projectIds"])) {
+    const projects = (params["projectIds"] as string[]).flatMap((id) => mapping.toCloud(id) ?? []);
+    if (!projects.length) return null;
+    next["projectIds"] = projects;
+  }
+  return next;
+}
+
+function toCloud(params: Record<string, unknown>, mapping: ProjectMapping): Record<string, unknown> {
+  return typeof params["projectId"] === "string" ? { ...params, projectId: mapping.toCloud(params["projectId"]) ?? params["projectId"] } : params;
+}
+
+const isInbox = (value: unknown): value is InboxList => typeof value === "object" && value !== null && Array.isArray((value as Partial<InboxList>).items);
+const isThread = (value: unknown): value is ThreadSummary => typeof value === "object" && value !== null && "projectId" in value && "worktreePath" in value;
+
+/**
+ * Brain rows as this Mac's windows read them: on this Mac's project, with no folder a window could act on, and marked
+ * as the cloud's when `owner` is given. Lists are marked where they are merged.
+ */
+function rehome(value: unknown, mapping: ProjectMapping, owner: ThreadSummary["owner"] | null, mirrors: Pick<BrainMirrors, "folder">): unknown {
+  if (Array.isArray(value)) return value.map((item) => rehome(item, mapping, owner, mirrors));
+  if (isInbox(value))
+    return {
+      ...value,
+      items: value.items.map((item) => (item.kind === "thread" ? { ...item, thread: rehome(item.thread, mapping, null, mirrors) } : { ...item, task: rehome(item.task, mapping, null, mirrors) })),
+    };
+  if (!isThread(value)) return value;
+  const mirror = mirrors.folder(value.id);
+  const marked = owner ? { owner: mirror ? { ...owner, mirror: true } : owner } : {};
+  return { ...value, projectId: mapping.toMac(value.projectId) ?? value.projectId, worktreePath: mirror, ...marked };
+}

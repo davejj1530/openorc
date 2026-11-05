@@ -66,7 +66,7 @@ function TaskHistory({ task, project }: { task: Task; project: Project }) {
         </p>
       ) : null}
       {merged ? (
-        <Transcript run={merged} basePath={task.worktreePath ?? project.rootPath} fileScope={{ kind: "task", id: task.id }} />
+        <Transcript run={merged} media={{ basePath: task.worktreePath ?? project.rootPath, fileScope: { kind: "task", id: task.id } }} />
       ) : (
         <div className="p-6 text-sm text-ink-3">{historyPlaceholder}</div>
       )}

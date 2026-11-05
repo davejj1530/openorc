@@ -37,6 +37,7 @@ import {
 import type { EnvSnapshot } from "./shell-environment.js";
 import { withOutsideNote, type OutsideChanges, type TurnStartCapture } from "./turn-start-checkpoint.js";
 import type { WorkspaceLease, WorkspaceWriters } from "./workspace-writers.js";
+import { assertNotMoving } from "./relocation-fence.js";
 
 type LaunchAttempt = {
   prepared: PreparedSession;
@@ -124,6 +125,7 @@ export class RunLaunch {
     let admitted = input;
     const assertAdmission = () => {
       if (this.deps.isClosing()) throw new Error("OpenOrc is closing.");
+      if (admitted.scope.thread) assertNotMoving(this.deps.db, admitted.scope.thread.id);
       admitted.assertCanStart?.();
     };
     const timing: [string, number][] = [];

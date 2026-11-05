@@ -21,7 +21,6 @@ import {
   subagentGroups,
 } from "@openorc/client";
 import { cn } from "../lib/cn";
-import type { FileSelection } from "../lib/layout";
 import { QuestionCard } from "./QuestionCard";
 import { AgentPresence } from "./AgentPresence";
 import { toolIcons } from "./tool-icons";
@@ -39,7 +38,7 @@ import { UsageRecovery } from "./UsageRecovery";
 import { SignInRecovery } from "./SignInRecovery";
 import { TranscriptErrorCard } from "./TranscriptErrorCard";
 import { IconButton, TextButton } from "./ui";
-import { ImageGenerationRow, ImageViewRow, ThreadImage, ThreadMedia, ThreadRichText } from "./ThreadImages";
+import { ImageGenerationRow, ImageViewRow, ThreadImage, ThreadMedia, ThreadRichText, type MediaScope } from "./ThreadImages";
 import { isImagePath } from "../../../shared/image-paths";
 import { CopyMessage, MessageTime, TurnActions } from "./MessageActions";
 import { useMessageReveal, type Reveal } from "../lib/message-reveal";
@@ -62,8 +61,7 @@ export function Transcript({
   scrollKey = run.runId,
   onFork,
   trailing,
-  basePath,
-  fileScope,
+  media,
   mentionNames,
   children,
   working = false,
@@ -72,8 +70,7 @@ export function Transcript({
   followKey,
   reveal,
 }: {
-  basePath?: string;
-  fileScope?: FileSelection["scope"];
+  media?: MediaScope;
   mentionNames?: ReadonlyMap<string, string>;
   run: RunTranscript;
   scrollKey?: string;
@@ -207,7 +204,7 @@ export function Transcript({
   const arrivals = useArrivals(waiting, scrollKey) && (working || run.live);
 
   return (
-    <ThreadMedia scopeKey={scrollKey} basePath={basePath} fileScope={fileScope} mentionNames={mentionNames}>
+    <ThreadMedia scopeKey={scrollKey} {...media} mentionNames={mentionNames}>
       <div ref={parentRef} data-transcript data-arrivals={arrivals || undefined} className={cn("h-full overflow-y-auto", waiting && "invisible")}>
         <div ref={contentRef} className="max-w-chat mx-auto px-6 py-5">
           {hasOlder ? <div ref={olderRef} aria-hidden /> : null}

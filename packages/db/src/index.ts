@@ -23,3 +23,16 @@ export { remoteDevices, type RemoteDeviceRecord } from "./remote-devices.js";
 export { remotePushTargets, type PushRecipient } from "./remote-push-targets.js";
 
 export { retiredTeams } from "./retired-teams.js";
+export {
+  deleteThreadRows,
+  HOST_TABLE_PREFIXES,
+  HOST_TABLES,
+  readThreadRows,
+  THREAD_TABLES,
+  unclassifiedTables,
+  writeThreadRows,
+  type RowRewrite,
+  type ThreadRows,
+  type ThreadTable,
+} from "./thread-rows.js";
+export { FROZEN, GONE_WORDS, frozenMoving, incomingMove, nextPhase, relocations, settled, type CoordinatorRelocation, type Relocation, type RelocationKind, type StepOutcome } from "./relocations.js";

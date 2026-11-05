@@ -17,8 +17,6 @@ export const ThreadListParams = z.object({
   includeChildren: z.boolean().optional(),
   selectedId: z.string().optional(),
   childLimits: z.record(z.string(), z.number().int().min(THREAD_CHILD_PAGE)).optional(),
-  /** Reveal matching descendants of the listed roots, including paths beyond a child page. */
-  childSearch: z.string().optional(),
   limit: z.number().int().positive().optional(),
   offset: z.number().int().nonnegative().optional(),
 });

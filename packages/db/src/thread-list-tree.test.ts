@@ -57,7 +57,7 @@ it("omits hidden children from the server payload, with a hidden count per paren
   }
 });
 
-it.each(["selected", "search", "working", "waiting"] as const)("retains the older %s child and its ancestors at each depth", (reason) => {
+it.each(["selected", "working", "waiting"] as const)("retains the older %s child and its ancestors at each depth", (reason) => {
   const { db, page } = forest();
   try {
     if (reason === "working") {
@@ -78,12 +78,11 @@ it.each(["selected", "search", "working", "waiting"] as const)("retains the olde
         endedAt: null,
       });
     }
-    const queries = { selected: { selectedId: "g1" }, search: { childSearch: "g1" }, waiting: { attentionIds: ["g1"] }, working: {} };
+    const queries = { selected: { selectedId: "g1" }, waiting: { attentionIds: ["g1"] }, working: {} };
     const rows = page(queries[reason]);
     expect(rows.map((row) => row.id)).toEqual(expect.arrayContaining(["root", "c1", "g1"]));
     expect(rows.find((row) => row.id === "root")?.hiddenChildren).toBe(94);
-    // g1 also matches g10..g19; all matching rows must be included.
-    expect(rows.find((row) => row.id === "c1")?.hiddenChildren).toBe(reason === "search" ? 8 : 14);
+    expect(rows.find((row) => row.id === "c1")?.hiddenChildren).toBe(14);
     expect(rows.some((row) => row.id === "c2")).toBe(false);
     expect(rows.some((row) => row.id === "g2")).toBe(false);
   } finally {
@@ -101,16 +100,6 @@ it("breaks equal start times by id and pages each parent independently", () => {
     expect(rows.find((row) => row.id === "root")?.hiddenChildren).toBe(96);
     expect(rows.find((row) => row.id === "c1")?.hiddenChildren).toBe(3);
     expect(rows.some((row) => row.id === "c97")).toBe(false);
-  } finally {
-    db.close();
-  }
-});
-
-it("finds hidden Unicode titles with the same casing rules as the sidebar", () => {
-  const { db, page } = forest();
-  try {
-    db.stmt("UPDATE threads SET title = 'École · Проверка' WHERE id = 'g1'").run();
-    for (const childSearch of ["école", "проверка"]) expect(page({ childSearch }).map((row) => row.id)).toEqual(expect.arrayContaining(["root", "c1", "g1"]));
   } finally {
     db.close();
   }

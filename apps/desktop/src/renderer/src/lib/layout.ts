@@ -17,7 +17,7 @@ export type WorkspaceChangesRequest = WorkspaceChangesTarget & { comparison: "ba
 export type PanelSide = "left" | "right";
 
 /** A screen the sidebar's footer reaches. Inbox sits in the window's header instead. */
-export type SidebarScreen = "tasks" | "pulls" | "scheduled" | "memory";
+export type SidebarScreen = "tasks" | "pulls" | "scheduled";
 
 interface LayoutState {
   sidebarOpen: boolean;

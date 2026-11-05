@@ -39,9 +39,10 @@ function DockButton({ label, current, pressed, onClick, children }: { label: str
 }
 
 /**
- * The open thread's weekly usage, then the app's screens as round buttons with Orclings among them and Settings at
- * the end. The current one sits on a knob that slides between them. Orclings switches the list above between project
- * threads and Orclings. Settings already fills the sidebar, so while it is open the footer steps away.
+ * One row: the open thread's weekly usage, then the app's screens as round buttons with Orclings among them and
+ * Settings last, kept together at the row's end. The current one sits on a knob that slides between them. Orclings
+ * switches the list above between project threads and Orclings. Settings already fills the sidebar, so while it is
+ * open the footer steps away.
  */
 export function SidebarFooter({ route, projectId, orclings }: { route: Route; projectId: string | null; orclings: { active: boolean; toggle: () => void } }) {
   const notes = useScreenNotes();
@@ -50,7 +51,9 @@ export function SidebarFooter({ route, projectId, orclings }: { route: Route; pr
   if (route.view === "settings") return null;
   return (
     <footer className="sidebar-footer">
-      <AccountUsage />
+      <div className="sidebar-usage">
+        <AccountUsage />
+      </div>
       <nav ref={dock} className="sidebar-dock" aria-label="Screens">
         <span aria-hidden="true" className="sidebar-dock-knob" data-placed={knob.placed || undefined} hidden={!knob.style} style={knob.style} />
         {SCREENS.map(({ id, label, Icon, route: to, views }) => (
@@ -61,7 +64,6 @@ export function SidebarFooter({ route, projectId, orclings }: { route: Route; pr
         <DockButton label="Orclings" pressed={orclings.active} onClick={orclings.toggle}>
           <Orclings size={16} />
         </DockButton>
-        <span className="flex-1" />
         <DockButton label="Settings" onClick={() => useRouter.getState().navigate({ view: "settings" })}>
           <Settings size={16} />
         </DockButton>

@@ -95,7 +95,6 @@ export {
   threadBranchPath,
   threadPageBranchPath,
   threadChildren,
-  threadSearchFolds,
   threadTreeActivity,
   threadTreeMatches,
   threadTreeOpen,

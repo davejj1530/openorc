@@ -19,9 +19,9 @@ import { WindowNav } from "./Sidebar";
 
 afterEach(cleanup);
 
-it("reads Inbox, Search, then the sidebar toggle, counting what waits in the inbox, with no window history buttons", () => {
+it("reads Inbox, then the sidebar toggle, counting what waits in the inbox, with no window history buttons", () => {
   const { rerender } = render(<WindowNav open={false} />);
-  expect(screen.getAllByRole("button").map((button) => button.getAttribute("aria-label"))).toEqual(["Inbox, 4", "Search", "Toggle sidebar"]);
+  expect(screen.getAllByRole("button").map((button) => button.getAttribute("aria-label"))).toEqual(["Inbox, 4", "Toggle sidebar"]);
   expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
   expect(screen.queryByRole("button", { name: "Forward" })).toBeNull();
 
@@ -32,7 +32,7 @@ it("reads Inbox, Search, then the sidebar toggle, counting what waits in the inb
   expect(useRouter.getState().route).toEqual({ view: "inbox" });
   expect(inbox.getAttribute("aria-current")).toBe("page");
   rerender(<WindowNav open />);
-  expect(screen.getAllByRole("button").map((button) => button.getAttribute("aria-label"))).toEqual(["Inbox, 4", "Search", "Toggle sidebar"]);
+  expect(screen.getAllByRole("button").map((button) => button.getAttribute("aria-label"))).toEqual(["Inbox, 4", "Toggle sidebar"]);
 });
 
 it("caps the inbox count at 99+", async () => {

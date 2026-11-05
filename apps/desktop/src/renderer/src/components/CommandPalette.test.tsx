@@ -79,3 +79,22 @@ it("puts New file in the focused thread's folder", () => {
   fireEvent.click(screen.getByRole("option", { name: "New file" }));
   expect(useUi.getState().newFile).toEqual({ kind: "thread", id: "focused" });
 });
+
+it("finds an Orcling by name, lists its own conversation only under Orclings, and opens it", async () => {
+  const results: Partial<Record<RpcMethod, unknown>> = {
+    "orclings.list": [{ id: "rini", name: "Rini", threadId: "rini-home" }],
+    "threads.list": [
+      { id: "rini-home", title: "Rini" },
+      { id: "notes", title: "Notes" },
+    ],
+  };
+  vi.mocked(core.call).mockImplementation((async (method: RpcMethod) => results[method] ?? []) as typeof core.call);
+  render(<PaletteHost />);
+  act(() => useUi.getState().setPalette(true));
+  await screen.findByRole("option", { name: "Notes" });
+  await screen.findByText("Orclings");
+  expect(screen.getAllByRole("option", { name: "Rini" })).toHaveLength(1);
+  fireEvent.click(screen.getByRole("option", { name: "Rini" }));
+  expect(useRouter.getState().route).toEqual({ view: "thread", threadId: "rini-home" });
+  expect(useUi.getState().palette).toBe(false);
+});

@@ -1,14 +1,14 @@
 import { retiredThreadIds } from "./retired-teams.js";
 import { THREAD_CHILD_PAGE, type RpcParams } from "@openorc/protocol";
 
-export function threadTreeArgs(options: Pick<RpcParams<"threads.list">, "selectedId" | "childLimits" | "childSearch"> & { attentionIds?: readonly string[] }): string[] {
-  return [options.selectedId ?? "", JSON.stringify(options.childLimits ?? {}), options.childSearch ?? "", JSON.stringify(options.attentionIds ?? [])];
+export function threadTreeArgs(options: Pick<RpcParams<"threads.list">, "selectedId" | "childLimits"> & { attentionIds?: readonly string[] }): string[] {
+  return [options.selectedId ?? "", JSON.stringify(options.childLimits ?? {}), JSON.stringify(options.attentionIds ?? [])];
 }
 
 /** Independent conversations obey filters; native children inherit their owner's visibility. */
 export function threadTreeSql(where: string, order: string, limit: string): string {
   return `WITH RECURSIVE
-    options AS (SELECT ? AS selected_id, ? AS child_limits, ? AS child_search, ? AS attention_ids),
+    options AS (SELECT ? AS selected_id, ? AS child_limits, ? AS attention_ids),
     ancestry(id, parent_thread_id) AS (
       SELECT id, parent_thread_id FROM threads WHERE id = (SELECT selected_id FROM options)
       UNION SELECT t.id, t.parent_thread_id FROM threads t JOIN ancestry a ON a.parent_thread_id = t.id
@@ -17,7 +17,6 @@ export function threadTreeSql(where: string, order: string, limit: string): stri
       SELECT id, parent_thread_id FROM threads WHERE id IN (SELECT id FROM ancestry)
         OR id IN (SELECT thread_id FROM subagents WHERE status = 'running')
         OR id IN (SELECT value FROM json_each((SELECT attention_ids FROM options)))
-        OR ((SELECT child_search FROM options) != '' AND includes_text(title, (SELECT child_search FROM options)))
       UNION SELECT t.id, t.parent_thread_id FROM threads t JOIN required r ON r.parent_thread_id = t.id
     ),
     eligible AS (

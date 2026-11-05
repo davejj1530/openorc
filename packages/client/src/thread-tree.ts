@@ -162,13 +162,3 @@ export function threadTreeMatches(thread: ThreadSummary, all: readonly ThreadSum
   };
   return visit(thread);
 }
-
-/** Search opens matching branches only for this render; the reader's saved folds stay intact. */
-export function threadSearchFolds(saved: readonly string[], all: readonly ThreadSummary[], search: string): readonly string[] {
-  if (!search) return saved;
-  const ancestors = threadAncestors(
-    all,
-    all.filter((thread) => thread.title.toLowerCase().includes(search.toLowerCase())).map((thread) => thread.id),
-  );
-  return saved.filter((key) => !key.startsWith("thread-closed:") || !ancestors.has(key.slice("thread-closed:".length)));
-}

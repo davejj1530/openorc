@@ -352,6 +352,13 @@ export const AlertCircle = icon(
     <path d="M12 7.5v5 M12 16v.1" />
   </>,
 );
+export const Crosshair = icon(
+  "Crosshair",
+  <>
+    <circle cx="12" cy="12" r="6.5" />
+    <path d="M12 3v4.5 M12 16.5V21 M3 12h4.5 M16.5 12H21" />
+  </>,
+);
 export const CircleHelp = icon(
   "CircleHelp",
   <>

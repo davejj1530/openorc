@@ -1,4 +1,4 @@
-import { CalendarClock, FileCode2, FolderGit2, ListTodo, MessageSquare, Moon, Plus, Settings, Sun, SunMoon } from "../components/icons";
+import { Brain, CalendarClock, FileCode2, FolderGit2, ListTodo, MessageSquare, Moon, Plus, Settings, Sun, SunMoon } from "../components/icons";
 import { fileTarget, focusedThread } from "./files-tool";
 import { newThread, useRouter, type Route } from "./router";
 import { useTheme } from "./theme";
@@ -27,6 +27,7 @@ export const paletteActions: readonly PaletteAction[] = [
   { label: "Import project", icon: FolderGit2, run: () => useUi.getState().setImportProject(true) },
   { label: "All tasks", icon: ListTodo, run: () => go({ view: "tasks" }) },
   { label: "Schedules", icon: CalendarClock, run: () => go({ view: "scheduled" }) },
+  { label: "Memory", icon: Brain, run: () => go({ view: "memory" }) },
   { label: "Settings", icon: Settings, run: () => go({ view: "settings" }) },
   { label: "Theme: light", icon: Sun, run: () => useTheme.getState().set("light") },
   { label: "Theme: dark", icon: Moon, run: () => useTheme.getState().set("dark") },

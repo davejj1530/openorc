@@ -1,8 +1,8 @@
 import type { ThreadSummary } from "@openorc/protocol";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { threadAncestors, threadSearchFolds, threadBranchPath, threadPageBranchPath, threadChildren, threadTreeRows, type ThreadTreeRow } from "@openorc/client";
+import { threadAncestors, threadBranchPath, threadPageBranchPath, threadChildren, threadTreeRows, type ThreadTreeRow } from "@openorc/client";
 import { useLayout } from "../lib/layout";
-import { ChevronRight } from "./icons";
+import { ChevronDown } from "./icons";
 import { ThreadRow } from "./ThreadLibraryRow";
 
 export function ThreadTreeList({
@@ -10,7 +10,6 @@ export function ThreadTreeList({
   all,
   activeId,
   projectNames,
-  search = "",
   childLimits,
   onShowMore,
 }: {
@@ -18,18 +17,16 @@ export function ThreadTreeList({
   all: ThreadSummary[];
   activeId: string | null;
   projectNames?: ReadonlyMap<string, string>;
-  search?: string;
   childLimits?: Readonly<Record<string, number>>;
   onShowMore?: (projectId: string, parentId: string) => void;
 }) {
   const saved = useLayout((state) => state.collapsed);
   const toggle = useLayout((state) => state.toggleThreadChildren);
-  const reveal = all.filter((thread) => thread.id === activeId || (search && thread.title.toLowerCase().includes(search.toLowerCase()))).map((thread) => thread.id);
   const ancestorsKey = JSON.stringify([...threadAncestors(all, activeId ? [activeId] : [])].sort());
   useLayoutEffect(() => {
     useLayout.getState().revealThreads(JSON.parse(ancestorsKey) as string[]);
   }, [activeId, ancestorsKey]);
-  const rows = new Map(threadTreeRows(roots, all, threadSearchFolds(saved, all, search), reveal, childLimits).map((row) => [row.thread.id, row]));
+  const rows = new Map(threadTreeRows(roots, all, saved, activeId ? [activeId] : [], childLimits).map((row) => [row.thread.id, row]));
   const children = threadChildren(all);
   const visited = new Set<string>();
   const render = (thread: ThreadSummary): ReactNode => {
@@ -40,14 +37,7 @@ export function ThreadTreeList({
     const projectName = depth ? undefined : projectNames?.get(thread.projectId);
     return (
       <div key={thread.id} className="sidebar-tree-node" data-child={depth > 0 || undefined}>
-        <BranchRow row={row} projectName={projectName}>
-          {hasChildren ? (
-            <button className="sidebar-tree-toggle no-drag" aria-label={`${expanded ? "Collapse" : "Expand"} ${thread.title}`} aria-expanded={expanded} onClick={() => toggle(thread.id, expanded)}>
-              <ChevronRight size={12} className={expanded ? "work-chevron rotate-90" : "work-chevron"} />
-            </button>
-          ) : (
-            <span className="sidebar-tree-spacer" />
-          )}
+        <BranchRow row={row} projectName={projectName} onToggle={hasChildren ? () => toggle(thread.id, expanded) : undefined}>
           <ThreadRow thread={thread} active={activeId === thread.id} compact={depth > 0} projectName={projectName} />
         </BranchRow>
         {expanded && hasChildren ? (
@@ -68,7 +58,16 @@ export function ThreadTreeList({
   return roots.map(render);
 }
 
-function BranchRow({ row, projectName, children, paging = false }: { row: ThreadTreeRow; projectName?: string; children: ReactNode; paging?: boolean }) {
+/** The tree's grid, as the phone draws it: a row's status mark sits in the project icons' column, and a sub thread steps in so its mark sits under its parent's title. */
+const MARK_X = 18;
+const STEP = 24;
+
+/**
+ * A row of the tree with its share of the branch lines drawn over its lead. A parent carries its disclosure at the end
+ * of its title line, where the phone keeps it: the chevron points down while its sub threads are folded and turns up
+ * as they open.
+ */
+function BranchRow({ row, projectName, children, paging = false, onToggle }: { row: ThreadTreeRow; projectName?: string; children: ReactNode; paging?: boolean; onToggle?: () => void }) {
   const element = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ height: projectName ? 52 : 34, mid: projectName ? 35 : 17 });
   useLayoutEffect(() => {
@@ -85,12 +84,23 @@ function BranchRow({ row, projectName, children, paging = false }: { row: Thread
     measure();
     return () => observer.disconnect();
   }, []);
-  const indent = Math.min(row.depth + Number(paging), 3) * 20;
+  const indent = Math.min(row.depth + Number(paging), 3) * STEP;
   return (
-    <div ref={element} className="sidebar-tree-item">
+    <div ref={element} className="sidebar-tree-item" data-parent={onToggle ? true : undefined}>
       {children}
-      <svg aria-hidden className="sidebar-tree-lines" style={{ left: -indent }} width={34 + indent} height={size.height}>
-        <path d={(paging ? threadPageBranchPath : threadBranchPath)(row, { markX: 34, ...size })} />
+      {onToggle ? (
+        <button
+          className="sidebar-tree-toggle no-drag"
+          style={{ top: size.mid - 12 }}
+          aria-label={`${row.expanded ? "Collapse" : "Expand"} ${row.thread.title}`}
+          aria-expanded={row.expanded}
+          onClick={onToggle}
+        >
+          <ChevronDown size={14} className={row.expanded ? "work-chevron rotate-180" : "work-chevron"} />
+        </button>
+      ) : null}
+      <svg aria-hidden className="sidebar-tree-lines" style={{ left: -indent }} width={MARK_X + 16 + indent} height={size.height}>
+        <path d={(paging ? threadPageBranchPath : threadBranchPath)(row, { markX: MARK_X, step: STEP, ...size })} />
       </svg>
     </div>
   );

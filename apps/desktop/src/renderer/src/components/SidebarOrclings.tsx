@@ -12,17 +12,16 @@ import { IconButton, Tooltip } from "./ui";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
 
 /** The Orclings destination replaces the project thread list in the same sidebar. */
-export function SidebarOrclings({ route, search }: { route: Route; search: string }) {
+export function SidebarOrclings({ route }: { route: Route }) {
   const orclings = useOrclings();
   const activeId = route.view === "thread" ? route.threadId : null;
-  const filtered = orclings.filter((orcling) => orcling.name.toLowerCase().includes(search.toLowerCase()));
   return (
     <section className="conversation-browser orcling-browser" aria-label="Orclings">
       <div className="browser-threads">
-        {filtered.map((orcling) => (
+        {orclings.map((orcling) => (
           <OrclingRow key={orcling.id} orcling={orcling} active={activeId === orcling.threadId} />
         ))}
-        {!filtered.length ? <p className="browser-empty">{search ? "No matching Orclings." : "Create an Orcling to start a conversation."}</p> : null}
+        {!orclings.length ? <p className="browser-empty">Create an Orcling to start a conversation.</p> : null}
       </div>
       <p className="browser-hint">Each Orcling keeps its own instructions and memory.</p>
     </section>

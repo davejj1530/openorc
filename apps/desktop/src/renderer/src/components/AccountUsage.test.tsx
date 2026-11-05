@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type { AllowanceWindow, PlanLimits } from "@openorc/protocol";
-import { afterEach, expect, it, vi } from "vitest";
+import { act } from "react";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 const NOW = Date.now();
 const limit = (id: string, label: string, used: number, resetsInMinutes: number): AllowanceWindow => ({
@@ -36,20 +37,35 @@ const accounts: PlanLimits[] = [
 
 vi.mock("../lib/client", async (original) => ({
   ...(await original<object>()),
-  useRpc: (method: string) => {
+  useRpc: (method: string, params: { provider?: string }) => {
     if (method === "threads.get") return { data: { id: "notes", agent: "claude", claudeAccountId: "work", teamInstanceId: null } };
     if (method === "claude.accounts.list") return { data: { defaultId: "work", accounts: [{ id: "work", name: "Work" }] } };
-    if (method === "providers.usage") return { data: { windows: accounts[1]!.windows } };
+    if (method === "providers.usage") return { data: { windows: (params.provider === "codex" ? accounts[0]! : accounts[1]!).windows } };
     if (method === "providers.limits") return { data: accounts };
     return { data: undefined };
   },
 }));
 vi.mock("../lib/browser-preview", () => ({ CoversPreview: () => null }));
 
+import { publishComposerAccount, useComposerAccount } from "../lib/composer-account";
 import { useRouter } from "../lib/router";
 import { AccountUsage } from "./AccountUsage";
 
-afterEach(cleanup);
+beforeEach(() => {
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      disconnect() {}
+    },
+  );
+  useComposerAccount.setState({ chosen: null });
+});
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 it("opens every account's 5-hour and weekly limits from the chip, the thread's account first", async () => {
   useRouter.setState({ route: { view: "thread", threadId: "notes" } });
@@ -67,4 +83,32 @@ it("opens every account's 5-hour and weekly limits from the chip, the thread's a
     ),
   ).toEqual([["4% left", "59% left"], ["82% left", "64% left"], ["Not signed in"]]);
   expect(rows[0]!.querySelector('[data-tone="low"]')?.textContent).toContain("in 21m");
+});
+
+it("off a thread, reports on the agent and account the new-thread composer has chosen", () => {
+  useRouter.setState({ route: { view: "newthread" } });
+  act(() => publishComposerAccount({ agent: "codex" }));
+  render(<AccountUsage />);
+  expect(screen.getByRole("button", { name: "Codex: 64% left this week" })).toBeTruthy();
+  act(() => publishComposerAccount({ agent: "claude", claudeAccountId: "work" }));
+  expect(screen.getByRole("button", { name: "Claude · Work: 59% left this week" })).toBeTruthy();
+});
+
+it.each([
+  [120, "full"],
+  [70, "short"],
+  [40, "icon"],
+])("in a %ipx slot, takes the fullest look that fits: %s", (room, look) => {
+  const widths: Record<string, number> = { full: 88, short: 66, icon: 32 };
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+    const width = this.classList.contains("sidebar-usage") ? room : (widths[this.dataset.look ?? "full"] ?? 0);
+    return { width, height: 32, top: 0, left: 0, right: width, bottom: 32, x: 0, y: 0, toJSON: () => ({}) };
+  });
+  useRouter.setState({ route: { view: "thread", threadId: "notes" } });
+  render(
+    <div className="sidebar-usage">
+      <AccountUsage />
+    </div>,
+  );
+  expect((screen.getByRole("button", { name: "Claude · Work: 59% left this week" }) as HTMLElement).dataset.look).toBe(look);
 });

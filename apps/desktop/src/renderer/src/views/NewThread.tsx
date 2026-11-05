@@ -16,6 +16,7 @@ import { Button, TextButton } from "../components/ui";
 import { ClaudeAccountScope } from "../lib/claude-account";
 import { usePermissionSelection, useRpc, useRpcMutation } from "../lib/client";
 import { useNewThreadCloud, type NewThreadCloud } from "../lib/cloud-offered";
+import { usePublishComposerAccount } from "../lib/composer-account";
 import { useComposerChanges } from "../lib/composer-changes";
 import { useDefaultHarness } from "../lib/default-harness";
 import { useLayout } from "../lib/layout";
@@ -128,6 +129,7 @@ function NewThreadProject({
     const initial = newThreadChoice(models.data, { preferred: defaultHarness, harnesses: info.data.harnesses });
     if (initial) changeDraft({ target: { kind: "model", choice: initial } });
   }, [target, models.data, info.data, defaultHarness]);
+  usePublishComposerAccount(choice?.agent, claudeAccountId);
 
   const {
     selectedProject: selected,

@@ -167,7 +167,7 @@ it.each([false, true])("keeps the sidebar and keyboard order visible during a th
   }
 });
 
-it.each([false, true])("fetches another child page, keeps rows while loading, and searches beyond the page (ungrouped=%s)", async (ungroupByProjects) => {
+it.each([false, true])("fetches another child page and keeps rows while loading (ungrouped=%s)", async (ungroupByProjects) => {
   const parent = {
     id: "parent",
     title: "Parent",
@@ -194,18 +194,14 @@ it.each([false, true])("fetches another child page, keeps rows while loading, an
   useLayout.setState({ ungroupByProjects });
   const implementation = vi.mocked(core.call).getMockImplementation()!;
   let release: (() => void) | undefined;
-  const requests: RpcParams<"threads.list">[] = [];
   vi.mocked(core.call).mockImplementation(async (method, params) => {
     if (method !== "threads.list") return implementation(method, params);
     const list = params as RpcParams<"threads.list">;
-    requests.push(list);
-    if (list.childLimits?.[parent.id] === 17 && !list.childSearch)
+    if (list.childLimits?.[parent.id] === 17)
       await new Promise<void>((resolve) => {
         release = resolve;
       });
-    const shown = [...children]
-      .reverse()
-      .filter((child, index) => index < (list.childLimits?.[parent.id] ?? 5) || child.activity === "running" || (list.childSearch && child.title.includes(list.childSearch)));
+    const shown = [...children].reverse().filter((child, index) => index < (list.childLimits?.[parent.id] ?? 5) || child.activity === "running");
     return [{ ...parent, hiddenChildren: children.length - shown.length }, ...shown] as never;
   });
   try {
@@ -218,29 +214,27 @@ it.each([false, true])("fetches another child page, keeps rows while loading, an
     await act(async () => release!());
     await screen.findByRole("button", { name: "Show 2 more in Parent" });
     expect(useUi.getState().threadOrder).toHaveLength(19);
-    fireEvent.change(screen.getByRole("textbox", { name: "Filter loaded threads" }), { target: { value: "Child 1" } });
-    await screen.findByText("Child 1");
-    expect(requests.some((params) => params.childSearch === "Child 1")).toBe(true);
-    expect(useUi.getState().threadOrder).toContain("child-1");
   } finally {
     vi.mocked(core.call).mockImplementation(implementation);
   }
 });
 
-it("shows the OpenOrc wordmark only while fullscreen and keeps the header controls available", () => {
+it("leads the window corner with the OpenOrc wordmark, in and out of fullscreen, and heads the list with the app's one search", () => {
   mountSidebar();
-  expect(screen.queryByRole("img", { name: "OpenOrc" })).toBeNull();
-  act(() => useWindow.setState({ fullscreen: true }));
+  const corner = () => screen.getByRole("group", { name: "Window" }).closest("header");
   expect(screen.getByRole("img", { name: "OpenOrc" }).textContent).toBe("OpenOrc");
+  expect(screen.getByRole("img", { name: "OpenOrc" }).closest("header")).toBe(corner());
   expect(
     within(screen.getByRole("group", { name: "Window" }))
       .getAllByRole("button")
       .map((button) => button.getAttribute("aria-label")),
-  ).toEqual(["Inbox", "Search", "Toggle sidebar"]);
-  expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
-  expect(screen.queryByRole("button", { name: "Forward" })).toBeNull();
-  act(() => useWindow.setState({ fullscreen: false }));
-  expect(screen.queryByRole("img", { name: "OpenOrc" })).toBeNull();
+  ).toEqual(["Inbox", "Toggle sidebar"]);
+  act(() => useWindow.setState({ fullscreen: true }));
+  expect(screen.getAllByRole("img", { name: "OpenOrc" })).toHaveLength(1);
+  expect(screen.getByRole("img", { name: "OpenOrc" }).closest("header")).toBe(corner());
+  expect(screen.queryByRole("textbox")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Search" }));
+  expect(useUi.getState()).toMatchObject({ palette: true, paletteMode: "all" });
 });
 
 it("unfolds the project that lists the opened thread", () => {
@@ -284,10 +278,10 @@ it("reaches the app's screens from the footer, marking the open one as current",
     within(dock)
       .getAllByRole("button")
       .map((button) => button.getAttribute("aria-label")),
-  ).toEqual(["Tasks", "Pull requests", "Schedules", "Memory", "Orclings", "Settings"]);
-  fireEvent.click(within(dock).getByRole("button", { name: "Memory" }));
-  expect(useRouter.getState().route).toEqual({ view: "memory" });
-  expect(within(dock).getByRole("button", { name: "Memory" }).getAttribute("aria-current")).toBe("page");
+  ).toEqual(["Tasks", "Pull requests", "Schedules", "Orclings", "Settings"]);
+  fireEvent.click(within(dock).getByRole("button", { name: "Schedules" }));
+  expect(useRouter.getState().route).toEqual({ view: "scheduled" });
+  expect(within(dock).getByRole("button", { name: "Schedules" }).getAttribute("aria-current")).toBe("page");
   expect(within(dock).getByRole("button", { name: "Tasks" }).getAttribute("aria-current")).toBeNull();
   expect(screen.queryByRole("button", { name: "More" })).toBeNull();
 });
@@ -369,7 +363,7 @@ function projectThreads() {
   ].map((thread) => ({ ...thread, agent: "codex", activity: "idle", unread: false, session: { status: "idle", message: null }, lastActivityAt: Date.now() }));
 }
 
-it("narrows to orcmode's working set, hides projects with nothing in it, and keeps search and the rest one step away", async () => {
+it("narrows to orcmode's working set, hides projects with nothing in it, and keeps the rest one step away", async () => {
   const day = 86_400_000;
   fixture.projects = [
     { id: "one", name: "First project", rootPath: "/projects/one" },
@@ -389,10 +383,7 @@ it("narrows to orcmode's working set, hides projects with nothing in it, and kee
   expect(screen.queryByText("Quiet project")).toBeNull();
   expect(screen.getByRole("button", { name: "Filter threads: Orcmode" })).toBeTruthy();
   expect(useUi.getState().threadOrder).toEqual(["today"]);
-  // A search reaches every thread, and the end of the list leads back to all of them.
-  fireEvent.change(screen.getByRole("textbox", { name: "Filter loaded threads" }), { target: { value: "dusty" } });
-  expect(screen.getByRole("button", { name: /Dusty idea/ })).toBeTruthy();
-  fireEvent.change(screen.getByRole("textbox", { name: "Filter loaded threads" }), { target: { value: "" } });
+  // The end of the list leads back to all of them.
   fireEvent.click(screen.getByRole("button", { name: "Show 2 more" }));
   expect(screen.getByRole("button", { name: /Old notes/ })).toBeTruthy();
   expect(useLayout.getState().sidebarFilter).toBe("active");
@@ -456,12 +447,11 @@ it("retains saved project folds across remounts and scope changes without hiding
   expect(useUi.getState().threadOrder).toEqual(["other"]);
 });
 
-it("keeps a project folded while searching and changing pinned filters", async () => {
+it("keeps a project folded while changing pinned filters", async () => {
   projectThreads();
   mountSidebar();
   await screen.findByRole("button", { name: /Regular notes/ });
   fireEvent.click(screen.getByRole("button", { name: "Collapse First project threads" }));
-  fireEvent.change(screen.getByRole("textbox", { name: "Filter loaded threads" }), { target: { value: "notes" } });
   fireEvent.click(screen.getByRole("button", { name: "Filter threads" }));
   fireEvent.click(await screen.findByRole("menuitem", { name: "Pinned threads" }));
   expect(screen.getByRole("button", { name: "Expand First project threads" })).toBeTruthy();
@@ -566,7 +556,7 @@ it("pages one activity-ordered list across projects without promoting pins or ne
   expect(screen.queryByRole("button", { name: "Load more threads" })).toBeNull();
 });
 
-it("keeps pinned, archived and title filters available while projects are ungrouped", async () => {
+it("keeps pinned and archived filters available while projects are ungrouped", async () => {
   projectThreads();
   const base = fixture.threads[0]!;
   fixture.threads = [
@@ -586,9 +576,6 @@ it("keeps pinned, archived and title filters available while projects are ungrou
   fireEvent.click(screen.getByRole("button", { name: /^Filter threads/ }));
   fireEvent.click(await screen.findByRole("menuitem", { name: "Archived threads" }));
   await waitFor(() => expect(useUi.getState().threadOrder).toEqual(["archived"]));
-  fireEvent.change(screen.getByRole("textbox", { name: "Filter loaded threads" }), { target: { value: "no match" } });
-  expect(await screen.findByText("No matches in loaded threads.")).toBeTruthy();
-  expect(useUi.getState().threadOrder).toEqual([]);
   expect(useLayout.getState().ungroupByProjects).toBe(true);
 });
 
@@ -667,7 +654,7 @@ it.each([false, true])("shows and hides projects in grouped/ungrouped mode (%s),
   expect(useLayout.getState().hiddenProjects).toEqual([]);
 });
 
-it.each([false, true])("keeps hidden projects out of Orcmode, pinned, archived and search results (%s)", async (ungrouped) => {
+it.each([false, true])("keeps hidden projects out of Orcmode, pinned and archived threads (%s)", async (ungrouped) => {
   projectThreads();
   fixture.threads[3]!.pinnedAt = 1;
   const base = fixture.threads[0]!;
@@ -682,9 +669,6 @@ it.each([false, true])("keeps hidden projects out of Orcmode, pinned, archived a
     expect(screen.queryByRole("button", { name: /Regular notes|Pinned notes|Snoozed notes|Hidden archived notes/ })).toBeNull();
     expect(useLayout.getState().hiddenProjects).toEqual(["one"]);
   }
-  fireEvent.change(screen.getByRole("textbox", { name: "Filter loaded threads" }), { target: { value: "Regular notes" } });
-  expect(screen.queryByRole("button", { name: /Regular notes/ })).toBeNull();
-  expect(useUi.getState().threadOrder).toEqual([]);
 });
 
 it.each([false, true])("can hide every project including Workspace, then show one again (%s)", async (ungrouped) => {

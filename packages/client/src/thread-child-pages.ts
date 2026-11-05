@@ -17,9 +17,9 @@ export function useChildThreadPages() {
   };
 }
 
-/** Keep loaded rows during paging/search reads; the tree still applies the current search and page limits. */
+/** Keep loaded rows during paging reads; the tree still applies the current page limits. */
 export function cachedChildPage(cache: QueryClient, params: RpcParams<"threads.list">): ThreadSummary[] | undefined {
-  const key = (value: RpcParams<"threads.list">) => JSON.stringify({ ...value, childLimits: undefined, childSearch: undefined });
+  const key = (value: RpcParams<"threads.list">) => JSON.stringify({ ...value, childLimits: undefined });
   return cache
     .getQueryCache()
     .findAll({ queryKey: ["threads.list"], predicate: (query) => key(query.queryKey[1] as RpcParams<"threads.list">) === key(params) && Array.isArray(query.state.data) })

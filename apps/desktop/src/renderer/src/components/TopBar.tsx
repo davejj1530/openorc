@@ -43,8 +43,9 @@ function headerEnds({ inSplit, panelShown, panelSide, rightmost }: { inSplit?: b
  * A plain-text title is the page's heading.
  * Window navigation stays here. With the sidebar hidden this is the window's
  * leftmost header, so it also clears the native window controls.
- * When a panel is available but closed, its toggle lives here so the third
- * column is one click away. A panel docked on the left takes the window
+ * When a panel is available its toggle lives here, showing it or hiding it, so
+ * the third column is one click away either way (the panel's own Hide shows only
+ * while it covers this header). A panel docked on the left takes the window
  * navigation into its own header.
  */
 export function TopBar({
@@ -57,8 +58,6 @@ export function TopBar({
   projectName,
   showProject = true,
   onProjectChange,
-  onPanelToggle,
-  panelActive,
   windowDragSurface,
   rightmost: isRightmost,
 }: {
@@ -71,8 +70,6 @@ export function TopBar({
   projectName?: string | null;
   showProject?: boolean;
   onProjectChange?: (id: string | null) => void;
-  onPanelToggle?: () => void;
-  panelActive?: boolean;
   windowDragSurface?: boolean;
   rightmost?: boolean;
 }) {
@@ -85,7 +82,7 @@ export function TopBar({
   const { first, last: rightmost } = headerEnds({ inSplit, panelShown: Boolean(panel && panelOpen), panelSide, rightmost: isRightmost });
   // Only the window's leftmost header clears the traffic lights, and only its rightmost clears the Windows controls.
   const leftmost = !sidebarOpen && first;
-  const panelLabel = panelActive ? "Hide panel" : "Show panel";
+  const panelLabel = panelOpen ? "Hide panel" : "Show panel";
   return (
     <header
       data-window-navigation={first || undefined}
@@ -113,9 +110,9 @@ export function TopBar({
       {windowDragSurface ? <span className="thread-header-gap w-2 shrink-0 self-stretch" aria-hidden="true" /> : null}
       <div className="topbar-actions flex shrink-0 items-center gap-1">
         {actions}
-        {panel && (onPanelToggle || !panelOpen) ? (
+        {panel ? (
           <Tooltip label={panelLabel}>
-            <IconButton onClick={onPanelToggle ?? (() => setPanel(true))} aria-label={panelLabel} aria-pressed={panelActive}>
+            <IconButton onClick={() => setPanel(!panelOpen)} aria-label={panelLabel} aria-pressed={panelOpen}>
               <PanelIcon side={panelSide} size={16} />
             </IconButton>
           </Tooltip>

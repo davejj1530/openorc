@@ -714,26 +714,6 @@ body[data-resizing] .sidebar-shell {
   margin-right: calc(2 * var(--spacing-well));
 }
 
-.sidebar-brand-mark {
-  width: 22px;
-  height: 22px;
-  object-fit: contain;
-}
-.sidebar-wordmark {
-  color: var(--ink);
-  font-size: 17px;
-  letter-spacing: -0.03em;
-  line-height: 1;
-}
-.sidebar-brand-new-thread {
-  color: var(--ink-2);
-  background-color: color-mix(in srgb, var(--ink) 7%, transparent);
-}
-.sidebar-brand-new-thread:is(:hover, :focus-visible) {
-  color: var(--ink);
-  background-color: color-mix(in srgb, var(--ink) 12%, transparent);
-}
-
 .sidebar-project-add {
   opacity: 0;
 }

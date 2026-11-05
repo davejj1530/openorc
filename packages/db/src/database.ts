@@ -13,10 +13,7 @@ export class Db {
   /** True when sqlite-vec loaded and the vector table exists; retrieval degrades to FTS otherwise. */
   hasVectors = false;
 
-  constructor(readonly raw: DatabaseSync) {
-    // SQLite lower() folds ASCII only; paged title search must match the clients' Unicode casing.
-    raw.function("includes_text", { deterministic: true }, (text, search) => Number(typeof text === "string" && typeof search === "string" && text.toLowerCase().includes(search.toLowerCase())));
-  }
+  constructor(readonly raw: DatabaseSync) {}
 
   static open(file: string): Db {
     const raw = new DatabaseSync(file, { allowExtension: true });

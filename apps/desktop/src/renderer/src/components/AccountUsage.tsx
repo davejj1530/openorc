@@ -1,29 +1,40 @@
 import { Popover } from "@base-ui/react/popover";
 import { DEFAULT_CLAUDE_ACCOUNT, harnessCatalog, isHarnessId, type AllowanceWindow, type PlanLimits, type ProviderUsage } from "@openorc/protocol";
 import { allowanceState, formatUsageTime, percentLeft, sessionWindow, usageResetLabel, weeklyWindow } from "@openorc/client";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { CoversPreview } from "../lib/browser-preview";
 import { cn } from "../lib/cn";
 import { useRpc } from "../lib/client";
+import { savedComposerAccount, useComposerAccount, type ComposerAccount } from "../lib/composer-account";
 import { useRouter } from "../lib/router";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { HarnessLogo } from "./HarnessLogo";
 
 type UsageAccount = { provider: ProviderUsage["provider"]; claudeAccountId?: string; name: string };
 
+/** An agent and Claude account as the chip names them, or null for an agent OpenOrc does not run. */
+function usageAccount(agent: string, claudeAccountId: string | undefined, accountName: (id: string) => string | undefined): UsageAccount | null {
+  if (!isHarnessId(agent)) return null;
+  if (agent !== "claude") return { provider: agent, name: harnessCatalog[agent].name };
+  const id = claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT;
+  return { provider: "claude", claudeAccountId: id, name: `Claude · ${accountName(id) ?? "Existing CLI login"}` };
+}
+
 /**
- * The account the open thread runs on: its Claude account, or its agent's own. None off a thread, and none for a team
- * conversation, whose members can each run on their own account.
+ * The account the chip reports on: on a thread, the one it runs on; anywhere else, the one the new-thread composer
+ * has chosen, so the chip always shows the setup the next message would spend. None for a team conversation, whose
+ * members can each run on their own account.
  */
-function useThreadAccount(): UsageAccount | null {
+function useUsageAccount(): UsageAccount | null {
   const threadId = useRouter((s) => (s.route.view === "thread" ? s.route.threadId : null));
   const thread = useRpc("threads.get", { id: threadId ?? "" }, { enabled: Boolean(threadId) }).data;
-  const accounts = useRpc("claude.accounts.list", {}, { enabled: thread?.agent === "claude" }).data;
-  if (!threadId || !thread || thread.id !== threadId || thread.teamInstanceId) return null;
-  if (!isHarnessId(thread.agent)) return null;
-  if (thread.agent !== "claude") return { provider: thread.agent, name: harnessCatalog[thread.agent].name };
-  const id = thread.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT;
-  return { provider: "claude", claudeAccountId: id, name: `Claude · ${accounts?.accounts.find((account) => account.id === id)?.name ?? "Existing CLI login"}` };
+  const composer: ComposerAccount | null = useComposerAccount((s) => s.chosen) ?? (threadId ? null : savedComposerAccount());
+  const agent = threadId ? thread?.agent : composer?.agent;
+  const accounts = useRpc("claude.accounts.list", {}, { enabled: agent === "claude" }).data;
+  const accountName = (id: string) => accounts?.accounts.find((account) => account.id === id)?.name;
+  if (!threadId) return composer ? usageAccount(composer.agent, composer.claudeAccountId, accountName) : null;
+  if (!thread || thread.id !== threadId || thread.teamInstanceId) return null;
+  return usageAccount(thread.agent, thread.claudeAccountId ?? undefined, accountName);
 }
 
 /** The id `providers.limits` gives an account: "codex", or "claude:" and the Claude account's id. */
@@ -146,12 +157,41 @@ function UsageTable({ current }: { current: string }) {
   );
 }
 
+const LOOKS = ["full", "short", "icon"] as const;
+
 /**
- * What is left of the open thread's account this week, above the sidebar's dock. It opens a table of every account's
- * limits out of the chip, the way the composer's pickers open out of theirs. Accounts without a weekly limit show nothing.
+ * The fullest look of the chip its slot has room for: "64% left", then "64%" with its ring, then the ring alone as a
+ * round button like the dock's. Each look is measured as the chip draws it, so any font and any share fits exactly.
+ */
+function useChipLook(chip: RefObject<HTMLButtonElement | null>, content: string): void {
+  useLayoutEffect(() => {
+    const node = chip.current;
+    const slot = node?.parentElement;
+    if (!node || !slot) return;
+    const fit = () => {
+      const room = slot.getBoundingClientRect().width;
+      for (const look of LOOKS) {
+        node.dataset.look = look;
+        if (look === "icon" || node.getBoundingClientRect().width <= room) return;
+      }
+    };
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(slot);
+    // The interface font can arrive after the first measure.
+    void document.fonts?.ready.then(fit);
+    return () => observer.disconnect();
+  }, [chip, content]);
+}
+
+/**
+ * What is left this week of the account the next message would spend, first in the sidebar's footer row. It opens a
+ * table of every account's limits out of the chip, the way the composer's pickers open out of theirs. Accounts
+ * without a weekly limit show nothing.
  */
 export function AccountUsage() {
-  const account = useThreadAccount();
+  const account = useUsageAccount();
+  const chip = useRef<HTMLButtonElement>(null);
   const usage = useRpc(
     "providers.usage",
     { provider: account?.provider ?? "claude", ...(account?.claudeAccountId ? { claudeAccountId: account.claudeAccountId } : {}) },
@@ -159,14 +199,15 @@ export function AccountUsage() {
   );
   const week = account && usage.data ? weeklyWindow(usage.data.windows) : null;
   const left = week ? percentLeft(week) : null;
-  if (!account || !week || left === null) return null;
-  const shown = Math.round(left);
+  const shown = left === null ? null : Math.round(left);
+  useChipLook(chip, `${account?.name}:${shown}`);
+  if (!account || left === null || shown === null) return null;
   return (
     <Popover.Root>
-      <Popover.Trigger className="account-usage-chip no-drag" data-low={shown <= 10 || undefined} aria-label={`${account.name}: ${shown}% left this week`}>
+      <Popover.Trigger ref={chip} className="account-usage-chip no-drag" data-low={shown <= 10 || undefined} aria-label={`${account.name}: ${shown}% left this week`}>
         <LeftRing left={left} />
         <span className="account-usage-value tabular">{shown}%</span>
-        <span className="account-usage-label">left this week</span>
+        <span className="account-usage-label">left</span>
       </Popover.Trigger>
       <Popover.Portal>
         <CoversPreview />

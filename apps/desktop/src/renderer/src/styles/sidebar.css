@@ -22,7 +22,8 @@
   flex-shrink: 0;
 }
 
-/* The window's corner: traffic lights, then Inbox, Search and the sidebar toggle at the right. */
+/* The window's corner: traffic lights where the OS draws them, the wordmark, then Inbox and the
+   sidebar toggle at the right. */
 .sidebar-header {
   display: flex;
   align-items: center;
@@ -30,19 +31,6 @@
 }
 .workspace-navigation[data-traffic-lights="true"] .sidebar-header {
   padding-left: var(--spacing-traffic);
-}
-.sidebar-brand {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  flex: 1;
-  min-width: 0;
-  color: var(--ink);
-  white-space: nowrap;
-}
-.sidebar-brand .sidebar-wordmark {
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .window-corner {
   display: flex;
@@ -126,133 +114,61 @@ button.sidebar-nav-row:hover {
   margin-bottom: 18px;
 }
 
-/* The list head: the list's name, a round search button, then the list's tools. While searching,
-   the capsule grows leftward over the name; the tools keep their place. */
+/* The wordmark leads the window's corner, after the traffic lights where the OS draws them, else with
+   its cube on the project icons' line. It is always set in Immaculate Gothic, whatever the interface
+   font. Short of room it never truncates: the name wraps onto a second line the box clips, leaving
+   the cube. */
+.sidebar-wordmark {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  align-items: center;
+  gap: 16px 7px;
+  min-width: 0;
+  height: 16px;
+  overflow: hidden;
+  color: var(--ink);
+  font-family: "Immaculate Gothic", var(--font-sans);
+  font-size: 15px;
+  letter-spacing: -0.02em;
+  line-height: 16px;
+  white-space: nowrap;
+}
+.workspace-navigation:not([data-traffic-lights="true"]) .sidebar-wordmark {
+  padding-left: 2px;
+}
+
+/* The list head: Search, its glyph in the status column and its word where titles start, then the
+   list's tools at the row's end. */
 .sidebar-list-head {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 2px;
   height: var(--control-row);
   margin: 6px 10px 0;
   flex-shrink: 0;
 }
-.sidebar-list-lead {
-  display: grid;
-  flex: 1;
-  align-items: center;
-  min-width: 0;
-}
-.sidebar-list-lead > * {
-  grid-area: 1 / 1;
-}
-.sidebar-list-title {
-  justify-self: start;
-  max-width: calc(100% - 34px);
-  padding-left: 10px;
-  overflow: hidden;
-  font-size: var(--text-base);
-  line-height: 16px;
-  color: var(--ink-3);
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  transition:
-    opacity var(--duration-leave) var(--ease-out),
-    filter var(--duration-leave) var(--ease-out),
-    translate var(--duration-arrive) var(--ease-out);
-}
-.sidebar-list-head[data-searching] .sidebar-list-title {
-  opacity: 0;
-  filter: blur(var(--arrive-blur));
-  translate: -8px 0;
-}
 .sidebar-search {
-  justify-self: end;
   display: flex;
   align-items: center;
-  width: 32px;
+  gap: 8px;
   height: 32px;
+  padding: 0 14px 0 10px;
   border-radius: var(--radius-pill);
-  overflow: hidden;
-  transition:
-    width var(--duration-resize) var(--ease-out),
-    background-color var(--duration-quick) var(--ease-out);
-}
-.sidebar-list-head[data-searching] .sidebar-search {
-  width: 100%;
-  background: var(--surface-2);
-}
-.sidebar-search-glass {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-pill);
+  font-size: var(--text-base);
   color: var(--ink-3);
   transition:
     background-color var(--duration-quick) var(--ease-out),
     color var(--duration-quick) var(--ease-out);
 }
-.sidebar-search-glass:hover {
+.sidebar-search:hover {
   background-color: var(--surface-2);
   color: var(--ink);
 }
-.sidebar-list-head[data-searching] .sidebar-search-glass {
-  pointer-events: none;
-}
-.sidebar-search-input {
-  flex: 1;
-  min-width: 0;
-  height: 100%;
-  padding: 0;
-  background: transparent;
-  font-size: var(--text-base);
-  line-height: 16px;
-  color: var(--ink);
-  outline: none;
-  opacity: 0;
-  filter: blur(var(--arrive-blur));
-  pointer-events: none;
-  transition:
-    opacity var(--duration-leave) var(--ease-out),
-    filter var(--duration-leave) var(--ease-out);
-}
-.sidebar-search-input::placeholder {
-  color: var(--ink-4);
-  opacity: 1;
-}
-.sidebar-list-head[data-searching] .sidebar-search-input {
-  opacity: 1;
-  filter: none;
-  pointer-events: auto;
-  transition-duration: var(--duration-arrive);
-  transition-delay: 140ms;
-}
-.sidebar-search-close {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 24px;
-  height: 24px;
-  margin-right: 4px;
-  border-radius: var(--radius-pill);
-  color: var(--ink-3);
-  opacity: 0;
-  scale: 0.8;
-  pointer-events: none;
-  transition:
-    opacity var(--duration-leave) var(--ease-out),
-    scale var(--duration-arrive) var(--ease-out);
-}
-.sidebar-search-close:hover {
+.sidebar-search:active {
   background-color: var(--surface-3);
-  color: var(--ink);
-}
-.sidebar-list-head[data-searching] .sidebar-search-close {
-  opacity: 1;
-  scale: 1;
-  pointer-events: auto;
-  transition-delay: 200ms;
 }
 .sidebar-list-tools {
   display: flex;
@@ -524,14 +440,24 @@ button.browser-empty:hover,
   margin-top: 2px;
 }
 
-/* Footer: the open thread's weekly usage, then the dock: the app's screens and Orclings as round
-   buttons, Settings at the end. One knob carries the current one's fill and slides between them. */
+/* Footer: one row, the next message's weekly usage first, then the dock at the row's end: the app's
+   screens and Orclings as round buttons, Settings last. One knob carries the current one's fill and
+   slides between them. The row never wraps: the usage slot takes what the dock leaves, and the chip
+   picks the fullest look that fits it, down to a round button the dock's size. */
 .sidebar-footer {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
   padding: 6px 10px 10px;
+}
+.sidebar-usage {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 32px;
+}
+.sidebar-usage:empty {
+  display: none;
 }
 .sidebar-dock {
   position: relative;
@@ -539,7 +465,6 @@ button.browser-empty:hover,
   display: flex;
   align-items: center;
   gap: 2px;
-  width: 100%;
 }
 .sidebar-dock-knob {
   position: absolute;
@@ -578,17 +503,26 @@ button.browser-empty:hover,
 .sidebar-dock-button[data-current]:hover {
   background-color: transparent;
 }
+/* The chip's looks (AccountUsage measures which fits): "64% left", "64%" with its ring, or the ring
+   alone in a 32px circle. */
 .account-usage-chip {
   display: flex;
+  flex: none;
   align-items: center;
-  gap: 8px;
-  min-width: 0;
-  height: var(--control-row);
-  padding: 0 14px 0 10px;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px 0 8px;
   border-radius: var(--radius-pill);
   background: var(--control-fill);
   white-space: nowrap;
   transition: background-color var(--duration-quick) var(--ease-out);
+}
+.account-usage-chip[data-look="short"] .account-usage-label,
+.account-usage-chip[data-look="icon"] :is(.account-usage-value, .account-usage-label) {
+  display: none;
+}
+.account-usage-chip[data-look="icon"] {
+  padding: 0 8px;
 }
 .account-usage-chip:hover,
 .account-usage-chip[data-popup-open] {
@@ -622,8 +556,7 @@ button.browser-empty:hover,
   color: var(--attention);
 }
 .account-usage-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
+  margin-left: -2px;
   font-size: var(--text-xs);
   line-height: 16px;
   color: var(--ink-4);
@@ -805,8 +738,5 @@ button.browser-empty:hover,
   .sidebar-dock-button[data-current],
   .orcling-contact[aria-current="page"] {
     outline: 1px solid Highlight;
-  }
-  .sidebar-search {
-    outline: 1px solid ButtonBorder;
   }
 }

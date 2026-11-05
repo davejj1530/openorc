@@ -1,86 +1,29 @@
-import { useRef, useState, type ReactNode } from "react";
-import { Search, X } from "./icons";
+import type { ReactNode } from "react";
+import { useUi } from "../lib/ui";
+import { Search } from "./icons";
+import { OpenOrcMark } from "./OpenOrcMark";
+
+/** OpenOrc's wordmark: the cube and the name, always in Immaculate Gothic. Short of room, the name gives way whole. */
+export function Wordmark() {
+  return (
+    <div className="sidebar-wordmark" role="img" aria-label="OpenOrc">
+      <OpenOrcMark size={16} className="shrink-0" />
+      <span className="sidebar-wordmark-name">OpenOrc</span>
+    </div>
+  );
+}
 
 /**
- * The head of the sidebar's list: its name, then a round search button and the list's own tools
- * (filter, Add project and New thread, or New Orcling). While searching, the field grows leftward
- * over the name; it folds back when closed or left empty. The tools stay where they are.
+ * The head of the sidebar's list: Search, the app's one search, which opens the palette over the window, then at the
+ * row's end the list's own tools (filter, Add project and New thread, or New Orcling).
  */
-export function SidebarListHead({
-  title,
-  search,
-  onSearch,
-  searchLabel,
-  placeholder,
-  tools,
-}: {
-  title: string;
-  search: string;
-  onSearch: (value: string) => void;
-  /** The field's accessible name. */
-  searchLabel: string;
-  placeholder: string;
-  tools: ReactNode;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const input = useRef<HTMLInputElement>(null);
-  const searching = expanded || search !== "";
-  const close = () => {
-    onSearch("");
-    setExpanded(false);
-  };
+export function SidebarListHead({ tools }: { tools: ReactNode }) {
   return (
-    <div className="sidebar-list-head" data-searching={searching || undefined}>
-      <div className="sidebar-list-lead">
-        <span className="sidebar-list-title" aria-hidden={searching}>
-          {title}
-        </span>
-        <div className="sidebar-search">
-          <button
-            type="button"
-            className="sidebar-search-glass no-drag"
-            aria-label={placeholder}
-            aria-expanded={searching}
-            tabIndex={searching ? -1 : undefined}
-            onClick={() => {
-              setExpanded(true);
-              input.current?.focus();
-            }}
-          >
-            <Search size={16} />
-          </button>
-          <input
-            ref={input}
-            className="sidebar-search-input native-field no-drag"
-            aria-label={searchLabel}
-            placeholder={placeholder}
-            value={search}
-            tabIndex={searching ? undefined : -1}
-            onFocus={() => setExpanded(true)}
-            onBlur={() => {
-              if (!search) setExpanded(false);
-            }}
-            onChange={(event) => onSearch(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key !== "Escape") return;
-              event.stopPropagation();
-              close();
-              input.current?.blur();
-            }}
-          />
-          <button
-            type="button"
-            className="sidebar-search-close no-drag"
-            aria-label="Close search"
-            tabIndex={searching ? undefined : -1}
-            aria-hidden={!searching}
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={close}
-          >
-            <X size={14} />
-          </button>
-        </div>
-      </div>
+    <div className="sidebar-list-head">
+      <button type="button" className="sidebar-search no-drag" onClick={() => useUi.getState().setPalette(true)}>
+        <Search size={16} />
+        Search
+      </button>
       <div className="sidebar-list-tools">{tools}</div>
     </div>
   );

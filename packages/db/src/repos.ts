@@ -373,7 +373,6 @@ export const threads = {
       excludeSubagents?: boolean;
       selectedId?: string;
       childLimits?: Record<string, number>;
-      childSearch?: string;
       attentionIds?: readonly string[];
     } = {},
   ): (Thread & { hiddenChildren?: number; treeActivityAt?: number })[] {

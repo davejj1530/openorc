@@ -1,9 +1,12 @@
 /* What a phase worked on, each drawn as itself in the step's second column. Rows share the chips' 28px rhythm and
    their 8px reach past the column, so an object lines up with the rows around it. Class names stay under work-:
    app.css owns .work-row, which draws a window drag region. */
+/* One column that may shrink: an opened call's long command or code line scrolls or truncates inside it rather
+   than widening the step past the thread. */
 .work-object-body {
   grid-column: 2;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   min-width: 0;
 }
 /* While the turn runs, a verb that changes ("Testing" to "Tested") and a receipt item that appears arrive afresh. */

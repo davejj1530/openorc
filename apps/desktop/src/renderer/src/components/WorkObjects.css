@@ -23,12 +23,8 @@
     filter: blur(var(--arrive-blur));
   }
 }
-/* A row that is a button still spans the column, so its sizes and marks sit at the end. */
 .work-object-body .work-chips {
   grid-column: auto;
-}
-.work-object-body button.work-chip {
-  width: calc(100% + 16px);
 }
 .work-object > .work-group-calls {
   grid-column: 2;

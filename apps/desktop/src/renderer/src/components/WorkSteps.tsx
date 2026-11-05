@@ -1,4 +1,4 @@
-import { Fragment, memo, useId, useMemo, useState, type ReactNode } from "react";
+import { memo, useId, useMemo, useState } from "react";
 import {
   type Block,
   workDuration,
@@ -26,10 +26,8 @@ import { FileGlyph } from "./FileGlyph";
 import { useVisited } from "../lib/use-visited";
 import { ThreadLink } from "./ThreadImages";
 import { ObjectGroup } from "./WorkObjects";
+import { OpenedCall, type RenderBlocks } from "./WorkMarks";
 import "./WorkSteps.css";
-
-/** How raw blocks render: the transcript's own rows, so the work list never needs to know them. `open` starts calls open. */
-type RenderBlocks = (blocks: Block[], open?: boolean) => ReactNode;
 
 const CHIP_LIMIT = 6;
 
@@ -356,7 +354,7 @@ function GroupView({ section, live, renderBlocks }: { section: WorkSection; live
 function ChipGroup({ section, live, renderBlocks }: { section: WorkSection; live: boolean; renderBlocks: RenderBlocks }) {
   const [all, setAll] = useState(false);
   const [calls, setCalls] = useState(false);
-  // A chip the reader picked shows its own call, already open, under the chips.
+  // A chip the reader picked grows into its own call.
   const [picked, setPicked] = useState<string | null>(null);
   const pick = section.chips.find((chip) => chip.key === picked);
   const [visited, setVisited] = useState(false);
@@ -384,10 +382,9 @@ function ChipGroup({ section, live, renderBlocks }: { section: WorkSection; live
       </button>
       <div className="work-chips">
         {shown.map((chip) => (
-          <Fragment key={chip.key}>
+          <OpenedCall key={chip.key} open={chip === pick} calls={chipCalls(chip)} renderBlocks={renderBlocks}>
             <ChipView chip={chip} live={live && chip.blocks.some(isLive)} picked={chip.key === picked} onPick={() => setPicked((key) => (key === chip.key ? null : chip.key))} />
-            {chip === pick ? <div className="work-group-calls">{renderBlocks(chipCalls(pick), true)}</div> : null}
-          </Fragment>
+          </OpenedCall>
         ))}
         {section.chips.length > shown.length ? (
           <button type="button" className="work-more" onClick={() => setAll(true)}>

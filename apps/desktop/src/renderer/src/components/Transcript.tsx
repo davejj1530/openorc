@@ -493,7 +493,7 @@ const WorkTurn = memo(function WorkTurn({
                 taskCards={props.taskCards}
                 pinned={props.replyAction?.blockId}
                 reveal={revealWork?.messageId}
-                renderBlocks={(items, openTools) => <TranscriptContents {...props} blocks={items} groupTools={false} openTools={openTools} />}
+                renderBlocks={(items, details) => <TranscriptContents {...props} blocks={items} groupTools={false} toolDetails={details} />}
               />
             ) : null}
           </div>
@@ -528,7 +528,7 @@ export function TranscriptContents({
   taskCards = true,
   groupTools = true,
   pendingApproval,
-  openTools = false,
+  toolDetails = false,
   replyActions = true,
 }: {
   runId: string;
@@ -539,8 +539,8 @@ export function TranscriptContents({
   taskCards?: boolean;
   groupTools?: boolean;
   pendingApproval?: ((block: Extract<Block, { kind: "approval" }>) => ReactNode) | undefined;
-  /** Tool calls start open, for a call the reader picked from the work list. */
-  openTools?: boolean;
+  /** Tool calls as their details alone, for a call opened from its chip in the work list. */
+  toolDetails?: boolean;
   /** Replies carry their own copy and time; a turn that ends in its actions row passes false. */
   replyActions?: boolean;
 }) {
@@ -571,7 +571,7 @@ export function TranscriptContents({
             {item.block.kind === "approval" && !item.block.decision && pendingApproval ? (
               pendingApproval(item.block)
             ) : (
-              <BlockView block={item.block} runId={runId} onFork={onFork} taskCards={taskCards} openTools={openTools} actions={replyActions} />
+              <BlockView block={item.block} runId={runId} onFork={onFork} taskCards={taskCards} toolDetails={toolDetails} actions={replyActions} />
             )}
             {replyAction?.blockId === item.block.id ? replyAction.content : null}
             {trailing?.([item.block])}
@@ -620,14 +620,14 @@ const BlockView = memo(function BlockView({
   runId,
   onFork,
   taskCards,
-  openTools = false,
+  toolDetails = false,
   actions = true,
 }: {
   block: Block;
   runId: string;
   onFork?: (() => void) | undefined;
   taskCards: boolean;
-  openTools?: boolean;
+  toolDetails?: boolean;
   actions?: boolean;
 }) {
   switch (block.kind) {
@@ -650,7 +650,7 @@ const BlockView = memo(function BlockView({
     case "thinking":
       return <ThinkingRow block={block} />;
     case "tool":
-      return <ToolBlock block={block} cards={taskCards} open={openTools} />;
+      return <ToolBlock block={block} cards={taskCards} details={toolDetails} />;
     case "approval":
       return block.approvalKind === "user_input" ? (
         <QuestionCard runId={runId} approvalId={block.approvalId} input={block.input} decided={block.decision} answers={block.answers} />
@@ -711,11 +711,11 @@ function AttachedFile({ path }: { path: string }) {
 }
 
 /** A tool call that saved or started work shows that work as a live card; any other call is a row. */
-function ToolBlock({ block, cards, open = false }: { block: Extract<Block, { kind: "tool" }>; cards: boolean; open?: boolean }) {
+function ToolBlock({ block, cards, details = false }: { block: Extract<Block, { kind: "tool" }>; cards: boolean; details?: boolean }) {
   const taskId = cards ? taskIdFromTool(block) : null;
   if (taskId) return <TaskCard taskId={taskId} />;
   const started = cards ? startedWorkFromTool(block) : null;
-  return started ? <StartedThreadCard threadId={started.threadId} /> : <ToolRow block={block} defaultOpen={open} />;
+  return started ? <StartedThreadCard threadId={started.threadId} /> : <ToolRow block={block} details={details} />;
 }
 
 function activityStatus(block: Extract<Block, { kind: "activity" }>, live: boolean): ReactNode {

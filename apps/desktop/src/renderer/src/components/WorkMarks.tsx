@@ -2,8 +2,8 @@ import { createContext, useContext, useState, type ReactNode } from "react";
 import type { Block, ObjectState, WorkChip } from "@openorc/client";
 import { Check, Loader2, X } from "./icons";
 
-/** How raw blocks render: the transcript's own rows. `open` starts calls open. */
-export type RenderBlocks = (blocks: Block[], open?: boolean) => ReactNode;
+/** How raw blocks render: the transcript's own rows. `details` draws a call as its details alone, under its chip. */
+export type RenderBlocks = (blocks: Block[], details?: boolean) => ReactNode;
 
 /** Whether an object's call is open. Held by the object's group, so it survives the drawing changing kind. */
 export const CallOpen = createContext<[boolean, (update: (open: boolean) => boolean) => void]>([false, () => {}]);
@@ -22,11 +22,27 @@ export function CallRow({ chip, calls, renderBlocks, under, children }: { chip: 
   const [open, setOpen] = useContext(CallOpen);
   return (
     <>
-      <button type="button" className="work-chip" data-kind={chip.kind} title={chip.title} aria-pressed={open} onClick={() => setOpen((value) => !value)}>
-        {children}
-      </button>
-      {open ? <div className="work-group-calls">{renderBlocks(calls, true)}</div> : under}
+      <OpenedCall open={open} calls={calls} renderBlocks={renderBlocks}>
+        <button type="button" className="work-chip" data-kind={chip.kind} title={chip.title} aria-pressed={open} onClick={() => setOpen((value) => !value)}>
+          {children}
+        </button>
+      </OpenedCall>
+      {open ? null : under}
     </>
+  );
+}
+
+/** A chip, and once it is pressed the call behind it, grown out of the chip on its fill with the chip as its head. */
+export function OpenedCall({ open, calls, renderBlocks, children }: { open: boolean; calls: Block[]; renderBlocks: RenderBlocks; children: ReactNode }) {
+  return (
+    <div className="work-call" data-open={open || undefined}>
+      {children}
+      {open ? (
+        <div className="work-call-body">
+          <div className="work-call-details">{renderBlocks(calls, true)}</div>
+        </div>
+      ) : null}
+    </div>
   );
 }
 

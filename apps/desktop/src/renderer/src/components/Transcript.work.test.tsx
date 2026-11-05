@@ -91,15 +91,19 @@ it("names MCP tool calls by server and tool in each provider's naming", () => {
   render(<WorkTranscript runId="run" blocks={blocks} />);
   fireEvent.click(receipt());
   fireEvent.click(screen.getByRole("button", { name: "Used Codegraph, used Mobbin" }));
-  // Each row reads the tool and what it was asked.
-  for (const [chip, call] of [
-    [/^explore who calls describe/, /^Codegraph: explore who calls describe/],
-    [/^search screens onboarding/, /^Mobbin: search screens onboarding/],
-    [/^get design context/, /^Figma: get design context/],
-    [/^thread list/, /^OpenOrc: thread list/],
+  // Each row reads the tool and what it was asked beside its server, and grows into its call with no second head.
+  for (const [name, server] of [
+    [/^explore who calls describe/, "Codegraph"],
+    [/^search screens onboarding/, "Mobbin"],
+    [/^get design context/, "Figma"],
+    [/^thread list/, "OpenOrc"],
   ] as const) {
-    fireEvent.click(screen.getByRole("button", { name: chip }));
-    expect(screen.getByRole("button", { name: call }).getAttribute("aria-expanded")).toBe("true");
+    const chip = screen.getByRole("button", { name });
+    expect(chip.closest(".work-object")?.querySelector(".work-object-verb")?.textContent).toBe(server);
+    fireEvent.click(chip);
+    expect(chip.getAttribute("aria-pressed")).toBe("true");
+    expect(chip.closest(".work-call")?.querySelector(".tool-view")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: new RegExp(`^${server}: `) })).toBeNull();
   }
   expect(groupSummary([call("task", `${own}.task_create`, { title: "Ship it" })])).toBe("Created task");
 });
@@ -142,14 +146,15 @@ it("carries the live step on one line, open or folded", () => {
 it("preserves an inspected command when it fails and a retry arrives", () => {
   const command: Block = { ...tool, name: "shell", input: { command: "pnpm test" } };
   const { rerender } = render(<WorkTranscript runId="run" blocks={[command]} live />);
-  // A test run under way is drawn as one; its row opens the call itself.
+  // A test run under way is drawn as one; its row grows into the call itself, the row standing as its only head.
   fireEvent.click(screen.getByRole("button", { name: "Run the tests" }));
-  expect(screen.getByRole("button", { name: /Running command pnpm test/ }).getAttribute("aria-expanded")).toBe("true");
+  expect(screen.getByRole("button", { name: "Run the tests" }).getAttribute("aria-pressed")).toBe("true");
+  expect(screen.getByText("pnpm test")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: /command pnpm test/ })).toBeNull();
   // It failed without a runner's counts, so it turns into a plain command and stays open as the retry starts.
   const failed: Block = { ...command, done: true, isError: true, status: "error", output: "7 tests failed" };
   rerender(<WorkTranscript runId="run" blocks={[failed, { ...command, id: "retry" }]} live />);
-  expect(screen.getByRole("button", { name: /pnpm test.*Failed/ }).getAttribute("aria-expanded")).toBe("true");
-  expect(screen.getByText("7 tests failed")).toBeTruthy();
+  expect(screen.getByRole("button", { pressed: true }).closest(".work-call")?.textContent).toContain("7 tests failed");
 });
 it("defaults completed work closed, preserves the final answer and reveals nested detail with keyboard-accessible controls", () => {
   render(<WorkTranscript runId="run" blocks={[{ ...tool, done: true }, thought, reply, end]} />);

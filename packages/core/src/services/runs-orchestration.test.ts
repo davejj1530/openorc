@@ -606,6 +606,7 @@ describe("coordinator run seams", () => {
     expect(spec.systemPromptAppendix).toContain("use OpenOrc's browser tool first");
     expect(spec.internalMcp?.toolNames).toContain("browser");
     expect(spec.systemPromptAppendix).toContain("Use OpenOrc's visualize tool");
+    expect(spec.systemPromptAppendix).toContain("To show the user an image, put it in your reply as a Markdown image");
     expect(spec.internalMcp?.toolNames).toContain("visualize");
   });
 

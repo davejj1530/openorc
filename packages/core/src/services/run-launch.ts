@@ -49,6 +49,9 @@ type LaunchAttempt = {
   locked: boolean;
 };
 
+const imageReplyInstructions =
+  'Opening an image with a tool lets you see it, not the user: they see at most its file name among your steps. To show the user an image, put it in your reply as a Markdown image with its absolute path, such as ![Dark theme](/path/to/screenshot.png). It appears inline and opens full size when clicked. Only call images "above" once they are in a reply.';
+
 /** Acquires the writer, records startup, launches the provider, then transfers the lease to the live entry. */
 interface RunLaunchDependencies {
   db: Db;
@@ -322,6 +325,7 @@ export class RunLaunch {
       this.deps.hooks.orclings?.brief(input) ?? "",
       !input.scope.comment && this.deps.hooks.browserAvailable ? browserInstructions : "",
       !input.scope.comment ? visualizationInstructions : "",
+      !input.scope.comment ? imageReplyInstructions : "",
       this.scopeBrief(input),
       taskImages.length ? `Task images in document order (open them from these paths):\n${taskImages.map((file, index) => `${index + 1}. ${file}`).join("\n")}` : "",
       input.handoff ?? "",

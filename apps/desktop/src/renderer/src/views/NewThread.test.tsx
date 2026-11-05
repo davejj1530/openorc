@@ -47,6 +47,7 @@ vi.mock("../lib/composer-changes", () => ({ useComposerChanges: () => null }));
 vi.mock("../components/NewThreadActivity", () => ({ useArrivalActivity: () => ({ any: false }), NewThreadRecent: () => null }));
 vi.mock("../components/NewThreadMascot", () => ({ NewThreadMascot: () => null }));
 vi.mock("../components/Panel", () => ({ Panel: () => null }));
+vi.mock("../components/ProjectIconPicker", () => ({ ProjectIconPicker: () => null, ProjectIcon: () => null }));
 vi.mock("../components/TopBar", () => ({ TopBar: ({ children }: { children: React.ReactNode }) => <header>{children}</header> }));
 vi.mock("../components/ModelPicker", () => ({
   ModelPicker: () => <button type="button">Choose model</button>,
@@ -163,18 +164,30 @@ describe("NewThread", () => {
     expect(readNewThreadDraft("p1").prompt).toBe("First project");
   });
 
-  it("switches projects beside the prompt, restores that draft, and sends to the chosen project", async () => {
+  it("switches projects from the question, restores that draft, and sends to the chosen project", async () => {
     saveModelDraft("p1", "First project");
     saveModelDraft("p2", "Second project");
     render(<NewThread projectId="p1" />);
     fireEvent.click(screen.getByRole("button", { name: "Project: p1" }));
-    fireEvent.click(await screen.findByRole("menuitem", { name: "p2 /p2" }));
+    expect(screen.getByRole("heading").textContent).toBe("What should we work on in p1?");
+    fireEvent.click(await screen.findByRole("button", { name: "p2" }));
     const message = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Message" });
     expect(message.value).toBe("Second project");
     expect(screen.getByRole("button", { name: "Project: p2" })).toBeTruthy();
     fireEvent.keyDown(message, { key: "Enter", code: "Enter" });
     await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ projectId: "p2", prompt: "Second project" })));
     expect(readNewThreadDraft("p1").prompt).toBe("First project");
+  });
+
+  it("finds a project by typing and switches on Enter without the key reaching the prompt", async () => {
+    projects = Array.from({ length: 9 }, (_, index) => makeProject(`p${index + 1}`));
+    render(<NewThread projectId="p1" />);
+    fireEvent.click(screen.getByRole("button", { name: "Project: p1" }));
+    const field = await screen.findByRole("textbox", { name: "Find a project" });
+    fireEvent.change(field, { target: { value: "p7" } });
+    expect(screen.queryByRole("button", { name: "p2" })).toBeNull();
+    expect(fireEvent.keyDown(field, { key: "Enter" })).toBe(false);
+    expect(screen.getByRole("button", { name: "Project: p7" })).toBeTruthy();
   });
 
   it("chooses a worktree above the prompt and uses it for the first turn", async () => {

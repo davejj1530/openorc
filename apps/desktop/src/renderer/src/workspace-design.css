@@ -64,31 +64,6 @@
     opacity: 0;
   }
 }
-.thread-project-picker {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  max-width: 100%;
-  color: var(--ink);
-  font-size: 21px;
-  line-height: 1.25;
-  letter-spacing: -0.6px;
-  border-radius: var(--radius-sm);
-  text-align: left;
-}
-.thread-project-picker > span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.thread-project-picker svg {
-  flex-shrink: 0;
-  color: var(--ink-3);
-}
-.thread-project-picker:hover {
-  color: var(--navigation-ink);
-}
 /* The thread header: a 13/16 title in a 30px rename box, then a faint run of facts. */
 .thread-rail-title {
   flex: 0 1 auto;

@@ -85,6 +85,18 @@ export {
   type SidebarFilter,
   type SidebarFold,
 } from "./sidebar-thread-groups.js";
+export {
+  SIDEBAR_DAYS,
+  SIDEBAR_LIST,
+  liveSidebarFold,
+  sidebarDay,
+  sidebarDayKey,
+  sidebarDayOpen,
+  sidebarDaySections,
+  sidebarListGrows,
+  type SidebarDay,
+  type SidebarDaySection,
+} from "./sidebar-days.js";
 export { snoozePresets, snoozePresetsChangeAt, snoozeWakeLabel } from "./snooze.js";
 export { startedWorkFromTool, taskActivity, taskCardStatusLabel, taskIdFromTool, taskStepLabel, uniqueTaskCards } from "./task-progress.js";
 export { pruneThreadFolds, threadFoldIds } from "./thread-folds.js";

@@ -1,7 +1,6 @@
-/* Lines up under the title, past the row's 16px status lead and the 8px gap after it. */
+/* Lines up under the title. */
 .thread-preview-headline {
   display: block;
-  margin-left: calc(16px + 8px);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

@@ -15,7 +15,7 @@ export function Wordmark() {
 
 /**
  * The head of the sidebar's list: Search, the app's one search, which opens the palette over the window, then at the
- * row's end the list's own tools (filter, Add project and New thread, or New Orcling).
+ * row's end the list's own tools (filter and New thread, or New Orcling).
  */
 export function SidebarListHead({ tools }: { tools: ReactNode }) {
   return (

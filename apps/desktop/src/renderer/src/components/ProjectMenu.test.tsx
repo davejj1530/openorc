@@ -6,7 +6,7 @@ import { core } from "../lib/rpc";
 import { queryClient } from "../lib/client";
 import { useLayout } from "../lib/layout";
 import { useRouter } from "../lib/router";
-import { SidebarProjectGroup } from "./SidebarProjectGroup";
+import { ProjectPicker } from "./ProjectPicker";
 
 vi.mock("../lib/browser-preview", () => ({ CoversPreview: () => null }));
 beforeEach(() => {
@@ -18,17 +18,19 @@ afterEach(() => {
   queryClient.clear();
   vi.restoreAllMocks();
 });
+/** The project list a new thread's question opens, where each project keeps its removal. */
 function show(id = "repo", name = "Studio") {
-  return render(
+  const workspace = { id: WORKSPACE_ID, name: "Workspace" };
+  const view = render(
     <QueryClientProvider client={queryClient}>
-      <SidebarProjectGroup id={id} name={name} meta={null}>
-        {null}
-      </SidebarProjectGroup>
+      <ProjectPicker projectId={id} projects={id === WORKSPACE_ID ? [workspace] : [workspace, { id, name, rootPath: "/code/studio" }]} onProject={() => {}} />
     </QueryClientProvider>,
   );
+  fireEvent.click(screen.getByRole("button", { name: `Project: ${name}` }));
+  return view;
 }
 async function confirmFromContextMenu(input: "pointer" | "keyboard" = "pointer") {
-  const heading = screen.getByRole("button", { name: "Collapse Studio threads" });
+  const heading = await screen.findByRole("button", { name: "Studio" });
   if (input === "keyboard") fireEvent.keyDown(heading, { key: "F10", shiftKey: true });
   else fireEvent.contextMenu(heading);
   fireEvent.click(await screen.findByRole("menuitem", { name: "Remove project…" }));
@@ -39,12 +41,12 @@ it("offers removal on right-click without toggling the project, and cancellation
   const call = vi.spyOn(core, "call");
   show();
   expect(screen.queryByRole("button", { name: /Project options/ })).toBeNull();
-  fireEvent.contextMenu(screen.getByRole("button", { name: "Collapse Studio threads" }));
+  fireEvent.contextMenu(await screen.findByRole("button", { name: "Studio" }));
   fireEvent.click(await screen.findByRole("menuitem", { name: "Remove project…" }));
-  expect((await screen.findByRole("dialog")).textContent).toContain("Files, worktrees, and history are kept");
+  expect((await screen.findByRole("dialog", { name: /Remove/ })).textContent).toContain("Files, worktrees, and history are kept");
   expect(useLayout.getState().collapsed).toEqual([]);
   fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: /Remove/ })).toBeNull());
   expect(call).not.toHaveBeenCalled();
 });
 
@@ -52,7 +54,7 @@ it("removes through the keyboard context menu and resets its scope while keeping
   const call = vi.spyOn(core, "call").mockResolvedValue({ ok: true });
   show();
   fireEvent.click(await confirmFromContextMenu("keyboard"));
-  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: /Remove/ })).toBeNull());
   expect(call).toHaveBeenCalledExactlyOnceWith("projects.remove", { id: "repo" });
   expect(useLayout.getState().projectId).toBe(WORKSPACE_ID);
   expect(useRouter.getState().route).toEqual({ view: "thread", threadId: "running-thread" });
@@ -80,14 +82,14 @@ it("keeps errors visible, prevents repeat submission while pending, and allows r
   expect((await screen.findByRole("alert")).textContent).toBe("Could not save changes");
   expect(useLayout.getState().projectId).toBe("other");
   fireEvent.click(screen.getByRole("button", { name: "Remove project" }));
-  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: /Remove/ })).toBeNull());
   expect(call).toHaveBeenCalledTimes(2);
   expect(useLayout.getState().projectId).toBe("other");
 });
 
-it("keeps Workspace permanent", () => {
+it("keeps Workspace permanent", async () => {
   show(WORKSPACE_ID, "Workspace");
   expect(screen.queryByRole("button", { name: /Project options/ })).toBeNull();
-  fireEvent.contextMenu(screen.getByRole("button", { name: "Collapse Workspace threads" }));
+  fireEvent.contextMenu(await screen.findByRole("button", { name: "Workspace" }));
   expect(screen.queryByRole("menuitem", { name: "Remove project…" })).toBeNull();
 });

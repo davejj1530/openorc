@@ -1,5 +1,5 @@
-/* The sidebar: its column, window corner, list head, project groups, Orclings and the footer dock.
-   It sits on the tile and paints nothing of its own: no fill, no seam. Rows are 34px with a 10px
+/* The sidebar: its column, window corner, list head, day sections, Orclings and the footer dock.
+   It sits on the tile with no fill of its own, a hairline seam at its edge. Rows have a 10px
    corner; the current row takes --current-row-fill and keeps --navigation-ink. */
 
 .app-shell .workspace-navigation {
@@ -202,107 +202,20 @@ button.sidebar-nav-row:hover {
   overflow-y: auto;
   padding: 14px 10px 16px;
 }
-.sidebar-project + .sidebar-project {
-  margin-top: 6px;
+/* Day sections: a 28px heading in the titles' column, its chevron after the word. The chevron shows
+   while the section is folded and on hover; it turns down as the section opens. */
+.sidebar-section + .sidebar-section {
+  margin-top: 10px;
 }
-
-/* Project headings: 34px, a 16px icon, the name in ink, and a faint meta that swaps for New thread
-   on hover and keyboard focus. */
-.app-shell .browser-group-title > * {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  height: var(--control-row);
-  padding: 0 5px 0 6px;
-  border-radius: var(--radius-md);
-  color: var(--ink-4);
-}
-.project-group-icon,
-.app-shell .browser-group-title .project-icon-trigger {
-  flex-shrink: 0;
-  color: var(--ink-4);
-}
-.project-group-icon {
-  margin-inline: 4px;
-}
-.browser-group-toggle {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  align-self: stretch;
-  min-width: 0;
-  font-size: var(--text-base);
-  line-height: 16px;
-  color: var(--ink);
-  text-align: left;
-}
-.project-group-end {
-  display: grid;
-  flex-shrink: 0;
-  align-items: center;
-  justify-items: end;
-}
-.project-group-end > * {
-  grid-area: 1 / 1;
-  transition: opacity var(--duration-leave) var(--ease-out);
-}
-.project-group-activity {
-  padding-right: 5px;
-  font-size: var(--text-sm);
-  line-height: 16px;
-  color: var(--ink-4);
-  white-space: nowrap;
-  /* It shares a cell with the New thread button and paints above it while faded out. */
-  pointer-events: none;
-}
-.project-group-activity[data-tone="attention"] {
-  color: var(--warn);
-}
-.project-group-end[data-meta] .project-group-new {
-  opacity: 0;
-}
-.browser-group-title:is(:hover, :has(:focus-visible)) .project-group-activity {
-  opacity: 0;
-}
-.browser-group-title:is(:hover, :has(:focus-visible)) .project-group-new {
-  opacity: 1;
-}
-@media (hover: none) {
-  .project-group-activity {
-    opacity: 0;
-  }
-  .project-group-end[data-meta] .project-group-new {
-    opacity: 1;
-  }
-}
-.sidebar-project-threads,
 .sidebar-thread-list {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 2px;
 }
-.sidebar-project-threads {
-  margin-top: 2px;
-}
-/* A fold the user opens grows to its height while its rows arrive one after another. */
-.sidebar-project-threads[data-animate] {
-  overflow: clip;
-  transition: height var(--duration-resize) var(--ease-out);
-}
-.sidebar-project-threads[data-animate] > * {
-  transition: opacity var(--duration-arrive) var(--ease-out) var(--motion-delay, 0ms);
-}
-@starting-style {
-  .sidebar-project-threads[data-animate] {
-    height: 0;
-  }
-  .sidebar-project-threads[data-animate] > * {
-    opacity: 0;
-  }
-}
 
-/* Thread rows: muted titles behind a 16px status lead. The open row sits on the current-row fill
-   with --navigation-ink. A second line appears only while there is something to say. */
+/* Thread rows: a muted title with what the thread needs at its end, what its agent is doing while it
+   works, then the project's icon and name with its pull request at the end. The icon's column is where
+   a parent's tree line leaves. The open row sits on the current-row fill with --navigation-ink. */
 .app-shell .thread-preview {
   position: relative;
   display: flex;
@@ -328,13 +241,36 @@ button.sidebar-nav-row:hover {
   background-color: var(--current-row-fill);
 }
 .thread-preview-project {
-  margin-left: calc(16px + 8px);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
   font-size: var(--text-xs);
   line-height: 16px;
   color: var(--ink-4);
+}
+.thread-preview-project-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 16px;
+  justify-content: center;
+}
+.thread-preview-project-icon > * {
+  width: 14px;
+  height: 14px;
+}
+.thread-preview-project-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.thread-preview-pull {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
 }
 .thread-preview-heading {
   display: flex;
@@ -347,6 +283,9 @@ button.sidebar-nav-row:hover {
   flex-shrink: 0;
   width: 16px;
   justify-content: center;
+}
+.thread-preview-status:empty {
+  display: none;
 }
 .thread-preview-title {
   flex: 1;
@@ -380,16 +319,33 @@ button.sidebar-nav-row:hover {
 .sidebar-section-toggle {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   width: 100%;
   height: 28px;
-  padding: 0 10px 0 30px;
+  padding: 0 10px;
   border-radius: var(--radius-md);
   font-size: var(--text-sm);
   color: var(--ink-4);
+  transition: color var(--duration-quick) var(--ease-out);
 }
 .sidebar-section-toggle:hover {
   color: var(--ink);
+}
+.sidebar-section-chevron {
+  opacity: 0;
+  transition:
+    opacity var(--duration-quick) var(--ease-out),
+    transform var(--duration-resize) var(--ease-out);
+}
+.sidebar-section-toggle:is(:hover, :focus-visible) .sidebar-section-chevron,
+.sidebar-section:not([data-open]) .sidebar-section-chevron {
+  opacity: 1;
+}
+.sidebar-section[data-open] .sidebar-section-chevron {
+  transform: rotate(90deg);
+}
+.sidebar-section-count {
+  margin-left: auto;
 }
 /* Empty, loading and load-more rows are faint rows lined up with the titles. */
 .browser-empty,
@@ -408,6 +364,11 @@ button.sidebar-nav-row:hover {
 button.browser-empty:hover,
 .browser-load-more:hover {
   color: var(--ink);
+}
+/* The list's own notes and paging line up with root titles; a sub thread's paging keeps its lead. */
+.browser-threads > :is(.browser-empty, .browser-load-more),
+.sidebar-thread-list > .browser-load-more {
+  padding-left: 10px;
 }
 .browser-hint {
   padding: 8px 20px;
@@ -696,6 +657,18 @@ button.browser-empty:hover,
   left: -0.5px;
   width: 4px;
 }
+/* A hairline seam between the sidebar and the work column, the window's full height. The floating
+   sidebar at 900px and narrower leans on its shadow instead. */
+.app-shell .sidebar-shell::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--hairline);
+  background: var(--line);
+  pointer-events: none;
+}
 
 /* At 900px and narrower the sidebar floats over the work column: an opaque tile with the one
    soft shadow the app keeps, since tile over tile has no fill step to lean on. */
@@ -704,6 +677,9 @@ button.browser-empty:hover,
     display: flex;
   }
   .app-shell .resize-handle[data-edge="sidebar"] {
+    display: none;
+  }
+  .app-shell .sidebar-shell::after {
     display: none;
   }
   .app-shell .workspace-navigation,

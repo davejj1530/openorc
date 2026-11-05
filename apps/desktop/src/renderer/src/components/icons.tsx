@@ -230,6 +230,24 @@ export const GitPullRequest = icon(
     <path d="M6 8v8 M18 16V9a3 3 0 0 0-3-3h-2 M16 3l-3 3 3 3" />
   </>,
 );
+export const GitMerge = icon(
+  "GitMerge",
+  <>
+    <circle cx="6" cy="5.5" r="2.5" />
+    <circle cx="6" cy="18.5" r="2.5" />
+    <circle cx="18" cy="12" r="2.5" />
+    <path d="M6 8v8 M6 8c0 2.5 2.5 4 5 4h4.5" />
+  </>,
+);
+export const GitPullRequestClosed = icon(
+  "GitPullRequestClosed",
+  <>
+    <circle cx="6" cy="5.5" r="2.5" />
+    <circle cx="6" cy="18.5" r="2.5" />
+    <circle cx="18" cy="18.5" r="2.5" />
+    <path d="M6 8v8 M18 16v-4.5 M15.5 3.5l5 5 M20.5 3.5l-5 5" />
+  </>,
+);
 export const GitCommitHorizontal = icon(
   "GitCommitHorizontal",
   <>

@@ -24,6 +24,26 @@
   letter-spacing: var(--text-title--letter-spacing);
   overflow-wrap: anywhere;
 }
+/* The project in the question is the switch: a word of the sentence with a 1px underline, faint at
+   rest and in ink on hover or while its list is open. */
+.new-thread-question-project {
+  display: inline;
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  text-align: inherit;
+  text-decoration-line: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 6px;
+  text-decoration-color: color-mix(in srgb, currentColor 30%, transparent);
+  transition: text-decoration-color var(--duration-quick) var(--ease-out);
+}
+.new-thread-question-project:is(:hover, [data-popup-open]):not(:disabled) {
+  text-decoration-color: currentColor;
+}
+.new-thread-question-project:disabled {
+  cursor: default;
+}
 .new-thread-empty {
   padding: 18px 20px;
   border-radius: var(--radius-3xl);

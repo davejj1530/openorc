@@ -714,19 +714,6 @@ body[data-resizing] .sidebar-shell {
   margin-right: calc(2 * var(--spacing-well));
 }
 
-.sidebar-project-add {
-  opacity: 0;
-}
-.sidebar-project:hover .sidebar-project-add,
-.sidebar-project:focus-within .sidebar-project-add {
-  opacity: 1;
-}
-@media (hover: none) {
-  .sidebar-project-add {
-    opacity: 1;
-  }
-}
-
 /* The handle takes no width: it sits on the seam between two panes, its grip and hit area straddling both, and the grip shows only when the pointer is near. */
 .resize-handle {
   position: relative;

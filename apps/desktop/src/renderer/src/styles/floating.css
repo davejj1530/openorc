@@ -81,6 +81,29 @@
   color: var(--ink-4);
   font-size: var(--text-xs);
 }
+.project-picker-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  margin-bottom: 4px;
+  padding: 0 12px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  color: var(--ink-4);
+}
+.project-picker-filter input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: none;
+  color: var(--ink);
+  font-size: var(--text-base);
+}
+.project-picker-filter input::placeholder {
+  color: var(--ink-4);
+}
 .project-picker-options {
   display: flex;
   flex-direction: column;

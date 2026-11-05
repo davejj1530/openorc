@@ -101,8 +101,6 @@ export interface ComposerProps {
   hasStarted?: boolean;
   /** Uncommitted changes and actions beside the working folder. */
   changes?: ComposerChanges | null;
-  /** The project, only when the caller lets you change it. The name alone is TopBar’s job. */
-  projectControl?: ReactNode;
   busy?: boolean;
   disabledReason?: string | null;
   /** A saved task can start from its spec without an additional message. */
@@ -291,7 +289,6 @@ export function Composer(props: ComposerProps) {
           {/* Attach, then where and how the agent works. Chips truncate before the end group moves. */}
           <div className="composer-tools">
             <ComposerAttach onAttach={pickFiles} disabledReason={props.attachmentsDisabledReason} />
-            {props.projectControl}
             {composerDestination(props)}
             {composerModelControl(props)}
             {composerModeControl(props)}

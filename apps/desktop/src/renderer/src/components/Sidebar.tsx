@@ -6,8 +6,7 @@ import { useProjectIconChanges } from "../lib/project-icons";
 import { OrclingsRailContext, useOrclingsRail } from "../lib/orclings-rail";
 import { useOrclings } from "../lib/orclings";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
-import { useUi } from "../lib/ui";
-import { FolderPlus, PenSquare } from "./icons";
+import { PenSquare } from "./icons";
 import { ResizeHandle } from "./ResizeHandle";
 import { SidebarFooter } from "./SidebarFooter";
 import { SidebarListHead, Wordmark } from "./SidebarListHead";
@@ -41,7 +40,6 @@ export function Sidebar() {
               ) : (
                 <>
                   <ThreadFilter />
-                  <AddProjectButton />
                   <NewThreadButton projectId={projectId} />
                 </>
               )
@@ -57,16 +55,6 @@ export function Sidebar() {
       </aside>
       {open ? <ResizeHandle edge="sidebar" /> : null}
     </>
-  );
-}
-
-function AddProjectButton() {
-  return (
-    <Tooltip label="Add project">
-      <IconButton size="lg" aria-label="Add project" className="no-drag" onClick={() => useUi.getState().setImportProject(true)}>
-        <FolderPlus size={16} />
-      </IconButton>
-    </Tooltip>
   );
 }
 

@@ -7,10 +7,10 @@ import { Composer } from "../components/Composer";
 import { FolderGit2 } from "../components/icons";
 import { ComposerModelPicker, ModelPicker, type ModelChoice, type OrclingPickerChoices } from "../components/ModelPicker";
 import { NewThreadRecent, useArrivalActivity } from "../components/NewThreadActivity";
-import { NewThreadProjectChoice } from "../components/NewThreadContext";
 import { NewThreadOptions } from "../components/NewThreadOptions";
 import { NewThreadStarters } from "../components/NewThreadStarters";
 import { Panel } from "../components/Panel";
+import { NewThreadQuestion } from "../components/ProjectPicker";
 import { TopBar } from "../components/TopBar";
 import { Button, TextButton } from "../components/ui";
 import { ClaudeAccountScope } from "../lib/claude-account";
@@ -200,7 +200,7 @@ function NewThreadProject({
               </div>
             ) : (
               <>
-                <h1 className="new-thread-question">{selected && !isWorkspace ? `What should we work on in ${selected.name}?` : "What should we work on?"}</h1>
+                <NewThreadQuestion projectId={projectId} projects={projects} disabled={start.isPending} onProject={onProject} />
                 <div className="relative">
                   <div className="mb-2 empty:hidden">{signIn.offer}</div>
                   <Composer
@@ -212,7 +212,6 @@ function NewThreadProject({
                     placeholder="Ask OpenOrc to build, fix bugs, explore"
                     size="lg"
                     presentation="new-thread"
-                    projectControl={<NewThreadProjectChoice projectId={projectId} projects={projects} disabled={start.isPending} onProject={onProject} />}
                     model={choice}
                     onModel={changeSettings}
                     modelControl={

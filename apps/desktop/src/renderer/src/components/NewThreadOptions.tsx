@@ -6,11 +6,19 @@ import { ComposerChoice } from "./ComposerChoice";
 import { ComposerCommitChip } from "./ComposerFooter";
 import { Cloud, Folder, GitBranch, Laptop } from "./icons";
 import { Button } from "./ui";
+import type { NewThreadCloud } from "../lib/cloud-offered";
 
-const workspaceOptions = (cloud: boolean) => [
+const workspaceOptions = (cloud: NewThreadCloud) => [
   { value: "current" as const, label: "Local checkout", hint: "The repository as it is checked out now", icon: Laptop },
   { value: "worktree" as const, label: "Worktree", hint: "A branch and folder of its own, so other threads never collide with it", icon: GitBranch },
-  { value: "cloud" as const, label: "Cloud", hint: "A sandbox of its own; its changes arrive in a worktree here", icon: Cloud, hidden: !cloud },
+  {
+    value: "cloud" as const,
+    label: "Cloud",
+    hint: cloud.brain ? "On your cloud brain, in a sandbox of its own" : "A sandbox of its own; its changes arrive in a worktree here",
+    icon: Cloud,
+    hidden: !cloud.shown,
+    blocked: cloud.blocked,
+  },
 ];
 
 /** Where the thread will work, said as a sentence. */
@@ -25,8 +33,7 @@ function LocationSentence({ mode, branch }: { mode: NewThreadPlace; branch: stri
 export function NewThreadOptions(props: {
   projectId: string;
   mode: NewThreadPlace;
-  /** Whether Cloud is offered: only targets that run in a sandbox can take it. */
-  cloud: boolean;
+  cloud: NewThreadCloud;
   location: ComposerProps["location"];
   blocked: string | null;
   disabled: boolean;

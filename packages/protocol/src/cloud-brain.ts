@@ -110,6 +110,8 @@ export type CloudBrainStatus =
       working: "waking" | "sending" | "updating" | null;
       /** Null until this Mac has looked at it since it started, and in builds without one. */
       door: CloudBrainDoor | null;
+      /** The conversations on it, as it last counted them for this Mac. They go with it when it is removed. */
+      threads: number;
       error: string | null;
     }
   | { state: "removing" };

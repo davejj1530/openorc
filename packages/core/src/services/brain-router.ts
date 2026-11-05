@@ -1,5 +1,19 @@
+import { readFile, stat } from "node:fs/promises";
+import path from "node:path";
 import { incomingMove, runs, settings, threads, type Db } from "@openorc/db";
-import { mergeInbox, mergeThreadPages, ownerRoute, rpcParams, type InboxList, type OwnerReach, type RpcMethod, type RpcRequest, type ThreadSummary } from "@openorc/protocol";
+import {
+  mergeInbox,
+  mergeThreadPages,
+  NOT_ON_BRAIN,
+  ownerRoute,
+  REMOTE_ATTACHMENT_BYTES,
+  rpcParams,
+  type InboxList,
+  type OwnerReach,
+  type RpcMethod,
+  type RpcRequest,
+  type ThreadSummary,
+} from "@openorc/protocol";
 import type { Logger, RpcReply, Transport } from "../transport.js";
 import { BrainOutOfReach, type BrainLink, type BrainPush, type ProjectMapping } from "./brain-link.js";
 import type { BrainMirrors } from "./brain-mirrors.js";
@@ -11,6 +25,9 @@ const RECENT_PAGES = 8;
 /** A run a window looked at stays in the brain's interest this long after its last frame or read. */
 const WATCH_MS = 5 * 60_000;
 const READS_RUN = new Set<RpcMethod>(["events.page", "events.listForRun", "events.toolOutput", "runs.send", "approvals.resolve", "runs.interrupt"]);
+const IMAGE_TYPES: Record<string, string> = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp" };
+/** The UUID attachments.saveFile puts before a file's name here; the brain puts its own. */
+const STORED_PREFIX = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}-/;
 
 type Merged = "threads.list" | "inbox.list";
 interface Page {
@@ -127,6 +144,8 @@ export class BrainRouter {
       case "owner":
       case "owner-only":
         return this.owned(request, method, params, route.thread(params), route.by === "owner-only" ? route.words : null);
+      case "start":
+        return this.start(request, params, route.cloud(params));
       default:
         return this.deps.local(request);
     }
@@ -140,12 +159,24 @@ export class BrainRouter {
     return kept ? Promise.resolve(kept) : this.forward(request, method, params);
   }
 
+  /**
+   * A new thread asked for the cloud starts on the brain, on its copy of the project, woken for it. The windows' lists
+   * have it before the reply, so the sidebar shows it as the conversation opens.
+   */
+  private async start(request: RpcRequest, params: Record<string, unknown>, project: string | undefined): Promise<RpcReply> {
+    if (!project) return this.deps.local(request);
+    if (!(await this.deps.mapping()).toCloud(project)) return error(request.id, NOT_ON_BRAIN);
+    const reply = await this.forward(request, "threads.start", params);
+    if (reply.type === "rpc.result") await this.refreshRecent();
+    return reply;
+  }
+
   /** A window's call for a thread the brain holds, woken for it: opening or sending to it is the person's own intent. */
   private async forward(request: RpcRequest, method: RpcMethod, params: Record<string, unknown>): Promise<RpcReply> {
     if (READS_RUN.has(method) && typeof params["runId"] === "string") this.watch(params["runId"]);
     try {
       const mapping = await this.deps.mapping();
-      const result = await this.deps.link.call(method, toCloud(params, mapping) as never, { wake: true });
+      const result = await this.deps.link.call(method, (await this.filesUp(toCloud(params, mapping))) as never, { wake: true });
       const rehomed = rehome(result, mapping, { brain: "cloud", reach: "live", heardAt: Date.now() }, this.deps.mirrors);
       if (method === "threads.get" && isThread(rehomed) && rehomed.liveRunId) this.watch(rehomed.liveRunId);
       return { type: "rpc.result", id: request.id, result: isThread(rehomed) ? this.asNow(rehomed) : rehomed };
@@ -207,6 +238,23 @@ export class BrainRouter {
     return { ...row, ...mirrored, ...(moving ? { moving } : {}) };
   }
 
+  /** The files a call names, stored on the brain first: it cannot read this Mac's files. Images stay images there. */
+  private async filesUp(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const files = params["attachments"];
+    if (!Array.isArray(files) || !files.length) return params;
+    const stored: string[] = [];
+    for (const file of files as string[]) {
+      if ((await stat(file)).size > REMOTE_ATTACHMENT_BYTES) throw new Error(`Files sent to a conversation in the cloud must be ${REMOTE_ATTACHMENT_BYTES / 1024 / 1024} MB or smaller.`);
+      const dataBase64 = (await readFile(file)).toString("base64");
+      const mime = IMAGE_TYPES[path.extname(file).slice(1).toLowerCase()];
+      const saved = mime
+        ? await this.deps.link.call("attachments.save", { name: path.basename(file), mime, dataBase64 }, { wake: true })
+        : await this.deps.link.call("attachments.saveFile", { name: path.basename(file).replace(STORED_PREFIX, ""), dataBase64 }, { wake: true });
+      stored.push(saved.path);
+    }
+    return { ...params, attachments: stored };
+  }
+
   /** The brain's answer to a list, kept; windows hear the list changed only when it did. Never wakes the brain. */
   private async refresh(method: Merged, params: unknown, mapping: ProjectMapping): Promise<void> {
     try {
@@ -250,7 +298,7 @@ export class BrainRouter {
         if (rest.length) windows.push({ type: "invalidate", keys: rest });
         // An open copy on this Mac follows the brain's files.
         for (const key of rest) if (key.startsWith("threaddiff:") && this.deps.mirrors.isOpen(key.slice("threaddiff:".length))) void this.deps.mirrors.pull(key.slice("threaddiff:".length));
-        if (lists.length) this.refreshRecent();
+        if (lists.length) void this.refreshRecent();
         return;
       }
       case "notify":
@@ -262,10 +310,10 @@ export class BrainRouter {
   }
 
   /** One refresh of the recent lists at a time; pushes while it runs ask for one more after it, however many arrive. */
-  private refreshRecent(): void {
+  private refreshRecent(): Promise<void> {
     if (this.refreshing) {
       this.refreshAgain = true;
-      return;
+      return this.refreshing;
     }
     const round = async () => {
       do {
@@ -274,9 +322,11 @@ export class BrainRouter {
         for (const page of this.pages.recent().slice(-RECENT_PAGES)) await this.refresh(page.method, page.params, mapping);
       } while (this.refreshAgain);
     };
-    this.refreshing = round()
+    const refreshing = round()
       .catch((caught: unknown) => this.deps.log.warn(`the cloud brain's lists did not refresh: ${caught instanceof Error ? caught.message : String(caught)}`))
       .finally(() => (this.refreshing = null));
+    this.refreshing = refreshing;
+    return refreshing;
   }
 
   close(): void {
@@ -308,6 +358,7 @@ function toCloud(params: Record<string, unknown>, mapping: ProjectMapping): Reco
 
 const isInbox = (value: unknown): value is InboxList => typeof value === "object" && value !== null && Array.isArray((value as Partial<InboxList>).items);
 const isThread = (value: unknown): value is ThreadSummary => typeof value === "object" && value !== null && "projectId" in value && "worktreePath" in value;
+const isStarted = (value: unknown): value is { thread: ThreadSummary } => typeof value === "object" && value !== null && "thread" in value && isThread(value.thread);
 
 /**
  * Brain rows as this Mac's windows read them: on this Mac's project, with no folder a window could act on, and marked
@@ -315,6 +366,7 @@ const isThread = (value: unknown): value is ThreadSummary => typeof value === "o
  */
 function rehome(value: unknown, mapping: ProjectMapping, owner: ThreadSummary["owner"] | null, mirrors: Pick<BrainMirrors, "folder">): unknown {
   if (Array.isArray(value)) return value.map((item) => rehome(item, mapping, owner, mirrors));
+  if (isStarted(value)) return { ...value, thread: rehome(value.thread, mapping, owner, mirrors) };
   if (isInbox(value))
     return {
       ...value,

@@ -1,4 +1,4 @@
-import { WORKSPACE_ID, harnessIds, type Project, type RpcResults } from "@openorc/protocol";
+import { NOT_ON_BRAIN, WORKSPACE_ID, harnessIds, type Project, type RpcResults } from "@openorc/protocol";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readNewThreadDraft, writeNewThreadDraft } from "../lib/new-thread-draft";
@@ -13,6 +13,7 @@ let branches: Record<string, string | null | undefined>;
 let branchError: boolean;
 let accounts: RpcResults["claude.accounts.list"] | undefined;
 let settings: Partial<RpcResults["app.settings.get"]>;
+let offer: RpcResults["cloud.offer"] | undefined;
 
 vi.mock("../lib/client", async (original) => ({
   ...(await original<object>()),
@@ -26,6 +27,7 @@ vi.mock("../lib/client", async (original) => ({
       "system.info": system,
       "agents.models": models,
       "app.settings.get": settings,
+      "cloud.offer": offer,
       "orchestration.availability": { enabled: true, reason: null, maxHierarchyDepth: 3 },
     };
     return { data: data[method], isError: method === "projects.checkoutBranch" && branchError, isPending: false, isLoading: false, error: null, refetch: vi.fn() };
@@ -69,6 +71,7 @@ beforeEach(() => {
     accounts: ["personal", "work", "client"].map((id, createdAt) => ({ id, name: id, kind: "managed", enabled: true, createdAt, status: "ready", email: null, organization: null, message: null })),
   };
   settings = { defaultWorkspaceMode: "current", defaultHarness: null };
+  offer = undefined;
   models = [{ id: "codex-model", label: "Codex", agent: "codex", isDefault: true, efforts: ["medium"], defaultEffort: "medium" }];
   system = {
     dataDir: "/data",
@@ -174,6 +177,29 @@ describe("NewThread", () => {
     expect(readNewThreadDraft("p1").workspace).toBe("worktree");
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ projectId: "p1", workspaceMode: "worktree", prompt: "Build in a separate checkout" })));
+  });
+
+  it("starts a cloud thread on the cloud brain for a project it has a copy of", async () => {
+    offer = { offered: true, provider: "vercel", brain: { host: "brain-key", projects: [{ mac: "p1", cloud: "brain-p1" }] } };
+    writeNewThreadDraft({ ...saveModelDraft("p1", "Run this in the cloud"), workspace: "cloud" });
+    render(<NewThread projectId="p1" />);
+    fireEvent.click(screen.getByRole("button", { name: "Where the thread works: Cloud" }));
+    expect((await screen.findByRole("menuitem", { name: /^Cloud On your cloud brain/ })).getAttribute("aria-disabled")).not.toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ projectId: "p1", workspaceMode: "worktree", cloud: true })));
+  });
+
+  it("offers Cloud with its reason on demand, and starts in a worktree, for a project the cloud brain has no copy of", async () => {
+    offer = { offered: true, provider: "vercel", brain: { host: "brain-key", projects: [{ mac: "p2", cloud: "brain-p2" }] } };
+    writeNewThreadDraft({ ...saveModelDraft("p1", "Run this in the cloud"), workspace: "cloud" });
+    render(<NewThread projectId="p1" />);
+    fireEvent.click(screen.getByRole("button", { name: "Where the thread works: Worktree" }));
+    const cloud = await screen.findByRole("menuitem", { name: /^Cloud / });
+    expect(cloud.getAttribute("aria-disabled")).toBe("true");
+    expect(cloud.getAttribute("title")).toBe(NOT_ON_BRAIN);
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(start).toHaveBeenCalledWith(expect.not.objectContaining({ cloud: true })));
+    expect(start).toHaveBeenCalledWith(expect.objectContaining({ workspaceMode: "worktree" }));
   });
 
   it("keeps the recovered prompt when its saved solo model is unavailable", () => {

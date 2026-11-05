@@ -1,4 +1,15 @@
-import { harnessShortName, WORKSPACE_ID, type CloudStep, type CloudThreadState, type AgentKind, type MoveStep, type QueuedMessage, type ThreadSummary } from "@openorc/protocol";
+import {
+  harnessShortName,
+  NOT_ON_BRAIN,
+  WORKSPACE_ID,
+  type CloudOffer,
+  type CloudStep,
+  type CloudThreadState,
+  type AgentKind,
+  type MoveStep,
+  type QueuedMessage,
+  type ThreadSummary,
+} from "@openorc/protocol";
 
 /** The agents that run in a cloud sandbox so far. */
 export function runsInCloud(agent: AgentKind | null | undefined): boolean {
@@ -20,6 +31,15 @@ export function brainMove(thread: ThreadSummary): { shown: boolean; blocked: str
   if (thread.agent !== "claude") return { shown, blocked: "Only Claude conversations can move to the cloud so far." };
   if (thread.openTaskCount > 0) return { shown, blocked: "Conversations with tasks can't move yet." };
   return { shown, blocked: null };
+}
+
+/**
+ * Why a new thread on this project can't start in the cloud, or null. With a cloud brain set up, a cloud thread starts on
+ * the brain, so only on a project it has a copy of; without one, in a sandbox of its own.
+ */
+export function cloudStartBlocked(offer: Pick<CloudOffer, "brain"> | undefined, projectId: string): string | null {
+  const brain = offer?.brain;
+  return brain && !brain.projects.some((project) => project.mac === projectId) ? NOT_ON_BRAIN : null;
 }
 
 /** The quiet word a row shows for where it lives, dimmed while its owner cannot be reached; null for this host's own. */

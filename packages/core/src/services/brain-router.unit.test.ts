@@ -1,6 +1,9 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { afterEach, expect, it, vi } from "vitest";
 import { Db, relocations } from "@openorc/db";
-import { threadListCompare, type CorePush, type InboxList, type OwnerReach, type RpcMethod, type RpcRequest, type ThreadSummary } from "@openorc/protocol";
+import { NOT_ON_BRAIN, threadListCompare, type CorePush, type InboxList, type OwnerReach, type RpcMethod, type RpcRequest, type ThreadSummary } from "@openorc/protocol";
 import type { RpcReply } from "../transport.js";
 import { until } from "../test-fixtures/fake-claude.js";
 import type { BrainLink, BrainPush } from "./brain-link.js";
@@ -16,12 +19,13 @@ function paged(rows: ThreadSummary[], params: { limit?: number; offset?: number 
   return sorted.slice(offset, params.limit ? offset + params.limit : undefined);
 }
 
-function harness(answers: { mac?: ThreadSummary[]; cloud?: ThreadSummary[]; cloudInbox?: InboxList; mirrors?: Record<string, string> } = {}) {
+function harness(answers: { mac?: ThreadSummary[]; cloud?: ThreadSummary[]; cloudInbox?: InboxList; mirrors?: Record<string, string>; listMs?: number } = {}) {
   const interest: string[][] = [];
   const windows: CorePush[] = [];
   const reaches: ((reach: OwnerReach) => void)[] = [];
   const pushes: ((push: BrainPush) => void)[] = [];
   const asked: RpcMethod[] = [];
+  const sent: { method: RpcMethod; params: Record<string, unknown> }[] = [];
   const link = {
     reach: "live",
     onPush: (listener: (push: BrainPush) => void) => void pushes.push(listener),
@@ -29,7 +33,19 @@ function harness(answers: { mac?: ThreadSummary[]; cloud?: ThreadSummary[]; clou
     setInterest: (runIds: readonly string[]) => void interest.push([...runIds]),
     call: async (method: RpcMethod, params: Record<string, unknown>) => {
       asked.push(method);
-      if (method === "threads.list") return paged(answers.cloud ?? [], params);
+      sent.push({ method, params });
+      if (method === "attachments.save") return { path: `/brain/attachments/${sent.length}.png`, url: "" };
+      if (method === "attachments.saveFile") return { path: `/brain/attachments/${sent.length}-${String(params["name"])}`, name: params["name"], bytes: 1 };
+      if (method === "threads.start") {
+        const started = row("new-thread", 99, params["projectId"] as string);
+        answers.cloud = [...(answers.cloud ?? []), started];
+        return { thread: started, run: null };
+      }
+      if (method === "threads.list") {
+        // The brain's answer takes a moment, as over the link.
+        if (answers.listMs) await new Promise((resolve) => setTimeout(resolve, answers.listMs));
+        return paged(answers.cloud ?? [], params);
+      }
       if (method === "inbox.list") return answers.cloudInbox ?? { items: [] };
       if (method === "threads.get") return (answers.cloud ?? []).find((each) => each.id === params["id"]) ?? null;
       return { events: [], fromTurn: 0, live: false };
@@ -57,6 +73,7 @@ function harness(answers: { mac?: ThreadSummary[]; cloud?: ThreadSummary[]; clou
     interest,
     windows,
     asked,
+    sent,
     reach: (next: OwnerReach) => reaches.forEach((listener) => listener(next)),
     push: (push: BrainPush) => pushes.forEach((listener) => listener(push)),
   };
@@ -162,4 +179,48 @@ it("marks a cloud thread this Mac is bringing here as moving, at its step, befor
   relocations.advance(db, "move", "asking", "abandoned");
   expect((await ask(router, "threads.get", { id: "cloud-thread" })) as ThreadSummary).not.toHaveProperty("moving");
   router.close();
+});
+
+const start = { mode: "act", permissionMode: "autonomous", agent: "claude", prompt: "Fix the build" } as const;
+
+it("starts a thread asked for the cloud on the brain's copy of the project, listed before the reply", async () => {
+  const { router, windows, sent } = harness({ cloud: [row("c1", 1, "cloud-project")], listMs: 20 });
+  await listedTwice(router, windows, "threads.list", {});
+  const { thread } = (await ask(router, "threads.start", { ...start, projectId: "mac-project", cloud: true })) as { thread: ThreadSummary };
+  expect(sent.find((each) => each.method === "threads.start")?.params).toMatchObject({ projectId: "cloud-project", cloud: true });
+  expect(thread).toMatchObject({ id: "new-thread", projectId: "mac-project", worktreePath: null, owner: { brain: "cloud", reach: "live" } });
+  const rows = (await ask(router, "threads.list", {})) as ThreadSummary[];
+  expect(rows.find((each) => each.id === "new-thread")).toMatchObject({ projectId: "mac-project", owner: { brain: "cloud" } });
+  router.close();
+});
+
+it("starts a thread here unless it asks for the cloud, and refuses the cloud for a project the brain has no copy of", async () => {
+  const { router, asked } = harness();
+  await expect(ask(router, "threads.start", { ...start, projectId: "other-project", cloud: true })).rejects.toThrow(NOT_ON_BRAIN);
+  await ask(router, "threads.start", { ...start, projectId: "mac-project", workspaceMode: "worktree" });
+  expect(asked).not.toContain("threads.start");
+  router.close();
+});
+
+it("stores a window's attached files on the brain before the call naming them, images as images, none over the link's limit", async () => {
+  const folder = await mkdtemp(path.join(os.tmpdir(), "openorc-router-images-"));
+  try {
+    const image = path.join(folder, "shot.png");
+    await writeFile(image, "png bytes");
+    const notes = path.join(folder, "0b9f3c3e-5d2a-4f1e-9c47-2a6f0d8e1b55-notes.pdf");
+    await writeFile(notes, "pdf bytes");
+    const { router, sent } = harness({ cloud: [row("cloud-thread", 1, "cloud-project")] });
+    await ask(router, "threads.queue", { id: "cloud-thread", text: "See these", attachments: [image, notes] });
+    expect(sent.map((each) => each.method)).toEqual(["attachments.save", "attachments.saveFile", "threads.queue"]);
+    expect(sent[0]!.params).toEqual({ name: "shot.png", mime: "image/png", dataBase64: Buffer.from("png bytes").toString("base64") });
+    expect(sent[1]!.params).toEqual({ name: "notes.pdf", dataBase64: Buffer.from("pdf bytes").toString("base64") });
+    expect(sent[2]!.params["attachments"]).toEqual(["/brain/attachments/1.png", "/brain/attachments/2-notes.pdf"]);
+    const large = path.join(folder, "large.log");
+    await writeFile(large, Buffer.alloc(10 * 1024 * 1024 + 1));
+    await expect(ask(router, "threads.queue", { id: "cloud-thread", text: "Read this", attachments: [large] })).rejects.toThrow("must be 10 MB or smaller");
+    expect(sent).toHaveLength(3);
+    router.close();
+  } finally {
+    await rm(folder, { recursive: true, force: true });
+  }
 });

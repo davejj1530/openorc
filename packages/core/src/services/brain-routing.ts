@@ -83,11 +83,13 @@ export class BrainRouting {
     });
     this.router = new BrainRouter({ db, link: this.link, mirrors: this.mirrors, local, windows, mapping: () => endpoint.projects(), notificationsOn, log });
     this.endpoint = endpoint;
+    this.windows = windows;
     this.log = log;
     this.link.onReach((reach) => void (reach === "live" && this.freshen()));
   }
 
   private readonly endpoint: BrainEndpoint;
+  private readonly windows: Transport;
   private readonly log: Logger;
   private freshening: ReturnType<typeof setInterval> | null = null;
 

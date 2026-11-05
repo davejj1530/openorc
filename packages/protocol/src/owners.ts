@@ -29,9 +29,13 @@ export type OwnerRoute<M extends RpcMethod> =
   /** Served by the asked host even for another host's thread: its folder, its preview, its windows. */
   | { by: "here" }
   /** Refused for a thread another host owns, in these words. */
-  | { by: "owner-only"; thread: (params: RpcParams<M>) => string | undefined; words: string };
+  | { by: "owner-only"; thread: (params: RpcParams<M>) => string | undefined; words: string }
+  /** A new thread asked for the cloud starts on the brain, on its copy of the Mac project `cloud` names; any other, here. */
+  | { by: "start"; cloud: (params: RpcParams<M>) => string | undefined };
 
 export const BRING_FIRST = "Bring it to this Mac first.";
+/** Why a project's conversations cannot start or move in the cloud while the brain has no copy of it. */
+export const NOT_ON_BRAIN = "Switch this project on for the cloud brain in Settings > Cloud first.";
 const IN_CLOUD = "This conversation is already in the cloud.";
 
 const byThreadId = { by: "owner", thread: (p: { threadId?: string | undefined }) => p.threadId } as const;
@@ -45,6 +49,7 @@ const here = { by: "here" } as const;
  * allowlist from it. Methods not listed and not RoutedMethod are host-level: the asked core answers about itself.
  */
 export const OWNER_ROUTES: { [M in RoutedMethod]: OwnerRoute<M> } & { [M in Exclude<RpcMethod, RoutedMethod>]?: OwnerRoute<M> } = {
+  "threads.start": { by: "start", cloud: (p) => (p.cloud ? p.projectId : undefined) },
   "threads.list": { by: "merge" },
   "inbox.list": { by: "merge" },
   "threads.get": byId,
@@ -112,12 +117,12 @@ export const OWNER_ROUTES: { [M in RoutedMethod]: OwnerRoute<M> } & { [M in Excl
   "mcpApps.open": here,
 };
 
-/** Methods only the Mac's own session asks the brain, besides those the router forwards. */
-const OWNER_SESSION_EXTRA: readonly RpcMethod[] = ["threads.snapshot"];
+/** Methods only the Mac's own session asks the brain, besides those the router forwards: attached files go up before the message naming them. */
+const OWNER_SESSION_EXTRA: readonly RpcMethod[] = ["threads.snapshot", "attachments.save", "attachments.saveFile"];
 
 /** What the brain admits from its Mac's session: everything the router may forward to it, derived, never listed. */
 export const OWNER_SESSION_METHODS: ReadonlySet<RpcMethod> = new Set([
-  ...(Object.entries(OWNER_ROUTES) as [RpcMethod, OwnerRoute<RpcMethod>][]).filter(([, route]) => route.by === "owner" || route.by === "run" || route.by === "merge").map(([method]) => method),
+  ...(Object.entries(OWNER_ROUTES) as [RpcMethod, OwnerRoute<RpcMethod>][]).filter(([, route]) => route.by !== "here" && route.by !== "owner-only").map(([method]) => method),
   ...OWNER_SESSION_EXTRA,
 ]);
 

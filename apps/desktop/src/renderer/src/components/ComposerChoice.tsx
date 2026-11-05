@@ -13,6 +13,8 @@ export interface ComposerChoiceOption<T extends string> {
   icon?: ComponentType<{ size?: number }>;
   /** A hidden option can still be the current value; the menu just doesn't offer it. */
   hidden?: boolean;
+  /** Why the option can't be chosen now; the menu offers it disabled, the reason on hover. */
+  blocked?: string | null;
 }
 
 /**
@@ -77,7 +79,14 @@ export function ComposerChoice<T extends string>({
             {options
               .filter((o) => !o.hidden)
               .map((o) => (
-                <Menu.Item key={o.value} className={cn(menuItemDetail, "composer-choice-item")} data-current={value === o.value || undefined} onClick={() => onChange(o.value)}>
+                <Menu.Item
+                  key={o.value}
+                  className={cn(menuItemDetail, "composer-choice-item")}
+                  data-current={value === o.value || undefined}
+                  disabled={Boolean(o.blocked)}
+                  title={o.blocked ?? undefined}
+                  onClick={() => onChange(o.value)}
+                >
                   <span className={cn(value === o.value ? "text-ink" : "text-ink-2")}>{o.label}</span>
                   {o.hint ? <span className="text-sm text-ink-4">{o.hint}</span> : null}
                 </Menu.Item>

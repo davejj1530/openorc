@@ -33,6 +33,8 @@ type Guard<M extends RemoteMethod> = (params: RpcParams<M>, context: GuardContex
 
 const allow = () => null;
 const STORED_IMAGE = /^[a-f0-9-]+\.(?:png|jpg|gif|webp)$/;
+/** attachments.saveFile's names: a UUID, then the name the file was given. */
+const STORED_FILE = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}-[A-Za-z0-9._-]+$/;
 const MAX_ATTACHMENT_BASE64 = Math.ceil(REMOTE_ATTACHMENT_BYTES / 3) * 4;
 /** What the phone's own controls change: the composer's settings, and how threads are organized (read state, pins, archive, snooze, title). */
 const PHONE_THREAD_PATCH = new Set(["seen", "agent", "model", "effort", "fastMode", "mode", "permissionMode", "pinned", "archived", "snoozedUntil", "title"]);
@@ -48,10 +50,17 @@ const COMMIT_MESSAGE_MAX = 10_000;
 const PR_TITLE_MAX = 256;
 const PR_BODY_MAX = 65_536;
 
+const storedIn = (paths: readonly string[] | undefined, { attachmentsDir }: GuardContext, names: (name: string) => boolean): boolean =>
+  paths?.every((file) => path.resolve(file) === file && path.dirname(file) === attachmentsDir && names(path.basename(file))) ?? true;
+
 /** Each path must be an image this profile stored with attachments.save. */
-function storedImages(paths: readonly string[] | undefined, { attachmentsDir }: GuardContext): string | null {
-  const foreign = paths?.some((file) => path.resolve(file) !== file || path.dirname(file) !== attachmentsDir || !STORED_IMAGE.test(path.basename(file)));
-  return foreign ? "Only images attached from your phone can be sent from it." : null;
+function storedImages(paths: readonly string[] | undefined, context: GuardContext): string | null {
+  return storedIn(paths, context, (name) => STORED_IMAGE.test(name)) ? null : "Only images attached from your phone can be sent from it.";
+}
+
+/** Each path must be an image or a file this profile stored, with attachments.save or attachments.saveFile. */
+function storedFiles(paths: readonly string[] | undefined, context: GuardContext): string | null {
+  return storedIn(paths, context, (name) => STORED_IMAGE.test(name) || STORED_FILE.test(name)) ? null : "This file did not reach the cloud. Attach it again.";
 }
 
 function phoneTitle(title: string | undefined): string | null {
@@ -227,12 +236,25 @@ export function remoteParams(method: RemoteMethod, params: unknown, capabilities
 
 export type RemoteAdmission = { ok: true } | { ok: false; message: string };
 
-/** Admits one phone request or says why not. Params a method's schema rejects pass through, so `handle` words the error. */
-export function admitRemoteRequest(method: string, params: unknown, context: GuardContext): RemoteAdmission {
+/**
+ * The brain's own Mac asks under a phone's guards except here, where its windows do more with the threads they forward:
+ * they keep a thread's draft, done mark and pull request, and attach any file the Mac stored on the brain first.
+ */
+const ownerGuards: Partial<{ [M in RemoteMethod]: Guard<M> }> = {
+  "threads.update": allow,
+  "threads.start": (params, context) => remoteGuards["threads.start"]({ ...params, attachments: undefined }, context) ?? storedFiles(params.attachments, context),
+  "runs.start": (params, context) => storedFiles(params.attachments, context),
+  "runs.send": (params, context) => storedFiles(params.attachments, context),
+  "threads.queue": (params, context) => storedFiles(params.attachments, context),
+};
+
+/** Admits one phone request, or one from the brain's own Mac, or says why not. Params a method's schema rejects pass through, so `handle` words the error. */
+export function admitRemoteRequest(method: string, params: unknown, context: GuardContext, from: "phone" | "owner" = "phone"): RemoteAdmission {
   if (!isRemoteMethod(method)) return { ok: false, message: "This is not available from a phone." };
   const parsed = rpcParams[method].safeParse(params ?? {});
   if (!parsed.success) return { ok: true };
-  const refusal = (remoteGuards[method] as Guard<RemoteMethod>)(parsed.data as RpcParams<RemoteMethod>, context);
+  const guard = (from === "owner" ? ownerGuards[method] : undefined) ?? remoteGuards[method];
+  const refusal = (guard as Guard<RemoteMethod>)(parsed.data as RpcParams<RemoteMethod>, context);
   return refusal ? { ok: false, message: refusal } : { ok: true };
 }
 

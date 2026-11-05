@@ -1,4 +1,4 @@
-import { newThreadChoice, newThreadWorkspaceMode, runsInCloud, targetModel, type NewThreadDraft } from "@openorc/client";
+import { newThreadChoice, newThreadWorkspaceMode, targetModel, type NewThreadDraft } from "@openorc/client";
 import { WORKSPACE_ID, type Project } from "@openorc/protocol";
 import { useEffect, useRef, useState } from "react";
 import { ClaudeAccountPicker } from "../components/ClaudeAccountPicker";
@@ -14,7 +14,7 @@ import { TopBar } from "../components/TopBar";
 import { Button, TextButton } from "../components/ui";
 import { ClaudeAccountScope } from "../lib/claude-account";
 import { usePermissionSelection, useRpc, useRpcMutation } from "../lib/client";
-import { cloudOffered } from "../lib/cloud-offered";
+import { useNewThreadCloud } from "../lib/cloud-offered";
 import { useComposerChanges } from "../lib/composer-changes";
 import { useDefaultHarness } from "../lib/default-harness";
 import { useLayout } from "../lib/layout";
@@ -104,9 +104,8 @@ function NewThreadProject({
   // The landing composer has no thread, so no thread action applies to it. The
   // skills do: they belong to the project, or the Workspace folder, chosen on this screen.
   const skillCommands = useSkillCommands(projectId, choice?.agent, draft.workingDirectory, claudeAccountId);
-  // Cloud runs only Claude so far, and only in development and QA builds until a real sandbox provider is set up.
-  const canCloud = cloudOffered && target.kind === "model" && runsInCloud(choice?.agent);
-  const workspaceMode = newThreadWorkspaceMode({ canBranch: !isWorkspace && !git.cannotBranch, canCloud, chosen: draft.workspace, preferred: settings.data?.defaultWorkspaceMode });
+  const cloud = useNewThreadCloud(target, projectId);
+  const workspaceMode = newThreadWorkspaceMode({ canBranch: !isWorkspace && !git.cannotBranch, canCloud: cloud.can, chosen: draft.workspace, preferred: settings.data?.defaultWorkspaceMode });
 
   useEffect(() => {
     if (target.kind !== "model" || target.choice || !models.data || !info.data || defaultHarness === undefined) return;
@@ -223,7 +222,7 @@ function NewThreadProject({
                 <NewThreadOptions
                   projectId={projectId}
                   mode={workspaceMode}
-                  cloud={canCloud}
+                  cloud={cloud}
                   location={location}
                   blocked={branchingReason(git.state, "Worktrees")}
                   disabled={start.isPending}

@@ -5,6 +5,7 @@ export { createClientState, type ClientState, type ClientStateOptions } from "./
 export {
   brainMove,
   canMoveToCloud,
+  cloudStartBlocked,
   ownerMark,
   cloudPlaceLabel,
   cloudStartFailure,

@@ -3,7 +3,19 @@ import { chmod, mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, writeFile
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { brainKeyText, brainLayout, bundleBranch, newBrainKey, sealHandover, signInPrint, type BrainControlResults, type BrainLayout, type BrainStart, type ProjectCopy } from "@openorc/cloud";
+import {
+  brainKeyText,
+  brainLayout,
+  bundleBranch,
+  copySyncedAt,
+  newBrainKey,
+  sealHandover,
+  signInPrint,
+  type BrainControlResults,
+  type BrainLayout,
+  type BrainStart,
+  type ProjectCopy,
+} from "@openorc/cloud";
 import { OpenOrc } from "@openorc/core";
 import { DEFAULT_CLAUDE_ACCOUNT } from "@openorc/protocol";
 import { claudeAccounts, threads } from "@openorc/db";

@@ -19,6 +19,8 @@ import { CloudHandoff } from "./cloud-handoff.js";
 import { CodexBrowserSignIn, CodexCloudLogin } from "./codex-cloud-login.js";
 import { spawnWithPipes } from "./terminal-process.js";
 import { CloudSandboxes, type CloudSandboxRuns } from "./cloud-sandboxes.js";
+import { CloudSignInsFlow } from "./cloud-sign-ins.js";
+import { macSignIns } from "./mac-agent-keys.js";
 import { agentHomes, everyVersion, hostVersions } from "./agent-homes.js";
 import { AgentSessions } from "./agent-sessions.js";
 import { CloudStandby, type CloudStandbyDeps } from "./cloud-standby.js";
@@ -124,6 +126,7 @@ export function createCloud(input: CloudInput): {
   handoff: CloudHandoff;
   standby: CloudStandby;
   brain: CloudBrain;
+  signIns: CloudSignInsFlow;
   relocations: ThreadRelocations;
   /** Null on the brain itself, which never coordinates a move. */
   coordinator: RelocationCoordinator | null;
@@ -205,7 +208,8 @@ export function createCloud(input: CloudInput): {
   // A thread's tasks move with it, so the task lists change too.
   const moved = (id: string) => invalidate(["threads", `thread:${id}`, "tasks", "inbox"]);
   const { relocations, coordinator } = createRelocations({ input, sessions, cloud, runs, brain, changed: moved });
-  return { settings, tokens, codex: codexLogin, opencode, cloud, checks, sandboxes: list, handoff, standby, brain, relocations, coordinator };
+  const flow = new CloudSignInsFlow({ db, tokens, codex: codexLogin, opencode, brain, mac: macSignIns(environment), changed: () => invalidate(["cloud-sign-ins"]) });
+  return { settings, tokens, codex: codexLogin, opencode, cloud, checks, sandboxes: list, handoff, standby, brain, signIns: flow, relocations, coordinator };
 }
 
 /** Where each agent keeps its conversations here and in sandboxes, the one caller that moves them, and this host's CLI versions. */

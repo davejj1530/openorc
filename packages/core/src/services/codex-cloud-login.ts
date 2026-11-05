@@ -82,6 +82,7 @@ function account(deps: CodexDeps, home: string, refresh: boolean): Promise<{ ema
 /** One ChatGPT sign-in in the browser at a time, in a private folder: Codex opens the browser, and the login it made is handed on. */
 export class CodexBrowserSignIn {
   private signing: { proc: TerminalProcess | null; cancelled: boolean } | null = null;
+  private done: Promise<void> = Promise.resolve();
   /** Why the last sign-in did not finish. */
   error: string | null = null;
 
@@ -113,7 +114,7 @@ export class CodexBrowserSignIn {
       if (code !== 0 || attempt.cancelled) return { code, said: stripAnsi(screen).trim().split("\n").at(-1) ?? "", who: null };
       return { code, said: "", who: await account(this.deps, home, false) };
     });
-    void finished
+    this.done = finished
       .then(async ({ result, auth }) => {
         if (attempt.cancelled) return;
         if (!auth || !result.who) {
@@ -122,7 +123,9 @@ export class CodexBrowserSignIn {
         }
         await take({ auth, ...result.who });
       })
-      .catch((error: unknown) => (this.error = error instanceof Error ? error.message : String(error)))
+      .catch((error: unknown) => {
+        this.error = error instanceof Error ? error.message : String(error);
+      })
       .finally(() => {
         this.signing = null;
         this.deps.changed();
@@ -133,6 +136,11 @@ export class CodexBrowserSignIn {
     if (!this.signing) return;
     this.signing.cancelled = true;
     this.signing.proc?.kill();
+  }
+
+  /** Once the sign-in open now ended, its login handed on or not. */
+  finished(): Promise<void> {
+    return this.done;
   }
 }
 
@@ -204,6 +212,11 @@ export class CodexCloudLogin {
 
   cancel(): void {
     this.browser.cancel();
+  }
+
+  /** Once the ChatGPT sign-in open now ended, its login kept or not. */
+  finished(): Promise<void> {
+    return this.browser.finished();
   }
 
   /** An OpenAI API key: billed by the token to that key's organization, with no ChatGPT plan involved. */

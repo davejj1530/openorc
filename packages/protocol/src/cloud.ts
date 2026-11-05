@@ -2,6 +2,7 @@ import { z } from "zod";
 import { brainSyncRpcParams, type BrainSyncRpcResults } from "./brain-sync.js";
 import { ClaudeAccountId } from "./claude-accounts.js";
 import { BrainRegion, cloudBrainRpcParams, type CloudBrainRpcResults } from "./cloud-brain.js";
+import { cloudSignInRpcParams, OpenCodeProviderId, type CloudSignInRpcResults } from "./cloud-sign-ins.js";
 import type { Thread } from "./domain.js";
 
 /** Where a cloud thread's sandbox runs: simulated on this Mac, on Vercel, or on Agent37. */
@@ -167,8 +168,6 @@ export interface CloudStatus {
 }
 
 const Token = z.string().trim().min(8).max(1000);
-/** A provider as OpenCode names it in a model id, `provider/model`. */
-export const OpenCodeProviderId = z.string().regex(/^[a-z0-9][a-z0-9._-]{0,63}$/);
 
 export const cloudRpcParams = {
   "cloud.status": z.object({}),
@@ -220,10 +219,11 @@ export const cloudRpcParams = {
   /** Deletes a sandbox for good. A conversation's next message sets up a new one from its worktree on the Mac. */
   "cloud.sandboxes.remove": z.object({ name: z.string().min(1).max(200) }).strict(),
   ...cloudBrainRpcParams,
+  ...cloudSignInRpcParams,
   ...brainSyncRpcParams,
 };
 
-export interface CloudRpcResults extends CloudBrainRpcResults, BrainSyncRpcResults {
+export interface CloudRpcResults extends CloudBrainRpcResults, CloudSignInRpcResults, BrainSyncRpcResults {
   "cloud.status": CloudStatus;
   "cloud.bringToMac": null;
   "cloud.keep": null;

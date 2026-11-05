@@ -66,6 +66,8 @@ const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
   "cloud.brain.cost": ["cloud-brain"],
   "cloud.brain.signIns": ["cloud-brain"],
   "cloud.brain.phones": ["cloud-brain"],
+  // Each row comes from the store that keeps it: Claude's tokens and Codex ("cloud"), the brain's own ("cloud-brain").
+  "cloud.signIns": ["cloud-sign-ins", "cloud", "cloud-brain", "claude-accounts"],
   "remote.status": ["remote"],
   "system.info": ["system"],
   "system.gh": ["system"],

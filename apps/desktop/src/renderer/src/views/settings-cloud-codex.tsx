@@ -88,7 +88,7 @@ export function CodexCloudSection({ codex }: { codex: CodexCloudAccess }) {
   };
   const error = signIn.error ?? cancel.error ?? apiKey.error ?? remove.error ?? (codex.error ? new Error(codex.error) : null);
   return (
-    <Section title="Codex" description="Codex signs in to sandboxes with a sign-in of its own, never this Mac's.">
+    <Section title="Codex" description="Codex signs in to sandboxes with a ChatGPT sign-in of its own, never this Mac's, or an API key.">
       <SettingRow label="Sign-in" hint={hint(codex)}>
         <Controls codex={codex} act={act} />
       </SettingRow>

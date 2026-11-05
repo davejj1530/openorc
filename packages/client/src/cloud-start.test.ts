@@ -1,7 +1,7 @@
-import type { ThreadSummary } from "@openorc/protocol";
+import type { CloudSignIn, ThreadSummary } from "@openorc/protocol";
 import { NOT_ON_BRAIN, WORKSPACE_ID } from "@openorc/protocol";
 import { expect, it } from "vitest";
-import { canMoveToCloud, cloudPlaceLabel, cloudStartBlocked, cloudStartSteps, threadMoveCard, type StartingCloudThread } from "./cloud-start.js";
+import { canMoveToCloud, cloudPlaceLabel, cloudStartBlocked, cloudStartSteps, missingCloudSignIn, threadMoveCard, type StartingCloudThread } from "./cloud-start.js";
 
 const thread = (more: Partial<ThreadSummary>) => ({ agent: "claude", projectId: "openorc", teamInstanceId: null, cloud: undefined, ...more }) as ThreadSummary;
 
@@ -55,4 +55,31 @@ it("starts a thread on the cloud brain by waking it, updated first when this Mac
   expect(steps(starting({ step: "sandbox" }, { owner: undefined }))[0]).toBe("Starting an Agent37 instance: running");
   // Its start card says the brain wakes; no second card does.
   expect(threadMoveCard(starting({ brain: "waking" }))).toBeNull();
+});
+
+it("names the one sign-in a cloud turn lacks: its Claude account, the Codex of where it runs, its OpenCode provider", () => {
+  const rows: CloudSignIn[] = [
+    { kind: "claude", accountId: "work", label: "Work", state: "missing", way: "private-window", error: null },
+    { kind: "claude", accountId: "claude-cli", label: "Personal", state: "ready", way: "browser", error: null },
+    { kind: "codex", label: "Codex", state: "ready", way: "browser", error: null },
+    { kind: "brain-codex", label: "Codex on the cloud brain", state: "missing", way: "copy", error: null },
+    { kind: "opencode", provider: "openrouter", label: "OpenRouter", state: "ready", way: "copy", error: null },
+  ];
+  const signIns = { rows, bringing: false };
+  const who = { agent: "claude", claudeAccountId: "work", model: null, brain: false, local: false };
+  expect(missingCloudSignIn(signIns, who)).toMatchObject({ kind: "claude", accountId: "work" });
+  expect(missingCloudSignIn(signIns, { ...who, claudeAccountId: "claude-cli" })).toBeNull();
+  expect(missingCloudSignIn(signIns, { ...who, local: true })).toBeNull();
+  expect(missingCloudSignIn(signIns, { ...who, agent: "codex" })).toBeNull();
+  expect(missingCloudSignIn(signIns, { ...who, agent: "codex", brain: true })).toMatchObject({ kind: "brain-codex", way: "copy" });
+  expect(missingCloudSignIn(signIns, { ...who, agent: "opencode", model: "openrouter/some-model" })).toBeNull();
+  expect(missingCloudSignIn(signIns, { ...who, agent: "opencode", model: "opencode/free-model" })).toBeNull();
+  expect(missingCloudSignIn(signIns, { ...who, agent: "opencode", model: "anthropic/claude" })).toEqual({
+    kind: "opencode",
+    provider: "anthropic",
+    label: "Anthropic",
+    state: "missing",
+    way: "key",
+    error: null,
+  });
 });

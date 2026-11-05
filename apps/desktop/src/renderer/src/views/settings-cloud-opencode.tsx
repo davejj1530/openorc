@@ -29,7 +29,7 @@ function ProviderChoice({ choices, value, onChange }: { choices: [string, string
 }
 
 /**
- * OpenCode's keys for the cloud, one per provider, entered here and never read from this Mac's OpenCode. A cloud turn
+ * OpenCode's keys for the cloud, one per provider, entered here or copied from this Mac's OpenCode. A cloud turn
  * gets only the key of its model's provider, which an agent in its sandbox can read, as the section says.
  */
 export function OpenCodeCloudSection({ opencode }: { opencode: CloudStatus["opencode"] }) {
@@ -42,7 +42,7 @@ export function OpenCodeCloudSection({ opencode }: { opencode: CloudStatus["open
   const provider = picked || choices[0]?.[0] || "";
   const busy = save.isPending || remove.isPending;
   return (
-    <Section title="OpenCode" description="OpenCode signs in to sandboxes with keys of its own, never this Mac's. An agent in a sandbox can read the key its model uses.">
+    <Section title="OpenCode" description="OpenCode signs in to sandboxes with a key for each provider. An agent in a sandbox can read the key its model uses.">
       {opencode.providers.map((id) => (
         <SettingRow key={id} label={names.get(id) ?? id}>
           <Status ok>Key saved</Status>

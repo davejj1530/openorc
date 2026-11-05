@@ -6,6 +6,7 @@ import { Agent37Settings, CloudServiceChoice } from "./settings-cloud-agent37";
 import { CloudBrainSection, RegionSelect } from "./settings-cloud-brain";
 import { CloudCheckSection } from "./settings-cloud-check";
 import { CloudSandboxesSection } from "./settings-cloud-sandboxes";
+import { CloudSignInsSection } from "./settings-cloud-sign-ins";
 import { Field, LoadError, Section, SettingRow, Status, Toggle } from "./settings-shared";
 import { CodexCloudSection } from "./settings-cloud-codex";
 import { OpenCodeCloudSection } from "./settings-cloud-opencode";
@@ -243,6 +244,7 @@ export function CloudSettings({ active }: { active: boolean }) {
           {status.data.error}
         </p>
       ) : null}
+      <CloudSignInsSection active={active} />
       <VercelSettings status={status.data} />
       <Agent37Settings status={status.data} />
       <CloudServiceChoice status={status.data} />

@@ -1,5 +1,5 @@
-import { NOT_ON_BRAIN, WORKSPACE_ID, harnessIds, type Project, type RpcResults } from "@openorc/protocol";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { NOT_ON_BRAIN, WORKSPACE_ID, harnessIds, type CloudSignIns, type Project, type RpcResults } from "@openorc/protocol";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readNewThreadDraft, writeNewThreadDraft } from "../lib/new-thread-draft";
 import { useRouter } from "../lib/router";
@@ -14,6 +14,8 @@ let branchError: boolean;
 let accounts: RpcResults["claude.accounts.list"] | undefined;
 let settings: Partial<RpcResults["app.settings.get"]>;
 let offer: RpcResults["cloud.offer"] | undefined;
+let signIns: CloudSignIns;
+const mutated: [string, unknown][] = [];
 
 vi.mock("../lib/client", async (original) => ({
   ...(await original<object>()),
@@ -28,14 +30,18 @@ vi.mock("../lib/client", async (original) => ({
       "agents.models": models,
       "app.settings.get": settings,
       "cloud.offer": offer,
+      "cloud.signIns": signIns,
       "orchestration.availability": { enabled: true, reason: null, maxHierarchyDepth: 3 },
     };
     return { data: data[method], isError: method === "projects.checkoutBranch" && branchError, isPending: false, isLoading: false, error: null, refetch: vi.fn() };
   },
   useRpcMutation: (method: string) =>
-    method === "threads.start" ? { mutateAsync: start, reset: resetStart, isPending: false, error: null } : { mutateAsync: vi.fn(), mutate: vi.fn(), reset: vi.fn(), isPending: false, error: null },
+    method === "threads.start"
+      ? { mutateAsync: start, reset: resetStart, isPending: false, error: null }
+      : { mutateAsync: vi.fn(), mutate: (params: unknown) => mutated.push([method, params]), reset: vi.fn(), isPending: false, error: null },
   usePermissionSelection: () => ({ permission: "review", ready: true, select: vi.fn(), error: null }),
 }));
+vi.mock("../lib/rpc", () => ({ core: { call: async (method: string) => (method === "cloud.signIns" ? signIns : null), onReady: () => () => {}, onPush: () => () => {} } }));
 vi.mock("../lib/skill-commands", () => ({ useSkillCommands: () => [] }));
 vi.mock("../lib/composer-changes", () => ({ useComposerChanges: () => null }));
 vi.mock("../components/NewThreadActivity", () => ({ useArrivalActivity: () => ({ any: false }), NewThreadRecent: () => null }));
@@ -72,6 +78,8 @@ beforeEach(() => {
   };
   settings = { defaultWorkspaceMode: "current", defaultHarness: null };
   offer = undefined;
+  signIns = { rows: [], bringing: false };
+  mutated.length = 0;
   models = [{ id: "codex-model", label: "Codex", agent: "codex", isDefault: true, efforts: ["medium"], defaultEffort: "medium" }];
   system = {
     dataDir: "/data",
@@ -269,4 +277,48 @@ it.each([
   fireEvent.change(screen.getByRole("textbox", { name: "Message" }), { target: { value: "Fix the build" } });
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
   await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ agent, prompt: "Fix the build" })));
+});
+
+it("offers the one sign-in a cloud start lacks where it was sent, and starts once it is ready", async () => {
+  models = [{ id: "claude-fixture", label: "Claude", agent: "claude", isDefault: true, efforts: [], defaultEffort: null }];
+  system.harnesses = system.harnesses.map((row) => ({ ...row, state: "ready" }));
+  offer = { offered: true, provider: "vercel", brain: null };
+  const work = { kind: "claude", accountId: "work", label: "Work", way: "private-window", error: null } as const;
+  signIns = { rows: [{ ...work, state: "missing" }], bringing: false };
+  writeNewThreadDraft({
+    ...readNewThreadDraft("p1"),
+    prompt: "Run this in the cloud",
+    workspace: "cloud",
+    target: { kind: "model", choice: { agent: "claude", model: "claude-fixture", effort: null } },
+  });
+  const view = render(<NewThread projectId="p1" />);
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  expect(await screen.findByText("Claude account “Work” has no sign-in for the cloud.")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+  expect(mutated).toEqual([["cloud.signIns.bring", { target: { kind: "claude", accountId: "work" } }]]);
+  expect(start).not.toHaveBeenCalled();
+  signIns = { rows: [{ ...work, state: "ready" }], bringing: false };
+  act(() => view.rerender(<NewThread projectId="p1" />));
+  await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ cloud: true, claudeAccountId: "work", prompt: "Run this in the cloud" })));
+  expect(screen.queryByText("Claude account “Work” has no sign-in for the cloud.")).toBeNull();
+});
+
+it("keeps the message when the person calls a waiting cloud start off", async () => {
+  models = [{ id: "claude-fixture", label: "Claude", agent: "claude", isDefault: true, efforts: [], defaultEffort: null }];
+  system.harnesses = system.harnesses.map((row) => ({ ...row, state: "ready" }));
+  offer = { offered: true, provider: "vercel", brain: null };
+  signIns = { rows: [{ kind: "claude", accountId: "work", label: "Work", way: "private-window", error: null, state: "missing" }], bringing: false };
+  writeNewThreadDraft({
+    ...readNewThreadDraft("p1"),
+    prompt: "Run this in the cloud",
+    workspace: "cloud",
+    target: { kind: "model", choice: { agent: "claude", model: "claude-fixture", effort: null } },
+  });
+  render(<NewThread projectId="p1" />);
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
+  await waitFor(() => expect(screen.queryByText("Claude account “Work” has no sign-in for the cloud.")).toBeNull());
+  expect(screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Message" }).value).toBe("Run this in the cloud");
+  expect(screen.queryByRole("alert")).toBeNull();
+  expect(start).not.toHaveBeenCalled();
 });

@@ -35,7 +35,7 @@ export interface SignInSources {
   memory(): Promise<string | null>;
   /** OpenCode's provider keys for the cloud. */
   opencode(): Promise<{ provider: string; key: string }[]>;
-  codex: Pick<CodexBrowserSignIn, "signingIn" | "error" | "start" | "cancel">;
+  codex: Pick<CodexBrowserSignIn, "signingIn" | "error" | "start" | "cancel" | "finished">;
 }
 
 /** For a host that keeps the brain on Claude's sign-ins alone, as in tests. */
@@ -44,7 +44,7 @@ export const NO_SIGN_INS: SignInSources = {
   push: async () => null,
   memory: async () => null,
   opencode: async () => [],
-  codex: { signingIn: false, error: null, start: () => undefined, cancel: () => undefined },
+  codex: { signingIn: false, error: null, start: () => undefined, cancel: () => undefined, finished: async () => undefined },
 };
 
 type Others = Omit<BrainHandover, "claude">;

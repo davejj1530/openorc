@@ -1,9 +1,15 @@
 import {
+  DEFAULT_CLAUDE_ACCOUNT,
   harnessShortName,
   isHarnessId,
   NOT_ON_BRAIN,
+  OPENCODE_FREE_PROVIDER,
+  openCodeProvider,
+  openCodeProviderName,
   WORKSPACE_ID,
   type CloudOffer,
+  type CloudSignIn,
+  type CloudSignIns,
   type CloudStep,
   type CloudThreadState,
   type AgentKind,
@@ -139,4 +145,43 @@ export function threadMoveCard(thread: Pick<ThreadSummary, "moving" | "owner" | 
     title: moving.to === "cloud" ? "Moving to the cloud" : "Moving to this Mac",
     steps: order.map((step, index) => ({ step, label: MOVE_LABELS[moving.to][step], state: stepState(index, current) })),
   };
+}
+
+/** Who a cloud turn signs in as, and where it runs. */
+export interface CloudTurnWho {
+  agent: string | null | undefined;
+  claudeAccountId: string;
+  model: string | null | undefined;
+  /** On the cloud brain, which keeps its own Codex login. */
+  brain: boolean;
+  /** Simulated on this Mac, where the Mac's own sign-ins serve. */
+  local: boolean;
+}
+
+function neededSignIn(rows: CloudSignIn[], who: CloudTurnWho): CloudSignIn | null {
+  if (who.agent === "claude") return rows.find((row) => row.kind === "claude" && row.accountId === who.claudeAccountId) ?? null;
+  if (who.agent === "codex") return rows.find((row) => row.kind === (who.brain ? "brain-codex" : "codex")) ?? null;
+  const provider = who.agent === "opencode" ? openCodeProvider(who.model) : null;
+  if (!provider || provider === OPENCODE_FREE_PROVIDER) return null;
+  // A provider nobody has a key for yet is not among the rows; it takes a key typed in.
+  return rows.find((row) => row.kind === "opencode" && row.provider === provider) ?? { kind: "opencode", provider, label: openCodeProviderName(provider), state: "missing", way: "key", error: null };
+}
+
+/** Who a thread's next cloud turn signs in as, when the send starts a process in its sandbox; null otherwise. */
+export function cloudTurnOf(thread: Pick<ThreadSummary, "cloud" | "claudeAccountId" | "owner"> | null, choice: { agent: string; model: string } | null, busy: boolean): CloudTurnWho | null {
+  // A send into a live process, or behind a running turn, starts nothing there, so it has nothing to sign in.
+  if (!thread?.cloud || !choice || busy) return null;
+  return {
+    agent: choice.agent,
+    claudeAccountId: thread.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT,
+    model: choice.model,
+    brain: thread.owner?.brain === "cloud",
+    local: thread.cloud.provider === "local",
+  };
+}
+
+/** The sign-in a cloud turn needs and the cloud lacks, or null when it has it or needs none. */
+export function missingCloudSignIn(signIns: CloudSignIns, who: CloudTurnWho): CloudSignIn | null {
+  const row = who.local ? null : neededSignIn(signIns.rows, who);
+  return row && row.state !== "ready" ? row : null;
 }

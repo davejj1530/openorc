@@ -16,6 +16,7 @@ import { useRpc, useRpcMutation } from "../lib/client";
 import { CloudBrainPhones } from "./settings-cloud-brain-phones";
 import { CloudBrainProjects } from "./settings-cloud-brain-projects";
 import { CloudBrainSignIns } from "./settings-cloud-brain-signins";
+import { BringMissing } from "./settings-cloud-sign-ins";
 import { PairingCode, pairingSheet, useTicker } from "./settings-phone";
 import { Failure, StillWorks } from "./settings-secret-field";
 import { Section, SettingRow, Status } from "./settings-shared";
@@ -91,6 +92,12 @@ function Door({ door }: { door: CloudBrainDoor | null }) {
   );
 }
 
+/** Before its first wake, the brain's setup offers the step that brings every sign-in, so it wakes with them. */
+function SignInsFirst() {
+  const signIns = useRpc("cloud.signIns", {}).data;
+  return signIns ? <BringMissing signIns={signIns} label="Sign-ins for the cloud" /> : null;
+}
+
 /** Set up on the service new cloud threads run on; on Vercel in a region, since Agent37 has one. */
 function NotSetUp({ available, service }: { available: boolean; service: CloudService }) {
   const create = useRpcMutation("cloud.brain.create");
@@ -103,6 +110,7 @@ function NotSetUp({ available, service }: { available: boolean; service: CloudSe
   );
   return (
     <>
+      {available ? <SignInsFirst /> : null}
       <SettingRow label={vercel ? "Region" : SERVICES[service].name} hint={vercel ? "Fixed once it is set up." : null}>
         {vercel ? <RegionSelect label="Region" value={region} disabled={!available || create.isPending} onChange={setRegion} /> : null}
         {available ? setUp : <Tooltip label="The cloud brain isn't available in this build.">{setUp}</Tooltip>}

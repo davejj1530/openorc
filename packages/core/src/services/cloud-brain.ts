@@ -307,6 +307,11 @@ export class CloudBrain {
     this.sources().codex.cancel();
   }
 
+  /** Once the browser sign-in for the brain's Codex ended, its login on its way to the brain or not. */
+  codexFinished(): Promise<void> {
+    return this.sources().codex.finished();
+  }
+
   /** An OpenAI API key for the brain's Codex, in place of a ChatGPT sign-in. */
   codexApiKey(key: string): void {
     this.codexNext({ id: randomUUID(), mode: "apiKey", auth: apiKeyAuth(key), email: null, plan: null });

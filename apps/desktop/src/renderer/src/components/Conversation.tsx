@@ -1,6 +1,6 @@
 import { useComposerChanges } from "../lib/composer-changes";
 import { useProjectGit } from "../lib/project-git";
-import { conversationActivity, conversationPlaceholder, conversationSendDisabledReason, conversationSteerReason, messageBody, processFit, type SubmitRequest } from "@openorc/client";
+import { cloudTurnOf, conversationActivity, conversationPlaceholder, conversationSendDisabledReason, conversationSteerReason, messageBody, processFit, type SubmitRequest } from "@openorc/client";
 import { WORKSPACE_ID, defaultHarnessId, harnessShortName, isSubagentThread, type Project, type Run, type Task, type ThreadSummary, type WorkspaceMode } from "@openorc/protocol";
 import { useCallback, useState } from "react";
 import { useConversationSettings, useConversationTranscript, useRpc, useRpcMutation, useSubmit } from "../lib/client";
@@ -19,6 +19,7 @@ import { useSkillCommands } from "../lib/skill-commands";
 import { ConversationVoice, useRunVoices } from "../lib/turn-authors";
 import { useTurnFooters } from "../lib/turn-footers";
 import { BackgroundCommands } from "./BackgroundCommands";
+import { useCloudSignInGate } from "./CloudSignInOffer";
 import { CloudStart, queueAfterStart } from "./CloudStart";
 import { Composer, type SlashCommand } from "./Composer";
 import { ComposerChoice } from "./ComposerChoice";
@@ -73,6 +74,16 @@ function useMessageTarget(scope: ConversationScope): MessageTarget | undefined {
   });
 }
 
+/** A thread's own `/` commands; compacting waits for the turn to finish. */
+function threadCommands({ working, compact, selectMode, fork }: { working: boolean; compact: () => void; selectMode: (mode: "plan" | "act") => void; fork: () => void }): SlashCommand[] {
+  return [
+    ...(!working ? [{ name: "compact", hint: "Fold the conversation so far into a summary", run: compact }] : []),
+    { name: "plan", hint: "Switch this thread to plan mode", run: () => selectMode("plan") },
+    { name: "act", hint: "Switch this thread to act mode", run: () => selectMode("act") },
+    { name: "fork", hint: "Continue in a new thread from here", run: fork },
+  ];
+}
+
 function IndividualConversation({ scope, project }: { scope: ConversationScope; project: Project }) {
   const runsQuery = useRpc(scope.kind === "task" ? "runs.listForTask" : "runs.listForThread", scope.kind === "task" ? { taskId: scope.task.id } : { threadId: scope.thread.id });
   const runs = runsQuery.data ?? [];
@@ -115,6 +126,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   const busy = submitter.pending;
   const turnFooter = useTurnFooter({ footers, threadId, working });
   const switching = Boolean(thread && choice && runs.length > 0 && !runs.some((r) => r.agent === choice.agent));
+  const signIn = useCloudSignInGate(cloudTurnOf(thread, choice, live || working));
 
   const request: Omit<SubmitRequest, "now"> = {
     target: scope.kind === "task" ? { kind: "task", taskId: scope.task.id, ...(firstTaskRun ? { workspaceMode } : {}) } : { kind: "thread", threadId: scope.thread.id },
@@ -133,6 +145,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
     setSends((count) => count + 1);
     // A message to an Orcling goes to the Orcling, not to this conversation's agent.
     if (await orclings.ask(messageBody(text, attachments), attachments)) return clearDraft();
+    await signIn.ready();
     await submitter.submit({ ...request, now }, { text, attachments });
     clearDraft();
   };
@@ -141,14 +154,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
 
   const skills = useSkillCommands(project.id, choice?.agent, thread?.workingDirectory);
   const commands: SlashCommand[] = [
-    ...(thread
-      ? [
-          ...(!working ? [{ name: "compact", hint: "Fold the conversation so far into a summary", run: () => compact.mutate({ id: thread.id }) }] : []),
-          { name: "plan", hint: "Switch this thread to plan mode", run: () => settings.selectMode("plan") },
-          { name: "act", hint: "Switch this thread to act mode", run: () => settings.selectMode("act") },
-          { name: "fork", hint: "Continue in a new thread from here", run: forkConversation },
-        ]
-      : []),
+    ...(thread ? threadCommands({ working, compact: () => compact.mutate({ id: thread.id }), selectMode: settings.selectMode, fork: forkConversation }) : []),
     ...skills,
   ];
 
@@ -207,6 +213,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
           {thread?.session && !working ? (
             <SessionRecovery thread={thread} disabled={!choice || busy} onRestart={() => void restart().catch(() => {})} onContinueWith={(id) => void continueWith(id).catch(() => {})} />
           ) : null}
+          {signIn.offer}
           <SwitchingNote agent={switching && choice ? choice.agent : null} />
           {settingsPending && activeRun && thread && activeRun.mode === "act" && permission === "autonomous" && activeRun.permissionMode !== permission ? (
             <div role="status" className="text-xs text-ink-3 px-1">

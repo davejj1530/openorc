@@ -1,5 +1,6 @@
 import path from "node:path";
 import type { CloudProviderId } from "@openorc/db";
+import { OPENCODE_FREE_PROVIDER, openCodeProvider, openCodeProviderName } from "@openorc/protocol";
 import { held, OUTSIDE_THE_SANDBOX, type CloudRunWho, type CloudSignIn, type TurnSignIn } from "./cloud-agents.js";
 import type { ProtectedSecretStore } from "./extraction-credentials.js";
 
@@ -18,21 +19,13 @@ const PROVIDER_APIS: Record<string, { domain: string; header: string; scheme?: s
   deepseek: { domain: "api.deepseek.com", header: "authorization", scheme: "Bearer" },
 };
 
-/** OpenCode's own provider, whose free models need no key. */
-const FREE = "opencode";
-/** How the providers people most often add are written; any other reads as OpenCode names it. */
-const NAMES: Record<string, string> = { anthropic: "Anthropic", openai: "OpenAI", openrouter: "OpenRouter", google: "Google", groq: "Groq", mistral: "Mistral", xai: "xAI", deepseek: "DeepSeek" };
-export const providerName = (provider: string): string => NAMES[provider] ?? provider;
 const UNREADABLE = "Cannot access protected storage for OpenCode's cloud keys. Unlock your OS keychain or secret service and retry.";
 
 type Stored = Record<string, { key: string; createdAt: number }>;
 
-/** The provider a model id `provider/model` names; null for an id without one. */
-export const providerOf = (model: string | null): string | null => (model?.includes("/") ? model.slice(0, model.indexOf("/")) : null);
-
 /**
- * OpenCode's provider API keys for the cloud, entered for the cloud and kept in protected storage, one per provider.
- * Never this Mac's OpenCode credentials: OpenCode hands none out, and a cloud-only key is revoked on its own.
+ * OpenCode's provider API keys for the cloud, kept in protected storage, one per provider: entered for the cloud, or
+ * copied from this Mac's OpenCode once the person says yes. A key made for the cloud alone is revoked on its own.
  */
 export class OpenCodeCloudKeys {
   private cache: Stored | undefined;
@@ -107,12 +100,12 @@ export class OpenCodeCloudKeys {
 export class OpenCodeCloudSignIn implements CloudSignIn {
   constructor(
     private readonly keys: Pick<OpenCodeCloudKeys, "key">,
-    private readonly label: (provider: string) => string = providerName,
+    private readonly label: (provider: string) => string = openCodeProviderName,
   ) {}
 
   private async keyFor(who: CloudRunWho): Promise<{ provider: string; key: string } | null> {
-    const provider = providerOf(who.model);
-    if (!provider || provider === FREE) return null;
+    const provider = openCodeProvider(who.model);
+    if (!provider || provider === OPENCODE_FREE_PROVIDER) return null;
     const key = await this.keys.key(provider);
     if (!key) throw new Error(`OpenCode has no key for ${this.label(provider)} in the cloud. Add one in Settings > Cloud.`);
     return { provider, key };

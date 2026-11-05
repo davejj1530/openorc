@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
-import type { CloudBrainCost, CloudBrainStatus, CloudService, RemoteDevice } from "@openorc/protocol";
+import type { CloudBrainCost, CloudBrainStatus, CloudService, CloudSignIns, RemoteDevice } from "@openorc/protocol";
 import { afterEach, expect, it, vi } from "vitest";
 import { CloudBrainSection } from "./settings-cloud-brain";
 import { queryClient } from "../lib/client";
@@ -34,12 +34,14 @@ function show(
   phones: RemoteDevice[] = [],
   codex: "chatgpt" | "apiKey" | null = null,
   service: CloudService = "vercel",
+  signIns: CloudSignIns = { rows: [], bringing: false },
 ) {
   vi.spyOn(Intl.DateTimeFormat.prototype, "resolvedOptions").mockReturnValue({ timeZone } as Intl.ResolvedDateTimeFormatOptions);
   vi.mocked(core.call).mockImplementation(async (method: string) => {
     if (method === "cloud.brain.pair") return { url: "openorc://pair#v1.brain-fixture", expiresAt: Date.now() + 120_000 } as never;
     if (method === "cloud.brain.projects") return [] as never;
     if (method === "cloud.brain.cost") return cost as never;
+    if (method === "cloud.signIns") return signIns as never;
     if (method === "cloud.brain.phones" || method === "cloud.brain.phones.remove") return phones as never;
     if (method === "cloud.brain.signIns")
       return {
@@ -283,4 +285,12 @@ it("tries setting up an Agent37 brain again without a region", async () => {
   fireEvent.click(await screen.findByRole("button", { name: "Try again" }));
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.brain.create", {}));
   expect(screen.getByText("Agent37")).toBeTruthy();
+});
+
+it("offers to bring the missing sign-ins before the brain's first wake", async () => {
+  const signIns: CloudSignIns = { rows: [{ kind: "claude", accountId: "work", label: "Work", state: "missing", way: "private-window", error: null }], bringing: false };
+  show({ state: "none", error: null }, "Asia/Manila", null, [], null, "vercel", signIns);
+  fireEvent.click(await screen.findByRole("button", { name: "Bring them" }));
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.signIns.bringAll", { copy: false }));
+  expect(screen.getByRole("button", { name: "Set up" })).toBeTruthy();
 });

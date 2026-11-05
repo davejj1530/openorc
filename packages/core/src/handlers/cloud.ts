@@ -6,6 +6,7 @@ import type { CodexCloudLogin } from "../services/codex-cloud-login.js";
 import type { OpenCodeCloudKeys } from "../services/cloud-opencode.js";
 import type { CloudHandoff } from "../services/cloud-handoff.js";
 import type { CloudSandboxes } from "../services/cloud-sandboxes.js";
+import type { CloudSignInsFlow } from "../services/cloud-sign-ins.js";
 import type { CloudSettings } from "../services/cloud-settings.js";
 import type { RelocationCoordinator } from "../services/relocation-coordinator.js";
 import type { Handlers } from "./types.js";
@@ -57,7 +58,11 @@ type CloudMethod =
   | "cloud.brain.codex.remove"
   | "cloud.brain.github"
   | "cloud.brain.phones"
-  | "cloud.brain.phones.remove";
+  | "cloud.brain.phones.remove"
+  | "cloud.signIns"
+  | "cloud.signIns.bringAll"
+  | "cloud.signIns.bring"
+  | "cloud.signIns.cancel";
 
 interface Dependencies {
   settings: CloudSettings;
@@ -68,6 +73,7 @@ interface Dependencies {
   sandboxes: CloudSandboxes;
   handoff: CloudHandoff;
   brain: CloudBrain;
+  signIns: CloudSignInsFlow;
   /** Moves threads to the cloud brain and back; null on the brain itself. */
   coordinator: RelocationCoordinator | null;
   /** Cloud threads are offered in this build. */
@@ -86,7 +92,21 @@ async function removeBrain(brain: CloudBrain, removed: Dependencies["removed"]):
   if (!(await brain.exists())) await removed(linkKey);
 }
 
-export function createCloudHandlers({ settings, tokens, checks, codex, opencode, sandboxes, handoff, brain, coordinator, offered, invalidate, removed }: Dependencies): Pick<Handlers, CloudMethod> {
+export function createCloudHandlers({
+  settings,
+  tokens,
+  checks,
+  codex,
+  opencode,
+  sandboxes,
+  handoff,
+  brain,
+  signIns,
+  coordinator,
+  offered,
+  invalidate,
+  removed,
+}: Dependencies): Pick<Handlers, CloudMethod> {
   const status = async (): Promise<CloudStatus> => {
     const vercel = await settings.status();
     const check = checks.status();
@@ -164,6 +184,21 @@ export function createCloudHandlers({ settings, tokens, checks, codex, opencode,
     },
     ...brainHandlers(brain, removed),
     ...brainSignInHandlers(brain),
+    ...signInFlowHandlers(signIns),
+  };
+}
+
+/** The one step that brings every sign-in: it runs in the background and answers with the rows at once. */
+function signInFlowHandlers(flow: CloudSignInsFlow): Pick<Handlers, Extract<CloudMethod, `cloud.signIns${string}`>> {
+  const started = (work: () => void) => {
+    work();
+    return flow.status();
+  };
+  return {
+    "cloud.signIns": () => flow.status(),
+    "cloud.signIns.bringAll": ({ copy }) => started(() => flow.bringAll(copy)),
+    "cloud.signIns.bring": ({ target }) => started(() => flow.bring(target)),
+    "cloud.signIns.cancel": () => started(() => flow.cancel()),
   };
 }
 

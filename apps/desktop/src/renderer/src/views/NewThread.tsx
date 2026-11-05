@@ -1,7 +1,8 @@
-import { newThreadChoice, newThreadWorkspaceMode, targetModel, type NewThreadDraft } from "@openorc/client";
+import { newThreadChoice, newThreadWorkspaceMode, targetModel, type CloudTurnWho, type ModelChoice as Choice, type NewThreadDraft, type NewThreadPlace } from "@openorc/client";
 import { WORKSPACE_ID, type Project } from "@openorc/protocol";
 import { useEffect, useRef, useState } from "react";
 import { ClaudeAccountPicker } from "../components/ClaudeAccountPicker";
+import { useCloudSignInGate } from "../components/CloudSignInOffer";
 import { Composer } from "../components/Composer";
 import { FolderGit2 } from "../components/icons";
 import { ComposerModelPicker, ModelPicker, type ModelChoice, type OrclingPickerChoices } from "../components/ModelPicker";
@@ -14,7 +15,7 @@ import { TopBar } from "../components/TopBar";
 import { Button, TextButton } from "../components/ui";
 import { ClaudeAccountScope } from "../lib/claude-account";
 import { usePermissionSelection, useRpc, useRpcMutation } from "../lib/client";
-import { useNewThreadCloud } from "../lib/cloud-offered";
+import { useNewThreadCloud, type NewThreadCloud } from "../lib/cloud-offered";
 import { useComposerChanges } from "../lib/composer-changes";
 import { useDefaultHarness } from "../lib/default-harness";
 import { useLayout } from "../lib/layout";
@@ -54,6 +55,20 @@ export function NewThread({ projectId }: { projectId?: string }) {
       onRetryProjects={() => void projects.refetch()}
     />
   );
+}
+
+/** Who a new cloud thread's first turn signs in as; null for one that starts on this Mac. */
+function newCloudTurn(mode: NewThreadPlace, choice: Choice | null, claudeAccountId: string, cloud: NewThreadCloud): CloudTurnWho | null {
+  return mode === "cloud" && choice ? { agent: choice.agent, claudeAccountId, model: choice.model, brain: cloud.brain, local: cloud.local } : null;
+}
+
+/** The Orclings the model picker offers, the one chosen marked. */
+function orclingChoices(options: OrclingPickerChoices["options"], target: NewThreadDraft["target"], choose: (target: NewThreadDraft["target"]) => void): OrclingPickerChoices {
+  return {
+    options,
+    selectedId: target.kind === "orcling" ? target.orclingId : null,
+    onSelect: (orcling) => choose({ kind: "orcling", orclingId: orcling.id, name: orcling.name, settings: orcling.settings }),
+  };
 }
 
 function NewThreadProject({
@@ -106,6 +121,7 @@ function NewThreadProject({
   const skillCommands = useSkillCommands(projectId, choice?.agent, draft.workingDirectory, claudeAccountId);
   const cloud = useNewThreadCloud(target, projectId);
   const workspaceMode = newThreadWorkspaceMode({ canBranch: !isWorkspace && !git.cannotBranch, canCloud: cloud.can, chosen: draft.workspace, preferred: settings.data?.defaultWorkspaceMode });
+  const signIn = useCloudSignInGate(newCloudTurn(workspaceMode, choice, claudeAccountId, cloud));
 
   useEffect(() => {
     if (target.kind !== "model" || target.choice || !models.data || !info.data || defaultHarness === undefined) return;
@@ -139,11 +155,7 @@ function NewThreadProject({
     void info.refetch();
     onRetryProjects();
   };
-  const pickerOrclings: OrclingPickerChoices = {
-    options: orclings,
-    selectedId: target.kind === "orcling" ? target.orclingId : null,
-    onSelect: (orcling) => changeDraft({ target: { kind: "orcling", orclingId: orcling.id, name: orcling.name, settings: orcling.settings } }),
-  };
+  const pickerOrclings = orclingChoices(orclings, target, (next) => changeDraft({ target: next }));
 
   const submit = async (text: string, attachments: string[]) => {
     if (disabledReason) throw new Error(disabledReason);
@@ -156,7 +168,8 @@ function NewThreadProject({
       permissionMode: permission,
       text,
       attachments,
-      launch: (params) => start.mutateAsync(params),
+      // A cloud start waits for the sign-in the cloud lacks, offered above the composer.
+      launch: (params) => signIn.ready().then(() => start.mutateAsync(params)),
     });
     if (mounted.current && useRouter.getState().route.view === "newthread") openThread(threadId);
   };
@@ -187,6 +200,7 @@ function NewThreadProject({
               <>
                 <h1 className="new-thread-question">{selected && !isWorkspace ? `What should we work on in ${selected.name}?` : "What should we work on?"}</h1>
                 <div className="relative">
+                  <div className="mb-2 empty:hidden">{signIn.offer}</div>
                   <Composer
                     draftKey={`newthread.${projectId}.attachments`}
                     autoFocus

@@ -35,7 +35,7 @@ export interface ClaudeSignIn {
 export class ClaudeCloudTokens {
   private pending: Promise<unknown> = Promise.resolve();
   private cache: Record<string, Saved> | null = null;
-  private readonly creating = new Map<string, { stop: () => void; cancelled: boolean }>();
+  private readonly creating = new Map<string, { stop: () => void; cancelled: boolean; done: Promise<void> }>();
   private readonly errors = new Map<string, string>();
   private closing = false;
 
@@ -126,7 +126,8 @@ export class ClaudeCloudTokens {
   async create(id: string): Promise<void> {
     if (this.closing) throw new Error("OpenOrc is closing.");
     if (this.creating.has(id)) return;
-    const attempt = { stop: () => undefined as void, cancelled: false };
+    let settle = () => undefined as void;
+    const attempt = { stop: () => undefined as void, cancelled: false, done: new Promise<void>((resolve) => (settle = resolve)) };
     this.errors.delete(id);
     this.creating.set(id, attempt);
     this.changed();
@@ -152,13 +153,19 @@ export class ClaudeCloudTokens {
       proc.onExit((code) => {
         clearTimeout(timer);
         this.creating.delete(id);
-        void this.finish(id, attempt.cancelled, code, token);
+        void this.finish(id, attempt.cancelled, code, token).finally(settle);
       });
     } catch {
       this.creating.delete(id);
       this.errors.set(id, "Claude could not start making a token. Check its installation and retry.");
       this.changed();
+      settle();
     }
+  }
+
+  /** Once the account's token in the making is saved, or its attempt ended without one. */
+  finished(id: string): Promise<void> {
+    return this.creating.get(id)?.done ?? Promise.resolve();
   }
 
   /** Why setup-token's screen says the sign-in failed, in its own words; null while it has not. */

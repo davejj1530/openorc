@@ -8,6 +8,7 @@ import {
   frozenMoving,
   projects,
   readThreadRows,
+  redact,
   relocations,
   runs as runRows,
   threadTaskIds,
@@ -27,7 +28,10 @@ import { AT_WORK, relocationRefusal } from "./relocation-rules.js";
 import { executionProject } from "./workspace-home.js";
 
 const CALLED_OFF = "This move was called off.";
+const LAST_CHANGES_STAY = "Its last changes are still in its sandbox, which did not answer. Try again in a moment.";
 const words = (error: unknown) => (error instanceof Error ? error.message : String(error));
+/** A failure's words as a refusal the Mac shows: a refusal's own, anything else scrubbed of secrets first. */
+const refusalWords = (error: unknown) => (error instanceof RelocationRefused ? error.message : redact(words(error)).text);
 /** The outbox file of a relocation's package. */
 export const packageFile = (relocation: string) => `${relocation}.thread`;
 
@@ -38,7 +42,7 @@ export interface RelocationDeps {
   sessions: Pick<CloudSessions, "export" | "import">;
   /** Where a worktree of the thread's own lives in the project, as WorkspaceService names it. */
   threadPath(thread: Pick<Thread, "id" | "title" | "workspaceMode" | "worktreePath">, project: Project): string;
-  cloud: Pick<CloudWorkspaceService, "place" | "admit" | "prepare" | "get" | "sync" | "removeSandbox">;
+  cloud: Pick<CloudWorkspaceService, "place" | "admit" | "prepare" | "get" | "sync" | "removeSandbox" | "sandboxes">;
   runs: { threadActivity(threadId: string): "idle" | "running" | "waiting"; liveRunForThread(threadId: string): { id: string } | null; closeAndWait(runId: string): Promise<void> };
   changed(threadId: string): void;
   /** Delivers queued messages, a taken thread's among them. */
@@ -169,35 +173,65 @@ export class ThreadRelocations {
     await this.cleanUp(relocation);
   }
 
-  /** The cleaning a relocation's source still owes, done and cleared. Safe to repeat. */
+  /**
+   * The cleaning a relocation's source still owes, done and cleared. A sandbox that would not go stays in the note, so
+   * the next start deletes it rather than leaving it, and its snapshot, billed. Safe to repeat.
+   */
   async cleanUp(relocation: string): Promise<void> {
     const note = relocations.cleanup(this.deps.db, relocation);
     if (!note) return;
-    const { threadId, root, worktree, sandbox } = JSON.parse(note) as Cleanup;
-    if (sandbox) await this.deps.cloud.removeSandbox(sandbox.provider, sandbox.name).catch((error: unknown) => this.deps.log.warn(`thread ${threadId}'s sandbox stays: ${words(error)}`));
+    const cleanup = JSON.parse(note) as Cleanup;
+    const { threadId, root, worktree, sandbox } = cleanup;
+    const removed = sandbox
+      ? await this.deps.cloud.removeSandbox(sandbox.provider, sandbox.name).then(
+          () => true,
+          (error: unknown) => {
+            this.deps.log.warn(`thread ${threadId}'s sandbox stays until the next start: ${words(error)}`);
+            return false;
+          },
+        )
+      : true;
     await retireCode(root, threadId, worktree);
-    relocations.setCleanup(this.deps.db, relocation, null);
+    relocations.setCleanup(this.deps.db, relocation, removed ? null : JSON.stringify({ ...cleanup, worktree: null }));
+  }
+
+  /** At start: every cleaning a source still owes, as after a crash or a sandbox that would not go. */
+  async cleanUpAll(): Promise<void> {
+    for (const id of relocations.withCleanup(this.deps.db)) await this.cleanUp(id).catch((error: unknown) => this.deps.log.warn(`a moved conversation's folder was not cleaned up: ${words(error)}`));
   }
 
   // ── The brain's part, asked by its Mac through control ops ──
 
-  /** receive-thread: takes a package from the inbox. One called off before it arrived is refused. */
+  /**
+   * receive-thread: takes a package from the inbox. One called off before it arrived is refused. A take that fails
+   * committed nothing, so the move is refused with the reason, and refused the same way when its Mac asks again.
+   */
   async receive(relocation: string, file: string, copyOf: (macProject: string) => string | null): Promise<BrainControlResults["receive-thread"]> {
     const { db } = this.deps;
     const row = relocations.get(db, relocation);
     if (row?.phase === "arrived") return { received: true };
-    if (row) return { refused: CALLED_OFF };
+    if (row) return { refused: row.error ?? CALLED_OFF };
+    let bytes: Buffer;
+    let pkg: RelocationPackage;
     try {
-      const bytes = await readFile(file);
-      const pkg = decodePackage(bytes);
+      bytes = await readFile(file);
+      pkg = decodePackage(bytes);
       if (pkg.relocation !== relocation) throw new RelocationRefused("The package is for another move.");
-      const commit = () => void relocations.open(db, { id: relocation, threadId: pkg.rows.threadId, role: "brain", direction: "to-cloud", phase: "arrived", projectId: copyOf(pkg.macProject) });
+    } catch (error) {
+      if (error instanceof RelocationRefused) return { refused: error.message };
+      throw error;
+    }
+    const commit = () => void relocations.open(db, { id: relocation, threadId: pkg.rows.threadId, role: "brain", direction: "to-cloud", phase: "arrived", projectId: copyOf(pkg.macProject) });
+    try {
       await this.take(bytes, { projectId: copyOf, place: "cloud", commit });
       return { received: true };
     } catch (error) {
       if (error instanceof LacksBase) return { lacksBase: true };
-      if (error instanceof RelocationRefused) return { refused: error.message };
-      throw error;
+      // Its transaction is the commit point: only a failure after it leaves the thread here.
+      if (relocations.get(db, relocation)?.phase === "arrived") return { received: true };
+      const reason = refusalWords(error);
+      relocations.open(db, { id: relocation, threadId: pkg.rows.threadId, role: "brain", direction: "to-cloud", phase: "dropped", projectId: null, error: reason });
+      return { refused: reason };
     }
   }
 
@@ -217,13 +251,21 @@ export class ThreadRelocations {
   async handOff(relocation: string, threadId: string, outbox: string, macProjectOf: (projectId: string) => string | null): Promise<BrainControlResults["hand-off-thread"]> {
     const { db } = this.deps;
     const row = relocations.get(db, relocation);
-    if (row && row.phase !== "leaving") return { refused: CALLED_OFF };
+    if (row && row.phase !== "leaving") return { refused: row.error ?? CALLED_OFF };
     if (!row) {
       const refusal = await this.freezeToLeave(relocation, threadId);
       if (refusal) return { refused: refusal };
     }
     const file = path.join(outbox, packageFile(relocation));
-    if (!(await stat(file).catch(() => null))) await this.writePackage(relocation, threadId, file, macProjectOf);
+    try {
+      if (!(await stat(file).catch(() => null))) await this.writePackage(relocation, threadId, file, macProjectOf);
+    } catch (error) {
+      // No package went out, so the Mac cannot hold the thread: it stays here, unfrozen, and the move is refused.
+      const reason = refusalWords(error);
+      relocations.advance(db, relocation, "leaving", "stayed", reason);
+      this.deps.changed(threadId);
+      return { refused: reason };
+    }
     const bytes = await readFile(file);
     return { file: packageFile(relocation), bytes: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") };
   }
@@ -246,8 +288,13 @@ export class ThreadRelocations {
     const thread = threads.get(this.deps.db, threadId)!;
     const macProject = macProjectOf(thread.projectId);
     if (!macProject) throw new Error("This conversation's project has no copy on the Mac.");
-    // The sandbox's last state and its session come to the brain's worktree first.
-    await this.deps.cloud.sync(thread, { turnEnded: true }).catch((error: unknown) => this.deps.log.warn(`thread ${threadId} left without its sandbox's last changes: ${words(error)}`));
+    // The sandbox's last state and its session come to the brain's worktree first: a package without them would leave
+    // the newer work in a sandbox the move then deletes. Only a sandbox that is gone has nothing newer to bring.
+    await this.deps.cloud.sync(thread, { turnEnded: true, leaving: true }).catch(async (error: unknown) => {
+      const listed = await this.deps.cloud.sandboxes().catch(() => null);
+      if (!listed || listed.some((sandbox) => sandbox.threadId === threadId)) throw new RelocationRefused(LAST_CHANGES_STAY);
+      this.deps.log.warn(`thread ${threadId} leaves with what the brain last pulled, since its sandbox is gone: ${words(error)}`);
+    });
     const root = executionProject(this.deps.db, thread).rootPath;
     const since = (await git(root, ["for-each-ref", "--format=%(objectname)", "refs/openorc/mac/"])).stdout.split("\n").filter(Boolean);
     const bytes = await this.pack(relocation, threadId, { from: "cloud", macProject, since });

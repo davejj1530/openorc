@@ -6,7 +6,7 @@ import { Db, projects, relocations, tasks } from "@openorc/db";
 import { NOT_ON_BRAIN, threadListCompare, type CorePush, type InboxList, type OwnerReach, type RpcMethod, type RpcRequest, type Task, type ThreadSummary } from "@openorc/protocol";
 import type { RpcReply } from "../transport.js";
 import { until } from "../test-fixtures/fake-claude.js";
-import type { BrainLink, BrainPush } from "./brain-link.js";
+import { BrainOutOfReach, type BrainLink, type BrainPush } from "./brain-link.js";
 import { BrainRouter } from "./brain-router.js";
 
 const row = (id: string, lastActivityAt: number, projectId: string, worktreePath: string | null = null) =>
@@ -26,12 +26,16 @@ function harness(answers: { mac?: ThreadSummary[]; cloud?: ThreadSummary[]; clou
   const pushes: ((push: BrainPush) => void)[] = [];
   const asked: RpcMethod[] = [];
   const sent: { method: RpcMethod; params: Record<string, unknown> }[] = [];
+  /** Each call that woke the brain, or would have. */
+  const woke: RpcMethod[] = [];
   const link = {
-    reach: "live",
+    reach: "live" as OwnerReach,
     onPush: (listener: (push: BrainPush) => void) => void pushes.push(listener),
     onReach: (listener: (reach: OwnerReach) => void) => void reaches.push(listener),
     setInterest: (runIds: readonly string[]) => void interest.push([...runIds]),
-    call: async (method: RpcMethod, params: Record<string, unknown>) => {
+    call: async (method: RpcMethod, params: Record<string, unknown>, options: { wake: boolean }) => {
+      if (options.wake) woke.push(method);
+      else if (link.reach !== "live") throw new BrainOutOfReach(link.reach);
       asked.push(method);
       sent.push({ method, params });
       if (method === "attachments.save") return { path: `/brain/attachments/${sent.length}.png`, url: "" };
@@ -74,6 +78,7 @@ function harness(answers: { mac?: ThreadSummary[]; cloud?: ThreadSummary[]; clou
     windows,
     asked,
     sent,
+    woke,
     reach: (next: OwnerReach) => reaches.forEach((listener) => listener(next)),
     push: (push: BrainPush) => pushes.forEach((listener) => listener(push)),
   };
@@ -264,5 +269,47 @@ it("lists the brain's tasks beside this Mac's, on this Mac's project and marked 
   expect(await ask(router, "tasks.get", { id: "cloud-task" })).toMatchObject({ id: "cloud-task", projectId: "mac-project", owner: { brain: "cloud" } });
   expect(await ask(router, "tasks.get", { id: local.id })).toBe("here");
   expect(asked.map((each) => each.method)).toEqual(["tasks.list", "tasks.list", "tasks.get"]);
+  router.close();
+});
+
+it("never wakes the brain for a window reading again what it shows, and answers from what the window holds", async () => {
+  const { router, windows, link, woke, asked } = harness({ cloud: [row("cloud-thread", 1, "cloud-project")] });
+  await listedTwice(router, windows, "threads.list", {});
+  link.reach = "asleep";
+  const calls = asked.length;
+  // The Commits panel's and task comments' polls, and the open pane's reads again after a change on this Mac.
+  for (const [method, params] of [
+    ["git.threadPushState", { threadId: "cloud-thread" }],
+    ["git.threadLog", { threadId: "cloud-thread" }],
+    ["threads.messages", { id: "cloud-thread" }],
+    ["runs.listForThread", { threadId: "cloud-thread" }],
+    ["events.page", { runId: "cloud-run" }],
+  ] as const)
+    await expect(ask(router, method, params, true)).rejects.toThrow(new BrainOutOfReach("asleep").message);
+  expect(woke).toEqual([]);
+  expect(asked.slice(calls)).toEqual([]);
+  // The person opening the conversation does wake it.
+  link.reach = "live";
+  await ask(router, "threads.messages", { id: "cloud-thread" });
+  expect(woke).toEqual(["threads.messages"]);
+  router.close();
+});
+
+it("answers a call about a thread, run or task on neither host here, never waking the brain for it", async () => {
+  const { router, windows, link, woke } = harness({ mac: [row("mac-thread", 2, "mac-project")], cloud: [row("cloud-thread", 1, "cloud-project")] });
+  await listedTwice(router, windows, "threads.list", {});
+  link.reach = "asleep";
+  // A Mac thread just deleted, whose open pane reads it once more, or a task this Mac never had: this Mac's own answer.
+  for (const [method, params] of [
+    ["threads.get", { id: "deleted-thread" }],
+    ["runs.listForThread", { threadId: "deleted-thread" }],
+    ["tasks.comments.list", { taskId: "deleted-task" }],
+  ] as const)
+    expect({ method, result: await ask(router, method, params) }).toEqual({ method, result: [row("mac-thread", 2, "mac-project")] });
+  await expect(ask(router, "events.page", { runId: "deleted-run" })).rejects.toThrow(new BrainOutOfReach("asleep").message);
+  expect(woke).toEqual([]);
+  // A thread the brain lists wakes it as a person opens it.
+  await ask(router, "threads.messages", { id: "cloud-thread" });
+  expect(woke).toEqual(["threads.messages"]);
   router.close();
 });

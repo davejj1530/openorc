@@ -37,8 +37,12 @@ it("gives up on a brain whose address takes the connection and never answers, as
 
 it("keeps saying it wakes the brain until the wake ends, though a dial meanwhile finds its address not answering yet", async () => {
   server = createHttpServer();
+  let upgrades = 0;
   // A sleeping brain's address refuses the upgrade, as Vercel's proxy does with 502.
-  server.on("upgrade", (_request, socket) => socket.end("HTTP/1.1 502 Bad Gateway\r\ncontent-length: 0\r\n\r\n"));
+  server.on("upgrade", (_request, socket) => {
+    upgrades++;
+    socket.end("HTTP/1.1 502 Bad Gateway\r\ncontent-length: 0\r\n\r\n");
+  });
   await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve));
   const { port } = server.address() as { port: number };
   const keys = { publicKey: new Uint8Array(32), privateKey: new Uint8Array(32) };
@@ -57,11 +61,14 @@ it("keeps saying it wakes the brain until the wake ends, though a dial meanwhile
   link.onReach((reach) => reaches.push(reach));
   const opening = link.call("events.page", { runId: "run" } as never, { wake: true });
   await vi.waitFor(() => expect(link.reach).toBe("waking"));
-  await expect(link.call("threads.list", {}, { wake: false })).rejects.toThrow(BrainOutOfReach);
+  const dialed = upgrades;
+  const meanwhile = link.call("threads.list", {}, { wake: false });
+  await vi.waitFor(() => expect(upgrades).toBe(dialed + 1));
   expect(link.reach).toBe("waking");
   expect(reaches.slice(reaches.indexOf("waking"))).toEqual(["waking"]);
   woke();
   await expect(opening).rejects.toThrow(BrainOutOfReach);
+  await expect(meanwhile).rejects.toThrow(BrainOutOfReach);
   expect(link.reach).toBe("asleep");
   link.close();
 });
@@ -114,5 +121,41 @@ it("wakes the brain once, and keeps one session with it, however many calls wait
   expect(wakes).toBe(1);
   expect(sessions).toBe(1);
   expect(link.reach).toBe("live");
+  link.close();
+});
+
+it("has a call that may not wake the brain wait for a wake under way, and answer once the brain is up", async () => {
+  const brainKeys = nodeCrypto.generateKeyPair();
+  let awake = false;
+  const dial = async () => {
+    if (!awake) throw new Error("connect ECONNREFUSED");
+    const { phone, mac } = socketPair();
+    void acceptLink({ socket: mac, crypto: nodeCrypto, local: brainKeys, admit: () => ({ ok: true, value: null, hello: { mac: { name: "Cloud" }, deviceId: "owner", routes: [] } }) }).then(
+      (accepted) => accepted?.session.onMessage((message) => message.t === "rpc" && accepted.session.send({ t: "rpc.result", id: message.id, result: message.method })),
+    );
+    return phone;
+  };
+  let wakes = 0;
+  let woke: () => void = () => undefined;
+  const link = new BrainLink({
+    endpoint: {
+      ready: async () => true,
+      locate: async () => ({ url: "ws://brain/link", brainKey: brainKeys.publicKey, ownerKeys: nodeCrypto.generateKeyPair() }),
+      wake: () => {
+        wakes++;
+        return new Promise<void>((resolve) => (woke = resolve));
+      },
+      projects: async () => ({ toCloud: () => null, toMac: () => null }),
+    },
+    log: { info: () => {}, warn: () => {}, error: () => {} } as never,
+    dial,
+  });
+  const opening = link.call("threads.messages", { id: "thread" }, { wake: true });
+  await vi.waitFor(() => expect(link.reach).toBe("waking"));
+  const following = link.call("events.page", { runId: "run" } as never, { wake: false });
+  awake = true;
+  woke();
+  expect(await Promise.all([opening, following])).toEqual(["threads.messages", "events.page"]);
+  expect(wakes).toBe(1);
   link.close();
 });

@@ -124,6 +124,21 @@ describe("a knock at the door", () => {
     expect((await lines(third)).filter(Boolean).at(-1)).toBe(JSON.stringify({ t: "done", outcome: READY }));
   });
 
+  it("takes a knock once: the same body again is refused, waking nothing, until it leaves the window", async () => {
+    let now = NOW;
+    const { knock, wakes } = door({ now: () => now });
+    const body = knockBody(nodeCrypto, ticketFor(KEY), NOW);
+    expect((await knock(body)).status).toBe(200);
+    now = NOW + 60_000;
+    const again = await knock(body);
+    expect(again.status).toBe(403);
+    expect(readDoorRefusal(await again.text())).toEqual({ t: "refused", why: "denied", now });
+    expect(wakes).toHaveLength(1);
+    // A fresh knock from the same phone still wakes it.
+    expect((await knock(knockBody(nodeCrypto, ticketFor(KEY), now))).status).toBe(200);
+    expect(wakes).toHaveLength(2);
+  });
+
   it("answers GET with its mark only", async () => {
     const answer = await door().handler(new Request("https://door.example/api/door"));
     expect(await answer.json()).toEqual({ door: 1, mark: "m4rk" });

@@ -4,7 +4,7 @@ import path from "node:path";
 import { gunzipSync, gzipSync } from "node:zlib";
 import type { ThreadRows } from "@openorc/db";
 import { git, pinObject, switchFiles, treeHash, worktree as worktrees } from "@openorc/git";
-import type { Brain, Thread } from "@openorc/protocol";
+import { SESSION_ID, type Brain, type Thread } from "@openorc/protocol";
 import { z } from "zod";
 import type { RelocatedSession } from "./cloud-sessions.js";
 import { checkpointRefs, snapshotRefs } from "./checkpoint-refs.js";
@@ -66,7 +66,7 @@ const Header = z
     // How many tasks travel: a brain from before tasks moved refuses this unknown field rather than drop them.
     tasks: z.number().int().positive().optional(),
     files: z.array(z.object({ path: z.string().regex(FILE_PATH), size: z.number().int().nonnegative() })).max(100_000),
-    session: z.object({ agent: z.literal("claude"), accountId: ID, sessionId: ID, text: z.string() }).nullable(),
+    session: z.object({ agent: z.literal("claude"), accountId: ID, sessionId: z.string().regex(SESSION_ID), text: z.string() }).nullable(),
     code: z.object({
       branch: z
         .string()
@@ -120,6 +120,9 @@ export function decodePackage(bytes: Buffer): RelocationPackage {
   const bundle = take(parsed.code.size);
   if (offset !== bytes.length) refuse("its sizes do not add up");
   if ((parsed.tasks ?? 0) !== (parsed.rows.tables["tasks"]?.length ?? 0)) refuse("its tasks do not add up");
+  // A run's session id names the session's file here once the thread resumes, so it is a plain name or nothing.
+  if ((parsed.rows.tables["runs"] ?? []).some(({ external_session_id: id }) => id != null && !(typeof id === "string" && SESSION_ID.test(id))))
+    refuse("a run names a session that is not a plain name");
   const { size: _size, ...code } = parsed.code;
   const { tasks: _tasks, ...header } = parsed;
   return { ...header, rows: parsed.rows as ThreadRows, files, code: { ...code, bundle } };

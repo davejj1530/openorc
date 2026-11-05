@@ -79,6 +79,7 @@ import { OrclingService } from "./services/orclings.js";
 import { readPlanLimits } from "./services/plan-limits.js";
 import { invalidateOnLifecycle } from "./services/preview.js";
 import { ProjectService } from "./services/projects.js";
+import { assertRouteNotMoving } from "./services/relocation-fence.js";
 import type { ThreadRelocations } from "./services/relocations.js";
 import { BrainRouting } from "./services/brain-routing.js";
 import { ProviderLog } from "./services/provider-log.js";
@@ -453,6 +454,10 @@ export class OpenOrc {
     core.upkeep.start();
     core.cloudParts.brain.opened();
     core.cloudParts.coordinator?.start();
+    void core.cloudParts.relocations.cleanUpAll();
+    core.brainRouting?.link.onReach((reach) => {
+      if (reach === "live") core.cloudParts.coordinator?.reachable();
+    });
     void core.brainRouting?.refresh();
     if (!options.ephemeral) core.agentUpdates.start();
     void core.devices.reapStale();
@@ -513,6 +518,7 @@ export class OpenOrc {
       if (!Object.hasOwn(rpcParams, method)) return { type: "rpc.error", id, message: `unknown method ${method}` };
       const parsed = rpcParams[method as RpcMethod].safeParse(request.params ?? {});
       if (!parsed.success) return { type: "rpc.error", id, message: invalidParamsMessage(method, parsed.error.message) };
+      assertRouteNotMoving(this.db, method as RpcMethod, parsed.data as Record<string, unknown>);
       const handler = this.handlers[method as RpcMethod] as (p: unknown) => Promise<unknown> | unknown;
       const started = Date.now();
       const result = await requestOrigin.run(origin, () => handler(parsed.data));

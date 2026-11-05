@@ -7,6 +7,8 @@ import type { MemoryService } from "./memory.js";
 import type { TextGenerationService } from "./text-generation.js";
 
 const CURSORS = "brain.memory";
+/** Pages one exchange takes at most, each up to 2000 rows a side: far past any project's memory. */
+const MAX_ROUNDS = 50;
 /** The tasks a backlog shows: not done, not archived. */
 export const OPEN_TASKS: TaskStatus[] = ["proposed", "backlog", "in_progress", "review"];
 
@@ -89,47 +91,55 @@ export class BrainSync {
     const at = (pair: { mac: string; cloud: string }) => (cursors[pair.mac]?.copy === pair.cloud ? cursors[pair.mac]! : { copy: pair.cloud, sent: 0, heard: 0 });
     const brainChanged = this.brainChanged;
     this.brainChanged = false;
-    const sending = enabled
-      ? pairs.flatMap((pair) => {
-          const cursor = at(pair);
-          const up = memoryChangesSince(this.deps.db, pair.mac, cursor.sent);
-          const fresh = cursors[pair.mac]?.copy !== pair.cloud;
-          return up.rows.length || up.removed.length || brainChanged || fresh ? [{ pair, cursor, up }] : [];
-        })
-      : [];
-    if (!sending.length && this.choiceSent === print) return;
-    let answer: { projects: MemoryExchangeProject[] };
-    try {
-      answer = await this.deps.call("brain.memory.exchange", {
-        ...choice,
-        projects: sending.map(({ pair, cursor, up }) => ({ projectId: pair.cloud, since: cursor.heard, rows: up.rows, removed: up.removed })),
-      });
-    } catch (error) {
-      this.brainChanged ||= brainChanged;
-      throw error;
-    }
-    this.choiceSent = print;
-    for (const { pair, cursor, up } of sending) {
-      const heard = answer.projects.find((project) => project.projectId === pair.cloud);
-      if (!heard) continue;
-      const next = await this.take(choice, pair, cursor, heard);
-      cursors[pair.mac] = { copy: pair.cloud, sent: up.next, heard: next };
-      settings.set(this.deps.db, CURSORS, JSON.stringify(cursors));
+    // After a page, the projects either side left rows of go again at once, so one exchange brings them all.
+    let left: Set<string> | null = null;
+    for (let round = 0; round < MAX_ROUNDS && (left === null || left.size > 0); round++) {
+      const again = left;
+      const sending = enabled
+        ? pairs.flatMap((pair) => {
+            if (again && !again.has(pair.mac)) return [];
+            const cursor = at(pair);
+            const up = memoryChangesSince(this.deps.db, pair.mac, cursor.sent);
+            const fresh = cursors[pair.mac]?.copy !== pair.cloud;
+            return again || up.rows.length || up.removed.length || brainChanged || fresh ? [{ pair, cursor, up }] : [];
+          })
+        : [];
+      if (!sending.length && this.choiceSent === print) return;
+      let answer: { projects: MemoryExchangeProject[] };
+      try {
+        answer = await this.deps.call("brain.memory.exchange", {
+          ...choice,
+          projects: sending.map(({ pair, cursor, up }) => ({ projectId: pair.cloud, since: cursor.heard, rows: up.rows, removed: up.removed })),
+        });
+      } catch (error) {
+        this.brainChanged ||= brainChanged || again !== null;
+        throw error;
+      }
+      this.choiceSent = print;
+      left = new Set();
+      for (const { pair, cursor, up } of sending) {
+        const heard = answer.projects.find((project) => project.projectId === pair.cloud);
+        if (!heard) continue;
+        const last = await this.take(choice, pair, cursor, heard);
+        cursors[pair.mac] = { copy: pair.cloud, sent: up.next, heard: last.next };
+        settings.set(this.deps.db, CURSORS, JSON.stringify(cursors));
+        if (up.more || last.more) left.add(pair.mac);
+      }
     }
   }
 
   /**
    * The brain's changes taken here. Rows here that beat the brain's, which it may never have had, go up at once, so both
-   * copies agree before the cursors move. Answers where the brain's next read starts.
+   * copies agree before the cursors move. Answers the brain's last answer, which says where its next read starts.
    */
-  private async take(choice: MemoryChoice, pair: { mac: string; cloud: string }, cursor: Cursor, heard: MemoryExchangeProject): Promise<number> {
+  private async take(choice: MemoryChoice, pair: { mac: string; cloud: string }, cursor: Cursor, heard: MemoryExchangeProject): Promise<MemoryExchangeProject> {
     const { kept } = this.deps.memory.merge(pair.mac, changes(heard));
-    if (!kept.length) return heard.next;
+    if (!kept.length) return heard;
     const again = await this.deps.call("brain.memory.exchange", { ...choice, projects: [{ projectId: pair.cloud, since: cursor.heard, rows: kept, removed: [] }] });
     const last = again.projects.find((project) => project.projectId === pair.cloud);
-    if (!last) return heard.next;
+    if (!last) return heard;
     this.deps.memory.merge(pair.mac, changes(last));
-    return last.next;
+    return last;
   }
 
   /** The Mac's open tasks of projects the brain has, on the brain's projects, sent when they changed. */

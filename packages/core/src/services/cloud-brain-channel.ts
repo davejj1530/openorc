@@ -13,8 +13,8 @@ export function brainChannel(brain: CloudBrain): BrainChannel {
       if (!record) return { missing: NOT_ON_BRAIN };
       return record.brainId ? { sent: record.sent } : { missing: NO_COPY };
     },
-    awake: (work) =>
-      brain.withMachine(true, (machine) => {
+    awake: (work, wake = true) =>
+      brain.withMachine(wake, (machine) => {
         const { receiveThread, readOutbox } = machine;
         if (!receiveThread || !readOutbox) throw new Error("The cloud brain can't move conversations.");
         return work({

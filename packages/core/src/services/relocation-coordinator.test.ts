@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { BrainUnavailable, LocalSandboxProvider, type BrainControlResults } from "@openorc/cloud";
-import { claudeAccounts, frozenMoving, incomingMove, LedgerWriter, relocations, runs, snapshots, tasks, threads } from "@openorc/db";
+import { claudeAccounts, cloudWorkspaces, frozenMoving, incomingMove, LedgerWriter, relocations, runs, snapshots, tasks, threads } from "@openorc/db";
 import { commitAll, git, pinObject, treeHash, worktree } from "@openorc/git";
 import { DEFAULT_CLAUDE_ACCOUNT, MOVING_WORDS, type Project } from "@openorc/protocol";
 import { OpenOrc } from "../openorc.js";
@@ -34,6 +34,12 @@ let loseNextReply = false;
 let failReceives = 0;
 /** Hand-offs that fail the same way, after the brain was woken. */
 let failHandOffs = 0;
+/** The brain sleeps: only an operation that wakes it reaches it. */
+let asleep = false;
+/** Brain operations that woke it first. */
+let wakes = 0;
+/** The Mac project of a brain copy, as the brain finds it from the folder the copy lives in. */
+let macProjectOf: (projectId: string) => string | null = () => project.id;
 /** The Mac's warnings. */
 let warnings: string[] = [];
 /** The thread whose move's step, as this Mac's windows read it, is noted at every brain call. */
@@ -86,7 +92,7 @@ const awakeBrain: AwakeBrain = {
         return ops.dropArrival(request.relocation, request.threadId) as never;
       case "hand-off-thread":
         if (failHandOffs > 0 && failHandOffs--) throw new Error("The cloud brain is not running.");
-        return (await ops.handOff(request.relocation, request.threadId, outbox(), () => project.id)) as never;
+        return (await ops.handOff(request.relocation, request.threadId, outbox(), (projectId) => macProjectOf(projectId))) as never;
       case "cancel-hand-off":
         return (await ops.cancelHandOff(request.relocation, request.threadId, outbox())) as never;
       case "handed-off":
@@ -106,8 +112,10 @@ let resumes = true;
 const channel: BrainChannel = {
   ready: async () => resumes,
   copy: async () => ({ sent: main }),
-  awake: (work) => {
+  awake: async (work, wake = true) => {
     noteStep();
+    if (wake) wakes++;
+    else if (asleep) throw new BrainUnavailable();
     return work(awakeBrain);
   },
   gone: async () => false,
@@ -146,6 +154,7 @@ beforeEach(async () => {
   await commitAll(checkout, "Baseline");
   main = (await git(checkout, ["rev-parse", "main"])).stdout.trim();
   [dead, dieAt, held, holdReceives, loseNextReply, resumes, failReceives, warnings, watched, stepsSeen, failHandOffs] = [false, null, [], false, false, true, 0, [], null, [], 0];
+  [asleep, wakes, macProjectOf] = [false, 0, () => project.id];
   passed.clear();
   await openMac();
   project = await mac!.projects.import(checkout);
@@ -335,6 +344,63 @@ describe("a task while its thread moves", () => {
   }, 60_000);
 });
 
+describe("writes to a thread while it moves", () => {
+  /** A comment on the thread's uncommitted draft, for the thread or for its task. */
+  const comment = (scope: { threadId: string } | { taskId: string }) => ({
+    ...scope,
+    path: "draft.md",
+    startLine: null,
+    startSide: null,
+    line: 1,
+    side: "new",
+    lineText: "uncommitted",
+    body: "Look here",
+  });
+  const titles = (core: OpenOrc) => (core.db.stmt("SELECT title FROM tasks").all() as { title: string }[]).map((row) => row.title);
+
+  it("refuses every write the package would leave behind on the Mac, in the moving words, and still answers reads", async () => {
+    const { threadId, taskId } = await macThreadWithTask();
+    holdReceives = true;
+    await moveUp(threadId);
+    await until(() => held.length > 0);
+    const call = (method: string, params: unknown) => mac!.handle({ type: "rpc", id: 9, method, params } as never);
+    for (const [method, params] of [
+      ["tasks.create", { projectId: project.id, threadId, title: "Added while moving" }],
+      ["review.comments.add", comment({ threadId })],
+      ["review.comments.add", comment({ taskId })],
+      ["review.commitThread", { threadId, message: "Committed while moving" }],
+      ["tasks.comments.post", { taskId, body: "Posted while moving", recipients: [], requestKey: "k-moving" }],
+      ["approvals.resolve", { runId: `run-${threadId}`, approvalId: "a1", decision: "allow" }],
+    ] as const)
+      expect({ method, reply: await call(method, params) }).toMatchObject({ method, reply: { type: "rpc.error", message: MOVING_WORDS.cloud } });
+    expect(await call("threads.update", { id: threadId, patch: { seen: true } })).toMatchObject({ type: "rpc.result" });
+    expect(await call("threads.get", { id: threadId })).toMatchObject({ type: "rpc.result", result: { id: threadId } });
+    expect(await call("review.comments.list", { threadId })).toMatchObject({ type: "rpc.result" });
+    holdReceives = false;
+    await Promise.all(held.map((take) => take().catch(() => undefined)));
+    await until(() => settledHere() && relocations.withCleanup(mac!.db).length === 0);
+    expect(titles(mac!)).toEqual([]);
+    expect(titles(brain)).toEqual(["Matrix task"]);
+    expect(await taskHolders(taskId, threadId)).toEqual([{ name: "brain", ...taskContent }]);
+  }, 60_000);
+
+  it("refuses those writes on the brain while it hands the thread back", async () => {
+    const { threadId, taskId } = await macThreadWithTask();
+    await moveUp(threadId);
+    await until(() => settledHere() && relocations.withCleanup(mac!.db).length === 0);
+    dieAt = { step: "hand-off answered", after: 0 };
+    await bringHome(threadId);
+    await until(() => dead);
+    const call = (method: string, params: unknown) => brain.handle({ type: "rpc", id: 9, method, params } as never);
+    expect(await call("tasks.create", { projectId: brainCopy.id, threadId, title: "Added while moving" })).toMatchObject({ type: "rpc.error", message: MOVING_WORDS.mac });
+    expect(await call("review.comments.add", comment({ threadId }))).toMatchObject({ type: "rpc.error", message: MOVING_WORDS.mac });
+    await restart();
+    await until(() => settledHere() && relocations.openFor(brain.db, threadId) === null);
+    expect(titles(brain)).toEqual([]);
+    expect(await taskHolders(taskId, threadId)).toEqual([{ name: "mac", ...taskContent }]);
+  }, 60_000);
+});
+
 describe("moving to the cloud", () => {
   it("leaves the thread on the Mac, unfrozen with the reason, when the brain cannot be woken", async () => {
     const threadId = await macThread();
@@ -412,6 +478,134 @@ describe("moving to the cloud", () => {
     const threadId = await macThread();
     await moveUp(threadId);
     await until(settledHere);
+    expect(await holders(threadId)).toEqual([{ name: "brain", ...content }]);
+  }, 60_000);
+});
+
+describe("a move that fails for a reason other than a lost connection", () => {
+  it("settles a move to the cloud with the brain's reason when the brain fails to take it, asking once", async () => {
+    const threadId = await macThread();
+    let receives = 0;
+    const receive = awakeBrain.receive;
+    awakeBrain.receive = async (relocation, bytes) => {
+      receives++;
+      return receive(relocation, bytes);
+    };
+    // What cloudAgentEnvironment throws on Vercel for an account the brain holds without a cloud token.
+    brain.cloud.place = async () => {
+      throw new Error("“Work” has no token for cloud threads. Create one in Settings → Cloud.");
+    };
+    // The refusal's reply is lost, so the Mac asks again and hears the same.
+    loseNextReply = true;
+    try {
+      await moveUp(threadId);
+      await until(settledHere, 5_000);
+    } finally {
+      awakeBrain.receive = receive;
+    }
+    expect(relocations.latest(mac!.db, threadId)).toMatchObject({ phase: "abandoned", error: "“Work” has no token for cloud threads. Create one in Settings → Cloud." });
+    expect(receives).toBe(2);
+    expect(await holders(threadId)).toEqual([{ name: "mac", ...content }]);
+    expect(relocations.latest(brain.db, threadId)).toMatchObject({ phase: "dropped" });
+  }, 60_000);
+
+  it("settles Bring to Mac with the brain's reason when it fails to pack the thread, unfrozen there", async () => {
+    const threadId = await macThread();
+    await moveUp(threadId);
+    await until(() => settledHere() && relocations.withCleanup(mac!.db).length === 0);
+    macProjectOf = () => null;
+    await bringHome(threadId);
+    await until(() => settledHere() && relocations.openFor(brain.db, threadId) === null, 5_000);
+    expect(relocations.latest(mac!.db, threadId)).toMatchObject({ phase: "abandoned", error: "This conversation's project has no copy on the Mac." });
+    expect(relocations.latest(brain.db, threadId)).toMatchObject({ phase: "stayed" });
+    expect(await holders(threadId)).toEqual([{ name: "brain", ...content }]);
+  }, 60_000);
+
+  it("settles Bring to Mac with the reason when this Mac fails to take the package, leaving it in the cloud", async () => {
+    const threadId = await macThread();
+    await moveUp(threadId);
+    await until(() => settledHere() && relocations.withCleanup(mac!.db).length === 0);
+    let takes = 0;
+    mac!.relocations.take = async () => {
+      takes++;
+      throw new Error("No space left on device");
+    };
+    await bringHome(threadId);
+    await until(() => settledHere() && relocations.openFor(brain.db, threadId) === null, 5_000);
+    expect(takes).toBe(1);
+    expect(relocations.latest(mac!.db, threadId)).toMatchObject({ phase: "abandoned", error: "No space left on device" });
+    expect(await holders(threadId)).toEqual([{ name: "brain", ...content }]);
+  }, 60_000);
+
+  it("keeps a thread this Mac took when a step after taking it fails, and the brain lets its copy go", async () => {
+    const threadId = await macThread();
+    await moveUp(threadId);
+    await until(() => settledHere() && relocations.withCleanup(mac!.db).length === 0);
+    const recover = mac!.threads.recoverQueue;
+    mac!.threads.recoverQueue = () => {
+      mac!.threads.recoverQueue = recover;
+      throw new Error("The queue could not be read.");
+    };
+    await bringHome(threadId);
+    await until(() => settledHere() && relocations.openFor(brain.db, threadId) === null, 5_000);
+    expect(relocations.latest(brain.db, threadId)).toMatchObject({ phase: "left" });
+    expect(await holders(threadId)).toEqual([{ name: "mac", ...content }]);
+  }, 60_000);
+
+  it("waits longer after each try that finds no brain", async () => {
+    const threadId = await macThread();
+    const at: number[] = [];
+    const receive = awakeBrain.receive;
+    awakeBrain.receive = async (relocation, bytes) => {
+      at.push(Date.now());
+      return receive(relocation, bytes);
+    };
+    failReceives = 1000;
+    try {
+      await moveUp(threadId);
+      await until(() => at.length >= 6, 10_000);
+    } finally {
+      awakeBrain.receive = receive;
+      failReceives = 0;
+    }
+    // The wait before the sixth try is sixteen retry periods of 20 ms.
+    expect(at[5]! - at[4]!).toBeGreaterThanOrEqual(16 * 20);
+  }, 60_000);
+
+  it("wakes a brain it cannot reach only a few times, then tries only while the brain is up anyway", async () => {
+    const threadId = await macThread();
+    const awake = channel.awake;
+    let naps = 0;
+    channel.awake = (work, wake = true) => {
+      if (!wake) naps++;
+      return awake(work, wake);
+    };
+    try {
+      [failReceives, asleep] = [1000, true];
+      await moveUp(threadId);
+      await until(() => naps >= 3, 10_000);
+      expect(wakes).toBe(3);
+      expect(frozenMoving(mac!.db, threadId)).toMatchObject({ to: "cloud" });
+      // The brain woke for something else: the next try finds it up, without waking it.
+      [failReceives, asleep] = [0, false];
+      await until(settledHere, 10_000);
+    } finally {
+      channel.awake = awake;
+    }
+    expect(wakes).toBe(3);
+    expect(await holders(threadId)).toEqual([{ name: "brain", ...content }]);
+  }, 60_000);
+
+  it("tries a waiting move again at once when this Mac's link reaches the brain", async () => {
+    await mac!.close();
+    await openMac(60_000);
+    const threadId = await macThread();
+    failReceives = 1;
+    await moveUp(threadId);
+    await until(() => failReceives === 0);
+    // As the link does once its dial finds the brain up.
+    (mac!.brainRouting!.link as unknown as { set(reach: "live"): void }).set("live");
+    await until(settledHere, 10_000);
     expect(await holders(threadId)).toEqual([{ name: "brain", ...content }]);
   }, 60_000);
 });
@@ -497,11 +691,15 @@ describe("bringing a thread to the Mac", () => {
     await mirrors.open(threadId);
     const copy = mirrorFolder(mac!.db, threadId)!.path;
     expect(existsSync(path.join(copy, "draft.md"))).toBe(true);
+    await writeFile(path.join(copy, "draft.md"), "edited in the copy\n");
     await bringHome(threadId);
     await until(() => settledHere() && relocations.openFor(brain.db, threadId) === null);
     expect(await holders(threadId)).toEqual([{ name: "mac", ...content }]);
     expect(mirrorFolder(mac!.db, threadId)).toBeNull();
     expect(existsSync(copy)).toBe(false);
+    // The edit made in the copy is kept aside, not lost with it.
+    const kept = (await git(checkout, ["for-each-ref", "--format=%(objectname)", `refs/openorc/mirror/${threadId}/kept/`])).stdout.trim();
+    expect((await git(checkout, ["show", `${kept}:draft.md`])).stdout).toBe("edited in the copy\n");
     expect((await git(checkout, ["worktree", "list", "--porcelain"])).stdout).not.toContain(copy);
   }, 60_000);
 
@@ -533,6 +731,80 @@ describe("bringing a thread to the Mac", () => {
     await bringHome(threadId);
     await until(() => settledHere() && relocations.openFor(brain.db, threadId) === null);
     expect(relocations.latest(mac!.db, threadId)).toMatchObject({ phase: "abandoned", error: "Its Claude account is not here." });
+    expect(await holders(threadId)).toEqual([{ name: "brain", ...content }]);
+  }, 60_000);
+});
+
+describe("bringing a thread to the Mac when its sandbox does not answer", () => {
+  async function inCloudSandbox(): Promise<string> {
+    const threadId = await macThread();
+    await moveUp(threadId);
+    await until(() => settledHere() && relocations.withCleanup(mac!.db).length === 0);
+    await until(() => brain.cloud.get(threadId)?.state === "ready", 30_000);
+    return threadId;
+  }
+  const sandboxOf = async (threadId: string) => (await brain.cloud.sandboxes()).filter((sandbox) => sandbox.threadId === threadId);
+
+  it("keeps it in the cloud, sandbox and all, with the reason, when the last pull from its sandbox fails", async () => {
+    const threadId = await inCloudSandbox();
+    brain.cloud.sync = async () => {
+      throw new Error("The sandbox did not answer.");
+    };
+    await bringHome(threadId);
+    await until(() => settledHere() && relocations.openFor(brain.db, threadId) === null);
+    expect(relocations.latest(mac!.db, threadId)).toMatchObject({ phase: "abandoned", error: "Its last changes are still in its sandbox, which did not answer. Try again in a moment." });
+    expect(await holders(threadId)).toEqual([{ name: "brain", ...content }]);
+    expect(await sandboxOf(threadId)).toHaveLength(1);
+  }, 60_000);
+
+  it("keeps it in the cloud when its Claude session does not come out of its sandbox", async () => {
+    const threadId = await inCloudSandbox();
+    const sessions = (brain.cloud as unknown as { options: { sessions: { keep(...args: unknown[]): Promise<void> } } }).options.sessions;
+    sessions.keep = async () => {
+      throw new Error("The session did not come.");
+    };
+    await bringHome(threadId);
+    await until(() => settledHere() && relocations.openFor(brain.db, threadId) === null);
+    expect(relocations.latest(mac!.db, threadId)).toMatchObject({ phase: "abandoned", error: "Its last changes are still in its sandbox, which did not answer. Try again in a moment." });
+    expect(await holders(threadId)).toEqual([{ name: "brain", ...content }]);
+  }, 60_000);
+
+  it("brings it home with what the brain pulled last when its sandbox is gone", async () => {
+    const threadId = await inCloudSandbox();
+    const record = brain.cloud.get(threadId)!;
+    await brain.cloud.removeSandbox(record.provider, record.sandbox);
+    brain.cloud.sync = async () => {
+      throw new Error("The sandbox is gone.");
+    };
+    await bringHome(threadId);
+    await until(() => settledHere() && relocations.openFor(brain.db, threadId) === null);
+    expect(await holders(threadId)).toEqual([{ name: "mac", ...content }]);
+  }, 60_000);
+});
+
+describe("cleaning up after a move", () => {
+  it("keeps the note of a sandbox whose delete failed, and deletes it at the next start", async () => {
+    const threadId = await macThread();
+    const folder = threads.get(mac!.db, threadId)!.worktreePath!;
+    cloudWorkspaces.insert(mac!.db, { threadId, provider: "local", sandbox: `openorc-${threadId}` });
+    const removeSandbox = mac!.cloud.removeSandbox.bind(mac!.cloud);
+    let refused = 0;
+    mac!.cloud.removeSandbox = async () => {
+      refused++;
+      throw new Error("Vercel did not answer.");
+    };
+    await moveUp(threadId);
+    const note = () => {
+      const [left] = relocations.withCleanup(mac!.db);
+      return left ? (JSON.parse(relocations.cleanup(mac!.db, left)!) as { worktree: string | null }) : null;
+    };
+    // The worktree's part is done and noted as such, the sandbox's kept for later.
+    await until(() => settledHere() && refused > 0 && note()?.worktree === null);
+    expect(existsSync(folder)).toBe(false);
+    expect(note()).toMatchObject({ worktree: null, sandbox: { provider: "local", name: `openorc-${threadId}` } });
+    mac!.cloud.removeSandbox = removeSandbox;
+    await restart();
+    await until(() => relocations.withCleanup(mac!.db).length === 0);
     expect(await holders(threadId)).toEqual([{ name: "brain", ...content }]);
   }, 60_000);
 });

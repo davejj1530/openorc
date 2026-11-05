@@ -1,5 +1,5 @@
 import { BrainMachine, brainDoor, ticketStanding, vercelDenied, type DoorConfig, type WakeResult } from "@openorc/cloud/door";
-import { doorLine, knockInWindow, knockProves, readKnock, type DoorOutcome, type DoorRefusalReason } from "@openorc/link";
+import { doorLine, KNOCK_WINDOW_MS, knockInWindow, knockProves, readKnock, type DoorOutcome, type DoorRefusalReason, type Knock } from "@openorc/link";
 import { nodeCrypto } from "@openorc/link/node";
 
 /**
@@ -21,12 +21,17 @@ export interface DoorDeps {
 
 const KEEPALIVE_MS = 10_000;
 const MAX_BODY = 4096;
+/** Knocks one instance remembers at most; past it the oldest go first. */
+const MAX_SEEN = 10_000;
 const HEADERS = { "content-type": "application/x-ndjson", "cache-control": "no-store" };
 
 type Admission = { kind: "unreadable" } | { kind: "refused"; why: DoorRefusalReason } | { kind: "admitted"; config: DoorConfig; device: string };
 
-/** Every check before anything costs: the body, the version, the config, the revoked list, the clock, the proof, the epoch. */
-function admit(config: DoorConfig | null, body: unknown, now: number): Admission {
+/**
+ * Every check before anything costs: the body, the version, the config, the revoked list, the clock, the proof, the
+ * epoch, and last whether this instance took the same knock already (`fresh` remembers each one it lets through).
+ */
+function admit(config: DoorConfig | null, body: unknown, now: number, fresh: (knock: Knock) => boolean): Admission {
   const read = readKnock(body);
   if (read.kind === "unreadable") return read;
   if (read.kind === "newer") return { kind: "refused", why: "door-outdated" };
@@ -37,6 +42,7 @@ function admit(config: DoorConfig | null, body: unknown, now: number): Admission
   if (config.revoked.includes(knock.device) || !knockInWindow(knock, now) || standing === "ahead") return { kind: "refused", why: "denied" };
   if (!knockProves(nodeCrypto, knock, { host: door.host, ticket: door.ticket(knock.device, knock.epoch) })) return { kind: "refused", why: "denied" };
   if (standing === "expired") return { kind: "refused", why: "expired" };
+  if (!fresh(knock)) return { kind: "refused", why: "denied" };
   return { kind: "admitted", config, device: knock.device };
 }
 
@@ -55,6 +61,19 @@ export function doorHandler(deps: DoorDeps): (request: Request) => Promise<Respo
   const keepaliveMs = deps.keepaliveMs ?? KEEPALIVE_MS;
   /** Knocks that arrive while a wake runs in this instance join it. */
   let waking: Promise<DoorOutcome> | null = null;
+  /**
+   * The nonce of every knock this instance took, until its knock leaves the window. The door keeps no other state, so a
+   * copied body still wakes the brain once on another instance within the window; that wake is all a replay can get.
+   */
+  const seen = new Map<string, number>();
+  const fresh = (knock: Knock) => {
+    const now = deps.now();
+    for (const [nonce, until] of seen) if (until < now || seen.size >= MAX_SEEN) seen.delete(nonce);
+    const nonce = Buffer.from(knock.nonce).toString("base64url");
+    if (seen.has(nonce)) return false;
+    seen.set(nonce, knock.at + KNOCK_WINDOW_MS);
+    return true;
+  };
 
   const wake = (config: DoorConfig) => {
     if (waking) return waking;
@@ -104,7 +123,7 @@ export function doorHandler(deps: DoorDeps): (request: Request) => Promise<Respo
     const now = deps.now();
     if (request.method === "GET") return Response.json({ door: 1, mark: deps.config?.mark ?? null }, { headers: { "cache-control": "no-store" } });
     if (request.method !== "POST") return new Response(null, { status: 405 });
-    const admitted = admit(deps.config, await readBody(request), now);
+    const admitted = admit(deps.config, await readBody(request), now, fresh);
     if (admitted.kind === "unreadable") return new Response(null, { status: 400 });
     if (admitted.kind === "refused") {
       deps.log(`door refused: ${admitted.why}`);

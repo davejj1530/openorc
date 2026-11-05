@@ -76,12 +76,29 @@ export function mirrorFolder(db: Db, threadId: string): { path: string; projectI
   return record ? { path: record.path, projectId: record.projectId } : null;
 }
 
-/** Removes a thread's read-only copy here and its record. False when it had none. */
-export async function closeMirror(db: Db, threadId: string): Promise<boolean> {
+/**
+ * Edits made in a copy stay findable under a ref of the thread's own, though they never go to the cloud. The ref, or
+ * null when the copy holds the brain's files as they came.
+ */
+async function keepEdits(root: string, threadId: string, folder: string, record: MirrorRecord): Promise<string | null> {
+  const files = await treeHash(folder);
+  if (files === record.tree) return null;
+  const kept = (await git(folder, ["commit-tree", files, "-p", record.snapshot, "-m", "Edits made in the copy on this Mac"], { env: IDENTITY })).stdout.trim();
+  const ref = `refs/openorc/mirror/${threadId}/kept/${Date.now()}`;
+  await pinObject(root, ref, kept);
+  return ref;
+}
+
+/** Removes a thread's read-only copy here and its record, its edits kept aside first. False when it had none. */
+export async function closeMirror(db: Db, threadId: string, log: Pick<Logger, "info">): Promise<boolean> {
   const record = records(db)[threadId];
   if (!record) return false;
   const root = projects.get(db, record.projectId)?.rootPath;
-  if (root && (await exists(record.path))) await worktrees.remove(root, record.path, { force: true });
+  if (root && (await exists(record.path))) {
+    const kept = await keepEdits(root, threadId, record.path, record);
+    if (kept) log.info(`thread ${threadId}: edits made in its copy on this Mac were kept in ${kept} when the copy closed`);
+    await worktrees.remove(root, record.path, { force: true });
+  }
   const all = records(db);
   delete all[threadId];
   settings.set(db, MIRRORS, JSON.stringify(all));
@@ -141,7 +158,7 @@ export class BrainMirrors {
   }
 
   async close(threadId: string): Promise<void> {
-    if (await closeMirror(this.deps.db, threadId)) this.deps.changed(threadId);
+    if (await closeMirror(this.deps.db, threadId, this.deps.log)) this.deps.changed(threadId);
   }
 
   /** Every copy here, as when the brain they follow is removed. */
@@ -177,12 +194,7 @@ export class BrainMirrors {
       await git(root, ["worktree", "add", "--detach", "-q", folder, snap.snapshot]);
       return;
     }
-    const files = await treeHash(folder);
-    if (record && files !== record.tree) {
-      // Edits made in the copy stay findable, though they never go to the cloud.
-      const kept = (await git(folder, ["commit-tree", files, "-p", record.snapshot, "-m", "Edits made in the copy on this Mac"], { env: IDENTITY })).stdout.trim();
-      await pinObject(root, `refs/openorc/mirror/${threadId}/kept/${Date.now()}`, kept);
-    }
+    if (record) await keepEdits(root, threadId, folder, record);
     await git(folder, ["checkout", "-q", "--detach", "-f", snap.snapshot]);
     await git(folder, ["clean", "-q", "-fd"]);
   }

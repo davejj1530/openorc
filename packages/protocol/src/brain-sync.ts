@@ -36,6 +36,8 @@ export interface MemoryExchangeProject {
   projectId: string;
   /** Where the side's next read starts, on its own clock. */
   next: number;
+  /** Rows were left for that read; a brain from before this says nothing. */
+  more?: boolean;
   rows: Memory[];
   removed: MemoryTombstone[];
 }

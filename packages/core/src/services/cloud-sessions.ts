@@ -2,10 +2,12 @@ import { mkdir, readdir, readFile, realpath, stat, writeFile } from "node:fs/pro
 import path from "node:path";
 import type { WorkspaceLocation } from "@openorc/cloud";
 import { runs, type CloudProviderId, type Db } from "@openorc/db";
-import type { Thread } from "@openorc/protocol";
+import { SESSION_ID, type Thread } from "@openorc/protocol";
 
 /** Where Claude Code keeps a session: `<config>/projects/<the folder it ran in, every other character as ->/<id>.jsonl`. */
 export function claudeSessionFile(configDir: string, cwd: string, sessionId: string): string {
+  // The id may come from a sandbox's CLI: one that is not a plain name would place the file elsewhere.
+  if (!SESSION_ID.test(sessionId)) throw new Error("The conversation's session id is not a plain name.");
   return path.posix.join(configDir, "projects", cwd.replace(/[^A-Za-z0-9]/g, "-"), `${sessionId}.jsonl`);
 }
 
@@ -27,6 +29,9 @@ function sessionFolders(text: string): string[] {
 }
 
 /** Where Codex keeps a session: `sessions/<yyyy>/<mm>/<dd>/rollout-<time>-<id>.jsonl` under its folder. */
+const CODEX_SESSION_FILE = /^sessions\/\d{4}\/\d{2}\/\d{2}\/rollout-[A-Za-z0-9_.:-]+\.jsonl$/;
+
+/** That file on this Mac, found by the session's id. */
 async function codexSessionOnMac(home: string, sessionId: string): Promise<string | null> {
   const root = path.join(home, "sessions");
   for (const year of (await readdir(root).catch(() => [] as string[])).sort().reverse())
@@ -134,9 +139,12 @@ export class CloudSessions {
     const { sandbox } = location.install;
     const found = await sandbox.exec("sh", ["-c", 'ls "$1"/sessions/*/*/*/rollout-*-"$2".jsonl 2>/dev/null | head -1', "sh", home, sessionId]);
     const file = found.stdout.toString("utf8").trim();
-    const data = file ? await sandbox.readFile(file) : null;
+    // The sandbox names the file, so only one in its own sessions folder has a place in this Mac's.
+    const relative = path.posix.relative(home, file);
+    if (!CODEX_SESSION_FILE.test(relative)) return;
+    const data = await sandbox.readFile(file);
     if (!data) return;
-    const target = path.join(this.deps.codexHomeOnMac(), path.posix.relative(home, file));
+    const target = path.join(this.deps.codexHomeOnMac(), relative);
     await mkdir(path.dirname(target), { recursive: true, mode: 0o700 });
     await writeFile(target, sessionMovedTo(data.toString("utf8"), thread.worktreePath), { mode: 0o600 });
   }

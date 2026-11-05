@@ -5,7 +5,6 @@ import type { MoveStep, Thread } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
 import { closeMirror } from "./brain-mirrors.js";
 import type { CloudWorkspaceService } from "./cloud-workspaces.js";
-import { RelocationRefused } from "./relocation-package.js";
 import { AT_WORK, relocationRefusal } from "./relocation-rules.js";
 import type { ThreadRelocations } from "./relocations.js";
 
@@ -17,8 +16,8 @@ export interface BrainChannel {
   ready(): Promise<boolean>;
   /** The brain's copy of a Mac project: what it holds of the branch, or why there is none. */
   copy(macProject: string): Promise<{ sent: string | null } | { missing: string }>;
-  /** Wakes the brain, updating it first, then runs `work` with it. */
-  awake<T>(work: (brain: AwakeBrain) => Promise<T>): Promise<T>;
+  /** Wakes the brain, updating it first, then runs `work` with it. Without `wake`, a brain not running fails instead. */
+  awake<T>(work: (brain: AwakeBrain) => Promise<T>, wake?: boolean): Promise<T>;
   /** The brain's machine is gone, and its ledger with it. */
   gone(): Promise<boolean>;
 }
@@ -53,6 +52,10 @@ const ARRIVED: Record<CoordinatorRelocation["direction"], string> = {
 /** The move reached its target, so Keep comes too late. */
 const arrived = (row: CoordinatorRelocation) => row.phase === "done" || (row.direction === "to-mac" && row.phase === "received");
 const sha256 = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
+/** Tries that may wake an unanswering brain each time a move is driven. */
+const WAKING_TRIES = 3;
+/** The longest wait between tries, in retry periods: at 30 s, well past the brain's 5 idle minutes before it sleeps. */
+const LONGEST_WAIT = 20;
 
 /**
  * The Mac's half: it moves threads to the cloud brain and back, since only the Mac can reach both ledgers. Each move is a
@@ -65,6 +68,8 @@ export class RelocationCoordinator {
   private readonly settling = new Map<string, Promise<void>>();
   /** Moves whose unanswered brain was logged already: a brain that stays down is retried quietly. */
   private readonly warned = new Set<string>();
+  /** Moves waiting to try again, each its own way to stop waiting. */
+  private readonly waiting = new Set<() => void>();
   private closed = false;
 
   constructor(private readonly deps: CoordinatorDeps) {}
@@ -83,7 +88,7 @@ export class RelocationCoordinator {
     if (live) await runs.closeAndWait(live.id);
     if (thread.workspaceMode === "current") thread = await this.deps.toWorktree(threadId);
     // A thread running in a sandbox from this Mac brings its last changes and session here first.
-    if (this.deps.cloud.get(threadId)) await this.deps.cloud.sync(thread, { turnEnded: true });
+    if (this.deps.cloud.get(threadId)) await this.deps.cloud.sync(thread, { turnEnded: true, leaving: true });
     // The idle check and the freeze in one synchronous step, so no turn starts between them.
     if (runs.threadActivity(threadId) !== "idle") throw new Error(AT_WORK);
     const row = relocations.open(db, {
@@ -152,18 +157,12 @@ export class RelocationCoordinator {
    * nothing pending reads nothing more.
    */
   start(): void {
-    if (relocations.unsettled(this.deps.db).length > 0 || relocations.withCleanup(this.deps.db).length > 0) this.resume();
-  }
-
-  /** Drives every unsettled move, at start and whenever the brain may be reachable again. Never awaited. */
-  resume(): void {
     for (const row of relocations.unsettled(this.deps.db)) this.drive(row.id);
-    for (const id of relocations.withCleanup(this.deps.db))
-      void this.deps.relocations.cleanUp(id).catch((error: unknown) => this.deps.log.warn(`a moved conversation's folder was not cleaned up: ${words(error)}`));
   }
 
   close(): void {
     this.closed = true;
+    this.reachable();
   }
 
   /** A step hook that throws stops every move here, as a crash would. */
@@ -184,15 +183,40 @@ export class RelocationCoordinator {
     this.driving.set(id, run);
   }
 
+  /**
+   * Each try that finds no brain waits twice as long as the one before. Only the first few wake it: a brain that wakes
+   * and still does not answer is not woken again and again, and a move goes on when the brain is up for something else.
+   */
   private async loop(id: string): Promise<void> {
+    let misses = 0;
     for (let row = this.row(id); row && !settled(row) && !this.closed; row = this.row(id)) {
-      const outcome = await this.next(row);
-      if (outcome.kind === "unreachable") {
-        await new Promise((resolve) => setTimeout(resolve, this.deps.retryMs ?? 30_000));
+      const outcome = await this.next(row, misses < WAKING_TRIES);
+      if (outcome.kind !== "unreachable") {
+        misses = 0;
+        await this.finish(id, outcome);
         continue;
       }
-      await this.finish(id, outcome);
+      misses++;
+      await this.pause((this.deps.retryMs ?? 30_000) * Math.min(2 ** (misses - 1), LONGEST_WAIT));
     }
+  }
+
+  /** `ms`, or until this Mac reaches the brain again or closes. */
+  private pause(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+      const go = () => {
+        clearTimeout(timer);
+        this.waiting.delete(go);
+        resolve();
+      };
+      const timer = setTimeout(go, ms);
+      this.waiting.add(go);
+    });
+  }
+
+  /** This Mac's link reached the brain: every move waiting to try again tries now. */
+  reachable(): void {
+    for (const go of [...this.waiting]) go();
   }
 
   /** Where the move stands now, for its card. */
@@ -206,25 +230,29 @@ export class RelocationCoordinator {
     return row?.role === "coordinator" ? row : null;
   }
 
-  /** One attempt at the row's current phase. */
-  private async next(row: CoordinatorRelocation): Promise<StepOutcome> {
+  /** One attempt at the row's current phase; one that may not `wake` the brain reaches it only while it runs. */
+  private async next(row: CoordinatorRelocation, wake: boolean): Promise<StepOutcome> {
     switch (row.phase) {
       case "frozen":
         return this.send(row);
       case "sending":
-        return this.ask(row.id, async (brain) => this.deliver(row, brain));
+        return this.ask(row.id, async (brain) => this.deliver(row, brain), wake);
       case "asking":
         // Each try wakes the brain again first, whatever step the last one stopped at.
         if (row.step !== "waking") this.at(row, "waking");
-        return this.ask(row.id, async (brain) => this.fetch(row, brain));
+        return this.ask(row.id, async (brain) => this.fetch(row, brain), wake);
       case "received":
         // This Mac holds the thread now, so a read-only copy of it here has nothing left to follow.
-        await closeMirror(this.deps.db, row.threadId).catch((error: unknown) => this.deps.log.warn(`a moved conversation's copy was not closed: ${words(error)}`));
-        return this.ask(row.id, async (brain) => {
-          await brain.ask({ op: "handed-off", relocation: row.id });
-          this.step("handed-off answered");
-          return { kind: "left" };
-        });
+        await closeMirror(this.deps.db, row.threadId, this.deps.log).catch((error: unknown) => this.deps.log.warn(`a moved conversation's copy was not closed: ${words(error)}`));
+        return this.ask(
+          row.id,
+          async (brain) => {
+            await brain.ask({ op: "handed-off", relocation: row.id });
+            this.step("handed-off answered");
+            return { kind: "left" };
+          },
+          wake,
+        );
       default:
         return { kind: "unreachable" };
     }
@@ -302,17 +330,19 @@ export class RelocationCoordinator {
       this.step("received");
       return { kind: "imported" };
     } catch (error) {
-      if (!(error instanceof RelocationRefused)) throw error;
+      if (this.closed) throw error;
+      // Taken in its transaction before the failure: the thread is this Mac's, and the brain must hear it left.
+      if (this.row(row.id)?.phase === "received") return { kind: "imported" };
       // The brain froze its copy for this Mac, so it hears this Mac will not take it.
       await brain.ask({ op: "cancel-hand-off", relocation: row.id, threadId: row.threadId });
-      return { kind: "refused", reason: error.message };
+      return { kind: "refused", reason: words(error) };
     }
   }
 
   /** One brain operation for move `id`, its failures sorted: a brain that is gone, or one that cannot be reached now. */
-  private async ask(id: string, work: (brain: AwakeBrain) => Promise<StepOutcome>): Promise<StepOutcome> {
+  private async ask(id: string, work: (brain: AwakeBrain) => Promise<StepOutcome>, wake = true): Promise<StepOutcome> {
     try {
-      return await this.deps.brain.awake(work);
+      return await this.deps.brain.awake(work, wake);
     } catch (error) {
       if (this.closed) throw error;
       if (await this.deps.brain.gone().catch(() => false)) return { kind: "gone" };

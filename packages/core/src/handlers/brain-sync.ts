@@ -54,7 +54,7 @@ export function createBrainSyncHandlers({ db, memory, textGeneration, cloudOnly,
           .map(({ projectId, since, rows, removed }) => {
             const { kept } = memory.merge(projectId, { rows, removed });
             const mine = memoryChangesSince(db, projectId, since);
-            return { projectId, next: mine.next, rows: [...mine.rows, ...kept], removed: mine.removed };
+            return { projectId, next: mine.next, more: mine.more, rows: [...mine.rows, ...kept], removed: mine.removed };
           }),
       };
     },

@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LocalSandboxProvider } from "@openorc/cloud";
 import { memories, settings, tasks } from "@openorc/db";
 import { commitAll, git } from "@openorc/git";
@@ -128,6 +128,32 @@ it("merges a project's memory both ways while both are awake, follows a removal,
   await on(brain, "memory.record", { projectId: brainProject.id, type: "lesson", title: "Ports", body: "Keep five." });
   await exchangedUntil(() => titles(mac, macProject).includes("Ports"));
   expect(titles(mac, macProject)).toEqual(["Ports", "Tests use vitest"]);
+});
+
+describe("a long memory", () => {
+  /** More rows than one answer carries, each changed at its own moment, as a long history is. */
+  const many = (core: OpenOrc, project: Project, side: string) =>
+    core.db.transaction(() => {
+      for (let index = 0; index < 2100; index++) memories.upsert(core.db, { projectId: project.id, type: "lesson", title: `${side} ${index}`, body: "A fact.", source: "agent" });
+      core.db.raw.prepare("UPDATE memories SET updated_at = 1000 + rowid WHERE project_id = ?").run(project.id);
+    });
+  const count = (core: OpenOrc, project: Project, side: string) =>
+    (core.db.raw.prepare("SELECT COUNT(*) AS c FROM memories WHERE project_id = ? AND title LIKE ?").get(project.id, `${side} %`) as { c: number }).c;
+
+  it("brings every page of both sides' memory in one exchange", async () => {
+    await on(mac, "memory.settings.set", { enabled: true });
+    many(brain, brainProject, "Brain");
+    many(mac, macProject, "Mac");
+    await mac.brainRouting!.freshen();
+    expect({ macHas: count(mac, macProject, "Brain"), brainHas: count(brain, brainProject, "Mac") }).toEqual({ macHas: 2100, brainHas: 2100 });
+  }, 60_000);
+
+  it("sends every page of the Mac's memory in one exchange when the brain has nothing to send back", async () => {
+    await on(mac, "memory.settings.set", { enabled: true });
+    many(mac, macProject, "Mac");
+    await mac.brainRouting!.freshen();
+    expect(count(brain, brainProject, "Mac")).toBe(2100);
+  }, 60_000);
 });
 
 /** Exchanges as the 2-minute look would, until `done`: the brain's push that its memory changed arrives on its own time. */

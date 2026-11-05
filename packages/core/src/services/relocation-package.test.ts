@@ -41,3 +41,15 @@ it("names how many tasks travel, which a brain from before refuses as an unknown
   // A thread with no tasks reads as packages always did.
   expect(header(encodePackage(packageWith(0)))).not.toHaveProperty("tasks");
 });
+
+it("refuses a package naming a session that is not a plain name, in its header or on a run, since it becomes a file name", () => {
+  const traversal = "../-Users-me-dev-other/2f1c-victim-session";
+  const session = { agent: "claude" as const, accountId: "work", sessionId: "0b9f3c3e-5d2a-4f1e-9c47-2a6f0d8e1b55", text: "" };
+  const plain = packageWith(0);
+  expect(decodePackage(encodePackage({ ...plain, session })).session?.sessionId).toBe(session.sessionId);
+  expect(() => decodePackage(encodePackage({ ...plain, session: { ...session, sessionId: traversal } }))).toThrow(RelocationRefused);
+  const run = (id: string | null) => ({ ...plain, rows: { ...plain.rows, tables: { ...plain.rows.tables, runs: [{ id: "run-1", external_session_id: id }] } } as never });
+  expect(decodePackage(encodePackage(run(null))).rows.tables.runs).toHaveLength(1);
+  expect(decodePackage(encodePackage(run(session.sessionId))).rows.tables.runs).toHaveLength(1);
+  expect(() => decodePackage(encodePackage(run(traversal)))).toThrow(RelocationRefused);
+});

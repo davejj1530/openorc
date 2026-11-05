@@ -119,11 +119,14 @@ export class BrainLink {
     this.retry.unref();
   }
 
-  /** One call to the brain. With `wake`, an unreachable brain is woken and the call waits for it; else it fails at once. */
+  /**
+   * One call to the brain. With `wake`, an unreachable brain is woken and the call waits for it; else it waits only for
+   * a wake already under way, and fails at once without one.
+   */
   async call<M extends RpcMethod>(method: M, params: RpcParams<M>, options: { wake: boolean }): Promise<RpcResults[M]> {
     let session = this.session ?? (await this.connect());
-    if (!session && options.wake) {
-      await this.wake();
+    if (!session && (options.wake || this.waking)) {
+      await (options.wake ? this.wake() : this.waking?.catch(() => undefined));
       session = await this.connect();
     }
     if (!session) throw new BrainOutOfReach(this.current === "live" ? "offline" : this.current);

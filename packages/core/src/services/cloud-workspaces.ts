@@ -207,9 +207,9 @@ export class CloudWorkspaceService {
    * Brings the sandbox's changes to the conversation's worktree on the Mac. With `push`, what changed in the worktree
    * first goes to the sandbox: between turns the Mac may commit, undo or edit, while during a turn only the sandbox
    * writes. Syncs for one conversation run one after another. False when the worktree did not change, or the
-   * conversation does not run in the cloud.
+   * conversation does not run in the cloud. `leaving`: the conversation leaves its sandbox, so its session must come too.
    */
-  sync(thread: Thread, options: { push?: boolean; turnEnded?: boolean } = {}): Promise<boolean> {
+  sync(thread: Thread, options: { push?: boolean; turnEnded?: boolean; leaving?: boolean } = {}): Promise<boolean> {
     const record = cloudWorkspaces.get(this.db, thread.id);
     const mirror = thread.worktreePath;
     if (record?.state !== "ready" || !mirror) return Promise.resolve(false);
@@ -220,7 +220,7 @@ export class CloudWorkspaceService {
       .then(async () => {
         if (options.push) await this.pushOnce(thread.id, mirror);
         const changed = await this.pullOnce(thread.id, mirror);
-        if (options.turnEnded) await this.keepSession(thread, mirror);
+        if (options.turnEnded) await this.keepSession(thread, mirror, options.leaving === true);
         return changed;
       });
     this.syncs.set(thread.id, next);
@@ -278,14 +278,16 @@ export class CloudWorkspaceService {
 
   /** Brings the conversation's Claude session to this Mac. A session not kept now is kept after the next turn. */
   /** After a turn: the conversation's session comes to this Mac, and a Codex login refreshed in the sandbox comes back. */
-  private async keepSession(thread: Thread, mirror: string): Promise<void> {
+  private async keepSession(thread: Thread, mirror: string, required: boolean): Promise<void> {
     const record = cloudWorkspaces.get(this.db, thread.id);
     if (!record) return;
     const location = await this.location(record, mirror);
     const kept = [this.options.sessions?.keep(thread, location, record.provider), thread.agent === "codex" ? this.codex.keep(location, record.provider) : undefined];
     for (const result of await Promise.allSettled(kept))
-      if (result.status === "rejected")
+      if (result.status === "rejected") {
+        if (required) throw result.reason;
         this.log.warn(`could not bring thread ${thread.id}'s session or login to the Mac: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`);
+      }
   }
 
   /**

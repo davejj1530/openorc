@@ -29,9 +29,10 @@ const MAX_ROWS = 2000;
 
 /**
  * A project's memories and removals changed at or after `since` on this ledger's clock, and where the next read starts.
- * At most MAX_ROWS rows, oldest first, with every row of the last one's millisecond, so the next read starts past them.
+ * At most MAX_ROWS rows, oldest first, with every row of the last one's millisecond, so the next read starts past them;
+ * `more` when rows were left for that read.
  */
-export function memoryChangesSince(db: Db, projectId: string, since: number): MemoryChanges & { next: number } {
+export function memoryChangesSince(db: Db, projectId: string, since: number): MemoryChanges & { next: number; more: boolean } {
   const now = Date.now();
   const ids = db.stmt("SELECT id, updated_at FROM memories WHERE project_id = ? AND orcling_id IS NULL AND updated_at >= ? ORDER BY updated_at, id LIMIT ?").all(projectId, since, MAX_ROWS + 1) as {
     id: string;
@@ -48,7 +49,7 @@ export function memoryChangesSince(db: Db, projectId: string, since: number): Me
     id: row.id,
     removedAt: row.removed_at,
   }));
-  return { rows: rows.flatMap((row) => memories.get(db, row.id) ?? []), removed, next: cut === null ? now : cut + 1 };
+  return { rows: rows.flatMap((row) => memories.get(db, row.id) ?? []), removed, next: cut === null ? now : cut + 1, more: cut !== null };
 }
 
 /** The same fact as last told: the later edit, then the later confirmation, then the larger text, so both sides agree. */

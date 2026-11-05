@@ -71,6 +71,9 @@ export type ActivityRecovery = z.infer<typeof ActivityRecovery>;
 export const BackgroundCommand = z.object({ id: z.string(), description: z.string() });
 export type BackgroundCommand = z.infer<typeof BackgroundCommand>;
 
+/** An agent's session id as hosts keep it: it names the session's file on the host, so it is never a path. */
+export const SESSION_ID = /^[A-Za-z0-9_-]{1,100}$/;
+
 export const AgentEvent = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("subagent.started"),

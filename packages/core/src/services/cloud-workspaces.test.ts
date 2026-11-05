@@ -111,6 +111,26 @@ describe("cloud workspace preparation", () => {
   });
 });
 
+describe("a cloud workspace's last pull", () => {
+  it("fails when the conversation leaves its sandbox and its session does not come too, and only warns after a turn", async () => {
+    const sessions = { send: async () => undefined, keep: async () => Promise.reject(new Error("The session did not come.")) };
+    const cloud = new CloudWorkspaceService(db, { providers: [sandboxes], sessions: sessions as never }, quiet);
+    const workspaces = new WorkspaceService(db, { dataDir: path.join(directory, "data-leaving"), cloud }, quiet, new WorkspaceWriters());
+    try {
+      const thread = db.transaction(() => {
+        const created = threads.insert(db, { projectId: project.id, title: "Leaving", agent: "claude", model: null, mode: "act", permissionMode: "trusted", workspaceMode: "worktree" });
+        workspaces.admitCloud(created.id, "local");
+        return created;
+      });
+      const prepared = await workspaces.prepareThread(thread, project, "HEAD");
+      await expect(cloud.sync(prepared, { turnEnded: true })).resolves.toEqual(expect.any(Boolean));
+      await expect(cloud.sync(prepared, { turnEnded: true, leaving: true })).rejects.toThrow("The session did not come.");
+    } finally {
+      await workspaces.shutdown();
+    }
+  });
+});
+
 describe("where cloud conversations run", () => {
   it("puts new conversations on Vercel once it is connected, and on this Mac until then", async () => {
     let access: { token: string; teamId: string; projectId: string } | null = null;

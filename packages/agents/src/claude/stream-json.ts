@@ -2,7 +2,7 @@ import type { AgentEvent, BackgroundCommand, Usage } from "@openorc/protocol";
 import { claudeFastModeReason } from "./fast-mode.js";
 import { ClaudeWorkflows } from "./workflows.js";
 import { ClaudeSubagents } from "./subagents.js";
-import { isRecord, num, str } from "./stream-values.js";
+import { isRecord, num, sessionId, str } from "./stream-values.js";
 
 /**
  * Background tasks that are the agent's own work, which report back when they finish. Anything else Claude Code runs
@@ -490,7 +490,7 @@ export class ClaudeStreamParser {
           runId: this.runId,
           ts: now,
           agent: "claude",
-          externalSessionId: str(msg["session_id"]),
+          externalSessionId: sessionId(msg["session_id"]),
           model: str(msg["model"]),
           ...(Array.isArray(msg["capabilities"]) ? { capabilities: msg["capabilities"].filter(isString) } : {}),
           ...(Array.isArray(msg["tools"]) ? { tools: msg["tools"].filter(isString) } : {}),

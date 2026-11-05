@@ -8,6 +8,7 @@ import {
   NOT_ON_BRAIN,
   ownerRoute,
   REMOTE_ATTACHMENT_BYTES,
+  ROUTED_READS,
   rpcParams,
   type InboxList,
   type OwnerReach,
@@ -146,7 +147,8 @@ export class BrainRouter {
       case "task":
         return this.task(request, method, params, route.task(params));
       case "run":
-        return runs.get(this.deps.db, route.run(params)) ? this.deps.local(request) : this.forward(request, method, params);
+        // A run's reads follow its thread's, which wake the brain when a person opens it; they wait for that wake.
+        return runs.get(this.deps.db, route.run(params)) ? this.deps.local(request) : this.forward(request, method, params, this.wakes(request, method, false), true);
       case "owner":
       case "owner-only":
         return this.owned(request, method, params, route.thread(params), route.by === "owner-only" ? route.words : null);
@@ -162,7 +164,8 @@ export class BrainRouter {
     if (!id || threads.get(this.deps.db, id)) return this.deps.local(request);
     if (ownerOnly !== null) return Promise.resolve(error(request.id, ownerOnly));
     const kept = method === "threads.get" ? this.kept(request, id) : null;
-    return kept ? Promise.resolve(kept) : this.forward(request, method, params);
+    const known = this.holdsThread(id);
+    return kept ? Promise.resolve(kept) : this.forward(request, method, params, this.wakes(request, method, known), known);
   }
 
   /** A list from every host, merged; asked about one thread, its owner's alone. */
@@ -170,9 +173,9 @@ export class BrainRouter {
     return thread ? this.owned(request, method, params, thread, null) : this.merge(request, method as Merged, params);
   }
 
-  /** A call about one task: this Mac's own answers it; one the brain holds goes there, woken for it. */
+  /** A call about one task: this Mac's own answers it; one the brain holds goes there. */
   private task(request: RpcRequest, method: RpcMethod, params: Record<string, unknown>, id: string | undefined): Promise<RpcReply> {
-    return !id || tasks.get(this.deps.db, id) ? this.deps.local(request) : this.forward(request, method, params);
+    if (!id || tasks.get(this.deps.db, id)) return this.deps.local(request);
   }
 
   /**
@@ -182,21 +185,25 @@ export class BrainRouter {
   private async start(request: RpcRequest, params: Record<string, unknown>, project: string | undefined): Promise<RpcReply> {
     if (!project) return this.deps.local(request);
     if (!(await this.deps.mapping()).toCloud(project)) return error(request.id, NOT_ON_BRAIN);
-    const reply = await this.forward(request, "threads.start", params);
+    const reply = await this.forward(request, "threads.start", params, true, true);
     if (reply.type === "rpc.result") await this.refreshRecent();
     return reply;
   }
 
-  /** A window's call for a thread the brain holds, woken for it: opening or sending to it is the person's own intent. */
-  private async forward(request: RpcRequest, method: RpcMethod, params: Record<string, unknown>): Promise<RpcReply> {
+  /**
+   * A window's call for a thread the brain may hold, woken for it when `wake`. One about a thread or task this Mac does
+   * not know the brain holds (`known` false) is this Mac's to answer when the brain is out of reach, as without a brain.
+   */
+  private async forward(request: RpcRequest, method: RpcMethod, params: Record<string, unknown>, wake: boolean, known: boolean): Promise<RpcReply> {
     if (READS_RUN.has(method) && typeof params["runId"] === "string") this.watch(params["runId"]);
     try {
       const mapping = await this.deps.mapping();
-      const result = await this.deps.link.call(method, (await this.filesUp(toCloud(params, mapping))) as never, { wake: true });
+      const result = await this.deps.link.call(method, (await this.filesUp(toCloud(params, mapping))) as never, { wake });
       const rehomed = rehome(result, mapping, { brain: "cloud", reach: "live", heardAt: Date.now() }, this.deps.mirrors);
       if (method === "threads.get" && isThread(rehomed) && rehomed.liveRunId) this.watch(rehomed.liveRunId);
       return { type: "rpc.result", id: request.id, result: isThread(rehomed) ? this.asNow(rehomed) : rehomed };
     } catch (caught) {
+      if (caught instanceof BrainOutOfReach && !known) return this.deps.local(request);
       return error(request.id, caught instanceof Error ? caught.message : String(caught));
     }
   }

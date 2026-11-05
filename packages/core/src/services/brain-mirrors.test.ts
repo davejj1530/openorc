@@ -134,6 +134,24 @@ it("opens a cloud thread's code on this Mac, read-only, and keeps it current one
   expect(((await window("threads.get", { id: "cloud-thread" })) as { worktreePath: string | null }).worktreePath).toBeNull();
 });
 
+it("keeps edits made in the copy aside when it closes, and says where", async () => {
+  await window("cloud.openOnMac", { threadId: "cloud-thread" });
+  const copy = mirrorFolder(mac!.db, "cloud-thread")!.path;
+  writeFileSync(path.join(copy, "draft.md"), "edited on the Mac before closing\n");
+  await window("cloud.closeOnMac", { threadId: "cloud-thread" });
+  expect(existsSync(copy)).toBe(false);
+  const keptRefs = async () => (await git(path.join(root, "app"), ["for-each-ref", "--format=%(refname) %(objectname)", "refs/openorc/mirror/cloud-thread/kept/"])).stdout.split("\n").filter(Boolean);
+  const refs = await keptRefs();
+  expect(refs).toEqual([expect.stringMatching(/^refs\/openorc\/mirror\/cloud-thread\/kept\/\d+ [0-9a-f]{40}$/)]);
+  const [ref, kept] = refs[0]!.split(" ");
+  expect((await git(path.join(root, "app"), ["show", `${kept}:draft.md`])).stdout).toBe("edited on the Mac before closing\n");
+  expect(windows).toContainEqual(expect.objectContaining({ type: "log", message: expect.stringContaining(ref!) }));
+  // A copy closed untouched keeps nothing.
+  await window("cloud.openOnMac", { threadId: "cloud-thread" });
+  await window("cloud.closeOnMac", { threadId: "cloud-thread" });
+  expect(await keptRefs()).toEqual(refs);
+});
+
 it("brings only what this Mac lacks the first time a cloud thread opens here", async () => {
   const asked = vi.spyOn(mac!.brainRouting!.link, "call");
   await window("cloud.openOnMac", { threadId: "cloud-thread" });
@@ -155,7 +173,7 @@ it("leaves a copy closed when it closes while a refresh waits on the brain", asy
   writeFileSync(path.join(brainFolder, "agent.md"), "written by the agent\n");
   const pulled = mac!.brainRouting!.mirrors.pull("cloud-thread");
   await until(() => vi.mocked(link.call).mock.calls.some(([method]) => method === "threads.snapshot"));
-  await closeMirror(mac!.db, "cloud-thread");
+  await closeMirror(mac!.db, "cloud-thread", { info: () => {} });
   answer();
   await pulled;
   expect(mirrorFolder(mac!.db, "cloud-thread")).toBeNull();

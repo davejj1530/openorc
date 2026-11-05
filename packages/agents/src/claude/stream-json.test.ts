@@ -142,6 +142,18 @@ describe("ClaudeStreamParser", () => {
     ]);
   });
 
+  it("takes no session id that is not a plain name, since the id becomes a file name on the host", () => {
+    for (const [sessionId, taken] of [
+      ["0b9f3c3e-5d2a-4f1e-9c47-2a6f0d8e1b55", "0b9f3c3e-5d2a-4f1e-9c47-2a6f0d8e1b55"],
+      ["../-Users-me-dev-other/2f1c-victim-session", null],
+      ["/etc/passwd", null],
+      ["", null],
+    ] as const) {
+      const started = new ClaudeStreamParser("run-id").parseLine(line({ type: "system", subtype: "init", session_id: sessionId, model: "m" }), 1).find((e) => e.type === "session.started");
+      expect({ sessionId, taken: started?.type === "session.started" ? started.externalSessionId : "none" }).toEqual({ sessionId, taken });
+    }
+  });
+
   it("keeps housekeeping and an earlier process's orphaned tasks out of the transcript", () => {
     const p = new ClaudeStreamParser("run-resumed");
     const types = (lines: unknown[]) => lines.flatMap((l) => p.parseLine(line(l), 1000)).filter((e) => e.type !== "raw");

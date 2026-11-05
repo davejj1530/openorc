@@ -151,6 +151,46 @@ export const OWNER_ROUTES: { [M in RoutedMethod]: OwnerRoute<M> } & { [M in Excl
 };
 
 /**
+ * Routed methods that only read the thread, run or task they name. Every other routed method writes, and is refused
+ * while that thread is frozen for a move, so a write the move's package would leave behind is never accepted.
+ */
+export const ROUTED_READS: ReadonlySet<RpcMethod> = new Set<RpcMethod>([
+  "threads.list",
+  "inbox.list",
+  "threads.get",
+  "threads.messages",
+  "threads.lastMessage",
+  "threads.plans",
+  "threads.checkpoints",
+  "threads.turnChanges",
+  "threads.movePreview",
+  "threads.restorePreview",
+  "runs.listForThread",
+  "events.listForRun",
+  "events.page",
+  "events.toolOutput",
+  "tasks.list",
+  "tasks.get",
+  "tasks.executionThread",
+  "tasks.comments.list",
+  "runs.listForTask",
+  "memory.forTask",
+  "workspace.removalImpact",
+  "workspace.usage",
+  "review.diff",
+  "review.snapshots",
+  "review.checkoutState",
+  "git.log",
+  "review.threadChanges",
+  "review.threadFileDiff",
+  "review.threadDiff",
+  "review.threadPrTemplate",
+  "git.threadLog",
+  "git.threadPushState",
+  "review.comments.list",
+]);
+
+/**
  * Methods only the Mac's own session asks the brain, besides those the router forwards: attached files go up before the
  * message naming them; memory, the Mac's open tasks and its text generation choice go while both are awake.
  */

@@ -130,14 +130,15 @@ const openList = OPEN_PHASES.map((phase) => `'${phase}'`).join(", ");
 
 export const relocations = {
   /** Throws when the thread already has an open relocation on this host. */
-  open(db: Db, row: Pick<Relocation, "id" | "threadId" | "role" | "direction" | "phase" | "projectId"> & { step?: MoveStep }, at = Date.now()): Relocation {
-    db.stmt("INSERT INTO thread_relocations (id, thread_id, role, direction, phase, project_id, error, step, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)").run(
+  open(db: Db, row: Pick<Relocation, "id" | "threadId" | "role" | "direction" | "phase" | "projectId"> & { step?: MoveStep; error?: string }, at = Date.now()): Relocation {
+    db.stmt("INSERT INTO thread_relocations (id, thread_id, role, direction, phase, project_id, error, step, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
       row.id,
       row.threadId,
       row.role,
       row.direction,
       row.phase,
       row.projectId,
+      row.error ?? null,
       row.step ?? null,
       at,
       at,

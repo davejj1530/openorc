@@ -472,6 +472,15 @@ export class CloudWorkspaceService {
     this.options.changed?.(ref.threadId);
   }
 
+  /** The agent's CLI on the sandbox's PATH at this host's version: a session goes in through it (OpenCode's import) and a turn runs it. */
+  async installAgent(agent: HarnessId, location: WorkspaceLocation, provider: CloudProviderId): Promise<void> {
+    const { cli, name } = harnessCatalog[agent];
+    // A sandbox simulated here runs this host's own CLI, so only a real one is brought to its version.
+    const mayInstall = provider !== "local";
+    const version = mayInstall ? ((await this.options.versions?.(agent)) ?? null) : null;
+    await ensureAgent(location.install.sandbox, cli, { name, mayInstall, version, read: releaseOf });
+  }
+
   /** The agent on the sandbox's PATH and signed in for one turn: its folder and credential variables. */
   async turnEnv(
     run: { agent: string; claudeAccountId?: string | null | undefined; model?: string | null | undefined },
@@ -479,8 +488,7 @@ export class CloudWorkspaceService {
     provider: CloudProviderId,
   ): Promise<Record<string, string>> {
     if (!isHarnessId(run.agent)) throw new Error(STAYS);
-    const { cli, name } = harnessCatalog[run.agent];
-    await ensureAgent(location.install.sandbox, cli, { name, mayInstall: provider !== "local" });
+    await this.installAgent(run.agent, location, provider);
     const { signIn } = this.agents[run.agent];
     const folders = await signIn.homeEnv(location.install.state, provider, who(run));
     const home = async () => folders && sandboxHome(location.install.sandbox, run.agent as HarnessId, folders);

@@ -2,31 +2,56 @@ import { expect, it } from "vitest";
 import { ensureAgent } from "./agent-install.js";
 import type { Sandbox, SandboxCommandOptions } from "./sandbox.js";
 
-/** A sandbox whose PATH holds `installed`; npm installs a package's binary when it runs as root. */
-function sandbox(installed: string[]) {
+/** A sandbox whose PATH holds the CLIs in `installed` at their versions; npm as root installs `pkg@version`. */
+function sandbox(installed: Map<string, string>) {
   const runs: { cmd: string; args: string[]; sudo: boolean }[] = [];
   const box = {
     exec: async (cmd: string, args: string[], options: SandboxCommandOptions = {}) => {
       runs.push({ cmd, args, sudo: Boolean(options.sudo) });
-      if (cmd === "sh") return { code: installed.includes(args.at(-1)!) ? 0 : 1, stdout: Buffer.alloc(0), stderr: "" };
-      if (cmd === "npm" && options.sudo) installed.push(args.at(-1)!.replace("@opencode/cli", "opencode"));
-      return { code: cmd === "npm" && options.sudo ? 0 : 1, stdout: Buffer.alloc(0), stderr: "npm ERR! EACCES" };
+      if (cmd === "sh") {
+        const version = installed.get(args.at(-1)!);
+        return { code: version ? 0 : 1, stdout: Buffer.from(version && args[1]!.includes("--version") ? `opencode v${version}\n` : ""), stderr: "" };
+      }
+      if (cmd === "npm" && options.sudo) {
+        const [, version = "9.9.9"] = args.at(-1)!.replace("@opencode/cli", "").split("@");
+        installed.set("opencode", version);
+        return { code: 0, stdout: Buffer.alloc(0), stderr: "" };
+      }
+      return { code: 1, stdout: Buffer.alloc(0), stderr: "npm ERR! EACCES" };
     },
   } as unknown as Sandbox;
-  return { box, runs };
+  return { box, runs, npm: () => runs.filter((run) => run.cmd === "npm").map((run) => run.args.at(-1)) };
 }
 
 const opencode = { npm: "@opencode/cli", bin: "opencode" };
+const read = (output: string) => /(\d+\.\d+\.\d+)/.exec(output)?.[1] ?? null;
+const pinned = (version: string | null) => ({ name: "OpenCode", mayInstall: true, version, read });
 
-it("installs an agent's own package as root only when its binary is missing", async () => {
-  const missing = sandbox([]);
-  await ensureAgent(missing.box, opencode, { name: "OpenCode", mayInstall: true });
-  expect(missing.runs.filter((run) => run.cmd === "npm")).toEqual([{ cmd: "npm", args: ["install", "-g", "@opencode/cli"], sudo: true }]);
-  const present = sandbox(["opencode"]);
-  await ensureAgent(present.box, opencode, { name: "OpenCode", mayInstall: true });
-  expect(present.runs.map((run) => run.cmd)).toEqual(["sh"]);
+it("installs the host's version as root when the sandbox has another or none, and asks only its version when it matches", async () => {
+  const older = sandbox(new Map([["opencode", "2.0.10"]]));
+  await ensureAgent(older.box, opencode, pinned("2.0.11"));
+  expect(older.npm()).toEqual(["@opencode/cli@2.0.11"]);
+  expect(older.runs.find((run) => run.cmd === "npm")?.sudo).toBe(true);
+  const missing = sandbox(new Map());
+  await ensureAgent(missing.box, opencode, pinned("2.0.11"));
+  expect(missing.npm()).toEqual(["@opencode/cli@2.0.11"]);
+  const current = sandbox(new Map([["opencode", "2.0.11"]]));
+  await ensureAgent(current.box, opencode, pinned("2.0.11"));
+  expect(current.runs.map((run) => run.cmd)).toEqual(["sh"]);
+});
+
+it("takes whatever is there, or the latest, when the host's version is unknown", async () => {
+  const any = sandbox(new Map([["opencode", "1.0.0"]]));
+  await ensureAgent(any.box, opencode, pinned(null));
+  expect(any.npm()).toEqual([]);
+  const missing = sandbox(new Map());
+  await ensureAgent(missing.box, opencode, pinned(null));
+  expect(missing.npm()).toEqual(["@opencode/cli"]);
 });
 
 it("never installs on a sandbox simulated on a Mac, whose CLI is the Mac's", async () => {
-  await expect(ensureAgent(sandbox([]).box, opencode, { name: "OpenCode", mayInstall: false })).rejects.toThrow("OpenCode is not installed on this Mac, where this sandbox is simulated.");
+  const local = sandbox(new Map([["opencode", "2.0.10"]]));
+  await ensureAgent(local.box, opencode, { ...pinned("2.0.11"), mayInstall: false });
+  expect(local.npm()).toEqual([]);
+  await expect(ensureAgent(sandbox(new Map()).box, opencode, { ...pinned("2.0.11"), mayInstall: false })).rejects.toThrow("OpenCode is not installed on this Mac, where this sandbox is simulated.");
 });

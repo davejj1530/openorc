@@ -29,6 +29,7 @@ export {
   type BrainControlReply,
   type BrainControlRequest,
   type BrainControlResult,
+  type AgentVersions,
   type BrainControlResults,
   type BrainHandover,
   type BrainKey,

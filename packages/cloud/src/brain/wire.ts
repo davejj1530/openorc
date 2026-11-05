@@ -314,7 +314,12 @@ export type BrainControlRequest =
   /** Unfreezes a thread the Mac did not take; a hand-off asked later is refused. */
   | { op: "cancel-hand-off"; relocation: string; threadId: string }
   /** The Mac took the thread: the brain deletes its copy, its sandbox and the package. */
-  | { op: "handed-off"; relocation: string };
+  | { op: "handed-off"; relocation: string }
+  /** The Mac's agent CLI versions: the brain installs each that differs, so a conversation moved either way resumes. Null keeps the brain's. */
+  | { op: "agent-versions"; versions: AgentVersions };
+
+/** Each agent CLI's version, as its `--version` reads; null when unknown or not installed. */
+export type AgentVersions = { [A in HarnessId]: string | null };
 export type BrainControlOp = BrainControlRequest["op"];
 
 /** What a Mac project's settings say about the work in it, which its copy on the brain takes as its own. */
@@ -382,6 +387,8 @@ export interface BrainControlResults {
   "hand-off-thread": { file: string; bytes: number; sha256: string } | { refused: string };
   "cancel-hand-off": { stayed: true } | { left: true };
   "handed-off": { left: true };
+  /** What the brain has after: an install that failed leaves the version it had. */
+  "agent-versions": { versions: AgentVersions };
 }
 export type BrainControlResult<R extends BrainControlRequest> = BrainControlResults[R["op"]];
 export type BrainControlReply<Op extends BrainControlOp> = { ok: true; result: BrainControlResults[Op] } | { ok: false; error: string };
@@ -413,6 +420,8 @@ const threadId = text(100, /^[A-Za-z0-9-]+$/);
 const deviceId = text(100, /^[A-Za-z0-9-]+$/);
 const packageFile = text(255, /^\w[\w.-]*$/);
 const refused = object({ refused: text(2000) });
+const release = nullable(text(32, /^\d+\.\d+\.\d+$/));
+const agentVersions = object({ claude: release, codex: release, opencode: release } satisfies { [A in HarnessId]: Parse<string | null> });
 const REQUESTS = variants<BrainControlRequest>({
   status: object({ op: literal("status") }),
   wake: object({ op: literal("wake") }),
@@ -441,6 +450,7 @@ const REQUESTS = variants<BrainControlRequest>({
   "hand-off-thread": object({ op: literal("hand-off-thread"), relocation: relocationId, threadId }),
   "cancel-hand-off": object({ op: literal("cancel-hand-off"), relocation: relocationId, threadId }),
   "handed-off": object({ op: literal("handed-off"), relocation: relocationId }),
+  "agent-versions": object({ op: literal("agent-versions"), versions: agentVersions }),
 });
 
 const timestamp = int(0, Number.MAX_SAFE_INTEGER);
@@ -471,6 +481,7 @@ const RESULTS: { [K in BrainControlOp]: Parse<BrainControlResults[K]> } = {
   "hand-off-thread": (value, field) => (isRecord(value) && "refused" in value ? refused : object({ file: packageFile, bytes: count, sha256: text(64, /^[0-9a-f]{64}$/) }))(value, field),
   "cancel-hand-off": (value, field) => (isRecord(value) && "left" in value ? object({ left: literal(true) }) : object({ stayed: literal(true) }))(value, field),
   "handed-off": object({ left: literal(true) }),
+  "agent-versions": object({ versions: agentVersions }),
 };
 
 export function parseControlRequest(line: string): BrainControlRequest {

@@ -8,6 +8,7 @@ import {
   brainVersionNewer,
   newBrainKey,
   sealHandover,
+  type AgentVersions,
   type BrainAccess,
   type BrainControlResults,
   type BrainKey,
@@ -24,6 +25,7 @@ import { BrainDoorKeeper, vercelDoors, type BrainDoors } from "./cloud-brain-doo
 import { anyMoved, blocked, confirmCurrent, copyBranch, failedAt, freshCopy, hasThreads, keptOwn, seen, stale, switchedOn, type BrainProject } from "./cloud-brain-projects.js";
 import { claudeToSend, sameSent, sent, type Sent } from "./cloud-brain-claude.js";
 import { NO_SIGN_INS, claimsSignIns, heardSignIns, signInChanges, signInsView, switchGitHub, type SignInRecord, type SignInSources } from "./cloud-brain-signins.js";
+import { alignAgentVersions } from "./cloud-brain-versions.js";
 import { apiKeyAuth } from "./codex-cloud-login.js";
 import type { ProtectedSecretStore } from "./extraction-credentials.js";
 
@@ -48,6 +50,8 @@ interface Stored extends SignInRecord {
   projects?: BrainProject[];
   /** The brain's link key, learned at its first start, which this Mac dials it with. */
   linkKey?: string;
+  /** The signInPrint of the agent CLI versions the brain last said it has, once they were this Mac's. */
+  agentVersions?: string;
 }
 
 type Activity = { kind: "setting-up"; step: CloudBrainStep } | { kind: "removing" } | { kind: "waking" } | { kind: "sending" } | { kind: "updating" };
@@ -69,6 +73,8 @@ export interface CloudBrainDeps {
   projects?: { brain?: string; door?: string };
   /** This Mac's sign-ins besides Claude's that the brain is kept on; none unless given. */
   signIns?: SignInSources;
+  /** This Mac's agent CLI versions, which the brain is brought to at each wake; none unless given. */
+  agentVersions?: () => Promise<AgentVersions>;
 }
 
 /**
@@ -423,6 +429,7 @@ export class CloudBrain {
     await this.write({ ...(await this.stored()), version: installed });
     this.step("start");
     await this.startInstalled(machine);
+    await this.alignAgents(machine).catch(() => undefined);
     this.step("sign-ins");
     await this.send(machine);
     this.refreshAfter();
@@ -442,7 +449,20 @@ export class CloudBrain {
       this.error = `The cloud brain could not be updated. ${await this.scrub(error)}`;
     });
     await this.startInstalled(machine);
+    // One that failed is asked again at the next wake; a move meanwhile refuses in words if the versions differ.
+    await this.alignAgents(machine).catch(() => undefined);
     this.refreshAfter();
+  }
+
+  /**
+   * Before anything else in a wake, as a move's: the brain's agent CLIs at this Mac's versions, so a conversation moved
+   * either way resumes. Asked only when they changed since the brain last said it had them; never of an older brain.
+   */
+  private async alignAgents(machine: BrainMachineLike): Promise<void> {
+    const stored = await this.stored();
+    if (!this.deps.agentVersions || (await this.behindUpdate(stored))) return;
+    const confirmed = await alignAgentVersions(machine, stored.agentVersions, await this.deps.agentVersions());
+    if (confirmed) await this.write({ ...(await this.stored()), agentVersions: confirmed });
   }
 
   /** Once the operation that woke the brain ends, so the brain runs this build's version first and a pairing waits on nothing. */

@@ -40,6 +40,8 @@ const OPS: Record<BrainControlOp, { answerMs: number; use: boolean; inTurn: bool
   "hand-off-thread": { answerMs: 300_000, use: true, inTurn: true },
   "cancel-hand-off": { answerMs: 30_000, use: true, inTurn: true },
   "handed-off": { answerMs: 60_000, use: true, inTurn: true },
+  // Installs a CLI or two the first time after the Mac updated one, as part of the wake before a move.
+  "agent-versions": { answerMs: 600_000, use: true, inTurn: true },
 };
 
 export type ControlAnswer = (request: BrainControlRequest) => Promise<unknown>;

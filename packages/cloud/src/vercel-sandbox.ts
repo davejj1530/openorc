@@ -96,7 +96,6 @@ export interface VercelOpenParams extends VercelCredentials {
   resources?: { vcpus: number };
   region?: string;
   env?: Record<string, string>;
-  onCreate: (vm: VercelVm) => Promise<void>;
 }
 
 /** How the provider reaches Vercel. Tests pass a stand-in; the app passes the SDK. */
@@ -109,8 +108,8 @@ export interface VercelApi {
 }
 
 const sdk: VercelApi = {
-  getOrCreate: async ({ onCreate, ...params }) => {
-    const vm: VercelVm = await SdkSandbox.getOrCreate({ ...params, onCreate: (sandbox) => onCreate(sandbox) });
+  getOrCreate: async (params) => {
+    const vm: VercelVm = await SdkSandbox.getOrCreate({ ...params, onCreate: async () => undefined });
     return vm;
   },
   remove: async ({ name, token, teamId, projectId }) => {
@@ -137,15 +136,6 @@ async function run(vm: VercelVm, cmd: string, args: string[], options: SandboxCo
   const command = await vm.runCommand({ cmd, args, cwd: options.cwd ?? vm.cwd, ...(options.env ? { env: options.env } : {}), ...(options.sudo ? { sudo: true } : {}), detached: true });
   const done = await command.wait();
   return { code: done.exitCode, stdout: Buffer.from(await done.stdout(), "utf8"), stderr: await done.stderr() };
-}
-
-/** Puts Claude Code on the VM's PATH unless it is there already. */
-export async function ensureClaude(vm: VercelVm): Promise<void> {
-  // Plain sh, not a login shell: the runner starts the CLI with the VM's default environment.
-  const found = await run(vm, "sh", ["-c", "command -v claude"]);
-  if (found.code === 0) return;
-  const install = await run(vm, "npm", ["install", "-g", "@anthropic-ai/claude-code"], { sudo: true });
-  if (install.code !== 0) throw new Error(`Claude Code could not be installed in the cloud workspace: ${install.stderr.trim().slice(-500)}`);
 }
 
 /** A VM on Vercel. Its files persist between sessions; its processes do not. */
@@ -213,8 +203,6 @@ export class VercelSandbox implements Sandbox {
 export class VercelSandboxProvider implements SandboxProvider {
   readonly id = "vercel";
   private readonly api: VercelApi;
-  /** Sandboxes whose Claude Code was checked since the app started. */
-  private readonly checked = new Set<string>();
 
   constructor(private readonly options: VercelProviderOptions) {
     this.api = options.api ?? sdk;
@@ -230,7 +218,6 @@ export class VercelSandboxProvider implements SandboxProvider {
   async remove(name: string): Promise<void> {
     const { token, teamId, projectId } = await this.access();
     await this.api.remove({ name, token, teamId, projectId });
-    this.checked.delete(name);
   }
 
   /** None until Vercel is connected. */
@@ -243,7 +230,6 @@ export class VercelSandboxProvider implements SandboxProvider {
 
   async open(name: string): Promise<VercelSandbox> {
     const access = await this.access();
-    let created = false;
     const vm = await this.api.getOrCreate({
       name,
       persistent: true,
@@ -255,14 +241,7 @@ export class VercelSandboxProvider implements SandboxProvider {
       token: access.token,
       teamId: access.teamId,
       projectId: access.projectId,
-      onCreate: async (fresh) => {
-        created = true;
-        await ensureClaude(fresh);
-      },
     });
-    // A sandbox made before this check existed, or whose install failed, gets it on first use.
-    if (!created && !this.checked.has(name)) await ensureClaude(vm);
-    this.checked.add(name);
     return new VercelSandbox(name, vm);
   }
 

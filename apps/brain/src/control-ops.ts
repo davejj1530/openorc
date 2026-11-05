@@ -1,4 +1,5 @@
 import { rm } from "node:fs/promises";
+import { alignAgents } from "./agent-versions.js";
 import path from "node:path";
 import {
   confirmSynced,
@@ -213,6 +214,7 @@ export function controlHandlers({ core, key, layout, github, stop, answering }: 
     "remove-project": (request) => removeProject(core, layout, request),
     projects: () => listCopies(core, layout),
     "copies-current": (request) => copiesCurrent(core, layout, request),
+    "agent-versions": ({ versions }) => alignAgents(layout.npm, versions),
     "project-settings": async ({ source, settings }) => {
       const id = copyOf(core, layout, source);
       if (id) core.projects.updateSettings(id, settings);

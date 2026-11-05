@@ -1,4 +1,4 @@
-import type { VercelConnection } from "@openorc/cloud";
+import type { AgentVersions, VercelConnection } from "@openorc/cloud";
 import type { HarnessId } from "@openorc/protocol";
 import { claudeAccounts, type Db, type LedgerWriter } from "@openorc/db";
 import type { OpenOrcOptions } from "../options.js";
@@ -18,7 +18,7 @@ import { CloudHandoff } from "./cloud-handoff.js";
 import { CodexBrowserSignIn, CodexCloudLogin } from "./codex-cloud-login.js";
 import { spawnWithPipes } from "./terminal-process.js";
 import { CloudSandboxes, type CloudSandboxRuns } from "./cloud-sandboxes.js";
-import { agentHomes } from "./agent-homes.js";
+import { agentHomes, everyVersion, hostVersions } from "./agent-homes.js";
 import { AgentSessions } from "./agent-sessions.js";
 import { CloudStandby, type CloudStandbyDeps } from "./cloud-standby.js";
 import { CloudSettings } from "./cloud-settings.js";
@@ -40,6 +40,7 @@ function cloudBrain(
   vercel: () => Promise<VercelConnection | null>,
   signIns: SignInSources,
   invalidate: (keys: string[]) => void,
+  agentVersions: () => Promise<AgentVersions>,
 ): CloudBrain {
   return new CloudBrain({
     db,
@@ -47,6 +48,7 @@ function cloudBrain(
     tokens,
     vercel,
     signIns,
+    agentVersions,
     bundle: options.cloudBrainBundle,
     // "cloud" too: the brain's region is where this Mac's sandboxes run unless another is chosen.
     changed: () => invalidate(["cloud-brain", "cloud"]),
@@ -116,7 +118,15 @@ export function createCloud(input: CloudInput): {
     opencode: () => opencode.all(),
     codex: new CodexBrowserSignIn({ ...codexDeps, changed: () => invalidate(["cloud-brain"]) }),
   };
-  const brain: CloudBrain = cloudBrain(db, options, tokens, options.cloudCredentials ?? (() => settings.credentials()), signIns, (keys) => [invalidate(keys), input.brainChanged?.()]);
+  const brain: CloudBrain = cloudBrain(
+    db,
+    options,
+    tokens,
+    options.cloudCredentials ?? (() => settings.credentials()),
+    signIns,
+    (keys) => [invalidate(keys), input.brainChanged?.()],
+    () => everyVersion(versions),
+  );
   // On a cloud-only host the cloud login is the only one, so whether Codex is signed in changes with it.
   const codexLogin = new CodexCloudLogin(options.codexCloudSecrets, { ...codexDeps, changed: () => invalidate(options.cloudOnly ? ["cloud", "system", "models"] : ["cloud"]) });
   const opencode = new OpenCodeCloudKeys(options.opencodeCloudSecrets, () => {
@@ -165,6 +175,20 @@ export function createCloud(input: CloudInput): {
   const moved = (id: string) => invalidate(["threads", `thread:${id}`, "tasks", "inbox"]);
   const { relocations, coordinator } = createRelocations({ input, sessions, cloud, runs, brain, changed: moved });
   return { settings, tokens, codex: codexLogin, opencode, cloud, checks, sandboxes: list, handoff, standby, brain, relocations, coordinator };
+}
+
+/** Where each agent keeps its conversations here and in sandboxes, the one caller that moves them, and this host's CLI versions. */
+function agentParts(input: CloudInput, agents: CloudAgents): { sessions: AgentSessions; versions: (agent: HarnessId) => Promise<string | null> } {
+  const { db, accounts, environment, options, log } = input;
+  const homes = agentHomes({
+    environment,
+    claudeFolder: (id) => {
+      const account = id ?? accounts.defaultId();
+      return claudeAccounts.list(db).some((candidate) => candidate.id === account) ? accounts.configDirectory(account) : null;
+    },
+    agents,
+  });
+  return { sessions: new AgentSessions({ db, dataDir: options.dataDir, homes, log }), versions: hostVersions(homes) };
 }
 
 /** Moving threads between this host and the other brain; the Mac alone coordinates. */

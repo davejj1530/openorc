@@ -1,8 +1,8 @@
 import os from "node:os";
 import path from "node:path";
-import { hostHome, type AgentHome } from "@openorc/agents";
-import type { Sandbox } from "@openorc/cloud";
-import type { HarnessId } from "@openorc/protocol";
+import { hostHome, sessionSlots, type AgentHome } from "@openorc/agents";
+import type { AgentVersions, Sandbox } from "@openorc/cloud";
+import { harnessIds, type HarnessId } from "@openorc/protocol";
 import type { AgentHomes, HomeOwner } from "./agent-sessions.js";
 import type { CloudAgents } from "./cloud-agents.js";
 import { RelocationRefused } from "./relocation-package.js";
@@ -34,6 +34,25 @@ export function agentHomes(deps: AgentHomeDeps): AgentHomes {
       return env && sandboxHome(location.install.sandbox, thread.agent, env);
     },
   };
+}
+
+/** Each agent CLI's version on this host, read at most once a minute: every turn's sandbox installs the same. */
+export function hostVersions(homes: AgentHomes, everyMs = 60_000): (agent: HarnessId) => Promise<string | null> {
+  const known = new Map<HarnessId, { at: number; version: Promise<string | null> }>();
+  return (agent) => {
+    const kept = known.get(agent);
+    if (kept && Date.now() - kept.at < everyMs) return kept.version;
+    const version = Promise.resolve()
+      .then(() => sessionSlots[agent].version(homes.here({ agent, claudeAccountId: null })))
+      .catch(() => null);
+    known.set(agent, { at: Date.now(), version });
+    return version;
+  };
+}
+
+/** Every agent CLI's version on this host, as the brain is brought to them. */
+export async function everyVersion(versions: (agent: HarnessId) => Promise<string | null>): Promise<AgentVersions> {
+  return Object.fromEntries(await Promise.all(harnessIds.map(async (id) => [id, await versions(id)] as const))) as AgentVersions;
 }
 
 function hostFolders(thread: HomeOwner, env: NodeJS.ProcessEnv, deps: AgentHomeDeps): Record<string, string> {

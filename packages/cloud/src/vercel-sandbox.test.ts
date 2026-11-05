@@ -195,7 +195,6 @@ describe("the Vercel sandbox provider", () => {
         if (!created.has(params.name)) {
           created.add(params.name);
           regions[params.name] = params.region;
-          await params.onCreate(vm);
         }
         return vm;
       },
@@ -206,7 +205,7 @@ describe("the Vercel sandbox provider", () => {
   const installs = (vm: { runs: Run[] }) => vm.runs.filter((run) => run.cmd === "npm");
   const checks = (vm: { runs: Run[] }) => vm.runs.filter((run) => run.cmd === "sh");
 
-  it("passes the credentials, keeps every account's Claude token out of the sandbox, and installs Claude Code only when it is missing", async () => {
+  it("passes the credentials, keeps every account's Claude token out of the sandbox, and opens it bare: each turn installs its own agent", async () => {
     const present = api(() => true);
     await new VercelSandboxProvider({ ...settings, api: present.fake }).open("openorc-a");
     expect(present.calls[0]).toMatchObject({
@@ -218,12 +217,8 @@ describe("the Vercel sandbox provider", () => {
       projectId: "proj",
     });
     expect(present.calls[0]).not.toHaveProperty("env");
-    expect(checks(present.vm)).toHaveLength(1);
+    expect(checks(present.vm)).toHaveLength(0);
     expect(installs(present.vm)).toHaveLength(0);
-
-    const missing = api(() => false);
-    await new VercelSandboxProvider({ ...settings, api: missing.fake }).open("openorc-b");
-    expect(installs(missing.vm)).toEqual([expect.objectContaining({ args: ["install", "-g", "@anthropic-ai/claude-code"], sudo: true })]);
   });
 
   it("makes new sandboxes the size Settings asks for, and leaves Vercel's default otherwise", async () => {
@@ -271,15 +266,6 @@ describe("the Vercel sandbox provider", () => {
       costUsd: expect.closeTo(0.1 * 0.128 + 16 * 0.0212, 6),
     });
     expect(sandboxes[1]).toMatchObject({ state: "stopping", awakeSince: null, awakeMs: 0, costUsd: 0 });
-  });
-
-  it("checks a sandbox it did not create once, the first time this app opens it", async () => {
-    const existing = api(() => true);
-    await existing.fake.getOrCreate({ name: "openorc-c", persistent: true, timeout: 1, token: "", teamId: "", projectId: "", onCreate: async () => undefined });
-    const provider = new VercelSandboxProvider({ ...settings, api: existing.fake });
-    await provider.open("openorc-c");
-    await provider.open("openorc-c");
-    expect(checks(existing.vm)).toHaveLength(1);
   });
 
   it("deletes a sandbox with the account's credentials", async () => {

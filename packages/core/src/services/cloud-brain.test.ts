@@ -15,6 +15,7 @@ import {
   openHandover,
   takeBranch,
   type BrainAccess,
+  type AgentVersions,
   type BrainControlRequest,
   type BrainControlResults,
   type BrainKey,
@@ -73,6 +74,8 @@ class FakeBrain implements BrainMachineLike {
   threads = new Map<string, number>();
   /** The copies the Mac said hold its branch as it is now. */
   confirmed: { source: string; macHead: string }[] = [];
+  /** The agent CLI versions the Mac asked the brain to run, each time it asked. */
+  agentVersions: AgentVersions[] = [];
   /** Each copy's settings as the Mac last sent them, by Mac project. */
   settings = new Map<string, CopySettings>();
   /** The version it ran as each project came. */
@@ -132,6 +135,10 @@ class FakeBrain implements BrainMachineLike {
       await this.beforeProjects();
       if (this.refusesProjects) throw new BrainRefused(this.refusesProjects);
       return (await this.listCopies()) as never;
+    }
+    if (request.op === "agent-versions") {
+      this.agentVersions.push(request.versions);
+      return { versions: request.versions } as never;
     }
     if (request.op === "copies-current") {
       this.confirmed.push(...request.copies);
@@ -274,7 +281,9 @@ describe("the cloud brain from the Mac", () => {
     core.claudeAccounts.update({ id: old.id, enabled: false });
     expect(await status()).toEqual({ state: "none", error: null });
     await setUp();
-    expect(brain.calls).toEqual(["provision v1 archive sin1", "wake", "control handover", "status"]);
+    expect(brain.calls).toEqual(["provision v1 archive sin1", "wake", "control agent-versions", "control handover", "status"]);
+    // Its agent CLIs are brought to this Mac's as it starts; later wakes ask only once one changed.
+    expect(brain.agentVersions).toEqual([{ claude: "2.1.317", codex: "0.166.0", opencode: "2.0.11" }]);
     expect(brain.access[0]).toEqual({ token: VERCEL_TOKEN, teamId: "team_fixture" });
     expect(brain.opens.slice(0, 2)).toEqual([
       { create: false, saved: 0 },

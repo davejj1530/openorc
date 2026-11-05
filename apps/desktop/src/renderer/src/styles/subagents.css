@@ -99,12 +99,13 @@
   bottom: auto;
   height: 14px;
 }
+/* The elbow ends where the mark's glyph begins, so each lane reads as one line from the trunk into its mark. */
 .subagent-lanes[data-trunk] > .subagent-card::after {
   content: "";
   position: absolute;
   top: 8px;
   left: -8px;
-  width: 9px;
+  width: 11px;
   height: 14px;
   border-bottom: 1.5px solid var(--line-strong);
   border-left: 1.5px solid var(--line-strong);
@@ -195,13 +196,89 @@
 .subagent-card-progress[data-live] {
   color: var(--ink-2);
 }
-.subagent-card-detail {
+/* What the agent was asked and what it reported, in the rail's two columns: a quiet verb, then its Markdown. The
+   text starts where the lane's title does. */
+.subagent-detail {
   display: grid;
-  gap: 12px;
-  padding: 4px 4px 12px;
-  overflow-wrap: anywhere;
+  grid-template-columns: fit-content(80px) minmax(0, 1fr);
+  column-gap: 16px;
+  row-gap: 14px;
+  margin: 0;
+  padding: 2px 8px 14px 28px;
+}
+.subagent-detail > dt {
+  min-width: 56px;
+  font-size: var(--text-xs);
+  line-height: 20px;
+  color: var(--ink-4);
+}
+.subagent-detail > dd {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+  min-width: 0;
+  margin: 0;
+}
+.subagent-detail-empty {
+  padding: 2px 8px 14px 28px;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+/* A card's Markdown reads a size down from a reply: headings by ink, not size or weight, blocks close together.
+   Scoped under the list so it outranks Streamdown's own utility classes. */
+.subagent-detail .subagent-detail-text {
+  justify-self: stretch;
   font-size: var(--text-sm);
+  line-height: 20px;
   color: var(--ink-2);
+}
+.subagent-detail .subagent-detail-text[data-tone="brief"] {
+  color: var(--ink-3);
+}
+.subagent-detail .subagent-detail-text > div > :not(:last-child) {
+  margin-block-end: 8px;
+}
+.subagent-detail .subagent-detail-text :is(p, li) {
+  line-height: 20px;
+}
+.subagent-detail .subagent-detail-text :is(h1, h2, h3, h4, h5, h6) {
+  margin: 14px 0 0;
+  font-size: var(--text-sm);
+  font-weight: inherit;
+  line-height: 20px;
+  letter-spacing: normal;
+  color: var(--ink-2);
+}
+.subagent-detail .subagent-detail-text > div > :first-child {
+  margin-top: 0;
+}
+/* Bullets hang outside the text, so a wrapped item lines up under its own words. */
+.subagent-detail .subagent-detail-text :is(ul, ol) {
+  margin: 0;
+  padding-left: 18px;
+  list-style-position: outside;
+}
+.subagent-detail .subagent-detail-text li {
+  margin: 0;
+  padding: 1px 0 1px 2px;
+}
+/* Code in a brief stays in the brief's voice: a size down, its own ink, a quiet fill. */
+.subagent-detail .subagent-detail-text code {
+  padding: 1px 4px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-size: var(--text-xs);
+  line-height: 16px;
+  color: inherit;
+}
+/* A long brief shows its first lines and fades into the button that shows the rest. */
+.subagent-detail-folded {
+  max-height: 168px;
+  overflow: hidden;
+  mask-image: linear-gradient(#000 60%, transparent);
+}
+.subagent-detail-more {
+  font-size: var(--text-xs);
 }
 .subagent-status-bar {
   flex-shrink: 0;

@@ -1,19 +1,26 @@
 import { useState } from "react";
+import { cn } from "../lib/cn";
 import { subagentStatusLabel, useTicking, workDuration, type Block, type SubagentCard } from "@openorc/client";
 import { openThread } from "../lib/router";
 import { ArrowUpRight, Check, ChevronRight, CircleDashed, Loader2, X } from "./icons";
-import { IconButton } from "./ui";
+import { IconButton, TextButton } from "./ui";
+import { ThreadRichText } from "./ThreadImages";
 import { useRpc, useRpcs } from "../lib/client";
 
-/** "Sonnet 5.5" for a Claude model id the catalogue does not list; any other id as it is. */
-const claudeName = (id: string) =>
-  /^claude-[a-z]+(?:-\d+)+$/.test(id)
-    ? id
-        .replace(/^claude-/, "")
-        .replace(/-(\d+)-(\d+)$/, " $1.$2")
-        .replace(/-(\d+)$/, " $1")
-        .replace(/^./, (c) => c.toUpperCase())
-    : id;
+/** "Sonnet 5.5" for a Claude model id the catalogue does not list, "Opus" for an alias; any other id as it is. */
+function claudeName(id: string): string {
+  const alias = /^(opus|sonnet|haiku|fable)(\[1m\])?$/.exec(id);
+  if (alias) return `${alias[1]!.charAt(0).toUpperCase()}${alias[1]!.slice(1)}${alias[2] ? " 1M" : ""}`;
+  if (!/^claude-[a-z]+(?:-\d+)+$/.test(id)) return id;
+  return id
+    .replace(/^claude-/, "")
+    .replace(/-(\d+)-(\d+)$/, " $1.$2")
+    .replace(/-(\d+)$/, " $1")
+    .replace(/^./, (c) => c.toUpperCase());
+}
+
+/** A subagent type without the plugin that ships it: "poteto-agent" for "pstack:poteto-agent". */
+const kindName = (type: string | undefined) => type?.replace(/^[\w-]+:/, "");
 
 /** The first sentence of what an agent came back with, for the line under its lane. */
 const firstSentence = (text: string) =>
@@ -85,7 +92,9 @@ function LaneHead({ card, model, now }: { card: SubagentCard; model: string; now
         <SubagentMark status={card.status} />
       </span>
       <span className="subagent-card-name">{card.title}</span>
-      <span className="subagent-card-meta subagent-card-kind">{[card.agentType, model].filter(Boolean).join(" · ")}</span>
+      <span className="subagent-card-meta subagent-card-kind" title={card.agentType}>
+        {[kindName(card.agentType), model].filter(Boolean).join(" · ")}
+      </span>
       {quiet ? null : <span className="subagent-card-meta">{subagentStatusLabel[card.status]}</span>}
       <span className="subagent-card-meta tabular">{workDuration((card.endedAt ?? now) - card.startedAt)}</span>
       <ArrowUpRight size={13} className="subagent-card-open" />
@@ -117,12 +126,45 @@ function SubagentLane({ card, model, now, open, toggle }: { card: SubagentCard; 
   );
 }
 
+/** A brief past this many characters or lines fades out behind a button rather than filling the card. */
+const LONG_BRIEF = { chars: 600, lines: 10 };
+
+/**
+ * What the agent was asked and what it reported, as the Markdown it was written in, in the rail's two columns: a
+ * quiet verb, then the text. A long brief fades out after its first lines until asked for whole.
+ */
 function LaneDetail({ card }: { card: SubagentCard }) {
+  const [whole, setWhole] = useState(false);
+  const brief = card.prompt?.trim() ?? "";
+  const long = brief.length > LONG_BRIEF.chars || brief.split("\n").length > LONG_BRIEF.lines;
+  if (!brief && !card.result) return <div className="subagent-detail-empty motion-arrive">{subagentStatusLabel[card.status]}</div>;
   return (
-    <div className="subagent-card-detail motion-arrive">
-      {card.prompt ? <p className="whitespace-pre-wrap">{card.prompt}</p> : null}
-      {card.result ? <p className="whitespace-pre-wrap">{card.result}</p> : null}
-      {!card.prompt && !card.result ? <span className="text-ink-3">{subagentStatusLabel[card.status]}</span> : null}
-    </div>
+    <dl className="subagent-detail motion-arrive">
+      {brief ? (
+        <>
+          <dt>Asked</dt>
+          <dd>
+            <div className={cn("subagent-detail-text prose-chat", long && !whole && "subagent-detail-folded")} data-tone="brief">
+              <ThreadRichText>{brief}</ThreadRichText>
+            </div>
+            {long ? (
+              <TextButton tone="muted" className="subagent-detail-more" aria-expanded={whole} onClick={() => setWhole(!whole)}>
+                {whole ? "Show less" : "Show the whole brief"}
+              </TextButton>
+            ) : null}
+          </dd>
+        </>
+      ) : null}
+      {card.result ? (
+        <>
+          <dt>Reported</dt>
+          <dd>
+            <div className="subagent-detail-text prose-chat">
+              <ThreadRichText>{card.result}</ThreadRichText>
+            </div>
+          </dd>
+        </>
+      ) : null}
+    </dl>
   );
 }

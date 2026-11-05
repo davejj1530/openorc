@@ -1,6 +1,6 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import { createClientState } from "@openorc/client";
+import { createClientState, type Block } from "@openorc/client";
 import { SubagentCards } from "./SubagentCards";
 const fixture = vi.hoisted(() => ({ exists: true as boolean | undefined }));
 vi.mock("../lib/client", () => ({
@@ -36,4 +36,38 @@ it("hides a deleted child even when saved history only contains its final card u
   view.rerender(<SubagentCards blocks={blocks} />);
   expect(screen.queryByRole("button", { name: "Open Subagent" })).toBeNull();
   expect(view.container.childElementCount).toBe(0);
+});
+
+it("shows an agent's brief and report as formatted text, the brief folded when long", async () => {
+  fixture.exists = true;
+  const brief = `Polish the comments.\n\n## Hard rules\n${Array.from({ length: 12 }, (_, i) => `- Rule ${i + 1} with \`code\``).join("\n")}`;
+  const block: Block = {
+    id: "agent",
+    kind: "tool",
+    name: "Agent",
+    input: {},
+    done: true,
+    subagent: {
+      nativeId: "agent",
+      threadId: "child",
+      title: "Rebuild comments",
+      agentType: "pstack:poteto-agent",
+      model: "opus",
+      prompt: brief,
+      result: "Done. **Three things changed.**",
+      status: "completed",
+      startedAt: 1,
+      endedAt: 2,
+    },
+  };
+  render(<SubagentCards blocks={[block]} />);
+  expect(screen.getByText("poteto-agent · Opus")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Details for Rebuild comments" }));
+  const heading = await screen.findByRole("heading", { name: "Hard rules" });
+  expect(screen.queryByText(/## Hard rules/)).toBeNull();
+  expect(within(heading.closest("dd")!).getAllByRole("listitem")).toHaveLength(12);
+  expect(screen.getByText("Three things changed.").tagName).not.toBe("P");
+  const more = screen.getByRole("button", { name: "Show the whole brief" });
+  fireEvent.click(more);
+  expect(more.getAttribute("aria-expanded")).toBe("true");
 });

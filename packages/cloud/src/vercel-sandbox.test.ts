@@ -134,6 +134,31 @@ describe("a sandbox on Vercel", () => {
     expect(vm.runs.map((run) => run.cwd)).toEqual(["/home/vercel-sandbox", "/home/vercel-sandbox"]);
   });
 
+  it("starts a command as root only when asked", async () => {
+    const vm = fakeVm(() => finished(0));
+    const sandbox = new VercelSandbox("s", vm);
+    await sandbox.launch("dockerd", [], { sudo: true });
+    await sandbox.launch("node", ["runner.ts", "daemon"]);
+    expect(vm.runs.map((run) => run.sudo)).toEqual([true, undefined]);
+  });
+
+  it("can run Docker, and two turns asking at once share one start", async () => {
+    let asked = 0;
+    let answer!: () => void;
+    const answered = new Promise<void>((resolve) => (answer = resolve));
+    const vm = fakeVm((run) => {
+      if (run.args.join(" ").includes("docker info")) asked++;
+      const command = new FakeCommand();
+      void answered.then(() => command.finish(0));
+      return command;
+    });
+    const sandbox = new VercelSandbox("s", vm);
+    const both = Promise.all([sandbox.startDocker(), sandbox.startDocker()]);
+    answer();
+    await both;
+    expect(asked).toBe(1);
+  });
+
   it("kills the command when the stream is closed", async () => {
     const command = new FakeCommand();
     const stream = await new VercelSandbox(

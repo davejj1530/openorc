@@ -7,6 +7,7 @@ export {
   type SandboxCommandOptions,
   type SandboxExecResult,
   type SandboxInfo,
+  type SandboxNeeds,
   type SandboxProvider,
   type SandboxStream,
 } from "./sandbox.js";
@@ -38,6 +39,7 @@ export {
   type Agent37PublicPort,
   type Agent37Resources,
   type Agent37Status,
+  type Agent37Type,
   type Agent37Usage,
   type PortAddress,
 } from "./agent37.js";

@@ -3,9 +3,20 @@ import path from "node:path";
 import { AGENT37_SIZES } from "@openorc/protocol";
 import { setTimeout as sleep } from "node:timers/promises";
 import { agent37Api, agent37Hourly, type Agent37Api, type Agent37Instance, type Agent37Status, type Agent37Usage } from "./agent37.js";
+import { ensureDocker } from "./docker.js";
 import { INSTANCE_SERVER_PORT, InstancePort, instanceServerAnswer, type InstanceProcess } from "./instance-port.js";
 import type { RunnerFile } from "./runner-client.js";
-import { SANDBOX_AWAY_MS, SANDBOX_PREFIX, type Sandbox, type SandboxCommandOptions, type SandboxExecResult, type SandboxInfo, type SandboxProvider, type SandboxStream } from "./sandbox.js";
+import {
+  SANDBOX_AWAY_MS,
+  SANDBOX_PREFIX,
+  type Sandbox,
+  type SandboxCommandOptions,
+  type SandboxExecResult,
+  type SandboxInfo,
+  type SandboxNeeds,
+  type SandboxProvider,
+  type SandboxStream,
+} from "./sandbox.js";
 
 /** The connection Settings keeps: the account's key, and the size new instances are made in. */
 export interface Agent37Connection {
@@ -92,6 +103,11 @@ function commandWords(cmd: string, args: string[], env: Record<string, string> =
   return ["env", ...Object.entries(env).map(([name, value]) => `${name}=${value}`), cmd, ...args].map(shellQuote).join(" ");
 }
 
+/** A VM instance, as Agent37 reports it or, should it not, as OpenOrc marked it when making it. */
+function agent37Vm(instance: Agent37Instance): boolean {
+  return instance.type === "vm" || instance.metadata?.type === "vm";
+}
+
 /** Waits out a change of state and starts a stopped instance, so commands can run in it. */
 export async function ready(api: Agent37Api, first: Agent37Instance | null): Promise<void> {
   const deadline = Date.now() + READY_TIMEOUT_MS;
@@ -125,6 +141,10 @@ export class Agent37Sandbox implements Sandbox {
   private serverStart: Promise<void> | null = null;
   /** Names this build of OpenOrc's server, so one an older OpenOrc left running is replaced. */
   private readonly build: string;
+  /** On a VM instance only: the default type runs under gVisor, which cannot run a Docker daemon. */
+  readonly startDocker?: () => Promise<void>;
+  /** Docker being started; a second call waits for it. */
+  private docker: Promise<void> | null = null;
 
   constructor(
     readonly name: string,
@@ -138,6 +158,11 @@ export class Agent37Sandbox implements Sandbox {
     this.idleSeconds = instance.idle_timeout_seconds;
     this.build = createHash("sha256").update(serverSource).digest("hex").slice(0, 12);
     this.server = new InstancePort(api.port(instance.id, INSTANCE_SERVER_PORT), this.build);
+    if (agent37Vm(instance))
+      this.startDocker = () => {
+        this.docker ??= ensureDocker(this).finally(() => (this.docker = null));
+        return this.docker;
+      };
   }
 
   private awake(): Promise<void> {
@@ -287,7 +312,7 @@ export interface Agent37ProviderOptions {
 type Ours = Agent37Instance & { name: string };
 
 function info(instance: Ours, spent: Agent37Usage | undefined): SandboxInfo {
-  const { compute } = agent37Hourly(instance.resources);
+  const { compute } = agent37Hourly(instance.resources, agent37Vm(instance) ? "vm" : "default");
   return {
     name: instance.name,
     state: STATES[instance.status],
@@ -327,24 +352,25 @@ export class Agent37SandboxProvider implements SandboxProvider {
     return { api: this.api(connection.key), connection };
   }
 
-  open(name: string): Promise<Agent37Sandbox> {
+  open(name: string, needs: SandboxNeeds = {}): Promise<Agent37Sandbox> {
     const pending = this.opening.get(name);
     if (pending) return pending;
-    const opening = this.openNow(name).finally(() => this.opening.delete(name));
+    const opening = this.openNow(name, needs).finally(() => this.opening.delete(name));
     this.opening.set(name, opening);
     return opening;
   }
 
-  private async openNow(name: string): Promise<Agent37Sandbox> {
+  private async openNow(name: string, needs: SandboxNeeds): Promise<Agent37Sandbox> {
     const { api, connection } = await this.access();
     const found = (await api.list()).find((instance) => instance.name === name && this.ours(instance) && OPENING[instance.status] !== "gone");
     const instance =
       found ??
       (await api.create({
         template: "agent37-base",
+        // Type and size apply when the instance is made; one that exists keeps what it was made with.
+        ...(needs.docker ? { type: "vm" as const } : {}),
         name,
-        metadata: { openorc: "thread", host: this.host },
-        // Applies when the instance is made; one that exists keeps the size it was made with.
+        metadata: { openorc: "thread", host: this.host, ...(needs.docker ? { type: "vm" } : {}) },
         resources: { cpu: connection.cpu, memory: connection.memory, disk: agent37Disk(connection) },
         // OpenOrc keeps the instance awake while an agent works; this is for when the Mac is away.
         auto_sleep: true,

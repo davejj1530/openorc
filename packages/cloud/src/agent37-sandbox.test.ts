@@ -3,7 +3,7 @@ import { chmod, mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises"
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { agent37Api, type Agent37Api } from "./agent37.js";
+import { agent37Api, type Agent37Api, type Agent37Instance } from "./agent37.js";
 import { startFakeAgent37, type FakeAgent37 } from "./agent37-fake.js";
 import { Agent37SandboxProvider, type Agent37Connection } from "./agent37-sandbox.js";
 import { checkSandbox, type CheckProgress } from "./check.js";
@@ -86,6 +86,42 @@ describe("opening an Agent37 instance", () => {
     fake.setStatus(instance!.id, "failed", "the disk could not be attached");
     await expect(provider.open("openorc-a")).rejects.toThrow("The Agent37 instance failed: the disk could not be attached. Delete it to start over.");
     expect(sandbox.name).toBe("openorc-a");
+  });
+
+  it("makes a VM only for a workspace that needs Docker, and only a VM can start Docker", async () => {
+    const plain = await provider.open("openorc-a");
+    const vm = await provider.open("openorc-b", { docker: true });
+    const made = new Map((await api.list()).map((instance) => [instance.name, instance]));
+    expect(made.get("openorc-a")).toMatchObject({ type: "default", template: "agent37-base" });
+    expect(made.get("openorc-b")).toMatchObject({ type: "vm", template: "agent37-base", metadata: { openorc: "thread", host: "mac", type: "vm" } });
+    expect(plain.startDocker).toBeUndefined();
+    expect(vm.startDocker).toEqual(expect.any(Function));
+  });
+
+  it("keeps the type an instance was made with when its workspace needs Docker later", async () => {
+    await provider.open("openorc-a");
+    const again = await provider.open("openorc-a", { docker: true });
+    expect((await api.list()).map((instance) => instance.type)).toEqual(["default"]);
+    expect(again.startDocker).toBeUndefined();
+  });
+
+  it("tells a VM by OpenOrc's mark when Agent37 does not report its type", async () => {
+    const unreported = (key: string): Agent37Api => {
+      const real = agent37Api(key, fake.endpoints);
+      const hide = (instance: Agent37Instance): Agent37Instance => ({ ...instance, type: "default" });
+      return {
+        ...real,
+        create: async (params) => hide(await real.create(params)),
+        list: async () => (await real.list()).map(hide),
+        get: async (id) => {
+          const instance = await real.get(id);
+          return instance && hide(instance);
+        },
+      };
+    };
+    const unsaid = new Agent37SandboxProvider({ credentials: async () => connection, files: runnerFiles(), api: unreported });
+    expect((await unsaid.open("openorc-b", { docker: true })).startDocker).toEqual(expect.any(Function));
+    expect((await unsaid.open("openorc-a")).startDocker).toBeUndefined();
   });
 
   it("asks to connect Agent37 until Settings has a key and one of its sizes, without calling Agent37", async () => {
@@ -231,6 +267,13 @@ describe("listing and removing Agent37 instances", () => {
     await api.sleep(mine!.id);
     fake.setUsage(mine!.id, { total_micros: 0, compute_micros: 0 });
     expect(await provider.list()).toMatchObject([{ state: "stopped", awakeMs: 0, costUsd: 0 }]);
+  });
+
+  it("reads a VM's time awake at the 2.5 times rate its compute bills at", async () => {
+    await provider.open("openorc-vm", { docker: true });
+    const [vm] = await api.list();
+    fake.setUsage(vm!.id, { total_micros: 1_000_000, compute_micros: 1_000_000 });
+    expect(await provider.list()).toMatchObject([{ name: "openorc-vm", awakeMs: expect.closeTo((730 / (4.4 * 2.5)) * 3_600_000, -1) }]);
   });
 
   it("keeps the Mac's thread instances and its cloud brain's apart: each host opens, lists and removes only its own", async () => {

@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { BrokeringUnavailable, LocalSandboxProvider, type BrokeredHeader } from "@openorc/cloud";
+import { BrokeringUnavailable, LocalSandboxProvider, type BrokeredHeader, type SandboxNeeds, type SandboxProvider } from "@openorc/cloud";
 import { cloudWorkspaces, Db, projects, threads } from "@openorc/db";
 import { git } from "@openorc/git";
 import type { Project, Thread } from "@openorc/protocol";
@@ -14,6 +14,7 @@ import { OpenCodeCloudKeys, OpenCodeCloudSignIn } from "./cloud-opencode.js";
 import { CloudWorkspaceService, cloudSandboxProviders, LOCAL_LAUNCH_REFUSED } from "./cloud-workspaces.js";
 import { WorkspaceService } from "./workspace.js";
 import { WorkspaceWriters } from "./workspace-writers.js";
+import type { Logger } from "../transport.js";
 
 const quiet = { info() {}, warn() {}, error() {} };
 
@@ -230,6 +231,113 @@ describe("an agent in a sandbox for a turn", () => {
       expect(warnings).toEqual(["cloud sign-ins stay in their sandboxes: This Vercel plan cannot add sign-ins outside the sandbox."]);
       expect(applied).toEqual([[]]);
     });
+  });
+});
+
+describe("Docker in a cloud workspace", () => {
+  /**
+   * Sandboxes on this Mac that record what each was opened for and, when `docker`, stand in for a VM's Docker: its
+   * daemon runs once started, leaves a mark in the sandbox for the setup script, and is gone when the VM stops.
+   */
+  function dockerSandboxes(docker: boolean) {
+    // The agent's CLI is looked for before a turn: a stand-in here, never the person's own.
+    const bin = path.join(directory, "bin-docker");
+    const local = new LocalSandboxProvider(path.join(directory, "sandboxes-docker"), () => ({ ...process.env, PATH: `${bin}:${process.env["PATH"] ?? ""}` }));
+    const opened: SandboxNeeds[] = [];
+    const daemon = { starts: 0, running: false };
+    const provider: SandboxProvider = {
+      id: "local",
+      open: async (name, needs = {}) => {
+        opened.push(needs);
+        const sandbox = await local.open(name);
+        if (!docker) return sandbox;
+        const stop = sandbox.stop.bind(sandbox);
+        const mark = path.join(sandbox.root, "docker-up");
+        return Object.assign(sandbox, {
+          startDocker: async () => {
+            daemon.starts++;
+            daemon.running = true;
+            await writeFile(mark, "");
+          },
+          stop: async () => {
+            daemon.running = false;
+            await rm(mark, { force: true });
+            await stop();
+          },
+        });
+      },
+      remove: (name) => local.remove(name),
+      list: () => local.list(),
+      close: () => local.close(),
+    };
+    return { provider, opened, daemon, bin };
+  }
+
+  async function prepared(sandboxes: SandboxProvider, logger: Logger = quiet) {
+    const cloud = new CloudWorkspaceService(db, { providers: [sandboxes] }, logger);
+    const workspaces = new WorkspaceService(db, { dataDir: path.join(directory, "data-docker"), cloud }, logger, new WorkspaceWriters());
+    const thread = db.transaction(() => {
+      const created = threads.insert(db, { projectId: project.id, title: "Containers", agent: "claude", model: null, mode: "act", permissionMode: "trusted", workspaceMode: "worktree" });
+      workspaces.admitCloud(created.id, "local");
+      return created;
+    });
+    const setup = '[ -f "$OPENORC_ROOT_PATH/../docker-up" ] && echo up > docker-seen.txt || echo down > docker-seen.txt';
+    const ready = await workspaces.prepareThread(thread, { ...project, settings: { ...project.settings, setupScript: setup } }, "HEAD");
+    const location = await cloud.location(cloud.get(ready.id)!, ready.worktreePath!);
+    return { cloud, workspaces, location, seen: () => readFileSync(path.join(location.repo, "docker-seen.txt"), "utf8").trim() };
+  }
+
+  async function composeProject(): Promise<void> {
+    await writeFile(path.join(root, "compose.yaml"), "services:\n  db:\n    image: postgres:17\n");
+    await git(root, ["add", "compose.yaml"]);
+    await git(root, ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.com", "commit", "-qm", "Compose"]);
+  }
+
+  it("opens a new conversation's sandbox for the Docker its project uses and starts it before the setup script, and again before each turn after the VM stopped", async () => {
+    await composeProject();
+    const { provider, opened, daemon, bin } = dockerSandboxes(true);
+    await mkdir(bin, { recursive: true });
+    await writeFile(path.join(bin, "claude"), "#!/bin/sh\necho 2.1.317\n", { mode: 0o755 });
+    const { cloud, workspaces, location, seen } = await prepared(provider);
+    try {
+      // The worktree was still being made when the sandbox opened, so the need came from the commit it starts at.
+      expect(opened).toEqual([{ docker: true }]);
+      expect(seen()).toBe("up");
+      await location.install.sandbox.stop();
+      expect(daemon.running).toBe(false);
+      await cloud.turnEnv({ agent: "claude" }, location, "local");
+      expect(daemon.running).toBe(true);
+      await location.install.sandbox.stop();
+      await cloud.turnEnv({ agent: "claude" }, location, "local");
+      expect(daemon).toEqual({ starts: 3, running: true });
+    } finally {
+      await workspaces.shutdown();
+    }
+  });
+
+  it("opens a sandbox without it for a project that does not use Docker, and never starts it", async () => {
+    const { provider, opened, daemon } = dockerSandboxes(true);
+    const { workspaces, seen } = await prepared(provider);
+    try {
+      expect(opened).toEqual([{ docker: false }]);
+      expect(seen()).toBe("down");
+      expect(daemon.starts).toBe(0);
+    } finally {
+      await workspaces.shutdown();
+    }
+  });
+
+  it("goes on with one line in the log when the sandbox cannot run Docker, as an Agent37 instance made before its project used it", async () => {
+    await composeProject();
+    const lines: string[] = [];
+    const { provider } = dockerSandboxes(false);
+    const { workspaces, seen } = await prepared(provider, { ...quiet, info: (line: string) => void lines.push(line) });
+    try {
+      expect(seen()).toBe("down");
+      expect(lines.filter((line) => line.includes("Docker"))).toEqual([expect.stringMatching(/^cloud workspace openorc-\S+ has no Docker of its own, though its project uses Docker$/)]);
+    } finally {
+      await workspaces.shutdown();
+    }
   });
 });
 

@@ -1,5 +1,6 @@
 import { PassThrough, Writable } from "node:stream";
 import { APIError, Sandbox as SdkSandbox, type NetworkPolicy, type NetworkPolicyRule } from "@vercel/sandbox";
+import { ensureDocker } from "./docker.js";
 import {
   BrokeringUnavailable,
   SANDBOX_AWAY_MS,
@@ -172,6 +173,8 @@ export class VercelSandbox implements Sandbox {
   readonly root: string;
   /** The session timeout each sandbox is made with. */
   readonly awayMs = SANDBOX_AWAY_MS;
+  /** Docker being started; a second call waits for it. */
+  private docker: Promise<void> | null = null;
 
   constructor(
     readonly name: string,
@@ -185,7 +188,7 @@ export class VercelSandbox implements Sandbox {
   }
 
   async launch(cmd: string, args: string[], options: SandboxCommandOptions = {}): Promise<void> {
-    await this.vm.runCommand({ cmd, args, cwd: options.cwd ?? this.root, ...(options.env ? { env: options.env } : {}), detached: true });
+    await this.vm.runCommand({ cmd, args, cwd: options.cwd ?? this.root, ...(options.env ? { env: options.env } : {}), ...(options.sudo ? { sudo: true } : {}), detached: true });
   }
 
   async stream(cmd: string, args: string[], options: SandboxCommandOptions = {}): Promise<SandboxStream> {
@@ -225,6 +228,12 @@ export class VercelSandbox implements Sandbox {
 
   async stop(): Promise<void> {
     await this.vm.stop();
+  }
+
+  /** Every Vercel VM has its own kernel, so Docker runs in any; its images stay with the files across sessions. */
+  startDocker(): Promise<void> {
+    this.docker ??= ensureDocker(this).finally(() => (this.docker = null));
+    return this.docker;
   }
 
   async broker(headers: BrokeredHeader[]): Promise<void> {

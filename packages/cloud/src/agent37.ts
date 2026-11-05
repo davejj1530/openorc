@@ -17,6 +17,7 @@ export interface Agent37Instance {
   /** Why it is in its state, when Agent37 says. */
   status_reason: { code: string; message: string } | null;
   template: string;
+  /** Such as `default`; the docs list `vm` among the types an instance is made as, but not among those it reports. */
   type: string;
   region: string;
   /** The default user's home, where its files live, such as /home/node. */
@@ -43,8 +44,15 @@ export interface Agent37PublicPort {
   label?: string | null;
 }
 
+/**
+ * What an instance runs on, fixed for its life: `default` is a sandbox under gVisor, which cannot run a Docker daemon;
+ * `vm` is a whole VM with its own kernel, whose compute bills at 2.5 times the default rate.
+ */
+export type Agent37Type = "default" | "vm";
+
 export interface Agent37CreateParams {
   template?: string;
+  type?: Agent37Type;
   resources?: Agent37Resources;
   region?: "us" | "eu" | "ap-south";
   name?: string;
@@ -238,12 +246,14 @@ export function agent37Api(key: string, endpoints: Agent37Endpoints = AGENT37_EN
 
 /** Agent37's list prices per 730-hour month (agent37.com/pricing, 2026-11-05). */
 const PRICE = { vcpu: 0.8, memoryGb: 0.7, diskGb: 0.09, monthHours: 730 } as const;
+/** How many times the default rate each type's compute bills at (agent37.com/docs/agents-api/vm-instances, 2026-11-06). */
+const COMPUTE_RATE: Record<Agent37Type, number> = { default: 1, vm: 2.5 };
 const HOUR_MS = 3_600_000;
 
-/** Dollars an hour for an instance of this size: compute while it runs, disk whatever its state. */
-export function agent37Hourly(resources: Agent37Resources): { compute: number; disk: number } {
+/** Dollars an hour for an instance of this size and type: compute while it runs, disk whatever its state. */
+export function agent37Hourly(resources: Agent37Resources, type: Agent37Type = "default"): { compute: number; disk: number } {
   return {
-    compute: (resources.cpu * PRICE.vcpu + resources.memory * PRICE.memoryGb) / PRICE.monthHours,
+    compute: ((resources.cpu * PRICE.vcpu + resources.memory * PRICE.memoryGb) * COMPUTE_RATE[type]) / PRICE.monthHours,
     disk: (resources.disk * PRICE.diskGb) / PRICE.monthHours,
   };
 }

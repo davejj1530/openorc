@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { sessionId, slotFor, type HeadlessRun } from "@openorc/agents";
-import { pushWorkspace, SANDBOX_PREFIX, seedWorkspace, type MirrorState, type RemoteProcess, type RunnerClient, type TakeoverStarted, type WorkspaceLocation } from "@openorc/cloud";
+import { pushWorkspace, SANDBOX_PREFIX, seedWorkspace, type MirrorState, type RemoteProcess, type RunnerClient, type TakeoverStarted } from "@openorc/cloud";
 import { realpath } from "node:fs/promises";
 import { checkpoints, cloudWorkspaces, retiredTeams, runs, threads, type Db, type LedgerWriter } from "@openorc/db";
 import { diffStat, originUrl, pinObject, treeHash } from "@openorc/git";
@@ -8,7 +8,7 @@ import { harnessShortName, WORKSPACE_ID, type AgentEvent, type HarnessId, type P
 import type { Logger } from "../transport.js";
 import { checkpointRefs } from "./checkpoint-refs.js";
 import type { AgentSessions, SessionBase } from "./agent-sessions.js";
-import type { CloudWorkspaceService, SandboxRef } from "./cloud-workspaces.js";
+import type { CloudLocation, CloudWorkspaceService, SandboxRef } from "./cloud-workspaces.js";
 
 /** What the agent is told when its sandbox takes over the turn. */
 const TAKEOVER_PROMPT =
@@ -27,7 +27,7 @@ const SESSION_EVERY_MS = 30_000;
 interface Standby {
   thread: Thread;
   ref: SandboxRef;
-  location: WorkspaceLocation;
+  location: CloudLocation;
   /** What the worktree and the sandbox both have. */
   mirror: MirrorState;
   /** What the sandbox got of the session at the last send, and what this Mac held then. */

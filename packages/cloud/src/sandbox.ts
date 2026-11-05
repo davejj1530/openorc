@@ -70,6 +70,17 @@ export interface Sandbox {
    * otherwise open as before. Throws BrokeringUnavailable when the account cannot.
    */
   broker?(headers: BrokeredHeader[]): Promise<void>;
+  /**
+   * Present only where the VM can run Docker: installs Docker the first time, starts its daemon, and returns once
+   * `docker info` answers as the sandbox's normal user. While the daemon runs this only asks.
+   */
+  startDocker?(): Promise<void>;
+}
+
+/** What a workspace needs of its sandbox, applied when the sandbox is made; one that exists keeps what it was made with. */
+export interface SandboxNeeds {
+  /** Its project runs Docker, such as Compose services or Testcontainers in its tests. */
+  docker?: boolean;
 }
 
 /** Every sandbox OpenOrc makes is named with this, so a list leaves out a team's other sandboxes. */
@@ -93,7 +104,7 @@ export interface SandboxInfo {
 export interface SandboxProvider {
   readonly id: "local" | "vercel" | "agent37";
   /** Creates the named sandbox, or wakes it when it exists. */
-  open(name: string): Promise<Sandbox>;
+  open(name: string, needs?: SandboxNeeds): Promise<Sandbox>;
   /** Deletes the named sandbox and its files for good. */
   remove(name: string): Promise<void>;
   /** Every sandbox OpenOrc made on this service: its conversations' own, and any no conversation has anymore. */

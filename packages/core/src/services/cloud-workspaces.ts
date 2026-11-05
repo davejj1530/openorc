@@ -36,6 +36,7 @@ import { CodexCloudSignIn } from "./cloud-codex.js";
 import { OpenCodeCloudKeys, OpenCodeCloudSignIn } from "./cloud-opencode.js";
 import { sandboxHome } from "./agent-homes.js";
 import type { StartThreadInput } from "./thread-inputs.js";
+import { usesDocker } from "./uses-docker.js";
 
 export interface CloudWorkspaceOptions {
   /** Every sandbox service a workspace may have been made with. A workspace keeps using its own. */
@@ -128,8 +129,20 @@ export interface CloudRunHost {
   env: Record<string, string>;
 }
 
+/** Where a conversation's code lives, and whether Docker starts there before each turn and setup. */
+export interface CloudLocation extends WorkspaceLocation {
+  /** Its project runs Docker and its sandbox can. */
+  docker: boolean;
+}
+
+/** Where a project's files are read to tell what its sandbox needs: a worktree's own, or a commit before the worktree exists. */
+export interface CodeSource {
+  folder: string;
+  commit?: string;
+}
+
 export interface Connection {
-  location: WorkspaceLocation;
+  location: CloudLocation;
   client: RunnerClient;
 }
 
@@ -140,7 +153,7 @@ export interface Connection {
 export class CloudWorkspaceService {
   private files: RunnerFile[] | null;
   /** Where each conversation's code lives, worked out once: opening the sandbox and installing the runner. */
-  private readonly locations = new Map<string, Promise<WorkspaceLocation>>();
+  private readonly locations = new Map<string, Promise<CloudLocation>>();
   /** One runner connection per conversation, kept while its VM is held awake. */
   private readonly connections = new Map<string, Promise<Connection>>();
   private readonly awake: CloudAwake;
@@ -217,16 +230,24 @@ export class CloudWorkspaceService {
     return cloudWorkspaces.get(this.db, threadId);
   }
 
-  /** Where the conversation's code lives in its sandbox and on the Mac. Waits for a stop in progress, then wakes the VM. */
-  async location(record: SandboxRef, mirror: string): Promise<WorkspaceLocation> {
+  /**
+   * Where the conversation's code lives in its sandbox and on the Mac. Waits for a stop in progress, then wakes the VM.
+   * The sandbox is opened for what the project in `code` needs, the worktree unless given.
+   */
+  async location(record: SandboxRef, mirror: string, code: CodeSource = { folder: mirror }): Promise<CloudLocation> {
     await this.stopping.get(record.threadId);
     const existing = this.locations.get(record.threadId);
     if (existing) return existing;
     const location = (async () => {
-      const sandbox = await this.provider(record.provider).open(record.sandbox);
+      const docker = await usesDocker(code.folder, code.commit).catch((error: unknown) => {
+        this.log.warn(`could not tell whether the project of ${record.sandbox} uses Docker: ${error instanceof Error ? error.message : String(error)}`);
+        return false;
+      });
+      const sandbox = await this.provider(record.provider).open(record.sandbox, { docker });
+      if (docker && !sandbox.startDocker) this.log.info(`cloud workspace ${record.sandbox} has no Docker of its own, though its project uses Docker`);
       this.files ??= runnerFiles();
       const install = await installRunner(sandbox, this.files, this.options.node);
-      return { install, repo: path.posix.join(sandbox.root, "repo"), mirror, refPrefix: `refs/openorc/cloud/${record.threadId}/` };
+      return { install, repo: path.posix.join(sandbox.root, "repo"), mirror, refPrefix: `refs/openorc/cloud/${record.threadId}/`, docker: docker && Boolean(sandbox.startDocker) };
     })();
     this.locations.set(record.threadId, location);
     location.catch(() => this.locations.delete(record.threadId));
@@ -332,11 +353,19 @@ export class CloudWorkspaceService {
    */
   seedFresh(threadId: string, project: Project, start: { mirror: string; branch: string; commit: string }): Promise<CloudMirrorState> {
     const { commit, branch } = start;
-    return this.build(threadId, project, start.mirror, (location, origin) => seedFromCommit(location, { source: project.rootPath, commit, branch, ...(origin ? { origin } : {}) }));
+    const seed = (location: WorkspaceLocation, origin: string | undefined) => seedFromCommit(location, { source: project.rootPath, commit, branch, ...(origin ? { origin } : {}) });
+    // The worktree is still being made, so what the sandbox needs is read from the commit it starts at.
+    return this.build(threadId, project, start.mirror, seed, { folder: project.rootPath, commit });
   }
 
   /** Opens the sandbox, gives it the code with `seed` and runs the project's setup there, reporting each step as it starts. */
-  private async build(threadId: string, project: Project, mirror: string, seed: (location: WorkspaceLocation, origin: string | undefined) => Promise<CloudMirrorState>): Promise<CloudMirrorState> {
+  private async build(
+    threadId: string,
+    project: Project,
+    mirror: string,
+    seed: (location: WorkspaceLocation, origin: string | undefined) => Promise<CloudMirrorState>,
+    code?: CodeSource,
+  ): Promise<CloudMirrorState> {
     const record = cloudWorkspaces.get(this.db, threadId);
     if (!record) throw new Error(`Thread ${threadId} has no cloud workspace.`);
     const script = project.settings.setupScript;
@@ -344,8 +373,9 @@ export class CloudWorkspaceService {
     let release: () => void = () => undefined;
     try {
       this.step(threadId, { step: "sandbox", setup: Boolean(script) });
-      const location = await this.location(record, mirror);
+      const location = await this.location(record, mirror, code);
       release = this.awake.hold(threadId, location.install.sandbox);
+      await this.dockerUp(location);
       this.step(threadId, { step: "code", setup: Boolean(script) });
       const state = await seed(location, (await originUrl(project.rootPath)) ?? undefined);
       if (script) {
@@ -506,15 +536,17 @@ export class CloudWorkspaceService {
   /**
    * The agent on the sandbox's PATH and signed in for one turn: its folder and credential variables. Where the sandbox
    * service can add headers on the way out, the sign-in stays on this host and the sandbox holds only stand-ins; a
-   * plan that refuses that keeps sign-ins in the sandbox until OpenOrc restarts.
+   * plan that refuses that keeps sign-ins in the sandbox until OpenOrc restarts. Docker answers there first when the
+   * project uses it.
    */
   async turnEnv(
     run: { agent: string; claudeAccountId?: string | null | undefined; model?: string | null | undefined },
-    location: WorkspaceLocation,
+    location: CloudLocation,
     provider: CloudProviderId,
   ): Promise<Record<string, string>> {
     if (!isHarnessId(run.agent)) throw new Error(STAYS);
     await this.installAgent(run.agent, location, provider);
+    await this.dockerUp(location);
     const { signIn } = this.agents[run.agent];
     const folders = await signIn.homeEnv(location.install.state, provider, who(run));
     const home = async () => folders && sandboxHome(location.install.sandbox, run.agent as HarnessId, folders);
@@ -546,6 +578,14 @@ export class CloudWorkspaceService {
     }
     this.brokered.set(sandbox, policy);
     return true;
+  }
+
+  /**
+   * Docker answers in the sandbox, when its project uses it. The location outlives a VM that stopped, by OpenOrc or on
+   * its own, and took the daemon with it, so this asks again each time; while the daemon runs, asking is one command.
+   */
+  private async dockerUp(location: CloudLocation): Promise<void> {
+    if (location.docker) await location.install.sandbox.startDocker?.();
   }
 
   /** The agent's folders in the conversation's sandbox, as its sign-in names them; null when they are this host's own. */

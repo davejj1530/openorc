@@ -29,6 +29,9 @@ export type MoveStep = z.infer<typeof MoveStep>;
 /** A thread frozen on this host while it relocates: reads answer, every write is refused. Derived from the journal. */
 export const ThreadMoving = z.object({ to: Brain, since: z.number(), step: MoveStep.optional() });
 
+/** A move this Mac asked for that settled without happening, with the words that say why, and when it settled. */
+export const MoveRefusal = z.object({ to: Brain, reason: z.string(), at: z.number() });
+export type MoveRefusal = z.infer<typeof MoveRefusal>;
 export type ThreadMoving = z.infer<typeof ThreadMoving>;
 
 export const MOVING_WORDS: Record<Brain, string> = {

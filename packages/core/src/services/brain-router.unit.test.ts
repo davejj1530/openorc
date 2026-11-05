@@ -186,6 +186,14 @@ it("marks a cloud thread this Mac is bringing here as moving, at its step, befor
   router.close();
 });
 
+it("says on a cloud thread that Bring to Mac did not happen, from this Mac's own journal", async () => {
+  const { router, db } = harness({ cloud: [row("cloud-thread", 1, "cloud-project")] });
+  relocations.open(db, { id: "move", threadId: "cloud-thread", role: "coordinator", direction: "to-mac", phase: "asking", projectId: null }, 5);
+  relocations.advance(db, "move", "asking", "abandoned", "Its branch is checked out in another folder on this Mac.", 6);
+  expect(await ask(router, "threads.get", { id: "cloud-thread" })).toMatchObject({ moveRefused: { to: "mac", reason: "Its branch is checked out in another folder on this Mac.", at: 6 } });
+  router.close();
+});
+
 const start = { mode: "act", permissionMode: "autonomous", agent: "claude", prompt: "Fix the build" } as const;
 
 it("starts a thread asked for the cloud on the brain's copy of the project, listed before the reply", async () => {

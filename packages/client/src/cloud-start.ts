@@ -98,19 +98,29 @@ const MOVE_LABELS: Record<"mac" | "cloud", Record<MoveStep, string>> = {
   mac: { waking: "Waking the cloud brain", packing: "Packing it in the cloud", sending: "Bringing it to this Mac" },
 };
 
+/** The card a conversation shows about a move: its steps while it moves or its brain wakes, or why the last one did not happen. */
+export type MoveCard =
+  | { kind: "moving"; title: string | null; steps: { step: MoveStep; label: string; state: CloudStartStepState }[] }
+  | { kind: "refused"; title: "Didn't move"; reason: string; retry: "cloud.move" | "cloud.bringToMac" };
+
 /**
  * The quiet card on a conversation while it moves between this Mac and the cloud brain, or while the brain it lives on
- * wakes; null otherwise. A move whose step is not known yet is at its first.
+ * wakes, or after a move this Mac asked for was refused, until it is tried again or the conversation does something
+ * else; null otherwise. A move whose step is not known yet is at its first.
  */
-export function threadMoveCard(thread: Pick<ThreadSummary, "moving" | "owner">): { title: string | null; steps: { step: MoveStep; label: string; state: CloudStartStepState }[] } | null {
+export function threadMoveCard(thread: Pick<ThreadSummary, "moving" | "owner" | "moveRefused" | "lastActivityAt">): MoveCard | null {
   const moving = thread.moving;
+  const refused = thread.moveRefused;
+  if (!moving && refused && thread.lastActivityAt <= refused.at)
+    return { kind: "refused", title: "Didn't move", reason: refused.reason, retry: refused.to === "cloud" ? "cloud.move" : "cloud.bringToMac" };
   if (!moving) {
     if (thread.owner?.brain !== "cloud" || thread.owner.reach !== "waking") return null;
-    return { title: null, steps: [{ step: "waking", label: "Waking the cloud brain", state: "running" }] };
+    return { kind: "moving", title: null, steps: [{ step: "waking", label: "Waking the cloud brain", state: "running" }] };
   }
   const order = MOVE_ORDER[moving.to];
   const current = Math.max(0, order.indexOf(moving.step ?? order[0]!));
   return {
+    kind: "moving",
     title: moving.to === "cloud" ? "Moving to the cloud" : "Moving to this Mac",
     steps: order.map((step, index) => ({ step, label: MOVE_LABELS[moving.to][step], state: stepState(index, current) })),
   };

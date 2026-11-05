@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Db } from "./database.js";
-import { FROZEN, GONE_WORDS, frozenMoving, nextPhase, relocations, type CoordinatorRelocation, type StepOutcome } from "./relocations.js";
+import { FROZEN, GONE_WORDS, frozenMoving, nextPhase, refusedMove, refusedMoves, relocations, type CoordinatorRelocation, type StepOutcome } from "./relocations.js";
 
 const OUTCOMES: StepOutcome[] = [
   { kind: "sent" },
@@ -91,5 +91,24 @@ describe("the journal", () => {
     cases.forEach(([role, direction, phase], index) => relocations.open(db, { id: `r${index}`, threadId: `t${index}`, role, direction, phase, projectId: null }));
     expect(cases.map((_, index) => frozenMoving(db, `t${index}`)?.to ?? null)).toEqual(cases.map(([, , , to]) => to));
     expect([...FROZEN["coordinator/to-cloud"]].sort()).toEqual(["frozen", "sending"]);
+  });
+});
+
+describe("a move this Mac asked for that did not happen", () => {
+  it("shows with its reason, and goes for the person's own Keep, a move that happened, a newer move, and the brain's rows", () => {
+    const db = Db.memory();
+    relocations.open(db, { id: "r1", threadId: "refused", role: "coordinator", direction: "to-cloud", phase: "frozen", projectId: "p" }, 1);
+    relocations.advance(db, "r1", "frozen", "abandoned", "The cloud brain has no copy of this project.", 5);
+    relocations.open(db, { id: "r2", threadId: "kept", role: "coordinator", direction: "to-mac", phase: "asking", projectId: "p" }, 1);
+    relocations.advance(db, "r2", "asking", "abandoned", null, 5);
+    relocations.open(db, { id: "r3", threadId: "moved", role: "coordinator", direction: "to-cloud", phase: "done", projectId: "p" }, 1);
+    relocations.open(db, { id: "r4", threadId: "again", role: "coordinator", direction: "to-mac", phase: "asking", projectId: "p" }, 1);
+    relocations.advance(db, "r4", "asking", "abandoned", "Its last changes are still in its sandbox.", 2);
+    relocations.open(db, { id: "r5", threadId: "again", role: "coordinator", direction: "to-mac", phase: "asking", projectId: "p" }, 3);
+    relocations.open(db, { id: "r6", threadId: "brain", role: "brain", direction: "to-mac", phase: "stayed", projectId: null, error: "Busy." }, 1);
+    expect(refusedMoves(db)).toEqual([{ threadId: "refused", refusal: { to: "cloud", reason: "The cloud brain has no copy of this project.", at: 5 } }]);
+    expect(refusedMove(db, "refused")).toEqual({ to: "cloud", reason: "The cloud brain has no copy of this project.", at: 5 });
+    for (const threadId of ["kept", "moved", "again", "brain"]) expect(refusedMove(db, threadId)).toBeNull();
+    db.close();
   });
 });

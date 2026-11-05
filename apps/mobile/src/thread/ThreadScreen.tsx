@@ -18,6 +18,7 @@ import { useThreadOnScreen } from "../notifications/on-screen";
 import { Spinner } from "../ui/Spinner";
 import { Text } from "../ui/Text";
 import { CloudStart } from "./CloudStart";
+import { MoveRefused } from "./MoveRefused";
 import { createDisclosure, DisclosureContext } from "./disclosure";
 import { useMarkSeen } from "./mark-seen";
 import { holdTranscriptList, perfEnabled, reportThreadOpened } from "./perf-probe";
@@ -180,6 +181,7 @@ export function ThreadScreen() {
       {menu}
       <DisclosureContext.Provider value={disclosure}>
         <VoicesContext.Provider value={voices}>
+          {thread ? <MoveRefused thread={thread} /> : null}
           {thread ? (
             <TranscriptPane
               threadId={id}

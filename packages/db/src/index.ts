@@ -38,4 +38,18 @@ export {
   type ThreadRows,
   type ThreadTable,
 } from "./thread-rows.js";
-export { FROZEN, GONE_WORDS, frozenMoving, incomingMove, nextPhase, relocations, settled, type CoordinatorRelocation, type Relocation, type RelocationKind, type StepOutcome } from "./relocations.js";
+export {
+  FROZEN,
+  GONE_WORDS,
+  frozenMoving,
+  incomingMove,
+  nextPhase,
+  refusedMove,
+  refusedMoves,
+  relocations,
+  settled,
+  type CoordinatorRelocation,
+  type Relocation,
+  type RelocationKind,
+  type StepOutcome,
+} from "./relocations.js";

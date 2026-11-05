@@ -126,7 +126,7 @@ describe("where a row lives", () => {
 });
 
 describe("the card on a conversation that moves", () => {
-  const states = (card: ReturnType<typeof threadMoveCard>) => card?.steps.map(({ label, state }) => `${label}: ${state}`);
+  const states = (card: ReturnType<typeof threadMoveCard>) => (card?.kind === "moving" ? card.steps.map(({ label, state }) => `${label}: ${state}`) : undefined);
 
   it("walks a move to the cloud through packing, waking the brain and sending, each step before the current done", () => {
     const card = threadMoveCard(summary("t", 1, { moving: { to: "cloud", since: 1, step: "waking" } }));
@@ -152,5 +152,14 @@ describe("the card on a conversation that moves", () => {
     expect(threadMoveCard(summary("t", 1, { owner: { brain: "cloud", reach: "live", heardAt: 1 } }))).toBeNull();
     expect(threadMoveCard(summary("t", 1, { owner: { brain: "cloud", reach: "asleep", heardAt: 1 } }))).toBeNull();
     expect(threadMoveCard(summary("t", 1))).toBeNull();
+  });
+
+  it("says a refused move did not happen, with its reason and the move to try again, until the conversation does something", () => {
+    const refused = { to: "cloud" as const, reason: "OpenCode has no key for OpenRouter in the cloud. Add one in Settings > Cloud.", at: 10 };
+    expect(threadMoveCard(summary("t", 10, { moveRefused: refused }))).toEqual({ kind: "refused", title: "Didn't move", reason: refused.reason, retry: "cloud.move" });
+    expect(threadMoveCard(summary("t", 10, { moveRefused: { ...refused, to: "mac" } }))).toMatchObject({ retry: "cloud.bringToMac" });
+    // Newer activity, or a new move under way, takes it away.
+    expect(threadMoveCard(summary("t", 11, { moveRefused: refused }))).toBeNull();
+    expect(threadMoveCard(summary("t", 10, { moveRefused: refused, moving: { to: "cloud", since: 12 } }))?.kind).toBe("moving");
   });
 });

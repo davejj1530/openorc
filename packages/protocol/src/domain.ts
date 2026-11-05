@@ -3,7 +3,7 @@ import { CloudThreadState } from "./cloud.js";
 import { ActivityRecovery, AgentKind, BackgroundCommand, SubagentStatus, Usage } from "./events.js";
 import { ExecutionTarget } from "./execution-target.js";
 import { HarnessId } from "./harness.js";
-import { ThreadMoving, ThreadOwner } from "./thread-owner.js";
+import { MoveRefusal, ThreadMoving, ThreadOwner } from "./thread-owner.js";
 
 /** Domain records as the renderer sees them. Columns are nullable, not optional. */
 
@@ -223,6 +223,8 @@ export const ThreadSummary = Thread.extend({
   owner: ThreadOwner.optional(),
   /** Set while the thread relocates between brains; it refuses writes until then. */
   moving: ThreadMoving.nullable().optional(),
+  /** The last move this Mac asked for, when it was refused; phones from before ignore it. */
+  moveRefused: MoveRefusal.nullable().optional(),
   /**
    * When the agent on this thread's active run last produced an event, epoch ms.
    * Null when no run is live, because a thread that is not running cannot stall.

@@ -1,4 +1,4 @@
-import { frozenMoving, subagents, tasks, threadQueue, type Db } from "@openorc/db";
+import { frozenMoving, refusedMove, subagents, tasks, threadQueue, type Db } from "@openorc/db";
 import type { Thread, ThreadSummary } from "@openorc/protocol";
 import type { RunService } from "./runs.js";
 import type { WorkspaceService } from "./workspace.js";
@@ -28,6 +28,7 @@ export function summarizeThread({ db, runs, workspaces }: SummaryDeps, t: Thread
     queued: threadQueue.list(db, t.id),
     cloud: workspaces.cloudState(t.id),
     moving: frozenMoving(db, t.id),
+    moveRefused: refusedMove(db, t.id),
     lastAgentEventAt: runs.threadLastAgentEventAt(t.id),
     liveRunId: liveRunId(db, runs, t.id),
     taskCount: own.filter((x) => x.status !== "archived").length,

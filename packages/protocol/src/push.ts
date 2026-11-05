@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Task } from "./domain.js";
+import type { MoveRefusal } from "./thread-owner.js";
 import type { CorePush } from "./rpc.js";
 
 /** The iPhone app: its APNs topic and the team whose key signs for it. apps/mobile/app.json must agree (tested). */
@@ -56,6 +57,11 @@ export const deviceRpcParams = {
    * before this method answers with an error: the phone shows no task list.
    */
   "tasks.board": z.object({}).strict(),
+  /**
+   * The moves this Mac asked for that were refused, by thread, for the phone's "Didn't move" card. A host from before
+   * this method answers with an error: none.
+   */
+  "moves.refused": z.object({}).strict(),
 };
 export type DeviceMethod = keyof typeof deviceRpcParams;
 export type DeviceParams<M extends DeviceMethod> = z.infer<(typeof deviceRpcParams)[M]>;
@@ -81,6 +87,7 @@ export interface DeviceRpcResults {
   "host.kind": "mac" | "brain";
   "brains.removed": string[];
   "tasks.board": TaskBoard;
+  "moves.refused": { threadId: string; refusal: MoveRefusal }[];
 }
 
 /** A task as a phone's list shows it: nothing about folders or branches on the host. */

@@ -1,4 +1,4 @@
-import type { Brain, MoveStep, ThreadMoving } from "@openorc/protocol";
+import type { Brain, MoveRefusal, MoveStep, ThreadMoving } from "@openorc/protocol";
 import type { Db } from "./database.js";
 
 interface RelocationBase {
@@ -184,6 +184,28 @@ export const relocations = {
     return row ? fromRow(row) : null;
   },
 };
+
+/**
+ * Each thread's last move this Mac asked for, when it settled refused with words, as "Didn't move" shows it. The
+ * person's own Keep settles with no words, so it is not one. Whether the thread did something since is the reader's to
+ * judge, with the thread's own last activity.
+ */
+export function refusedMoves(db: Db, threadId?: string): { threadId: string; refusal: MoveRefusal }[] {
+  const rows = db
+    .stmt(
+      `SELECT r.thread_id, r.direction, r.phase, r.error, r.updated_at FROM thread_relocations r
+       WHERE r.role = 'coordinator' AND (? IS NULL OR r.thread_id = ?) AND NOT EXISTS (
+         SELECT 1 FROM thread_relocations later WHERE later.thread_id = r.thread_id AND later.role = 'coordinator'
+           AND (later.updated_at > r.updated_at OR (later.updated_at = r.updated_at AND later.rowid > r.rowid)))`,
+    )
+    .all(threadId ?? null, threadId ?? null) as { thread_id: string; direction: "to-cloud" | "to-mac"; phase: string; error: string | null; updated_at: number }[];
+  return rows.flatMap((row) =>
+    row.phase === "abandoned" && row.error ? [{ threadId: row.thread_id, refusal: { to: row.direction === "to-cloud" ? "cloud" : "mac", reason: row.error, at: row.updated_at } as const }] : [],
+  );
+}
+
+/** The thread's last move this Mac asked for, when it was refused with words; null otherwise. */
+export const refusedMove = (db: Db, threadId: string): MoveRefusal | null => refusedMoves(db, threadId)[0]?.refusal ?? null;
 
 /** The thread's frozen state on this host, or null: read by every write path. */
 export function frozenMoving(db: Db, threadId: string): ThreadMoving | null {

@@ -14,6 +14,7 @@ export {
   runsInCloud,
   startingInCloud,
   threadMoveCard,
+  type MoveCard,
   type CloudStartStep,
   type CloudStartStepState,
   type StartingCloudThread,

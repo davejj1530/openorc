@@ -1,6 +1,6 @@
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
-import { incomingMove, runs, settings, tasks, threads, type Db } from "@openorc/db";
+import { incomingMove, refusedMove, runs, settings, tasks, threads, type Db } from "@openorc/db";
 import {
   mergeInbox,
   mergeTaskPages,
@@ -299,8 +299,10 @@ export class BrainRouter {
     if (!row.owner) return row;
     const folder = this.deps.mirrors.folder(row.id);
     const moving = incomingMove(this.deps.db, row.id) ?? row.moving;
+    // Bring to Mac is this Mac's own move, so its refusal is in this Mac's journal, never the brain's row.
+    const moveRefused = refusedMove(this.deps.db, row.id);
     const mirrored = folder ? { worktreePath: folder, owner: { ...row.owner, mirror: true } } : {};
-    return { ...row, ...mirrored, ...(moving ? { moving } : {}) };
+    return { ...row, ...mirrored, ...(moving ? { moving } : {}), ...(moveRefused ? { moveRefused } : {}) };
   }
 
   /** The files a call names, stored on the brain first: it cannot read this Mac's files. Images stay images there. */

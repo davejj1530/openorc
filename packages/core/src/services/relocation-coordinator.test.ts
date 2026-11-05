@@ -583,6 +583,11 @@ describe("a move that fails for a reason other than a lost connection", () => {
     expect(receives).toBe(2);
     expect(await holders(threadId)).toEqual([{ name: "mac", ...content }]);
     expect(relocations.latest(brain.db, threadId)).toMatchObject({ phase: "dropped" });
+    // The conversation says so on its card, and so does the phone's question of this Mac.
+    const reason = "“Work” has no token for cloud threads. Create one in Settings → Cloud.";
+    const listed = (await mac!.handle({ type: "rpc", id: 9, method: "threads.get", params: { id: threadId } })) as { result: { moveRefused: unknown } };
+    expect(listed.result.moveRefused).toMatchObject({ to: "cloud", reason });
+    expect(await mac!.remote.device("phone", "moves.refused", {})).toEqual([{ threadId, refusal: expect.objectContaining({ to: "cloud", reason }) }]);
   }, 60_000);
 
   it("settles Bring to Mac with the brain's reason when it fails to pack the thread, unfrozen there", async () => {

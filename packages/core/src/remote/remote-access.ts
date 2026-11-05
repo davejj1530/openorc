@@ -1,4 +1,4 @@
-import { projects, remoteDevices, remotePushTargets, retiredTeams, settings, threads, type Db, type LedgerWriter, type RemoteDeviceRecord } from "@openorc/db";
+import { projects, refusedMoves, remoteDevices, remotePushTargets, retiredTeams, settings, threads, type Db, type LedgerWriter, type RemoteDeviceRecord } from "@openorc/db";
 import {
   acceptLink,
   encodePairingUrl,
@@ -228,6 +228,8 @@ export class RemoteAccess {
         return removedBrains(this.options.db);
       case "tasks.board":
         return taskBoard(this.options.db, Boolean(this.network.publicAddress));
+      case "moves.refused":
+        return refusedMoves(this.options.db);
     }
   }
 

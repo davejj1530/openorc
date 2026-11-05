@@ -14,7 +14,7 @@ afterEach(() => {
 const steps = (states: CloudCheck["steps"][number]["state"][]): CloudCheck["steps"] =>
   (["sandbox", "tools", "runner", "relay", "signins", "sync", "remove"] as const).map((step, index) => ({ step, state: states[index] ?? "pending", ms: null, detail: null, error: null }));
 
-function show(check: CloudCheck | null, vercel: CloudStatus["vercel"] = null) {
+function show(check: CloudCheck | null, vercel: CloudStatus["vercel"] = null, service?: CloudStatus["service"]) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
@@ -27,6 +27,7 @@ function show(check: CloudCheck | null, vercel: CloudStatus["vercel"] = null) {
           check,
           error: null,
           takeover: false,
+          ...(service !== undefined ? { service } : {}),
         }}
       />
     </QueryClientProvider>,
@@ -39,6 +40,12 @@ it("starts a check where new cloud threads run", async () => {
   expect(screen.getByText("On Vercel")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Run check" }));
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.check", {}));
+});
+
+it("says it runs on Agent37 when new cloud threads run there", () => {
+  vi.mocked(core.call).mockResolvedValue(null);
+  show(null, { team: { id: "t", name: "Team" }, project: "openorc-sandboxes", vcpus: null, region: "sin1" }, "agent37");
+  expect(screen.getByText("On Agent37")).toBeTruthy();
 });
 
 it("shows the steps while it runs, without a second start", () => {

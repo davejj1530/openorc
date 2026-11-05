@@ -1,4 +1,4 @@
-import type { CloudCheck, CloudCheckStep, CloudStatus } from "@openorc/protocol";
+import type { CloudCheck, CloudCheckStep, CloudService, CloudStatus } from "@openorc/protocol";
 import { Button } from "../components/ui";
 import { StepMark } from "../components/WorkSteps";
 import { useRpcMutation } from "../lib/client";
@@ -42,6 +42,14 @@ function CheckSteps({ check }: { check: CloudCheck }) {
   );
 }
 
+const PLACES: Record<CloudService | "local", string> = { vercel: "On Vercel", agent37: "On Agent37", local: "In a sandbox simulated on this Mac" };
+
+/** The check runs where new cloud threads run: the service "Run on" names, else Vercel once it has a team, for older cores. */
+function checkService(status: CloudStatus): CloudService | null {
+  if (status.service !== undefined) return status.service;
+  return status.vercel?.team && status.vercel.project ? "vercel" : null;
+}
+
 function verdict(check: CloudCheck | null): string | undefined {
   if (!check || check.passed === null) return undefined;
   return check.passed ? "Cloud threads can run here." : "A cloud thread would fail at the step marked below.";
@@ -52,8 +60,7 @@ export function CloudCheckSection({ status }: { status: CloudStatus }) {
   const start = useRpcMutation("cloud.check");
   const { check } = status;
   const running = check?.passed === null;
-  // New cloud threads, and so the check, run on Vercel once it has a team and project.
-  const where = status.vercel?.team && status.vercel.project ? "On Vercel" : "In a sandbox simulated on this Mac";
+  const where = PLACES[checkService(status) ?? "local"];
   return (
     <Section title="Check" description={verdict(check)}>
       <SettingRow label="Cloud check" hint={where}>

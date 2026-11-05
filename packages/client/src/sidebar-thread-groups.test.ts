@@ -1,6 +1,6 @@
 import type { ThreadSummary } from "@openorc/protocol";
 import { describe, expect, it } from "vitest";
-import { ORC_MODE_WINDOW, projectMeta, sidebarSectionOpen, sidebarThreadPage, threadListParams, toggleSidebarFold, visibleSidebarThreadIds } from "./sidebar-thread-groups.js";
+import { projectMeta, sidebarSectionOpen, sidebarThreadPage, threadListParams, toggleSidebarFold, visibleSidebarThreadIds } from "./sidebar-thread-groups.js";
 import { threadTreeRows, toggleThreadTree } from "./thread-tree.js";
 
 function thread(id: string, values: Partial<ThreadSummary> = {}): ThreadSummary {
@@ -59,27 +59,6 @@ describe("sidebar thread page", () => {
     expect(visibleSidebarThreadIds(section, ["snoozed-open:project"])).toEqual(["pinned", "regular", "both", "snoozed"]);
     expect(visibleSidebarThreadIds(section, ["pinned:project", "snoozed-open:project"])).toEqual(["regular", "both", "snoozed"]);
     expect(visibleSidebarThreadIds(section, ["project:project"])).toEqual([]);
-  });
-
-  it("keeps orcmode's working set and the open thread, and counts what it leaves out", () => {
-    const now = 10 * ORC_MODE_WINDOW;
-    const old = now - 2 * ORC_MODE_WINDOW;
-    const idle = { activity: "idle", unread: false, lastActivityAt: old } as const;
-    const fetched = [
-      thread("waiting", { ...idle, activity: "waiting" }),
-      thread("running", { ...idle, activity: "running" }),
-      thread("unread", { ...idle, unread: true }),
-      thread("pinned", { ...idle, pinnedAt: 1 }),
-      thread("recent", { ...idle, lastActivityAt: now - ORC_MODE_WINDOW + 1 }),
-      thread("stale", idle),
-      thread("snoozed", { ...idle, lastActivityAt: now, snoozedUntil: now + 1 }),
-    ];
-    const page = sidebarThreadPage({ projectId: "project", fetched, selected: thread("open", idle), filter: "orc", limit: 8, now });
-    expect(page.pinned.map((row) => row.id)).toEqual(["pinned"]);
-    expect(page.rest.map((row) => row.id)).toEqual(["waiting", "running", "unread", "recent", "open"]);
-    expect(page.snoozed).toEqual([]);
-    expect(page.leftOut).toBe(2);
-    expect(sidebarThreadPage({ projectId: "project", fetched, selected: null, filter: "active", limit: 8, now }).leftOut).toBe(0);
   });
 
   it("leaves archived threads in fetched order without active-only groups", () => {
@@ -148,7 +127,7 @@ describe("project heading meta", () => {
 
 describe("thread list reads", () => {
   it("asks for one more thread than a project shows, from the list its filter reads", () => {
-    expect(threadListParams("project", "orc")).toEqual({ projectId: "project", filter: "active", limit: 13, includeChildren: true });
+    expect(threadListParams("project", "active")).toEqual({ projectId: "project", filter: "active", limit: 13, includeChildren: true });
     expect(threadListParams("project", "archived", 24)).toEqual({ projectId: "project", filter: "archived", limit: 25, includeChildren: true });
   });
 });

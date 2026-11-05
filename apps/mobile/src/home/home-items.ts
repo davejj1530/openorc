@@ -43,7 +43,7 @@ export type HomeItem =
 
 export interface HomeOptions {
   now: number;
-  /** What Home lists: orcmode's working set, the active threads (only the pinned ones with `pinnedOnly`), or the archive. */
+  /** What Home lists: the active threads (only the pinned ones with `pinnedOnly`), or the archive. */
   filter: SidebarFilter;
   pinnedOnly: boolean;
   /** The reader's saved fold keys. */
@@ -122,6 +122,8 @@ interface Part {
   more?: boolean;
   /** Older stands while more threads are left to load, before any of it has. */
   standsEmpty?: boolean;
+  /** A day, which folded still shows the threads that need you. */
+  day?: boolean;
 }
 
 function partItems(part: Part, list: HomeList, options: HomeOptions, waitingRoots: ReadonlySet<string>): HomeItem[] {
@@ -130,7 +132,7 @@ function partItems(part: Part, list: HomeList, options: HomeOptions, waitingRoot
   const all = list.days.all.filter((thread) => !waitingRoots.has(thread.id));
   return [
     { kind: "section", key: part.key, label: part.label, open: part.open, ...(part.counted ? { count: roots.length } : {}) },
-    ...treeRows(list.days.shown(roots, part.open), all, list, options, options.opened === part.key),
+    ...treeRows((part.day ? list.days.shownInDay : list.days.shown)(roots, part.open), all, list, options, options.opened === part.key),
     ...(part.open && part.more ? [{ kind: "more", key: `more:${part.key}` } as const] : []),
   ];
 }
@@ -177,6 +179,7 @@ export function homeItems(list: HomeList, options: HomeOptions): HomeItem[] {
       open: sidebarDayOpen(options.collapsed, day),
       more: day === "older" && days.hasMore,
       standsEmpty: day === "older",
+      day: true,
     })),
   ];
   return [

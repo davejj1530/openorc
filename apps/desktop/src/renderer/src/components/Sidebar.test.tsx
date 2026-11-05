@@ -12,6 +12,20 @@ const fixture: {
     Partial<Pick<ThreadSummary, "createdAt" | "archivedAt" | "parentThreadId" | "parentRelation" | "subagent" | "prUrl" | "prState">>)[];
 } = vi.hoisted(() => ({ projects: [], threads: [] }));
 
+/** The core's answer to a thread list, as the fixture's threads read. */
+const listThreads = vi.hoisted(() => (params: RpcParams<"threads.list">) => {
+  const rows = fixture.threads.filter(
+    (thread) =>
+      (!params.projectId || thread.projectId === params.projectId) &&
+      (!params.projectIds || params.projectIds.includes(thread.projectId)) &&
+      (!params.pinnedOnly || thread.pinnedAt) &&
+      (!params.needsYou || thread.unread || thread.activity !== "idle") &&
+      (params.filter === "archived") === Boolean(thread.archivedAt),
+  );
+  if (params.orderBy === "activity") rows.sort((a, b) => b.lastActivityAt - a.lastActivityAt || b.id.localeCompare(a.id));
+  return rows.slice(0, params.limit);
+});
+
 vi.mock("../lib/client", async (original) => {
   const rpcData = (method: string, params: { id?: string }) => {
     if (method === "threads.get" && !params.id) return null;
@@ -29,24 +43,22 @@ vi.mock("../lib/client", async (original) => {
           session: { status: "idle", message: null },
         }
       );
+    if (method === "threads.list") return listThreads(params as RpcParams<"threads.list">);
     return undefined;
   };
-  return { ...(await original<object>()), useRpc: (method: string, params: { id?: string }) => ({ data: rpcData(method, params) }), usePendingApprovals: () => 0, useRun: () => undefined };
+  return {
+    ...(await original<object>()),
+    useRpc: (method: string, params: { id?: string }, options?: { enabled?: boolean }) => ({ data: options?.enabled === false ? undefined : rpcData(method, params) }),
+    usePendingApprovals: () => 0,
+    useRun: () => undefined,
+  };
 });
 vi.mock("../lib/rpc", () => ({
   core: {
     call: vi.fn(async (method: string, params: RpcParams<"threads.list">) => {
       if (method === "threads.get") return fixture.threads.find((thread) => thread.id === (params as { id?: string }).id) ?? null;
       if (method !== "threads.list") return [];
-      const rows = fixture.threads.filter(
-        (thread) =>
-          (!params.projectId || thread.projectId === params.projectId) &&
-          (!params.projectIds || params.projectIds.includes(thread.projectId)) &&
-          (!params.pinnedOnly || thread.pinnedAt) &&
-          (params.filter === "archived") === Boolean(thread.archivedAt),
-      );
-      if (params.orderBy === "activity") rows.sort((a, b) => b.lastActivityAt - a.lastActivityAt || b.id.localeCompare(a.id));
-      return rows.slice(0, params.limit);
+      return listThreads(params);
     }),
     onPush: () => () => {},
   },
@@ -350,54 +362,6 @@ function projectThreads() {
   ].map((thread) => ({ ...thread, agent: "codex", activity: "idle", unread: false, session: { status: "idle", message: null }, lastActivityAt: Date.now() }));
 }
 
-it("narrows to orcmode's working set, hides projects with nothing in it, and keeps the rest one step away", async () => {
-  const day = 86_400_000;
-  fixture.projects = [
-    { id: "one", name: "First project", rootPath: "/projects/one" },
-    { id: "quiet", name: "Quiet project", rootPath: "/projects/quiet" },
-  ];
-  fixture.threads = [
-    { id: "today", title: "Today's work", projectId: "one", lastActivityAt: Date.now() - 60_000 },
-    { id: "old", title: "Old notes", projectId: "one", lastActivityAt: Date.now() - 3 * day },
-    { id: "dusty", title: "Dusty idea", projectId: "quiet", lastActivityAt: Date.now() - 9 * day },
-  ].map((thread) => ({ ...thread, agent: "codex", activity: "idle", unread: false, session: { status: "idle", message: null }, pinnedAt: null, snoozedUntil: null }));
-  mountSidebar();
-  await screen.findByRole("button", { name: /Today's work/ });
-  fireEvent.click(screen.getByRole("button", { name: "Filter threads" }));
-  fireEvent.click(await screen.findByRole("menuitem", { name: "Orcmode" }));
-  expect(await screen.findByRole("button", { name: /Today's work/ })).toBeTruthy();
-  expect(screen.queryByRole("button", { name: /Old notes|Dusty idea/ })).toBeNull();
-  expect(screen.queryByText("Quiet project")).toBeNull();
-  expect(screen.getByRole("button", { name: "Filter threads: Orcmode" })).toBeTruthy();
-  expect(useUi.getState().threadOrder).toEqual(["today"]);
-  // The end of the list leads back to all of them.
-  fireEvent.click(screen.getByRole("button", { name: "Show 2 more" }));
-  expect(useLayout.getState().sidebarFilter).toBe("active");
-  fireEvent.click(await screen.findByRole("button", { name: "Last 7 days" }));
-  expect(screen.getByRole("button", { name: /Old notes/ })).toBeTruthy();
-});
-
-it("says so when nothing needs you, with every thread still one click away", async () => {
-  projectThreads();
-  fixture.threads = fixture.threads.map((thread) => ({ ...thread, pinnedAt: null, lastActivityAt: Date.now() - 2 * 86_400_000 }));
-  useLayout.setState({ sidebarFilter: "orc" });
-  mountSidebar();
-  expect(await screen.findByText("Nothing needs you today.")).toBeTruthy();
-  expect(screen.queryByText("First project")).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Show 4 more" }));
-  fireEvent.click(await screen.findByRole("button", { name: "Last 7 days" }));
-  expect(await screen.findByRole("button", { name: /Regular notes/ })).toBeTruthy();
-});
-
-it("toggles orcmode from the keyboard, leaving pinned-only behind and remembering the choice", () => {
-  useLayout.setState({ sidebarFilter: "active", pinnedOnly: true });
-  useLayout.getState().toggleOrcMode();
-  expect(useLayout.getState()).toMatchObject({ sidebarFilter: "orc", pinnedOnly: false });
-  expect(JSON.parse(localStorage.getItem("openorc.layout") ?? "{}")).toMatchObject({ sidebarFilter: "orc" });
-  useLayout.getState().toggleOrcMode();
-  expect(useLayout.getState().sidebarFilter).toBe("active");
-});
-
 function dayThreads() {
   fixture.projects = [{ id: "one", name: "First project", rootPath: "/projects/one" }];
   fixture.threads = [
@@ -409,6 +373,24 @@ function dayThreads() {
 }
 
 const section = (name: string) => screen.getByRole("button", { name }).getAttribute("aria-expanded");
+
+it("keeps what needs you in a folded day, even past the loaded pages, and nothing else of it", async () => {
+  fixture.projects = [
+    { id: "one", name: "First project", rootPath: "/projects/one" },
+    { id: "two", name: "Second project", rootPath: "/projects/two" },
+  ];
+  const base = { agent: "codex", activity: "idle", unread: false, session: { status: "idle", message: null }, pinnedAt: null, snoozedUntil: null } as const;
+  fixture.threads = [
+    ...Array.from({ length: 14 }, (_, index) => ({ ...base, id: `week-${index}`, title: `Week notes ${index}`, projectId: "one", lastActivityAt: ago(3) - index })),
+    { ...base, id: "waiting", title: "Waiting on you", projectId: "one", lastActivityAt: ago(3) - 100, activity: "waiting" as const },
+    { ...base, id: "unread", title: "Old unread result", projectId: "two", lastActivityAt: ago(30), unread: true },
+    { ...base, id: "quiet", title: "Old quiet notes", projectId: "two", lastActivityAt: ago(30) },
+  ];
+  mountSidebar();
+  await waitFor(() => expect(useUi.getState().threadOrder).toEqual(["waiting", "unread"]));
+  expect(screen.queryByRole("button", { name: /Old quiet notes|Week notes 0/ })).toBeNull();
+  expect(["Last 7 days", "Older"].map(section)).toEqual(["false", "false"]);
+});
 
 it("lists threads by day, today and yesterday open, the last week and older folded, and keeps the reader's folds", async () => {
   dayThreads();
@@ -499,37 +481,18 @@ it("keeps pinned and archived filters available", async () => {
   await waitFor(() => expect(useUi.getState().threadOrder).toEqual(["archived"]));
 });
 
-it("keeps orcmode's working set and a shared snoozed section", async () => {
+it("keeps snoozed threads in one shared section", async () => {
   projectThreads();
   const base = fixture.threads[0]!;
   fixture.threads = [
     { ...base, id: "running", title: "Older running thread", createdAt: 1, lastActivityAt: Date.now() - 1000, pinnedAt: null, activity: "running" },
     { ...base, id: "recent", title: "Newer recent thread", projectId: "two", createdAt: 3, pinnedAt: null },
-    { ...base, id: "quiet", title: "Older quiet thread", createdAt: 2, pinnedAt: null, lastActivityAt: Date.now() - 3 * 86_400_000 },
     { ...base, id: "snoozed", title: "Snoozed thread", createdAt: 4, pinnedAt: null, snoozedUntil: Date.now() + 60_000 },
   ];
   mountSidebar();
   await waitFor(() => expect(useUi.getState().threadOrder).toEqual(["recent", "running"]));
   fireEvent.click(screen.getByRole("button", { name: "Snoozed 1" }));
   expect(useUi.getState().threadOrder).toEqual(["recent", "running", "snoozed"]);
-  fireEvent.click(screen.getByRole("button", { name: /^Filter threads/ }));
-  fireEvent.click(await screen.findByRole("menuitem", { name: "Orcmode" }));
-  await waitFor(() => expect(useUi.getState().threadOrder).toEqual(["recent", "running"]));
-  expect(screen.queryByRole("button", { name: /Older quiet thread|Snoozed thread/ })).toBeNull();
-  expect(screen.getByRole("button", { name: "Show 2 more" })).toBeTruthy();
-});
-
-it("retains orcmode work from every project even when another project fills a page", async () => {
-  projectThreads();
-  const base = fixture.threads[0]!;
-  fixture.threads = [
-    ...Array.from({ length: 14 }, (_, index) => ({ ...base, id: `new-${index}`, title: `New ${index}`, createdAt: index + 2, pinnedAt: null })),
-    { ...base, id: "working", title: "Older work in another project", projectId: "two", createdAt: 1, pinnedAt: null, activity: "running" },
-  ];
-  useLayout.setState({ sidebarFilter: "orc" });
-  mountSidebar();
-  expect(await screen.findByRole("button", { name: /Older work in another project/ })).toBeTruthy();
-  await waitFor(() => expect(useUi.getState().threadOrder).toContain("working"));
 });
 
 async function editProjects() {
@@ -570,7 +533,7 @@ it("shows and hides projects, keeping the open conversation and scope", async ()
   expect(useLayout.getState().hiddenProjects).toEqual([]);
 });
 
-it("keeps hidden projects out of Orcmode, pinned and archived threads", async () => {
+it("keeps hidden projects out of pinned and archived threads", async () => {
   projectThreads();
   fixture.threads[3]!.pinnedAt = 1;
   const base = fixture.threads[0]!;
@@ -578,7 +541,7 @@ it("keeps hidden projects out of Orcmode, pinned and archived threads", async ()
   useLayout.setState({ hiddenProjects: ["one"] });
   mountSidebar();
   await screen.findByRole("button", { name: /Other notes/ });
-  for (const filter of ["Orcmode", "Pinned threads", "Archived threads", "Active threads"]) {
+  for (const filter of ["Pinned threads", "Archived threads", "Active threads"]) {
     fireEvent.click(screen.getByRole("button", { name: /^Filter threads/ }));
     fireEvent.click(await screen.findByRole("menuitem", { name: filter }));
     await screen.findByRole("button", { name: filter === "Archived threads" ? /Other archived notes/ : /Other notes/ });
@@ -589,10 +552,9 @@ it("keeps hidden projects out of Orcmode, pinned and archived threads", async ()
 
 it("can hide every project including Workspace, then show one again", async () => {
   projectThreads();
-  useLayout.setState({ hiddenProjects: [WORKSPACE_ID, "one", "two"], sidebarFilter: "orc" });
+  useLayout.setState({ hiddenProjects: [WORKSPACE_ID, "one", "two"] });
   mountSidebar();
   expect(await screen.findByText("All projects are hidden.")).toBeTruthy();
-  expect(screen.queryByText("Nothing needs you today.")).toBeNull();
   expect(useUi.getState().threadOrder).toEqual([]);
   const dialog = await editProjects();
   expect(

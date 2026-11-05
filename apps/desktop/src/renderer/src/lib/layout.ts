@@ -68,8 +68,6 @@ interface LayoutState {
   setProject: (id: string | null) => void;
   /** Choosing a filter clears pinned-only unless it is asked for again. */
   setSidebarFilter: (filter: SidebarFilter, pinnedOnly?: boolean) => void;
-  /** Orcmode on, or back to every active thread. */
-  toggleOrcMode: () => void;
   setProjectShown: (id: string, shown: boolean) => void;
   setProjectsShown: (ids: readonly string[], shown: boolean) => void;
   showOnlyProject: (id: string, listedIds: readonly string[]) => void;
@@ -166,7 +164,7 @@ export const useLayout = create<LayoutState>((set, get) => {
     workspaceChanges: null,
     projectId: saved.projectId === undefined ? WORKSPACE_ID : saved.projectId,
     panelThreadId: null,
-    sidebarFilter: (["orc", "archived"] as const).find((filter) => filter === saved.sidebarFilter) ?? ("active" as const),
+    sidebarFilter: saved.sidebarFilter === "archived" ? ("archived" as const) : ("active" as const),
     pinnedOnly: false,
     hiddenProjects: saved.hiddenProjects ?? [],
     collapsed: (saved.collapsed ?? []).filter(liveSidebarFold),
@@ -224,7 +222,6 @@ export const useLayout = create<LayoutState>((set, get) => {
       commit({ panelThreadId: id, panelOpen: open, ...(open ? {} : { panelExpanded: false }) });
     },
     setSidebarFilter: (sidebarFilter, pinnedOnly = false) => commit({ sidebarFilter, pinnedOnly }),
-    toggleOrcMode: () => commit({ sidebarFilter: get().sidebarFilter === "orc" ? "active" : "orc", pinnedOnly: false }),
     setProjectShown: (id, shown) => commit({ hiddenProjects: withProjectsShown(get().hiddenProjects, [id], shown) }),
     setProjectsShown: (ids, shown) => commit({ hiddenProjects: withProjectsShown(get().hiddenProjects, ids, shown) }),
     showOnlyProject: (id, listedIds) => commit({ hiddenProjects: withOnlyProject(get().hiddenProjects, id, listedIds) }),

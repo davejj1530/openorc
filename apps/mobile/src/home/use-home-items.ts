@@ -1,15 +1,4 @@
-import {
-  cachedListPage,
-  listedThreads,
-  sidebarDayList,
-  sidebarListGrows,
-  sidebarThreadPage,
-  THREAD_PAGE,
-  threadFoldIds,
-  threadListParams,
-  useChildThreadPages,
-  type SidebarFilter,
-} from "@openorc/client";
+import { cachedListPage, NEEDS_YOU_PAGE, sidebarDayList, sidebarListGrows, sidebarThreadPage, THREAD_PAGE, threadFoldIds, useChildThreadPages, type SidebarFilter } from "@openorc/client";
 import { WORKSPACE_ID, type InboxList, type ThreadSummary } from "@openorc/protocol";
 import { useQueryClient } from "@tanstack/react-query";
 import { useContext, useEffect, useState } from "react";
@@ -49,15 +38,15 @@ function useOpening(): [string | null, (key: string) => void] {
 function useSelectedFamily(selected: ThreadSummary | null, filter: SidebarFilter, listed: ReadonlySet<string>, children: ReturnType<typeof useChildThreadPages>) {
   return useRpc(
     "threads.list",
-    { projectId: selected?.projectId, filter: listedThreads(filter), includeChildren: true, limit: 1, selectedId: selected?.id, ...children.params(selected?.projectId) },
+    { projectId: selected?.projectId, filter, includeChildren: true, limit: 1, selectedId: selected?.id, ...children.params(selected?.projectId) },
     { enabled: Boolean(selected && !listed.has(selected.id)) },
   ).data;
 }
 
 /**
  * The host's threads as one list across its projects, newest work first, read a page at a time; pins come from their
- * own read so an old pin still leads. Orcmode reads each project's working set. The list reads on by itself until
- * every open day is whole, and Older pages on request.
+ * own read so an old pin still leads, and so do the threads that need you, so a folded day can still show them. The
+ * list reads on by itself until every open day is whole, and Older pages on request.
  */
 function useThreadList(connected: boolean, selectedId: string | undefined) {
   const projects = useRpc("projects.list", {});
@@ -67,26 +56,25 @@ function useThreadList(connected: boolean, selectedId: string | undefined) {
   const cache = useQueryClient();
   const choices = projectChoices(projects.data);
   const projectIds = choices.map((project) => project.id).sort();
-  const orc = filter === "orc";
-  const listed = { projectIds, filter: listedThreads(filter), orderBy: "activity" as const, includeChildren: true, ...children.params() };
-  const params = orc ? choices.map(({ id }) => ({ ...threadListParams(id, filter), ...children.params(id) })) : [{ ...listed, pinnedOnly, limit: limit + 1 }];
+  const listed = { projectIds, filter, orderBy: "activity" as const, includeChildren: true, ...children.params() };
+  const params = [{ ...listed, pinnedOnly, limit: limit + 1 }];
   const lists = useRpcs("threads.list", params, { refetchInterval: 60_000 });
-  const pins = useRpc("threads.list", { ...listed, pinnedOnly: true }, { enabled: filter === "active" && !pinnedOnly, refetchInterval: 60_000 });
-  const fetched = lists.map((list, index) => (list.data ? { rows: list.data, limit: orc ? THREAD_PAGE : limit } : cachedListPage(cache, params[index]!)));
+  const besides = { enabled: filter === "active" && !pinnedOnly, refetchInterval: 60_000 };
+  const pins = useRpc("threads.list", { ...listed, pinnedOnly: true }, besides);
+  const needsYou = useRpc("threads.list", { ...listed, needsYou: true, limit: NEEDS_YOU_PAGE }, besides);
+  const fetched = lists.map((list, index) => (list.data ? { rows: list.data, limit } : cachedListPage(cache, params[index]!)));
   const opened = useRpc("threads.get", { id: selectedId ?? "" }, { enabled: Boolean(selectedId) }).data;
   const selected = opened && projectIds.includes(opened.projectId) ? opened : null;
   const family = useSelectedFamily(selected, filter, new Set(fetched.flatMap((page) => page?.rows.map((thread) => thread.id) ?? [])), children);
   const now = Date.now();
   const withFamily = (rows: readonly ThreadSummary[] | undefined) => (rows ? [...new Map([...rows, ...(family ?? [])].map((thread) => [thread.id, thread])).values()] : rows);
-  const pages = fetched.map((page, index) =>
-    sidebarThreadPage({ projectId: orc ? choices[index]!.id : (selected?.projectId ?? WORKSPACE_ID), fetched: withFamily(page?.rows), selected, filter, limit: page?.limit ?? limit, now }),
-  );
-  const pinPage = sidebarThreadPage({ projectId: WORKSPACE_ID, fetched: pins.data, selected: null, filter, limit: Number.MAX_SAFE_INTEGER, now });
-  const days = sidebarDayList({ pages, pins: pinPage, pinnedOnly, orc, activeId: selectedId, now });
-  const read = [...(pins.data ?? []), ...fetched.flatMap((page) => page?.rows ?? [])];
+  const pages = fetched.map((page) => sidebarThreadPage({ projectId: selected?.projectId ?? WORKSPACE_ID, fetched: withFamily(page?.rows), selected, filter, limit: page?.limit ?? limit, now }));
+  const apart = (rows: ThreadSummary[] | undefined) => sidebarThreadPage({ projectId: WORKSPACE_ID, fetched: rows, selected: null, filter, limit: Number.MAX_SAFE_INTEGER, now });
+  const days = sidebarDayList({ pages, pins: apart(pins.data), needsYou: apart(needsYou.data), pinnedOnly, activeId: selectedId, now });
+  const read = [...(pins.data ?? []), ...(needsYou.data ?? []), ...fetched.flatMap((page) => page?.rows ?? [])];
   const list: HomeList = { days, read, names: new Map(choices.map(({ id, name }) => [id, name])), failed: connected && lists.some((each) => each.isError) };
   const pending = lists.some((each) => each.isPending);
-  return { projects, lists, list, filter, pinnedOnly, children, pending, orc, limit, showMore: () => setLimit((old) => old + THREAD_PAGE) };
+  return { projects, lists, list, filter, pinnedOnly, children, pending, limit, showMore: () => setLimit((old) => old + THREAD_PAGE) };
 }
 
 /**
@@ -95,7 +83,7 @@ function useThreadList(connected: boolean, selectedId: string | undefined) {
  * waiting threads here, or this host's under the shown one's Needs you.
  */
 export function useHomeItems(connected: boolean, needsYou: Pick<HomeOptions, "partnerWaiting" | "waitingShownElsewhere" | "selectedId"> = {}) {
-  const { projects, lists, list, filter, pinnedOnly, children, pending, orc, limit, showMore } = useThreadList(connected, needsYou.selectedId);
+  const { projects, lists, list, filter, pinnedOnly, children, pending, limit, showMore } = useThreadList(connected, needsYou.selectedId);
   // A partner's sections fold on their own host.
   const host = useContext(HostContext);
   const collapsed = useFolds(host);
@@ -109,7 +97,7 @@ export function useHomeItems(connected: boolean, needsYou: Pick<HomeOptions, "pa
   useEffect(() => {
     if (connected) pruneMissingFolds(new Set(JSON.parse(missingKey) as string[]), host);
   }, [connected, missingKey, host]);
-  const grows = !orc && !pinnedOnly && !pending && sidebarListGrows({ sections: list.days.sections, hasMore: list.days.hasMore, collapsed, limit });
+  const grows = !pinnedOnly && !pending && sidebarListGrows({ end: list.days.end, hasMore: list.days.hasMore, collapsed, limit });
   useEffect(() => {
     if (grows) showMore();
   }, [grows, limit, showMore]);

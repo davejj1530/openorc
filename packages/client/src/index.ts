@@ -73,7 +73,6 @@ export type { RpcQueryOptions } from "./query.js";
 export type { LoadRequest, RunStore } from "./run-store.js";
 export {
   THREAD_PAGE,
-  listedThreads,
   projectMeta,
   sidebarFoldKey,
   sidebarSectionOpen,
@@ -87,6 +86,7 @@ export {
   type ThreadPage,
 } from "./sidebar-thread-groups.js";
 export {
+  NEEDS_YOU_PAGE,
   SIDEBAR_DAYS,
   SIDEBAR_LIST,
   liveSidebarFold,
@@ -96,6 +96,7 @@ export {
   sidebarDayOpen,
   sidebarDaySections,
   sidebarListGrows,
+  threadNeedsYou,
   type SidebarDay,
   type SidebarDayList,
   type SidebarDaySection,

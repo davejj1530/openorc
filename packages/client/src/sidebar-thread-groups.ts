@@ -1,45 +1,23 @@
 import type { ThreadSummary } from "@openorc/protocol";
-import { threadChildren, threadTreeActivity, threadTreeMatches, threadTreeRoot, threadTreeRows, visibleThreadForest } from "./thread-tree.js";
+import { threadChildren, threadTreeActivity, threadTreeRoot, threadTreeRows, visibleThreadForest } from "./thread-tree.js";
 
-/** Which threads the sidebar lists: every active thread, orcmode's working set of them, or the archive. */
-export type SidebarFilter = "active" | "orc" | "archived";
-
-/** How long orcmode keeps a thread after it last saw work: a rolling day, so late nights and mornings both carry over. */
-export const ORC_MODE_WINDOW = 24 * 60 * 60 * 1000;
-
-/** Orcmode's working set: threads that need you or have an agent on them, unread results, pins, and the last day's work. */
-export function inOrcMode(thread: ThreadSummary, now: number): boolean {
-  return thread.activity !== "idle" || thread.unread || Boolean(thread.pinnedAt) || now - thread.lastActivityAt < ORC_MODE_WINDOW;
-}
-
-/** The list a filter reads from the core. Orcmode narrows the active threads, so it reads those. */
-export function listedThreads(filter: SidebarFilter): "active" | "archived" {
-  return filter === "archived" ? "archived" : "active";
-}
+/** Which threads the sidebar lists: every active thread, or the archive. */
+export type SidebarFilter = "active" | "archived";
 
 /** How many threads a project lists at first, and how many more each "Load more" adds. */
 export const THREAD_PAGE = 12;
 
 /** The `threads.list` read behind a project's list: one more than it shows, so the list knows when there are more. */
 export function threadListParams(projectId: string, filter: SidebarFilter, shown = THREAD_PAGE) {
-  return { projectId, filter: listedThreads(filter), limit: shown + 1, includeChildren: true };
+  return { projectId, filter, limit: shown + 1, includeChildren: true };
 }
 
 /** One read of a list as the sidebar shows it: the whole fetched family, and its roots split into pinned, the rest and snoozed. */
-export type ThreadPage = { list: ThreadSummary[]; pinned: ThreadSummary[]; rest: ThreadSummary[]; snoozed: ThreadSummary[]; hasMore: boolean; leftOut: number };
-
-/** Orcmode keeps the working set and the open thread. Snoozed threads wait, and the rest are counted rather than shown. */
-function orcPage(page: ThreadPage, selected: ThreadSummary | null | undefined, now: number): ThreadPage {
-  const keep = (thread: ThreadSummary) => threadTreeMatches(thread, page.list, (row) => row.id === selected?.id || inOrcMode(row, now));
-  const pinned = page.pinned.filter(keep);
-  const rest = page.rest.filter(keep);
-  return { ...page, pinned, rest, snoozed: [], leftOut: page.list.filter((thread) => !thread.parentThreadId).length - pinned.length - rest.length };
-}
+export type ThreadPage = { list: ThreadSummary[]; pinned: ThreadSummary[]; rest: ThreadSummary[]; snoozed: ThreadSummary[]; hasMore: boolean };
 
 /**
  * One project's fetched page, with the active thread kept visible even when it falls outside that page. Hidden
- * threads, such as Orclings' own conversations listed apart, are left out. In orcmode, `leftOut` counts the loaded
- * threads it does not show.
+ * threads, such as Orclings' own conversations listed apart, are left out.
  */
 export function sidebarThreadPage({
   projectId,
@@ -88,8 +66,7 @@ export function sidebarThreadPage({
   const snoozed = archived ? [] : shown.filter((thread) => thread.snoozedUntil && thread.snoozedUntil > now);
   const pinned = archived ? [] : shown.filter((thread) => thread.pinnedAt && !snoozed.includes(thread));
   const rest = shown.filter((thread) => !pinned.includes(thread) && !snoozed.includes(thread));
-  const page = { list, pinned, rest, snoozed, hasMore: roots.length > limit, leftOut: 0 };
-  return filter === "orc" ? orcPage(page, selected, now) : page;
+  return { list, pinned, rest, snoozed, hasMore: roots.length > limit };
 }
 
 /** A part of a project's list that folds: the project itself, its pinned threads, or its snoozed threads. */

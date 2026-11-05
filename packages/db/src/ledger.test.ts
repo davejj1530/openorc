@@ -110,6 +110,23 @@ describe("threads", () => {
     db.close();
   });
 
+  it("lists only the threads that need you: unread, or working or waiting on you", () => {
+    const { db, project } = fixture();
+    const base = { projectId: project.id, agent: "codex" as const, model: null, mode: "act" as const, permissionMode: "trusted" as const };
+    const read = threads.insert(db, { ...base, title: "Read" });
+    const unread = threads.insert(db, { ...base, title: "Unread" });
+    const working = threads.insert(db, { ...base, title: "Working" });
+    const archived = threads.insert(db, { ...base, title: "Archived unread" });
+    db.stmt("UPDATE threads SET last_activity_at = seen_at + 5 WHERE id IN (?, ?)").run(unread.id, archived.id);
+    threads.update(db, archived.id, { archivedAt: 1 });
+    const query = { projectIds: [project.id], filter: "active", orderBy: "activity", needsYou: true, attentionIds: [working.id] } satisfies NonNullable<Parameters<typeof threads.list>[1]>;
+    expect(threads.list(db, query).map((thread) => thread.title)).toEqual(["Unread", "Working"]);
+    expect(threads.list(db, { ...query, includeChildren: true }).map((thread) => thread.title)).toEqual(["Unread", "Working"]);
+    expect(threads.list(db, { ...query, attentionIds: [] }).map((thread) => thread.id)).toEqual([unread.id]);
+    expect(threads.list(db, { projectIds: [project.id], filter: "active" }).map((thread) => thread.id)).toContain(read.id);
+    db.close();
+  });
+
   it("includes legacy done threads in the active list, with pinned threads first", () => {
     const { db, project } = fixture();
     const base = { projectId: project.id, agent: "codex" as const, model: null, mode: "act" as const, permissionMode: "trusted" as const };

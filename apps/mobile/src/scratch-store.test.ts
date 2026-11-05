@@ -10,14 +10,14 @@ describe("ScratchStore", () => {
   it("reads and writes what is kept while nothing is scratched", () => {
     const kept = memory({ appearance: "dark" });
     const store = new ScratchStore(kept);
-    store.set("home.filter", "orc");
+    store.set("home.filter", "archived");
     store.remove("appearance");
-    expect(Object.fromEntries(kept.values)).toEqual({ "home.filter": "orc" });
-    expect(store.getString("home.filter")).toBe("orc");
+    expect(Object.fromEntries(kept.values)).toEqual({ "home.filter": "archived" });
+    expect(store.getString("home.filter")).toBe("archived");
   });
 
   it("keeps writes in memory while scratching, over the kept values, and never touches them", () => {
-    const kept = memory({ appearance: "dark", "home.filter": "orc" });
+    const kept = memory({ appearance: "dark", "home.filter": "archived" });
     const store = new ScratchStore(kept);
     store.scratch(true);
     expect(store.getString("appearance")).toBe("dark");
@@ -27,7 +27,7 @@ describe("ScratchStore", () => {
     expect(store.getString("appearance")).toBe("light");
     expect(store.getString("home.filter")).toBeUndefined();
     expect(store.getString("lists.demo")).toBe("[]");
-    expect(Object.fromEntries(kept.values)).toEqual({ appearance: "dark", "home.filter": "orc" });
+    expect(Object.fromEntries(kept.values)).toEqual({ appearance: "dark", "home.filter": "archived" });
   });
 
   it("drops the scratch when it ends, and tells whoever holds a value in memory to read it again", () => {

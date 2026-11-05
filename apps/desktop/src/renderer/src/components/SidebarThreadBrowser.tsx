@@ -8,7 +8,7 @@ import {
   type SidebarDayList,
   type SidebarFilter,
   cachedListPage,
-  listedThreads,
+  NEEDS_YOU_PAGE,
   sidebarDayKey,
   sidebarDayList,
   sidebarDayOpen,
@@ -18,7 +18,6 @@ import {
   sidebarSectionOpen,
   sidebarThreadPage,
   THREAD_PAGE,
-  threadListParams,
   threadTreeRows,
   threadFoldIds,
   useChildThreadPages,
@@ -27,7 +26,7 @@ import { useOrclings } from "../lib/orclings";
 import { useRpc, useRpcs } from "../lib/client";
 import { useRouter } from "../lib/router";
 import { useUi } from "../lib/ui";
-import { Check, ChevronRight, Crosshair, Funnel, Pin, SlidersHorizontal } from "./icons";
+import { Check, ChevronRight, Funnel, Pin, SlidersHorizontal } from "./icons";
 import { SidebarProjectVisibility } from "./SidebarProjectVisibility";
 import type { RowProject } from "./ThreadLibraryRow";
 import { ThreadTreeList } from "./ThreadTreeList";
@@ -60,7 +59,7 @@ function useSelectedFamily(selected: ThreadSummary | null | undefined, filter: S
     "threads.list",
     {
       projectId: selected?.projectId,
-      filter: listedThreads(filter),
+      filter,
       includeChildren: true,
       limit: 1,
       selectedId: selected?.id,
@@ -75,22 +74,6 @@ function useSelectedFamily(selected: ThreadSummary | null | undefined, filter: S
 function withFamily(page: ThreadSummary[] | undefined, family: ThreadSummary[] | undefined, projectIds: readonly string[]): ThreadSummary[] | undefined {
   if (!page) return page;
   return [...new Map([...page, ...(family ?? []).filter((thread) => projectIds.includes(thread.projectId))].map((thread) => [thread.id, thread])).values()];
-}
-
-/** Orcmode's way out: the threads it leaves out, one click from the full list. */
-function OrcModeEnd({ leftOut, more, pending, shown }: { leftOut: number; more: boolean; pending: boolean; shown: number }) {
-  const setFilter = useLayout((s) => s.setSidebarFilter);
-  if (pending && !shown) return <p className="browser-empty">Loading threads…</p>;
-  return (
-    <>
-      {shown ? null : <p className="browser-empty">Nothing needs you today.</p>}
-      {leftOut || more ? (
-        <button className="browser-load-more" onClick={() => setFilter("active")}>
-          {more ? "Show all threads" : `Show ${leftOut} more`}
-        </button>
-      ) : null}
-    </>
-  );
 }
 
 /** The list keeps its filters and loaded pages across app destinations. */
@@ -110,8 +93,8 @@ export function SidebarThreadBrowser() {
 }
 
 /**
- * One list across the shown projects, newest work first. Orcmode keeps each project's working set; the other
- * filters page one list, and pinned threads come from their own read so an old pin still leads the list.
+ * One list across the shown projects, newest work first, read a page at a time. Pinned threads come from their own
+ * read so an old pin still leads the list, and so do the threads that need you, so a folded day can still show them.
  */
 function useThreadList(children: ChildPages) {
   const queryClient = useQueryClient();
@@ -123,12 +106,13 @@ function useThreadList(children: ChildPages) {
   const homes = new Set(useOrclings().map((orcling) => orcling.threadId));
   const activeId = useRouter((s) => (s.route.view === "thread" ? s.route.threadId : null));
   const active = useRpc("threads.get", { id: activeId ?? "" }, { enabled: Boolean(activeId) });
-  const orc = chosen === "orc";
-  const listed = { projectIds, filter: listedThreads(chosen), orderBy: "activity" as const, includeChildren: true, ...children.params() };
-  const params = orc ? projectIds.map((id) => ({ ...threadListParams(id, chosen), ...children.params(id) })) : [{ ...listed, pinnedOnly, limit: limit + 1 }];
+  const listed = { projectIds, filter: chosen, orderBy: "activity" as const, includeChildren: true, ...children.params() };
+  const params = [{ ...listed, pinnedOnly, limit: limit + 1 }];
   const queries = useRpcs("threads.list", params, { enabled: Boolean(projects.data), refetchInterval: 60_000 });
-  const pins = useRpc("threads.list", { ...listed, pinnedOnly: true }, { enabled: Boolean(projects.data) && chosen === "active" && !pinnedOnly, refetchInterval: 60_000 });
-  const fetched = queries.map((query, index) => (query.data ? { rows: query.data, limit: orc ? THREAD_PAGE : limit } : cachedListPage(queryClient, params[index]!)));
+  const besides = { enabled: Boolean(projects.data) && chosen === "active" && !pinnedOnly, refetchInterval: 60_000 };
+  const pins = useRpc("threads.list", { ...listed, pinnedOnly: true }, besides);
+  const needsYou = useRpc("threads.list", { ...listed, needsYou: true, limit: NEEDS_YOU_PAGE }, besides);
+  const fetched = queries.map((query, index) => (query.data ? { rows: query.data, limit } : cachedListPage(queryClient, params[index]!)));
   const family = useSelectedFamily(
     active.data,
     chosen,
@@ -136,10 +120,10 @@ function useThreadList(children: ChildPages) {
     children,
   );
   const selected = active.data && projectIds.includes(active.data.projectId) && (!pinnedOnly || active.data.pinnedAt) ? active.data : null;
-  const pages = fetched.map((page, index) =>
+  const pages = fetched.map((page) =>
     sidebarThreadPage({
-      projectId: orc ? projectIds[index]! : (selected?.projectId ?? WORKSPACE_ID),
-      fetched: withFamily(page?.rows, family, orc ? [projectIds[index]!] : projectIds),
+      projectId: selected?.projectId ?? WORKSPACE_ID,
+      fetched: withFamily(page?.rows, family, projectIds),
       selected,
       filter: chosen,
       limit: page?.limit ?? limit,
@@ -147,16 +131,19 @@ function useThreadList(children: ChildPages) {
       hidden: homes,
     }),
   );
-  const pinPage = sidebarThreadPage({ projectId: WORKSPACE_ID, fetched: pins.data, selected: null, filter: chosen, limit: Number.MAX_SAFE_INTEGER, now: Date.now(), hidden: homes });
+  const apart = (rows: ThreadSummary[] | undefined) =>
+    sidebarThreadPage({ projectId: WORKSPACE_ID, fetched: rows, selected: null, filter: chosen, limit: Number.MAX_SAFE_INTEGER, now: Date.now(), hidden: homes });
+  const pinPage = apart(pins.data);
+  const needsYouPage = apart(needsYou.data);
   const pending = queries.some((query) => query.isPending);
   return {
     projects,
     queries,
     pages,
     pinPage,
+    needsYouPage,
     activeId,
     pinnedOnly,
-    view: chosen,
     allHidden,
     pending,
     limit,
@@ -167,7 +154,7 @@ function useThreadList(children: ChildPages) {
 type ThreadList = ReturnType<typeof useThreadList>;
 
 function ListFeedback({ state, shown, snoozed }: { state: ThreadList; shown: number; snoozed: number }) {
-  const { projects, queries, pages, view, pinnedOnly, allHidden, pending } = state;
+  const { projects, queries, pages, pinnedOnly, allHidden, pending } = state;
   if (projects.isError) return null;
   if (allHidden) return <p className="browser-empty">All projects are hidden.</p>;
   const hasMore = pages.some((page) => page.hasMore);
@@ -178,15 +165,14 @@ function ListFeedback({ state, shown, snoozed }: { state: ThreadList; shown: num
         Couldn’t load threads. Retry
       </button>
     );
-  if (view === "orc") return <OrcModeEnd leftOut={pages.reduce((sum, page) => sum + page.leftOut, 0)} more={hasMore} pending={pending} shown={shown} />;
   if (pending && !shown) return <p className="browser-empty">Loading threads…</p>;
   if (shown || snoozed || hasMore) return null;
   return <p className="browser-empty">{emptyMessage(pinnedOnly)}</p>;
 }
 
 /** The list's parts from its pages: pins first, then the rest in their days, snoozed threads apart. */
-function dayList({ pages, pinPage, pinnedOnly, view, activeId }: ThreadList) {
-  return sidebarDayList({ pages, pins: pinPage, pinnedOnly, orc: view === "orc", activeId, now: Date.now() });
+function dayList({ pages, pinPage, needsYouPage, pinnedOnly, activeId }: ThreadList) {
+  return sidebarDayList({ pages, pins: pinPage, needsYou: needsYouPage, pinnedOnly, activeId, now: Date.now() });
 }
 
 type ListPart = { key: string; label: string; count?: number; open: boolean; fold: string; roots: ThreadSummary[]; more: boolean };
@@ -205,7 +191,7 @@ function listParts(list: SidebarDayList, collapsed: readonly string[], pinnedOnl
   };
   const days = list.sections.map((section) => {
     const open = sidebarDayOpen(collapsed, section.day);
-    return { key: section.day, label: section.label, open, fold: sidebarDayKey(section.day), roots: list.shown(section.roots, open), more: section.day === "older" && list.hasMore };
+    return { key: section.day, label: section.label, open, fold: sidebarDayKey(section.day), roots: list.shownInDay(section.roots, open), more: section.day === "older" && list.hasMore };
   });
   return [...(list.pinned.length ? [pins] : []), ...days];
 }
@@ -213,7 +199,7 @@ function listParts(list: SidebarDayList, collapsed: readonly string[], pinnedOnl
 /** The threads by when they last saw work: pinned ones first, then today and yesterday open, the last week and older folded. Search reaches the rest. */
 function DayThreadBrowser({ children }: { children: ChildPages }) {
   const state = useThreadList(children);
-  const { projects, activeId, pinnedOnly, view, pending, limit, loadMore } = state;
+  const { projects, activeId, pinnedOnly, pending, limit, loadMore } = state;
   const collapsed = useLayout((s) => s.collapsed);
   const list = dayList(state);
   const parts = listParts(list, collapsed, pinnedOnly);
@@ -225,7 +211,7 @@ function DayThreadBrowser({ children }: { children: ChildPages }) {
   useEffect(() => {
     useUi.getState().setThreadOrder(JSON.parse(orderKey) as string[]);
   }, [orderKey]);
-  const grows = view !== "orc" && !pinnedOnly && !pending && sidebarListGrows({ sections: list.sections, hasMore: list.hasMore, collapsed, limit });
+  const grows = !pinnedOnly && !pending && sidebarListGrows({ end: list.end, hasMore: list.hasMore, collapsed, limit });
   useEffect(() => {
     if (grows) loadMore();
   }, [grows, limit, loadMore]);
@@ -286,18 +272,14 @@ function Section({ label, count, open, onToggle, children }: { label: string; co
   );
 }
 
-const FILTER_NAMES: Record<SidebarFilter | "pinned", string> = { active: "Active threads", orc: "Orcmode", archived: "Archived threads", pinned: "Pinned threads" };
+const FILTER_NAMES: Record<SidebarFilter | "pinned", string> = { active: "Active threads", archived: "Archived threads", pinned: "Pinned threads" };
 
-/**
- * The filter's mark: orcmode (a crosshair, for the working set it narrows to) and pins show their own, so a narrowed list
- * never looks like the whole one.
- */
+/** The filter's mark: pins show their own, so the pinned list never looks like the whole one. */
 function FilterMark({ selection }: { selection: SidebarFilter | "pinned" }) {
-  if (selection === "orc") return <Crosshair size={16} />;
   return selection === "pinned" ? <Pin size={16} /> : <Funnel size={16} />;
 }
 
-/** The thread list's filter: orcmode, active, archived or pinned threads, which projects show, and importing terminal sessions. */
+/** The thread list's filter: active, archived or pinned threads, which projects show, and importing terminal sessions. */
 export function ThreadFilter() {
   const filter = useLayout((s) => s.sidebarFilter);
   const pinned = useLayout((s) => s.pinnedOnly);
@@ -325,7 +307,7 @@ export function ThreadFilter() {
           <CoversPreview />
           <Menu.Positioner sideOffset={6} align="end" className="z-40" collisionPadding={8}>
             <Menu.Popup ref={floatingGround} className={menuPopup}>
-              {(["orc", "active", "archived"] as const).map((value) => (
+              {(["active", "archived"] as const).map((value) => (
                 <Menu.Item key={value} className={menuItem} onClick={() => setFilter(value)}>
                   <Check size={13} className={filter === value && !pinned ? "text-accent-ink" : "text-transparent"} />
                   {FILTER_NAMES[value]}

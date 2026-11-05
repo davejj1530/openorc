@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { THREAD_PAGE } from "@openorc/client";
+import { NEEDS_YOU_PAGE, THREAD_PAGE } from "@openorc/client";
 import { WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
@@ -70,6 +70,7 @@ afterEach(() => {
   cleanup();
   mac.failing = false;
   mac.waiting = [];
+  mac.pages.clear();
   mac.phone!.module.queryClient.clear();
 });
 
@@ -101,6 +102,18 @@ it("reads the next page by itself while today is unfinished, keeping its rows me
   expect(outline(home.result.current.items)).toEqual(first);
   await answer(THREAD_PAGE * 2);
   await waitFor(() => expect(outline(home.result.current.items)).toEqual(["section", ...threads.map((thread) => thread.id)]));
+});
+
+it("shows a thread that needs you from past the loaded pages in its folded day, and nothing else of that day", async () => {
+  const days = (count: number) => Date.now() - count * 86_400_000;
+  const week = Array.from({ length: THREAD_PAGE + 1 }, (_, index): ThreadSummary => ({ ...threads[0]!, id: `week-${index}`, lastActivityAt: days(3) - index }));
+  const unread = { ...threads[0]!, id: "old-unread", unread: true, lastActivityAt: days(30) };
+  const home = renderHook(() => useHomeItems(true), { wrapper: mac.phone!.wrapper });
+  await waitFor(() => expect(mac.pages.has(THREAD_PAGE + 1) && mac.pages.has(NEEDS_YOU_PAGE)).toBe(true));
+  await act(async () => mac.pages.get(THREAD_PAGE + 1)!(week));
+  await act(async () => mac.pages.get(NEEDS_YOU_PAGE)!([unread]));
+  await waitFor(() => expect(outline(home.result.current.items)).toEqual(["section", "section", "old-unread"]));
+  expect(mac.pages.has(THREAD_PAGE * 2 + 1)).toBe(false);
 });
 
 it("asks again for a list that failed while connected, and leaves a failure while not connected to the header", async () => {

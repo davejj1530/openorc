@@ -3,9 +3,8 @@ import { useSyncExternalStore } from "react";
 import { storage } from "../client";
 
 /**
- * Which threads Home lists, as the desktop sidebar's filter: orcmode's working set, every active thread, or the
- * archive; `pinnedOnly` narrows the active ones to pins. The filter is kept on the phone across launches; pinned-only
- * is not, as on the desktop.
+ * Which threads Home lists, as the desktop sidebar's filter: every active thread, or the archive; `pinnedOnly` narrows
+ * the active ones to pins. The filter is kept on the phone across launches; pinned-only is not, as on the desktop.
  */
 export interface HomeFilter {
   filter: SidebarFilter;
@@ -15,7 +14,6 @@ export interface HomeFilter {
 export type FilterChoice = SidebarFilter | "pinned";
 
 export const FILTER_CHOICES: readonly { choice: FilterChoice; label: string }[] = [
-  { choice: "orc", label: "Orcmode" },
   { choice: "active", label: "Active threads" },
   { choice: "archived", label: "Archived threads" },
   { choice: "pinned", label: "Pinned threads" },
@@ -27,7 +25,7 @@ let shown: HomeFilter = { filter: readFilter(), pinnedOnly: false };
 
 function readFilter(): SidebarFilter {
   const saved = storage.getString(KEY);
-  return saved === "orc" || saved === "archived" ? saved : "active";
+  return saved === "archived" ? saved : "active";
 }
 
 export const filterChoice = ({ filter, pinnedOnly }: HomeFilter): FilterChoice => (pinnedOnly ? "pinned" : filter);

@@ -32,7 +32,7 @@ function list(
   const page = sidebarThreadPage({ projectId: WORKSPACE_ID, fetched: sorted, selected: null, filter, limit, now: at });
   const pinned = sorted.filter((thread) => thread.pinnedAt);
   const pins = filter === "active" && !pinnedOnly ? sidebarThreadPage({ projectId: WORKSPACE_ID, fetched: pinned, selected: null, filter, limit: Number.MAX_SAFE_INTEGER, now: at }) : undefined;
-  return { days: sidebarDayList({ pages: [page], pins, pinnedOnly, orc: filter === "orc", activeId, now: at }), names, read: sorted, failed };
+  return { days: sidebarDayList({ pages: [page], pins, pinnedOnly, activeId, now: at }), names, read: sorted, failed };
 }
 const options = (more: Partial<HomeOptions> = {}): HomeOptions => ({ now, filter: "active", pinnedOnly: false, collapsed: allOpen, waiting: [], projectsFailed: false, opened: null, ...more });
 
@@ -97,7 +97,7 @@ describe("homeItems", () => {
   });
 
   it("puts a waiting thread just past a page's end under Needs you, and shows more in Older while the host lists more", () => {
-    const many: ThreadSummary[] = Array.from({ length: THREAD_PAGE + 1 }, (_, index) => ({ ...fixtureThreads[1]!, id: `w-${index}`, lastActivityAt: Date.UTC(2026, 8, 1) - index }));
+    const many: ThreadSummary[] = Array.from({ length: THREAD_PAGE + 1 }, (_, index) => ({ ...fixtureThreads[1]!, id: `w-${index}`, unread: false, lastActivityAt: Date.UTC(2026, 8, 1) - index }));
     many[THREAD_PAGE] = { ...many[THREAD_PAGE]!, activity: "waiting" };
     const items = outline(homeItems(list(many, { limit: THREAD_PAGE }), options()));
     expect(items.slice(0, 2)).toEqual(["# Needs you (1)", `w-${THREAD_PAGE} @ Workspace`]);
@@ -112,14 +112,10 @@ describe("homeItems", () => {
     expect(items.at(-1)).toBe("retry threads");
   });
 
-  it("lists only the pinned threads, or the archive with nothing under Needs you, or orcmode's working set without paging", () => {
+  it("lists only the pinned threads, or the archive with nothing under Needs you", () => {
     expect(outline(homeItems(list(fixtureThreads, { pinnedOnly: true }), options({ pinnedOnly: true })))).toEqual(["§ Pinned 2", "t-notes @ openorc", "t-headline @ openorc"]);
     const archived = fixtureThreads.map((thread) => ({ ...thread, archivedAt: 1 })).filter((thread) => thread.projectId === "website");
     expect(rows(homeItems(list(archived, { filter: "archived" }), options({ filter: "archived" })))).toEqual(["t-hero @ website", "t-docs @ website", "t-phone @ website"]);
-    const many: ThreadSummary[] = Array.from({ length: THREAD_PAGE + 3 }, (_, index) => ({ ...fixtureThreads[1]!, id: `w-${index}`, unread: true, lastActivityAt: now - index }));
-    const orc = outline(homeItems(list(many, { filter: "orc", limit: THREAD_PAGE }), options({ filter: "orc" })));
-    expect(orc).not.toContain("more");
-    expect(orc.filter((line) => line.startsWith("w-"))).toHaveLength(THREAD_PAGE);
   });
 });
 

@@ -73,7 +73,6 @@ const cases: { chord: string; does: string; given?: () => void; then: () => unkn
       expect(useUi.getState().palette).toBe(false);
     },
   },
-  { chord: "⇧o", does: "switches the sidebar to orcmode", then: () => expect(useLayout.getState().sidebarFilter).toBe("orc") },
   { chord: "⇧p", does: "pins the focused thread", then: () => vi.waitFor(() => expect(updates).toEqual([{ id: "t10", patch: { pinned: true } }])) },
   { chord: "⇧a", does: "archives the focused thread", then: () => vi.waitFor(() => expect(updates).toEqual([{ id: "t10", patch: { archived: true } }])) },
   { chord: "⇧u", does: "marks the focused thread unread", then: () => vi.waitFor(() => expect(updates).toEqual([{ id: "t10", patch: { seen: false } }])) },

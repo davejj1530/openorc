@@ -367,6 +367,7 @@ export const threads = {
       filter?: ThreadListFilter;
       orderBy?: "activity";
       pinnedOnly?: boolean;
+      needsYou?: boolean;
       limit?: number;
       offset?: number;
       includeChildren?: boolean;
@@ -394,6 +395,11 @@ export const threads = {
     where.push(VISIBLE);
     if (filter.excludeSubagents) where.push("COALESCE(parent_relation, '') != 'subagent'");
     if (filter.pinnedOnly) where.push("pinned_at IS NOT NULL");
+    // Unread as the thread summary reads it, or with a run that is working or waiting on you.
+    if (filter.needsYou) {
+      where.push("(seen_at IS NULL OR last_activity_at > seen_at OR id IN (SELECT value FROM json_each(?)))");
+      args.push(JSON.stringify(filter.attentionIds ?? []));
+    }
     const kind = filter.filter ?? "active";
     if (kind === "active") where.push("archived_at IS NULL");
     else if (kind === "done") where.push("archived_at IS NULL AND done_at IS NOT NULL");

@@ -73,7 +73,6 @@ export const shortcuts: ReadonlyMap<string, Shortcut> = new Map([
   ["⇧]", step(1)],
   ["⇧n", act(({ projectId }) => useUi.getState().openNewTask(projectId))],
   ["⇧f", ({ focusedThreadId }) => openFilesTool("contents", focusedThreadId)],
-  ["⇧o", act(() => useLayout.getState().toggleOrcMode())],
   ["⇧p", onFocusedThread((thread) => ({ pinned: !thread.pinnedAt }))],
   ["⇧a", onFocusedThread((thread) => ({ archived: !thread.archivedAt }))],
   ["⇧u", onFocusedThread((thread) => ({ seen: thread.unread }))],

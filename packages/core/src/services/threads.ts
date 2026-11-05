@@ -101,11 +101,13 @@ export class ThreadService {
   }
 
   list(filter: RpcParams<"threads.list"> = {}): ThreadSummary[] {
-    return threads.list(this.db, { ...filter, ...(filter.includeChildren ? { attentionIds: this.runs.attentionThreadIds() } : {}) }).map(({ hiddenChildren, treeActivityAt, ...thread }) => ({
-      ...this.summarize(thread),
-      ...(hiddenChildren === undefined ? {} : { hiddenChildren }),
-      ...(treeActivityAt === undefined ? {} : { treeActivityAt }),
-    }));
+    return threads
+      .list(this.db, { ...filter, ...(filter.includeChildren || filter.needsYou ? { attentionIds: this.runs.attentionThreadIds() } : {}) })
+      .map(({ hiddenChildren, treeActivityAt, ...thread }) => ({
+        ...this.summarize(thread),
+        ...(hiddenChildren === undefined ? {} : { hiddenChildren }),
+        ...(treeActivityAt === undefined ? {} : { treeActivityAt }),
+      }));
   }
 
   /** Missing and retired conversations read as absent, including previously open tabs. */

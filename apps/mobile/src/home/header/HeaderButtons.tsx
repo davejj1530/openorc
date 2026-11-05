@@ -4,8 +4,6 @@ import { endDemo } from "../../client";
 import { Funnel, ListChecks, Pin, Settings } from "../../generated/icons";
 import { useTaskBoard } from "../../tasks/use-task-board";
 import { cn } from "../../ui/cn";
-import { useColors } from "../../ui/mode";
-import { OpenOrcMark } from "../../ui/OpenOrcMark";
 import { Text } from "../../ui/Text";
 import { FILTER_CHOICES, filterChoice, useHomeFilter } from "../filter";
 
@@ -16,16 +14,14 @@ import { FILTER_CHOICES, filterChoice, useHomeFilter } from "../filter";
 const circle = "size-10 items-center justify-center rounded-full bg-surface active:bg-surface-3";
 const reach = 2;
 
-/** The filter's mark, as the sidebar's: orcmode and pins show their own, inked while the list is narrowed. */
+/** The filter's mark, as the sidebar's: pins show their own, inked while the list is narrowed. */
 export function FilterButton() {
   const choice = filterChoice(useHomeFilter());
-  const colors = useColors();
   const narrowed = choice !== "active";
   const label = FILTER_CHOICES.find((item) => item.choice === choice)?.label;
   return (
     <Link href="/filter" asChild>
       <Pressable accessibilityRole="button" accessibilityLabel={narrowed ? `Show, ${label}` : "Show"} hitSlop={reach} className={circle}>
-        {choice === "orc" ? <OpenOrcMark size={18} color={colors.ink} working={false} /> : null}
         {choice === "pinned" ? <Pin size={20} className="text-ink" /> : null}
         {choice === "active" || choice === "archived" ? <Funnel size={20} className={cn("text-ink-3", narrowed && "text-ink")} /> : null}
       </Pressable>
